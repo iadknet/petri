@@ -169,9 +169,12 @@ Food-type catalog posture:
   including annealing. Disabled fertility admits all passable cells. No eligible
   cells means no food; this does not prohibit later growth. False preserves the
   original candidate order, shuffle and RNG draws.
-- `FbmThreshold` terrain uses the existing raw fBm helper with one pattern RNG
-  u64 seed draw. Values strictly above `threshold` become barriers within local
-  bounds, translated/clipped without wrapping. Parameters normalize: octaves
+- `FbmThreshold` terrain uses the existing raw fBm field with one pattern RNG
+  u64 seed draw. The field is sampled at world coordinates
+  (`bounds.x + x`, `bounds.y + y`), so a bounded layer equals the whole-world
+  layer at the same seed cut to its bounds and nested same-seed layers grade one
+  region. Values strictly above `threshold` become barriers, clipped to the
+  coordinate space without wrapping. Parameters normalize: octaves
   `1..=32` (default 4), frequency `[0.000001,1]` (0.02), lacunarity `[1,4]`
   (2), persistence `[0,1]` (0.5), threshold `[-1,1]` (0); nonfinite floats use
   the listed defaults. Existing layer seeds and barrier union semantics apply.

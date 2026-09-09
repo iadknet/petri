@@ -150,13 +150,11 @@ fn intensity(value: f32, ceiling: f32) -> f32 {
     }
 }
 
-/// One downsampled cell's color: barriers win outright (they are max-pooled),
-/// otherwise each of the first two food types adds its hue in proportion to the
-/// pooled value, and the two blend by addition.
-fn blend(barrier: bool, intensities: [f32; 2]) -> [u8; 3] {
-    if barrier {
-        return BARRIER_RGB.map(|channel| channel as u8);
-    }
+/// One downsampled cell's color: each of the first two food types adds its hue
+/// over bare ground in proportion to the pooled value, and the result fades to
+/// barrier gray in proportion to how much of the block is walled — a block of
+/// nothing but barrier is solid gray, a block with none is untouched.
+fn blend(barrier_fraction: f32, intensities: [f32; 2]) -> [u8; 3] {
     let mut rgb = GROUND_RGB;
     for (hue, intensity) in TYPE_RGB.iter().zip(intensities) {
         let scaled = intensity.clamp(0.0, 1.0);
@@ -164,15 +162,20 @@ fn blend(barrier: bool, intensities: [f32; 2]) -> [u8; 3] {
             *channel += hue_channel * scaled;
         }
     }
-    rgb.map(|channel| channel.clamp(0.0, 255.0) as u8)
+    let gray = barrier_fraction.clamp(0.0, 1.0);
+    std::array::from_fn(|channel| {
+        let color = rgb[channel].clamp(0.0, 255.0);
+        (color * (1.0 - gray) + BARRIER_RGB[channel] * gray) as u8
+    })
 }
 
 /// Render the two-panel PNG preview: habitat (barriers and per-type effective
 /// tick-zero fertility) on the left, tick-zero food density on the right.
 ///
-/// Barriers are max-pooled and every other layer is mean-pooled over each
-/// downsample block, so a preview never hides a barrier and never exaggerates
-/// a sparse one. Only the first two food types are drawn.
+/// Every layer, barriers included, is mean-pooled over each downsample block,
+/// so a block reads gray in proportion to how much of it is walled and a sparse
+/// rubble field cannot render as solid rock. Only the first two food types are
+/// drawn.
 #[must_use]
 pub fn render_preview(sim: &Simulation) -> Vec<u8> {
     let (width, height) = (sim.world.width, sim.world.height);
@@ -206,13 +209,15 @@ pub fn render_preview(sim: &Simulation) -> Vec<u8> {
             let x1 = (x0 + factor).min(u32::from(width));
             let y1 = (y0 + factor).min(u32::from(height));
             let cells = u64::from(x1 - x0) * u64::from(y1 - y0);
-            let mut barrier = false;
+            let mut barrier_sum = 0.0f32;
             let mut fertility_sums = [0.0f32; 2];
             let mut density_sums = [0.0f32; 2];
             for y in y0..y1 {
                 for x in x0..x1 {
                     let pos = Position::new(x as u16, y as u16);
-                    barrier |= sim.world.is_barrier(pos);
+                    if sim.world.is_barrier(pos) {
+                        barrier_sum += 1.0;
+                    }
                     for index in 0..drawn_types {
                         fertility_sums[index] += *fertility[index].get(x as u16, y as u16);
                         density_sums[index] += sim
@@ -228,12 +233,13 @@ pub fn render_preview(sim: &Simulation) -> Vec<u8> {
                     sum / cells as f32
                 }
             };
+            let barrier_fraction = mean(barrier_sum);
             let habitat = blend(
-                barrier,
+                barrier_fraction,
                 fertility_sums.map(|sum| intensity(mean(sum), fertility_ceiling)),
             );
             let food = blend(
-                barrier,
+                barrier_fraction,
                 density_sums.map(|sum| intensity(mean(sum), density_ceiling)),
             );
             for (panel_x, rgb) in [(out_x, habitat), (out_x + panel_width, food)] {
@@ -463,19 +469,27 @@ mod tests {
         pixels
     }
 
+    /// Barriers are mean-pooled: a block reads gray in proportion to how much
+    /// of it is walled, so a sparse rubble field cannot render as solid rock.
+    /// Fertility is disabled in `wide_sim`, so every cell — barrier or not —
+    /// carries full habitat intensity and the gray is the only variable.
     #[test]
-    fn a_downsampled_block_max_pools_barriers_and_mean_pools_food() {
+    fn a_downsampled_block_grays_in_proportion_to_its_barrier_fraction() {
         let mut sim = wide_sim();
         assert_eq!(preview_downsample_factor(2048, 16), 4);
-        // One barrier cell inside the 4x4 block at (0, 0) must color it.
-        sim.world.set_barrier(Position::new(3, 3), true);
-        let pixels = decode(&render_preview(&sim));
-        let barrier = BARRIER_RGB.map(|channel| channel as u8);
-        assert_eq!(&pixels[0..3], &barrier, "one barrier cell colors the block");
-        // Barriers are pooled inside their own block, not smeared into the next.
-        assert_ne!(&pixels[3..6], &barrier, "the neighboring block is passable");
+        // Block (5, 0) covers x 20..24, y 0..4: wall all sixteen of its cells.
+        for y in 0..4u16 {
+            for x in 20..24u16 {
+                sim.world.set_barrier(Position::new(x, y), true);
+            }
+        }
+        // Block (6, 0) covers x 24..28: wall the eight cells in its top half.
+        for y in 0..2u16 {
+            for x in 24..28u16 {
+                sim.world.set_barrier(Position::new(x, y), true);
+            }
+        }
 
-        sim.world.set_barrier(Position::new(3, 3), false);
         let pixels = decode(&render_preview(&sim));
         let (image_width, image_height) = preview_dimensions(2048, 16);
         assert_eq!(pixels.len(), (image_width * image_height * 3) as usize);
@@ -483,14 +497,29 @@ mod tests {
             let offset = ((y * image_width + x) * 3) as usize;
             [pixels[offset], pixels[offset + 1], pixels[offset + 2]]
         };
-        // Fertility is disabled, so every passable cell reads full habitat
-        // intensity for type 0 and none for the absent type 1.
-        let full = blend(false, [1.0, 0.0]);
-        assert_eq!(at(0, 0), full);
-        assert_eq!(at(7, 3), full);
-        assert_ne!(full, blend(false, [0.0, 0.0]), "the hue must be visible");
-        // Nothing was seeded, so the food panel is bare ground everywhere.
-        assert_eq!(at(image_width / 2 + 7, 3), blend(false, [0.0, 0.0]));
+        let gray = BARRIER_RGB.map(|channel| channel as u8);
+        let full = blend(0.0, [1.0, 0.0]);
+        let bare = blend(0.0, [0.0, 0.0]);
+        assert_ne!(full, bare, "the hue must be visible");
+
+        // Habitat panel: solid gray, half gray, and untouched.
+        assert_eq!(at(5, 0), gray, "an all-barrier block is solid gray");
+        assert_eq!(at(6, 0), blend(0.5, [1.0, 0.0]), "half-walled reads half");
+        assert_eq!(at(7, 0), full, "a block with no barrier is unchanged");
+        assert!(
+            (0..3)
+                .all(|c| at(6, 0)[c] > full[c].min(gray[c]) && at(6, 0)[c] < full[c].max(gray[c])),
+            "the half-walled block lies strictly between {full:?} and {gray:?}"
+        );
+        // Barriers are pooled inside their own block, not smeared into the next.
+        assert_eq!(at(4, 0), full, "the block before the walled one is clear");
+        assert_eq!(at(5, 1), full, "the row below the walled block is clear");
+
+        // Food panel: nothing was seeded, so the same grays sit over bare ground.
+        let food = image_width / 2;
+        assert_eq!(at(food + 5, 0), gray);
+        assert_eq!(at(food + 6, 0), blend(0.5, [0.0, 0.0]));
+        assert_eq!(at(food + 7, 0), bare);
     }
 
     #[test]
@@ -517,18 +546,18 @@ mod tests {
             let offset = ((block_y * image_width + image_width / 2 + block_x) * 3) as usize;
             [pixels[offset], pixels[offset + 1], pixels[offset + 2]]
         };
-        assert_eq!(food(2, 0), blend(false, [1.0, 0.0]), "a full block is full");
+        assert_eq!(food(2, 0), blend(0.0, [1.0, 0.0]), "a full block is full");
         assert_eq!(
             food(5, 0),
-            blend(false, [0.125, 0.0]),
+            blend(0.0, [0.125, 0.0]),
             "four of sixteen cells at half the maximum is an eighth of it"
         );
         assert_ne!(
-            blend(false, [0.125, 0.0]),
-            blend(false, [1.0, 0.0]),
+            blend(0.0, [0.125, 0.0]),
+            blend(0.0, [1.0, 0.0]),
             "the two intensities must be distinguishable"
         );
-        let bare = blend(false, [0.0, 0.0]);
+        let bare = blend(0.0, [0.0, 0.0]);
         assert_eq!(food(1, 0), bare, "the block before the filled one is bare");
         assert_eq!(food(3, 0), bare, "and so is the one after it");
         assert_eq!(food(2, 1), bare, "the row below the filled block is bare");
@@ -621,22 +650,38 @@ mod tests {
     /// The exact colors the preview draws, pinned as literals: an expectation
     /// computed by `blend` itself would move with any change to `blend`.
     #[test]
-    fn blend_adds_each_type_hue_over_bare_ground_and_barriers_win() {
-        assert_eq!(blend(false, [0.0, 0.0]), [21, 29, 42]);
-        assert_eq!(blend(false, [1.0, 0.0]), [70, 229, 142]);
-        assert_eq!(blend(false, [0.0, 1.0]), [252, 159, 84]);
-        assert_eq!(blend(false, [0.5, 0.0]), [45, 129, 92]);
+    fn blend_adds_each_type_hue_over_bare_ground_and_fades_to_the_barrier_gray() {
+        assert_eq!(blend(0.0, [0.0, 0.0]), [21, 29, 42]);
+        assert_eq!(blend(0.0, [1.0, 0.0]), [70, 229, 142]);
+        assert_eq!(blend(0.0, [0.0, 1.0]), [252, 159, 84]);
+        assert_eq!(blend(0.0, [0.5, 0.0]), [45, 129, 92]);
         assert_eq!(
-            blend(false, [1.0, 1.0]),
+            blend(0.0, [1.0, 1.0]),
             [255, 255, 184],
             "two hues add and clamp per channel"
         );
         assert_eq!(
-            blend(false, [2.0, 0.0]),
+            blend(0.0, [2.0, 0.0]),
             [70, 229, 142],
             "an intensity above one clamps rather than overflowing the hue"
         );
-        assert_eq!(blend(true, [1.0, 1.0]), [110, 116, 128], "a barrier wins");
+        assert_eq!(
+            blend(1.0, [1.0, 1.0]),
+            [110, 116, 128],
+            "an entirely walled block is solid gray whatever grows under it"
+        );
+        assert_eq!(
+            blend(0.5, [0.0, 0.0]),
+            [65, 72, 85],
+            "half a block walled is halfway from its color to the gray"
+        );
+        assert_eq!(blend(0.5, [1.0, 0.0]), [90, 172, 135]);
+        assert_eq!(blend(0.25, [1.0, 0.0]), [80, 200, 138]);
+        assert_eq!(
+            blend(2.0, [1.0, 0.0]),
+            [110, 116, 128],
+            "a fraction above one clamps rather than overshooting the gray"
+        );
     }
 
     #[test]

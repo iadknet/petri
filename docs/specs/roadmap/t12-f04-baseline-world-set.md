@@ -131,7 +131,7 @@ and the `v3-cli` bench tests.
       readings as JSON and writes a downsampled PNG preview (barriers,
       per-type fertility, tick-zero food). Replaces the ignored
       `inspect_saved_world_layouts` test.
-- [ ] `FbmThreshold` samples the noise field at world coordinates
+- [x] `FbmThreshold` samples the noise field at world coordinates
       (`bounds.x + x`, `bounds.y + y`) instead of bounds-local ones, so a
       bounded layer equals the matching sub-rectangle of the whole-world
       layer at the same seed; the runtime pattern endpoint follows.
@@ -352,6 +352,147 @@ The intermediate `MUTANTS_ITERATE=1` run between those two
 (`29 mutants tested in 5m: 3 missed, 24 caught, 2 timeouts`) is recorded as
 remediation feedback only, not as closure evidence.
 
+#### Follow-up pass
+
+Second implementer pass, 2026-09-09, same worktree, on base `f0b9ec58` (a fresh
+agent; the pass above could not be resumed). Two items: world-coordinate
+`FbmThreshold` sampling and preview readability.
+
+**`FbmThreshold` samples the noise field at world coordinates.** `fbm.rs` now
+exposes `FbmField`, a seeded field with `new(octaves, frequency, lacunarity,
+persistence, seed)` (the same XOR-folded u64 seed and builder) and
+`sample(world_x, world_y) -> f32` clamped to [-1, 1]. `generate_fbm` is a loop
+over `sample` and produces the identical grid, so fertility layers are
+unchanged. `generate_pattern` builds the field from its one `rng.gen::<u64>()`
+draw and tests `field.sample(bounds.x + x, bounds.y + y) > threshold` directly,
+dropping the intermediate bounds-local `Grid` allocation; the strict `>`,
+row-major output order and the `u16::MAX` coordinate clipping are unchanged, and
+the runtime pattern endpoint follows through the same function.
+
+Tests, red before the change:
+
+- `fbm_bounded_layer_equals_the_whole_world_layer_inside_its_bounds` (proptest,
+  `baseline_worlds.rs`) draws a seed, a threshold and a rectangle over a 32-cell
+  world, clips it the way `seed_simulation` clips a layer's bounds, and asserts
+  the bounded layer's point set equals the whole-world layer's cut to that
+  rectangle. It failed on the old code at the first case
+  (`x = 0, y = 1, width = 1, height = 1`); the shrink it saved is left in the
+  worktree as `crates/v3-core/tests/baseline_worlds.proptest-regressions` for
+  the orchestrator to commit.
+- `fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges` no longer claims
+  the `u16::MAX` corner samples zero. Perlin fBm is exactly zero at world
+  (0, 0), so a layer at the origin excludes (0, 0) at threshold 0.0 and includes
+  it at -1.0 (and the -1.0 set is a superset), which is the same strictness
+  witness under the new semantics. The two coordinate-clipping witnesses at the
+  `u16::MAX` corner (1 point, then 6) are unchanged.
+- `fbm_unique_in_bounds_and_threshold_monotone` still passes unchanged;
+  `reproducibility.rs` (which carries an fBm terrain layer) and `terrain.rs`
+  pass; `legacy_default_short_run_identity` still reads
+  `13138541837675773035`.
+
+`docs/reference/v3-world-grid-spec.md` replaces "translated to the bounds
+origin" with world-coordinate sampling and the nested-layer consequence.
+
+**Which stored recipes move.** Measured with the release `world inspect` after
+the change: Orchards/11 and Canyon/22 print readings byte-identical to the ones
+recorded above (Canyon 1,349,524 passable, 0.527158, largest component
+0.980559, 728,743 food cells; Orchards grass mean 0.581150 / 1,664,000 food
+cells / 2,662,400.039673 standing energy, fruit 468,253 fertile / 0.182911 /
+1.517091 / 398,015 / 5,970,225.000000). Orchards has no terrain and Canyon's two
+layers are whole-world (`bounds: null`), where local and world coordinates
+coincide. Confluence's eight nested `FbmThreshold` regions are bounded, so its
+map does move: its outermost north-east layer (bounds 1000,0 600x620, seed 3301,
+threshold 0.02) goes from 190,725 barrier cells under the old semantics to
+183,194 under the new, sharing only 88,138 — the nested thresholds now grade one
+field instead of reading four copies of the same local origin. Confluence/33
+after the change:
+
+- 1600x1600 Bounded, `world_seed` 3304 pinned, 1,961,687 passable
+  (0.766283984375), largest component 0.9953555281754939 of passable, 10,000
+  founders placed. Grass fertile on every passable cell (mean 0.545019),
+  1,275,097 food cells, standing energy 3,187,742.50. Fruit fertile on 208,503
+  cells (0.081446 of the world, mean 1.504632), 177,228 food cells, standing
+  energy 2,658,420.00.
+
+These match the "about 77% passable, 99.5% in one component" the recipe was
+designed for. `experiments/worlds/previews/confluence.png` is stale against this
+map; regenerating it is the orchestrator's step.
+
+**Preview readability.** `render_preview` mean-pools the barrier fraction per
+block instead of max-pooling a boolean, and `blend` takes that fraction and
+fades the habitat or food color to the barrier gray in proportion to it: a block
+with no barrier keeps its color exactly, an entirely walled block is solid gray,
+and anything between lies strictly between. Canyon's 52.7%-passable map no
+longer reads as mostly wall at its downsample factor of 4. JSON readings are
+untouched. `a_downsampled_block_grays_in_proportion_to_its_barrier_fraction`
+asserts the three cases on named non-origin blocks at factor 4 in both panels,
+and `blend`'s literal color pins gain `blend(1.0, ..)`, `blend(0.5, ..)`,
+`blend(0.25, ..)` and the above-one clamp. `docs/reference/v3-cli-contract-spec.md`
+records the new pooling rule.
+
+**Supersedes.** The "Recorded decisions and deviations" bullet above stating
+that the preview max-pools barriers, so Canyon reads as more walled than its
+passable fraction, describes the first pass and no longer holds; the JSON
+`passable_connectivity` remains the quantitative reading either way.
+
+**Commands and results** (worktree root, `PATH` prefixed with the petri-tools
+and aqua bin directories; every entry rerun after the simplification pass):
+
+| Command | Result |
+| --- | --- |
+| `cargo test -p v3-core --test viability` (run first) | ok, 24 passed |
+| `cargo test -p v3-core --test baseline_worlds --test reproducibility --test terrain` | ok, 19 passed / 1 ignored, 3 passed, 10 passed |
+| `cargo test -p v3-core --lib fertility` / `--lib patterns` | ok, 32 passed / ok, 45 passed |
+| `cargo test -p v3-cli` | ok, 66 lib + 11 `main` + 18 `tests/bench.rs` + 11 `tests/cli.rs` passed |
+| `cargo clippy --workspace --all-targets -- -D warnings` | clean |
+| `cargo fmt --all` | applied |
+| `make check` | exit 0 |
+| `make check-docs` | exit 0 |
+| `make roadmap-check` | validation passed |
+| `MUTANTS_ITERATE=0 make rust-mutants` | see below |
+
+**Simplification pass.** Run on this pass's diff against `f0b9ec58`
+(single-pass inline review; the Agent fan-out is unavailable in this context).
+Applied: `blend`'s two-stage clamp-then-mix loop collapsed to one
+`std::array::from_fn` over the channels, dropping a shadowed intermediate array;
+the barrier accumulator written as a plain `if` rather than
+`f32::from(u8::from(bool))`; the duplicated point-set collection in
+`fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges` extracted to one
+closure taking the params; the `WORLD` const moved above the `proptest!` block
+that uses it. Skipped: converting `generate_pattern`'s fBm loop back to an
+iterator chain — the nested loop already allocates only the output `Vec` and
+reads more plainly than a `flat_map` with a captured field.
+
+**Preview viewed.** `world inspect --config experiments/worlds/canyon-country.json
+--seed 22 --png` was written to a scratch path (not to
+`experiments/worlds/previews/`) and looked at: the habitat panel reads as roughly
+half gray rock against dark open ground with the meadow blobs picked out, and the
+3% rubble field as a faint speckle rather than a wash of gray — the readable map
+the mean-pooled fraction was meant to produce, consistent with the 0.527158
+passable fraction.
+
+**Mutation record (follow-up pass).** Fresh `MUTANTS_ITERATE=0 make rust-mutants`
+against the merge base `c95457d9`, run after the simplification pass with nothing
+else on the machine:
+
+```
+309 mutants tested in 26m: 256 caught, 51 unviable, 2 timeouts
+```
+
+Output path: `~/.local/share/petri-tools/mutants/t12-f04/mutants.out`
+(`run-mode.txt` records `fresh`). Survivor list, complete — no mutant was missed
+by every test, and the two survivors are the same pre-existing pair the pass
+above deferred:
+
+| Survivor | Resolution |
+| --- | --- |
+| `crates/v3-core/src/kernel/world.rs:57:48: replace && with \|\| in WorldState::passable_connectivity` | **deferred** — timed out at 120 s rather than failing; the mutated visited guard never terminates. See "Notes for AI Agents". |
+| `crates/v3-core/src/kernel/world.rs:57:32: delete ! in WorldState::passable_connectivity` | **deferred** — same guard, same reason. |
+
+Every mutant in this pass's own code — `FbmField::new`, `FbmField::sample`,
+`generate_fbm`, `generate_pattern`'s fBm arm, `blend` and `render_preview` — was
+caught, with no test added after the run.
+
 ## Performance and Goal Impact
 
 Natural analogs: food profitability against return rate (orchard fruit in
@@ -427,7 +568,17 @@ for the whole command.
   the implementer's fresh run on 2026-09-09 (`world.rs:57:48` `&&` to `||`,
   `world.rs:57:32` deleted `!`); the mutated traversal revisits cells forever,
   so the mutant hangs instead of producing a wrong reading, and every other
-  mutant in the feature diff is caught.
+  mutant in the feature diff is caught. Reconfirmed by the follow-up pass's own
+  fresh run on 2026-09-09 (`309 mutants tested in 26m: 256 caught, 51 unviable,
+  2 timeouts`): still the only two survivors, still the same lines, and nothing
+  missed.
+- Deferred P3 (map change, found 2026-09-09): the follow-up pass's
+  world-coordinate `FbmThreshold` sampling moves Confluence's barrier map (its
+  eight bounded same-seed layers), so `experiments/worlds/previews/confluence.png`
+  and any Confluence reading taken before that change are stale. Orchards and
+  Canyon are unaffected — no terrain and whole-world bounds respectively, verified
+  by identical `world inspect` output. Regenerating the preview and the
+  `experiments/worlds/README.md` readings is the orchestrator's step.
 - Deferred P3 (test wiring, found 2026-09-09): `crates/v3-core/tests/
   mutational_neighborhood.rs` is run by no `make` target, the same gap this
   pass closed for `baseline_worlds.rs`. Left alone here because it belongs to

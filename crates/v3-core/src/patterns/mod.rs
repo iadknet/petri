@@ -126,23 +126,30 @@ pub fn generate_pattern(
             };
             let width = u32::from(bounds.width).min(65536 - u32::from(bounds.x)) as u16;
             let height = u32::from(bounds.height).min(65536 - u32::from(bounds.y)) as u16;
-            let grid = crate::kernel::fertility::generate_fbm(
-                width,
-                height,
+            // The field is sampled at world coordinates, so a bounded layer is
+            // the whole-world layer cut to its bounds and nested same-seed
+            // layers grade one region instead of reading unrelated noise.
+            let field = crate::kernel::fertility::FbmField::new(
                 octaves,
                 frequency,
                 lacunarity,
                 persistence,
                 rng.gen(),
             );
-            grid.iter()
-                .filter_map(|(x, y, value)| {
-                    (*value > threshold).then_some(PaintPoint {
-                        x: bounds.x + x,
-                        y: bounds.y + y,
-                    })
-                })
-                .collect()
+            let mut points = Vec::new();
+            for y in 0..height {
+                for x in 0..width {
+                    let world_x = u32::from(bounds.x) + u32::from(x);
+                    let world_y = u32::from(bounds.y) + u32::from(y);
+                    if field.sample(world_x, world_y) > threshold {
+                        points.push(PaintPoint {
+                            x: bounds.x + x,
+                            y: bounds.y + y,
+                        });
+                    }
+                }
+            }
+            points
         }
         PatternParams::Maze {
             corridor_width,

@@ -1,6 +1,34 @@
 use crate::kernel::Grid;
 use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
 
+/// A seeded fractional Brownian motion field, sampled by world coordinate.
+///
+/// The field belongs to the world rather than to any rectangle read out of it:
+/// a cell samples the same value whatever bounds a caller reads it through, so
+/// two layers sharing a seed agree wherever they overlap.
+pub struct FbmField(Fbm<Perlin>);
+
+impl FbmField {
+    /// Build the field. Deterministic for a given seed.
+    pub fn new(octaves: u32, frequency: f32, lacunarity: f32, persistence: f32, seed: u64) -> Self {
+        // XOR-fold the u64 seed so both the upper and lower 32 bits influence the
+        // Perlin builder's u32 seed parameter.
+        Self(
+            Fbm::<Perlin>::new((seed >> 32) as u32 ^ seed as u32)
+                .set_octaves(octaves as usize)
+                .set_frequency(frequency as f64)
+                .set_lacunarity(lacunarity as f64)
+                .set_persistence(persistence as f64),
+        )
+    }
+
+    /// The field's value at a world cell, clamped to [-1, 1]. Frequency scaling
+    /// is handled internally by the noise crate's Fbm builder.
+    pub fn sample(&self, x: u32, y: u32) -> f32 {
+        (self.0.get([f64::from(x), f64::from(y)]) as f32).clamp(-1.0, 1.0)
+    }
+}
+
 /// Generate a fertility grid using fractional Brownian motion (Fbm) noise.
 ///
 /// Each cell's value is the Fbm noise evaluated at `(x * frequency, y * frequency)`,
@@ -14,20 +42,11 @@ pub fn generate_fbm(
     persistence: f32,
     seed: u64,
 ) -> Grid<f32> {
-    // XOR-fold the u64 seed so both the upper and lower 32 bits influence the
-    // Perlin builder's u32 seed parameter.
-    let fbm = Fbm::<Perlin>::new((seed >> 32) as u32 ^ seed as u32)
-        .set_octaves(octaves as usize)
-        .set_frequency(frequency as f64)
-        .set_lacunarity(lacunarity as f64)
-        .set_persistence(persistence as f64);
-
+    let field = FbmField::new(octaves, frequency, lacunarity, persistence, seed);
     let mut grid = Grid::new(width, height, 0.0f32);
     for y in 0..height {
         for x in 0..width {
-            // Frequency scaling is handled internally by the noise crate's Fbm builder.
-            let val = fbm.get([x as f64, y as f64]) as f32;
-            grid.set(x, y, val.clamp(-1.0, 1.0));
+            grid.set(x, y, field.sample(u32::from(x), u32::from(y)));
         }
     }
     grid
