@@ -209,7 +209,7 @@
 <body>
 <header>
   <h1>Petri progress</h1>
-  <p>Benchmark work counters and goal indicators per closed roadmap feature, read from the stored reports listed in <code>benchmark-series.json</code>. The x-axis is closure order. Hover any chart for the exact readings at that closure, or switch a card to its table.</p>
+  <p>Benchmark work counters and goal indicators from the reports listed in <code>benchmark-series.json</code>. Goal worlds identify each environment separately. Historical charts follow closure order; hover a chart for exact readings or switch a card to its table.</p>
 </header>
 <div class="filters">
   <div class="seg" role="group" aria-label="Benchmark profile">
@@ -287,6 +287,7 @@
   };
 
   // ── Data loading ─────────────────────────────────────────────────────────
+  const rel = (p) => p.replace(/^docs\/progress\//, '');
   async function fetchJson(path) {
     const r = await fetch(path, { cache: 'no-store' });
     if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
@@ -295,12 +296,13 @@
 
   async function loadAll() {
     const index = await fetchJson('benchmark-series.json');
-    const rel = (p) => p.replace(/^docs\/progress\//, '');
     const order = [];
     const seen = new Set();
     const add = (p, profile) => { if (!seen.has(p)) { seen.add(p); order.push({ path: p, profile }); } };
     (get(index, 'gate.closed') || []).forEach((p) => add(p, 'gate'));
     (get(index, 'goal.closed') || []).forEach((p) => add(p, 'goal'));
+    const worldEpoch = get(index, 'goal_worlds.epoch_baseline');
+    if (worldEpoch) add(worldEpoch, 'goal_worlds');
     (get(index, 'goal_worlds.closed') || []).forEach((p) => add(p, 'goal_worlds'));
     const reports = await Promise.all(order.map(async (o) => ({ ...o, report: await fetchJson(rel(o.path)) })));
 
@@ -756,17 +758,18 @@
   // ── Rendering ────────────────────────────────────────────────────────────
   function renderWorlds(data, app) {
     const features = data.features.filter((f) => f.goal_worlds);
-    document.getElementById('status').textContent = `${features.length} goal-worlds-v1 closures · one run per environment · historical goal-v1 remains separate`;
+    document.getElementById('status').textContent = `${features.length} goal-worlds-v1 reports · one run per environment · historical goal-v1 remains separate`;
     const g = group('Goal worlds', 'Orchards / 11, Canyon / 22, Confluence / 33. Each is a distinct environment, not a seed replicate. Cross-profile deltas are unavailable.');
     if (!features.length) g.cards.appendChild(el('p', null, 'No world-set report has been recorded yet.'));
     for (const f of features) {
       const report = f.goal_worlds;
+      const closure = (get(data.index, 'goal_worlds.closed') || []).includes(f.paths.goal_worlds) ? 'Closed' : 'Not yet closed';
       for (const observation of get(report, 'deterministic.goal_indicators.cases') || []) {
         const info = observation.case;
         const seed = (get(report, 'deterministic.per_seed') || []).find((s) => s.seed === info.seed) || {};
         const persistence = (get(report, 'deterministic.goal_indicators.population_persistence.per_seed') || []).find((s) => s.seed === info.seed) || {};
         const connectivity = seed.tick_zero_connectivity || {};
-        const c = card(`${f.id} · ${info.name}`, `Seed ${info.seed} · ${info.recipe_path} · ${info.food_type_count} foods`);
+        const c = card(`${f.id} · ${info.name}`, `${closure} · Seed ${info.seed} · ${info.recipe_path} · Food types: ${info.food_type_count}`);
         c.card.classList.add('wide');
         c.card.appendChild(table(['Reading', 'Value'], [
           ['Final population', fmt(seed.final_population)], ['Extinction tick', seed.extinction_tick ?? 'Survived full horizon'],

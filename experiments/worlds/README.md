@@ -45,7 +45,21 @@ Regenerate the full-size layout observations and preview PPM files with
 --ignored --nocapture`. Connectivity uses eight-direction movement with the
 world's actual edge rule, ignores occupancy, and is measured before tick work.
 
-Persistence and full goal readings are pending the single final goal run.
+The first [full goal report](../../docs/progress/features/t12-f04-baseline-world-set-goal.json)
+was measured at `5f87c8f4`; it is **not yet closed**. All three cases completed
+2,000 ticks without extinction. Final populations were 32,909 / 7 / 39,318;
+minimum populations 10,000 / 7 / 6,661 and plateau populations
+22,674.06 / 19.918 / 35,937.08. Canyon's seven survivors are a fragile
+finite-horizon result, not robust viability; its evolved battery samples all
+seven under the existing min(population, 12) rule.
+
+All cases miss the unchanged depth-2,000 drift floor of 0.008000:
+Orchards and Confluence each measure 12/2,000 (0.006000), Canyon 10/2,000
+(0.005000). Canyon's full drift reading equals T11.F18; two-food cases use a
+different battery context. The single run took 1,047.04 seconds; the documented
+[investigation and full acceptance record](../../docs/specs/roadmap/t12-f04-baseline-world-set.md#performance-and-goal-impact)
+retains the failed floors, while all hard observation timing caps passed.
+
 Survival through 2,000 ticks is not proof of long-term viability, evolved food
 specialization, or causal necessity of barrier awareness. This first series
 reading precedes the planned T11 supply repairs; later matching readings name
