@@ -83,17 +83,23 @@ low-frequency fertility gradient that leaves some regions scarce. Regions
 overlap rather than tile: meadows and orchards fall inside and outside the
 rock, and the ridge crosses both.
 
-## Applied tick-zero readings
+## Applied readings at T12.F04 (2026-09-09, commit `e6757fa3`)
 
-Filled from the stored closure report
-(`docs/progress/features/t12-f04-baseline-world-set-goal.json`); regenerate
-the previews with `world inspect` after any recipe edit.
+From `world inspect` (tick zero) and the stored closure report
+(`docs/progress/features/t12-f04-baseline-world-set-goal.json`, one
+2,000-tick run per world, 512.69 s for the whole `make bench PROFILE=goal`
+command). Regenerate the previews with `world inspect` after any recipe edit.
 
-| World | Passable | Largest component / passable | Grass fertile cells | Fruit habitat cells |
-| --- | --- | --- | --- | --- |
-| Orchards in grassland | 100% | 100% | all | 468,253 (18.3%) |
-| Canyon country | 52.7% | 98.1% | 1,349,524 (52.7%) | none |
-| Confluence | 76.6% | 99.5% | 1,961,687 (76.6%) | 208,503 (8.1%) |
+| World | Passable | Largest component / passable | Type-0 fertile cells | Type-1 habitat cells | Final / minimum / plateau population | Type-1 share of applied eats | Moves blocked by barrier |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Orchards in grassland | 100% | 100% | all 2,560,000 | 468,253 (18.3%) | 8,818 / 1,273 / 7,805 | 0.031% (2,199 eats) | 0% |
+| Canyon country | 52.7% | 98.1% | 1,349,524 (52.7%) | none | 7,715 / 3,202 / 8,144 | – | 15.04% |
+| Confluence | 76.6% | 99.5% | 1,961,687 (76.6%) | 208,503 (8.1%) | 21,818 / 1,054 / 12,004 | 4.97% (304,166 eats) | 7.60% |
+
+Confluence's late rise (7,083 at tick 1,600 to 21,818 at 2,000) came with
+fruit reaching a 5% eat share and lineage entropy falling to 0.88 nats: one
+lineage found the rich food. Canyon's creatures that read a barrier input
+were blocked avoidably on 1.3% of their moves against 40.5% for the rest.
 
 ![Orchards](previews/orchards-in-grassland.png)
 ![Canyon](previews/canyon-country.png)

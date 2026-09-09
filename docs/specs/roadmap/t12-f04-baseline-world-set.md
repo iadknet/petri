@@ -126,7 +126,7 @@ and the `v3-cli` bench tests.
 
 - [x] Food substrate, `FbmThreshold`, connectivity, per-case goal profile,
       frontend and reference carry-through (first pass; reviewed here).
-- [ ] `v3-cli world inspect --config <recipe> --seed <n> [--png <path>]`:
+- [x] `v3-cli world inspect --config <recipe> --seed <n> [--png <path>]`:
       prints connectivity and per-type habitat, food-cell, and standing-crop
       readings as JSON and writes a downsampled PNG preview (barriers,
       per-type fertility, tick-zero food). Replaces the ignored
@@ -135,28 +135,28 @@ and the `v3-cli` bench tests.
       (`bounds.x + x`, `bounds.y + y`) instead of bounds-local ones, so a
       bounded layer equals the matching sub-rectangle of the whole-world
       layer at the same seed; the runtime pattern endpoint follows.
-- [ ] Redesign the three recipes under `experiments/worlds/` with pinned
+- [x] Redesign the three recipes under `experiments/worlds/` with pinned
       `world_seed`, regenerate `previews/*.png` with the command above, and
       rewrite `experiments/worlds/README.md` (design intent, applied
       readings, how to inspect and run).
-- [ ] Per-world tracking in the report: persistence samples and each
+- [x] Per-world tracking in the report: persistence samples and each
       `GoalCaseObservation` carry cumulative typed-eat counts per type (from
       applied successful Eat actions), per-type standing food density (from
       the applied growth summary), move attempts, moves blocked by barrier,
       and avoidable blocked moves by barrier-reader state.
-- [ ] World-set comparisons: profile identity for `goal-worlds-v1` ignores
+- [x] World-set comparisons: profile identity for `goal-worlds-v1` ignores
       per-case digests; each reference comparison gains a per-case block (by
       case name) with `inputs_changed` and both digests, deltas for
       persistence, per-case work counters, lineage, memory, drift,
       neighborhood, structure, typed eats, and blocked moves. A digest change
       is labeled, never an error, and never a claim of unchanged inputs.
       Missing cases in a reference are recorded absent.
-- [ ] Dashboard: the Goal worlds tab shows, per world, series over closure
+- [x] Dashboard: the Goal worlds tab shows, per world, series over closure
       order for the readings above, population-trajectory overlays by
       closure, and markers where inputs changed; `docs/progress.md` gains a
       world-set table; `docs/reference/v3-cli-contract-spec.md` records the
       command, the sample fields, and the comparison rule.
-- [ ] Store gate and goal reports, list the goal report in the
+- [x] Store gate and goal reports, list the goal report in the
       `goal_worlds` series, and record the readings below.
 
 ## Verification
@@ -178,11 +178,14 @@ and the `v3-cli` bench tests.
       `inputs_changed: true` and correct deltas; a reference with a different
       case list records the absent case; gate and single-config behavior are
       unchanged (existing tests).
-- [ ] Dashboard checked in a browser against the stored report; `make
-      check` (records the tested commit) and `make check-docs` at closure.
+- [x] Dashboard checked in a browser against the stored report (2026-09-09:
+      the Goal worlds tab renders every per-world chart for all three cases
+      with no console errors).
+- [ ] `make check` on the final feature code (records the tested commit) and
+      `make check-docs` at closure.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after the simplify pass:
       summary line, output path, and every survivor resolved.
-- [ ] Reports: `docs/progress/features/t12-f04-baseline-world-set.json`
+- [x] Reports: `docs/progress/features/t12-f04-baseline-world-set.json`
       (gate) and `...-goal.json` (goal, replacing the first pass's unbalanced
       reading, which is preserved as
       `...-goal-first-pass.json` and stays out of the series index).
@@ -506,20 +509,59 @@ series; its budget is the 600 s wall-clock bound above, and the new
 telemetry adds one counter increment per applied eat and per blocked move
 plus a per-type density read already produced by the growth summary.
 
-Readings to record here at closure, per case: final, minimum, peak, and
-plateau population; births; mean energy; passable fraction and largest
-component; typed eats per type; blocked-move fraction and avoidable fraction
-by reader state; lineage entropy and clades; memory sensitivity; drift
-changed/all at 1,000 and 2,000 against the 0.0015 and 0.008 floors; founder
-and evolved neighborhood fractions; structure median; wall-clock per case and
-for the whole command.
+**Measured, 2026-09-09, at `e6757fa3` on the recording host (Apple M1 Pro,
+eight threads), reports stored under `docs/progress/features/`.**
+
+Gate (`t12-f04-baseline-world-set.json`): exit 0, `severe=false`; all six
+counters `ok` against both the pinned epoch and T11.F18; wall-clock per
+creature-tick 0.0015873 ms (+1.8% against the epoch, -19.8% against
+T11.F18). The gate profile and its epoch are unchanged.
+
+Goal (`t12-f04-baseline-world-set-goal.json`, the first `goal-worlds-v1`
+reading, no prior reference): `/usr/bin/time -p make bench PROFILE=goal`
+took **512.69 s** end to end; simulation 498.1 s (Orchards 182.5 s, Canyon
+126.3 s, Confluence 189.2 s); founder observation 120 ms, evolved
+neighborhoods 610 ms total, drift 11.88 s, final-state observation 0.95 s,
+all inside their caps. Profile totals per creature-tick: VM steps 23.34, mesh
+hops 2.248, graph visits 1.029, plasticity 0.047, actions 1.371, births
+0.0186. Every case survived the horizon; every peak is the 100,000 cap at
+tick 61–65 and no case sits there afterwards.
+
+| Reading | Orchards / 11 | Canyon / 22 | Confluence / 33 |
+| --- | --- | --- | --- |
+| Final / minimum / plateau population | 8,818 / 1,273 / 7,804.98 | 7,715 / 3,202 / 8,143.92 | 21,818 / 1,054 / 12,003.77 |
+| Births; creature-ticks | 372,811; 22.25 M | 351,803; 17.75 M | 432,991; 22.21 M |
+| Final mean energy | 21.90 | 21.85 | 24.27 |
+| Passable; largest component of passable | 100%; 100% | 52.72%; 98.06% | 76.63%; 99.54% |
+| Applied eats type 0 / type 1 (type-1 share) | 7,176,755 / 2,199 (0.031%) | 4,883,443 / – | 5,811,299 / 304,166 (4.97%) |
+| Final standing density type 0 / type 1 | 738,829 / 468,253 | 409,865 / – | 539,023 / 193,724 |
+| Moves attempted; blocked by barrier (fraction) | 20,336,298; 0 (0%) | 16,132,634; 2,426,094 (15.04%) | 19,647,038; 1,492,516 (7.60%) |
+| Avoidable blocked-move fraction, barrier reader / no reader | 0.17% / 20.75% | 1.27% / 40.47% | 0.46% / 35.80% |
+| Surviving founder clades; entropy (nats) | 22; 2.360513 | 24; 2.625223 | 14; 0.882285 |
+| Memory sensitivity (different from either) | 0.000113 | 0.000518 | 0.000092 |
+| Drift changed/all births at 1,000 (floor 0.0015) / 2,000 (floor 0.008) | 9/2,000 = 0.0045 / **12/2,000 = 0.006** | 20/2,000 = 0.010 / **10/2,000 = 0.005** | 9/2,000 = 0.0045 / **12/2,000 = 0.006** |
+| Drift hop-cap hits | 0 | 0 | 0 |
+| Founder changed / dead | 0.480769 / 0 | 0.447115 / 0 | 0.480769 / 0 |
+| Evolved changed / dead (pooled) | 0.270000 / 0.030909 | 0.290000 / 0 | 0.282727 / 0.011818 |
+| Structure size median (p25–p75; mean) | 82 (73–115; 98.80) | 90 (71–131; 104.48) | 87 (84–106; 101.36) |
+
+What the readings say. Orchards' fruit was eaten 2,199 times, so the latent
+niche is touched by mutants at a trace rate; Confluence's fruit share of
+4.97% and its late rise from 7,083 at tick 1,600 to 21,818 at 2,000 with
+entropy collapsing to 0.88 nats over 14 clades are one lineage exploiting
+the rich food, which is the first thing the tracking exists to show.
+Canyon's barrier-reading creatures are blocked avoidably on 1.27% of their
+moves against 40.47% for the rest, the barrier-awareness reading later
+closures compare against. The depth-2,000 drift readings are the substrate's
+(identical to T11.F18 for one food type), below the standing floor, and
+recorded for the user's decision under Notes.
 
 ## Success Criteria
 
-- [ ] `make bench PROFILE=goal` runs Orchards, Canyon, and Confluence once
+- [x] `make bench PROFILE=goal` runs Orchards, Canyon, and Confluence once
       each from fixed maps, all three persist to tick 2,000 without pinning
       at the cap, and the command completes under 600 s on the recording host.
-- [ ] A later closure's goal report can be compared per world against this
+- [x] A later closure's goal report can be compared per world against this
       one, with changed recipe inputs labeled, and the dashboard shows each
       world's readings over closure order.
 - [ ] Reviewed diff, mutation record, stored reports, and closure checks
@@ -532,7 +574,27 @@ for the whole command.
   `.claude/worktrees/t12-f04`, branch `worktree-t12-f04`). Recipe design and
   balancing were done by the orchestrator (config data, tuned by screening
   runs), a recorded deviation from "write no feature code yourself"; all Rust,
-  frontend, and dashboard code went through the implementer.
+  frontend, and dashboard code went through the implementer. The follow-up
+  pass (world-coordinate fBm sampling, preview blending) ran on a fresh
+  implementer because this environment exposes no way to message a finished
+  agent; both passes' records are under Verification.
+- Recipe screening evidence (orchestrator, `v3-cli run` at 1600² with 10,000
+  founders, one run each, population at ticks 100/500/1000 unless noted):
+  literal diffuse-only grass (uniform fertility 0.2, growth 0.03) extinct by
+  tick 400; uniform 0.4 fertility, growth 0.06: 31 at 800; meadow-textured
+  grass (the shipped Orchards, density 0.5 variant) 100,000 / 15,076 / 3,526
+  and 11,885 at 2,000; founders on rich patches (fruit as type 0) pinned at
+  100,000 through tick 1,000 for both standing-crop settings; fBm canyon on
+  production fertility 44,855 / 119 / 7 and 46,674 / 192 / 3; canyon with 70
+  valley meadows 81,301 / 8,244 / 9,977, with 45 meadows (shipped) 45,014 /
+  3,947 / 4,102; composite drafts with diluted meadows 60,807 / 11 / 1 and
+  72,767 / 140 / 514, with Wrap edges 73,094 / 142 / 77, with production
+  grass 100,000 / 12,754 / 15,208, without terrain 99,998 / 6,061 / 1,517,
+  with grass at density 0.5 and 5 per unit (shipped, before adding five
+  meadows) 100,000 / 6,556 / 1,779. Final 2,000-tick runs of the shipped
+  recipes under host contention: Orchards 184 s ending at 8,818 (range
+  2,517–17,790 after the boom), Canyon 136 s ending at 7,715 (3,534–8,778),
+  Confluence 265 s ending at 21,818 (2,979–21,818, rising late).
 - First-pass review findings (Fable, 2026-09-09): (1) Orchards and
   Confluence used grass fertility blobs covering nearly the whole world, so
   regrowth held the population at the 100,000 cap for 1,400 ticks and the run
