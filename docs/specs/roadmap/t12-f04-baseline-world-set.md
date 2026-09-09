@@ -197,11 +197,11 @@ Required terrain and world set:
 
 ## Implementation Tasks
 
-- [ ] Establish failing behavior/property tests, then implement food overrides
+- [x] Establish failing behavior/property tests, then implement food overrides
   and opt-in fertile placement with unchanged default behavior.
-- [ ] Add thresholded fBm through existing pattern machinery; carry food and
+- [x] Add thresholded fBm through existing pattern machinery; carry food and
   pattern fields through server/frontend and update affected canonical refs.
-- [ ] Add truthful tick-zero report connectivity, compose/inspect the four
+- [x] Add truthful tick-zero report connectivity, compose/inspect the four
   recipes, and integrate them into the existing goal profile/report as three
   cases with one production-default run each.
 - [ ] Review the diff for reuse/simplification/efficiency, triage fresh mutation
@@ -209,22 +209,22 @@ Required terrain and world set:
 
 ## Verification
 
-- [ ] TDD red/green evidence for inherited/overridden/zero typed rewards and
+- [x] TDD red/green evidence for inherited/overridden/zero typed rewards and
   growth/recovery, energy cap/cost order, invalid type, normalization, config
   roundtrip and subsequent shared-value changes. Property-test normalization
   and effective-value invariants across all drawn cases.
-- [ ] Placement examples/properties cover fertile-only exact eligible coverage,
+- [x] Placement examples/properties cover fertile-only exact eligible coverage,
   zero eligible, disabled fertility, annealing at tick zero, barriers,
   overlapping typed habitats and legacy false behavior. Preserve default
   short-run state/RNG identity against the pre-feature behavior and confirm
   measured default gate deterministic trajectory remains unchanged. No extra
   old-goal run is required to prove unchanged defaults.
-- [ ] fBm tests cover normalization, threshold direction/boundaries,
+- [x] fBm tests cover normalization, threshold direction/boundaries,
   zero/translated/clipped bounds, seed determinism, uniqueness and threshold
   monotonicity with fixed noise parameters. Extend the existing reproducibility
   fixture with fBm and differentiated foods across independent initialization
   and thread counts. Do not assume random property draws hit every variant.
-- [ ] Connectivity examples cover all-passable, no-passable, separated islands,
+- [x] Connectivity examples cover all-passable, no-passable, separated islands,
   diagonal passage and Wrap versus Bounded edges; property-test count/fraction
   bounds and invariance to occupancy. Reports identify the effective recipe
   digest/path and applied tick-zero map. Recipe smoke tests load all four,
@@ -232,10 +232,10 @@ Required terrain and world set:
   tests. A small production-path fixture proves exactly three distinct recipe
   configs execute once each with their own observation context; report tests
   reject cross-profile comparison and preserve historical series records.
-- [ ] Server/frontend tests verify restart-only type edits, inherited shared
+- [x] Server/frontend tests verify restart-only type edits, inherited shared
   runtime edits, new fields and pattern hydration/requests, optional controls
   and recipe roundtrip. Inspect the rendered edited controls and recipe maps.
-- [ ] Record a bounded founder-neighborhood diagnostic of whether production
+- [x] Record a bounded founder-neighborhood diagnostic of whether production
   mutations can change the selected Eat food type on a two-food fixture,
   using existing mutation/runtime APIs: `Battery::generate(2)`, the production
   founder and mutation/runtime defaults, 1,000 fresh offspring with seeds
@@ -246,14 +246,14 @@ Required terrain and world set:
   zero-event births and corpus seed/size, including zero results honestly;
   no favorable-count gate, new permanent
   indicator, changed mutation rate or evolutionary repair is required.
-- [ ] Run `cargo test -p v3-core --test viability` first after affected Rust
+- [x] Run `cargo test -p v3-core --test viability` first after affected Rust
   edits, then `cargo check --workspace --all-targets` after coherent changes
   and focused tests. Use relevant Rust/React skills and retain property
   regression files. Run `make roadmap-check` on documentation changes.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after self-review/remediation:
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after self-review/remediation:
   store summary/output path/full missed and timeout lists with each survivor
   killed by tests plus fresh rerun, equivalent with reason, or deferred.
-- [ ] Store gate `docs/progress/features/t12-f04-baseline-world-set.json`, goal
+- [x] Store gate `docs/progress/features/t12-f04-baseline-world-set.json`, goal
   `docs/progress/features/t12-f04-baseline-world-set-goal.json` with all three
   named cases. Use `make bench` sequentially with no competing loads. Record
   report commits, exact commands, per-case persistence/connectivity/goal
@@ -261,6 +261,9 @@ Required terrain and world set:
   table while preserving retired series history. Gate profile inputs,
   thresholds and epoch remain unchanged; all goal timing budgets apply to
   the complete three-case profile, never separately multiplied per case.
+- [ ] Standing later-closure drift floor: each case must reach 0.008000 at
+  depth 2,000. Actual readings 0.006000 / 0.005000 / 0.006000 fail; this remains
+  a measured closure blocker without an authorized resolution.
 - [x] Second goal determinism run: Not applicable by the workflow's 2026-09-05
   decision; existing reproducibility and gate two-run tests remain required.
 - [ ] Fresh independent final review, final `make check`, closure
@@ -299,6 +302,18 @@ are retained under `/private/tmp/t12-f04-*.log` for this execution.
   reward override, fertile-only placement and the fBm editor. It caught and
   corrected unreadable float tails in the new shared-value labels. Inspection
   servers and the isolated browser were stopped afterward.
+- Final `cargo test -p v3-server --test server
+  patch_config_rejects_food_types_runtime_patch`: one passed. Rendered
+  dashboard red/green verification with the actual stored report reproduced
+  `rel is not defined`, then confirmed all three named cards, full-reading
+  disclosures/report links and the separate historical goal tab after reusing
+  the helper at shared scope. The initial epoch is deduplicated with closed
+  reports and labeled not yet closed. Screenshot:
+  `/private/tmp/t12-f04-dashboard-final.png`; snapshots:
+  `/private/tmp/t12-f04-dashboard-green.txt` and
+  `/private/tmp/t12-f04-dashboard-history.txt`. Browser and local HTTP server
+  stopped. Self-review retained the existing loader/cards and changed only
+  shared helper scope, epoch inclusion and truthful labels.
 - `cargo test -p v3-core --test baseline_worlds
   food_choice_mutation_diagnostic -- --ignored --nocapture`: exit 0. Production
   founder/mutation/runtime defaults, Battery::generate(2), 80 executions/genome,
@@ -318,8 +333,8 @@ are retained under `/private/tmp/t12-f04-*.log` for this execution.
   observation assembly instead of adding a runner or suppressing the length
   lint. No speculative abstractions, dependencies or production tuning added.
 - `make roadmap-check` passed on document edits. Fresh mutation evidence is
-  recorded below; measured gate/goal reports, reviewer and closure evidence
-  remain pending.
+  recorded below; measured gate/goal reports are stored. Independent reviewer
+  and final closure checks remain pending; the drift floor is unmet.
 
 ### Mutation remediation record
 
@@ -372,6 +387,114 @@ production locations reported by cargo-mutants):
 
 ## Performance and Goal Impact
 
+Measured gate command: `/usr/bin/time -p make bench PROFILE=gate
+FEATURE=t12-f04-baseline-world-set`, with the workflow PATH prefix, serialized
+preflight and eight threads. Report revision
+`5f87c8f48bebc63b59cb5822bca152025757cbdb`; exit 0, `severe=false`.
+All existing deterministic fields exactly equal T11.F18 after removing only
+the new per-seed tick-zero connectivity field. All six normalized counters
+are unchanged against F18 and all are `ok` against the pinned
+`remove-complementary-nutrition` epoch. Wall/creature-tick is
+0.0012517163 ms (-36.72% versus F18, -19.75% versus the epoch); seeded/tick
+work totals 535.17 ms and founder observation 55.74 ms. External command
+elapsed is 37.16 s including the release build. No epoch re-pin or numeric
+threshold change. Log: `/private/tmp/t12-f04-bench-gate.log`.
+
+Measured goal command: `/usr/bin/time -p make bench PROFILE=goal
+FEATURE=t12-f04-baseline-world-set`, with the same PATH, serialized preflight,
+revision `5f87c8f48bebc63b59cb5822bca152025757cbdb` and eight threads. It ran
+once, exit 0, on 2026-09-09 UTC. The report is
+[the initial goal-worlds-v1 reading](../../progress/features/t12-f04-baseline-world-set-goal.json).
+Its empty comparison list is intentional: no matching prior world-set report
+exists. `severe=false` is not evidence that the independent drift floor passed.
+The historical goal series and both closed lists remain unchanged.
+
+**Measured closure blocker.** All three depth-2,000 changed/all-birth readings
+are below 0.008000 (16/2,000). No rate, seed, recipe, battery, threshold or
+report was altered to improve the result. T11.F18's feature-local exception
+does not apply here. T12.F04 remains In Progress and unclosed.
+
+| Case / seed | Depth 1,000 changed/all births (floor 0.001500) | Depth 2,000 changed/all births (floor 0.008000) | Drift hop-cap hits |
+| --- | --- | --- | --- |
+| Orchards / 11 | 9/2,000 = 0.004500, pass | 12/2,000 = 0.006000, fail | 0 at every checkpoint |
+| Canyon / 22 | 20/2,000 = 0.010000, pass | 10/2,000 = 0.005000, fail | 0 at every checkpoint |
+| Confluence / 33 | 9/2,000 = 0.004500, pass | 12/2,000 = 0.006000, fail | 0 at every checkpoint |
+
+Canyon's complete drift object equals T11.F18's. Its recipe changes only
+terrain; the observation's founder, mutation, runtime/shared-memory settings,
+one-food battery and sizes remain the same. The relevant core neighborhood,
+mutation, founder and runtime implementation has no changes from F18's report
+revision `b16f2820` to this report. Orchards and Confluence have identical
+two-food drift objects, a different battery/mutation context from Canyon.
+These are substrate readings, not evidence that geography caused the floor
+failure or that the new environments regressed a matched cohort.
+
+All cases completed 2,000 ticks at 1600² with 10,000 production founders.
+Report case metadata stores the exact path, digest, seed and food count.
+Applied connectivity exactly matches the earlier full-size layout inspection.
+
+| Case | Final / minimum / peak population | Plateau population | Births | Passable cells / total | Largest component / passable |
+| --- | --- | --- | --- | --- | --- |
+| Orchards | 32,909 / 10,000 / 100,000 | 22,674.06 | 929,986 | 2,560,000 / 2,560,000 | 2,560,000 / 2,560,000 |
+| Canyon | 7 / 7 / 28,408 | 19.918 | 47,748 | 1,828,071 / 2,560,000 | 1,828,071 / 1,828,071 |
+| Confluence | 39,318 / 6,661 / 100,000 | 35,937.08 | 1,062,166 | 1,895,611 / 2,560,000 | 1,893,309 / 1,895,611 |
+
+No case became extinct within this horizon. Canyon is fragile finite-horizon
+survival, not robust viability. Existing evolved sampling takes
+min(population, 12): 12 / 7 / 12 actual genomes, with no trial-size reduction.
+Each case retains battery seeds 7/8, 48 snapshots, eight four-tick sequences,
+80 executions/genome, founder 50 operator trials/500 births and evolved
+20 operator trials/200 births per sampled genome. Every required case
+neighborhood and drift object is defined; the singular top-level objects are
+explicitly undefined because their readings are reported per case.
+
+| Case | Founder changed / mutated | Founder single-event silent | Evolved changed / mutated | Evolved dead / mutated | Sample route variation |
+| --- | --- | --- | --- | --- | --- |
+| Orchards | 100/208 = 0.480769 | 93/164 = 0.567073 | 424/1,100 = 0.385455 | 14/1,100 = 0.012727 | 2/12 |
+| Canyon | 93/208 = 0.447115 | 98/164 = 0.597561 | 214/636 = 0.336478 | 0/636 = 0 | 0/7 |
+| Confluence | 100/208 = 0.480769 | 93/164 = 0.567073 | 364/1,100 = 0.330909 | 27/1,100 = 0.024545 | 1/12 |
+
+Founder single-event deaths are zero and all evolved dead fractions are below
+5%; all sampled-genome hop-cap hits are zero. Founder single-event silence
+remains below the 60% T11 capstone target in every case; it is not labeled a
+pass. Canyon's value is unchanged from F18 and the two-food values have a
+different observation context. Advisor 10's scope clarification below
+preserves that target without expanding F04 into a T11 repair.
+
+Surviving founder clades are 258 / 7 / 55, entropy 3.562945 / 1.945910 /
+3.364906. Current-memory sensitivity changes actions for 6/32,909, 0/7 and
+26/39,318 creatures. Temporal operator-state counts are 739 / 0 / 15;
+persisted-output counts 80 / 0 / 108; previous-slot counts 0 / 0 / 2, with
+the same case population denominators. Pooled structure size mean 97.968671,
+median 85, p25/p75 70/117, maximum 445. These observations do not establish
+food specialization, cognition improvement or barrier-awareness necessity.
+
+**Runtime investigation after 900 seconds.** External elapsed is 1,047.04 s.
+Simulation/seed time is 1,032.270010 s; final-state observation 1.561952 s;
+founder 0.122171 s; evolved 0.425779 s; drift 11.000025 s. Their
+nonoverlapping sum is 1,045.379938 s, leaving 1.660062 s unmeasured residual
+setup/connectivity/serialization/cleanup. The report does not attribute that
+residual. Hard aggregate caps pass: founder <10 s, evolved <180 s, drift <30 s.
+
+| Case | Simulation/seed seconds | Creature-ticks | Mean population across ticks | Sensors / world update seconds | Cognition / actions / reward seconds | Final-state / evolved observation seconds |
+| --- | --- | --- | --- | --- | --- | --- |
+| Orchards | 547.168362 | 156,836,559 | 78,418.2795 | 213.867 / 164.874 | 72.166 / 69.742 / 11.617 | 0.646393 / 0.182644 |
+| Canyon | 80.473344 | 3,332,837 | 1,666.4185 | 2.603 / 73.838 | 1.474 / 1.755 / 0.218 | 0.000177 / 0.088148 |
+| Confluence | 404.628304 | 95,164,986 | 47,582.4930 | 172.000 / 116.520 | 44.414 / 52.579 / 8.568 | 0.915382 / 0.154987 |
+
+Phase times are subsets of simulation time, not additional costs. The two-food
+cases account for 92.204% of simulation time and 252,001,545 creature-ticks,
+versus Canyon's 3,332,837. The run spends 388.470 s in sensor assembly and
+355.232 s in world update; Canyon's small population still incurs 73.838 s
+of world update. Per-creature-tick VM steps are 22.702317 / 22.058545 /
+23.339446 and mesh hops 2.132223 / 2.036578 / 2.219345. This localizes the
+measured cost to simulation workload with substantially different populations,
+not observation overhead. It does not isolate a causal food-count, terrain
+or host cost, and no old-goal regression percentage is meaningful across the
+changed inputs. The unchanged gate supplies the comparable compute check.
+The bounded investigation is complete; no profiler, tuning or second goal
+run was used. Log: `/private/tmp/t12-f04-bench-goal.log`.
+
 Natural analogs are food profitability and return rate, landscape barriers,
 and patchy habitats. These reach creatures through consumed energy, applied
 food growth/placement, passability and existing perception.
@@ -389,13 +512,14 @@ mutation floors, the 30-second drift observation cap, 10-second founder,
 180-second aggregate evolved-neighborhood and 15-minute investigation limits
 across the complete profile. No timing/sample threshold is increased to
 accommodate the new environments. The world set is the standard goal baseline,
-with per-case evidence rather than a composite score. Measurements are pending.
+with per-case evidence rather than a composite score. The measured evidence
+above retains the failed drift floors and completed runtime investigation.
 
 ## Success Criteria
 
-- [ ] Foods differ in applied payoff, initial habitat, regrowth and recovery
+- [x] Foods differ in applied payoff, initial habitat, regrowth and recovery
   through recipes alone while default behavior and inheritance remain intact.
-- [ ] Four named worlds load in app/CLI, faithfully express their pressures,
+- [x] Four named worlds load in app/CLI, faithfully express their pressures,
   and the standard goal command runs exactly the three non-plains environments
   once each with attributable full readings, including failures.
 - [ ] Required verification, mutation/review records and exact-content closure
@@ -403,6 +527,11 @@ with per-case evidence rather than a composite score. Measurements are pending.
 
 ## Notes for AI Agents
 
+- Measured blocker: depth-2,000 drift changed/all births is 12/2,000,
+  10/2,000 and 12/2,000, below the standing 16/2,000 in every case. Store the
+  reports and complete independent review/checks, but do not mark Complete,
+  add this report to `closed`, or integrate without an explicit resolution.
+  No F18 exception, recipe tuning, favorable rerun or lowered floor applies.
 - Deferred finding P2, mutation coverage: the two visited-guard mutations at
   `crates/v3-core/src/kernel/world.rs:57:48` (`&&` to `||`) and `:57:32`
   (delete `!`) repeatedly enqueue visited cells and do not terminate. The
@@ -497,3 +626,34 @@ with per-case evidence rather than a composite score. Measurements are pending.
   not yet closed. Keep `closed` empty until acceptance and retain historical
   tabs. Verify the rendered report; this HTML-only correction does not change
   the Rust mutation diff. Consultations so far: 8; usage unavailable.
+- Advisor consultation 9 followed the single goal command exceeding 900
+  seconds. The 15-minute threshold triggers documented investigation, not
+  cancellation or an automatic waiver. Finish the run and use its existing
+  per-case simulation/phase times, work counts, population samples and
+  observation timings; compare external elapsed with the nonoverlapping
+  component totals and leave residual setup/connectivity/serialization/cleanup
+  unmeasured. Phase timings are a subset, not additional elapsed time. Do not
+  assert an old-goal regression or unmeasured terrain/host cause across changed
+  inputs. Founder 10 s, evolved 180 s and drift 30 s remain hard aggregate
+  caps; mutation floors remain blockers if missed. No second goal, profiler or
+  tuning run is authorized by the overrun. Consultations so far: 9; usage
+  unavailable.
+- Advisor consultation 10 verified every actual drift denominator, the exact
+  Canyon/F18 drift equality, the two-food context distinction and the closure
+  blocker. The runtime investigation accounts for 1,045.379938 of 1,047.04 s;
+  simulation workload dominates and all hard observation caps pass. Existing
+  timing/population/work data sufficiently investigate the 900-second trigger;
+  no separate waiver, profiler or second goal run is needed. Canyon's seven
+  evolved samples follow the existing population-limited rule and demonstrate
+  fragile finite-horizon survival, not robust viability.
+  Scope clarification: the 60% single-event silence target remains unmet,
+  with 93/164 in the two-food cases and unchanged 98/164 in Canyon. The
+  [F01 floor deadline](t11-f01-mutational-neighborhood-indicator.md#floors-final-values),
+  [F15 acceptance](t11-f15-mesh-routing-connection-semantics.md), and
+  [F18 historical reading](t11-f18-backend-neutral-mesh-node-growth.md#performance-and-goal-impact)
+  distinguish this T11 capstone target from the strict later-closure drift
+  requirement. Retain the target and actual gap; do not expand F04 into an
+  unrequested repair or call the reading a pass. This is scope clarification,
+  not a changed floor or acceptance exception. Consultations: 10; usage
+  unavailable. Independent final review and final `make check` remain the
+  orchestrator's next steps after the implementer handoff.
