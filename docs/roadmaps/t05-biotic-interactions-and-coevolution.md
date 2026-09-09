@@ -1,7 +1,7 @@
 # T05 — Biotic Interactions and Coevolution
 
 **Status**: Planned
-**Last updated**: 2026-09-04
+**Last updated**: 2026-09-08
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -35,6 +35,8 @@ strategies without directly rewarding complexity.
   - Goal: Deferred proof phase. Replicated confirmatory runs that a food web with more than one durable strategy persists.
 
 ## Notes for AI Agents
+
+- T05.F01/F02/F06 must enable their encounter, predator-prey, and parasite mechanisms in all three standard goal environments under the [shared baseline contract](../workflow.md#environmental-pressures-in-the-standard-baseline). Report applied interactions, including absence; enabling the mechanism does not establish coevolution.
 
 - Extend the existing `StealEnergy` interaction and predation accounting only where they provide sound primitives; do not treat kill counts as proof of coevolution.
 - T05.F01 resolves an encounter from the two creatures' applied traits, actions, and energy. It is not a generic framework or a resolution table; an outcome that cannot be traced to a body trait or an action does not belong.

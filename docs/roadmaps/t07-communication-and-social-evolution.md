@@ -1,7 +1,7 @@
 # T07 — Communication and Social Evolution
 
 **Status**: Planned
-**Last updated**: 2026-09-04
+**Last updated**: 2026-09-08
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -36,6 +36,8 @@ tested.
   - Goal: Deferred proof phase. Replicated confirmatory runs that more than one social strategy persists.
 
 ## Notes for AI Agents
+
+- T07.F01–F03/F05/F06 must enable their signal medium and social interaction opportunities in all three standard goal environments under the [shared baseline contract](../workflow.md#environmental-pressures-in-the-standard-baseline). Report applied effects without assigning signal meaning or forcing cooperation.
 
 - Do not encode meanings such as food, danger, kin, or cooperation into signal channels. Meaning must arise from sender-receiver effects.
 - Existing identity and kin-affinity inputs may provide context, but lineage labels must not become automatic cooperation bonuses.

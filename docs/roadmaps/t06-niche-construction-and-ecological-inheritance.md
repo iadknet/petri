@@ -36,6 +36,8 @@ themselves and for other lineages across lifetimes and generations.
 
 ## Notes for AI Agents
 
+- T06.F01–F05 must integrate construction, caching, byproducts, habitat modification, and persistence/decay into all three standard goal environments under the [shared baseline contract](../workflow.md#environmental-pressures-in-the-standard-baseline). Verify applied action-to-world effects with fixtures and report actual baseline occurrences; do not seed fabricated evolved constructions.
+
 - Advance designs requested 2026-09-04: [T06.F01 spec](../specs/roadmap/t06-f01-material-carrying-and-barrier-construction.md) and [T06.F02 spec](../specs/roadmap/t06-f02-food-transport-and-caching.md). Both remain Planned. F01 reuses T12.F01 seeded barriers (moved from T02.F02 on 2026-09-08; T02.F02 keeps their visibility behavior, which the sensor contract already provides); F02 transports uneaten food and does not require T03.F05 internal energy-storage traits. Trails are outside these two features. F04 covers habitat properties beyond F01's barrier relocation.
 - The applied world grid owns environmental truth. Construction actions must change that state through normal action resolution and energy accounting.
 - A creature merely consuming or occupying a cell is not sufficient evidence of niche construction; the change must alter later selection and survive long enough to be assayed.

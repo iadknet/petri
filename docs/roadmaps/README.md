@@ -28,3 +28,8 @@ execution policy or integration authority. Those belong in
 one feature per goal, in dependency order: the target feature must have all
 dependencies checked, and a goal never implements a prerequisite or an unrelated
 ready feature implicitly.
+
+Feature specs that introduce environmental pressures must include their
+integration into all three standard goal environments and applied-behavior
+verification under the [shared baseline contract](../workflow.md#environmental-pressures-in-the-standard-baseline).
+This remains part of the owning feature, not a separate roadmap item.

@@ -231,6 +231,36 @@ times for builds): a mutant that times out is reported as a survivor to
 triage, so a tight cap on a loaded host manufactures survivors and a retriage
 loop rather than catching anything.
 
+### Environmental pressures in the standard baseline
+
+From T12.F04 onward, every feature that adds an environmental pressure must
+integrate it into all three standard goal environments: Orchards, Canyon,
+and Confluence. Update the existing goal-profile recipes/configuration in the
+same feature so the ordinary `make bench PROFILE=goal` run exercises the new
+pressure once in each environment, three runs total. Retain previously added
+pressures for subsequent closures; a separate opt-in sweep or an unchanged
+world-set reading does not satisfy this requirement. Keep the short compute
+gate unchanged unless its change is explicitly authorized.
+
+The feature spec identifies the applied mechanism, its settings in each world,
+and the evidence that it is enabled and can affect creatures there. For
+creature-authored pressures, verify the action-to-world path with a focused
+fixture and report actual occurrences in the goal runs, including zero; do not
+force the behavior or claim it evolved merely because it is enabled. Record
+per-environment persistence and pressure observations with effective config
+identity in the closure report. Preserve each world's distinguishing habitat,
+existing budgets, historical reports, and honest comparison boundaries when
+inputs change. Disabled controls remain available for attribution, but do not
+replace the three pressure-bearing standard cases. Unresolved incompatibility
+with a world is a recorded blocker, not a silent omission or weakened check.
+
+This applies to abiotic, biotic, and creature-authored pressures, including
+T02.F01–F05, T04.F03/F04, T05.F01/F02/F06, T06.F01–F05,
+T07.F01–F03/F05/F06, and future T12 pressure additions. Observation-only
+features, recipe transport, and deferred characterization campaigns do not
+invent new pressures to satisfy it. The final reviewer checks this integration
+against the original roadmap goal before closure.
+
 ### Close and integrate
 
 In the worktree: run `make check` once on the final feature code and record
