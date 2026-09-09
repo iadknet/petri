@@ -18,6 +18,10 @@ is visible as **not yet closed**: all three depth-2,000 drift readings miss
 the standing floor. The 1,047.04-second run triggered the documented runtime
 investigation; its hard observation timing caps passed. No acceptance exception
 or integration is implied by storing the report.
+Independent review also found missing per-case population structure
+distributions in the initial report. They are explicitly unavailable; the
+original reference is preserved while a separately named corrected report
+repairs the evidence omission.
 
 Each row preserves the comparison references stored when that closure ran:
 the epoch baseline and, where one existed, the immediately previous closure.

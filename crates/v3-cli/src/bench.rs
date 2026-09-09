@@ -385,6 +385,9 @@ pub struct PerCreatureTick {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoalCaseObservation {
     pub case: GoalCase,
+    /// Complete final population for this case; absent in the initial F04 report.
+    #[serde(default)]
+    pub reachable_structure_size_distribution: Option<StructureSizeDistribution>,
     pub mutational_neighborhood: Indicator<MutationalNeighborhood>,
     pub drift_depth: Indicator<DriftDepth>,
 }
@@ -395,6 +398,7 @@ pub struct GoalIndicators {
     pub cases: Vec<GoalCaseObservation>,
     pub population_persistence: PopulationPersistence,
     pub births_per_100_ticks: String,
+    /// Pooled complete final populations across every seed/case.
     pub reachable_structure_size_distribution: StructureSizeDistribution,
     #[serde(default = "undefined_lineage_diversity")]
     pub lineage_diversity: Indicator<LineageDiversity>,
@@ -1966,6 +1970,9 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         if let Some(case) = case {
             case_observations.push(GoalCaseObservation {
                 case: case.case,
+                reachable_structure_size_distribution: Some(structure_size_distribution(
+                    run.complexities,
+                )),
                 mutational_neighborhood: build_mutational_neighborhood_indicator(
                     Some(case.founder),
                     params,
@@ -2524,6 +2531,55 @@ mod tests {
         let _case = prepare_goal_case(&params, 0, 11, &mut founder_ms, &mut drift_ms);
         assert!(founder_ms > 0.0);
         assert!(drift_ms.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn goal_cases_keep_distinct_full_population_structure_distributions() {
+        let mut params = goal_profile_params();
+        params.width = 32;
+        params.height = 32;
+        params.founders = 32;
+        params.ticks = 60;
+        params.neighborhood = NeighborhoodSizes::default();
+        params.drift = Default::default();
+        let (report, _) = run_deterministic(&params);
+        let mut expected_cases = Vec::new();
+        let mut pooled = Vec::new();
+        for (index, case) in report.goal_indicators.cases.iter().enumerate() {
+            let (_, config) = goal_case(&params, index, params.seeds[index]);
+            let run = run_one_seed(
+                &config,
+                params.seeds[index],
+                params.ticks,
+                false,
+                None,
+                params.neighborhood,
+            );
+            assert_eq!(run.complexities.len() as u64, run.per_seed.final_population);
+            assert!(run.complexities.len() > neighborhood::SAMPLE_SIZE);
+            pooled.extend_from_slice(&run.complexities);
+            let expected =
+                serde_json::to_value(structure_size_distribution(run.complexities)).unwrap();
+            assert_eq!(
+                serde_json::to_value(case.reachable_structure_size_distribution.as_ref().unwrap())
+                    .unwrap(),
+                expected
+            );
+            expected_cases.push(expected);
+            let mut historical = serde_json::to_value(case).unwrap();
+            historical
+                .as_object_mut()
+                .unwrap()
+                .remove("reachable_structure_size_distribution");
+            let historical: GoalCaseObservation = serde_json::from_value(historical).unwrap();
+            assert!(historical.reachable_structure_size_distribution.is_none());
+        }
+        assert!(expected_cases.windows(2).any(|pair| pair[0] != pair[1]));
+        assert_eq!(
+            serde_json::to_value(report.goal_indicators.reachable_structure_size_distribution)
+                .unwrap(),
+            serde_json::to_value(structure_size_distribution(pooled)).unwrap()
+        );
     }
 
     #[test]

@@ -158,6 +158,9 @@ Required terrain and world set:
   observations; singular top-level fields are explicitly `Undefined` with
   a per-case attribution reason for a multi-config goal, not a first-case
   value. Gate and single-config report behavior remain intact.
+  Case structure-size distributions use each complete final population;
+  historical missing values are unavailable, never replaced by the pooled
+  distribution or evolved sample. The retained top-level distribution is pooled.
 - Record extinction tick, peak/plateau/final population, births and final mean
   energy from existing persistence fields for each case. Survival means
   nonextinction through the full horizon, not proof of long-term viability.
@@ -264,6 +267,10 @@ Required terrain and world set:
 - [ ] Standing later-closure drift floor: each case must reach 0.008000 at
   depth 2,000. Actual readings 0.006000 / 0.005000 / 0.006000 fail; this remains
   a measured closure blocker without an authorized resolution.
+- [ ] Post-review corrected goal evidence stores per-case full-population
+  structure distributions at a distinct path/revision, preserving the initial
+  report/reference and identical profile inputs. This is evidence repair,
+  not a redundant determinism run or favorable-outcome selection.
 - [x] Second goal determinism run: Not applicable by the workflow's 2026-09-05
   decision; existing reproducibility and gate two-run tests remain required.
 - [ ] Fresh independent final review, final `make check`, closure
@@ -366,12 +373,13 @@ change was made for mutation remediation.
   abstraction, watchdog, test filter, performance threshold or production edit.
 - Final fresh pass: `112 mutants tested in 10m: 84 caught, 26 unviable,
   2 timeouts`, exit 0; `run-mode.txt` is `fresh`. Full output:
-  `/Users/istefanek/.local/share/petri-tools/mutants/t12-f04/mutants.out`;
+  `/private/tmp/t12-f04-mutants-prereview-final.out` (archived before the
+  post-review fresh pass reused the ordinary output directory);
   log `/private/tmp/t12-f04-mutants-final.log`. `missed.txt` is empty.
   No equivalent classifications or mutation exclusions were added.
 
-Complete survivor history and final resolutions (locations are the unchanged
-production locations reported by cargo-mutants):
+Complete pre-review survivor history and resolutions (locations are those
+reported by cargo-mutants in the corresponding pre-review source):
 
 | File and location | Mutation | Resolution |
 | --- | --- | --- |
@@ -384,6 +392,17 @@ production locations reported by cargo-mutants):
 | `crates/v3-core/src/patterns/mod.rs:140:29` | `>` to `>=` in `generate_pattern` | Killed by exact-zero threshold example; final fresh caught list. |
 | `crates/v3-core/src/kernel/world.rs:57:48` | `&&` to `||` in `WorldState::passable_connectivity` | Deferred P2: final fresh timeout, 3 s build + 120 s test; see Notes for AI Agents. |
 | `crates/v3-core/src/kernel/world.rs:57:32` | delete `!` in `WorldState::passable_connectivity` | Deferred P2: final fresh timeout, 3 s build + 120 s test; see Notes for AI Agents. |
+
+Post-review remediation pass 1 reran `MUTANTS_ITERATE=0 make rust-mutants`:
+`112 mutants tested in 10m: 84 caught, 26 unviable, 2 timeouts`, exit 0,
+`run-mode.txt` fresh, unmutated baseline 39 s build + 11 s test. Full output:
+`/Users/istefanek/.local/share/petri-tools/mutants/t12-f04/mutants.out`;
+log `/private/tmp/t12-f04-review-mutants.log`. The complete survivor list is
+the same two deferred visited-guard mutations at `world.rs:57:48` (`&&` to
+`||`) and `world.rs:57:32` (delete `!`), each 3 s build + 120 s test.
+`missed.txt` is empty. Existing finite-survivor tests remain caught; no new
+exclusions, test filtering, production mutation remediation or time-cap
+changes were introduced.
 
 ## Performance and Goal Impact
 
@@ -408,6 +427,12 @@ once, exit 0, on 2026-09-09 UTC. The report is
 Its empty comparison list is intentional: no matching prior world-set report
 exists. `severe=false` is not evidence that the independent drift floor passed.
 The historical goal series and both closed lists remain unchanged.
+
+Initial-report limitation found during review: it contains only the pooled
+population structure distribution, with no per-case distributions. Historical
+absence is unavailable; it cannot be reconstructed from evolved samples.
+The initial artifact/reference remains unchanged while the required corrected
+measurement at a distinct path supplies the missing case readings.
 
 **Measured closure blocker.** All three depth-2,000 changed/all-birth readings
 are below 0.008000 (16/2,000). No rate, seed, recipe, battery, threshold or
@@ -527,6 +552,33 @@ above retains the failed drift floors and completed runtime investigation.
 
 ## Notes for AI Agents
 
+- Independent review at `101bf12a`: P1 1, P2 0, P3 1. Post-review remediation
+  pass 1 fixes P1 missing per-case full-population structure distributions and
+  P3 the shared recovery-rate formula in `v3-world-grid-spec.md`. No simulation,
+  recipe, mutation policy or sampling change. Advisor consultation 11 accepted
+  the existing distribution helper applied to each complete complexities vector,
+  optional historical absence, explicit pooled top-level semantics, and a
+  distinct-case/full-population regression test. Red: missing field compile
+  error. Green: the fixed 32², 32-founder, 60-tick production fixture checks
+  unequal case distributions, complete populations larger than the evolved
+  sample, exact attribution, pooled retention and historical missing values.
+  `cargo check --workspace --all-targets`, all `cargo test -p v3-cli` suites
+  (46/11/17/11 tests), and workspace Clippy pass. Self-review reuses the
+  existing helper and moves each owned vector after the existing pooled copy;
+  the only new reporting work is each population's distribution sort.
+  Advisor 11 requires a corrected full goal report as evidence repair, distinct
+  from a redundant determinism rerun. Preserve the original report byte-for-byte
+  at its path/reference (SHA-256
+  `f9654d1681ae7681e4acb223bb4ad7834e77379a4999fef7b612196764db82c8`),
+  label its missing per-case distribution, and write corrected evidence to
+  `t12-f04-baseline-world-set-goal-corrected.json` at the new actual revision.
+  Identical cases/seeds/configs/horizon/sizes are required. Fresh mutation
+  passed with the two documented deferred timeouts; corrected measurement
+  remains pending and the drift blocker is not waived.
+  Parent `make check` passed the reviewed commit and will rerun after correction.
+  The same independent reviewer checked the remediation code/docs read-only:
+  original P1/P3 resolved, no new P1; measurement/mutation/final-check evidence
+  remains pending. Consultations: 11; usage unavailable.
 - Measured blocker: depth-2,000 drift changed/all births is 12/2,000,
   10/2,000 and 12/2,000, below the standing 16/2,000 in every case. Store the
   reports and complete independent review/checks, but do not mark Complete,

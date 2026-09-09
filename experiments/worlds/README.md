@@ -45,13 +45,18 @@ Regenerate the full-size layout observations and preview PPM files with
 --ignored --nocapture`. Connectivity uses eight-direction movement with the
 world's actual edge rule, ignores occupancy, and is measured before tick work.
 
-The first [full goal report](../../docs/progress/features/t12-f04-baseline-world-set-goal.json)
+The first [goal report](../../docs/progress/features/t12-f04-baseline-world-set-goal.json)
 was measured at `5f87c8f4`; it is **not yet closed**. All three cases completed
 2,000 ticks without extinction. Final populations were 32,909 / 7 / 39,318;
 minimum populations 10,000 / 7 / 6,661 and plateau populations
 22,674.06 / 19.918 / 35,937.08. Canyon's seven survivors are a fragile
 finite-horizon result, not robust viability; its evolved battery samples all
 seven under the existing min(population, 12) rule.
+
+Review found that this initial report retained only the pooled population
+structure distribution. Its missing per-case distributions are unavailable,
+not zero. The original report/reference is preserved; a separately named
+corrected measurement is required to repair that evidence omission.
 
 All cases miss the unchanged depth-2,000 drift floor of 0.008000:
 Orchards and Confluence each measure 12/2,000 (0.006000), Canyon 10/2,000
