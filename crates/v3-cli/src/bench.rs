@@ -2491,6 +2491,41 @@ mod tests {
     use v3_core::contracts::{Direction, WorldAction};
     use v3_core::simulation::seed_simulation;
 
+    proptest! {
+        #[test]
+        fn births_rate_uses_complete_profile_totals(births in 0u64..1_000_000, ticks in 0u64..100_000) {
+            for ticks in [0, ticks.max(1)] {
+                let inputs = GoalIndicatorInputs {
+                    population_persistence_per_seed: vec![],
+                    lineage_diversity_per_seed: vec![],
+                    memory_sensitivity_per_seed: vec![],
+                    temporal_memory_sensitivity_per_seed: vec![],
+                    evolved_neighborhood_per_seed: vec![],
+                    pooled_complexities: vec![],
+                    neighborhood_founder: None,
+                    drift_depth: Indicator::Undefined("test profile".into()),
+                    case_observations: vec![],
+                };
+                let totals = Totals { births, ticks, ..Totals::default() };
+                let indicators = assemble_goal_indicators(&small_profile("synthetic"), &totals, inputs);
+                let expected = if ticks == 0 { 0.0 } else { births as f64 * 100.0 / ticks as f64 };
+                let actual: f64 = indicators.births_per_100_ticks.parse().unwrap();
+                prop_assert!((actual - expected).abs() <= 0.000_001);
+            }
+        }
+    }
+
+    #[test]
+    fn goal_case_adds_observation_time_to_zero_accumulators() {
+        let mut params = small_profile(GOAL_WORLD_SET);
+        params.seeds = vec![11, 22, 33];
+        let mut founder_ms = 0.0;
+        let mut drift_ms = Some(0.0);
+        let _case = prepare_goal_case(&params, 0, 11, &mut founder_ms, &mut drift_ms);
+        assert!(founder_ms > 0.0);
+        assert!(drift_ms.unwrap() > 0.0);
+    }
+
     #[test]
     fn goal_world_set_executes_three_named_configs_with_case_observations() {
         let mut params = goal_profile_params();

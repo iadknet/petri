@@ -29,7 +29,45 @@ fn fbm_threshold_extremes_and_translation() {
         "octaves":4,"frequency":0.02,"lacunarity":2.0,"persistence":0.5,"threshold":1.0}))
     .unwrap();
     assert!(generate_pattern_seeded(bounds, &params, 42).is_empty());
-    let _ = SimulationConfig::default();
+}
+
+#[test]
+fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
+    let mut params = PatternParams::FbmThreshold {
+        octaves: 4,
+        frequency: 0.02,
+        lacunarity: 2.0,
+        persistence: 0.5,
+        threshold: 0.0,
+    };
+    // Perlin fBm is exactly zero at the local origin, which must be excluded.
+    let bounds = PatternBounds {
+        x: u16::MAX,
+        y: u16::MAX,
+        width: 4,
+        height: 5,
+    };
+    assert!(generate_pattern_seeded(bounds, &params, 42).is_empty());
+    if let PatternParams::FbmThreshold { threshold, .. } = &mut params {
+        *threshold = -1.0;
+    }
+    let points = generate_pattern_seeded(bounds, &params, 42);
+    assert_eq!(points.len(), 1);
+    assert_eq!((points[0].x, points[0].y), (u16::MAX, u16::MAX));
+    let bounds = PatternBounds {
+        x: u16::MAX - 1,
+        y: u16::MAX - 2,
+        width: 4,
+        height: 5,
+    };
+    let points = generate_pattern_seeded(bounds, &params, 42);
+    let actual: std::collections::BTreeSet<_> =
+        points.iter().map(|point| (point.x, point.y)).collect();
+    let expected = (u16::MAX - 1..=u16::MAX)
+        .flat_map(|x| (u16::MAX - 2..=u16::MAX).map(move |y| (x, y)))
+        .collect();
+    assert_eq!(actual, expected);
+    assert_eq!(points.len(), 6);
 }
 
 #[test]

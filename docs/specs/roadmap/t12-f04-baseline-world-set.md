@@ -317,8 +317,58 @@ are retained under `/private/tmp/t12-f04-*.log` for this execution.
   Reused existing goal observation types per case and extracted cohesive
   observation assembly instead of adding a runner or suppressing the length
   lint. No speculative abstractions, dependencies or production tuning added.
-- `make roadmap-check` passed on document edits. Full fresh mutation results,
-  final measured gate/goal reports, reviewer and closure evidence remain pending.
+- `make roadmap-check` passed on document edits. Fresh mutation evidence is
+  recorded below; measured gate/goal reports, reviewer and closure evidence
+  remain pending.
+
+### Mutation remediation record
+
+All passes use `MUTANTS_ITERATE=0 make rust-mutants`, the unfiltered affected
+package suites and ordinary timeout caps. The initial sandbox could not inspect
+host processes; the command did not start until the ordinary process/cache
+permissions were granted. No test-selection, tool-configuration or production
+change was made for mutation remediation.
+
+- First fresh pass: `112 mutants tested in 11m: 10 missed, 74 caught,
+  26 unviable, 2 timeouts`. Full output retained at
+  `/private/tmp/t12-f04-mutants-first.out`; log
+  `/private/tmp/t12-f04-mutants.log`.
+- Second fresh pass: `112 mutants tested in 10m: 3 missed, 81 caught,
+  26 unviable, 2 timeouts`. Full output retained at
+  `/private/tmp/t12-f04-mutants-second.out`; log
+  `/private/tmp/t12-f04-mutants-second.log`.
+- Test-only remediation adds a births-rate property over complete profile
+  totals (including zero ticks on every draw), exact strict-zero and coordinate
+  clipping witnesses, and zero-initialized founder/drift timing accumulation.
+  A first maximum-corner witness caught overflow but missed division because
+  both expressions equal one there; the near-corner witness retains exactly
+  six cells. A positive aggregate timer alone could miss multiplication of a
+  tiny positive initial duration; the helper fixture starts from exact zero.
+  `cargo test -p v3-core --test baseline_worlds`: 15 passed, two separately
+  executed diagnostics ignored. Both new CLI properties/examples passed;
+  `cargo clippy --workspace --all-targets -- -D warnings` passed. Self-review:
+  these assertions exercise existing interfaces and invariants without a new
+  abstraction, watchdog, test filter, performance threshold or production edit.
+- Final fresh pass: `112 mutants tested in 10m: 84 caught, 26 unviable,
+  2 timeouts`, exit 0; `run-mode.txt` is `fresh`. Full output:
+  `/Users/istefanek/.local/share/petri-tools/mutants/t12-f04/mutants.out`;
+  log `/private/tmp/t12-f04-mutants-final.log`. `missed.txt` is empty.
+  No equivalent classifications or mutation exclusions were added.
+
+Complete survivor history and final resolutions (locations are the unchanged
+production locations reported by cargo-mutants):
+
+| File and location | Mutation | Resolution |
+| --- | --- | --- |
+| `crates/v3-cli/src/bench.rs:1795:48` | `==` to `!=` in `assemble_goal_indicators` | Killed by births-rate property; final fresh caught list. |
+| `crates/v3-cli/src/bench.rs:1798:56` | `*` to `+`; `*` to `/` in `assemble_goal_indicators` | Both killed by births-rate property; final fresh caught list. |
+| `crates/v3-cli/src/bench.rs:1798:34` | `/` to `%`; `/` to `*` in `assemble_goal_indicators` | Both killed by births-rate property; final fresh caught list. |
+| `crates/v3-cli/src/bench.rs:1738:17` | `+=` to `*=` in `prepare_goal_case` | Killed by zero-accumulator timing example; final fresh caught list. |
+| `crates/v3-core/src/patterns/mod.rs:127:59` | `-` to `+`; `-` to `/` in `generate_pattern` | Both killed by clipped-bound examples; final fresh caught list. |
+| `crates/v3-core/src/patterns/mod.rs:128:61` | `-` to `+`; `-` to `/` in `generate_pattern` | Both killed by clipped-bound examples; final fresh caught list. |
+| `crates/v3-core/src/patterns/mod.rs:140:29` | `>` to `>=` in `generate_pattern` | Killed by exact-zero threshold example; final fresh caught list. |
+| `crates/v3-core/src/kernel/world.rs:57:48` | `&&` to `||` in `WorldState::passable_connectivity` | Deferred P2: final fresh timeout, 3 s build + 120 s test; see Notes for AI Agents. |
+| `crates/v3-core/src/kernel/world.rs:57:32` | delete `!` in `WorldState::passable_connectivity` | Deferred P2: final fresh timeout, 3 s build + 120 s test; see Notes for AI Agents. |
 
 ## Performance and Goal Impact
 
@@ -353,6 +403,14 @@ with per-case evidence rather than a composite score. Measurements are pending.
 
 ## Notes for AI Agents
 
+- Deferred finding P2, mutation coverage: the two visited-guard mutations at
+  `crates/v3-core/src/kernel/world.rs:57:48` (`&&` to `||`) and `:57:32`
+  (delete `!`) repeatedly enqueue visited cells and do not terminate. The
+  final fresh suite timed out at 120 seconds for each. Ordinary in-process
+  assertions cannot finish with the guard missing; these are not equivalent
+  or killed. Connectivity examples/properties and the unmutated full baseline
+  pass. Advisor 6 accepted retaining this explicit coverage debt rather than
+  adding subprocess/watchdog test machinery solely for mutation score.
 - Starting main: `f7673fc29655b5213a4da14c88295ca5bf6d16a5`.
   Worktree: `/Users/istefanek/projects/petri/.worktrees/t12-f04`,
   branch `codex/t12-f04`. Track already In Progress and master Active;
@@ -409,3 +467,33 @@ with per-case evidence rather than a composite score. Measurements are pending.
   to existing food/config validation, not enum-wide tightening of historical
   PatternParams. No new pattern validation wrapper or lint waiver was added.
   Implementer consultations so far: 4; usage unavailable.
+- Advisor consultation 5 accepted measuring the goal once without substrate
+  tuning. The T11.F18 depth-2,000 drift result of 10/2,000 (0.005000) had a
+  feature-local exception; it does not waive F04's standing 0.008000 floor.
+  Compare Canyon's relevant observation inputs and full drift rows with F18;
+  two-food cases have a different battery/mutation context. Any measured
+  failure remains an unmet criterion, with no terrain-causality claim,
+  favorable rerun or automatic closure exception.
+- Advisor consultation 6 accepted test-only remediation of finite mutation
+  gaps and explicit deferral of nonterminating visited-guard mutants if they
+  remain in the final fresh run. They are neither equivalent nor killed.
+  In-process connectivity assertions cannot complete once traversal repeatedly
+  revisits cells; adding subprocess/watchdog machinery solely for mutation
+  score is not required. Preserve normal timeout caps, test selection and
+  unmutated connectivity tests/properties. Consultations so far: 6; usage
+  unavailable.
+- Advisor consultation 7 accepted two further test-only witnesses after the
+  coordinate-division survivors recurred: bounds at (65534, 65533) with a
+  requested 4-by-5 region must retain exactly six coordinates, while division
+  incorrectly retains one. Retain the broad property test. Test founder timing
+  accumulation from exactly zero with reduced observation sizes and a positive
+  elapsed duration assertion; do not assert exact time or change performance
+  thresholds. Finish each active mutation pass and run fresh after remediation.
+  Consultations so far: 7; usage unavailable.
+- Advisor consultation 8 accepted hoisting the dashboard's existing relative
+  link helper after self-review found it inaccessible to the new case cards.
+  Load the new series' epoch reference through the existing deduplicating path,
+  count reports rather than closures, and label an epoch outside `closed` as
+  not yet closed. Keep `closed` empty until acceptance and retain historical
+  tabs. Verify the rendered report; this HTML-only correction does not change
+  the Rust mutation diff. Consultations so far: 8; usage unavailable.
