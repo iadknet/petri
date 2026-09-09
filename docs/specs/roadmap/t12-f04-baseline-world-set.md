@@ -659,6 +659,139 @@ recorded before the fields existed.
 this pass, so no report under `docs/progress/features/` was regenerated or
 edited here.
 
+#### Fold-in pass
+
+Fourth implementer pass, 2026-09-09, same worktree, on base `3ba4a782` (a fresh
+agent). One user-requested fold-in: carry every blocked move by its cause, not
+only the barrier ones. Nothing outside `crates/v3-cli/src/bench.rs`,
+`docs/progress/index.html`, `docs/reference/v3-cli-contract-spec.md`, and this
+subsection was touched; `experiments/worlds/`, the roadmaps, and
+`docs/progress.md` were not.
+
+**What landed.** `SimStats.move_actions_blocked_total_by_cause` already counted
+every blocked move under `MoveBlockedCause::{Barrier, Occupied, OutOfBounds}`,
+but the report kept only the barrier entry, so a world that traded barrier
+blocks for crowding read as if nothing had changed. `WorldTracking` now carries
+`moves_blocked_total_by_cause: {barrier, occupied, out_of_bounds}`, read once
+per cause from that map in `observe`, and `moves_blocked_barrier_total` is
+assigned the same `barrier` value rather than looked up a second time — one
+measurement, two keys on the wire, kept because reports stored before this pass
+carry only the old key. Because `WorldTracking` is the one struct both the
+persistence samples (existing `births_total` cadence) and each
+`GoalCaseObservation` embed, both surfaces gained the totals together.
+
+The field is `Option<MovesBlockedByCause>`, not a defaulted struct, on purpose:
+the world-set per-case comparison follows the three totals as raw readings
+(`moves_blocked_barrier_total`, `moves_blocked_occupied_total`,
+`moves_blocked_out_of_bounds_total`), and the reference report it compares
+against — the stored `...-goal.json` — predates the field. A defaulted struct
+would have made that reference read a measured zero and reported the first real
+measurement as an infinite change; `None` reads unmeasured, the same discipline
+the remediation pass applied to the reader-state rates. `serde(default)` keeps
+the historical parse working, and nothing in the report uses
+`deny_unknown_fields`.
+
+The dashboard's "Blocked moves" chart takes the two new causes as secondary
+series, each named for its cause and its denominator ("blocked by an occupied
+cell, of all moves", "blocked at the world edge, of all moves"), divided by
+`moves_attempted_total` in the same JS-side way the per-creature-tick charts
+divide; the emphasized headline pair is untouched. The reference spec's
+persistence-sample field list names the new object, its source stats map, that
+its `barrier` entry is the same measurement as `moves_blocked_barrier_total`,
+and that it is absent rather than zeroed in an older report.
+
+Tests. The red was a compile failure: the new
+`observe_reads_each_blocked_move_cause_from_its_own_stats_key` referenced a
+field and a type that did not exist yet (`no field
+moves_blocked_total_by_cause on type WorldTracking`, `failed to resolve: use of
+undeclared type MovesBlockedByCause`), reported by the compile-check hook.
+
+- `observe_reads_each_blocked_move_cause_from_its_own_stats_key` stamps three
+  distinct counts under the three cause keys and asserts each lands in its own
+  field and that `moves_blocked_barrier_total` is the map's barrier entry; it
+  also asserts an unstamped run reads `Some(default)` — zero, not absent.
+- `persistence_samples_carry_world_tracking_on_the_births_cadence` now asserts,
+  on every sample, that the by-cause barrier entry equals
+  `moves_blocked_barrier_total` and that the three causes together are a subset
+  of `moves_attempted_total`.
+- `tracking_fields_default_when_absent_and_survive_a_round_trip` pins the wire
+  key `moves_blocked_total_by_cause.occupied`; the pre-T12.F04 parse assertion
+  is unchanged and still passes.
+- `case_readings_follow_the_case_seed_and_observation` stamps three different
+  multiples of each case's seed (`seed`, `seed * 3`, `seed * 5`) so a swapped
+  cause is visible, asserts all three readings by name, and leaves the first
+  case's field `None` to assert an unmeasured reading rather than zero.
+- `tracking_fractions_divide_each_reading_by_its_own_denominator` and
+  `world_set_case_tracking_matches_a_replayed_run` needed no new assertions:
+  the first is a whole-struct literal, the second a whole-struct equality
+  against a replayed `observe`.
+
+**Commands and results** (worktree root, `PATH` prefixed with the petri-tools
+and aqua bin directories):
+
+| Command | Result |
+| --- | --- |
+| `cargo test -p v3-core --test viability` (run first) | ok, 24 passed |
+| `cargo test -p v3-cli` | ok, 69 lib + 11 `main` + 18 `tests/bench.rs` + 11 `tests/cli.rs` passed |
+| `cargo clippy --workspace --all-targets -- -D warnings` | clean |
+| `cargo fmt --all` | applied |
+| `make check` | exit 0 |
+| `make roadmap-check` | validation passed |
+| `MUTANTS_ITERATE=0 make rust-mutants` | see below |
+
+**Simplification pass.** Run on this pass's diff against `3ba4a782`
+(single-pass inline review; the Agent fan-out is unavailable in this context).
+Applied: `by_cause_readings` dropped its function-pointer indirection for a
+three-entry array mapped once into `(String, Option<f64>)`, and the new
+`observe` test reuses its one simulation for both the unstamped and the stamped
+assertion instead of building a second one. Skipped: a generic `ByCause<T>`
+mirroring `ByReaderState<T>` (only `u64` is ever carried, so the type parameter
+would be unused ceremony) and folding the three
+`get().copied().unwrap_or_default()` lookups into a shared free function
+(it would rewrite two adjacent pre-existing lookups for no behavior change).
+
+**Dashboard checked in a browser.** `docs/progress` served with
+`python3 -m http.server`, driven headless. The Goal worlds tab rendered with an
+empty console, the "Blocked moves" card shows all seven series with their
+denominators in the legend, and its table view reads `—` for both new causes on
+the stored pre-fold-in report — unmeasured, not a fabricated zero.
+
+**Not run.** `make bench` (either profile).
+
+**Mutation record (fold-in pass).** One fresh `MUTANTS_ITERATE=0
+make rust-mutants`, diffing against the merge base `c95457d9` so the whole
+feature diff was mutated (85 of the caught mutants are in `bench.rs`):
+
+```
+333 mutants tested in 21m: 262 caught, 69 unviable, 2 timeouts
+```
+
+Output path: `~/.local/share/petri-tools/mutants/t12-f04/mutants.out`
+(`run-mode.txt` records `fresh`). `missed.txt` is empty — nothing was missed by
+every test. Survivor list, complete; both are the same pre-existing timeouts
+every earlier pass deferred:
+
+| Survivor | Resolution |
+| --- | --- |
+| `crates/v3-core/src/kernel/world.rs:57:48: replace && with \|\| in WorldState::passable_connectivity` | **deferred** — timed out at 120 s rather than failing; the mutated visited guard never terminates. See "Notes for AI Agents". |
+| `crates/v3-core/src/kernel/world.rs:57:32: delete ! in WorldState::passable_connectivity` | **deferred** — same guard, same reason. |
+
+Caught is the same 262 as the remediation pass's run and the mutant count rose
+by eight, all unviable: cargo-mutants' only mutation of this pass's one new
+function replaces `by_cause_readings`'s whole return value with a repeat
+expression over a non-`Copy` `(String, Option<f64>)` tuple, which does not
+compile. Its behavior is pinned by
+`case_readings_follow_the_case_seed_and_observation` — three distinct multiples
+of the seed, each reading asserted by name, plus the `None` case — rather than
+by mutation. Every mutant of `observe` and of the fields it fills, including
+`replace WorldTracking::observe -> Self with Default::default()`, is caught.
+
+No production code was edited to kill a mutant, and no `#[mutants::skip]` or
+`exclude_re` entry was added. The only edit made after this run, and after the
+browser check above, was to the chart's subtitle: its trailing "split by what
+blocked it" described the two avoidable series, which are split by reader
+state, so it was dropped. No Rust changed.
+
 ## Performance and Goal Impact
 
 Natural analogs: food profitability against return rate (orchard fruit in
@@ -820,7 +953,8 @@ recorded for the user's decision under Notes.
   mutant in the feature diff is caught. Reconfirmed by the follow-up pass's own
   fresh run on 2026-09-09 (`309 mutants tested in 26m: 256 caught, 51 unviable,
   2 timeouts`): still the only two survivors, still the same lines, and nothing
-  missed.
+  missed. Reconfirmed again by the remediation pass's fresh run (`325 mutants
+  tested in 21m: 262 caught, 61 unviable, 2 timeouts`, same two survivors).
 - Resolved (was a deferred P3, found 2026-09-09): the follow-up pass's
   world-coordinate `FbmThreshold` sampling moved Confluence's barrier map;
   all three previews and the README readings were regenerated with
