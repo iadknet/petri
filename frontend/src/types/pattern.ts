@@ -2,7 +2,16 @@ import type { DirtyRect, PaintStats } from "./paint.ts";
 
 // --- Pattern parameter types ---
 
-export type PatternType = "Maze" | "Spiral" | "Noise" | "ParallelLines" | "Star";
+export type PatternType = "Maze" | "Spiral" | "Noise" | "ParallelLines" | "Star" | "FbmThreshold";
+
+export interface FbmThresholdParams {
+	pattern_type: "FbmThreshold";
+	octaves: number;
+	frequency: number;
+	lacunarity: number;
+	persistence: number;
+	threshold: number;
+}
 
 export interface MazeParams {
 	pattern_type: "Maze";
@@ -43,6 +52,7 @@ export interface StarParams {
 }
 
 export type PatternParams =
+	| FbmThresholdParams
 	| MazeParams
 	| SpiralParams
 	| NoiseParams
@@ -81,6 +91,14 @@ export interface PatternApplyResponse {
 // --- Default params per pattern type ---
 
 export const DEFAULT_PATTERN_PARAMS: Record<PatternType, PatternParams> = {
+	FbmThreshold: {
+		pattern_type: "FbmThreshold",
+		octaves: 4,
+		frequency: 0.02,
+		lacunarity: 2,
+		persistence: 0.5,
+		threshold: 0,
+	},
 	Maze: {
 		pattern_type: "Maze",
 		corridor_width: 2,

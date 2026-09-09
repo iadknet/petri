@@ -217,6 +217,7 @@ mod tests {
                 initial_density: 0.0,
                 initial_coverage: 0.0,
                 growth_inhibitor: 0.2,
+                ..FoodTypeConfig::default()
             },
             FoodTypeConfig {
                 name: "Secondary Food".to_string(),
@@ -224,6 +225,7 @@ mod tests {
                 initial_density: 0.0,
                 initial_coverage: 0.0,
                 growth_inhibitor: 0.2,
+                ..FoodTypeConfig::default()
             },
         ];
 

@@ -196,8 +196,9 @@ Each world action is applied at the acting creature's turn per Section 5.
 
 - Consume food from creature's current cell using selected-type `consume_food_type` semantics
   from `v3-world-grid-spec.md`.
-- Gain energy using the shared reward for every ordinary type:
-  `energy += consumed_amount * energy.costs.eat_reward_per_food`.
+- Gain energy using the selected type’s `energy_per_unit`, inheriting the shared
+  `energy.costs.eat_reward_per_food` when absent/null:
+  `energy += consumed_amount * effective_type_reward`.
 - Clamp energy to `energy.lifecycle.max_energy` before charging the action cost.
 - Deduct `energy.costs.eat_cost` from creature energy.
 

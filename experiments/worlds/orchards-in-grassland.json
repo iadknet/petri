@@ -1,0 +1,70 @@
+{
+  "world": {
+    "food": {
+      "types": [
+        {
+          "name": "Grass",
+          "color": "#22c55e",
+          "initial_density": 1.0,
+          "initial_coverage": 0.54,
+          "growth_inhibitor": 0.2,
+          "energy_per_unit": 5.0,
+          "growth_rate": 0.09,
+          "recovery_spawn_rate": 0.01,
+          "initial_fertility_only": false
+        },
+        {
+          "name": "Fruit",
+          "color": "#f97316",
+          "initial_density": 1.0,
+          "initial_coverage": 0.2,
+          "growth_inhibitor": 0.2,
+          "energy_per_unit": 12.0,
+          "growth_rate": 0.025,
+          "recovery_spawn_rate": 0.002,
+          "initial_fertility_only": true
+        }
+      ],
+      "fertility": {
+        "min_fertility": 0.0,
+        "max_fertility": 2.0,
+        "layers": [
+          {
+            "target": {
+              "SingleType": {
+                "type_idx": 0
+              }
+            },
+            "weight": 1.0,
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 40,
+                "min_radius": 130,
+                "max_radius": 230,
+                "falloff": 0.5,
+                "seed": null
+              }
+            }
+          },
+          {
+            "target": {
+              "SingleType": {
+                "type_idx": 1
+              }
+            },
+            "weight": 1.0,
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 16,
+                "min_radius": 100,
+                "max_radius": 170,
+                "falloff": 0.5,
+                "seed": null
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

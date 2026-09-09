@@ -159,7 +159,7 @@ pub fn gate_profile_params() -> ProfileParams {
 pub fn goal_profile_params() -> ProfileParams {
     ProfileParams {
         recipe: None,
-        name: "goal".to_string(),
+        name: GOAL_WORLD_SET.to_string(),
         width: 1600,
         height: 1600,
         founders: 10_000,
@@ -169,6 +169,60 @@ pub fn goal_profile_params() -> ProfileParams {
         neighborhood: NeighborhoodSizes::PRODUCTION,
         drift: neighborhood::drift::DriftSizes::PRODUCTION,
     }
+}
+
+pub const GOAL_WORLD_SET: &str = "goal-worlds-v1";
+
+const GOAL_RECIPES: [(&str, &str, &str); 3] = [
+    (
+        "Orchards in grassland",
+        "experiments/worlds/orchards-in-grassland.json",
+        include_str!("../../../experiments/worlds/orchards-in-grassland.json"),
+    ),
+    (
+        "Canyon country",
+        "experiments/worlds/canyon-country.json",
+        include_str!("../../../experiments/worlds/canyon-country.json"),
+    ),
+    (
+        "Confluence",
+        "experiments/worlds/confluence.json",
+        include_str!("../../../experiments/worlds/confluence.json"),
+    ),
+];
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GoalCase {
+    pub name: String,
+    pub seed: u64,
+    pub recipe_path: String,
+    pub config_digest: String,
+    pub food_type_count: usize,
+}
+
+fn goal_case(params: &ProfileParams, index: usize, seed: u64) -> (GoalCase, SimulationConfig) {
+    let (name, path, source) = GOAL_RECIPES[index];
+    let config = v3_core::config::resolve_config(
+        &SimulationConfig::default(),
+        serde_json::from_str(source).expect("checked-in recipe JSON"),
+    )
+    .expect("checked-in goal recipe");
+    let mut case_params = params.clone();
+    case_params.recipe = Some(Recipe {
+        path: path.to_string(),
+        config,
+    });
+    let config = build_config(&case_params);
+    (
+        GoalCase {
+            name: name.to_string(),
+            seed,
+            recipe_path: path.to_string(),
+            config_digest: v3_core::config::config_digest(&config),
+            food_type_count: config.world.food.types.len(),
+        },
+        config,
+    )
 }
 
 /// The `profile.food_coverage` report string for a profile that leaves
@@ -198,6 +252,16 @@ pub fn build_config(params: &ProfileParams) -> SimulationConfig {
 
 fn profile_block(params: &ProfileParams, config: &SimulationConfig) -> ProfileBlock {
     ProfileBlock {
+        cases: if params.name == GOAL_WORLD_SET {
+            params
+                .seeds
+                .iter()
+                .enumerate()
+                .map(|(index, seed)| goal_case(params, index, *seed).0)
+                .collect()
+        } else {
+            Vec::new()
+        },
         recipe_path: params.recipe.as_ref().map(|recipe| recipe.path.clone()),
         config_digest: params
             .recipe
@@ -211,7 +275,9 @@ fn profile_block(params: &ProfileParams, config: &SimulationConfig) -> ProfileBl
         ticks: params.ticks,
         food_coverage: params.food_coverage.map_or_else(
             || {
-                if params.recipe.is_some() {
+                if params.name == GOAL_WORLD_SET {
+                    "per-case recipe".to_string()
+                } else if params.recipe.is_some() {
                     "recipe".to_string()
                 } else {
                     DEFAULT_FOOD_COVERAGE.to_string()
@@ -256,6 +322,8 @@ pub struct Deterministic {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProfileBlock {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cases: Vec<GoalCase>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recipe_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -271,6 +339,8 @@ pub struct ProfileBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerSeed {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tick_zero_connectivity: Option<v3_core::kernel::PassableConnectivity>,
     pub seed: u64,
     pub ticks: u64,
     pub creature_ticks: u64,
@@ -313,7 +383,16 @@ pub struct PerCreatureTick {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoalCaseObservation {
+    pub case: GoalCase,
+    pub mutational_neighborhood: Indicator<MutationalNeighborhood>,
+    pub drift_depth: Indicator<DriftDepth>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoalIndicators {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cases: Vec<GoalCaseObservation>,
     pub population_persistence: PopulationPersistence,
     pub births_per_100_ticks: String,
     pub reachable_structure_size_distribution: StructureSizeDistribution,
@@ -518,7 +597,7 @@ fn timed_drift_depth(
     config: &SimulationConfig,
     battery: Option<&Battery>,
 ) -> (Indicator<DriftDepth>, Option<f64>) {
-    if params.name != "goal" {
+    if params.name != "goal" && params.name != GOAL_WORLD_SET {
         return (undefined_drift_depth(), None);
     }
     let started = Instant::now();
@@ -1189,6 +1268,9 @@ fn run_one_seed(
 ) -> SeedRun {
     let start = Instant::now();
     let mut sim = seed_simulation(config.clone(), seed);
+    let observation_start = Instant::now();
+    let tick_zero_connectivity = sim.world.passable_connectivity();
+    let connectivity_duration = observation_start.elapsed();
     let mut persistence = PersistenceAccumulator::new(horizon, sim.creatures.len() as u64);
 
     let mut ticks_executed: u64 = 0;
@@ -1209,7 +1291,7 @@ fn run_one_seed(
             break;
         }
     }
-    let wall_clock_ms = millis(start.elapsed());
+    let wall_clock_ms = millis(start.elapsed().saturating_sub(connectivity_duration));
 
     let persistence = persistence.finish(seed);
     let complexities: Vec<u32> = sim
@@ -1255,6 +1337,7 @@ fn run_one_seed(
     });
 
     let per_seed = PerSeed {
+        tick_zero_connectivity: Some(tick_zero_connectivity),
         seed,
         ticks: ticks_executed,
         creature_ticks: sim.stats.creature_ticks_total,
@@ -1633,101 +1716,78 @@ fn build_mutational_neighborhood_indicator(
     })
 }
 
-/// Run the deterministic profile (no host/timestamp data) and return the
-/// `Deterministic` block plus the run's wall-clock observations for the
-/// caller to fold into the `environment` block.
-pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) {
-    let config = build_config(params);
+struct PreparedGoalCase {
+    case: GoalCase,
+    config: SimulationConfig,
+    battery: Battery,
+    founder: NeighborhoodFounderHalf,
+    drift: Indicator<DriftDepth>,
+}
 
-    let mut per_seed = Vec::with_capacity(params.seeds.len());
-    let mut wall_clock = Vec::with_capacity(params.seeds.len());
-    let mut phase_wall_clock = Vec::with_capacity(params.seeds.len());
-    let mut throughput_per_seed = Vec::with_capacity(params.seeds.len());
-    let mut pooled_complexities: Vec<u32> = Vec::new();
-    let mut totals = Totals::default();
-    let mut population_persistence_per_seed = Vec::with_capacity(params.seeds.len());
-    let mut lineage_diversity_per_seed = Vec::with_capacity(params.seeds.len());
-    let mut memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
-    let mut temporal_memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
-    let mut final_state_observation_ms_per_seed = Vec::with_capacity(params.seeds.len());
-    let mut evolved_neighborhood_per_seed = Vec::with_capacity(params.seeds.len());
-    let mut neighborhood_evolved_wall_clock_ms_per_seed = Vec::with_capacity(params.seeds.len());
-    let observe_goal_indicators = params.name == "goal";
-
-    // The founder half runs for exactly the gate and goal profiles (never
-    // sweep, and never a test-only or synthetic profile name), and only once
-    // per report — it depends only on the founder genome and the production
-    // mutation config, never on any seed's world trajectory, so it is
-    // computed outside the per-seed loop and timed separately from every
-    // per-seed wall-clock field.
-    let run_neighborhood = params.name == "gate" || observe_goal_indicators;
-    let neighborhood_battery =
-        run_neighborhood.then(|| Battery::generate(config.world.food.types.len()));
-    let neighborhood_founder_start = Instant::now();
-    let neighborhood_founder = neighborhood_battery
-        .as_ref()
-        .map(|battery| compute_founder_neighborhood(&config, battery, params.neighborhood));
-    let neighborhood_founder_wall_clock_ms = millis(neighborhood_founder_start.elapsed());
-    let (drift_depth, drift_depth_wall_clock_ms) =
-        timed_drift_depth(params, &config, neighborhood_battery.as_ref());
-
-    for &seed in &params.seeds {
-        // `run_one_seed` only reads `neighborhood_battery` inside its own
-        // `observe_goal_indicators`-gated closure, so passing it unconditionally
-        // here is equivalent to nulling it out for non-goal profiles and one
-        // branch simpler.
-        let run = run_one_seed(
-            &config,
-            seed,
-            params.ticks,
-            observe_goal_indicators,
-            neighborhood_battery.as_ref(),
-            params.neighborhood,
-        );
-        totals.ticks += run.per_seed.ticks;
-        totals.creature_ticks += run.per_seed.creature_ticks;
-        totals.mesh_hops += run.per_seed.mesh_hops;
-        totals.vm_steps += run.per_seed.vm_steps;
-        totals.graph_relax_iters += run.per_seed.graph_relax_iters;
-        totals.plasticity_updates += run.per_seed.plasticity_updates;
-        totals.actions_applied += run.per_seed.actions_applied;
-        totals.births += run.per_seed.births;
-        pooled_complexities.extend(run.complexities.iter().copied());
-        wall_clock.push(SeedWallClock {
-            seed,
-            wall_clock_ms: run.wall_clock_ms,
-        });
-        throughput_per_seed.push(run.throughput);
-        phase_wall_clock.push(run.phase_wall_clock);
-        population_persistence_per_seed.push(run.persistence);
-        if let Some(observation) = run.goal_observation {
-            lineage_diversity_per_seed.push(observation.lineage_diversity);
-            memory_sensitivity_per_seed.push(observation.memory_sensitivity);
-            temporal_memory_sensitivity_per_seed.push(observation.temporal_memory_sensitivity);
-            final_state_observation_ms_per_seed.push(SeedFinalStateObservation {
-                seed,
-                wall_clock_ms: observation.wall_clock_ms,
-            });
-            if let Some(evolved) = observation.evolved_neighborhood {
-                evolved_neighborhood_per_seed.push(evolved);
-                neighborhood_evolved_wall_clock_ms_per_seed.push(SeedFinalStateObservation {
-                    seed,
-                    wall_clock_ms: observation.evolved_neighborhood_wall_clock_ms,
-                });
-            }
-        }
-        per_seed.push(run.per_seed);
+fn prepare_goal_case(
+    params: &ProfileParams,
+    index: usize,
+    seed: u64,
+    founder_ms: &mut f64,
+    drift_ms: &mut Option<f64>,
+) -> PreparedGoalCase {
+    let (case, config) = goal_case(params, index, seed);
+    let battery = Battery::generate(config.world.food.types.len());
+    let start = Instant::now();
+    let founder = compute_founder_neighborhood(&config, &battery, params.neighborhood);
+    *founder_ms += millis(start.elapsed());
+    let (drift, duration) = timed_drift_depth(params, &config, Some(&battery));
+    *drift_ms.as_mut().expect("world-set timing") += duration.expect("goal timing");
+    PreparedGoalCase {
+        case,
+        config,
+        battery,
+        founder,
+        drift,
     }
+}
 
-    let per_creature_tick = PerCreatureTick {
+fn normalized_totals(totals: &Totals) -> PerCreatureTick {
+    PerCreatureTick {
         mesh_hops: Some(ratio(totals.mesh_hops, totals.creature_ticks)),
         vm_steps: Some(ratio(totals.vm_steps, totals.creature_ticks)),
         graph_relax_iters: Some(ratio(totals.graph_relax_iters, totals.creature_ticks)),
         plasticity_updates: Some(ratio(totals.plasticity_updates, totals.creature_ticks)),
         actions_applied: Some(ratio(totals.actions_applied, totals.creature_ticks)),
         births: Some(ratio(totals.births, totals.creature_ticks)),
-    };
+    }
+}
 
+struct GoalIndicatorInputs {
+    population_persistence_per_seed: Vec<PopulationPersistenceSeed>,
+    lineage_diversity_per_seed: Vec<LineageDiversitySeed>,
+    memory_sensitivity_per_seed: Vec<MemorySensitivitySeed>,
+    temporal_memory_sensitivity_per_seed: Vec<TemporalMemorySensitivitySeed>,
+    evolved_neighborhood_per_seed: Vec<NeighborhoodEvolvedSeed>,
+    pooled_complexities: Vec<u32>,
+    neighborhood_founder: Option<NeighborhoodFounderHalf>,
+    drift_depth: Indicator<DriftDepth>,
+    case_observations: Vec<GoalCaseObservation>,
+}
+
+fn assemble_goal_indicators(
+    params: &ProfileParams,
+    totals: &Totals,
+    inputs: GoalIndicatorInputs,
+) -> GoalIndicators {
+    let GoalIndicatorInputs {
+        population_persistence_per_seed,
+        lineage_diversity_per_seed,
+        memory_sensitivity_per_seed,
+        temporal_memory_sensitivity_per_seed,
+        evolved_neighborhood_per_seed,
+        pooled_complexities,
+        neighborhood_founder,
+        drift_depth,
+        case_observations,
+    } = inputs;
+    let world_set = params.name == GOAL_WORLD_SET;
+    let observe_goal_indicators = params.name == "goal" || world_set;
     let population_persistence = PopulationPersistence {
         per_seed: population_persistence_per_seed,
     };
@@ -1738,7 +1798,8 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         six(totals.births as f64 / totals.ticks as f64 * 100.0)
     };
 
-    let goal_indicators = GoalIndicators {
+    GoalIndicators {
+        cases: case_observations,
         population_persistence,
         births_per_100_ticks,
         reachable_structure_size_distribution: structure_size_distribution(pooled_complexities),
@@ -1769,12 +1830,16 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         } else {
             undefined_temporal_memory_sensitivity()
         },
-        mutational_neighborhood: build_mutational_neighborhood_indicator(
-            neighborhood_founder,
-            params,
-            observe_goal_indicators,
-            evolved_neighborhood_per_seed,
-        ),
+        mutational_neighborhood: if world_set {
+            Indicator::Undefined("reported per case".to_string())
+        } else {
+            build_mutational_neighborhood_indicator(
+                neighborhood_founder,
+                params,
+                observe_goal_indicators,
+                evolved_neighborhood_per_seed,
+            )
+        },
         drift_depth,
         strategy_count: UNDEFINED.to_string(),
         strategy_causal_distinctness: UNDEFINED.to_string(),
@@ -1785,7 +1850,151 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         prediction_dependence: UNDEFINED.to_string(),
         information_integration: UNDEFINED.to_string(),
         reciprocal_interaction: UNDEFINED.to_string(),
+    }
+}
+
+/// Run the deterministic profile (no host/timestamp data) and return the
+/// `Deterministic` block plus the run's wall-clock observations for the
+/// caller to fold into the `environment` block.
+pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) {
+    let config = build_config(params);
+
+    let mut per_seed = Vec::with_capacity(params.seeds.len());
+    let mut wall_clock = Vec::with_capacity(params.seeds.len());
+    let mut phase_wall_clock = Vec::with_capacity(params.seeds.len());
+    let mut throughput_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut pooled_complexities: Vec<u32> = Vec::new();
+    let mut totals = Totals::default();
+    let mut population_persistence_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut lineage_diversity_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut temporal_memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut final_state_observation_ms_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut evolved_neighborhood_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut neighborhood_evolved_wall_clock_ms_per_seed = Vec::with_capacity(params.seeds.len());
+    let world_set = params.name == GOAL_WORLD_SET;
+    let observe_goal_indicators = params.name == "goal" || world_set;
+    let mut case_observations = Vec::new();
+
+    // The founder half runs for exactly the gate and goal profiles (never
+    // sweep, and never a test-only or synthetic profile name), and only once
+    // per report — it depends only on the founder genome and the production
+    // mutation config, never on any seed's world trajectory, so it is
+    // computed outside the per-seed loop and timed separately from every
+    // per-seed wall-clock field.
+    let run_neighborhood = !world_set && (params.name == "gate" || observe_goal_indicators);
+    let neighborhood_battery =
+        run_neighborhood.then(|| Battery::generate(config.world.food.types.len()));
+    let neighborhood_founder_start = Instant::now();
+    let neighborhood_founder = neighborhood_battery
+        .as_ref()
+        .map(|battery| compute_founder_neighborhood(&config, battery, params.neighborhood));
+    let mut neighborhood_founder_wall_clock_ms = millis(neighborhood_founder_start.elapsed());
+    let (drift_depth, mut drift_depth_wall_clock_ms) = if world_set {
+        (
+            Indicator::Undefined("reported per case".to_string()),
+            Some(0.0),
+        )
+    } else {
+        timed_drift_depth(params, &config, neighborhood_battery.as_ref())
     };
+
+    for (index, &seed) in params.seeds.iter().enumerate() {
+        let case = world_set.then(|| {
+            prepare_goal_case(
+                params,
+                index,
+                seed,
+                &mut neighborhood_founder_wall_clock_ms,
+                &mut drift_depth_wall_clock_ms,
+            )
+        });
+        let case_config = case.as_ref().map_or(&config, |case| &case.config);
+        let battery = case
+            .as_ref()
+            .map(|case| &case.battery)
+            .or(neighborhood_battery.as_ref());
+        // `run_one_seed` only reads `neighborhood_battery` inside its own
+        // `observe_goal_indicators`-gated closure, so passing it unconditionally
+        // here is equivalent to nulling it out for non-goal profiles and one
+        // branch simpler.
+        let run = run_one_seed(
+            case_config,
+            seed,
+            params.ticks,
+            observe_goal_indicators,
+            battery,
+            params.neighborhood,
+        );
+        totals.ticks += run.per_seed.ticks;
+        totals.creature_ticks += run.per_seed.creature_ticks;
+        totals.mesh_hops += run.per_seed.mesh_hops;
+        totals.vm_steps += run.per_seed.vm_steps;
+        totals.graph_relax_iters += run.per_seed.graph_relax_iters;
+        totals.plasticity_updates += run.per_seed.plasticity_updates;
+        totals.actions_applied += run.per_seed.actions_applied;
+        totals.births += run.per_seed.births;
+        pooled_complexities.extend(run.complexities.iter().copied());
+        wall_clock.push(SeedWallClock {
+            seed,
+            wall_clock_ms: run.wall_clock_ms,
+        });
+        throughput_per_seed.push(run.throughput);
+        phase_wall_clock.push(run.phase_wall_clock);
+        population_persistence_per_seed.push(run.persistence);
+        let mut case_evolved = Vec::new();
+        if let Some(observation) = run.goal_observation {
+            lineage_diversity_per_seed.push(observation.lineage_diversity);
+            memory_sensitivity_per_seed.push(observation.memory_sensitivity);
+            temporal_memory_sensitivity_per_seed.push(observation.temporal_memory_sensitivity);
+            final_state_observation_ms_per_seed.push(SeedFinalStateObservation {
+                seed,
+                wall_clock_ms: observation.wall_clock_ms,
+            });
+            if let Some(evolved) = observation.evolved_neighborhood {
+                if world_set {
+                    case_evolved.push(evolved);
+                } else {
+                    evolved_neighborhood_per_seed.push(evolved);
+                }
+                neighborhood_evolved_wall_clock_ms_per_seed.push(SeedFinalStateObservation {
+                    seed,
+                    wall_clock_ms: observation.evolved_neighborhood_wall_clock_ms,
+                });
+            }
+        }
+        if let Some(case) = case {
+            case_observations.push(GoalCaseObservation {
+                case: case.case,
+                mutational_neighborhood: build_mutational_neighborhood_indicator(
+                    Some(case.founder),
+                    params,
+                    true,
+                    case_evolved,
+                ),
+                drift_depth: case.drift,
+            });
+        }
+        per_seed.push(run.per_seed);
+    }
+
+    let per_creature_tick = normalized_totals(&totals);
+
+    let goal_indicators = assemble_goal_indicators(
+        params,
+        &totals,
+        GoalIndicatorInputs {
+            population_persistence_per_seed,
+            lineage_diversity_per_seed,
+            memory_sensitivity_per_seed,
+            temporal_memory_sensitivity_per_seed,
+            evolved_neighborhood_per_seed,
+            pooled_complexities,
+            neighborhood_founder,
+            drift_depth,
+            case_observations,
+        },
+    );
 
     let deterministic = Deterministic {
         graph_work_definition: "graph_relax_iters: entered nonempty single-evaluation visits, including unaffordable visits (T11.F06); historical deltas cross definitions".to_string(),
@@ -2189,6 +2398,8 @@ pub struct SeriesIndex {
 pub struct BenchmarkSeriesIndex {
     pub gate: SeriesIndex,
     pub goal: SeriesIndex,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_worlds: Option<SeriesIndex>,
 }
 
 /// Resolve the gate profile's default comparison references from the series
@@ -2217,11 +2428,14 @@ pub fn default_goal_references(series_index_path: &Path) -> Result<Vec<PathBuf>,
         .map_err(|e| format!("failed to read {}: {e}", series_index_path.display()))?;
     let index: BenchmarkSeriesIndex = serde_json::from_str(&content)
         .map_err(|e| format!("failed to parse {}: {e}", series_index_path.display()))?;
-    let baseline = PathBuf::from(&index.goal.epoch_baseline);
+    let Some(series) = index.goal_worlds.as_ref() else {
+        return Ok(Vec::new());
+    };
+    let baseline = PathBuf::from(&series.epoch_baseline);
     if !baseline.exists() {
         return Ok(Vec::new());
     }
-    references_from_series(&index.goal)
+    references_from_series(series)
 }
 
 fn references_from_series(index: &SeriesIndex) -> Result<Vec<PathBuf>, String> {
@@ -2276,6 +2490,73 @@ mod tests {
     use proptest::prelude::*;
     use v3_core::contracts::{Direction, WorldAction};
     use v3_core::simulation::seed_simulation;
+
+    #[test]
+    fn goal_world_set_executes_three_named_configs_with_case_observations() {
+        let mut params = goal_profile_params();
+        params.width = 16;
+        params.height = 16;
+        params.founders = 4;
+        params.ticks = 1;
+        params.neighborhood = NeighborhoodSizes::default();
+        params.drift = Default::default();
+        let (report, timings) = run_deterministic(&params);
+        assert_eq!(report.profile.name, "goal-worlds-v1");
+        assert_eq!(report.per_seed.len(), 3);
+        assert_eq!(
+            report
+                .profile
+                .cases
+                .iter()
+                .map(|case| case.seed)
+                .collect::<Vec<_>>(),
+            vec![11, 22, 33]
+        );
+        assert_eq!(
+            report
+                .profile
+                .cases
+                .iter()
+                .map(|case| case.food_type_count)
+                .collect::<Vec<_>>(),
+            vec![2, 1, 2]
+        );
+        assert_eq!(report.goal_indicators.cases.len(), 3);
+        assert!(
+            matches!(report.goal_indicators.mutational_neighborhood, Indicator::Undefined(ref reason) if reason == "reported per case")
+        );
+        assert!(
+            matches!(report.goal_indicators.drift_depth, Indicator::Undefined(ref reason) if reason == "reported per case")
+        );
+        for (index, case) in report.goal_indicators.cases.iter().enumerate() {
+            let (expected, config) = goal_case(&params, index, params.seeds[index]);
+            assert_eq!(case.case, expected);
+            let seeded = seed_simulation(config.clone(), expected.seed);
+            assert_eq!(
+                report.per_seed[index].tick_zero_connectivity,
+                Some(seeded.world.passable_connectivity())
+            );
+            let Indicator::Defined(neighborhood) = &case.mutational_neighborhood else {
+                panic!("case neighborhood missing")
+            };
+            let battery = Battery::generate(config.world.food.types.len());
+            let expected_founder =
+                compute_founder_neighborhood(&config, &battery, params.neighborhood);
+            assert_eq!(
+                serde_json::to_value(&neighborhood.founder).unwrap(),
+                serde_json::to_value(expected_founder).unwrap()
+            );
+            let Indicator::Defined(evolved) = &neighborhood.evolved else {
+                panic!("case evolved reading missing")
+            };
+            assert_eq!(evolved.per_seed.len(), 1);
+            assert_eq!(evolved.per_seed[0].seed, expected.seed);
+            assert!(matches!(case.drift_depth, Indicator::Defined(_)));
+        }
+        assert!(timings.neighborhood_founder_wall_clock_ms > 0.0);
+        assert!(timings.drift_depth_wall_clock_ms.unwrap() > 0.0);
+        assert_eq!(timings.neighborhood_evolved_wall_clock_ms_per_seed.len(), 3);
+    }
 
     #[test]
     fn lockfile_identity_selects_core_dependency_among_reordered_versions() {

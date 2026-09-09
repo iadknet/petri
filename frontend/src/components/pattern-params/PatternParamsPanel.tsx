@@ -1,4 +1,5 @@
 import type { PatternParams } from "../../types/pattern.ts";
+import { FbmThresholdParams } from "./FbmThresholdParams.tsx";
 import { LinesParams } from "./LinesParams.tsx";
 import { MazeParams } from "./MazeParams.tsx";
 import { NoiseParams } from "./NoiseParams.tsx";
@@ -12,6 +13,8 @@ export function PatternParamsPanel({
 	onChange: (params: PatternParams) => void;
 }) {
 	switch (params.pattern_type) {
+		case "FbmThreshold":
+			return <FbmThresholdParams params={params} onChange={onChange} />;
 		case "Maze":
 			return <MazeParams params={params} onChange={(p) => onChange(p)} />;
 		case "Spiral":

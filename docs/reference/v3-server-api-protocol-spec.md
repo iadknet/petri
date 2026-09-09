@@ -522,7 +522,7 @@ Request shape:
 
 Rules:
 - Unknown fields rejected.
-- `energy.costs.eat_reward_per_food` is live-editable and applies to all ordinary food types.
+- `energy.costs.eat_reward_per_food` is live-editable and applies to types inheriting it (`energy_per_unit` absent/null). Food type `energy_per_unit`, `growth_rate`, `recovery_spawn_rate` overrides and `initial_fertility_only` are startup/restart-only fields; optional/null rates inherit their shared live values and explicit zero overrides.
 - PATCH supports the full canonical keyspace from `GET /config`, including all
   top-level `mutation.*` keys owned by `v3-runtime-config-spec.md`, plus the
   runtime-editable `world.food.shared.occupancy_depletion.*` keys

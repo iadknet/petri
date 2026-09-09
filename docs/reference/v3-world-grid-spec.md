@@ -147,8 +147,16 @@ Food-type catalog posture:
 - `world.food.types` is ordered, and the list index defines the stable per-run
   `OrdinaryFoodTypeId`.
 - `FoodTypeConfig` carries display metadata (`name`, `color`), startup seeding fields
-  (`initial_density`, `initial_coverage`), and `growth_inhibitor`. Typed Eat uses
-  the shared `energy.costs.eat_reward_per_food` for the actual amount consumed.
+  (`initial_density`, `initial_coverage`, `initial_fertility_only`), and
+  `growth_inhibitor`. Optional/null `energy_per_unit`, `growth_rate` and
+  `recovery_spawn_rate` inherit `energy.costs.eat_reward_per_food`,
+  `world.food.shared.growth_rate` and `world.food.shared.recovery_spawn_rate`.
+  Explicit zero overrides. Finite reward clamps nonnegative; finite rates
+  clamp to `[0,1]`; nonfinite overrides become inheritance. Save/load retains
+  inheritance, so later shared runtime edits remain live. Typed Eat multiplies
+  consumed density by the effective reward, then caps energy and charges the
+  existing action cost. Growth/recovery resolve once per type and retain the
+  existing local/spread/recovery formulas and suppression telemetry.
 - The primary type (`types[0]`) is mirrored into
   `world.food.shared.initial_density` and
   `world.food.shared.initial_coverage` during config normalization.
@@ -156,6 +164,17 @@ Food-type catalog posture:
   candidate list separately and takes its own rounded coverage target. A shared
   ordering is not reused across types, so equal coverages do not imply equal
   spatial placement.
+- `initial_fertility_only` defaults false. When true, initial coverage counts
+  only passable cells whose tick-zero effective fertility is strictly positive,
+  including annealing. Disabled fertility admits all passable cells. No eligible
+  cells means no food; this does not prohibit later growth. False preserves the
+  original candidate order, shuffle and RNG draws.
+- `FbmThreshold` terrain uses the existing raw fBm helper with one pattern RNG
+  u64 seed draw. Values strictly above `threshold` become barriers within local
+  bounds, translated/clipped without wrapping. Parameters normalize: octaves
+  `1..=32` (default 4), frequency `[0.000001,1]` (0.02), lacunarity `[1,4]`
+  (2), persistence `[0,1]` (0.5), threshold `[-1,1]` (0); nonfinite floats use
+  the listed defaults. Existing layer seeds and barrier union semantics apply.
 - Type-targeted fertility layers are startup-only config; runtime patching does
   not mutate the catalog or layer targets.
 
@@ -193,7 +212,7 @@ For each non-barrier cell:
 - Apply occupancy depletion recovery/deposit for the current tick using the
   current creature occupancy mask.
 - Compute an occupancy multiplier from the depletion layer for the cell.
-- `delta = source * world.food.shared.growth_rate`.
+- `delta = source * effective_type_growth_rate`.
 - Apply local growth:
   `food_density[cell] = clamp(food_density[cell] + delta * occupancy_multiplier, 0.0, max_density)`.
 - If `source >= max_density * world.food.shared.spread_threshold_ratio` and
@@ -206,7 +225,7 @@ After local growth/spread pass:
 - If `average_density_ratio < world.food.shared.recovery_floor_ratio`, run
   `round(total_cells * world.food.shared.recovery_spawn_rate)` recovery attempts.
 - Each attempt picks one random non-barrier cell and adds
-  `max_density * world.food.shared.growth_rate * occupancy_multiplier` (clamped).
+  `max_density * effective_type_growth_rate * occupancy_multiplier` (clamped).
 
 Barrier cells are excluded from growth/spread/recovery targets.
 Creature occupancy does not block food growth/spread/recovery directly in

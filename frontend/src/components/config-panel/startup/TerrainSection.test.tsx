@@ -32,10 +32,10 @@ it("edits ordered layers, bounds and seeds in the startup request", () => {
 	expect(buildStartupRequest(useStartupConfigStore.getState().preset).world?.terrain).toEqual([]);
 });
 
-it("switches through all five pattern editors and keeps surviving layer order", () => {
+it("switches through all pattern editors and keeps surviving layer order", () => {
 	render(<Harness />);
 	fireEvent.click(screen.getByRole("button", { name: "Add terrain layer" }));
-	for (const pattern of ["Maze", "Spiral", "Noise", "ParallelLines", "Star"]) {
+	for (const pattern of ["Maze", "Spiral", "Noise", "ParallelLines", "Star", "FbmThreshold"]) {
 		fireEvent.change(screen.getByLabelText("Layer 1 pattern"), { target: { value: pattern } });
 		expect(useStartupConfigStore.getState().preset.world.terrain[0]?.params.pattern_type).toBe(
 			pattern,

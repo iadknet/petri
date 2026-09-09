@@ -228,7 +228,7 @@ impl FoodResource {
         seed_density(
             &mut self.state,
             &self.catalog,
-            &self.config.shared,
+            &self.config,
             &mut self.occupancy_depletion,
             &mut self.claim_scratch,
             barriers,

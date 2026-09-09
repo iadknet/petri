@@ -193,6 +193,29 @@ fn terrain_config() -> SimulationConfig {
         }),
         seed: None,
     }];
+    cfg.world.terrain.push(v3_core::config::TerrainLayer {
+        params: v3_core::patterns::PatternParams::FbmThreshold {
+            octaves: 4,
+            frequency: 0.04,
+            lacunarity: 2.0,
+            persistence: 0.5,
+            threshold: 0.2,
+        },
+        bounds: Some(v3_core::patterns::PatternBounds {
+            x: 40,
+            y: 40,
+            width: 40,
+            height: 40,
+        }),
+        seed: Some(901),
+    });
+    cfg.world.food.types.push(v3_core::config::FoodTypeConfig {
+        energy_per_unit: Some(12.0),
+        growth_rate: Some(0.025),
+        recovery_spawn_rate: Some(0.002),
+        initial_fertility_only: true,
+        ..v3_core::config::FoodTypeConfig::default()
+    });
     cfg
 }
 
@@ -223,12 +246,12 @@ fn terrain_is_identical_across_independent_initialization_and_thread_counts() {
         .unwrap();
     let mut first = one.install(|| seed_simulation(terrain_config(), SEED));
     let mut second = four.install(|| seed_simulation(terrain_config(), SEED));
-    assert_eq!(
+    assert!(
         world_fingerprint(&first)
             .iter()
             .filter(|cell| cell.0)
-            .count(),
-        2
+            .count()
+            > 2
     );
     for tick in 0..=20 {
         assert_eq!(

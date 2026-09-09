@@ -56,5 +56,10 @@
       "after": "entered nonempty single-evaluation graph visits including unaffordable attempts",
       "comparison": "raw deltas retained; cross-definition deltas are not like-for-like work efficiency"
     }
-  ]
+  ],
+  "goal_worlds": {
+    "series": "goal-worlds-v1",
+    "epoch_baseline": "docs/progress/features/t12-f04-baseline-world-set-goal.json",
+    "closed": []
+  }
 }

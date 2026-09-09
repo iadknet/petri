@@ -159,7 +159,7 @@ Queue-shape coupling invariant:
 | `energy.lifecycle.genome_carry_cost_per_unit` | `f32` | `1e-4` | Must be finite and `>= 0.0`; invalid values fall back to `1e-4`. A missing field defaults to `1e-4`. `0.0` is allowed and disables the charge. Energy charged per tick per unit of total genome size. |
 | `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
-| `energy.costs.eat_reward_per_food` | `f32` | `5.0` | Live shared reward per consumed density for every ordinary food type. Must be finite and `>= 0.0`; invalid values fall back to `5.0`. |
+| `energy.costs.eat_reward_per_food` | `f32` | `5.0` | Live shared reward per consumed density for ordinary food types whose `energy_per_unit` is absent/null. Must be finite and `>= 0.0`; invalid values fall back to `5.0`. |
 | `energy.costs.noop_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. |
 | `energy.costs.reproduce_cost` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. |
 | `energy.costs.failed_action_penalty` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |

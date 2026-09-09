@@ -8,6 +8,14 @@ Browsers block `fetch()` under `file://`, so serve the directory first:
 `http://localhost:8000/`. New closures appear automatically once
 `benchmark-series.json` lists their reports.
 
+T12.F04 is implementing the user-authorized `goal-worlds-v1` baseline: one
+run each of Orchards/11, Canyon/22 and Confluence/33 through the standard goal
+command. Its first report begins a new profile series; the goal-v1 rows below
+remain historical measurements with their original references and acceptance
+results. Comparisons stay within matching profile definitions. The short gate,
+its epoch and all numerical thresholds remain unchanged. No T12.F04 result is
+claimed until its measured report is stored.
+
 Each row preserves the comparison references stored when that closure ran:
 the epoch baseline and, where one existed, the immediately previous closure.
 The six normalized counters are mesh hops, VM steps, graph relaxation,

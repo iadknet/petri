@@ -432,3 +432,29 @@ it("refreshes recipe startup controls without changing the selected run seed", (
 	expect(useStartupConfigStore.getState().preset.seed).toBe(42);
 	expect(useStartupConfigStore.getState().preset.world.width).toBe(MOCK_CONFIG.world.width);
 });
+
+it("retains overrides, zero and inheritance through hydration and startup requests", () => {
+	useStartupConfigStore.getState().reset();
+	const config = structuredClone(MOCK_CONFIG);
+	Object.assign(config.world.food.types[0]!, {
+		energy_per_unit: 12,
+		growth_rate: null,
+		recovery_spawn_rate: 0,
+		initial_fertility_only: true,
+	});
+	useStartupConfigStore.getState().hydrateFromServerConfig(config);
+	const first = buildStartupRequest(useStartupConfigStore.getState().preset).world?.food
+		?.types?.[0];
+	expect(first).toMatchObject({
+		energy_per_unit: 12,
+		growth_rate: null,
+		recovery_spawn_rate: 0,
+		initial_fertility_only: true,
+	});
+	useStartupConfigStore
+		.getState()
+		.updateFoodType(0, { energy_per_unit: null, growth_rate: Number.POSITIVE_INFINITY });
+	expect(
+		buildStartupRequest(useStartupConfigStore.getState().preset).world?.food?.types?.[0],
+	).toMatchObject({ energy_per_unit: null, growth_rate: null, recovery_spawn_rate: 0 });
+});

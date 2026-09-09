@@ -210,13 +210,14 @@ pub(super) fn apply_config_transition(
 pub(super) fn seed_density(
     state: &mut OrdinaryFoodState,
     catalog: &OrdinaryFoodCatalog,
-    shared: &FoodResourceConfig,
+    config: &FoodConfig,
     occupancy_depletion: &mut OccupancyDepletionLayer,
     _claim_scratch: &mut Vec<Vec<(OrdinaryFoodTypeId, f32)>>,
     barriers: &Grid<bool>,
     rng: &mut impl Rng,
 ) {
     use rand::seq::SliceRandom;
+    let shared = &config.shared;
 
     state.clear_density();
     occupancy_depletion.reset();
@@ -240,9 +241,23 @@ pub(super) fn seed_density(
         // ordering would silently co-seed every type and erase the spatial
         // choice pressure that typed-food cognition is meant to solve.
         let mut shuffled_candidates = candidates.clone();
+        if entry.config.initial_fertility_only && config.fertility.enabled {
+            let (min, max) = fertility::effective_fertility_range(
+                &config.annealing,
+                config.fertility.min_fertility,
+                config.fertility.max_fertility,
+                0,
+            );
+            shuffled_candidates.retain(|pos| {
+                state.fertility_grid(entry.id).is_some_and(|grid| {
+                    fertility::map_fertility(*grid.get(pos.x, pos.y), min, max) > 0.0
+                })
+            });
+        }
         shuffled_candidates.shuffle(rng);
         let coverage = entry.config.initial_coverage.clamp(0.0, 1.0);
-        let target = ((coverage * candidates.len() as f32).round() as usize).min(candidates.len());
+        let target = ((coverage * shuffled_candidates.len() as f32).round() as usize)
+            .min(shuffled_candidates.len());
         if target == 0 {
             continue;
         }
@@ -322,11 +337,9 @@ pub(super) fn grow<T: Clone>(
         return FoodGrowthSummary::default();
     }
 
-    let growth_rate = shared.growth_rate.max(0.0);
     let spread_threshold = max_density * shared.spread_threshold_ratio.clamp(0.0, 1.0);
     let spread_density_ratio = shared.spread_density_ratio.clamp(0.0, 1.0);
     let recovery_floor = shared.recovery_floor_ratio.clamp(0.0, 1.0);
-    let recovery_spawn_rate = shared.recovery_spawn_rate.clamp(0.0, 1.0);
     let occupancy_enabled = shared.occupancy_depletion.enabled;
 
     let (eff_min, eff_max) = if full_config.fertility.enabled {
@@ -356,6 +369,16 @@ pub(super) fn grow<T: Clone>(
 
     for entry in catalog.entries() {
         let type_idx = entry.id;
+        let growth_rate = entry
+            .config
+            .growth_rate
+            .unwrap_or(shared.growth_rate)
+            .max(0.0);
+        let recovery_spawn_rate = entry
+            .config
+            .recovery_spawn_rate
+            .unwrap_or(shared.recovery_spawn_rate)
+            .clamp(0.0, 1.0);
         let type_inhibitor = entry.config.growth_inhibitor.clamp(0.0, 1.0);
         let type_density_ratio = {
             let type_total = state.total_food_by_type(type_idx);
@@ -558,6 +581,54 @@ mod tests {
     }
 
     #[test]
+    fn legacy_placement_keeps_candidate_order_and_rng_even_for_zero_coverage() {
+        use rand::{seq::SliceRandom, RngCore};
+        for coverage in [0.0, 0.54, 1.0] {
+            let mut config = FoodConfig::default();
+            config.types[0].initial_coverage = coverage;
+            config.types.push(crate::config::FoodTypeConfig {
+                initial_coverage: coverage,
+                ..Default::default()
+            });
+            let catalog = OrdinaryFoodCatalog::new(&config);
+            let mut state = OrdinaryFoodState::new(7, 6, catalog.len());
+            let mut barriers = barrier_grid(7, 6);
+            barriers.set(2, 3, true);
+            let mut actual_rng = StdRng::seed_from_u64(31);
+            let mut expected_rng = actual_rng.clone();
+            seed_density(
+                &mut state,
+                &catalog,
+                &config,
+                &mut OccupancyDepletionLayer::new(7, 6),
+                &mut Vec::new(),
+                &barriers,
+                &mut actual_rng,
+            );
+            let candidates: Vec<_> = (0..6)
+                .flat_map(|y| (0..7).map(move |x| Position::new(x, y)))
+                .filter(|p| !*barriers.get(p.x, p.y))
+                .collect();
+            for entry in catalog.entries() {
+                let mut shuffled = candidates.clone();
+                shuffled.shuffle(&mut expected_rng);
+                let target = (coverage * candidates.len() as f32).round() as usize;
+                for pos in &candidates {
+                    assert_eq!(
+                        state.food_at_type(*pos, entry.id),
+                        if shuffled[..target].contains(pos) {
+                            1.0
+                        } else {
+                            0.0
+                        }
+                    );
+                }
+            }
+            assert_eq!(actual_rng.next_u64(), expected_rng.next_u64());
+        }
+    }
+
+    #[test]
     fn seed_density_allows_multiple_types_on_one_cell() {
         let mut config = FoodConfig::default();
         config.types = vec![
@@ -583,7 +654,7 @@ mod tests {
         seed_density(
             &mut state,
             &catalog,
-            &config.shared,
+            &config,
             &mut occupancy_depletion,
             &mut claim_scratch,
             &barriers,
@@ -613,7 +684,7 @@ mod tests {
         seed_density(
             &mut state,
             &catalog,
-            &config.shared,
+            &config,
             &mut occupancy_depletion,
             &mut claim_scratch,
             &barriers,

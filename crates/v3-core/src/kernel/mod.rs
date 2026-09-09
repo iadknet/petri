@@ -7,4 +7,4 @@ mod world;
 
 pub use grid::Grid;
 pub use ordinary_food::{FoodGrowthSummary, FoodResource};
-pub use world::WorldState;
+pub use world::{PassableConnectivity, WorldState};
