@@ -223,7 +223,7 @@ For each non-barrier cell:
 After local growth/spread pass:
 - Compute `average_density_ratio = sum(snapshot_food) / (total_cells * max_density)`.
 - If `average_density_ratio < world.food.shared.recovery_floor_ratio`, run
-  `round(total_cells * world.food.shared.recovery_spawn_rate)` recovery attempts.
+  `round(total_cells * effective_type_recovery_spawn_rate)` recovery attempts.
 - Each attempt picks one random non-barrier cell and adds
   `max_density * effective_type_growth_rate * occupancy_multiplier` (clamped).
 

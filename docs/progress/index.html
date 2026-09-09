@@ -776,6 +776,8 @@
           ['Peak population', fmt(persistence.peak_population)], ['Births', fmt(seed.births)],
           ['Passable fraction', pct(connectivity.passable_fraction)], ['Largest component / passable', pct(connectivity.largest_component_fraction_of_passable)],
           ['Founder changed fraction', get(observation, 'mutational_neighborhood.founder.births.any_events.changed_fraction') ?? 'Unavailable'],
+          ['Population structure mean', get(observation, 'reachable_structure_size_distribution.mean') ?? 'Unavailable in this report'],
+          ['Population structure median', get(observation, 'reachable_structure_size_distribution.median') ?? 'Unavailable in this report'],
           ['Config digest', info.config_digest],
         ]));
         const details = el('details'); details.appendChild(el('summary', null, 'Full case neighborhood and drift observations'));

@@ -103,7 +103,11 @@ recipe cases: Orchards in grassland/11, Canyon country/22 and Confluence/33.
 Each executes once at 2,000 ticks with production creature policies and full
 goal observations, using that case's effective config and food-type count.
 The profile identifies case name, recipe path, effective digest and run seed;
-case-specific neighborhood/drift observations retain that attribution.
+case-specific neighborhood/drift observations retain that attribution. Each
+case also reports `reachable_structure_size_distribution` over its complete
+final population; historical missing/null values are unavailable, not zero or a
+distribution inferred from the evolved sample. The top-level distribution is
+explicitly pooled across all final populations.
 There is no mandatory fourth Plains run or three-seed-per-recipe sweep set.
 The new `goal-worlds-v1` series preserves `goal-v1` history and does not
 compare across profile definitions. The short gate profile, its epoch and
