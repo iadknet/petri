@@ -164,7 +164,9 @@ Rules:
   first two food types' effective tick-zero fertility blended as intensity) and
   tick-zero food density on the right, in the same colors. Both panels are
   downsampled by one integer factor chosen so each panel's longer side is at
-  most 512 px, max-pooling barriers and mean-pooling every other layer.
+  most 512 px, mean-pooling every layer including barriers: a block fades to the
+  barrier gray in proportion to its walled fraction, so an entirely walled block
+  is solid gray and one with no barrier keeps its habitat or food color.
 - A missing or unreadable recipe, or one the resolver rejects, is a validation
   error that exits `1` and writes neither the readings nor the preview.
 

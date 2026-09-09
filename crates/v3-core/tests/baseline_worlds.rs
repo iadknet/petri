@@ -40,17 +40,38 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
         persistence: 0.5,
         threshold: 0.0,
     };
-    // Perlin fBm is exactly zero at the local origin, which must be excluded.
+    // Perlin fBm is exactly zero at world (0, 0), which a strict `>` excludes.
+    let origin = PatternBounds {
+        x: 0,
+        y: 0,
+        width: 4,
+        height: 5,
+    };
+    let cells = |params: &PatternParams| {
+        generate_pattern_seeded(origin, params, 42)
+            .into_iter()
+            .map(|point| (point.x, point.y))
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+    let at_zero = cells(&params);
+    assert!(
+        !at_zero.contains(&(0, 0)),
+        "the world origin samples exactly zero, which threshold 0.0 excludes"
+    );
     let bounds = PatternBounds {
         x: u16::MAX,
         y: u16::MAX,
         width: 4,
         height: 5,
     };
-    assert!(generate_pattern_seeded(bounds, &params, 42).is_empty());
     if let PatternParams::FbmThreshold { threshold, .. } = &mut params {
         *threshold = -1.0;
     }
+    // The same cell is included once the threshold drops below its value, so
+    // the exclusion above is strictness at zero and not an empty layer.
+    let below_zero = cells(&params);
+    assert!(below_zero.contains(&(0, 0)));
+    assert!(below_zero.is_superset(&at_zero));
     let points = generate_pattern_seeded(bounds, &params, 42);
     assert_eq!(points.len(), 1);
     assert_eq!((points[0].x, points[0].y), (u16::MAX, u16::MAX));
@@ -105,6 +126,9 @@ use v3_core::config::{FertilityAlgorithm, FertilityLayer, OrdinaryFoodTypeId};
 use v3_core::contracts::Position;
 use v3_core::simulation::seed_simulation;
 
+/// Side of the small world the fBm translation property samples.
+const WORLD: u16 = 32;
+
 proptest! {
     #[test]
     fn override_normalization_and_roundtrip(value in any::<f32>(), shared in 0.0f32..1.0) {
@@ -150,6 +174,27 @@ proptest! {
         for p in &low { prop_assert!(p.x >= x && p.y >= y && u32::from(p.x) < u32::from(x)+13 && u32::from(p.y) < u32::from(y)+12); }
         for p in high { prop_assert!(set.contains(&(p.x,p.y))); }
         prop_assert_eq!(low, generate_pattern_seeded(bounds, &make(a.min(b)), seed));
+    }
+
+    /// The noise field is a property of the world, not of a layer's bounds: a
+    /// bounded layer must equal the whole-world layer at the same seed cut to
+    /// that rectangle, so nested same-seed layers grade one region.
+    #[test]
+    fn fbm_bounded_layer_equals_the_whole_world_layer_inside_its_bounds(
+        seed in any::<u64>(), threshold in -0.5f32..0.5,
+        x in 0..WORLD, y in 0..WORLD, width in 1..2 * WORLD, height in 1..2 * WORLD,
+    ) {
+        let params = PatternParams::FbmThreshold {octaves:4, frequency:0.1, lacunarity:2.0, persistence:0.5, threshold};
+        // Clip to the world exactly as `seed_simulation` clips a layer's bounds.
+        let bounds = PatternBounds { x, y, width: width.min(WORLD - x), height: height.min(WORLD - y) };
+        let whole = PatternBounds { x: 0, y: 0, width: WORLD, height: WORLD };
+        let cells = |bounds| generate_pattern_seeded(bounds, &params, seed)
+            .into_iter().map(|p| (p.x, p.y)).collect::<std::collections::BTreeSet<_>>();
+        let inside = cells(whole).into_iter()
+            .filter(|(px, py)| (bounds.x..bounds.x + bounds.width).contains(px)
+                && (bounds.y..bounds.y + bounds.height).contains(py))
+            .collect::<std::collections::BTreeSet<_>>();
+        prop_assert_eq!(cells(bounds), inside);
     }
 }
 

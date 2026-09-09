@@ -10,7 +10,7 @@ mod poisson_blobs;
 mod uniform;
 
 pub use annealing::{effective_fertility_range, map_fertility};
-pub use fbm::generate_fbm;
+pub use fbm::{generate_fbm, FbmField};
 pub use mixing::mix_layers;
 pub use poisson_blobs::generate_poisson_blobs;
 pub use uniform::generate_uniform;
