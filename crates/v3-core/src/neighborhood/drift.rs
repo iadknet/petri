@@ -1,6 +1,7 @@
 //! Mutation-only lineage depth observations, isolated from ecological state.
 
 use super::mesh_execution::indices_for_node_ids;
+use super::recruitment::{BirthObservation, RecruitmentCheckpoint, RecruitmentTracker};
 use super::{births, mesh_execution::MeshExecutionReading, Battery, BirthResult, EvalContext};
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
@@ -11,7 +12,7 @@ use rand::{rngs::SmallRng, SeedableRng};
 use rayon::prelude::*;
 use std::collections::BTreeSet;
 
-pub const VERSION: &str = "drift-depth-v2";
+pub const VERSION: &str = "drift-depth-v3";
 /// How the walk keeps each lineage's executed node set current (T11.F17).
 pub const EXECUTED_SOURCE: &str = "battery hop records (mesh-execution-v1), node ids";
 pub const EXECUTED_REFRESH: &str =
@@ -87,6 +88,14 @@ pub struct Checkpoint {
     pub births: BirthResult,
 }
 
+/// One walk's readings: the unchanged depth checkpoints, and beside them the
+/// module recruitment reading taken at the same depths (T13.F01).
+#[derive(Debug, Clone, PartialEq)]
+pub struct DriftWalk {
+    pub checkpoints: Vec<Checkpoint>,
+    pub recruitment: Vec<RecruitmentCheckpoint>,
+}
+
 /// Retain every production birth unconditionally. Checkpoint reads borrow genomes
 /// and use separate trial RNGs; they never consume the persistent walk streams.
 #[must_use]
@@ -96,7 +105,7 @@ pub fn observe(
     mutation: &MutationConfig,
     context: &EvalContext,
     sizes: DriftSizes,
-) -> Vec<Checkpoint> {
+) -> DriftWalk {
     assert!(sizes.birth_lineages <= sizes.lineages);
     assert!(sizes.checkpoints.windows(2).all(|pair| pair[0] < pair[1]));
     let mut genomes: Vec<_> = (0..sizes.lineages).map(|_| founder.clone()).collect();
@@ -104,20 +113,36 @@ pub fn observe(
         .map(|index| SmallRng::seed_from_u64(WALK_SEED_BASE + u64::from(index)))
         .collect();
     let mut depth = 0;
+    // The recruitment observation reads the genomes and summaries the walk
+    // already produces; it consumes no RNG and runs no extra battery pass.
+    let mut tracker = RecruitmentTracker::new(sizes.lineages);
+    for lineage in 0..sizes.lineages {
+        tracker.seed_founder(lineage, &founder.nodes);
+    }
     // Each lineage's executed nodes, by node id so the set survives the index
     // shuffling of intervening births. Refreshed on the predeclared cadence:
     // between refreshes removed nodes drop out and added nodes wait.
     let mut executed_ids = refresh_executed_ids(&genomes, battery, context);
+    record_dispatch(&mut tracker, &executed_ids, depth);
     let mut readings = Vec::with_capacity(sizes.checkpoints.len());
+    let mut recruitment = Vec::with_capacity(sizes.checkpoints.len());
     for &checkpoint in sizes.checkpoints {
         while depth < checkpoint {
             if depth > 0 && depth.is_multiple_of(EXECUTED_REFRESH_INTERVAL) {
                 executed_ids = refresh_executed_ids(&genomes, battery, context);
+                record_dispatch(&mut tracker, &executed_ids, depth);
             }
-            for ((genome, rng), ids) in genomes.iter_mut().zip(&mut rngs).zip(&executed_ids) {
+            let born = depth + 1;
+            for (lineage, ((genome, rng), ids)) in genomes
+                .iter_mut()
+                .zip(&mut rngs)
+                .zip(&executed_ids)
+                .enumerate()
+            {
                 let reachable = mesh_reachable_nodes(genome);
                 let executed = indices_for_node_ids(genome, ids);
-                MutationEngine::apply_mutations_with_food_type_count(
+                let before = genome.nodes.clone();
+                let summary = MutationEngine::apply_mutations_with_food_type_count(
                     genome,
                     mutation,
                     &reachable,
@@ -125,17 +150,42 @@ pub fn observe(
                     rng,
                     context.food_type_count,
                 );
+                tracker.record_birth(BirthObservation {
+                    lineage: lineage as u32,
+                    depth: born,
+                    before: &before,
+                    after: &genome.nodes,
+                    summary: &summary,
+                });
             }
             depth += 1;
         }
         // A checkpoint's births derive their own executed set from the battery
         // inside `births::per_birth_result`. The walk's own sets stay on the
         // fixed interval, so checkpoint placement never changes the walk.
-        readings.push(observe_checkpoint(
-            &genomes, battery, mutation, context, sizes, depth,
-        ));
+        let (row, sets) = observe_checkpoint(&genomes, battery, mutation, context, sizes, depth);
+        for (lineage, (executed, contributing)) in sets.iter().enumerate() {
+            tracker.record_reading(lineage as u32, depth, executed, Some(contributing));
+        }
+        readings.push(row);
+        recruitment.push(tracker.checkpoint(depth));
     }
-    readings
+    DriftWalk {
+        checkpoints: readings,
+        recruitment,
+    }
+}
+
+/// Fold an executed-set refresh into the module table. The walk's own executed
+/// sets are untouched: this only dates each module's first dispatch.
+fn record_dispatch(
+    tracker: &mut RecruitmentTracker,
+    executed_ids: &[BTreeSet<NodeId>],
+    depth: u64,
+) {
+    for (lineage, ids) in executed_ids.iter().enumerate() {
+        tracker.record_reading(lineage as u32, depth, ids, None);
+    }
 }
 
 /// Re-read every lineage's executed node ids from the fixed battery. Pure per
@@ -153,6 +203,8 @@ fn refresh_executed_ids(
         .collect()
 }
 
+/// A checkpoint row and, per lineage, the node ids behind its mesh counts:
+/// the same single battery pass, read once (T13.F01).
 fn observe_checkpoint(
     genomes: &[CreatureGenome],
     battery: &Battery,
@@ -160,17 +212,17 @@ fn observe_checkpoint(
     context: &EvalContext,
     sizes: DriftSizes,
     depth: u64,
-) -> Checkpoint {
+) -> (Checkpoint, Vec<(BTreeSet<NodeId>, BTreeSet<NodeId>)>) {
     let mut row = Checkpoint {
         depth,
         ..Checkpoint::default()
     };
+    let mut sets = Vec::with_capacity(genomes.len());
     for (index, genome) in genomes.iter().enumerate() {
-        row.mesh.record(battery.mesh_execution(
-            genome,
-            context.runtime,
-            context.shared_memory_decay_rate,
-        ));
+        let reading =
+            battery.mesh_execution_sets(genome, context.runtime, context.shared_memory_decay_rate);
+        sets.push((reading.executed, reading.contributing));
+        row.mesh.record(reading.reading);
         if index < sizes.birth_lineages as usize {
             let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
             row.births = row.births.merge(&births::per_birth_result(
@@ -184,7 +236,7 @@ fn observe_checkpoint(
             ));
         }
     }
-    row
+    (row, sets)
 }
 
 #[cfg(test)]
@@ -272,7 +324,7 @@ mod tests {
             births: 3,
             checkpoints: &[0, 22],
         };
-        let actual = observe(&dead, &battery, &config.mutation, &context, sizes);
+        let actual = observe(&dead, &battery, &config.mutation, &context, sizes).checkpoints;
         let mut genomes = vec![dead];
         let mut rng = SmallRng::seed_from_u64(90_000);
         let mut zero_births = 0;
@@ -314,7 +366,8 @@ mod tests {
                     &context,
                     sizes,
                     depth,
-                );
+                )
+                .0;
                 let _ = observe_checkpoint(
                     &genomes,
                     &battery,
@@ -351,7 +404,7 @@ mod tests {
         assert!(applied_dead_births > 0);
         assert_eq!(
             actual[1],
-            observe_checkpoint(&genomes, &battery, &config.mutation, &context, sizes, 22)
+            observe_checkpoint(&genomes, &battery, &config.mutation, &context, sizes, 22).0
         );
     }
 
@@ -368,7 +421,8 @@ mod tests {
             births: 4,
             checkpoints: &[0, 3, 22],
         };
-        let actual = observe(&founder, &battery, &config.mutation, &context, sizes);
+        let walk = observe(&founder, &battery, &config.mutation, &context, sizes);
+        let actual = walk.checkpoints;
         let mut expected = vec![Checkpoint::default(); 3];
         let mut applied = 0;
         for index in 0..3 {
@@ -442,7 +496,7 @@ mod tests {
             births: 0,
             checkpoints: &[DEPTH],
         };
-        let actual = observe(&founder, &battery, &config.mutation, &context, sizes);
+        let actual = observe(&founder, &battery, &config.mutation, &context, sizes).checkpoints;
 
         let replay = |refresh: bool| {
             (0..sizes.lineages)
@@ -492,6 +546,96 @@ mod tests {
         );
     }
 
+    /// The recruitment observation rides along without changing the walk: a
+    /// replay that never touches the tracker reproduces the checkpoints byte
+    /// for byte, and the module table it produced describes exactly the nodes
+    /// those replayed genomes carry.
+    #[test]
+    fn recruitment_readings_track_the_walk_without_changing_it() {
+        let config = SimulationConfig::default();
+        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let battery = Battery::generate(2);
+        let context = EvalContext::from_config(&config);
+        const DEPTH: u64 = 22;
+        let sizes = DriftSizes {
+            lineages: 3,
+            birth_lineages: 1,
+            births: 2,
+            checkpoints: &[0, 12, DEPTH],
+        };
+        let walk = observe(&founder, &battery, &config.mutation, &context, sizes);
+
+        // The same walk with no observation of any kind.
+        let mut replayed = Vec::new();
+        for index in 0..sizes.lineages {
+            let mut genome = founder.clone();
+            let mut rng = SmallRng::seed_from_u64(WALK_SEED_BASE + u64::from(index));
+            let mut ids = BTreeSet::new();
+            for step in 0..DEPTH {
+                let executed = replay_executed(step, &genome, &battery, &context, &mut ids);
+                let reachable = mesh_reachable_nodes(&genome);
+                MutationEngine::apply_mutations_with_food_type_count(
+                    &mut genome,
+                    &config.mutation,
+                    &reachable,
+                    ParentExecuted::Indices(&executed),
+                    &mut rng,
+                    context.food_type_count,
+                );
+            }
+            replayed.push(genome);
+        }
+        assert_eq!(
+            walk.checkpoints[2],
+            observe_checkpoint(
+                &replayed,
+                &battery,
+                &config.mutation,
+                &context,
+                sizes,
+                DEPTH
+            )
+            .0
+        );
+
+        let last = &walk.recruitment[2];
+        assert_eq!(last.depth, DEPTH);
+        assert_eq!(
+            last.founders.created,
+            founder.nodes.len() as u64 * u64::from(sizes.lineages)
+        );
+        assert_eq!(
+            last.founders.created,
+            last.founders.present + last.founders.deleted
+        );
+        // Present modules are exactly the nodes the replayed genomes carry.
+        assert_eq!(
+            last.cohort.present + last.founders.present,
+            replayed
+                .iter()
+                .map(|genome| genome.nodes.len() as u64)
+                .sum::<u64>()
+        );
+        assert!(last.cohort.created > 0, "the walk creates modules");
+        assert_eq!(
+            last.cohort.created,
+            last.cohort.present + last.cohort.deleted
+        );
+        assert_eq!(last.graph.created + last.vm.created, last.cohort.created);
+        assert!(last.cohort.contributing <= last.cohort.dispatched());
+        // Opportunities pool every birth of every lineage up to the checkpoint.
+        assert_eq!(last.opportunities.births, DEPTH * u64::from(sizes.lineages));
+        assert_eq!(
+            last.opportunities.attempted,
+            last.opportunities.applied + last.opportunities.skipped
+        );
+        assert!(last.opportunities.applied > 0);
+        assert_eq!(last.lineage_rows.len(), sizes.lineages as usize);
+        assert_eq!(last.lineage_opportunities.len(), sizes.lineages as usize);
+        assert_eq!(walk.recruitment[0].retention, None);
+        assert!(walk.recruitment[2].retention.is_some());
+    }
+
     #[test]
     fn zero_mutation_and_observation_changes_leave_walk_readings_unchanged() {
         let mut config = SimulationConfig::default();
@@ -504,7 +648,7 @@ mod tests {
             checkpoints: &[0, 22],
         };
         let context = EvalContext::from_config(&config);
-        let sparse = observe(&founder, &battery, &config.mutation, &context, sizes);
+        let sparse = observe(&founder, &battery, &config.mutation, &context, sizes).checkpoints;
         let dense = observe(
             &founder,
             &battery,
@@ -515,11 +659,12 @@ mod tests {
                 births: 5,
                 ..sizes
             },
-        );
+        )
+        .checkpoints;
         assert_eq!(sparse[1].mesh, dense[2].mesh);
         config.mutation.mutation_probability = 0.0;
         let context = EvalContext::from_config(&config);
-        let zero = observe(&founder, &battery, &config.mutation, &context, sizes);
+        let zero = observe(&founder, &battery, &config.mutation, &context, sizes).checkpoints;
         assert_eq!(zero[0].mesh, zero[1].mesh);
         assert!(zero.iter().all(|r| r.births.zero_event_births == 2));
     }
