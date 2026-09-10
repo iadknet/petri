@@ -23,7 +23,7 @@ selection can be distinguished before changing the substrate.
 
 ## Executable Features
 
-- [ ] **T13.F01 — Module Recruitment Observability** — Depends on: T11.F14, T11.F16
+- [x] **T13.F01 — Module Recruitment Observability** — Depends on: T11.F14, T11.F16
   - Goal: Observe a new brain module from its creation through mutation, expression, contribution and loss, so each closure shows where recruitment advances or stalls.
 - [ ] **T13.F02 — Recruitment Paths and Replicated Baseline** — Depends on: T13.F01, T11.F05, T11.F08
   - Goal: Measure how often new Graph and VM modules acquire useful behavior through viable steps, separating lineage variation, dormant preparation and selection from mere growth.
