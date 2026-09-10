@@ -11,37 +11,27 @@ use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::simulation::simulation::Simulation;
 
-/// Build child plasticity weights from parent state, respecting Lamarckian/Darwinian inheritance.
-///
-/// For each mesh node with a Graph backend, inspects each internal node:
-/// - `plasticity.lamarckian == true`: copies parent's learned weights if available
-/// - `plasticity.lamarckian == false` or `plasticity == None`: empty `Box<[f32]>` (reinit from genome on first tick)
-fn build_child_plasticity_weights(
-    child_genome: &CreatureGenome,
-    parent_plasticity: &[Vec<Box<[f32]>>],
-) -> Vec<Vec<Box<[f32]>>> {
-    let mut result: Vec<Vec<Box<[f32]>>> = Vec::new();
-
-    for (mesh_idx, mesh_node) in child_genome.nodes.iter().enumerate() {
-        let cgp_def = match &mesh_node.backend_def {
-            BackendDef::Graph(g) => g,
-            _ => continue, // VM nodes have no plasticity weights
-        };
-
-        // Ensure result covers this mesh node index.
-        if result.len() <= mesh_idx {
-            result.resize_with(mesh_idx + 1, Vec::new);
+/// Capture birth-local values before any structural mutation.
+fn capture_birth_weights(genome: &mut CreatureGenome, parent: &[Vec<Box<[f32]>>]) {
+    for (idx, node) in genome.nodes.iter_mut().enumerate() {
+        if let BackendDef::Graph(def) = &mut node.backend_def {
+            cgp_reproduction::capture_birth_weights(
+                def,
+                parent.get(idx).map_or(&[], Vec::as_slice),
+            );
         }
-
-        let parent_weights_for_node = parent_plasticity
-            .get(mesh_idx)
-            .map_or(&[] as &[_], |v| v.as_slice());
-        let inner =
-            cgp_reproduction::build_cgp_child_plasticity_weights(cgp_def, parent_weights_for_node);
-
-        result[mesh_idx] = inner;
     }
+}
 
+/// Consume every backend's birth correspondence before constructing the newborn.
+fn build_child_plasticity_weights(child_genome: &mut CreatureGenome) -> Vec<Vec<Box<[f32]>>> {
+    let mut result = Vec::new();
+    for (idx, node) in child_genome.nodes.iter_mut().enumerate() {
+        if let BackendDef::Graph(def) = &mut node.backend_def {
+            result.resize_with(idx + 1, Vec::new);
+            result[idx] = cgp_reproduction::build_cgp_child_plasticity_weights(def);
+        }
+    }
     result
 }
 
@@ -214,6 +204,7 @@ pub fn apply_reproduce(
 
     // Step 10: Apply genome mutations.
     let mut child_genome = child_genome;
+    capture_birth_weights(&mut child_genome, &parent_plasticity);
     let summary = MutationEngine::apply_mutations_with_food_type_count(
         &mut child_genome,
         &sim.config.mutation,
@@ -341,7 +332,7 @@ pub fn apply_reproduce(
     }
 
     // Step 12: Build child's plasticity weights (Lamarckian inheritance).
-    let child_plasticity = build_child_plasticity_weights(&child_genome, &parent_plasticity);
+    let child_plasticity = build_child_plasticity_weights(&mut child_genome);
 
     // Step 13–14: Spawn child in slotmap + world.
     // No-mutation fast path: if no genome mutations were applied, the offspring's
@@ -401,6 +392,15 @@ mod tests {
     use crate::config::MutationConfig;
     use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, GraphSource};
     use crate::creature::genome::{HebbianRule, PlasticityConfig};
+
+    fn build_child_plasticity_weights(
+        genome: &CreatureGenome,
+        parent: &[Vec<Box<[f32]>>],
+    ) -> Vec<Vec<Box<[f32]>>> {
+        let mut child = genome.clone();
+        capture_birth_weights(&mut child, parent);
+        super::build_child_plasticity_weights(&mut child)
+    }
 
     /// Helper: builds a genome with a single Graph mesh node containing the given compute nodes.
     fn genome_with_cgp_compute_nodes(compute_nodes: Vec<ComputeNode>) -> CreatureGenome {
@@ -595,5 +595,169 @@ mod tests {
 
         // VM nodes produce no Hebbian weight entries
         assert!(child_hw.is_empty());
+    }
+    #[test]
+    fn birth_mesh_copies_removal_and_backend_replacement_keep_their_own_values() {
+        use crate::contracts::{NodeId, RouteTarget};
+        use crate::mutation::reachability::TargetSelector;
+        use crate::mutation::topology::{TopologyMutator, TopologyOperator};
+        use rand::SeedableRng;
+        let compute = ComputeNode {
+            kind: ComputeNodeKind::Add,
+            inputs: vec![GraphEdge {
+                source: GraphSource::SharedMemory {
+                    slot: 0,
+                    previous: false,
+                },
+                weight: 0.1,
+            }],
+            plasticity: Some(PlasticityConfig {
+                rule: HebbianRule::Classic,
+                learning_rate: 0.1,
+                weight_clamp: 5.0,
+                lamarckian: true,
+                modulation: None,
+            }),
+        };
+        let mut original = genome_with_cgp_compute_nodes(vec![compute]);
+        original.nodes = vec![original.nodes[0].clone(); 3];
+        for (idx, node) in original.nodes.iter_mut().enumerate() {
+            node.node_id = NodeId::new(idx as u32);
+            if idx < 2 {
+                node.targets = vec![RouteTarget {
+                    target_id: NodeId::new(idx as u32 + 1),
+                    slot: 0,
+                    gate_bias: 0.0,
+                }];
+            }
+            let BackendDef::Graph(def) = &mut node.backend_def else {
+                unreachable!()
+            };
+            def.compute_nodes[0].inputs[0].weight = idx as f32 + 1.0;
+        }
+        let parent: Vec<Vec<Box<[f32]>>> = vec![
+            vec![Box::new([11.0])],
+            vec![Box::new([12.0])],
+            vec![Box::new([13.0])],
+        ];
+        for op in [
+            TopologyOperator::CopyNode,
+            TopologyOperator::CopyMeshBackwardSlice,
+            TopologyOperator::CopyMeshForwardSlice,
+            TopologyOperator::RemoveNode,
+        ] {
+            let mut child = original.clone();
+            capture_birth_weights(&mut child, &parent);
+            TopologyMutator::apply(
+                &mut child,
+                op,
+                &mut TargetSelector::reachable_only(&[0, 1, 2], 0.0),
+                &mut rand::rngs::SmallRng::seed_from_u64(73),
+                &MutationConfig::default(),
+            )
+            .unwrap();
+            let result = super::build_child_plasticity_weights(&mut child);
+            for (idx, node) in child.nodes.iter().enumerate() {
+                let BackendDef::Graph(def) = &node.backend_def else {
+                    unreachable!()
+                };
+                assert_eq!(
+                    result[idx][0][0],
+                    def.compute_nodes[0].inputs[0].weight + 10.0
+                );
+                assert!(def.birth_weights.is_none());
+            }
+        }
+        let mut child = original.clone();
+        capture_birth_weights(&mut child, &parent);
+        // Replacing a backend at the same mesh index/ID gives it no correspondence.
+        child.nodes[0].backend_def = original.nodes[0].backend_def.clone();
+        let result = super::build_child_plasticity_weights(&mut child);
+        assert!(result[0][0].is_empty());
+        assert_eq!(result[1][0][0], 12.0);
+    }
+
+    #[test]
+    fn birth_applied_reproduction_keeps_parent_and_resets_all_newborn_credit() {
+        use crate::config::SimulationConfig;
+        use crate::simulation::seed_simulation;
+        use rand::SeedableRng;
+        let mut cfg = SimulationConfig::default();
+        cfg.population.initial_creatures = 1;
+        cfg.mutation.mutation_probability = 0.0;
+        let mut sim = seed_simulation(cfg, 83);
+        let parent_id = sim.creatures.keys().next().unwrap();
+        let genome = genome_with_cgp_compute_nodes(vec![ComputeNode {
+            kind: ComputeNodeKind::Add,
+            inputs: vec![GraphEdge {
+                source: GraphSource::SharedMemory {
+                    slot: 0,
+                    previous: false,
+                },
+                weight: 0.5,
+            }],
+            plasticity: Some(PlasticityConfig {
+                rule: HebbianRule::Classic,
+                learning_rate: 0.1,
+                weight_clamp: 5.0,
+                lamarckian: true,
+                modulation: None,
+            }),
+        }]);
+        let parent = &mut sim.creatures[parent_id];
+        parent.genome = genome.clone();
+        parent.age = sim.config.energy.lifecycle.min_reproduce_age;
+        parent.energy = 10000.0;
+        parent.graph_runtime.plasticity_weights = vec![vec![Box::new([0.9])]];
+        parent.graph_runtime.eligibility_traces = vec![vec![Box::new([99.0])]];
+        parent.graph_runtime.tick_start_eligibility_traces = vec![vec![Box::new([88.0])]];
+        parent.graph_runtime.node_state = vec![vec![7.0]];
+        parent.graph_runtime.node_outputs = vec![vec![8.0]];
+        parent.graph_runtime.dispatch_record.record_dispatch(0);
+        let direction = Direction::ALL
+            .into_iter()
+            .find(|&direction| {
+                sim.world
+                    .resolve_neighbor(sim.creatures[parent_id].position, direction)
+                    .is_some_and(|p| sim.world.is_valid_target_cell(p))
+            })
+            .unwrap();
+        assert_eq!(
+            apply_reproduce(
+                parent_id,
+                &mut sim,
+                direction,
+                10.0,
+                &mut rand::rngs::SmallRng::seed_from_u64(2)
+            ),
+            ReproductionActionResult::Spawned
+        );
+        let child = sim
+            .creatures
+            .iter()
+            .find(|(id, _)| *id != parent_id)
+            .unwrap()
+            .1;
+        assert_eq!(child.graph_runtime.plasticity_weights[0][0][0], 0.9);
+        assert!(child.graph_runtime.eligibility_traces.is_empty());
+        assert!(child.graph_runtime.tick_start_eligibility_traces.is_empty());
+        assert!(child.graph_runtime.node_state.is_empty());
+        assert!(child.graph_runtime.node_outputs.is_empty());
+        assert!(child.graph_runtime.tick_start_state.is_empty());
+        assert!(child.graph_runtime.tick_start_outputs.is_empty());
+        assert!(child.graph_runtime.dispatch_record.is_empty());
+        let BackendDef::Graph(def) = &child.genome.nodes[0].backend_def else {
+            unreachable!()
+        };
+        assert!(def.birth_weights.is_none());
+        assert_eq!(sim.creatures[parent_id].genome, genome);
+        assert_eq!(
+            sim.creatures[parent_id].graph_runtime.eligibility_traces[0][0][0],
+            99.0
+        );
+        assert_eq!(
+            sim.creatures[parent_id].graph_runtime.plasticity_weights[0][0][0],
+            0.9
+        );
     }
 }

@@ -185,6 +185,7 @@ mod tests {
 
     fn empty_def() -> CgpGraphBackendDef {
         CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
             action_bank: Vec::new(),
@@ -199,6 +200,7 @@ mod tests {
         // ActionSlot gate wired to CN1
         // ExecuteGate wired to CN0
         CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![
                 ComputeNode {
                     kind: ComputeNodeKind::Add,

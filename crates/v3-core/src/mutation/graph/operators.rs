@@ -391,16 +391,28 @@ pub(crate) fn add_compute_node(
     }
 }
 
+/// Append without repairing indices: existing dangling sources retain the
+/// mutation operator's original behavior when their index becomes addressable.
+fn append_compute_node(def: &mut CgpGraphBackendDef, node: ComputeNode) {
+    if let Some(weights) = &mut def.birth_weights {
+        weights.push(vec![None; node.inputs.len()]);
+    }
+    def.compute_nodes.push(node);
+}
+
 /// Form (a): a random kind joins the graph with no inputs and no consumer.
 pub(crate) fn add_disconnected_node(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    def.compute_nodes.push(ComputeNode {
-        kind: random_compute_node_kind(rng),
-        inputs: Vec::new(),
-        plasticity: None,
-    });
+    append_compute_node(
+        def,
+        ComputeNode {
+            kind: random_compute_node_kind(rng),
+            inputs: Vec::new(),
+            plasticity: None,
+        },
+    );
     Ok(())
 }
 
@@ -415,14 +427,17 @@ pub(crate) fn add_bootstrap_node(
 ) -> Result<(), MutationSkipReason> {
     let compute_count = def.compute_nodes.len() as u16;
     let source = random_graph_source(compute_count, input_refs, config, rng);
-    def.compute_nodes.push(ComputeNode {
-        kind: random_compute_node_kind(rng),
-        inputs: vec![GraphEdge {
-            source,
-            weight: rng.gen_range(-1.0f32..=1.0),
-        }],
-        plasticity: None,
-    });
+    append_compute_node(
+        def,
+        ComputeNode {
+            kind: random_compute_node_kind(rng),
+            inputs: vec![GraphEdge {
+                source,
+                weight: rng.gen_range(-1.0f32..=1.0),
+            }],
+            plasticity: None,
+        },
+    );
     Ok(())
 }
 
@@ -468,6 +483,9 @@ pub(crate) fn split_existing_edge(
         let new_idx = consumer_idx as u16;
         let shifted_consumer_idx = consumer_idx + 1; // shifted by the insert above
         let remapped_source = def.compute_nodes[shifted_consumer_idx].inputs[edge_idx].source;
+        if let Some(weights) = &mut def.birth_weights {
+            weights[consumer_idx].push(None);
+        }
         def.compute_nodes[consumer_idx].inputs.push(GraphEdge {
             source: remapped_source,
             weight: 1.0,
@@ -476,10 +494,13 @@ pub(crate) fn split_existing_edge(
             GraphSource::ComputeNode(new_idx);
     } else {
         let new_idx = def.compute_nodes.len() as u16;
-        def.compute_nodes.push(identity_add_node(vec![GraphEdge {
-            source: old_source,
-            weight: 1.0,
-        }]));
+        append_compute_node(
+            def,
+            identity_add_node(vec![GraphEdge {
+                source: old_source,
+                weight: 1.0,
+            }]),
+        );
         get_edge_vec_mut(def, surface)[edge_idx].source = GraphSource::ComputeNode(new_idx);
     }
     Ok(())
@@ -657,6 +678,9 @@ pub(crate) fn add_edge(
     let weight = rng.gen_range(-1.0f32..=1.0);
     let edges = get_edge_vec_mut(def, surface);
     edges.push(GraphEdge { source, weight });
+    if let (Some(weights), EdgeSurface::ComputeInput(node)) = (&mut def.birth_weights, surface) {
+        weights[node].push(None);
+    }
     Ok(())
 }
 
@@ -669,6 +693,9 @@ pub(crate) fn remove_edge(
         pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     let edges = get_edge_vec_mut(def, surface);
     edges.remove(edge_idx);
+    if let (Some(weights), EdgeSurface::ComputeInput(node)) = (&mut def.birth_weights, surface) {
+        weights[node].remove(edge_idx);
+    }
     Ok(())
 }
 
@@ -684,8 +711,18 @@ pub(crate) fn retarget_edge(
     let compute_count = def.compute_nodes.len() as u16;
     let new_source = random_graph_source(compute_count, input_refs, config, rng);
     let edges = get_edge_vec_mut(def, surface);
+    let changed = edges[edge_idx].source != new_source;
     edges[edge_idx].source = new_source;
+    if changed {
+        reset_inherited_edge(def, surface, edge_idx);
+    }
     Ok(())
+}
+
+fn reset_inherited_edge(def: &mut CgpGraphBackendDef, surface: EdgeSurface, edge: usize) {
+    if let (Some(weights), EdgeSurface::ComputeInput(node)) = (&mut def.birth_weights, surface) {
+        weights[node][edge] = None;
+    }
 }
 
 /// Alter the weight of a random edge.
@@ -695,6 +732,7 @@ pub(crate) fn alter_edge_weight_in_def(
 ) -> Result<(), MutationSkipReason> {
     let (surface, edge_idx) =
         pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
+    reset_inherited_edge(def, surface, edge_idx);
     let edges = get_edge_vec_mut(def, surface);
     let w = &mut edges[edge_idx].weight;
     if w.abs() > 0.01 {
@@ -723,6 +761,10 @@ pub(crate) fn copy_edge_bundle(
     }
     let copied = def.compute_nodes[source].inputs.clone();
     def.compute_nodes[target].inputs.extend(copied);
+    if let Some(weights) = &mut def.birth_weights {
+        let copied = weights[source].clone();
+        weights[target].extend(copied);
+    }
     Ok(())
 }
 
@@ -930,6 +972,9 @@ pub(crate) fn raw_field_mutation(
     }
     let chosen = moves[rng.gen_range(0..moves.len())];
     apply_edge_field_move(&mut get_edge_vec_mut(def, surface)[edge_idx].source, chosen);
+    if get_edge_vec_mut(def, surface)[edge_idx].source != source {
+        reset_inherited_edge(def, surface, edge_idx);
+    }
     Ok(())
 }
 
@@ -949,6 +994,7 @@ mod tests {
 
     fn minimal_def() -> CgpGraphBackendDef {
         CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![
                 ComputeNode {
                     kind: ComputeNodeKind::Add,
@@ -1061,6 +1107,7 @@ mod tests {
     #[test]
     fn split_existing_edge_no_edges_is_skip() {
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(1.0),
                 inputs: Vec::new(),
@@ -1080,6 +1127,7 @@ mod tests {
     #[test]
     fn split_existing_edge_dangling_compute_source_is_skip() {
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(1.0),
                 inputs: Vec::new(),
@@ -1110,6 +1158,7 @@ mod tests {
     #[test]
     fn split_existing_edge_compute_consumer_inserts_and_remaps() {
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![
                 ComputeNode {
                     kind: ComputeNodeKind::Constant(0.25),
@@ -1169,6 +1218,7 @@ mod tests {
     #[test]
     fn split_existing_edge_self_loop_shifts_consistently() {
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::DecayIntegrator(0.5),
                 inputs: vec![GraphEdge {
@@ -1203,6 +1253,7 @@ mod tests {
     #[test]
     fn split_existing_edge_sink_consumer_appends() {
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(0.5),
                 inputs: Vec::new(),
@@ -1247,6 +1298,7 @@ mod tests {
     #[test]
     fn remove_compute_node_empty_is_skip() {
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
             action_bank: Vec::new(),
@@ -1296,6 +1348,7 @@ mod tests {
     #[test]
     fn copy_cgp_subgraph_too_small_is_skip() {
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
                 inputs: Vec::new(),
@@ -1334,6 +1387,7 @@ mod tests {
     fn retarget_edge_changes_source() {
         // Single edge for targeted testing
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
                 inputs: vec![GraphEdge {
@@ -1365,6 +1419,7 @@ mod tests {
     fn alter_edge_weight_modifies_weight() {
         // Use a single compute node with one edge for targeted testing
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
                 inputs: vec![GraphEdge {
@@ -1430,6 +1485,7 @@ mod tests {
     #[test]
     fn mutate_compute_param_no_parameterized_is_skip() {
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
                 inputs: Vec::new(),
@@ -1549,6 +1605,7 @@ mod tests {
         // only eligible target is the Add node's one edge — every trial
         // mutates that edge's ComputeNode index.
         let def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![
                 ComputeNode {
                     kind: ComputeNodeKind::WeightedSum,
@@ -1588,6 +1645,7 @@ mod tests {
     #[test]
     fn raw_field_mutation_shared_memory_slot_wraps_modulo_16() {
         let def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
                 inputs: vec![GraphEdge {
@@ -1631,6 +1689,7 @@ mod tests {
             InputReference::World(WorldInputKey::NeighborBarrierRing),
         ];
         let def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![
                 ComputeNode {
                     kind: ComputeNodeKind::Constant(0.5),
@@ -1697,6 +1756,7 @@ mod tests {
         // A single compute node's self-referencing edge has no valid
         // ComputeNode index move (0 is the only valid index).
         let mut def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
                 inputs: vec![GraphEdge {
@@ -1789,6 +1849,7 @@ mod tests {
     fn add_compute_node_reaches_all_three_forms_with_distinct_signatures() {
         fn fixture() -> CgpGraphBackendDef {
             CgpGraphBackendDef {
+                birth_weights: None,
                 compute_nodes: vec![ComputeNode {
                     kind: ComputeNodeKind::Negate,
                     inputs: Vec::new(),

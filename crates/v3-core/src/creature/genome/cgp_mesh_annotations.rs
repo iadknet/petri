@@ -165,6 +165,7 @@ mod tests {
     #[test]
     fn empty_graph_no_annotations() {
         let def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
             action_bank: Vec::new(),
@@ -180,6 +181,7 @@ mod tests {
     #[test]
     fn wired_sink_produces_write_class() {
         let def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
                 inputs: vec![GraphEdge {
@@ -221,6 +223,7 @@ mod tests {
     #[test]
     fn stateful_node_detected() {
         let def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::DecayIntegrator(0.5),
                 inputs: Vec::new(),
@@ -243,6 +246,7 @@ mod tests {
     #[test]
     fn action_slot_produces_action_write() {
         let def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(1.0),
                 inputs: Vec::new(),
@@ -266,6 +270,7 @@ mod tests {
     #[test]
     fn memory_sink_is_stateful() {
         let def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Constant(1.0),
                 inputs: Vec::new(),
@@ -289,6 +294,7 @@ mod tests {
     #[test]
     fn shared_memory_source_is_stateful() {
         let def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: vec![ComputeNode {
                 kind: ComputeNodeKind::Add,
                 inputs: vec![GraphEdge {
@@ -317,6 +323,7 @@ mod tests {
     #[test]
     fn read_class_from_action_slot_and_execute_gate_edges() {
         let def = CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
             action_bank: vec![ActionSlot {

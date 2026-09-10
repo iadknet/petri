@@ -145,6 +145,7 @@ pub(super) fn assert_neutral(
 /// execute gate), so growth operators are exercised against real structure.
 pub(super) fn base_def() -> CgpGraphBackendDef {
     CgpGraphBackendDef {
+        birth_weights: None,
         compute_nodes: vec![
             ComputeNode {
                 kind: ComputeNodeKind::Sigmoid,
@@ -228,6 +229,7 @@ pub(super) fn base_input_refs() -> Vec<InputReference> {
 /// introspection reference directly on a non-compute surface.
 pub(super) fn plasticity_def() -> CgpGraphBackendDef {
     CgpGraphBackendDef {
+        birth_weights: None,
         compute_nodes: vec![
             ComputeNode {
                 kind: ComputeNodeKind::WeightedSum,

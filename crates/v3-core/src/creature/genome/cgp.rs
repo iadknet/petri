@@ -173,8 +173,13 @@ pub struct ExecuteGate {
 // ── Top-level graph backend ─────────────────────────────────────────────────
 
 /// CGP-style graph backend definition.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct CgpGraphBackendDef {
+    /// Birth-only available learned values, aligned with compute input occurrences.
+    /// Excluded from genome identity and removed before the newborn is constructed.
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub birth_weights: Option<Vec<Vec<Option<f32>>>>,
     pub compute_nodes: Vec<ComputeNode>,
     /// Fixed set — structurally immutable. Only edges are evolvable.
     pub output_sinks: Vec<OutputSink>,
@@ -182,6 +187,28 @@ pub struct CgpGraphBackendDef {
     pub action_bank: Vec<ActionSlot>,
     /// Separate terminal gate.
     pub execute_gate: ExecuteGate,
+}
+
+// Keep temporary birth state out of diagnostic genome identity as well as
+// serialization and equality. Existing state fingerprints use this format.
+impl std::fmt::Debug for CgpGraphBackendDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CgpGraphBackendDef")
+            .field("compute_nodes", &self.compute_nodes)
+            .field("output_sinks", &self.output_sinks)
+            .field("action_bank", &self.action_bank)
+            .field("execute_gate", &self.execute_gate)
+            .finish()
+    }
+}
+
+impl PartialEq for CgpGraphBackendDef {
+    fn eq(&self, other: &Self) -> bool {
+        self.compute_nodes == other.compute_nodes
+            && self.output_sinks == other.output_sinks
+            && self.action_bank == other.action_bank
+            && self.execute_gate == other.execute_gate
+    }
 }
 
 /// Number of CustomOutput sinks in the fixed catalog.
@@ -247,6 +274,7 @@ impl CgpGraphBackendDef {
         Self {
             compute_nodes: Vec::new(),
             output_sinks,
+            birth_weights: None,
             action_bank,
             execute_gate: ExecuteGate { inputs: Vec::new() },
         }
@@ -266,6 +294,16 @@ impl CgpGraphBackendDef {
             self.compute_nodes.len()
         );
         self.compute_nodes.remove(idx);
+        if let Some(weights) = &mut self.birth_weights {
+            weights.remove(idx);
+            for (node, values) in self.compute_nodes.iter().zip(weights) {
+                for (edge, inherited) in node.inputs.iter().zip(values) {
+                    if edge.source == GraphSource::ComputeNode(idx as u16) {
+                        *inherited = None;
+                    }
+                }
+            }
+        }
         let removed = idx as u16;
         self.remap_compute_sources(|src_idx| {
             if src_idx == removed {
@@ -302,6 +340,9 @@ impl CgpGraphBackendDef {
                 src_idx
             }
         });
+        if let Some(weights) = &mut self.birth_weights {
+            weights.insert(idx, vec![None; node.inputs.len()]);
+        }
         self.compute_nodes.insert(idx, node);
     }
 
@@ -342,6 +383,11 @@ impl CgpGraphBackendDef {
                 src_idx + sources.partition_point(|&c| c < src_idx as usize) as u16
             }
         };
+        if let Some(weights) = &mut self.birth_weights {
+            for &source in sources.iter().rev() {
+                weights.insert(source + 1, weights[source].clone());
+            }
+        }
         self.remap_compute_sources(shift);
         for (i, mut copy) in originals.into_iter().enumerate().rev() {
             for edge in &mut copy.inputs {
@@ -360,48 +406,55 @@ impl CgpGraphBackendDef {
     /// `GraphSource::InputLeaf { ref_idx }` across all edge containers.
     /// Matching ref_idx edges are removed. Higher ref_idx values are decremented.
     pub fn reindex_input_refs_after_removal(&mut self, removed_ref_idx: u16) {
-        self.for_each_edge_vec_mut(|edges| {
-            edges.retain_mut(|edge| {
-                if let GraphSource::InputLeaf { ref_idx, .. } = &mut edge.source {
-                    if *ref_idx == removed_ref_idx {
-                        return false; // remove edge
-                    }
-                    if *ref_idx > removed_ref_idx {
-                        *ref_idx -= 1;
-                    }
+        self.retain_edges(|edge| {
+            if let GraphSource::InputLeaf { ref_idx, .. } = &mut edge.source {
+                if *ref_idx == removed_ref_idx {
+                    return false;
                 }
-                true
-            });
+                if *ref_idx > removed_ref_idx {
+                    *ref_idx -= 1;
+                }
+            }
+            true
         });
     }
 
-    /// After an input_ref is swapped, clamp sub_idx values that exceed the
-    /// new width for the given ref_idx. Edges with out-of-range sub_idx
-    /// are removed.
+    /// Remove edges outside the replacement input reference's width.
     pub fn clamp_sub_idx_after_swap(&mut self, ref_idx: u16, new_width: u16) {
-        if new_width == 0 {
-            // Remove all edges pointing to this ref_idx
-            self.for_each_edge_vec_mut(|edges| {
-                edges.retain(|edge| {
-                    !matches!(edge.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx)
-                });
-            });
-            return;
-        }
-        self.for_each_edge_vec_mut(|edges| {
-            edges.retain_mut(|edge| {
-                if let GraphSource::InputLeaf {
-                    ref_idx: r,
-                    sub_idx,
-                } = &mut edge.source
-                {
-                    if *r == ref_idx && *sub_idx >= new_width {
-                        return false; // remove out-of-range edge
-                    }
-                }
-                true
-            });
+        self.retain_edges(|edge| {
+            !matches!(edge.source,
+            GraphSource::InputLeaf { ref_idx: r, sub_idx } if r == ref_idx && sub_idx >= new_width)
         });
+    }
+
+    fn retain_edges(&mut self, mut keep: impl FnMut(&mut GraphEdge) -> bool) {
+        for (idx, node) in self.compute_nodes.iter_mut().enumerate() {
+            let mut values = self.birth_weights.as_mut().map(|rows| &mut rows[idx]);
+            let mut read = 0;
+            let mut written = 0;
+            node.inputs.retain_mut(|edge| {
+                let retained = keep(edge);
+                if retained {
+                    if let Some(values) = &mut values {
+                        values[written] = values[read];
+                    }
+                    written += 1;
+                }
+                read += 1;
+                retained
+            });
+            if let Some(values) = values {
+                values.truncate(written);
+            }
+        }
+        for sink in &mut self.output_sinks {
+            sink.inputs.retain_mut(&mut keep);
+        }
+        for slot in &mut self.action_bank {
+            slot.gate_inputs.retain_mut(&mut keep);
+            slot.param_inputs.retain_mut(&mut keep);
+        }
+        self.execute_gate.inputs.retain_mut(keep);
     }
 
     // ── Internal helpers ────────────────────────────────────────────────────
@@ -439,22 +492,6 @@ impl CgpGraphBackendDef {
         for edge in &mut self.execute_gate.inputs {
             f(edge);
         }
-    }
-
-    /// Apply a closure to every `Vec<GraphEdge>` across all containers.
-    /// Used for retain-style operations that need mutable access to the Vec.
-    fn for_each_edge_vec_mut(&mut self, mut f: impl FnMut(&mut Vec<GraphEdge>)) {
-        for node in &mut self.compute_nodes {
-            f(&mut node.inputs);
-        }
-        for sink in &mut self.output_sinks {
-            f(&mut sink.inputs);
-        }
-        for slot in &mut self.action_bank {
-            f(&mut slot.gate_inputs);
-            f(&mut slot.param_inputs);
-        }
-        f(&mut self.execute_gate.inputs);
     }
 }
 

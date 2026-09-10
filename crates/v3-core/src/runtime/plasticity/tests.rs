@@ -44,6 +44,7 @@ fn config(rule: HebbianRule, eta: f32, lambda: f32) -> PlasticityConfig {
 
 fn graph(rule: HebbianRule, eta: f32, lambda: f32) -> CgpGraphBackendDef {
     CgpGraphBackendDef {
+        birth_weights: None,
         compute_nodes: vec![ComputeNode {
             kind: ComputeNodeKind::Constant(1.0),
             inputs: vec![GraphEdge {
@@ -517,4 +518,27 @@ fn explicit_reward_clamp_bounds_and_decay_normalization() {
         reward(&def, &mut state, signal);
         assert_eq!(state.plasticity_weights[0][0][0], expected);
     }
+}
+
+#[test]
+fn birth_aligned_weights_drive_first_execution_and_reward_without_parent_credit() {
+    use crate::simulation::actions::cgp_reproduction::{
+        build_cgp_child_plasticity_weights, capture_birth_weights,
+    };
+    let mut def = graph(HebbianRule::Classic, 0.1, 0.5);
+    def.compute_nodes[0].kind = ComputeNodeKind::Add;
+    def.compute_nodes[0].plasticity.as_mut().unwrap().lamarckian = true;
+    capture_birth_weights(&mut def, &[Box::new([0.75])]);
+    def.duplicate_compute_nodes_in_place(&[0]);
+    def.remove_compute_node_at(0);
+    let mut child = GraphRuntimeState::new();
+    child.plasticity_weights = vec![build_cgp_child_plasticity_weights(&mut def)];
+    assert!(child.eligibility_traces.is_empty());
+    assert_eq!(reward(&def, &mut child, 1.0), (0.0, 0));
+    begin(&mut child, &def);
+    visit(&def, &mut child, 2.0, &mut 100.0, &RuntimeConfig::default());
+    assert_eq!(child.node_outputs[0][0], 1.5);
+    assert_eq!(child.eligibility_traces[0][0][0], 3.0);
+    reward(&def, &mut child, 1.0);
+    assert!((child.plasticity_weights[0][0][0] - 1.05).abs() < 1e-6);
 }

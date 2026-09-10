@@ -25,6 +25,7 @@ fn single_graph_genome_with_action_bank(action_bank: Vec<ActionSlot>) -> Creatur
             node_id: NodeId::new(0),
             input_refs: Vec::new(),
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                birth_weights: None,
                 compute_nodes: Vec::new(),
                 output_sinks: Vec::new(),
                 action_bank,

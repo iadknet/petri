@@ -93,6 +93,7 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
             node_id,
             input_refs: vec![],
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                birth_weights: None,
                 compute_nodes: vec![ComputeNode {
                     kind: ComputeNodeKind::Constant(1.0),
                     inputs: vec![GraphEdge {
