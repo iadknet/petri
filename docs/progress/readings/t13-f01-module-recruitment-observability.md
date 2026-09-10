@@ -122,7 +122,8 @@ on only one side, with no filtering; classification afterwards.
   Every deterministic field is equal. Note that the gate profile carries
   `drift_depth: "Undefined"`, so this comparison covers fewer fields than the
   goal one — no drift, recruitment, or opportunity field exists in it. Equal
-  deterministic blocks also mean the six gate counters equal T12.F04's exactly.
+  deterministic blocks mean the six gate counters, which are derived from the
+  equal `per_creature_tick` and `totals` fields, equal T12.F04's exactly.
 - **Goal**, against `t12-f04-baseline-world-set-goal.json`: **42 difference
   lines**, in four groups and nothing else:
   1. 15 × `goal_indicators.cases[i].drift_depth.readings[j].recruitment` —
