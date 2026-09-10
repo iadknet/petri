@@ -1,7 +1,7 @@
 # T13 — Neutral Module Recruitment
 
-**Status**: Planned
-**Last updated**: 2026-09-08
+**Status**: In Progress
+**Last updated**: 2026-09-10
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
