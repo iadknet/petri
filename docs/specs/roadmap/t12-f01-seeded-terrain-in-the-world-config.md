@@ -318,6 +318,10 @@ explicit exemption F01 has no fresh drift-floor evaluation; closure relies on
 the remaining authorized checks and does not require an unrelated evolution
 repair. No floor is lowered or claimed satisfied, and F18's exception is not
 transferred. Any failure of a remaining required check still blocks closure.
+(Superseded 2026-09-09: at T12.F04's closure the user re-based the standing
+generation-2,000 floor from 0.008000 to 0.005000 permanently; the paragraph
+above records the floor as it stood at F01's closure. See the dated note in
+the [T11 track](../../roadmaps/t11-brain-genotype-phenotype-map.md#notes-for-ai-agents).)
 No world-set sweep is due before that set exists.
 
 ## Success Criteria
