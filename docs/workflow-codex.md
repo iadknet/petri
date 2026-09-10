@@ -37,9 +37,14 @@ integration conditions still follow the shared contract.
 After worktree setup, delegate the shared Plan step to `roadmap_spec_owner`
 with `model: gpt-6-astra`, `reasoning_effort: high`, and `fork_turns: none`.
 Give it the original user requirements, absolute repository/worktree paths,
-feature ID, and instructions to read `AGENTS.md`, this workflow, the roadmap
-contract and template, owning track, dependency specs, and relevant code
-directly. It uses the research-first-planning, spec-writing, and spec-review
+feature ID, and instructions to read `AGENTS.md`, the roadmap contract and
+template, and the sections it needs rather than whole files: from
+`docs/workflow.md`, "Plan", "Review", and "Environmental pressures in the
+standard baseline"; from this adapter, "Planning and spec ownership". From the
+owning track it reads the feature's row, its dependency rows, and the "Notes for
+AI Agents" entries naming them; from each dependency spec the Goal, Inputs and
+Invariants, and Performance predeclaration, opening a readings file only for a
+specific number. It reads relevant code directly. It uses the research-first-planning, spec-writing, and spec-review
 skills to write the flat spec, perform one readiness review, and allow one
 revision. Its self-review is not independent validation. It handles the
 shared Plan status updates and runs `make roadmap-check`; the orchestrator
@@ -109,7 +114,12 @@ app Handoff, or separate user-owned task is needed.
 The orchestrator spawns `roadmap_implementer` with `model: gpt-6-astra`,
 `reasoning_effort: low`, and `fork_turns: none`. Supply a self-contained brief:
 absolute repository and worktree paths, feature ID, spec path, assigned role,
-and instructions to read `AGENTS.md`, `docs/workflow.md`, and this adapter. A full-history
+and instructions to read `AGENTS.md` and the sections it needs, not whole files:
+from `docs/workflow.md`, "Start", "Implement", and "Environmental pressures in
+the standard baseline"; from this adapter, "Start and worktree" and "Delegation
+and advice". Name the spec sections too, as the Implement step requires. The
+planning, launch, review, waiting, and close sections belong to the
+orchestrator, not to the implementer. A full-history
 fork cannot accept model overrides in the current desktop tools.
 
 Keep that agent for every pass: use `followup_task` to resume an idle agent and
