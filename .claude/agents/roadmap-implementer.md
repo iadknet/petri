@@ -1,13 +1,13 @@
 ---
 name: roadmap-implementer
 description: >-
-  Implements exactly one roadmap feature (TNN.FNN) against its flat feature
-  spec, in the feature worktree the orchestrator is working in. Delegate all
-  roadmap feature implementation and remediation to this agent; keep it alive
-  across passes via SendMessage so it retains context. Does not plan scope or
-  review other work.
+  Implements or verifies one pass of exactly one roadmap feature (TNN.FNN)
+  against its flat feature spec, in the feature worktree the orchestrator is
+  working in. Delegate all roadmap feature implementation and remediation to
+  this agent. Each pass is a fresh agent with a self-contained brief; it does
+  not persist across passes. Does not plan scope or review other work.
 model: opus
-effort: high
+effort: medium
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
 hooks:
   PostToolUse:
@@ -125,7 +125,14 @@ checker output and you keep working until it passes. Do not try to bypass it.
 
 When you finish (or hit a blocker), report to the orchestrator: the changed
 files, the exact commands you ran and their results, the `make rust-mutants`
-summary line and survivor resolutions, how many times you consulted the
-advisor and the decisive guidance from each consult, and any blocker. Then stop
-and wait — expect follow-up remediation messages on this same task and preserve
-your context across them.
+summary line and survivor resolutions when this pass ran them, how many times
+you consulted the advisor and the decisive guidance from each consult, and any
+blocker. Your report is the only thing the next pass inherits, so make it
+self-contained: a later pass is a fresh agent with none of your context. Then
+stop.
+
+Read only what the brief names. When it names spec sections, read those
+sections, not the whole spec. Do not re-read a document to reconfirm something
+already in your context, and when a Bash result is spilled to a
+`tool-results/*.txt` file, re-run the command narrowed rather than reading the
+saved file.

@@ -14,6 +14,11 @@ Browsers block `fetch()` under `file://`, so serve the directory first:
 `http://localhost:8000/`. New closures appear automatically once
 `benchmark-series.json` lists their reports.
 
+The `[full readings]` links below point into each spec's Performance and Goal
+Impact section, which carries the predeclaration, the verdict, and any user
+decision. Where a feature's full comparison tables were relocated on 2026-09-09,
+that section links on to `progress/readings/<id>.md`.
+
 T12.F04 starts the `goal-worlds-v1` series: the standard goal command now
 runs Orchards in grassland / 11, Canyon country / 22 and Confluence / 33 once
 each from fixed maps instead of three plains seed replicates. The goal-v1
