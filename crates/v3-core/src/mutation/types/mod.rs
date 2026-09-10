@@ -505,12 +505,22 @@ impl MutationEventOutcome {
 /// node the event's target selector returned. It is `None` when nothing was
 /// ever selected, which distinguishes *no eligible node of the required kind
 /// exists* from *a node was selected but carried no applicable site*.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// `discarded` lists, in draw order, every operator the event tried and threw
+/// away because it reported `NoApplicableTarget`, with the id of the first node
+/// that operator selected (`None` when it selected nothing). A discard naming a
+/// node is the *selected but no applicable site* fact, and it stays visible
+/// when a later operator of the same domain applied. For a domain-exhausted
+/// event `discarded` holds every operator of the domain and `target` is the
+/// first node any of them selected.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MutationEventRecord {
     pub domain: MutationDomain,
     pub operator: Option<MutationOperator>,
     pub target: Option<NodeId>,
     pub outcome: MutationEventOutcome,
+    /// Empty for an event whose first operator was accepted; an empty `Vec`
+    /// allocates nothing.
+    pub discarded: Vec<(MutationOperator, Option<NodeId>)>,
 }
 
 /// Per-operator funnel counters for mutation-event staging.

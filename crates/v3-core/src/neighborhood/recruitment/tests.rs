@@ -70,38 +70,56 @@ fn applied(operator: MutationOperator, target: u32) -> MutationEventRecord {
         operator: Some(operator),
         target: Some(NodeId::new(target)),
         outcome: MutationEventOutcome::Applied(TargetReachability::Reachable),
+        discarded: Vec::new(),
     }
 }
 
-fn selected_inapplicable(domain: MutationDomain, target: u32) -> MutationEventRecord {
+/// An applied event that first threw away `discarded_operator`, which had
+/// already selected `discarded_target`.
+fn applied_after_discard(
+    operator: MutationOperator,
+    target: u32,
+    discarded_operator: MutationOperator,
+    discarded_target: Option<u32>,
+) -> MutationEventRecord {
     MutationEventRecord {
-        domain,
+        discarded: vec![(discarded_operator, discarded_target.map(NodeId::new))],
+        ..applied(operator, target)
+    }
+}
+
+/// A domain-exhausted event: every operator of `operator`'s domain reported no
+/// applicable site, and `operator` had selected `target` first.
+fn selected_inapplicable(operator: MutationOperator, target: u32) -> MutationEventRecord {
+    MutationEventRecord {
+        domain: operator.domain(),
         operator: None,
         target: Some(NodeId::new(target)),
         outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
+        discarded: vec![(operator, Some(NodeId::new(target)))],
     }
 }
 
-fn no_eligible(domain: MutationDomain) -> MutationEventRecord {
+/// A domain-exhausted event whose operators found no node to select at all.
+fn no_eligible(operator: MutationOperator) -> MutationEventRecord {
     MutationEventRecord {
-        domain,
+        domain: operator.domain(),
         operator: None,
         target: None,
         outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
+        discarded: vec![(operator, None)],
     }
 }
 
 fn birth(
     tracker: &mut RecruitmentTracker,
     depth: u64,
-    before: &[NodeGenome],
     after: &[NodeGenome],
     summary: &MutationSummary,
 ) {
     tracker.record_birth(BirthObservation {
         lineage: 0,
         depth,
-        before,
         after,
         summary,
     });
@@ -120,7 +138,6 @@ fn an_id_reused_after_deletion_is_two_modules() {
     birth(
         &mut tracker,
         1,
-        &founder,
         &after_removal,
         &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 1)]),
     );
@@ -129,7 +146,6 @@ fn an_id_reused_after_deletion_is_two_modules() {
     birth(
         &mut tracker,
         5,
-        &after_removal,
         &reborn,
         &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
     );
@@ -156,7 +172,6 @@ fn copy_provenance_needs_both_a_copy_event_and_matching_content() {
     birth(
         &mut copied,
         1,
-        &before,
         &[vm_node(0, 3), vm_node(1, 3)],
         &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 0)]),
     );
@@ -171,7 +186,6 @@ fn copy_provenance_needs_both_a_copy_event_and_matching_content() {
     birth(
         &mut detour,
         1,
-        &before,
         &[vm_node(0, 3), vm_node(1, 7)],
         &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
     );
@@ -186,7 +200,6 @@ fn copy_provenance_needs_both_a_copy_event_and_matching_content() {
     birth(
         &mut coincidence,
         1,
-        &before,
         &[vm_node(0, 3), vm_node(1, 3)],
         &summary_with(vec![applied(MutationOperator::TopologySpliceNode, 0)]),
     );
@@ -207,7 +220,6 @@ fn the_censoring_split_keeps_every_module_in_the_denominator() {
     birth(
         &mut tracker,
         1,
-        &founder,
         &grown,
         &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
     );
@@ -215,7 +227,6 @@ fn the_censoring_split_keeps_every_module_in_the_denominator() {
     birth(
         &mut tracker,
         2,
-        &grown,
         &pruned,
         &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 2)]),
     );
@@ -252,10 +263,9 @@ fn a_selected_inapplicable_event_is_separated_from_a_missing_eligible_node() {
         &mut tracker,
         1,
         &founder,
-        &founder,
         &summary_with(vec![
-            selected_inapplicable(MutationDomain::Graph, 0),
-            no_eligible(MutationDomain::Vm),
+            selected_inapplicable(MutationOperator::GraphAddGraphEdge, 0),
+            no_eligible(MutationOperator::VmDeleteInstruction),
         ]),
     );
     let reading = tracker.checkpoint(1);
@@ -277,6 +287,79 @@ fn a_selected_inapplicable_event_is_separated_from_a_missing_eligible_node() {
 }
 
 #[test]
+fn a_module_named_only_by_a_discarded_operator_reaches_the_selected_only_rung() {
+    // The engine throws away an operator that found no applicable site and
+    // retries another one, which applies elsewhere. The discarded operator's
+    // pick is still a selection, so the module it named sits on the
+    // selected-only rung instead of never selected.
+    let founder = vec![vm_node(0, 1)];
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &founder);
+    let grown = vec![vm_node(0, 1), vm_node(1, 1)];
+    birth(
+        &mut tracker,
+        1,
+        &grown,
+        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+    );
+    birth(
+        &mut tracker,
+        2,
+        &grown,
+        &summary_with(vec![applied_after_discard(
+            MutationOperator::TopologyMutateGateBias,
+            0,
+            MutationOperator::TopologyRemoveRouteTarget,
+            Some(1),
+        )]),
+    );
+
+    let reading = tracker.checkpoint(2);
+    assert_eq!(reading.cohort.present, 1);
+    assert_eq!(reading.cohort.selected_only, 1);
+    assert_eq!(reading.cohort.never_selected, 0);
+    let module = tracker
+        .modules()
+        .find(|module| module.node == NodeId::new(1))
+        .expect("the new module");
+    assert_eq!(module.first_selection, Some(2));
+    assert_eq!(module.first_applicable_selection, None);
+    let pooled = &reading.opportunities;
+    // The discard is per operator; no event-level skip happened at all.
+    assert_eq!(
+        pooled.discarded_selected_inapplicable_by_operator,
+        BTreeMap::from([(MutationOperator::TopologyRemoveRouteTarget, 1)])
+    );
+    assert!(pooled.discarded_no_eligible_node_by_operator.is_empty());
+    assert!(pooled.selected_inapplicable_by_domain.is_empty());
+    assert_eq!(pooled.applied, 2);
+}
+
+#[test]
+fn a_discarded_operator_that_selected_nothing_counts_as_no_eligible_node() {
+    let founder = vec![vm_node(0, 1)];
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &founder);
+    birth(
+        &mut tracker,
+        1,
+        &founder,
+        &summary_with(vec![applied_after_discard(
+            MutationOperator::TopologyMutateGateBias,
+            0,
+            MutationOperator::TopologyRemoveRouteTarget,
+            None,
+        )]),
+    );
+    let pooled = &tracker.checkpoint(1).opportunities;
+    assert_eq!(
+        pooled.discarded_no_eligible_node_by_operator,
+        BTreeMap::from([(MutationOperator::TopologyRemoveRouteTarget, 1)])
+    );
+    assert!(pooled.discarded_selected_inapplicable_by_operator.is_empty());
+}
+
+#[test]
 fn retention_splits_the_previous_checkpoints_contributors() {
     let founder = vec![vm_node(0, 1)];
     let mut tracker = RecruitmentTracker::new(1);
@@ -285,7 +368,6 @@ fn retention_splits_the_previous_checkpoints_contributors() {
     birth(
         &mut tracker,
         1,
-        &founder,
         &grown,
         &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
     );
@@ -298,7 +380,6 @@ fn retention_splits_the_previous_checkpoints_contributors() {
     birth(
         &mut tracker,
         2,
-        &grown,
         &pruned,
         &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 3)]),
     );
@@ -374,15 +455,24 @@ proptest! {
                 let events: Vec<_> = generation.selected.iter()
                     .filter(|(id, _)| live.contains(id))
                     .map(|&(id, apply)| if apply {
-                        applied(MutationOperator::TopologyAddNode, id)
+                        // Half the applied events first discarded an operator:
+                        // even ids had already been selected by it, odd ids
+                        // left it with nothing to select.
+                        applied_after_discard(
+                            MutationOperator::TopologyAddNode,
+                            id,
+                            MutationOperator::TopologyMutateGateBias,
+                            (id % 2 == 0).then_some(id),
+                        )
+                    } else if id % 3 == 0 {
+                        no_eligible(MutationOperator::TopologyRemoveRouteTarget)
                     } else {
-                        selected_inapplicable(MutationDomain::Topology, id)
+                        selected_inapplicable(MutationOperator::TopologyRemoveRouteTarget, id)
                     })
                     .collect();
                 tracker.record_birth(BirthObservation {
                     lineage,
                     depth,
-                    before: &before,
                     after: &after,
                     summary: &summary_with(events),
                 });
@@ -465,6 +555,16 @@ proptest! {
             prop_assert_eq!(
                 reading.opportunities.attempted_by_domain.values().sum::<u64>(),
                 reading.opportunities.attempted);
+            // Every event-level skip discarded at least one operator of the
+            // same kind, so the per-operator discard counts dominate the
+            // per-domain event counts.
+            let pooled = &reading.opportunities;
+            prop_assert!(
+                pooled.discarded_selected_inapplicable_by_operator.values().sum::<u64>()
+                    >= pooled.selected_inapplicable_by_domain.values().sum::<u64>());
+            prop_assert!(
+                pooled.discarded_no_eligible_node_by_operator.values().sum::<u64>()
+                    >= pooled.no_eligible_node_by_domain.values().sum::<u64>());
         }
         for pair in checkpoints.windows(2) {
             let retention = pair[1].retention.expect("later checkpoints carry retention");

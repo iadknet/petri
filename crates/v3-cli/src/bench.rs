@@ -764,11 +764,15 @@ pub struct LineageOpportunityRow {
 /// The mutation opportunities production offered, pooled from depth 0 to this
 /// checkpoint over every lineage (T13.F01).
 ///
-/// `selected_inapplicable` counts events that selected a node carrying no
-/// applicable site; `no_eligible_node` counts events that found no node of the
-/// required kind at all. Both are keyed by domain: the engine retries every
-/// operator of a domain before recording the skip, so no single operator owns
-/// such an attempt.
+/// `selected_inapplicable` counts a node that was selected and carried no
+/// applicable site; `no_eligible_node` counts finding no node of the required
+/// kind at all. The `_by_domain` maps count whole events, and only an event
+/// whose domain exhausted every operator can land there, because the engine
+/// retries the other operators of a domain before recording the skip. The
+/// `discarded_*_by_operator` maps count each operator the engine threw away
+/// for reporting no applicable site, whether or not a later operator of the
+/// same domain then applied, so an operator that selected a module and found
+/// no site is visible there alone.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MutationOpportunities {
     pub births: u64,
@@ -786,6 +790,10 @@ pub struct MutationOpportunities {
     pub applied_by_domain: BTreeMap<String, u64>,
     pub selected_inapplicable_by_domain: BTreeMap<String, u64>,
     pub no_eligible_node_by_domain: BTreeMap<String, u64>,
+    #[serde(default)]
+    pub discarded_selected_inapplicable_by_operator: BTreeMap<String, u64>,
+    #[serde(default)]
+    pub discarded_no_eligible_node_by_operator: BTreeMap<String, u64>,
     pub operators: Vec<OperatorOpportunityRow>,
     pub lineages: Vec<LineageOpportunityRow>,
 }
@@ -794,6 +802,15 @@ fn domain_keys(counts: &BTreeMap<v3_core::mutation::MutationDomain, u64>) -> BTr
     counts
         .iter()
         .map(|(domain, &count)| (domain.as_key().to_string(), count))
+        .collect()
+}
+
+fn operator_keys(
+    counts: &BTreeMap<v3_core::mutation::MutationOperator, u64>,
+) -> BTreeMap<String, u64> {
+    counts
+        .iter()
+        .map(|(operator, &count)| (operator.as_key().to_string(), count))
         .collect()
 }
 
@@ -886,6 +903,12 @@ fn mutation_opportunities(
         applied_by_domain: domain_keys(&pooled.applied_by_domain),
         selected_inapplicable_by_domain: domain_keys(&pooled.selected_inapplicable_by_domain),
         no_eligible_node_by_domain: domain_keys(&pooled.no_eligible_node_by_domain),
+        discarded_selected_inapplicable_by_operator: operator_keys(
+            &pooled.discarded_selected_inapplicable_by_operator,
+        ),
+        discarded_no_eligible_node_by_operator: operator_keys(
+            &pooled.discarded_no_eligible_node_by_operator,
+        ),
         operators: pooled
             .attempted_by_operator
             .iter()
@@ -3578,6 +3601,7 @@ mod tests {
             operator: Some(MutationOperator::TopologyAddNode),
             target: Some(founder.nodes[0].node_id),
             outcome: MutationEventOutcome::Applied(TargetReachability::Reachable),
+            discarded: Vec::new(),
         });
         summary.record_domain_skip(
             MutationDomain::Graph,
@@ -3588,6 +3612,7 @@ mod tests {
             operator: None,
             target: Some(founder.nodes[0].node_id),
             outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
+            discarded: vec![(MutationOperator::GraphAddGraphEdge, Some(founder.nodes[0].node_id))],
         });
 
         let mut tracker = RecruitmentTracker::new(1);
@@ -3595,7 +3620,6 @@ mod tests {
         tracker.record_birth(BirthObservation {
             lineage: 0,
             depth: 1,
-            before: &founder.nodes,
             after: &grown,
             summary: &summary,
         });
@@ -3650,6 +3674,14 @@ mod tests {
             BTreeMap::from([("Graph".to_string(), 1)])
         );
         assert!(opportunities.no_eligible_node_by_domain.is_empty());
+        // The discarded operator is reported by operator, not by domain.
+        assert_eq!(
+            opportunities.discarded_selected_inapplicable_by_operator,
+            BTreeMap::from([("Graph.AddGraphEdge".to_string(), 1)])
+        );
+        assert!(opportunities
+            .discarded_no_eligible_node_by_operator
+            .is_empty());
         assert_eq!(opportunities.lineages.len(), 1);
         assert_eq!(opportunities.lineages[0].selected_inapplicable, 1);
         assert_eq!(

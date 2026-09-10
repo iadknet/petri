@@ -5,7 +5,7 @@ use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ExecuteGate, OutputSink, OutputSinkKind};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::{
-    MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationEventRecord,
+    MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
     MutationOperator, MutationSkipReason, MutationSummary,
 };
 use rand::rngs::SmallRng;
@@ -1428,15 +1428,30 @@ fn a_selected_module_with_no_applicable_site_is_recorded_with_its_node_id() {
     let summary = first_event_in_domain(&genome, &config, MutationDomain::Graph);
     assert_eq!(summary.attempted_events, 1);
     assert_eq!(summary.skipped_events, 1);
+    let [event] = &summary.events[..] else {
+        panic!("one event: {:?}", summary.events);
+    };
+    assert_eq!(event.domain, MutationDomain::Graph);
+    assert_eq!(event.operator, None);
+    assert_eq!(event.target, Some(NodeId::new(0)));
     assert_eq!(
-        summary.events,
-        vec![MutationEventRecord {
-            domain: MutationDomain::Graph,
-            operator: None,
-            target: Some(NodeId::new(0)),
-            outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
-        }]
+        event.outcome,
+        MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget)
     );
+    // Every operator of the domain was tried and thrown away, and at least one
+    // of them had already selected the edgeless node.
+    assert!(!event.discarded.is_empty());
+    assert!(event
+        .discarded
+        .iter()
+        .all(|&(operator, _)| operator.domain() == MutationDomain::Graph));
+    assert_eq!(
+        event.discarded.iter().find_map(|&(_, pick)| pick),
+        Some(NodeId::new(0))
+    );
+    let operators: BTreeSet<MutationOperator> =
+        event.discarded.iter().map(|&(operator, _)| operator).collect();
+    assert_eq!(operators.len(), event.discarded.len(), "no operator retried");
 }
 
 #[test]
@@ -1458,15 +1473,57 @@ fn an_event_with_no_eligible_node_records_no_target() {
         }],
     };
     let summary = first_event_in_domain(&genome, &config, MutationDomain::Graph);
+    let [event] = &summary.events[..] else {
+        panic!("one event: {:?}", summary.events);
+    };
+    assert_eq!(event.domain, MutationDomain::Graph);
+    assert_eq!(event.operator, None);
+    assert_eq!(event.target, None);
     assert_eq!(
-        summary.events,
-        vec![MutationEventRecord {
-            domain: MutationDomain::Graph,
-            operator: None,
-            target: None,
-            outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
-        }]
+        event.outcome,
+        MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget)
     );
+    assert!(!event.discarded.is_empty());
+    assert!(
+        event.discarded.iter().all(|&(_, pick)| pick.is_none()),
+        "nothing was ever selected: {:?}",
+        event.discarded
+    );
+}
+
+#[test]
+fn a_discarded_operator_stays_visible_when_a_later_operator_applied() {
+    // An edgeless Graph node offers the edge operators no site, so they select
+    // it and report NoApplicableTarget; the engine then retries another Graph
+    // operator, which applies. The discard is the T13.F01 fact and it must
+    // survive the retry.
+    let config = single_node_internal_event_config();
+    let genome = single_graph_genome_with_inputs(vec![]);
+    let mut seen = 0;
+    for seed in 0u64..2_000 {
+        let summary =
+            MutationEngine::apply_mutations(&mut genome.clone(), &config, &[0], &mut rng(seed));
+        let Some(event) = summary.events.first() else {
+            continue;
+        };
+        if event.domain != MutationDomain::Graph
+            || !event.outcome.is_applied()
+            || event.discarded.is_empty()
+        {
+            continue;
+        }
+        seen += 1;
+        assert!(event.operator.is_some(), "an applied event names its operator");
+        assert!(
+            event
+                .discarded
+                .iter()
+                .any(|&(operator, pick)| operator.domain() == MutationDomain::Graph
+                    && pick == Some(NodeId::new(0))),
+            "the discarded edge operator selected the edgeless module: {event:?}"
+        );
+    }
+    assert!(seen > 0, "no seed applied after discarding an operator");
 }
 
 #[test]
@@ -1533,6 +1590,21 @@ proptest::proptest! {
         // A record naming no operator is a domain-exhausted skip, and it is
         // the only kind of record that carries no operator.
         for event in &summary.events {
+            // Every discarded operator belongs to the event's domain, is
+            // discarded at most once, and never repeats the accepted operator.
+            let mut seen = std::collections::BTreeSet::new();
+            for &(operator, _) in &event.discarded {
+                proptest::prop_assert_eq!(operator.domain(), event.domain);
+                proptest::prop_assert!(seen.insert(operator));
+                proptest::prop_assert_ne!(Some(operator), event.operator);
+            }
+            if event.operator.is_none() {
+                // A domain-exhausted event discarded every operator it tried
+                // and carries the first node any of them selected.
+                proptest::prop_assert!(!event.discarded.is_empty());
+                proptest::prop_assert_eq!(
+                    event.target, event.discarded.iter().find_map(|&(_, pick)| pick));
+            }
             proptest::prop_assert!(event.operator.is_some() || matches!(
                 event.outcome,
                 MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget)));

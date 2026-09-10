@@ -217,12 +217,15 @@ pub enum CohortFact {
 /// The mutation opportunities production offered one lineage, pooled from
 /// depth 0 to the current depth.
 ///
-/// The two `NoApplicableTarget` splits are keyed by domain because the engine
-/// retries every operator of a domain before recording the skip: an
-/// operator-level `NoApplicableTarget` never reaches the summary, so only the
-/// domain owns the attempt. `selected_inapplicable` means a node was selected
-/// and carried no applicable site; `no_eligible_node` means no node of the
-/// required kind existed to select at all.
+/// `selected_inapplicable` means a node was selected and carried no applicable
+/// site; `no_eligible_node` means no node of the required kind existed to
+/// select at all. The split is reported twice. The `_by_domain` maps count
+/// whole events, and only events whose domain exhausted every operator can
+/// count there, because the engine retries the other operators of a domain
+/// before recording the skip. The `discarded_*_by_operator` maps count each
+/// operator the engine threw away for reporting no applicable site, whether or
+/// not a later operator of the same domain then applied, so a module selected
+/// by an operator that found no site is visible in them alone.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Opportunities {
     pub births: u64,
@@ -240,6 +243,8 @@ pub struct Opportunities {
     pub skipped_by_operator_reason: BTreeMap<MutationOperator, BTreeMap<MutationSkipReason, u64>>,
     pub selected_inapplicable_by_domain: BTreeMap<MutationDomain, u64>,
     pub no_eligible_node_by_domain: BTreeMap<MutationDomain, u64>,
+    pub discarded_selected_inapplicable_by_operator: BTreeMap<MutationOperator, u64>,
+    pub discarded_no_eligible_node_by_operator: BTreeMap<MutationOperator, u64>,
 }
 
 fn bump<K: Ord>(map: &mut BTreeMap<K, u64>, key: K, count: u64) {
@@ -294,6 +299,14 @@ impl Opportunities {
                 };
                 bump(split, event.domain, 1);
             }
+            for &(operator, pick) in &event.discarded {
+                let split = if pick.is_some() {
+                    &mut self.discarded_selected_inapplicable_by_operator
+                } else {
+                    &mut self.discarded_no_eligible_node_by_operator
+                };
+                bump(split, operator, 1);
+            }
         }
     }
 
@@ -325,6 +338,14 @@ impl Opportunities {
         merge_map(
             &mut self.no_eligible_node_by_domain,
             &other.no_eligible_node_by_domain,
+        );
+        merge_map(
+            &mut self.discarded_selected_inapplicable_by_operator,
+            &other.discarded_selected_inapplicable_by_operator,
+        );
+        merge_map(
+            &mut self.discarded_no_eligible_node_by_operator,
+            &other.discarded_no_eligible_node_by_operator,
         );
     }
 }
@@ -447,15 +468,22 @@ struct LineageState {
     opportunities: Opportunities,
     live: BTreeMap<NodeId, usize>,
     modules: Vec<Module>,
+    /// The nodes this lineage carried before the next birth, retained so a
+    /// generation is diffed in place. Only the nodes a birth changed or added
+    /// are cloned into it, so a birth that changed nothing clones nothing.
+    previous: BTreeMap<NodeId, NodeGenome>,
 }
 
 /// The facts one birth of one lineage offers the tracker.
+///
+/// The pre-birth nodes are the tracker's own retained snapshot, seeded by
+/// [`RecruitmentTracker::seed_founder`], so the caller hands over only the
+/// genome the birth produced.
 #[derive(Debug, Clone, Copy)]
 pub struct BirthObservation<'a> {
     pub lineage: u32,
     /// The depth of the generation this birth produced.
     pub depth: u64,
-    pub before: &'a [NodeGenome],
     pub after: &'a [NodeGenome],
     pub summary: &'a MutationSummary,
 }
@@ -479,7 +507,8 @@ impl RecruitmentTracker {
         }
     }
 
-    /// Record a lineage's founder modules, created at depth 0.
+    /// Record a lineage's founder modules, created at depth 0, and seed the
+    /// snapshot every later birth is diffed against.
     pub fn seed_founder(&mut self, lineage: u32, nodes: &[NodeGenome]) {
         for node in nodes {
             self.create(
@@ -490,6 +519,11 @@ impl RecruitmentTracker {
                 Provenance::Founder,
             );
         }
+        let state = &mut self.lineages[lineage as usize];
+        state.previous = nodes
+            .iter()
+            .map(|node| (node.node_id, node.clone()))
+            .collect();
     }
 
     /// Every module of every lineage, in creation order per lineage.
@@ -515,60 +549,82 @@ impl RecruitmentTracker {
 
     /// Pool one birth's opportunities and fold its genome diff into the
     /// module table: deletions, creations with provenance, selections from the
-    /// event records, and internal change for the ids that survived.
+    /// event records, and internal change for the ids that survived. The diff
+    /// runs against the lineage's retained snapshot, which this call updates.
     pub fn record_birth(&mut self, observation: BirthObservation<'_>) {
         let BirthObservation {
             lineage,
             depth,
-            before,
             after,
             summary,
         } = observation;
-        self.lineages[lineage as usize]
-            .opportunities
-            .record(summary);
-        self.record_selections(lineage, depth, &summary.events);
-
-        let after_by_id: BTreeMap<NodeId, &NodeGenome> =
-            after.iter().map(|node| (node.node_id, node)).collect();
-        for node in before {
-            match after_by_id.get(&node.node_id) {
-                None => self.delete(lineage, node.node_id, depth),
-                Some(current) if *current != node => {
-                    self.fact_reached(lineage, node.node_id, CohortFact::InternalChange, depth);
-                }
-                Some(_) => {}
-            }
-        }
-
         let copy_applied = summary.events.iter().any(|event| {
             event.outcome.is_applied() && event.operator == Some(MutationOperator::TopologyCopyNode)
         });
-        let before_ids: BTreeSet<NodeId> = before.iter().map(|node| node.node_id).collect();
+
+        let state = &mut self.lineages[lineage as usize];
+        state.opportunities.record(summary);
+        let mut previous = std::mem::take(&mut state.previous);
+        let mut changed: Vec<NodeId> = Vec::new();
+        let mut created: Vec<(NodeId, ModuleBackend, Provenance)> = Vec::new();
         for node in after {
-            if before_ids.contains(&node.node_id) {
+            if let Some(slot) = previous.get_mut(&node.node_id) {
+                if slot != node {
+                    changed.push(node.node_id);
+                    slot.clone_from(node);
+                }
                 continue;
             }
             let copied = copy_applied
-                && before
-                    .iter()
+                && previous
+                    .values()
                     .any(|existing| existing.backend_def == node.backend_def);
-            self.create(
-                lineage,
+            created.push((
                 node.node_id,
-                depth,
                 ModuleBackend::from(&node.backend_def),
                 if copied {
                     Provenance::Copy
                 } else {
                     Provenance::New
                 },
-            );
+            ));
+            previous.insert(node.node_id, node.clone());
+        }
+        // Every id of `after` is now in the snapshot, so a longer snapshot is
+        // the only way this birth deleted anything.
+        let deleted: Vec<NodeId> = if previous.len() == after.len() {
+            Vec::new()
+        } else {
+            let live: BTreeSet<NodeId> = after.iter().map(|node| node.node_id).collect();
+            let gone: Vec<NodeId> = previous
+                .keys()
+                .copied()
+                .filter(|id| !live.contains(id))
+                .collect();
+            previous.retain(|id, _| live.contains(id));
+            gone
+        };
+        self.lineages[lineage as usize].previous = previous;
+
+        self.record_selections(lineage, depth, &summary.events);
+        for node in deleted {
+            self.delete(lineage, node, depth);
+        }
+        for node in changed {
+            self.fact_reached(lineage, node, CohortFact::InternalChange, depth);
+        }
+        for (node, backend, provenance) in created {
+            self.create(lineage, node, depth, backend, provenance);
         }
     }
 
     fn record_selections(&mut self, lineage: u32, depth: u64, events: &[MutationEventRecord]) {
         for event in events {
+            // A discarded operator's pick is a selection too: the module was
+            // named and carried no applicable site.
+            for target in event.discarded.iter().filter_map(|&(_, pick)| pick) {
+                self.fact_reached(lineage, target, CohortFact::Selection, depth);
+            }
             let Some(target) = event.target else {
                 continue;
             };
