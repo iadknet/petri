@@ -146,6 +146,12 @@ it. Its scope is the `simplify` skill on the feature diff and the spec's
 Verification update. It reports what the simplify pass changed, the verification
 commands it reran with their results, and its advisor consult count.
 
+**Self-review follows code, not passes.** Put the `simplify` skill in the brief
+of the pass that follows a build, and in any remediation brief that adds code —
+new code gets one self-review pass before it reaches the gate. A remediation
+brief that only strengthens tests, or only edits documents, does not need it.
+The implementer never decides this for itself; it does what its brief names.
+
 **The mutation gate is not part of implementation.** It runs once, after review
 and any remediation, on the code that ships. See "Mutation gate" below.
 

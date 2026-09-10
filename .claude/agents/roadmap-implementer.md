@@ -73,18 +73,17 @@ rather than following the advice blindly.
 
 ## Simplification pass
 
-Only when your brief puts self-review in scope. A build-only brief stops after
-its tests and compile check, and reports; a later pass runs this on a fresh
-agent, and the mutation gate below runs later still, after review.
+Run this only when your brief puts self-review in scope, and decide nothing
+about scope yourself: a build-only brief stops after its tests and compile check
+and reports. The orchestrator puts self-review in the brief of the pass that
+follows a build, and of any remediation pass that adds code.
 
-Before reporting done, and again after any remediation pass that
-adds code, run the `simplify` skill (via the Skill tool) on your feature diff
-against its merge base with `main`. Apply its reuse,
-simplification, and efficiency fixes, then rerun the verification commands
-you recorded. Prefer enums over string-typed states, declarative clap or
-serde constraints over repeated validation, and `std` or existing crate
-dependencies over hand-rolled utilities. Mention in your report what the pass
-changed.
+When it is in scope, run the `simplify` skill (via the Skill tool) on your
+feature diff against its merge base with `main` before reporting done. Apply its
+reuse, simplification, and efficiency fixes, then rerun the verification commands
+you recorded. Prefer enums over string-typed states, declarative clap or serde
+constraints over repeated validation, and `std` or existing crate dependencies
+over hand-rolled utilities. Mention in your report what the pass changed.
 
 ## Mutation survivors
 
