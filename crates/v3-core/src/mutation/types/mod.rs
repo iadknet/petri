@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::contracts::{InputReference, WorldInputKey};
+use crate::contracts::{InputReference, NodeId, WorldInputKey};
 
 /// Whether a mutation operator increases, decreases, or preserves genome complexity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -25,7 +25,9 @@ impl ComplexityEffect {
 }
 
 /// Reason a mutation event was skipped.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum MutationSkipReason {
     ParseabilityViolation,
     NoApplicableTarget,
@@ -45,7 +47,9 @@ impl MutationSkipReason {
 }
 
 /// Domain selected for a mutation event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum MutationDomain {
     Topology,
     Vm,
@@ -129,7 +133,9 @@ impl MutationDomain {
 }
 
 /// Mutation operator selected for one attempted mutation event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum MutationOperator {
     // Topology
     TopologyAddNode,
@@ -448,7 +454,7 @@ impl MutationOperator {
 }
 
 /// Whether a mutation target node is reachable from the mesh entry node.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TargetReachability {
     Reachable,
     Unreachable,
@@ -470,6 +476,41 @@ impl MutationSemanticCategory {
             Self::SemanticChange => "SemanticChange",
         }
     }
+}
+
+/// What one attempted mutation event did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MutationEventOutcome {
+    /// The event changed the genome; the classification is its first target's.
+    Applied(TargetReachability),
+    /// The event left the genome as it found it.
+    Skipped(MutationSkipReason),
+}
+
+impl MutationEventOutcome {
+    /// Whether this event changed the genome.
+    #[must_use]
+    pub const fn is_applied(self) -> bool {
+        matches!(self, Self::Applied(_))
+    }
+}
+
+/// One attempted mutation event, in draw order (T13.F01).
+///
+/// `operator` is `None` for a domain-exhausted event: every operator of the
+/// domain reported `NoApplicableTarget`, so no single operator owns the
+/// attempt (see [`MutationSummary::record_domain_skip`]).
+///
+/// `target` is the id the genome carried, before this event, for the first
+/// node the event's target selector returned. It is `None` when nothing was
+/// ever selected, which distinguishes *no eligible node of the required kind
+/// exists* from *a node was selected but carried no applicable site*.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct MutationEventRecord {
+    pub domain: MutationDomain,
+    pub operator: Option<MutationOperator>,
+    pub target: Option<NodeId>,
+    pub outcome: MutationEventOutcome,
 }
 
 /// Per-operator funnel counters for mutation-event staging.
@@ -511,6 +552,9 @@ pub struct MutationSummary {
     /// so short-circuited draws on an all-executed eligible set count too.
     pub executed_target_events: u32,
     pub not_applicable_events: u32,
+    /// One record per attempted event, in draw order (T13.F01). Purely
+    /// observational: recording consumes no RNG and changes no selection.
+    pub events: Vec<MutationEventRecord>,
 }
 
 impl MutationSummary {
@@ -536,7 +580,14 @@ impl MutationSummary {
             unreachable_target_events: 0,
             executed_target_events: 0,
             not_applicable_events: 0,
+            events: Vec::new(),
         }
+    }
+
+    /// Append one attempted event's record, keeping
+    /// `events.len() == attempted_events`.
+    pub fn record_event(&mut self, event: MutationEventRecord) {
+        self.events.push(event);
     }
 
     pub fn record_attempt(&mut self, domain: MutationDomain, operator: MutationOperator) {
