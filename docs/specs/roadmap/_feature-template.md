@@ -5,12 +5,17 @@
 **Feature**: T01.F01
 **Track**: [T01 — <Track title>](../../roadmaps/t01-<track-slug>.md)
 
-This spec is the contract, not the record. It carries the goal, inputs,
-invariants, tasks, the Verification checklist, the mutation survivor list, the
-Performance predeclaration, user decisions, and notes. Measured evidence lives in
-`docs/progress/features/<id>.json` (machine-written) and
-`docs/progress/readings/<id>.md` (hand-written tables). A closed spec should land
-under about 20 KB; growing past that means evidence has leaked back in.
+**A spec records the state of the world at closure, not the path taken to reach
+it.** Write for the next process that reads this file — a later feature's Plan
+step, a reviewer, you in a month — and give it only what it is bound by. Fold
+each outcome into the section it changes, in the present tense. Delete text a
+later pass superseded rather than annotating it; the history is in git.
+
+There is no readiness-review log, no implementation-deviation log, and no
+pass-by-pass narrative. `scripts/roadmap-check.mjs` enforces a **15 KB budget of
+non-table prose** per spec: tables and fenced blocks are free, narration is not.
+Measured evidence lives in `docs/progress/features/<id>.json` (machine-written)
+and `docs/progress/readings/<id>.md` (tables and transcripts, not narrative).
 
 ## Goal
 
@@ -81,5 +86,12 @@ closes before T10.F10 is checked or that cannot change simulation cost.
 
 ## Notes for AI Agents
 
-Record implementation context, blockers, advisory review findings, and this
-feature's cost record. Keep execution policy in `docs/workflow.md`.
+Only what a later feature is bound by. Every line is a bullet starting with one
+of four labels — the checker rejects anything else, including prose paragraphs:
+
+- `Decision:` a user decision later work must honour.
+- `Exception:` an accepted exception, with what it applies to.
+- `Deferred:` a deferred review finding or mutation survivor.
+- `Cost:` this feature's closure cost record.
+
+Keep execution policy in `docs/workflow.md`.

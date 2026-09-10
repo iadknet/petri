@@ -137,6 +137,16 @@ blocker. Your report is the only thing the next pass inherits, so make it
 self-contained: a later pass is a fresh agent with none of your context. Then
 stop.
 
+Record the state of the world, not how you got there. The spec is read by later
+features and by the reviewer: fold each outcome into the section it changes, in
+the present tense, and delete what a later pass superseded instead of annotating
+it. No readiness-review log, no deviation log, no pass-by-pass narrative — your
+report to the orchestrator carries what happened, and git carries the rest.
+`scripts/roadmap-check.mjs` enforces a 15 KB non-table prose budget per spec and
+rejects any "Notes for AI Agents" line that is not a `Decision:`, `Exception:`,
+`Deferred:`, or `Cost:` bullet; the stop gate runs it, so an over-budget spec
+blocks you from reporting done.
+
 Read only what the brief names. When it names spec sections, read those
 sections, not the whole spec. Do not re-read a document to reconfirm something
 already in your context, and when a Bash result is spilled to a
