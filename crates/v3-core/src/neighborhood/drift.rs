@@ -1,9 +1,8 @@
 //! Mutation-only lineage depth observations, isolated from ecological state.
 
-use super::mesh_execution::indices_for_node_ids;
-use super::mesh_execution::MeshExecutionSets;
+use super::mesh_execution::{indices_for_node_ids, MeshExecutionReading, MeshExecutionSets};
 use super::recruitment::{BirthObservation, RecruitmentCheckpoint, RecruitmentTracker};
-use super::{births, mesh_execution::MeshExecutionReading, Battery, BirthResult, EvalContext};
+use super::{births, Battery, BirthResult, EvalContext};
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
 use crate::creature::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
