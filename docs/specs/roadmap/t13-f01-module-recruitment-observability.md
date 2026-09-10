@@ -187,28 +187,32 @@ release cap per goal world is unchanged and covers the new work.
 
 Evidence lives in
 [`docs/progress/readings/t13-f01-module-recruitment-observability.md`](../../progress/readings/t13-f01-module-recruitment-observability.md),
-which also names the thirteen focused tests.
+which also names the sixteen focused tests.
 
 - [x] `cargo test -p v3-core --test viability` (engine birth path touched):
       `ok, 24 passed; 0 failed` at `af5dc3a1`, re-run at `ab00bb07` after the
-      self-review commit with the same result.
-- [x] `make check` re-run on the final code: exit 0 at `28222351`, the commit
-      that landed the measured run's documents and reports.
-- [x] Focused tests, re-run at `ab00bb07`: `cargo test -p v3-core`
-      (1277 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 1 passed, 0 failed) and
+      self-review commit and at `afa6ae5c` after the 2026-09-10 remediation,
+      each with the same result.
+- [x] `make check` re-run on the final code: exit 0 at `MAKECHECK_COMMIT`,
+      the commit that landed the remediation's documents and re-measured
+      reports.
+- [x] Focused tests, re-run at `afa6ae5c`: `cargo test -p v3-core`
+      (1280 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 0 passed, 0 failed) and
       `cargo test -p v3-cli` (70 + 18 + 11 + 11 passed, 0 failed), plus
       `cargo clippy -p v3-core -p v3-cli --all-targets -- -D warnings` clean.
 - [x] Measured results recorded in the readings file above.
-- [x] Structural comparison, a recursive leaf diff of the whole `deterministic`
-      block against T12.F04's reports: **no pre-existing field differs.** Gate 0
-      difference lines; goal 42, every one a field new in `drift-depth-v3`
-      (15 `recruitment`, 15 `opportunities`, 3 `version`, and 9 lines of the
-      three new `drift_depth` recruitment-contract strings, which sit outside
-      the three named exclusions and are reported as their own group).
-- [x] Per goal world: `drift_depth_wall_clock_ms` is one accumulated 25,004.8 ms
-      over the three worlds, so every world is under the 30 s cap (average
-      8.33 s); T12.F04 read 11,179.5 ms, so the observation added +4.61 s per
-      world against a predeclared "under 2 s". Cohort, opportunity, retention
+- [x] Structural comparison, a recursive diff of the whole `deterministic`
+      block against T12.F04's reports, re-run on the re-measured reports:
+      **no pre-existing field differs.** Gate 0 difference lines; goal 42,
+      every one a field new in `drift-depth-v3` (15 `recruitment`,
+      15 `opportunities`, 3 `version`, and 9 lines of the three new
+      `drift_depth` recruitment-contract strings, which sit outside the three
+      named exclusions and are reported as their own group).
+- [x] Per goal world: `drift_depth_wall_clock_ms` is one accumulated
+      19,186.6 ms over the three worlds, so every world is under the 30 s cap
+      (average 6.40 s); T12.F04 read 11,179.5 ms, so the observation adds
+      +2.67 s per world, down from +4.61 s before the in-place node diff, and
+      still above the predeclared "under 2 s". Cohort, opportunity, retention
       and censoring tables per checkpoint are in the readings file. Drift
       changed/all births 0.0045/0.006, 0.010/0.005, 0.0045/0.006 at depths
       1,000/2,000 all meet the 0.0015 and 0.005 floors, byte-identical to
@@ -217,9 +221,12 @@ which also names the thirteen focused tests.
       and every survivor resolved as killed, equivalent, or deferred.
 - [x] Benchmark reports stored at
       `docs/progress/features/t13-f01-module-recruitment-observability.json`
-      and `-goal.json`, each run exactly once (`make bench PROFILE=gate` and
-      `PROFILE=goal`, both exit 0); the second goal run is not required (user
-      decision 2026-09-05, `docs/workflow.md`).
+      and `-goal.json`, each re-run exactly once at `afa6ae5c` after the
+      remediation (`make bench PROFILE=gate` then `PROFILE=goal`, sequential,
+      both exit 0, logs `/tmp/t13-f01-gate2.log` and `/tmp/t13-f01-goal2.log`);
+      they overwrite the superseded `ab00bb07` reports because the code they
+      measured changed. The second goal run is not required (user decision
+      2026-09-05, `docs/workflow.md`).
 
 ## Performance and Goal Impact
 
@@ -240,7 +247,7 @@ T12.F04. The new cohort and opportunity readings are descriptive baselines
 with no floor; T13.F02 owns the replicated baseline. Cognition indicators
 remain `Undefined`.
 
-**Measured verdict.** Gate: `make bench PROFILE=gate` exit 0, `comparison.severe=false`, no threshold crossed — all six counters 0.000000% against T11.F18 and wall/creature-tick 0.0014120875 ok against both references; gate epoch not re-pinned. Goal: `make bench PROFILE=goal` exit 0, `comparison.severe=false`, no counter or wall threshold crossed — all six counters 0.000000% against T12.F04 and wall/creature-tick 0.0078817109 (+6.41%) ok, end-to-end 518 s inside the 15-minute threshold; the drift walk's accumulated 25,004.8 ms keeps every world inside the 30 s cap but misses the predeclared "under 2 s added per world" at +4.61 s per world on average; goal epoch not re-pinned.
+**Measured verdict** (re-measured at `afa6ae5c` after the 2026-09-10 remediation; the `ab00bb07` measurement is superseded). Gate: `make bench PROFILE=gate` exit 0, `comparison.severe=false`, no threshold crossed — all six counters 0.000000% against T11.F18 and wall/creature-tick 0.0013765385 ok against both references; gate epoch not re-pinned. Goal: `make bench PROFILE=goal` exit 0, `comparison.severe=false`, no counter or wall threshold crossed — all six counters 0.000000% against T12.F04 and wall/creature-tick 0.0078085009 (+5.43%) ok, end-to-end 507 s inside the 15-minute threshold; the drift walk's accumulated 19,186.6 ms keeps every world inside the 30 s cap and the in-place node diff cut the added time from +4.61 s to +2.67 s per world, which still misses the predeclared "under 2 s added per world"; goal epoch not re-pinned. The observation now reports the selected-but-inapplicable fact: 27,096 / 28,380 / 27,096 discarded operators had selected a module and found no applicable site by depth 2,000, and the `selected only` rung holds 609 / 621 / 609 present modules.
 
 - Reports: [gate](../../progress/features/t13-f01-module-recruitment-observability.json),
   [goal](../../progress/features/t13-f01-module-recruitment-observability-goal.json).
@@ -283,3 +290,25 @@ remain `Undefined`.
     recorded as `new`.
   - `observe_checkpoint` reads `Battery::mesh_execution_sets` once per lineage,
     so the checkpoint runs no battery pass beyond the existing one.
+- Remediation, 2026-09-10 (`afa6ae5c`), which supersedes the first bullet
+  above: the per-domain-only split was an observation gap, not the whole
+  truth. `MutationEventRecord` now carries an ordered `discarded` list of
+  `(operator, Option<NodeId>)` entries, one per operator the event threw away
+  for reporting `NoApplicableTarget`, so a module selected by an operator that
+  found no site stays visible even when a later operator of the same domain
+  applied. `Opportunities` splits those discards per operator
+  (`discarded_selected_inapplicable_by_operator`,
+  `discarded_no_eligible_node_by_operator`, both serde-defaulted in the report)
+  and feeds their picks into first *selection*, which makes the ladder's
+  *selected only* rung reachable; the per-domain event-level split is kept and
+  still reads empty, because only a domain that exhausts every operator
+  records an event-level skip. The record drops `Copy` and keeps
+  `Clone`/`PartialEq`/`Eq`/`Ord`/`Hash`; an event without a discard allocates
+  nothing; no RNG draw, selection, or existing summary field changed.
+  Separately, the walk no longer clones each parent's `nodes` every
+  generation: `RecruitmentTracker` retains one node snapshot per lineage,
+  seeded by `seed_founder`, diffs the birth against it in place, and clones
+  only the nodes the birth changed or added, so `BirthObservation` no longer
+  carries `before`. Every existing `Checkpoint` field, walk genome, and RNG
+  stream is unchanged, which the unmodified isolation tests and the re-run
+  structural comparison both confirm.
