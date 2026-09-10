@@ -182,8 +182,8 @@ which also names the thirteen focused tests.
 - [x] `cargo test -p v3-core --test viability` (engine birth path touched):
       `ok, 24 passed; 0 failed` at `af5dc3a1`, re-run at `ab00bb07` after the
       self-review commit with the same result.
-- [ ] `make check` re-run on the final code once the measured run's documents
-      land.
+- [x] `make check` re-run on the final code: exit 0 at `28222351`, the commit
+      that landed the measured run's documents and reports.
 - [x] Focused tests, re-run at `ab00bb07`: `cargo test -p v3-core`
       (1277 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 1 passed, 0 failed) and
       `cargo test -p v3-cli` (70 + 18 + 11 + 11 passed, 0 failed), plus
