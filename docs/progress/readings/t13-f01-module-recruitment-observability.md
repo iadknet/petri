@@ -6,9 +6,16 @@ The spec keeps the predeclaration, the verdict, and the mutation survivor
 record. Machine-written reports:
 [gate](../features/t13-f01-module-recruitment-observability.json),
 [goal](../features/t13-f01-module-recruitment-observability-goal.json).
-Measured code `c1cfee5a7c3624957b00b94b16afccdf46e0cfe5` (the last
-remediation commit), host `Isaacs-MacBook-Pro-2.local`, Apple M1 Pro,
+Measured code `ea0044d5f4390ada662b0506caf020191fea9252` (the last commit of
+the 2026-09-10 review remediation), host `Isaacs-MacBook-Pro-2.local`, Apple M1 Pro,
 8 threads, release.
+
+**Supersedes the 2026-09-10 review-remediation measurement.** The 09:15–09:23 runs
+replace the `c1cfee5a` pair (16:15/16:23 vs the earlier 15:45/15:54Z reports), which
+are superseded because that code counted founder modules in the cohort retention
+row and reported 0 selected-inapplicable per lineage. Every cohort ladder, founder
+row, time-to-first row and discard total below is unchanged from it; the retention
+lines and the per-lineage rows are not. Both reports were overwritten in place.
 
 **Supersedes the first measurement.** The 07:40–07:49 runs at `ab00bb07` are
 superseded because that code dropped each discarded operator, so its
@@ -26,7 +33,7 @@ usefulness is unmeasured. Nothing here is a cognition claim.
 
 ## Focused tests
 
-Re-run at `c1cfee5a` after the last remediation commit, all green:
+Re-run at `ea0044d5` after the 2026-09-10 review remediation, all green:
 
 - `cargo test -p v3-core --test viability` — `ok, 24 passed; 0 failed`
   (the engine birth path is touched, so this ran first).
@@ -59,8 +66,8 @@ and the four added by this remediation:
 
 `make bench PROFILE=gate FEATURE=t13-f01-module-recruitment-observability`
 exited 0; `comparison.severe=false`. Stored
-`t13-f01-module-recruitment-observability.json`, generated 2026-09-10T15:45:56Z.
-Log `/tmp/t13-f01-gate3.log`. Run once, before the goal run, nothing else
+`t13-f01-module-recruitment-observability.json`, generated 2026-09-10T16:15:23Z.
+Log `/tmp/t13-f01-gate4.log`. Run once, before the goal run, nothing else
 running.
 
 | Reference | Measure | Current | Reference reading | Delta % | Result |
@@ -71,21 +78,21 @@ running.
 | remove-complementary-nutrition | plasticity_updates | 0.009880 | 0.011171 | -11.556709 | ok |
 | remove-complementary-nutrition | actions_applied | 1.272860 | 1.275525 | -0.208934 | ok |
 | remove-complementary-nutrition | births | 0.026902 | 0.026780 | 0.455564 | ok |
-| remove-complementary-nutrition | wall ms/creature-tick | 0.0013538889 | 0.0015598310 | -13.202847 | ok |
+| remove-complementary-nutrition | wall ms/creature-tick | 0.0013768476 | 0.0015598310 | -11.730980 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | mesh_hops | 2.028954 | 2.028954 | 0.000000 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | vm_steps | 22.425973 | 22.425973 | 0.000000 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | graph_relax_iters | 0.994920 | 0.994920 | 0.000000 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | plasticity_updates | 0.009880 | 0.009880 | 0.000000 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | actions_applied | 1.272860 | 1.272860 | 0.000000 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | births | 0.026902 | 0.026902 | 0.000000 | ok |
-| t11-f18-backend-neutral-mesh-node-growth | wall ms/creature-tick | 0.0013538889 | 0.0019781652 | -31.558350 | ok |
+| t11-f18-backend-neutral-mesh-node-growth | wall ms/creature-tick | 0.0013768476 | 0.0019781652 | -30.397747 | ok |
 
 The harness compares the gate profile against the epoch and T11.F18, not
 T12.F04. Hand-computed against T12.F04's gate report and carrying no harness
-level: wall 0.0013538889 vs 0.0013002215 ms/creature-tick, +4.127560%.
+level: wall 0.0013768476 vs 0.0013002215 ms/creature-tick, +5.893308%.
 
-Observation times (ms): founder 54.240; evolved and drift are not measured in
-the gate profile (`drift_depth: "Undefined"`). Whole measured run 578.850 ms.
+Observation times (ms): founder 60.624; evolved and drift are not measured in
+the gate profile (`drift_depth: "Undefined"`). Whole measured run 588.666 ms.
 Caps unchanged: founder 10 s, evolved 180 s, drift 30 s, whole goal
 investigation 900 s.
 
@@ -94,7 +101,7 @@ investigation 900 s.
 `make bench PROFILE=goal FEATURE=t13-f01-module-recruitment-observability`
 exited 0; `comparison.severe=false`. Stored
 `t13-f01-module-recruitment-observability-goal.json`, generated
-2026-09-10T15:54:27Z. Log `/tmp/t13-f01-goal3.log`. Run once, sequentially after
+2026-09-10T16:23:50Z. Log `/tmp/t13-f01-goal4.log`. Run once, sequentially after
 the gate run with nothing else running.
 
 | Reference | Measure | Current | Reference reading | Delta % | Result |
@@ -105,30 +112,31 @@ the gate run with nothing else running.
 | t12-f04-baseline-world-set-goal | plasticity_updates | 0.046976 | 0.046976 | 0.000000 | ok |
 | t12-f04-baseline-world-set-goal | actions_applied | 1.371176 | 1.371176 | 0.000000 | ok |
 | t12-f04-baseline-world-set-goal | births | 0.018609 | 0.018609 | 0.000000 | ok |
-| t12-f04-baseline-world-set-goal | wall ms/creature-tick | 0.0077881741 | 0.0074066599 | 5.150960 | ok |
+| t12-f04-baseline-world-set-goal | wall ms/creature-tick | 0.0078041359 | 0.0074066599 | 5.366468 | ok |
 
-Simulation wall 484.48 s total (182.51 / 122.86 / 179.11 s for seeds
-11 / 22 / 33). End-to-end elapsed 506 s, measured as the interval between the
-goal log's creation (08:46:01 local) and the report write (08:54:27 local),
+Simulation wall 485.47 s total (182.21 / 123.59 / 179.68 s for seeds
+11 / 22 / 33). End-to-end elapsed 507 s, measured as the interval between the
+goal log's creation (09:15:23 local) and the report write (09:23:50 local),
 against the 15-minute investigation threshold — under it, no investigation
 triggered.
 
-Observation times: founder 122.508 ms (cap 10 s); evolved 516.882 ms total,
-177.388 / 185.901 / 153.594 ms per seed (cap 180 s); final-state observation
-881.219 ms.
+Observation times: founder 100.379 ms (cap 10 s); evolved 466.108 ms total,
+164.142 / 161.590 / 140.377 ms per seed (cap 180 s); final-state observation
+875.871 ms.
 
 **Drift wall time.** The harness records a single accumulated
 `drift_depth_wall_clock_ms` across the three worlds and no per-world split
-exists in the report: 18,966.423 ms, down from 25,004.812 ms in the superseded
-first measurement. Because the total is 18.97 s, no single world can exceed
-18.97 s, so every world is under the 30 s cap; the per-world average is 6.32 s.
+exists in the report: 18,956.800 ms, against 18,966.423 ms at `c1cfee5a` and
+25,004.812 ms in the first measurement. Because the total is 18.96 s, no single
+world can exceed 18.96 s, so every world is under the 30 s cap; the per-world
+average is 6.32 s.
 T12.F04 recorded 11,179.458 ms for the same three worlds, so the recruitment
-observation adds 7.79 s in total, an average of **+2.60 s per world**. The walk
+observation adds 7.78 s in total, an average of **+2.59 s per world**. The walk
 no longer clones each parent's `nodes` per birth: each lineage keeps one node
 snapshot that the birth is diffed against in place, and only the nodes a birth
 changed or added are cloned into it. **The predeclaration expected "under 2 s
 added per world"; the cap holds with room to spare and the remediation cut the
-overshoot from +4.61 s to +2.60 s, but the predeclared bound is still
+overshoot from +4.61 s to +2.59 s, but the predeclared bound is still
 missed.** What remains is the per-generation equality comparison over every
 surviving node of 50 lineages across 2,000 generations, which allocates nothing
 but still reads every node; no further work is done here.
@@ -140,15 +148,15 @@ report against T12.F04's, printing every value difference and every key present
 on only one side, with no filtering; classification afterwards.
 
 - **Gate**, against `t12-f04-baseline-world-set.json`: **0 difference lines**
-  (re-run against the final gate report).
+  (re-run against the 2026-09-10 review-remediation gate report).
   Every deterministic field is equal. Note that the gate profile carries
   `drift_depth: "Undefined"`, so this comparison covers fewer fields than the
   goal one — no drift, recruitment, or opportunity field exists in it. Equal
   deterministic blocks mean the six gate counters, which are derived from the
   equal `per_creature_tick` and `totals` fields, equal T12.F04's exactly.
 - **Goal**, against `t12-f04-baseline-world-set-goal.json`: **42 difference
-  lines** (re-run against the final goal report; the same count and the same
-  four groups as the superseded measurement), and nothing else:
+  lines** (re-run against the review-remediation goal report; the same count and
+  the same four groups as both superseded measurements), and nothing else:
   1. 15 × `goal_indicators.cases[i].drift_depth.readings[j].recruitment` —
      present only in the current report (the new recruitment block).
   2. 15 × `…readings[j].opportunities` — present only in the current report
@@ -216,6 +224,17 @@ purely because the discard was dropped. Every per-operator figure here is one
 operator's discard, not an event: an event that discards three operators and
 then applies contributes three discards and one applied event.
 
+**Per lineage.** Each row of `opportunities.lineages[]` carries
+`discarded_selected_inapplicable`, the sum of that lineage's
+`discarded_selected_inapplicable_by_operator`, and the 50 rows sum exactly to
+the pooled total at every checkpoint of every world (checked for all fifteen
+readings). At depth 2,000 the per-lineage counts run 283–722 in Orchards and
+Confluence and 285–759 in Canyon; at depth 22, 46 of 50 lineages in Orchards
+and Confluence and 47 of 50 in Canyon already carry at least one and the rest
+carry none. In both superseded measurements every one of these rows read 0 at
+every checkpoint, because the row summed the event-level per-domain split,
+which is empty by construction.
+
 ## Per-world, per-checkpoint readings
 
 Checkpoints are depths 0, 22, 250, 1,000 and 2,000, over 50 lineages per world;
@@ -223,7 +242,10 @@ Checkpoints are depths 0, 22, 250, 1,000 and 2,000, over 50 lineages per world;
 `reached + censored_deleted + censored_present == created` in every
 time-to-first row (one instance of that identity is printed under each table).
 Opportunity totals are cumulative from depth 0 to the checkpoint, pooled over
-all 50 lineages.
+all 50 lineages. Retention is a cohort reading: its denominator is the
+`new`+`copy` modules contributing at the earlier checkpoint, so it equals that
+checkpoint's cohort `contributing` count and founder modules — which the
+reference row reports separately — never enter it.
 
 ### Orchards in grassland (seed 11) — drift_depth `drift-depth-v3`, 50 lineages
 
@@ -252,7 +274,7 @@ Founder reference row: created 100, deleted 1, present 99, dispatched 85, contri
 
 Denominator identity, selection row: 23 + 0 + 55 = 78 created.
 
-Retention from depth 0: 80/100 still contributing (0.800000), 19 present not contributing, 1 deleted.
+Retention from depth 0: the depth-0 cohort is empty, so `contributing_before` is 0 and the fraction is `Undefined` (founder modules are a separate reference row and never enter retention).
 
 Opportunities (cumulative): births 1100, zero-event 597 (0.542727), attempted 643, applied 643 (1.000000), skipped 0; executed-target 550 (0.855365 of applied), reachable 544, unreachable 37.
 attempted_by_domain {'Graph': 172, 'InputRef': 176, 'Topology': 131, 'Vm': 164}; applied_by_domain {'Graph': 172, 'InputRef': 176, 'Topology': 131, 'Vm': 164}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {}.
@@ -279,7 +301,7 @@ Founder reference row: created 100, deleted 11, present 89, dispatched 39, contr
 
 Denominator identity, selection row: 566 + 0 + 352 = 918 created.
 
-Retention from depth 22: 22/87 still contributing (0.252874), 59 present not contributing, 6 deleted.
+Retention from depth 22: 2/7 cohort modules still contributing (0.285714), 5 present not contributing, 0 deleted.
 
 Opportunities (cumulative): births 12500, zero-event 6940 (0.555200), attempted 7001, applied 6990 (0.998429), skipped 11; executed-target 5143 (0.735765 of applied), reachable 5308, unreachable 994.
 attempted_by_domain {'Graph': 1882, 'InputRef': 1870, 'Topology': 1424, 'Vm': 1825}; applied_by_domain {'Graph': 1871, 'InputRef': 1870, 'Topology': 1424, 'Vm': 1825}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {'Graph': 11}.
@@ -306,7 +328,7 @@ Founder reference row: created 100, deleted 20, present 80, dispatched 5, contri
 
 Denominator identity, selection row: 2670 + 0 + 1447 = 4117 created.
 
-Retention from depth 250: 8/43 still contributing (0.186047), 33 present not contributing, 2 deleted.
+Retention from depth 250: 5/23 cohort modules still contributing (0.217391), 17 present not contributing, 1 deleted.
 
 Opportunities (cumulative): births 50000, zero-event 27756 (0.555120), attempted 27874, applied 27863 (0.999605), skipped 11; executed-target 19251 (0.690916 of applied), reachable 19528, unreachable 5605.
 attempted_by_domain {'Graph': 7497, 'InputRef': 7436, 'Topology': 5678, 'Vm': 7263}; applied_by_domain {'Graph': 7486, 'InputRef': 7436, 'Topology': 5678, 'Vm': 7263}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {'Graph': 11}.
@@ -333,7 +355,7 @@ Founder reference row: created 100, deleted 26, present 74, dispatched 5, contri
 
 Denominator identity, selection row: 5474 + 0 + 2844 = 8318 created.
 
-Retention from depth 1000: 4/37 still contributing (0.108108), 32 present not contributing, 1 deleted.
+Retention from depth 1000: 2/32 cohort modules still contributing (0.062500), 29 present not contributing, 1 deleted.
 
 Opportunities (cumulative): births 100000, zero-event 55878 (0.558780), attempted 55204, applied 55193 (0.999801), skipped 11; executed-target 37949 (0.687569 of applied), reachable 38094, unreachable 11705.
 attempted_by_domain {'Graph': 14729, 'InputRef': 14699, 'Topology': 11144, 'Vm': 14632}; applied_by_domain {'Graph': 14718, 'InputRef': 14699, 'Topology': 11144, 'Vm': 14632}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {'Graph': 11}.
@@ -366,7 +388,7 @@ Founder reference row: created 100, deleted 1, present 99, dispatched 87, contri
 
 Denominator identity, selection row: 21 + 0 + 67 = 88 created.
 
-Retention from depth 0: 83/100 still contributing (0.830000), 16 present not contributing, 1 deleted.
+Retention from depth 0: the depth-0 cohort is empty, so `contributing_before` is 0 and the fraction is `Undefined` (founder modules are a separate reference row and never enter retention).
 
 Opportunities (cumulative): births 1100, zero-event 612 (0.556364), attempted 630, applied 630 (1.000000), skipped 0; executed-target 549 (0.871429 of applied), reachable 542, unreachable 28.
 attempted_by_domain {'Graph': 172, 'InputRef': 164, 'Topology': 128, 'Vm': 166}; applied_by_domain {'Graph': 172, 'InputRef': 164, 'Topology': 128, 'Vm': 166}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {}.
@@ -393,7 +415,7 @@ Founder reference row: created 100, deleted 12, present 88, dispatched 32, contr
 
 Denominator identity, selection row: 562 + 0 + 307 = 869 created.
 
-Retention from depth 22: 21/89 still contributing (0.235955), 61 present not contributing, 7 deleted.
+Retention from depth 22: 2/6 cohort modules still contributing (0.333333), 3 present not contributing, 1 deleted.
 
 Opportunities (cumulative): births 12500, zero-event 6992 (0.559360), attempted 6837, applied 6835 (0.999707), skipped 2; executed-target 5029 (0.735772 of applied), reachable 5108, unreachable 1049.
 attempted_by_domain {'Graph': 1826, 'InputRef': 1786, 'Topology': 1378, 'Vm': 1847}; applied_by_domain {'Graph': 1824, 'InputRef': 1786, 'Topology': 1378, 'Vm': 1847}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {'Graph': 2}.
@@ -420,7 +442,7 @@ Founder reference row: created 100, deleted 19, present 81, dispatched 7, contri
 
 Denominator identity, selection row: 2574 + 0 + 1253 = 3827 created.
 
-Retention from depth 250: 5/45 still contributing (0.111111), 36 present not contributing, 4 deleted.
+Retention from depth 250: 3/26 cohort modules still contributing (0.115385), 21 present not contributing, 2 deleted.
 
 Opportunities (cumulative): births 50000, zero-event 27886 (0.557720), attempted 27593, applied 27591 (0.999928), skipped 2; executed-target 19235 (0.697148 of applied), reachable 19431, unreachable 5443.
 attempted_by_domain {'Graph': 7326, 'InputRef': 7364, 'Topology': 5525, 'Vm': 7378}; applied_by_domain {'Graph': 7324, 'InputRef': 7364, 'Topology': 5525, 'Vm': 7378}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {'Graph': 2}.
@@ -447,7 +469,7 @@ Founder reference row: created 100, deleted 21, present 79, dispatched 2, contri
 
 Denominator identity, selection row: 5383 + 0 + 2505 = 7888 created.
 
-Retention from depth 1000: 7/40 still contributing (0.175000), 31 present not contributing, 2 deleted.
+Retention from depth 1000: 6/36 cohort modules still contributing (0.166667), 28 present not contributing, 2 deleted.
 
 Opportunities (cumulative): births 100000, zero-event 55801 (0.558010), attempted 55142, applied 55140 (0.999964), skipped 2; executed-target 38026 (0.689626 of applied), reachable 38176, unreachable 11544.
 attempted_by_domain {'Graph': 14723, 'InputRef': 14705, 'Topology': 10992, 'Vm': 14722}; applied_by_domain {'Graph': 14721, 'InputRef': 14705, 'Topology': 10992, 'Vm': 14722}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {'Graph': 2}.
@@ -480,7 +502,7 @@ Founder reference row: created 100, deleted 1, present 99, dispatched 85, contri
 
 Denominator identity, selection row: 23 + 0 + 55 = 78 created.
 
-Retention from depth 0: 80/100 still contributing (0.800000), 19 present not contributing, 1 deleted.
+Retention from depth 0: the depth-0 cohort is empty, so `contributing_before` is 0 and the fraction is `Undefined` (founder modules are a separate reference row and never enter retention).
 
 Opportunities (cumulative): births 1100, zero-event 597 (0.542727), attempted 643, applied 643 (1.000000), skipped 0; executed-target 550 (0.855365 of applied), reachable 544, unreachable 37.
 attempted_by_domain {'Graph': 172, 'InputRef': 176, 'Topology': 131, 'Vm': 164}; applied_by_domain {'Graph': 172, 'InputRef': 176, 'Topology': 131, 'Vm': 164}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {}.
@@ -507,7 +529,7 @@ Founder reference row: created 100, deleted 11, present 89, dispatched 39, contr
 
 Denominator identity, selection row: 566 + 0 + 352 = 918 created.
 
-Retention from depth 22: 22/87 still contributing (0.252874), 59 present not contributing, 6 deleted.
+Retention from depth 22: 2/7 cohort modules still contributing (0.285714), 5 present not contributing, 0 deleted.
 
 Opportunities (cumulative): births 12500, zero-event 6940 (0.555200), attempted 7001, applied 6990 (0.998429), skipped 11; executed-target 5143 (0.735765 of applied), reachable 5308, unreachable 994.
 attempted_by_domain {'Graph': 1882, 'InputRef': 1870, 'Topology': 1424, 'Vm': 1825}; applied_by_domain {'Graph': 1871, 'InputRef': 1870, 'Topology': 1424, 'Vm': 1825}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {'Graph': 11}.
@@ -534,7 +556,7 @@ Founder reference row: created 100, deleted 20, present 80, dispatched 5, contri
 
 Denominator identity, selection row: 2670 + 0 + 1447 = 4117 created.
 
-Retention from depth 250: 8/43 still contributing (0.186047), 33 present not contributing, 2 deleted.
+Retention from depth 250: 5/23 cohort modules still contributing (0.217391), 17 present not contributing, 1 deleted.
 
 Opportunities (cumulative): births 50000, zero-event 27756 (0.555120), attempted 27874, applied 27863 (0.999605), skipped 11; executed-target 19251 (0.690916 of applied), reachable 19528, unreachable 5605.
 attempted_by_domain {'Graph': 7497, 'InputRef': 7436, 'Topology': 5678, 'Vm': 7263}; applied_by_domain {'Graph': 7486, 'InputRef': 7436, 'Topology': 5678, 'Vm': 7263}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {'Graph': 11}.
@@ -561,7 +583,7 @@ Founder reference row: created 100, deleted 26, present 74, dispatched 5, contri
 
 Denominator identity, selection row: 5474 + 0 + 2844 = 8318 created.
 
-Retention from depth 1000: 4/37 still contributing (0.108108), 32 present not contributing, 1 deleted.
+Retention from depth 1000: 2/32 cohort modules still contributing (0.062500), 29 present not contributing, 1 deleted.
 
 Opportunities (cumulative): births 100000, zero-event 55878 (0.558780), attempted 55204, applied 55193 (0.999801), skipped 11; executed-target 37949 (0.687569 of applied), reachable 38094, unreachable 11705.
 attempted_by_domain {'Graph': 14729, 'InputRef': 14699, 'Topology': 11144, 'Vm': 14632}; applied_by_domain {'Graph': 14718, 'InputRef': 14699, 'Topology': 11144, 'Vm': 14632}; selected_inapplicable_by_domain {}; no_eligible_node_by_domain {'Graph': 11}.
