@@ -11,7 +11,8 @@
 //! battery is executed. Dispatch is not an effect, a contribution is battery
 //! sensitivity only, and usefulness is unmeasured.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::hash::Hash;
 
 use crate::contracts::NodeId;
 use crate::creature::genome::{BackendDef, NodeGenome};
@@ -179,6 +180,16 @@ impl Module {
             CohortFact::Contribution => self.first_contribution,
         }
     }
+
+    fn fact_mut(&mut self, fact: CohortFact) -> &mut Option<u64> {
+        match fact {
+            CohortFact::Selection => &mut self.first_selection,
+            CohortFact::ApplicableSelection => &mut self.first_applicable_selection,
+            CohortFact::InternalChange => &mut self.first_internal_change,
+            CohortFact::Dispatch => &mut self.first_dispatch,
+            CohortFact::Contribution => &mut self.first_contribution,
+        }
+    }
 }
 
 /// A rung of the exclusive state ladder; a module sits in the highest rung it
@@ -241,6 +252,13 @@ fn merge_map<K: Ord + Copy>(into: &mut BTreeMap<K, u64>, from: &BTreeMap<K, u64>
     }
 }
 
+/// Fold one of [`MutationSummary`]'s `u32` tallies into a pooled `u64` one.
+fn absorb<K: Ord + Copy + Hash>(into: &mut BTreeMap<K, u64>, from: &HashMap<K, u32>) {
+    for (&key, &count) in from {
+        bump(into, key, u64::from(count));
+    }
+}
+
 impl Opportunities {
     /// Pool one birth's summary.
     pub fn record(&mut self, summary: &MutationSummary) {
@@ -252,23 +270,18 @@ impl Opportunities {
         self.reachable_target_events += u64::from(summary.reachable_target_events);
         self.unreachable_target_events += u64::from(summary.unreachable_target_events);
         self.executed_target_events += u64::from(summary.executed_target_events);
-        for (&domain, &count) in &summary.attempted_by_domain {
-            bump(&mut self.attempted_by_domain, domain, u64::from(count));
-        }
-        for (&domain, &count) in &summary.applied_by_domain {
-            bump(&mut self.applied_by_domain, domain, u64::from(count));
-        }
-        for (&operator, &count) in &summary.attempted_by_operator {
-            bump(&mut self.attempted_by_operator, operator, u64::from(count));
-        }
-        for (&operator, &count) in &summary.applied_by_operator {
-            bump(&mut self.applied_by_operator, operator, u64::from(count));
-        }
+        absorb(&mut self.attempted_by_domain, &summary.attempted_by_domain);
+        absorb(&mut self.applied_by_domain, &summary.applied_by_domain);
+        absorb(
+            &mut self.attempted_by_operator,
+            &summary.attempted_by_operator,
+        );
+        absorb(&mut self.applied_by_operator, &summary.applied_by_operator);
         for (&operator, reasons) in &summary.skip_reasons_by_operator {
-            let entry = self.skipped_by_operator_reason.entry(operator).or_default();
-            for (&reason, &count) in reasons {
-                bump(entry, reason, u64::from(count));
-            }
+            absorb(
+                self.skipped_by_operator_reason.entry(operator).or_default(),
+                reasons,
+            );
         }
         for event in &summary.events {
             if event.outcome
@@ -581,15 +594,7 @@ impl RecruitmentTracker {
         let Some(&index) = state.live.get(&node) else {
             return;
         };
-        let module = &mut state.modules[index];
-        let slot = match fact {
-            CohortFact::Selection => &mut module.first_selection,
-            CohortFact::ApplicableSelection => &mut module.first_applicable_selection,
-            CohortFact::InternalChange => &mut module.first_internal_change,
-            CohortFact::Dispatch => &mut module.first_dispatch,
-            CohortFact::Contribution => &mut module.first_contribution,
-        };
-        slot.get_or_insert(depth);
+        state.modules[index].fact_mut(fact).get_or_insert(depth);
     }
 
     /// Fold one battery reading of one lineage in: which modules the battery
