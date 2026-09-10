@@ -599,6 +599,14 @@ pub struct DriftDepth {
     pub executed_source: String,
     #[serde(default)]
     pub executed_refresh: String,
+    /// New in `drift-depth-v3`: how modules are identified and where their
+    /// provenance comes from. Empty in earlier reports.
+    #[serde(default)]
+    pub recruitment_version: String,
+    #[serde(default)]
+    pub module_identity: String,
+    #[serde(default)]
+    pub provenance_rule: String,
     pub executions_per_genome: u32,
     pub snapshot_count: u32,
     pub sequence_count: u32,
@@ -610,6 +618,11 @@ pub struct DriftDepth {
 pub struct DriftDepthCheckpoint {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backends: Option<neighborhood::mesh_execution::MeshBackendCounts>,
+    /// New in `drift-depth-v3`; absent, never zero, in earlier reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recruitment: Option<ModuleRecruitment>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opportunities: Option<MutationOpportunities>,
     pub depth: u64,
     pub lineages: u32,
     pub total_nodes: u64,
@@ -631,12 +644,300 @@ pub struct DriftDepthCheckpoint {
     pub dead_per_all_births: String,
 }
 
-fn drift_checkpoint(row: neighborhood::drift::Checkpoint) -> DriftDepthCheckpoint {
+/// Cohort counts for one backend split, with fractions against the pooled
+/// integers beside them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CohortLadder {
+    pub created: u64,
+    pub deleted: u64,
+    pub present: u64,
+    pub never_selected: u64,
+    pub selected_only: u64,
+    pub applied_only: u64,
+    pub changed_only: u64,
+    pub dispatched_not_contributing: u64,
+    pub contributing: u64,
+    /// `present / created`.
+    pub present_fraction: String,
+    /// `(dispatched_not_contributing + contributing) / present`.
+    pub dispatched_fraction: String,
+    /// `contributing / present`.
+    pub contributing_fraction: String,
+}
+
+fn cohort_ladder(counts: neighborhood::recruitment::CohortCounts) -> CohortLadder {
+    CohortLadder {
+        created: counts.created,
+        deleted: counts.deleted,
+        present: counts.present,
+        never_selected: counts.never_selected,
+        selected_only: counts.selected_only,
+        applied_only: counts.applied_only,
+        changed_only: counts.changed_only,
+        dispatched_not_contributing: counts.dispatched_not_contributing,
+        contributing: counts.contributing,
+        present_fraction: fraction_or_undefined(counts.present, counts.created),
+        dispatched_fraction: fraction_or_undefined(counts.dispatched(), counts.present),
+        contributing_fraction: fraction_or_undefined(counts.contributing, counts.present),
+    }
+}
+
+/// Founder modules as a reference row beside the recruited cohort.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FounderRow {
+    pub created: u64,
+    pub deleted: u64,
+    pub present: u64,
+    pub dispatched: u64,
+    pub contributing: u64,
+    pub contributing_fraction: String,
+}
+
+/// How long a cohort took to first reach one fact, with both censoring counts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TimeToFirstRow {
+    pub fact: String,
+    pub reached: u64,
+    pub reached_fraction: String,
+    pub median_generations: Option<u64>,
+    pub censored_deleted: u64,
+    pub censored_present: u64,
+}
+
+/// What became of the modules contributing at the previous checkpoint.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RetentionRow {
+    pub from_depth: u64,
+    pub contributing_before: u64,
+    pub still_contributing: u64,
+    pub present_not_contributing: u64,
+    pub deleted: u64,
+    pub retained_fraction: String,
+}
+
+/// One lineage's cohort row at a checkpoint.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CohortLineageRow {
+    pub lineage: u32,
+    pub created: u64,
+    pub present: u64,
+    pub dispatched: u64,
+    pub contributing: u64,
+}
+
+/// The module recruitment reading at one checkpoint (T13.F01). Absent from
+/// `drift-depth-v2` and earlier reports, never zero there.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModuleRecruitment {
+    pub cohort: CohortLadder,
+    pub graph: CohortLadder,
+    pub vm: CohortLadder,
+    pub founders: FounderRow,
+    pub time_to_first: Vec<TimeToFirstRow>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retention: Option<RetentionRow>,
+    pub lineages: Vec<CohortLineageRow>,
+}
+
+/// One operator's cumulative opportunities across the walk.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OperatorOpportunityRow {
+    pub operator: String,
+    pub attempted: u64,
+    pub applied: u64,
+    pub applied_fraction: String,
+    pub skipped_by_reason: BTreeMap<String, u64>,
+}
+
+/// One lineage's cumulative opportunities across the walk.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LineageOpportunityRow {
+    pub lineage: u32,
+    pub births: u64,
+    pub attempted: u64,
+    pub applied: u64,
+    pub skipped: u64,
+    pub selected_inapplicable: u64,
+    pub applied_by_domain: BTreeMap<String, u64>,
+}
+
+/// The mutation opportunities production offered, pooled from depth 0 to this
+/// checkpoint over every lineage (T13.F01).
+///
+/// `selected_inapplicable` counts events that selected a node carrying no
+/// applicable site; `no_eligible_node` counts events that found no node of the
+/// required kind at all. Both are keyed by domain: the engine retries every
+/// operator of a domain before recording the skip, so no single operator owns
+/// such an attempt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MutationOpportunities {
+    pub births: u64,
+    pub zero_event_births: u64,
+    pub zero_event_fraction: String,
+    pub attempted: u64,
+    pub applied: u64,
+    pub skipped: u64,
+    pub applied_fraction: String,
+    pub reachable_target_events: u64,
+    pub unreachable_target_events: u64,
+    pub executed_target_events: u64,
+    pub executed_target_fraction: String,
+    pub attempted_by_domain: BTreeMap<String, u64>,
+    pub applied_by_domain: BTreeMap<String, u64>,
+    pub selected_inapplicable_by_domain: BTreeMap<String, u64>,
+    pub no_eligible_node_by_domain: BTreeMap<String, u64>,
+    pub operators: Vec<OperatorOpportunityRow>,
+    pub lineages: Vec<LineageOpportunityRow>,
+}
+
+fn domain_keys(counts: &BTreeMap<v3_core::mutation::MutationDomain, u64>) -> BTreeMap<String, u64> {
+    counts
+        .iter()
+        .map(|(domain, &count)| (domain.as_key().to_string(), count))
+        .collect()
+}
+
+fn module_recruitment(
+    reading: &neighborhood::recruitment::RecruitmentCheckpoint,
+) -> ModuleRecruitment {
+    use neighborhood::recruitment::CohortFact;
+    let created = reading.cohort.created;
+    let facts = [
+        (CohortFact::Selection, "selection"),
+        (CohortFact::ApplicableSelection, "applicable_selection"),
+        (CohortFact::InternalChange, "internal_change"),
+        (CohortFact::Dispatch, "dispatch"),
+        (CohortFact::Contribution, "contribution"),
+    ];
+    ModuleRecruitment {
+        cohort: cohort_ladder(reading.cohort),
+        graph: cohort_ladder(reading.graph),
+        vm: cohort_ladder(reading.vm),
+        founders: FounderRow {
+            created: reading.founders.created,
+            deleted: reading.founders.deleted,
+            present: reading.founders.present,
+            dispatched: reading.founders.dispatched,
+            contributing: reading.founders.contributing,
+            contributing_fraction: fraction_or_undefined(
+                reading.founders.contributing,
+                reading.founders.present,
+            ),
+        },
+        time_to_first: facts
+            .into_iter()
+            .map(|(fact, key)| {
+                let time = reading.time_to_first(fact);
+                TimeToFirstRow {
+                    fact: key.to_string(),
+                    reached: time.reached,
+                    reached_fraction: fraction_or_undefined(time.reached, created),
+                    median_generations: time.median_generations,
+                    censored_deleted: time.censored_deleted,
+                    censored_present: time.censored_present,
+                }
+            })
+            .collect(),
+        retention: reading.retention.map(|retention| RetentionRow {
+            from_depth: retention.from_depth,
+            contributing_before: retention.contributing_before,
+            still_contributing: retention.still_contributing,
+            present_not_contributing: retention.present_not_contributing,
+            deleted: retention.deleted,
+            retained_fraction: fraction_or_undefined(
+                retention.still_contributing,
+                retention.contributing_before,
+            ),
+        }),
+        lineages: reading
+            .lineage_rows
+            .iter()
+            .map(|row| CohortLineageRow {
+                lineage: row.lineage,
+                created: row.created,
+                present: row.present,
+                dispatched: row.dispatched,
+                contributing: row.contributing,
+            })
+            .collect(),
+    }
+}
+
+fn mutation_opportunities(
+    reading: &neighborhood::recruitment::RecruitmentCheckpoint,
+) -> MutationOpportunities {
+    let pooled = &reading.opportunities;
+    MutationOpportunities {
+        births: pooled.births,
+        zero_event_births: pooled.zero_event_births,
+        zero_event_fraction: fraction_or_undefined(pooled.zero_event_births, pooled.births),
+        attempted: pooled.attempted,
+        applied: pooled.applied,
+        skipped: pooled.skipped,
+        applied_fraction: fraction_or_undefined(pooled.applied, pooled.attempted),
+        reachable_target_events: pooled.reachable_target_events,
+        unreachable_target_events: pooled.unreachable_target_events,
+        executed_target_events: pooled.executed_target_events,
+        executed_target_fraction: fraction_or_undefined(
+            pooled.executed_target_events,
+            pooled.applied,
+        ),
+        attempted_by_domain: domain_keys(&pooled.attempted_by_domain),
+        applied_by_domain: domain_keys(&pooled.applied_by_domain),
+        selected_inapplicable_by_domain: domain_keys(&pooled.selected_inapplicable_by_domain),
+        no_eligible_node_by_domain: domain_keys(&pooled.no_eligible_node_by_domain),
+        operators: pooled
+            .attempted_by_operator
+            .iter()
+            .map(|(operator, &attempted)| {
+                let applied = pooled
+                    .applied_by_operator
+                    .get(operator)
+                    .copied()
+                    .unwrap_or_default();
+                OperatorOpportunityRow {
+                    operator: operator.as_key().to_string(),
+                    attempted,
+                    applied,
+                    applied_fraction: fraction_or_undefined(applied, attempted),
+                    skipped_by_reason: pooled
+                        .skipped_by_operator_reason
+                        .get(operator)
+                        .into_iter()
+                        .flatten()
+                        .map(|(reason, &count)| (reason.as_key().to_string(), count))
+                        .collect(),
+                }
+            })
+            .collect(),
+        lineages: reading
+            .lineage_opportunities
+            .iter()
+            .enumerate()
+            .map(|(lineage, row)| LineageOpportunityRow {
+                lineage: lineage as u32,
+                births: row.births,
+                attempted: row.attempted,
+                applied: row.applied,
+                skipped: row.skipped,
+                selected_inapplicable: row.selected_inapplicable_by_domain.values().sum(),
+                applied_by_domain: domain_keys(&row.applied_by_domain),
+            })
+            .collect(),
+    }
+}
+
+fn drift_checkpoint(
+    row: neighborhood::drift::Checkpoint,
+    recruitment: &neighborhood::recruitment::RecruitmentCheckpoint,
+) -> DriftDepthCheckpoint {
     let mesh = row.mesh;
     let denominator = u64::from(mesh.lineages);
     let battery_executions = denominator * u64::from(neighborhood_battery_execution_count());
     DriftDepthCheckpoint {
         backends: Some(mesh.backends),
+        recruitment: Some(module_recruitment(recruitment)),
+        opportunities: Some(mutation_opportunities(recruitment)),
         depth: row.depth,
         lineages: mesh.lineages,
         total_nodes: mesh.total_nodes,
@@ -689,7 +990,7 @@ fn compute_drift_depth(
     battery: &Battery,
     sizes: neighborhood::drift::DriftSizes,
 ) -> DriftDepth {
-    use neighborhood::{battery as fixed_battery, drift, mesh_execution};
+    use neighborhood::{battery as fixed_battery, drift, mesh_execution, recruitment};
     let founder = founder_genome(v3_core::config::FounderProfile::V3Alpha1);
     let readings = drift::observe(
         &founder,
@@ -718,11 +1019,19 @@ fn compute_drift_depth(
         knockout_method: mesh_execution::KNOCKOUT_METHOD.to_string(),
         executed_source: drift::EXECUTED_SOURCE.to_string(),
         executed_refresh: drift::EXECUTED_REFRESH.to_string(),
+        recruitment_version: recruitment::RECRUITMENT_VERSION.to_string(),
+        module_identity: recruitment::MODULE_IDENTITY.to_string(),
+        provenance_rule: recruitment::PROVENANCE_RULE.to_string(),
         executions_per_genome: neighborhood_battery_execution_count(),
         snapshot_count: fixed_battery::SNAPSHOT_COUNT as u32,
         sequence_count: fixed_battery::SEQUENCE_COUNT as u32,
         sequence_len: fixed_battery::SEQUENCE_LEN as u32,
-        readings: readings.into_iter().map(drift_checkpoint).collect(),
+        readings: readings
+            .checkpoints
+            .into_iter()
+            .zip(&readings.recruitment)
+            .map(|(row, recruitment)| drift_checkpoint(row, recruitment))
+            .collect(),
     }
 }
 
@@ -3233,6 +3542,138 @@ mod tests {
         );
     }
 
+    /// A recruitment reading over no lineages at all, for checkpoint
+    /// conversions that only exercise the mesh and birth fields.
+    fn empty_recruitment(depth: u64) -> neighborhood::recruitment::RecruitmentCheckpoint {
+        neighborhood::recruitment::RecruitmentTracker::new(0).checkpoint(depth)
+    }
+
+    #[test]
+    fn drift_checkpoint_reports_recruitment_and_opportunities_and_still_loads_older_reports() {
+        use neighborhood::recruitment::{BirthObservation, RecruitmentTracker};
+        use v3_core::contracts::NodeId;
+        use v3_core::mutation::{
+            MutationDomain, MutationEventOutcome, MutationEventRecord, MutationOperator,
+            MutationSemanticCategory, MutationSkipReason, MutationSummary, TargetReachability,
+        };
+
+        let founder = founder_genome(v3_core::config::FounderProfile::V3Alpha1);
+        let mut grown = founder.nodes.clone();
+        let mut detour = grown[0].clone();
+        detour.node_id = NodeId::new(900);
+        grown.push(detour);
+
+        // One birth that applied an AddNode event naming the founder's entry
+        // node, and one event that selected a node with no applicable site.
+        let mut summary = MutationSummary::zero();
+        summary.record_attempt(MutationDomain::Topology, MutationOperator::TopologyAddNode);
+        summary.record_applied(
+            MutationDomain::Topology,
+            MutationOperator::TopologyAddNode,
+            MutationSemanticCategory::SemanticChange,
+        );
+        summary.record_reachability(TargetReachability::Reachable);
+        summary.record_event(MutationEventRecord {
+            domain: MutationDomain::Topology,
+            operator: Some(MutationOperator::TopologyAddNode),
+            target: Some(founder.nodes[0].node_id),
+            outcome: MutationEventOutcome::Applied(TargetReachability::Reachable),
+        });
+        summary.record_domain_skip(
+            MutationDomain::Graph,
+            MutationSkipReason::NoApplicableTarget,
+        );
+        summary.record_event(MutationEventRecord {
+            domain: MutationDomain::Graph,
+            operator: None,
+            target: Some(founder.nodes[0].node_id),
+            outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
+        });
+
+        let mut tracker = RecruitmentTracker::new(1);
+        tracker.seed_founder(0, &founder.nodes);
+        tracker.record_birth(BirthObservation {
+            lineage: 0,
+            depth: 1,
+            before: &founder.nodes,
+            after: &grown,
+            summary: &summary,
+        });
+        let executed = std::collections::BTreeSet::from([NodeId::new(900)]);
+        tracker.record_reading(0, 1, &executed, Some(&executed));
+        let reading = tracker.checkpoint(1);
+
+        let report = drift_checkpoint(
+            neighborhood::drift::Checkpoint {
+                depth: 1,
+                ..neighborhood::drift::Checkpoint::default()
+            },
+            &reading,
+        );
+        let recruitment = report.recruitment.clone().expect("a v3 recruitment block");
+        assert_eq!(recruitment.cohort.created, 1);
+        assert_eq!(recruitment.cohort.present, 1);
+        assert_eq!(recruitment.cohort.contributing, 1);
+        assert_eq!(recruitment.cohort.present_fraction, "1.000000");
+        assert_eq!(recruitment.cohort.contributing_fraction, "1.000000");
+        assert_eq!(recruitment.founders.created, founder.nodes.len() as u64);
+        assert_eq!(recruitment.founders.contributing, 0);
+        assert_eq!(recruitment.lineages.len(), 1);
+        assert_eq!(recruitment.retention, None);
+        let dispatch = recruitment
+            .time_to_first
+            .iter()
+            .find(|row| row.fact == "dispatch")
+            .expect("a dispatch row");
+        assert_eq!(dispatch.reached, 1);
+        assert_eq!(dispatch.median_generations, Some(0));
+        assert_eq!(dispatch.reached_fraction, "1.000000");
+        let never = recruitment
+            .time_to_first
+            .iter()
+            .find(|row| row.fact == "selection")
+            .expect("a selection row");
+        assert_eq!(never.reached, 0);
+        assert_eq!(never.censored_present, 1);
+        assert_eq!(never.median_generations, None);
+
+        let opportunities = report
+            .opportunities
+            .clone()
+            .expect("a v3 opportunity block");
+        assert_eq!(opportunities.births, 1);
+        assert_eq!(opportunities.attempted, 2);
+        assert_eq!(opportunities.applied, 1);
+        assert_eq!(opportunities.applied_fraction, "0.500000");
+        assert_eq!(
+            opportunities.selected_inapplicable_by_domain,
+            BTreeMap::from([("Graph".to_string(), 1)])
+        );
+        assert!(opportunities.no_eligible_node_by_domain.is_empty());
+        assert_eq!(opportunities.lineages.len(), 1);
+        assert_eq!(opportunities.lineages[0].selected_inapplicable, 1);
+        assert_eq!(
+            opportunities.operators,
+            vec![OperatorOpportunityRow {
+                operator: "Topology.AddNode".to_string(),
+                attempted: 1,
+                applied: 1,
+                applied_fraction: "1.000000".to_string(),
+                skipped_by_reason: BTreeMap::new(),
+            }]
+        );
+
+        // A drift-depth-v2 report carries neither block, and loads as absent.
+        let mut historical = serde_json::to_value(&report).unwrap();
+        let object = historical.as_object_mut().unwrap();
+        object.remove("recruitment");
+        object.remove("opportunities");
+        let historical: DriftDepthCheckpoint = serde_json::from_value(historical).unwrap();
+        assert_eq!(historical.recruitment, None);
+        assert_eq!(historical.opportunities, None);
+        assert_eq!(historical.depth, 1);
+    }
+
     #[test]
     fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
         let row = neighborhood::drift::Checkpoint {
@@ -3271,7 +3712,7 @@ mod tests {
                 ..BirthResult::default()
             },
         };
-        let report = drift_checkpoint(row);
+        let report = drift_checkpoint(row, &empty_recruitment(250));
         let backends = report.backends.expect("measured backend totals");
         assert_eq!(
             (
@@ -3306,7 +3747,10 @@ mod tests {
         assert_eq!(report.changed_per_all_births, "0.150000");
         assert_eq!(report.dead_per_all_births, "0.100000");
         assert_eq!(report.births.any_events.changed_fraction, "0.300000");
-        let empty = drift_checkpoint(neighborhood::drift::Checkpoint::default());
+        let empty = drift_checkpoint(
+            neighborhood::drift::Checkpoint::default(),
+            &empty_recruitment(0),
+        );
         assert_eq!(empty.mean_total_nodes, UNDEFINED);
         assert_eq!(empty.hop_cap_fraction, UNDEFINED);
         assert_eq!(empty.changed_per_all_births, UNDEFINED);
@@ -3343,7 +3787,10 @@ mod tests {
         let Indicator::Defined(drift) = &goal.deterministic.goal_indicators.drift_depth else {
             panic!("goal drift missing")
         };
-        assert_eq!(drift.version, "drift-depth-v2");
+        assert_eq!(drift.version, "drift-depth-v3");
+        assert_eq!(drift.recruitment_version, "module-recruitment-v1");
+        assert!(drift.module_identity.contains("creation depth"));
+        assert!(drift.provenance_rule.contains("Topology.CopyNode"));
         assert_eq!(drift.founder, "V3Alpha1");
         assert_eq!(
             drift.birth_subset,
@@ -3391,6 +3838,28 @@ mod tests {
         assert_eq!(drift.readings.len(), 2);
         assert_eq!(drift.readings[0].births.births_total, 2);
         assert_eq!(drift.readings[0].battery_executions, 160);
+        // Every checkpoint carries the v3 blocks, with the founder reference
+        // row and the pooled opportunity denominators.
+        for reading in &drift.readings {
+            let recruitment = reading.recruitment.as_ref().expect("a recruitment block");
+            assert_eq!(
+                recruitment.founders.created,
+                recruitment.founders.present + recruitment.founders.deleted
+            );
+            assert_eq!(recruitment.lineages.len(), drift.lineages as usize);
+            let opportunities = reading
+                .opportunities
+                .as_ref()
+                .expect("an opportunity block");
+            assert_eq!(
+                opportunities.births,
+                u64::from(reading.depth) * u64::from(drift.lineages)
+            );
+            assert_eq!(
+                opportunities.attempted,
+                opportunities.applied + opportunities.skipped
+            );
+        }
         assert!(goal.environment.drift_depth_wall_clock_ms.is_some());
         for name in ["gate", "sweep", "synthetic"] {
             let report = build_report(&small_profile(name), "test").expect("a valid profile");
