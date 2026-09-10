@@ -631,3 +631,191 @@ proptest! {
         }
     }
 }
+
+// The tests below close mutation-gate survivors: the reported keys, the two
+// state accessors, the two pooling paths, the in-place change diff, the
+// changed-only rung, the lineage index of a row, and the founder loss count.
+
+#[test]
+fn every_reported_key_is_its_documented_string() {
+    assert_eq!(ModuleBackend::Graph.as_key(), "graph");
+    assert_eq!(ModuleBackend::Vm.as_key(), "vm");
+    assert_eq!(Provenance::Founder.as_key(), "founder");
+    assert_eq!(Provenance::New.as_key(), "new");
+    assert_eq!(Provenance::Copy.as_key(), "copy");
+    assert_eq!(
+        CohortFact::ALL.map(CohortFact::as_key),
+        [
+            "selection",
+            "applicable_selection",
+            "internal_change",
+            "dispatch",
+            "contribution",
+        ],
+    );
+}
+
+#[test]
+fn the_state_accessors_follow_the_latest_reading() {
+    let founder = vec![vm_node(0, 1), vm_node(1, 1)];
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &founder);
+    fn state(tracker: &RecruitmentTracker) -> Vec<(bool, bool)> {
+        tracker
+            .modules()
+            .map(|module| (module.is_dispatched(), module.is_contributing()))
+            .collect()
+    }
+    assert_eq!(state(&tracker), vec![(false, false), (false, false)]);
+    // A checkpoint reading: both dispatched, only node 0 contributing.
+    tracker.record_reading(0, 1, &ids(&[0, 1]), Some(&ids(&[0])));
+    assert_eq!(state(&tracker), vec![(true, true), (true, false)]);
+    // A plain refresh reading drops node 0 and clears contribution.
+    tracker.record_reading(0, 2, &ids(&[1]), None);
+    assert_eq!(state(&tracker), vec![(false, false), (true, false)]);
+}
+
+#[test]
+fn pooling_one_birth_sums_every_event_total() {
+    let mut pooled = Opportunities::default();
+    pooled.record(&MutationSummary::zero());
+    assert_eq!(pooled.births, 1);
+    assert_eq!(pooled.zero_event_births, 1);
+
+    let mut summary = summary_with(vec![
+        applied(MutationOperator::TopologyAddNode, 0),
+        applied(MutationOperator::TopologyAddNode, 1),
+    ]);
+    summary.unreachable_target_events = 3;
+    summary.executed_target_events = 5;
+    pooled.record(&summary);
+    assert_eq!(pooled.births, 2);
+    // The second birth attempted events, so it is not a zero-event birth.
+    assert_eq!(pooled.zero_event_births, 1);
+    assert_eq!(pooled.attempted, 2);
+    assert_eq!(pooled.applied, 2);
+    assert_eq!(pooled.skipped, 0);
+    assert_eq!(pooled.reachable_target_events, 2);
+    assert_eq!(pooled.unreachable_target_events, 3);
+    assert_eq!(pooled.executed_target_events, 5);
+}
+
+#[test]
+fn an_internally_changed_module_reaches_the_changed_only_rung() {
+    let founder = vec![vm_node(0, 1)];
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &founder);
+    let grown = vec![vm_node(0, 1), vm_node(2, 1)];
+    birth(
+        &mut tracker,
+        1,
+        &grown,
+        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+    );
+    // A later birth leaves node 2's id in place and changes its content.
+    let changed = vec![vm_node(0, 1), vm_node(2, 9)];
+    birth(
+        &mut tracker,
+        2,
+        &changed,
+        &summary_with(vec![applied(MutationOperator::VmRegisterCountMutation, 2)]),
+    );
+    let module = tracker
+        .modules()
+        .find(|module| module.node == NodeId::new(2))
+        .expect("the first birth created module 2");
+    assert_eq!(module.first(CohortFact::InternalChange), Some(2));
+    assert_eq!(module.rung(), Rung::ChangedOnly);
+
+    let reading = tracker.checkpoint(2);
+    assert_eq!(reading.cohort.present, 1);
+    assert_eq!(reading.cohort.changed_only, 1);
+    assert_eq!(reading.cohort.applied_only, 0);
+}
+
+#[test]
+fn every_lineage_row_names_its_own_lineage() {
+    let mut tracker = RecruitmentTracker::new(3);
+    let lineages: Vec<u32> = tracker
+        .checkpoint(0)
+        .lineage_rows
+        .iter()
+        .map(|row| row.lineage)
+        .collect();
+    assert_eq!(lineages, vec![0, 1, 2]);
+}
+
+#[test]
+fn a_deleted_founder_leaves_the_founder_row() {
+    let founder = vec![vm_node(0, 1), vm_node(1, 1)];
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &founder);
+    let pruned = vec![vm_node(0, 1)];
+    birth(
+        &mut tracker,
+        1,
+        &pruned,
+        &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 1)]),
+    );
+    let founders = tracker.checkpoint(1).founders;
+    assert_eq!(founders.created, 2);
+    assert_eq!(founders.deleted, 1);
+    assert_eq!(founders.present, 1);
+    assert_eq!(founders.created, founders.deleted + founders.present);
+}
+
+fn opportunities_strategy() -> impl Strategy<Value = Opportunities> {
+    (
+        prop::array::uniform8(0u64..1_000),
+        prop::collection::vec((0usize..4, 0u64..1_000), 0..4),
+    )
+        .prop_map(|(scalars, operators)| Opportunities {
+            births: scalars[0],
+            zero_event_births: scalars[1],
+            attempted: scalars[2],
+            applied: scalars[3],
+            skipped: scalars[4],
+            reachable_target_events: scalars[5],
+            unreachable_target_events: scalars[6],
+            executed_target_events: scalars[7],
+            applied_by_operator: operators
+                .into_iter()
+                .map(|(index, count)| (MutationOperator::all()[index], count))
+                .collect(),
+            ..Opportunities::default()
+        })
+}
+
+proptest! {
+    /// Merging one lineage's pooled opportunities into another's adds every
+    /// total field by field, whatever the two carry.
+    #[test]
+    fn merging_lineage_opportunities_adds_every_total(
+        left in opportunities_strategy(),
+        right in opportunities_strategy(),
+    ) {
+        let mut merged = left.clone();
+        merged.merge(&right);
+        prop_assert_eq!(merged.births, left.births + right.births);
+        prop_assert_eq!(
+            merged.zero_event_births,
+            left.zero_event_births + right.zero_event_births);
+        prop_assert_eq!(merged.attempted, left.attempted + right.attempted);
+        prop_assert_eq!(merged.applied, left.applied + right.applied);
+        prop_assert_eq!(merged.skipped, left.skipped + right.skipped);
+        prop_assert_eq!(
+            merged.reachable_target_events,
+            left.reachable_target_events + right.reachable_target_events);
+        prop_assert_eq!(
+            merged.unreachable_target_events,
+            left.unreachable_target_events + right.unreachable_target_events);
+        prop_assert_eq!(
+            merged.executed_target_events,
+            left.executed_target_events + right.executed_target_events);
+        for operator in left.applied_by_operator.keys().chain(right.applied_by_operator.keys()) {
+            let total = left.applied_by_operator.get(operator).copied().unwrap_or_default()
+                + right.applied_by_operator.get(operator).copied().unwrap_or_default();
+            prop_assert_eq!(merged.applied_by_operator.get(operator), Some(&total));
+        }
+    }
+}
