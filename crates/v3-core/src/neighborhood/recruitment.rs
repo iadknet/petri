@@ -424,7 +424,10 @@ pub struct TimeToFirstReading {
     pub contribution: TimeToFirst,
 }
 
-/// What became of the modules contributing at the previous checkpoint.
+/// What became of the *cohort* modules contributing at the previous
+/// checkpoint. Founder modules are outside the cohort and never counted here,
+/// so `contributing_before` equals the earlier checkpoint's
+/// [`CohortCounts::contributing`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Retention {
     pub from_depth: u64,
@@ -730,9 +733,6 @@ impl RecruitmentTracker {
                 ..LineageRow::default()
             };
             for (index, module) in state.modules.iter().enumerate() {
-                if module.contributing_now {
-                    contributors.insert((module.lineage, index));
-                }
                 if !module.provenance.is_cohort() {
                     let founders = &mut reading.founders;
                     founders.created += 1;
@@ -744,6 +744,11 @@ impl RecruitmentTracker {
                         founders.deleted += 1;
                     }
                     continue;
+                }
+                // Retention is a cohort reading, so only `new`/`copy` modules
+                // enter the next checkpoint's denominator.
+                if module.contributing_now {
+                    contributors.insert((module.lineage, index));
                 }
                 reading.cohort.record(module);
                 match module.backend {
