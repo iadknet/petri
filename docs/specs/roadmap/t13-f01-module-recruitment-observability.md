@@ -193,7 +193,7 @@ which also names the seventeen focused tests.
       `ok, 24 passed; 0 failed` at `af5dc3a1`, re-run at `ab00bb07` after the
       self-review commit and at `c1cfee5a` after the 2026-09-10 remediation,
       each with the same result.
-- [x] `make check` re-run on the final code: exit 0 at `MAKECHECK_COMMIT`
+- [x] `make check` re-run on the final code: exit 0 at `c1cfee5a`
       (log `/tmp/t13-f01-check4.log`), the last code commit of the 2026-09-10
       remediation; every later commit on this branch changes documents only.
 - [x] Focused tests, re-run at `c1cfee5a`: `cargo test -p v3-core`
