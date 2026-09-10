@@ -671,4 +671,56 @@ mod tests {
         assert_eq!(zero[0].mesh, zero[1].mesh);
         assert!(zero.iter().all(|r| r.births.zero_event_births == 2));
     }
+
+    /// The walk dates a module from the generation its birth produced, and it
+    /// folds every executed-set refresh into the module table rather than
+    /// waiting for the next checkpoint. Both show up in the cohort's
+    /// time-to-first medians, which this deterministic walk pins.
+    #[test]
+    fn the_walk_dates_modules_from_their_birth_and_from_every_refresh() {
+        use crate::neighborhood::recruitment::{CohortFact, TimeToFirst};
+        let config = SimulationConfig::default();
+        let context = EvalContext::from_config(&config);
+        let battery = Battery::generate(context.food_type_count);
+        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let walk = observe(
+            &founder,
+            &battery,
+            &config.mutation,
+            &context,
+            DriftSizes {
+                lineages: 8,
+                birth_lineages: 2,
+                births: 2,
+                // Past the depth-10 refresh, so a dispatch date can predate
+                // the closing checkpoint.
+                checkpoints: &[1, 20],
+            },
+        );
+        let reading = &walk.recruitment[1];
+        assert_eq!(reading.depth, 20);
+        assert_eq!(reading.cohort.created, 14);
+        assert_eq!(reading.cohort.dispatched(), 4);
+        // Four cohort modules were dispatched, the median four generations
+        // after the birth that created them: later births, or a dispatch date
+        // taken only at the closing checkpoint, would both read higher.
+        assert_eq!(
+            reading.time_to_first(CohortFact::Dispatch),
+            &TimeToFirst {
+                reached: 4,
+                median_generations: Some(4),
+                censored_deleted: 0,
+                censored_present: 10,
+            },
+        );
+        assert_eq!(
+            reading.time_to_first(CohortFact::InternalChange),
+            &TimeToFirst {
+                reached: 6,
+                median_generations: Some(6),
+                censored_deleted: 0,
+                censored_present: 8,
+            },
+        );
+    }
 }
