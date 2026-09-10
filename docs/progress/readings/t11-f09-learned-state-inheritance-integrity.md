@@ -471,7 +471,7 @@
 
 | Evidence record |
 | --- |
-| Final `make roadmap-check` passed after measured documentation updates (`/tmp/t11-f09-measured-roadmap.log`); `git diff --check` passed. Independent final review is complete and its sole documentation finding is resolved. Documentation-only remediation passed `make roadmap-check` (`/tmp/t11-f09-review-remediation-roadmap.log`) and `git diff --check`. Heavyweight `make check` remains pending; mutation closure is recorded below. |
+| Final `make roadmap-check` passed after measured documentation updates (`/tmp/t11-f09-measured-roadmap.log`); `git diff --check` passed. Independent final review is complete and its sole documentation finding is resolved. Documentation-only remediation passed `make roadmap-check` (`/tmp/t11-f09-review-remediation-roadmap.log`) and `git diff --check`. Heavyweight `make check` passes on the rebased code commit recorded in the closure table; mutation closure is recorded below. |
 
 ## Mutation baseline correction
 
@@ -536,7 +536,7 @@
 
 | Evidence record |
 | --- |
-| After strengthening, `cargo clippy --workspace --all-targets -- -D warnings` passed (`/tmp/t11-f09-equality-clippy.log`). Final documentation validation is `make roadmap-check` (`/tmp/t11-f09-mutants-roadmap.log`) plus `git diff --check`. The orchestrator's heavyweight `make check` remains pending. |
+| After strengthening, `cargo clippy --workspace --all-targets -- -D warnings` passed (`/tmp/t11-f09-equality-clippy.log`). Final documentation validation is `make roadmap-check` (`/tmp/t11-f09-mutants-roadmap.log`) plus `git diff --check`. The orchestrator's heavyweight `make check` passes on the rebased code commit recorded below. |
 
 | Evidence record |
 | --- |
@@ -578,3 +578,15 @@
 | --- | --- |
 | `node /tmp/t11-f09-main-roadmap-check.mjs --root /Users/istefanek/projects/petri/.worktrees/t11-f09` using the exact checker from `main` at `fe7665fb` | Passed; `/tmp/t11-f09-main-contract-roadmap.log`. |
 | `make roadmap-check` and `git diff --check` | Passed; `/tmp/t11-f09-final-prose-roadmap.log`. |
+
+## Closure verification
+
+| Record | Evidence |
+| --- | --- |
+| Integration base | Rebased onto `fe7665fbbab2a650027dea36ae144039e62c5a63`, including the existing 15 KB non-table prose and labeled-Notes rules. |
+| Full code verification | Orchestrator `make check` exited 0 on `2c5c0a32d823a8d472b5b340ca21d713143c41e5`; `/tmp/t11-f09-make-check.log`. This is the tested code commit, not an invented final documentation/integration hash. |
+| Mutation audit | Orchestrator accepted the preserved fresh 67-mutant coverage plus exact four incremental kills, two equivalent proofs, zero timeouts/deferrals, unchanged selection/configuration, and no production edits after the final fresh run. Full lists and paths are above. |
+| Roadmap rollup | F09 and the combined working-copy/learned-correspondence criterion are complete, supported by closed F08 plus F09. T11 remains In Progress and the master Active because other features and criteria remain open. |
+| Benchmark registry | F09 appended to existing `gate.closed` and `goal_worlds.closed`; epoch baselines and historical `goal-v1` remain unchanged. |
+| Role and cost record | Astra low orchestration/implementation, persistent Astra high spec owner/advisor, fresh Astra medium reviews; 6 consultations; original review 1 P1 resolved, 0 P2/P3; correction review 0 findings; documentation review remediation 1, formatting correction 1, test strengthening 1; requirement corrections 0, user interventions 1. Total task-specific all-agent token usage unavailable; no total inferred. |
+| Final documentation gate | `make check-docs` passed; `/tmp/t11-f09-close-check-docs.log`. |

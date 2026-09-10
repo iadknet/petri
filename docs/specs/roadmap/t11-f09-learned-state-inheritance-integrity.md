@@ -1,6 +1,6 @@
 # T11.F09 — Learned-State Inheritance Integrity
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-10
 **Feature**: T11.F09
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -98,7 +98,7 @@ state remain an implementation layout, not the definition of homology.
   using existing reproduction and mutation test seams.
 - [x] Carry birth-local correspondence through existing structural edits and
   connect it to ordinary/Lamarckian offspring weight construction.
-- [ ] Update the three reference contracts, complete required checks and
+- [x] Update the three reference contracts, complete required checks and
   measured reports, and record closure evidence without broadening scope.
 
 ## Verification
@@ -111,9 +111,10 @@ state remain an implementation layout, not the definition of homology.
 - [x] Pure correspondence/shape invariants have proptest coverage; applied
   reproduction and first-runtime-use coverage establish integration. Results
   and any regression files are recorded in the readings.
-- [ ] `make check` and `make roadmap-check` pass; command evidence in readings.
-  Run viability first if implementation changes production defaults, founder
-  behavior, or tick-loop mechanics.
+- [x] `make check` passes on code commit
+  `2c5c0a32d823a8d472b5b340ca21d713143c41e5`; `make roadmap-check` passes.
+  Command evidence is in the readings. Production defaults, founder behavior,
+  and tick-loop mechanics are unchanged.
 - [x] Gate and single goal reports exist at the paths below, produced by
   `make bench PROFILE=gate FEATURE=t11-f09-learned-state-inheritance-integrity`
   and `make bench PROFILE=goal FEATURE=t11-f09-learned-state-inheritance-integrity`.
@@ -207,11 +208,11 @@ was authorized. Learning dependence remains `Undefined`.
 
 ## Success Criteria
 
-- [ ] Surviving and faithfully copied connections retain the correct eligible
+- [x] Surviving and faithfully copied connections retain the correct eligible
   learned value through structural mutation without position-based cross-talk.
-- [ ] New and reset edges use the defined child genomic values; ordinary
+- [x] New and reset edges use the defined child genomic values; ordinary
   inheritance, independent storage and all newborn trace resets are preserved.
-- [ ] Reference contracts, verification, measured evidence, and roadmap closure
+- [x] Reference contracts, verification, measured evidence, and roadmap closure
   agree with the applied implementation.
 
 ## Notes for AI Agents

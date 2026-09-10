@@ -1,7 +1,7 @@
 # T11 — Brain Genotype-Phenotype Map
 
 **Status**: In Progress
-**Last updated**: 2026-09-08
+**Last updated**: 2026-09-10
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -24,7 +24,7 @@ representation only where the neighborhood reading still shows a gap.
 - [x] Adding or copying a graph compute node, or adding an input reference, is silent on the founder battery at least 95% of the time, and new edges can reach every sensor sub-value. (T11.F03 closure, 2026-09-05: `AddInternalGraphNode`, `CopyInternalNode`, and input-reference `Add` each read 1.00 silent on the stored gate report, and `random_graph_source` draws every sub-index; the no-regression rule keeps this true at later closures.)
 - [ ] At production defaults, mutated births are behaviorally dead at most 5% of the time and single-event births are silent at least 60% of the time, with every behavior-changing operator family still enabled.
 - [x] Persistent graph state and eligibility traces advance on an explicit world-tick clock, verified by fixtures across relaxation-pass limits, disconnected-node additions, and skipped module visits.
-- [ ] Copying a working module keeps it working, and learned weights follow surviving homologous nodes and edges through structural mutation.
+- [x] Copying a working module keeps it working, and learned weights follow surviving homologous nodes and edges through structural mutation.
 - [ ] Founders reach and retain a useful remembered decision through viable mutations in a bounded delayed-cue task.
 - [ ] The node-type contract (references stable by id or remapped on every edit, growth that preserves function when it fires, persistent state that advances once per world tick, mutation delivered in small steps) is recorded in the reference specs, and every backend, existing or added, is checked against it by property tests and the neighborhood indicator.
 - [ ] A new route branch is born pointing at working structure and carrying its own gate write, so it is silent when it fires and can become conditional in one event; retargeting draws a nearby destination; removing a node or a branch is not predominantly lethal; a node runs at most once per tick; and every topology operator sits in the growth-versus-connection taxonomy with a named owner.
@@ -52,7 +52,7 @@ representation only where the neighborhood reading still shows a gap.
   - Goal: Synaptic eligibility. Recent activity fades with elapsed world time and influences later learning through one explicit, calibrated reward-update rule.
 - [x] **T11.F08 — Function-Preserving Duplication and Module Growth** — Depends on: T11.F02, T11.F03, T11.F06
   - Goal: Gene duplication. Copying a working module keeps it working, so complexity can grow by copy and divergence as in real genomes.
-- [ ] **T11.F09 — Learned-State Inheritance Integrity** — Depends on: T11.F07, T11.F08
+- [x] **T11.F09 — Learned-State Inheritance Integrity** — Depends on: T11.F07, T11.F08
   - Goal: Inherited neural adaptation. When learned weights are heritable, structural mutation preserves their association with surviving connections and initializes new connections explicitly.
 - [ ] **T11.F10 — Memory-Motif Evolvability from Founders** — Depends on: T11.F04, T11.F09, T11.F18, T13.F06
   - Goal: Can memory be found? In small temporal tasks, measure whether founders reach and retain useful remembered decisions through viable mutations before testing seasonal ecology.
