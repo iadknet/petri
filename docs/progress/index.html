@@ -949,9 +949,9 @@
           })),
       });
       chart({
-        title: 'Drift depth: changed per all births', sub: 'drift_depth.readings[] at depth 1,000 and 2,000, against the T11.F17 floors',
+        title: 'Drift depth: changed per all births', sub: 'drift_depth.readings[] at depth 1,000 and 2,000, against the standing floors (T11.F17; depth-2,000 re-based to 0.005 on 2026-09-09)',
         tipFmt: pct, yFmt: pct,
-        refLines: [{ y: 0.0015, label: 'depth-1,000 floor' }, { y: 0.008, label: 'depth-2,000 floor' }],
+        refLines: [{ y: 0.0015, label: 'depth-1,000 floor' }, { y: 0.005, label: 'depth-2,000 floor' }],
         series: [
           { name: 'depth 1,000', color: 'var(--s1)', values: series((rep, obs) => driftAt(obs, 1000)) },
           { name: 'depth 2,000', color: 'var(--s2)', values: series((rep, obs) => driftAt(obs, 2000)) },

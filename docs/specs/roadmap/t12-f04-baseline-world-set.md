@@ -1,6 +1,6 @@
 # T12.F04 — Baseline World Set
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-09
 **Feature**: T12.F04
 **Track**: [T12 — World Composition and Baseline Worlds](../../roadmaps/t12-world-composition-and-baseline-worlds.md)
@@ -84,7 +84,8 @@ and the `v3-cli` bench tests.
 - Drift depth reads only the mutation config and the food-type count, never
   the world. Its depth-2,000 changed/all-birth reading is 0.005 with one food
   type (byte-identical to T11.F18's accepted exception) and 0.006 with two,
-  both below the T11.F17 track floor of 0.008. T12.F04 cannot move it.
+  both below the 0.008 floor T11.F17 set; T12.F04 cannot move the reading.
+  At closure the user re-based the standing floor to 0.005 (see Notes).
 
 **Design decisions (recorded assumptions).**
 
@@ -850,7 +851,7 @@ case sits there afterwards.
 | Avoidable blocked moves of any cause by reader state, share of all moves (reader / no reader) | 0.17% / 20.75% | 1.27% / 40.47% | 0.46% / 35.80% |
 | Surviving founder clades; entropy (nats) | 22; 2.360513 | 24; 2.625223 | 14; 0.882285 |
 | Memory sensitivity (different from either) | 0.000113 | 0.000518 | 0.000092 |
-| Drift changed/all births at 1,000 (floor 0.0015) / 2,000 (floor 0.008) | 9/2,000 = 0.0045 / **12/2,000 = 0.006** | 20/2,000 = 0.010 / **10/2,000 = 0.005** | 9/2,000 = 0.0045 / **12/2,000 = 0.006** |
+| Drift changed/all births at 1,000 (floor 0.0015) / 2,000 (floor 0.005, re-based from 0.008 at this closure) | 9/2,000 = 0.0045 / **12/2,000 = 0.006** | 20/2,000 = 0.010 / **10/2,000 = 0.005** | 9/2,000 = 0.0045 / **12/2,000 = 0.006** |
 | Drift hop-cap hits | 0 | 0 | 0 |
 | Founder changed / dead | 0.480769 / 0 | 0.447115 / 0 | 0.480769 / 0 |
 | Evolved changed / dead (pooled) | 0.270000 / 0.030909 | 0.290000 / 0 | 0.282727 / 0.011818 |
@@ -880,7 +881,7 @@ Notes.
 - [x] A later closure's goal report can be compared per world against this
       one, with changed recipe inputs labeled, and the dashboard shows each
       world's readings over closure order.
-- [ ] Reviewed diff, mutation record, stored reports, and closure checks
+- [x] Reviewed diff, mutation record, stored reports, and closure checks
       pass; the drift-floor reading is recorded with the user's decision.
 
 ## Notes for AI Agents
@@ -957,9 +958,11 @@ Notes.
 - Drift floor: the depth-2,000 changed/all-birth floor is a T11.F17 track
   floor (0.008, strict not-below). The reading here is the substrate's, not
   the worlds': 10/2,000 with one food type (identical to T11.F18, closed on
-  the user's written exception on 2026-09-08) and 12/2,000 with two. Closure
-  needs the user's decision to extend that exception or to hold this feature
-  open until a T11 repair lands; the orchestrator does not grant it.
+  the user's written exception on 2026-09-08) and 12/2,000 with two. On
+  2026-09-09 the user decided to re-base the standing floor permanently to
+  0.005 (10/2,000), so later closures pass unless the reading regresses
+  further, and to merge; the decision is recorded in the T11 track's dated
+  note, and both readings here meet the re-based floor.
 - Deferred P2 (mutation): the two `passable_connectivity` visited-guard
   mutants time out rather than fail; killing them needs a watchdog test,
   which is not worth adding for score. Confirmed still the only survivors by

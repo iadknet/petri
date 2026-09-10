@@ -60,6 +60,8 @@
   "goal_worlds": {
     "series": "goal-worlds-v1",
     "epoch_baseline": "docs/progress/features/t12-f04-baseline-world-set-goal.json",
-    "closed": []
+    "closed": [
+      "docs/progress/features/t12-f04-baseline-world-set-goal.json"
+    ]
   }
 }
