@@ -176,8 +176,8 @@ release cap per goal world is unchanged and covers the new work.
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` (engine birth path touched) and
-      `make check` on the implementation code at `af5dc3a1`:
-      viability `ok, 24 passed; 0 failed`, `make check` exit 0.
+      `make check` on the build-pass code: viability `ok, 24 passed; 0 failed`
+      at `af5dc3a1`, `make check` exit 0 re-run at `a1880e9e`.
 - [ ] `make check` re-run on the final code once the measured run's documents
       land.
 - [x] Focused tests named above, all green at `af5dc3a1`:
