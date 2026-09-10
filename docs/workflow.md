@@ -139,13 +139,15 @@ It carries the detailed rules ($rust-skills, `make roadmap-check` on document
 edits, POSIX `sh`). It reports the changed files, the exact commands it ran with
 their results, and its advisor consult count, then stops.
 
-**Brief 2 — self-review, mutants, spec (a fresh agent).** Give it the feature ID,
-the spec path, brief 1's report, and the spec sections this pass needs —
+**Brief 2 — self-review and spec (a fresh agent).** Give it the feature ID, the
+spec path, brief 1's report, and the spec sections this pass needs —
 Verification, plus the Performance predeclaration when the feature is subject to
-it. Its scope is the `simplify` skill on the feature diff, one fresh
-`MUTANTS_ITERATE=0 make rust-mutants` with full survivor triage, and the spec's
-Verification update. It reports the summary line, the output path, every survivor
-with its disposition, and its advisor consult count.
+it. Its scope is the `simplify` skill on the feature diff and the spec's
+Verification update. It reports what the simplify pass changed, the verification
+commands it reran with their results, and its advisor consult count.
+
+**The mutation gate is not part of implementation.** It runs once, after review
+and any remediation, on the code that ships. See "Mutation gate" below.
 
 Splitting the work this way is a cost measure, not a correctness one: first
 launches were the expensive ones in the sessions this rule came from. If it
@@ -167,11 +169,17 @@ something already in context, and do not hand a subagent a document you have
 already summarized for it; quote the fact into the brief instead.
 
 Verify each agent's reported commands and results rather than taking them on
-faith; if brief 2's report does not mention the simplify pass or the mutation
-run, send it back before review.
+faith; if brief 2's report does not mention the simplify pass, send it back
+before review.
 
-**Mutation survivors.** After the simplify pass and before reporting done, the
-implementer runs a fresh `make rust-mutants` (`MUTANTS_ITERATE=0`, the default).
+**Mutation gate.** This is a closure gate, not an implementation step: it runs
+**once, after the review and any post-review remediation are complete**, on the
+final feature code. Running it earlier tests code that then changes and forces a
+second full run; that ordering cost about two fresh runs per feature and up to
+six on one of them. Give a fresh implementer a brief whose only scope is this
+gate, its triage, and the spec's Verification record.
+
+The gate is a fresh `make rust-mutants` (`MUTANTS_ITERATE=0`, the default).
 The target diffs the worktree (committed, uncommitted, and untracked) against
 its merge base with `main`,
 runs `cargo mutants --in-diff` with the caps in `.cargo/mutants.toml`, writes
@@ -184,7 +192,7 @@ this target.
 The `mutants` Cargo profile uses optimization level 1 with debug assertions and
 overflow checks retained. The wrapper records `fresh` or `incremental` in
 `run-mode.txt` beside `mutants.out` and identifies the mode in its output.
-Brief 2's implementer records in the spec's Verification section the summary line, the
+The gate's implementer records in the spec's Verification section the summary line, the
 output path, and the full survivor list, each survivor resolved as **killed**
 (a test added or strengthened, then the target rerun), **equivalent** (one
 sentence on why it cannot change observable behavior), or **deferred** (a
@@ -199,10 +207,17 @@ This passes cargo-mutants' `--iterate`: prior caught/unviable results in the
 same output directory may be reused, with accumulated entries in
 `mutants.out/previously_caught.txt`. Matching is heuristic and does not prove
 that coverage survived other changes. Incremental output is never closure
-evidence, even if no survivors remain in that pass. After remediation, run
-`MUTANTS_ITERATE=0 make rust-mutants` and record its fresh survivor list. Use a
-fresh run immediately after production, test-selection, or tool-configuration
-changes, or after deleting or weakening tests.
+evidence, even if no survivors remain in that pass.
+
+**One fresh run, two at most.** Killing survivors by adding or strengthening
+tests does not require another fresh run: the contract already forbids editing
+production code to kill a mutant, so the production content the first run
+measured is unchanged. Run a second fresh `MUTANTS_ITERATE=0` pass only when
+triage actually changed production code, test selection, or tool configuration,
+or deleted or weakened a test — and record why in the spec. **A third fresh run
+is not authorized:** stop, report the reason to the user, and let them decide.
+Do not close a feature with unresolved survivors to stay under the limit; an
+unresolved survivor is a blocker to report, not a number to hide.
 
 ### Review
 
@@ -236,12 +251,19 @@ untruthful claim is P1 under the existing spec-truthfulness rule.
 (Both were recorded as user decisions on 2026-09-05 alongside the one-goal-run
 rule below, but never reached this contract until 2026-09-09.)
 
-The reviewer audits the mutation survivor record against the diff and, where
-readable, against the `missed.txt` and `timeout.txt` in the recorded output
-path. A missing survivor list, or a `#[mutants::skip]` or `exclude_re` without
-justification, is a waived check and P1. An unresolved survivor is P2. A
-survivor "killed" by editing production code rather than a test is a finding at
-the severity of the behavior change it made.
+The reviewer does not audit the mutation record: the gate runs after this review,
+so there is nothing final to audit yet. **The orchestrator audits it at the
+closure gate instead**, against the diff and, where readable, against the
+`missed.txt` and `timeout.txt` in the recorded output path. A missing survivor
+list, or a `#[mutants::skip]` or `exclude_re` without justification, is a waived
+check and blocks closure. An unresolved survivor blocks closure until it is
+killed, justified as equivalent, or explicitly deferred with the user's
+agreement. A survivor "killed" by editing production code rather than a test is a
+behavior change that must go back through review at the severity it warrants.
+
+(Across the seventeen features closed before 2026-09-09, the reviewer's survivor
+audit produced no P1. Moving it to the orchestrator keeps the check at the point
+where the record is final, with one reader rather than two.)
 
 Every feature closed after T10.F10 stores a benchmark report and completes the
 spec's Performance and Goal Impact section. A severe compute regression without
@@ -333,6 +355,12 @@ feature row, update the track and master rollups only if their own criteria are
 now satisfied, run `make check-docs` (the closure edits are documentation, and
 the full suite was just run on the same code), and commit. Then:
 
+0. Confirm the mutation gate ran on the final code and audit its record: the
+   summary line and output path in the spec's Verification section, every
+   survivor resolved as killed, equivalent, or deferred, and `missed.txt` /
+   `timeout.txt` at the recorded path agreeing with the list. A `#[mutants::skip]`
+   or `exclude_re` without a written justification blocks closure. This replaces
+   the reviewer's former survivor audit.
 1. `ExitWorktree` with `action: "keep"` — the session returns to the main
    checkout. While inside a worktree, Claude Code blocks every git command
    aimed at the main checkout, so the merge cannot happen before this step.

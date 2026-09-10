@@ -74,8 +74,8 @@ rather than following the advice blindly.
 ## Simplification pass
 
 Only when your brief puts self-review in scope. A build-only brief stops after
-its tests and compile check, and reports; the next pass runs this and the
-mutation triage below on a fresh agent.
+its tests and compile check, and reports; a later pass runs this on a fresh
+agent, and the mutation gate below runs later still, after review.
 
 Before reporting done, and again after any remediation pass that
 adds code, run the `simplify` skill (via the Skill tool) on your feature diff
@@ -88,10 +88,11 @@ changed.
 
 ## Mutation survivors
 
-Only when your brief puts mutation triage in scope; see the note above.
+Only when your brief puts the mutation gate in scope. This gate runs once, after
+review and any remediation, on the final feature code — not at the end of an
+implementation pass. A build or self-review brief never runs it.
 
-After the simplification pass and before reporting done, run `make rust-mutants`
-once. It mutation-tests only the code your diff touches (merge base with
+Run `make rust-mutants` once. It mutation-tests only the code your diff touches (merge base with
 `main`, uncommitted and untracked files included) and prints every survivor:
 mutants missed by every test and mutants that timed out. Record in the spec's
 Verification section the summary line, the output path it printed, and the

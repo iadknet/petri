@@ -45,15 +45,13 @@ on the integration branch itself.
   recorded result is implausible given the code (for example, a test file the
   diff does not add, or a viability gate not recorded when defaults, founders,
   or tick-loop mechanics changed).
-- Mutation survivor record: the spec's Verification section carries the
-  `make rust-mutants` summary line, its output path, and the full survivor list
-  (missed and timed-out mutants), each resolved as killed (with a test the diff
-  adds or strengthens), equivalent (with a one-sentence reason), or deferred
-  (recorded in "Notes for AI Agents"). When the output directory is readable,
-  compare the recorded list with its `missed.txt` and `timeout.txt`. A
-  survivor "killed" by a production-code edit rather than a test is a finding.
-  Any `#[mutants::skip]` attribute or `exclude_re` entry in the diff must carry
-  a written justification.
+- **Not** the mutation survivor record. The mutation gate runs after this review,
+  on the final code, so there is nothing final for you to audit; the orchestrator
+  audits it at the closure gate. Do not report a missing survivor list as a
+  finding, and do not ask for a mutation run. If the diff already carries a
+  `#[mutants::skip]` attribute or an `exclude_re` entry without a written
+  justification, that *is* yours to report — it is a change to the gate's scope,
+  not a result of running it.
 - Repository rules from `AGENTS.md`: TDD for behavior changes, property tests
   for pure invariants with assertions that do not depend on which cases were
   drawn, POSIX `sh` in shell automation, telemetry derived from applied
@@ -79,12 +77,10 @@ on the integration branch itself.
 ## Severity
 
 - P1: wrong behavior, untruthful spec state, a waived required check, scope
-  beyond the feature, or a blocking regression. Blocks closure. A missing
-  mutation survivor list, or a `#[mutants::skip]` or `exclude_re` without
-  justification, is a waived check.
-- P2: likely to cause rework or mislead a later feature. Advisory. An
-  unresolved survivor (listed but neither killed, justified as equivalent, nor
-  recorded as deferred) is P2.
+  beyond the feature, or a blocking regression. Blocks closure. An unjustified
+  `#[mutants::skip]` or `exclude_re` in the diff is a waived check. The survivor
+  list itself is not yours to audit — see above.
+- P2: likely to cause rework or mislead a later feature. Advisory.
 - P3: wording, organization, or small cleanups. Advisory.
 
 ## Report
