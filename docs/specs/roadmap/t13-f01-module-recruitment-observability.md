@@ -77,17 +77,26 @@ genome carried before that event. Recording consumes no RNG, changes no
 selection, and leaves every existing summary field and production genome
 byte-identical. `events.len() == attempted_events`, and the applied/skipped
 records agree with `applied_events`/`skipped_events` and with each operator's
-funnel. This runs on every production birth; its cost is one small vector per
-birth that draws events.
+funnel. Because the engine discards an operator that returns
+`NoApplicableTarget` and retries another operator of the same domain, the
+record also lists, in order, every operator discarded for that event with the
+node it first selected (`None` when it selected nothing): a discarded operator
+that selected a node is the *selected but no applicable site* fact the track
+names and T13.F03 repairs, and it must be visible even when a later operator
+applied. A record whose domain exhausted every operator is a skipped event
+carrying the first node any of its discarded operators selected. This runs on
+every production birth; its cost is one small vector per birth that draws
+events and no allocation for an event without a discard.
 
 **Opportunity accounting (per lineage, cumulative).** The walk pools each
 lineage's per-generation summaries from depth 0 to each checkpoint:
 births, zero-event births, attempted/applied/skipped events; per operator
 attempted, applied, and skipped by reason; per domain (Topology/Vm/Graph/
 InputRef) attempted and applied; reachable-, unreachable-, and executed-target
-events; and, from the event records, per operator the split of skipped events
-into *selected a target but found no applicable site* (record has a target and
-`NoApplicableTarget`) and *no eligible node* (no target). Report pooled totals
+events; and, from the event records, per operator the count of discards that
+*selected a target but found no applicable site* and of discards with *no
+eligible node*, plus per domain the same split for events whose domain
+exhausted every operator. Report pooled totals
 across the 50 lineages per checkpoint, and per-lineage rows carrying births,
 attempted, applied, skipped, selected-inapplicable, and applied by domain.
 Nothing is inferred from a checkpoint's fresh births; those keep their existing
@@ -108,8 +117,9 @@ No cross-lineage identity exists. The harness stores only this table; it is
 bounded by nodes created along the walk, never a production genealogy.
 
 **Cohort facts (separate, never merged).** For each module the harness records
-the depth of: creation; first *selection* (an event record naming its id, any
-outcome); first *applicable selection* (an applied event naming its id); first
+the depth of: creation; first *selection* (an event record or one of its
+discarded operators naming its id, any outcome); first *applicable selection*
+(an applied event naming its id); first
 *internal change* (its `NodeGenome` differs from the previous generation's node
 with the same id, including input refs, targets, and backend content); first
 *dispatch* (its id is in the lineage's executed set at an executed-set refresh
