@@ -3612,7 +3612,10 @@ mod tests {
             operator: None,
             target: Some(founder.nodes[0].node_id),
             outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
-            discarded: vec![(MutationOperator::GraphAddGraphEdge, Some(founder.nodes[0].node_id))],
+            discarded: vec![(
+                MutationOperator::GraphAddGraphEdge,
+                Some(founder.nodes[0].node_id),
+            )],
         });
 
         let mut tracker = RecruitmentTracker::new(1);

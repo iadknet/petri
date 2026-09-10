@@ -5,8 +5,8 @@ use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ExecuteGate, OutputSink, OutputSinkKind};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::{
-    MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
-    MutationOperator, MutationSkipReason, MutationSummary,
+    MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationOperator,
+    MutationSkipReason, MutationSummary,
 };
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -1449,9 +1449,16 @@ fn a_selected_module_with_no_applicable_site_is_recorded_with_its_node_id() {
         event.discarded.iter().find_map(|&(_, pick)| pick),
         Some(NodeId::new(0))
     );
-    let operators: BTreeSet<MutationOperator> =
-        event.discarded.iter().map(|&(operator, _)| operator).collect();
-    assert_eq!(operators.len(), event.discarded.len(), "no operator retried");
+    let operators: BTreeSet<MutationOperator> = event
+        .discarded
+        .iter()
+        .map(|&(operator, _)| operator)
+        .collect();
+    assert_eq!(
+        operators.len(),
+        event.discarded.len(),
+        "no operator retried"
+    );
 }
 
 #[test]
@@ -1513,13 +1520,18 @@ fn a_discarded_operator_stays_visible_when_a_later_operator_applied() {
             continue;
         }
         seen += 1;
-        assert!(event.operator.is_some(), "an applied event names its operator");
+        assert!(
+            event.operator.is_some(),
+            "an applied event names its operator"
+        );
         assert!(
             event
                 .discarded
                 .iter()
-                .any(|&(operator, pick)| operator.domain() == MutationDomain::Graph
-                    && pick == Some(NodeId::new(0))),
+                .any(
+                    |&(operator, pick)| operator.domain() == MutationDomain::Graph
+                        && pick == Some(NodeId::new(0))
+                ),
             "the discarded edge operator selected the edgeless module: {event:?}"
         );
     }
