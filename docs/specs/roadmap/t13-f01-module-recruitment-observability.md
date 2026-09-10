@@ -175,43 +175,41 @@ release cap per goal world is unchanged and covers the new work.
 
 ## Verification
 
-- [x] `cargo test -p v3-core --test viability` (engine birth path touched) and
-      `make check` on the build-pass code: viability `ok, 24 passed; 0 failed`
-      at `af5dc3a1`, `make check` exit 0 re-run at `a1880e9e`.
+Evidence lives in
+[`docs/progress/readings/t13-f01-module-recruitment-observability.md`](../../progress/readings/t13-f01-module-recruitment-observability.md),
+which also names the thirteen focused tests.
+
+- [x] `cargo test -p v3-core --test viability` (engine birth path touched):
+      `ok, 24 passed; 0 failed` at `af5dc3a1`, re-run at `ab00bb07` after the
+      self-review commit with the same result.
 - [ ] `make check` re-run on the final code once the measured run's documents
       land.
-- [x] Focused tests named above, all green at `af5dc3a1`:
-      `cargo test -p v3-core` (1277 + 19 + 24 + others passed, 0 failed) and
-      `cargo test -p v3-cli` (70 + 18 + 11 + 11 passed, 0 failed), covering
-      `a_selected_module_with_no_applicable_site_is_recorded_with_its_node_id`,
-      `an_event_with_no_eligible_node_records_no_target`,
-      `an_applied_event_records_the_node_the_genome_carried_before_it`,
-      `event_records_agree_with_the_totals_and_the_operator_funnels`,
-      `mesh_execution_sets_carry_the_ids_behind_the_unchanged_counts`,
-      `an_id_reused_after_deletion_is_two_modules`,
-      `copy_provenance_needs_both_a_copy_event_and_matching_content`,
-      `the_censoring_split_keeps_every_module_in_the_denominator`,
-      `a_selected_inapplicable_event_is_separated_from_a_missing_eligible_node`,
-      `retention_splits_the_previous_checkpoints_contributors`,
-      `cohort_readings_partition_every_module_they_count`,
-      `recruitment_readings_track_the_walk_without_changing_it`, and
-      `drift_checkpoint_reports_recruitment_and_opportunities_and_still_loads_older_reports`.
-- [ ] Measured results in
-      [`docs/progress/readings/t13-f01-module-recruitment-observability.md`](../../progress/readings/t13-f01-module-recruitment-observability.md).
-- [ ] Every pre-existing deterministic field of the gate and goal reports
-      equals T12.F04's (`t12-f04-baseline-world-set{,-goal}.json`), excluding
-      the feature label, `drift_depth.version`, and the new blocks; checked by
-      a recorded structural comparison, result in the readings file.
-- [ ] Per goal world: drift wall time under the 30-second cap; the cohort,
-      opportunity, and retention tables per checkpoint with denominators and
-      censoring counts, in the readings file; depth-1,000 and 2,000
-      changed/all-birth readings against the 0.0015 and 0.005 floors.
+- [x] Focused tests, re-run at `ab00bb07`: `cargo test -p v3-core`
+      (1277 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 1 passed, 0 failed) and
+      `cargo test -p v3-cli` (70 + 18 + 11 + 11 passed, 0 failed), plus
+      `cargo clippy -p v3-core -p v3-cli --all-targets -- -D warnings` clean.
+- [x] Measured results recorded in the readings file above.
+- [x] Structural comparison, a recursive leaf diff of the whole `deterministic`
+      block against T12.F04's reports: **no pre-existing field differs.** Gate 0
+      difference lines; goal 42, every one a field new in `drift-depth-v3`
+      (15 `recruitment`, 15 `opportunities`, 3 `version`, and 9 lines of the
+      three new `drift_depth` recruitment-contract strings, which sit outside
+      the three named exclusions and are reported as their own group).
+- [x] Per goal world: `drift_depth_wall_clock_ms` is one accumulated 25,004.8 ms
+      over the three worlds, so every world is under the 30 s cap (average
+      8.33 s); T12.F04 read 11,179.5 ms, so the observation added +4.61 s per
+      world against a predeclared "under 2 s". Cohort, opportunity, retention
+      and censoring tables per checkpoint are in the readings file. Drift
+      changed/all births 0.0045/0.006, 0.010/0.005, 0.0045/0.006 at depths
+      1,000/2,000 all meet the 0.0015 and 0.005 floors, byte-identical to
+      T12.F04.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
-- [ ] Benchmark reports stored at
+- [x] Benchmark reports stored at
       `docs/progress/features/t13-f01-module-recruitment-observability.json`
-      and `-goal.json`; the second goal run is not required (user decision
-      2026-09-05, `docs/workflow.md`).
+      and `-goal.json`, each run exactly once (`make bench PROFILE=gate` and
+      `PROFILE=goal`, both exit 0); the second goal run is not required (user
+      decision 2026-09-05, `docs/workflow.md`).
 
 ## Performance and Goal Impact
 
@@ -232,7 +230,7 @@ T12.F04. The new cohort and opportunity readings are descriptive baselines
 with no floor; T13.F02 owns the replicated baseline. Cognition indicators
 remain `Undefined`.
 
-**Measured verdict.** To be recorded at closure.
+**Measured verdict.** Gate: `make bench PROFILE=gate` exit 0, `comparison.severe=false`, no threshold crossed — all six counters 0.000000% against T11.F18 and wall/creature-tick 0.0014120875 ok against both references; gate epoch not re-pinned. Goal: `make bench PROFILE=goal` exit 0, `comparison.severe=false`, no counter or wall threshold crossed — all six counters 0.000000% against T12.F04 and wall/creature-tick 0.0078817109 (+6.41%) ok, end-to-end 518 s inside the 15-minute threshold; the drift walk's accumulated 25,004.8 ms keeps every world inside the 30 s cap but misses the predeclared "under 2 s added per world" at +4.61 s per world on average; goal epoch not re-pinned.
 
 - Reports: [gate](../../progress/features/t13-f01-module-recruitment-observability.json),
   [goal](../../progress/features/t13-f01-module-recruitment-observability-goal.json).
