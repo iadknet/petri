@@ -1,6 +1,6 @@
 # T13.F01 — Module Recruitment Observability
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-10
 **Feature**: T13.F01
 **Track**: [T13 — Neutral Module Recruitment](../../roadmaps/t13-neutral-module-recruitment.md)
@@ -236,6 +236,10 @@ eight the mutation gate added are named in the mutation item below.
       `~/.local/share/petri-tools/mutants/t13-f01/mutants.out`. Summary line as
       printed: `181 mutants tested in 13m: 25 missed, 138 caught, 18 unviable`.
       `timeout.txt` is empty, so the 25 missed are the whole survivor list.
+      Closure audit 2026-09-10 (orchestrator): the incremental confirmation
+      run reused that output directory, so `missed.txt` there is now empty
+      and `run-mode.txt` reads `incremental`; the fresh run's 25 `MISSED`
+      lines in `/tmp/t13-f01-mutants.log` match this list one for one.
       **All 25 killed** by eight tests added at `2f93d32a`, confirmed by
       `MUTANTS_ITERATE=1 make rust-mutants`: `25 mutants tested in 3m:
       25 caught` (incremental, so not closure evidence on its own; no
@@ -322,11 +326,11 @@ remain `Undefined`.
 
 ## Success Criteria
 
-- [ ] The goal report and `docs/progress.md` show, per world and checkpoint,
+- [x] The goal report and `docs/progress.md` show, per world and checkpoint,
       new-module cohorts by backend across the state ladder with censoring and
       retention, and per-lineage mutation opportunities by operator with the
       selected-but-inapplicable split, all with denominators.
-- [ ] Existing drift, birth, and mesh readings and every production
+- [x] Existing drift, birth, and mesh readings and every production
       trajectory are unchanged, and the observation stays inside its caps.
 
 ## Notes for AI Agents
@@ -422,3 +426,11 @@ remain `Undefined`.
     events (`node_ids` and `summary.events`), not one; the wording is fixed.
   - P3-2: the `bench.rs` task is checked and its stale parenthetical dropped —
     the readings file and the `docs/progress.md` row both exist.
+- Cost record 2026-09-10 (telemetry only): `/usage` totals not collected (the
+  user was not present at closure). Implementer passes: build (3 advisor
+  consults), self-review and benchmarks (3), discarded-operator remediation
+  and re-measurement (2), post-review remediation and re-measurement (2),
+  mutation gate (3); five passes, 13 consults. Reviewer findings: P1 1, P2 3,
+  P3 2, all remediated. Goal profile ran three times because the measured
+  code changed twice after the first run; the stored reports are from the
+  final code.
