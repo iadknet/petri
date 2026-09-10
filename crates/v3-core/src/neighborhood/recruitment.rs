@@ -480,7 +480,6 @@ impl RecruitmentTracker {
     }
 
     /// Every module of every lineage, in creation order per lineage.
-    #[must_use]
     pub fn modules(&self) -> impl Iterator<Item = &Module> {
         self.lineages.iter().flat_map(|state| state.modules.iter())
     }

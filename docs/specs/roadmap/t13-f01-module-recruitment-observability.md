@@ -155,27 +155,48 @@ release cap per goal world is unchanged and covers the new work.
 
 ## Implementation Tasks
 
-- [ ] `TargetSelector` first-pick memory and `MutationSummary::events` with
+- [x] `TargetSelector` first-pick memory and `MutationSummary::events` with
       `MutationEventRecord`; tests for the count/funnel agreement, the
       selected-but-inapplicable case on an edgeless Graph module, and the
       no-eligible-node case; a property that recording leaves genome, RNG
       stream, and existing summary fields unchanged.
-- [ ] `mesh_execution` exposes the executed and contributing node id sets
+- [x] `mesh_execution` exposes the executed and contributing node id sets
       beside the existing counts, with the counts unchanged.
-- [ ] Drift harness: per-lineage opportunity pooling, the module table with
+- [x] Drift harness: per-lineage opportunity pooling, the module table with
       the identity/provenance rule, cohort facts, per-checkpoint cohort and
       retention readings; property tests for the invariants above; fixtures
       for id reuse as two modules, copy provenance, the censoring split, and
       walk isolation (genomes/RNG identical with and without the readings).
 - [ ] `bench.rs`: `drift-depth-v3` blocks under each checkpoint reading,
       serde-defaulted, six-decimal fractions from pooled integers; readings
-      file and `docs/progress.md` row.
+      file and `docs/progress.md` row. *(Report blocks and the version string
+      are implemented at `af5dc3a1`; the readings file and the
+      `docs/progress.md` row wait on the measured run.)*
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` (engine birth path touched) and
-      `make check` on the final code -> result and tested commit recorded here.
-- [ ] Focused tests named above -> results in
+- [x] `cargo test -p v3-core --test viability` (engine birth path touched) and
+      `make check` on the implementation code at `af5dc3a1`:
+      viability `ok, 24 passed; 0 failed`, `make check` exit 0.
+- [ ] `make check` re-run on the final code once the measured run's documents
+      land.
+- [x] Focused tests named above, all green at `af5dc3a1`:
+      `cargo test -p v3-core` (1277 + 19 + 24 + others passed, 0 failed) and
+      `cargo test -p v3-cli` (70 + 18 + 11 + 11 passed, 0 failed), covering
+      `a_selected_module_with_no_applicable_site_is_recorded_with_its_node_id`,
+      `an_event_with_no_eligible_node_records_no_target`,
+      `an_applied_event_records_the_node_the_genome_carried_before_it`,
+      `event_records_agree_with_the_totals_and_the_operator_funnels`,
+      `mesh_execution_sets_carry_the_ids_behind_the_unchanged_counts`,
+      `an_id_reused_after_deletion_is_two_modules`,
+      `copy_provenance_needs_both_a_copy_event_and_matching_content`,
+      `the_censoring_split_keeps_every_module_in_the_denominator`,
+      `a_selected_inapplicable_event_is_separated_from_a_missing_eligible_node`,
+      `retention_splits_the_previous_checkpoints_contributors`,
+      `cohort_readings_partition_every_module_they_count`,
+      `recruitment_readings_track_the_walk_without_changing_it`, and
+      `drift_checkpoint_reports_recruitment_and_opportunities_and_still_loads_older_reports`.
+- [ ] Measured results in
       [`docs/progress/readings/t13-f01-module-recruitment-observability.md`](../../progress/readings/t13-f01-module-recruitment-observability.md).
 - [ ] Every pre-existing deterministic field of the gate and goal reports
       equals T12.F04's (`t12-f04-baseline-world-set{,-goal}.json`), excluding
@@ -236,3 +257,21 @@ remain `Undefined`.
   require a `CopyNode` event in the same birth so blank detours matching an
   existing blank node are not labeled copies.
 - Unobserved facts stay unmeasured: effects and usefulness have no field here.
+- Implementation deviations, 2026-09-10 (build pass, `12ccdb6b`..`af5dc3a1`):
+  - The engine retries every operator of a drawn domain before recording a
+    skip, so an operator-level `NoApplicableTarget` never reaches the summary
+    and the *selected-but-inapplicable* / *no-eligible-node* split is reported
+    **per domain**, not per operator. `MutationEventRecord::operator` is
+    therefore `Option<MutationOperator>`: `None` marks a domain-exhausted
+    attempt, and the record still carries the first node any of that domain's
+    operators selected, which is what separates the two cases.
+  - The pure observation types and the module table live in
+    `crates/v3-core/src/neighborhood/recruitment.rs`; `drift.rs` owns the walk
+    and feeds them. `observe` now returns `DriftWalk { checkpoints,
+    recruitment }` so every existing `Checkpoint` field and its equality tests
+    stay untouched.
+  - Copy provenance keys on `Topology.CopyNode` only, as the spec's literal
+    `CopyNode`; the mesh slice-copy operators also create nodes and are
+    recorded as `new`.
+  - `observe_checkpoint` reads `Battery::mesh_execution_sets` once per lineage,
+    so the checkpoint runs no battery pass beyond the existing one.
