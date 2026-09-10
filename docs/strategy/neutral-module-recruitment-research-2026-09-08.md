@@ -44,7 +44,10 @@ Primary sources checked 2026-09-08; read depth and transfer limits follow.
   across 50 lineages rose from 31 to 36. These observations do not establish
   the mechanism of the drift regression. T11.F18 subsequently closed on main
   with a [recorded feature-specific user exception](../specs/roadmap/t11-f18-backend-neutral-mesh-node-growth.md#performance-and-goal-impact)
-  for the 0.005 reading; the standing 0.008 floor remains for later features.
+  for the 0.005 reading; the standing 0.008 floor remained for later features
+  until 2026-09-09, when the user re-based it permanently to 0.005 at
+  T12.F04's closure (dated note in the
+  [T11 track](../roadmaps/t11-brain-genotype-phenotype-map.md#notes-for-ai-agents)).
 - The walk retains every descendant without ecological selection. Birth
   observations use 100 offspring from each of 20 parent lineages. A new RNG
   draw changes subsequent lineage histories. Preserve per-lineage results;
