@@ -407,6 +407,7 @@ mod work_counter_tests {
                 node_id: id0,
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    birth_weights: None,
                     compute_nodes: vec![ComputeNode {
                         kind: ComputeNodeKind::Constant(1.0),
                         inputs: vec![],
@@ -454,6 +455,7 @@ mod work_counter_tests {
                 node_id: id0,
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    birth_weights: None,
                     compute_nodes: vec![ComputeNode {
                         kind: ComputeNodeKind::Constant(1.0),
                         inputs: vec![GraphEdge {
@@ -544,6 +546,7 @@ mod clock_tests {
             plasticity: None,
         }));
         CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: nodes,
             output_sinks: vec![OutputSink {
                 kind: OutputSinkKind::WriteSlot(1),

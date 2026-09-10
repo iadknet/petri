@@ -45,6 +45,7 @@ fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureG
             node_id: NodeId::new(0),
             input_refs,
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                birth_weights: None,
                 compute_nodes: Vec::new(),
                 output_sinks: vec![OutputSink {
                     kind: OutputSinkKind::CustomOutput(0),
@@ -180,6 +181,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                 node_id: NodeId::new(0),
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    birth_weights: None,
                     compute_nodes: Vec::new(),
                     output_sinks: vec![OutputSink {
                         kind: OutputSinkKind::CustomOutput(0),
@@ -198,6 +200,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                 node_id: NodeId::new(1),
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    birth_weights: None,
                     compute_nodes: Vec::new(),
                     output_sinks: vec![OutputSink {
                         kind: OutputSinkKind::CustomOutput(0),
@@ -1639,4 +1642,90 @@ proptest::proptest! {
                 event.domain);
         }
     }
+}
+
+#[test]
+fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
+    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, GraphSource};
+    use crate::simulation::actions::cgp_reproduction::capture_birth_weights;
+    use rand::RngCore;
+    let mut original = single_graph_genome_with_inputs(vec![]);
+    let BackendDef::Graph(def) = &mut original.nodes[0].backend_def else {
+        unreachable!()
+    };
+    def.compute_nodes.push(ComputeNode {
+        kind: ComputeNodeKind::Add,
+        inputs: vec![GraphEdge {
+            source: GraphSource::SharedMemory {
+                slot: 0,
+                previous: false,
+            },
+            weight: 0.5,
+        }],
+        plasticity: None,
+    });
+    let mut config = SimulationConfig::default().mutation;
+    config.mutation_probability = 1.0;
+    config.per_birth_mutation_events_min = 6;
+    config.per_birth_mutation_events_max = 6;
+    for seed in 0..32 {
+        let mut plain = original.clone();
+        let mut tracked = original.clone();
+        let BackendDef::Graph(def) = &mut tracked.nodes[0].backend_def else {
+            unreachable!()
+        };
+        capture_birth_weights(def, &[Box::new([0.75])]);
+        let mut plain_rng = rng(seed);
+        let mut tracked_rng = rng(seed);
+        let plain_summary =
+            MutationEngine::apply_mutations(&mut plain, &config, &[0], &mut plain_rng);
+        let tracked_summary =
+            MutationEngine::apply_mutations(&mut tracked, &config, &[0], &mut tracked_rng);
+        assert_eq!(plain, tracked);
+        assert_eq!(plain_summary.events, tracked_summary.events);
+        assert_eq!(
+            plain_summary.applied_semantic_noop_events,
+            tracked_summary.applied_semantic_noop_events
+        );
+        assert_eq!(
+            plain_summary.applied_semantic_change_events,
+            tracked_summary.applied_semantic_change_events
+        );
+        assert_eq!(
+            plain_summary.operator_funnel_by_operator,
+            tracked_summary.operator_funnel_by_operator
+        );
+        assert_eq!(plain_rng.next_u64(), tracked_rng.next_u64());
+        for node in &tracked.nodes {
+            if let BackendDef::Graph(def) = &node.backend_def {
+                if let Some(weights) = &def.birth_weights {
+                    assert_eq!(weights.len(), def.compute_nodes.len());
+                    for (row, node) in weights.iter().zip(&def.compute_nodes) {
+                        assert_eq!(row.len(), node.inputs.len());
+                    }
+                }
+            }
+        }
+    }
+    original.nodes.push(original.nodes[0].clone());
+    let BackendDef::Graph(def) = &mut original.nodes[0].backend_def else {
+        unreachable!()
+    };
+    capture_birth_weights(def, &[Box::new([0.75])]);
+    let before = original.clone();
+    assert_eq!(
+        apply_graph_event(
+            &mut original,
+            GraphOperator::AlterGraphEdgeWeight,
+            &mut TargetSelector::reachable_only(&[0], 1.0),
+            &mut rng(9),
+            &config
+        ),
+        Err(MutationSkipReason::ParseabilityViolation)
+    );
+    assert_eq!(original, before);
+    let BackendDef::Graph(def) = &original.nodes[0].backend_def else {
+        unreachable!()
+    };
+    assert_eq!(def.birth_weights, Some(vec![vec![Some(0.75)]]));
 }

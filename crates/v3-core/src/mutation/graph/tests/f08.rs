@@ -159,6 +159,7 @@ fn activate_copies(def: &mut CgpGraphBackendDef, sources: &[usize]) {
 /// what a consumer of the copy reads, or both.
 pub(super) fn phase_def() -> CgpGraphBackendDef {
     CgpGraphBackendDef {
+        birth_weights: None,
         compute_nodes: vec![
             ComputeNode {
                 kind: ComputeNodeKind::WeightedSum,
@@ -341,6 +342,7 @@ fn copy_operators_skip_when_the_copy_would_exceed_the_index_space() {
     // highest index that is not `remove_compute_node_at`'s sentinel, so it
     // still applies.
     let mut def = CgpGraphBackendDef {
+        birth_weights: None,
         compute_nodes: vec![
             ComputeNode {
                 kind: ComputeNodeKind::Add,
@@ -450,6 +452,7 @@ fn introspection_edge_def(plasticity: bool, on_compute_input: bool) -> CgpGraphB
         weight: 1.0,
     };
     CgpGraphBackendDef {
+        birth_weights: None,
         compute_nodes: vec![ComputeNode {
             kind: ComputeNodeKind::WeightedSum,
             inputs: if on_compute_input {

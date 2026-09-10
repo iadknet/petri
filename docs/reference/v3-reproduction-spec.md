@@ -120,9 +120,26 @@ Constraints:
 
 ### Graph state
 
-- Child graph runtime state is not inherited.
-- Child starts with empty graph-state map.
-- Graph state is lazily allocated at runtime by `NodeId` as nodes execute.
+- Newborn temporal state, eligibility traces, decayed trace bases, and dispatch
+  history start empty. Shared memory follows the separate memory rule above.
+- The final child's `plasticity.lamarckian` flag controls learned-weight
+  inheritance per compute node. False or absent plasticity leaves an empty
+  weight slice for lazy initialization from the child genome.
+- Eligible connections inherit available parent learned values by edge
+  occurrence through the entire birth mutation sequence, including mesh and
+  compute-node moves and faithful copies. Parent flags do not restrict this
+  transfer; a child flag mutation can enable inheritance of ordinary learning.
+- New or replaced connections, deleted sources, actual direct retargeting,
+  and explicit weight mutations use final child genomic weights. Index repairs
+  and faithful-copy remaps preserve correspondence. An identity split preserves
+  the consumer's learned weight; its new identity edge has no parent value.
+- If any input has an inherited value, materialize exactly one weight per final
+  input, using child genomic weights for missing values. If none has a value,
+  preserve lazy initialization. Never borrow another edge's value from a short
+  parent slice; parallel equal edges remain separate occurrences.
+- Inherited storage is independent. Birth adds no clamping and never writes
+  learned values into the child genome or changes the parent's state. Temporary
+  correspondence is consumed before spawn; runtime arrays do not define homology.
 
 ### Phenotype
 

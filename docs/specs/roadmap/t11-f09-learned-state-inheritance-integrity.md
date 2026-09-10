@@ -38,25 +38,17 @@ offspring retain the existing reset behavior.
   `runtime/plasticity/hebbian.rs`'s lazy weight initialization. Genome mutation
   stays in the existing engine; reproduction transfers learned state; runtime
   continues to own learning. Keep the existing runtime weight vector layout.
-- Local diagnosis, 2026-09-10: reproduction snapshots parent weights before
-  mutation but reads them by the child's mesh index afterward. CGP inheritance
-  repeats that lookup by compute-node index and clones the whole input-weight
-  slice without checking edge correspondence or length. Mesh removal, graph
-  interleaved insertion/copy, and edge removal can therefore attach learning
-  to unrelated connections. Lazy initialization only fills empty slices, so a
-  stale nonempty slice is not repaired at first execution.
-- Research checked 2026-09-10: Stanley and Miikkulainen's
+- Birth-local `Option<Vec<Vec<Option<f32>>>>` metadata carries each compute input
+  occurrence's available parent value through existing edits. It is absent
+  outside reproduction and excluded from serialization, equality, and debug
+  genome identity. Newborn construction consumes it; absent parent values do
+  not allocate tracking rows.
+- Stanley and Miikkulainen's
   [NEAT historical markings](https://nn.cs.utexas.edu/downloads/papers/stanley.cec02.pdf)
-  distinguish connection ancestry from array position. That supports tracking
-  origin, not adopting NEAT's population-wide innovation registry or crossover.
-  Options: extend existing mutation edits with birth-local provenance
-  (selected); persistent innovation IDs (unnecessary lifetime and schema
-  scope); infer correspondence from final topology (ambiguous for identical
-  edges and copies); bake learned values into the child genome before mutation
-  (changes genotype/runtime separation and mutation inputs). The existing
-  clone, splice, and rollback paths provide the needed information; no package
-  improves this bounded repair. Exact internal representation is the
-  implementer's choice, reviewed at the required advisor checkpoint.
+  support distinguishing connection ancestry from array position. Birth-local
+  correspondence is sufficient here; persistent innovation IDs add unnecessary
+  schema scope, final-topology matching is ambiguous for parallel edges, and
+  baking learning into genomic weights changes genotype/runtime separation.
 
 **Connection correspondence.** Provenance describes an edge occurrence in the
 parent, not merely an equal source or an array position. Track it across the
@@ -102,37 +94,61 @@ state remain an implementation layout, not the definition of homology.
 
 ## Implementation Tasks
 
-- [ ] Add failing coverage for the correspondence and initialization contract
+- [x] Add failing coverage for the correspondence and initialization contract
   using existing reproduction and mutation test seams.
-- [ ] Carry birth-local correspondence through existing structural edits and
+- [x] Carry birth-local correspondence through existing structural edits and
   connect it to ordinary/Lamarckian offspring weight construction.
 - [ ] Update the three reference contracts, complete required checks and
   measured reports, and record closure evidence without broadening scope.
 
 ## Verification
 
-- [ ] Focused reproduction/mutation tests prove insertion, deletion, all copy
+- [x] Focused reproduction/mutation tests prove insertion, deletion, all copy
   forms, split, rewiring, explicit weight mutation, config eligibility, absent
   parent values, multi-event composition/rollback, independent child storage,
-  and newborn trace reset. Record exact test names, red/green commands and
-  outcomes in the [readings](../../progress/readings/t11-f09-learned-state-inheritance-integrity.md).
-- [ ] Pure correspondence/shape invariants have proptest coverage; applied
+  and newborn trace reset. Exact test names, red/green commands and outcomes
+  are in the [readings](../../progress/readings/t11-f09-learned-state-inheritance-integrity.md).
+- [x] Pure correspondence/shape invariants have proptest coverage; applied
   reproduction and first-runtime-use coverage establish integration. Results
   and any regression files are recorded in the readings.
 - [ ] `make check` and `make roadmap-check` pass; command evidence in readings.
   Run viability first if implementation changes production defaults, founder
   behavior, or tick-loop mechanics.
-- [ ] Store `make bench PROFILE=gate FEATURE=t11-f09-learned-state-inheritance-integrity`
-  and one `make bench PROFILE=goal FEATURE=t11-f09-learned-state-inheritance-integrity`
-  run at the report paths below; record threshold verdicts and comparisons in
-  readings. Retain all three standard goal worlds and their existing pressures.
+- [x] Gate and single goal reports exist at the paths below, produced by
+  `make bench PROFILE=gate FEATURE=t11-f09-learned-state-inheritance-integrity`
+  and `make bench PROFILE=goal FEATURE=t11-f09-learned-state-inheritance-integrity`.
+  Threshold verdicts and comparisons are in the readings; all three standard
+  worlds retain their existing pressures.
 - [x] Second goal-profile determinism run: Not applicable under the standing
   2026-09-05 one-run rule; cross-process coverage and the gate two-run check
   remain in `make check`.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path,
-  and resolve every survivor here as killed, equivalent, or user-agreed deferred.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` coverage and test-only
+  incremental kill confirmation are complete; every survivor is resolved below.
 
-Mutation survivors: pending the required fresh run.
+Mutation disposition across all 67 final-production mutants: 55 caught
+(51 fresh plus 4 incrementally confirmed), 10 unviable, and 2 equivalent.
+There are no timeouts, deferrals, new exclusions, weakened tests, or unresolved
+survivors. The readings preserve the initial baseline failure, unchanged
+fingerprint pin, and exact fresh/incremental command evidence.
+
+Fresh output: `/tmp/t11-f09-mutants-second-fresh/` (67 tested: 51 caught,
+6 missed, 10 unviable, 0 timeouts). Incremental confirmation:
+`/tmp/t11-f09-mutants-incremental/` (6 tested: 4 caught, 2 missed/equivalent,
+0 timeouts). Standard tool output:
+`/Users/istefanek/.local/share/petri-tools/mutants/t11-f09/mutants.out` (now the
+incremental result). Each preserved directory contains `outcomes.json`, full
+survivor lists, logs, and diffs. Timeout lists are empty; no deferrals remain.
+
+Full original survivor list, locations in `crates/v3-core/src/creature/genome/cgp.rs`:
+
+| Location and mutant | Final disposition |
+| --- | --- |
+| `207:9: replace <impl PartialEq for CgpGraphBackendDef>::eq -> bool with true` | Killed incrementally by `birth_genome_equality_requires_every_genetic_field`. |
+| `210:13: replace && with \|\| in <impl PartialEq for CgpGraphBackendDef>::eq` | Killed incrementally by the same property. |
+| `208:13: replace && with \|\| in <impl PartialEq for CgpGraphBackendDef>::eq` | Killed incrementally by the same property. |
+| `209:13: replace && with \|\| in <impl PartialEq for CgpGraphBackendDef>::eq` | Killed incrementally by the same property. |
+| `388:39: replace + with * in CgpGraphBackendDef::duplicate_compute_nodes_in_place` | Equivalent: inserting an identical cloned row at `source` or `source + 1` produces the same adjacent values, including each descending insertion. |
+| `414:29: replace > with >= in CgpGraphBackendDef::reindex_input_refs_after_removal` | Equivalent: equality already returns `false`, so the comparison is reached only for unequal indices. |
 
 ## Performance and Goal Impact
 
@@ -173,7 +189,17 @@ Retain founder observation's 10-second cap, the summed evolved observation
 Investigate unpredicted founder changes, crossed floors, and severe regressions;
 record limitations rather than changing acceptance rules.
 
-**Measured verdict.** Pending gate and goal runs; no epoch re-pin authorized.
+**Measured verdict.** Gate and one goal run passed (`comparison.severe=false`).
+Gate work is unchanged from T11.F18, with no flags. Goal aggregate plasticity
+work (+40.887%) and wall time (+41.720%) warn against T12.F04; the user reported
+external CPU contention during that run, limiting timing attribution. All caps
+remain satisfied (whole measured goal 639.969 s). Founder neighborhoods and
+comparable drift readings are unchanged; evolved outcomes are mixed, including
+Confluence final population -54.189%, fruit share 0.049737→0.000017, and shared
+memory sensitivity 2/21818→0/9995. Per-case plasticity work rises 64.501% in
+Orchards and 53.275% in Canyon; full comparisons and all neighborhood declines
+with denominators are in the readings. No thresholds changed or epoch re-pin
+was authorized. Learning dependence remains `Undefined`.
 
 - Reports: [gate](../../progress/features/t11-f09-learned-state-inheritance-integrity.json),
   [goal](../../progress/features/t11-f09-learned-state-inheritance-integrity-goal.json).
@@ -190,20 +216,13 @@ record limitations rather than changing acceptance rules.
 
 ## Notes for AI Agents
 
-- Plan authored and self-reviewed on 2026-09-10 by the persistent spec owner,
-  `gpt-6-astra` at `high`; orchestration uses Astra `low`, implementation and
-  remediation use one persistent Astra `low`, and final independent review uses
-  a fresh Astra `medium` agent. Self-review/advice is not independent validation.
-- Readiness review, 2026-09-10: **Ready**, no P1/P2/P3 findings. One wording
-  revision clarified that a retarget draw retaining the same source is not a
-  new connection and that provenance may traverse existing graph structure.
-  Reviewed template/status consistency, dependency invariants, bounded scope,
-  and observable verification. Runtime correctness remains for implementation
-  tests and the independent final review. `make roadmap-check` passed. Track
-  already `In Progress` and master already `Active`; neither needs promotion.
-  F07 and F08 are checked.
-- Required advisor consultations, review findings/remediation, requirement
-  corrections, and workflow interventions: none yet; record them as they occur.
-  Planning itself does not count as advisor consultation.
-- Cost record: token usage unavailable unless measured. Preserve actual role,
-  review and command evidence; do not infer a token count.
+- Cost: Orchestration and persistent implementation/remediation use Astra
+  `low`; the persistent spec owner/advisor uses Astra `high`; independent
+  review uses a fresh Astra `medium`. Token usage is unavailable, not inferred.
+- Cost: Advisor consultations 6; independent review findings 1 P1 resolved,
+  0 P2/P3; correction review 0 P1/P2/P3. Documentation remediation 1,
+  formatting correction 1, test-strengthening pass 1; requirement corrections 0.
+  Detailed evidence is in the [readings](../../progress/readings/t11-f09-learned-state-inheritance-integrity.md).
+- Cost: User interventions 1: external CPU contention during the single goal
+  run limits wall-time attribution. Thresholds and the one-goal-run rule remain
+  unchanged; no waiver or epoch re-pin applies.

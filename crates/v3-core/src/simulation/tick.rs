@@ -1204,6 +1204,7 @@ mod final_action_observation_tests {
                 node_id: NodeId::new(0),
                 input_refs: vec![],
                 backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    birth_weights: None,
                     compute_nodes: vec![ComputeNode {
                         kind: ComputeNodeKind::DecayIntegrator(0.0),
                         inputs: vec![],

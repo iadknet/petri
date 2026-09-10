@@ -246,7 +246,19 @@ its terminal guard, graph copy placement and the copy self-edge rule, the
 split exclusion, and the mesh post-activation qualification. A copy is
 required to be neutral when it fires *and* to reproduce its original when a
 later mutation runs it in the original's place. Learned-weight correspondence
-through such a copy remains T11.F09's.
+through such a copy follows T11.F09: birth-local available values move with each
+compute input occurrence through graph/mesh splices and faithful copies, including
+edge bundles. Rollback restores them with the genome. New/replaced backends or
+edges have no parent origin, even at a reused mesh ID or index. Source deletion,
+actual direct retargeting (including raw source-field changes), and explicit
+edge-weight mutation clear that edge's origin. Pure index repair and copy remaps
+preserve it; identity split preserves the consumer origin and creates a new
+identity edge at its genomic weight. Compute kind/parameter, input-reference
+meaning, routing, and plasticity changes preserve surviving edge occurrences.
+Tracking consumes no RNG and does not affect selection, semantic counts,
+parseability, serialization, or genome identity. The final child flag and
+[reproduction inheritance rules](v3-reproduction-spec.md#graph-state) determine
+whether tracked values materialize as runtime weights.
 
 Growth-versus-connection taxonomy (requirement 2, established for the graph
 and InputRef domains by T11.F03; the VM insert/copy families are T11.F02's

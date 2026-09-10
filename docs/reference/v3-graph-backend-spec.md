@@ -416,8 +416,14 @@ per compute node, one `f32` per input edge.
 
 - Plasticity weights are lazy-initialized from each genome edge weight on first use.
 - Eligibility traces are lazy-initialized to `0.0` on first use.
-- Offspring start with empty traces. Plasticity weights are inherited only
-  if `lamarckian` is true.
+- Offspring start with empty traces and temporal state. The final child node's
+  `lamarckian` flag enables learned-weight inheritance by connection occurrence,
+  including faithful copies and index repairs. See
+  [reproduction inheritance](v3-reproduction-spec.md#graph-state) for new/reset
+  edges and absent parent values. A materialized inherited slice has exactly the
+  final input count; nodes with no available inherited values remain lazy.
+- Birth correspondence is temporary, excluded from serialization and genome
+  equality, and consumed before spawn. Runtime weight layout remains unchanged.
 
 ### Eligibility trace clock and activity (Phases 0 and 1)
 

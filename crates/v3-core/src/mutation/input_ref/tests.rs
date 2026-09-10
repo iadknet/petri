@@ -132,6 +132,7 @@ fn swap_input_ref_changes_value() {
 fn swap_graph_input_ref_clamps_out_of_range_sub_indices() {
     let config = default_config();
     let def = CgpGraphBackendDef {
+        birth_weights: None,
         compute_nodes: vec![ComputeNode {
             kind: ComputeNodeKind::Add,
             inputs: vec![
@@ -421,6 +422,7 @@ fn graph_node_genome_zero_refs() -> CreatureGenome {
             node_id: NodeId::new(0),
             input_refs: vec![],
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                birth_weights: None,
                 compute_nodes: vec![ComputeNode {
                     kind: ComputeNodeKind::Add,
                     inputs: vec![],

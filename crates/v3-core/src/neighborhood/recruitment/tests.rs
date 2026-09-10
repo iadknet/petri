@@ -22,6 +22,7 @@ fn graph_node(id: u32) -> NodeGenome {
         node_id: NodeId::new(id),
         input_refs: vec![InputReference::ActionQueue],
         backend_def: BackendDef::Graph(crate::creature::genome::cgp::CgpGraphBackendDef {
+            birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
             action_bank: Vec::new(),
