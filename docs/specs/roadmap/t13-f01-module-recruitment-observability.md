@@ -206,6 +206,10 @@ eight the mutation gate added are named in the mutation item below.
       (log `/tmp/t13-f01-check6.log`), the mutation-gate commit that added the
       eight kill tests and the last commit on this branch to touch code; the
       earlier run was exit 0 at `ea0044d5` (log `/tmp/t13-f01-check5.log`).
+      At integration the branch was rebased without conflicts onto main
+      `f3798191` (documentation-only change, no overlapping files) and
+      `make check` exited 0 again on the rebased closure commit `f3bb1082`
+      (log `/tmp/t13-f01-check-rebased.log`).
 - [x] Focused tests: at `ea0044d5`, before the mutation gate,
       `cargo test -p v3-core` (1281 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 0
       passed, 0 failed) and `cargo test -p v3-cli` (70 + 18 + 11 + 11 passed,
