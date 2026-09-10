@@ -6,15 +6,18 @@ The spec keeps the predeclaration, the verdict, and the mutation survivor
 record. Machine-written reports:
 [gate](../features/t13-f01-module-recruitment-observability.json),
 [goal](../features/t13-f01-module-recruitment-observability-goal.json).
-Measured code `afa6ae5c78f30d05d18a99c2cd43e7b8868b9f09` (the remediation
-commit), host `Isaacs-MacBook-Pro-2.local`, Apple M1 Pro, 8 threads, release.
+Measured code `c1cfee5a7c3624957b00b94b16afccdf46e0cfe5` (the last
+remediation commit), host `Isaacs-MacBook-Pro-2.local`, Apple M1 Pro,
+8 threads, release.
 
-**Supersedes the first measurement.** The 07:40:24 gate and 07:40:30–07:49:08
-goal runs at `ab00bb07` are superseded by the 08:19 runs recorded here: that
-first measurement saw an empty selected-but-inapplicable split, because the
-engine dropped the operator it discarded for finding no applicable site, and
-its drift walk took 25,004.812 ms accumulated over the three worlds by cloning
-every parent's nodes each generation. Both reports were overwritten in place.
+**Supersedes the first measurement.** The 07:40–07:49 runs at `ab00bb07` are
+superseded because that code dropped each discarded operator, so its
+selected-but-inapplicable split was empty and its drift walk took 25,004.812 ms
+accumulated over the three worlds. Both reports were overwritten in place. An
+intermediate pair at `afa6ae5c` (08:19–08:28, drift 19,186.559 ms) was
+overwritten in turn by these runs after the copy-provenance fix; its
+`deterministic` block is byte-identical to this one, since provenance never
+reaches the report.
 
 **What these numbers are and are not.** Every reading here is observation of
 the mutation-only drift walk. Dispatch is not an effect, a *contribution* is
@@ -23,11 +26,11 @@ usefulness is unmeasured. Nothing here is a cognition claim.
 
 ## Focused tests
 
-Re-run at `afa6ae5c` after the remediation commit, all green:
+Re-run at `c1cfee5a` after the last remediation commit, all green:
 
 - `cargo test -p v3-core --test viability` — `ok, 24 passed; 0 failed`
   (the engine birth path is touched, so this ran first).
-- `cargo test -p v3-core` — 1280 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 0
+- `cargo test -p v3-core` — 1281 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 0
   passed, 0 failed, 3 ignored, across every target.
 - `cargo test -p v3-cli` — 70 + 18 + 11 + 11 passed, 0 failed.
 - `cargo clippy -p v3-core -p v3-cli --all-targets -- -D warnings` — clean.
@@ -46,17 +49,18 @@ The named tests these cover:
 `cohort_readings_partition_every_module_they_count`,
 `recruitment_readings_track_the_walk_without_changing_it`, and
 `drift_checkpoint_reports_recruitment_and_opportunities_and_still_loads_older_reports`,
-and the three added by this remediation:
+and the four added by this remediation:
 `a_discarded_operator_stays_visible_when_a_later_operator_applied`,
 `a_module_named_only_by_a_discarded_operator_reaches_the_selected_only_rung`,
-and `a_discarded_operator_that_selected_nothing_counts_as_no_eligible_node`.
+`a_discarded_operator_that_selected_nothing_counts_as_no_eligible_node`, and
+`copy_provenance_compares_only_against_the_pre_birth_nodes`.
 
 ## Gate report
 
 `make bench PROFILE=gate FEATURE=t13-f01-module-recruitment-observability`
 exited 0; `comparison.severe=false`. Stored
-`t13-f01-module-recruitment-observability.json`, generated 2026-09-10T15:19:50Z.
-Log `/tmp/t13-f01-gate2.log`. Run once, before the goal run, nothing else
+`t13-f01-module-recruitment-observability.json`, generated 2026-09-10T15:45:56Z.
+Log `/tmp/t13-f01-gate3.log`. Run once, before the goal run, nothing else
 running.
 
 | Reference | Measure | Current | Reference reading | Delta % | Result |
@@ -67,21 +71,21 @@ running.
 | remove-complementary-nutrition | plasticity_updates | 0.009880 | 0.011171 | -11.556709 | ok |
 | remove-complementary-nutrition | actions_applied | 1.272860 | 1.275525 | -0.208934 | ok |
 | remove-complementary-nutrition | births | 0.026902 | 0.026780 | 0.455564 | ok |
-| remove-complementary-nutrition | wall ms/creature-tick | 0.0013765385 | 0.0015598310 | -11.750792 | ok |
+| remove-complementary-nutrition | wall ms/creature-tick | 0.0013538889 | 0.0015598310 | -13.202847 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | mesh_hops | 2.028954 | 2.028954 | 0.000000 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | vm_steps | 22.425973 | 22.425973 | 0.000000 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | graph_relax_iters | 0.994920 | 0.994920 | 0.000000 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | plasticity_updates | 0.009880 | 0.009880 | 0.000000 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | actions_applied | 1.272860 | 1.272860 | 0.000000 | ok |
 | t11-f18-backend-neutral-mesh-node-growth | births | 0.026902 | 0.026902 | 0.000000 | ok |
-| t11-f18-backend-neutral-mesh-node-growth | wall ms/creature-tick | 0.0013765385 | 0.0019781652 | -30.413369 | ok |
+| t11-f18-backend-neutral-mesh-node-growth | wall ms/creature-tick | 0.0013538889 | 0.0019781652 | -31.558350 | ok |
 
 The harness compares the gate profile against the epoch and T11.F18, not
 T12.F04. Hand-computed against T12.F04's gate report and carrying no harness
-level: wall 0.0013765385 vs 0.0013002215 ms/creature-tick, +5.869541%.
+level: wall 0.0013538889 vs 0.0013002215 ms/creature-tick, +4.127560%.
 
-Observation times (ms): founder 49.935; evolved and drift are not measured in
-the gate profile (`drift_depth: "Undefined"`). Whole measured run 588.534 ms.
+Observation times (ms): founder 54.240; evolved and drift are not measured in
+the gate profile (`drift_depth: "Undefined"`). Whole measured run 578.850 ms.
 Caps unchanged: founder 10 s, evolved 180 s, drift 30 s, whole goal
 investigation 900 s.
 
@@ -90,7 +94,7 @@ investigation 900 s.
 `make bench PROFILE=goal FEATURE=t13-f01-module-recruitment-observability`
 exited 0; `comparison.severe=false`. Stored
 `t13-f01-module-recruitment-observability-goal.json`, generated
-2026-09-10T15:28:23Z. Log `/tmp/t13-f01-goal2.log`. Run once, sequentially after
+2026-09-10T15:54:27Z. Log `/tmp/t13-f01-goal3.log`. Run once, sequentially after
 the gate run with nothing else running.
 
 | Reference | Measure | Current | Reference reading | Delta % | Result |
@@ -101,30 +105,30 @@ the gate run with nothing else running.
 | t12-f04-baseline-world-set-goal | plasticity_updates | 0.046976 | 0.046976 | 0.000000 | ok |
 | t12-f04-baseline-world-set-goal | actions_applied | 1.371176 | 1.371176 | 0.000000 | ok |
 | t12-f04-baseline-world-set-goal | births | 0.018609 | 0.018609 | 0.000000 | ok |
-| t12-f04-baseline-world-set-goal | wall ms/creature-tick | 0.0078085009 | 0.0074066599 | 5.425401 | ok |
+| t12-f04-baseline-world-set-goal | wall ms/creature-tick | 0.0077881741 | 0.0074066599 | 5.150960 | ok |
 
-Simulation wall 485.74 s total (183.50 / 122.93 / 179.32 s for seeds
-11 / 22 / 33). End-to-end elapsed 507 s, measured as the interval between the
-goal log's creation (08:19:56 local) and the report write (08:28:23 local),
+Simulation wall 484.48 s total (182.51 / 122.86 / 179.11 s for seeds
+11 / 22 / 33). End-to-end elapsed 506 s, measured as the interval between the
+goal log's creation (08:46:01 local) and the report write (08:54:27 local),
 against the 15-minute investigation threshold — under it, no investigation
 triggered.
 
-Observation times: founder 117.794 ms (cap 10 s); evolved 496.073 ms total,
-180.504 / 174.674 / 140.894 ms per seed (cap 180 s); final-state observation
-880.393 ms.
+Observation times: founder 122.508 ms (cap 10 s); evolved 516.882 ms total,
+177.388 / 185.901 / 153.594 ms per seed (cap 180 s); final-state observation
+881.219 ms.
 
 **Drift wall time.** The harness records a single accumulated
 `drift_depth_wall_clock_ms` across the three worlds and no per-world split
-exists in the report: 19,186.559 ms, down from 25,004.812 ms in the superseded
-first measurement. Because the total is 19.19 s, no single world can exceed
-19.19 s, so every world is under the 30 s cap; the per-world average is 6.40 s.
+exists in the report: 18,966.423 ms, down from 25,004.812 ms in the superseded
+first measurement. Because the total is 18.97 s, no single world can exceed
+18.97 s, so every world is under the 30 s cap; the per-world average is 6.32 s.
 T12.F04 recorded 11,179.458 ms for the same three worlds, so the recruitment
-observation adds 8.01 s in total, an average of **+2.67 s per world**. The walk
+observation adds 7.79 s in total, an average of **+2.60 s per world**. The walk
 no longer clones each parent's `nodes` per birth: each lineage keeps one node
 snapshot that the birth is diffed against in place, and only the nodes a birth
 changed or added are cloned into it. **The predeclaration expected "under 2 s
 added per world"; the cap holds with room to spare and the remediation cut the
-overshoot from +4.61 s to +2.67 s, but the predeclared bound is still
+overshoot from +4.61 s to +2.60 s, but the predeclared bound is still
 missed.** What remains is the per-generation equality comparison over every
 surviving node of 50 lineages across 2,000 generations, which allocates nothing
 but still reads every node; no further work is done here.
@@ -136,14 +140,14 @@ report against T12.F04's, printing every value difference and every key present
 on only one side, with no filtering; classification afterwards.
 
 - **Gate**, against `t12-f04-baseline-world-set.json`: **0 difference lines**
-  (re-run against the new gate report).
+  (re-run against the final gate report).
   Every deterministic field is equal. Note that the gate profile carries
   `drift_depth: "Undefined"`, so this comparison covers fewer fields than the
   goal one — no drift, recruitment, or opportunity field exists in it. Equal
   deterministic blocks mean the six gate counters, which are derived from the
   equal `per_creature_tick` and `totals` fields, equal T12.F04's exactly.
 - **Goal**, against `t12-f04-baseline-world-set-goal.json`: **42 difference
-  lines** (re-run against the new goal report; the same count and the same
+  lines** (re-run against the final goal report; the same count and the same
   four groups as the superseded measurement), and nothing else:
   1. 15 × `goal_indicators.cases[i].drift_depth.readings[j].recruitment` —
      present only in the current report (the new recruitment block).
