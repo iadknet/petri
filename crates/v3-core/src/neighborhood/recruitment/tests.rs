@@ -411,10 +411,13 @@ fn retention_splits_the_previous_checkpoints_contributors() {
         &grown,
         &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
     );
-    tracker.record_reading(0, 1, &ids(&[1, 2, 3]), Some(&ids(&[1, 2, 3])));
+    // Founder node 0 contributes at both checkpoints. Retention is a cohort
+    // reading, so it must never count that founder.
+    tracker.record_reading(0, 1, &ids(&[0, 1, 2, 3]), Some(&ids(&[0, 1, 2, 3])));
     let first = tracker.checkpoint(1);
     assert_eq!(first.retention, None);
     assert_eq!(first.cohort.contributing, 3);
+    assert_eq!(first.founders.contributing, 1);
 
     let pruned = vec![vm_node(0, 1), vm_node(1, 1), vm_node(2, 1)];
     birth(
@@ -423,11 +426,12 @@ fn retention_splits_the_previous_checkpoints_contributors() {
         &pruned,
         &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 3)]),
     );
-    tracker.record_reading(0, 2, &ids(&[1, 2]), Some(&ids(&[1])));
+    tracker.record_reading(0, 2, &ids(&[0, 1, 2]), Some(&ids(&[0, 1])));
     let second = tracker.checkpoint(2);
     let retention = second.retention.expect("a second checkpoint has retention");
     assert_eq!(retention.from_depth, 1);
     assert_eq!(retention.contributing_before, 3);
+    assert_eq!(retention.contributing_before, first.cohort.contributing);
     assert_eq!(retention.still_contributing, 1);
     assert_eq!(retention.present_not_contributing, 1);
     assert_eq!(retention.deleted, 1);
@@ -589,6 +593,15 @@ proptest! {
                 summed.merge(lineage);
             }
             prop_assert_eq!(&summed, &reading.opportunities);
+            // The per-lineage discard totals, which the report's per-lineage
+            // rows carry, sum to the pooled ones.
+            prop_assert_eq!(
+                reading.lineage_opportunities.iter()
+                    .map(|row| row.discarded_selected_inapplicable_by_operator
+                        .values().sum::<u64>())
+                    .sum::<u64>(),
+                reading.opportunities.discarded_selected_inapplicable_by_operator
+                    .values().sum::<u64>());
             prop_assert_eq!(
                 reading.opportunities.attempted,
                 reading.opportunities.applied + reading.opportunities.skipped);
@@ -609,6 +622,9 @@ proptest! {
         for pair in checkpoints.windows(2) {
             let retention = pair[1].retention.expect("later checkpoints carry retention");
             prop_assert_eq!(retention.from_depth, pair[0].depth);
+            // Retention is a cohort reading: founders contributing at the
+            // earlier checkpoint never enter its denominator.
+            prop_assert_eq!(retention.contributing_before, pair[0].cohort.contributing);
             prop_assert_eq!(retention.contributing_before,
                 retention.still_contributing + retention.present_not_contributing
                     + retention.deleted);

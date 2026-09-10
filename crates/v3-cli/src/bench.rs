@@ -757,7 +757,11 @@ pub struct LineageOpportunityRow {
     pub attempted: u64,
     pub applied: u64,
     pub skipped: u64,
-    pub selected_inapplicable: u64,
+    /// Operators this lineage's births discarded after selecting a node that
+    /// carried no applicable site, summed over
+    /// `discarded_selected_inapplicable_by_operator`. These rows sum to the
+    /// pooled map's total.
+    pub discarded_selected_inapplicable: u64,
     pub applied_by_domain: BTreeMap<String, u64>,
 }
 
@@ -943,7 +947,10 @@ fn mutation_opportunities(
                 attempted: row.attempted,
                 applied: row.applied,
                 skipped: row.skipped,
-                selected_inapplicable: row.selected_inapplicable_by_domain.values().sum(),
+                discarded_selected_inapplicable: row
+                    .discarded_selected_inapplicable_by_operator
+                    .values()
+                    .sum(),
                 applied_by_domain: domain_keys(&row.applied_by_domain),
             })
             .collect(),
@@ -3587,7 +3594,10 @@ mod tests {
         grown.push(detour);
 
         // One birth that applied an AddNode event naming the founder's entry
-        // node, and one event that selected a node with no applicable site.
+        // node after discarding an operator that had already selected it, and
+        // one event that selected a node with no applicable site. The two
+        // splits therefore differ: two operators were discarded, one event
+        // exhausted its domain.
         let mut summary = MutationSummary::zero();
         summary.record_attempt(MutationDomain::Topology, MutationOperator::TopologyAddNode);
         summary.record_applied(
@@ -3601,7 +3611,10 @@ mod tests {
             operator: Some(MutationOperator::TopologyAddNode),
             target: Some(founder.nodes[0].node_id),
             outcome: MutationEventOutcome::Applied(TargetReachability::Reachable),
-            discarded: Vec::new(),
+            discarded: vec![(
+                MutationOperator::TopologyRemoveRouteTarget,
+                Some(founder.nodes[0].node_id),
+            )],
         });
         summary.record_domain_skip(
             MutationDomain::Graph,
@@ -3677,16 +3690,34 @@ mod tests {
             BTreeMap::from([("Graph".to_string(), 1)])
         );
         assert!(opportunities.no_eligible_node_by_domain.is_empty());
-        // The discarded operator is reported by operator, not by domain.
+        // Discarded operators are reported by operator, not by domain, and an
+        // operator discarded by an event that later applied counts too.
         assert_eq!(
             opportunities.discarded_selected_inapplicable_by_operator,
-            BTreeMap::from([("Graph.AddGraphEdge".to_string(), 1)])
+            BTreeMap::from([
+                ("Graph.AddGraphEdge".to_string(), 1),
+                ("Topology.RemoveRouteTarget".to_string(), 1)
+            ])
         );
         assert!(opportunities
             .discarded_no_eligible_node_by_operator
             .is_empty());
         assert_eq!(opportunities.lineages.len(), 1);
-        assert_eq!(opportunities.lineages[0].selected_inapplicable, 1);
+        // The per-lineage row carries the discarded-operator count, which the
+        // event-level per-domain count (1) undercounts, and the rows sum to
+        // the pooled map.
+        assert_eq!(opportunities.lineages[0].discarded_selected_inapplicable, 2);
+        assert_eq!(
+            opportunities
+                .lineages
+                .iter()
+                .map(|row| row.discarded_selected_inapplicable)
+                .sum::<u64>(),
+            opportunities
+                .discarded_selected_inapplicable_by_operator
+                .values()
+                .sum::<u64>()
+        );
         assert_eq!(
             opportunities.operators,
             vec![OperatorOpportunityRow {
@@ -3893,6 +3924,18 @@ mod tests {
             assert_eq!(
                 opportunities.attempted,
                 opportunities.applied + opportunities.skipped
+            );
+            // The per-lineage rows sum to the pooled discard total.
+            assert_eq!(
+                opportunities
+                    .lineages
+                    .iter()
+                    .map(|row| row.discarded_selected_inapplicable)
+                    .sum::<u64>(),
+                opportunities
+                    .discarded_selected_inapplicable_by_operator
+                    .values()
+                    .sum::<u64>()
             );
         }
         assert!(goal.environment.drift_depth_wall_clock_ms.is_some());

@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 2cb8c4c2aa29406a4ca6ad8546642fdeb2603ae572c7f6148645193e323437a5 # shrinks to generations = [Generation { kept: [0], added: [], selected: [], executed: [], contributing: [] }, Generation { kept: [], added: [0], selected: [], executed: [0], contributing: [0] }, Generation { kept: [], added: [], selected: [], executed: [], contributing: [] }, Generation { kept: [], added: [], selected: [], executed: [], contributing: [] }], lineages = 1
