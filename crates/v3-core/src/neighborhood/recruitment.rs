@@ -101,11 +101,9 @@ pub struct Module {
     pub backend: ModuleBackend,
     pub provenance: Provenance,
     pub deleted_depth: Option<u64>,
-    pub first_selection: Option<u64>,
-    pub first_applicable_selection: Option<u64>,
-    pub first_internal_change: Option<u64>,
-    pub first_dispatch: Option<u64>,
-    pub first_contribution: Option<u64>,
+    /// The depth at which this module first reached each [`CohortFact`],
+    /// indexed by `fact as usize`; read it through [`Module::first`].
+    first: [Option<u64>; CohortFact::COUNT],
     dispatched_now: bool,
     contributing_now: bool,
 }
@@ -125,11 +123,7 @@ impl Module {
             backend,
             provenance,
             deleted_depth: None,
-            first_selection: None,
-            first_applicable_selection: None,
-            first_internal_change: None,
-            first_dispatch: None,
-            first_contribution: None,
+            first: [None; CohortFact::COUNT],
             dispatched_now: false,
             contributing_now: false,
         }
@@ -155,40 +149,30 @@ impl Module {
 
     /// The rung this module occupies in the exclusive state ladder.
     #[must_use]
-    pub const fn rung(&self) -> Rung {
+    pub fn rung(&self) -> Rung {
         if self.contributing_now {
             Rung::Contributing
         } else if self.dispatched_now {
             Rung::DispatchedNotContributing
-        } else if self.first_internal_change.is_some() {
+        } else if self.first(CohortFact::InternalChange).is_some() {
             Rung::ChangedOnly
-        } else if self.first_applicable_selection.is_some() {
+        } else if self.first(CohortFact::ApplicableSelection).is_some() {
             Rung::AppliedOnly
-        } else if self.first_selection.is_some() {
+        } else if self.first(CohortFact::Selection).is_some() {
             Rung::SelectedOnly
         } else {
             Rung::NeverSelected
         }
     }
 
-    fn fact(&self, fact: CohortFact) -> Option<u64> {
-        match fact {
-            CohortFact::Selection => self.first_selection,
-            CohortFact::ApplicableSelection => self.first_applicable_selection,
-            CohortFact::InternalChange => self.first_internal_change,
-            CohortFact::Dispatch => self.first_dispatch,
-            CohortFact::Contribution => self.first_contribution,
-        }
+    /// The depth at which this module first reached `fact`, if it has.
+    #[must_use]
+    pub fn first(&self, fact: CohortFact) -> Option<u64> {
+        self.first[fact as usize]
     }
 
-    fn fact_mut(&mut self, fact: CohortFact) -> &mut Option<u64> {
-        match fact {
-            CohortFact::Selection => &mut self.first_selection,
-            CohortFact::ApplicableSelection => &mut self.first_applicable_selection,
-            CohortFact::InternalChange => &mut self.first_internal_change,
-            CohortFact::Dispatch => &mut self.first_dispatch,
-            CohortFact::Contribution => &mut self.first_contribution,
-        }
+    fn first_mut(&mut self, fact: CohortFact) -> &mut Option<u64> {
+        &mut self.first[fact as usize]
     }
 }
 
@@ -204,7 +188,9 @@ pub enum Rung {
     Contributing,
 }
 
-/// One of the cohort facts a module can reach.
+/// One of the cohort facts a module can reach. The discriminants index
+/// [`Module`]'s and [`RecruitmentCheckpoint`]'s per-fact arrays, so adding a
+/// fact here is the only edit a new fact needs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CohortFact {
     Selection,
@@ -212,6 +198,31 @@ pub enum CohortFact {
     InternalChange,
     Dispatch,
     Contribution,
+}
+
+impl CohortFact {
+    /// Every fact, in ladder order.
+    pub const ALL: [Self; Self::COUNT] = [
+        Self::Selection,
+        Self::ApplicableSelection,
+        Self::InternalChange,
+        Self::Dispatch,
+        Self::Contribution,
+    ];
+    /// How many facts there are.
+    pub const COUNT: usize = 5;
+
+    /// The stable key this fact is reported under.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::Selection => "selection",
+            Self::ApplicableSelection => "applicable_selection",
+            Self::InternalChange => "internal_change",
+            Self::Dispatch => "dispatch",
+            Self::Contribution => "contribution",
+        }
+    }
 }
 
 /// The mutation opportunities production offered one lineage, pooled from
@@ -414,16 +425,6 @@ pub struct TimeToFirst {
     pub censored_present: u64,
 }
 
-/// Time-to-first readings for every cohort fact.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct TimeToFirstReading {
-    pub selection: TimeToFirst,
-    pub applicable_selection: TimeToFirst,
-    pub internal_change: TimeToFirst,
-    pub dispatch: TimeToFirst,
-    pub contribution: TimeToFirst,
-}
-
 /// What became of the *cohort* modules contributing at the previous
 /// checkpoint. Founder modules are outside the cohort and never counted here,
 /// so `contributing_before` equals the earlier checkpoint's
@@ -456,7 +457,9 @@ pub struct RecruitmentCheckpoint {
     pub graph: CohortCounts,
     pub vm: CohortCounts,
     pub founders: FounderCounts,
-    pub time_to_first: TimeToFirstReading,
+    /// Time-to-first readings indexed by [`CohortFact`]; read them through
+    /// [`RecruitmentCheckpoint::time_to_first`].
+    time_to_first: [TimeToFirst; CohortFact::COUNT],
     /// Absent at the first checkpoint: retention needs an earlier one.
     pub retention: Option<Retention>,
     pub lineage_rows: Vec<LineageRow>,
@@ -669,7 +672,7 @@ impl RecruitmentTracker {
         let Some(&index) = state.live.get(&node) else {
             return;
         };
-        state.modules[index].fact_mut(fact).get_or_insert(depth);
+        state.modules[index].first_mut(fact).get_or_insert(depth);
     }
 
     /// Fold one battery reading of one lineage in: which modules the battery
@@ -714,7 +717,7 @@ impl RecruitmentTracker {
             graph: CohortCounts::default(),
             vm: CohortCounts::default(),
             founders: FounderCounts::default(),
-            time_to_first: TimeToFirstReading::default(),
+            time_to_first: [TimeToFirst::default(); CohortFact::COUNT],
             retention: self.last_checkpoint_depth.map(|from_depth| Retention {
                 from_depth,
                 contributing_before: self.last_contributors.len() as u64,
@@ -761,8 +764,8 @@ impl RecruitmentTracker {
                     row.dispatched += u64::from(module.dispatched_now);
                     row.contributing += u64::from(module.contributing_now);
                 }
-                for fact in FACTS {
-                    match module.fact(fact) {
+                for fact in CohortFact::ALL {
+                    match module.first(fact) {
                         Some(reached) => generations
                             .entry(fact)
                             .or_default()
@@ -785,7 +788,7 @@ impl RecruitmentTracker {
                 .push(state.opportunities.clone());
         }
 
-        for fact in FACTS {
+        for fact in CohortFact::ALL {
             let mut samples = generations.remove(&fact).unwrap_or_default();
             samples.sort_unstable();
             let slot = reading.time_to_first_mut(fact);
@@ -811,35 +814,15 @@ impl RecruitmentTracker {
     }
 }
 
-const FACTS: [CohortFact; 5] = [
-    CohortFact::Selection,
-    CohortFact::ApplicableSelection,
-    CohortFact::InternalChange,
-    CohortFact::Dispatch,
-    CohortFact::Contribution,
-];
-
 impl RecruitmentCheckpoint {
     fn time_to_first_mut(&mut self, fact: CohortFact) -> &mut TimeToFirst {
-        match fact {
-            CohortFact::Selection => &mut self.time_to_first.selection,
-            CohortFact::ApplicableSelection => &mut self.time_to_first.applicable_selection,
-            CohortFact::InternalChange => &mut self.time_to_first.internal_change,
-            CohortFact::Dispatch => &mut self.time_to_first.dispatch,
-            CohortFact::Contribution => &mut self.time_to_first.contribution,
-        }
+        &mut self.time_to_first[fact as usize]
     }
 
     /// The time-to-first reading for one fact.
     #[must_use]
     pub const fn time_to_first(&self, fact: CohortFact) -> &TimeToFirst {
-        match fact {
-            CohortFact::Selection => &self.time_to_first.selection,
-            CohortFact::ApplicableSelection => &self.time_to_first.applicable_selection,
-            CohortFact::InternalChange => &self.time_to_first.internal_change,
-            CohortFact::Dispatch => &self.time_to_first.dispatch,
-            CohortFact::Contribution => &self.time_to_first.contribution,
-        }
+        &self.time_to_first[fact as usize]
     }
 }
 
