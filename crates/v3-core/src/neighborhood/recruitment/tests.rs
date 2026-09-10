@@ -161,7 +161,7 @@ fn an_id_reused_after_deletion_is_two_modules() {
     assert_eq!(modules[1].deleted_depth, None);
     assert_eq!(modules[1].provenance, Provenance::New);
     // The dead module keeps its facts; the new one starts empty.
-    assert_eq!(modules[1].first_selection, None);
+    assert_eq!(modules[1].first(CohortFact::Selection), None);
 }
 
 #[test]
@@ -320,8 +320,8 @@ fn a_selected_inapplicable_event_is_separated_from_a_missing_eligible_node() {
     );
     // The selected node reached selection but not applicable selection.
     let founder_module = tracker.modules().next().expect("the founder module");
-    assert_eq!(founder_module.first_selection, Some(1));
-    assert_eq!(founder_module.first_applicable_selection, None);
+    assert_eq!(founder_module.first(CohortFact::Selection), Some(1));
+    assert_eq!(founder_module.first(CohortFact::ApplicableSelection), None);
 }
 
 #[test]
@@ -360,8 +360,8 @@ fn a_module_named_only_by_a_discarded_operator_reaches_the_selected_only_rung() 
         .modules()
         .find(|module| module.node == NodeId::new(1))
         .expect("the new module");
-    assert_eq!(module.first_selection, Some(2));
-    assert_eq!(module.first_applicable_selection, None);
+    assert_eq!(module.first(CohortFact::Selection), Some(2));
+    assert_eq!(module.first(CohortFact::ApplicableSelection), None);
     let pooled = &reading.opportunities;
     // The discard is per operator; no event-level skip happened at all.
     assert_eq!(
@@ -580,7 +580,7 @@ proptest! {
                 reading.lineage_rows.iter().map(|row| row.contributing).sum::<u64>(),
                 cohort.contributing);
             // Every fact accounts for every created module.
-            for fact in FACTS {
+            for fact in CohortFact::ALL {
                 let time = reading.time_to_first(fact);
                 prop_assert_eq!(
                     time.reached + time.censored_deleted + time.censored_present,

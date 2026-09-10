@@ -823,13 +823,6 @@ fn module_recruitment(
 ) -> ModuleRecruitment {
     use neighborhood::recruitment::CohortFact;
     let created = reading.cohort.created;
-    let facts = [
-        (CohortFact::Selection, "selection"),
-        (CohortFact::ApplicableSelection, "applicable_selection"),
-        (CohortFact::InternalChange, "internal_change"),
-        (CohortFact::Dispatch, "dispatch"),
-        (CohortFact::Contribution, "contribution"),
-    ];
     ModuleRecruitment {
         cohort: cohort_ladder(reading.cohort),
         graph: cohort_ladder(reading.graph),
@@ -845,12 +838,12 @@ fn module_recruitment(
                 reading.founders.present,
             ),
         },
-        time_to_first: facts
+        time_to_first: CohortFact::ALL
             .into_iter()
-            .map(|(fact, key)| {
+            .map(|fact| {
                 let time = reading.time_to_first(fact);
                 TimeToFirstRow {
-                    fact: key.to_string(),
+                    fact: fact.as_key().to_string(),
                     reached: time.reached,
                     reached_fraction: fraction_or_undefined(time.reached, created),
                     median_generations: time.median_generations,
