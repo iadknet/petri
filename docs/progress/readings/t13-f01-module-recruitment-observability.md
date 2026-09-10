@@ -10,21 +10,21 @@ Measured code `ea0044d5f4390ada662b0506caf020191fea9252` (the last commit of
 the 2026-09-10 review remediation), host `Isaacs-MacBook-Pro-2.local`, Apple M1 Pro,
 8 threads, release.
 
-**Supersedes the 2026-09-10 review-remediation measurement.** The 09:15–09:23 runs
-replace the `c1cfee5a` pair (16:15/16:23 vs the earlier 15:45/15:54Z reports), which
-are superseded because that code counted founder modules in the cohort retention
-row and reported 0 selected-inapplicable per lineage. Every cohort ladder, founder
-row, time-to-first row and discard total below is unchanged from it; the retention
-lines and the per-lineage rows are not. Both reports were overwritten in place.
+**Supersedes the 2026-09-10 remediation measurement (`c1cfee5a`).** These
+09:15–09:23 runs replace that pair, which is superseded because its code counted
+founder modules in the cohort retention row and reported 0 selected-inapplicable
+per lineage. Every cohort ladder, founder row, time-to-first row and discard
+total below is unchanged from it; the retention lines and the per-lineage
+opportunity rows are not. Both reports were overwritten in place.
 
 **Supersedes the first measurement.** The 07:40–07:49 runs at `ab00bb07` are
 superseded because that code dropped each discarded operator, so its
 selected-but-inapplicable split was empty and its drift walk took 25,004.812 ms
 accumulated over the three worlds. Both reports were overwritten in place. An
 intermediate pair at `afa6ae5c` (08:19–08:28, drift 19,186.559 ms) was
-overwritten in turn by these runs after the copy-provenance fix; its
-`deterministic` block is byte-identical to this one, since provenance never
-reaches the report.
+overwritten in turn by the `c1cfee5a` runs after the copy-provenance fix; its
+`deterministic` block is byte-identical to the `c1cfee5a` one, since provenance
+never reaches the report.
 
 **What these numbers are and are not.** Every reading here is observation of
 the mutation-only drift walk. Dispatch is not an effect, a *contribution* is
@@ -56,7 +56,7 @@ The named tests these cover:
 `cohort_readings_partition_every_module_they_count`,
 `recruitment_readings_track_the_walk_without_changing_it`, and
 `drift_checkpoint_reports_recruitment_and_opportunities_and_still_loads_older_reports`,
-and the four added by this remediation:
+and the four added by the `afa6ae5c`..`c1cfee5a` remediation:
 `a_discarded_operator_stays_visible_when_a_later_operator_applied`,
 `a_module_named_only_by_a_discarded_operator_reaches_the_selected_only_rung`,
 `a_discarded_operator_that_selected_nothing_counts_as_no_eligible_node`, and
