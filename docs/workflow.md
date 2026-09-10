@@ -241,12 +241,22 @@ remediation pass, not scope creep. Allow one post-review remediation pass, given
 to a fresh implementer with a brief naming the finding, the files, and the spec
 sections to update. Never silently waive a required check.
 
-**Verification cap.** A spec's Verification section stays under about 3 KB
-excluding the mutation survivor list. Pass-by-pass logs, command transcripts, and
-raw test output go to `docs/progress/readings/<id>.md`, linked from the item that
-produced them. A verification item names what is checked and where the result
-lives; it does not prescribe test design in prose. This is a review expectation,
-not a check — nothing in the repository measures it.
+**Prose budget (enforced).** A spec records the state of the world at closure,
+not the path taken to reach it. `scripts/roadmap-check.mjs` fails any spec over
+**15 KB of non-table prose** — tables and fenced blocks are free — and rejects a
+"Notes for AI Agents" line that is not a `Decision:`, `Exception:`, `Deferred:`,
+or `Cost:` bullet. `scripts/implementer-gate` runs that checker on every changed
+spec and blocks the implementer from reporting done, so the budget is a gate, not
+an expectation. Specs written before 2026-09-10 are grandfathered in the checker
+and leave that list when they are next rewritten under budget.
+
+There is no readiness-review log, no implementation-deviation log, and no
+pass-by-pass narrative. Fold each outcome into the section it changes, in the
+present tense, and delete what a later pass superseded instead of annotating it.
+A verification item names what is checked and where the result lives; it does not
+prescribe test design in prose. Command transcripts and raw output go to
+`docs/progress/readings/<id>.md`, which holds tables and transcripts, not
+narrative.
 
 **Spec claim spot-check.** The reviewer picks at least three claims from the
 spec's Verification and Performance sections — a command result, a stored-report

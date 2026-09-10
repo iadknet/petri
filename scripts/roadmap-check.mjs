@@ -3,6 +3,39 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+const PROSE_BUDGET = 15000;
+const NOTES_HEADING = 'Notes for AI Agents';
+const NOTES_LABELS = ['Decision:', 'Exception:', 'Deferred:', 'Cost:'];
+// Specs written before the 2026-09-10 budget. New specs are never added here;
+// a grandfathered spec leaves the list when it is next rewritten under budget.
+const BUDGET_GRANDFATHERED = new Set([
+  't01-f11-baseline-persistence-characterization.md',
+  't01-f12-goal-profile-basic-indicators-and-progress-table.md',
+  't03-f08-genome-size-maintenance-cost.md',
+  't03-f10-activity-ramped-compute-cost.md',
+  't06-f01-material-carrying-and-barrier-construction.md',
+  't06-f02-food-transport-and-caching.md',
+  't10-f09-throughput-baseline-and-profiling-budget.md',
+  't10-f10-deterministic-benchmark-harness.md',
+  't10-f11-cross-process-reproducibility-of-seeded-runs.md',
+  't11-f01-mutational-neighborhood-indicator.md',
+  't11-f02-vm-structural-mutation-semantics.md',
+  't11-f03-function-preserving-graph-growth.md',
+  't11-f04-mutation-supply-and-neutral-scaffold.md',
+  't11-f05-temporal-controller-fixtures.md',
+  't11-f06-graph-memory-clock.md',
+  't11-f07-reward-trace-clock.md',
+  't11-f08-function-preserving-duplication-and-module-growth.md',
+  't11-f14-mesh-execution-observability.md',
+  't11-f15-mesh-routing-connection-semantics.md',
+  't11-f16-drift-depth-indicator.md',
+  't11-f17-executed-biased-mutation-targeting.md',
+  't11-f18-backend-neutral-mesh-node-growth.md',
+  't12-f01-seeded-terrain-in-the-world-config.md',
+  't12-f02-world-recipe-save-and-load.md',
+  't12-f04-baseline-world-set.md',
+  't13-f01-module-recruitment-observability.md',
+]);
 const TRACK_ID = /^T\d{2}$/;
 const FEATURE_ID = /^T\d{2}\.F\d{2}$/;
 const TRACK_FILE = /^t(\d{2})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
@@ -94,6 +127,48 @@ function featureRows(text, file, trackId, errors) {
     rows.push({ checked: checked(match[1]), id: match[2], deps: dependencies(match[4], file, errors) });
   }
   return rows;
+}
+
+// Prose is everything that is not a markdown table row or a fenced block:
+// measured data is free, narration is not.
+function proseBytes(text) {
+  let fenced = false;
+  let bytes = 0;
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith('```')) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced || trimmed.startsWith('|')) continue;
+    bytes += line.length + 1;
+  }
+  return bytes;
+}
+
+function budget(text, file, errors) {
+  const bytes = proseBytes(text);
+  if (bytes > PROSE_BUDGET) {
+    errors.push(
+      `${file}: prose budget exceeded (${bytes} > ${PROSE_BUDGET} bytes of non-table prose). ` +
+        'A spec records the state at closure, not how the work went: fold outcomes into the ' +
+        'section they change, drop superseded text, and move tables and transcripts to ' +
+        'docs/progress/readings/.',
+    );
+  }
+  const notes = section(text, NOTES_HEADING);
+  if (notes === undefined) return;
+  for (const line of notes.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    if (/^\s+\S/.test(line)) continue; // continuation of the bullet above
+    const bullet = line.match(/^- (.*)$/);
+    if (bullet && NOTES_LABELS.some((label) => bullet[1].startsWith(label))) continue;
+    errors.push(
+      `${file}: ${NOTES_HEADING} accepts only bullets starting ${NOTES_LABELS.join(', ')} ` +
+        `— found: ${line.trim().slice(0, 60)}`,
+    );
+    break;
+  }
 }
 
 function checklistComplete(text, heading, file, errors) {
@@ -206,6 +281,7 @@ function validate(root) {
     const specStatus = status(text, file, ['Planned', 'In Progress', 'Blocked', 'Complete'], errors);
     if (featureId !== pathId) errors.push(`${file}: Feature metadata must match ${pathId}`);
     if (!features.has(pathId)) errors.push(`${file}: orphan feature spec for ${pathId}`);
+    if (!BUDGET_GRANDFATHERED.has(path)) budget(text, file, errors);
     if (!specs.has(pathId)) specs.set(pathId, []);
     specs.get(pathId).push({ file, text, status: specStatus });
   }

@@ -184,3 +184,43 @@ test('unsupported arguments return a usage error', () => {
   assert.equal(result.status, 2);
   assert.match(result.stderr, /Usage/);
 });
+
+test('a spec over the prose budget fails; tables and fenced blocks do not count', () => {
+  const repository = root();
+  try {
+    base(repository);
+    const filler = `${'Narrative prose that says how the work went. '.repeat(20)}\n\n`;
+    write(repository, 'docs/specs/roadmap/t01-f01-foundation.md',
+      `${spec('T01.F01')}\n${filler.repeat(20)}`);
+    const over = run(repository);
+    assert.equal(over.status, 1);
+    assert.match(over.stderr, /prose budget/);
+
+    const rows = `| a | b |\n| --- | --- |\n${'| data | data |\n'.repeat(900)}`;
+    const fenced = `\`\`\`\n${'log line output\n'.repeat(900)}\`\`\`\n`;
+    write(repository, 'docs/specs/roadmap/t01-f01-foundation.md',
+      `${spec('T01.F01')}\n${rows}\n${fenced}`);
+    assert.equal(run(repository).status, 0);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test('Notes for AI Agents accepts only labelled bullets', () => {
+  const repository = root();
+  try {
+    base(repository);
+    const notes = (body) => `${spec('T01.F01')}\n## Notes for AI Agents\n\n${body}\n`;
+    write(repository, 'docs/specs/roadmap/t01-f01-foundation.md',
+      notes('The orchestrator reviewed the first draft and then changed its mind.'));
+    const bad = run(repository);
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /Notes for AI Agents/);
+
+    write(repository, 'docs/specs/roadmap/t01-f01-foundation.md',
+      notes('- Decision: the user accepted the measured cost on 2026-09-10.\n- Deferred: survivor at vm.rs:382 times out; see Notes.\n- Cost: 4 advisor consults, 0 P1.'));
+    assert.equal(run(repository).status, 0);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
