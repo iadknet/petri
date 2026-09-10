@@ -73,7 +73,11 @@ rather than following the advice blindly.
 
 ## Simplification pass
 
-Before reporting the feature done, and again after any remediation pass that
+Only when your brief puts self-review in scope. A build-only brief stops after
+its tests and compile check, and reports; the next pass runs this and the
+mutation triage below on a fresh agent.
+
+Before reporting done, and again after any remediation pass that
 adds code, run the `simplify` skill (via the Skill tool) on your feature diff
 against its merge base with `main`. Apply its reuse,
 simplification, and efficiency fixes, then rerun the verification commands
@@ -83,6 +87,8 @@ dependencies over hand-rolled utilities. Mention in your report what the pass
 changed.
 
 ## Mutation survivors
+
+Only when your brief puts mutation triage in scope; see the note above.
 
 After the simplification pass and before reporting done, run `make rust-mutants`
 once. It mutation-tests only the code your diff touches (merge base with
