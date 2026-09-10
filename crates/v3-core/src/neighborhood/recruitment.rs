@@ -624,6 +624,9 @@ impl RecruitmentTracker {
     ///
     /// Call after every lineage's checkpoint reading has been folded in, so
     /// the ladder's dispatch and contribution rungs describe this checkpoint.
+    /// A [`RecruitmentTracker::record_reading`] without `contributing` in
+    /// between resets contribution, so a refresh reading must never sit
+    /// between a checkpoint's readings and this call.
     pub fn checkpoint(&mut self, depth: u64) -> RecruitmentCheckpoint {
         let mut reading = RecruitmentCheckpoint {
             depth,
