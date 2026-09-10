@@ -356,7 +356,9 @@ fn a_discarded_operator_that_selected_nothing_counts_as_no_eligible_node() {
         pooled.discarded_no_eligible_node_by_operator,
         BTreeMap::from([(MutationOperator::TopologyRemoveRouteTarget, 1)])
     );
-    assert!(pooled.discarded_selected_inapplicable_by_operator.is_empty());
+    assert!(pooled
+        .discarded_selected_inapplicable_by_operator
+        .is_empty());
 }
 
 #[test]
