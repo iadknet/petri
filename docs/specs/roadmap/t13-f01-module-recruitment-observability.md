@@ -194,21 +194,26 @@ release cap per goal world is unchanged and covers the new work.
 
 Evidence lives in
 [`docs/progress/readings/t13-f01-module-recruitment-observability.md`](../../progress/readings/t13-f01-module-recruitment-observability.md),
-which also names the seventeen focused tests.
+which also names the seventeen focused tests written with the feature; the
+eight the mutation gate added are named in the mutation item below.
 
 - [x] `cargo test -p v3-core --test viability` (engine birth path touched):
       `ok, 24 passed; 0 failed` at `af5dc3a1`, re-run at `ab00bb07` after the
       self-review commit, at `c1cfee5a` after the 2026-09-10 remediation, and
       at `ea0044d5` after the 2026-09-10 review remediation, each with the same
       result.
-- [x] `make check` re-run on the final code: exit 0 at `ea0044d5`
-      (log `/tmp/t13-f01-check5.log`), the last code commit of the 2026-09-10
-      review remediation; every later commit on this branch changes documents
-      only.
-- [x] Focused tests, re-run at `ea0044d5`: `cargo test -p v3-core`
-      (1281 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 0 passed, 0 failed) and
-      `cargo test -p v3-cli` (70 + 18 + 11 + 11 passed, 0 failed), plus
-      `cargo clippy -p v3-core -p v3-cli --all-targets -- -D warnings` clean.
+- [x] `make check` re-run on the final code: exit 0 at `2f93d32a`
+      (log `/tmp/t13-f01-check6.log`), the mutation-gate commit that added the
+      eight kill tests and the last commit on this branch to touch code; the
+      earlier run was exit 0 at `ea0044d5` (log `/tmp/t13-f01-check5.log`).
+- [x] Focused tests: at `ea0044d5`, before the mutation gate,
+      `cargo test -p v3-core` (1281 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 0
+      passed, 0 failed) and `cargo test -p v3-cli` (70 + 18 + 11 + 11 passed,
+      0 failed), plus `cargo clippy -p v3-core -p v3-cli --all-targets --
+      -D warnings` clean. Re-run at `2f93d32a` with the eight kill tests added:
+      `cargo test -p v3-core` (1289 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 0
+      passed, 0 failed); `v3-cli` is untouched by that commit and `make check`
+      above covers it.
 - [x] Measured results recorded in the readings file above.
 - [x] Structural comparison, a recursive diff of the whole `deterministic`
       block against T12.F04's reports, re-run on the re-measured reports:
@@ -226,8 +231,58 @@ which also names the seventeen focused tests.
       changed/all births 0.0045/0.006, 0.010/0.005, 0.0045/0.006 at depths
       1,000/2,000 all meet the 0.0015 and 0.005 floors, byte-identical to
       T12.F04.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`, run mode `fresh` ("fresh
+      run; no prior mutant results reused"), output in
+      `~/.local/share/petri-tools/mutants/t13-f01/mutants.out`. Summary line as
+      printed: `181 mutants tested in 13m: 25 missed, 138 caught, 18 unviable`.
+      `timeout.txt` is empty, so the 25 missed are the whole survivor list.
+      **All 25 killed** by eight tests added at `2f93d32a`, confirmed by
+      `MUTANTS_ITERATE=1 make rust-mutants`: `25 mutants tested in 3m:
+      25 caught` (incremental, so not closure evidence on its own; no
+      production code, test selection or tool configuration changed, so no
+      second fresh run is required). Survivors, by the test that kills each —
+      the first seven are in `crates/v3-core/src/neighborhood/recruitment/tests.rs`,
+      the last in `crates/v3-core/src/neighborhood/drift.rs`:
+  - `every_reported_key_is_its_documented_string` — killed
+    `recruitment.rs:45:9: replace ModuleBackend::as_key -> &'static str with ""`,
+    `recruitment.rs:45:9: ... with "xyzzy"`,
+    `recruitment.rs:77:9: replace Provenance::as_key -> &'static str with ""`,
+    `recruitment.rs:77:9: ... with "xyzzy"`,
+    `recruitment.rs:218:9: replace CohortFact::as_key -> &'static str with ""`,
+    `recruitment.rs:218:9: ... with "xyzzy"`.
+  - `the_state_accessors_follow_the_latest_reading` — killed
+    `recruitment.rs:141:9: replace Module::is_dispatched -> bool with true`,
+    `... with false`, `recruitment.rs:147:9: replace
+    Module::is_contributing -> bool with true`, and `... with false`.
+  - `pooling_one_birth_sums_every_event_total` — killed
+    `recruitment.rs:282:32: replace += with *= in Opportunities::record`,
+    `recruitment.rs:282:70: replace == with != in Opportunities::record`,
+    `recruitment.rs:286:38: replace += with *=`,
+    `recruitment.rs:287:40: replace += with *=`, and
+    `recruitment.rs:288:37: replace += with *=`, all in
+    `Opportunities::record`.
+  - `merging_lineage_opportunities_adds_every_total` (proptest) — killed
+    `recruitment.rs:327:32`, `:331:38`, `:332:40` and `:333:37: replace +=
+    with *= in Opportunities::merge`. The existing partition proptest could
+    not: it pooled its own expectation with the same `merge`, so a mutated
+    merge stayed self-consistent. No `proptest-regressions` entry appeared.
+  - `an_internally_changed_module_reaches_the_changed_only_rung` — killed
+    `recruitment.rs:581:31: replace match guard slot == node with true in
+    RecruitmentTracker::record_birth` and `recruitment.rs:392:52: replace +=
+    with *= in CohortCounts::record`. The existing partition proptest never
+    changed a kept node's content, so no module reached the changed-only rung.
+  - `every_lineage_row_names_its_own_lineage` — killed
+    `recruitment.rs:735:17: delete field lineage from struct LineageRow
+    expression in RecruitmentTracker::checkpoint`.
+  - `a_deleted_founder_leaves_the_founder_row` — killed
+    `recruitment.rs:747:42: replace += with *= in
+    RecruitmentTracker::checkpoint` (the founder `deleted` count).
+  - `the_walk_dates_modules_from_their_birth_and_from_every_refresh` — killed
+    `drift.rs:135:30: replace + with * in observe` (the birth's depth) and
+    `drift.rs:189:5: replace record_dispatch with ()`. Both are observable
+    only through the cohort's time-to-first medians, so the test pins a
+    deterministic 8-lineage walk over checkpoints `[1, 20]` in which four
+    cohort modules are dispatched.
 - [x] Benchmark reports stored at
       `docs/progress/features/t13-f01-module-recruitment-observability.json`
       and `-goal.json`, each re-run exactly once at `ea0044d5` after the review
