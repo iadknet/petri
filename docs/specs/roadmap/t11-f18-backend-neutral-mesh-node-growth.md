@@ -624,3 +624,9 @@ Nine deferred cognition indicators remain `Undefined`; no cognition improvement 
   task-usage snapshot, 2026-09-08 before closure edits: **700,483 tokens**
   and **3,288 seconds**. This is task telemetry, not billing or an exact
   final-usage claim; it supersedes the earlier handoff snapshot for recency.
+- Standing floor superseded, 2026-09-09: at T12.F04's closure the user
+  re-based the generation-2,000 changed/all-birth floor from 0.008000 to
+  0.005000 permanently, so the statements above that the floor "remains
+  0.008000 for later features" are historical. The authoritative statement
+  is the dated note in the
+  [T11 track](../../roadmaps/t11-brain-genotype-phenotype-map.md#notes-for-ai-agents).
