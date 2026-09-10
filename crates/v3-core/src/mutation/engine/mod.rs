@@ -120,9 +120,9 @@ impl MutationEngine {
         for _ in 0..event_count {
             node_ids.clear();
             node_ids.extend(genome.nodes.iter().map(|node| node.node_id));
-            // The first pick of an operator that then found no applicable site,
-            // kept only for an event no operator of the domain could accept.
-            let mut exhausted_pick: Option<usize> = None;
+            // Every operator this event tried and threw away for reporting no
+            // applicable site, with the node it first selected (T13.F01).
+            let mut discarded: Vec<(MutationOperator, Option<NodeId>)> = Vec::new();
             // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
             let rb = &config.reachable_bias;
             let (domain, selected) = if rng.gen_bool(config.mesh_layer_probability) {
@@ -154,7 +154,10 @@ impl MutationEngine {
                         food_type_count,
                     );
                     if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
-                        exhausted_pick = exhausted_pick.or(targets.first_pick());
+                        discarded.push((
+                            operator,
+                            targets.first_pick().and_then(|i| node_ids.get(i).copied()),
+                        ));
                         available.swap_remove(idx);
                         continue;
                     }
@@ -193,7 +196,10 @@ impl MutationEngine {
                             let mut targets = selector(rb.vm);
                             let result = apply_vm_event(genome, op, &mut targets, rng, config);
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
-                                exhausted_pick = exhausted_pick.or(targets.first_pick());
+                                discarded.push((
+                                    operator,
+                                    targets.first_pick().and_then(|i| node_ids.get(i).copied()),
+                                ));
                                 available.swap_remove(idx);
                                 continue;
                             }
@@ -230,7 +236,10 @@ impl MutationEngine {
                             let mut targets = selector(rb.graph);
                             let result = apply_graph_event(genome, op, &mut targets, rng, config);
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
-                                exhausted_pick = exhausted_pick.or(targets.first_pick());
+                                discarded.push((
+                                    operator,
+                                    targets.first_pick().and_then(|i| node_ids.get(i).copied()),
+                                ));
                                 available.swap_remove(idx);
                                 continue;
                             }
@@ -274,7 +283,10 @@ impl MutationEngine {
                                 food_type_count,
                             );
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
-                                exhausted_pick = exhausted_pick.or(targets.first_pick());
+                                discarded.push((
+                                    operator,
+                                    targets.first_pick().and_then(|i| node_ids.get(i).copied()),
+                                ));
                                 available.swap_remove(idx);
                                 continue;
                             }
@@ -304,8 +316,12 @@ impl MutationEngine {
                 summary.record_event(MutationEventRecord {
                     domain,
                     operator: None,
-                    target: exhausted_pick.and_then(|index| node_ids.get(index).copied()),
+                    // The first node any discarded operator selected, which is
+                    // what separates "selected, no applicable site" from
+                    // "no eligible node".
+                    target: discarded.iter().find_map(|&(_, pick)| pick),
                     outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
+                    discarded,
                 });
                 continue;
             };
@@ -318,6 +334,7 @@ impl MutationEngine {
                     Ok(reachability) => MutationEventOutcome::Applied(reachability),
                     Err(reason) => MutationEventOutcome::Skipped(reason),
                 },
+                discarded,
             });
 
             match result {

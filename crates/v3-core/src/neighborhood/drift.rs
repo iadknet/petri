@@ -141,7 +141,6 @@ pub fn observe(
             {
                 let reachable = mesh_reachable_nodes(genome);
                 let executed = indices_for_node_ids(genome, ids);
-                let before = genome.nodes.clone();
                 let summary = MutationEngine::apply_mutations_with_food_type_count(
                     genome,
                     mutation,
@@ -153,7 +152,6 @@ pub fn observe(
                 tracker.record_birth(BirthObservation {
                     lineage: lineage as u32,
                     depth: born,
-                    before: &before,
                     after: &genome.nodes,
                     summary: &summary,
                 });
