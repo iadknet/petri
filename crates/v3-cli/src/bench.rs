@@ -3853,7 +3853,7 @@ mod tests {
                 .expect("an opportunity block");
             assert_eq!(
                 opportunities.births,
-                u64::from(reading.depth) * u64::from(drift.lineages)
+                reading.depth * u64::from(drift.lineages)
             );
             assert_eq!(
                 opportunities.attempted,

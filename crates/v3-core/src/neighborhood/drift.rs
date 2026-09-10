@@ -1,6 +1,7 @@
 //! Mutation-only lineage depth observations, isolated from ecological state.
 
 use super::mesh_execution::indices_for_node_ids;
+use super::mesh_execution::MeshExecutionSets;
 use super::recruitment::{BirthObservation, RecruitmentCheckpoint, RecruitmentTracker};
 use super::{births, mesh_execution::MeshExecutionReading, Battery, BirthResult, EvalContext};
 use crate::config::MutationConfig;
@@ -164,8 +165,13 @@ pub fn observe(
         // inside `births::per_birth_result`. The walk's own sets stay on the
         // fixed interval, so checkpoint placement never changes the walk.
         let (row, sets) = observe_checkpoint(&genomes, battery, mutation, context, sizes, depth);
-        for (lineage, (executed, contributing)) in sets.iter().enumerate() {
-            tracker.record_reading(lineage as u32, depth, executed, Some(contributing));
+        for (lineage, lineage_sets) in sets.iter().enumerate() {
+            tracker.record_reading(
+                lineage as u32,
+                depth,
+                &lineage_sets.executed,
+                Some(&lineage_sets.contributing),
+            );
         }
         readings.push(row);
         recruitment.push(tracker.checkpoint(depth));
@@ -212,7 +218,7 @@ fn observe_checkpoint(
     context: &EvalContext,
     sizes: DriftSizes,
     depth: u64,
-) -> (Checkpoint, Vec<(BTreeSet<NodeId>, BTreeSet<NodeId>)>) {
+) -> (Checkpoint, Vec<MeshExecutionSets>) {
     let mut row = Checkpoint {
         depth,
         ..Checkpoint::default()
@@ -221,8 +227,8 @@ fn observe_checkpoint(
     for (index, genome) in genomes.iter().enumerate() {
         let reading =
             battery.mesh_execution_sets(genome, context.runtime, context.shared_memory_decay_rate);
-        sets.push((reading.executed, reading.contributing));
         row.mesh.record(reading.reading);
+        sets.push(reading);
         if index < sizes.birth_lineages as usize {
             let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
             row.births = row.births.merge(&births::per_birth_result(
