@@ -210,6 +210,44 @@ fn copy_provenance_needs_both_a_copy_event_and_matching_content() {
 }
 
 #[test]
+fn copy_provenance_compares_only_against_the_pre_birth_nodes() {
+    // The same birth changed node 0 and added node 1 with the *changed*
+    // content. No pre-birth node carried it, so node 1 is new, not a copy.
+    let before = vec![vm_node(0, 3)];
+    let mut changed_source = RecruitmentTracker::new(1);
+    changed_source.seed_founder(0, &before);
+    birth(
+        &mut changed_source,
+        1,
+        &[vm_node(0, 5), vm_node(1, 5)],
+        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 0)]),
+    );
+    assert_eq!(
+        changed_source.modules().last().map(|m| m.provenance),
+        Some(Provenance::New)
+    );
+
+    // Two nodes added in one birth match each other and nothing that existed
+    // before it, so neither is a copy of a pre-birth node.
+    let mut twins = RecruitmentTracker::new(1);
+    twins.seed_founder(0, &before);
+    birth(
+        &mut twins,
+        1,
+        &[vm_node(0, 3), vm_node(1, 7), vm_node(2, 7)],
+        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 0)]),
+    );
+    assert_eq!(
+        twins
+            .modules()
+            .filter(|m| m.created_depth == 1)
+            .map(|m| m.provenance)
+            .collect::<Vec<_>>(),
+        vec![Provenance::New, Provenance::New]
+    );
+}
+
+#[test]
 fn the_censoring_split_keeps_every_module_in_the_denominator() {
     let founder = vec![vm_node(0, 1)];
     let mut tracker = RecruitmentTracker::new(1);
