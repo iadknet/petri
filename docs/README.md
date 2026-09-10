@@ -1,6 +1,7 @@
 # Petri documentation
 
 - [Roadmap execution workflow](workflow.md) (how a feature gets implemented)
+- [Codex adapter](workflow-codex.md) (Codex model, tool, and worktree substitutions for that contract)
 - [Roadmap contract](roadmaps/README.md)
 - [Roadmap templates](roadmaps/)
 - [Strategy](strategy/)
@@ -13,6 +14,7 @@
 
 Historical, non-executable material:
 
+- [Workflow history and rationale](workflow-history.md) (why the workflow has this shape; dated record of changes)
 - [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md)
 - [Archived PRDs](prds/archive/README.md)
 - [Historical V3 roadmap](archive/v3-program-roadmap.md)

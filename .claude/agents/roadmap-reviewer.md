@@ -21,8 +21,15 @@ on the integration branch itself.
 
 ## What to read
 
-- `docs/roadmaps/README.md` (roadmap contract), the owning track roadmap, and
-  the flat feature spec you were given.
+- `docs/roadmaps/README.md` (roadmap contract); from the owning track roadmap,
+  the feature's own row, its dependency rows, and the track "Notes for AI
+  Agents" entries that name them — not the whole track; and the sections of the
+  flat feature spec the orchestrator's brief names.
+- Read each document once and work from what you read. Do not re-read a spec,
+  track, or workflow to reconfirm something already in your context. When a Bash
+  result is spilled to a `tool-results/*.txt` file, re-run the command narrowed
+  (`grep`, a line range, `--stat`) rather than reading the saved file, and never
+  read the same spilled file twice.
 - The diff of the feature worktree against its merge base with `main`:
   `git -C <worktree> diff $(git -C <worktree> merge-base HEAD main)`, plus
   untracked files from `git -C <worktree> status --porcelain`.
@@ -51,7 +58,12 @@ on the integration branch itself.
   for pure invariants with assertions that do not depend on which cases were
   drawn, POSIX `sh` in shell automation, telemetry derived from applied
   simulation behavior, and no workflow machinery introduced outside
-  `docs/workflow.md`.
+  `docs/workflow.md` and its `workflow-codex.md` / `workflow-history.md`
+  companions.
+- Spec claim spot-check: pick at least three claims from the spec's Verification
+  and Performance sections — a command result, a stored-report path, and a
+  specific number — and check each against the diff or the stored file. Report
+  any claim you could not check as unverified rather than assuming it.
 - Benchmark report and Performance and Goal Impact section when the feature is
   subject to them; a severe compute regression without a predeclared, justified
   cost is P1.
