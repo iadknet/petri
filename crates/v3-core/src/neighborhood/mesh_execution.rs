@@ -24,6 +24,17 @@ pub struct MeshExecutionReading {
     pub hop_cap_hits: usize,
 }
 
+/// A [`MeshExecutionReading`] with the node ids behind two of its counts.
+///
+/// `contributing` is always a subset of `executed`: a node contributes only
+/// when it was dispatched and its bypass changed the battery signature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MeshExecutionSets {
+    pub reading: MeshExecutionReading,
+    pub executed: BTreeSet<NodeId>,
+    pub contributing: BTreeSet<NodeId>,
+}
+
 /// Additive battery-specific node counts, not mutation creation counts.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct BackendNodeCounts {
@@ -191,6 +202,21 @@ impl Battery {
         runtime: &RuntimeConfig,
         decay_rate: f32,
     ) -> MeshExecutionReading {
+        self.mesh_execution_sets(genome, runtime, decay_rate)
+            .reading
+    }
+
+    /// [`Battery::mesh_execution`] with the node ids behind two of its counts:
+    /// the nodes the battery dispatched and, among those, the nodes whose
+    /// static-successor bypass changed the complete signature (T13.F01).
+    /// Same single battery pass and same counts; nothing extra is executed.
+    #[must_use]
+    pub fn mesh_execution_sets(
+        &self,
+        genome: &CreatureGenome,
+        runtime: &RuntimeConfig,
+        decay_rate: f32,
+    ) -> MeshExecutionSets {
         let BatteryObservation {
             executed,
             hop_cap_hits,
@@ -199,6 +225,7 @@ impl Battery {
         } = self.observe(genome, runtime, decay_rate);
         let mut backends = MeshBackendCounts::default();
         let mut knockout_count = 0;
+        let mut contributing = BTreeSet::new();
         for node in &genome.nodes {
             let counts = match node.backend_def {
                 BackendDef::Graph(_) => &mut backends.graph,
@@ -216,17 +243,22 @@ impl Battery {
                     knockout_count += 1;
                 } else {
                     counts.contributing += 1;
+                    contributing.insert(node.node_id);
                 }
             }
         }
-        MeshExecutionReading {
-            backends,
-            total_node_count: genome.nodes.len(),
-            reachable_node_count: mesh_reachable_nodes(genome).len(),
-            executed_node_count: executed.len(),
-            knockout_count,
-            route_varies_with_input: route_varies_with_input(&routes),
-            hop_cap_hits,
+        MeshExecutionSets {
+            reading: MeshExecutionReading {
+                backends,
+                total_node_count: genome.nodes.len(),
+                reachable_node_count: mesh_reachable_nodes(genome).len(),
+                executed_node_count: executed.len(),
+                knockout_count,
+                route_varies_with_input: route_varies_with_input(&routes),
+                hop_cap_hits,
+            },
+            executed,
+            contributing,
         }
     }
 }
@@ -749,5 +781,27 @@ mod tests {
             prop_assert_eq!(g,before);
             }
         }
+    }
+
+    /// The sibling reading exposes ids without moving any count: the executed
+    /// and contributing sets have exactly the sizes the counts report, and
+    /// contributing is a subset of executed.
+    #[test]
+    fn mesh_execution_sets_carry_the_ids_behind_the_unchanged_counts() {
+        let config = RuntimeConfig::default();
+        let battery = Battery::generate(2);
+        let genome =
+            crate::creature::founder::founder_genome(crate::config::FounderProfile::V3Alpha1);
+        let sets = battery.mesh_execution_sets(&genome, &config, 0.0);
+        assert_eq!(sets.reading, battery.mesh_execution(&genome, &config, 0.0));
+        assert_eq!(sets.executed.len(), sets.reading.executed_node_count);
+        assert_eq!(
+            sets.contributing.len(),
+            sets.reading.executed_node_count - sets.reading.knockout_count
+        );
+        assert!(sets.contributing.is_subset(&sets.executed));
+        assert!(!sets.executed.is_empty(), "the founder dispatches nodes");
+        let ids: BTreeSet<_> = genome.nodes.iter().map(|node| node.node_id).collect();
+        assert!(sets.executed.is_subset(&ids));
     }
 }

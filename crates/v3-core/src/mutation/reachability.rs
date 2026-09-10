@@ -140,6 +140,7 @@ pub struct TargetSelector<'a> {
     reachable_bias: f64,
     executed_bias: f64,
     executed_hits: u32,
+    first_pick: Option<usize>,
 }
 
 impl<'a> TargetSelector<'a> {
@@ -156,6 +157,7 @@ impl<'a> TargetSelector<'a> {
             reachable_bias,
             executed_bias,
             executed_hits: 0,
+            first_pick: None,
         }
     }
 
@@ -165,6 +167,14 @@ impl<'a> TargetSelector<'a> {
     #[must_use]
     pub(crate) fn reachable_only(reachable: &'a [usize], reachable_bias: f64) -> Self {
         Self::new(reachable, &[], reachable_bias, 0.0)
+    }
+
+    /// The first node index this selector returned, or `None` when it never
+    /// returned one. Read after the operator runs to record which node a
+    /// mutation event selected (T13.F01); purely observational.
+    #[must_use]
+    pub const fn first_pick(&self) -> Option<usize> {
+        self.first_pick
     }
 
     /// How many targets this selector picked from the executed set.
@@ -203,6 +213,7 @@ impl<'a> TargetSelector<'a> {
                 let pick = rng.gen_range(0..executed_count);
                 let index = nth_intersection(eligible, self.executed, pick);
                 self.executed_hits += 1;
+                self.remember(index);
                 return Some((index, classify_target(index, self.reachable)));
             }
         }
@@ -210,7 +221,13 @@ impl<'a> TargetSelector<'a> {
         if self.executed.binary_search(&picked.0).is_ok() {
             self.executed_hits += 1;
         }
+        self.remember(picked.0);
         Some(picked)
+    }
+
+    /// Keep the first returned index, ignoring every later one.
+    fn remember(&mut self, index: usize) {
+        self.first_pick.get_or_insert(index);
     }
 }
 

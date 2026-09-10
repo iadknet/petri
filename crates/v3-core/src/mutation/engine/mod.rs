@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use rand::Rng;
 
 use crate::config::MutationConfig;
+use crate::contracts::NodeId;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
@@ -11,8 +12,8 @@ use crate::mutation::pressure;
 use crate::mutation::reachability::{ParentExecuted, TargetSelector, TargetSets};
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
-    MutationAddedNodeInputClass, MutationDomain, MutationOperator, MutationSkipReason,
-    MutationSummary, TargetReachability,
+    MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationEventRecord,
+    MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
 };
 use crate::mutation::vm::{VmMutator, VmOperator};
 
@@ -28,6 +29,18 @@ fn requested_event_count(config: &MutationConfig, rng: &mut impl Rng) -> u32 {
         count += 1;
     }
     count
+}
+
+/// What one attempted mutation event produced, once an operator of the drawn
+/// domain accepted the attempt.
+struct SelectedEvent {
+    operator: MutationOperator,
+    tracked_before: Option<CreatureGenome>,
+    result: Result<TargetReachability, MutationSkipReason>,
+    executed_hits: u32,
+    /// The index this event's kept selector first returned, into the genome as
+    /// it stood before the event (T13.F01).
+    first_pick: Option<usize>,
 }
 
 /// Orchestrates genome mutation events for offspring.
@@ -101,12 +114,18 @@ impl MutationEngine {
         };
 
         let mut summary = MutationSummary::zero();
+        // Reused across events: the ids the genome carries before each event,
+        // so a selected index can be recorded as the node it named (T13.F01).
+        let mut node_ids: Vec<NodeId> = Vec::with_capacity(genome.nodes.len());
         for _ in 0..event_count {
+            node_ids.clear();
+            node_ids.extend(genome.nodes.iter().map(|node| node.node_id));
+            // The first pick of an operator that then found no applicable site,
+            // kept only for an event no operator of the domain could accept.
+            let mut exhausted_pick: Option<usize> = None;
             // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
             let rb = &config.reachable_bias;
-            let (domain, operator, tracked_before, result, executed_hits) = if rng
-                .gen_bool(config.mesh_layer_probability)
-            {
+            let (domain, selected) = if rng.gen_bool(config.mesh_layer_probability) {
                 // Layer 1: Mesh (Topology)
                 let mut available: Vec<TopologyOperator> = TopologyOperator::ALL
                     .iter()
@@ -135,25 +154,19 @@ impl MutationEngine {
                         food_type_count,
                     );
                     if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
+                        exhausted_pick = exhausted_pick.or(targets.first_pick());
                         available.swap_remove(idx);
                         continue;
                     }
-                    break Some((operator, tracked_before, result, targets.executed_hits()));
+                    break Some(SelectedEvent {
+                        operator,
+                        tracked_before,
+                        result,
+                        executed_hits: targets.executed_hits(),
+                        first_pick: targets.first_pick(),
+                    });
                 };
-                let Some((operator, tracked_before, result, executed_hits)) = selected else {
-                    summary.record_domain_skip(
-                        MutationDomain::Topology,
-                        MutationSkipReason::NoApplicableTarget,
-                    );
-                    continue;
-                };
-                (
-                    MutationDomain::Topology,
-                    operator,
-                    tracked_before,
-                    result,
-                    executed_hits,
-                )
+                (MutationDomain::Topology, selected)
             } else {
                 // Layer 2: Node-internal (VM, Graph, InputRef — equal probability)
                 match rng.gen_range(0u8..3) {
@@ -180,31 +193,19 @@ impl MutationEngine {
                             let mut targets = selector(rb.vm);
                             let result = apply_vm_event(genome, op, &mut targets, rng, config);
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
+                                exhausted_pick = exhausted_pick.or(targets.first_pick());
                                 available.swap_remove(idx);
                                 continue;
                             }
-                            break Some((
+                            break Some(SelectedEvent {
                                 operator,
                                 tracked_before,
                                 result,
-                                targets.executed_hits(),
-                            ));
+                                executed_hits: targets.executed_hits(),
+                                first_pick: targets.first_pick(),
+                            });
                         };
-                        let Some((operator, tracked_before, result, executed_hits)) = selected
-                        else {
-                            summary.record_domain_skip(
-                                MutationDomain::Vm,
-                                MutationSkipReason::NoApplicableTarget,
-                            );
-                            continue;
-                        };
-                        (
-                            MutationDomain::Vm,
-                            operator,
-                            tracked_before,
-                            result,
-                            executed_hits,
-                        )
+                        (MutationDomain::Vm, selected)
                     }
                     1 => {
                         let mut available: Vec<GraphOperator> = GraphOperator::ALL
@@ -229,31 +230,19 @@ impl MutationEngine {
                             let mut targets = selector(rb.graph);
                             let result = apply_graph_event(genome, op, &mut targets, rng, config);
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
+                                exhausted_pick = exhausted_pick.or(targets.first_pick());
                                 available.swap_remove(idx);
                                 continue;
                             }
-                            break Some((
+                            break Some(SelectedEvent {
                                 operator,
                                 tracked_before,
                                 result,
-                                targets.executed_hits(),
-                            ));
+                                executed_hits: targets.executed_hits(),
+                                first_pick: targets.first_pick(),
+                            });
                         };
-                        let Some((operator, tracked_before, result, executed_hits)) = selected
-                        else {
-                            summary.record_domain_skip(
-                                MutationDomain::Graph,
-                                MutationSkipReason::NoApplicableTarget,
-                            );
-                            continue;
-                        };
-                        (
-                            MutationDomain::Graph,
-                            operator,
-                            tracked_before,
-                            result,
-                            executed_hits,
-                        )
+                        (MutationDomain::Graph, selected)
                     }
                     _ => {
                         let mut available: Vec<InputRefOperator> = InputRefOperator::ALL
@@ -285,35 +274,51 @@ impl MutationEngine {
                                 food_type_count,
                             );
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
+                                exhausted_pick = exhausted_pick.or(targets.first_pick());
                                 available.swap_remove(idx);
                                 continue;
                             }
-                            break Some((
+                            break Some(SelectedEvent {
                                 operator,
                                 tracked_before,
                                 result,
-                                targets.executed_hits(),
-                            ));
+                                executed_hits: targets.executed_hits(),
+                                first_pick: targets.first_pick(),
+                            });
                         };
-                        let Some((operator, tracked_before, result, executed_hits)) = selected
-                        else {
-                            summary.record_domain_skip(
-                                MutationDomain::InputRef,
-                                MutationSkipReason::NoApplicableTarget,
-                            );
-                            continue;
-                        };
-                        (
-                            MutationDomain::InputRef,
-                            operator,
-                            tracked_before,
-                            result,
-                            executed_hits,
-                        )
+                        (MutationDomain::InputRef, selected)
                     }
                 }
             };
+            let Some(SelectedEvent {
+                operator,
+                tracked_before,
+                result,
+                executed_hits,
+                first_pick,
+            }) = selected
+            else {
+                // Every operator of the drawn domain reported no applicable
+                // site, so the attempt belongs to the domain, not an operator.
+                summary.record_domain_skip(domain, MutationSkipReason::NoApplicableTarget);
+                summary.record_event(MutationEventRecord {
+                    domain,
+                    operator: None,
+                    target: exhausted_pick.and_then(|index| node_ids.get(index).copied()),
+                    outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
+                });
+                continue;
+            };
             summary.record_attempt(domain, operator);
+            summary.record_event(MutationEventRecord {
+                domain,
+                operator: Some(operator),
+                target: first_pick.and_then(|index| node_ids.get(index).copied()),
+                outcome: match result {
+                    Ok(reachability) => MutationEventOutcome::Applied(reachability),
+                    Err(reason) => MutationEventOutcome::Skipped(reason),
+                },
+            });
 
             match result {
                 Ok(reachability) => {

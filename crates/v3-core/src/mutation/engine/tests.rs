@@ -4,7 +4,10 @@ use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ExecuteGate, OutputSink, OutputSinkKind};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
-use crate::mutation::{MutationAddedNodeInputClass, MutationDomain, MutationOperator};
+use crate::mutation::{
+    MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationEventRecord,
+    MutationOperator, MutationSkipReason, MutationSummary,
+};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -1380,4 +1383,162 @@ fn production_supply_keeps_all_operator_families_enabled() {
     assert!(VmOperator::ALL.iter().all(|op| op.weight() > 0));
     assert!(GraphOperator::ALL.iter().all(|op| op.weight() > 0));
     assert!(InputRefOperator::ALL.iter().all(|op| op.weight() > 0));
+}
+
+/// A configuration that draws exactly one node-internal event per birth.
+fn single_node_internal_event_config() -> MutationConfig {
+    let mut config = SimulationConfig::default().mutation;
+    config.mutation_probability = 1.0;
+    config.per_birth_mutation_events_min = 1;
+    config.per_birth_mutation_events_max = 1;
+    config.mesh_layer_probability = 0.0;
+    config
+}
+
+/// The first seed in `0..2_000` whose single event lands on `domain`, with
+/// that birth's summary.
+fn first_event_in_domain(
+    genome: &CreatureGenome,
+    config: &MutationConfig,
+    domain: MutationDomain,
+) -> MutationSummary {
+    for seed in 0u64..2_000 {
+        let summary =
+            MutationEngine::apply_mutations(&mut genome.clone(), config, &[0], &mut rng(seed));
+        if summary
+            .events
+            .first()
+            .is_some_and(|event| event.domain == domain)
+        {
+            return summary;
+        }
+    }
+    panic!("no seed drew the {domain:?} domain");
+}
+
+#[test]
+fn a_selected_module_with_no_applicable_site_is_recorded_with_its_node_id() {
+    // Size pressure at the cap leaves only decreasing Graph operators, and an
+    // edgeless Graph node offers none of them a site: every operator selects
+    // the node and then reports NoApplicableTarget.
+    let mut config = single_node_internal_event_config();
+    config.genome_size_pressure_enabled = true;
+    config.genome_size_cap = 1;
+    let genome = single_graph_genome_with_inputs(vec![]);
+    let summary = first_event_in_domain(&genome, &config, MutationDomain::Graph);
+    assert_eq!(summary.attempted_events, 1);
+    assert_eq!(summary.skipped_events, 1);
+    assert_eq!(
+        summary.events,
+        vec![MutationEventRecord {
+            domain: MutationDomain::Graph,
+            operator: None,
+            target: Some(NodeId::new(0)),
+            outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
+        }]
+    );
+}
+
+#[test]
+fn an_event_with_no_eligible_node_records_no_target() {
+    // The same domain on a genome carrying no Graph node: nothing is ever
+    // selected, so the record carries no target at all.
+    let config = single_node_internal_event_config();
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: Vec::new(),
+            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+                register_count: 1,
+                constants: Vec::new(),
+                program: vec![crate::creature::genome::VmInstruction::Halt],
+            }),
+            targets: Vec::new(),
+        }],
+    };
+    let summary = first_event_in_domain(&genome, &config, MutationDomain::Graph);
+    assert_eq!(
+        summary.events,
+        vec![MutationEventRecord {
+            domain: MutationDomain::Graph,
+            operator: None,
+            target: None,
+            outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
+        }]
+    );
+}
+
+#[test]
+fn an_applied_event_records_the_node_the_genome_carried_before_it() {
+    let config = forced_topology_config();
+    let founder = v3alpha1_founder_genome();
+    let before: Vec<NodeId> = founder.nodes.iter().map(|node| node.node_id).collect();
+    let mut applied = 0;
+    for seed in 0u64..200 {
+        let summary =
+            MutationEngine::apply_mutations(&mut founder.clone(), &config, &[0], &mut rng(seed));
+        for event in &summary.events {
+            if let Some(target) = event.target {
+                assert!(before.contains(&target), "{event:?}");
+            }
+            if event.outcome.is_applied() {
+                applied += 1;
+                assert!(event.operator.is_some());
+            }
+        }
+    }
+    assert!(applied > 0, "the fixture must apply some events");
+}
+
+proptest::proptest! {
+    /// Every attempted event leaves exactly one record, and the records
+    /// reconcile with the applied/skipped totals and each operator's funnel.
+    #[test]
+    fn event_records_agree_with_the_totals_and_the_operator_funnels(
+        seed in proptest::prelude::any::<u64>(),
+        min in 1u32..6,
+        extra in 0u32..6,
+        mesh_layer in 0.0f64..=1.0,
+        restricted in proptest::prelude::any::<bool>(),
+    ) {
+        let base = SimulationConfig::default().mutation;
+        let config = MutationConfig {
+            mutation_probability: 1.0,
+            per_birth_mutation_events_min: min,
+            per_birth_mutation_events_max: min + extra,
+            mesh_layer_probability: mesh_layer,
+            genome_size_pressure_enabled: restricted,
+            genome_size_cap: if restricted { 1 } else { base.genome_size_cap },
+            ..base
+        };
+        let summary = MutationEngine::apply_mutations(
+            &mut v3alpha1_founder_genome(), &config, &[0], &mut rng(seed));
+
+        proptest::prop_assert_eq!(summary.events.len(), summary.attempted_events as usize);
+        let applied = summary.events.iter().filter(|e| e.outcome.is_applied()).count();
+        proptest::prop_assert_eq!(applied, summary.applied_events as usize);
+        proptest::prop_assert_eq!(
+            summary.events.len() - applied, summary.skipped_events as usize);
+
+        for (&operator, funnel) in &summary.operator_funnel_by_operator {
+            let owned: Vec<_> = summary.events.iter()
+                .filter(|e| e.operator == Some(operator)).collect();
+            proptest::prop_assert_eq!(owned.len() as u64, funnel.attempted);
+            proptest::prop_assert_eq!(
+                owned.iter().filter(|e| e.outcome.is_applied()).count() as u64, funnel.applied);
+            proptest::prop_assert_eq!(
+                owned.iter().filter(|e| !e.outcome.is_applied()).count() as u64, funnel.skipped);
+        }
+        // A record naming no operator is a domain-exhausted skip, and it is
+        // the only kind of record that carries no operator.
+        for event in &summary.events {
+            proptest::prop_assert!(event.operator.is_some() || matches!(
+                event.outcome,
+                MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget)));
+            proptest::prop_assert_eq!(
+                event.operator.map(MutationOperator::domain).unwrap_or(event.domain),
+                event.domain);
+        }
+    }
 }
