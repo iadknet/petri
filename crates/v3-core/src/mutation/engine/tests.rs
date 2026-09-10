@@ -1507,6 +1507,7 @@ fn a_discarded_operator_stays_visible_when_a_later_operator_applied() {
     let config = single_node_internal_event_config();
     let genome = single_graph_genome_with_inputs(vec![]);
     let mut seen = 0;
+    let mut edge_operator_discarded = 0;
     for seed in 0u64..2_000 {
         let summary =
             MutationEngine::apply_mutations(&mut genome.clone(), &config, &[0], &mut rng(seed));
@@ -1528,14 +1529,27 @@ fn a_discarded_operator_stays_visible_when_a_later_operator_applied() {
             event
                 .discarded
                 .iter()
-                .any(
+                .all(
                     |&(operator, pick)| operator.domain() == MutationDomain::Graph
                         && pick == Some(NodeId::new(0))
                 ),
-            "the discarded edge operator selected the edgeless module: {event:?}"
+            "every discarded operator selected the edgeless module: {event:?}"
         );
+        edge_operator_discarded += u32::from(event.discarded.iter().any(|&(operator, _)| {
+            matches!(
+                operator,
+                MutationOperator::GraphRemoveGraphEdge
+                    | MutationOperator::GraphRetargetGraphEdge
+                    | MutationOperator::GraphAlterGraphEdgeWeight
+                    | MutationOperator::GraphCopyEdgeBundle
+            )
+        }));
     }
     assert!(seen > 0, "no seed applied after discarding an operator");
+    assert!(
+        edge_operator_discarded > 0,
+        "no applied event discarded an operator that needs an edge"
+    );
 }
 
 #[test]

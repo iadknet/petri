@@ -565,30 +565,38 @@ impl RecruitmentTracker {
         let state = &mut self.lineages[lineage as usize];
         state.opportunities.record(summary);
         let mut previous = std::mem::take(&mut state.previous);
-        let mut changed: Vec<NodeId> = Vec::new();
-        let mut created: Vec<(NodeId, ModuleBackend, Provenance)> = Vec::new();
-        for node in after {
-            if let Some(slot) = previous.get_mut(&node.node_id) {
-                if slot != node {
-                    changed.push(node.node_id);
-                    slot.clone_from(node);
+        let mut changed: Vec<usize> = Vec::new();
+        let mut created: Vec<(usize, Provenance)> = Vec::new();
+        // Classify against the untouched snapshot: provenance asks whether
+        // some *pre-birth* node carried this content, so nothing is written
+        // back until the whole birth has been read.
+        for (index, node) in after.iter().enumerate() {
+            match previous.get(&node.node_id) {
+                Some(slot) if slot == node => {}
+                Some(_) => changed.push(index),
+                None => {
+                    let copied = copy_applied
+                        && previous
+                            .values()
+                            .any(|existing| existing.backend_def == node.backend_def);
+                    created.push((
+                        index,
+                        if copied {
+                            Provenance::Copy
+                        } else {
+                            Provenance::New
+                        },
+                    ));
                 }
-                continue;
             }
-            let copied = copy_applied
-                && previous
-                    .values()
-                    .any(|existing| existing.backend_def == node.backend_def);
-            created.push((
-                node.node_id,
-                ModuleBackend::from(&node.backend_def),
-                if copied {
-                    Provenance::Copy
-                } else {
-                    Provenance::New
-                },
-            ));
-            previous.insert(node.node_id, node.clone());
+        }
+        for &index in &changed {
+            if let Some(slot) = previous.get_mut(&after[index].node_id) {
+                slot.clone_from(&after[index]);
+            }
+        }
+        for &(index, _) in &created {
+            previous.insert(after[index].node_id, after[index].clone());
         }
         // Every id of `after` is now in the snapshot, so a longer snapshot is
         // the only way this birth deleted anything.
@@ -610,11 +618,19 @@ impl RecruitmentTracker {
         for node in deleted {
             self.delete(lineage, node, depth);
         }
-        for node in changed {
+        for index in changed {
+            let node = after[index].node_id;
             self.fact_reached(lineage, node, CohortFact::InternalChange, depth);
         }
-        for (node, backend, provenance) in created {
-            self.create(lineage, node, depth, backend, provenance);
+        for (index, provenance) in created {
+            let node = &after[index];
+            self.create(
+                lineage,
+                node.node_id,
+                depth,
+                ModuleBackend::from(&node.backend_def),
+                provenance,
+            );
         }
     }
 
