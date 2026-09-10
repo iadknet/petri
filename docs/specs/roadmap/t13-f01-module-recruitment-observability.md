@@ -193,9 +193,9 @@ which also names the sixteen focused tests.
       `ok, 24 passed; 0 failed` at `af5dc3a1`, re-run at `ab00bb07` after the
       self-review commit and at `afa6ae5c` after the 2026-09-10 remediation,
       each with the same result.
-- [x] `make check` re-run on the final code: exit 0 at `MAKECHECK_COMMIT`,
-      the commit that landed the remediation's documents and re-measured
-      reports.
+- [x] `make check` re-run on the final code: exit 0 at `25dd21c9`
+      (log `/tmp/t13-f01-check3.log`), the last code commit of the 2026-09-10
+      remediation; every later commit on this branch changes documents only.
 - [x] Focused tests, re-run at `afa6ae5c`: `cargo test -p v3-core`
       (1280 + 24 + 19 + 13 + 10 + 7 + 4 + 3 + 2 + 1 + 0 passed, 0 failed) and
       `cargo test -p v3-cli` (70 + 18 + 11 + 11 passed, 0 failed), plus
