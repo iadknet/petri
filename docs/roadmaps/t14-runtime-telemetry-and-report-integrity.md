@@ -31,7 +31,7 @@ the microscope: it records applied behavior and adds no mechanism.
 
 ## Executable Features
 
-- [ ] **T14.F01 — Closure Comparison and Indicator Coverage Integrity** — Depends on: None
+- [x] **T14.F01 — Closure Comparison and Indicator Coverage Integrity** — Depends on: None
   - Goal: A closure's verdict means what it says: the report compares against an earlier closure or records that it has none, and every wired indicator is visible to the no-regression rule.
 - [ ] **T14.F02 — Existing Counter Transfer** — Depends on: T14.F01
   - Goal: Counters the simulation already maintains — production mutation supply and targeting, mutation lifecycle outcomes, predation, failed eats, energy-exhausted dispatches — become readable at closure instead of being discarded each run.
