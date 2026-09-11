@@ -1034,3 +1034,88 @@ fn world_inspect_prints_readings_writes_a_preview_and_rejects_a_missing_recipe()
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// An explicit `--compare` path is the reference even for a profile whose
+/// default selection is empty: reference selection reads the explicit paths
+/// first and only falls back to the profile default when none were given.
+#[test]
+fn an_explicit_compare_path_is_preferred_over_the_profile_default_selection() {
+    let sweep = |out: &std::path::Path, compare: Option<&std::path::Path>| {
+        let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"));
+        command
+            .args([
+                "bench",
+                "--profile",
+                "sweep",
+                "--width",
+                "16",
+                "--height",
+                "16",
+                "--founders",
+                "4",
+                "--seeds",
+                "11",
+                "--ticks",
+                "5",
+                "--feature",
+                "t14-f01-explicit-compare-check",
+                "--out",
+            ])
+            .arg(out);
+        if let Some(compare) = compare {
+            command.arg("--compare").arg(compare);
+        }
+        command
+            .current_dir(repo_root())
+            .output()
+            .expect("the v3-cli binary must run")
+    };
+
+    let reference_out = std::env::temp_dir().join(format!(
+        "t14-f01-explicit-compare-reference-{}.json",
+        std::process::id()
+    ));
+    let current_out = std::env::temp_dir().join(format!(
+        "t14-f01-explicit-compare-current-{}.json",
+        std::process::id()
+    ));
+    let reference_run = sweep(&reference_out, None);
+    assert!(
+        reference_run.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&reference_run.stderr)
+    );
+
+    let compared = sweep(&current_out, Some(&reference_out));
+    assert!(
+        compared.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&compared.stderr)
+    );
+    let report: bench::Report = serde_json::from_str(
+        &std::fs::read_to_string(&current_out).expect("the compared run must be written"),
+    )
+    .expect("the sweep report must parse");
+    let _ = std::fs::remove_file(&reference_out);
+    let _ = std::fs::remove_file(&current_out);
+
+    assert_eq!(
+        report
+            .comparison
+            .references
+            .iter()
+            .map(|reference| reference.path.as_str())
+            .collect::<Vec<_>>(),
+        vec![reference_out.to_str().expect("UTF-8 reference path")],
+        "the explicit --compare path must be the only reference"
+    );
+    assert_eq!(
+        report.comparison.reference_absence, None,
+        "an explicit reference leaves no absence cause"
+    );
+    let stdout = String::from_utf8_lossy(&compared.stdout);
+    assert!(
+        !stdout.contains("no comparison reference:"),
+        "an explicit reference prints no absence line; stdout: {stdout}"
+    );
+}

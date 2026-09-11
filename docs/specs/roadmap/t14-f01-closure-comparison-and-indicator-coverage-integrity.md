@@ -125,7 +125,7 @@ round-trip.
 
 ## Verification
 
-- [x] Focused tests: `cargo test -p v3-cli` -> 75/11/19/11 passed, 0 failed;
+- [x] Focused tests: `cargo test -p v3-cli` -> 75/11/20/11 passed, 0 failed;
       test names in the readings file.
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` -> clean.
 - [ ] `make check` on the final feature code -> exit 0, commit recorded.
@@ -137,8 +137,19 @@ round-trip.
 - [x] Stored gate and goal reports carry the three version tokens (the gate
       profile leaves `lineage_diversity` and `memory_sensitivity` `Undefined`,
       so its report carries the reachable-structure token only).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred.
+- [x] Fresh run (`MUTANTS_ITERATE=0 make rust-mutants`), output at
+  `/Users/istefanek/.local/share/petri-tools/mutants/t14-f01/mutants.out`. No
+  timeouts. A confirming incremental pass reused that directory afterwards, so
+  its `missed.txt` is superseded; the fresh run's survivor list is the table
+  below.
+
+  ```
+  47 mutants tested in 4m: 1 missed, 34 caught, 12 unviable
+  ```
+
+  | Survivor | Resolution |
+  | --- | --- |
+  | `crates/v3-cli/src/main.rs:373:24: delete ! in run_bench` | killed by `an_explicit_compare_path_is_preferred_over_the_profile_default_selection` in `crates/v3-cli/tests/bench.rs`, which asserts an explicit `--compare` path is the sole reference of a sweep run whose profile default is empty |
 - [x] Benchmark reports stored at
       `docs/progress/features/t14-f01-closure-comparison-and-indicator-coverage-integrity.json`
       and `-goal.json`.
