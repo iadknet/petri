@@ -367,29 +367,30 @@ fn run_bench(args: BenchArgs) {
         }
     };
 
-    let mut reference_paths = args.baseline.clone();
-    reference_paths.extend(args.compare.clone());
-    if reference_paths.is_empty() && args.profile == BenchProfile::Gate {
-        let series_path = std::path::PathBuf::from("docs/progress/benchmark-series.json");
-        match bench::default_gate_references(&series_path) {
-            Ok(paths) => reference_paths = paths,
-            Err(e) => {
-                eprintln!("error: {e}");
-                std::process::exit(1);
-            }
+    let mut explicit_paths = args.baseline.clone();
+    explicit_paths.extend(args.compare.clone());
+    let series_path = std::path::Path::new("docs/progress/benchmark-series.json");
+    let selection = if !explicit_paths.is_empty() {
+        Ok(bench::ReferenceSelection {
+            paths: explicit_paths,
+            absence: None,
+        })
+    } else if args.profile == BenchProfile::Gate {
+        bench::default_gate_references(series_path)
+    } else if args.profile == BenchProfile::Goal {
+        bench::default_goal_references(series_path)
+    } else {
+        Ok(bench::ReferenceSelection::default())
+    };
+    let selection = match selection {
+        Ok(selection) => selection,
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::exit(1);
         }
-    } else if reference_paths.is_empty() && args.profile == BenchProfile::Goal {
-        let series_path = std::path::PathBuf::from("docs/progress/benchmark-series.json");
-        match bench::default_goal_references(&series_path) {
-            Ok(paths) => reference_paths = paths,
-            Err(e) => {
-                eprintln!("error: {e}");
-                std::process::exit(1);
-            }
-        }
-    }
+    };
 
-    let severe = match bench::apply_comparisons(&mut report, &reference_paths) {
+    let severe = match bench::apply_comparisons(&mut report, &selection, &out_path) {
         Ok(severe) => severe,
         Err(e) => {
             eprintln!("error: {e}");
@@ -412,6 +413,9 @@ fn run_bench(args: BenchArgs) {
     }
 
     println!("wrote {}", out_path.display());
+    if let Some(cause) = &report.comparison.reference_absence {
+        println!("no comparison reference: {cause}");
+    }
     for reference in &report.comparison.references {
         println!(
             "compared against {}: severe={}",

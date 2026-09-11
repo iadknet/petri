@@ -516,8 +516,17 @@ fn undefined_memory_sensitivity() -> Indicator<MemorySensitivity> {
     Indicator::Undefined(UNDEFINED.to_string())
 }
 
+/// Definition tokens for the indicators that carry one. A definition change
+/// moves the token here, so a stored report names the definition it measured.
+pub const LINEAGE_DIVERSITY_VERSION: &str = "lineage-diversity-v1";
+pub const MEMORY_SENSITIVITY_VERSION: &str = "memory-sensitivity-v1";
+pub const REACHABLE_STRUCTURE_VERSION: &str = "reachable-structure-v1";
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LineageDiversity {
+    /// Absent in reports stored before T14.F01: the token was not measured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
     pub per_seed: Vec<LineageDiversitySeed>,
 }
 
@@ -530,6 +539,9 @@ pub struct LineageDiversitySeed {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MemorySensitivity {
+    /// Absent in reports stored before T14.F01: the token was not measured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
     pub snapshot_timing: String,
     pub scramble_algorithm: String,
     pub per_seed: Vec<MemorySensitivitySeed>,
@@ -1464,6 +1476,9 @@ pub struct PersistenceSample {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructureSizeDistribution {
+    /// Absent in reports stored before T14.F01: the token was not measured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
     pub min: u32,
     pub p25: u32,
     pub median: u32,
@@ -1603,6 +1618,11 @@ pub struct SeedWallClock {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Comparison {
     pub references: Vec<ReferenceComparison>,
+    /// Why `references` is empty, when it is: one of the fixed cause strings
+    /// built by [`apply_comparisons`] and the series-index resolvers. Absent
+    /// whenever at least one reference was compared, and in historical reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_absence: Option<String>,
     pub severe: bool,
 }
 
@@ -2253,6 +2273,7 @@ fn percentile(sorted: &[u32], p: f64) -> u32 {
 fn structure_size_distribution(mut pooled: Vec<u32>) -> StructureSizeDistribution {
     if pooled.is_empty() {
         return StructureSizeDistribution {
+            version: Some(REACHABLE_STRUCTURE_VERSION.to_string()),
             min: 0,
             p25: 0,
             median: 0,
@@ -2265,6 +2286,7 @@ fn structure_size_distribution(mut pooled: Vec<u32>) -> StructureSizeDistributio
     let sum: u64 = pooled.iter().map(|&v| u64::from(v)).sum();
     let mean = sum as f64 / pooled.len() as f64;
     StructureSizeDistribution {
+        version: Some(REACHABLE_STRUCTURE_VERSION.to_string()),
         min: pooled[0],
         p25: percentile(&pooled, 25.0),
         median: percentile(&pooled, 50.0),
@@ -2419,6 +2441,7 @@ fn assemble_goal_indicators(
         reachable_structure_size_distribution: structure_size_distribution(pooled_complexities),
         lineage_diversity: if observe_goal_indicators {
             Indicator::Defined(LineageDiversity {
+                version: Some(LINEAGE_DIVERSITY_VERSION.to_string()),
                 per_seed: lineage_diversity_per_seed,
             })
         } else {
@@ -2426,6 +2449,7 @@ fn assemble_goal_indicators(
         },
         memory_sensitivity: if observe_goal_indicators {
             Indicator::Defined(MemorySensitivity {
+                version: Some(MEMORY_SENSITIVITY_VERSION.to_string()),
                 snapshot_timing: "after the final executed tick, before any observation action"
                     .to_string(),
                 scramble_algorithm: "rotate_left(1) across 16 shared-memory slots".to_string(),
@@ -2913,6 +2937,58 @@ fn by_cause_readings(blocked: Option<&MovesBlockedByCause>) -> [(String, Option<
 }
 
 /// Every reading a world-set comparison follows for one case, in report order.
+/// The per-seed goal indicators that live beside the cases rather than inside
+/// them, read from the row whose seed is the case's run seed. Every one is
+/// `None` when its indicator is `Undefined` or the row is absent.
+fn per_seed_indicator_readings(
+    indicators: &GoalIndicators,
+    seed: u64,
+) -> [(String, Option<f64>); 6] {
+    let lineage = match &indicators.lineage_diversity {
+        Indicator::Defined(reading) => reading.per_seed.iter().find(|row| row.seed == seed),
+        Indicator::Undefined(_) => None,
+    };
+    let memory = match &indicators.memory_sensitivity {
+        Indicator::Defined(reading) => reading.per_seed.iter().find(|row| row.seed == seed),
+        Indicator::Undefined(_) => None,
+    };
+    // Matched on the outer row's seed; the component rows carry their own.
+    let temporal = match &indicators.temporal_memory_sensitivity {
+        Indicator::Defined(reading) => reading.per_seed.iter().find(|row| row.seed == seed),
+        Indicator::Undefined(_) => None,
+    };
+    let temporal_fraction =
+        |component: fn(&TemporalMemorySensitivitySeed) -> &MemorySensitivitySeed| {
+            temporal.and_then(|row| parse_reading(&component(row).different_from_either_fraction))
+        };
+    [
+        (
+            "lineage_shannon_entropy_nats".to_string(),
+            lineage.and_then(|row| parse_reading(&row.shannon_entropy_nats)),
+        ),
+        (
+            "surviving_founder_clade_count".to_string(),
+            lineage.map(|row| row.surviving_founder_clade_count as f64),
+        ),
+        (
+            "memory_different_from_either_fraction".to_string(),
+            memory.and_then(|row| parse_reading(&row.different_from_either_fraction)),
+        ),
+        (
+            "temporal_memory_previous_slots_different_from_either_fraction".to_string(),
+            temporal_fraction(|row| &row.previous_slots),
+        ),
+        (
+            "temporal_memory_persisted_outputs_different_from_either_fraction".to_string(),
+            temporal_fraction(|row| &row.persisted_outputs),
+        ),
+        (
+            "temporal_memory_operator_state_different_from_either_fraction".to_string(),
+            temporal_fraction(|row| &row.operator_state),
+        ),
+    ]
+}
+
 /// An absent case, an unmeasured indicator, and a zero denominator all read as
 /// `None` rather than as a zero the delta would then compare against.
 fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)> {
@@ -2935,14 +3011,6 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
         .per_seed
         .iter()
         .find(|row| row.seed == seed);
-    let lineage = match &indicators.lineage_diversity {
-        Indicator::Defined(reading) => reading.per_seed.iter().find(|row| row.seed == seed),
-        Indicator::Undefined(_) => None,
-    };
-    let memory = match &indicators.memory_sensitivity {
-        Indicator::Defined(reading) => reading.per_seed.iter().find(|row| row.seed == seed),
-        Indicator::Undefined(_) => None,
-    };
     let neighborhood = match &observation.mutational_neighborhood {
         Indicator::Defined(reading) => Some(reading),
         Indicator::Undefined(_) => None,
@@ -3027,23 +3095,12 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
     readings.extend(by_cause_readings(
         observation.tracking.moves_blocked_total_by_cause.as_ref(),
     ));
+    readings.push((
+        "blocked_move_fraction".to_string(),
+        parse_reading(&observation.fractions.blocked_move_fraction),
+    ));
+    readings.extend(per_seed_indicator_readings(indicators, seed));
     readings.extend([
-        (
-            "blocked_move_fraction".to_string(),
-            parse_reading(&observation.fractions.blocked_move_fraction),
-        ),
-        (
-            "lineage_shannon_entropy_nats".to_string(),
-            lineage.and_then(|row| parse_reading(&row.shannon_entropy_nats)),
-        ),
-        (
-            "surviving_founder_clade_count".to_string(),
-            lineage.map(|row| row.surviving_founder_clade_count as f64),
-        ),
-        (
-            "memory_different_from_either_fraction".to_string(),
-            memory.and_then(|row| parse_reading(&row.different_from_either_fraction)),
-        ),
         (
             "drift_changed_per_all_births_at_2000".to_string(),
             match &observation.drift_depth {
@@ -3263,23 +3320,99 @@ pub fn compare_against_path(
     Ok(compare_against(current, reference_path, &reference))
 }
 
-/// Compare `current` against every reference path, folding the results into
-/// `current.comparison`, and return whether any reference was severe.
+/// The reference paths a run compares against, with the cause when the
+/// selection is empty, so the reason travels with the (lack of) paths.
+/// Explicit `--baseline`/`--compare` paths carry no absence.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReferenceSelection {
+    pub paths: Vec<PathBuf>,
+    pub absence: Option<String>,
+}
+
+impl ReferenceSelection {
+    fn absent(cause: String) -> Self {
+        Self {
+            paths: Vec::new(),
+            absence: Some(cause),
+        }
+    }
+}
+
+/// Whether `path` and `output` name the same file: canonical paths when both
+/// exist, otherwise the lexically normalized paths. The output file normally
+/// does not exist yet when a comparison runs, so the lexical rule is the one
+/// that usually decides.
+fn resolves_to_same_file(path: &Path, output: &Path) -> bool {
+    if let (Ok(a), Ok(b)) = (path.canonicalize(), output.canonicalize()) {
+        return a == b;
+    }
+    normalize_lexically(path) == normalize_lexically(output)
+}
+
+/// Join a relative path to the current directory and resolve `.` and `..`
+/// components without touching the filesystem.
+fn normalize_lexically(path: &Path) -> PathBuf {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(path))
+            .unwrap_or_else(|_| path.to_path_buf())
+    };
+    let mut normalized = PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                normalized.pop();
+            }
+            other => normalized.push(other),
+        }
+    }
+    normalized
+}
+
+/// Compare `current` against every selected reference that is not the report's
+/// own output path, folding the results into `current.comparison`, and return
+/// whether any reference was severe. A skipped self-reference is never an
+/// error and never severe; when nothing remains to compare, the comparison
+/// records why.
 pub fn apply_comparisons(
     current: &mut Report,
-    reference_paths: &[PathBuf],
+    selection: &ReferenceSelection,
+    out_path: &Path,
 ) -> Result<bool, String> {
-    let mut references = Vec::with_capacity(reference_paths.len());
+    let mut references = Vec::with_capacity(selection.paths.len());
     let mut overall_severe = false;
-    for path in reference_paths {
+    let mut skipped_self = false;
+    for path in &selection.paths {
+        if resolves_to_same_file(path, out_path) {
+            skipped_self = true;
+            continue;
+        }
         let entry = compare_against_path(current, path)?;
         if entry.severe {
             overall_severe = true;
         }
         references.push(entry);
     }
+    let reference_absence = if references.is_empty() {
+        Some(selection.absence.clone().unwrap_or_else(|| {
+            if skipped_self {
+                format!(
+                    "the only candidate reference is this report's own output path {}",
+                    out_path.display()
+                )
+            } else {
+                "no reference paths were given".to_string()
+            }
+        }))
+    } else {
+        None
+    };
     current.comparison = Comparison {
         references,
+        reference_absence,
         severe: overall_severe,
     };
     Ok(overall_severe)
@@ -3304,48 +3437,69 @@ pub struct BenchmarkSeriesIndex {
 
 /// Resolve the gate profile's default comparison references from the series
 /// index: the epoch baseline and the last closed report (if different).
-/// Returns an empty list when the series index does not exist yet (this
-/// feature's own first report, which becomes the epoch baseline).
-pub fn default_gate_references(series_index_path: &Path) -> Result<Vec<PathBuf>, String> {
-    if !series_index_path.exists() {
-        return Ok(Vec::new());
-    }
-    let content = std::fs::read_to_string(series_index_path)
-        .map_err(|e| format!("failed to read {}: {e}", series_index_path.display()))?;
-    let index: BenchmarkSeriesIndex = serde_json::from_str(&content)
-        .map_err(|e| format!("failed to parse {}: {e}", series_index_path.display()))?;
-    references_from_series(&index.gate)
+/// An absent series index (this feature's own first report, which becomes the
+/// epoch baseline) is an empty selection carrying that cause.
+pub fn default_gate_references(series_index_path: &Path) -> Result<ReferenceSelection, String> {
+    let Some(index) = read_series_index(series_index_path)? else {
+        return Ok(ReferenceSelection::absent(no_series_index(
+            series_index_path,
+        )));
+    };
+    Ok(references_from_series(&index.gate))
 }
 
 /// Resolve the goal profile's comparison references from its distinct series.
 /// Its initial baseline does not exist until that first goal report is written,
-/// so the first invocation deliberately has no comparison.
-pub fn default_goal_references(series_index_path: &Path) -> Result<Vec<PathBuf>, String> {
+/// so the first invocation deliberately has no comparison and says so.
+pub fn default_goal_references(series_index_path: &Path) -> Result<ReferenceSelection, String> {
+    let Some(index) = read_series_index(series_index_path)? else {
+        return Ok(ReferenceSelection::absent(no_series_index(
+            series_index_path,
+        )));
+    };
+    let Some(series) = index.goal_worlds.as_ref() else {
+        return Ok(ReferenceSelection::absent(no_epoch_baseline(
+            GOAL_WORLD_SET,
+        )));
+    };
+    if !Path::new(&series.epoch_baseline).exists() {
+        return Ok(ReferenceSelection::absent(no_epoch_baseline(
+            &series.series,
+        )));
+    }
+    Ok(references_from_series(series))
+}
+
+fn read_series_index(series_index_path: &Path) -> Result<Option<BenchmarkSeriesIndex>, String> {
     if !series_index_path.exists() {
-        return Ok(Vec::new());
+        return Ok(None);
     }
     let content = std::fs::read_to_string(series_index_path)
         .map_err(|e| format!("failed to read {}: {e}", series_index_path.display()))?;
-    let index: BenchmarkSeriesIndex = serde_json::from_str(&content)
-        .map_err(|e| format!("failed to parse {}: {e}", series_index_path.display()))?;
-    let Some(series) = index.goal_worlds.as_ref() else {
-        return Ok(Vec::new());
-    };
-    let baseline = PathBuf::from(&series.epoch_baseline);
-    if !baseline.exists() {
-        return Ok(Vec::new());
-    }
-    references_from_series(series)
+    serde_json::from_str(&content)
+        .map(Some)
+        .map_err(|e| format!("failed to parse {}: {e}", series_index_path.display()))
 }
 
-fn references_from_series(index: &SeriesIndex) -> Result<Vec<PathBuf>, String> {
+fn no_series_index(series_index_path: &Path) -> String {
+    format!("no series index at {}", series_index_path.display())
+}
+
+fn no_epoch_baseline(series: &str) -> String {
+    format!("series {series} has no stored epoch baseline yet")
+}
+
+fn references_from_series(index: &SeriesIndex) -> ReferenceSelection {
     let mut paths = vec![PathBuf::from(&index.epoch_baseline)];
     if let Some(last) = index.closed.last() {
         if last != &index.epoch_baseline {
             paths.push(PathBuf::from(last));
         }
     }
-    Ok(paths)
+    ReferenceSelection {
+        paths,
+        absence: None,
+    }
 }
 
 /// Read the simulation crate's dependency identity, not lockfile package order.
@@ -5598,6 +5752,283 @@ mod tests {
             case_readings(&report, "a world no report ran").is_empty(),
             "an unknown case has no readings at all"
         );
+    }
+
+    /// The three temporal memory fractions are compared per case by their fixed
+    /// names, read from the outer row whose seed is the case seed, and sit
+    /// immediately after `memory_different_from_either_fraction`.
+    #[test]
+    fn temporal_readings_follow_the_outer_row_seed_and_sit_after_memory() {
+        let mut report = small_world_set_report();
+        let Indicator::Defined(temporal) = &mut report
+            .deterministic
+            .goal_indicators
+            .temporal_memory_sensitivity
+        else {
+            panic!("world set defines temporal memory sensitivity");
+        };
+        // Three different divisors per component, and the inner component
+        // seeds deliberately mismatched, so the reading is proven to follow
+        // the outer row's seed and the right component.
+        for row in &mut temporal.per_seed {
+            let seeded = f64::from(row.seed as u32);
+            row.previous_slots.seed = row.seed + 100;
+            row.previous_slots.different_from_either_fraction = six(seeded / 8.0);
+            row.persisted_outputs.seed = row.seed + 200;
+            row.persisted_outputs.different_from_either_fraction = six(seeded / 16.0);
+            row.operator_state.seed = row.seed + 300;
+            row.operator_state.different_from_either_fraction = six(seeded / 32.0);
+        }
+
+        let case = &report.deterministic.profile.cases[1];
+        let (name, seeded) = (case.name.clone(), f64::from(case.seed as u32));
+        let readings = case_readings(&report, &name);
+        let value = |reading: &str| {
+            readings
+                .iter()
+                .find(|(candidate, _)| candidate == reading)
+                .unwrap_or_else(|| panic!("{reading} must be a compared reading"))
+                .1
+        };
+        assert_eq!(
+            value("temporal_memory_previous_slots_different_from_either_fraction"),
+            Some(seeded / 8.0)
+        );
+        assert_eq!(
+            value("temporal_memory_persisted_outputs_different_from_either_fraction"),
+            Some(seeded / 16.0)
+        );
+        assert_eq!(
+            value("temporal_memory_operator_state_different_from_either_fraction"),
+            Some(seeded / 32.0)
+        );
+        let names: Vec<&str> = readings.iter().map(|(name, _)| name.as_str()).collect();
+        let memory_index = names
+            .iter()
+            .position(|name| *name == "memory_different_from_either_fraction")
+            .expect("memory reading is compared");
+        assert_eq!(
+            &names[memory_index + 1..memory_index + 4],
+            &[
+                "temporal_memory_previous_slots_different_from_either_fraction",
+                "temporal_memory_persisted_outputs_different_from_either_fraction",
+                "temporal_memory_operator_state_different_from_either_fraction",
+            ],
+            "the temporal readings sit immediately after the memory reading"
+        );
+    }
+
+    /// A report whose temporal memory indicator is `Undefined` still lists the
+    /// three temporal readings, each unmeasured, so a comparison against a
+    /// report that did measure them labels the gap instead of dropping it.
+    #[test]
+    fn temporal_readings_are_unmeasured_when_the_indicator_is_undefined() {
+        let mut report = small_world_set_report();
+        report
+            .deterministic
+            .goal_indicators
+            .temporal_memory_sensitivity = undefined_temporal_memory_sensitivity();
+        let case = report.deterministic.profile.cases[0].name.clone();
+        let readings = case_readings(&report, &case);
+        for name in [
+            "temporal_memory_previous_slots_different_from_either_fraction",
+            "temporal_memory_persisted_outputs_different_from_either_fraction",
+            "temporal_memory_operator_state_different_from_either_fraction",
+        ] {
+            let (_, value) = readings
+                .iter()
+                .find(|(reading, _)| reading == name)
+                .unwrap_or_else(|| panic!("{name} must be a compared reading"));
+            assert_eq!(*value, None, "{name} is unmeasured, not dropped or zero");
+        }
+    }
+
+    /// Comparing a report against its own output path — whether the path was
+    /// given explicitly or spelled differently — records the self-reference
+    /// cause and no comparison entry. A different explicit reference alongside
+    /// the output path is still compared, and an empty explicit selection names
+    /// its own cause.
+    #[test]
+    fn self_reference_is_skipped_and_its_absence_recorded() {
+        let scratch_dir =
+            std::env::temp_dir().join(format!("t14-f01-self-reference-{}", std::process::id()));
+        std::fs::create_dir_all(&scratch_dir).expect("create scratch directory");
+        let out_path = scratch_dir.join("this-report.json");
+        let mut report = build_report(&small_profile("gate"), "t14-f01-self-reference")
+            .expect("a valid profile");
+        let self_cause = format!(
+            "the only candidate reference is this report's own output path {}",
+            out_path.display()
+        );
+
+        // The output file does not exist yet: a `--baseline` naming it through
+        // a `..` component matches by lexical normalization.
+        let spelled_differently = scratch_dir
+            .join("elsewhere")
+            .join("..")
+            .join("this-report.json");
+        assert!(!out_path.exists());
+        let explicit = ReferenceSelection {
+            paths: vec![spelled_differently],
+            absence: None,
+        };
+        let severe = apply_comparisons(&mut report, &explicit, &out_path)
+            .expect("a skipped self-reference is never an error");
+        assert!(!severe);
+        assert!(report.comparison.references.is_empty());
+        assert_eq!(
+            report.comparison.reference_absence.as_deref(),
+            Some(self_cause.as_str())
+        );
+        assert!(!report.comparison.severe);
+
+        // The output file exists from an earlier run: canonical paths match,
+        // and a genuine reference next to it is still compared.
+        std::fs::write(&out_path, report_json_pretty(&report)).expect("write earlier report");
+        let other = scratch_dir.join("other.json");
+        std::fs::write(&other, report_json_pretty(&report)).expect("write other reference");
+        let mixed = ReferenceSelection {
+            paths: vec![other.clone(), out_path.clone()],
+            absence: None,
+        };
+        apply_comparisons(&mut report, &mixed, &out_path).expect("the other reference parses");
+        assert_eq!(report.comparison.references.len(), 1);
+        assert_eq!(
+            report.comparison.references[0].path,
+            other.display().to_string()
+        );
+        assert_eq!(report.comparison.reference_absence, None);
+
+        let only_self = ReferenceSelection {
+            paths: vec![out_path.clone()],
+            absence: None,
+        };
+        apply_comparisons(&mut report, &only_self, &out_path).expect("nothing to compare");
+        assert!(report.comparison.references.is_empty());
+        assert_eq!(
+            report.comparison.reference_absence.as_deref(),
+            Some(self_cause.as_str())
+        );
+
+        apply_comparisons(&mut report, &ReferenceSelection::default(), &out_path)
+            .expect("nothing to compare");
+        assert!(report.comparison.references.is_empty());
+        assert_eq!(
+            report.comparison.reference_absence.as_deref(),
+            Some("no reference paths were given")
+        );
+
+        // The absence field is serialized only when set, so a report with
+        // references never carries it and a historical block loads as `None`.
+        let json = serde_json::to_value(&report.comparison).unwrap();
+        assert_eq!(
+            json["reference_absence"],
+            serde_json::Value::String("no reference paths were given".to_string())
+        );
+        let historical: Comparison =
+            serde_json::from_str(r#"{"references":[],"severe":false}"#).unwrap();
+        assert_eq!(historical.reference_absence, None);
+        assert!(!serde_json::to_string(&historical)
+            .unwrap()
+            .contains("reference_absence"));
+        std::fs::remove_dir_all(&scratch_dir).expect("remove scratch directory");
+    }
+
+    /// A new report stamps every versioned indicator with its definition token,
+    /// pooled and per case.
+    #[test]
+    fn new_reports_carry_indicator_version_tokens() {
+        let report = small_world_set_report();
+        let indicators = &report.deterministic.goal_indicators;
+        let Indicator::Defined(lineage) = &indicators.lineage_diversity else {
+            panic!("world set defines lineage diversity");
+        };
+        assert_eq!(lineage.version.as_deref(), Some(LINEAGE_DIVERSITY_VERSION));
+        assert_eq!(LINEAGE_DIVERSITY_VERSION, "lineage-diversity-v1");
+        let Indicator::Defined(memory) = &indicators.memory_sensitivity else {
+            panic!("world set defines memory sensitivity");
+        };
+        assert_eq!(memory.version.as_deref(), Some(MEMORY_SENSITIVITY_VERSION));
+        assert_eq!(MEMORY_SENSITIVITY_VERSION, "memory-sensitivity-v1");
+        assert_eq!(
+            indicators
+                .reachable_structure_size_distribution
+                .version
+                .as_deref(),
+            Some(REACHABLE_STRUCTURE_VERSION)
+        );
+        assert_eq!(REACHABLE_STRUCTURE_VERSION, "reachable-structure-v1");
+        assert!(!indicators.cases.is_empty());
+        for case in &indicators.cases {
+            assert_eq!(
+                case.reachable_structure_size_distribution
+                    .as_ref()
+                    .expect("a new report measures every case")
+                    .version
+                    .as_deref(),
+                Some(REACHABLE_STRUCTURE_VERSION)
+            );
+        }
+        assert_eq!(
+            structure_size_distribution(Vec::new()).version.as_deref(),
+            Some(REACHABLE_STRUCTURE_VERSION),
+            "an empty population still names the definition it was measured under"
+        );
+    }
+
+    /// T12.F04's stored goal report predates the version tokens: it loads with
+    /// `version` absent on all three indicators and re-serializes those blocks
+    /// exactly as stored, with no `version` key.
+    #[test]
+    fn historical_goal_report_loads_without_versions_and_reserializes_them_absent() {
+        let stored: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/progress/features/t12-f04-baseline-world-set-goal.json"
+        ))
+        .unwrap();
+        let report: Report = serde_json::from_value(stored.clone()).unwrap();
+        let indicators = &report.deterministic.goal_indicators;
+        let stored_indicators = &stored["deterministic"]["goal_indicators"];
+
+        let Indicator::Defined(lineage) = &indicators.lineage_diversity else {
+            panic!("the stored report defines lineage diversity");
+        };
+        assert_eq!(lineage.version, None);
+        assert_eq!(
+            serde_json::to_value(lineage).unwrap(),
+            stored_indicators["lineage_diversity"]
+        );
+        let Indicator::Defined(memory) = &indicators.memory_sensitivity else {
+            panic!("the stored report defines memory sensitivity");
+        };
+        assert_eq!(memory.version, None);
+        assert_eq!(
+            serde_json::to_value(memory).unwrap(),
+            stored_indicators["memory_sensitivity"]
+        );
+        assert_eq!(
+            indicators.reachable_structure_size_distribution.version,
+            None
+        );
+        assert_eq!(
+            serde_json::to_value(&indicators.reachable_structure_size_distribution).unwrap(),
+            stored_indicators["reachable_structure_size_distribution"]
+        );
+        assert!(!indicators.cases.is_empty());
+        for (case, stored_case) in indicators
+            .cases
+            .iter()
+            .zip(stored_indicators["cases"].as_array().unwrap())
+        {
+            let distribution = case
+                .reachable_structure_size_distribution
+                .as_ref()
+                .expect("the stored report measured every case");
+            assert_eq!(distribution.version, None);
+            assert_eq!(
+                serde_json::to_value(distribution).unwrap(),
+                stored_case["reachable_structure_size_distribution"]
+            );
+        }
     }
 
     /// The world set runs exactly the seeds its recipes carry, in their order,

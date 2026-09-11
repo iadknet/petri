@@ -131,17 +131,27 @@ fn gate_profile_has_no_severe_regression_against_series_references() {
          generate it with `make bench PROFILE=gate FEATURE=<slug>` first"
     );
 
-    let reference_paths = bench::default_gate_references(&series_path)
+    let selection = bench::default_gate_references(&series_path)
         .expect("series index must parse and reference existing reports");
     assert!(
-        !reference_paths.is_empty(),
+        !selection.paths.is_empty(),
         "series index must declare at least one reference report"
     );
 
-    let resolved_paths: Vec<PathBuf> = reference_paths
-        .iter()
-        .map(|p| repo_root().join(p))
-        .collect();
+    let resolved = bench::ReferenceSelection {
+        paths: selection
+            .paths
+            .iter()
+            .map(|p| repo_root().join(p))
+            .collect(),
+        absence: None,
+    };
+    // An output path that is provably not a reference, so the self-reference
+    // filter can never empty the selection here.
+    let out_path = std::env::temp_dir().join(format!(
+        "t10-f10-regression-check-{}.json",
+        std::process::id()
+    ));
 
     // Same reduced-fixture rationale as the byte-identity test above: the
     // work-counter and profile comparisons below do not depend on
@@ -155,9 +165,15 @@ fn gate_profile_has_no_severe_regression_against_series_references() {
     let mut report =
         bench::build_report(&params, "t10-f10-regression-check").expect("a valid profile");
 
-    let severe = bench::apply_comparisons(&mut report, &resolved_paths)
+    let severe = bench::apply_comparisons(&mut report, &resolved, &out_path)
         .expect("every declared reference report must exist and parse");
 
+    assert_eq!(
+        report.comparison.references.len(),
+        resolved.paths.len(),
+        "every series reference is compared; none is mistaken for the output path"
+    );
+    assert_eq!(report.comparison.reference_absence, None);
     for reference in &report.comparison.references {
         for counter in &reference.counters {
             assert_ne!(
@@ -661,12 +677,129 @@ fn gate_and_goal_series_select_only_their_own_references() {
 
     assert_eq!(
         bench::default_gate_references(&index_path).expect("read gate references"),
-        vec![gate_epoch.clone(), gate_latest]
+        bench::ReferenceSelection {
+            paths: vec![gate_epoch.clone(), gate_latest],
+            absence: None,
+        }
     );
     assert_eq!(
         bench::default_goal_references(&index_path).expect("read goal references"),
-        vec![goal_epoch]
+        bench::ReferenceSelection {
+            paths: vec![goal_epoch],
+            absence: None,
+        }
     );
+    std::fs::remove_dir_all(&scratch_dir).expect("remove scratch directory");
+}
+
+/// Each way the series index can yield no reference names its own cause, and
+/// the cause travels through `apply_comparisons` into the report instead of a
+/// silent empty comparison. The third cause — the index naming the output path
+/// itself — is the T12.F04 defect.
+#[test]
+fn series_index_absence_causes_are_each_recorded() {
+    let scratch_dir =
+        std::env::temp_dir().join(format!("t14-f01-series-absence-{}", std::process::id()));
+    std::fs::create_dir_all(&scratch_dir).expect("create scratch directory");
+    let out_path = scratch_dir.join("this-report-goal.json");
+    let mut report = tiny_report();
+
+    // 1. No series index at all.
+    let missing_index = scratch_dir.join("benchmark-series.json");
+    let expected_missing = format!("no series index at {}", missing_index.display());
+    let gate =
+        bench::default_gate_references(&missing_index).expect("absent index is not an error");
+    assert_eq!(
+        gate,
+        bench::ReferenceSelection {
+            paths: vec![],
+            absence: Some(expected_missing.clone()),
+        }
+    );
+    let goal =
+        bench::default_goal_references(&missing_index).expect("absent index is not an error");
+    assert_eq!(goal.absence.as_deref(), Some(expected_missing.as_str()));
+    bench::apply_comparisons(&mut report, &gate, &out_path).expect("nothing to compare");
+    assert!(report.comparison.references.is_empty());
+    assert_eq!(
+        report.comparison.reference_absence.as_deref(),
+        Some(expected_missing.as_str())
+    );
+    assert!(!report.comparison.severe);
+
+    // 2. The goal-worlds series has no stored epoch baseline yet: either the
+    //    series is missing from the index or its baseline file does not exist.
+    let write_index = |goal_worlds: Option<bench::SeriesIndex>| {
+        let index = bench::BenchmarkSeriesIndex {
+            gate: bench::SeriesIndex {
+                series: "gate-v1".to_string(),
+                epoch_baseline: "unused".to_string(),
+                closed: vec![],
+            },
+            goal: bench::SeriesIndex {
+                series: "goal-v1".to_string(),
+                epoch_baseline: "unused".to_string(),
+                closed: vec![],
+            },
+            goal_worlds,
+        };
+        std::fs::write(
+            &missing_index,
+            serde_json::to_string(&index).expect("serialize series index"),
+        )
+        .expect("write series index");
+    };
+    let expected_no_baseline = "series goal-worlds-v1 has no stored epoch baseline yet";
+    write_index(None);
+    let goal = bench::default_goal_references(&missing_index).expect("index parses");
+    assert_eq!(goal.paths, Vec::<PathBuf>::new());
+    assert_eq!(goal.absence.as_deref(), Some(expected_no_baseline));
+    write_index(Some(bench::SeriesIndex {
+        series: "goal-worlds-v1".to_string(),
+        epoch_baseline: scratch_dir.join("never-written.json").display().to_string(),
+        closed: vec![],
+    }));
+    let goal = bench::default_goal_references(&missing_index).expect("index parses");
+    assert_eq!(goal.paths, Vec::<PathBuf>::new());
+    assert_eq!(goal.absence.as_deref(), Some(expected_no_baseline));
+    bench::apply_comparisons(&mut report, &goal, &out_path).expect("nothing to compare");
+    assert!(report.comparison.references.is_empty());
+    assert_eq!(
+        report.comparison.reference_absence.as_deref(),
+        Some(expected_no_baseline)
+    );
+
+    // 3. The index names this report's own output path (written by an earlier
+    //    run), so the selection carries it and the comparison drops it.
+    std::fs::write(&out_path, bench::report_json_pretty(&report)).expect("write earlier report");
+    write_index(Some(bench::SeriesIndex {
+        series: "goal-worlds-v1".to_string(),
+        epoch_baseline: out_path.display().to_string(),
+        closed: vec![out_path.display().to_string()],
+    }));
+    let goal = bench::default_goal_references(&missing_index).expect("index parses");
+    assert_eq!(
+        goal,
+        bench::ReferenceSelection {
+            paths: vec![out_path.clone()],
+            absence: None,
+        }
+    );
+    let severe = bench::apply_comparisons(&mut report, &goal, &out_path)
+        .expect("a skipped self-reference is not an error");
+    assert!(!severe);
+    assert!(report.comparison.references.is_empty());
+    assert_eq!(
+        report.comparison.reference_absence.as_deref(),
+        Some(
+            format!(
+                "the only candidate reference is this report's own output path {}",
+                out_path.display()
+            )
+            .as_str()
+        )
+    );
+
     std::fs::remove_dir_all(&scratch_dir).expect("remove scratch directory");
 }
 
