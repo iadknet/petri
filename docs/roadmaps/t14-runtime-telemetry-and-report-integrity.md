@@ -1,6 +1,6 @@
 # T14 — Runtime Telemetry and Report Integrity
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-09-11
 **Master**: [Program Roadmap](../roadmap.md)
 
