@@ -58,7 +58,7 @@ series index named the report before it was written.
 - `Comparison` gains `reference_absence: Option<String>`
   (`#[serde(default, skip_serializing_if = "Option::is_none")]`), set only
   when `references` is empty and naming the case by its cause. The recorded
-  strings are fixed, one per cause, so the three cases stay distinguishable:
+  strings are fixed, one per cause, so the four cases stay distinguishable:
   - `no series index at <path>`
   - `series <name> has no stored epoch baseline yet` (the goal series before
     its first report exists)
@@ -187,6 +187,12 @@ epoch unchanged.
 
 ## Notes for AI Agents
 
+- Deferred: review P3 — `per_seed_indicator_readings` returns a fixed-size
+  `[(String, Option<f64>); 6]` (`crates/v3-cli/src/bench.rs`), so a later T14
+  per-seed reading is a two-place edit; make it a `Vec` when one is added.
+- Deferred: review P3 — the historical round-trip test `include_str!`s the whole
+  T12.F04 goal report into every lib-test compile; read it from
+  `CARGO_MANIFEST_DIR` if the compile cost becomes noticeable.
 - Exception: both stored reports were produced from the code committed as the
   self-review commit while their `git_revision` field reads the preceding
   build commit `de2559bd`; the self-review edits are mechanical refactors that
