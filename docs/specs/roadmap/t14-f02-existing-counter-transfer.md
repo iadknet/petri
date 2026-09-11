@@ -130,7 +130,7 @@ checkpoint sample carries exactly the field set it carried before this feature.
 
 - [x] Focused tests or checks: `cargo test -p v3-core --test viability` ->
       24 passed, 0 failed; `cargo test -p v3-core` -> 1362 passed and 3 ignored across eight
-      binaries, 0 failed; `cargo test -p v3-cli` -> 119 passed across four
+      binaries, 0 failed; `cargo test -p v3-cli` -> 120 passed across four
       binaries, 0 failed; `cargo test -p v3-server` -> 143 passed across three
       binaries, 0 failed (all via `make check`, which runs the per-binary targets);
       `make check` -> exit 0 on the final code.
@@ -142,7 +142,10 @@ checkpoint sample carries exactly the field set it carried before this feature.
       survivor list stays here; `docs/workflow.md` requires it in the spec.
 - [x] Benchmark report stored at
       `docs/progress/features/t14-f02-existing-counter-transfer.json` and
-      `...-goal.json`.
+      `...-goal.json`. Both were regenerated on the post-review code, because
+      remediation changed what a report contains and a stored report must be
+      what the shipped code produces; the once-per-closure rule of 2026-09-05
+      governs the second goal run for the `deterministic` block, not this.
 - [x] Second goal run for the `deterministic` block: `Not applicable` — the
       goal profile runs once per closure and cross-process reproducibility is
       covered by `reproducibility.rs` inside `make check` (user decision,
@@ -178,9 +181,11 @@ identical to T14.F01's stored goal report (0.000000 %), so the predeclared
 direction of **none** holds; the one `flag` level, `plasticity_updates`
 +40.886836 % against T12.F04, is the value T14.F01 already stored against that
 same reference and is not moved by this feature. Caps: evolved neighborhood
-478.71 ms of 180,000, founder neighborhood 108.97 ms of 10,000, goal profile
-492.0 s of the 15-minute budget. All six transferred blocks are present and
-non-null in all three world cases of the stored goal report.
+579.48 ms of 180,000, founder neighborhood 130.82 ms of 10,000, goal profile
+503.9 s of the 15-minute budget. All six transferred blocks are present and
+non-null in the end-of-run block of all three world cases and absent from every
+checkpoint sample, whose key set matches T14.F01's stored report; the goal
+report is 74,587 lines and 3.11 MB.
 
 - Reports: [gate](../../progress/features/t14-f02-existing-counter-transfer.json),
   [goal](../../progress/features/t14-f02-existing-counter-transfer-goal.json).
