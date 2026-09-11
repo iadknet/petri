@@ -1348,23 +1348,18 @@ pub struct MutationSupply {
     pub not_applicable_target_total: u64,
 }
 
-/// The integer fields of `v3_core::simulation::stats::MutationValueTotals`:
-/// what the carriers of an applied birth mutation did while they lived. The
-/// float fields are excluded by the track's F02 note — `final_energy_sum` is
-/// structurally zero, and the score sums are the composite the observation
-/// contract leaves out.
+/// The applied-behavior integer sums of
+/// `v3_core::simulation::stats::MutationValueTotals`: what the carriers of an
+/// applied birth mutation did while they lived. The score sums are the
+/// composite the observation contract leaves out, the six classification
+/// counters are bucketings of `viability_score` and go with it, and
+/// `final_energy_sum` is zero on every benchmark path.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MutationOutcomeTotals {
     pub carriers_observed_total: u64,
     pub survival_ticks_sum: u64,
     pub offspring_spawned_sum: u64,
-    pub helpful_total: u64,
-    pub neutral_total: u64,
-    pub detrimental_total: u64,
-    pub confidence_low_total: u64,
-    pub confidence_medium_total: u64,
-    pub confidence_high_total: u64,
     pub survived_short_horizon_total: u64,
     pub survived_long_horizon_total: u64,
     pub reproduced_once_total: u64,
@@ -1380,12 +1375,6 @@ impl From<&v3_core::simulation::stats::MutationValueTotals> for MutationOutcomeT
             carriers_observed_total: totals.carriers_observed_total,
             survival_ticks_sum: totals.survival_ticks_sum,
             offspring_spawned_sum: totals.offspring_spawned_sum,
-            helpful_total: totals.helpful_total,
-            neutral_total: totals.neutral_total,
-            detrimental_total: totals.detrimental_total,
-            confidence_low_total: totals.confidence_low_total,
-            confidence_medium_total: totals.confidence_medium_total,
-            confidence_high_total: totals.confidence_high_total,
             survived_short_horizon_total: totals.survived_short_horizon_total,
             survived_long_horizon_total: totals.survived_long_horizon_total,
             reproduced_once_total: totals.reproduced_once_total,
@@ -1453,34 +1442,56 @@ pub struct WorldTracking {
     pub moves_blocked_barrier_with_barrier_neighbor_by_reader_state: ByReaderState<u64>,
     /// Eat actions that found no food, indexed like
     /// [`WorldTracking::typed_eats_total`] by the food type the action named.
-    /// Absent — not zeroed — in a report stored before T14.F02.
-    #[serde(default)]
+    /// Absent — not zeroed — in a report stored before T14.F02, and absent
+    /// from every checkpoint sample, which carries only the fields above.
+    /// The same holds for each transferred block that follows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub typed_eats_failed_total: Option<Vec<u64>>,
     /// Mesh dispatches that stopped because the creature ran out of energy
     /// mid-chain.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mesh_dispatches_energy_exhausted_total: Option<u64>,
     /// The mutation supply this case produced and where its events aimed.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mutation_supply: Option<MutationSupply>,
     /// What the carriers of an applied birth mutation did while they lived,
     /// pooled across every operator.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mutation_outcome_summary: Option<MutationOutcomeTotals>,
     /// The same lifetime totals split by the operator that produced them,
     /// keyed by `MutationOperator::as_key`.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mutation_value_totals_by_operator: Option<BTreeMap<String, MutationOutcomeTotals>>,
     /// What the population's predation attempts did.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predation: Option<PredationTracking>,
 }
 
+/// Counts keyed by ordinary food type, as a `Vec` indexed by type id: a dense
+/// order fixed by the configured food types, so no `HashMap` iteration order
+/// reaches the report.
+fn by_food_type(
+    sim: &v3_core::simulation::Simulation,
+    counts: &std::collections::HashMap<v3_core::config::OrdinaryFoodTypeId, u64>,
+) -> Vec<u64> {
+    use v3_core::config::OrdinaryFoodTypeId;
+    (0..sim.config.world.food.types.len())
+        .map(|index| {
+            counts
+                .get(&OrdinaryFoodTypeId::new(index as u16))
+                .copied()
+                .unwrap_or(0)
+        })
+        .collect()
+}
+
 impl WorldTracking {
-    /// Read the cumulative counters out of a running simulation.
+    /// Read the cumulative per-world counters out of a running simulation.
+    /// The T14.F02 transferred blocks are left absent here; only the
+    /// end-of-run per-case block carries them, via
+    /// [`WorldTracking::with_transferred_counters`].
     fn observe(sim: &v3_core::simulation::Simulation) -> Self {
         use std::collections::HashMap;
-        use v3_core::config::OrdinaryFoodTypeId;
         use v3_core::simulation::actions::{BarrierReaderState, MoveBlockedCause};
         let stats = &sim.stats;
         let by_reader_state = |counts: &HashMap<BarrierReaderState, u64>| {
@@ -1502,18 +1513,8 @@ impl WorldTracking {
             occupied: blocked(MoveBlockedCause::Occupied),
             out_of_bounds: blocked(MoveBlockedCause::OutOfBounds),
         };
-        let by_food_type = |counts: &HashMap<OrdinaryFoodTypeId, u64>| {
-            (0..sim.config.world.food.types.len())
-                .map(|index| {
-                    counts
-                        .get(&OrdinaryFoodTypeId::new(index as u16))
-                        .copied()
-                        .unwrap_or(0)
-                })
-                .collect::<Vec<u64>>()
-        };
         Self {
-            typed_eats_total: by_food_type(&stats.eat_actions_applied_total_by_type),
+            typed_eats_total: by_food_type(sim, &stats.eat_actions_applied_total_by_type),
             food_density_total: stats
                 .last_tick_food_total_density_by_type
                 .iter()
@@ -1531,7 +1532,26 @@ impl WorldTracking {
             moves_blocked_barrier_with_barrier_neighbor_by_reader_state: by_reader_state(
                 &stats.move_blocked_barrier_with_barrier_neighbor_total_by_reader_state,
             ),
-            typed_eats_failed_total: Some(by_food_type(&stats.eat_actions_failed_total_by_type)),
+            typed_eats_failed_total: None,
+            mesh_dispatches_energy_exhausted_total: None,
+            mutation_supply: None,
+            mutation_outcome_summary: None,
+            mutation_value_totals_by_operator: None,
+            predation: None,
+        }
+    }
+
+    /// Add the T14.F02 transferred counters, which only the end-of-run
+    /// per-case block carries. Checkpoint samples stay at the shape they had
+    /// before T14.F02, so a stored report keeps one copy of these totals per
+    /// case rather than one per sampled tick.
+    fn with_transferred_counters(self, sim: &v3_core::simulation::Simulation) -> Self {
+        let stats = &sim.stats;
+        Self {
+            typed_eats_failed_total: Some(by_food_type(
+                sim,
+                &stats.eat_actions_failed_total_by_type,
+            )),
             mesh_dispatches_energy_exhausted_total: Some(
                 stats.mesh_dispatches_energy_exhausted_total,
             ),
@@ -1563,6 +1583,7 @@ impl WorldTracking {
                     .map(|(result, count)| (result.as_key().to_string(), *count))
                     .collect(),
             }),
+            ..self
         }
     }
 
@@ -2052,7 +2073,7 @@ fn run_one_seed(
     }
     let wall_clock_ms = millis(start.elapsed().saturating_sub(connectivity_duration));
 
-    let tracking = WorldTracking::observe(&sim);
+    let tracking = WorldTracking::observe(&sim).with_transferred_counters(&sim);
     let persistence = persistence.finish(seed);
     let complexities: Vec<u32> = sim
         .creatures
@@ -5224,7 +5245,7 @@ mod tests {
                     break;
                 }
             }
-            let expected = WorldTracking::observe(&sim);
+            let expected = WorldTracking::observe(&sim).with_transferred_counters(&sim);
             assert_eq!(case.tracking, expected, "case {}", case.case.name);
             assert_eq!(
                 case.tracking.typed_eats_total.len(),
@@ -5273,7 +5294,7 @@ mod tests {
             carriers_observed_total: 5,
             survival_ticks_sum: 120,
             offspring_spawned_sum: 4,
-            // Excluded from the report: structurally zero at its only site.
+            // Excluded from the report: zero on every benchmark path.
             final_energy_sum: 9.5,
             ..MutationValueTotals::default()
         };
@@ -5297,7 +5318,7 @@ mod tests {
             .eat_actions_failed_total_by_type
             .insert(OrdinaryFoodTypeId::default(), 6);
 
-        let tracking = WorldTracking::observe(&sim);
+        let tracking = WorldTracking::observe(&sim).with_transferred_counters(&sim);
 
         assert_eq!(
             tracking.mutation_supply,
@@ -5343,6 +5364,45 @@ mod tests {
         );
         assert_eq!(tracking.mesh_dispatches_energy_exhausted_total, Some(14));
         assert_eq!(tracking.typed_eats_failed_total, Some(vec![6]));
+    }
+
+    /// A checkpoint sample carries exactly the keys it carried before T14.F02:
+    /// the transferred blocks are not merely null there, they are absent, and
+    /// only the end-of-run per-case block writes them.
+    #[test]
+    fn checkpoint_tracking_omits_every_transferred_block() {
+        use v3_core::simulation::seed_simulation;
+
+        const TRANSFERRED_KEYS: [&str; 6] = [
+            "typed_eats_failed_total",
+            "mesh_dispatches_energy_exhausted_total",
+            "mutation_supply",
+            "mutation_outcome_summary",
+            "mutation_value_totals_by_operator",
+            "predation",
+        ];
+
+        let sim = seed_simulation(SimulationConfig::default(), 7);
+        let checkpoint = serde_json::to_value(WorldTracking::observe(&sim)).expect("serializable");
+        let end_of_run =
+            serde_json::to_value(WorldTracking::observe(&sim).with_transferred_counters(&sim))
+                .expect("serializable");
+
+        for key in TRANSFERRED_KEYS {
+            assert!(
+                checkpoint.get(key).is_none(),
+                "checkpoint samples must not carry {key}"
+            );
+            assert!(
+                end_of_run.get(key).is_some_and(|value| !value.is_null()),
+                "the end-of-run block must carry {key}"
+            );
+        }
+        assert_eq!(
+            end_of_run.as_object().expect("an object").len(),
+            checkpoint.as_object().expect("an object").len() + TRANSFERRED_KEYS.len(),
+            "the two shapes differ only by the transferred blocks"
+        );
     }
 
     /// The world-set tracking fractions read against the totals they came
