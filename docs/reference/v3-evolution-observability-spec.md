@@ -53,8 +53,6 @@ Implementations must expose, at minimum:
 - `mutation_events_applied_total_by_domain`
 - `mutation_events_attempted_total_by_operator`
 - `mutation_events_applied_total_by_operator`
-- `mutation_events_applied_total_semantic_noop`
-- `mutation_events_applied_total_semantic_change`
 
 ### Reproduction counters
 
@@ -103,9 +101,6 @@ Mutation accounting invariants:
   These events are counted in `attempted_total` and `attempted_by_domain`
   but not in `attempted_by_operator` since no operator was selected.)
 - `sum(mutation_events_applied_total_by_operator) =
-  mutation_events_applied_total`
-- `mutation_events_applied_total_semantic_noop +
-  mutation_events_applied_total_semantic_change =
   mutation_events_applied_total`
 
 ---
@@ -165,7 +160,6 @@ minimum fields per event type:
 - `operator`
 - `outcome` (`Applied` or `Skipped`)
 - `skip_reason` (when skipped)
-- `semantic_category` (`SemanticNoop` or `SemanticChange`, when applied)
 
 ### `ReproductionActionEvent`
 

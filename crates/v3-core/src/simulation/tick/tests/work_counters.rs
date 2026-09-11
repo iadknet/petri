@@ -136,3 +136,32 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
     // confirming this is exercising the graph path and not a no-op mesh.
     assert!(sim.stats.graph_relax_iters_total > 0);
 }
+
+/// A dispatch that cannot pay for its first opcode stops with
+/// `TerminationReason::EnergyExhausted`, and the tick's queue-order reduction
+/// counts that termination and no other.
+#[test]
+fn run_tick_counts_only_dispatches_that_ran_out_of_energy() {
+    let genome = vm_program_genome(vec![
+        VmInstruction::Noop,
+        VmInstruction::PushAction { action_type: 0 },
+        VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut sim, id) = make_sim_with_custom_genome(100.0, genome);
+    sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+    sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.0;
+
+    run_tick(&mut sim, &mut None);
+    assert_eq!(
+        sim.stats.mesh_dispatches_energy_exhausted_total, 0,
+        "a dispatch that emitted its action is not an exhausted one"
+    );
+
+    // Alive, but with less energy than the first opcode's charge.
+    sim.creatures[id].energy = 1e-9;
+    run_tick(&mut sim, &mut None);
+    assert_eq!(
+        sim.stats.mesh_dispatches_energy_exhausted_total, 1,
+        "the dispatch that ran out of energy is counted once"
+    );
+}

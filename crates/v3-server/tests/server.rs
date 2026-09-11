@@ -364,14 +364,6 @@ async fn get_status_has_all_required_fields() {
         "missing mutation_events_skipped_total_by_operator"
     );
     assert!(
-        body["mutation_events_applied_total_semantic_noop"].is_number(),
-        "missing mutation_events_applied_total_semantic_noop"
-    );
-    assert!(
-        body["mutation_events_applied_total_semantic_change"].is_number(),
-        "missing mutation_events_applied_total_semantic_change"
-    );
-    assert!(
         body["mutation_target_reachability_total"].is_object(),
         "missing mutation_target_reachability_total"
     );
@@ -1480,12 +1472,6 @@ async fn health_payload_contains_mutation_skip_by_reason() {
                 .not_applicable,
         frame.health.mutation_events_applied_total,
         "reachability totals must reconcile to mutation_events_applied_total"
-    );
-    assert_eq!(
-        frame.health.mutation_events_applied_total_semantic_noop
-            + frame.health.mutation_events_applied_total_semantic_change,
-        frame.health.mutation_events_applied_total,
-        "semantic categories must reconcile to mutation_events_applied_total"
     );
 }
 

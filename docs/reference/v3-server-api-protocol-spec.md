@@ -346,8 +346,6 @@ Response:
     "Topology.AddNode": 13,
     "Vm.VmInstructionMutation": 25
   },
-  "mutation_events_applied_total_semantic_noop": 37,
-  "mutation_events_applied_total_semantic_change": 284,
   "last_tick_compute_total_mean": 18.7,
   "last_tick_compute_total_min": 0.0,
   "last_tick_compute_total_max": 52.0,
@@ -815,8 +813,6 @@ Payload mapping:
     "Topology.AddNode": 13,
     "Vm.VmInstructionMutation": 25
   },
-  "mutation_events_applied_total_semantic_noop": 37,
-  "mutation_events_applied_total_semantic_change": 284,
   "reproduction_actions_attempted_total": 721,
   "reproduction_actions_spawned_total": 129,
   "reproduction_actions_rejected_total": 592,

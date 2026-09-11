@@ -84,8 +84,6 @@ pub struct TickSampleEvent {
     pub mutation_events_applied_total_by_domain: HashMap<String, u64>,
     pub mutation_events_attempted_total_by_operator: HashMap<String, u64>,
     pub mutation_events_applied_total_by_operator: HashMap<String, u64>,
-    pub mutation_events_applied_total_semantic_noop: u64,
-    pub mutation_events_applied_total_semantic_change: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -226,12 +224,6 @@ fn build_tick_sample(sim: &v3_core::simulation::Simulation, tick: u64) -> TickSa
             .iter()
             .map(|(operator, count)| (operator.as_key().to_string(), *count))
             .collect(),
-        mutation_events_applied_total_semantic_noop: sim
-            .stats
-            .mutation_events_applied_total_semantic_noop,
-        mutation_events_applied_total_semantic_change: sim
-            .stats
-            .mutation_events_applied_total_semantic_change,
     }
 }
 

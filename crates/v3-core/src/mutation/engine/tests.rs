@@ -475,11 +475,6 @@ fn engine_domain_and_operator_counters_reconcile_to_global_totals() {
         skipped_by_operator <= summary.skipped_events,
         "operator skips cannot exceed total skips"
     );
-
-    assert_eq!(
-        summary.applied_semantic_noop_events + summary.applied_semantic_change_events,
-        summary.applied_events
-    );
 }
 
 #[test]
@@ -526,7 +521,7 @@ fn engine_attempted_counters_cover_all_domains_and_hit_each_domain_operator_surf
 }
 
 #[test]
-fn engine_live_operators_record_semantic_changes() {
+fn engine_live_operators_record_every_applied_event_in_the_operator_funnel() {
     let mut config = SimulationConfig::default().mutation;
     config.mutation_probability = 1.0;
     config.per_birth_mutation_events_min = 1;
@@ -534,11 +529,12 @@ fn engine_live_operators_record_semantic_changes() {
     for seed in 0..100 {
         let mut genome = v3alpha1_founder_genome();
         let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut rng(seed));
-        assert_eq!(summary.applied_semantic_noop_events, 0);
-        assert_eq!(
-            summary.applied_semantic_change_events,
-            summary.applied_events
-        );
+        let funnel_applied: u64 = summary
+            .operator_funnel_by_operator
+            .values()
+            .map(|funnel| funnel.applied)
+            .sum();
+        assert_eq!(funnel_applied, u64::from(summary.applied_events));
     }
 }
 
@@ -1683,14 +1679,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
             MutationEngine::apply_mutations(&mut tracked, &config, &[0], &mut tracked_rng);
         assert_eq!(plain, tracked);
         assert_eq!(plain_summary.events, tracked_summary.events);
-        assert_eq!(
-            plain_summary.applied_semantic_noop_events,
-            tracked_summary.applied_semantic_noop_events
-        );
-        assert_eq!(
-            plain_summary.applied_semantic_change_events,
-            tracked_summary.applied_semantic_change_events
-        );
+        assert_eq!(plain_summary.applied_events, tracked_summary.applied_events);
         assert_eq!(
             plain_summary.operator_funnel_by_operator,
             tracked_summary.operator_funnel_by_operator

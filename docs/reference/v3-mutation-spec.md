@@ -447,8 +447,6 @@ Call semantics:
 - `applied_by_domain: map<MutationDomain, u32>`
 - `attempted_by_operator: map<MutationOperator, u32>`
 - `applied_by_operator: map<MutationOperator, u32>`
-- `applied_semantic_noop_events: u32`
-- `applied_semantic_change_events: u32`
 - `reachable_target_events: u32`
 - `unreachable_target_events: u32`
 - `executed_target_events: u32`

@@ -42,7 +42,7 @@ pub struct TickTrace {
 }
 
 /// Why the mesh chain terminated for this tick.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum TerminationReason {
     ActionEmitted,
     EnergyExhausted,

@@ -597,7 +597,7 @@ mod tests {
             let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
 
             if result == ReproductionActionResult::Spawned
-                && sim.stats.mutation_events_applied_total_semantic_change > 0
+                && sim.stats.mutation_events_applied_total > 0
             {
                 let child = sim
                     .creatures

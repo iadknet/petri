@@ -154,8 +154,6 @@ pub struct HealthPayload {
     pub mutation_added_node_input_classes_total_by_operator: HashMap<String, HashMap<String, u64>>,
     pub mutation_added_node_world_inputs_total_by_operator: HashMap<String, HashMap<String, u64>>,
     pub vm_live_read_world_inputs_current: HashMap<String, u64>,
-    pub mutation_events_applied_total_semantic_noop: u64,
-    pub mutation_events_applied_total_semantic_change: u64,
     pub mutation_target_reachability_total: MutationTargetReachabilityTotalPayload,
     pub mutation_value_totals_by_operator: HashMap<String, MutationOperatorValueTotalsPayload>,
     pub mutation_outcome_summary: MutationOperatorValueTotalsPayload,
@@ -199,7 +197,6 @@ pub struct MutationOperatorFunnelPayload {
     pub applicable: u64,
     pub structurally_valid: u64,
     pub applied: u64,
-    pub semantic_change: u64,
     pub skipped: u64,
 }
 
@@ -449,7 +446,6 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
                         applicable: funnel.applicable,
                         structurally_valid: funnel.structurally_valid,
                         applied: funnel.applied,
-                        semantic_change: funnel.semantic_change,
                         skipped: funnel.skipped,
                     },
                 )
@@ -498,10 +494,6 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .into_iter()
             .map(|(key, count)| (key.as_key().to_string(), count))
             .collect(),
-        mutation_events_applied_total_semantic_noop: stats
-            .mutation_events_applied_total_semantic_noop,
-        mutation_events_applied_total_semantic_change: stats
-            .mutation_events_applied_total_semantic_change,
         mutation_target_reachability_total: MutationTargetReachabilityTotalPayload {
             reachable: stats.mutation_reachable_target_total,
             unreachable: stats.mutation_unreachable_target_total,

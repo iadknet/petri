@@ -104,8 +104,6 @@ export interface StatusPayload {
 	move_actions_blocked_total_by_cause?: Record<string, number>;
 	reproduction_actions_rejected_invalid_target_total_by_cause?: Record<string, number>;
 	vm_live_read_world_inputs_current?: Record<string, number>;
-	mutation_events_applied_total_semantic_noop: number;
-	mutation_events_applied_total_semantic_change: number;
 	last_tick_compute_energy_total_mean: number;
 	last_tick_compute_energy_total_min: number;
 	last_tick_compute_energy_total_max: number;
@@ -131,8 +129,6 @@ export interface HealthPayload {
 	move_actions_blocked_total_by_cause?: Record<string, number>;
 	reproduction_actions_rejected_invalid_target_total_by_cause?: Record<string, number>;
 	vm_live_read_world_inputs_current?: Record<string, number>;
-	mutation_events_applied_total_semantic_noop: number;
-	mutation_events_applied_total_semantic_change: number;
 	reproduction_actions_attempted_total: number;
 	reproduction_actions_spawned_total: number;
 	reproduction_actions_rejected_total: number;

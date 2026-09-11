@@ -5,6 +5,7 @@ use crate::contracts::{CreatureId, Position, WorldAction};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
+use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::types::{ComputeCostReport, MeshOutput};
 use crate::simulation::seeding::seed_simulation;
 use slotmap::SlotMap;
@@ -31,6 +32,7 @@ fn sort_by_priority_bid_orders_descending() {
         cost_report: ComputeCostReport::default(),
         priority_bid: bid,
         work_counters: Default::default(),
+        termination_reason: TerminationReason::ActionEmitted,
     };
 
     let mut decisions = vec![
@@ -61,6 +63,7 @@ fn sort_by_priority_bid_stable_for_equal_bids() {
         cost_report: ComputeCostReport::default(),
         priority_bid: bid,
         work_counters: Default::default(),
+        termination_reason: TerminationReason::ActionEmitted,
     };
 
     let mut decisions = vec![

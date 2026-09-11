@@ -1,7 +1,7 @@
 use super::*;
 use crate::contracts::{InputReference, RouteTarget};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
-use crate::mutation::{MutationSemanticCategory, TargetReachability};
+use crate::mutation::TargetReachability;
 use proptest::prelude::*;
 
 fn vm_node(id: u32, register_count: u8) -> NodeGenome {
@@ -44,11 +44,7 @@ fn summary_with(events: Vec<MutationEventRecord>) -> MutationSummary {
         match (event.operator, event.outcome) {
             (Some(operator), MutationEventOutcome::Applied(reachability)) => {
                 summary.record_attempt(event.domain, operator);
-                summary.record_applied(
-                    event.domain,
-                    operator,
-                    MutationSemanticCategory::SemanticChange,
-                );
+                summary.record_applied(event.domain, operator);
                 summary.record_reachability(reachability);
             }
             (Some(operator), MutationEventOutcome::Skipped(reason)) => {

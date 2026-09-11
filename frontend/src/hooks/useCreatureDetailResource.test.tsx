@@ -167,8 +167,6 @@ describe("useCreatureDetailResource", () => {
 				mutation_events_applied_total_by_domain: {},
 				mutation_events_attempted_total_by_operator: {},
 				mutation_events_applied_total_by_operator: {},
-				mutation_events_applied_total_semantic_noop: 0,
-				mutation_events_applied_total_semantic_change: 0,
 				last_tick_compute_energy_total_mean: 0,
 				last_tick_compute_energy_total_min: 0,
 				last_tick_compute_energy_total_max: 0,

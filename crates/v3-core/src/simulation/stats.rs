@@ -204,10 +204,6 @@ pub struct SimStats {
     pub mutation_events_attempted_total_by_operator: HashMap<MutationOperator, u64>,
     /// Per-operator applied mutation event breakdown (cumulative).
     pub mutation_events_applied_total_by_operator: HashMap<MutationOperator, u64>,
-    /// Applied events classified as semantic-noop.
-    pub mutation_events_applied_total_semantic_noop: u64,
-    /// Applied events classified as semantic-change.
-    pub mutation_events_applied_total_semantic_change: u64,
     /// Per-reason mutation skip breakdown (cumulative).
     pub mutation_events_skipped_by_reason: HashMap<MutationSkipReason, u64>,
     /// Per-operator mutation skip breakdown (cumulative).
@@ -240,6 +236,11 @@ pub struct SimStats {
     /// (cumulative). A typed Eat that found no food is not counted, so this
     /// reads which food types the living population actually harvests.
     pub eat_actions_applied_total_by_type: HashMap<OrdinaryFoodTypeId, u64>,
+    /// Eat actions that found no food, keyed by the food type the action named
+    /// (cumulative). The failure twin of
+    /// [`SimStats::eat_actions_applied_total_by_type`]: together they are every
+    /// typed Eat the population executed.
+    pub eat_actions_failed_total_by_type: HashMap<OrdinaryFoodTypeId, u64>,
     /// Fine-grained move blocked breakdown (cumulative).
     pub move_actions_blocked_total_by_cause: HashMap<MoveBlockedCause, u64>,
     /// Move blocked outcomes where at least one adjacent alternative target was valid.
@@ -289,6 +290,9 @@ pub struct SimStats {
     pub plasticity_updates_total: u64,
     /// Creatures that ran the mesh, summed per tick.
     pub creature_ticks_total: u64,
+    /// Mesh dispatches that stopped because the creature ran out of energy
+    /// mid-chain, summed in queue order after the parallel mesh phase.
+    pub mesh_dispatches_energy_exhausted_total: u64,
     /// Every action the action phase executed (move, eat, noop, reproduce, steal).
     pub actions_applied_total: u64,
 

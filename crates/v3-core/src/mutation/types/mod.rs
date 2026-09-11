@@ -319,11 +319,6 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn semantic_category(self) -> MutationSemanticCategory {
-        MutationSemanticCategory::SemanticChange
-    }
-
-    #[must_use]
     pub const fn complexity_effect(self) -> ComplexityEffect {
         match self {
             // Topology: structural additions
@@ -461,23 +456,6 @@ pub enum TargetReachability {
     NotApplicable,
 }
 
-/// Semantic class for an applied mutation event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum MutationSemanticCategory {
-    SemanticNoop,
-    SemanticChange,
-}
-
-impl MutationSemanticCategory {
-    #[must_use]
-    pub const fn as_key(self) -> &'static str {
-        match self {
-            Self::SemanticNoop => "SemanticNoop",
-            Self::SemanticChange => "SemanticChange",
-        }
-    }
-}
-
 /// What one attempted mutation event did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MutationEventOutcome {
@@ -530,7 +508,6 @@ pub struct MutationOperatorFunnel {
     pub applicable: u64,
     pub structurally_valid: u64,
     pub applied: u64,
-    pub semantic_change: u64,
     pub skipped: u64,
 }
 
@@ -548,8 +525,6 @@ pub struct MutationSummary {
     pub applied_by_domain: HashMap<MutationDomain, u32>,
     pub attempted_by_operator: HashMap<MutationOperator, u32>,
     pub applied_by_operator: HashMap<MutationOperator, u32>,
-    pub applied_semantic_noop_events: u32,
-    pub applied_semantic_change_events: u32,
     pub operator_funnel_by_operator: HashMap<MutationOperator, MutationOperatorFunnel>,
     pub skip_reasons_by_operator: HashMap<MutationOperator, HashMap<MutationSkipReason, u32>>,
     pub added_node_input_classes_by_operator:
@@ -580,8 +555,6 @@ impl MutationSummary {
             applied_by_domain: HashMap::new(),
             attempted_by_operator: HashMap::new(),
             applied_by_operator: HashMap::new(),
-            applied_semantic_noop_events: 0,
-            applied_semantic_change_events: 0,
             operator_funnel_by_operator: HashMap::new(),
             skip_reasons_by_operator: HashMap::new(),
             added_node_input_classes_by_operator: HashMap::new(),
@@ -610,12 +583,7 @@ impl MutationSummary {
             .attempted += 1;
     }
 
-    pub fn record_applied(
-        &mut self,
-        domain: MutationDomain,
-        operator: MutationOperator,
-        semantic: MutationSemanticCategory,
-    ) {
+    pub fn record_applied(&mut self, domain: MutationDomain, operator: MutationOperator) {
         self.applied_events += 1;
         *self.applied_by_domain.entry(domain).or_insert(0) += 1;
         *self.applied_by_operator.entry(operator).or_insert(0) += 1;
@@ -626,13 +594,6 @@ impl MutationSummary {
         funnel.applicable += 1;
         funnel.structurally_valid += 1;
         funnel.applied += 1;
-        match semantic {
-            MutationSemanticCategory::SemanticNoop => self.applied_semantic_noop_events += 1,
-            MutationSemanticCategory::SemanticChange => {
-                self.applied_semantic_change_events += 1;
-                funnel.semantic_change += 1;
-            }
-        }
     }
 
     pub fn record_skipped(&mut self, operator: MutationOperator, reason: MutationSkipReason) {

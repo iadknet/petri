@@ -935,6 +935,54 @@ fn typed_eat_counters_rise_only_for_the_type_an_applied_eat_consumed() {
 }
 
 #[test]
+fn failed_typed_eat_counters_rise_only_for_the_type_the_action_named() {
+    let pos = Position::new(5, 5);
+    let (mut sim, _id) = make_sim_with_custom_genome(100.0, eat_type_genome(1));
+    add_second_food_type(&mut sim);
+    let staple = crate::config::OrdinaryFoodTypeId::default();
+    let fruit = crate::config::OrdinaryFoodTypeId::new(1);
+
+    // No fruit on the cell: the Eat fails and is counted against fruit alone,
+    // even though the cell holds no staple either.
+    run_tick(&mut sim, &mut None);
+    assert_eq!(
+        sim.stats
+            .eat_actions_failed_total_by_type
+            .get(&fruit)
+            .copied(),
+        Some(1),
+        "a typed Eat that found nothing is counted against the type it named"
+    );
+    assert_eq!(
+        sim.stats
+            .eat_actions_failed_total_by_type
+            .get(&staple)
+            .copied(),
+        None,
+        "the type the action did not name stays absent"
+    );
+
+    // With fruit on the cell the Eat applies, so the failure total holds.
+    sim.world.set_food_type(pos, fruit, 1.0);
+    run_tick(&mut sim, &mut None);
+    assert_eq!(
+        sim.stats
+            .eat_actions_failed_total_by_type
+            .get(&fruit)
+            .copied(),
+        Some(1),
+        "an applied Eat is not a failed one"
+    );
+    assert_eq!(
+        sim.stats
+            .eat_actions_applied_total_by_type
+            .get(&fruit)
+            .copied(),
+        Some(1)
+    );
+}
+
+#[test]
 fn move_attempts_count_blocked_and_successful_moves_alike() {
     let genome = vm_program_genome(vec![
         VmInstruction::PushAction { action_type: 2 },

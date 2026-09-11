@@ -1332,6 +1332,83 @@ pub struct MovesBlockedByCause {
     pub out_of_bounds: u64,
 }
 
+/// The mutation supply one case produced and where its events aimed
+/// (T14.F02), read from `SimStats`. `attempted = applied + skipped`, and the
+/// four-way target split is T11.F17's own delivery instrument.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MutationSupply {
+    pub events_attempted_total: u64,
+    pub events_applied_total: u64,
+    pub events_skipped_total: u64,
+    /// Applied events whose target was a node the parent executed recently.
+    pub executed_target_total: u64,
+    pub reachable_target_total: u64,
+    pub unreachable_target_total: u64,
+    pub not_applicable_target_total: u64,
+}
+
+/// The integer fields of `v3_core::simulation::stats::MutationValueTotals`:
+/// what the carriers of an applied birth mutation did while they lived. The
+/// float fields are excluded by the track's F02 note — `final_energy_sum` is
+/// structurally zero, and the score sums are the composite the observation
+/// contract leaves out.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MutationOutcomeTotals {
+    pub carriers_observed_total: u64,
+    pub survival_ticks_sum: u64,
+    pub offspring_spawned_sum: u64,
+    pub helpful_total: u64,
+    pub neutral_total: u64,
+    pub detrimental_total: u64,
+    pub confidence_low_total: u64,
+    pub confidence_medium_total: u64,
+    pub confidence_high_total: u64,
+    pub survived_short_horizon_total: u64,
+    pub survived_long_horizon_total: u64,
+    pub reproduced_once_total: u64,
+    pub action_attempted_total: u64,
+    pub blocked_move_total: u64,
+    pub invalid_reproduce_total: u64,
+    pub invalid_action_total: u64,
+}
+
+impl From<&v3_core::simulation::stats::MutationValueTotals> for MutationOutcomeTotals {
+    fn from(totals: &v3_core::simulation::stats::MutationValueTotals) -> Self {
+        Self {
+            carriers_observed_total: totals.carriers_observed_total,
+            survival_ticks_sum: totals.survival_ticks_sum,
+            offspring_spawned_sum: totals.offspring_spawned_sum,
+            helpful_total: totals.helpful_total,
+            neutral_total: totals.neutral_total,
+            detrimental_total: totals.detrimental_total,
+            confidence_low_total: totals.confidence_low_total,
+            confidence_medium_total: totals.confidence_medium_total,
+            confidence_high_total: totals.confidence_high_total,
+            survived_short_horizon_total: totals.survived_short_horizon_total,
+            survived_long_horizon_total: totals.survived_long_horizon_total,
+            reproduced_once_total: totals.reproduced_once_total,
+            action_attempted_total: totals.action_attempted_total,
+            blocked_move_total: totals.blocked_move_total,
+            invalid_reproduce_total: totals.invalid_reproduce_total,
+            invalid_action_total: totals.invalid_action_total,
+        }
+    }
+}
+
+/// What the population's predation attempts did (T14.F02), with the per-result
+/// breakdown keyed by `PredationActionResult::as_key` so its order is fixed.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PredationTracking {
+    pub actions_attempted_total: u64,
+    pub actions_transferred_total: u64,
+    pub actions_rejected_total: u64,
+    pub kills_total: u64,
+    pub actions_by_result: BTreeMap<String, u64>,
+}
+
 /// Cumulative per-world behavior a baseline world is followed by (T12.F04):
 /// what the population ate, how much food stood, and how often it walked into
 /// something. Every field comes from applied simulation behavior, and every one
@@ -1374,6 +1451,29 @@ pub struct WorldTracking {
     /// same fraction.
     #[serde(default)]
     pub moves_blocked_barrier_with_barrier_neighbor_by_reader_state: ByReaderState<u64>,
+    /// Eat actions that found no food, indexed like
+    /// [`WorldTracking::typed_eats_total`] by the food type the action named.
+    /// Absent — not zeroed — in a report stored before T14.F02.
+    #[serde(default)]
+    pub typed_eats_failed_total: Option<Vec<u64>>,
+    /// Mesh dispatches that stopped because the creature ran out of energy
+    /// mid-chain.
+    #[serde(default)]
+    pub mesh_dispatches_energy_exhausted_total: Option<u64>,
+    /// The mutation supply this case produced and where its events aimed.
+    #[serde(default)]
+    pub mutation_supply: Option<MutationSupply>,
+    /// What the carriers of an applied birth mutation did while they lived,
+    /// pooled across every operator.
+    #[serde(default)]
+    pub mutation_outcome_summary: Option<MutationOutcomeTotals>,
+    /// The same lifetime totals split by the operator that produced them,
+    /// keyed by `MutationOperator::as_key`.
+    #[serde(default)]
+    pub mutation_value_totals_by_operator: Option<BTreeMap<String, MutationOutcomeTotals>>,
+    /// What the population's predation attempts did.
+    #[serde(default)]
+    pub predation: Option<PredationTracking>,
 }
 
 impl WorldTracking {
@@ -1402,16 +1502,18 @@ impl WorldTracking {
             occupied: blocked(MoveBlockedCause::Occupied),
             out_of_bounds: blocked(MoveBlockedCause::OutOfBounds),
         };
-        Self {
-            typed_eats_total: (0..sim.config.world.food.types.len())
+        let by_food_type = |counts: &HashMap<OrdinaryFoodTypeId, u64>| {
+            (0..sim.config.world.food.types.len())
                 .map(|index| {
-                    stats
-                        .eat_actions_applied_total_by_type
+                    counts
                         .get(&OrdinaryFoodTypeId::new(index as u16))
                         .copied()
                         .unwrap_or(0)
                 })
-                .collect(),
+                .collect::<Vec<u64>>()
+        };
+        Self {
+            typed_eats_total: by_food_type(&stats.eat_actions_applied_total_by_type),
             food_density_total: stats
                 .last_tick_food_total_density_by_type
                 .iter()
@@ -1429,6 +1531,38 @@ impl WorldTracking {
             moves_blocked_barrier_with_barrier_neighbor_by_reader_state: by_reader_state(
                 &stats.move_blocked_barrier_with_barrier_neighbor_total_by_reader_state,
             ),
+            typed_eats_failed_total: Some(by_food_type(&stats.eat_actions_failed_total_by_type)),
+            mesh_dispatches_energy_exhausted_total: Some(
+                stats.mesh_dispatches_energy_exhausted_total,
+            ),
+            mutation_supply: Some(MutationSupply {
+                events_attempted_total: stats.mutation_events_attempted_total,
+                events_applied_total: stats.mutation_events_applied_total,
+                events_skipped_total: stats.mutation_events_skipped_total,
+                executed_target_total: stats.mutation_executed_target_total,
+                reachable_target_total: stats.mutation_reachable_target_total,
+                unreachable_target_total: stats.mutation_unreachable_target_total,
+                not_applicable_target_total: stats.mutation_not_applicable_target_total,
+            }),
+            mutation_outcome_summary: Some((&stats.mutation_outcome_summary).into()),
+            mutation_value_totals_by_operator: Some(
+                stats
+                    .mutation_value_totals_by_operator
+                    .iter()
+                    .map(|(operator, totals)| (operator.as_key().to_string(), totals.into()))
+                    .collect(),
+            ),
+            predation: Some(PredationTracking {
+                actions_attempted_total: stats.predation_actions_attempted_total,
+                actions_transferred_total: stats.predation_actions_transferred_total,
+                actions_rejected_total: stats.predation_actions_rejected_total,
+                kills_total: stats.predation_kills_total,
+                actions_by_result: stats
+                    .predation_actions_by_result
+                    .iter()
+                    .map(|(result, count)| (result.as_key().to_string(), *count))
+                    .collect(),
+            }),
         }
     }
 
@@ -3730,7 +3864,7 @@ mod tests {
         use v3_core::contracts::NodeId;
         use v3_core::mutation::{
             MutationDomain, MutationEventOutcome, MutationEventRecord, MutationOperator,
-            MutationSemanticCategory, MutationSkipReason, MutationSummary, TargetReachability,
+            MutationSkipReason, MutationSummary, TargetReachability,
         };
 
         let founder = founder_genome(v3_core::config::FounderProfile::V3Alpha1);
@@ -3746,11 +3880,7 @@ mod tests {
         // exhausted its domain.
         let mut summary = MutationSummary::zero();
         summary.record_attempt(MutationDomain::Topology, MutationOperator::TopologyAddNode);
-        summary.record_applied(
-            MutationDomain::Topology,
-            MutationOperator::TopologyAddNode,
-            MutationSemanticCategory::SemanticChange,
-        );
+        summary.record_applied(MutationDomain::Topology, MutationOperator::TopologyAddNode);
         summary.record_reachability(TargetReachability::Reachable);
         summary.record_event(MutationEventRecord {
             domain: MutationDomain::Topology,
@@ -5106,7 +5236,195 @@ mod tests {
                 case.case.food_type_count
             );
             assert_eq!(case.fractions, expected.fractions());
+
+            // The transferred blocks are the run's own counters, not a
+            // re-derivation: each reads equal to the `SimStats` field behind it.
+            let stats = &sim.stats;
+            let supply = case
+                .tracking
+                .mutation_supply
+                .as_ref()
+                .expect("a new report carries the mutation supply");
+            assert_eq!(
+                supply.events_attempted_total,
+                stats.mutation_events_attempted_total
+            );
+            assert_eq!(
+                supply.events_applied_total,
+                stats.mutation_events_applied_total
+            );
+            assert_eq!(
+                supply.events_skipped_total,
+                stats.mutation_events_skipped_total
+            );
+            assert_eq!(
+                supply.executed_target_total,
+                stats.mutation_executed_target_total
+            );
+            assert_eq!(
+                supply.reachable_target_total,
+                stats.mutation_reachable_target_total
+            );
+            assert_eq!(
+                supply.unreachable_target_total,
+                stats.mutation_unreachable_target_total
+            );
+            assert_eq!(
+                supply.not_applicable_target_total,
+                stats.mutation_not_applicable_target_total
+            );
+            assert_eq!(
+                case.tracking.mutation_outcome_summary,
+                Some(MutationOutcomeTotals::from(&stats.mutation_outcome_summary))
+            );
+            let per_operator = case
+                .tracking
+                .mutation_value_totals_by_operator
+                .as_ref()
+                .expect("a new report carries the per-operator value totals");
+            assert_eq!(
+                per_operator.len(),
+                stats.mutation_value_totals_by_operator.len()
+            );
+            for (operator, totals) in &stats.mutation_value_totals_by_operator {
+                assert_eq!(
+                    per_operator.get(operator.as_key()),
+                    Some(&MutationOutcomeTotals::from(totals))
+                );
+            }
+            let predation = case
+                .tracking
+                .predation
+                .as_ref()
+                .expect("a new report carries the predation counters");
+            assert_eq!(
+                predation.actions_attempted_total,
+                stats.predation_actions_attempted_total
+            );
+            assert_eq!(
+                predation.actions_transferred_total,
+                stats.predation_actions_transferred_total
+            );
+            assert_eq!(
+                predation.actions_rejected_total,
+                stats.predation_actions_rejected_total
+            );
+            assert_eq!(predation.kills_total, stats.predation_kills_total);
+            assert_eq!(
+                predation.actions_by_result.len(),
+                stats.predation_actions_by_result.len()
+            );
+            assert_eq!(
+                case.tracking.mesh_dispatches_energy_exhausted_total,
+                Some(stats.mesh_dispatches_energy_exhausted_total)
+            );
+            let failed = case
+                .tracking
+                .typed_eats_failed_total
+                .as_ref()
+                .expect("a new report carries failed eats by type");
+            assert_eq!(failed.len(), case.case.food_type_count);
+            assert_eq!(
+                failed.iter().sum::<u64>(),
+                stats.eat_actions_failed_total_by_type.values().sum::<u64>()
+            );
         }
+    }
+
+    /// Every transferred block is the `SimStats` counter behind it, read
+    /// field for field from a simulation whose counters are set by hand: the
+    /// replay test above exercises a short run, where most of these are zero.
+    #[test]
+    fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
+        use v3_core::config::OrdinaryFoodTypeId;
+        use v3_core::mutation::MutationOperator;
+        use v3_core::simulation::actions::PredationActionResult;
+        use v3_core::simulation::seed_simulation;
+        use v3_core::simulation::stats::MutationValueTotals;
+
+        let mut sim = seed_simulation(SimulationConfig::default(), 7);
+        let stats = &mut sim.stats;
+        stats.mutation_events_attempted_total = 40;
+        stats.mutation_events_applied_total = 31;
+        stats.mutation_events_skipped_total = 9;
+        stats.mutation_executed_target_total = 6;
+        stats.mutation_reachable_target_total = 17;
+        stats.mutation_unreachable_target_total = 11;
+        stats.mutation_not_applicable_target_total = 3;
+        stats.mutation_outcome_summary = MutationValueTotals {
+            carriers_observed_total: 5,
+            survival_ticks_sum: 120,
+            offspring_spawned_sum: 4,
+            // Excluded from the report: structurally zero at its only site.
+            final_energy_sum: 9.5,
+            ..MutationValueTotals::default()
+        };
+        stats.mutation_value_totals_by_operator.insert(
+            MutationOperator::TopologyAddNode,
+            MutationValueTotals {
+                carriers_observed_total: 2,
+                invalid_action_total: 1,
+                ..MutationValueTotals::default()
+            },
+        );
+        stats.predation_actions_attempted_total = 8;
+        stats.predation_actions_transferred_total = 5;
+        stats.predation_actions_rejected_total = 3;
+        stats.predation_kills_total = 2;
+        stats
+            .predation_actions_by_result
+            .insert(PredationActionResult::TransferredAndKilled, 2);
+        stats.mesh_dispatches_energy_exhausted_total = 14;
+        stats
+            .eat_actions_failed_total_by_type
+            .insert(OrdinaryFoodTypeId::default(), 6);
+
+        let tracking = WorldTracking::observe(&sim);
+
+        assert_eq!(
+            tracking.mutation_supply,
+            Some(MutationSupply {
+                events_attempted_total: 40,
+                events_applied_total: 31,
+                events_skipped_total: 9,
+                executed_target_total: 6,
+                reachable_target_total: 17,
+                unreachable_target_total: 11,
+                not_applicable_target_total: 3,
+            })
+        );
+        assert_eq!(
+            tracking.mutation_outcome_summary,
+            Some(MutationOutcomeTotals {
+                carriers_observed_total: 5,
+                survival_ticks_sum: 120,
+                offspring_spawned_sum: 4,
+                ..MutationOutcomeTotals::default()
+            })
+        );
+        assert_eq!(
+            tracking.mutation_value_totals_by_operator,
+            Some(BTreeMap::from([(
+                "Topology.AddNode".to_string(),
+                MutationOutcomeTotals {
+                    carriers_observed_total: 2,
+                    invalid_action_total: 1,
+                    ..MutationOutcomeTotals::default()
+                },
+            )]))
+        );
+        assert_eq!(
+            tracking.predation,
+            Some(PredationTracking {
+                actions_attempted_total: 8,
+                actions_transferred_total: 5,
+                actions_rejected_total: 3,
+                kills_total: 2,
+                actions_by_result: BTreeMap::from([("TransferredAndKilled".to_string(), 2)]),
+            })
+        );
+        assert_eq!(tracking.mesh_dispatches_energy_exhausted_total, Some(14));
+        assert_eq!(tracking.typed_eats_failed_total, Some(vec![6]));
     }
 
     /// The world-set tracking fractions read against the totals they came
@@ -5138,6 +5456,7 @@ mod tests {
                 has_barrier_reader: 1,
                 no_barrier_reader: 10,
             },
+            ..WorldTracking::default()
         };
         let fractions = tracking.fractions();
         assert_eq!(fractions.typed_eat_share, vec![six(0.75), six(0.25)]);
@@ -5389,6 +5708,37 @@ mod tests {
                     has_barrier_reader: 2,
                     no_barrier_reader: 1,
                 },
+                typed_eats_failed_total: Some(vec![4]),
+                mesh_dispatches_energy_exhausted_total: Some(6),
+                mutation_supply: Some(MutationSupply {
+                    events_attempted_total: 12,
+                    events_applied_total: 9,
+                    events_skipped_total: 3,
+                    executed_target_total: 2,
+                    reachable_target_total: 5,
+                    unreachable_target_total: 3,
+                    not_applicable_target_total: 1,
+                }),
+                mutation_outcome_summary: Some(MutationOutcomeTotals {
+                    carriers_observed_total: 4,
+                    survival_ticks_sum: 40,
+                    offspring_spawned_sum: 2,
+                    ..MutationOutcomeTotals::default()
+                }),
+                mutation_value_totals_by_operator: Some(BTreeMap::from([(
+                    "Topology.AddNode".to_string(),
+                    MutationOutcomeTotals {
+                        carriers_observed_total: 1,
+                        ..MutationOutcomeTotals::default()
+                    },
+                )])),
+                predation: Some(PredationTracking {
+                    actions_attempted_total: 5,
+                    actions_transferred_total: 3,
+                    actions_rejected_total: 2,
+                    kills_total: 1,
+                    actions_by_result: BTreeMap::from([("Transferred".to_string(), 3)]),
+                }),
             },
         };
         let wire = serde_json::to_value(&sample).unwrap();
@@ -5404,8 +5754,34 @@ mod tests {
             wire["moves_blocked_total_by_cause"]["occupied"], 2,
             "each blocked-move cause is on the wire under its own key: {wire}"
         );
+        assert_eq!(
+            wire["mutation_supply"]["executed_target_total"], 2,
+            "the mutation target split is on the wire under its own key: {wire}"
+        );
+        assert_eq!(
+            wire["typed_eats_failed_total"][0], 4,
+            "failed eats are indexed by food type: {wire}"
+        );
         let decoded: PersistenceSample = serde_json::from_value(wire).unwrap();
         assert_eq!(decoded.tracking, sample.tracking);
+    }
+
+    /// A report stored before T14.F02 carries no transferred block, and every
+    /// one of them reads as absent rather than as a zero the run produced.
+    #[test]
+    fn transferred_tracking_blocks_are_absent_not_zero_in_a_historical_report() {
+        let legacy: PersistenceSample = serde_json::from_value(serde_json::json!({
+            "tick": 100, "population": 5, "births_total": 2,
+            "typed_eats_total": [7], "moves_attempted_total": 9
+        }))
+        .expect("a pre-T14.F02 sample must still parse");
+        assert_eq!(legacy.tracking.typed_eats_total, vec![7]);
+        assert_eq!(legacy.tracking.typed_eats_failed_total, None);
+        assert_eq!(legacy.tracking.mesh_dispatches_energy_exhausted_total, None);
+        assert_eq!(legacy.tracking.mutation_supply, None);
+        assert_eq!(legacy.tracking.mutation_outcome_summary, None);
+        assert_eq!(legacy.tracking.mutation_value_totals_by_operator, None);
+        assert_eq!(legacy.tracking.predation, None);
     }
 
     proptest! {

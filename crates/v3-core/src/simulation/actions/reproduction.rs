@@ -218,10 +218,6 @@ pub fn apply_reproduce(
     sim.stats.mutation_events_attempted_total += summary.attempted_events as u64;
     sim.stats.mutation_events_applied_total += summary.applied_events as u64;
     sim.stats.mutation_events_skipped_total += summary.skipped_events as u64;
-    sim.stats.mutation_events_applied_total_semantic_noop +=
-        summary.applied_semantic_noop_events as u64;
-    sim.stats.mutation_events_applied_total_semantic_change +=
-        summary.applied_semantic_change_events as u64;
     for (domain, count) in &summary.attempted_by_domain {
         *sim.stats
             .mutation_events_attempted_total_by_domain
@@ -268,7 +264,6 @@ pub fn apply_reproduce(
         entry.applicable += funnel.applicable;
         entry.structurally_valid += funnel.structurally_valid;
         entry.applied += funnel.applied;
-        entry.semantic_change += funnel.semantic_change;
         entry.skipped += funnel.skipped;
     }
     for (operator, by_reason) in &summary.skip_reasons_by_operator {
