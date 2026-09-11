@@ -22,7 +22,7 @@ the microscope: it records applied behavior and adds no mechanism.
 - [ ] Every closure report names a comparison reference that is a different, earlier closure, or records the absence of one; no report compares against itself.
 - [ ] Every indicator wired into the goal profile appears in the comparison block the no-regression rule reads, and carries a version or definition token that moves when its definition moves.
 - [ ] Population readings the report takes once at the horizon — lineage diversity, carried structure, generation depth — are also taken at the persistence checkpoints the run already samples.
-- [ ] Counters the runtime already maintains reach the stored report or are deleted; no counter is transferred whose value is structurally constant.
+- [x] Counters the runtime already maintains reach the stored report or are deleted; no counter is transferred whose value is structurally constant.
 - [ ] Reproductive success and lifespan are stored by cognitive class, so whether memory-carrying brains out-reproduce reactive ones is read from applied outcomes rather than from perturbation alone.
 - [ ] Each surviving founder clade has a stored behavioral profile — what it eats, what it does, where it lives, and when it would have gone extinct — so "many coexisting ways of making a living" is readable as differentiation and duration, not only as a count.
 - [ ] The living population's sensor usage is stored at the persistence checkpoints, so whether creatures can perceive what a niche or a memory requires is read before either is looked for.
@@ -33,7 +33,7 @@ the microscope: it records applied behavior and adds no mechanism.
 
 - [x] **T14.F01 — Closure Comparison and Indicator Coverage Integrity** — Depends on: None
   - Goal: A closure's verdict means what it says: the report compares against an earlier closure or records that it has none, and every wired indicator is visible to the no-regression rule.
-- [ ] **T14.F02 — Existing Counter Transfer** — Depends on: T14.F01
+- [x] **T14.F02 — Existing Counter Transfer** — Depends on: T14.F01
   - Goal: Counters the simulation already maintains — production mutation supply and targeting, mutation lifecycle outcomes, predation, failed eats, energy-exhausted dispatches — become readable at closure instead of being discarded each run.
 - [ ] **T14.F03 — Applied Mortality and Energy Accounting** — Depends on: T14.F02
   - Goal: Death is counted and attributed to the sink that caused it, and every energy flow the world applies is totalled, so a cost feature's effect is read from what it did rather than from what it charged.

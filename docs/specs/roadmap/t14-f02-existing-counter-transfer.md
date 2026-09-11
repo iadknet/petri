@@ -1,6 +1,6 @@
 # T14.F02 — Existing Counter Transfer
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-11
 **Feature**: T14.F02
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -214,14 +214,14 @@ report is 74,587 lines and 3.11 MB.
 
 ## Success Criteria
 
-- [ ] Every counter the track's F02 note names is readable in the stored goal
+- [x] Every counter the track's F02 note names is readable in the stored goal
       report, per case, except the two it excludes.
-- [ ] No transferred value is structurally constant, and no `HashMap` iteration
+- [x] No transferred value is structurally constant, and no `HashMap` iteration
       order reaches the report.
-- [ ] `mutation_events_applied_total_semantic_noop` and its twin no longer
+- [x] `mutation_events_applied_total_semantic_noop` and its twin no longer
       exist anywhere in the repository.
-- [ ] A report stored before this feature loads with the new blocks absent.
-- [ ] Byte-for-byte reproducibility across processes and thread counts is
+- [x] A report stored before this feature loads with the new blocks absent.
+- [x] Byte-for-byte reproducibility across processes and thread counts is
       preserved.
 
 ## Notes for AI Agents
@@ -243,3 +243,4 @@ report is 74,587 lines and 3.11 MB.
 - Deferred: P3 review finding, the trace-domain `TerminationReason` should be
   defined in `crates/v3-core/src/runtime/types.rs` and re-exported from
   `trace::domain` rather than imported across that layer boundary.
+- Cost: four implementer passes (build, self-review and benchmarks, post-review remediation, mutation gate) with 2 advisor consults each; reviewer findings 0 P1, 1 P2, 4 P3, the P2 and three P3s remediated and one P3 deferred; two benchmark generations, the second required because remediation changed report content; `/usage` totals not collected — the session ran unattended.
