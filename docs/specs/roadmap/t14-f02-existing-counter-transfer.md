@@ -28,17 +28,24 @@ that produced them.
   (T14.F05), the per-clade behavioral table (T14.F07), the progress page
   (T14.F11).
 - `MutationValueTotals::final_energy_sum`: excluded by the track's F02 note.
-  Verified structurally constant — it is only accumulated in
+  Verified zero on every benchmark path — it is only accumulated in
   `Simulation::remove_creature` (`crates/v3-core/src/simulation/simulation.rs:86`),
   which reads `creature.energy.max(0.0)`; starvation removal happens at
   energy ≤ 0, a predation kill removes the victim only at energy ≤ 0
   (`crates/v3-core/src/simulation/actions/predation.rs:110`) and bypasses this
-  funnel entirely, and creatures alive at the horizon are never removed. A
+  funnel entirely, and creatures alive at the horizon are never removed. Only
+  server-side paint-stroke eviction
+  (`Simulation::apply_paint_stroke`, `crates/v3-core/src/simulation/simulation.rs:80`)
+  reaches the funnel with positive energy, and no benchmark paints. A
   transferred column would be a permanent zero.
-- `viability_score_sum`, `viability_score_delta_sum` and
-  `mean_lifetime_energy_sum`: the first two are the composite observability
-  score the observation contract excludes, and per-creature energy means are
-  T14.F03's accounting. Only integer fields of `MutationValueTotals` transfer.
+- `viability_score_sum`, `viability_score_delta_sum`,
+  `mean_lifetime_energy_sum`, and the six classification counters
+  (`helpful_total`, `neutral_total`, `detrimental_total` and the three
+  confidence totals): the score sums are the composite observability score the
+  observation contract excludes, the classification counters are bucketings of
+  that same score via `classify_mutation_outcome` and go with it, and
+  per-creature energy means are T14.F03's accounting. Only the
+  applied-behavior integer sums of `MutationValueTotals` transfer.
 - Rewriting historical reports. A report stored before these blocks existed
   reads them as absent, never as zero.
 - Any change to the goal profile's indicator set, thresholds or epoch.
@@ -91,8 +98,10 @@ labelled as a distinction that is not made.
 **Report shape.** New blocks are `Option<T>` with `#[serde(default)]`, following
 the `moves_blocked_total_by_cause` precedent, so a historical report
 deserializes them as `None`. Each block is one struct with named integer
-fields; `bench.rs` builds it at the single site that constructs `WorldTracking`
-from `SimStats`.
+fields. They belong to the end-of-run per-case block only: `WorldTracking::observe`
+leaves them absent, `with_transferred_counters` adds them at the single
+end-of-run site, and they are `skip_serializing_if = "Option::is_none"` so a
+checkpoint sample carries exactly the field set it carried before this feature.
 
 ## Implementation Tasks
 
@@ -110,7 +119,8 @@ from `SimStats`.
       supply and target split, `mutation_outcome_summary` integer fields,
       per-operator integer value totals, predation counters and results,
       failed eats by requested type, energy-exhausted dispatches — all
-      deterministically ordered, and populate them at the single build site.
+      deterministically ordered, and populate them at the end-of-run per-case
+      site only, leaving checkpoint samples at their previous shape.
 - [x] Tests: the transferred report values equal the `SimStats` values that
       produced them; a report stored without the blocks loads with them absent;
       a failed eat of a type with no food increments only that type; a
@@ -200,7 +210,10 @@ non-null in all three world cases of the stored goal report.
   `medium` in place of `docs/workflow.md`'s Fable 5.1, authorized by the user
   in the goal command on 2026-09-11. Implementer and reviewer models are
   unchanged.
-- Decision: `final_energy_sum` is never transferred to a report. It is
-  structurally zero at its only accumulation site; a later feature that wants
-  energy at death defines it in T14.F03's accounting rather than reviving this
-  field.
+- Decision: `final_energy_sum` is never transferred to a report. It is zero on
+  every benchmark path, and only server-side paint-stroke eviction can make it
+  non-zero; a later feature that wants energy at death defines it in T14.F03's
+  accounting rather than reviving this field.
+- Deferred: P3 review finding, the trace-domain `TerminationReason` should be
+  defined in `crates/v3-core/src/runtime/types.rs` and re-exported from
+  `trace::domain` rather than imported across that layer boundary.

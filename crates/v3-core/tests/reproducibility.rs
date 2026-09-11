@@ -91,8 +91,8 @@ fn population_fingerprint(sim: &Simulation) -> Vec<CreatureFingerprint<'_>> {
         .collect()
 }
 
-/// The six deterministic work counters the benchmark harness reports.
-fn work_counters(sim: &Simulation) -> [(&'static str, u64); 6] {
+/// The seven deterministic work counters the benchmark harness reports.
+fn work_counters(sim: &Simulation) -> [(&'static str, u64); 7] {
     [
         ("mesh_hops", sim.stats.mesh_hops_total),
         ("vm_steps", sim.stats.vm_steps_total),
@@ -100,6 +100,10 @@ fn work_counters(sim: &Simulation) -> [(&'static str, u64); 6] {
         ("plasticity_updates", sim.stats.plasticity_updates_total),
         ("actions_applied", sim.stats.actions_applied_total),
         ("births", sim.stats.reproduction_actions_spawned_total),
+        (
+            "mesh_dispatches_energy_exhausted",
+            sim.stats.mesh_dispatches_energy_exhausted_total,
+        ),
     ]
 }
 
