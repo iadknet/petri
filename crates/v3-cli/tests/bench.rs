@@ -448,6 +448,15 @@ fn sweep_output_and_reference_selection_stay_separate_from_goal() {
         report.comparison.references.is_empty(),
         "a sweep without --baseline/--compare must not auto-select goal references"
     );
+    assert_eq!(
+        report.comparison.reference_absence.as_deref(),
+        Some("no reference paths were given")
+    );
+    let stdout = String::from_utf8_lossy(&accepted.stdout);
+    assert!(
+        stdout.contains("no comparison reference: no reference paths were given"),
+        "the absence cause is printed after the report is written; stdout: {stdout}"
+    );
 }
 
 /// A counter that was exactly zero in the reference but positive in the
