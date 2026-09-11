@@ -149,18 +149,6 @@ fn stats_accounting_invariant_in_cli_output() {
         applied_by_operator, mutation_applied,
         "applied_by_operator must reconcile to mutation_events_applied_total"
     );
-
-    let semantic_noop = sample["mutation_events_applied_total_semantic_noop"]
-        .as_u64()
-        .unwrap();
-    let semantic_change = sample["mutation_events_applied_total_semantic_change"]
-        .as_u64()
-        .unwrap();
-    assert_eq!(
-        semantic_noop + semantic_change,
-        mutation_applied,
-        "semantic categories must reconcile to mutation_events_applied_total"
-    );
 }
 
 #[test]

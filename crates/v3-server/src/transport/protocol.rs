@@ -72,8 +72,6 @@ pub struct StatusEventPayload {
     pub mutation_added_node_world_inputs_total_by_operator:
         std::collections::HashMap<String, std::collections::HashMap<String, u64>>,
     pub vm_live_read_world_inputs_current: std::collections::HashMap<String, u64>,
-    pub mutation_events_applied_total_semantic_noop: u64,
-    pub mutation_events_applied_total_semantic_change: u64,
     pub mutation_target_reachability_total: MutationTargetReachabilityTotalPayload,
     pub mutation_value_totals_by_operator:
         std::collections::HashMap<String, MutationOperatorValueTotalsPayload>,
@@ -256,10 +254,6 @@ pub fn build_status_event_payload(
             .mutation_added_node_world_inputs_total_by_operator
             .clone(),
         vm_live_read_world_inputs_current: health.vm_live_read_world_inputs_current.clone(),
-        mutation_events_applied_total_semantic_noop: health
-            .mutation_events_applied_total_semantic_noop,
-        mutation_events_applied_total_semantic_change: health
-            .mutation_events_applied_total_semantic_change,
         mutation_target_reachability_total: health.mutation_target_reachability_total.clone(),
         mutation_value_totals_by_operator: health.mutation_value_totals_by_operator.clone(),
         mutation_outcome_summary: health.mutation_outcome_summary.clone(),
@@ -571,8 +565,6 @@ mod tests {
             mutation_added_node_input_classes_total_by_operator: Default::default(),
             mutation_added_node_world_inputs_total_by_operator: Default::default(),
             vm_live_read_world_inputs_current: Default::default(),
-            mutation_events_applied_total_semantic_noop: 0,
-            mutation_events_applied_total_semantic_change: 0,
             mutation_target_reachability_total:
                 super::MutationTargetReachabilityTotalPayload::default(),
             mutation_value_totals_by_operator: Default::default(),

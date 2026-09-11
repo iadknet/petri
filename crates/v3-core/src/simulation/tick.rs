@@ -15,7 +15,9 @@ use crate::kernel::WorldState;
 use crate::runtime::mesh::execute_creature_mesh;
 use crate::runtime::plasticity::reward::apply_reward_modulated_updates;
 use crate::runtime::plasticity::traces::has_any_reward_modulated;
-use crate::runtime::trace::domain::{PerceptionDebugSnapshot, StaticInputsSnapshot, TickTrace};
+use crate::runtime::trace::domain::{
+    PerceptionDebugSnapshot, StaticInputsSnapshot, TerminationReason, TickTrace,
+};
 use crate::runtime::trace::recording::ActiveTrace;
 use crate::runtime::traced_mesh::execute_creature_mesh_traced;
 use crate::runtime::types::MeshOutput;
@@ -514,6 +516,7 @@ struct TickComputeStats {
     vm_steps: u64,
     graph_relax_iters: u64,
     plasticity_updates: u64,
+    energy_exhausted_dispatches: u64,
 }
 
 impl Default for TickComputeStats {
@@ -533,6 +536,7 @@ impl Default for TickComputeStats {
             vm_steps: 0,
             graph_relax_iters: 0,
             plasticity_updates: 0,
+            energy_exhausted_dispatches: 0,
         }
     }
 }
@@ -567,6 +571,9 @@ impl TickComputeStats {
         self.vm_steps += u64::from(work.vm_steps);
         self.graph_relax_iters += u64::from(work.graph_relax_iters);
         self.plasticity_updates += u64::from(work.plasticity_updates);
+        if output.termination_reason == TerminationReason::EnergyExhausted {
+            self.energy_exhausted_dispatches += 1;
+        }
 
         self.priority_bid_sum += output.priority_bid;
         if output.priority_bid > 0.0 {
@@ -603,6 +610,7 @@ impl TickComputeStats {
         stats.graph_relax_iters_total += self.graph_relax_iters;
         stats.plasticity_updates_total += self.plasticity_updates;
         stats.creature_ticks_total += u64::from(self.creature_count);
+        stats.mesh_dispatches_energy_exhausted_total += self.energy_exhausted_dispatches;
         stats.actions_applied_total += u64::from(
             stats.last_tick_move
                 + stats.last_tick_eat
@@ -729,6 +737,10 @@ fn execute_eat(
                 .or_insert(0) += 1;
         } else {
             action_result = ActionResult::NoFood;
+            *sim.stats
+                .eat_actions_failed_total_by_type
+                .entry(type_idx)
+                .or_insert(0) += 1;
             debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
         }
     }

@@ -16,8 +16,6 @@ fn mutation_summary_zero_has_zero_counts() {
     assert!(s.skip_reasons_by_operator.is_empty());
     assert!(s.added_node_input_classes_by_operator.is_empty());
     assert!(s.added_node_world_inputs_by_operator.is_empty());
-    assert_eq!(s.applied_semantic_noop_events, 0);
-    assert_eq!(s.applied_semantic_change_events, 0);
     assert_eq!(s.reachable_target_events, 0);
     assert_eq!(s.unreachable_target_events, 0);
     assert_eq!(s.not_applicable_events, 0);
@@ -387,25 +385,13 @@ fn record_reachability_increments_correct_counter() {
 fn reachability_accounting_matches_applied_events() {
     let mut s = MutationSummary::zero();
     // Simulate 3 applied events with reachability tracking
-    s.record_applied(
-        MutationDomain::Topology,
-        MutationOperator::TopologyAddNode,
-        MutationSemanticCategory::SemanticChange,
-    );
+    s.record_applied(MutationDomain::Topology, MutationOperator::TopologyAddNode);
     s.record_reachability(TargetReachability::Reachable);
 
-    s.record_applied(
-        MutationDomain::Vm,
-        MutationOperator::VmConstantMutation,
-        MutationSemanticCategory::SemanticChange,
-    );
+    s.record_applied(MutationDomain::Vm, MutationOperator::VmConstantMutation);
     s.record_reachability(TargetReachability::Unreachable);
 
-    s.record_applied(
-        MutationDomain::Topology,
-        MutationOperator::TopologyAddNode,
-        MutationSemanticCategory::SemanticChange,
-    );
+    s.record_applied(MutationDomain::Topology, MutationOperator::TopologyAddNode);
     s.record_reachability(TargetReachability::NotApplicable);
 
     let reachability_total =
@@ -420,7 +406,7 @@ fn operator_funnel_tracks_stage_counts_and_skip_reason_breakdown() {
     let domain = MutationDomain::Vm;
 
     s.record_attempt(domain, operator);
-    s.record_applied(domain, operator, MutationSemanticCategory::SemanticChange);
+    s.record_applied(domain, operator);
 
     s.record_attempt(domain, operator);
     s.record_skipped(operator, MutationSkipReason::NoApplicableTarget);
@@ -436,7 +422,6 @@ fn operator_funnel_tracks_stage_counts_and_skip_reason_breakdown() {
     assert_eq!(funnel.applicable, 2);
     assert_eq!(funnel.structurally_valid, 1);
     assert_eq!(funnel.applied, 1);
-    assert_eq!(funnel.semantic_change, 1);
     assert_eq!(funnel.skipped, 2);
 
     let by_reason = s

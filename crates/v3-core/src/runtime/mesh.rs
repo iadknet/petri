@@ -100,7 +100,9 @@ pub(crate) trait MeshExecutionMode {
     ) {
     }
 
-    fn finish(self, output: MeshOutput, termination_reason: TerminationReason) -> Self::Output;
+    /// Consume the finished evaluation. The termination reason travels on
+    /// [`MeshOutput::termination_reason`], so every mode reads the same value.
+    fn finish(self, output: MeshOutput) -> Self::Output;
 }
 
 pub(crate) struct UntracedMeshExecution;
@@ -159,7 +161,7 @@ impl MeshExecutionMode for UntracedMeshExecution {
     }
 
     #[inline]
-    fn finish(self, output: MeshOutput, _termination_reason: TerminationReason) -> MeshOutput {
+    fn finish(self, output: MeshOutput) -> MeshOutput {
         output
     }
 }
@@ -232,7 +234,8 @@ impl MeshExecutionMode for ObservedMeshExecution {
         self.hops.push((node.node_id, route));
     }
 
-    fn finish(self, output: MeshOutput, termination_reason: TerminationReason) -> Self::Output {
+    fn finish(self, output: MeshOutput) -> Self::Output {
+        let termination_reason = output.termination_reason;
         (
             output,
             MeshObservation {
@@ -270,8 +273,9 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
             cost_report: report,
             priority_bid: side_outputs.priority_bid,
             work_counters: side_outputs.work_counters,
+            termination_reason: TerminationReason::MissingNode,
         };
-        return mode.finish(output, TerminationReason::MissingNode);
+        return mode.finish(output);
     }
 
     loop {
@@ -281,8 +285,9 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
                 work_counters: side_outputs.work_counters,
+                termination_reason: TerminationReason::MaxHopsReached,
             };
-            return mode.finish(output, TerminationReason::MaxHopsReached);
+            return mode.finish(output);
         }
 
         // Invariant: verified present before the loop, and after every routing step.
@@ -348,8 +353,9 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
                 work_counters: side_outputs.work_counters,
+                termination_reason: TerminationReason::EnergyExhausted,
             };
-            return mode.finish(output, TerminationReason::EnergyExhausted);
+            return mode.finish(output);
         }
 
         if result.terminal {
@@ -358,8 +364,9 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
                 work_counters: side_outputs.work_counters,
+                termination_reason: TerminationReason::ActionEmitted,
             };
-            return mode.finish(output, TerminationReason::ActionEmitted);
+            return mode.finish(output);
         }
 
         // Routing via per-target gate scoring.
@@ -371,8 +378,9 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                         cost_report: report,
                         priority_bid: side_outputs.priority_bid,
                         work_counters: side_outputs.work_counters,
+                        termination_reason: TerminationReason::MissingNode,
                     };
-                    return mode.finish(output, TerminationReason::MissingNode);
+                    return mode.finish(output);
                 }
                 upstream_slots = result.output_slots;
                 current_node_id = id;
@@ -384,8 +392,9 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                     cost_report: report,
                     priority_bid: side_outputs.priority_bid,
                     work_counters: side_outputs.work_counters,
+                    termination_reason: TerminationReason::NoTargets,
                 };
-                return mode.finish(output, TerminationReason::NoTargets);
+                return mode.finish(output);
             }
         }
     }

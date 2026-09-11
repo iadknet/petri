@@ -1,6 +1,7 @@
 use crate::contracts::{ActionQueue, WorldAction};
 use crate::creature::genome::cgp::CUSTOM_OUTPUT_COUNT;
 use crate::runtime::routing::RouteGateMap;
+use crate::runtime::trace::domain::TerminationReason;
 
 /// Number of output slots produced by an evaluated cognition node.
 pub const OUTPUT_SLOT_COUNT: usize = CUSTOM_OUTPUT_COUNT as usize;
@@ -122,6 +123,9 @@ pub struct MeshOutput {
     pub priority_bid: f32,
     /// Deterministic integer work counters accumulated during this evaluation.
     pub work_counters: WorkCounters,
+    /// Why the mesh chain stopped. Carried on every execution mode's output so
+    /// the untraced production path can count terminations without a trace.
+    pub termination_reason: TerminationReason,
 }
 
 /// Sanitize an f32 value per v3-vm-isa-spec.md Section 5:

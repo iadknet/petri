@@ -314,8 +314,6 @@ mod tests {
                     mutation_added_node_input_classes_total_by_operator: Default::default(),
                     mutation_added_node_world_inputs_total_by_operator: Default::default(),
                     vm_live_read_world_inputs_current: Default::default(),
-                    mutation_events_applied_total_semantic_noop: 0,
-                    mutation_events_applied_total_semantic_change: 0,
                     mutation_target_reachability_total: Default::default(),
                     mutation_value_totals_by_operator: Default::default(),
                     mutation_outcome_summary: Default::default(),

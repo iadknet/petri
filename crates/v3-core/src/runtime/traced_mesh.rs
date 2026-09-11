@@ -156,7 +156,8 @@ impl MeshExecutionMode for RecordingMeshExecution {
         });
     }
 
-    fn finish(self, output: MeshOutput, termination_reason: TerminationReason) -> Self::Output {
+    fn finish(self, output: MeshOutput) -> Self::Output {
+        let termination_reason = output.termination_reason;
         (output, self.hops, termination_reason)
     }
 }

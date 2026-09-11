@@ -339,7 +339,7 @@ impl MutationEngine {
 
             match result {
                 Ok(reachability) => {
-                    summary.record_applied(domain, operator, operator.semantic_category());
+                    summary.record_applied(domain, operator);
                     if let Some(before) = tracked_before.as_ref() {
                         if let Some(classes) =
                             collect_added_node_input_classes(before, genome, operator)

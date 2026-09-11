@@ -147,6 +147,18 @@ imply, each against its own denominator:
 All of these fields are serde-defaulted; a report stored before T12.F04 is
 unmeasured, not zero.
 
+From T14.F02 the same tracking block also carries the runtime counters the
+simulation already maintains: `typed_eats_failed_total` (Eat actions that found
+no food, indexed by the food type the action named),
+`mesh_dispatches_energy_exhausted_total`, `mutation_supply` (attempted, applied
+and skipped events with the executed/reachable/unreachable/not-applicable
+target split), `mutation_outcome_summary` and
+`mutation_value_totals_by_operator` (the integer lifetime totals of creatures
+carrying an applied birth mutation, keyed by operator), and `predation`
+(attempted, transferred, rejected and kill totals with the per-result
+breakdown). Every keyed block is ordered by its key, and each block is absent —
+not zero — in a report stored before T14.F02.
+
 The `goal-worlds-v1` profile runs exactly the checked-in recipes under
 `experiments/worlds/`, one per seed, in the order those recipes are declared;
 each recipe carries its own seed. A world-set profile whose seed list is not
@@ -279,9 +291,7 @@ compact recursively key-sorted JSON SHA-256 encoding, not the input file bytes.
   "mutation_events_applied_total_by_operator": {
     "Topology.AddNode": 13,
     "Vm.VmInstructionMutation": 25
-  },
-  "mutation_events_applied_total_semantic_noop": 37,
-  "mutation_events_applied_total_semantic_change": 284
+  }
 }
 ```
 
