@@ -96,42 +96,44 @@ from `SimStats`.
 
 ## Implementation Tasks
 
-- [ ] Add `eat_actions_failed_total_by_type` to `SimStats` and increment it in
+- [x] Add `eat_actions_failed_total_by_type` to `SimStats` and increment it in
       the `NoFood` branch of `execute_eat`.
-- [ ] Carry `termination_reason` on `MeshOutput` and accumulate
+- [x] Carry `termination_reason` on `MeshOutput` and accumulate
       `mesh_dispatches_energy_exhausted_total` in the existing sequential
       queue-order reduction.
-- [ ] Delete `mutation_events_applied_total_semantic_noop`,
+- [x] Delete `mutation_events_applied_total_semantic_noop`,
       `mutation_events_applied_total_semantic_change`, `semantic_category` and
       `MutationSemanticCategory` from `v3-core`, and their carriers in
       `v3-cli`, `v3-server` and `frontend/src/types/protocol.ts`, with the
       reference specs under `docs/reference/` updated to match.
-- [ ] Extend `WorldTracking` with the optional transferred blocks — mutation
+- [x] Extend `WorldTracking` with the optional transferred blocks — mutation
       supply and target split, `mutation_outcome_summary` integer fields,
       per-operator integer value totals, predation counters and results,
       failed eats by requested type, energy-exhausted dispatches — all
       deterministically ordered, and populate them at the single build site.
-- [ ] Tests: the transferred report values equal the `SimStats` values that
+- [x] Tests: the transferred report values equal the `SimStats` values that
       produced them; a report stored without the blocks loads with them absent;
       a failed eat of a type with no food increments only that type; a
       dispatch that runs out of energy increments the exhausted total.
 
 ## Verification
 
-- [ ] Focused tests or checks: `cargo test -p v3-core --test viability` ->
-      `<result>`; `cargo test -p v3-core` -> `<result>`;
-      `cargo test -p v3-cli` -> `<result>`; `cargo test -p v3-server` ->
-      `<result>`; `make check` -> `<result>`.
-- [ ] Byte-identical reproduction across processes and thread counts:
+- [x] Focused tests or checks: `cargo test -p v3-core --test viability` ->
+      24 passed, 0 failed; `cargo test -p v3-core` -> 1362 passed and 3 ignored across eight
+      binaries, 0 failed; `cargo test -p v3-cli` -> 119 passed across four
+      binaries, 0 failed; `cargo test -p v3-server` -> 143 passed across three
+      binaries, 0 failed (all via `make check`, which runs the per-binary targets);
+      `make check` -> exit 0 on the final code.
+- [x] Byte-identical reproduction across processes and thread counts:
       `crates/v3-core/tests/reproducibility.rs` inside `make check` ->
-      `<result>`.
+      3 passed, 0 failed.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
-- [ ] Benchmark report stored at
+- [x] Benchmark report stored at
       `docs/progress/features/t14-f02-existing-counter-transfer.json` and
       `...-goal.json`.
-- [ ] Second goal run for the `deterministic` block: `Not applicable` — the
+- [x] Second goal run for the `deterministic` block: `Not applicable` — the
       goal profile runs once per closure and cross-process reproducibility is
       covered by `reproducibility.rs` inside `make check` (user decision,
       2026-09-05).
@@ -158,8 +160,17 @@ transferred mutation supply and target split, are what make T03.F10's
 lethality claim and T11.F17's targeting delivery re-readable at any later
 closure rather than only in the session that measured them.
 
-**Measured verdict.** `<one line per profile: exit status, severe flag,
-threshold crossings, epoch re-pin>`
+**Measured verdict.** Gate: exit 0, `severe=false` against both references,
+no threshold crossing, no epoch re-pin — every metric reads 0.000000 % against
+the T14.F01 gate report. Goal: exit 0, `severe=false` against both references,
+no epoch re-pin, and every metric and every per-case indicator reading is
+identical to T14.F01's stored goal report (0.000000 %), so the predeclared
+direction of **none** holds; the one `flag` level, `plasticity_updates`
++40.886836 % against T12.F04, is the value T14.F01 already stored against that
+same reference and is not moved by this feature. Caps: evolved neighborhood
+478.71 ms of 180,000, founder neighborhood 108.97 ms of 10,000, goal profile
+492.0 s of the 15-minute budget. All six transferred blocks are present and
+non-null in all three world cases of the stored goal report.
 
 - Reports: [gate](../../progress/features/t14-f02-existing-counter-transfer.json),
   [goal](../../progress/features/t14-f02-existing-counter-transfer-goal.json).
