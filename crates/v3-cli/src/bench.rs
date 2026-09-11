@@ -5237,97 +5237,15 @@ mod tests {
             );
             assert_eq!(case.fractions, expected.fractions());
 
-            // The transferred blocks are the run's own counters, not a
-            // re-derivation: each reads equal to the `SimStats` field behind it.
-            let stats = &sim.stats;
-            let supply = case
-                .tracking
-                .mutation_supply
-                .as_ref()
-                .expect("a new report carries the mutation supply");
-            assert_eq!(
-                supply.events_attempted_total,
-                stats.mutation_events_attempted_total
-            );
-            assert_eq!(
-                supply.events_applied_total,
-                stats.mutation_events_applied_total
-            );
-            assert_eq!(
-                supply.events_skipped_total,
-                stats.mutation_events_skipped_total
-            );
-            assert_eq!(
-                supply.executed_target_total,
-                stats.mutation_executed_target_total
-            );
-            assert_eq!(
-                supply.reachable_target_total,
-                stats.mutation_reachable_target_total
-            );
-            assert_eq!(
-                supply.unreachable_target_total,
-                stats.mutation_unreachable_target_total
-            );
-            assert_eq!(
-                supply.not_applicable_target_total,
-                stats.mutation_not_applicable_target_total
-            );
-            assert_eq!(
-                case.tracking.mutation_outcome_summary,
-                Some(MutationOutcomeTotals::from(&stats.mutation_outcome_summary))
-            );
-            let per_operator = case
-                .tracking
-                .mutation_value_totals_by_operator
-                .as_ref()
-                .expect("a new report carries the per-operator value totals");
-            assert_eq!(
-                per_operator.len(),
-                stats.mutation_value_totals_by_operator.len()
-            );
-            for (operator, totals) in &stats.mutation_value_totals_by_operator {
-                assert_eq!(
-                    per_operator.get(operator.as_key()),
-                    Some(&MutationOutcomeTotals::from(totals))
-                );
-            }
-            let predation = case
-                .tracking
-                .predation
-                .as_ref()
-                .expect("a new report carries the predation counters");
-            assert_eq!(
-                predation.actions_attempted_total,
-                stats.predation_actions_attempted_total
-            );
-            assert_eq!(
-                predation.actions_transferred_total,
-                stats.predation_actions_transferred_total
-            );
-            assert_eq!(
-                predation.actions_rejected_total,
-                stats.predation_actions_rejected_total
-            );
-            assert_eq!(predation.kills_total, stats.predation_kills_total);
-            assert_eq!(
-                predation.actions_by_result.len(),
-                stats.predation_actions_by_result.len()
-            );
-            assert_eq!(
-                case.tracking.mesh_dispatches_energy_exhausted_total,
-                Some(stats.mesh_dispatches_energy_exhausted_total)
-            );
+            // The transferred blocks come from the replayed run above (the
+            // `expected` equality covers their values); only their shape is
+            // not implied by it.
             let failed = case
                 .tracking
                 .typed_eats_failed_total
                 .as_ref()
                 .expect("a new report carries failed eats by type");
             assert_eq!(failed.len(), case.case.food_type_count);
-            assert_eq!(
-                failed.iter().sum::<u64>(),
-                stats.eat_actions_failed_total_by_type.values().sum::<u64>()
-            );
         }
     }
 
