@@ -1,7 +1,11 @@
 # Petri
 
-Petri is a Rust and React artificial-life simulation with mutable controllers,
-a live spatial ecosystem, and a dashboard backed by applied simulation state.
+This is a pet project of mine to experiment with genetic programming algorithms in an artifical life simulation.  It is based on a program I had fun playing with in college that used genetic programming principals to simulate an ecosystem of "creatures" that would scavenge, reproduce, communicate, and evolve.
+
+Petri is written in rust and is one of the primary projects I use to experiment with new agentic coding workflows and toolsets.
+
+It integrates an array of different artifical life and machine learning approaches with the goal of creating a small ecosystem of diverse creatures that can evolve complex behaviors.
+
 
 ![Petri creatures foraging in a live simulation](docs/assets/petri-creatures.gif)
 
