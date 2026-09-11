@@ -508,6 +508,16 @@ pub enum Indicator<T> {
     Defined(T),
 }
 
+impl<T> Indicator<T> {
+    /// The measured reading, or `None` when the indicator is undefined.
+    pub fn defined(&self) -> Option<&T> {
+        match self {
+            Indicator::Defined(reading) => Some(reading),
+            Indicator::Undefined(_) => None,
+        }
+    }
+}
+
 fn undefined_lineage_diversity() -> Indicator<LineageDiversity> {
     Indicator::Undefined(UNDEFINED.to_string())
 }
@@ -2944,19 +2954,19 @@ fn per_seed_indicator_readings(
     indicators: &GoalIndicators,
     seed: u64,
 ) -> [(String, Option<f64>); 6] {
-    let lineage = match &indicators.lineage_diversity {
-        Indicator::Defined(reading) => reading.per_seed.iter().find(|row| row.seed == seed),
-        Indicator::Undefined(_) => None,
-    };
-    let memory = match &indicators.memory_sensitivity {
-        Indicator::Defined(reading) => reading.per_seed.iter().find(|row| row.seed == seed),
-        Indicator::Undefined(_) => None,
-    };
+    let lineage = indicators
+        .lineage_diversity
+        .defined()
+        .and_then(|reading| reading.per_seed.iter().find(|row| row.seed == seed));
+    let memory = indicators
+        .memory_sensitivity
+        .defined()
+        .and_then(|reading| reading.per_seed.iter().find(|row| row.seed == seed));
     // Matched on the outer row's seed; the component rows carry their own.
-    let temporal = match &indicators.temporal_memory_sensitivity {
-        Indicator::Defined(reading) => reading.per_seed.iter().find(|row| row.seed == seed),
-        Indicator::Undefined(_) => None,
-    };
+    let temporal = indicators
+        .temporal_memory_sensitivity
+        .defined()
+        .and_then(|reading| reading.per_seed.iter().find(|row| row.seed == seed));
     let temporal_fraction =
         |component: fn(&TemporalMemorySensitivitySeed) -> &MemorySensitivitySeed| {
             temporal.and_then(|row| parse_reading(&component(row).different_from_either_fraction))
@@ -3011,14 +3021,8 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
         .per_seed
         .iter()
         .find(|row| row.seed == seed);
-    let neighborhood = match &observation.mutational_neighborhood {
-        Indicator::Defined(reading) => Some(reading),
-        Indicator::Undefined(_) => None,
-    };
-    let evolved = neighborhood.and_then(|reading| match &reading.evolved {
-        Indicator::Defined(half) => half.per_seed.first(),
-        Indicator::Undefined(_) => None,
-    });
+    let neighborhood = observation.mutational_neighborhood.defined();
+    let evolved = neighborhood.and_then(|reading| reading.evolved.defined()?.per_seed.first());
     let per_creature_tick = |count: fn(&PerSeed) -> u64| {
         run.and_then(|row| {
             (row.creature_ticks > 0).then(|| count(row) as f64 / row.creature_ticks as f64)
@@ -3103,14 +3107,13 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
     readings.extend([
         (
             "drift_changed_per_all_births_at_2000".to_string(),
-            match &observation.drift_depth {
-                Indicator::Defined(drift) => drift
+            observation.drift_depth.defined().and_then(|drift| {
+                drift
                     .readings
                     .iter()
                     .find(|row| row.depth == 2_000)
-                    .and_then(|row| parse_reading(&row.changed_per_all_births)),
-                Indicator::Undefined(_) => None,
-            },
+                    .and_then(|row| parse_reading(&row.changed_per_all_births))
+            }),
         ),
         (
             "founder_changed_per_all_births".to_string(),
@@ -3352,13 +3355,9 @@ fn resolves_to_same_file(path: &Path, output: &Path) -> bool {
 /// Join a relative path to the current directory and resolve `.` and `..`
 /// components without touching the filesystem.
 fn normalize_lexically(path: &Path) -> PathBuf {
-    let absolute = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        std::env::current_dir()
-            .map(|cwd| cwd.join(path))
-            .unwrap_or_else(|_| path.to_path_buf())
-    };
+    // `std::path::absolute` joins the current directory but, on Unix, keeps
+    // `.` and `..` components; those are resolved below.
+    let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     let mut normalized = PathBuf::new();
     for component in absolute.components() {
         match component {

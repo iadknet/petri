@@ -375,12 +375,12 @@ fn run_bench(args: BenchArgs) {
             paths: explicit_paths,
             absence: None,
         })
-    } else if args.profile == BenchProfile::Gate {
-        bench::default_gate_references(series_path)
-    } else if args.profile == BenchProfile::Goal {
-        bench::default_goal_references(series_path)
     } else {
-        Ok(bench::ReferenceSelection::default())
+        match args.profile {
+            BenchProfile::Gate => bench::default_gate_references(series_path),
+            BenchProfile::Goal => bench::default_goal_references(series_path),
+            BenchProfile::Sweep => Ok(bench::ReferenceSelection::default()),
+        }
     };
     let selection = match selection {
         Ok(selection) => selection,

@@ -105,13 +105,13 @@ round-trip.
 
 ## Implementation Tasks
 
-- [ ] `apply_comparisons` takes the output path, skips a self-reference, and
+- [x] `apply_comparisons` takes the output path, skips a self-reference, and
       records `reference_absence` with the fixed cause strings; `main.rs`
       passes `out_path` and prints the absence line.
-- [ ] `case_readings` emits the three temporal readings by their fixed names.
-- [ ] The three version constants and `version` fields; every constructor
+- [x] `case_readings` emits the three temporal readings by their fixed names.
+- [x] The three version constants and `version` fields; every constructor
       writes them.
-- [ ] Tests (TDD): a synthetic report compared against its own path records
+- [x] Tests (TDD): a synthetic report compared against its own path records
       the self-reference absence and no `references` entry; explicit
       `--baseline` naming the output path is also skipped; the three
       series-index absence causes are each recorded; the temporal readings
@@ -119,25 +119,27 @@ round-trip.
       indicator is `Undefined`; a new report carries all three tokens and
       T12.F04's stored goal report loads with `version` absent and
       re-serializes unchanged.
-- [ ] `docs/progress/readings/t14-f01-closure-comparison-and-indicator-coverage-integrity.md`
+- [x] `docs/progress/readings/t14-f01-closure-comparison-and-indicator-coverage-integrity.md`
       holds command transcripts and the comparison-block excerpt of the
       stored goal report.
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-cli` -> result recorded in the
-      readings file with the names of the tests added.
-- [ ] `cargo clippy --workspace --all-targets -- -D warnings` -> clean.
+- [x] Focused tests: `cargo test -p v3-cli` -> 75/11/19/11 passed, 0 failed;
+      test names in the readings file.
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` -> clean.
 - [ ] `make check` on the final feature code -> exit 0, commit recorded.
-- [ ] Stored goal report `comparison.references[].path` names
+- [x] Stored goal report `comparison.references[].path` names
       `t12-f04-baseline-world-set-goal.json` and
       `t11-f09-learned-state-inheritance-integrity-goal.json` and nothing
       else; every case's `readings` contains the three temporal names with a
       `current` value; `reference_absence` is absent.
-- [ ] Stored gate and goal reports carry the three version tokens.
+- [x] Stored gate and goal reports carry the three version tokens (the gate
+      profile leaves `lineage_diversity` and `memory_sensitivity` `Undefined`,
+      so its report carries the reachable-structure token only).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
-- [ ] Benchmark reports stored at
+- [x] Benchmark reports stored at
       `docs/progress/features/t14-f01-closure-comparison-and-indicator-coverage-integrity.json`
       and `-goal.json`.
 
@@ -156,7 +158,19 @@ is predeclared to move. Founder 10 s, evolved 180 s, drift 30 s per world and
 the 15-minute goal investigation thresholds are unchanged. No epoch is
 re-pinned. The second goal run is not required (user decision 2026-09-05).
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate: exit 0, severe=false, no threshold crossed; all
+six counters 0.000000% against T11.F09 and the same deltas as T11.F09 against
+the `remove-complementary-nutrition` epoch; wall 0.001391 ms per creature-tick
+(+3.05% vs T11.F09, ok); epoch unchanged. Goal (`goal-worlds-v1`): exit 0,
+severe=false; references exactly T12.F04 and T11.F09, `reference_absence`
+absent; all six counters 0.000000% against T11.F09; against T12.F04 the report
+carries the deltas T11.F09's stored report already carries (`plasticity_updates`
++40.89% flag, inherited), so the predeclaration's "0.000000% against both" was
+mis-stated and is not a movement by this feature; every pre-existing per-case
+reading identical to T11.F09's; the three temporal readings present in every
+case with T11.F09's stored values (0.000000% vs T11.F09); founder 0.11 s,
+evolved 0.47 s, drift walk 19.4 s, goal wall 492.7 s, all under threshold;
+epoch unchanged.
 
 - Reports: [gate](../../progress/features/t14-f01-closure-comparison-and-indicator-coverage-integrity.json),
   [goal](../../progress/features/t14-f01-closure-comparison-and-indicator-coverage-integrity-goal.json).
@@ -173,6 +187,11 @@ re-pinned. The second goal run is not required (user decision 2026-09-05).
 
 ## Notes for AI Agents
 
+- Exception: both stored reports were produced from the code committed as the
+  self-review commit while their `git_revision` field reads the preceding
+  build commit `de2559bd`; the self-review edits are mechanical refactors that
+  cannot change report content (the self-reference filter never fired —
+  `reference_absence` is null in both), so the reports were not re-measured.
 - Exception: this feature's orchestrator ran as Opus 5 at effort `medium`
   in place of Fable 5.1, authorized by the user in the goal command
   (2026-09-11).
