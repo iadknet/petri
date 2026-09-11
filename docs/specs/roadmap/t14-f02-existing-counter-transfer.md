@@ -129,17 +129,38 @@ checkpoint sample carries exactly the field set it carried before this feature.
 ## Verification
 
 - [x] Focused tests or checks: `cargo test -p v3-core --test viability` ->
-      24 passed, 0 failed; `cargo test -p v3-core` -> 1362 passed and 3 ignored across eight
+      24 passed, 0 failed; `cargo test -p v3-core` -> 1364 passed and 3 ignored across eight
       binaries, 0 failed; `cargo test -p v3-cli` -> 120 passed across four
       binaries, 0 failed; `cargo test -p v3-server` -> 143 passed across three
       binaries, 0 failed (all via `make check`, which runs the per-binary targets);
-      `make check` -> exit 0 on the final code.
+      `make check` -> exit 0 on the final code, and again after the two tests
+      the mutation gate added.
 - [x] Byte-identical reproduction across processes and thread counts:
       `crates/v3-core/tests/reproducibility.rs` inside `make check` ->
       3 passed, 0 failed.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here; `docs/workflow.md` requires it in the spec.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` ->
+      `41 mutants tested in 7m: 3 missed, 28 caught, 10 unviable`, output in
+      `~/.local/share/petri-tools/mutants/t14-f02/mutants.out`. All three
+      survivors are in the per-operator mutation funnel accumulation of
+      `apply_reproduce`, which the diff touches by deleting its
+      `semantic_change` line, and all three are **killed** by two added tests in
+      `crates/v3-core/src/simulation/actions/mod.rs`
+      (`reproduce_accumulates_applied_operator_funnel_across_births` and
+      `reproduce_accumulates_skipped_operator_funnel_across_births`); the
+      incremental rerun that retested only them reported
+      `3 mutants tested in 2m: 3 caught`.
+      - `crates/v3-core/src/simulation/actions/reproduction.rs:266:23: replace
+        += with *= in apply_reproduce` (`entry.applied`) — killed: the applied
+        test asserts the cumulative per-operator `applied` sum equals
+        `mutation_events_applied_total` and grows across two births.
+      - `crates/v3-core/src/simulation/actions/reproduction.rs:267:23: replace
+        += with -= in apply_reproduce` (`entry.skipped`) — killed: the skipped
+        test drives a birth whose every event the parseability gate rejects, so
+        the subtraction underflows a zero counter.
+      - `crates/v3-core/src/simulation/actions/reproduction.rs:267:23: replace
+        += with *= in apply_reproduce` (`entry.skipped`) — killed: the same test
+        asserts the cumulative `skipped` sum is above zero and grows across two
+        births.
 - [x] Benchmark report stored at
       `docs/progress/features/t14-f02-existing-counter-transfer.json` and
       `...-goal.json`. Both were regenerated on the post-review code, because
