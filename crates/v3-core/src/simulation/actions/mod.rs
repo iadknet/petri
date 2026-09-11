@@ -176,6 +176,24 @@ mod tests {
         (sim, id)
     }
 
+    /// Cumulative `applied` across every per-operator mutation funnel.
+    fn applied_funnel_total(sim: &Simulation) -> u64 {
+        sim.stats
+            .mutation_operator_funnel_total_by_operator
+            .values()
+            .map(|funnel| funnel.applied)
+            .sum()
+    }
+
+    /// Cumulative `skipped` across every per-operator mutation funnel.
+    fn skipped_funnel_total(sim: &Simulation) -> u64 {
+        sim.stats
+            .mutation_operator_funnel_total_by_operator
+            .values()
+            .map(|funnel| funnel.skipped)
+            .sum()
+    }
+
     #[test]
     fn energy_only_reproduction_needs_no_reserve_preparation() {
         let (mut sim, id) = make_sim_one_creature(Position::new(5, 5), 80.0);
@@ -590,6 +608,8 @@ mod tests {
             sim.config.mutation.phenotype.channel_change_chance = 0.0;
             sim.config.mutation.phenotype.polarity_flip_chance = 0.0;
             sim.config.mutation.phenotype.channel_step = 1;
+            sim.config.mutation.genome_size_pressure_enabled = true;
+            sim.config.mutation.genome_size_cap = 1;
 
             let parent_channels = sim.creatures[parent_id].phenotype_channels;
             let parent_generation = sim.creatures[parent_id].generation;
@@ -720,6 +740,88 @@ mod tests {
             sim.stats.mutation_executed_target_total <= sim.stats.mutation_reachable_target_total,
             "executed targets are a subset of reachable targets on this genome"
         );
+    }
+
+    /// Every birth adds its per-operator funnel to the cumulative one, so the
+    /// `applied` stage carries the running sum and decomposes the
+    /// simulation-wide applied-event total.
+    #[test]
+    fn reproduce_accumulates_applied_operator_funnel_across_births() {
+        // Arrange
+        let (mut sim, parent_id) = make_sim_one_creature(Position::new(5, 5), 400.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
+        sim.config.mutation.mutation_probability = 1.0;
+        sim.config.mutation.per_birth_mutation_events_min = 6;
+        sim.config.mutation.per_birth_mutation_events_max = 6;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
+
+        // Act
+        assert_eq!(
+            apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng),
+            ReproductionActionResult::Spawned
+        );
+
+        // Assert: the first birth's applied events are in the funnel.
+        let applied = applied_funnel_total(&sim);
+        assert!(applied > 0, "this birth applies at least one event");
+        assert_eq!(applied, sim.stats.mutation_events_applied_total);
+
+        // Act: a second birth from the same parent.
+        assert_eq!(
+            apply_reproduce(parent_id, &mut sim, Direction::S, 20.0, &mut rng),
+            ReproductionActionResult::Spawned
+        );
+
+        // Assert: the stage carries the sum over both births.
+        let applied_after = applied_funnel_total(&sim);
+        assert!(
+            applied_after > applied,
+            "the second birth adds its applied events ({applied} then {applied_after})"
+        );
+        assert_eq!(applied_after, sim.stats.mutation_events_applied_total);
+    }
+
+    /// An operator that is selected but whose result the parseability gate
+    /// rejects lands in the funnel's `skipped` stage, and that stage is
+    /// cumulative across births like every other.
+    #[test]
+    fn reproduce_accumulates_skipped_operator_funnel_across_births() {
+        // Arrange: a duplicated node id leaves every mutated genome
+        // unparseable, so each selected operator is rolled back and skipped.
+        let (mut sim, parent_id) = make_sim_one_creature(Position::new(5, 5), 400.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
+        sim.config.mutation.mutation_probability = 1.0;
+        sim.config.mutation.per_birth_mutation_events_min = 6;
+        sim.config.mutation.per_birth_mutation_events_max = 6;
+        let duplicate = sim.creatures[parent_id].genome.nodes[0].clone();
+        sim.creatures[parent_id].genome.nodes.push(duplicate);
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
+
+        // Act
+        assert_eq!(
+            apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng),
+            ReproductionActionResult::Spawned
+        );
+
+        // Assert: the rejected events are counted, and nothing applied.
+        let skipped = skipped_funnel_total(&sim);
+        assert!(skipped > 0, "a rejected operator is a skipped funnel event");
+        assert_eq!(applied_funnel_total(&sim), 0);
+        assert!(skipped <= sim.stats.mutation_events_skipped_total);
+
+        // Act: a second birth from the same parent.
+        assert_eq!(
+            apply_reproduce(parent_id, &mut sim, Direction::S, 20.0, &mut rng),
+            ReproductionActionResult::Spawned
+        );
+
+        // Assert: the stage carries the sum over both births.
+        let skipped_after = skipped_funnel_total(&sim);
+        assert!(
+            skipped_after > skipped,
+            "the second birth adds its skipped events ({skipped} then {skipped_after})"
+        );
+        assert!(skipped_after <= sim.stats.mutation_events_skipped_total);
     }
 
     #[test]
