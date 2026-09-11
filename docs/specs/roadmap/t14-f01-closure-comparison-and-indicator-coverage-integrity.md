@@ -1,6 +1,6 @@
 # T14.F01 — Closure Comparison and Indicator Coverage Integrity
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-11
 **Feature**: T14.F01
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -128,7 +128,8 @@ round-trip.
 - [x] Focused tests: `cargo test -p v3-cli` -> 75/11/20/11 passed, 0 failed;
       test names in the readings file.
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` -> clean.
-- [ ] `make check` on the final feature code -> exit 0, commit recorded.
+- [x] `make check` on the final feature code -> exit 0 at `bf53f3dd`
+      (log `/private/tmp/claude-501/-Users-istefanek-projects-petri/3210ad1f-6aec-4896-90a3-53405123209a/scratchpad/t14-f01-check.log`).
 - [x] Stored goal report `comparison.references[].path` names
       `t12-f04-baseline-world-set-goal.json` and
       `t11-f09-learned-state-inheritance-integrity-goal.json` and nothing
@@ -189,11 +190,11 @@ epoch unchanged.
 
 ## Success Criteria
 
-- [ ] A `bench` run whose only series candidate is its own output path
+- [x] A `bench` run whose only series candidate is its own output path
       records `reference_absence` and no self-comparison.
-- [ ] The stored goal report's every case comparison lists the three
+- [x] The stored goal report's every case comparison lists the three
       temporal memory readings.
-- [ ] New reports carry version tokens on the three indicators; historical
+- [x] New reports carry version tokens on the three indicators; historical
       reports load unchanged.
 
 ## Notes for AI Agents
