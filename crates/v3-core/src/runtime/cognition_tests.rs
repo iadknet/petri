@@ -210,7 +210,7 @@ fn graph_invalid_and_unwired_sinks_do_not_count_as_writes() {
     def.output_sinks = vec![
         OutputSink {
             kind: OutputSinkKind::WriteSlot(16),
-            inputs: vec![edge.clone()],
+            inputs: vec![edge],
         },
         OutputSink {
             kind: OutputSinkKind::ClearSlot(16),

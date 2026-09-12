@@ -186,7 +186,7 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
     };
     let node = |edges, modulated: bool| ComputeNode {
         kind: ComputeNodeKind::Constant(1.0),
-        inputs: vec![edge.clone(); edges],
+        inputs: vec![edge; edges],
         plasticity: Some(PlasticityConfig {
             rule: HebbianRule::Classic,
             learning_rate: 0.5,
@@ -218,7 +218,7 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
                 output_sinks: vec![
                     OutputSink {
                         kind: OutputSinkKind::WriteSlot(0),
-                        inputs: vec![edge.clone()],
+                        inputs: vec![edge],
                     },
                     OutputSink {
                         kind: OutputSinkKind::ClearSlot(0),
