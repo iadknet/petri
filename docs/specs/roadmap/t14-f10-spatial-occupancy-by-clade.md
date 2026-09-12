@@ -198,6 +198,15 @@ behind world totals.
   neighborhood 108.90 ms against the 10,000 ms cap; evolved neighborhood
   506.76 ms against the 180,000 ms cap. The stored goal report grows to
   109,387 lines (3.97 MB) from T14.F08's 78,187.
+- Artifact growth is larger than predeclared, because the reports are stored
+  pretty-printed and the block sits about eight levels deep, where whitespace
+  dominates: one grid is 1,854 bytes compact (`jq -c`) but averages 12,142 bytes
+  as stored. The goal report grew 728,537 bytes (0.73 MB, about +22 %) over its
+  60 checkpoints and the gate report 36,481 bytes over its 3. The Inputs and
+  Invariants comparison against row objects was compact-against-compact and
+  still holds in that form; a later per-checkpoint block — T14.F09's and
+  T14.F11's — must size itself from the stored ~12 KB, not from the compact
+  figure.
 - Full readings: [`docs/progress/readings/t14-f10.md`](../../progress/readings/t14-f10.md).
 
 ## Deviations
@@ -242,6 +251,12 @@ None of the three is a precedent for later features.
 - Decision: The distinct-clade count comes from a sorted `Vec` of
   `(cell_index, lineage_id)` pairs, so no hash iteration order reaches the
   stored report.
+- Deferred: The preconditions of the pure API in
+  `crates/v3-core/src/kernel/occupancy_grid.rs` are doc-comment only — a zero
+  `width` or `height` divides by zero, and a position outside the world indexes
+  past the grid and panics. The sole caller satisfies both and the absence of
+  clamping is deliberate, so `debug_assert!`s are declined here rather than
+  added as extra mutants to the gate.
 - Exception: The Deviations section's three model substitutions were authorized
   on 2026-09-12 for T14.F10 only; they set no precedent and reach no file on
   `main`.
