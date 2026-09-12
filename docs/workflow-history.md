@@ -132,6 +132,22 @@ rule from that policy landed. Both are written into the contract by this change.
 On 2026-09-12, the user changed the Codex orchestrator to Sol at `medium` and
 all three Astra subagent roles to `xhigh`.
 
+Later on 2026-09-12, the user isolated the two long-running mechanical closure
+checks from the feature implementer and orchestrator. A Terra `high` benchmark
+specialist now owns the gate and goal baseline runs and their records; a Sol
+`medium` mutation specialist owns the fresh mutation gate, survivor triage, and
+test-only remediation. They run sequentially and cannot weaken thresholds,
+replace baselines, or edit production code. Production remediation remains with
+the persistent Astra `xhigh` implementer and returns through fresh review before
+the affected final checks run again.
+
+The user then made the equivalent split for Claude. A Sonnet 5 benchmark
+specialist owns the gate and goal baseline runs and their records, and a separate
+Opus 5 `medium` mutation specialist owns the fresh mutation gate, survivor
+triage, and test-only remediation. Production remediation remains with a fresh
+Opus 5 `medium` roadmap implementer. The two mechanical specialists use narrow
+briefs and run sequentially without competing workloads.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the

@@ -6,7 +6,7 @@ Claude and Codex share the per-feature contract below. Codex uses the
 [Codex adapter](workflow-codex.md) for model, tool, and worktree differences;
 Claude uses the original instructions. Do not mix their session controls.
 Both may run concurrently on different eligible features. Claude's agent
-definitions, hooks, settings, and goal command remain active and unchanged.
+definitions, hooks, settings, and goal command remain active.
 
 ## Roles
 
@@ -16,6 +16,8 @@ Claude:
 | --- | --- | --- |
 | Orchestrator | Fable 5.1, effort `medium` | the session you paste the goal into |
 | Implementer | Opus 5, effort `medium`, Fable 5.1 advisor | `.claude/agents/roadmap-implementer.md` |
+| Benchmark specialist | Sonnet 5, default effort | `.claude/agents/roadmap-benchmark-specialist.md` |
+| Mutation specialist | Opus 5, effort `medium` | `.claude/agents/roadmap-mutation-specialist.md` |
 | Reviewer | Fable 5.1, effort `high`, read-only | `.claude/agents/roadmap-reviewer.md` |
 
 `.claude/settings.json` sets `advisorModel: fable` and `worktree.baseRef: head`.
@@ -34,6 +36,8 @@ is caught by `make check`.
 `make rust-mutants` runs cargo-mutants (installed through aqua's local
 registry) on the feature diff; it is deliberately outside `make check` and the
 stop gate, because its output is a survivor list to triage, not a score.
+The benchmark and mutation specialists run sequentially and never alongside
+each other or competing builds, tests, servers, or measurements.
 
 ## Run the next feature
 
@@ -77,7 +81,7 @@ completion conditions. Generating either template does not execute it.
 Substitute `<TNN.FNN>` and the lowercase `<tnn-fnn>` worktree name.
 
 ```
-/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Fable 5.1 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; plan and commit the flat spec there; delegate all implementation and remediation to the roadmap-implementer subagent and the final diff review to roadmap-reviewer; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
+/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Fable 5.1 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; plan and commit the flat spec there; delegate feature implementation and production-code remediation to roadmap-implementer, the gate and goal baseline runs and their records to roadmap-benchmark-specialist, the final diff review to roadmap-reviewer, and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
 ```
 
 The `/goal` evaluator reads only this conversation and runs no commands, so
@@ -123,8 +127,9 @@ review yourself, allow one revision, and commit it. Set the spec to
 
 ### Implement
 
-Delegate **all** implementation and remediation to `roadmap-implementer`. Write
-no feature code yourself. `SendMessage` is not exposed in the current Claude
+Delegate feature implementation and production-code remediation to
+`roadmap-implementer`. Mutation-gate test-only remediation belongs to
+`roadmap-mutation-specialist`. Write no feature code yourself. `SendMessage` is not exposed in the current Claude
 desktop client, so an implementer cannot be kept alive across passes: every pass
 starts a fresh agent and its brief carries what it needs. (This applies to Claude
 only. The Codex adapter has `followup_task` and `send_message` and keeps one
@@ -182,8 +187,10 @@ before review.
 **once, after the review and any post-review remediation are complete**, on the
 final feature code. Running it earlier tests code that then changes and forces a
 second full run; that ordering cost about two fresh runs per feature and up to
-six on one of them. Give a fresh implementer a brief whose only scope is this
-gate, its triage, and the spec's Verification record.
+six on one of them. Delegate it to a fresh `roadmap-mutation-specialist` whose
+only scope is this gate, its test-only triage, and the spec's Verification
+record. Give it the worktree and spec paths, feature ID, final-review result,
+and only the spec's Verification and Notes for AI Agents sections.
 
 The gate is a fresh `make rust-mutants` (`MUTANTS_ITERATE=0`, the default).
 The target diffs the worktree (committed, uncommitted, and untracked) against
@@ -198,7 +205,7 @@ this target.
 The `mutants` Cargo profile uses optimization level 1 with debug assertions and
 overflow checks retained. The wrapper records `fresh` or `incremental` in
 `run-mode.txt` beside `mutants.out` and identifies the mode in its output.
-The gate's implementer records in the spec's Verification section the summary line, the
+The mutation specialist records in the spec's Verification section the summary line, the
 output path, and the full survivor list, each survivor resolved as **killed**
 (a test added or strengthened, then the target rerun), **equivalent** (one
 sentence on why it cannot change observable behavior), or **deferred** (a
@@ -229,7 +236,7 @@ unresolved survivor is a blocker to report, not a number to hide.
 
 Delegate the final diff review to `roadmap-reviewer` with the worktree path, the
 feature ID, the spec path, and the spec sections the review needs: Goal, Inputs
-and Invariants, Verification including the survivor list, and Performance and
+and Invariants, Verification, and Performance and
 Goal Impact when the feature is subject to it. The reviewer reads the feature's
 own track row and the matching track Notes entries, not the whole track, and the
 no-spillover-re-read rule above applies to it as well.
@@ -281,10 +288,25 @@ behavior change that must go back through review at the severity it warrants.
 audit produced no P1. Moving it to the orchestrator keeps the check at the point
 where the record is final, with one reader rather than two.)
 
+### Benchmark gate
+
 Every feature closed after T10.F10 stores a benchmark report and completes the
 spec's Performance and Goal Impact section. A severe compute regression without
 a predeclared, justified cost is a P1. Never weaken a threshold or edit a stored
 baseline to make a feature pass.
+
+After the implementer has finished benchmark-affecting work and before final
+review, delegate the spec's required gate and goal profiles to a fresh
+`roadmap-benchmark-specialist`. Give it the worktree and spec paths, feature ID
+and slug, exact commands, and only the spec's Verification and Performance and
+Goal Impact sections. It owns the runs, stored reports and concise readings, and
+the recorded exit status, `severe` flag, threshold verdict, and report paths. It
+does not change thresholds or baselines, remediate code, or interpret unexpected
+results into a new requirement. Route those results through the orchestrator to
+the advisor and a fresh implementer as appropriate. If later production
+remediation invalidates a report, return only the affected final-code
+measurement to a fresh benchmark specialist before closure; this is not a
+second determinism check.
 
 From T11.F14 onward, the evolved-neighborhood observation cap is **180 seconds
 per goal-profile run, summed across seeds**

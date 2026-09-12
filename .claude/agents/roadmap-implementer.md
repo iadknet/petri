@@ -3,9 +3,10 @@ name: roadmap-implementer
 description: >-
   Implements or verifies one pass of exactly one roadmap feature (TNN.FNN)
   against its flat feature spec, in the feature worktree the orchestrator is
-  working in. Delegate all roadmap feature implementation and remediation to
-  this agent. Each pass is a fresh agent with a self-contained brief; it does
-  not persist across passes. Does not plan scope or review other work.
+  working in. Delegate feature implementation and production-code remediation
+  to this agent. Each pass is a fresh agent with a self-contained brief; it does
+  not persist across passes. Does not run closure mutation or benchmark gates,
+  plan scope, or review other work.
 model: opus
 effort: medium
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
@@ -85,34 +86,6 @@ you recorded. Prefer enums over string-typed states, declarative clap or serde
 constraints over repeated validation, and `std` or existing crate dependencies
 over hand-rolled utilities. Mention in your report what the pass changed.
 
-## Mutation survivors
-
-Only when your brief puts the mutation gate in scope. This gate runs once, after
-review and any remediation, on the final feature code — not at the end of an
-implementation pass. A build or self-review brief never runs it.
-
-Run `make rust-mutants` once. It mutation-tests only the code your diff touches (merge base with
-`main`, uncommitted and untracked files included) and prints every survivor:
-mutants missed by every test and mutants that timed out. Record in the spec's
-Verification section the summary line, the output path it printed, and the
-full survivor list, with each survivor resolved one of three ways:
-
-- **killed** — you added or strengthened a test that catches it and reran the
-  target (record the second summary line);
-- **equivalent** — the mutant cannot change observable behavior; say why in one
-  sentence;
-- **deferred** — a real gap you are not closing in this feature; record it as
-  a deferred finding in the spec's "Notes for AI Agents".
-
-Never edit production code to kill a mutant: a survivor is a test gap, never a
-reason to reshape the code under test. Never add `#[mutants::skip]` or an
-`exclude_re` entry without a written justification next to it; the reviewer
-treats an unjustified one as a waived check. Read timeouts as survivors, not
-noise. "No survivors" and "no changes against the merge base; nothing to
-mutate" are both valid records when they are what the target printed. The
-first run in a fresh environment builds cargo-mutants through aqua and can
-take several minutes before the report begins.
-
 ## Compile feedback
 
 A hook runs `scripts/implementer-compile-check` after every Edit or Write of a
@@ -130,10 +103,9 @@ checker output and you keep working until it passes. Do not try to bypass it.
 ## Reporting back
 
 When you finish (or hit a blocker), report to the orchestrator: the changed
-files, the exact commands you ran and their results, the `make rust-mutants`
-summary line and survivor resolutions when this pass ran them, how many times
-you consulted the advisor and the decisive guidance from each consult, and any
-blocker. Your report is the only thing the next pass inherits, so make it
+files, the exact commands you ran and their results, how many times you consulted
+the advisor and the decisive guidance from each consult, and any blocker. Your
+report is the only thing the next pass inherits, so make it
 self-contained: a later pass is a fresh agent with none of your context. Then
 stop.
 
