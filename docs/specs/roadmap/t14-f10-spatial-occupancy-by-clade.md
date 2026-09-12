@@ -1,6 +1,6 @@
 # T14.F10 — Spatial Occupancy by Clade
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-12
 **Feature**: T14.F10
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -61,10 +61,10 @@ A position bins by proportion:
 
 The multiply is in `u32`: `u16` overflows at `x >= 4096`, and the goal worlds
 are 1600 wide. The form needs no divisibility precondition and never yields
-`16` for an in-world position, because `x <= width - 1`. It coincides exactly
-with cell edges every 100 positions on the 1600x1600 goal worlds and every 8 on
-the 128x128 gate world, which is the "divisor of the world size" the track note
-asks for, without making divisibility a precondition a sweep could violate. The
+`16` for an in-world position, because `x <= width - 1`. It falls on exact
+cell edges every 100 positions on the 1600x1600 goal worlds and every 8 on the
+128x128 gate world — the track note's "divisor of the world size" without the
+precondition. The
 `cell_size = width / 16` form is rejected: on a width not divisible by 16 it
 indexes past the last cell. A world narrower than 16 leaves some cells
 unreachable; they report `0`, which is what an unoccupied cell reports anyway.
@@ -73,10 +73,9 @@ unreachable; they report `0`, which is what an unoccupied cell reports anyway.
 collects one `(flat_index, lineage_id)` pair per living creature into a `Vec`,
 `sort_unstable`s it, and counts distinct `lineage_id` runs within each index
 run. No `HashMap` or `HashSet` is iterated and no hash order reaches the report,
-per T14.F02's constraint. The sorted-`Vec` form is chosen over 256 per-cell
-`BTreeSet`s because it is one allocation per checkpoint rather than 256, and
-because a sort is an explicit total order rather than a set whose determinism
-rests on its element type.
+per T14.F02's constraint. The sorted-`Vec` form is chosen over 256
+per-cell `BTreeSet`s: one allocation per checkpoint, and an explicit total
+order.
 
 **Two parallel row-major arrays, always full.** The block carries `cells_x`,
 `cells_y`, and two vectors of length `cells_x * cells_y` in row-major order —
@@ -138,8 +137,8 @@ lives in `v3-core`, as T14.F08 split them.
 
 ## Verification
 
-- [ ] `make check` -> exit 0, run once on the final feature code; record the
-      tested commit.
+- [x] `make check` -> exit 0 at the tested commit `c7e85a0c`, run once on the
+      final feature code. The commits after it are this closure record.
 - [x] Focused tests at `b521b534`: `cargo test -p v3-core -p v3-cli` exit 0
       (1,335 v3-core unit tests and every v3-cli target pass, 0 failed, 2
       ignored), `cargo clippy -p v3-core -p v3-cli --all-targets` exit 0 with no
@@ -151,7 +150,7 @@ lives in `v3-core`, as T14.F08 split them.
       `~/.local/share/petri-tools/mutants/t14-f10/mutants.out`. The survivor
       list is empty: nothing was missed and nothing timed out. The two unviable
       mutants replace an `observe` constructor with `Default::default()` on a
-      type that has no `Default`, so they do not compile. Nothing changed after
+      type without `Default`, so they do not compile. Nothing changed after
       the run, so one fresh run stands. Log in the readings file.
 - [x] All sixty checkpoint samples of the stored goal report — twenty on each
       of Orchards in grassland, Canyon country and Confluence — carry the grid
@@ -203,15 +202,13 @@ behind world totals.
   neighborhood 108.90 ms against the 10,000 ms cap; evolved neighborhood
   506.76 ms against the 180,000 ms cap. The stored goal report grows to
   109,387 lines (3.97 MB) from T14.F08's 78,187.
-- Artifact growth is larger than predeclared, because the reports are stored
-  pretty-printed and the block sits about eight levels deep, where whitespace
-  dominates: one grid is 1,854 bytes compact (`jq -c`) but averages 12,142 bytes
-  as stored. The goal report grew 728,537 bytes (0.73 MB, about +22 %) over its
-  60 checkpoints and the gate report 36,481 bytes over its 3. The Inputs and
-  Invariants comparison against row objects was compact-against-compact and
-  still holds in that form; a later per-checkpoint block — T14.F09's and
-  T14.F11's — must size itself from the stored ~12 KB, not from the compact
-  figure.
+- Artifact growth is larger than predeclared: the reports are stored
+  pretty-printed and the block sits about eight levels deep, so one grid is
+  1,854 bytes compact (`jq -c`) but averages 12,142 as stored. The goal report
+  grew 728,537 bytes (0.73 MB, +22 %) over its 60 checkpoints and the gate
+  report 36,481 over its 3. The predeclared comparison against row objects was
+  compact-against-compact and holds in that form; a later per-checkpoint block
+  sizes itself from the stored ~12 KB, not the compact figure.
 - Full readings: [`docs/progress/readings/t14-f10.md`](../../progress/readings/t14-f10.md).
 
 ## Deviations
@@ -233,14 +230,14 @@ None of the three is a precedent for later features.
 
 ## Success Criteria
 
-- [ ] Every checkpoint sample of a stored benchmark report carries the 16x16
+- [x] Every checkpoint sample of a stored benchmark report carries the 16x16
       occupancy grid, on all three goal world cases, with population and
       distinct-clade counts per cell.
-- [ ] Two clades occupying different parts of one world are distinguishable in
+- [x] Two clades occupying different parts of one world are distinguishable in
       the stored grid from two clades sharing the same cells.
-- [ ] The readings are reproducible byte-for-byte across processes and thread
+- [x] The readings are reproducible byte-for-byte across processes and thread
       counts, consume no production RNG and change no execution.
-- [ ] Reports stored before this feature still load with the grid absent, and
+- [x] Reports stored before this feature still load with the grid absent, and
       the existing checkpoint readings, the `v3-cli run` tick sample and the
       server payload are unchanged.
 
@@ -265,3 +262,8 @@ None of the three is a precedent for later features.
 - Exception: The Deviations section's three model substitutions were authorized
   on 2026-09-12 for T14.F10 only; they set no precedent and reach no file on
   `main`.
+- Cost: Four implementer passes (build, self-review and measurement,
+  remediation, mutation gate) at 2, 2, 2 and 2 advisor consults; one reviewer
+  pass, 0 P1, 1 P2, 2 P3, all fixed or deferred above. One fresh mutation run
+  with no survivor, one gate run, one goal run. `/usage` is a user command this
+  session cannot read.

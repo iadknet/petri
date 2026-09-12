@@ -49,7 +49,7 @@ the microscope: it records applied behavior and adds no mechanism.
   - Goal: What the population can perceive is read at the checkpoints — which world inputs living brains reference, and how many read anything stateful — so a food niche nobody senses or a memory no brain reads is visible as a closed door.
 - [ ] **T14.F09 — Clade Persistence Timeline** — Depends on: T14.F04
   - Goal: Coexistence is read as duration: each founder clade's peak and, if it ends, its extinction tick, so a closure shows whether clades are lost in the founding crash or excluded one by one over the run.
-- [ ] **T14.F10 — Spatial Occupancy by Clade** — Depends on: T14.F04
+- [x] **T14.F10 — Spatial Occupancy by Clade** — Depends on: T14.F04
   - Goal: Where life is becomes readable on the worlds built to shape it — a coarse grid of population and clade count at each checkpoint — so habitat partitioning shows as a way of coexisting rather than staying invisible.
 - [ ] **T14.F11 — Progress Page Information Design** — Depends on: T14.F01
   - Goal: `docs/progress/index.html` reads as answers rather than a spray of charts: it leads with the questions the success definition asks, shows each indicator across the three worlds side by side against its floor and first reading, labels a single-run delta as single-run, and puts compute last — so a reader sees in one screen whether the world is more alive, more diverse and more cognitive than at the last closure.
