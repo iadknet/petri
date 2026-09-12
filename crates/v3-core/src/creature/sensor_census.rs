@@ -7,16 +7,16 @@
 //!
 //! Liveness is the analysis already in the tree, applied at key resolution
 //! instead of class resolution: [`collect_live_vm_instruction_indices`] for the
-//! VM backend, and the wired-surface edge walk `derive_cgp_annotations` uses
-//! for the graph backend. The graph walk covers live compute nodes *and* the
-//! wired output sinks, action-bank slots and execute gate, because a founder's
-//! world inputs are wired straight to its output sinks.
+//! VM backend, and the shared [`wired_surface_edges`] walk for the graph
+//! backend. That walk covers live compute nodes *and* the wired output sinks,
+//! action-bank slots and execute gate, because a founder's world inputs are
+//! wired straight to its output sinks.
 
 use std::collections::BTreeSet;
 
 use crate::contracts::{InputReference, OrdinaryFoodTypeId, WorldInputKey};
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, NodeClass};
-use crate::creature::genome::cgp_analysis::cgp_live_compute_indices;
+use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphSource, NodeClass};
+use crate::creature::genome::cgp_analysis::{cgp_live_compute_indices, wired_surface_edges};
 use crate::creature::genome::mesh_annotations::collect_live_vm_instruction_indices;
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 
@@ -89,33 +89,21 @@ fn census_graph(
     input_refs: &[InputReference],
     census: &mut CreatureSensorCensus,
 ) {
-    for idx in cgp_live_compute_indices(graph) {
-        let node = &graph.compute_nodes[idx];
-        if node.kind.class() == NodeClass::Stateful {
+    let live = cgp_live_compute_indices(graph);
+    for &idx in &live {
+        if graph.compute_nodes[idx].kind.class() == NodeClass::Stateful {
             census.holds_stateful_node = true;
         }
-        census_edges(&node.inputs, input_refs, census);
     }
-    for sink in &graph.output_sinks {
-        census_edges(&sink.inputs, input_refs, census);
-    }
-    for slot in &graph.action_bank {
-        census_edges(&slot.gate_inputs, input_refs, census);
-        census_edges(&slot.param_inputs, input_refs, census);
-    }
-    census_edges(&graph.execute_gate.inputs, input_refs, census);
-}
-
-fn census_edges(
-    edges: &[GraphEdge],
-    input_refs: &[InputReference],
-    census: &mut CreatureSensorCensus,
-) {
-    for edge in edges {
+    for edge in wired_surface_edges(graph, &live) {
         match edge.source {
             GraphSource::InputLeaf { ref_idx, .. } => {
                 insert_world_key(&mut census.world_inputs, input_refs.get(ref_idx as usize));
             }
+            // Deliberate and spec-mandated: the stateful table counts a
+            // shared-memory read on every wired surface, not on live compute
+            // nodes alone as `derive_cgp_annotations` does. Do not harmonize
+            // the two — a founder wires its edges straight onto its sinks.
             GraphSource::SharedMemory { .. } => census.reads_shared_memory = true,
             GraphSource::ComputeNode(_) => {}
         }
@@ -170,8 +158,8 @@ mod tests {
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::genome::analysis::mesh_reachable_nodes;
     use crate::creature::genome::cgp::{
-        ActionSlot, ActionSlotBehavior, ComputeNode, ComputeNodeKind, ExecuteGate, OutputSink,
-        OutputSinkKind, WorldActionKind,
+        ActionSlot, ActionSlotBehavior, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge,
+        OutputSink, OutputSinkKind, WorldActionKind,
     };
     use crate::creature::genome::{
         HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef, VmInstruction,
