@@ -129,6 +129,9 @@ The 2026-09-05 spec Verification cap and reviewer spot-check were recorded as
 decisions at the time but never reached the contract; only the one-goal-run
 rule from that policy landed. Both are written into the contract by this change.
 
+On 2026-09-12, the user changed the Codex orchestrator to Sol at `medium` and
+all three Astra subagent roles to `xhigh`.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the
