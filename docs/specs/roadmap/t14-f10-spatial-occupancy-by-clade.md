@@ -117,14 +117,14 @@ lives in `v3-core`, as T14.F08 split them.
 
 ## Implementation Tasks
 
-- [ ] A pure `v3-core` binning and aggregation function: `(Position, u32)` pairs
+- [x] A pure `v3-core` binning and aggregation function: `(Position, u32)` pairs
       plus world width and height to a fixed 16x16 grid of population and
       distinct-clade counts, under the index, ordering and full-array rules
       above.
-- [ ] Carry the grid on `PersistenceSample` as a structured optional block,
+- [x] Carry the grid on `PersistenceSample` as a structured optional block,
       aggregated only on sampled ticks and only from post-tick state, under the
       empty-population and historical-report rules above.
-- [ ] Tests: the bin edges of a width divisible by 16 and of one that is not;
+- [x] Tests: the bin edges of a width divisible by 16 and of one that is not;
       the far corner of a world landing in the last cell; a clade counted once
       per cell however many of its creatures stand there and counted separately
       in each cell it occupies; two clades in one cell and two clades split
