@@ -11,18 +11,17 @@ Use the shared Plan, Implement, Review, and Close contract above with these
 substitutions. This adapter uses native subagents and Git; it adds no runner,
 plugin, separate roadmap, or global model settings.
 
-Select `gpt-6-astra` with `low` reasoning effort when launching any feature.
+Select `gpt-5.6-sol` with `medium` reasoning effort when launching any feature.
 Verify the active session model and effort; this workflow does not set them.
-The implementer uses `low` reasoning effort ("Astra light").
 
 | Role | Model | Effort | Responsibility |
 | --- | --- | --- | --- |
-| Orchestrator | `gpt-6-astra` | `low` | Delegate, verify, integrate |
-| Spec owner and advisor | `gpt-6-astra` | `high` | Write spec, review readiness, advise implementation, resolve escalations; same agent throughout |
-| Implementer | `gpt-6-astra` | `low` | All feature code and remediation; same agent across passes |
-| Reviewer | `gpt-6-astra` | `medium` | Fresh-context final review |
+| Orchestrator | `gpt-5.6-sol` | `medium` | Delegate, verify, integrate |
+| Spec owner and advisor | `gpt-6-astra` | `xhigh` | Write spec, review readiness, advise implementation, resolve escalations; same agent throughout |
+| Implementer | `gpt-6-astra` | `xhigh` | All feature code and remediation; same agent across passes |
+| Reviewer | `gpt-6-astra` | `xhigh` | Fresh-context final review |
 
-The reviewer uses a fresh Astra context at `medium` effort for independent
+The reviewer uses a fresh Astra context at `xhigh` effort for independent
 review. The spec owner also provides implementation advice in the same
 persistent context; do not spawn a separate advisor. Advice is read-only with
 respect to feature code. Native subagents inherit the session's sandbox;
@@ -35,7 +34,7 @@ handles the shared Plan step; required checks, review severity rules, and
 integration conditions still follow the shared contract.
 
 After worktree setup, delegate the shared Plan step to `roadmap_spec_owner`
-with `model: gpt-6-astra`, `reasoning_effort: high`, and `fork_turns: none`.
+with `model: gpt-6-astra`, `reasoning_effort: xhigh`, and `fork_turns: none`.
 Give it the original user requirements, absolute repository/worktree paths,
 feature ID, and instructions to read `AGENTS.md`, the roadmap contract and
 template, and the sections it needs rather than whole files: from
@@ -73,7 +72,7 @@ intent as well as the spec and diff; do not reuse the spec owner for that review
 1. Ask **"give me the Codex goal prompt for the next roadmap feature."** Apply
    the shared next-feature rule using the current roadmap, not its dated example.
 2. Start a new **Local** Codex task in the main checkout on clean `main`.
-   Select **Astra**, effort **low**.
+   Select **Sol**, effort **medium**.
    The task stays rooted there while all
    feature edits and checks use the feature worktree's absolute path.
 3. Paste the substituted prompt below. The requested goal is explicit; use
@@ -82,12 +81,12 @@ intent as well as the spec and diff; do not reuse the spec owner for that review
    token budget. Use the native tool's rules for goal status and blockers.
 
 ```text
-Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and docs/workflow-codex.md, and follow the shared per-feature contract with the adapter's substitutions. Use Astra (gpt-6-astra, low) as orchestrator. Delegate spec writing, readiness review, and implementation advice to one separate persistent Astra (gpt-6-astra, high) spec owner and advisor. Return to that same agent at the workflow's advisor checkpoints and for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior; do not spawn a separate advisor. Use one persistent Astra (gpt-6-astra, low) subagent for all implementation and remediation and a fresh Astra (gpt-6-astra, medium) subagent for final review. Follow the adapter's waiting and context discipline: prefer 25-minute event-driven waits within tool and higher-priority session limits, do not duplicate healthy workers' work, and never interrupt or replace a worker solely because a wait timed out. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
+Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and docs/workflow-codex.md, and follow the shared per-feature contract with the adapter's substitutions. Use Sol (gpt-5.6-sol, medium) as orchestrator. Delegate spec writing, readiness review, and implementation advice to one separate persistent Astra (gpt-6-astra, xhigh) spec owner and advisor. Return to that same agent at the workflow's advisor checkpoints and for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior; do not spawn a separate advisor. Use one persistent Astra (gpt-6-astra, xhigh) subagent for all implementation and remediation and a fresh Astra (gpt-6-astra, xhigh) subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
 ```
 
 ### Start and worktree
 
-Replace Claude's Start model check with `gpt-6-astra`. Verify model and effort
+Replace Claude's Start model check with `gpt-5.6-sol`. Verify model and effort
 from available session metadata, not from an agent's self-description. Verify
 that native subagent tools expose explicit model and effort selection before
 starting; if unavailable, report the limitation instead of silently using a
@@ -112,13 +111,13 @@ app Handoff, or separate user-owned task is needed.
 ### Delegation and advice
 
 The orchestrator spawns `roadmap_implementer` with `model: gpt-6-astra`,
-`reasoning_effort: low`, and `fork_turns: none`. Supply a self-contained brief:
+`reasoning_effort: xhigh`, and `fork_turns: none`. Supply a self-contained brief:
 absolute repository and worktree paths, feature ID, spec path, assigned role,
 and instructions to read `AGENTS.md` and the sections it needs, not whole files:
 from `docs/workflow.md`, "Start", "Implement", and "Environmental pressures in
 the standard baseline"; from this adapter, "Start and worktree" and "Delegation
 and advice". Name the spec sections too, as the Implement step requires. The
-planning, launch, review, waiting, and close sections belong to the
+planning, launch, review, and close sections belong to the
 orchestrator, not to the implementer. A full-history
 fork cannot accept model overrides in the current desktop tools.
 
@@ -130,7 +129,7 @@ the implementer owns code edits; avoid simultaneous writes to the same documents
 The implementer requests advice through the orchestrator at the three existing
 advisor checkpoints: before choosing an approach, after the same failure
 recurs twice, and before reporting done. The orchestrator returns to the
-existing `roadmap_spec_owner` at `high`, using `followup_task` when idle or
+existing `roadmap_spec_owner` at `xhigh`, using `followup_task` when idle or
 `send_message` when running. Supply the implementer's question, current
 evidence, and worktree/spec paths; relay each answer back to the implementer.
 During consultations the spec owner reads and advises; it does not edit
@@ -170,50 +169,12 @@ and before reporting done. The orchestrator independently runs `make roadmap-che
 before accepting the implementer's report and `make check` before integration. These
 are required workflow checks, not an automatic SubagentStop gate.
 
-For final review, spawn `roadmap_reviewer` using `gpt-6-astra`, `medium`, and
+For final review, spawn `roadmap_reviewer` using `gpt-6-astra`, `xhigh`, and
 `fork_turns: none`. Provide the worktree/spec paths and feature ID; instruct it
 to read the shared Review contract and `.claude/agents/roadmap-reviewer.md`
 as a checklist, ignoring its Claude model/tool front matter. It must not edit,
 run tests/builds, or consult the spec owner. Do not reuse the spec owner as reviewer. Apply
 the existing severity rules and route remediation to the same implementer agent.
-
-### Waiting and context discipline
-
-Apply these rules while the spec owner, implementer, or reviewer is running:
-
-- When there is no concrete independent orchestrator work, call `wait_agent`
-  with `timeout_ms: 1500000` (25 minutes), subject to the tool's supported
-  range and higher-priority session instructions. Events and user input can
-  end the wait early. If session instructions impose a shorter blocking-wait
-  or communication limit, use the longest permitted interval instead; for
-  example, a 60-second limit means `timeout_ms: 60000`. State that limitation
-  once. Do not silently fall back to the 30-second default or build a custom
-  polling runner to bypass the limit.
-- A timeout alone is not evidence of a stalled worker. With no actionable
-  update, wait again. Do not add status probes, reread transcripts or diffs,
-  request "still working?" reports, or interrupt, replace, or restart a worker
-  solely because time elapsed. Intervene for a concrete error, an explicit
-  blocker or advice request, evidence of incorrect work, or user steering.
-- Do independent work only when it advances a named workflow obligation.
-  Do not duplicate the worker's investigation, implementation, or checks to
-  fill waiting time. Required orchestrator verification still runs at the
-  acceptance and integration gates after the worker hands off its result.
-- Keep briefs and replies scoped to the decision: paths, requirements,
-  changed facts, relevant evidence, and the question or result. Reuse the
-  persistent agents and their retained context; do not resend unchanged
-  documents or full histories. Request updates at handoffs, required advice
-  checkpoints, and blockers rather than on a timer. Follow higher-priority
-  user-update requirements without launching extra inspections merely to
-  manufacture progress to report.
-
-This adopts the behavioral mitigations proposed in the user's linked
-[Reddit comment](https://www.reddit.com/r/codex/comments/1wa9c9d/comment/p8gggw9/).
-The 25-minute interval is an operational preference, not a verified Codex
-prompt-cache lifetime or quota guarantee. Official
-[Astra API guidance](https://developers.openai.com/api/docs/guides/latest-model)
-documents API cache settings; it does not establish this desktop session's
-cache policy or subscription accounting. Savings and the same failure mode
-in Petri remain unmeasured.
 
 ### Close and integrate in Codex
 
