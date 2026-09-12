@@ -90,11 +90,9 @@ fn census_graph(
     census: &mut CreatureSensorCensus,
 ) {
     let live = cgp_live_compute_indices(graph);
-    for &idx in &live {
-        if graph.compute_nodes[idx].kind.class() == NodeClass::Stateful {
-            census.holds_stateful_node = true;
-        }
-    }
+    census.holds_stateful_node |= live
+        .iter()
+        .any(|&idx| graph.compute_nodes[idx].kind.class() == NodeClass::Stateful);
     for edge in wired_surface_edges(graph, &live) {
         match edge.source {
             GraphSource::InputLeaf { ref_idx, .. } => {

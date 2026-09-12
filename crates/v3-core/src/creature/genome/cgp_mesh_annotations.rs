@@ -48,11 +48,10 @@ pub(crate) fn derive_cgp_annotations(
         // Narrower than `sensor_census` on purpose: a shared-memory read
         // counts here only on a live compute node, where that census counts it
         // on the whole wired surface. Do not harmonize the two.
-        for edge in &node.inputs {
-            if let GraphSource::SharedMemory { .. } = edge.source {
-                has_stateful_behavior = true;
-            }
-        }
+        has_stateful_behavior |= node
+            .inputs
+            .iter()
+            .any(|edge| matches!(edge.source, GraphSource::SharedMemory { .. }));
     }
 
     // Read classes from InputLeaf edges anywhere on the wired surface.

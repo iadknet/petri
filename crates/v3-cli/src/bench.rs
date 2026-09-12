@@ -1721,13 +1721,12 @@ impl SensorCensus {
             creatures_with_stateful_node += u64::from(census.holds_stateful_node);
             creatures_with_any_stateful_read += u64::from(census.reads_any_stateful());
             for key in census.world_inputs {
-                // Every key lands on a row the universe already declared, so
-                // the row set is the same at every checkpoint: mutation draws
-                // food type ids from `config.world.food.types.len()` clamped
+                // The row set is the same at every checkpoint: mutation draws
+                // food type ids from `config.world.food.types.len()`, clamped
                 // to at least one (`mutation::sampling::sample_food_type_id`),
-                // and the universe above is the runtime catalog, which is that
-                // same list — or the single synthesized default when the
-                // config carries none, in which case only type 0 is drawn.
+                // and the universe above is the runtime catalog — that same
+                // list, or the one synthesized default when the config carries
+                // none. So no key can land outside the declared universe.
                 *world_inputs.entry(key).or_insert(0) += 1;
             }
         }
