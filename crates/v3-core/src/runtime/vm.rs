@@ -4,7 +4,9 @@ use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::routing::RouteGateMap;
-use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{
+    sanitize_f32, shared_memory_write_changed, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT,
+};
 use crate::sensors::perception::SensorSnapshot;
 use crate::simulation::energy_accounting::{applied_debit, observe_energy_change, DeathCause};
 
@@ -522,6 +524,8 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 let old_value = slot_copy[idx];
                 let new_value = sanitize_f32(regs[nr(*src, reg_count)]);
                 slot_copy[idx] = new_value;
+                side_outputs.work_counters.shared_memory_writes_changed +=
+                    u32::from(shared_memory_write_changed(old_value, new_value));
                 trace_sink.record_slot_write(idx, old_value, new_value);
             }
 
@@ -535,6 +539,8 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 let old_value = slot_copy[idx];
                 let new_value = sanitize_f32(regs[nr(*src, reg_count)]);
                 slot_copy[idx] = new_value;
+                side_outputs.work_counters.shared_memory_writes_changed +=
+                    u32::from(shared_memory_write_changed(old_value, new_value));
                 trace_sink.record_slot_write(idx, old_value, new_value);
             }
 
@@ -547,6 +553,8 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 let idx = (*slot_idx as usize) % 16;
                 let old_value = slot_copy[idx];
                 slot_copy[idx] = 0.0;
+                side_outputs.work_counters.shared_memory_writes_changed +=
+                    u32::from(shared_memory_write_changed(old_value, 0.0));
                 trace_sink.record_slot_write(idx, old_value, 0.0);
             }
         }

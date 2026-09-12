@@ -112,6 +112,11 @@ pub struct WorkCounters {
     /// Hebbian weight updates applied (reward-modulated updates are counted
     /// separately in `SimStats`, since they run after the mesh phase).
     pub plasticity_updates: u32,
+    /// Hebbian assignments whose final stored weight differs from its prior value.
+    pub plasticity_changes: u32,
+    /// Executed shared-memory store/clear events exceeding the trace epsilon.
+    /// Includes VM writes executed before a later exhaustion discards its copy.
+    pub shared_memory_writes_changed: u32,
 }
 
 /// Complete output of one creature's mesh evaluation for a single tick.
@@ -147,6 +152,13 @@ pub fn sanitize_f32(v: f32) -> f32 {
     } else {
         v.clamp(-CLAMP, CLAMP)
     }
+}
+
+/// The shared changed-write predicate for production memory events and VM traces.
+/// Call with the sanitized written value and the slot's immediately prior value.
+#[inline]
+pub(crate) fn shared_memory_write_changed(old_value: f32, new_value: f32) -> bool {
+    (old_value - new_value).abs() > f32::EPSILON
 }
 
 #[cfg(test)]

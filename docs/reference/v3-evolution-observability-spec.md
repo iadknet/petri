@@ -1,7 +1,7 @@
 # V3 Evolution Observability Spec
 
-Reference specification for minimal required mutation/reproduction observability
-signals in V3.
+Reference specification for minimal required mutation/reproduction and cognition
+observability signals in V3.
 
 Status: Active
 
@@ -18,7 +18,8 @@ Related references:
 
 This document defines the minimal required observability contract for:
 - mutation processing outcomes,
-- reproduction action outcomes.
+- reproduction action outcomes,
+- applied learning and shared-memory events.
 
 Minimal required scope includes:
 - required counters,
@@ -70,6 +71,35 @@ Implementations must expose, at minimum:
 
 Counter scope (tick-level, run-level, or both) may vary by implementation, but
 the semantic meaning of each counter must remain consistent.
+
+### Cognition counters
+
+From T14.F05, cumulative `SimStats` observations distinguish assignments from
+changes while preserving existing work accounting:
+
+- `plasticity_updates_total` counts Hebbian plus reward-modulated edge
+  assignments, including unchanged results; `hebbian_updates_total` and
+  `reward_modulated_updates_total` partition it.
+- `plasticity_changes_total` counts assignments whose final clamped `f32`
+  weight is unequal (`!=`) to the immediately prior weight. Its partitions are
+  `hebbian_changes_total` and `reward_modulated_changes_total`; each changed
+  count is at most that pathway's assignment count. Proposed deltas that clamp
+  or round away do not count as changes. Formulas, costs, and write timing are
+  unchanged.
+- `shared_memory_writes_changed_total` counts each executed VM store/clear and
+  applied wired Graph write/clear when the sanitized written value satisfies
+  `(old_value - new_value).abs() > f32::EPSILON`. Production and traced VM
+  execution share this predicate. Repeated writes use the immediate prior
+  value; a later reversal does not erase a counted event. VM writes executed
+  before later energy exhaustion still count, even though exhaustion discards
+  that dispatch's working memory copy. The unaffordable instruction does not
+  execute. Unwired/invalid Graph sinks, same-value writes, decay, snapshots,
+  initialization, and inheritance contribute no events.
+
+Dispatch-local integers join the existing queue-order reduction. Reward
+learning contributes in Phase 2.5. Observation/tracing on copies never commits
+to the running simulation's totals. The CLI's terminal report projects these
+counts without inferring learning or memory capability.
 
 Genome complexity stats:
 - Population-level `genome_complexity_mean`, `genome_complexity_min`, and

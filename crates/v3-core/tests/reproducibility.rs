@@ -92,13 +92,28 @@ fn population_fingerprint(sim: &Simulation) -> Vec<CreatureFingerprint<'_>> {
 }
 
 /// The deterministic work counters a report carries: the six compute counters
-/// the benchmark harness compares, plus the energy-exhausted dispatch total.
-fn work_counters(sim: &Simulation) -> [(&'static str, u64); 7] {
+/// the benchmark harness compares, plus terminal cognition and exhaustion totals.
+fn work_counters(sim: &Simulation) -> [(&'static str, u64); 13] {
     [
         ("mesh_hops", sim.stats.mesh_hops_total),
         ("vm_steps", sim.stats.vm_steps_total),
         ("graph_relax_iters", sim.stats.graph_relax_iters_total),
         ("plasticity_updates", sim.stats.plasticity_updates_total),
+        ("plasticity_changes", sim.stats.plasticity_changes_total),
+        ("hebbian_updates", sim.stats.hebbian_updates_total),
+        ("hebbian_changes", sim.stats.hebbian_changes_total),
+        (
+            "reward_modulated_updates",
+            sim.stats.reward_modulated_updates_total,
+        ),
+        (
+            "reward_modulated_changes",
+            sim.stats.reward_modulated_changes_total,
+        ),
+        (
+            "shared_memory_writes_changed",
+            sim.stats.shared_memory_writes_changed_total,
+        ),
         ("actions_applied", sim.stats.actions_applied_total),
         ("births", sim.stats.reproduction_actions_spawned_total),
         (

@@ -80,7 +80,7 @@ impl VmTraceSink for RecordingVmTraceSink {
     }
 
     fn record_slot_write(&mut self, slot_idx: usize, old_value: f32, new_value: f32) {
-        if (old_value - new_value).abs() > f32::EPSILON {
+        if crate::runtime::types::shared_memory_write_changed(old_value, new_value) {
             self.slot_writes.push(SlotWrite {
                 slot_idx: slot_idx as u8,
                 old_value,

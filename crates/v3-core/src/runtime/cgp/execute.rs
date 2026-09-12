@@ -229,18 +229,20 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             energy_consumed,
             action_queue: &queue_snapshot,
         };
-        let (plasticity_cost, plasticity_update_count) = hebbian::apply_hebbian_updates(
-            def,
-            node_idx,
-            &mut graph_runtime.plasticity_weights,
-            &curr_outputs,
-            input_refs,
-            &post_ctx,
-            shared_memory,
-            prev_shared_memory,
-            config.plasticity_update_cost,
-        );
+        let (plasticity_cost, plasticity_update_count, plasticity_changed_count) =
+            hebbian::apply_hebbian_updates(
+                def,
+                node_idx,
+                &mut graph_runtime.plasticity_weights,
+                &curr_outputs,
+                input_refs,
+                &post_ctx,
+                shared_memory,
+                prev_shared_memory,
+                config.plasticity_update_cost,
+            );
         side_outputs.work_counters.plasticity_updates += plasticity_update_count;
+        side_outputs.work_counters.plasticity_changes += plasticity_changed_count;
         let before = *energy;
         *energy -= plasticity_cost;
         side_outputs.energy_observation.hebbian_learning += applied_debit(before, *energy);
