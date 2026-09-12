@@ -39,7 +39,7 @@ the microscope: it records applied behavior and adds no mechanism.
   - Goal: Death is counted and attributed to the sink that caused it, and every energy flow the world applies is totalled, so a cost feature's effect is read from what it did rather than from what it charged.
 - [x] **T14.F04 — Population Readings on the Persistence Checkpoints** — Depends on: T14.F02
   - Goal: Lineage diversity, carried structure and generation depth are read at the checkpoints the run already samples, so a closure shows when a change took hold and not only where it ended.
-- [ ] **T14.F05 — Cognition Telemetry Resolution** — Depends on: T14.F02
+- [x] **T14.F05 — Cognition Telemetry Resolution** — Depends on: T14.F02
   - Goal: A plasticity update that moves a weight is distinguishable from one that does not, reward-modulated learning is counted separately from Hebbian, a shared-memory write that changes a slot is counted in production, and the memory indicator reports how many creatures could have responded at all.
 - [ ] **T14.F06 — Reproductive Success by Cognitive Class** — Depends on: T14.F03
   - Goal: Whether cognition pays is readable: creatures that read memory, hold state or learn are counted at death with their offspring and lifespan beside those that do not, so selection for remembering is read from outcomes rather than inferred from presence.
