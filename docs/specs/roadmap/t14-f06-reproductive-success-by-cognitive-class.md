@@ -140,9 +140,11 @@ or causal selection; class precedence also prevents independent-trait claims.
   reproducibility; `make roadmap-check` passes. Results: same readings file.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path,
   and every survivor here as killed, equivalent, or explicitly user-deferred.
-- [ ] Gate and one goal benchmark run store the reports below; their exits,
-  severe flags, threshold verdicts, class totals and observation budgets are
-  recorded in `docs/progress/readings/t14-f06.md`.
+- [x] Gate and one goal benchmark run stored the reports below; both exit 0 and
+  have `severe=false`. Gate is all `ok`; goal has one non-severe advisory flag
+  against its older epoch. Exact threshold verdicts, class totals, effective
+  configuration identities and observation budgets are in
+  `docs/progress/readings/t14-f06.md`.
 - [x] Second goal run: Not applicable under the shared one-run closure contract;
   cross-process reproducibility remains in `make check`, and the gate's two-run
   deterministic check remains required there.
@@ -187,7 +189,17 @@ make bench PROFILE=gate FEATURE=t14-f06-reproductive-success-by-cognitive-class
 make bench PROFILE=goal FEATURE=t14-f06-reproductive-success-by-cognitive-class
 ```
 
-**Measured verdict.** Pending gate and goal runs; no results are claimed.
+**Measured verdict.** Gate and goal completed sequentially on 2026-09-12 at
+revision `698510b4a233643f9934fc232375c0f78d939483`; both exit 0 and report
+`severe=false`. Gate is all `ok`. Goal is non-severe: the only normalized
+advisory flag is `plasticity_updates` (+40.886836% against the older T12.F04
+epoch), while its wall-clock comparison is `ok`; the matching T14.F03 goal
+comparison is all `ok`. Founder and evolved-neighborhood observations are
+within their 10 s and 180 s caps. The goal report includes the first terminal
+class totals for all three unchanged standard-world configuration identities.
+They are confounded removed-creature correlations, not a cognition-payoff or
+selection conclusion. Full values and comparison boundary:
+`docs/progress/readings/t14-f06.md`.
 
 - Reports: `docs/progress/features/t14-f06-reproductive-success-by-cognitive-class.json`
   and `docs/progress/features/t14-f06-reproductive-success-by-cognitive-class-goal.json`.
