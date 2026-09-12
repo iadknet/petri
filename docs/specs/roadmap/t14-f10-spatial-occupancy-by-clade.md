@@ -145,9 +145,14 @@ lives in `v3-core`, as T14.F08 split them.
       ignored), `cargo clippy -p v3-core -p v3-cli --all-targets` exit 0 with no
       warning, and `cargo fmt --all -- --check` exit 0; test names in the
       readings file.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here.
+- [x] One fresh `MUTANTS_ITERATE=0 make rust-mutants` at `9ac33c7f`, diffing
+      against merge base `e3d52444`: `21 mutants tested in 4m: 19 caught, 2
+      unviable`, and the target printed `rust-mutants: no survivors`. Output in
+      `~/.local/share/petri-tools/mutants/t14-f10/mutants.out`. The survivor
+      list is empty: nothing was missed and nothing timed out. The two unviable
+      mutants replace an `observe` constructor with `Default::default()` on a
+      type that has no `Default`, so they do not compile. Nothing changed after
+      the run, so one fresh run stands. Log in the readings file.
 - [x] All sixty checkpoint samples of the stored goal report — twenty on each
       of Orchards in grassland, Canyon country and Confluence — carry the grid
       with `cells_x == cells_y == 16`, both arrays at length 256, and the
