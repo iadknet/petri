@@ -1661,7 +1661,7 @@ pub struct PersistenceSample {
 
 /// The five population readings a checkpoint sample carries, read from
 /// post-tick state through the same accessors the horizon readings use.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 struct PopulationReadings {
     mean_genome_size: f64,
     mean_mesh_nodes: f64,
@@ -1681,20 +1681,6 @@ impl PopulationReadings {
             mean_generation,
             surviving_founder_clade_count,
             shannon_entropy_nats,
-        }
-    }
-}
-
-impl Default for PopulationReadings {
-    /// The empty-population reading: zero means that never reach the report,
-    /// no surviving clade, and undefined entropy.
-    fn default() -> Self {
-        Self {
-            mean_genome_size: 0.0,
-            mean_mesh_nodes: 0.0,
-            mean_generation: 0.0,
-            surviving_founder_clade_count: 0,
-            shannon_entropy_nats: UNDEFINED.to_string(),
         }
     }
 }
@@ -4340,13 +4326,26 @@ mod tests {
         assert_eq!(historical.environment.drift_depth_wall_clock_ms, None);
     }
 
+    /// The reading `PopulationReadings::observe` produces for an empty
+    /// population: zero means that never reach the report, no surviving clade,
+    /// and undefined entropy.
+    fn empty_readings() -> PopulationReadings {
+        PopulationReadings {
+            mean_genome_size: 0.0,
+            mean_mesh_nodes: 0.0,
+            mean_generation: 0.0,
+            surviving_founder_clade_count: 0,
+            shannon_entropy_nats: UNDEFINED.to_string(),
+        }
+    }
+
     /// Population readings a living tick stands in with: values keyed to the
     /// tick so a sample can be traced back to the tick it was taken on. An
-    /// empty population reads [`PopulationReadings::default`], exactly as
+    /// empty population reads [`empty_readings`], exactly as
     /// `PopulationReadings::observe` does.
     fn readings_for(tick: u64, population: u64) -> PopulationReadings {
         if population == 0 {
-            return PopulationReadings::default();
+            return empty_readings();
         }
         PopulationReadings {
             mean_genome_size: tick as f64,
@@ -4696,7 +4695,7 @@ mod tests {
     }
 
     #[test]
-    fn population_readings_of_an_empty_population_are_the_default_reading() {
+    fn population_readings_of_an_empty_population_are_zero_means_and_undefined_entropy() {
         let mut config = SimulationConfig::default();
         config.world.width = 32;
         config.world.height = 32;
@@ -4704,10 +4703,7 @@ mod tests {
         let sim = seed_simulation(config, 42);
         assert_eq!(sim.creatures.len(), 0);
 
-        assert_eq!(
-            PopulationReadings::observe(&sim),
-            PopulationReadings::default()
-        );
+        assert_eq!(PopulationReadings::observe(&sim), empty_readings());
     }
 
     #[test]
