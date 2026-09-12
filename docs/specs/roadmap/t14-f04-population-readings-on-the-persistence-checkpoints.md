@@ -161,8 +161,10 @@ read their own series off these same checkpoints.
   `t12-f04-baseline-world-set-goal` and the T14.F01 goal reference; no new
   threshold crossed — the only non-`ok` level is the `plasticity_updates` flag
   against T12.F04 that T14.F01 and T14.F02 already store, and every metric reads
-  0.000000 % against T14.F01, so the predeclared direction of **none** holds for
-  every goal indicator; epoch not re-pinned; evolved neighborhood 426.49 ms
+  0.000000 % against T14.F01; the predeclared direction of **none** holds for
+  every goal indicator, checked on the indicators themselves — with the five new
+  sample keys deleted, `deterministic.goal_indicators` is byte-identical to
+  T14.F02's stored goal report; epoch not re-pinned; evolved neighborhood 426.49 ms
   against the 180,000 ms cap, founder neighborhood 97.82 ms against the
   10,000 ms cap, total 460.45 s (7.67 min) against the 15-minute budget.
 
