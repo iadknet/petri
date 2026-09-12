@@ -220,3 +220,5 @@ selection conclusion. Full values and comparison boundary:
 
 - Decision: Cognitive class is a structural, mutually exclusive death cohort
   defined by the precedence above, not a claim of executed or useful cognition.
+- Decision: Final review found P1=0, P2=0, P3=1: the stale readings status
+  was corrected in documentation.
