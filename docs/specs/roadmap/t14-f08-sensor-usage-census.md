@@ -181,7 +181,8 @@ readings updates them.
       `each_stateful_split_counts_the_creatures_that_qualify_for_it`: its
       population holds one reader of each kind, so each split reads `1` where
       `*=` leaves `0`. No production code changed, and no `#[mutants::skip]` or
-      `exclude_re` was added. The second fresh run, at `b8399dd2`, prints
+      `exclude_re` was added. A second fresh run, the test set having changed, at
+      `b8399dd2`, prints
       `57 mutants tested in 8m: 35 caught, 22 unviable` — no survivor, no
       timeout.
 - [x] Checkpoint samples in the stored goal report carry the census at every
