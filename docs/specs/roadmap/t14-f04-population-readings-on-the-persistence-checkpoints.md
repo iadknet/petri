@@ -109,15 +109,24 @@ deserialize with these readings absent.
       `checkpoint_tracking_omits_every_transferred_block`, the
       `lineage_diversity` tests and the `v3-cli run` tick-sample tests.
       `cargo clippy -p v3-cli --all-targets` -> clean.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here; `docs/workflow.md` requires it in the spec.
-- [ ] Checkpoint samples in the stored goal report carry all five readings at
-      every checkpoint of all three world cases, and the `WorldTracking` key set
-      of a checkpoint sample is unchanged from T14.F02's stored report.
-- [ ] Benchmark reports stored at
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` at commit `f771c30d`, diff base
+      `b377b790`, output in
+      `~/.local/share/petri-tools/mutants/t14-f04/mutants.out`:
+      `11 mutants tested in 82s: 8 caught, 3 unviable`, then
+      `rust-mutants: no survivors`. Survivor list: none — no mutant was missed by
+      every test and none timed out, so no survivor needed killing, an
+      equivalence argument, or a deferral. No `#[mutants::skip]` and no
+      `exclude_re` entry was added, and no test or production file changed for
+      the gate.
+- [x] Checkpoint samples in the stored goal report carry all five readings at
+      every checkpoint of all three world cases: 20 samples per case, all five
+      keys present on each of the 60, none null. The sample key set grows by
+      exactly those five keys (12 -> 17); every T14.F02 key is present, none
+      removed, renamed or re-nested, so the `WorldTracking` key set of a
+      checkpoint sample is unchanged. Key diff in the readings file.
+- [x] Benchmark reports stored at
       `docs/progress/features/t14-f04-population-readings-on-the-persistence-checkpoints.json`
-      and its `-goal` companion.
+      and its `-goal` companion, both at `git_revision` `f771c30d`.
 
 ## Performance and Goal Impact
 
@@ -142,8 +151,20 @@ Goal impact: the horizon readings the report already trusts become a trajectory,
 so a later closure can say when a change took hold. T14.F08, T14.F09 and T14.F10
 read their own series off these same checkpoints.
 
-**Measured verdict.** One line per profile: exit status, the `severe` flag,
-whether any threshold was crossed, and whether the epoch was re-pinned.
+**Measured verdict.**
+
+- Gate profile: exit 0; `severe=false` against both `remove-complementary-nutrition`
+  and the T14.F01 gate reference; no threshold crossed, every metric `level=ok`;
+  epoch not re-pinned; founder neighborhood 57.44 ms against the 10,000 ms cap,
+  wall total 540.86 ms, 0.001265 wall ms per creature-tick.
+- Goal profile: exit 0, run once; `severe=false` against both
+  `t12-f04-baseline-world-set-goal` and the T14.F01 goal reference; no new
+  threshold crossed — the only non-`ok` level is the `plasticity_updates` flag
+  against T12.F04 that T14.F01 and T14.F02 already store, and every metric reads
+  0.000000 % against T14.F01, so the predeclared direction of **none** holds for
+  every goal indicator; epoch not re-pinned; evolved neighborhood 426.49 ms
+  against the 180,000 ms cap, founder neighborhood 97.82 ms against the
+  10,000 ms cap, total 460.45 s (7.67 min) against the 15-minute budget.
 
 - Reports: [gate](../../progress/features/t14-f04-population-readings-on-the-persistence-checkpoints.json),
   [goal](../../progress/features/t14-f04-population-readings-on-the-persistence-checkpoints-goal.json).
