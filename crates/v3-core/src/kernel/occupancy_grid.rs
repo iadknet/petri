@@ -47,15 +47,17 @@ impl Default for OccupancyGrid {
 ///
 /// Binning is by proportion: `(coord * 16) / extent`, multiplied in `u32`
 /// because `u16` overflows at `4096` and the goal worlds are `1600` wide. An
-/// in-world position never yields `16`, since `coord <= extent - 1`; a
-/// position outside the world, or a degenerate zero extent, lands in the last
-/// cell of its axis rather than past the end of the grid.
+/// in-world position never yields `16`, since `coord <= extent - 1`, so no
+/// divisibility precondition and no clamp is needed.
+///
+/// `position` is in-world and `width` and `height` are nonzero: the only
+/// caller bins one living creature per call, and a creature stands in a world
+/// with an extent.
 #[must_use]
 pub fn occupancy_cell_index(position: Position, width: u16, height: u16) -> usize {
     let axis = u32::from(OCCUPANCY_CELLS_PER_AXIS);
     let cell = |coord: u16, extent: u16| -> usize {
-        let bin = u32::from(coord) * axis / u32::from(extent).max(1);
-        bin.min(axis - 1) as usize
+        (u32::from(coord) * axis / u32::from(extent)) as usize
     };
     cell(position.y, height) * usize::from(OCCUPANCY_CELLS_PER_AXIS) + cell(position.x, width)
 }
@@ -137,18 +139,6 @@ mod tests {
             OCCUPANCY_CELL_COUNT - 1
         );
         assert_eq!(occupancy_cell_index(at(0, 0), 1, 1), 0);
-    }
-
-    #[test]
-    fn bins_an_out_of_world_position_into_the_last_cell_rather_than_past_the_grid() {
-        assert_eq!(
-            occupancy_cell_index(at(4_000, 4_000), 1600, 1600),
-            OCCUPANCY_CELL_COUNT - 1
-        );
-        assert_eq!(
-            occupancy_cell_index(at(7, 9), 0, 0),
-            OCCUPANCY_CELL_COUNT - 1
-        );
     }
 
     #[test]
