@@ -140,17 +140,21 @@ lives in `v3-core`, as T14.F08 split them.
 
 - [ ] `make check` -> exit 0, run once on the final feature code; record the
       tested commit.
-- [ ] Focused tests: `cargo test -p v3-core -p v3-cli`,
-      `cargo clippy -p v3-core -p v3-cli --all-targets` and
-      `cargo fmt --all -- --check`; test names in the readings file.
+- [x] Focused tests at `b521b534`: `cargo test -p v3-core -p v3-cli` exit 0
+      (1,335 v3-core unit tests and every v3-cli target pass, 0 failed, 2
+      ignored), `cargo clippy -p v3-core -p v3-cli --all-targets` exit 0 with no
+      warning, and `cargo fmt --all -- --check` exit 0; test names in the
+      readings file.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.
-- [ ] Checkpoint samples in the stored goal report carry the grid at every
-      checkpoint of all three world cases, with both arrays at full length and
-      the per-checkpoint population sum equal to the sample's `population`. Key
-      diff and the three worlds' occupied-cell counts in the readings file.
-- [ ] Benchmark reports stored at
+- [x] All sixty checkpoint samples of the stored goal report — twenty on each
+      of Orchards in grassland, Canyon country and Confluence — carry the grid
+      with `cells_x == cells_y == 16`, both arrays at length 256, and the
+      per-checkpoint population sum equal to the sample's own `population`; zero
+      failures. The horizon checkpoint occupies 202, 113 and 160 of 256 cells.
+      Key diff, jq transcript and the per-world table in the readings file.
+- [x] Benchmark reports stored at
       `docs/progress/features/t14-f10-spatial-occupancy-by-clade.json` and its
       `-goal` companion.
 
@@ -180,7 +184,20 @@ behind world totals.
 **Measured verdict.**
 
 - Reports: [gate](../../progress/features/t14-f10-spatial-occupancy-by-clade.json),
-  [goal](../../progress/features/t14-f10-spatial-occupancy-by-clade-goal.json).
+  [goal](../../progress/features/t14-f10-spatial-occupancy-by-clade-goal.json),
+  both run once at `b521b534` and stored at their default paths.
+- Both profiles exit 0 with `severe=false` against both references. The gate
+  crosses no threshold at all; the goal's only non-`ok` level is the
+  `plasticity_updates` flag inherited from T12.F04 since T14.F01, and both
+  profiles' `wall_clock` levels are `ok`. The epoch is not re-pinned.
+- Predeclared direction of **none** holds: deleting `occupancy_grid` from the
+  goal report's `deterministic.goal_indicators` and diffing the sorted block
+  against T14.F08's stored goal report gives an empty diff over 76,526 lines.
+  No indicator moved.
+- Cost: goal total 468.25 s (7.80 min) against the 15-minute budget; founder
+  neighborhood 108.90 ms against the 10,000 ms cap; evolved neighborhood
+  506.76 ms against the 180,000 ms cap. The stored goal report grows to
+  109,387 lines (3.97 MB) from T14.F08's 78,187.
 - Full readings: [`docs/progress/readings/t14-f10.md`](../../progress/readings/t14-f10.md).
 
 ## Deviations
