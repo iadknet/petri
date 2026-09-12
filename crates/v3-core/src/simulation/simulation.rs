@@ -44,13 +44,15 @@ impl Simulation {
         use rand::SeedableRng;
         // Ensure the world's FoodResource uses the simulation's food config.
         world.reconfigure_food(config.world.food.clone());
+        let mut stats = SimStats::default();
+        stats.energy_flows.food_intake_by_type = vec![0.0; config.world.food.types.len()];
         Self {
             world,
             creatures,
             action_logs: SecondaryMap::new(),
             tick,
             config,
-            stats: SimStats::default(),
+            stats,
             rng: SmallRng::seed_from_u64(seed),
         }
     }
@@ -85,6 +87,16 @@ impl Simulation {
     /// Remove one creature and record exit-time mutation value aggregates.
     pub fn remove_creature(&mut self, id: CreatureId) {
         if let Some(creature) = self.creatures.remove(id) {
+            use super::energy_accounting::DeathCause;
+            let cause = if creature.energy > 0.0 {
+                self.stats.energy_flows.external_removal_loss += f64::from(creature.energy);
+                DeathCause::ExternalRemoval
+            } else {
+                creature
+                    .pending_death_cause
+                    .unwrap_or(DeathCause::Unattributed)
+            };
+            self.stats.mortality.record(cause);
             let observation = build_mutation_outcome_observation(&creature, &self.config);
             let evaluation = self
                 .stats

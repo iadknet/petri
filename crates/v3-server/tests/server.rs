@@ -3330,7 +3330,8 @@ async fn energy_only_shared_reward_can_be_changed_live() {
                 &mut sim.creatures[id],
                 &mut sim.world,
                 &sim.config,
-                type_idx
+                type_idx,
+                &mut sim.stats.energy_flows
             ));
             assert!((sim.creatures[id].energy - 13.75).abs() < 1e-6);
         }

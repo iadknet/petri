@@ -226,7 +226,8 @@ fn typed_rewards_inherit_live_values_and_apply_cap_before_cost() {
             &mut sim.creatures[id],
             &mut sim.world,
             &sim.config,
-            OrdinaryFoodTypeId::new(1)
+            OrdinaryFoodTypeId::new(1),
+            &mut sim.stats.energy_flows
         ));
         assert_eq!(sim.creatures[id].energy, expected);
     }
@@ -237,7 +238,8 @@ fn typed_rewards_inherit_live_values_and_apply_cap_before_cost() {
         &mut sim.creatures[id],
         &mut sim.world,
         &sim.config,
-        OrdinaryFoodTypeId::new(1)
+        OrdinaryFoodTypeId::new(1),
+        &mut sim.stats.energy_flows
     ));
     assert_eq!(
         sim.creatures[id].energy,
@@ -248,7 +250,8 @@ fn typed_rewards_inherit_live_values_and_apply_cap_before_cost() {
         &mut sim.creatures[id],
         &mut sim.world,
         &sim.config,
-        OrdinaryFoodTypeId::new(99)
+        OrdinaryFoodTypeId::new(99),
+        &mut sim.stats.energy_flows
     ));
     assert_eq!(sim.creatures[id].energy, before - 2.0);
 }

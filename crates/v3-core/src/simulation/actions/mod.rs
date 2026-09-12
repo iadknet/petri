@@ -10,6 +10,7 @@ use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
+use crate::simulation::energy_accounting::{applied_debit, DeathCause, EnergyFlows};
 
 // ─── Action application functions ─────────────────────────────────────────────
 
@@ -52,12 +53,18 @@ impl BarrierReaderState {
 }
 
 /// Apply a NoOp action (deduct noop cost, scaled by genome complexity and age).
-pub fn apply_noop(creature: &mut CreatureState, config: &SimulationConfig) {
+pub fn apply_noop(
+    creature: &mut CreatureState,
+    config: &SimulationConfig,
+    flows: &mut EnergyFlows,
+) {
+    let before = creature.energy;
     creature.energy -= config.energy.adjusted_action_cost(
         config.energy.costs.noop_cost,
         creature.cached_complexity,
         creature.age,
     );
+    flows.action_charges.noop += creature.observe_energy(before, DeathCause::ActionNoop);
 }
 
 /// Apply a typed Eat action using the configured food owner for the cell.
@@ -67,7 +74,11 @@ pub fn apply_typed_eat(
     world: &mut WorldState,
     config: &SimulationConfig,
     type_idx: OrdinaryFoodTypeId,
+    flows: &mut EnergyFlows,
 ) -> bool {
+    flows
+        .food_intake_by_type
+        .resize(config.world.food.types.len(), 0.0);
     let food = world.consume_food_type(creature.position, type_idx);
     if food > 0.0 {
         let reward = config
@@ -77,14 +88,21 @@ pub fn apply_typed_eat(
             .get(usize::from(type_idx.get()))
             .and_then(|food_type| food_type.energy_per_unit)
             .unwrap_or(config.energy.costs.eat_reward_per_food);
-        creature.energy =
-            (creature.energy + food * reward).clamp(0.0, config.energy.lifecycle.max_energy);
+        let before = creature.energy;
+        let credited = creature.energy + food * reward;
+        creature.energy = credited.clamp(0.0, config.energy.lifecycle.max_energy);
+        flows.food_intake_by_type[usize::from(type_idx.get())] += applied_debit(credited, before);
+        flows.maximum_energy_clamp_loss += applied_debit(credited, creature.energy).max(0.0);
+        flows.zero_floor_credit += applied_debit(creature.energy, credited).max(0.0);
+        creature.observe_energy(before, DeathCause::ActionEat);
     }
+    let before = creature.energy;
     creature.energy -= config.energy.adjusted_action_cost(
         config.energy.costs.eat_cost,
         creature.cached_complexity,
         creature.age,
     );
+    flows.action_charges.eat += creature.observe_energy(before, DeathCause::ActionEat);
     food > 0.0
 }
 
@@ -99,6 +117,7 @@ pub fn apply_move(
     world: &mut WorldState,
     dir: Direction,
     config: &SimulationConfig,
+    flows: &mut EnergyFlows,
 ) -> bool {
     let target = world
         .resolve_neighbor(creature.position, dir)
@@ -113,11 +132,13 @@ pub fn apply_move(
         false
     };
 
+    let before = creature.energy;
     creature.energy -= config.energy.adjusted_action_cost(
         config.energy.costs.move_cost,
         creature.cached_complexity,
         creature.age,
     );
+    flows.action_charges.r#move += creature.observe_energy(before, DeathCause::ActionMove);
     succeeded
 }
 
@@ -219,6 +240,7 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::default(),
+            &mut sim.stats.energy_flows,
         );
         assert!(
             sim.creatures[id].energy > energy_before,
@@ -245,6 +267,7 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::default(),
+            &mut sim.stats.energy_flows,
         );
         assert_eq!(
             sim.creatures[id].energy,
@@ -267,6 +290,7 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::new(0),
+            &mut sim.stats.energy_flows,
         );
 
         assert!(succeeded);
@@ -287,7 +311,14 @@ mod tests {
         let energy_before = sim.creatures[id].energy;
         {
             let creature = sim.creatures.get_mut(id).unwrap();
-            let _ = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
+            let _ = apply_move(
+                id,
+                creature,
+                &mut sim.world,
+                Direction::N,
+                &sim.config,
+                &mut sim.stats.energy_flows,
+            );
         }
         // In wrap mode, N of (5,5) on a 10×10 world is (5,4).
         let expected = Position::new(5, 4);
@@ -311,7 +342,14 @@ mod tests {
         );
         {
             let creature = sim.creatures.get_mut(id).unwrap();
-            let _ = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
+            let _ = apply_move(
+                id,
+                creature,
+                &mut sim.world,
+                Direction::N,
+                &sim.config,
+                &mut sim.stats.energy_flows,
+            );
         }
         assert_eq!(
             sim.creatures[id].position, start,
@@ -371,7 +409,14 @@ mod tests {
         };
         {
             let creature = sim.creatures.get_mut(id1).unwrap();
-            let _ = apply_move(id1, creature, &mut sim.world, Direction::N, &sim.config);
+            let _ = apply_move(
+                id1,
+                creature,
+                &mut sim.world,
+                Direction::N,
+                &sim.config,
+                &mut sim.stats.energy_flows,
+            );
         }
         assert_eq!(
             sim.creatures[id1].position, pos1,
@@ -889,7 +934,14 @@ mod tests {
         let start = Position::new(5, 5);
         let (mut sim, id) = make_sim_one_creature(start, 50.0);
         let creature = sim.creatures.get_mut(id).unwrap();
-        let result = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
+        let result = apply_move(
+            id,
+            creature,
+            &mut sim.world,
+            Direction::N,
+            &sim.config,
+            &mut sim.stats.energy_flows,
+        );
         assert!(result, "successful move should return true");
     }
 
@@ -899,7 +951,14 @@ mod tests {
         let (mut sim, id) = make_sim_one_creature(start, 50.0);
         sim.world.set_barrier(Position::new(5, 4), true);
         let creature = sim.creatures.get_mut(id).unwrap();
-        let result = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
+        let result = apply_move(
+            id,
+            creature,
+            &mut sim.world,
+            Direction::N,
+            &sim.config,
+            &mut sim.stats.energy_flows,
+        );
         assert!(!result, "blocked move should return false");
     }
 
@@ -950,7 +1009,14 @@ mod tests {
             rng: rand::rngs::SmallRng::seed_from_u64(0),
         };
         let creature = sim.creatures.get_mut(id1).unwrap();
-        let result = apply_move(id1, creature, &mut sim.world, Direction::N, &sim.config);
+        let result = apply_move(
+            id1,
+            creature,
+            &mut sim.world,
+            Direction::N,
+            &sim.config,
+            &mut sim.stats.energy_flows,
+        );
         assert!(!result, "move into occupied cell should return false");
     }
 
@@ -967,6 +1033,7 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::default(),
+            &mut sim.stats.energy_flows,
         );
         assert!(result, "eating food should return true");
     }
@@ -982,6 +1049,7 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::default(),
+            &mut sim.stats.energy_flows,
         );
         assert!(!result, "eating empty cell should return false");
     }
@@ -1000,6 +1068,7 @@ mod tests {
             &mut sim.world,
             &sim.config,
             OrdinaryFoodTypeId::new(99),
+            &mut sim.stats.energy_flows,
         );
 
         assert!(!result);
@@ -1082,7 +1151,11 @@ mod tests {
         assert!(low_genome.complexity() <= 50);
         let (mut sim_low, id_low) = make_sim_with_genome(Position::new(5, 5), 100.0, low_genome);
         let energy_before_low = sim_low.creatures[id_low].energy;
-        apply_noop(sim_low.creatures.get_mut(id_low).unwrap(), &sim_low.config);
+        apply_noop(
+            sim_low.creatures.get_mut(id_low).unwrap(),
+            &sim_low.config,
+            &mut sim_low.stats.energy_flows,
+        );
         let cost_low = energy_before_low - sim_low.creatures[id_low].energy;
 
         // High-complexity creature (well above threshold): pays more
@@ -1093,6 +1166,7 @@ mod tests {
         apply_noop(
             sim_high.creatures.get_mut(id_high).unwrap(),
             &sim_high.config,
+            &mut sim_high.stats.energy_flows,
         );
         let cost_high = energy_before_high - sim_high.creatures[id_high].energy;
 
@@ -1118,6 +1192,7 @@ mod tests {
                 &mut sim_low.world,
                 &sim_low.config,
                 OrdinaryFoodTypeId::default(),
+                &mut sim_low.stats.energy_flows,
             );
         }
         let cost_low = energy_before_low - sim_low.creatures[id_low].energy;
@@ -1133,6 +1208,7 @@ mod tests {
                 &mut sim_high.world,
                 &sim_high.config,
                 OrdinaryFoodTypeId::default(),
+                &mut sim_high.stats.energy_flows,
             );
         }
         let cost_high = energy_before_high - sim_high.creatures[id_high].energy;
@@ -1161,6 +1237,7 @@ mod tests {
                 &mut sim_low.world,
                 Direction::N,
                 &sim_low.config,
+                &mut sim_low.stats.energy_flows,
             );
         }
         let cost_low = energy_before_low - sim_low.creatures[id_low].energy;
@@ -1176,6 +1253,7 @@ mod tests {
                 &mut sim_high.world,
                 Direction::N,
                 &sim_high.config,
+                &mut sim_high.stats.energy_flows,
             );
         }
         let cost_high = energy_before_high - sim_high.creatures[id_high].energy;
@@ -1299,13 +1377,18 @@ mod tests {
         apply_noop(
             sim_young.creatures.get_mut(id_young).unwrap(),
             &sim_young.config,
+            &mut sim_young.stats.energy_flows,
         );
         let cost_young = energy_before_young - sim_young.creatures[id_young].energy;
 
         let (mut sim_old, id_old) = make_sim_one_creature(Position::new(5, 5), 100.0);
         sim_old.creatures[id_old].age = 400;
         let energy_before_old = sim_old.creatures[id_old].energy;
-        apply_noop(sim_old.creatures.get_mut(id_old).unwrap(), &sim_old.config);
+        apply_noop(
+            sim_old.creatures.get_mut(id_old).unwrap(),
+            &sim_old.config,
+            &mut sim_old.stats.energy_flows,
+        );
         let cost_old = energy_before_old - sim_old.creatures[id_old].energy;
 
         assert!(
@@ -1326,6 +1409,7 @@ mod tests {
                 &mut sim_young.world,
                 &sim_young.config,
                 OrdinaryFoodTypeId::default(),
+                &mut sim_young.stats.energy_flows,
             );
         }
         let cost_young = energy_before_young - sim_young.creatures[id_young].energy;
@@ -1341,6 +1425,7 @@ mod tests {
                 &mut sim_old.world,
                 &sim_old.config,
                 OrdinaryFoodTypeId::default(),
+                &mut sim_old.stats.energy_flows,
             );
         }
         let cost_old = energy_before_old - sim_old.creatures[id_old].energy;
@@ -1363,6 +1448,7 @@ mod tests {
                 &mut sim_young.world,
                 Direction::N,
                 &sim_young.config,
+                &mut sim_young.stats.energy_flows,
             );
         }
         let cost_young = energy_before_young - sim_young.creatures[id_young].energy;
@@ -1378,6 +1464,7 @@ mod tests {
                 &mut sim_old.world,
                 Direction::N,
                 &sim_old.config,
+                &mut sim_old.stats.energy_flows,
             );
         }
         let cost_old = energy_before_old - sim_old.creatures[id_old].energy;
@@ -1474,7 +1561,7 @@ mod tests {
             for selected in 0..2 {
                 sim.creatures[id].energy = 10.0;
                 for index in 0..2 { sim.world.set_food_type(pos, OrdinaryFoodTypeId::new(index), density); }
-                let applied = apply_typed_eat(&mut sim.creatures[id], &mut sim.world, &sim.config, OrdinaryFoodTypeId::new(selected));
+                let applied = apply_typed_eat(&mut sim.creatures[id], &mut sim.world, &sim.config, OrdinaryFoodTypeId::new(selected), &mut sim.stats.energy_flows);
                 proptest::prop_assert!(applied);
                 proptest::prop_assert!((sim.creatures[id].energy - (10.0 + density * reward)).abs() < 1e-5);
                 proptest::prop_assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(selected)), 0.0);
@@ -1514,6 +1601,9 @@ mod tests {
                 expected
             );
             assert_eq!(sim.creatures[id].energy, 1.0);
+            assert_eq!(sim.stats.energy_flows.action_charges.reproduce, 0.0);
+            assert_eq!(sim.stats.energy_flows.parental_transfer_debit, 0.0);
+            assert_eq!(sim.stats.energy_flows.offspring_energy_credit, 0.0);
         }
         for (energy, request) in [
             (20.0, 10.0),
@@ -1541,6 +1631,12 @@ mod tests {
                 ReproductionActionResult::RejectedEnergyConstraints
             );
             assert!((sim.creatures[id].energy - (energy - cost)).abs() < 1e-6);
+            assert_eq!(
+                sim.stats.energy_flows.action_charges.reproduce,
+                f64::from(energy) - f64::from(energy - cost)
+            );
+            assert_eq!(sim.stats.energy_flows.parental_transfer_debit, 0.0);
+            assert_eq!(sim.stats.energy_flows.offspring_energy_credit, 0.0);
             assert_eq!(sim.creatures.len(), 1);
         }
         let (mut sim, id) = make_sim_one_creature(Position::new(5, 5), 180.0);
@@ -1579,7 +1675,8 @@ mod tests {
             &mut sim.creatures[id],
             &mut sim.world,
             &sim.config,
-            OrdinaryFoodTypeId::default()
+            OrdinaryFoodTypeId::default(),
+            &mut sim.stats.energy_flows
         ));
         assert_eq!(sim.creatures[id].energy, 48.0);
     }

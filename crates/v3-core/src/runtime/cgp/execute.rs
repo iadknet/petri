@@ -11,6 +11,7 @@ use crate::runtime::plasticity::traces;
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
+use crate::simulation::energy_accounting::{applied_debit, observe_energy_change, DeathCause};
 
 /// Callback trait for instrumenting the ordered graph evaluation.
 #[allow(clippy::too_many_arguments)]
@@ -116,7 +117,15 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     // The wire counter records entered nonempty graph visits, even when unaffordable.
     side_outputs.work_counters.graph_relax_iters += 1;
     let pass_cost = config.graph_node_base_cost * node_count as f32;
+    let before = *energy;
     *energy -= pass_cost;
+    side_outputs.energy_observation.graph_compute += applied_debit(before, *energy);
+    observe_energy_change(
+        &mut side_outputs.energy_observation.pending_cause,
+        f64::from(before),
+        f64::from(*energy),
+        DeathCause::GraphCompute,
+    );
     tracer.on_pass_start(0, pass_cost, *energy);
     if *energy <= 0.0 {
         tracer.on_pass_end(0.0);
@@ -232,7 +241,15 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             config.plasticity_update_cost,
         );
         side_outputs.work_counters.plasticity_updates += plasticity_update_count;
+        let before = *energy;
         *energy -= plasticity_cost;
+        side_outputs.energy_observation.hebbian_learning += applied_debit(before, *energy);
+        observe_energy_change(
+            &mut side_outputs.energy_observation.pending_cause,
+            f64::from(before),
+            f64::from(*energy),
+            DeathCause::HebbianLearning,
+        );
         if *energy <= 0.0 {
             tracer.on_finish(
                 graph_runtime

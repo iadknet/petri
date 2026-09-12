@@ -189,6 +189,8 @@ pub struct PhaseWallClock {
 /// of each call to `run_tick`.
 #[derive(Debug, Clone, Default)]
 pub struct SimStats {
+    pub mortality: super::energy_accounting::MortalityTotals,
+    pub energy_flows: super::energy_accounting::EnergyFlows,
     // ── Cumulative (never reset) ─────────────────────────────────────────────
     pub reproduction_actions_attempted_total: u64,
     pub reproduction_actions_spawned_total: u64,

@@ -67,8 +67,8 @@ rust-test-terrain: ## Run v3-core startup terrain integration tests.
 rust-test-baseline-worlds: ## Run v3-core saved baseline world and food-substrate tests.
 	@cargo test -p v3-core --test baseline_worlds
 
-rust-test-reproducibility: ## Run the v3-core seeded-run reproducibility test.
-	@cargo test -p v3-core --test reproducibility
+rust-test-reproducibility: ## Run the v3-core seeded-run and sampled-trajectory reproducibility tests.
+	@cargo test -p v3-core --test reproducibility --test applied_trajectory
 
 rust-test-vm-all-opcodes: ## Run v3-core VM opcode integration tests.
 	@cargo test -p v3-core --test vm_all_opcodes_e2e

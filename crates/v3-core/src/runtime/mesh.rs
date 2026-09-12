@@ -273,6 +273,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
             cost_report: report,
             priority_bid: side_outputs.priority_bid,
             work_counters: side_outputs.work_counters,
+            energy_observation: side_outputs.energy_observation,
             termination_reason: TerminationReason::MissingNode,
         };
         return mode.finish(output);
@@ -285,6 +286,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
                 work_counters: side_outputs.work_counters,
+                energy_observation: side_outputs.energy_observation,
                 termination_reason: TerminationReason::MaxHopsReached,
             };
             return mode.finish(output);
@@ -353,6 +355,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
                 work_counters: side_outputs.work_counters,
+                energy_observation: side_outputs.energy_observation,
                 termination_reason: TerminationReason::EnergyExhausted,
             };
             return mode.finish(output);
@@ -364,6 +367,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
                 work_counters: side_outputs.work_counters,
+                energy_observation: side_outputs.energy_observation,
                 termination_reason: TerminationReason::ActionEmitted,
             };
             return mode.finish(output);
@@ -378,6 +382,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                         cost_report: report,
                         priority_bid: side_outputs.priority_bid,
                         work_counters: side_outputs.work_counters,
+                        energy_observation: side_outputs.energy_observation,
                         termination_reason: TerminationReason::MissingNode,
                     };
                     return mode.finish(output);
@@ -392,6 +397,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                     cost_report: report,
                     priority_bid: side_outputs.priority_bid,
                     work_counters: side_outputs.work_counters,
+                    energy_observation: side_outputs.energy_observation,
                     termination_reason: TerminationReason::NoTargets,
                 };
                 return mode.finish(output);
@@ -475,6 +481,89 @@ mod tests {
             observed.termination_reason,
             TerminationReason::EnergyExhausted
         ));
+    }
+
+    #[test]
+    fn applied_energy_observations_survive_all_mesh_exits_in_every_mode() {
+        let id = NodeId::new(0);
+        let next = NodeId::new(1);
+        let config = RuntimeConfig {
+            max_mesh_hops: 1,
+            ..default_config()
+        };
+        let cases = [
+            (vec![], 100.0, TerminationReason::MissingNode),
+            (
+                vec![vm_halt_with_route(id, 1.0, vec![])],
+                100.0,
+                TerminationReason::NoTargets,
+            ),
+            (
+                vec![vm_emit_node(id, 0, vec![])],
+                100.0,
+                TerminationReason::ActionEmitted,
+            ),
+            (
+                vec![vm_emit_node(id, 0, vec![])],
+                0.0,
+                TerminationReason::EnergyExhausted,
+            ),
+            (
+                vec![vm_halt_with_route(id, 1.0, vec![next])],
+                100.0,
+                TerminationReason::MissingNode,
+            ),
+            (
+                vec![
+                    vm_halt_with_route(id, 1.0, vec![next]),
+                    vm_emit_node(next, 0, vec![]),
+                ],
+                100.0,
+                TerminationReason::MaxHopsReached,
+            ),
+        ];
+        for (nodes, start, expected) in cases {
+            let genome = CreatureGenome {
+                entry_node_id: id,
+                nodes,
+            };
+            let mut energy = start;
+            let plain = execute_creature_mesh(
+                &genome,
+                &empty_sensor_snapshot(),
+                &mut energy,
+                &mut [0.0; 16],
+                &[0.0; 16],
+                &mut GraphRuntimeState::new(),
+                &config,
+            );
+            let (observed, _) = execute_creature_mesh_impl(
+                &genome,
+                &empty_sensor_snapshot(),
+                &mut { start },
+                &mut [0.0; 16],
+                &[0.0; 16],
+                &mut GraphRuntimeState::new(),
+                &config,
+                ObservedMeshExecution::default(),
+            );
+            let (traced, _, _) = crate::runtime::traced_mesh::execute_creature_mesh_traced(
+                &genome,
+                &empty_sensor_snapshot(),
+                &mut { start },
+                &mut [0.0; 16],
+                &[0.0; 16],
+                &mut GraphRuntimeState::new(),
+                &config,
+            );
+            assert_eq!(plain.termination_reason, expected);
+            assert_eq!(plain.energy_observation, observed.energy_observation);
+            assert_eq!(plain.energy_observation, traced.energy_observation);
+            assert_eq!(
+                plain.energy_observation.vm_compute,
+                f64::from(start) - f64::from(energy)
+            );
+        }
     }
 
     #[test]
@@ -583,6 +672,7 @@ mod tests {
                 assert_eq!(plain.cost_report.vm_cost, traced.cost_report.vm_cost);
                 assert_eq!(plain.cost_report.graph_cost, traced.cost_report.graph_cost);
                 assert_eq!(plain.work_counters, traced.work_counters);
+                assert_eq!(plain.energy_observation, traced.energy_observation);
                 assert_eq!(energy, traced_energy);
                 assert_eq!(memory, traced_memory);
                 assert_eq!(plain.actions, observed.actions);
@@ -593,6 +683,7 @@ mod tests {
                     observed.cost_report.graph_cost
                 );
                 assert_eq!(plain.work_counters, observed.work_counters);
+                assert_eq!(plain.energy_observation, observed.energy_observation);
                 assert_eq!(energy, observed_energy);
                 assert_eq!(memory, observed_memory);
                 assert_eq!(state.node_state, observed_state.node_state);

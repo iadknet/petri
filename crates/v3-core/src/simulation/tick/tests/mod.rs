@@ -1,5 +1,6 @@
 mod actions;
 mod dispatch_record;
+mod energy_accounting;
 mod logging;
 mod ordering;
 mod phase0;

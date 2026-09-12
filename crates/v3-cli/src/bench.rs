@@ -1403,6 +1403,81 @@ pub struct PredationTracking {
     pub actions_by_result: BTreeMap<String, u64>,
 }
 
+/// Every successful removal, partitioned by the first applied exhausting sink.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MortalityTracking {
+    pub definition: String,
+    pub deaths_total: u64,
+    pub by_cause: BTreeMap<String, u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionChargeTracking {
+    pub noop: String,
+    pub eat: String,
+    pub r#move: String,
+    pub reproduce: String,
+    pub steal_energy: String,
+}
+
+/// Applied signed energy changes, rounded only at the report boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnergyFlowTracking {
+    pub definition: String,
+    pub food_intake_by_type: Vec<String>,
+    pub action_charges: ActionChargeTracking,
+    pub failed_action_penalty: String,
+    pub vm_compute: String,
+    pub priority_bid: String,
+    pub graph_compute: String,
+    pub hebbian_learning: String,
+    pub reward_learning: String,
+    pub lifecycle_decay: String,
+    pub genome_carrying: String,
+    pub genome_size_creature_ticks: u64,
+    pub parental_transfer_debit: String,
+    pub offspring_energy_credit: String,
+    pub predation_victim_debit: String,
+    pub predation_attacker_credit: String,
+    pub predation_kill_bonus_credit: String,
+    pub maximum_energy_clamp_loss: String,
+    pub zero_floor_credit: String,
+    pub external_removal_loss: String,
+}
+
+impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTracking {
+    fn from(flows: &v3_core::simulation::energy_accounting::EnergyFlows) -> Self {
+        Self {
+            definition: "applied-energy-flows-v1".into(),
+            food_intake_by_type: flows.food_intake_by_type.iter().copied().map(six).collect(),
+            action_charges: ActionChargeTracking {
+                noop: six(flows.action_charges.noop),
+                eat: six(flows.action_charges.eat),
+                r#move: six(flows.action_charges.r#move),
+                reproduce: six(flows.action_charges.reproduce),
+                steal_energy: six(flows.action_charges.steal_energy),
+            },
+            failed_action_penalty: six(flows.failed_action_penalty),
+            vm_compute: six(flows.vm_compute),
+            priority_bid: six(flows.priority_bid),
+            graph_compute: six(flows.graph_compute),
+            hebbian_learning: six(flows.hebbian_learning),
+            reward_learning: six(flows.reward_learning),
+            lifecycle_decay: six(flows.lifecycle_decay),
+            genome_carrying: six(flows.genome_carrying),
+            genome_size_creature_ticks: flows.genome_size_creature_ticks,
+            parental_transfer_debit: six(flows.parental_transfer_debit),
+            offspring_energy_credit: six(flows.offspring_energy_credit),
+            predation_victim_debit: six(flows.predation_victim_debit),
+            predation_attacker_credit: six(flows.predation_attacker_credit),
+            predation_kill_bonus_credit: six(flows.predation_kill_bonus_credit),
+            maximum_energy_clamp_loss: six(flows.maximum_energy_clamp_loss),
+            zero_floor_credit: six(flows.zero_floor_credit),
+            external_removal_loss: six(flows.external_removal_loss),
+        }
+    }
+}
+
 /// Cumulative per-world behavior a baseline world is followed by (T12.F04):
 /// what the population ate, how much food stood, and how often it walked into
 /// something. Every field comes from applied simulation behavior, and every one
@@ -1470,6 +1545,12 @@ pub struct WorldTracking {
     /// What the population's predation attempts did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predation: Option<PredationTracking>,
+    /// Terminal-only applied death attribution; absent means unmeasured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mortality: Option<MortalityTracking>,
+    /// Terminal-only applied energy flows; absent means unmeasured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub energy_flows: Option<EnergyFlowTracking>,
 }
 
 /// Counts keyed by ordinary food type, as a `Vec` indexed by type id: a dense
@@ -1543,6 +1624,8 @@ impl WorldTracking {
             mutation_outcome_summary: None,
             mutation_value_totals_by_operator: None,
             predation: None,
+            mortality: None,
+            energy_flows: None,
         }
     }
 
@@ -1553,6 +1636,15 @@ impl WorldTracking {
     fn with_transferred_counters(self, sim: &v3_core::simulation::Simulation) -> Self {
         let stats = &sim.stats;
         Self {
+            mortality: Some(MortalityTracking {
+                definition: "applied-mortality-v1".into(),
+                deaths_total: stats.mortality.deaths_total,
+                by_cause: v3_core::simulation::energy_accounting::DeathCause::ALL
+                    .into_iter()
+                    .map(|cause| (cause.as_key().to_string(), stats.mortality.count(cause)))
+                    .collect(),
+            }),
+            energy_flows: Some((&stats.energy_flows).into()),
             typed_eats_failed_total: Some(by_food_type(
                 sim,
                 &stats.eat_actions_failed_total_by_type,
@@ -6147,6 +6239,17 @@ mod tests {
                 .as_ref()
                 .expect("a new report carries failed eats by type");
             assert_eq!(failed.len(), case.case.food_type_count);
+            let flows = case.tracking.energy_flows.as_ref().expect("terminal flows");
+            assert_eq!(flows.food_intake_by_type.len(), case.case.food_type_count);
+            assert!(flows.vm_compute.parse::<f64>().unwrap() > 0.0);
+            assert!(flows.lifecycle_decay.parse::<f64>().unwrap() > 0.0);
+            assert!(flows.genome_size_creature_ticks > 0);
+            let deaths = case
+                .tracking
+                .mortality
+                .as_ref()
+                .expect("terminal mortality");
+            assert_eq!(deaths.by_cause.values().sum::<u64>(), deaths.deaths_total);
         }
     }
 
@@ -6253,13 +6356,15 @@ mod tests {
     fn checkpoint_tracking_omits_every_transferred_block() {
         use v3_core::simulation::seed_simulation;
 
-        const TRANSFERRED_KEYS: [&str; 6] = [
+        const TRANSFERRED_KEYS: [&str; 8] = [
             "typed_eats_failed_total",
             "mesh_dispatches_energy_exhausted_total",
             "mutation_supply",
             "mutation_outcome_summary",
             "mutation_value_totals_by_operator",
             "predation",
+            "mortality",
+            "energy_flows",
         ];
 
         let sim = seed_simulation(SimulationConfig::default(), 7);
@@ -6282,6 +6387,82 @@ mod tests {
             end_of_run.as_object().expect("an object").len(),
             checkpoint.as_object().expect("an object").len() + TRANSFERRED_KEYS.len(),
             "the two shapes differ only by the transferred blocks"
+        );
+    }
+
+    #[test]
+    fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
+        use v3_core::simulation::energy_accounting::{ActionCharges, DeathCause, EnergyFlows};
+        let mut sim = seed_simulation(SimulationConfig::default(), 7);
+        sim.stats.mortality.record(DeathCause::RewardLearning);
+        sim.stats.energy_flows = EnergyFlows {
+            food_intake_by_type: vec![0.123456789, -2.0, 0.0],
+            action_charges: ActionCharges {
+                noop: 1.0,
+                eat: 2.0,
+                r#move: 3.0,
+                reproduce: 4.0,
+                steal_energy: 5.0,
+            },
+            failed_action_penalty: 6.0,
+            vm_compute: 7.0,
+            priority_bid: 8.0,
+            graph_compute: 9.0,
+            hebbian_learning: 10.0,
+            reward_learning: 11.0,
+            lifecycle_decay: 12.0,
+            genome_carrying: 13.0,
+            genome_size_creature_ticks: 14,
+            parental_transfer_debit: 15.0,
+            offspring_energy_credit: 16.0,
+            predation_victim_debit: -17.0,
+            predation_attacker_credit: -18.0,
+            predation_kill_bonus_credit: 19.0,
+            maximum_energy_clamp_loss: 20.0,
+            zero_floor_credit: 21.0,
+            external_removal_loss: 22.0,
+        };
+        let tracking = WorldTracking::observe(&sim).with_transferred_counters(&sim);
+        let mortality = tracking.mortality.unwrap();
+        assert_eq!(mortality.definition, "applied-mortality-v1");
+        assert_eq!(mortality.deaths_total, 1);
+        let expected_keys = [
+            "lifecycle_decay",
+            "genome_carrying",
+            "vm_compute",
+            "graph_compute",
+            "hebbian_learning",
+            "reward_learning",
+            "priority_bid",
+            "action_noop",
+            "action_eat",
+            "action_move",
+            "action_reproduce",
+            "action_steal_energy",
+            "failed_action_penalty",
+            "parental_transfer",
+            "predation",
+            "external_removal",
+            "unattributed",
+        ];
+        assert_eq!(mortality.by_cause.len(), expected_keys.len());
+        for key in expected_keys {
+            assert_eq!(mortality.by_cause[key], u64::from(key == "reward_learning"));
+        }
+        assert_eq!(
+            serde_json::to_value(tracking.energy_flows.unwrap()).unwrap(),
+            serde_json::json!({
+                "definition": "applied-energy-flows-v1",
+                "food_intake_by_type": ["0.123457", "-2.000000", "0.000000"],
+                "action_charges": {"noop": "1.000000", "eat": "2.000000", "move": "3.000000", "reproduce": "4.000000", "steal_energy": "5.000000"},
+                "failed_action_penalty": "6.000000", "vm_compute": "7.000000", "priority_bid": "8.000000",
+                "graph_compute": "9.000000", "hebbian_learning": "10.000000", "reward_learning": "11.000000",
+                "lifecycle_decay": "12.000000", "genome_carrying": "13.000000", "genome_size_creature_ticks": 14,
+                "parental_transfer_debit": "15.000000", "offspring_energy_credit": "16.000000",
+                "predation_victim_debit": "-17.000000", "predation_attacker_credit": "-18.000000",
+                "predation_kill_bonus_credit": "19.000000", "maximum_energy_clamp_loss": "20.000000",
+                "zero_floor_credit": "21.000000", "external_removal_loss": "22.000000",
+            })
         );
     }
 
@@ -6611,6 +6792,8 @@ mod tests {
                     kills_total: 1,
                     actions_by_result: BTreeMap::from([("Transferred".to_string(), 3)]),
                 }),
+                mortality: None,
+                energy_flows: None,
             },
         };
         let wire = serde_json::to_value(&sample).unwrap();
@@ -6654,6 +6837,11 @@ mod tests {
         assert_eq!(legacy.tracking.mutation_outcome_summary, None);
         assert_eq!(legacy.tracking.mutation_value_totals_by_operator, None);
         assert_eq!(legacy.tracking.predation, None);
+        assert_eq!(legacy.tracking.mortality, None);
+        assert_eq!(legacy.tracking.energy_flows, None);
+        let encoded = serde_json::to_value(legacy).unwrap();
+        assert!(encoded.get("mortality").is_none());
+        assert!(encoded.get("energy_flows").is_none());
     }
 
     proptest! {

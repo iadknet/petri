@@ -29,6 +29,31 @@ fn sensors() -> SensorSnapshot {
     }
 }
 
+#[test]
+fn applied_graph_accounting_separates_base_and_hebbian_exhaustion() {
+    use crate::simulation::energy_accounting::DeathCause;
+    let mut def = graph(HebbianRule::Classic, 1.0, 0.5);
+    def.compute_nodes[0].plasticity.as_mut().unwrap().modulation = None;
+    let runtime = RuntimeConfig {
+        graph_node_base_cost: 2.0,
+        plasticity_update_cost: 3.0,
+        ..RuntimeConfig::default()
+    };
+    for (initial, cause, base, learning) in [
+        (1.0, DeathCause::GraphCompute, 2.0, 0.0),
+        (4.0, DeathCause::HebbianLearning, 2.0, 3.0),
+    ] {
+        let mut state = GraphRuntimeState::new();
+        begin(&mut state, &def);
+        let mut energy = initial;
+        let side = visit(&def, &mut state, 1.0, &mut energy, &runtime);
+        assert_eq!(side.energy_observation.graph_compute, base);
+        assert_eq!(side.energy_observation.hebbian_learning, learning);
+        assert_eq!(side.energy_observation.pending_cause, Some(cause));
+        assert_eq!(energy, initial - base as f32 - learning as f32);
+    }
+}
+
 fn config(rule: HebbianRule, eta: f32, lambda: f32) -> PlasticityConfig {
     PlasticityConfig {
         rule,

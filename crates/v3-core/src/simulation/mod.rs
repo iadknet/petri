@@ -1,4 +1,5 @@
 pub mod actions;
+pub mod energy_accounting;
 pub(crate) mod outcomes;
 pub mod seeding;
 #[allow(clippy::module_inception)]
