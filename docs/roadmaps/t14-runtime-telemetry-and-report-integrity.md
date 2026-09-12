@@ -41,7 +41,7 @@ the microscope: it records applied behavior and adds no mechanism.
   - Goal: Lineage diversity, carried structure and generation depth are read at the checkpoints the run already samples, so a closure shows when a change took hold and not only where it ended.
 - [x] **T14.F05 — Cognition Telemetry Resolution** — Depends on: T14.F02
   - Goal: A plasticity update that moves a weight is distinguishable from one that does not, reward-modulated learning is counted separately from Hebbian, a shared-memory write that changes a slot is counted in production, and the memory indicator reports how many creatures could have responded at all.
-- [ ] **T14.F06 — Reproductive Success by Cognitive Class** — Depends on: T14.F03
+- [x] **T14.F06 — Reproductive Success by Cognitive Class** — Depends on: T14.F03
   - Goal: Whether cognition pays is readable: creatures that read memory, hold state or learn are counted at death with their offspring and lifespan beside those that do not, so selection for remembering is read from outcomes rather than inferred from presence.
 - [ ] **T14.F07 — Surviving-Clade Behavioral Profile** — Depends on: T14.F02
   - Goal: Each clade that survives to closure shows how it made its living — what it ate, what it did, how large and how old it grew — so a count of survivors becomes a reading of how many of them live differently.

@@ -1,6 +1,6 @@
 # T14.F06 — Reproductive Success by Cognitive Class
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-12
 **Feature**: T14.F06
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -123,7 +123,7 @@ or causal selection; class precedence also prevents independent-trait claims.
 - [x] Add the fixed class totals and the sole removal-time observation.
 - [x] Transfer all twelve integers into each standard goal case's optional
   terminal block, with its definition token and historical absence semantics.
-- [ ] Complete verification, store the gate/goal reports and concise readings,
+- [x] Complete verification, store the gate/goal reports and concise readings,
   and close the feature under the shared workflow.
 
 ## Verification
@@ -136,7 +136,9 @@ or causal selection; class precedence also prevents independent-trait claims.
 - [x] Focused report tests: `cargo test -p v3-cli` checks twelve-field transfer,
   definition/key shape, empty cohorts, historical absence, checkpoint omission
   and terminal per-world replay agreement. Results: same readings file.
-- [ ] `make check` passes, including viability and cross-process/thread-count
+- [x] `make check` passes at tested commit
+  `4f116b4cad727f9d29e6b7cefe520e2faee05f84`, including viability and
+  cross-process/thread-count
   reproducibility; `make roadmap-check` passes. Results: same readings file.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: fresh mode, output
   `/Users/istefanek/.local/share/petri-tools/mutants/t14-f06/mutants.out`;
@@ -220,13 +222,13 @@ selection conclusion. Full values and comparison boundary:
 
 ## Success Criteria
 
-- [ ] Every removed creature contributes its successful offspring and age once
+- [x] Every removed creature contributes its successful offspring and age once
   to exactly one specified cognitive class, including the `none` comparison.
-- [ ] Every standard goal case stores all twelve applied integers; checkpoints
+- [x] Every standard goal case stores all twelve applied integers; checkpoints
   and historical reports preserve unmeasured absence.
-- [ ] Interpretation states the class precedence, survivor exclusion and
+- [x] Interpretation states the class precedence, survivor exclusion and
   confounding; no cognition payoff claim is inferred from these correlations.
-- [ ] Required tests, review, mutation gate, stored benchmark verdicts and
+- [x] Required tests, review, mutation gate, stored benchmark verdicts and
   workflow closure are complete without behavior changes or waived checks.
 
 ## Notes for AI Agents
@@ -235,3 +237,21 @@ selection conclusion. Full values and comparison boundary:
   defined by the precedence above, not a claim of executed or useful cognition.
 - Decision: Final review found P1=0, P2=0, P3=1: the stale readings status
   was corrected in documentation.
+- Decision: Workflow roles were Sol `medium` orchestrator; persistent Astra
+  `xhigh` spec owner/advisor; persistent Astra `xhigh` implementer; Terra
+  `high` benchmark specialist; fresh Astra `xhigh` reviewer; and Sol `medium`
+  mutation specialist. Explicit subagent selections were enforced; active
+  orchestrator runtime metadata was unavailable beyond the goal configuration.
+- Decision: Three advisor consultations covered the pre-approach boundary,
+  pre-handoff verification, and the sandboxed full-check permission exception.
+  All advice was accepted; no implementation requirement correction or check
+  waiver occurred. One planning clarification made the twelve integers four
+  exclusive precedence-ordered classes.
+- Decision: One documentation-only post-review remediation pass corrected the
+  P3 status row. Production remediation passes were zero.
+- Decision: One user intervention requested a durable Codex benchmark-agent
+  instruction to request process-inspection permission on its first measured
+  attempt; `docs/workflow-codex.md` now records it. No remote was mutated.
+- Cost: Task-specific total usage unavailable. Advisor consultations: 3;
+  implementation passes: 1 build plus 1 documentation-only remediation;
+  final review findings: P1=0, P2=0, P3=1.
