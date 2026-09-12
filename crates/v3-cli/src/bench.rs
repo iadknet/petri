@@ -14,8 +14,12 @@ use serde::{Deserialize, Serialize};
 use v3_core::config::{MutationConfig, SimulationConfig};
 
 use crate::{fraction_or_undefined, six, UNDEFINED};
+use v3_core::contracts::WorldInputKey;
 use v3_core::creature::founder::founder_genome;
 use v3_core::creature::genome::analysis::functional_complexity;
+use v3_core::creature::sensor_census::{
+    creature_sensor_census, world_input_key_label, world_input_key_universe,
+};
 use v3_core::neighborhood::{
     self, evaluate_genome, evolved_sample_ranks, structural_companions, Battery, BirthResult,
     EvalContext, GenomeEvaluation, OperatorRow, StructuralCompanions, Tally, BATTERY_VERSION,
@@ -1655,12 +1659,89 @@ pub struct PersistenceSample {
     /// at extinction and absent in reports stored before T14.F04.
     #[serde(default)]
     pub shannon_entropy_nats: Option<String>,
+    /// What the living population can perceive and remember at this tick. A
+    /// true all-zero census at extinction, absent in reports stored before
+    /// T14.F08.
+    #[serde(default)]
+    pub sensor_census: Option<SensorCensus>,
     #[serde(flatten)]
     pub tracking: WorldTracking,
 }
 
-/// The five population readings a checkpoint sample carries, read from
-/// post-tick state through the same accessors the horizon readings use.
+/// One world input key's row in a checkpoint census.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorldInputCensusRow {
+    /// `WorldInputKey::as_key()`, with `:<food_type_idx>` appended for the
+    /// food-parameterized families.
+    pub key: String,
+    /// Living creatures holding at least one live reference to this key. A
+    /// creature counts once however many instructions or edges reference it.
+    pub creatures: u64,
+}
+
+/// The sensor usage census of one checkpoint: living creatures per world input
+/// key, and the three stateful-reach counts.
+///
+/// Every key the run's world can present has a row, so a `0` reads as "no
+/// living creature references this" rather than as an absent key. Rows are in
+/// `WorldInputKey` order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SensorCensus {
+    pub world_inputs: Vec<WorldInputCensusRow>,
+    /// Living creatures a live reference of which reads a shared-memory slot.
+    /// `shared_memory` persists across ticks, so a same-tick read counts.
+    pub creatures_reading_shared_memory: u64,
+    /// Living creatures holding a live compute node with persisted state.
+    pub creatures_with_stateful_node: u64,
+    /// Living creatures reading either stateful source.
+    pub creatures_with_any_stateful_read: u64,
+}
+
+impl SensorCensus {
+    /// Census the living population from post-tick state. Pure structure: it
+    /// reads genomes and cached reachability and executes no brain.
+    fn observe(sim: &v3_core::simulation::Simulation) -> Self {
+        let mut world_inputs: BTreeMap<WorldInputKey, u64> = world_input_key_universe(
+            sim.world
+                .food()
+                .food_types()
+                .iter()
+                .map(|food_type| food_type.id),
+        )
+        .into_iter()
+        .map(|key| (key, 0))
+        .collect();
+        let mut creatures_reading_shared_memory = 0;
+        let mut creatures_with_stateful_node = 0;
+        let mut creatures_with_any_stateful_read = 0;
+
+        for creature in sim.creatures.values() {
+            let census = creature_sensor_census(&creature.genome, &creature.cached_reachable_nodes);
+            creatures_reading_shared_memory += u64::from(census.reads_shared_memory);
+            creatures_with_stateful_node += u64::from(census.holds_stateful_node);
+            creatures_with_any_stateful_read += u64::from(census.reads_any_stateful());
+            for key in census.world_inputs {
+                *world_inputs.entry(key).or_insert(0) += 1;
+            }
+        }
+
+        Self {
+            world_inputs: world_inputs
+                .into_iter()
+                .map(|(key, creatures)| WorldInputCensusRow {
+                    key: world_input_key_label(key),
+                    creatures,
+                })
+                .collect(),
+            creatures_reading_shared_memory,
+            creatures_with_stateful_node,
+            creatures_with_any_stateful_read,
+        }
+    }
+}
+
+/// The population readings a checkpoint sample carries, read from post-tick
+/// state through the same accessors the horizon readings use.
 #[derive(Debug, PartialEq)]
 struct PopulationReadings {
     mean_genome_size: f64,
@@ -1668,6 +1749,7 @@ struct PopulationReadings {
     mean_generation: f64,
     surviving_founder_clade_count: u64,
     shannon_entropy_nats: String,
+    sensor_census: SensorCensus,
 }
 
 impl PopulationReadings {
@@ -1681,6 +1763,7 @@ impl PopulationReadings {
             mean_generation,
             surviving_founder_clade_count,
             shannon_entropy_nats,
+            sensor_census: SensorCensus::observe(sim),
         }
     }
 }
@@ -2021,6 +2104,7 @@ impl PersistenceAccumulator {
                 mean_generation: alive.then(|| six(readings.mean_generation)),
                 surviving_founder_clade_count: Some(readings.surviving_founder_clade_count),
                 shannon_entropy_nats: Some(readings.shannon_entropy_nats),
+                sensor_census: Some(readings.sensor_census),
                 tracking: tracking(),
             });
         }
@@ -4326,9 +4410,31 @@ mod tests {
         assert_eq!(historical.environment.drift_depth_wall_clock_ms, None);
     }
 
+    /// A stand-in census of a one-food-type world: the whole key universe is
+    /// present, `FoodHere:0` is referenced by every living creature, and the
+    /// stateful counts are a fixed share of the population. An empty
+    /// population makes every row a true `0`, exactly as
+    /// `SensorCensus::observe` does.
+    fn census_for(population: u64) -> SensorCensus {
+        use v3_core::config::OrdinaryFoodTypeId;
+        let food_here = WorldInputKey::food_here(OrdinaryFoodTypeId::new(0));
+        SensorCensus {
+            world_inputs: world_input_key_universe([OrdinaryFoodTypeId::new(0)])
+                .into_iter()
+                .map(|key| WorldInputCensusRow {
+                    key: world_input_key_label(key),
+                    creatures: if key == food_here { population } else { 0 },
+                })
+                .collect(),
+            creatures_reading_shared_memory: population / 2,
+            creatures_with_stateful_node: population / 4,
+            creatures_with_any_stateful_read: population / 2,
+        }
+    }
+
     /// The reading `PopulationReadings::observe` produces for an empty
     /// population: zero means that never reach the report, no surviving clade,
-    /// and undefined entropy.
+    /// undefined entropy, and an all-zero census.
     fn empty_readings() -> PopulationReadings {
         PopulationReadings {
             mean_genome_size: 0.0,
@@ -4336,6 +4442,7 @@ mod tests {
             mean_generation: 0.0,
             surviving_founder_clade_count: 0,
             shannon_entropy_nats: UNDEFINED.to_string(),
+            sensor_census: census_for(0),
         }
     }
 
@@ -4353,6 +4460,7 @@ mod tests {
             mean_generation: tick as f64 * 3.0,
             surviving_founder_clade_count: population,
             shannon_entropy_nats: six(tick as f64 / 4.0),
+            sensor_census: census_for(population),
         }
     }
 
@@ -4680,6 +4788,122 @@ mod tests {
         );
     }
 
+    /// The census reaches every checkpoint of a real `run_one_seed` loop, and
+    /// the horizon checkpoint equals a census computed independently from an
+    /// oracle re-run of the same seed. The founder population is Graph-backend
+    /// and wires its world inputs to output sinks, so a VM-only or
+    /// compute-node-only census would report `FoodHere:0` as zero here.
+    #[test]
+    fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpoint() {
+        const SEED: u64 = 13;
+        const HORIZON: u64 = 250;
+        let config = build_config(&ProfileParams {
+            recipe: None,
+            name: "sweep".to_string(),
+            width: 32,
+            height: 32,
+            founders: 8,
+            seeds: vec![SEED],
+            ticks: HORIZON,
+            food_coverage: None,
+            neighborhood: NeighborhoodSizes::default(),
+            drift: Default::default(),
+        });
+
+        // Act
+        let run = run_one_seed(
+            &config,
+            SEED,
+            HORIZON,
+            false,
+            None,
+            NeighborhoodSizes::default(),
+        );
+        let mut oracle = seed_simulation(config.clone(), SEED);
+        for _ in 0..HORIZON {
+            run_tick(&mut oracle, &mut None);
+        }
+
+        // Assert: every checkpoint carries a census, and every census carries
+        // the world's whole key universe in key order.
+        let expected_keys: Vec<String> = world_input_key_universe(
+            oracle
+                .world
+                .food()
+                .food_types()
+                .iter()
+                .map(|food_type| food_type.id),
+        )
+        .into_iter()
+        .map(world_input_key_label)
+        .collect();
+        assert!(!run.persistence.samples.is_empty());
+        for sample in &run.persistence.samples {
+            let census = sample
+                .sensor_census
+                .as_ref()
+                .expect("every checkpoint carries a census");
+            let keys: Vec<String> = census
+                .world_inputs
+                .iter()
+                .map(|row| row.key.clone())
+                .collect();
+            assert_eq!(keys, expected_keys, "tick {}", sample.tick);
+            assert!(
+                census.creatures_with_any_stateful_read
+                    >= census
+                        .creatures_reading_shared_memory
+                        .max(census.creatures_with_stateful_node),
+                "the combined count covers each split: {census:?}"
+            );
+            for row in &census.world_inputs {
+                assert!(
+                    row.creatures <= sample.population,
+                    "a creature counts at most once per key: {row:?} at tick {}",
+                    sample.tick
+                );
+            }
+        }
+
+        // The horizon checkpoint equals the census of the oracle's terminal
+        // state — the state `run_one_seed` sampled on that tick, by T10.F11.
+        let horizon_sample = run
+            .persistence
+            .samples
+            .iter()
+            .find(|sample| sample.tick == HORIZON)
+            .expect("the horizon tick is sampled");
+        assert!(horizon_sample.population > 0);
+        assert_eq!(
+            horizon_sample.sensor_census.as_ref(),
+            Some(&SensorCensus::observe(&oracle))
+        );
+
+        // The founder population's graph-backend references are visible.
+        let first = run.persistence.samples[0]
+            .sensor_census
+            .as_ref()
+            .expect("the first checkpoint carries a census");
+        let food_here = first
+            .world_inputs
+            .iter()
+            .find(|row| row.key == "FoodHere:0")
+            .expect("the primary food key is in the universe");
+        assert!(
+            food_here.creatures > 0,
+            "graph-backend world input references are counted: {first:?}"
+        );
+        let unread = first
+            .world_inputs
+            .iter()
+            .find(|row| row.key == "NearbyCreatureIdentity")
+            .expect("an unreferenced key still has a row");
+        assert_eq!(
+            unread.creatures, 0,
+            "a key no living creature references reads zero, not absent"
+        );
+    }
+
     /// At extinction the three means and the entropy report absence, never
     /// zero; the clade count is a true `0`.
     #[test]
@@ -4696,6 +4920,19 @@ mod tests {
         assert_eq!(last.mean_generation, None);
         assert_eq!(last.surviving_founder_clade_count, Some(0));
         assert_eq!(last.shannon_entropy_nats.as_deref(), Some(UNDEFINED));
+
+        let census = last
+            .sensor_census
+            .as_ref()
+            .expect("a census of an empty population is zero, not unmeasured");
+        assert!(
+            census.world_inputs.iter().all(|row| row.creatures == 0),
+            "every key universe row is a true zero: {census:?}"
+        );
+        assert!(!census.world_inputs.is_empty());
+        assert_eq!(census.creatures_reading_shared_memory, 0);
+        assert_eq!(census.creatures_with_stateful_node, 0);
+        assert_eq!(census.creatures_with_any_stateful_read, 0);
     }
 
     #[test]
@@ -4730,7 +4967,7 @@ mod tests {
     }
 
     proptest! {
-        /// The five optional readings survive a JSON round trip beside the
+        /// The optional readings survive a JSON round trip beside the
         /// flattened tracking block, and a wire form without them reads them
         /// as absent rather than as zero.
         #[test]
@@ -4752,6 +4989,7 @@ mod tests {
                 mean_generation: mean_generation.map(six),
                 surviving_founder_clade_count,
                 shannon_entropy_nats: shannon_entropy_nats.map(six),
+                sensor_census: Some(census_for(population)),
                 tracking: WorldTracking::default(),
             };
 
@@ -4767,6 +5005,7 @@ mod tests {
                 sample.surviving_founder_clade_count
             );
             prop_assert_eq!(&decoded.shannon_entropy_nats, &sample.shannon_entropy_nats);
+            prop_assert_eq!(&decoded.sensor_census, &sample.sensor_census);
             prop_assert_eq!(&decoded.tracking, &sample.tracking);
 
             let mut stripped: serde_json::Value =
@@ -4778,6 +5017,7 @@ mod tests {
                 "mean_generation",
                 "surviving_founder_clade_count",
                 "shannon_entropy_nats",
+                "sensor_census",
             ] {
                 object.remove(key);
             }
@@ -4788,6 +5028,7 @@ mod tests {
             prop_assert_eq!(historical.mean_generation, None);
             prop_assert_eq!(historical.surviving_founder_clade_count, None);
             prop_assert_eq!(historical.shannon_entropy_nats, None);
+            prop_assert_eq!(historical.sensor_census, None);
         }
     }
 
@@ -6020,6 +6261,7 @@ mod tests {
         assert_eq!(legacy.mean_generation, None);
         assert_eq!(legacy.surviving_founder_clade_count, None);
         assert_eq!(legacy.shannon_entropy_nats, None);
+        assert_eq!(legacy.sensor_census, None);
 
         let sample = PersistenceSample {
             tick: 100,
@@ -6031,6 +6273,7 @@ mod tests {
             mean_generation: Some(six(3.5)),
             surviving_founder_clade_count: Some(4),
             shannon_entropy_nats: Some(six(1.25)),
+            sensor_census: Some(census_for(5)),
             tracking: WorldTracking {
                 typed_eats_total: vec![7],
                 food_density_total: vec![six(2.0)],

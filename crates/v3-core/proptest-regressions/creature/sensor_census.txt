@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 6b04e1c27a108f4fdd7d7a1f69b1809667d72e55483cb575d9a84cf5389f71b5 # shrinks to refs = [World(FoodHere { type_idx: OrdinaryFoodTypeId(0) })], indices = [0]
