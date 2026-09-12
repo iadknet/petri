@@ -318,4 +318,4 @@ invocation are recorded in the readings; no epoch re-pin, waiver or rerun.
 - Decision: T14.F03 measures the existing sinks and transfers. Predation's
   removal counter and mortality's exhausting-sink counter answer distinct
   questions for a victim already exhausted by cognition.
-- Cost: usage unavailable; advisor consultations 10; implementation/self-review passes 1/1; post-review remediation 0; mutation test-only remediation 1; review P1=0/P2=0/P3=0; user interventions 0.
+- Cost: native goal pre-close snapshot: 1,257,230 tokens / 6,812 s; advisor consultations 10; implementation/self-review passes 1/1; post-review remediation 0; mutation test-only remediation 1; review P1=0/P2=0/P3=0; user interventions 0.
