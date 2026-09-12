@@ -83,18 +83,25 @@ deserialize with these readings absent.
 - [x] Carry the five readings on `PersistenceSample`, evaluated only on sampled
       ticks and only from post-tick state, with the empty-population and
       historical-report rules above.
-- [x] Tests: the readings appear on every checkpoint of a run and match a
-      directly computed value; the extinction sample reports absence rather than
-      zero; a stored report predating the fields still loads; the existing
-      `v3-cli run` tick sample and the terminal goal reading are unchanged.
+- [x] Tests: the readings appear on every checkpoint and match a directly
+      computed value, both through the accumulator and through the real
+      `run_one_seed` loop, where the horizon checkpoint equals an independently
+      re-run terminal state and differs from tick 100's; the extinction sample
+      reports absence rather than zero; a stored report predating the fields
+      still loads. The `v3-cli run` tick sample and the terminal goal reading
+      are pinned by pre-existing tests (`crates/v3-cli/tests/cli.rs:212` and
+      `:223`, `crates/v3-cli/src/bench.rs`'s `lineage_diversity` tests) plus one
+      cross-check in `population_readings_average_the_living_population_and_count_its_clades`
+      asserting the checkpoint entropy equals `lineage_diversity`'s.
 
 ## Verification
 
 - [ ] `make check` -> exit status recorded here, run once on the final feature
       code, with the tested commit named.
-- [x] Focused tests at commit `5228afb7`: `cargo test -p v3-cli` -> ok,
-      83 + 11 + 20 + 11 passed, 0 failed. Covers the new checkpoint-reading
+- [x] Focused tests at commit `75fa7e6c`: `cargo test -p v3-cli` -> ok,
+      84 + 11 + 20 + 11 passed, 0 failed. Covers the new checkpoint-reading
       tests (`every_checkpoint_carries_the_population_readings_of_its_own_tick`,
+      `the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state`,
       `the_extinction_checkpoint_reports_absent_means_and_a_zero_clade_count`,
       `population_readings_average_the_living_population_and_count_its_clades`,
       `population_readings_of_an_empty_population_are_zero_means_and_undefined_entropy`,
@@ -175,6 +182,18 @@ because the Fable 5.1 budget is exhausted. No model configuration reaches
   indicators: they carry no version token, no threshold and no entry in the
   comparison block the no-regression rule reads. T14.F01's token rule applies to
   indicators.
+- Deferred: A sixth checkpoint reading costs edits in five places today —
+  `PersistenceSample`, `PopulationReadings`, the `alive.then(|| six(...))`
+  mapping in `PersistenceAccumulator::observe`, and two test helpers. The
+  proposed shape for T14.F08's planner: make `PopulationReadings` itself the
+  serialized type with `Option` fields, `#[serde(default)]` and
+  `#[serde(flatten)]` into `PersistenceSample`, plus an `absent()` constructor
+  for the extinction sample; the caveat is that two flattened fields in one
+  struct requires neither flattened type to deny unknown fields. Not taken here
+  because the scheduled extensions are structured blocks with their own types
+  (T14.F08's per-`WorldInputKey` counts, T14.F10's occupancy grid), not a sixth
+  flat scalar, and a flatten change to a determinism-critical stored-report
+  struct is not worth making inside a closure path.
 - Exception: The three model substitutions in this spec's Deviations section
   were authorized by the user on 2026-09-11 for T14.F04 only, because the
   Fable 5.1 budget is exhausted. They are not a precedent for later features and
