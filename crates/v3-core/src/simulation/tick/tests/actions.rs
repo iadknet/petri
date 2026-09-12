@@ -209,7 +209,14 @@ fn failed_move_deducts_penalty_in_tick() {
     );
 
     let creature = sim.creatures.get_mut(id).unwrap();
-    let succeeded = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
+    let succeeded = apply_move(
+        id,
+        creature,
+        &mut sim.world,
+        Direction::N,
+        &sim.config,
+        &mut sim.stats.energy_flows,
+    );
     assert!(!succeeded, "move into barrier should fail");
     if !succeeded {
         sim.creatures.get_mut(id).unwrap().energy -= adjusted_penalty;
@@ -237,6 +244,7 @@ fn failed_move_deducts_penalty_in_tick() {
         &mut sim.world,
         &sim.config,
         crate::config::OrdinaryFoodTypeId::default(),
+        &mut sim.stats.energy_flows,
     );
     assert!(!eat_succeeded, "eat on empty cell should fail");
     if !eat_succeeded {
@@ -286,6 +294,7 @@ fn failed_action_penalty_increases_with_age() {
             &mut sim_young.world,
             Direction::N,
             &sim_young.config,
+            &mut sim_young.stats.energy_flows,
         );
     }
     sim_young.creatures[id_young].energy -= adjusted_penalty_young;
@@ -308,6 +317,7 @@ fn failed_action_penalty_increases_with_age() {
             &mut sim_old.world,
             Direction::N,
             &sim_old.config,
+            &mut sim_old.stats.energy_flows,
         );
     }
     sim_old.creatures[id_old].energy -= adjusted_penalty_old;

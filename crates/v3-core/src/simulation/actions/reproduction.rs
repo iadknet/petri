@@ -148,10 +148,15 @@ pub fn apply_reproduce(
     }
 
     // Step 5: Deduct reproduce_cost from parent (scaled by genome complexity and age).
+    let before = sim.creatures[parent_id].energy;
     sim.creatures[parent_id].energy -= sim.config.energy.adjusted_action_cost(
         sim.config.energy.costs.reproduce_cost,
         sim.creatures[parent_id].cached_complexity,
         sim.creatures[parent_id].age,
+    );
+    sim.stats.energy_flows.action_charges.reproduce += sim.creatures[parent_id].observe_energy(
+        before,
+        crate::simulation::energy_accounting::DeathCause::ActionReproduce,
     );
 
     // Step 6: Check parent has sufficient energy after cost deduction.
@@ -182,7 +187,12 @@ pub fn apply_reproduce(
     }
 
     // Step 8: Deduct transfer from parent.
+    let before = sim.creatures[parent_id].energy;
     sim.creatures[parent_id].energy -= transfer;
+    sim.stats.energy_flows.parental_transfer_debit += sim.creatures[parent_id].observe_energy(
+        before,
+        crate::simulation::energy_accounting::DeathCause::ParentalTransfer,
+    );
 
     // Step 9: Build offspring draft (clone parent genome + state).
     let child_genome = sim.creatures[parent_id].genome.clone();
@@ -370,6 +380,7 @@ pub fn apply_reproduce(
         child.birth_mutation_operators = child_birth_mutation_operators;
         child
     });
+    sim.stats.energy_flows.offspring_energy_credit += f64::from(sim.creatures[child_id].energy);
     sim.action_logs
         .insert(child_id, ActionLog::new(sim.config.action_log.capacity));
     sim.world.place_creature(target, child_id);

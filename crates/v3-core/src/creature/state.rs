@@ -150,6 +150,8 @@ pub struct CreatureState {
     pub genome: CreatureGenome,
     pub position: Position,
     pub energy: f32,
+    /// Observation only: first exhausting sink since the last positive recovery.
+    pub(crate) pending_death_cause: Option<crate::simulation::energy_accounting::DeathCause>,
     pub age: u64,
     pub generation: u64,
     /// Shared f32 memory slots, accessible by both VM and Graph backends.
@@ -198,6 +200,22 @@ pub struct CreatureState {
 }
 
 impl CreatureState {
+    /// Observe the already-applied arithmetic without changing the stored energy.
+    pub(crate) fn observe_energy(
+        &mut self,
+        before: f32,
+        sink: crate::simulation::energy_accounting::DeathCause,
+    ) -> f64 {
+        use crate::simulation::energy_accounting::{applied_debit, observe_energy_change};
+        observe_energy_change(
+            &mut self.pending_death_cause,
+            f64::from(before),
+            f64::from(self.energy),
+            sink,
+        );
+        applied_debit(before, self.energy)
+    }
+
     /// Create a new creature with empty graph runtime state and zeroed prev_shared_memory.
     /// Computes `cached_complexity` and `cached_genome_size` from the genome.
     #[allow(clippy::too_many_arguments)]
@@ -225,6 +243,7 @@ impl CreatureState {
             genome,
             position,
             energy,
+            pending_death_cause: None,
             age: 0,
             generation,
             shared_memory,
@@ -277,6 +296,7 @@ impl CreatureState {
             genome,
             position,
             energy,
+            pending_death_cause: None,
             age: 0,
             generation,
             shared_memory,

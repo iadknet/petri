@@ -152,6 +152,7 @@ pub(crate) fn phase_0_energy_charge(
 ///    cost `genome_carry_cost_per_unit * cached_genome_size`, as one charge)
 /// 4. Death removal (remove creatures where energy <= 0 from slotmap + world occupancy)
 pub fn run_phase_0(sim: &mut Simulation) {
+    use super::energy_accounting::{decay_partition, DeathCause};
     // Step 1: Food growth
     let food_growth = sim.world.grow_food(sim.tick, &mut sim.rng);
     sim.stats.record_food_growth_summary(food_growth);
@@ -161,11 +162,26 @@ pub fn run_phase_0(sim: &mut Simulation) {
     let lifecycle = &sim.config.energy.lifecycle;
     for (_, creature) in sim.creatures.iter_mut() {
         creature.age += 1;
+        let energy_before = creature.energy;
         creature.energy -= phase_0_energy_charge(
             lifecycle.energy_decay_per_tick,
             lifecycle.genome_carry_cost_per_unit,
             creature.cached_genome_size,
         );
+        let (decay, carrying) = decay_partition(
+            energy_before,
+            creature.energy,
+            lifecycle.energy_decay_per_tick,
+        );
+        sim.stats.energy_flows.lifecycle_decay += decay;
+        sim.stats.energy_flows.genome_carrying += carrying;
+        sim.stats.energy_flows.genome_size_creature_ticks += u64::from(creature.cached_genome_size);
+        let cause = if energy_before - lifecycle.energy_decay_per_tick <= 0.0 {
+            DeathCause::LifecycleDecay
+        } else {
+            DeathCause::GenomeCarrying
+        };
+        creature.observe_energy(energy_before, cause);
         creature.lifetime_energy_sum += f64::from(creature.energy.max(0.0));
         creature.lifetime_energy_sample_count += 1;
 
@@ -441,6 +457,7 @@ fn run_cognition(
                 &mut creature.graph_runtime,
                 &runtime_config,
             );
+            creature.pending_death_cause = output.energy_observation.pending_cause;
             (*id, output)
         })
         .collect();
@@ -460,6 +477,7 @@ fn run_cognition(
                 &mut creature.graph_runtime,
                 &runtime_config,
             );
+            creature.pending_death_cause = output.energy_observation.pending_cause;
 
             // Record tick trace.
             if let Some(ref mut active) = trace {
@@ -659,9 +677,14 @@ fn push_action_log(
 }
 
 /// Charge the complexity- and age-adjusted penalty for a failed action.
-fn debit_failed_action(creature: &mut CreatureState, energy: &EnergyConfig, penalty: f32) {
+fn debit_failed_action(creature: &mut CreatureState, energy: &EnergyConfig, penalty: f32) -> f64 {
+    let before = creature.energy;
     creature.energy -=
         energy.adjusted_action_cost(penalty, creature.cached_complexity, creature.age);
+    creature.observe_energy(
+        before,
+        super::energy_accounting::DeathCause::FailedActionPenalty,
+    )
 }
 
 /// Barrier-awareness telemetry captured before a move or reproduce attempt.
@@ -700,7 +723,7 @@ impl BarrierContext {
 fn execute_noop(sim: &mut Simulation, ctx: &ActionContext, outcome_acc: &mut OutcomeAccumulator) {
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
         creature.lifetime_action_attempted_count += 1;
-        apply_noop(creature, &sim.config);
+        apply_noop(creature, &sim.config, &mut sim.stats.energy_flows);
         sim.stats.last_tick_noop += 1;
         outcome_acc.record_action_result(ctx.id, true);
     }
@@ -726,7 +749,13 @@ fn execute_eat(
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
         creature.lifetime_action_attempted_count += 1;
         let food_before = sim.world.food_at_type(creature.position, type_idx);
-        let succeeded = apply_typed_eat(creature, &mut sim.world, &sim.config, type_idx);
+        let succeeded = apply_typed_eat(
+            creature,
+            &mut sim.world,
+            &sim.config,
+            type_idx,
+            &mut sim.stats.energy_flows,
+        );
         sim.stats.last_tick_eat += 1;
         outcome_acc.record_action_result(ctx.id, succeeded);
         if succeeded {
@@ -741,7 +770,8 @@ fn execute_eat(
                 .eat_actions_failed_total_by_type
                 .entry(type_idx)
                 .or_insert(0) += 1;
-            debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
+            sim.stats.energy_flows.failed_action_penalty +=
+                debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
         }
     }
     push_action_log(
@@ -773,7 +803,14 @@ fn execute_move(
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
         creature.lifetime_action_attempted_count += 1;
         let from = creature.position;
-        let succeeded = apply_move(ctx.id, creature, &mut sim.world, dir, &sim.config);
+        let succeeded = apply_move(
+            ctx.id,
+            creature,
+            &mut sim.world,
+            dir,
+            &sim.config,
+            &mut sim.stats.energy_flows,
+        );
         sim.stats.last_tick_move += 1;
         sim.stats.move_actions_attempted_total += 1;
         outcome_acc.record_action_result(ctx.id, succeeded);
@@ -781,7 +818,8 @@ fn execute_move(
             creature.lifetime_blocked_move_count += 1;
             blocked_cause = Some(classify_move_blocked_cause(&sim.world, from, dir));
             action_result = ActionResult::Blocked;
-            debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
+            sim.stats.energy_flows.failed_action_penalty +=
+                debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
         }
     }
     if let Some(cause) = blocked_cause {
@@ -880,7 +918,8 @@ fn execute_reproduce(
     };
     if !succeeded {
         if let Some(creature) = sim.creatures.get_mut(ctx.id) {
-            debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
+            sim.stats.energy_flows.failed_action_penalty +=
+                debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
         }
     }
     push_action_log(
@@ -929,7 +968,8 @@ fn execute_steal_energy(
         PredationActionResult::TransferredAndKilled => ActionResult::TransferredAndKilled,
         PredationActionResult::RejectedNoVictim => {
             if let Some(creature) = sim.creatures.get_mut(ctx.id) {
-                debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
+                sim.stats.energy_flows.failed_action_penalty +=
+                    debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
             }
             ActionResult::NoVictim
         }
@@ -960,6 +1000,9 @@ fn run_phase_2(
 
     for (id, output) in decisions {
         compute.record(&output);
+        sim.stats
+            .energy_flows
+            .record_cognition(output.energy_observation);
 
         // Skip all actions for creatures killed by earlier predation this tick.
         if !sim.creatures.contains_key(id) {
@@ -1006,7 +1049,10 @@ fn run_phase_2(
 
             // Floor energy at 0.0 — creatures cannot spend more than they have.
             if let Some(creature) = sim.creatures.get_mut(id) {
+                let before = creature.energy;
                 creature.energy = creature.energy.max(0.0);
+                sim.stats.energy_flows.zero_floor_credit +=
+                    super::energy_accounting::applied_debit(creature.energy, before);
             }
 
             if remove_creature_if_dead(sim, id) {
@@ -1023,6 +1069,7 @@ fn run_phase_2(
 /// For each creature with reward-modulated graph nodes, compute outcome signals
 /// and apply three-factor weight updates using eligibility traces.
 fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
+    use super::energy_accounting::{applied_debit, observe_energy_change, DeathCause};
     let reward_cost = sim.config.runtime.reward_learning_cost;
 
     // Collect IDs to avoid borrow conflict (need &mut creature + &sim.config).
@@ -1069,12 +1116,23 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
                         reward_cost,
                     );
                     sim.stats.plasticity_updates_total += u64::from(update_count);
+                    let before = creature.energy;
                     creature.energy -= update_cost;
+                    sim.stats.energy_flows.reward_learning +=
+                        applied_debit(before, creature.energy);
+                    observe_energy_change(
+                        &mut creature.pending_death_cause,
+                        f64::from(before),
+                        f64::from(creature.energy),
+                        DeathCause::RewardLearning,
+                    );
                 }
             }
         }
         // Floor energy at 0.0 — same invariant as Phase 2 action costs.
+        let before = creature.energy;
         creature.energy = creature.energy.max(0.0);
+        sim.stats.energy_flows.zero_floor_credit += applied_debit(creature.energy, before);
     }
 }
 

@@ -116,12 +116,54 @@ fn applied(sim: &Simulation, op: MutationOperator) -> u64 {
         .unwrap_or(0)
 }
 
+fn accounting_fingerprint(sim: &Simulation) -> Vec<u64> {
+    let f = &sim.stats.energy_flows;
+    let mut bits = vec![
+        sim.stats.mortality.deaths_total,
+        f.genome_size_creature_ticks,
+    ];
+    bits.extend(sim.stats.mortality.by_cause);
+    bits.extend(f.food_intake_by_type.iter().map(|value| value.to_bits()));
+    bits.extend(
+        [
+            f.action_charges.noop,
+            f.action_charges.eat,
+            f.action_charges.r#move,
+            f.action_charges.reproduce,
+            f.action_charges.steal_energy,
+            f.failed_action_penalty,
+            f.vm_compute,
+            f.priority_bid,
+            f.graph_compute,
+            f.hebbian_learning,
+            f.reward_learning,
+            f.lifecycle_decay,
+            f.genome_carrying,
+            f.parental_transfer_debit,
+            f.offspring_energy_credit,
+            f.predation_victim_debit,
+            f.predation_attacker_credit,
+            f.predation_kill_bonus_credit,
+            f.maximum_energy_clamp_loss,
+            f.zero_floor_credit,
+            f.external_removal_loss,
+        ]
+        .map(f64::to_bits),
+    );
+    bits
+}
+
 #[test]
 fn two_simulations_with_the_same_seed_are_byte_identical() {
     let mut first = seeded_fixture(SEED);
     let mut second = seeded_fixture(SEED);
     let mut compared_mutated_descendant = false;
     for tick in 0..=TICKS {
+        assert_eq!(
+            accounting_fingerprint(&first),
+            accounting_fingerprint(&second),
+            "accounting tick {tick}"
+        );
         assert_eq!(
             work_counters(&first),
             work_counters(&second),
@@ -273,6 +315,11 @@ fn terrain_is_identical_across_independent_initialization_and_thread_counts() {
             "founders/state tick {tick}"
         );
         assert_eq!(work_counters(&first), work_counters(&second));
+        assert_eq!(
+            accounting_fingerprint(&first),
+            accounting_fingerprint(&second),
+            "accounting across thread counts tick {tick}"
+        );
         if tick < 20 {
             one.install(|| run_tick(&mut first, &mut None));
             four.install(|| run_tick(&mut second, &mut None));

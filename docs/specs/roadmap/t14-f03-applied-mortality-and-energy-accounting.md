@@ -171,30 +171,30 @@ zero. No existing indicator is redefined and no new composite score is added.
 
 ## Implementation Tasks
 
-- [ ] Establish failing focused mortality/flow coverage and pure-invariant
+- [x] Establish failing focused mortality/flow coverage and pure-invariant
   properties before adding production instrumentation; cover the existing delayed
   and predation-removal paths.
-- [ ] Add bounded cumulative mortality/flow state and pending-cause handling;
+- [x] Add bounded cumulative mortality/flow state and pending-cause handling;
   join predation to the removal funnel and instrument the verified charge,
   credit, cap and transfer sites without changing execution.
-- [ ] Carry dispatch observations through shared runtime modes and the existing
+- [x] Carry dispatch observations through shared runtime modes and the existing
   deterministic reduction; expose the two terminal report blocks.
 - [ ] Complete verification, store the gate/goal reports and readings, update
   progress through the existing closure path, and close this spec and its row.
 
 ## Verification
 
-- [ ] Focused core tests cover every cause and flow site, scaling and rejected
+- [x] Focused core tests cover every cause and flow site, scaling and rejected
   gates, first-crossing/recovery precedence, delayed reward removal, duplicate
   removal, predation of a previously exhausted victim, successful/failed
   parental transfer, multiple/all-in bids, combined decay/carry allocation,
   carrying exposure, float rounding and caps. Results and exact test names:
   `docs/progress/readings/t14-f03.md`.
-- [ ] Pure-invariant property tests cover count partition, pending-cause
+- [x] Pure-invariant property tests cover count partition, pending-cause
   transitions and the combined-debit partition; traced/untraced runtime
   equivalence and all exit paths cover the new observations. Assertions are
   independent of which generated cases are drawn; commit regressions if any.
-- [ ] CLI report tests check terminal source-to-report equality, all cause
+- [x] CLI report tests check terminal source-to-report equality, all cause
   keys, configured food order, absent historical blocks, and omitted checkpoint
   blocks. A tiny real goal-world run demonstrates applied nonzero observations.
 - [ ] Reproducibility coverage includes new integer totals and raw float bits
@@ -203,14 +203,36 @@ zero. No existing indicator is redefined and no new composite score is added.
   RNG results match the pre-feature behavior under unchanged inputs.
 - [ ] `cargo test -p v3-core --test viability` first for tick-loop work, then
   `make check`: results in the readings file.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path,
-  and the full survivor list here, each killed, equivalent or user-deferred.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: the evidence and complete
+  survivor resolutions are recorded below and in the readings file.
 - [ ] `make bench PROFILE=gate FEATURE=t14-f03-applied-mortality-and-energy-accounting`
   and one `make bench PROFILE=goal FEATURE=t14-f03-applied-mortality-and-energy-accounting`:
   stored reports below; readings include each world's mortality and flow rows,
   effective config identity, existing persistence and pressure observations.
 - [x] Second goal run: not applicable under the shared one-run closure rule;
   cross-process/thread reproducibility is checked by ordinary tests.
+
+### Mutation gate evidence
+
+| Record | Result |
+| --- | --- |
+| Fresh command / mode | `MUTANTS_ITERATE=0 make rust-mutants` / `fresh` |
+| Exact fresh summary | `170 mutants tested in 20m: 6 missed, 155 caught, 9 unviable` |
+| Preserved fresh output | `/Users/istefanek/.local/share/petri-tools/mutants/t14-f03/fresh-evidence.taIUGE/mutants.out` (original output: `/Users/istefanek/.local/share/petri-tools/mutants/t14-f03/mutants.out`) |
+| Fresh survivor files | `missed.txt`: six identities below; `timeout.txt`: empty. |
+| Test-only feedback | `MUTANTS_ITERATE=1 make rust-mutants`: `6 mutants tested in 2m: 6 caught`; incremental feedback, not replacement fresh evidence. |
+| Feedback output | `/Users/istefanek/.local/share/petri-tools/mutants/t14-f03/mutants.out`; all six identities in `caught.txt`, empty `missed.txt` and `timeout.txt`. |
+| Production and gate scope | Production content, test selection and tool configuration unchanged; four tests added, none deleted or weakened. One fresh run only under the shared test-strengthening rule. |
+| Exclusions / unresolved survivors | No feature-added `#[mutants::skip]` or `exclude_re`; no equivalent, deferred or unresolved survivors. |
+
+| Full fresh survivor identity | Resolution verified in incremental feedback |
+| --- | --- |
+| `crates/v3-core/src/simulation/energy_accounting.rs:48:9: replace DeathCause::as_key -> &'static str with ""` | Killed by `cause_keys_follow_the_stable_report_schema`, an independent 17-literal core property. |
+| `crates/v3-core/src/simulation/energy_accounting.rs:48:9: replace DeathCause::as_key -> &'static str with "xyzzy"` | Killed by `cause_keys_follow_the_stable_report_schema`. |
+| `crates/v3-core/src/simulation/energy_accounting.rs:96:29: replace > with >= in observe_energy_change` | Killed by `unchanged_energy_preserves_pending_attribution`: unchanged positive energy cannot clear a pending cause without a credit. |
+| `crates/v3-core/src/simulation/energy_accounting.rs:98:22: replace > with >= in observe_energy_change` | Killed by `unchanged_energy_preserves_pending_attribution`: unchanged zero energy cannot invent a crossing. |
+| `crates/v3-core/src/simulation/tick.rs:179:72: replace <= with > in run_phase_0` | Killed by `phase_zero_assigns_each_creatures_decay_first_cause_at_the_zero_boundary`, which checks each creature separately, including exact decay-only zero. |
+| `crates/v3-core/src/simulation/tick.rs:725:50: replace += with *= in execute_noop` | Killed by `noop_counts_each_applied_attempt`, which checks successive lifetime NoOp attempts. |
 
 ## Performance and Goal Impact
 

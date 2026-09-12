@@ -32,6 +32,7 @@ fn sort_by_priority_bid_orders_descending() {
         cost_report: ComputeCostReport::default(),
         priority_bid: bid,
         work_counters: Default::default(),
+        energy_observation: Default::default(),
         termination_reason: TerminationReason::ActionEmitted,
     };
 
@@ -63,6 +64,7 @@ fn sort_by_priority_bid_stable_for_equal_bids() {
         cost_report: ComputeCostReport::default(),
         priority_bid: bid,
         work_counters: Default::default(),
+        energy_observation: Default::default(),
         termination_reason: TerminationReason::ActionEmitted,
     };
 

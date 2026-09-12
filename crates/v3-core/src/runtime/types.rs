@@ -78,6 +78,8 @@ pub struct MeshSideOutputs {
     pub priority_bid: f32,
     /// Deterministic integer work counters accumulated during this mesh evaluation.
     pub work_counters: WorkCounters,
+    /// Applied cognition debits and exhausting sink; never used to control execution.
+    pub energy_observation: crate::simulation::energy_accounting::CognitionEnergyObservation,
 }
 
 impl MeshSideOutputs {
@@ -87,6 +89,7 @@ impl MeshSideOutputs {
             action_queue: ActionQueue::new(max_actions),
             priority_bid: 0.0,
             work_counters: WorkCounters::default(),
+            energy_observation: Default::default(),
         }
     }
 }
@@ -123,6 +126,8 @@ pub struct MeshOutput {
     pub priority_bid: f32,
     /// Deterministic integer work counters accumulated during this evaluation.
     pub work_counters: WorkCounters,
+    /// Dispatch-local applied energy observations, committed sequentially by Phase 2.
+    pub energy_observation: crate::simulation::energy_accounting::CognitionEnergyObservation,
     /// Why the mesh chain stopped. Carried on every execution mode's output so
     /// the untraced production path can count terminations without a trace.
     pub termination_reason: TerminationReason,

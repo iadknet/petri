@@ -47,6 +47,7 @@ pub fn apply_steal_energy(
     dir: Direction,
     requested_amount: f32,
 ) -> PredationActionResult {
+    use crate::simulation::energy_accounting::DeathCause;
     // Sanitize requested amount: NaN/Inf/negative → 0.0.
     let requested_amount = if requested_amount.is_finite() && requested_amount > 0.0 {
         requested_amount
@@ -64,7 +65,11 @@ pub fn apply_steal_energy(
         sim.creatures[attacker_id].cached_complexity,
         sim.creatures[attacker_id].age,
     );
-    sim.creatures[attacker_id].energy -= cost;
+    let attacker = &mut sim.creatures[attacker_id];
+    let before = attacker.energy;
+    attacker.energy -= cost;
+    sim.stats.energy_flows.action_charges.steal_energy +=
+        attacker.observe_energy(before, DeathCause::ActionStealEnergy);
 
     // Step 3: Resolve target cell.
     let attacker_pos = sim.creatures[attacker_id].position;
@@ -97,13 +102,24 @@ pub fn apply_steal_energy(
     let actual = requested_amount.min(sim.creatures[victim_id].energy);
 
     // Step 6: Transfer energy.
-    sim.creatures[victim_id].energy -= actual;
-    sim.creatures[attacker_id].energy += actual;
+    let victim = &mut sim.creatures[victim_id];
+    let before = victim.energy;
+    victim.energy -= actual;
+    sim.stats.energy_flows.predation_victim_debit +=
+        victim.observe_energy(before, DeathCause::Predation);
+    let attacker = &mut sim.creatures[attacker_id];
+    let before = attacker.energy;
+    attacker.energy += actual;
+    sim.stats.energy_flows.predation_attacker_credit -=
+        attacker.observe_energy(before, DeathCause::Predation);
 
     // Step 7: Cap attacker energy at max.
     let max_energy = sim.config.energy.lifecycle.max_energy;
     if sim.creatures[attacker_id].energy > max_energy {
+        let before = sim.creatures[attacker_id].energy;
         sim.creatures[attacker_id].energy = max_energy;
+        sim.stats.energy_flows.maximum_energy_clamp_loss +=
+            crate::simulation::energy_accounting::applied_debit(before, max_energy);
     }
 
     // Step 8: Check kill.
@@ -115,15 +131,20 @@ pub fn apply_steal_energy(
         // Compute and award complexity bonus.
         let bonus =
             victim_complexity as f32 * sim.config.predation.kill_complexity_bonus_multiplier;
-        sim.creatures[attacker_id].energy += bonus;
+        let attacker = &mut sim.creatures[attacker_id];
+        let before = attacker.energy;
+        attacker.energy += bonus;
+        sim.stats.energy_flows.predation_kill_bonus_credit -=
+            attacker.observe_energy(before, DeathCause::Predation);
         if sim.creatures[attacker_id].energy > max_energy {
+            let before = sim.creatures[attacker_id].energy;
             sim.creatures[attacker_id].energy = max_energy;
+            sim.stats.energy_flows.maximum_energy_clamp_loss +=
+                crate::simulation::energy_accounting::applied_debit(before, max_energy);
         }
 
         // Remove victim from world, slotmap, and action logs.
-        sim.world.remove_creature(victim_pos);
-        sim.creatures.remove(victim_id);
-        sim.action_logs.remove(victim_id);
+        sim.remove_creature(victim_id);
 
         sim.stats.predation_kills_total += 1;
         sim.stats.last_tick_predation_kills += 1;

@@ -6,6 +6,7 @@ use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
+use crate::simulation::energy_accounting::{applied_debit, observe_energy_change, DeathCause};
 
 /// Execute a VM backend node.
 ///
@@ -211,8 +212,15 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
         trace_sink.before_instruction(pc, instr, &regs[..reg_count]);
 
         // Charge before executing; exhaustion halts without side effects.
+        let effective_before = effective_energy!();
         debt += charge;
         let effective = effective_energy!();
+        observe_energy_change(
+            &mut side_outputs.energy_observation.pending_cause,
+            effective_before,
+            effective,
+            DeathCause::VmCompute,
+        );
         if effective <= 0.0 {
             // Do NOT commit memory.
             trace_sink.after_instruction(
@@ -442,6 +450,7 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                     0.0
                 };
                 let paid = bid as f32;
+                let before = *energy;
                 *energy -= paid;
                 step_energy_cost += paid;
                 // A bid the cap bit into is an all-in: it leaves nothing behind
@@ -449,7 +458,16 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 // Pin energy to the debt so the single settlement below lands on
                 // exactly 0.0 and death at `energy <= 0.0` stays deterministic.
                 if bid >= effective || effective_energy!() <= 0.0 {
+                    // This is the existing all-in/effective exhaustion decision,
+                    // before the debt-backed store is pinned for final rounding.
+                    observe_energy_change(
+                        &mut side_outputs.energy_observation.pending_cause,
+                        effective,
+                        0.0,
+                        DeathCause::PriorityBid,
+                    );
                     *energy = debt as f32;
+                    side_outputs.energy_observation.priority_bid += applied_debit(before, *energy);
                     trace_sink.after_instruction(
                         pc,
                         instr,
@@ -459,6 +477,7 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                     );
                     break NodeResult::exhausted();
                 }
+                side_outputs.energy_observation.priority_bid += applied_debit(before, *energy);
                 side_outputs.priority_bid = paid;
             }
 
@@ -545,7 +564,18 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
 
     // Single settlement: every exit path leaves the loop here, so the dispatch's
     // accumulated charge rounds against the creature's energy exactly once.
+    let before = *energy;
+    let effective_before_settlement = effective_energy!();
     *energy -= debt as f32;
+    side_outputs.energy_observation.vm_compute += applied_debit(before, *energy);
+    // A positive effective remainder can round to stored zero. Observe that
+    // final compute crossing without changing the node result or queued actions.
+    observe_energy_change(
+        &mut side_outputs.energy_observation.pending_cause,
+        effective_before_settlement,
+        f64::from(*energy),
+        DeathCause::VmCompute,
+    );
     let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
     (result, trace)
 }

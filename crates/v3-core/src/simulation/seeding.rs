@@ -112,13 +112,15 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
         world.place_creature(pos, id);
     }
 
+    let mut stats = crate::simulation::stats::SimStats::default();
+    stats.energy_flows.food_intake_by_type = vec![0.0; config.world.food.types.len()];
     Simulation {
         world,
         creatures,
         action_logs,
         tick: 0,
         config,
-        stats: crate::simulation::stats::SimStats::default(),
+        stats,
         rng,
     }
 }
