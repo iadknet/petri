@@ -80,14 +80,12 @@ pub fn occupancy_grid(
     pairs.sort_unstable();
 
     let mut grid = OccupancyGrid::default();
-    let mut previous: Option<(usize, u32)> = None;
-    for pair in pairs {
-        let (cell, _) = pair;
-        grid.population[cell] += 1;
-        if previous != Some(pair) {
-            grid.distinct_clades[cell] += 1;
-        }
-        previous = Some(pair);
+    // Equal neighbours in the sorted pairs are one clade standing in one cell:
+    // each run adds its creatures to the population and one to the clade count.
+    for run in pairs.chunk_by(|left, right| left == right) {
+        let (cell, _) = run[0];
+        grid.population[cell] += run.len() as u64;
+        grid.distinct_clades[cell] += 1;
     }
     grid
 }
