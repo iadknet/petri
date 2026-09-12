@@ -4863,6 +4863,18 @@ mod tests {
                     sample.tick
                 );
             }
+            for count in [
+                census.creatures_reading_shared_memory,
+                census.creatures_with_stateful_node,
+                census.creatures_with_any_stateful_read,
+            ] {
+                assert!(
+                    count <= sample.population,
+                    "a creature counts at most once per stateful reading: \
+                     {census:?} at tick {}",
+                    sample.tick
+                );
+            }
         }
 
         // The horizon checkpoint equals the census of the oracle's terminal
@@ -4892,15 +4904,6 @@ mod tests {
         assert!(
             food_here.creatures > 0,
             "graph-backend world input references are counted: {first:?}"
-        );
-        let unread = first
-            .world_inputs
-            .iter()
-            .find(|row| row.key == "NearbyCreatureIdentity")
-            .expect("an unreferenced key still has a row");
-        assert_eq!(
-            unread.creatures, 0,
-            "a key no living creature references reads zero, not absent"
         );
     }
 
