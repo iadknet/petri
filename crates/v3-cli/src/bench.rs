@@ -1430,6 +1430,32 @@ pub struct MortalityTracking {
     pub by_cause: BTreeMap<String, u64>,
 }
 
+/// Correlated lifetime outcomes of removed creatures carrying each structure class.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReproductiveSuccessByCognitiveClassTracking {
+    pub definition: String,
+    pub by_class: BTreeMap<String, ReproductiveSuccessTotalsTracking>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReproductiveSuccessTotalsTracking {
+    pub creatures_observed_total: u64,
+    pub offspring_spawned_sum: u64,
+    pub survival_ticks_sum: u64,
+}
+
+impl From<v3_core::simulation::reproductive_success::ReproductiveSuccessTotals>
+    for ReproductiveSuccessTotalsTracking
+{
+    fn from(totals: v3_core::simulation::reproductive_success::ReproductiveSuccessTotals) -> Self {
+        Self {
+            creatures_observed_total: totals.creatures_observed_total,
+            offspring_spawned_sum: totals.offspring_spawned_sum,
+            survival_ticks_sum: totals.survival_ticks_sum,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActionChargeTracking {
     pub noop: String,
@@ -1567,6 +1593,10 @@ pub struct WorldTracking {
     /// Terminal-only applied death attribution; absent means unmeasured.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mortality: Option<MortalityTracking>,
+    /// Terminal-only removed-creature cohorts; absence is unmeasured, zeros are empty.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reproductive_success_by_cognitive_class:
+        Option<ReproductiveSuccessByCognitiveClassTracking>,
     /// Terminal-only applied energy flows; absent means unmeasured.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub energy_flows: Option<EnergyFlowTracking>,
@@ -1659,6 +1689,7 @@ impl WorldTracking {
             mutation_value_totals_by_operator: None,
             predation: None,
             mortality: None,
+            reproductive_success_by_cognitive_class: None,
             energy_flows: None,
             cognition: None,
         }
@@ -1688,6 +1719,23 @@ impl WorldTracking {
                     .map(|cause| (cause.as_key().to_string(), stats.mortality.count(cause)))
                     .collect(),
             }),
+            reproductive_success_by_cognitive_class: Some(
+                ReproductiveSuccessByCognitiveClassTracking {
+                    definition: "reproductive-success-by-cognitive-class-v1".into(),
+                    by_class: v3_core::simulation::reproductive_success::CognitiveClass::ALL
+                        .into_iter()
+                        .map(|class| {
+                            (
+                                class.as_key().to_string(),
+                                stats
+                                    .reproductive_success_by_cognitive_class
+                                    .totals(class)
+                                    .into(),
+                            )
+                        })
+                        .collect(),
+                },
+            ),
             energy_flows: Some((&stats.energy_flows).into()),
             typed_eats_failed_total: Some(by_food_type(
                 sim,
@@ -6537,6 +6585,106 @@ mod tests {
                 .as_ref()
                 .expect("terminal mortality");
             assert_eq!(deaths.by_cause.values().sum::<u64>(), deaths.deaths_total);
+            let reproduction = case
+                .tracking
+                .reproductive_success_by_cognitive_class
+                .as_ref()
+                .expect("terminal reproductive success");
+            assert_eq!(reproduction.by_class.len(), 4);
+            assert_eq!(
+                reproduction
+                    .by_class
+                    .values()
+                    .map(|row| row.creatures_observed_total)
+                    .sum::<u64>(),
+                deaths.deaths_total
+            );
+            let wire = serde_json::to_value(case).unwrap();
+            assert_eq!(
+                wire["reproductive_success_by_cognitive_class"],
+                serde_json::to_value(reproduction).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn reproductive_success_report_transfers_all_twelve_integers_and_stable_keys() {
+        use v3_core::simulation::reproductive_success::ReproductiveSuccessTotals;
+        let mut sim = seed_simulation(SimulationConfig::default(), 7);
+        let rows = [
+            (1, 2, 3),
+            (4, 5, 6),
+            (7, 8, 9),
+            (10, 11, 9_007_199_254_740_993),
+        ];
+        for (destination, (creatures, offspring, age)) in sim
+            .stats
+            .reproductive_success_by_cognitive_class
+            .by_class
+            .iter_mut()
+            .zip(rows)
+        {
+            *destination = ReproductiveSuccessTotals {
+                creatures_observed_total: creatures,
+                offspring_spawned_sum: offspring,
+                survival_ticks_sum: age,
+            };
+        }
+        let terminal = WorldTracking::observe(&sim).with_transferred_counters(&sim);
+        let block = terminal
+            .reproductive_success_by_cognitive_class
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            block.definition,
+            "reproductive-success-by-cognitive-class-v1"
+        );
+        assert_eq!(
+            block
+                .by_class
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            ["none", "plasticity", "shared_memory", "stateful"]
+        );
+        let wire = serde_json::to_value(block).unwrap();
+        assert_eq!(wire.as_object().unwrap().len(), 2);
+        for (key, (creatures, offspring, age)) in
+            ["plasticity", "stateful", "shared_memory", "none"]
+                .into_iter()
+                .zip(rows)
+        {
+            assert_eq!(
+                wire["by_class"][key],
+                serde_json::json!({
+                    "creatures_observed_total": creatures,
+                    "offspring_spawned_sum": offspring,
+                    "survival_ticks_sum": age,
+                })
+            );
+        }
+        let round_trip: WorldTracking =
+            serde_json::from_value(serde_json::to_value(&terminal).unwrap()).unwrap();
+        assert_eq!(round_trip, terminal);
+    }
+
+    #[test]
+    fn reproductive_success_report_keeps_all_empty_cohorts_as_integer_zeros() {
+        let sim = seed_simulation(SimulationConfig::default(), 7);
+        let terminal = WorldTracking::observe(&sim).with_transferred_counters(&sim);
+        let block = terminal.reproductive_success_by_cognitive_class.unwrap();
+        let wire = serde_json::to_value(block).unwrap();
+        let rows = wire["by_class"].as_object().unwrap();
+        assert_eq!(rows.len(), 4);
+        for key in ["none", "plasticity", "shared_memory", "stateful"] {
+            assert_eq!(
+                rows[key],
+                serde_json::json!({
+                    "creatures_observed_total": 0,
+                    "offspring_spawned_sum": 0,
+                    "survival_ticks_sum": 0,
+                })
+            );
         }
     }
 
@@ -6643,7 +6791,7 @@ mod tests {
     fn checkpoint_tracking_omits_every_transferred_block() {
         use v3_core::simulation::seed_simulation;
 
-        const TRANSFERRED_KEYS: [&str; 9] = [
+        const TRANSFERRED_KEYS: [&str; 10] = [
             "typed_eats_failed_total",
             "mesh_dispatches_energy_exhausted_total",
             "mutation_supply",
@@ -6653,6 +6801,7 @@ mod tests {
             "mortality",
             "energy_flows",
             "cognition",
+            "reproductive_success_by_cognitive_class",
         ];
 
         let sim = seed_simulation(SimulationConfig::default(), 7);
@@ -7081,6 +7230,7 @@ mod tests {
                     actions_by_result: BTreeMap::from([("Transferred".to_string(), 3)]),
                 }),
                 mortality: None,
+                reproductive_success_by_cognitive_class: None,
                 energy_flows: None,
                 cognition: None,
             },
@@ -7128,9 +7278,16 @@ mod tests {
         assert_eq!(legacy.tracking.predation, None);
         assert_eq!(legacy.tracking.mortality, None);
         assert_eq!(legacy.tracking.energy_flows, None);
+        assert_eq!(
+            legacy.tracking.reproductive_success_by_cognitive_class,
+            None
+        );
         let encoded = serde_json::to_value(legacy).unwrap();
         assert!(encoded.get("mortality").is_none());
         assert!(encoded.get("energy_flows").is_none());
+        assert!(encoded
+            .get("reproductive_success_by_cognitive_class")
+            .is_none());
     }
 
     proptest! {

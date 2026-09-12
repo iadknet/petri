@@ -190,6 +190,8 @@ pub struct PhaseWallClock {
 #[derive(Debug, Clone, Default)]
 pub struct SimStats {
     pub mortality: super::energy_accounting::MortalityTotals,
+    pub reproductive_success_by_cognitive_class:
+        super::reproductive_success::ReproductiveSuccessByCognitiveClass,
     pub energy_flows: super::energy_accounting::EnergyFlows,
     // ── Cumulative (never reset) ─────────────────────────────────────────────
     pub reproduction_actions_attempted_total: u64,

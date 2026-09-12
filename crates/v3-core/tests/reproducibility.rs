@@ -138,6 +138,19 @@ fn accounting_fingerprint(sim: &Simulation) -> Vec<u64> {
         f.genome_size_creature_ticks,
     ];
     bits.extend(sim.stats.mortality.by_cause);
+    bits.extend(
+        sim.stats
+            .reproductive_success_by_cognitive_class
+            .by_class
+            .iter()
+            .flat_map(|row| {
+                [
+                    row.creatures_observed_total,
+                    row.offspring_spawned_sum,
+                    row.survival_ticks_sum,
+                ]
+            }),
+    );
     bits.extend(f.food_intake_by_type.iter().map(|value| value.to_bits()));
     bits.extend(
         [

@@ -118,22 +118,22 @@ or causal selection; class precedence also prevents independent-trait claims.
 
 ## Implementation Tasks
 
-- [ ] Share the existing structural analyzer from the genome layer while
+- [x] Share the existing structural analyzer from the genome layer while
   retaining its neighborhood callers and semantics.
-- [ ] Add the fixed class totals and the sole removal-time observation.
-- [ ] Transfer all twelve integers into each standard goal case's optional
+- [x] Add the fixed class totals and the sole removal-time observation.
+- [x] Transfer all twelve integers into each standard goal case's optional
   terminal block, with its definition token and historical absence semantics.
 - [ ] Complete verification, store the gate/goal reports and concise readings,
   and close the feature under the shared workflow.
 
 ## Verification
 
-- [ ] Focused core tests: `cargo test -p v3-core --lib` checks all class
+- [x] Focused core tests: `cargo test -p v3-core --lib` checks all class
   combinations, unchanged structural-companion callers, unreachable structure,
   all removals counted once, birth outcomes and age sums; property tests cover
   classification partition and additive/permutation invariants. Record executed
   test names and results in `docs/progress/readings/t14-f06.md`.
-- [ ] Focused report tests: `cargo test -p v3-cli` checks twelve-field transfer,
+- [x] Focused report tests: `cargo test -p v3-cli` checks twelve-field transfer,
   definition/key shape, empty cohorts, historical absence, checkpoint omission
   and terminal per-world replay agreement. Results: same readings file.
 - [ ] `make check` passes, including viability and cross-process/thread-count
