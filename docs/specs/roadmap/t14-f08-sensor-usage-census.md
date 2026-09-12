@@ -175,8 +175,8 @@ constructed literally by the `bench.rs` test helpers `empty_readings` and
 - [x] Focused tests at `6112143f`: `cargo test -p v3-core -p v3-cli`,
       `cargo clippy -p v3-core -p v3-cli --all-targets` and
       `cargo fmt --all -- --check` all exit 0 and clean. 12 unit
-      tests and 2 proptests in `creature::sensor_census::tests`, four
-      `bench::tests` arms; names in the readings file.
+      tests, 2 proptests in `creature::sensor_census::tests` and four
+      `bench::tests` arms; named in the readings file.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.
@@ -221,15 +221,14 @@ at all.
 - Gate profile: exit 0 at `6112143f`, `severe=false` on both references, every
   compute metric `level=ok`, epoch not re-pinned, founder neighborhood 76.62 ms
   against the 10,000 ms cap, no evolved neighborhood in this profile.
-  `wall_clock` crosses to `level=flag` (+51.3 %, +69.7 %), mostly host load as
-  the readings file shows.
+  `wall_clock` crosses to `level=flag` (+51.3 %, +69.7 %): mostly host load.
 - Goal profile: exit 0 at `6112143f`, `severe=false` on both references, epoch
   not re-pinned, evolved neighborhood 659.74 ms against 180,000 ms, founder
   230.65 ms against 10,000 ms, total 636,820.52 ms (10.61 min) against the
   15-minute budget. Direction **none** holds on the indicators: with
   `sensor_census` deleted, `deterministic.goal_indicators` diffs empty against
-  T14.F04's. `wall_clock` crosses to `level=flag` (+41.0 %, +29.2 %); the
-  `plasticity_updates` flag is T12.F04's inherited 0.066183.
+  T14.F04's. `wall_clock` crosses to `level=flag` (+41.0 %, +29.2 %), 4–5 % of
+  it the census; `plasticity_updates` flags T12.F04's inherited 0.066183.
 
 - Reports: [gate](../../progress/features/t14-f08-sensor-usage-census.json),
   [goal](../../progress/features/t14-f08-sensor-usage-census-goal.json).
