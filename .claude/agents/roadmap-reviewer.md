@@ -4,8 +4,8 @@ description: >-
   Reviews exactly one implemented roadmap feature (TNN.FNN) diff against its
   flat feature spec and the roadmap contract, from a fresh context, and reports
   P1/P2/P3 findings. Read-only. Use for the final diff review after the
-  roadmap-implementer reports a feature complete. Does not implement, edit, or
-  adjudicate scope.
+  roadmap-implementer and roadmap-benchmark-specialist report complete. Does
+  not implement, edit, or adjudicate scope.
 model: fable
 effort: high
 permissionMode: plan
