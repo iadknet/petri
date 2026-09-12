@@ -4581,6 +4581,105 @@ mod tests {
         }
     }
 
+    /// The synthetic-series test above drives the accumulator directly; this
+    /// one binds the composition inside `run_one_seed`, the call site T14.F08,
+    /// T14.F09 and T14.F10 hang their own series off. The oracle is an
+    /// independent re-run of the same seed to the same horizon: byte-identical
+    /// reproducibility (T10.F11) makes the oracle's terminal state the state
+    /// `run_one_seed` sampled on its horizon tick, so the equality catches a
+    /// reading taken before `run_tick`, and the inequality against tick 100
+    /// catches one reading reused for every checkpoint.
+    #[test]
+    fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
+        // Arrange: a 32x32 world with 8 founders over 250 ticks, past the
+        // founding crash near tick 150, so the horizon population is a
+        // recovered one whose readings differ from tick 100's. Seed 13 was
+        // measured to survive the horizon.
+        const SEED: u64 = 13;
+        const HORIZON: u64 = 250;
+        let config = build_config(&ProfileParams {
+            recipe: None,
+            name: "sweep".to_string(),
+            width: 32,
+            height: 32,
+            founders: 8,
+            seeds: vec![SEED],
+            ticks: HORIZON,
+            food_coverage: None,
+            neighborhood: NeighborhoodSizes::default(),
+            drift: Default::default(),
+        });
+
+        // Act
+        let run = run_one_seed(
+            &config,
+            SEED,
+            HORIZON,
+            false,
+            None,
+            NeighborhoodSizes::default(),
+        );
+        let mut oracle = seed_simulation(config.clone(), SEED);
+        for _ in 0..HORIZON {
+            run_tick(&mut oracle, &mut None);
+        }
+        let terminal = PopulationReadings::observe(&oracle);
+
+        // Assert: the run reached the horizon alive, so the horizon readings
+        // are measured values and the comparison below is not `None` against
+        // `Some`.
+        assert_eq!(
+            run.persistence.extinction_tick, None,
+            "the fixture must survive the horizon for this test to bind anything"
+        );
+        let horizon_sample = run
+            .persistence
+            .samples
+            .iter()
+            .find(|sample| sample.tick == HORIZON)
+            .expect("the horizon tick is sampled");
+        assert_eq!(horizon_sample.population, oracle.creatures.len() as u64);
+        assert!(horizon_sample.population > 0);
+
+        assert_eq!(
+            horizon_sample.mean_genome_size.as_deref(),
+            Some(six(terminal.mean_genome_size).as_str())
+        );
+        assert_eq!(
+            horizon_sample.mean_mesh_nodes.as_deref(),
+            Some(six(terminal.mean_mesh_nodes).as_str())
+        );
+        assert_eq!(
+            horizon_sample.mean_generation.as_deref(),
+            Some(six(terminal.mean_generation).as_str())
+        );
+        assert_eq!(
+            horizon_sample.surviving_founder_clade_count,
+            Some(terminal.surviving_founder_clade_count)
+        );
+        assert_eq!(
+            horizon_sample.shannon_entropy_nats.as_deref(),
+            Some(terminal.shannon_entropy_nats.as_str())
+        );
+
+        // A checkpoint carries its own tick's readings, not the run's.
+        let early_sample = run
+            .persistence
+            .samples
+            .iter()
+            .find(|sample| sample.tick == 100)
+            .expect("tick 100 is sampled");
+        assert_ne!(
+            early_sample.mean_generation, horizon_sample.mean_generation,
+            "generations advance between tick 100 and the horizon"
+        );
+        assert_ne!(
+            early_sample.surviving_founder_clade_count,
+            horizon_sample.surviving_founder_clade_count,
+            "founder clades are lost between tick 100 and the horizon"
+        );
+    }
+
     /// At extinction the three means and the entropy report absence, never
     /// zero; the clade count is a true `0`.
     #[test]
@@ -4624,11 +4723,8 @@ mod tests {
         assert_eq!(readings.shannon_entropy_nats, six(4.0_f64.ln()));
         assert_eq!(
             readings.shannon_entropy_nats,
-            lineage_diversity(
-                42,
-                sim.creatures.values().map(|c| c.identity.lineage_id)
-            )
-            .shannon_entropy_nats,
+            lineage_diversity(42, sim.creatures.values().map(|c| c.identity.lineage_id))
+                .shannon_entropy_nats,
             "the checkpoint reading and the terminal reading share one computation"
         );
     }
@@ -4662,6 +4758,7 @@ mod tests {
             let wire = serde_json::to_string(&sample).expect("serializable");
             let decoded: PersistenceSample =
                 serde_json::from_str(&wire).expect("deserializable");
+            prop_assert_eq!(decoded.population, sample.population);
             prop_assert_eq!(&decoded.mean_genome_size, &sample.mean_genome_size);
             prop_assert_eq!(&decoded.mean_mesh_nodes, &sample.mean_mesh_nodes);
             prop_assert_eq!(&decoded.mean_generation, &sample.mean_generation);
