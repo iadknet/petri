@@ -1635,8 +1635,68 @@ pub struct PersistenceSample {
     pub mean_energy: Option<String>,
     /// Cumulative `reproduction_actions_spawned_total` at this tick.
     pub births_total: u64,
+    /// Mean genome size of the living population, junk included. `null` at
+    /// extinction and absent in reports stored before T14.F04.
+    #[serde(default)]
+    pub mean_genome_size: Option<String>,
+    /// Mean mesh node count of the living population. `null` at extinction and
+    /// absent in reports stored before T14.F04.
+    #[serde(default)]
+    pub mean_mesh_nodes: Option<String>,
+    /// Mean generation of the living population. `null` at extinction and
+    /// absent in reports stored before T14.F04.
+    #[serde(default)]
+    pub mean_generation: Option<String>,
+    /// Founder clades with at least one living creature — a true `0` at
+    /// extinction, absent in reports stored before T14.F04.
+    #[serde(default)]
+    pub surviving_founder_clade_count: Option<u64>,
+    /// Shannon entropy of the living clade distribution, in nats. `UNDEFINED`
+    /// at extinction and absent in reports stored before T14.F04.
+    #[serde(default)]
+    pub shannon_entropy_nats: Option<String>,
     #[serde(flatten)]
     pub tracking: WorldTracking,
+}
+
+/// The five population readings a checkpoint sample carries, read from
+/// post-tick state through the same accessors the horizon readings use.
+#[derive(Debug, Clone, PartialEq)]
+struct PopulationReadings {
+    mean_genome_size: f64,
+    mean_mesh_nodes: f64,
+    mean_generation: f64,
+    surviving_founder_clade_count: u64,
+    shannon_entropy_nats: String,
+}
+
+impl PopulationReadings {
+    fn observe(sim: &v3_core::simulation::Simulation) -> Self {
+        let (mean_genome_size, mean_mesh_nodes, mean_generation) = crate::structure_means(sim);
+        let (surviving_founder_clade_count, shannon_entropy_nats) =
+            clade_diversity(sim.creatures.values().map(|c| c.identity.lineage_id));
+        Self {
+            mean_genome_size,
+            mean_mesh_nodes,
+            mean_generation,
+            surviving_founder_clade_count,
+            shannon_entropy_nats,
+        }
+    }
+}
+
+impl Default for PopulationReadings {
+    /// The empty-population reading: zero means that never reach the report,
+    /// no surviving clade, and undefined entropy.
+    fn default() -> Self {
+        Self {
+            mean_genome_size: 0.0,
+            mean_mesh_nodes: 0.0,
+            mean_generation: 0.0,
+            surviving_founder_clade_count: 0,
+            shannon_entropy_nats: UNDEFINED.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1935,16 +1995,18 @@ impl PersistenceAccumulator {
         tick.is_multiple_of(SAMPLE_EVERY_TICKS) || tick == self.horizon || population == 0
     }
 
-    /// Record one executed tick. `mean_energy` and `tracking` are evaluated
-    /// only on sampled ticks — the first keeps the `O(population)` energy sum
-    /// to the predeclared cadence and leaves `null` at extinction, the second
-    /// keeps the per-world counter reads there too.
+    /// Record one executed tick. `mean_energy`, `readings` and `tracking` are
+    /// evaluated only on sampled ticks — the first keeps the `O(population)`
+    /// energy sum to the predeclared cadence and leaves `null` at extinction,
+    /// the second keeps the structure and clade passes to that cadence, and the
+    /// third keeps the per-world counter reads there too.
     fn observe(
         &mut self,
         tick: u64,
         population: u64,
         births_total: u64,
         mean_energy: impl FnOnce() -> f64,
+        readings: impl FnOnce() -> PopulationReadings,
         tracking: impl FnOnce() -> WorldTracking,
     ) {
         self.population = population;
@@ -1961,11 +2023,18 @@ impl PersistenceAccumulator {
             self.plateau_ticks += 1;
         }
         if self.is_sampled(tick, population) {
+            let alive = population > 0;
+            let readings = readings();
             self.samples.push(PersistenceSample {
                 tick,
                 population,
-                mean_energy: (population > 0).then(|| six(mean_energy())),
+                mean_energy: alive.then(|| six(mean_energy())),
                 births_total,
+                mean_genome_size: alive.then(|| six(readings.mean_genome_size)),
+                mean_mesh_nodes: alive.then(|| six(readings.mean_mesh_nodes)),
+                mean_generation: alive.then(|| six(readings.mean_generation)),
+                surviving_founder_clade_count: Some(readings.surviving_founder_clade_count),
+                shannon_entropy_nats: Some(readings.shannon_entropy_nats),
                 tracking: tracking(),
             });
         }
@@ -2065,6 +2134,7 @@ fn run_one_seed(
                 let total: f64 = sim.creatures.values().map(|c| f64::from(c.energy)).sum();
                 total / population as f64
             },
+            || PopulationReadings::observe(&sim),
             || WorldTracking::observe(&sim),
         );
         if population == 0 {
@@ -2161,10 +2231,11 @@ fn run_one_seed(
     }
 }
 
-fn lineage_diversity(
-    seed: u64,
-    lineage_ids: impl IntoIterator<Item = u32>,
-) -> LineageDiversitySeed {
+/// Surviving founder clade count and the Shannon entropy of their size
+/// distribution, in nats. Counting is keyed in a `BTreeMap`, so neither the
+/// count nor the fixed summation order of the entropy depends on how the
+/// caller's population was iterated.
+fn clade_diversity(lineage_ids: impl IntoIterator<Item = u32>) -> (u64, String) {
     let mut counts = BTreeMap::<u32, u64>::new();
     for lineage_id in lineage_ids {
         *counts.entry(lineage_id).or_default() += 1;
@@ -2180,9 +2251,17 @@ fn lineage_diversity(
         });
         six(entropy)
     };
+    (counts.len() as u64, shannon_entropy_nats)
+}
+
+fn lineage_diversity(
+    seed: u64,
+    lineage_ids: impl IntoIterator<Item = u32>,
+) -> LineageDiversitySeed {
+    let (surviving_founder_clade_count, shannon_entropy_nats) = clade_diversity(lineage_ids);
     LineageDiversitySeed {
         seed,
-        surviving_founder_clade_count: counts.len() as u64,
+        surviving_founder_clade_count,
         shannon_entropy_nats,
     }
 }
@@ -4261,9 +4340,26 @@ mod tests {
         assert_eq!(historical.environment.drift_depth_wall_clock_ms, None);
     }
 
+    /// Population readings a living tick stands in with: values keyed to the
+    /// tick so a sample can be traced back to the tick it was taken on. An
+    /// empty population reads [`PopulationReadings::default`], exactly as
+    /// `PopulationReadings::observe` does.
+    fn readings_for(tick: u64, population: u64) -> PopulationReadings {
+        if population == 0 {
+            return PopulationReadings::default();
+        }
+        PopulationReadings {
+            mean_genome_size: tick as f64,
+            mean_mesh_nodes: tick as f64 * 2.0,
+            mean_generation: tick as f64 * 3.0,
+            surviving_founder_clade_count: population,
+            shannon_entropy_nats: six(tick as f64 / 4.0),
+        }
+    }
+
     /// Feed the accumulator one observation per tick from a population
-    /// series (index 0 is tick 1), with a constant mean creature energy and
-    /// a cumulative birth count equal to the tick.
+    /// series (index 0 is tick 1), with a constant mean creature energy, a
+    /// cumulative birth count equal to the tick, and [`readings_for`].
     fn observe_series(
         horizon: u64,
         seeded_population: u64,
@@ -4273,7 +4369,14 @@ mod tests {
         let mut accumulator = PersistenceAccumulator::new(horizon, seeded_population);
         for (index, &population) in populations.iter().enumerate() {
             let tick = index as u64 + 1;
-            accumulator.observe(tick, population, tick, || energy, WorldTracking::default);
+            accumulator.observe(
+                tick,
+                population,
+                tick,
+                || energy,
+                || readings_for(tick, population),
+                WorldTracking::default,
+            );
         }
         accumulator.finish(7)
     }
@@ -4444,6 +4547,167 @@ mod tests {
 
         let survived = observe_series(4, 4, &[4, 4, 4, 4], 2.5);
         assert_eq!(survived.mean_energy.as_deref(), Some("2.500000"));
+    }
+
+    #[test]
+    fn every_checkpoint_carries_the_population_readings_of_its_own_tick() {
+        let populations = [6_u64; 250];
+        let summary = observe_series(250, 6, &populations, 1.0);
+
+        assert_eq!(
+            summary.samples.iter().map(|s| s.tick).collect::<Vec<_>>(),
+            vec![100, 200, 250]
+        );
+        for sample in &summary.samples {
+            let expected = readings_for(sample.tick, sample.population);
+            assert_eq!(
+                sample.mean_genome_size.as_deref(),
+                Some(six(expected.mean_genome_size).as_str()),
+                "tick {}",
+                sample.tick
+            );
+            assert_eq!(
+                sample.mean_mesh_nodes.as_deref(),
+                Some(six(expected.mean_mesh_nodes).as_str())
+            );
+            assert_eq!(
+                sample.mean_generation.as_deref(),
+                Some(six(expected.mean_generation).as_str())
+            );
+            assert_eq!(sample.surviving_founder_clade_count, Some(6));
+            assert_eq!(
+                sample.shannon_entropy_nats.as_deref(),
+                Some(expected.shannon_entropy_nats.as_str())
+            );
+        }
+    }
+
+    /// At extinction the three means and the entropy report absence, never
+    /// zero; the clade count is a true `0`.
+    #[test]
+    fn the_extinction_checkpoint_reports_absent_means_and_a_zero_clade_count() {
+        let extinct = observe_series(4, 4, &[4, 2, 0], 2.5);
+        let last = extinct
+            .samples
+            .last()
+            .expect("the extinction tick is sampled");
+
+        assert_eq!(last.population, 0);
+        assert_eq!(last.mean_genome_size, None);
+        assert_eq!(last.mean_mesh_nodes, None);
+        assert_eq!(last.mean_generation, None);
+        assert_eq!(last.surviving_founder_clade_count, Some(0));
+        assert_eq!(last.shannon_entropy_nats.as_deref(), Some(UNDEFINED));
+    }
+
+    #[test]
+    fn population_readings_average_the_living_population_and_count_its_clades() {
+        let mut config = SimulationConfig::default();
+        config.world.width = 32;
+        config.world.height = 32;
+        config.population.initial_creatures = 4;
+        let sim = seed_simulation(config, 42);
+        assert_eq!(sim.creatures.len(), 4);
+
+        let expected_genome_size = f64::from(
+            sim.creatures
+                .values()
+                .map(|c| c.cached_genome_size)
+                .sum::<u32>(),
+        ) / 4.0;
+        let readings = PopulationReadings::observe(&sim);
+        assert_eq!(readings.mean_genome_size, expected_genome_size);
+        assert_eq!(readings.mean_mesh_nodes, 2.0);
+        assert_eq!(readings.mean_generation, 0.0);
+        // Every founder is its own clade, so the distribution is uniform and
+        // the entropy is ln(4).
+        assert_eq!(readings.surviving_founder_clade_count, 4);
+        assert_eq!(readings.shannon_entropy_nats, six(4.0_f64.ln()));
+        assert_eq!(
+            readings.shannon_entropy_nats,
+            lineage_diversity(
+                42,
+                sim.creatures.values().map(|c| c.identity.lineage_id)
+            )
+            .shannon_entropy_nats,
+            "the checkpoint reading and the terminal reading share one computation"
+        );
+    }
+
+    proptest! {
+        /// The five optional readings survive a JSON round trip beside the
+        /// flattened tracking block, and a wire form without them reads them
+        /// as absent rather than as zero.
+        #[test]
+        fn persistence_sample_readings_survive_a_json_round_trip(
+            mean_genome_size in proptest::option::of(0.0f64..1e6),
+            mean_mesh_nodes in proptest::option::of(0.0f64..1e6),
+            mean_generation in proptest::option::of(0.0f64..1e6),
+            surviving_founder_clade_count in proptest::option::of(0u64..10_000),
+            shannon_entropy_nats in proptest::option::of(0.0f64..20.0),
+            population in 0u64..1000,
+        ) {
+            let sample = PersistenceSample {
+                tick: 100,
+                population,
+                mean_energy: None,
+                births_total: 7,
+                mean_genome_size: mean_genome_size.map(six),
+                mean_mesh_nodes: mean_mesh_nodes.map(six),
+                mean_generation: mean_generation.map(six),
+                surviving_founder_clade_count,
+                shannon_entropy_nats: shannon_entropy_nats.map(six),
+                tracking: WorldTracking::default(),
+            };
+
+            let wire = serde_json::to_string(&sample).expect("serializable");
+            let decoded: PersistenceSample =
+                serde_json::from_str(&wire).expect("deserializable");
+            prop_assert_eq!(&decoded.mean_genome_size, &sample.mean_genome_size);
+            prop_assert_eq!(&decoded.mean_mesh_nodes, &sample.mean_mesh_nodes);
+            prop_assert_eq!(&decoded.mean_generation, &sample.mean_generation);
+            prop_assert_eq!(
+                decoded.surviving_founder_clade_count,
+                sample.surviving_founder_clade_count
+            );
+            prop_assert_eq!(&decoded.shannon_entropy_nats, &sample.shannon_entropy_nats);
+            prop_assert_eq!(&decoded.tracking, &sample.tracking);
+
+            let mut stripped: serde_json::Value =
+                serde_json::from_str(&wire).expect("an object on the wire");
+            let object = stripped.as_object_mut().expect("an object on the wire");
+            for key in [
+                "mean_genome_size",
+                "mean_mesh_nodes",
+                "mean_generation",
+                "surviving_founder_clade_count",
+                "shannon_entropy_nats",
+            ] {
+                object.remove(key);
+            }
+            let historical: PersistenceSample =
+                serde_json::from_value(stripped).expect("a historical sample must parse");
+            prop_assert_eq!(historical.mean_genome_size, None);
+            prop_assert_eq!(historical.mean_mesh_nodes, None);
+            prop_assert_eq!(historical.mean_generation, None);
+            prop_assert_eq!(historical.surviving_founder_clade_count, None);
+            prop_assert_eq!(historical.shannon_entropy_nats, None);
+        }
+    }
+
+    #[test]
+    fn population_readings_of_an_empty_population_are_the_default_reading() {
+        let mut config = SimulationConfig::default();
+        config.world.width = 32;
+        config.world.height = 32;
+        config.population.initial_creatures = 0;
+        let sim = seed_simulation(config, 42);
+        assert_eq!(sim.creatures.len(), 0);
+
+        assert_eq!(
+            PopulationReadings::observe(&sim),
+            PopulationReadings::default()
+        );
     }
 
     #[test]
@@ -5658,12 +5922,22 @@ mod tests {
         }))
         .expect("a pre-T12.F04 sample must still parse");
         assert_eq!(legacy.tracking, WorldTracking::default());
+        assert_eq!(legacy.mean_genome_size, None);
+        assert_eq!(legacy.mean_mesh_nodes, None);
+        assert_eq!(legacy.mean_generation, None);
+        assert_eq!(legacy.surviving_founder_clade_count, None);
+        assert_eq!(legacy.shannon_entropy_nats, None);
 
         let sample = PersistenceSample {
             tick: 100,
             population: 5,
             mean_energy: None,
             births_total: 2,
+            mean_genome_size: Some(six(111.0)),
+            mean_mesh_nodes: Some(six(8.0)),
+            mean_generation: Some(six(3.5)),
+            surviving_founder_clade_count: Some(4),
+            shannon_entropy_nats: Some(six(1.25)),
             tracking: WorldTracking {
                 typed_eats_total: vec![7],
                 food_density_total: vec![six(2.0)],
