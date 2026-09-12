@@ -1,6 +1,7 @@
 pub mod actions;
 pub mod energy_accounting;
 pub(crate) mod outcomes;
+pub mod reproductive_success;
 pub mod seeding;
 #[allow(clippy::module_inception)]
 pub mod simulation;

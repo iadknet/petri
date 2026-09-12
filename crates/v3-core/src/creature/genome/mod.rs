@@ -2,7 +2,10 @@ pub mod analysis;
 pub mod cgp;
 pub(crate) mod cgp_analysis;
 pub(crate) mod cgp_mesh_annotations;
+pub mod companions;
 pub mod mesh_annotations;
+
+pub use companions::{structural_companions, StructuralCompanions};
 
 use crate::contracts::{InputReference, NodeId, RouteTarget};
 

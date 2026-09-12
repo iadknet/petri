@@ -4,9 +4,11 @@ use slotmap::{SecondaryMap, SlotMap};
 use crate::config::SimulationConfig;
 use crate::contracts::CreatureId;
 use crate::creature::action_log::ActionLog;
+use crate::creature::genome::structural_companions;
 use crate::creature::state::CreatureState;
 use crate::kernel::paint::{PaintPoint, PaintStats, PaintTool};
 use crate::kernel::WorldState;
+use crate::simulation::reproductive_success::CognitiveClass;
 use crate::simulation::stats::{MutationOutcomeObservation, SimStats};
 
 const SHORT_SURVIVAL_HORIZON_TICKS: u64 = 32;
@@ -84,7 +86,7 @@ impl Simulation {
         stats
     }
 
-    /// Remove one creature and record exit-time mutation value aggregates.
+    /// Remove one creature and record mortality and exit-time lifetime aggregates.
     pub fn remove_creature(&mut self, id: CreatureId) {
         if let Some(creature) = self.creatures.remove(id) {
             use super::energy_accounting::DeathCause;
@@ -97,6 +99,11 @@ impl Simulation {
                     .unwrap_or(DeathCause::Unattributed)
             };
             self.stats.mortality.record(cause);
+            self.stats.reproductive_success_by_cognitive_class.record(
+                CognitiveClass::from_companions(&structural_companions(&creature.genome)),
+                creature.offspring_spawned_count,
+                creature.age,
+            );
             let observation = build_mutation_outcome_observation(&creature, &self.config);
             let evaluation = self
                 .stats
