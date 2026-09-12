@@ -280,6 +280,30 @@ mod tests {
         let census = census_of(&graph_node(graph, vec![InputReference::World(key)]));
 
         assert_eq!(census.world_inputs, BTreeSet::from([key]));
+
+        let vm = census_of(&vm_node(
+            vec![
+                VmInstruction::ReadInput {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                    dst: 1,
+                },
+                VmInstruction::ReadInput {
+                    ref_idx: 0,
+                    sub_idx: 1,
+                    dst: 2,
+                },
+                VmInstruction::Add { dst: 3, a: 1, b: 2 },
+                VmInstruction::WriteInternalPayload {
+                    slot_idx: 0,
+                    src: 3,
+                },
+                VmInstruction::Halt,
+            ],
+            vec![InputReference::World(key)],
+        ));
+
+        assert_eq!(vm.world_inputs, BTreeSet::from([key]));
     }
 
     #[test]
