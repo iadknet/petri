@@ -16,6 +16,7 @@ use std::collections::BTreeSet;
 
 use crate::contracts::{InputReference, OrdinaryFoodTypeId, WorldInputKey};
 use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, NodeClass};
+use crate::creature::genome::cgp_analysis::cgp_live_compute_indices;
 use crate::creature::genome::mesh_annotations::collect_live_vm_instruction_indices;
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 
@@ -88,7 +89,7 @@ fn census_graph(
     input_refs: &[InputReference],
     census: &mut CreatureSensorCensus,
 ) {
-    for &idx in &crate::creature::genome::cgp_analysis::cgp_live_compute_indices(graph) {
+    for idx in cgp_live_compute_indices(graph) {
         let node = &graph.compute_nodes[idx];
         if node.kind.class() == NodeClass::Stateful {
             census.holds_stateful_node = true;
@@ -99,9 +100,6 @@ fn census_graph(
         census_edges(&sink.inputs, input_refs, census);
     }
     for slot in &graph.action_bank {
-        if slot.gate_inputs.is_empty() && slot.param_inputs.is_empty() {
-            continue;
-        }
         census_edges(&slot.gate_inputs, input_refs, census);
         census_edges(&slot.param_inputs, input_refs, census);
     }
