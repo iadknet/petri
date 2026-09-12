@@ -20,6 +20,7 @@ use v3_core::creature::genome::analysis::functional_complexity;
 use v3_core::creature::sensor_census::{
     creature_sensor_census, world_input_key_label, world_input_key_universe,
 };
+use v3_core::kernel::occupancy_grid::{occupancy_grid, OCCUPANCY_CELLS_PER_AXIS};
 use v3_core::neighborhood::{
     self, evaluate_genome, evolved_sample_ranks, structural_companions, Battery, BirthResult,
     EvalContext, GenomeEvaluation, OperatorRow, StructuralCompanions, Tally, BATTERY_VERSION,
@@ -1664,8 +1665,50 @@ pub struct PersistenceSample {
     /// T14.F08.
     #[serde(default)]
     pub sensor_census: Option<SensorCensus>,
+    /// Where the living population stands, on a fixed 16x16 grid over the
+    /// world. A true all-zero grid at extinction, absent in reports stored
+    /// before T14.F10.
+    #[serde(default)]
+    pub occupancy_grid: Option<OccupancyGrid>,
     #[serde(flatten)]
     pub tracking: WorldTracking,
+}
+
+/// The occupancy grid of one checkpoint: two parallel row-major arrays of
+/// length `cells_x * cells_y`, always emitted in full.
+///
+/// An unoccupied cell is a `0` in both arrays, never an absence, so a reader
+/// never reconstructs the grid shape from which cells appear.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OccupancyGrid {
+    pub cells_x: u16,
+    pub cells_y: u16,
+    /// Living creatures per cell, row-major.
+    pub population: Vec<u64>,
+    /// Distinct founder clades per cell, row-major. A clade counts once per
+    /// cell however many of its creatures stand there.
+    pub distinct_clades: Vec<u64>,
+}
+
+impl OccupancyGrid {
+    /// Aggregate the living population's positions from post-tick state. Pure
+    /// integer counting over an ordered structure: no RNG is consumed, and the
+    /// creature iteration order does not reach the result.
+    fn observe(sim: &v3_core::simulation::Simulation) -> Self {
+        let grid = occupancy_grid(
+            sim.world.width,
+            sim.world.height,
+            sim.creatures
+                .values()
+                .map(|creature| (creature.position, creature.identity.lineage_id)),
+        );
+        Self {
+            cells_x: OCCUPANCY_CELLS_PER_AXIS,
+            cells_y: OCCUPANCY_CELLS_PER_AXIS,
+            population: grid.population.to_vec(),
+            distinct_clades: grid.distinct_clades.to_vec(),
+        }
+    }
 }
 
 /// One world input key's row in a checkpoint census.
@@ -1756,6 +1799,7 @@ struct PopulationReadings {
     surviving_founder_clade_count: u64,
     shannon_entropy_nats: String,
     sensor_census: SensorCensus,
+    occupancy_grid: OccupancyGrid,
 }
 
 impl PopulationReadings {
@@ -1770,6 +1814,7 @@ impl PopulationReadings {
             surviving_founder_clade_count,
             shannon_entropy_nats,
             sensor_census: SensorCensus::observe(sim),
+            occupancy_grid: OccupancyGrid::observe(sim),
         }
     }
 }
@@ -2111,6 +2156,7 @@ impl PersistenceAccumulator {
                 surviving_founder_clade_count: Some(readings.surviving_founder_clade_count),
                 shannon_entropy_nats: Some(readings.shannon_entropy_nats),
                 sensor_census: Some(readings.sensor_census),
+                occupancy_grid: Some(readings.occupancy_grid),
                 tracking: tracking(),
             });
         }
@@ -3851,7 +3897,8 @@ fn rand_version_from_lock(lockfile: &str) -> Option<&str> {
 mod tests {
     use super::*;
     use proptest::prelude::*;
-    use v3_core::contracts::{Direction, WorldAction};
+    use v3_core::contracts::{Direction, Position, WorldAction};
+    use v3_core::kernel::occupancy_grid::OCCUPANCY_CELL_COUNT;
     use v3_core::simulation::seed_simulation;
 
     proptest! {
@@ -4438,6 +4485,22 @@ mod tests {
         }
     }
 
+    /// A stand-in occupancy grid: the whole `population` standing in the first
+    /// cell as one clade, every other cell a true zero. An empty population
+    /// makes the whole grid zero, exactly as `OccupancyGrid::observe` does.
+    fn grid_for(population: u64) -> OccupancyGrid {
+        let mut population_cells = vec![0; OCCUPANCY_CELL_COUNT];
+        let mut clade_cells = vec![0; OCCUPANCY_CELL_COUNT];
+        population_cells[0] = population;
+        clade_cells[0] = u64::from(population > 0);
+        OccupancyGrid {
+            cells_x: OCCUPANCY_CELLS_PER_AXIS,
+            cells_y: OCCUPANCY_CELLS_PER_AXIS,
+            population: population_cells,
+            distinct_clades: clade_cells,
+        }
+    }
+
     /// The reading `PopulationReadings::observe` produces for an empty
     /// population: zero means that never reach the report, no surviving clade,
     /// undefined entropy, and an all-zero census.
@@ -4449,6 +4512,7 @@ mod tests {
             surviving_founder_clade_count: 0,
             shannon_entropy_nats: UNDEFINED.to_string(),
             sensor_census: census_for(0),
+            occupancy_grid: grid_for(0),
         }
     }
 
@@ -4467,6 +4531,7 @@ mod tests {
             surviving_founder_clade_count: population,
             shannon_entropy_nats: six(tick as f64 / 4.0),
             sensor_census: census_for(population),
+            occupancy_grid: grid_for(population),
         }
     }
 
@@ -5018,6 +5083,134 @@ mod tests {
         assert_eq!(census.creatures_reading_shared_memory, 0);
         assert_eq!(census.creatures_with_stateful_node, 0);
         assert_eq!(census.creatures_with_any_stateful_read, 0);
+
+        let grid = last
+            .occupancy_grid
+            .as_ref()
+            .expect("the grid of an empty population is zero, not unmeasured");
+        assert_eq!(grid.cells_x, OCCUPANCY_CELLS_PER_AXIS);
+        assert_eq!(grid.cells_y, OCCUPANCY_CELLS_PER_AXIS);
+        assert_eq!(grid.population.len(), OCCUPANCY_CELL_COUNT);
+        assert_eq!(grid.distinct_clades.len(), OCCUPANCY_CELL_COUNT);
+        assert!(grid.population.iter().all(|&count| count == 0));
+        assert!(grid.distinct_clades.iter().all(|&count| count == 0));
+    }
+
+    /// `OccupancyGrid::observe` reads the living population's positions and
+    /// lineage ids against the world's own extent: two clades in different
+    /// parts of the world occupy different cells, and two clades in one part
+    /// share a cell.
+    #[test]
+    fn the_observed_grid_separates_clades_by_where_they_stand() {
+        let mut config = SimulationConfig::default();
+        config.world.width = 160;
+        config.world.height = 160;
+        config.population.initial_creatures = 4;
+        let mut sim = seed_simulation(config, 42);
+        let ids: Vec<_> = sim.creatures.keys().collect();
+        assert_eq!(ids.len(), 4);
+
+        // Two clades in the top-left cell, and the same two clades again in
+        // the cell one row down and one column right.
+        for (id, (position, lineage_id)) in ids.iter().zip([
+            (Position::new(0, 0), 1),
+            (Position::new(9, 9), 2),
+            (Position::new(10, 10), 1),
+            (Position::new(19, 19), 2),
+        ]) {
+            sim.creatures[*id].position = position;
+            sim.creatures[*id].identity.lineage_id = lineage_id;
+        }
+
+        let grid = OccupancyGrid::observe(&sim);
+
+        assert_eq!(grid.cells_x, OCCUPANCY_CELLS_PER_AXIS);
+        assert_eq!(grid.cells_y, OCCUPANCY_CELLS_PER_AXIS);
+        assert_eq!(grid.population[0], 2);
+        assert_eq!(grid.distinct_clades[0], 2);
+        // Row-major: the cell at (1, 1) is index 17.
+        assert_eq!(grid.population[17], 2);
+        assert_eq!(grid.distinct_clades[17], 2);
+        assert_eq!(grid.population.iter().sum::<u64>(), 4);
+        assert_eq!(grid.distinct_clades.iter().sum::<u64>(), 4);
+    }
+
+    #[test]
+    fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
+        const SEED: u64 = 13;
+        const HORIZON: u64 = 250;
+        let config = build_config(&ProfileParams {
+            recipe: None,
+            name: "sweep".to_string(),
+            width: 32,
+            height: 32,
+            founders: 8,
+            seeds: vec![SEED],
+            ticks: HORIZON,
+            food_coverage: None,
+            neighborhood: NeighborhoodSizes::default(),
+            drift: Default::default(),
+        });
+
+        // Act
+        let run = run_one_seed(
+            &config,
+            SEED,
+            HORIZON,
+            false,
+            None,
+            NeighborhoodSizes::default(),
+        );
+        let mut oracle = seed_simulation(config.clone(), SEED);
+        for _ in 0..HORIZON {
+            run_tick(&mut oracle, &mut None);
+        }
+
+        assert!(!run.persistence.samples.is_empty());
+        for sample in &run.persistence.samples {
+            let grid = sample
+                .occupancy_grid
+                .as_ref()
+                .expect("every checkpoint carries an occupancy grid");
+            assert_eq!(grid.cells_x, OCCUPANCY_CELLS_PER_AXIS);
+            assert_eq!(grid.cells_y, OCCUPANCY_CELLS_PER_AXIS);
+            assert_eq!(grid.population.len(), OCCUPANCY_CELL_COUNT);
+            assert_eq!(grid.distinct_clades.len(), OCCUPANCY_CELL_COUNT);
+            assert_eq!(
+                grid.population.iter().sum::<u64>(),
+                sample.population,
+                "every living creature is binned exactly once at tick {}",
+                sample.tick
+            );
+            for cell in 0..OCCUPANCY_CELL_COUNT {
+                assert!(
+                    grid.distinct_clades[cell] <= grid.population[cell],
+                    "a cell counts at most one clade per creature: cell {cell} at tick {}",
+                    sample.tick
+                );
+            }
+        }
+
+        // The horizon checkpoint equals the grid of the oracle's terminal
+        // state — the state `run_one_seed` sampled on that tick, by T10.F11.
+        let horizon_sample = run
+            .persistence
+            .samples
+            .iter()
+            .find(|sample| sample.tick == HORIZON)
+            .expect("the horizon tick is sampled");
+        assert!(horizon_sample.population > 0);
+        assert_eq!(
+            horizon_sample.occupancy_grid.as_ref(),
+            Some(&OccupancyGrid::observe(&oracle))
+        );
+        assert!(
+            horizon_sample
+                .occupancy_grid
+                .as_ref()
+                .is_some_and(|grid| grid.population.iter().filter(|&&count| count > 0).count() > 1),
+            "a living population spread over a world occupies more than one cell"
+        );
     }
 
     #[test]
@@ -5075,6 +5268,7 @@ mod tests {
                 surviving_founder_clade_count,
                 shannon_entropy_nats: shannon_entropy_nats.map(six),
                 sensor_census: Some(census_for(population)),
+                occupancy_grid: Some(grid_for(population)),
                 tracking: WorldTracking::default(),
             };
 
@@ -5091,6 +5285,7 @@ mod tests {
             );
             prop_assert_eq!(&decoded.shannon_entropy_nats, &sample.shannon_entropy_nats);
             prop_assert_eq!(&decoded.sensor_census, &sample.sensor_census);
+            prop_assert_eq!(&decoded.occupancy_grid, &sample.occupancy_grid);
             prop_assert_eq!(&decoded.tracking, &sample.tracking);
 
             let mut stripped: serde_json::Value =
@@ -5103,6 +5298,7 @@ mod tests {
                 "surviving_founder_clade_count",
                 "shannon_entropy_nats",
                 "sensor_census",
+                "occupancy_grid",
             ] {
                 object.remove(key);
             }
@@ -5114,6 +5310,7 @@ mod tests {
             prop_assert_eq!(historical.surviving_founder_clade_count, None);
             prop_assert_eq!(historical.shannon_entropy_nats, None);
             prop_assert_eq!(historical.sensor_census, None);
+            prop_assert_eq!(historical.occupancy_grid, None);
         }
     }
 
@@ -6347,6 +6544,7 @@ mod tests {
         assert_eq!(legacy.surviving_founder_clade_count, None);
         assert_eq!(legacy.shannon_entropy_nats, None);
         assert_eq!(legacy.sensor_census, None);
+        assert_eq!(legacy.occupancy_grid, None);
 
         let sample = PersistenceSample {
             tick: 100,
@@ -6359,6 +6557,7 @@ mod tests {
             surviving_founder_clade_count: Some(4),
             shannon_entropy_nats: Some(six(1.25)),
             sensor_census: Some(census_for(5)),
+            occupancy_grid: Some(grid_for(5)),
             tracking: WorldTracking {
                 typed_eats_total: vec![7],
                 food_density_total: vec![six(2.0)],
