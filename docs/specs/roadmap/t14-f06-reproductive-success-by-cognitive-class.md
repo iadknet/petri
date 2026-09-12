@@ -252,6 +252,7 @@ selection conclusion. Full values and comparison boundary:
 - Decision: One user intervention requested a durable Codex benchmark-agent
   instruction to request process-inspection permission on its first measured
   attempt; `docs/workflow-codex.md` now records it. No remote was mutated.
-- Cost: Task-specific total usage unavailable. Advisor consultations: 3;
-  implementation passes: 1 build plus 1 documentation-only remediation;
-  final review findings: P1=0, P2=0, P3=1.
+- Cost: Native goal telemetry immediately before completion reported 642,353
+  tokens and 3,535 seconds elapsed. Advisor consultations: 3; implementation
+  passes: 1 build plus 1 documentation-only remediation; final review findings:
+  P1=0, P2=0, P3=1.
