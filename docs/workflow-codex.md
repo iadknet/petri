@@ -192,6 +192,13 @@ appropriate. If later production remediation invalidates a report, return to the
 same specialist for only the affected final-code measurement before closure;
 this is not a second determinism check.
 
+Codex's filesystem sandbox does not permit the `/bin/ps` process inspection used
+by `scripts/bench-wait`. Run each measured `make bench` command through
+`exec_command` with `sandbox_permissions: "require_escalated"` and a concise
+justification that the benchmark preflight requires process inspection. Request
+that permission on the first attempt; do not first run the command in the
+sandbox, and do not bypass `scripts/bench-wait` when permission is unavailable.
+
 ### Final review
 
 For final review, spawn `roadmap_reviewer` using `gpt-6-astra`, `xhigh`, and
