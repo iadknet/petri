@@ -156,9 +156,9 @@ change to a determinism-critical stored-report struct.
 
 ## Verification
 
-- [x] `make check` -> exit 0 at the tested commit `4905b3bb`, run once on the
-      final feature code. The closure edits after it are documentation only and
-      are covered by `make check-docs`.
+- [x] `make check` -> exit 0 at the tested commit `3a508067`, rerun after a
+      clean rebase onto a `main` that had moved. The one commit after it is
+      this record, documentation only.
 - [x] Focused tests at `b8399dd2`: `cargo test -p v3-core -p v3-cli`,
       `cargo clippy -p v3-core -p v3-cli --all-targets` and
       `cargo fmt --all -- --check` all exit 0 and clean. 12 unit
