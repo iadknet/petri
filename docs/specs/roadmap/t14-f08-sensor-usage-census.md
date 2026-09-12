@@ -192,17 +192,16 @@ constructed literally by the `bench.rs` test helpers `empty_readings` and
 
 **Predeclaration — written before the run.** Measurement feature; the track's
 observation contract exempts it from the natural-analog rule and it adds no
-mechanism. References: the gate and goal profiles compare against the epoch
-baselines the series index names, under the existing thresholds.
+mechanism. Both profiles compare against the epoch baselines the series index
+names, under the existing thresholds.
 
 Expected compute cost: small and larger than T14.F04's. T14.F04 reads cached
 values; this feature recomputes VM and graph liveness for each living creature
 on each sampled tick — at most 21 sampled ticks per seed, against a population
 in the thousands, inside the timed loop. The walk is the same liveness analysis
 birth already performs once per creature, and no new work enters the hot path.
-The measured wall-clock delta is reported in the readings file. A severe compute
-regression is a blocker to report, not a cost to justify here, and no epoch
-re-pin is expected or authorized.
+The measured delta is in the readings file. A severe regression is a blocker to
+report, not a cost to justify here, and no epoch re-pin is authorized.
 
 Predeclared direction for every goal indicator: **none**. This feature changes
 nothing the simulation applies, so lineage diversity, memory sensitivity,
@@ -218,17 +217,20 @@ at all.
 
 **Measured verdict.**
 
-- Gate profile: exit 0 at `6112143f`, `severe=false` on both references, every
-  compute metric `level=ok`, epoch not re-pinned, founder neighborhood 76.62 ms
-  against the 10,000 ms cap, no evolved neighborhood in this profile.
-  `wall_clock` crosses to `level=flag` (+51.3 %, +69.7 %): mostly host load.
+- Gate profile, rerun on the shipped code: exit 0 at `887ed8c0`,
+  `severe=false` on both references, no threshold crossed — every compute metric
+  and `wall_clock` (-10.3 %, +0.6 %) read `level=ok` — epoch not re-pinned,
+  founder neighborhood 58.32 ms against the 10,000 ms cap, no evolved
+  neighborhood here.
 - Goal profile: exit 0 at `6112143f`, `severe=false` on both references, epoch
   not re-pinned, evolved neighborhood 659.74 ms against 180,000 ms, founder
   230.65 ms against 10,000 ms, total 636,820.52 ms (10.61 min) against the
   15-minute budget. Direction **none** holds on the indicators: with
   `sensor_census` deleted, `deterministic.goal_indicators` diffs empty against
   T14.F04's. `wall_clock` crosses to `level=flag` (+41.0 %, +29.2 %), 4–5 % of
-  it the census; `plasticity_updates` flags T12.F04's inherited 0.066183.
+  it the census; `plasticity_updates` flags T12.F04's inherited 0.066183. Its
+  `git_revision` predates the post-review refactors, which change no stored
+  value.
 
 - Reports: [gate](../../progress/features/t14-f08-sensor-usage-census.json),
   [goal](../../progress/features/t14-f08-sensor-usage-census-goal.json).
