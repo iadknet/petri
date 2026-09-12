@@ -77,13 +77,13 @@ deserialize with these readings absent.
 
 ## Implementation Tasks
 
-- [ ] Share `structure_means` and the clade-count/entropy computation between
+- [x] Share `structure_means` and the clade-count/entropy computation between
       their existing callers and the checkpoint sample, without changing either
       caller's current output.
-- [ ] Carry the five readings on `PersistenceSample`, evaluated only on sampled
+- [x] Carry the five readings on `PersistenceSample`, evaluated only on sampled
       ticks and only from post-tick state, with the empty-population and
       historical-report rules above.
-- [ ] Tests: the readings appear on every checkpoint of a run and match a
+- [x] Tests: the readings appear on every checkpoint of a run and match a
       directly computed value; the extinction sample reports absence rather than
       zero; a stored report predating the fields still loads; the existing
       `v3-cli run` tick sample and the terminal goal reading are unchanged.
@@ -92,9 +92,17 @@ deserialize with these readings absent.
 
 - [ ] `make check` -> exit status recorded here, run once on the final feature
       code, with the tested commit named.
-- [ ] Focused tests: the bench checkpoint-reading tests and the existing
-      `v3-cli` tick-sample and lineage-diversity tests -> `<command>` ->
-      `<result>`.
+- [x] Focused tests: `cargo test -p v3-cli` -> ok, 83 + 11 + 20 + 11 passed,
+      0 failed. Covers the new checkpoint-reading tests
+      (`every_checkpoint_carries_the_population_readings_of_its_own_tick`,
+      `the_extinction_checkpoint_reports_absent_means_and_a_zero_clade_count`,
+      `population_readings_average_the_living_population_and_count_its_clades`,
+      `population_readings_of_an_empty_population_are_the_default_reading`,
+      `persistence_sample_readings_survive_a_json_round_trip`), the unchanged
+      `checkpoint_tracking_omits_every_transferred_block`, the
+      `lineage_diversity` tests and the `v3-cli run` tick-sample tests.
+      `cargo check --workspace --all-targets` and `cargo clippy -p v3-cli
+      --all-targets` -> clean.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.

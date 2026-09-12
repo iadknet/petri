@@ -160,7 +160,7 @@ pub fn run_simulation<W: std::io::Write>(
 /// Means of the living population's structure and lineage depth, in one pass:
 /// total genome size (junk included), mesh node count, and generation. All
 /// `0.0` for an empty population, like `Simulation::mean_energy`.
-fn structure_means(sim: &v3_core::simulation::Simulation) -> (f64, f64, f64) {
+pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> (f64, f64, f64) {
     let population = sim.creatures.len();
     if population == 0 {
         return (0.0, 0.0, 0.0);
