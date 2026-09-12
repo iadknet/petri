@@ -119,9 +119,9 @@ deterministic; no global counters, RNG calls, or unordered serialized maps.
   `/Users/istefanek/.local/share/petri-tools/mutants/t14-f05/mutants.out`.
   Full survivor list: missed — none; timed out — none. No triage edits,
   incremental pass, or second fresh run; raw output in the readings.
-- [ ] Gate report: `make bench PROFILE=gate FEATURE=t14-f05-cognition-telemetry-resolution`
+- [x] Gate report: `make bench PROFILE=gate FEATURE=t14-f05-cognition-telemetry-resolution`
   → `docs/progress/features/t14-f05-cognition-telemetry-resolution.json`.
-- [ ] One goal report:
+- [x] One goal report:
   `make bench PROFILE=goal FEATURE=t14-f05-cognition-telemetry-resolution`
   → `docs/progress/features/t14-f05-cognition-telemetry-resolution-goal.json`.
   Record the new observations, including zeros, for Orchards, Canyon, and
@@ -158,7 +158,19 @@ resolve. The new carrier census is wired beside the existing memory indicator
 in the goal profile and is not a sensitivity or capability score. Newly visible
 counts have no directional target; zero is a valid reading.
 
-**Measured verdict.** Not measured.
+**Measured verdict.** Both commands exited 0; no new regression. All existing
+deterministic data matches T14.F03 exactly at identical inputs (goal comparison
+excludes only the new cognition and census fields). All six normalized work
+counters are unchanged versus T14.F03. The goal plasticity +40.886836% epoch
+flag and founder single-event silence floor gap are inherited, unchanged, and
+not waived. Wall time per creature-tick is +3.408074% gate / -1.293679% goal
+versus T14.F03 and -11.553548% / +2.369318% versus the epochs; all wall levels
+are `ok`, with no severe reference. Founder observations are 53.309042 ms gate
+and 103.718667 ms goal; evolved observation is 499.322792 ms total. The single
+goal run took approximately 483 seconds, within every predeclared time cap.
+No epoch re-pin is needed or performed for either the gate or goal profile.
+The readings record all three worlds' applied counts, overlapping census, and
+unchanged sensitivity including zeros. Final `make check` and closure remain.
 
 - Reports: [gate](../../progress/features/t14-f05-cognition-telemetry-resolution.json),
   [goal](../../progress/features/t14-f05-cognition-telemetry-resolution-goal.json).
@@ -166,7 +178,7 @@ counts have no directional target; zero is a valid reading.
 
 ## Success Criteria
 
-- [ ] Closure reports distinguish unchanged and changed plasticity assignments
+- [x] Closure reports distinguish unchanged and changed plasticity assignments
   and Hebbian versus reward-modulated learning without changing learning.
 - [x] Production changed-memory-write totals cover both backends and reflect
   individual applied events, including writes subsequently reversed.

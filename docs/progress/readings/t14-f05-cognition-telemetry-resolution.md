@@ -5,7 +5,7 @@
 | Date | 2026-09-12 |
 | Worktree / branch | `.worktrees/t14-f05` / `codex/t14-f05` |
 | Planning commit | `07dd1948` |
-| State | Build, self-review, final review, and fresh mutation gate complete; benchmark reports and final `make check` remain. |
+| State | Build, self-review, final review, fresh mutation gate, and both benchmark reports complete; final `make check` and closure remain. |
 
 ## Build verification
 
@@ -51,6 +51,7 @@
 | 3 — final build checkpoint | No correctness, requirement, or scope blocker. Accepted confirmation of unchanged learning/costs, exact partitions, pre-exhaustion event retention, memory coverage, optional report semantics, census/sensitivity meaning, and viability inapplicability. No corrective change recommended. |
 | 4 — final self-review/spec checkpoint | Pass sufficient; checked items are supported, closure-dependent items correctly remain open, absent benchmark files match the unmeasured verdict, and the performance predeclaration is intact. Accepted no-correction/no-runtime-rerun guidance; documentation checks passed. |
 | 5 — final mutation checkpoint | Fresh mode, successful baseline, 92 = 86 caught + 6 unviable, zero missed/timeouts, empty survivor files, and no added exclusions/skips satisfy the gate. Accepted no-remediation/no-additional-run guidance; spec record is truthful. |
+| 6 — final benchmark checkpoint | Confirmed deterministic equality, measured deltas and caps, cognition partitions, census denominators, and checkpoint omission. Inherited plasticity flag and founder gap are unchanged. Accepted no-rerun/no-waiver/no-re-pin/no-remediation guidance and the required spec clarification explicitly ruling out an epoch re-pin for both profiles. |
 
 ## Self-review
 
@@ -97,4 +98,127 @@ rust-mutants: no survivors
 
 ## Closure measurements
 
-No gate, goal, or final full-check result is claimed yet.
+| Measurement record | Value |
+| --- | --- |
+| Measured revision | `22cd1afd5e14747d9bf7c849242677ac174fa736`; production unchanged from reviewed/mutation-tested `123e90e2ccb3e0dadd767afc2188ac4a917d2205` |
+| Host / build / threads | Apple M1 Pro, macOS aarch64, `Isaacs-MacBook-Pro-2.local`; release; 8 threads |
+| Gate command | `make bench PROFILE=gate FEATURE=t14-f05-cognition-telemetry-resolution` — exit 0; one invocation |
+| Goal command | `make bench PROFILE=goal FEATURE=t14-f05-cognition-telemetry-resolution` — exit 0; exactly one invocation, after gate success |
+| Isolation | Both commands used the unchanged `bench-wait` host preflight; authorized host access allowed process inspection. No competing benchmark/server/build/test/mutant work was started. |
+| Gate report | [t14-f05-cognition-telemetry-resolution.json](../features/t14-f05-cognition-telemetry-resolution.json), generated `2026-09-12T19:34:49Z` |
+| Goal report | [t14-f05-cognition-telemetry-resolution-goal.json](../features/t14-f05-cognition-telemetry-resolution-goal.json), generated `2026-09-12T19:43:10Z` |
+| Gate SHA-256 | `63f6045b7934a9f9ce954b14d355bb4a301e23a25d9765fb35547ccdbb43f051` |
+| Goal SHA-256 | `4d853ec67836a95b9a707a43ccad8389aa12e362d87b2faef3bde56fc6832b23` |
+| Gate profile | `gate`, 128×128, 256 founders, seeds 11/22/33, 75 ticks, food coverage `1.000000` |
+| Goal profile | `goal-worlds-v1`, 1600×1600, 10,000 founders per world, seeds 11/22/33, 2,000 ticks, recipe-specific food coverage |
+| Reference selection | Unchanged `docs/progress/benchmark-series.json`: `gate-v1` and `goal-worlds-v1` epochs plus latest indexed T14.F03 closures; no baseline edits or epoch re-pin |
+| Final full check | Not run in this benchmark pass; no result claimed |
+| Documentation verification | `make roadmap-check` exited 0 after the measured record (`roadmap-check: validation passed`; nonfatal Aqua timestamp warning); `git diff --check` exited 0. |
+
+### Reference comparisons and caps
+
+Reference paths below are relative to `docs/progress/features/`.
+
+| Profile / reference | Baseline | Severe | Wall delta / level |
+| --- | --- | --- | --- |
+| Gate / epoch | `remove-complementary-nutrition.json` | false | -11.553548% / ok |
+| Gate / latest | `t14-f03-applied-mortality-and-energy-accounting.json` | false | +3.408074% / ok |
+| Goal / epoch | `t12-f04-baseline-world-set-goal.json` | false | +2.369318% / ok |
+| Goal / latest | `t14-f03-applied-mortality-and-energy-accounting-goal.json` | false | -1.293679% / ok |
+
+| Normalized work / creature-tick | Gate current | Gate vs epoch | Goal current | Goal vs epoch | Both vs latest |
+| --- | --- | --- | --- | --- | --- |
+| `mesh_hops` | 2.028954 | +0.083512% | 2.258369 | +0.464115% | 0.000000% |
+| `vm_steps` | 22.425973 | -1.429996% | 23.478709 | +0.595336% | 0.000000% |
+| `graph_relax_iters` | 0.994920 | -0.031550% | 1.024449 | -0.397748% | 0.000000% |
+| `plasticity_updates` | 0.009880 | -11.556709% | 0.066183 | +40.886836% (inherited flag) | 0.000000% |
+| `actions_applied` | 1.272860 | -0.208934% | 1.360568 | -0.773642% | 0.000000% |
+| `births` | 0.026902 | +0.455564% | 0.019659 | +5.642431% | 0.000000% |
+
+| Cost boundary | Applied reading / verdict |
+| --- | --- |
+| Work >+10% flagged / >+50% severe | Only aggregate flag is goal plasticity vs T12.F04; identical to T14.F03, no new or severe regression |
+| Wall >+25% flagged / >+100% severe | All four comparisons `ok`; gate `0.001379615195` ms/creature-tick, goal `0.007582147304` |
+| Founder observation ≤10,000 ms/profile | Gate 53.309042 ms; goal 103.718667 ms — met |
+| Evolved observation ≤180,000 ms summed across seeds | Goal 499.322792 ms — met |
+| Goal timed simulation | 462273.505085 ms |
+| Final-state observation, outside timed simulation | 817.288167 ms |
+| Drift-depth observation, outside timed simulation | 18252.618751 ms |
+| Goal invocation 900-second investigation threshold | Approximately 483 seconds (8.05 min), observed CLI start `19:35:07 UTC` to report timestamp `19:43:10 UTC`; even the conservative interval from the preceding gate report is only 501 seconds — met |
+
+### Deterministic and report audit
+
+Read-only `jq` comparisons and invariant checks passed:
+
+- The gate's entire `deterministic` block equals T14.F03. The goal's entire
+  `deterministic` block equals T14.F03 after deleting exactly
+  `goal_indicators.structural_companions` and `goal_indicators.cases[].cognition`.
+  No existing trajectory, indicator, persistence sample, work counter, mortality,
+  energy, or mutation reading changed.
+- Goal profile identity equals T14.F03. All three effective config digests equal
+  both selected references; no absent case or `inputs_changed` flag. The 104
+  case comparisons (35/34/35) equal T14.F03's comparisons for each reference.
+- Exactly three terminal cognition blocks exist; zero of 60 persistence
+  checkpoints has one. Assignment and changed totals each equal their two
+  pathways; changes do not exceed assignments; combined assignment counts equal
+  the existing per-seed work counters.
+- All census counts are bounded by their final population, and each denominator
+  equals the same seed's memory-sensitivity denominator. Counts overlap; they
+  are not disjoint categories or a capability score.
+- The new cognition and four census counts are positive in all three measured
+  worlds; none was omitted or replaced with a historical zero. Existing zero
+  sensitivity readings are explicitly preserved below. Historical new-field
+  absence remains unmeasured, as covered by focused tests.
+
+### World identity and cognition observations
+
+| Field | Orchards in grassland | Canyon country | Confluence |
+| --- | --- | --- | --- |
+| Seed | 11 | 22 | 33 |
+| Recipe | `experiments/worlds/orchards-in-grassland.json` | `experiments/worlds/canyon-country.json` | `experiments/worlds/confluence.json` |
+| Effective config digest | `sha256:8141056a33bc30445fd29340fa40498372835e08459b7c04c347f9724b445423` | `sha256:ee72c5532cb947fad7349a3a4d3c5a5b5bef2c501ebe5b299b5de12ad26bd99d` | `sha256:25fb4d0baf34719c0f1e657c98b4e8a7932216510d69651c6fd58d4f6d318676` |
+| Configured food slots | 2 | 1 | 2 |
+| `plasticity_updates_total` | 1948986 | 1451896 | 634227 |
+| `plasticity_changes_total` | 149840 | 159555 | 103850 |
+| Unchanged assignments (updates minus changes) | 1799146 | 1292341 | 530377 |
+| `hebbian_updates_total` | 1909900 | 1437191 | 618955 |
+| `hebbian_changes_total` | 147898 | 158553 | 103788 |
+| `reward_modulated_updates_total` | 39086 | 14705 | 15272 |
+| `reward_modulated_changes_total` | 1942 | 1002 | 62 |
+| `shared_memory_writes_changed_total` | 177139 | 473073 | 516538 |
+| Final living population / census denominator | 11313 | 7090 | 9995 |
+| `reads_shared_memory` | 6341 | 3134 | 5250 |
+| `writes_shared_memory` | 7894 | 4210 | 5716 |
+| `has_stateful_compute_node` | 252 | 487 | 458 |
+| `has_plasticity` | 1551 | 626 | 383 |
+| Memory-sensitive to zeroing, count / fraction | 0 / 0.000000 | 5 / 0.000705 | 0 / 0.000000 |
+| Memory-sensitive to scrambling, count / fraction | 1 / 0.000088 | 5 / 0.000705 | 0 / 0.000000 |
+| Memory-sensitive to either, count / fraction | 1 / 0.000088 | 5 / 0.000705 | 0 / 0.000000 |
+| Temporal previous-slot sensitivity, either | 0 / 0.000000 | 0 / 0.000000 | 0 / 0.000000 |
+| Temporal persisted-output sensitivity, either | 19 / 0.001679 | 47 / 0.006629 | 150 / 0.015008 |
+| Temporal operator-state sensitivity, either | 2 / 0.000177 | 127 / 0.017913 | 49 / 0.004902 |
+
+These first readings distinguish executed assignments from stored-weight
+changes and eventful memory use from final structural exposure. They do not
+claim evolved cognition: Confluence has 5250 memory readers and 516538 changed
+write events yet zero final memory-sensitive creatures under the unchanged
+probe. No mechanism or environmental pressure was added; environmental-pressure
+integration is not applicable.
+
+### Existing goal floors and no-regression verdict
+
+| Floor / observation | Orchards in grassland | Canyon country | Confluence | Verdict |
+| --- | --- | --- | --- | --- |
+| Memory motifs silent ≥0.80 (read/store, read/bid, load/compare) | 0.900000 / 1.000000 / 0.880000 | 0.900000 / 1.000000 / 0.860000 | 0.900000 / 1.000000 / 0.880000 | Met |
+| Graph add-node / copy-node / input-reference-add silent ≥0.95 | 1.000000 / 1.000000 / 1.000000 | 1.000000 / 1.000000 / 1.000000 | 1.000000 / 1.000000 / 1.000000 | Met |
+| Founder mutated-birth dead ≤0.05 | 0.000000 | 0.000000 | 0.000000 | Met |
+| Founder single-event silent ≥0.60 | 0.567073 | 0.597561 | 0.567073 | Inherited gap; unchanged, not claimed met |
+| Evolved mutated-birth dead ≤0.05 | 0.000909 | 0.000909 | 0.009091 | Met |
+| Evolved single-event silent ≥0.60 | 0.695175 | 0.739035 | 0.725877 | Met |
+
+Gate founder single-event silence is also unchanged at 0.597561 below 0.60.
+The inherited founder floor belongs to T11.F01's fixed targets due by T11.F10;
+this feature neither resolves nor waives it. No existing goal or comparison
+coverage regressed. No rerun, baseline change, threshold weakening, verification
+exception, or production remediation was used. Final `make check` and closure
+state are still pending.
