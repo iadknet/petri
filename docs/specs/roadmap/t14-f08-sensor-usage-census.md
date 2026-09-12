@@ -1,6 +1,6 @@
 # T14.F08 — Sensor Usage Census
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-12
 **Feature**: T14.F08
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -10,16 +10,16 @@
 Every persistence checkpoint the benchmark already samples carries a census of
 what the living population can perceive: how many living creatures hold a live
 reference to each world input key, and how many read any stateful source —
-shared memory or a persisted compute-node state. A stored report shows a food
-type nobody senses, or a population no brain of which can remember, as a time
-series rather than as an absence nobody looked for.
+shared memory or a persisted compute-node state. A food type nobody senses, or
+a population no brain of which can remember, reads as a time series rather than
+as an absence nobody looked for.
 
 ## Non-Goals
 
-- Any new mechanism, charge, rate, default, threshold or RNG draw. This feature
+- Any new mechanism, charge, rate, default, threshold or RNG draw; this feature
   reads structure the simulation already carries.
-- New checkpoints or a new cadence. `SAMPLE_EVERY_TICKS` and the sampled-tick
-  rule are T14.F04's and are untouched.
+- New checkpoints or a cadence change: `SAMPLE_EVERY_TICKS` and the
+  sampled-tick rule are T14.F04's.
 - New goal indicators, thresholds, comparison-block entries, indicator version
   or definition tokens, and the no-regression rule's coverage set. This is a
   checkpoint reading inside the stored `population_persistence` block, not an
@@ -27,13 +27,11 @@ series rather than as an absence nobody looked for.
 - Any change to `cached_live_vm_world_inputs`, to `structural_companions`, or to
   the server's `vm_live_read_world_inputs_current` payload and its semantics.
 - Plasticity resolution, changed-write detection and the shared-memory carrier
-  census beside `memory_sensitivity` — T14.F05.
-- The clade persistence timeline (T14.F09) and the occupancy grid (T14.F10),
-  which reuse these same checkpoints.
-- The `v3-cli run` tick sample, and progress-page presentation of the new series
-  (T14.F11).
-- Any claim that a referenced input is used, matters, or was selected for. A
-  reference is exposure, not capability.
+  census (T14.F05); the clade timeline (T14.F09) and occupancy grid (T14.F10),
+  which reuse these checkpoints; the `v3-cli run` tick sample and the
+  progress-page presentation of the series (T14.F11).
+- Any claim that a referenced input is used, matters, or was selected for.
+  A reference is exposure, not capability.
 - Rewriting historical reports. A report stored before this block existed reads
   it as absent, never as zero.
 
@@ -53,9 +51,9 @@ Sources of truth: `crates/v3-core/src/creature/state.rs`
 `PopulationReadings`, `PersistenceAccumulator::observe`, `run_one_seed`), and
 the track's F08 note.
 
-**No graph-input cache exists**, against the track note's claim, which is
-amended to record the refutation. `compute_live_vm_world_inputs` skips every
-non-`BackendDef::Vm` node and founders are Graph-backend
+**No graph-input cache exists**, against the track note's claim, now amended.
+`compute_live_vm_world_inputs` skips every non-`BackendDef::Vm` node and founders
+are Graph-backend
 (`crates/v3-core/src/creature/founder.rs:106`), so a census on
 `cached_live_vm_world_inputs` alone would report founders as sensing nothing.
 The census covers both backends, at checkpoint time.
@@ -76,16 +74,14 @@ nodes alone. A compute-node-only rule reports founders as blind —
 `crates/v3-core/src/creature/cgp_founder.rs:71-95` wires `FoodHere` and
 `NeighborFoodRing` as `InputLeaf` edges straight onto `output_sinks`.
 
-**Creatures, not references.** A creature contributes at most `1` to a key's
-count however many instructions or edges reference it. The server's
-`vm_live_read_world_inputs_current` sums reference counts instead; it is a
-different reading and stays as it is.
+**Creatures, not references.** A creature contributes at most `1` to a key
+however many instructions or edges reference it. The server's
+`vm_live_read_world_inputs_current` sums references instead and stays as it is.
 
 **Stateful reach.** `advance_shared_memory` snapshots `shared_memory` into
-`prev_shared_memory` and then decays `shared_memory` in place — a no-op multiply
-at the production default `0.0`. It never clears it, so a same-tick `LoadSlot`
-reads a value an earlier tick wrote. Every shared-memory read is therefore a
-stateful read, not only the explicitly previous ones:
+`prev_shared_memory` and decays it in place — a no-op at the production default
+`0.0` — but never clears it, so a same-tick `LoadSlot` reads what an earlier tick
+wrote. Every shared-memory read is therefore stateful:
 
 | Content of a live, reachable node | Counts as a stateful read |
 | --- | --- |
@@ -96,17 +92,17 @@ stateful read, not only the explicitly previous ones:
 | compute node carrying a plasticity rule | no — T14.F05 owns plasticity |
 
 Three counts per checkpoint: creatures reading shared memory, creatures holding
-a stateful compute node, and creatures with either. The split makes the combined
-count readable; the combined count is what the track note asks for.
+a stateful compute node, and creatures with either — the split is what makes the
+combined count the track note asks for readable.
 
 **The whole key universe, not the observed subset.** Rows are emitted for every
 key the run's world can present — the seven unparameterized keys plus the three
 food-parameterized families once per ordinary food type it carries, read from
 the runtime `OrdinaryFoodCatalog` via `food_types()`
-(`crates/v3-core/src/kernel/ordinary_food/mod.rs:190`): the world the run has,
-not the config; the two diverge only when `config.types` is empty and the
-catalog synthesizes one default entry. A `0` distinguishes "no living creature
-references this" from "this key does not exist in this world". Row order is
+(`crates/v3-core/src/kernel/ordinary_food/mod.rs:190`) — the world the run has,
+not the config, which diverge only when `config.types` is empty and the catalog
+synthesizes one default entry. A `0` separates "no living creature references
+this" from "this key does not exist here". Row order is
 `BTreeMap<WorldInputKey, _>` order; no `HashMap` iteration order reaches the
 report, per T14.F02's constraint. A row's label is
 `as_key()` with `:<food_type_idx>` appended when `food_type_idx()` is `Some`, so
@@ -121,26 +117,22 @@ byte-identical check inside `make check` exercises these fields:
 - Every value is read after `run_tick` on an already-sampled tick, from state
   the tick produced. No production RNG is consumed and no execution path
   changes.
-- The census is pure structure: genomes and cached reachability, no brain run.
+- Pure structure: genomes and cached reachability, no brain run.
 
 **Empty population.** Every count is a true `0` and the key-universe rows are
 still emitted, following `surviving_founder_clade_count` rather than the
 `Option` means beside it.
 
-**Placement.** The per-creature predicates are pure functions in `v3-core`,
-taking a genome and the creature's `cached_reachable_nodes` so no second
-reachability walk is paid. Aggregation lives in `bench.rs` inside the existing
-sampled-tick `readings()` closure, so it fires at most 21 times per seed.
+**Placement.** The per-creature predicates are pure `v3-core` functions taking a
+genome and its `cached_reachable_nodes`, so no second reachability walk is paid.
+Aggregation is in `bench.rs`, inside the sampled-tick `readings()` closure, so it
+fires at most 21 times per seed.
 `CreatureState`, the birth path and the existing caches are untouched.
 
 **Serialization.** The census is one structured block of its own type on
 `PersistenceSample`, `Option` and `#[serde(default)]` — the shape T14.F04's
 deferred note proposed: not a sixth flat scalar, and no `#[serde(flatten)]`
 change to a determinism-critical stored-report struct.
-
-**Test-helper fallout.** `PopulationReadings` is constructed literally by the
-`bench.rs` helpers `empty_readings` and `readings_for`; extending the checkpoint
-readings updates them.
 
 ## Implementation Tasks
 
@@ -164,8 +156,9 @@ readings updates them.
 
 ## Verification
 
-- [ ] `make check` -> exit 0, run once on the final feature code; record the
-      tested commit.
+- [x] `make check` -> exit 0 at the tested commit `4905b3bb`, run once on the
+      final feature code. The closure edits after it are documentation only and
+      are covered by `make check-docs`.
 - [x] Focused tests at `b8399dd2`: `cargo test -p v3-core -p v3-cli`,
       `cargo clippy -p v3-core -p v3-cli --all-targets` and
       `cargo fmt --all -- --check` all exit 0 and clean. 12 unit
@@ -178,11 +171,10 @@ readings updates them.
       survivors — `crates/v3-cli/src/bench.rs:1720:45` and `1721:42`, `replace
       += with *= in SensorCensus::observe`, the shared-memory and stateful-node
       splits — are **killed** by the added
-      `each_stateful_split_counts_the_creatures_that_qualify_for_it`: its
+      `each_stateful_split_counts_the_creatures_that_qualify_for_it`, whose
       population holds one reader of each kind, so each split reads `1` where
-      `*=` leaves `0`. No production code changed, and no `#[mutants::skip]` or
-      `exclude_re` was added. A second fresh run, the test set having changed, at
-      `b8399dd2`, prints
+      `*=` leaves `0`. No production code changed; no `#[mutants::skip]` or
+      `exclude_re` added. Second fresh run at `b8399dd2`:
       `57 mutants tested in 8m: 35 caught, 22 unviable` — no survivor, no
       timeout.
 - [x] Checkpoint samples in the stored goal report carry the census at every
@@ -213,9 +205,8 @@ nothing the simulation applies, so every indicator is expected to be unchanged
 and any movement in one is a defect rather than a result. The stored reports
 grow by one census block per checkpoint sample.
 
-Goal impact: the perceptual prerequisite the north-star rows depend on becomes
-readable before capability is looked for. T14.F06 and T14.F07 ask whether
-creatures live differently; this says whether they can perceive the difference.
+Goal impact: the perceptual prerequisite the north-star rows depend on is
+readable before capability is looked for.
 
 **Measured verdict.**
 
@@ -255,29 +246,37 @@ exhausted; no model configuration reaches `main`.
   `.claude/settings.local.json` containing `{"advisorModel": "opus"}` — an
   ignored path; the tracked `.claude/settings.json` is not edited.
 
+None of the three is a precedent for later features.
 
 ## Success Criteria
 
-- [ ] Every checkpoint sample of a stored benchmark report carries the world
+- [x] Every checkpoint sample of a stored benchmark report carries the world
       input key census and the three stateful-reach counts, on all three goal
       world cases.
-- [ ] The census counts Graph-backend references, so the founder population's
+- [x] The census counts Graph-backend references, so the founder population's
       perceptual reach is visible rather than reading as zero.
-- [ ] The readings are reproducible byte-for-byte across processes and thread
+- [x] The readings are reproducible byte-for-byte across processes and thread
       counts, consume no production RNG and change no execution.
-- [ ] Reports stored before this feature still load with the census absent, and
+- [x] Reports stored before this feature still load with the census absent, and
       the existing caches, the server payload and the `v3-cli run` tick sample
       are unchanged.
 
 ## Notes for AI Agents
 
-- Decision: The census counts living creatures per key, not references per key.
-  The server's `vm_live_read_world_inputs_current` sums references and remains a
-  different reading with its own semantics.
+- Decision: The census counts living creatures per key, not references; the
+  server's `vm_live_read_world_inputs_current` remains a separate reading.
 - Decision: Row labels are `as_key()` with `:<food_type_idx>` appended for the
   food-parameterized families, and the full key universe is emitted with zeros,
   so an unread key is distinguishable from an absent one.
-- Exception: The three model substitutions in this spec's Deviations section
-  were authorized by the user on 2026-09-12 for T14.F08 only, because the
-  Fable 5.1 budget is exhausted. They are not a precedent for later features and
-  reach no file on `main`.
+- Exception: The Deviations section's three model substitutions were authorized
+  on 2026-09-12 for T14.F08 only; they set no precedent and reach no file on
+  `main`.
+- Decision: Remediation's shared `wired_surface_edges` walk is inert on applied
+  behavior — the gate report measured on the shipped code has a `deterministic`
+  block identical to T14.F04's once `sensor_census` is removed, which is also
+  why the goal report's earlier revision still measures what ships.
+- Cost: Four implementer passes (build, self-review and measurement,
+  remediation, closure gates) at 2, 3, 2 and 2 advisor consults; one reviewer
+  pass, 0 P1, 1 P2, 5 P3, all resolved. Two fresh mutation runs, the second
+  optional; two gate runs, the second because remediation touched the birth
+  path; one goal run. `/usage` is a user command this session cannot read.

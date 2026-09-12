@@ -1,7 +1,7 @@
 # T14 — Runtime Telemetry and Report Integrity
 
 **Status**: In Progress
-**Last updated**: 2026-09-11
+**Last updated**: 2026-09-12
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -25,7 +25,7 @@ the microscope: it records applied behavior and adds no mechanism.
 - [x] Counters the runtime already maintains reach the stored report or are deleted; no counter is transferred whose value is structurally constant.
 - [ ] Reproductive success and lifespan are stored by cognitive class, so whether memory-carrying brains out-reproduce reactive ones is read from applied outcomes rather than from perturbation alone.
 - [ ] Each surviving founder clade has a stored behavioral profile — what it eats, what it does, where it lives, and when it would have gone extinct — so "many coexisting ways of making a living" is readable as differentiation and duration, not only as a count.
-- [ ] The living population's sensor usage is stored at the persistence checkpoints, so whether creatures can perceive what a niche or a memory requires is read before either is looked for.
+- [x] The living population's sensor usage is stored at the persistence checkpoints, so whether creatures can perceive what a niche or a memory requires is read before either is looked for.
 - [ ] The progress page is organized by the questions the success definition asks rather than by data source; its headline tiles are diversity and cognition indicators, not verification artifacts; every indicator is shown across the three baseline worlds side by side against its floor and first reading; a delta on a single run says so; and compute is one section at the end — still one static file in Git reading the stored JSON, with no composite score, no build step and no service.
 - [ ] Every reading added here derives from applied simulation behavior, consumes no production RNG, selects no survivors, changes no execution, and preserves byte-for-byte reproducibility across processes and thread counts.
 
@@ -45,7 +45,7 @@ the microscope: it records applied behavior and adds no mechanism.
   - Goal: Whether cognition pays is readable: creatures that read memory, hold state or learn are counted at death with their offspring and lifespan beside those that do not, so selection for remembering is read from outcomes rather than inferred from presence.
 - [ ] **T14.F07 — Surviving-Clade Behavioral Profile** — Depends on: T14.F02
   - Goal: Each clade that survives to closure shows how it made its living — what it ate, what it did, how large and how old it grew — so a count of survivors becomes a reading of how many of them live differently.
-- [ ] **T14.F08 — Sensor Usage Census** — Depends on: T14.F04
+- [x] **T14.F08 — Sensor Usage Census** — Depends on: T14.F04
   - Goal: What the population can perceive is read at the checkpoints — which world inputs living brains reference, and how many read anything stateful — so a food niche nobody senses or a memory no brain reads is visible as a closed door.
 - [ ] **T14.F09 — Clade Persistence Timeline** — Depends on: T14.F04
   - Goal: Coexistence is read as duration: each founder clade's peak and, if it ends, its extinction tick, so a closure shows whether clades are lost in the founding crash or excluded one by one over the run.
