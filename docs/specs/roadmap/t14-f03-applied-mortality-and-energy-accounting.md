@@ -153,8 +153,10 @@ float reduction, unordered map reduction, telemetry RNG, or per-event log.
 `energy_flows: Option<EnergyFlowTracking>`, both
 `#[serde(default, skip_serializing_if = "Option::is_none")]`. Leave them absent
 in `WorldTracking::observe`; populate them at `with_transferred_counters`'s
-existing terminal site. They appear once per goal case at
-`deterministic.goal_indicators.cases[].tracking`, not in persistence samples.
+existing terminal site. They appear once per goal case as direct `mortality`
+and `energy_flows` members at `deterministic.goal_indicators.cases[]`, because
+the existing `tracking` field is flattened. They remain absent from persistence
+samples.
 
 - `MortalityTracking` has `definition: "applied-mortality-v1"`,
   `deaths_total: u64`, and `by_cause: BTreeMap<String, u64>` with every cause
@@ -205,7 +207,7 @@ zero. No existing indicator is redefined and no new composite score is added.
   `make check`: results in the readings file.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: the evidence and complete
   survivor resolutions are recorded below and in the readings file.
-- [ ] `make bench PROFILE=gate FEATURE=t14-f03-applied-mortality-and-energy-accounting`
+- [x] `make bench PROFILE=gate FEATURE=t14-f03-applied-mortality-and-energy-accounting`
   and one `make bench PROFILE=goal FEATURE=t14-f03-applied-mortality-and-energy-accounting`:
   stored reports below; readings include each world's mortality and flow rows,
   effective config identity, existing persistence and pressure observations.
@@ -271,7 +273,22 @@ debit, actual action costs and carrying exposure in the same stored worlds.
 These raw readings support causal investigation without making a cognition or
 diversification claim.
 
-**Measured verdict.** Pending gate and goal measurement; no epoch re-pin.
+**Measured verdict.** No new regression; the inherited flag and floor gap
+remain. Both guarded reports exit 0 at implementation commit
+`6ee48ed8a75f7fda2922cd9e7309f182add85b04`. One gate and exactly one goal
+invocation are recorded in the readings; no epoch re-pin, waiver or rerun.
+
+| Measurement | Result |
+| --- | --- |
+| Selected references | Documented epochs plus T14.F01, the latest closed entry in each existing series index; no reference or profile changes. |
+| Normalized work | All six counters 0.000000% against T14.F01 for both profiles. Goal plasticity +40.886836% against T12.F04 is an inherited flag below +50% severe; all reference `severe` values are false. |
+| Matching-host wall time | Gate 0.001334146499 ms/creature-tick: -14.468524% vs epoch, -4.089997% vs prior. Goal 0.007681521543: +3.711006% vs epoch, -4.951132% vs prior. All are below +25%/+100% advisory thresholds. |
+| Observation and investigation caps | Goal founder 108.493960 ms / 10,000 ms; evolved 464.915416 ms / 180,000 ms summed across seeds. Complete goal invocation approximately 489 s / 900 s, including build and observations, measured from log/report file timestamps. |
+| Existing readings and inputs | All 104 per-case comparison readings and all pre-existing deterministic scalar values match T14.F01. All three effective config digests match both references. Final populations 11,313 / 7,090 / 9,995 survive 2,000 ticks. |
+| Existing floor gap | Founder single-event silence 0.567073 / 0.597561 / 0.567073 remains below 0.60, unchanged from T14.F01/T14.F02; the fixed floor remains due by still-open T11.F10. Other reported founder motif/growth/dead and evolved dead/single-event floors are met. No floor is weakened or claimed universally met. |
+| First mortality readings | Orchards / Canyon / Confluence: 369,427 / 380,596 / 450,155 removals. Each has all 17 causes, matching cause sum and founders + births - final population; external and unattributed deaths are zero. |
+| First flow readings | Every specified scalar/action field and dense food vector is present at the terminal case, absent from persistence samples; all per-world values, including applied zeros, are in the readings. Historical absence is not zero and no cognition or conservation claim follows. |
+| Expected observation correction | Versus T14.F02, additional observed mutation carriers are +21 / +10 / +36. All 396 changed pre-existing scalar values are confined to mutation-outcome summary/operator aggregates because predation victims now reach the existing observer; no other pre-existing scalar changes. |
 
 - Reports: `docs/progress/features/t14-f03-applied-mortality-and-energy-accounting.json`
   and `docs/progress/features/t14-f03-applied-mortality-and-energy-accounting-goal.json`.
