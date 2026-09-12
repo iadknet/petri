@@ -114,9 +114,11 @@ deterministic; no global counters, RNG calls, or unordered serialized maps.
 - [x] Terminal transfer, checkpoint omission, four overlapping carrier counts,
   empty population, historical absence, and unchanged sensitivity/comparison
   semantics: `cargo test -p v3-cli bench::tests`; results in the readings.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path,
-  and every survivor here as killed, equivalent, or explicitly deferred under
-  the workflow; raw output in the readings. No run recorded yet.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `92 mutants tested in 10m:
+  86 caught, 6 unviable`; run mode `fresh`, output
+  `/Users/istefanek/.local/share/petri-tools/mutants/t14-f05/mutants.out`.
+  Full survivor list: missed — none; timed out — none. No triage edits,
+  incremental pass, or second fresh run; raw output in the readings.
 - [ ] Gate report: `make bench PROFILE=gate FEATURE=t14-f05-cognition-telemetry-resolution`
   → `docs/progress/features/t14-f05-cognition-telemetry-resolution.json`.
 - [ ] One goal report:

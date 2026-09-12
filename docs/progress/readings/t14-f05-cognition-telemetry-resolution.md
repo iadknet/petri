@@ -5,7 +5,7 @@
 | Date | 2026-09-12 |
 | Worktree / branch | `.worktrees/t14-f05` / `codex/t14-f05` |
 | Planning commit | `07dd1948` |
-| State | Build and self-review complete; final review, mutation gate, benchmark reports, and final `make check` remain. |
+| State | Build, self-review, final review, and fresh mutation gate complete; benchmark reports and final `make check` remain. |
 
 ## Build verification
 
@@ -50,6 +50,7 @@
 | 2 — repeated compile diagnostics | A workspace check and queued CLI test both reported the same two fixture errors before remediation: `creature_count` instead of existing `final_creature_count`, and an explicit checkpoint initializer missing `cognition`. Accepted the two test-only corrections: correct field and `cognition: None`. No requirement revision. |
 | 3 — final build checkpoint | No correctness, requirement, or scope blocker. Accepted confirmation of unchanged learning/costs, exact partitions, pre-exhaustion event retention, memory coverage, optional report semantics, census/sensitivity meaning, and viability inapplicability. No corrective change recommended. |
 | 4 — final self-review/spec checkpoint | Pass sufficient; checked items are supported, closure-dependent items correctly remain open, absent benchmark files match the unmeasured verdict, and the performance predeclaration is intact. Accepted no-correction/no-runtime-rerun guidance; documentation checks passed. |
+| 5 — final mutation checkpoint | Fresh mode, successful baseline, 92 = 86 caught + 6 unviable, zero missed/timeouts, empty survivor files, and no added exclusions/skips satisfy the gate. Accepted no-remediation/no-additional-run guidance; spec record is truthful. |
 
 ## Self-review
 
@@ -62,6 +63,38 @@
 | Documentation | Recorded completed consultation 3 and focused evidence. Checked only implemented/tested tasks and criteria; closure-dependent items remain unchecked. Performance predeclaration and unmeasured verdict are unchanged. |
 | Verification scope | This pass changes documentation only; the focused build results above remain current. No additional runtime tests, benchmarks, mutation gate, or full check were run. |
 
+## Mutation gate
+
+| Measurement | Result |
+| --- | --- |
+| Command | `MUTANTS_ITERATE=0 make rust-mutants` |
+| Tested commit | `123e90e2ccb3e0dadd767afc2188ac4a917d2205` |
+| Diff base | `6bd9d1bf7359e8773739834f919c0e069fc7d1af` |
+| Run mode | `fresh`, confirmed by `/Users/istefanek/.local/share/petri-tools/mutants/t14-f05/run-mode.txt` |
+| Output directory | `/Users/istefanek/.local/share/petri-tools/mutants/t14-f05/mutants.out` |
+| Printed summary | `92 mutants tested in 10m: 86 caught, 6 unviable` |
+| Exit result | 0; `rust-mutants: no survivors` |
+| Baseline | Unmutated build and full selected-package tests passed: printed 46s build + 13s test. |
+| Full missed survivor list | None; `missed.txt` is 0 bytes. |
+| Full timed-out survivor list | None; `timeout.txt` is 0 bytes. |
+| Machine evidence | `outcomes.json`: total 92, caught 86, unviable 6, missed 0, timeout 0. |
+| Triage | No survivor requires a killed/equivalent/deferred resolution. No production or test edits, incremental pass, or second fresh run. |
+| Documentation verification | `make roadmap-check` passed after the mutation record, with the nonfatal Aqua timestamp warning; `git diff --check` was clean. |
+| Environment | Initial sandbox invocation stopped in `bench-wait` before mutation testing because host process inspection was denied. The authorized host-access retry performed the single fresh run. |
+
+Raw mutation command output:
+
+```text
+rust-mutants: fresh run; no prior mutant results reused
+rust-mutants: diff against 6bd9d1bf7359e8773739834f919c0e069fc7d1af, output in /Users/istefanek/.local/share/petri-tools/mutants/t14-f05/mutants.out
+Found 92 mutants to test
+ok       Unmutated baseline in 46s build + 13s test
+ INFO Auto-set build timeout to 374s
+ INFO Auto-set test timeout to 120s
+92 mutants tested in 10m: 86 caught, 6 unviable
+rust-mutants: no survivors
+```
+
 ## Closure measurements
 
-No mutation, gate, goal, or final full-check result is claimed in this build pass.
+No gate, goal, or final full-check result is claimed yet.
