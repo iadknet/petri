@@ -43,8 +43,9 @@ Sources of truth: `crates/v3-core/src/creature/state.rs`
 (`compute_live_vm_world_inputs`, `cached_reachable_nodes`),
 `crates/v3-core/src/creature/genome/mesh_annotations.rs`
 (`collect_live_vm_instruction_indices`),
-`crates/v3-core/src/creature/genome/cgp_mesh_annotations.rs`
-(`derive_cgp_annotations`, `cgp_live_compute_indices`),
+`crates/v3-core/src/creature/genome/` (`cgp_mesh_annotations.rs`'s
+`derive_cgp_annotations`, `cgp_analysis.rs`'s `cgp_live_compute_indices` and
+`wired_surface_edges`),
 `crates/v3-core/src/contracts/inputs.rs` (`WorldInputKey`, `as_key`,
 `food_type_idx`, `InputReference`), `crates/v3-core/src/creature/genome/cgp.rs`
 (`GraphSource`, `NodeClass`), `crates/v3-core/src/simulation/tick.rs`
@@ -52,13 +53,11 @@ Sources of truth: `crates/v3-core/src/creature/state.rs`
 `PopulationReadings`, `PersistenceAccumulator::observe`, `run_one_seed`), and
 the track's F08 note.
 
-**The track note's cache claim is wrong, re-verified in planning.** The note
-says graph input references are cached beside `cached_live_vm_world_inputs`.
-They are not: `compute_live_vm_world_inputs` skips every node whose backend is
-not `BackendDef::Vm`, and no graph-input cache exists. Founders are
-Graph-backend (`crates/v3-core/src/creature/founder.rs:106`), so a census built
-on that cache alone would report the founder population as referencing no world
-input at all — precisely the false closed door this feature exists to prevent.
+**No graph-input cache exists**, against the track note's claim, which is
+amended to record the refutation. `compute_live_vm_world_inputs` skips every
+non-`BackendDef::Vm` node and founders are Graph-backend
+(`crates/v3-core/src/creature/founder.rs:106`), so a census built on
+`cached_live_vm_world_inputs` alone would report founders as sensing nothing.
 The census covers both backends and is computed at checkpoint time.
 
 **A live reference, in both backends.** A creature is counted for a key when a
@@ -71,12 +70,11 @@ ones already in the tree, applied at exact-key resolution:
 | `BackendDef::Graph` | `cgp_live_compute_indices`, plus every wired output surface — output sink, action-bank slot, execute gate | each `GraphSource::InputLeaf { ref_idx, .. }` edge on a live compute node or on a wired output surface -> `node.input_refs[ref_idx]` -> `InputReference::World(key)` |
 
 The VM rule is `compute_live_vm_world_inputs`'s, unchanged. The graph rule is
-the one `derive_cgp_annotations` already uses to derive `MeshReadClass`, read at
-key resolution instead of class resolution — which means every wired surface,
-not compute nodes alone. A compute-node-only rule reports the founder population
-as blind: `crates/v3-core/src/creature/cgp_founder.rs:71-95` wires `FoodHere`
-and `NeighborFoodRing` as `InputLeaf` edges straight onto `output_sinks`, and
-the founder's compute nodes reference no world input at all.
+the shared `wired_surface_edges` walk `derive_cgp_annotations` also uses, read
+at key resolution instead of class resolution: every wired surface, not compute
+nodes alone. A compute-node-only rule reports founders as blind —
+`crates/v3-core/src/creature/cgp_founder.rs:71-95` wires `FoodHere` and
+`NeighborFoodRing` as `InputLeaf` edges straight onto `output_sinks`.
 
 **Creatures, not references.** A creature contributes at most `1` to a key's
 count however many instructions or edges reference it. The server's
@@ -103,10 +101,12 @@ combined count readable; the combined count is what the track note asks for.
 
 **The whole key universe, not the observed subset.** Rows are emitted for every
 key the run's world can present — the seven unparameterized keys plus the three
-food-parameterized families once per ordinary food type the world is configured
-with, read from the same `food_types()` accessor
-(`crates/v3-core/src/kernel/ordinary_food/mod.rs:190`) the rest of the report
-uses — so a `0`
+food-parameterized families once per ordinary food type it carries, read from
+the runtime `OrdinaryFoodCatalog` via `food_types()`
+(`crates/v3-core/src/kernel/ordinary_food/mod.rs:190`): the world the run has,
+not the config. The report's other per-food-type arrays key off
+`config.world.food.types.len()`, which diverges only when `config.types` is
+empty and the catalog synthesizes one default entry. A `0`
 distinguishes "no living creature references this" from "this key does not exist
 in this world". Row order is `BTreeMap<WorldInputKey, _>` order; no `HashMap`
 iteration order reaches the report, per T14.F02's constraint. A row's label is
