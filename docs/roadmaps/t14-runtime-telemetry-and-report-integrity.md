@@ -17,8 +17,8 @@ the microscope: it records applied behavior and adds no mechanism.
 
 ## Track Success Criteria
 
-- [ ] Every energy flow the simulation applies — intake, action charges, compute charge, carrying cost, parental transfer — has a stored total on the goal profile, so any cost can be stated as a share of what the population earns rather than as a nominal rate.
-- [ ] Creature death is counted and attributed to the sink that caused it, so a feature whose stated mechanism ends in death is verified at its own closure rather than through a work-counter proxy.
+- [x] Every energy flow the simulation applies — intake, action charges, compute charge, carrying cost, parental transfer — has a stored total on the goal profile, so any cost can be stated as a share of what the population earns rather than as a nominal rate.
+- [x] Creature death is counted and attributed to the sink that caused it, so a feature whose stated mechanism ends in death is verified at its own closure rather than through a work-counter proxy.
 - [ ] Every closure report names a comparison reference that is a different, earlier closure, or records the absence of one; no report compares against itself.
 - [ ] Every indicator wired into the goal profile appears in the comparison block the no-regression rule reads, and carries a version or definition token that moves when its definition moves.
 - [x] Population readings the report takes once at the horizon — lineage diversity, carried structure, generation depth — are also taken at the persistence checkpoints the run already samples.
@@ -35,7 +35,7 @@ the microscope: it records applied behavior and adds no mechanism.
   - Goal: A closure's verdict means what it says: the report compares against an earlier closure or records that it has none, and every wired indicator is visible to the no-regression rule.
 - [x] **T14.F02 — Existing Counter Transfer** — Depends on: T14.F01
   - Goal: Counters the simulation already maintains — production mutation supply and targeting, mutation lifecycle outcomes, predation, failed eats, energy-exhausted dispatches — become readable at closure instead of being discarded each run.
-- [ ] **T14.F03 — Applied Mortality and Energy Accounting** — Depends on: T14.F02
+- [x] **T14.F03 — Applied Mortality and Energy Accounting** — Depends on: T14.F02
   - Goal: Death is counted and attributed to the sink that caused it, and every energy flow the world applies is totalled, so a cost feature's effect is read from what it did rather than from what it charged.
 - [x] **T14.F04 — Population Readings on the Persistence Checkpoints** — Depends on: T14.F02
   - Goal: Lineage diversity, carried structure and generation depth are read at the checkpoints the run already samples, so a closure shows when a change took hold and not only where it ended.

@@ -1,6 +1,6 @@
 # T14.F03 — Applied Mortality and Energy Accounting
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-12
 **Feature**: T14.F03
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -181,7 +181,7 @@ zero. No existing indicator is redefined and no new composite score is added.
   credit, cap and transfer sites without changing execution.
 - [x] Carry dispatch observations through shared runtime modes and the existing
   deterministic reduction; expose the two terminal report blocks.
-- [ ] Complete verification, store the gate/goal reports and readings, update
+- [x] Complete verification, store the gate/goal reports and readings, update
   progress through the existing closure path, and close this spec and its row.
 
 ## Verification
@@ -199,11 +199,11 @@ zero. No existing indicator is redefined and no new composite score is added.
 - [x] CLI report tests check terminal source-to-report equality, all cause
   keys, configured food order, absent historical blocks, and omitted checkpoint
   blocks. A tiny real goal-world run demonstrates applied nonzero observations.
-- [ ] Reproducibility coverage includes new integer totals and raw float bits
+- [x] Reproducibility coverage includes new integer totals and raw float bits
   across independent simulations/thread counts; existing gate two-run byte
   identity remains inside `make check`. Production trajectories, actions and
   RNG results match the pre-feature behavior under unchanged inputs.
-- [ ] `cargo test -p v3-core --test viability` first for tick-loop work, then
+- [x] `cargo test -p v3-core --test viability` first for tick-loop work, then
   `make check`: results in the readings file.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: the evidence and complete
   survivor resolutions are recorded below and in the readings file.
@@ -213,6 +213,16 @@ zero. No existing indicator is redefined and no new composite score is added.
   effective config identity, existing persistence and pressure observations.
 - [x] Second goal run: not applicable under the shared one-run closure rule;
   cross-process/thread reproducibility is checked by ordinary tests.
+
+| Closure verification | Evidence |
+| --- | --- |
+| Tested commit | `eda18f4d0c163bbb66b5189cbe21e3063fa1c8a1` |
+| Required full check | Orchestrator ran `make check` with local-listener permission: exit 0; `/private/tmp/t14-f03-make-check-escalated.log` (2,095 lines). Rust/server tests, frontend tests/build and scans completed; server 95 passed, frontend 61 files / 322 tests passed. |
+| Verification environment rerun | Initial sandboxed `make check` failed only when seven WebSocket tests could not bind listeners (`PermissionDenied`); 88 other server tests passed. `/private/tmp/t14-f03-make-check.log` preserves that failure. Permission-enabled rerun is the passing required evidence; no code change or waived test. |
+| Benchmark revision | Reports record `6ee48ed8a75f7fda2922cd9e7309f182add85b04`; source/build configuration is unchanged between that revision and the tested commit. Both report commands exit 0; paths and full transcripts are below/in the readings. |
+| Review / mutation audit | Fresh independent review P1=0, P2=0, P3=0. Orchestrator audited the preserved fresh mutation evidence and all six test-killed survivor resolutions; no unresolved survivors. |
+| Required / used role settings | Orchestrator `gpt-5.6-sol` medium; persistent spec owner/advisor `gpt-6-astra` xhigh; persistent implementer `gpt-6-astra` xhigh; fresh reviewer `gpt-6-astra` xhigh. Required and used settings match for every role. |
+| Requirement corrections | Two: readiness timing clarification and flattened terminal JSON-path correction. |
 
 ### Mutation gate evidence
 
@@ -296,11 +306,11 @@ invocation are recorded in the readings; no epoch re-pin, waiver or rerun.
 
 ## Success Criteria
 
-- [ ] Every creature removal is counted once with the specified attribution;
+- [x] Every creature removal is counted once with the specified attribution;
   delayed removal and predation preserve the exhausting sink.
-- [ ] Applied energy flows and genome carrying exposure reach each goal case's
+- [x] Applied energy flows and genome carrying exposure reach each goal case's
   terminal report in deterministic, bounded fields.
-- [ ] Historical absence stays unmeasured; execution, economics and standard
+- [x] Historical absence stays unmeasured; execution, economics and standard
   environments remain unchanged; required verification and closure pass.
 
 ## Notes for AI Agents
@@ -308,3 +318,4 @@ invocation are recorded in the readings; no epoch re-pin, waiver or rerun.
 - Decision: T14.F03 measures the existing sinks and transfers. Predation's
   removal counter and mortality's exhausting-sink counter answer distinct
   questions for a victim already exhausted by cognition.
+- Cost: usage unavailable; advisor consultations 10; implementation/self-review passes 1/1; post-review remediation 0; mutation test-only remediation 1; review P1=0/P2=0/P3=0; user interventions 0.
