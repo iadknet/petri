@@ -68,11 +68,15 @@ ones already in the tree, applied at exact-key resolution:
 | Backend | Liveness | Key extraction |
 | --- | --- | --- |
 | `BackendDef::Vm` | `collect_live_vm_instruction_indices` (backward slice from output instructions) | `VmInstruction::ReadInput { ref_idx }` -> `node.input_refs[ref_idx]` -> `InputReference::World(key)` |
-| `BackendDef::Graph` | `cgp_live_compute_indices` | each live compute node's `inputs` edge with `GraphSource::InputLeaf { ref_idx, .. }` -> `node.input_refs[ref_idx]` -> `InputReference::World(key)` |
+| `BackendDef::Graph` | `cgp_live_compute_indices`, plus every wired output surface — output sink, action-bank slot, execute gate | each `GraphSource::InputLeaf { ref_idx, .. }` edge on a live compute node or on a wired output surface -> `node.input_refs[ref_idx]` -> `InputReference::World(key)` |
 
 The VM rule is `compute_live_vm_world_inputs`'s, unchanged. The graph rule is
 the one `derive_cgp_annotations` already uses to derive `MeshReadClass`, read at
-key resolution instead of class resolution.
+key resolution instead of class resolution — which means every wired surface,
+not compute nodes alone. A compute-node-only rule reports the founder population
+as blind: `crates/v3-core/src/creature/cgp_founder.rs:71-95` wires `FoodHere`
+and `NeighborFoodRing` as `InputLeaf` edges straight onto `output_sinks`, and
+the founder's compute nodes reference no world input at all.
 
 **Creatures, not references.** A creature contributes at most `1` to a key's
 count however many instructions or edges reference it. The server's
@@ -89,7 +93,7 @@ stateful read, not only the explicitly previous ones:
 | --- | --- |
 | `VmInstruction::LoadSlot`, `LoadSlotImm`, `LoadSlotPrev` | yes |
 | `VmInstruction::StoreSlot`, `StoreSlotImm`, `ClearSlot` | no — a write, not a read |
-| `GraphSource::SharedMemory { .. }` edge, `previous` either way | yes |
+| `GraphSource::SharedMemory { .. }` edge on a live compute node or a wired output surface, `previous` either way | yes |
 | compute node whose `kind.class()` is `NodeClass::Stateful` | yes — persisted node state |
 | compute node carrying a plasticity rule | no — T14.F05 owns plasticity |
 
