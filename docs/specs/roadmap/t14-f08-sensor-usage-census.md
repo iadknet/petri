@@ -172,7 +172,7 @@ constructed literally by the `bench.rs` test helpers `empty_readings` and
 
 - [ ] `make check` -> exit 0, run once on the final feature code; record the
       tested commit.
-- [x] Focused tests at `6112143f`: `cargo test -p v3-core -p v3-cli`,
+- [x] Focused tests at `2f9d437b`: `cargo test -p v3-core -p v3-cli`,
       `cargo clippy -p v3-core -p v3-cli --all-targets` and
       `cargo fmt --all -- --check` all exit 0 and clean. 12 unit
       tests, 2 proptests in `creature::sensor_census::tests` and four
