@@ -632,8 +632,8 @@ proptest! {
         modulated in any::<bool>(),
     ) {
         let mut def = graph(HebbianRule::Classic, eta, 0.0);
-        let edge = def.compute_nodes[0].inputs[0].clone();
-        def.compute_nodes[0].inputs = weights.iter().map(|&weight| GraphEdge { weight, ..edge.clone() }).collect();
+        let edge = def.compute_nodes[0].inputs[0];
+        def.compute_nodes[0].inputs = weights.iter().map(|&weight| GraphEdge { weight, ..edge }).collect();
         if !modulated { def.compute_nodes[0].plasticity.as_mut().unwrap().modulation = None; }
         let mut state = GraphRuntimeState::new();
         begin(&mut state, &def);

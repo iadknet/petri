@@ -52,6 +52,7 @@
 | 4 — final self-review/spec checkpoint | Pass sufficient; checked items are supported, closure-dependent items correctly remain open, absent benchmark files match the unmeasured verdict, and the performance predeclaration is intact. Accepted no-correction/no-runtime-rerun guidance; documentation checks passed. |
 | 5 — final mutation checkpoint | Fresh mode, successful baseline, 92 = 86 caught + 6 unviable, zero missed/timeouts, empty survivor files, and no added exclusions/skips satisfy the gate. Accepted no-remediation/no-additional-run guidance; spec record is truthful. |
 | 6 — final benchmark checkpoint | Confirmed deterministic equality, measured deltas and caps, cognition partitions, census denominators, and checkpoint omission. Inherited plasticity flag and founder gap are unchanged. Accepted no-rerun/no-waiver/no-re-pin/no-remediation guidance and the required spec clarification explicitly ruling out an epoch re-pin for both profiles. |
+| 7 — full-check environment checkpoint | Accepted a full host rerun after seven websocket tests could not bind localhost in the sandbox. No test skip, requirement waiver, or final-check pass was authorized or claimed. |
 
 ## Self-review
 
@@ -222,3 +223,34 @@ this feature neither resolves nor waives it. No existing goal or comparison
 coverage regressed. No rerun, baseline change, threshold weakening, verification
 exception, or production remediation was used. Final `make check` and closure
 state are still pending.
+
+## Post-review test-only remediation
+
+The orchestrator reported these full-check attempts; neither is passing
+closure evidence, and no tested commit is claimed here.
+
+| Full-check attempt | Result |
+| --- | --- |
+| 1 — `make check` in sandbox | Exit 2: seven websocket tests could not bind localhost. Consultation 7 authorized a full host rerun, not a waiver. |
+| 2 — `make check` with host access | All tests and doctests passed, then `rust-clippy` failed on exactly five `clone_on_copy` diagnostics in the three test files below. Full check remains non-passing. |
+
+Removed exactly five unnecessary `GraphEdge::clone()` calls using the type's
+existing `Copy` semantics: two in `runtime/plasticity/tests.rs`, one in
+`runtime/cognition_tests.rs`, and two in
+`simulation/tick/tests/work_counters.rs`. Fixture values, test selection,
+assertions, and production code are unchanged. The reported Clippy failure is
+the red evidence; the same lint gate passes after this correction. Viability
+first is not applicable to this test-only edit. No new self-review pass is
+required for this scoped post-review test remediation.
+
+| Remediation command | Result |
+| --- | --- |
+| `cargo fmt --all` | Exit 0 |
+| `cargo check --workspace --all-targets` | Exit 0 |
+| `make rust-clippy` | Exit 0; exact Makefile gate: `cargo clippy --workspace --all-targets -- -D warnings` |
+| `cargo test -p v3-core runtime::plasticity --quiet` | Exit 0; 17 passed |
+| `cargo test -p v3-core runtime::cognition_tests --quiet` | Exit 0; 5 passed |
+| `cargo test -p v3-core simulation::tick::tests::work_counters --quiet` | Exit 0; 8 passed |
+
+No full check, benchmark, or mutation run was repeated in this remediation
+pass. The final full-check item and dependent closure items remain unchecked.
