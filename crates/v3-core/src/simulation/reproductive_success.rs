@@ -127,6 +127,14 @@ mod tests {
         assert_eq!(CognitiveClass::ALL.len(), 4);
     }
 
+    #[test]
+    fn cognitive_class_keys_match_the_report_contract() {
+        assert_eq!(
+            CognitiveClass::ALL.map(CognitiveClass::as_key),
+            ["plasticity", "stateful", "shared_memory", "none"]
+        );
+    }
+
     proptest! {
         #[test]
         fn cognitive_classes_partition_every_structural_flag_combination(

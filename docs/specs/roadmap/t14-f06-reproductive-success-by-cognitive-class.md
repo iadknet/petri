@@ -138,8 +138,21 @@ or causal selection; class precedence also prevents independent-trait claims.
   and terminal per-world replay agreement. Results: same readings file.
 - [ ] `make check` passes, including viability and cross-process/thread-count
   reproducibility; `make roadmap-check` passes. Results: same readings file.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path,
-  and every survivor here as killed, equivalent, or explicitly user-deferred.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: fresh mode, output
+  `/Users/istefanek/.local/share/petri-tools/mutants/t14-f06/mutants.out`;
+  summary `21 mutants tested in 4m: 2 missed, 16 caught, 3 unviable`.
+  Full survivor resolution:
+  - **Killed:** `crates/v3-core/src/simulation/reproductive_success.rs:37:9:
+    replace CognitiveClass::as_key -> &'static str with ""` — the new
+    `cognitive_class_keys_match_the_report_contract` core test pins all four
+    public report keys; the incremental remediation pass caught the mutant.
+  - **Killed:** `crates/v3-core/src/simulation/reproductive_success.rs:37:9:
+    replace CognitiveClass::as_key -> &'static str with "xyzzy"` — the same
+    exact-key contract test caught this arbitrary replacement.
+  - Incremental feedback: `MUTANTS_ITERATE=1 make rust-mutants`, incremental
+    mode, `2 mutants tested in 2m: 2 caught`, no survivors. No second fresh run
+    was required: only a test was added; production, test selection and tool
+    configuration were unchanged, and no test was deleted or weakened.
 - [x] Gate and one goal benchmark run stored the reports below; both exit 0 and
   have `severe=false`. Gate is all `ok`; goal has one non-severe advisory flag
   against its older epoch. Exact threshold verdicts, class totals, effective
