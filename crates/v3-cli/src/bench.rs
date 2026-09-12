@@ -4799,6 +4799,82 @@ mod tests {
     /// oracle re-run of the same seed. The founder population is Graph-backend
     /// and wires its world inputs to output sinks, so a VM-only or
     /// compute-node-only census would report `FoodHere:0` as zero here.
+    /// Each stateful split sums one per qualifying creature over the whole
+    /// population, separately from the other two. A real run reaches the
+    /// shared-memory split but carries no stateful compute node, so the
+    /// population here is built to hold one creature of each kind.
+    #[test]
+    fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
+        use v3_core::contracts::NodeId;
+        use v3_core::creature::genome::cgp::{
+            CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
+            OutputSink, OutputSinkKind,
+        };
+        use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+
+        // Arrange: three creatures — one reads a shared-memory slot, one holds
+        // a live stateful compute node, one reads neither.
+        fn graph_genome(graph: CgpGraphBackendDef) -> CreatureGenome {
+            CreatureGenome {
+                entry_node_id: NodeId::new(0),
+                nodes: vec![NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![],
+                    targets: vec![],
+                    backend_def: BackendDef::Graph(graph),
+                }],
+            }
+        }
+        fn sink(source: GraphSource) -> OutputSink {
+            OutputSink {
+                kind: OutputSinkKind::CustomOutput(0),
+                inputs: vec![GraphEdge {
+                    source,
+                    weight: 1.0,
+                }],
+            }
+        }
+        let inert = CgpGraphBackendDef {
+            birth_weights: None,
+            compute_nodes: vec![ComputeNode {
+                kind: ComputeNodeKind::Constant(0.0),
+                inputs: vec![],
+                plasticity: None,
+            }],
+            output_sinks: vec![sink(GraphSource::ComputeNode(0))],
+            action_bank: vec![],
+            execute_gate: ExecuteGate { inputs: vec![] },
+        };
+        let mut shared_memory_reader = inert.clone();
+        shared_memory_reader.output_sinks = vec![sink(GraphSource::SharedMemory {
+            slot: 0,
+            previous: false,
+        })];
+        let mut stateful_node_holder = inert.clone();
+        stateful_node_holder.compute_nodes[0].kind = ComputeNodeKind::DecayIntegrator(0.5);
+
+        let mut config = SimulationConfig::default();
+        config.population.initial_creatures = 3;
+        let mut sim = seed_simulation(config, 11);
+        let ids: Vec<_> = sim.creatures.keys().collect();
+        assert_eq!(ids.len(), 3);
+        for (id, graph) in ids
+            .iter()
+            .zip([shared_memory_reader, stateful_node_holder, inert])
+        {
+            sim.creatures[*id].genome = graph_genome(graph);
+            sim.creatures[*id].cached_reachable_nodes = vec![0].into_boxed_slice();
+        }
+
+        // Act
+        let census = SensorCensus::observe(&sim);
+
+        // Assert: one creature per split, and the combined count is the union.
+        assert_eq!(census.creatures_reading_shared_memory, 1);
+        assert_eq!(census.creatures_with_stateful_node, 1);
+        assert_eq!(census.creatures_with_any_stateful_read, 2);
+    }
+
     #[test]
     fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpoint() {
         const SEED: u64 = 13;
