@@ -56,13 +56,13 @@ the track's F08 note.
 **No graph-input cache exists**, against the track note's claim, which is
 amended to record the refutation. `compute_live_vm_world_inputs` skips every
 non-`BackendDef::Vm` node and founders are Graph-backend
-(`crates/v3-core/src/creature/founder.rs:106`), so a census built on
+(`crates/v3-core/src/creature/founder.rs:106`), so a census on
 `cached_live_vm_world_inputs` alone would report founders as sensing nothing.
-The census covers both backends and is computed at checkpoint time.
+The census covers both backends, at checkpoint time.
 
 **A live reference, in both backends.** A creature is counted for a key when a
-mesh-reachable node holds a live reference to it. The two liveness rules are the
-ones already in the tree, applied at exact-key resolution:
+mesh-reachable node holds a live reference to it, under the two liveness rules
+already in the tree, applied at exact-key resolution:
 
 | Backend | Liveness | Key extraction |
 | --- | --- | --- |
@@ -96,20 +96,19 @@ stateful read, not only the explicitly previous ones:
 | compute node carrying a plasticity rule | no — T14.F05 owns plasticity |
 
 Three counts per checkpoint: creatures reading shared memory, creatures holding
-a stateful compute node, and creatures with either. The split is what makes the
-combined count readable; the combined count is what the track note asks for.
+a stateful compute node, and creatures with either. The split makes the combined
+count readable; the combined count is what the track note asks for.
 
 **The whole key universe, not the observed subset.** Rows are emitted for every
 key the run's world can present — the seven unparameterized keys plus the three
 food-parameterized families once per ordinary food type it carries, read from
 the runtime `OrdinaryFoodCatalog` via `food_types()`
 (`crates/v3-core/src/kernel/ordinary_food/mod.rs:190`): the world the run has,
-not the config. The report's other per-food-type arrays key off
-`config.world.food.types.len()`, which diverges only when `config.types` is
-empty and the catalog synthesizes one default entry. A `0`
-distinguishes "no living creature references this" from "this key does not exist
-in this world". Row order is `BTreeMap<WorldInputKey, _>` order; no `HashMap`
-iteration order reaches the report, per T14.F02's constraint. A row's label is
+not the config; the two diverge only when `config.types` is empty and the
+catalog synthesizes one default entry. A `0` distinguishes "no living creature
+references this" from "this key does not exist in this world". Row order is
+`BTreeMap<WorldInputKey, _>` order; no `HashMap` iteration order reaches the
+report, per T14.F02's constraint. A row's label is
 `as_key()` with `:<food_type_idx>` appended when `food_type_idx()` is `Some`, so
 the food-parameterized families stay distinct instead of colliding as they do in
 the server's `HashMap<String, u64>` payload.
@@ -120,33 +119,28 @@ byte-identical check inside `make check` exercises these fields:
 
 - Every value is an integer count. No float is accumulated.
 - Every value is read after `run_tick` on an already-sampled tick, from state
-  the tick produced. No production RNG is consumed, no survivor is selected, and
-  no execution path changes.
-- The census is pure structure: it inspects genomes and cached reachability, and
-  executes no brain.
+  the tick produced. No production RNG is consumed and no execution path
+  changes.
+- The census is pure structure: genomes and cached reachability, no brain run.
 
 **Empty population.** Every count is a true `0` and the key-universe rows are
-still emitted. A census of an empty population is zero, not unmeasured, so this
-follows `surviving_founder_clade_count` rather than the `Option` means beside
-it.
+still emitted, following `surviving_founder_clade_count` rather than the
+`Option` means beside it.
 
 **Placement.** The per-creature predicates are pure functions in `v3-core`,
 taking a genome and the creature's `cached_reachable_nodes` so no second
-reachability walk is paid, which also puts the pure invariants where `proptest`
-is already a dev-dependency. Aggregation lives in `bench.rs` inside the existing
+reachability walk is paid. Aggregation lives in `bench.rs` inside the existing
 sampled-tick `readings()` closure, so it fires at most 21 times per seed.
-`CreatureState`, the birth path and the existing caches are untouched: no new
-cached field is added to the hot path.
+`CreatureState`, the birth path and the existing caches are untouched.
 
 **Serialization.** The census is one structured block of its own type on
-`PersistenceSample`, `Option` and `#[serde(default)]`. This is the shape
-T14.F04's deferred note proposed for this feature: a structured block, not a
-sixth flat scalar, and no `#[serde(flatten)]` change to a determinism-critical
-stored-report struct.
+`PersistenceSample`, `Option` and `#[serde(default)]` — the shape T14.F04's
+deferred note proposed: not a sixth flat scalar, and no `#[serde(flatten)]`
+change to a determinism-critical stored-report struct.
 
-**Test-helper fallout.** `PopulationReadings` derives `PartialEq` and is
-constructed literally by the `bench.rs` test helpers `empty_readings` and
-`readings_for`; extending the checkpoint readings updates those helpers.
+**Test-helper fallout.** `PopulationReadings` is constructed literally by the
+`bench.rs` helpers `empty_readings` and `readings_for`; extending the checkpoint
+readings updates them.
 
 ## Implementation Tasks
 
@@ -163,23 +157,33 @@ constructed literally by the `bench.rs` test helpers `empty_readings` and
 - [x] Tests: the Graph-backend founder case a VM-only census misses; a key
       referenced several times counted once; an unreferenced key present with
       `0`; unreachable and dead references uncounted; each row of the stateful
-      table; the census at every checkpoint of the real `run_one_seed` loop,
-      matching an independently computed value; zeros at extinction; a stored
-      report predating the block still loading, plus `v3-core` property tests
-      for the pure invariants.
+      table and each split counted over a mixed population; the census at every
+      checkpoint of the real `run_one_seed` loop, matching an independently
+      computed value; zeros at extinction; a stored report predating the block
+      still loading, plus `v3-core` property tests for the pure invariants.
 
 ## Verification
 
 - [ ] `make check` -> exit 0, run once on the final feature code; record the
       tested commit.
-- [x] Focused tests at `2f9d437b`: `cargo test -p v3-core -p v3-cli`,
+- [x] Focused tests at `b8399dd2`: `cargo test -p v3-core -p v3-cli`,
       `cargo clippy -p v3-core -p v3-cli --all-targets` and
       `cargo fmt --all -- --check` all exit 0 and clean. 12 unit
-      tests, 2 proptests in `creature::sensor_census::tests` and four
+      tests, 2 proptests in `creature::sensor_census::tests` and five
       `bench::tests` arms; named in the readings file.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here.
+- [x] `MUTANTS_ITERATE=0 make rust-mutants`, output
+      `~/.local/share/petri-tools/mutants/t14-f08/mutants.out`, diff against
+      `fc6f1f11`. Fresh run at `8f1c928f`:
+      `57 mutants tested in 8m: 2 missed, 33 caught, 22 unviable`. Both
+      survivors — `crates/v3-cli/src/bench.rs:1720:45` and `1721:42`, `replace
+      += with *= in SensorCensus::observe`, the shared-memory and stateful-node
+      splits — are **killed** by the added
+      `each_stateful_split_counts_the_creatures_that_qualify_for_it`: its
+      population holds one reader of each kind, so each split reads `1` where
+      `*=` leaves `0`. No production code changed, and no `#[mutants::skip]` or
+      `exclude_re` was added. The second fresh run, at `b8399dd2`, prints
+      `57 mutants tested in 8m: 35 caught, 22 unviable` — no survivor, no
+      timeout.
 - [x] Checkpoint samples in the stored goal report carry the census at every
       checkpoint of all three world cases, with the key universe complete and
       the founder population's graph-backend references present rather than
@@ -204,16 +208,13 @@ The measured delta is in the readings file. A severe regression is a blocker to
 report, not a cost to justify here, and no epoch re-pin is authorized.
 
 Predeclared direction for every goal indicator: **none**. This feature changes
-nothing the simulation applies, so lineage diversity, memory sensitivity,
-temporal memory sensitivity, mutational neighborhood, drift depth, population
-persistence and births per 100 ticks are all expected to be unchanged, and any
-movement in them is a defect rather than a result. The stored reports grow by
-one census block per checkpoint sample.
+nothing the simulation applies, so every indicator is expected to be unchanged
+and any movement in one is a defect rather than a result. The stored reports
+grow by one census block per checkpoint sample.
 
 Goal impact: the perceptual prerequisite the north-star rows depend on becomes
 readable before capability is looked for. T14.F06 and T14.F07 ask whether
-creatures live differently; this says whether they can perceive the difference
-at all.
+creatures live differently; this says whether they can perceive the difference.
 
 **Measured verdict.**
 
@@ -238,9 +239,8 @@ at all.
 
 ## Deviations
 
-Authorized by the user in this feature's goal command, for this feature only,
-because the Fable 5.1 budget is exhausted. No model configuration reaches
-`main`: the merged range touches no file under `.claude/`.
+Authorized by the user for this feature only, because the Fable 5.1 budget is
+exhausted; no model configuration reaches `main`.
 
 - The orchestrator is Opus 5 at effort `high` in place of Fable 5.1 at effort
   `medium`; the contract's model check passes on that basis. The effort is
@@ -251,11 +251,9 @@ because the Fable 5.1 budget is exhausted. No model configuration reaches
   `effort: high` frontmatter stays in force, so the reviewer is Opus 5 at effort
   `high`. `.claude/agents/roadmap-reviewer.md` is not edited.
 - The implementer's advisor is Opus 5, set by a worktree-local
-  `.claude/settings.local.json` containing `{"advisorModel": "opus"}`. That path
-  is ignored by git and cannot be committed; the tracked
-  `.claude/settings.json` is not edited.
+  `.claude/settings.local.json` containing `{"advisorModel": "opus"}` — an
+  ignored path; the tracked `.claude/settings.json` is not edited.
 
-None of the three is a precedent for later features.
 
 ## Success Criteria
 
