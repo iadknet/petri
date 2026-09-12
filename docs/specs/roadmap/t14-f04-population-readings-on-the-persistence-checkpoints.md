@@ -92,17 +92,16 @@ deserialize with these readings absent.
 
 - [ ] `make check` -> exit status recorded here, run once on the final feature
       code, with the tested commit named.
-- [x] Focused tests: `cargo test -p v3-cli` -> ok, 83 + 11 + 20 + 11 passed,
-      0 failed. Covers the new checkpoint-reading tests
-      (`every_checkpoint_carries_the_population_readings_of_its_own_tick`,
+- [x] Focused tests at commit `5228afb7`: `cargo test -p v3-cli` -> ok,
+      83 + 11 + 20 + 11 passed, 0 failed. Covers the new checkpoint-reading
+      tests (`every_checkpoint_carries_the_population_readings_of_its_own_tick`,
       `the_extinction_checkpoint_reports_absent_means_and_a_zero_clade_count`,
       `population_readings_average_the_living_population_and_count_its_clades`,
-      `population_readings_of_an_empty_population_are_the_default_reading`,
+      `population_readings_of_an_empty_population_are_zero_means_and_undefined_entropy`,
       `persistence_sample_readings_survive_a_json_round_trip`), the unchanged
       `checkpoint_tracking_omits_every_transferred_block`, the
       `lineage_diversity` tests and the `v3-cli run` tick-sample tests.
-      `cargo check --workspace --all-targets` and `cargo clippy -p v3-cli
-      --all-targets` -> clean.
+      `cargo clippy -p v3-cli --all-targets` -> clean.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
