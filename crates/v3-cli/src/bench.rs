@@ -486,6 +486,9 @@ pub struct GoalIndicators {
     pub lineage_diversity: Indicator<LineageDiversity>,
     #[serde(default = "undefined_memory_sensitivity")]
     pub memory_sensitivity: Indicator<MemorySensitivity>,
+    /// Structural exposure in the same final populations; not a capability indicator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structural_companions: Option<StructuralCompanionsCensus>,
     #[serde(default = "undefined_temporal_memory_sensitivity")]
     pub temporal_memory_sensitivity: Indicator<TemporalMemorySensitivity>,
     #[serde(default = "undefined_mutational_neighborhood")]
@@ -560,6 +563,22 @@ pub struct MemorySensitivity {
     pub snapshot_timing: String,
     pub scramble_algorithm: String,
     pub per_seed: Vec<MemorySensitivitySeed>,
+}
+
+/// Four overlapping carrier counts alongside shared-memory sensitivity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StructuralCompanionsCensus {
+    pub per_seed: Vec<StructuralCompanionsSeed>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StructuralCompanionsSeed {
+    pub seed: u64,
+    pub final_creature_count: u64,
+    pub reads_shared_memory: u64,
+    pub writes_shared_memory: u64,
+    pub has_stateful_compute_node: u64,
+    pub has_plasticity: u64,
 }
 
 fn undefined_temporal_memory_sensitivity() -> Indicator<TemporalMemorySensitivity> {
@@ -1551,6 +1570,21 @@ pub struct WorldTracking {
     /// Terminal-only applied energy flows; absent means unmeasured.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub energy_flows: Option<EnergyFlowTracking>,
+    /// Terminal-only applied learning and changed-memory-write events.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cognition: Option<CognitionTracking>,
+}
+
+/// Applied assignments and changes, without claiming useful learning or memory.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CognitionTracking {
+    pub plasticity_updates_total: u64,
+    pub plasticity_changes_total: u64,
+    pub hebbian_updates_total: u64,
+    pub hebbian_changes_total: u64,
+    pub reward_modulated_updates_total: u64,
+    pub reward_modulated_changes_total: u64,
+    pub shared_memory_writes_changed_total: u64,
 }
 
 /// Counts keyed by ordinary food type, as a `Vec` indexed by type id: a dense
@@ -1626,6 +1660,7 @@ impl WorldTracking {
             predation: None,
             mortality: None,
             energy_flows: None,
+            cognition: None,
         }
     }
 
@@ -1636,6 +1671,15 @@ impl WorldTracking {
     fn with_transferred_counters(self, sim: &v3_core::simulation::Simulation) -> Self {
         let stats = &sim.stats;
         Self {
+            cognition: Some(CognitionTracking {
+                plasticity_updates_total: stats.plasticity_updates_total,
+                plasticity_changes_total: stats.plasticity_changes_total,
+                hebbian_updates_total: stats.hebbian_updates_total,
+                hebbian_changes_total: stats.hebbian_changes_total,
+                reward_modulated_updates_total: stats.reward_modulated_updates_total,
+                reward_modulated_changes_total: stats.reward_modulated_changes_total,
+                shared_memory_writes_changed_total: stats.shared_memory_writes_changed_total,
+            }),
             mortality: Some(MortalityTracking {
                 definition: "applied-mortality-v1".into(),
                 deaths_total: stats.mortality.deaths_total,
@@ -2289,6 +2333,7 @@ struct SeedRun {
 struct GoalObservation {
     lineage_diversity: LineageDiversitySeed,
     memory_sensitivity: MemorySensitivitySeed,
+    structural_companions: StructuralCompanionsSeed,
     temporal_memory_sensitivity: TemporalMemorySensitivitySeed,
     wall_clock_ms: f64,
     /// `Some` only in the goal profile, where the evolved-genome half of the
@@ -2374,6 +2419,10 @@ fn run_one_seed(
                 .map(|creature| creature.identity.lineage_id),
         );
         let memory_sensitivity_seed = memory_sensitivity(seed, &actions);
+        let structural_companions = structural_companions_census(
+            seed,
+            sim.creatures.values().map(|creature| &creature.genome),
+        );
         let temporal_memory_sensitivity = temporal_memory_sensitivity(seed, &sim);
         let wall_clock_ms = millis(observation_started.elapsed());
 
@@ -2394,6 +2443,7 @@ fn run_one_seed(
         GoalObservation {
             lineage_diversity: lineage_diversity_seed,
             memory_sensitivity: memory_sensitivity_seed,
+            structural_companions,
             temporal_memory_sensitivity,
             wall_clock_ms,
             evolved_neighborhood,
@@ -2478,6 +2528,25 @@ fn lineage_diversity(
         surviving_founder_clade_count,
         shannon_entropy_nats,
     }
+}
+
+fn structural_companions_census<'a>(
+    seed: u64,
+    genomes: impl Iterator<Item = &'a v3_core::creature::genome::CreatureGenome>,
+) -> StructuralCompanionsSeed {
+    let mut census = StructuralCompanionsSeed {
+        seed,
+        ..Default::default()
+    };
+    for genome in genomes {
+        let companions = structural_companions(genome);
+        census.final_creature_count += 1;
+        census.reads_shared_memory += u64::from(companions.reads_shared_memory);
+        census.writes_shared_memory += u64::from(companions.writes_shared_memory);
+        census.has_stateful_compute_node += u64::from(companions.has_stateful_compute_node);
+        census.has_plasticity += u64::from(companions.has_plasticity);
+    }
+    census
 }
 
 fn memory_sensitivity(seed: u64, observations: &[FinalActionObservation]) -> MemorySensitivitySeed {
@@ -2856,6 +2925,7 @@ struct GoalIndicatorInputs {
     population_persistence_per_seed: Vec<PopulationPersistenceSeed>,
     lineage_diversity_per_seed: Vec<LineageDiversitySeed>,
     memory_sensitivity_per_seed: Vec<MemorySensitivitySeed>,
+    structural_companions_per_seed: Vec<StructuralCompanionsSeed>,
     temporal_memory_sensitivity_per_seed: Vec<TemporalMemorySensitivitySeed>,
     evolved_neighborhood_per_seed: Vec<NeighborhoodEvolvedSeed>,
     pooled_complexities: Vec<u32>,
@@ -2873,6 +2943,7 @@ fn assemble_goal_indicators(
         population_persistence_per_seed,
         lineage_diversity_per_seed,
         memory_sensitivity_per_seed,
+        structural_companions_per_seed,
         temporal_memory_sensitivity_per_seed,
         evolved_neighborhood_per_seed,
         pooled_complexities,
@@ -2916,6 +2987,9 @@ fn assemble_goal_indicators(
         } else {
             undefined_memory_sensitivity()
         },
+        structural_companions: observe_goal_indicators.then_some(StructuralCompanionsCensus {
+            per_seed: structural_companions_per_seed,
+        }),
         temporal_memory_sensitivity: if observe_goal_indicators {
             Indicator::Defined(TemporalMemorySensitivity {
                 version: "temporal-memory-v1".to_string(),
@@ -2964,6 +3038,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
     let mut population_persistence_per_seed = Vec::with_capacity(params.seeds.len());
     let mut lineage_diversity_per_seed = Vec::with_capacity(params.seeds.len());
     let mut memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut structural_companions_per_seed = Vec::with_capacity(params.seeds.len());
     let mut temporal_memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
     let mut final_state_observation_ms_per_seed = Vec::with_capacity(params.seeds.len());
     let mut evolved_neighborhood_per_seed = Vec::with_capacity(params.seeds.len());
@@ -3036,6 +3111,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
         if let Some(observation) = run.goal_observation {
             lineage_diversity_per_seed.push(observation.lineage_diversity);
             memory_sensitivity_per_seed.push(observation.memory_sensitivity);
+            structural_companions_per_seed.push(observation.structural_companions);
             temporal_memory_sensitivity_per_seed.push(observation.temporal_memory_sensitivity);
             final_state_observation_ms_per_seed.push(SeedFinalStateObservation {
                 seed,
@@ -3083,6 +3159,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
             population_persistence_per_seed,
             lineage_diversity_per_seed,
             memory_sensitivity_per_seed,
+            structural_companions_per_seed,
             temporal_memory_sensitivity_per_seed,
             evolved_neighborhood_per_seed,
             pooled_complexities,
@@ -3993,6 +4070,215 @@ mod tests {
     use v3_core::kernel::occupancy_grid::OCCUPANCY_CELL_COUNT;
     use v3_core::simulation::seed_simulation;
 
+    #[test]
+    fn cognition_tracking_transfers_every_terminal_counter_and_preserves_absence() {
+        let mut sim = seed_simulation(SimulationConfig::default(), 7);
+        sim.stats.plasticity_updates_total = 19;
+        sim.stats.plasticity_changes_total = 7;
+        sim.stats.hebbian_updates_total = 8;
+        sim.stats.hebbian_changes_total = 2;
+        sim.stats.reward_modulated_updates_total = 11;
+        sim.stats.reward_modulated_changes_total = 5;
+        sim.stats.shared_memory_writes_changed_total = 23;
+        let terminal = WorldTracking::observe(&sim).with_transferred_counters(&sim);
+        let value = serde_json::to_value(&terminal).unwrap();
+        assert_eq!(
+            value["cognition"],
+            serde_json::json!({
+                "plasticity_updates_total": 19, "plasticity_changes_total": 7,
+                "hebbian_updates_total": 8, "hebbian_changes_total": 2,
+                "reward_modulated_updates_total": 11, "reward_modulated_changes_total": 5,
+                "shared_memory_writes_changed_total": 23,
+            })
+        );
+        let round_trip: WorldTracking = serde_json::from_value(value).unwrap();
+        assert_eq!(terminal, round_trip);
+        assert!(WorldTracking::observe(&sim).cognition.is_none());
+        let historical: WorldTracking = serde_json::from_str("{}").unwrap();
+        assert!(historical.cognition.is_none());
+        assert!(serde_json::to_value(historical)
+            .unwrap()
+            .get("cognition")
+            .is_none());
+    }
+
+    fn companion_population() -> [v3_core::creature::genome::CreatureGenome; 3] {
+        use v3_core::contracts::NodeId;
+        use v3_core::creature::genome::cgp::{
+            CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+        };
+        use v3_core::creature::genome::{
+            BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef,
+            VmInstruction,
+        };
+        let make = |backend_def| CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def,
+                targets: vec![],
+            }],
+        };
+        let reader_writer = make(BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![
+                VmInstruction::LoadSlotImm {
+                    dst: 0,
+                    slot_idx: 0,
+                },
+                VmInstruction::ClearSlot { slot_idx: 0 },
+            ],
+        }));
+        let stateful_plastic = make(BackendDef::Graph(CgpGraphBackendDef {
+            compute_nodes: vec![ComputeNode {
+                kind: ComputeNodeKind::DecayIntegrator(0.5),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::SharedMemory {
+                        slot: 0,
+                        previous: true,
+                    },
+                    weight: 1.0,
+                }],
+                plasticity: Some(PlasticityConfig {
+                    rule: HebbianRule::Classic,
+                    learning_rate: 0.1,
+                    weight_clamp: 1.0,
+                    lamarckian: false,
+                    modulation: None,
+                }),
+            }],
+            birth_weights: None,
+            output_sinks: vec![],
+            action_bank: vec![],
+            execute_gate: v3_core::creature::genome::cgp::ExecuteGate { inputs: vec![] },
+        }));
+        let mut inert = make(BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![VmInstruction::Halt],
+        }));
+        let mut unreachable = stateful_plastic.nodes[0].clone();
+        unreachable.node_id = NodeId::new(1);
+        inert.nodes.push(unreachable);
+        [reader_writer, stateful_plastic, inert]
+    }
+
+    #[test]
+    fn companion_census_counts_overlapping_reachable_carriers_and_empty_population() {
+        let population = companion_population();
+        let census = structural_companions_census(11, population.iter());
+        assert_eq!(
+            census,
+            StructuralCompanionsSeed {
+                seed: 11,
+                final_creature_count: 3,
+                reads_shared_memory: 2,
+                writes_shared_memory: 1,
+                has_stateful_compute_node: 1,
+                has_plasticity: 1,
+            }
+        );
+        assert_eq!(
+            structural_companions_census(11, std::iter::empty()),
+            StructuralCompanionsSeed {
+                seed: 11,
+                ..Default::default()
+            }
+        );
+    }
+
+    proptest! {
+        #[test]
+        fn companion_census_counts_each_flag_independently_of_population_order(
+            carriers in prop::collection::vec(0usize..3, 0..24),
+        ) {
+            let population = companion_population();
+            let census = structural_companions_census(11, carriers.iter().map(|&i| &population[i]));
+            prop_assert_eq!(&census, &structural_companions_census(11, carriers.iter().rev().map(|&i| &population[i])));
+            prop_assert_eq!(census.final_creature_count, carriers.len() as u64);
+            prop_assert_eq!(census.reads_shared_memory, carriers.iter().filter(|&&i| i != 2).count() as u64);
+            prop_assert_eq!(census.writes_shared_memory, carriers.iter().filter(|&&i| i == 0).count() as u64);
+            prop_assert_eq!(census.has_stateful_compute_node, carriers.iter().filter(|&&i| i == 1).count() as u64);
+            prop_assert_eq!(census.has_plasticity, carriers.iter().filter(|&&i| i == 1).count() as u64);
+        }
+    }
+
+    #[test]
+    fn empty_measured_population_reports_zero_companion_counts() {
+        let mut config = SimulationConfig::default();
+        config.population.initial_creatures = 0;
+        let run = run_one_seed(&config, 11, 0, true, None, NeighborhoodSizes::default());
+        let observation = run.goal_observation.expect("measured final population");
+        assert_eq!(observation.memory_sensitivity.final_creature_count, 0);
+        assert_eq!(
+            observation.structural_companions,
+            StructuralCompanionsSeed {
+                seed: 11,
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            serde_json::to_value(observation.structural_companions).unwrap(),
+            serde_json::json!({
+                "seed": 11, "final_creature_count": 0, "reads_shared_memory": 0,
+                "writes_shared_memory": 0, "has_stateful_compute_node": 0, "has_plasticity": 0,
+            })
+        );
+    }
+
+    #[test]
+    fn companion_reports_share_final_population_and_do_not_change_comparisons() {
+        let report = small_world_set_report();
+        let indicators = &report.deterministic.goal_indicators;
+        let companions = indicators.structural_companions.as_ref().unwrap();
+        let memory = indicators.memory_sensitivity.defined().unwrap();
+        assert_eq!(companions.per_seed.len(), memory.per_seed.len());
+        for (census, sensitivity) in companions.per_seed.iter().zip(&memory.per_seed) {
+            assert_eq!(census.seed, sensitivity.seed);
+            assert_eq!(
+                census.final_creature_count,
+                sensitivity.final_creature_count
+            );
+        }
+        let mut historical = report.clone();
+        historical
+            .deterministic
+            .goal_indicators
+            .structural_companions = None;
+        for case in &mut historical.deterministic.goal_indicators.cases {
+            case.tracking.cognition = None;
+        }
+        assert_eq!(
+            compare_cases(&report, &report),
+            compare_cases(&report, &historical)
+        );
+        let value = serde_json::to_value(&historical).unwrap();
+        assert!(value["deterministic"]["goal_indicators"]
+            .get("structural_companions")
+            .is_none());
+        let loaded: Report = serde_json::from_value(value).unwrap();
+        assert!(loaded
+            .deterministic
+            .goal_indicators
+            .structural_companions
+            .is_none());
+        assert_eq!(
+            loaded.deterministic.goal_indicators.memory_sensitivity,
+            indicators.memory_sensitivity
+        );
+        assert_eq!(
+            loaded
+                .deterministic
+                .goal_indicators
+                .temporal_memory_sensitivity,
+            indicators.temporal_memory_sensitivity
+        );
+        let (unmeasured, _) = run_deterministic(&small_profile("synthetic")).unwrap();
+        assert!(unmeasured.goal_indicators.structural_companions.is_none());
+    }
+
     proptest! {
         #[test]
         fn births_rate_uses_complete_profile_totals(births in 0u64..1_000_000, ticks in 0u64..100_000) {
@@ -4001,6 +4287,7 @@ mod tests {
                     population_persistence_per_seed: vec![],
                     lineage_diversity_per_seed: vec![],
                     memory_sensitivity_per_seed: vec![],
+                    structural_companions_per_seed: vec![],
                     temporal_memory_sensitivity_per_seed: vec![],
                     evolved_neighborhood_per_seed: vec![],
                     pooled_complexities: vec![],
@@ -6356,7 +6643,7 @@ mod tests {
     fn checkpoint_tracking_omits_every_transferred_block() {
         use v3_core::simulation::seed_simulation;
 
-        const TRANSFERRED_KEYS: [&str; 8] = [
+        const TRANSFERRED_KEYS: [&str; 9] = [
             "typed_eats_failed_total",
             "mesh_dispatches_energy_exhausted_total",
             "mutation_supply",
@@ -6365,6 +6652,7 @@ mod tests {
             "predation",
             "mortality",
             "energy_flows",
+            "cognition",
         ];
 
         let sim = seed_simulation(SimulationConfig::default(), 7);
@@ -6794,6 +7082,7 @@ mod tests {
                 }),
                 mortality: None,
                 energy_flows: None,
+                cognition: None,
             },
         };
         let wire = serde_json::to_value(&sample).unwrap();

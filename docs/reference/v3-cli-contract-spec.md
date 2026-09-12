@@ -161,6 +161,30 @@ per-result breakdown). Every keyed block is ordered by its key, and each block
 is absent — not zero — in a checkpoint sample and in a report stored before
 T14.F02.
 
+From T14.F05 terminal `WorldTracking` also carries an optional `cognition`
+block, serialized directly under each world-set case alongside the other
+flattened tracking fields. It copies cumulative `SimStats` counters:
+`plasticity_updates_total`, `plasticity_changes_total`,
+`hebbian_updates_total`, `hebbian_changes_total`,
+`reward_modulated_updates_total`, `reward_modulated_changes_total`, and
+`shared_memory_writes_changed_total`. The existing work-counter definition of
+`plasticity_updates` is unchanged. Event semantics are defined in
+`v3-evolution-observability-spec.md`; assignments, changed weights, and changed
+memory writes do not establish useful learning or memory capability.
+
+Beside `goal_indicators.memory_sensitivity`, optional `structural_companions`
+carries `per_seed` rows with `seed`, `final_creature_count`,
+`reads_shared_memory`, `writes_shared_memory`, `has_stateful_compute_node`, and
+`has_plasticity`. Each count uses the existing mesh-reachable
+`structural_companions` predicate on every final living creature observed for
+memory sensitivity. The four flags overlap; an observed empty population has
+zero counts. They describe structural exposure, without an executed-path or
+capability claim. The census is absent when memory sensitivity is unmeasured;
+`cognition` is absent in checkpoints. Both additions remain absent when loading
+historical reports. Existing sensitivity fractions, definition tokens,
+temporal-memory readings, and comparison inputs are unchanged; these new
+diagnostics introduce no regression floor.
+
 The `goal-worlds-v1` profile runs exactly the checked-in recipes under
 `experiments/worlds/`, one per seed, in the order those recipes are declared;
 each recipe carries its own seed. A world-set profile whose seed list is not

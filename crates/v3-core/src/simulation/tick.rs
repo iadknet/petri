@@ -534,6 +534,8 @@ struct TickComputeStats {
     vm_steps: u64,
     graph_relax_iters: u64,
     plasticity_updates: u64,
+    plasticity_changes: u64,
+    shared_memory_writes_changed: u64,
     energy_exhausted_dispatches: u64,
 }
 
@@ -554,6 +556,8 @@ impl Default for TickComputeStats {
             vm_steps: 0,
             graph_relax_iters: 0,
             plasticity_updates: 0,
+            plasticity_changes: 0,
+            shared_memory_writes_changed: 0,
             energy_exhausted_dispatches: 0,
         }
     }
@@ -589,6 +593,8 @@ impl TickComputeStats {
         self.vm_steps += u64::from(work.vm_steps);
         self.graph_relax_iters += u64::from(work.graph_relax_iters);
         self.plasticity_updates += u64::from(work.plasticity_updates);
+        self.plasticity_changes += u64::from(work.plasticity_changes);
+        self.shared_memory_writes_changed += u64::from(work.shared_memory_writes_changed);
         if output.termination_reason == TerminationReason::EnergyExhausted {
             self.energy_exhausted_dispatches += 1;
         }
@@ -627,6 +633,10 @@ impl TickComputeStats {
         stats.vm_steps_total += self.vm_steps;
         stats.graph_relax_iters_total += self.graph_relax_iters;
         stats.plasticity_updates_total += self.plasticity_updates;
+        stats.hebbian_updates_total += self.plasticity_updates;
+        stats.plasticity_changes_total += self.plasticity_changes;
+        stats.hebbian_changes_total += self.plasticity_changes;
+        stats.shared_memory_writes_changed_total += self.shared_memory_writes_changed;
         stats.creature_ticks_total += u64::from(self.creature_count);
         stats.mesh_dispatches_energy_exhausted_total += self.energy_exhausted_dispatches;
         stats.actions_applied_total += u64::from(
@@ -1107,7 +1117,7 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
         for (node_idx, node) in creature.genome.nodes.iter().enumerate() {
             if let BackendDef::Graph(ref def) = node.backend_def {
                 if has_any_reward_modulated(def) {
-                    let (update_cost, update_count) = apply_reward_modulated_updates(
+                    let (update_cost, update_count, changed_count) = apply_reward_modulated_updates(
                         def,
                         node_idx,
                         &mut creature.graph_runtime.plasticity_weights,
@@ -1116,6 +1126,9 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
                         reward_cost,
                     );
                     sim.stats.plasticity_updates_total += u64::from(update_count);
+                    sim.stats.reward_modulated_updates_total += u64::from(update_count);
+                    sim.stats.plasticity_changes_total += u64::from(changed_count);
+                    sim.stats.reward_modulated_changes_total += u64::from(changed_count);
                     let before = creature.energy;
                     creature.energy -= update_cost;
                     sim.stats.energy_flows.reward_learning +=

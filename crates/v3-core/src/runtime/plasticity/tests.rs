@@ -232,14 +232,15 @@ fn failed_visits_preserve_decay_and_last_successful_activity() {
 fn reward(def: &CgpGraphBackendDef, state: &mut GraphRuntimeState, signal: f32) -> (f32, u32) {
     let mut signals = super::OutcomeSignalBank::default();
     signals.signals[OutcomeChannel::EnergyDelta as usize] = signal;
-    super::reward::apply_reward_modulated_updates(
+    let (cost, assignments, _) = super::reward::apply_reward_modulated_updates(
         def,
         0,
         &mut state.plasticity_weights,
         &state.eligibility_traces,
         &signals,
         0.25,
-    )
+    );
+    (cost, assignments)
 }
 
 #[test]
@@ -566,4 +567,91 @@ fn birth_aligned_weights_drive_first_execution_and_reward_without_parent_credit(
     assert_eq!(child.eligibility_traces[0][0][0], 3.0);
     reward(&def, &mut child, 1.0);
     assert!((child.plasticity_weights[0][0][0] - 1.05).abs() < 1e-6);
+}
+
+#[test]
+fn learning_counts_assignments_separately_from_final_weight_changes() {
+    // Zero activity, a clamped-away delta, and a rounded-away delta still cost
+    // one assignment. Only the last case changes the stored f32.
+    for (weight, eta, input, expected) in [
+        (0.5, 0.5, 0.0, 0.5),
+        (2.0, 0.5, 1.0, 2.0),
+        (1.0, f32::MIN_POSITIVE, 1.0, 1.0),
+        (0.5, 0.5, 1.0, 1.0),
+    ] {
+        for modulated in [false, true] {
+            let mut def = graph(HebbianRule::Classic, eta, 0.0);
+            def.compute_nodes[0].inputs[0].weight = weight;
+            if !modulated {
+                def.compute_nodes[0].plasticity.as_mut().unwrap().modulation = None;
+            }
+            let mut state = GraphRuntimeState::new();
+            begin(&mut state, &def);
+            let runtime = RuntimeConfig {
+                graph_node_base_cost: 0.0,
+                plasticity_update_cost: 0.25,
+                ..RuntimeConfig::default()
+            };
+            let mut energy = 100.0;
+            let side = visit(&def, &mut state, input, &mut energy, &runtime);
+            let (cost, assignments, changes) = if modulated {
+                assert_eq!(side.work_counters.plasticity_updates, 0);
+                assert_eq!(side.work_counters.plasticity_changes, 0);
+                assert_eq!(energy, 100.0);
+                let mut signals = super::OutcomeSignalBank::default();
+                signals.signals[OutcomeChannel::EnergyDelta as usize] = 1.0;
+                super::reward::apply_reward_modulated_updates(
+                    &def,
+                    0,
+                    &mut state.plasticity_weights,
+                    &state.eligibility_traces,
+                    &signals,
+                    0.25,
+                )
+            } else {
+                (
+                    100.0 - energy,
+                    side.work_counters.plasticity_updates,
+                    side.work_counters.plasticity_changes,
+                )
+            };
+            assert_eq!(state.plasticity_weights[0][0][0], expected);
+            assert_eq!(
+                (cost, assignments, changes),
+                (0.25, 1, u32::from(expected != weight))
+            );
+        }
+    }
+}
+
+proptest! {
+    #[test]
+    fn learning_change_counts_match_each_final_assignment(
+        weights in prop::collection::vec(-2.0f32..2.0, 1..12),
+        eta in 0.0f32..1.0, input in -2.0f32..2.0, signal in -2.0f32..2.0,
+        modulated in any::<bool>(),
+    ) {
+        let mut def = graph(HebbianRule::Classic, eta, 0.0);
+        let edge = def.compute_nodes[0].inputs[0].clone();
+        def.compute_nodes[0].inputs = weights.iter().map(|&weight| GraphEdge { weight, ..edge.clone() }).collect();
+        if !modulated { def.compute_nodes[0].plasticity.as_mut().unwrap().modulation = None; }
+        let mut state = GraphRuntimeState::new();
+        begin(&mut state, &def);
+        let side = visit(&def, &mut state, input, &mut 100.0, &RuntimeConfig::default());
+        let (assignments, changes) = if modulated {
+            let mut signals = super::OutcomeSignalBank::default();
+            signals.signals[OutcomeChannel::EnergyDelta as usize] = signal;
+            let (cost, assignments, changes) = super::reward::apply_reward_modulated_updates(
+                &def, 0, &mut state.plasticity_weights, &state.eligibility_traces, &signals, 0.25,
+            );
+            prop_assert_eq!(cost, weights.len() as f32 * 0.25);
+            (assignments, changes)
+        } else {
+            (side.work_counters.plasticity_updates, side.work_counters.plasticity_changes)
+        };
+        let expected_changes = weights.iter().zip(state.plasticity_weights[0][0].iter()).filter(|(old, new)| old != new).count() as u32;
+        prop_assert_eq!(assignments, weights.len() as u32);
+        prop_assert_eq!(changes, expected_changes);
+        prop_assert!(changes <= assignments);
+    }
 }

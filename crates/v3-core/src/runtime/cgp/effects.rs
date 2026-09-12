@@ -11,7 +11,9 @@ use crate::runtime::routing::RouteGateMap;
 use crate::runtime::trace::domain::{
     GraphActionSlotTrace, GraphExecuteGateTrace, GraphOutputSinkTrace,
 };
-use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{
+    sanitize_f32, shared_memory_write_changed, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT,
+};
 
 pub(crate) struct CgpEffectsTrace {
     pub(crate) output_sinks: Vec<GraphOutputSinkTrace>,
@@ -161,12 +163,17 @@ pub(crate) fn apply_cgp_graph_effects(
             OutputSinkKind::WriteSlot(s) => {
                 if (s as usize) < 16 {
                     applied_value = sanitize_f32(wsum);
+                    side_outputs.work_counters.shared_memory_writes_changed += u32::from(
+                        shared_memory_write_changed(shared_memory[s as usize], applied_value),
+                    );
                     shared_memory[s as usize] = applied_value;
                     applied = true;
                 }
             }
             OutputSinkKind::ClearSlot(s) => {
                 if (s as usize) < 16 {
+                    side_outputs.work_counters.shared_memory_writes_changed +=
+                        u32::from(shared_memory_write_changed(shared_memory[s as usize], 0.0));
                     shared_memory[s as usize] = 0.0;
                     applied_value = 0.0;
                     applied = true;

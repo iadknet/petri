@@ -290,6 +290,19 @@ pub struct SimStats {
     pub graph_relax_iters_total: u64,
     /// Hebbian plus reward-modulated plasticity weight updates applied.
     pub plasticity_updates_total: u64,
+    /// Assignments whose final stored f32 weight differs from its prior value.
+    pub plasticity_changes_total: u64,
+    /// Hebbian edge assignments, including unchanged weights.
+    pub hebbian_updates_total: u64,
+    /// Hebbian assignments that change the stored weight.
+    pub hebbian_changes_total: u64,
+    /// Phase 2.5 reward-modulated edge assignments, including unchanged weights.
+    pub reward_modulated_updates_total: u64,
+    /// Reward-modulated assignments that change the stored weight.
+    pub reward_modulated_changes_total: u64,
+    /// Executed changed VM store/clear and applied changed Graph write/clear events.
+    /// Excludes lifecycle memory decay, initialization, and observation on copies.
+    pub shared_memory_writes_changed_total: u64,
     /// Creatures that ran the mesh, summed per tick.
     pub creature_ticks_total: u64,
     /// Mesh dispatches that stopped because the creature ran out of energy

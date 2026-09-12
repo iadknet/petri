@@ -94,24 +94,24 @@ deterministic; no global counters, RNG calls, or unordered serialized maps.
 
 ## Implementation Tasks
 
-- [ ] Add applied-change observations at both learning sites and all production
+- [x] Add applied-change observations at both learning sites and all production
   shared-memory write sites, and carry the counts into cumulative `SimStats`.
-- [ ] Transfer the terminal cognition block and final-population carrier census
+- [x] Transfer the terminal cognition block and final-population carrier census
   into the existing benchmark report with truthful absence semantics.
 - [ ] Complete focused verification and closure evidence; update affected
   reference documentation, progress artifacts, and roadmap/spec state.
 
 ## Verification
 
-- [ ] Learning assignments versus changes, pathway partitioning, unchanged
+- [x] Learning assignments versus changes, pathway partitioning, unchanged
   clamped/rounded results and costs: `cargo test -p v3-core runtime::plasticity`
   and runtime integration tests; exact results in the
   [readings](../../progress/readings/t14-f05-cognition-telemetry-resolution.md).
-- [ ] VM/Graph memory event coverage, epsilon boundary, repeated/reversed writes,
+- [x] VM/Graph memory event coverage, epsilon boundary, repeated/reversed writes,
   and traced/plain parity: `cargo test -p v3-core runtime::`; counter invariants
   have property tests. Production accumulation and observational non-mutation:
   `cargo test -p v3-core simulation::tick::tests`; results in the readings.
-- [ ] Terminal transfer, checkpoint omission, four overlapping carrier counts,
+- [x] Terminal transfer, checkpoint omission, four overlapping carrier counts,
   empty population, historical absence, and unchanged sensitivity/comparison
   semantics: `cargo test -p v3-cli bench::tests`; results in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path,
@@ -166,9 +166,9 @@ counts have no directional target; zero is a valid reading.
 
 - [ ] Closure reports distinguish unchanged and changed plasticity assignments
   and Hebbian versus reward-modulated learning without changing learning.
-- [ ] Production changed-memory-write totals cover both backends and reflect
+- [x] Production changed-memory-write totals cover both backends and reflect
   individual applied events, including writes subsequently reversed.
-- [ ] The memory reading carries the final-population structural census while
+- [x] The memory reading carries the final-population structural census while
   its shipped fraction and historical readings retain their meaning.
 - [ ] Required verification and both benchmark profiles pass, evidence is
   stored, and feature/spec completion state agrees.
