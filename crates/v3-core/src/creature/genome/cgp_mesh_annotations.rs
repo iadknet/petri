@@ -14,7 +14,7 @@ use crate::creature::genome::cgp::{
 };
 use crate::creature::genome::mesh_annotations::{MeshReadClass, MeshWriteClass};
 
-use super::cgp_analysis::cgp_live_compute_indices;
+use super::cgp_analysis::{cgp_live_compute_indices, wired_surface_edges};
 
 /// Derive read/write/stateful annotations for a CGP graph backend.
 ///
@@ -29,7 +29,7 @@ pub(crate) fn derive_cgp_annotations(
 
     let live_indices = cgp_live_compute_indices(def);
 
-    // Stateful and read classes from live compute nodes
+    // Stateful flags from live compute nodes
     for &idx in &live_indices {
         let node = &def.compute_nodes[idx];
         if node.plasticity.is_some() {
@@ -45,15 +45,21 @@ pub(crate) fn derive_cgp_annotations(
             _ => {}
         }
 
-        // Read classes from InputLeaf edges on live compute nodes
+        // Narrower than `sensor_census` on purpose: a shared-memory read
+        // counts here only on a live compute node, where that census counts it
+        // on the whole wired surface. Do not harmonize the two.
         for edge in &node.inputs {
-            if let GraphSource::InputLeaf { ref_idx, .. } = edge.source {
-                if let Some(input_ref) = input_refs.get(ref_idx as usize) {
-                    read_classes.insert(classify_input_ref(input_ref));
-                }
-            }
             if let GraphSource::SharedMemory { .. } = edge.source {
                 has_stateful_behavior = true;
+            }
+        }
+    }
+
+    // Read classes from InputLeaf edges anywhere on the wired surface.
+    for edge in wired_surface_edges(def, &live_indices) {
+        if let GraphSource::InputLeaf { ref_idx, .. } = edge.source {
+            if let Some(input_ref) = input_refs.get(ref_idx as usize) {
+                read_classes.insert(classify_input_ref(input_ref));
             }
         }
     }
@@ -75,15 +81,6 @@ pub(crate) fn derive_cgp_annotations(
                 write_classes.insert(MeshWriteClass::Memory);
             }
         }
-
-        // Read classes from InputLeaf edges on sinks
-        for edge in &sink.inputs {
-            if let GraphSource::InputLeaf { ref_idx, .. } = edge.source {
-                if let Some(input_ref) = input_refs.get(ref_idx as usize) {
-                    read_classes.insert(classify_input_ref(input_ref));
-                }
-            }
-        }
     }
 
     // Write classes from wired action bank
@@ -93,28 +90,11 @@ pub(crate) fn derive_cgp_annotations(
             continue;
         }
         write_classes.insert(MeshWriteClass::Action);
-
-        // Read classes from action slot edges
-        for edge in slot.gate_inputs.iter().chain(slot.param_inputs.iter()) {
-            if let GraphSource::InputLeaf { ref_idx, .. } = edge.source {
-                if let Some(input_ref) = input_refs.get(ref_idx as usize) {
-                    read_classes.insert(classify_input_ref(input_ref));
-                }
-            }
-        }
     }
 
     // Write class from wired execute gate (terminal = action)
     if !def.execute_gate.inputs.is_empty() {
         write_classes.insert(MeshWriteClass::Action);
-
-        for edge in &def.execute_gate.inputs {
-            if let GraphSource::InputLeaf { ref_idx, .. } = edge.source {
-                if let Some(input_ref) = input_refs.get(ref_idx as usize) {
-                    read_classes.insert(classify_input_ref(input_ref));
-                }
-            }
-        }
     }
 
     (

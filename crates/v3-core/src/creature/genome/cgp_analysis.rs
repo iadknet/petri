@@ -80,48 +80,42 @@ pub(crate) fn cgp_live_compute_indices(def: &CgpGraphBackendDef) -> Vec<usize> {
         .collect()
 }
 
+/// Every edge on the graph's wired surface: the inputs of the given live
+/// compute nodes, then all output sinks, action-bank gate and param inputs,
+/// and the execute gate.
+///
+/// `live` is a `cgp_live_compute_indices` result. An unwired sink, slot or
+/// execute gate carries no edge, so no wiredness test is needed here. Edges
+/// are yielded once each, in traversal order; every caller reduces them into
+/// an order-independent result, and each keeps its own filtering — the census
+/// in `sensor_census` deliberately reads `SharedMemory` on the whole surface
+/// while `derive_cgp_annotations` reads it on live compute nodes alone.
+pub(crate) fn wired_surface_edges<'a>(
+    def: &'a CgpGraphBackendDef,
+    live: &'a [usize],
+) -> impl Iterator<Item = &'a GraphEdge> {
+    live.iter()
+        .flat_map(|&idx| &def.compute_nodes[idx].inputs)
+        .chain(def.output_sinks.iter().flat_map(|sink| &sink.inputs))
+        .chain(
+            def.action_bank
+                .iter()
+                .flat_map(|slot| slot.gate_inputs.iter().chain(slot.param_inputs.iter())),
+        )
+        .chain(&def.execute_gate.inputs)
+}
+
 // ── Functional complexity ───────────────────────────────────────────────────
 
-/// Collect consumed `InputLeaf` ref_idx values from edges in a set of live
-/// compute nodes, plus all wired surface edges.
-fn collect_consumed_input_refs(def: &CgpGraphBackendDef, live: &HashSet<usize>) -> HashSet<u16> {
-    let mut refs = HashSet::new();
-
-    // From live compute nodes
-    for &idx in live {
-        for edge in &def.compute_nodes[idx].inputs {
-            if let GraphSource::InputLeaf { ref_idx, .. } = edge.source {
-                refs.insert(ref_idx);
-            }
-        }
-    }
-
-    // From wired output sinks
-    for sink in &def.output_sinks {
-        for edge in &sink.inputs {
-            if let GraphSource::InputLeaf { ref_idx, .. } = edge.source {
-                refs.insert(ref_idx);
-            }
-        }
-    }
-
-    // From wired action bank
-    for slot in &def.action_bank {
-        for edge in slot.gate_inputs.iter().chain(slot.param_inputs.iter()) {
-            if let GraphSource::InputLeaf { ref_idx, .. } = edge.source {
-                refs.insert(ref_idx);
-            }
-        }
-    }
-
-    // From execute gate
-    for edge in &def.execute_gate.inputs {
-        if let GraphSource::InputLeaf { ref_idx, .. } = edge.source {
-            refs.insert(ref_idx);
-        }
-    }
-
-    refs
+/// Collect consumed `InputLeaf` ref_idx values from the wired surface edges of
+/// a graph with these live compute nodes.
+fn collect_consumed_input_refs(def: &CgpGraphBackendDef, live: &[usize]) -> HashSet<u16> {
+    wired_surface_edges(def, live)
+        .filter_map(|edge| match edge.source {
+            GraphSource::InputLeaf { ref_idx, .. } => Some(ref_idx),
+            GraphSource::SharedMemory { .. } | GraphSource::ComputeNode(_) => None,
+        })
+        .collect()
 }
 
 /// Count the functional complexity of a CGP graph backend.
@@ -160,7 +154,6 @@ pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
 
     // Live compute nodes (backward-reachable from wired surfaces)
     let live_indices = cgp_live_compute_indices(def);
-    let live_set: HashSet<usize> = live_indices.iter().copied().collect();
 
     for &idx in &live_indices {
         score += 1; // the compute node
@@ -168,7 +161,7 @@ pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
     }
 
     // Consumed input refs across all live edges
-    let consumed = collect_consumed_input_refs(def, &live_set);
+    let consumed = collect_consumed_input_refs(def, &live_indices);
     score += consumed.len() as u32;
 
     score
