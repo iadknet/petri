@@ -5,7 +5,7 @@
 | Date | 2026-09-12 |
 | Worktree / branch | `.worktrees/t14-f05` / `codex/t14-f05` |
 | Planning commit | `07dd1948` |
-| State | Build, self-review, final review, fresh mutation gate, and both benchmark reports complete; final `make check` and closure remain. |
+| State | Feature complete in the worktree: focused checks, final review, fresh mutation gate, both benchmark reports, and final full check passed; integration remains the orchestrator's responsibility. |
 
 ## Build verification
 
@@ -53,6 +53,8 @@
 | 5 — final mutation checkpoint | Fresh mode, successful baseline, 92 = 86 caught + 6 unviable, zero missed/timeouts, empty survivor files, and no added exclusions/skips satisfy the gate. Accepted no-remediation/no-additional-run guidance; spec record is truthful. |
 | 6 — final benchmark checkpoint | Confirmed deterministic equality, measured deltas and caps, cognition partitions, census denominators, and checkpoint omission. Inherited plasticity flag and founder gap are unchanged. Accepted no-rerun/no-waiver/no-re-pin/no-remediation guidance and the required spec clarification explicitly ruling out an epoch re-pin for both profiles. |
 | 7 — full-check environment checkpoint | Accepted a full host rerun after seven websocket tests could not bind localhost in the sandbox. No test skip, requirement waiver, or final-check pass was authorized or claimed. |
+| 8 — final test-only remediation checkpoint | Confirmed exactly five clone removals on `Copy` `GraphEdge`, unchanged fixtures/assertions, and passing focused/Clippy checks. Accepted no further correction, self-review, or viability run; existing benchmark/mutation evidence remains applicable. |
+| 9 — final closure-document checkpoint | Confirmed Complete status, supported feature checkboxes, unchanged broader rollups, and truthful verification records. Accepted the final telemetry correction from eight to nine completed consultations; no blocker or runtime rerun. |
 
 ## Self-review
 
@@ -113,7 +115,7 @@ rust-mutants: no survivors
 | Gate profile | `gate`, 128×128, 256 founders, seeds 11/22/33, 75 ticks, food coverage `1.000000` |
 | Goal profile | `goal-worlds-v1`, 1600×1600, 10,000 founders per world, seeds 11/22/33, 2,000 ticks, recipe-specific food coverage |
 | Reference selection | Unchanged `docs/progress/benchmark-series.json`: `gate-v1` and `goal-worlds-v1` epochs plus latest indexed T14.F03 closures; no baseline edits or epoch re-pin |
-| Final full check | Not run in this benchmark pass; no result claimed |
+| Final full check | Not run in this benchmark pass; subsequent successful closure check is recorded below |
 | Documentation verification | `make roadmap-check` exited 0 after the measured record (`roadmap-check: validation passed`; nonfatal Aqua timestamp warning); `git diff --check` exited 0. |
 
 ### Reference comparisons and caps
@@ -221,18 +223,18 @@ Gate founder single-event silence is also unchanged at 0.597561 below 0.60.
 The inherited founder floor belongs to T11.F01's fixed targets due by T11.F10;
 this feature neither resolves nor waives it. No existing goal or comparison
 coverage regressed. No rerun, baseline change, threshold weakening, verification
-exception, or production remediation was used. Final `make check` and closure
-state are still pending.
+exception, or production remediation was used in the benchmark pass. Its
+pending final full check was subsequently completed as recorded below.
 
 ## Post-review test-only remediation
 
-The orchestrator reported these full-check attempts; neither is passing
-closure evidence, and no tested commit is claimed here.
+The orchestrator reported these first two full-check attempts; neither is
+passing closure evidence, and no tested commit is claimed for either attempt.
 
 | Full-check attempt | Result |
 | --- | --- |
 | 1 — `make check` in sandbox | Exit 2: seven websocket tests could not bind localhost. Consultation 7 authorized a full host rerun, not a waiver. |
-| 2 — `make check` with host access | All tests and doctests passed, then `rust-clippy` failed on exactly five `clone_on_copy` diagnostics in the three test files below. Full check remains non-passing. |
+| 2 — `make check` with host access | All tests and doctests passed, then `rust-clippy` failed on exactly five `clone_on_copy` diagnostics in the three test files below. This attempt is non-passing. |
 
 Removed exactly five unnecessary `GraphEdge::clone()` calls using the type's
 existing `Copy` semantics: two in `runtime/plasticity/tests.rs`, one in
@@ -253,4 +255,34 @@ required for this scoped post-review test remediation.
 | `cargo test -p v3-core simulation::tick::tests::work_counters --quiet` | Exit 0; 8 passed |
 
 No full check, benchmark, or mutation run was repeated in this remediation
-pass. The final full-check item and dependent closure items remain unchecked.
+pass. Its final full-check item and dependent closure items remained unchecked
+until the successful run below.
+
+## Final closure verification and workflow telemetry
+
+| Closure evidence | Result |
+| --- | --- |
+| Final command | Full host-permitted `make check` — exit 0, run by the orchestrator after the five test-only clone removals |
+| Tested commit | `a0ea25c264e9fb5eef7b5f42d78a4451163242dd` |
+| Completed gate coverage | Rust tests/doctests and `rust-clippy`; frontend lint with four pre-existing warnings only; 61 frontend test files / 322 tests; frontend build; dependency scan; skill check; documentation validation |
+| Spec state | Complete; all Implementation Tasks, Verification items, and Success Criteria checked with stored evidence |
+| Roadmap state | T14.F05 checked; T14 remains In Progress, its remaining feature rows and master rollup are unchanged |
+| Heavyweight evidence | Existing fresh mutation and single gate/goal reports retained; no additional benchmark or mutation run |
+| Documentation checks | `make check-docs` exited 0 after correcting the initially rejected `Workflow:` Notes prefix to permitted `Cost:`; separate `make roadmap-check` and `git diff --check` exited 0. Aqua timestamp warnings were nonfatal. |
+
+| Required / used role | Model / effort |
+| --- | --- |
+| Orchestrator | Sol `gpt-5.6-sol` / `medium` |
+| Separate persistent spec owner and advisor | Astra `gpt-6-astra` / `xhigh` |
+| Single persistent implementer and remediator | Astra `gpt-6-astra` / `xhigh` |
+| Fresh final reviewer | Astra `gpt-6-astra` / `xhigh` |
+
+| Workflow telemetry | Reading |
+| --- | --- |
+| Completed advisor consultations | 9; decisive guidance and acceptance recorded above |
+| Final review | P1=0 / P2=0 / P3=0 |
+| Post-review remediation | One test-only pass; no production remediation |
+| Requirement corrections | 0; explicit no-epoch-re-pin wording was a documentation clarification, not a requirement change |
+| Completed user interventions | 1: direct authorization for local planning and implementation commits |
+| Verification exception | 1 sandbox exception: localhost websocket binding was unavailable; resolved by full host rerun, with no waiver or skip |
+| Task-total usage | `usage unavailable`: native goal usage is stale at an earlier blocked state, and no task-total including subagents is exposed; no stale partial total or account rate-limit figure is used |

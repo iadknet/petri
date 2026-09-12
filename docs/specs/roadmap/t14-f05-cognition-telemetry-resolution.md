@@ -1,6 +1,6 @@
 # T14.F05 — Cognition Telemetry Resolution
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-12
 **Feature**: T14.F05
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -98,7 +98,7 @@ deterministic; no global counters, RNG calls, or unordered serialized maps.
   shared-memory write sites, and carry the counts into cumulative `SimStats`.
 - [x] Transfer the terminal cognition block and final-population carrier census
   into the existing benchmark report with truthful absence semantics.
-- [ ] Complete focused verification and closure evidence; update affected
+- [x] Complete focused verification and closure evidence; update affected
   reference documentation, progress artifacts, and roadmap/spec state.
 
 ## Verification
@@ -126,8 +126,10 @@ deterministic; no global counters, RNG calls, or unordered serialized maps.
   → `docs/progress/features/t14-f05-cognition-telemetry-resolution-goal.json`.
   Record the new observations, including zeros, for Orchards, Canyon, and
   Confluence in the readings.
-- [ ] Required final `make check`, including existing reproducibility checks,
-  passes; command result in the readings. A second goal run is not applicable
+- [x] Required final host-permitted `make check`, including existing
+  reproducibility checks, exited 0 on tested commit
+  `a0ea25c264e9fb5eef7b5f42d78a4451163242dd`; result and both prior non-passing
+  attempts are preserved in the readings. A second goal run is not applicable
   under the workflow's one-goal-run contract.
 
 ## Performance and Goal Impact
@@ -170,7 +172,8 @@ and 103.718667 ms goal; evolved observation is 499.322792 ms total. The single
 goal run took approximately 483 seconds, within every predeclared time cap.
 No epoch re-pin is needed or performed for either the gate or goal profile.
 The readings record all three worlds' applied counts, overlapping census, and
-unchanged sensitivity including zeros. Final `make check` and closure remain.
+unchanged sensitivity including zeros. Final `make check` passed on the tested
+commit recorded above.
 
 - Reports: [gate](../../progress/features/t14-f05-cognition-telemetry-resolution.json),
   [goal](../../progress/features/t14-f05-cognition-telemetry-resolution-goal.json).
@@ -184,12 +187,18 @@ unchanged sensitivity including zeros. Final `make check` and closure remain.
   individual applied events, including writes subsequently reversed.
 - [x] The memory reading carries the final-population structural census while
   its shipped fraction and historical readings retain their meaning.
-- [ ] Required verification and both benchmark profiles pass, evidence is
+- [x] Required verification and both benchmark profiles pass, evidence is
   stored, and feature/spec completion state agrees.
 
 ## Notes for AI Agents
 
 - Decision: The carrier census reuses `structural_companions` and is exposure,
   not capability; it does not redefine `memory-sensitivity-v1`.
-- Cost: One completed user intervention: direct authorization for local T14.F05
-  planning and implementation commits. Closure cost totals remain unmeasured.
+- Cost: Required/used roles, nine completed advisor consultations, final
+  review P1=0/P2=0/P3=0, and one test-only post-review remediation pass are
+  recorded in the readings. Requirement corrections: 0; explicit no-re-pin
+  wording was a documentation clarification.
+- Cost: One completed user intervention authorized local planning and
+  implementation commits. One sandbox verification exception was resolved by
+  a full host rerun without waiver. Usage: `usage unavailable`; stale native
+  goal usage does not include a reliable task total with subagents.
