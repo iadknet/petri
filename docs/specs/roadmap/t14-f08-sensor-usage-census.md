@@ -150,41 +150,41 @@ constructed literally by the `bench.rs` test helpers `empty_readings` and
 
 ## Implementation Tasks
 
-- [ ] Pure per-creature predicates in `v3-core`: the live world-input key set
+- [x] Pure per-creature predicates in `v3-core`: the live world-input key set
       across both backends, and the stateful-read predicate of the table above,
       each from a genome and its cached reachable indices.
       `compute_live_vm_world_inputs`, `structural_companions`,
       `derive_cgp_annotations` and the server payload keep their current
       behavior and output.
-- [ ] Carry the census on `PersistenceSample` as a structured optional block,
+- [x] Carry the census on `PersistenceSample` as a structured optional block,
       aggregated only on sampled ticks and only from post-tick state, emitting
       the full key universe including zeros, under the empty-population and
       historical-report rules above.
-- [ ] Tests: a Graph-backend creature referencing a world input is counted —
-      the founder case that a VM-only census misses; a creature referencing one
-      key from several instructions or edges counts once; a key no creature
-      references is present with `0`; an unreachable or dead reference is not
-      counted; each row of the stateful table holds; the census appears at every
-      checkpoint through the real `run_one_seed` loop and matches an
-      independently computed value; the extinction checkpoint reports zeros; a
-      stored report predating the block still loads. Property tests in `v3-core`
+- [x] Tests: the Graph-backend founder case a VM-only census misses; a key
+      referenced several times counted once; an unreferenced key present with
+      `0`; unreachable and dead references uncounted; each row of the stateful
+      table; the census at every checkpoint of the real `run_one_seed` loop,
+      matching an independently computed value; zeros at extinction; a stored
+      report predating the block still loading, plus `v3-core` property tests
       for the pure invariants.
 
 ## Verification
 
 - [ ] `make check` -> exit 0, run once on the final feature code; record the
       tested commit.
-- [ ] Focused tests: `cargo test -p v3-core -p v3-cli` and
-      `cargo clippy -p v3-core -p v3-cli --all-targets` -> results and the new
-      test names recorded here.
+- [x] Focused tests at `6112143f`: `cargo test -p v3-core -p v3-cli`,
+      `cargo clippy -p v3-core -p v3-cli --all-targets` and
+      `cargo fmt --all -- --check` all exit 0 and clean. 12 unit
+      tests and 2 proptests in `creature::sensor_census::tests`, four
+      `bench::tests` arms; names in the readings file.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.
-- [ ] Checkpoint samples in the stored goal report carry the census at every
+- [x] Checkpoint samples in the stored goal report carry the census at every
       checkpoint of all three world cases, with the key universe complete and
       the founder population's graph-backend references present rather than
       zero. Key diff in the readings file.
-- [ ] Benchmark reports stored at
+- [x] Benchmark reports stored at
       `docs/progress/features/t14-f08-sensor-usage-census.json` and its `-goal`
       companion.
 
@@ -218,8 +218,18 @@ at all.
 
 **Measured verdict.**
 
-- Gate profile: pending.
-- Goal profile: pending.
+- Gate profile: exit 0 at `6112143f`, `severe=false` on both references, every
+  compute metric `level=ok`, epoch not re-pinned, founder neighborhood 76.62 ms
+  against the 10,000 ms cap, no evolved neighborhood in this profile.
+  `wall_clock` crosses to `level=flag` (+51.3 %, +69.7 %), mostly host load as
+  the readings file shows.
+- Goal profile: exit 0 at `6112143f`, `severe=false` on both references, epoch
+  not re-pinned, evolved neighborhood 659.74 ms against 180,000 ms, founder
+  230.65 ms against 10,000 ms, total 636,820.52 ms (10.61 min) against the
+  15-minute budget. Direction **none** holds on the indicators: with
+  `sensor_census` deleted, `deterministic.goal_indicators` diffs empty against
+  T14.F04's. `wall_clock` crosses to `level=flag` (+41.0 %, +29.2 %); the
+  `plasticity_updates` flag is T12.F04's inherited 0.066183.
 
 - Reports: [gate](../../progress/features/t14-f08-sensor-usage-census.json),
   [goal](../../progress/features/t14-f08-sensor-usage-census-goal.json).
