@@ -1,6 +1,6 @@
 # T14.F04 — Population Readings on the Persistence Checkpoints
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-11
 **Feature**: T14.F04
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -96,8 +96,8 @@ deserialize with these readings absent.
 
 ## Verification
 
-- [ ] `make check` -> exit status recorded here, run once on the final feature
-      code, with the tested commit named.
+- [x] `make check` -> exit 0, run once on the final feature code at the tested
+      commit `3b49bd88`.
 - [x] Focused tests at commit `75fa7e6c`: `cargo test -p v3-cli` -> ok,
       84 + 11 + 20 + 11 passed, 0 failed. Covers the new checkpoint-reading
       tests (`every_checkpoint_carries_the_population_readings_of_its_own_tick`,
@@ -190,12 +190,12 @@ because the Fable 5.1 budget is exhausted. No model configuration reaches
 
 ## Success Criteria
 
-- [ ] Every checkpoint sample of a stored benchmark report carries mean genome
+- [x] Every checkpoint sample of a stored benchmark report carries mean genome
       size, mean mesh nodes, mean generation, surviving founder clade count and
       Shannon entropy, on all three goal world cases.
-- [ ] The readings are reproducible byte-for-byte across processes and thread
+- [x] The readings are reproducible byte-for-byte across processes and thread
       counts, consume no production RNG and change no execution.
-- [ ] Reports stored before this feature still load with the readings absent,
+- [x] Reports stored before this feature still load with the readings absent,
       and the existing horizon readings and `v3-cli run` tick sample are
       unchanged.
 
@@ -221,3 +221,6 @@ because the Fable 5.1 budget is exhausted. No model configuration reaches
   were authorized by the user on 2026-09-11 for T14.F04 only, because the
   Fable 5.1 budget is exhausted. They are not a precedent for later features and
   reach no file on `main`.
+- Cost: Four implementer passes (build, self-review, post-review remediation,
+  closure gates), two advisor consults each; one reviewer pass with 0 P1, 2 P2
+  and 2 P3; one fresh mutation run; one gate and one goal benchmark run.

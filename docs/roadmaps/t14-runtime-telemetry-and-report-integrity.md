@@ -21,7 +21,7 @@ the microscope: it records applied behavior and adds no mechanism.
 - [ ] Creature death is counted and attributed to the sink that caused it, so a feature whose stated mechanism ends in death is verified at its own closure rather than through a work-counter proxy.
 - [ ] Every closure report names a comparison reference that is a different, earlier closure, or records the absence of one; no report compares against itself.
 - [ ] Every indicator wired into the goal profile appears in the comparison block the no-regression rule reads, and carries a version or definition token that moves when its definition moves.
-- [ ] Population readings the report takes once at the horizon — lineage diversity, carried structure, generation depth — are also taken at the persistence checkpoints the run already samples.
+- [x] Population readings the report takes once at the horizon — lineage diversity, carried structure, generation depth — are also taken at the persistence checkpoints the run already samples.
 - [x] Counters the runtime already maintains reach the stored report or are deleted; no counter is transferred whose value is structurally constant.
 - [ ] Reproductive success and lifespan are stored by cognitive class, so whether memory-carrying brains out-reproduce reactive ones is read from applied outcomes rather than from perturbation alone.
 - [ ] Each surviving founder clade has a stored behavioral profile — what it eats, what it does, where it lives, and when it would have gone extinct — so "many coexisting ways of making a living" is readable as differentiation and duration, not only as a count.
@@ -37,7 +37,7 @@ the microscope: it records applied behavior and adds no mechanism.
   - Goal: Counters the simulation already maintains — production mutation supply and targeting, mutation lifecycle outcomes, predation, failed eats, energy-exhausted dispatches — become readable at closure instead of being discarded each run.
 - [ ] **T14.F03 — Applied Mortality and Energy Accounting** — Depends on: T14.F02
   - Goal: Death is counted and attributed to the sink that caused it, and every energy flow the world applies is totalled, so a cost feature's effect is read from what it did rather than from what it charged.
-- [ ] **T14.F04 — Population Readings on the Persistence Checkpoints** — Depends on: T14.F02
+- [x] **T14.F04 — Population Readings on the Persistence Checkpoints** — Depends on: T14.F02
   - Goal: Lineage diversity, carried structure and generation depth are read at the checkpoints the run already samples, so a closure shows when a change took hold and not only where it ended.
 - [ ] **T14.F05 — Cognition Telemetry Resolution** — Depends on: T14.F02
   - Goal: A plasticity update that moves a weight is distinguishable from one that does not, reward-modulated learning is counted separately from Hebbian, a shared-memory write that changes a slot is counted in production, and the memory indicator reports how many creatures could have responded at all.
