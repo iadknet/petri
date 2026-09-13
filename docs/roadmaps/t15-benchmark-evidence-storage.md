@@ -57,7 +57,7 @@ truthful provenance and availability.
 
 ## Executable Features
 
-- [ ] **T15.F01 — Local Raw Artifacts and Committed Benchmark Summaries** — Depends on: T14.F01
+- [x] **T15.F01 — Local Raw Artifacts and Committed Benchmark Summaries** — Depends on: T14.F01
   - Goal: The world's measured outcomes remain readable and comparable across closures from concise committed summaries, while full experiment records stay local and their availability is stated honestly.
 - [ ] **T15.F02 — Historical Report Migration and Main-History Rewrite** — Depends on: T15.F01
   - Goal: Every earlier benchmark report is reduced to concise committed evidence and preserved as a local ignored raw artifact, then the full reports are removed from `main` history and the rewritten branch replaces `origin/main` without overwriting an unseen remote update.
@@ -66,8 +66,8 @@ truthful provenance and availability.
 
 - Decision: Added at the user's direction on 2026-09-12 after T13.F02's single
   goal run produced a 356,934,683-byte report; its [readings](../progress/readings/t13-f02-recruitment-paths-and-replicated-baseline.md)
-  record the narrow current exception. T15.F01 is In Progress under its flat
-  spec; T15.F02 remains unscheduled. Storage and workflow changes land through
+  record the narrow current exception. T15.F01 is Complete under its flat spec;
+  T15.F02 remains unscheduled. Storage and workflow changes landed through
   T15.F01. T13.F02 is evidence, not a prerequisite.
 - Decision: Local inspection on 2026-09-12 found existing output overrides in
   `Makefile` and full `Report` deserialization in

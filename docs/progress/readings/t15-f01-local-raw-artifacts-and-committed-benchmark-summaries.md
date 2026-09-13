@@ -23,8 +23,8 @@ and [artifact format/commands](../../benchmark-artifacts.md).
 | `make quality-check` | Passed: ShellCheck/actionlint, 3 progress-page/Makefile tests, existing benchmark-wait, mutation-wrapper, development-shutdown and skill-cache tests. Aqua's metadata timestamp writes were unavailable in the sandbox; checks themselves passed. |
 | `make roadmap-check` | Passed after workflow/template/output documentation edits. |
 | `make check-docs` | Passed: roadmap/policy/hook checks and repository quality checks, including all 3 progress-page/Makefile tests. |
-| `make check` | Pending orchestrator closure gate. |
-| Mutation gate | Pending separate mutation specialist. |
+| `make check` | Passed on final-code commit `8159d211`: exit 0; Rust, frontend, policy, audit, documentation and build gates completed. Full output captured once in `/private/tmp/t15-f01-make-check.log` for closure inspection. |
+| Mutation gate | Fresh `make rust-mutants` passed: 126 tested in 29m, 21 missed, 94 caught, 11 unviable, 0 timed out. Test-only strengthening killed 19 survivors; 2 are documented equivalent and 0 deferred. Output: `/Users/istefanek/.local/share/petri-tools/mutants/t15-f01/mutants.out`. |
 | Runtime scope | Simulation defaults, counters, recipes, observation work and thresholds unchanged. |
 
 The output-path integration fixture creates temporary main and linked Git
