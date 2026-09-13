@@ -9,10 +9,15 @@ No historical simulation, assay, benchmark, or baseline was rerun for this migra
 
 The [manifest](../historical-benchmark-manifest.json) records every report/path
 association, measurement identity, version frontier, conversion input/result,
-raw and summary hash, exclusion, and unsupported disposition. Full occurrences
-and census listings live in the persistent local package:
+raw and summary hash, exclusion, and unsupported disposition. The original
+raw/conversion/rewrite recovery package remains preserved at:
 
 `/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-complete/`
+
+The corrected reference census, current manifest and post-review receipts live at
+`/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-remediation-v2/`.
+This supplementary package reuses the original immutable raws, converter,
+summaries and provenance; preserve both directories.
 
 | Frozen-source census | Count |
 | --- | ---: |
@@ -22,7 +27,7 @@ and census listings live in the persistent local package:
 | Unique root trees | 1,166 |
 | Unique blobs | 7,181 |
 | Blob/path associations | 8,147 |
-| Historical report/index references from 107 source blobs | 997 |
+| Historical report/index references from 111 source blobs | 1,011 |
 | Entries across unique root-tree listings | 809,883 |
 | Entries across all commit-tree occurrences | 815,103 |
 | Logical reports / unique raw report blobs | 97 / 97 |
@@ -86,7 +91,7 @@ pending.
 
 | Command | Observed result |
 | --- | --- |
-| `node --test scripts/historical-benchmarks.test.mjs` | Exit 0, nine fixtures passed. Missing-module/export and behavior assertions failed before their implementations, including incomplete-profile, unreachable-map, and historical-reference regressions. |
+| `node --test scripts/historical-benchmarks.test.mjs` | Exit 0, initially nine fixtures; ten after the post-review root-level series regression. Missing-module/export and behavior assertions failed before their implementations, including incomplete-profile, unreachable-map, and historical-reference regressions. |
 | `cargo test -p v3-cli --test bench_artifacts offline_pair_parity_preserves_compatible_incompatible_and_absent_references` | Exit 0, one test passed. |
 | `cargo check --workspace --all-targets` | Exit 0. Production Rust is unchanged. |
 | `cargo test -p v3-cli --lib historical_goal_` | Exit 0, two tests passed after replacing migrated full-report assumptions with the existing synthetic full fixture and exact retained-aggregate round trips. |
@@ -149,7 +154,7 @@ the ambiguous-merge fixture's edited manifest with an actual merged history.
 It also follows historical references before classifying unrecognizable bytes;
 an independently regenerated census produced identical report/exclusion sets
 and enumeration hashes. The nine focused fixtures pass after those changes.
-Advisor consultations: 3;
+Advisor consultations: 4;
 the accepted identity rule and four unsupported dispositions are recorded above.
 
 ## Disposable rewrite and review preparation
@@ -192,6 +197,67 @@ Advisor consultation 3 requires an In Progress review candidate first. Task 4
 remains unchecked until fresh final review. Only afterward may the disposable
 candidate stage Complete metadata and checked rollups, pass closure doc gates
 and fresh-clone verification, and be frozen as the approval candidate. The
-source worktree stays In Progress. Final review, closure checks, candidate
-bundle, fresh lease, expanded cutover commands and explicit authorization are
-pending; no cutover-readiness claim is made here.
+source worktree stays In Progress. At that checkpoint final review and closure
+were pending; the later review/remediation is recorded below. Fresh lease,
+expanded cutover commands and explicit authorization remain pending, with no
+cutover-readiness claim.
+
+The In Progress review snapshot is `74cf3cd50af5b127039db03da5ad1efdcbad8c6f`
+in `<package>/filter-candidate`; its independent `review-fresh-clone` has the
+same OID. This source-worktree follow-up records its results without changing
+that immutable review snapshot. The 1,168-file tree equals the frozen tip minus
+exact raw pairs plus 104 exported migration files and one preserved deletion.
+Both clones pass all 93 summary hashes, manifest contents, committed map, all
+54 series references, raw ancestry absence and no unexpected full report;
+the existing synthetic test fixture is the sole allowed full envelope.
+All 97 raw objects are also absent from the fresh clone's object database.
+Candidate `make check-docs`, `make roadmap-check`, fresh-clone `fsck`, and
+bundle verification each exit 0. Structural receipts are
+`review-candidate-verification.json` and `review-fresh-clone-verification.json`;
+they do not stand in for command transcripts. Command-specific closure receipts
+will be created only for observed commands, with their exact revision and exit.
+
+The single-main review bundle is 10,740,608 bytes, SHA-256
+`9461ea932e066f6348e79ed790dcab9eebec2f5ad1a4311ee361b4897db517d8`.
+It is 262,961 bytes larger than the pre-rewrite bundle; raw-unreachability and
+uncompressed evidence-size reduction do not imply packed Git-size reduction.
+No packing/GC optimization was attempted. The review commit is unsigned.
+
+The operator verifier's initial byte-equality assertion exposed only indentation
+differences in four manifest disposition entries. Parsed manifests match exactly;
+the verifier now checks those contents and separately enforces the exact exported
+tip bytes. No historical data, summary, or production code changed. Self-review
+kept the callback bounded to saved pairs, copies restricted to explicit source
+paths, and scans batched; it reuses the existing package verifier. Final-review
+remediation and closure remain pending, with task 4 unchecked.
+
+## Single post-review remediation
+
+The fresh final review reported P1: 0, P2: 1, P3: 1. Its required P2 correction
+adds the historical root-level `epoch_baseline`/`closed` index shape to the
+existing series traversal, without new dependencies or a separate parser.
+The focused deleted-baseline/closed-reference fixture failed with an empty
+reference list before the three-line correction; it and all ten history
+fixtures pass afterward. Self-review confirmed that nested pointers and
+classification/grouping remain unchanged and that the same traversal handles
+both formats.
+
+Regeneration adds exactly 14 reference fields from four earlier index blobs:
+1,011 references from 111 source blobs. All previous 997 references match
+exactly. All 1,009 introduction-time target occurrences resolve to 54 supported,
+preserved target blobs; the same two initially absent targets have their later
+supported raw versions preserved. `reference-completeness.json` records those
+proofs. The reference listing is 642,844 bytes, SHA-256
+`be958b104d395883e076417107196a10155a53039789de01094f569fb7e457bf`.
+Commit/tree/object/occurrence/filter-input hashes, classifications, 97 logical
+reports, selected versions, conversion results, 93 summary byte streams and four
+raw-only dispositions are unchanged. No conversion, comparison measurement,
+benchmark or mutation run was repeated.
+
+The P3 correction names the two existing structural receipts above instead of
+the nonexistent consolidated filename. New command-specific receipts are
+written only after their commands run and identify the exact candidate revision
+and exit. The original reviewed candidate and bundles remain unchanged; the
+versioned replacement candidate and evidence are under the supplementary
+package. Source status remains In Progress. Final implementation commit, its
+full `make check`, closure staging, fresh lease and authorization remain pending.

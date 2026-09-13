@@ -4,7 +4,7 @@
     "repository": "/Users/istefanek/projects/petri/.worktrees/t15-f02",
     "commit": "84c9c7e2afad3f1621d1ada2988f9fe851af4cb9"
   },
-  "package_path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-complete",
+  "package_path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-remediation-v2",
   "verified_at": "2026-09-13T19:36:06.347Z",
   "enumeration": {
     "commits": 1179,
@@ -15,23 +15,23 @@
     "tree_entries": 809883,
     "commit_tree_entries": 815103,
     "blob_path_associations": 8147,
-    "report_references": {
-      "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-complete/report-references.json",
-      "sha256": "aa9c6f21ca68b32c1b0a24169fd2e73593f41d96de063ce6c9da4beae88121d6",
-      "bytes": 634021
-    },
     "census": {
-      "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-complete/census.json",
+      "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-remediation-v2/census.json",
       "sha256": "d33aa468407881a62a1eaf5d79490d1dac3652b4a0ba95c872d4dbcef600f62b",
       "bytes": 163291008
     },
     "reachable_objects": {
-      "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-complete/reachable-objects.txt",
+      "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-remediation-v2/reachable-objects.txt",
       "sha256": "d146ebef1fab10f7eb63991627e813aeee3a8bb8dcd369f2f1d195fa40b34020",
       "bytes": 701100
     },
+    "report_references": {
+      "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-remediation-v2/report-references.json",
+      "sha256": "be958b104d395883e076417107196a10155a53039789de01094f569fb7e457bf",
+      "bytes": 642844
+    },
     "report_occurrences": {
-      "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-complete/occurrences.json",
+      "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-remediation-v2/occurrences.json",
       "sha256": "7759385b3dccd68f907684e3d7aa97c83d2b16b81ab1ca2191b0021a605967e9",
       "bytes": 882651
     }
@@ -71947,7 +71947,7 @@
   ],
   "unresolved": [],
   "filter_inputs": {
-    "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-complete/filter-inputs.json",
+    "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-remediation-v2/filter-inputs.json",
     "sha256": "a9927802ec3803ddde4b72629251203a9859b910ce714ee43ad7d38932d666cd",
     "bytes": 14497
   },
