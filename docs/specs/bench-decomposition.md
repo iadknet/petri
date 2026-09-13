@@ -86,14 +86,51 @@ unrelated user changes in the worktree.
       19 `bench_artifacts`, 11 `cli`; the earlier estimate of 151 omitted the
       `main.rs` unit binary) and the pre-move gate summary (Verification,
       first item).
-- [ ] Create the six modules per the target layout, moving whole items; add
+- [x] Create the six modules per the target layout, moving whole items; add
       `pub use` re-exports in `bench.rs` so every current `bench::` path resolves.
-- [ ] Distribute the test module per the Tests rule; fix `use` paths only.
-- [ ] Run `cargo check --workspace --all-targets`, `cargo clippy --workspace
+      `bench.rs` re-exports every item that was `pub` before the move (not only
+      the 27 names callers use) and privately imports the four comparison
+      thresholds so `artifacts.rs`'s `super::FLAG_PERCENT` paths still resolve.
+- [x] Distribute the test module per the Tests rule; fix `use` paths only.
+      Each test went to the module owning its primary subject (the item its
+      assertions target), not to every module whose types it touches; the
+      five tests that drive `run_one_seed`/`run_deterministic` to assert on
+      tracking, comparison, or companion output sit in `bench/tests.rs`
+      together with the three helpers used from several test modules
+      (`small_profile`, `small_world_set_params`, `small_world_set_report`,
+      widened to `pub(super)`).
+- [x] Run `cargo check --workspace --all-targets`, `cargo clippy --workspace
       --all-targets`, and `cargo test -p v3-cli`; resolve only visibility and
       import errors.
-- [ ] Record any deviations from the target map here, one line each, with the
+- [x] Record any deviations from the target map here, one line each, with the
       reason.
+- Deviation: `FLAG_PERCENT`, `SEVERE_PERCENT`, `WALL_CLOCK_FLAG_PERCENT`,
+  `WALL_CLOCK_SEVERE_PERCENT` live in `bench/comparison.rs`, not `profiles.rs`;
+  they are comparison thresholds whose only users are `counter_level` and
+  `artifacts.rs`.
+- Deviation: `undefined_generation_distribution` lives in `bench/schema.rs`, not
+  `indicators.rs`; `NeighborhoodEvolvedSeed` names it in a
+  `#[serde(default = "...")]` string, which resolves in the struct's module.
+- Deviation: `Comparison` lives in `bench/comparison.rs`, not `schema.rs`; its
+  field doc links `` [`apply_comparisons`] ``, and `rustdoc::broken_intra_doc_links`
+  is denied while an import used only by a doc link is reported unused.
+- Exception: the six `include_str!` literals gained one `../` per extra
+  directory level (`bench/profiles.rs` x3, `bench/comparison.rs` x1,
+  `bench/schema/tests.rs` x2, which sits two levels down); `include_str!`
+  paths are source-file-relative, so the bytes included are unchanged. The
+  pure alternative is keeping `GOAL_RECIPES`, `locked_rand_version`, and the
+  two historical-report tests in `bench.rs`.
+- Exception: `cargo fmt` (a `make check` gate) rewrapped four signatures that
+  `pub(super) ` pushed past 100 columns (`compare_cases`,
+  `generation_distribution`, `memory_sensitivity`, `goal_case`) and rejoined
+  thirteen dedented test statements that now fit on one line
+  (`comparison/tests.rs` 205, 212, 437; `profiles/tests.rs` 58;
+  `run/tests.rs` 69, 86, 140, 459, 492, 540; `schema/tests.rs` 46;
+  `tests.rs` 160; `tracking/tests.rs` 572); both are AST-preserving.
+- Size: `tracking.rs` (763) + `tracking/tests.rs` (1,147) and `indicators.rs`
+  (797) + `indicators/tests.rs` (843) exceed ~1,300 combined; no natural
+  neighbouring module exists and no extra split was invented. Every single
+  file is under 1,150 lines.
 
 ## Verification
 
@@ -110,10 +147,11 @@ unrelated user changes in the worktree.
 - [ ] The two summaries' `deterministic` blocks are byte-identical:
       `node -e 'const fs=require("fs"); for (const [f,o] of [[process.argv[1],"/tmp/bench-decomposition-before.det"],[process.argv[2],"/tmp/bench-decomposition-after.det"]]) fs.writeFileSync(o, JSON.stringify(JSON.parse(fs.readFileSync(f,"utf8")).deterministic, null, 1))' /tmp/bench-decomposition-before.json docs/progress/features/bench-decomposition.json && cmp /tmp/bench-decomposition-before.det /tmp/bench-decomposition-after.det`
       exits 0.
-- [ ] Test inventory unchanged: the `--list` count equals the recorded
+- [x] Test inventory unchanged: the `--list` count equals the recorded
       baseline (162), and `cargo test -p v3-cli` passes with the same
-      per-binary pass counts.
-- [ ] `make check` exits 0 in the worktree.
+      per-binary pass counts (101 / 11 / 20 / 19 / 11 on the split tree,
+      2026-09-13).
+- [x] `make check` exits 0 in the worktree (2026-09-13, on the split tree).
 - [ ] Independent review by `roadmap-reviewer` of
       `git diff -M --color-moved=dimmed-zebra --color-moved-ws=allow-indentation-change <base>..HEAD -- crates/v3-cli`
       confirms the purity rule: every non-moved line is a `use`/`mod`/re-export,
