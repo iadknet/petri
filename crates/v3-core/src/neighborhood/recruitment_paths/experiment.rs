@@ -615,3 +615,289 @@ pub fn observe(sizes: Sizes) -> Report {
             "Target-applicability gaps belong to T13.F03; zero-compute direct Graph effect activation to T13.F04; function-preserving module preparation/recruitment paths to T13.F05. This observation repairs none.".into()],
         total_proposals: opportunities.births, opportunities, constructed, starts, arms, pairs }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn production_lineages(start: &Start, policy: Policy) -> Vec<Lineage> {
+        let sizes = Sizes::PRODUCTION;
+        let config = task_config();
+        let battery = Battery::generate(config.world.food.types.len());
+        (0..sizes.batches)
+            .flat_map(|batch| {
+                let config = &config;
+                let battery = &battery;
+                (0..sizes.lineages)
+                    .map(move |index| lineage(start, policy, sizes, batch, index, battery, config))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn fingerprint_is_a_sha256_hex_digest() {
+        let digest = fingerprint(&("recruitment", 13_02u32));
+        assert_eq!(digest.len(), 64);
+        assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn module_use_reports_dispatch_and_each_observable_effect() {
+        let start = starting_forms()
+            .into_iter()
+            .find(|start| start.name == "graph_copy")
+            .unwrap();
+        let tracker = initial_tracker(&start);
+        let module = tracker
+            .modules()
+            .find(|module| module.provenance.is_cohort())
+            .unwrap()
+            .node;
+        let config = task_config();
+        let bypass = evaluate_with_config(&static_successor_bypass(&start.genome, module), &config);
+
+        let mut unchanged = bypass.clone();
+        unchanged.scenes[0].dispatched.push(module);
+        let unchanged_use = uses(&start.genome, &unchanged, start.task, &tracker, &config);
+        assert_eq!(unchanged_use.len(), 1);
+        assert!(unchanged_use[0].dispatched);
+        assert_eq!(
+            unchanged_use[0].current_backend,
+            unchanged_use[0].created_backend
+        );
+        assert_eq!(unchanged_use[0].score_loss, 0);
+        assert!(!unchanged_use[0].queue_effect);
+        assert_eq!(unchanged_use[0].memory_effect, Some(false));
+        assert!(!unchanged_use[0].output_effect);
+        assert!(!unchanged_use[0].routing_effect);
+
+        let mut changed = bypass.clone();
+        changed.scenes[0].dispatched.push(module);
+        for scene in &mut changed.scenes {
+            scene.correct_a = true;
+        }
+        if changed.scenes[1].actions.is_empty() {
+            changed.scenes[1]
+                .actions
+                .push(crate::contracts::WorldAction::NoOp);
+        } else {
+            changed.scenes[1].actions.clear();
+        }
+        changed.scenes[1].shared_memory = Some([1.0; 16]);
+        changed.scenes[1].routing.push((
+            crate::contracts::NodeId::new(98),
+            crate::contracts::NodeId::new(99),
+        ));
+        changed.scenes[1]
+            .output_slots
+            .push((crate::contracts::NodeId::new(99), [1.0; 24]));
+        let changed_use = uses(&start.genome, &changed, start.task, &tracker, &config);
+        assert_eq!(changed_use.len(), 1);
+        assert!(changed_use[0].score_loss > 0);
+        assert!(changed_use[0].queue_effect);
+        assert_eq!(changed_use[0].memory_effect, Some(true));
+        assert!(changed_use[0].output_effect);
+        assert!(changed_use[0].routing_effect);
+    }
+
+    #[test]
+    fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
+        let starts = starting_forms();
+        let cases = [
+            ("graph_prepared", Policy::Drift, [19, 14, 12, 1], [372, 332]),
+            (
+                "graph_prepared",
+                Policy::Selection,
+                [19, 19, 19, 16],
+                [331, 350],
+            ),
+            ("vm_prepared", Policy::Drift, [19, 15, 15, 2], [355, 228]),
+            (
+                "vm_prepared",
+                Policy::Selection,
+                [19, 19, 19, 15],
+                [297, 228],
+            ),
+        ];
+        for (name, policy, expected, expected_discards) in cases {
+            let start = starts.iter().find(|start| start.name == name).unwrap();
+            let lineages = production_lineages(start, policy);
+            let refs: Vec<_> = lineages.iter().collect();
+            let aggregate = summary(&refs);
+            assert_eq!(
+                [
+                    aggregate.proposal_discovery.numerator,
+                    aggregate.retained_discovery.numerator,
+                    aggregate.viable_retained_discovery.numerator,
+                    aggregate.retained_useful.numerator,
+                ],
+                expected
+            );
+
+            let mut graph_discards = 0;
+            let mut vm_discards = 0;
+            for lineage in &lineages {
+                let expected_identity =
+                    lineage.batch * Sizes::PRODUCTION.lineages + lineage.lineage;
+                assert!(lineage.checkpoints.iter().all(|checkpoint| checkpoint
+                    .modules
+                    .iter()
+                    .all(|module| module.lineage == expected_identity)));
+                assert!(lineage.checkpoints.iter().all(|checkpoint| checkpoint
+                    .cohort
+                    .lineage_rows
+                    .iter()
+                    .all(|row| row.lineage == expected_identity)));
+                assert_eq!(
+                    lineage
+                        .checkpoints
+                        .iter()
+                        .map(|checkpoint| checkpoint.generation)
+                        .collect::<Vec<_>>(),
+                    vec![
+                        0,
+                        Sizes::PRODUCTION.discovery,
+                        Sizes::PRODUCTION.discovery + Sizes::PRODUCTION.followup,
+                    ]
+                );
+
+                let mut viable_path = start.task_reading.live();
+                for siblings in lineage.proposals.chunks_exact(2) {
+                    for proposal in siblings {
+                        let child_score = match start.task {
+                            Task::A => proposal.outcome.correct_a,
+                            Task::B => proposal.outcome.correct_b,
+                        };
+                        assert_eq!(
+                            proposal.seed,
+                            proposal_seed(
+                                lineage.batch,
+                                lineage.lineage,
+                                proposal.generation - 1,
+                                proposal.sibling
+                            )
+                        );
+                        assert_eq!(proposal.mutation_fingerprint.len(), 64);
+                        assert_eq!(proposal.parent_fingerprint.len(), 64);
+                        assert_eq!(
+                            proposal.discovery,
+                            proposal.outcome.surviving_scenes == 8
+                                && child_score > start.task_reading.correct(start.task)
+                                && !proposal.useful_modules.is_empty()
+                        );
+                        assert_eq!(
+                            proposal.viable_path,
+                            viable_path
+                                && proposal.parent_live
+                                && proposal.outcome.surviving_scenes == 8
+                                && child_score + 1 >= proposal.parent_score
+                        );
+                        graph_discards += proposal
+                            .selected_inapplicable_by_backend_operator
+                            .get(&ModuleBackend::Graph)
+                            .into_iter()
+                            .flat_map(|operators| operators.values())
+                            .sum::<u64>();
+                        vm_discards += proposal
+                            .selected_inapplicable_by_backend_operator
+                            .get(&ModuleBackend::Vm)
+                            .into_iter()
+                            .flat_map(|operators| operators.values())
+                            .sum::<u64>();
+                        assert_eq!(proposal.selected_inapplicable_backend_unresolved, 0);
+                        assert!(proposal
+                            .useful_modules
+                            .iter()
+                            .all(|module| { module.dispatched && module.score_loss >= 1 }));
+                    }
+                    if let Some(chosen) = siblings.iter().find(|proposal| proposal.chosen) {
+                        viable_path = chosen.viable_path;
+                    }
+                }
+            }
+            assert_eq!([graph_discards, vm_discards], expected_discards);
+        }
+    }
+
+    #[test]
+    fn paired_lineages_report_each_first_divergence_and_signed_difference() {
+        let start = starting_forms()
+            .into_iter()
+            .find(|start| start.name == "graph_prepared")
+            .unwrap();
+        let left_lineages = production_lineages(&start, Policy::Drift);
+        let right_lineages = production_lineages(&start, Policy::Selection);
+        let make_arm = |policy, lineages: Vec<Lineage>| {
+            let refs: Vec<_> = lineages.iter().collect();
+            Arm {
+                start: start.name.clone(),
+                task: start.task,
+                policy,
+                summary: summary(&refs),
+                batches: vec![],
+                opportunities: Opportunities::default(),
+                lineages,
+            }
+        };
+        let left = make_arm(Policy::Drift, left_lineages);
+        let right = make_arm(Policy::Selection, right_lineages);
+        let paired = pair(&left, &right, 3, 7);
+        assert_eq!((paired.left_arm, paired.right_arm), (3, 7));
+        for ((left, right), observed) in left
+            .lineages
+            .iter()
+            .zip(&right.lineages)
+            .zip(&paired.lineages)
+        {
+            let proposals: Vec<_> = left.proposals.iter().zip(&right.proposals).collect();
+            let first_mutation = proposals
+                .iter()
+                .position(|(left, right)| left.mutation_fingerprint != right.mutation_fingerprint);
+            let useful = |lineage: &Lineage| {
+                lineage
+                    .retention
+                    .as_ref()
+                    .is_some_and(|retention| retention.outcome == RetentionOutcome::Useful)
+            };
+            assert_eq!(observed.batch, left.batch);
+            assert_eq!(observed.lineage, left.lineage);
+            assert_eq!(
+                observed.proposal_discovery_difference,
+                i8::from(right.proposal_discovery.is_some())
+                    - i8::from(left.proposal_discovery.is_some())
+            );
+            assert_eq!(
+                observed.retained_discovery_difference,
+                i8::from(right.retained_discovery.is_some())
+                    - i8::from(left.retained_discovery.is_some())
+            );
+            assert_eq!(
+                observed.useful_retention_difference,
+                i8::from(useful(right)) - i8::from(useful(left))
+            );
+            assert_eq!(
+                observed.first_parent_divergence,
+                proposals
+                    .iter()
+                    .find(|(left, right)| left.parent_fingerprint != right.parent_fingerprint)
+                    .map(|(left, _)| left.generation - 1)
+            );
+            assert_eq!(
+                observed.first_mutation_divergence,
+                first_mutation
+                    .map(|index| { (proposals[index].0.generation, proposals[index].0.sibling) })
+            );
+            assert_eq!(
+                observed.first_rng_divergence,
+                proposals
+                    .iter()
+                    .find(|(left, right)| left.rng_after != right.rng_after)
+                    .map(|(left, _)| (left.generation, left.sibling))
+            );
+            assert_eq!(
+                observed.matched_proposals_before_divergence,
+                first_mutation.unwrap_or(proposals.len()) as u32
+            );
+        }
+    }
+}

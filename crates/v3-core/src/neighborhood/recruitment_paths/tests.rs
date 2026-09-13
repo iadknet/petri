@@ -335,12 +335,33 @@ fn recruitment_paths_reduced_run_has_complete_supply_and_replay() {
     let report = observe(Sizes::TEST);
     assert_eq!(report.total_proposals, Sizes::TEST.proposals());
     assert_eq!(report.arms.len(), 18);
+    assert_eq!(report.pairs.len(), 73);
+    assert!(report.pairs.iter().all(|pair| {
+        pair.left_arm < pair.right_arm
+            && report.arms[pair.left_arm].task == report.arms[pair.right_arm].task
+    }));
     assert_eq!(
         report.opportunities.attempted,
         report.opportunities.applied + report.opportunities.skipped
     );
     for arm in &report.arms {
         assert_eq!(arm.summary.retained_discovery.denominator, 1);
+        assert_eq!(arm.batches.len(), 1);
+        assert_eq!(
+            [
+                arm.batches[0].proposal_discovery.numerator,
+                arm.batches[0].retained_discovery.numerator,
+                arm.batches[0].viable_retained_discovery.numerator,
+                arm.batches[0].retained_useful.numerator,
+            ],
+            [
+                arm.summary.proposal_discovery.numerator,
+                arm.summary.retained_discovery.numerator,
+                arm.summary.viable_retained_discovery.numerator,
+                arm.summary.retained_useful.numerator,
+            ]
+        );
+        assert_eq!(arm.batches[0].proposal_discovery.denominator, 1);
         for lineage in &arm.lineages {
             assert_eq!(lineage.proposals.len(), 6);
             assert_eq!(lineage.checkpoints.len(), 3);
@@ -400,4 +421,176 @@ fn recruitment_paths_seed_streams_cover_the_fixed_disjoint_replicates() {
     assert_eq!(Sizes::PRODUCTION.proposals(), 55_296);
     let zero = estimate(0, 32);
     assert!((zero.wilson_95.unwrap()[1] - 0.107_179_198_255_070_6).abs() < 1e-12);
+}
+
+#[test]
+fn recruitment_paths_scene_encoding_covers_each_food_bit_and_aggregates_work() {
+    let reading = evaluate(&constructed_paths().remove(1).base);
+    let lifecycle_decay = f64::from(task_config().energy.lifecycle.energy_decay_per_tick);
+    for (index, scene) in reading.scenes.iter().enumerate() {
+        assert_eq!(scene.food, [index & 4 != 0, index & 2 != 0, index & 1 != 0]);
+        assert!((scene.maintenance - scene.carrying - lifecycle_decay).abs() < 1e-12);
+    }
+
+    let mut synthetic = reading.clone();
+    synthetic.scenes.truncate(2);
+    synthetic.scenes[0].dispatched = vec![NodeId::new(4), NodeId::new(4)];
+    synthetic.scenes[1].dispatched = vec![NodeId::new(7)];
+    synthetic.scenes[0].work = Work {
+        mesh_hops: 2,
+        vm_steps: 3,
+        graph_visits: 5,
+        plasticity: 7,
+    };
+    synthetic.scenes[1].work = Work {
+        mesh_hops: 11,
+        vm_steps: 13,
+        graph_visits: 17,
+        plasticity: 19,
+    };
+    synthetic.scenes[0].energy = Some(23.0);
+    synthetic.scenes[1].energy = Some(29.0);
+    synthetic.scenes[0].maintenance = 31.0;
+    synthetic.scenes[1].maintenance = 37.0;
+    synthetic.scenes[0].carrying = 41.0;
+    synthetic.scenes[1].carrying = 43.0;
+
+    assert_eq!(
+        synthetic.dispatched(),
+        [NodeId::new(4), NodeId::new(7)].into_iter().collect()
+    );
+    let summary = synthetic.summary();
+    assert_eq!(summary.ending_energy_sum, 52.0);
+    assert_eq!(summary.maintenance_sum, 68.0);
+    assert_eq!(summary.carrying_sum, 84.0);
+    assert_eq!(
+        summary.work,
+        Work {
+            mesh_hops: 13,
+            vm_steps: 16,
+            graph_visits: 22,
+            plasticity: 26,
+        }
+    );
+}
+
+#[test]
+fn recruitment_paths_delta_rejects_each_mismatched_precondition() {
+    let before = constructed_paths().remove(1).base;
+    let mut after = before.clone();
+    after.nodes.reverse();
+    let delta = GenomeDelta::between(&before, &after);
+
+    let mut wrong_entry = before.clone();
+    wrong_entry.entry_node_id = NodeId::new(99);
+    assert_eq!(delta.apply(&wrong_entry), None);
+
+    let mut wrong_order = before.clone();
+    wrong_order.nodes.reverse();
+    assert_eq!(delta.apply(&wrong_order), None);
+
+    let mut changed_node = before.clone();
+    changed_node.nodes[0].targets.clear();
+    let content_delta = GenomeDelta::between(&before, &changed_node);
+    let mut wrong_content = before.clone();
+    wrong_content.nodes[0].targets[0].slot = 99;
+    assert_eq!(content_delta.apply(&wrong_content), None);
+}
+
+#[test]
+fn recruitment_paths_fixture_sites_and_preparation_are_exact() {
+    let starts = starting_forms();
+    let expected = [
+        ("graph_blank", [1, 2, 1, 0, 2, 3, 8], 14),
+        ("graph_copy", [2, 2, 1, 0, 4, 6, 8], 22),
+        ("graph_split", [2, 2, 1, 0, 5, 7, 8], 24),
+        ("graph_unprepared", [2, 2, 1, 1, 4, 8, 8], 25),
+        ("graph_prepared", [2, 2, 1, 1, 4, 8, 8], 25),
+        ("vm_blank", [1, 2, 13, 2, 0, 0, 0], 21),
+        ("vm_copy", [2, 2, 23, 4, 0, 0, 0], 34),
+        ("vm_unprepared", [2, 2, 21, 5, 0, 0, 0], 33),
+        ("vm_prepared", [2, 2, 21, 5, 0, 0, 0], 33),
+    ];
+    for (name, sites, genome_size) in expected {
+        let start = starts.iter().find(|start| start.name == name).unwrap();
+        assert_eq!(
+            [
+                start.mutable_sites.input_refs,
+                start.mutable_sites.route_targets,
+                start.mutable_sites.vm_instructions,
+                start.mutable_sites.vm_constants,
+                start.mutable_sites.graph_compute_nodes,
+                start.mutable_sites.graph_edges,
+                start.mutable_sites.graph_action_slots,
+            ],
+            sites
+        );
+        assert_eq!(start.genome_size, genome_size);
+    }
+
+    for backend in ["graph", "vm"] {
+        let unprepared = starts
+            .iter()
+            .find(|start| start.name == format!("{backend}_unprepared"))
+            .unwrap();
+        let prepared = starts
+            .iter()
+            .find(|start| start.name == format!("{backend}_prepared"))
+            .unwrap();
+        let mut unprepared_active = unprepared.genome.clone();
+        fixtures::topology(
+            &mut unprepared_active,
+            crate::mutation::topology::TopologyOperator::SwapRouteTargets,
+            3,
+        );
+        let mut prepared_active = prepared.genome.clone();
+        fixtures::topology(
+            &mut prepared_active,
+            crate::mutation::topology::TopologyOperator::SwapRouteTargets,
+            3,
+        );
+        assert_eq!(evaluate(&unprepared_active).correct(Task::B), 2);
+        assert_eq!(evaluate(&prepared_active).correct(Task::B), 8);
+        assert!(!prepared.history.last().unwrap().useful);
+        assert!(!unprepared.history.last().unwrap().useful);
+        assert_eq!(
+            unprepared.preparation_difference,
+            prepared.preparation_difference
+        );
+        assert!(unprepared.preparation_difference.is_some());
+    }
+    for path in constructed_paths() {
+        assert_eq!(
+            path.stages
+                .iter()
+                .map(|stage| (stage.name.as_str(), stage.useful))
+                .collect::<Vec<_>>(),
+            vec![
+                ("blank", false),
+                ("sensor_preparation", false),
+                ("dormant_preparation", false),
+                ("activated", true),
+            ]
+        );
+        assert_eq!(
+            path.copy_stages
+                .iter()
+                .map(|stage| (stage.name.as_str(), stage.useful))
+                .collect::<Vec<_>>(),
+            vec![
+                ("dormant_copy", false),
+                ("prepared_copy", false),
+                ("activated", true),
+            ]
+        );
+    }
+}
+
+#[test]
+fn recruitment_paths_wilson_midpoint_has_the_predeclared_interval() {
+    let reading = estimate(1, 2);
+    assert_eq!(reading.fraction, Some(0.5));
+    let [lower, upper] = reading.wilson_95.unwrap();
+    assert!((lower - 0.094_531_205_734_230_74).abs() < 1e-14);
+    assert!((upper - 0.905_468_794_265_769_3).abs() < 1e-14);
 }
