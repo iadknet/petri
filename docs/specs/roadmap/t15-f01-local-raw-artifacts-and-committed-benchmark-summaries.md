@@ -1,6 +1,6 @@
 # T15.F01 — Local Raw Artifacts and Committed Benchmark Summaries
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-13
 **Feature**: T15.F01
 **Track**: [T15 — Benchmark Evidence Storage](../../roadmaps/t15-benchmark-evidence-storage.md)
@@ -134,16 +134,16 @@ checks own that boundary, not a generic storage framework.
 
 ## Implementation Tasks
 
-- [ ] Add versioned summary projection and deterministic full-artifact
+- [x] Add versioned summary projection and deterministic full-artifact
   conversion, including provenance and compact experiment evidence.
-- [ ] Make full reports and summaries valid comparison references through the
+- [x] Make full reports and summaries valid comparison references through the
   existing comparison rules, retaining all absence and compatibility semantics.
-- [ ] Route raw output into the main checkout's ignored artifact root, retain
+- [x] Route raw output into the main checkout's ignored artifact root, retain
   explicit overrides, and emit a separate summary for gate, goal and sweep.
-- [ ] Adapt existing report consumers and update the shared workflow, Codex
+- [x] Adapt existing report consumers and update the shared workflow, Codex
   adapter, feature template and output documentation to this storage contract;
   closure review checks summary provenance and the absence of staged raw data.
-- [ ] Record this feature's summaries, concise readings and series entries;
+- [x] Record this feature's summaries, concise readings and series entries;
   complete verification and truthful spec/track status updates.
 
 ## Verification
@@ -164,8 +164,9 @@ checks own that boundary, not a generic storage framework.
   rerunning observations; its original identity and comparisons remain intact.
   Stored summary size, source hash, byte count and representative claim
   locations are spot-checked and recorded in the readings.
-- [ ] `make check` and `make roadmap-check` pass; closure inspection confirms
-  no new full benchmark artifact is staged. Results live in the readings.
+- [x] `make check` exited 0 on final-code commit `8159d211`; `make
+  roadmap-check` passed, and closure inspection confirms no new full benchmark
+  artifact is staged. Results live in the readings.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` ran once on final production
   content in `fresh` mode: `126 mutants tested in 29m: 21 missed, 94 caught, 11
   unviable`; no mutant timed out. Output:
@@ -250,16 +251,24 @@ paths, byte counts, hashes, measurement identities and local availability.
 
 ## Success Criteria
 
-- [ ] New gate, goal and sweep runs retain full local artifacts and produce
+- [x] New gate, goal and sweep runs retain full local artifacts and produce
   concise versioned summaries with truthful provenance and availability.
-- [ ] Historical/full and summary references yield the same comparison values
+- [x] Historical/full and summary references yield the same comparison values
   and verdicts, and current consumers preserve retained readings.
-- [ ] Existing artifacts convert deterministically without a new measurement;
+- [x] Existing artifacts convert deterministically without a new measurement;
   experiment totals, uncertainty, missing values and claim extracts survive.
-- [ ] The shared workflow and template use this one contract, this closure
+- [x] The shared workflow and template use this one contract, this closure
   commits summaries only, and all required checks are satisfied.
 
 ## Notes for AI Agents
 
 - Decision: T15.F02 reuses this converter and summary format for historical
   migration; T15.F01 grants no history-rewrite or remote-update authority.
+- Cost: Codex roles/settings were Sol medium orchestrator (requested; root-session
+  metadata unavailable), persistent Astra xhigh spec owner/advisor, persistent
+  Astra xhigh implementer, Terra high benchmark specialist, fresh Astra xhigh
+  reviewer, and Sol medium mutation specialist. Eight advisor consultations;
+  one implementation self-review pass, one post-review remediation pass, and
+  one mutation test-only remediation pass; no production-code remediation,
+  requirement correction, or user intervention after launch. Review P1/P2/P3
+  counts 0/1/1, both advisory findings resolved. Task-specific usage unavailable.
