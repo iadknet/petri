@@ -35,6 +35,153 @@ Documentation-only checks, 2026-09-12:
 | `make check-docs` | Exit 0; roadmap, policy, quality and documentation gate regression checks passed. |
 | `git diff --check` | Exit 0; no whitespace errors. |
 
+## Mutation gate
+
+The required fresh command was `MUTANTS_ITERATE=0 make rust-mutants`. Its
+wrapper preamble was `rust-mutants: fresh run; no prior mutant results reused`.
+Fresh terminal counts: 322 mutants; 163 caught; 106 missed; 53 unviable; 0
+timed out. Output was written to
+`/Users/istefanek/.local/share/petri-tools/mutants/t13-f02/mutants.out`.
+The launching handle detached before returning an exit status; the terminal
+counts are the captured command result.
+
+Two permitted `MUTANTS_ITERATE=1 make rust-mutants` feedback passes reused that
+directory after test-only strengthening. The first killed 86 of the 106 fresh
+survivors. The second reused 302 caught/unviable results and retested 20,
+killing 8 and leaving the 12 equivalent mutants below. Consequently the
+fresh `missed.txt`, `timeout.txt`, and `outcomes.json` were superseded; the
+captured fresh counts and survivor set, incremental `previously_caught.txt`,
+and terminal 12-entry `missed.txt` support this adjudication. No second fresh
+run is required: production code, test selection, tool configuration,
+thresholds, exclusions, and existing tests were unchanged; only tests were
+added or strengthened.
+
+The following 94 fresh survivors were killed by the strengthened tests:
+
+```text
+crates/v3-core/src/neighborhood/recruitment_paths/mod.rs:49:31: replace != with == in evaluate_with_config
+crates/v3-core/src/neighborhood/recruitment_paths/mod.rs:49:47: replace != with == in evaluate_with_config
+crates/v3-core/src/neighborhood/recruitment_paths/mod.rs:49:43: replace & with | in evaluate_with_config
+crates/v3-core/src/neighborhood/recruitment_paths/mod.rs:49:63: replace != with == in evaluate_with_config
+crates/v3-core/src/neighborhood/recruitment_paths/mod.rs:49:59: replace & with | in evaluate_with_config
+crates/v3-core/src/neighborhood/recruitment_paths/mod.rs:49:59: replace & with ^ in evaluate_with_config
+crates/v3-core/src/neighborhood/recruitment_paths/mod.rs:97:17: replace + with - in evaluate_with_config
+crates/v3-core/src/neighborhood/recruitment_paths/mod.rs:97:17: replace + with * in evaluate_with_config
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:23:5: replace fingerprint -> String with String::new()
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:23:5: replace fingerprint -> String with "xyzzy".into()
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:67:46: replace && with || in uses
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:64:5: replace uses -> Vec<ModuleUse> with vec![]
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:72:43: replace == with != in uses
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:91:54: replace - with + in uses
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:91:54: replace - with / in uses
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:94:41: replace |= with &= in uses
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:94:59: replace != with == in uses
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:95:42: replace |= with &= in uses
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:98:47: replace != with == in uses
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:100:43: replace |= with &= in uses
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:100:61: replace != with == in uses
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:176:61: replace - with + in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:176:61: replace - with / in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:200:69: replace && with || in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:200:48: replace && with || in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:200:90: replace >= with < in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:204:13: replace && with || in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:203:47: replace > with == in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:203:47: replace > with < in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:204:16: delete ! in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:260:17: replace && with || in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:259:17: replace && with || in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:258:17: replace && with || in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:260:55: replace >= with < in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:260:51: replace + with - in propose_siblings
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:340:23: replace <= with > in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:365:27: replace <= with > in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:403:27: replace == with != in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:403:51: replace + with - in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:403:51: replace + with * in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:406:49: replace == with != in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:414:57: replace - with + in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:414:57: replace - with / in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:426:23: replace == with != in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:442:53: replace + with - in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:442:53: replace + with * in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:442:36: replace * with + in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:442:36: replace * with / in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:445:50: replace + with - in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:445:50: replace + with * in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:445:33: replace * with + in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:445:33: replace * with / in lineage
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:463:60: replace == with != in summary
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:507:69: replace != with == in pair
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:512:64: replace == with != in pair
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:518:21: replace - with + in pair
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:520:21: replace - with + in pair
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:521:70: replace - with + in pair
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:524:67: replace != with == in pair
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:525:54: replace - with + in pair
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:525:54: replace - with / in pair
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:530:58: replace != with == in pair
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:573:61: replace == with != in observe
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:600:27: replace + with * in observe
+crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs:601:32: replace == with != in observe
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:81:26: replace += with *= in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:82:29: replace += with *= in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:85:39: replace += with *= in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:86:36: replace += with *= in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:89:43: replace += with *= in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:90:42: replace += with *= in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:91:35: replace += with *= in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:106:21: replace + with - in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:106:21: replace + with * in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:101:21: replace + with * in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:96:21: replace + with * in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:104:60: replace + with * in sites
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:293:29: replace && with || in stage
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:293:54: replace > with >= in stage
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:483:23: replace - with / in starts_from_paths
+crates/v3-core/src/neighborhood/recruitment_paths/fixtures.rs:490:5: replace direction with ()
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:111:9: replace TaskReading::dispatched -> BTreeSet<NodeId> with BTreeSet::new()
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:119:28: replace += with *= in TaskReading::summary
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:120:27: replace += with *= in TaskReading::summary
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:121:31: replace += with *= in TaskReading::summary
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:122:29: replace += with -= in TaskReading::summary
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:122:29: replace += with *= in TaskReading::summary
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:208:13: replace || with && in GenomeDelta::apply
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:202:13: replace || with && in GenomeDelta::apply
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:381:38: replace / with * in estimate
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:384:41: replace / with % in estimate
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:384:41: replace / with * in estimate
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:384:29: replace * with / in estimate
+crates/v3-core/src/neighborhood/recruitment_paths/records.rs:384:36: replace - with + in estimate
+```
+
+The terminal 12 survivors are equivalent; each disposition names the reason
+the mutation cannot change this experiment's observable report:
+
+| Survivor | Disposition |
+| --- | --- |
+| `mod.rs:94:71: replace > with >= in evaluate_with_config` | Equivalent: `run_tick` removes every subject whose energy is nonpositive, so a retained creature can never expose the zero-energy boundary to this predicate. |
+| `experiment.rs:203:47: replace > with >= in propose_siblings` | Equivalent: the exhaustive maximum valid batch/lineage/generation seed space contains no live useful-module proposal whose child score equals its starting score. |
+| `experiment.rs:218:21: delete match arm MutationDomain::Graph in propose_siblings` | Equivalent: for every fixed proposal discard with a target, fallback target lookup resolves the same Graph backend; targetless discards are skipped before the match. |
+| `experiment.rs:219:21: delete match arm MutationDomain::Vm in propose_siblings` | Equivalent: for every fixed proposal discard with a target, fallback target lookup resolves the same VM backend; targetless discards are skipped before the match. |
+| `experiment.rs:224:51: replace == with != in propose_siblings` | Equivalent: across the exhaustive fixed proposal universe, the alternate located node has the same backend as the matched target whenever fallback attribution contributes. |
+| `experiment.rs:234:32: replace += with -= in propose_siblings` | Equivalent: exhaustive production observation records zero unresolved targeted discards, so the unresolved increment is never executed. |
+| `experiment.rs:234:32: replace += with *= in propose_siblings` | Equivalent: exhaustive production observation records zero unresolved targeted discards, so the unresolved increment is never executed. |
+| `experiment.rs:260:51: replace + with * in propose_siblings` | Equivalent: the exhaustive fixed proposal universe contains no otherwise-viable child exactly one score point below its parent, the only boundary where these expressions differ. |
+| `experiment.rs:407:25: replace && with \|\| in lineage` | Equivalent: no retained discovery in the exhaustive fixed run has another tracked module whose partial identity/presence can change the exact discovered module's presence result. |
+| `experiment.rs:406:25: replace && with \|\| in lineage` | Equivalent: no retained discovery in the exhaustive fixed run has another tracked module whose partial identity/presence can change the exact discovered module's presence result. |
+| `experiment.rs:405:33: replace == with != in lineage` | Equivalent: no retained discovery in the exhaustive fixed run has another tracked module whose partial identity/presence can change the exact discovered module's presence result. |
+| `fixtures.rs:96:21: replace + with - in sites` | Equivalent: every authored Graph fixture has zero output-sink input edges, so this changes addition of zero to subtraction of zero. |
+
+No survivor was deferred.
+
+| Mutation-specialist verification | Result |
+| --- | --- |
+| `cargo test -p v3-core recruitment_paths` | Exit 0; 20 unit and 2 integration tests passed. |
+| `cargo clippy -p v3-core --all-targets -- -D warnings` | Exit 0; no warnings. |
+| `make roadmap-check` | Exit 0; validation and prose budget passed. |
+| `git diff --check` | Exit 0; no whitespace errors. |
+
 No production defaults, founder behavior or tick-loop mechanics changed, so
 the implementer's viability-first rule did not apply. The orchestrator owns
 `make check`; the separate specialists own the final mutation and benchmark

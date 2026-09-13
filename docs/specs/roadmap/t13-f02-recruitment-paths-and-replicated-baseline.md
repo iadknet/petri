@@ -188,10 +188,9 @@ that reason. Any genotype/size/exposure difference remains a stated limitation.
   readings as above. No stochastic discovery success is an invariant.
 - [ ] `make check` and `make roadmap-check`; results in readings. Use TDD and
   proptest for pure invariants; preserve any generated regression files.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record the exact summary,
-  output path and full survivor list here, each killed, equivalent with
-  evidence, or deferred with user agreement. The separate specialist owns
-  test-only remediation; no unexplained skips or exclusions.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: 94 survivors killed by
+  tests; 12 equivalent; 0 deferred. Counts, output path and full disposition
+  are in the [readings](../../progress/readings/t13-f02-recruitment-paths-and-replicated-baseline.md#mutation-gate).
 - [x] Both benchmark commands generated the required outcomes, uncertainty,
   paths, controls, caps and verdicts; readings are linked above. The goal
   artifact is local-only by exception; retain the gate report for closure.
