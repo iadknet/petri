@@ -19,6 +19,7 @@
 *.tmp
 
 # Generated outputs
+/.bench-artifacts/
 /target/
 /frontend/tsconfig.tsbuildinfo
 coverage/

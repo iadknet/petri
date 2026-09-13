@@ -1,10 +1,11 @@
 # Benchmark Progress
 
-Planned, unscheduled infrastructure: [T15 — Benchmark Evidence Storage](roadmaps/t15-benchmark-evidence-storage.md)
-has one unchecked feature, T15.F01, for local raw artifacts and committed
-summaries. This is a planning rollup, not a closure or a measured result; the
-current benchmark contract remains unchanged apart from T13.F02's explicit
-goal-report storage exception.
+[T15 — Benchmark Evidence Storage](roadmaps/t15-benchmark-evidence-storage.md)
+introduces local raw artifacts and committed summaries. New benchmark commands
+follow the [artifact contract](benchmark-artifacts.md): full gate, goal and
+sweep reports stay in the main checkout's ignored `.bench-artifacts/`; the
+calling checkout stores concise summaries with exact raw hashes and recorded
+local verification times. Existing historical reports remain unchanged.
 
 [progress/index.html](progress/index.html) charts every closure below over
 time: work counters, wall clock, population, lineage, memory sensitivity,
@@ -18,7 +19,8 @@ not measure is drawn as "not measured", never as zero.
 Browsers block `fetch()` under `file://`, so serve the directory first:
 `python3 -m http.server 8000 --directory docs/progress`, then open
 `http://localhost:8000/`. New closures appear automatically once
-`benchmark-series.json` lists their reports.
+`benchmark-series.json` lists their summaries. The page also reads historical
+full reports and labels unavailable detail; it never fetches a local raw path.
 
 The `[full readings]` links below point into each spec's Performance and Goal
 Impact section, which carries the predeclaration, the verdict, and any user

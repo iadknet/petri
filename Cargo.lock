@@ -1716,8 +1716,10 @@ dependencies = [
  "png",
  "proptest",
  "rayon",
+ "same-file",
  "serde",
  "serde_json",
+ "sha2",
  "v3-core",
 ]
 

@@ -148,19 +148,19 @@ checks own that boundary, not a generic storage framework.
 
 ## Verification
 
-- [ ] Focused CLI/library checks establish full/summary comparison parity,
+- [x] Focused CLI/library checks establish full/summary comparison parity,
   profile/case/reference errors, both-output self-reference filtering,
   measured-zero/unmeasured fidelity, experiment aggregation and bounded
   extracts, deterministic conversion, exact byte hashes and write failures:
   `cargo test -p v3-cli` -> concise results in this feature's readings.
-- [ ] Main-checkout and linked-worktree output checks cover gate/goal/sweep
+- [x] Main-checkout and linked-worktree output checks cover gate/goal/sweep
   defaults, paths with spaces, explicit raw/summary overrides and distinct
   destinations; existing shell automation checks pass. Commands and temporary
   artifact paths are recorded in the readings.
-- [ ] Existing progress-page consumers load a mixture of full reports and
+- [x] Existing progress-page consumers load a mixture of full reports and
   summaries, retain headline values and expose unavailable detail. The check
   and its results are recorded in the readings.
-- [ ] A historical full report converts twice from fixed provenance without
+- [x] A historical full report converts twice from fixed provenance without
   rerunning observations; its original identity and comparisons remain intact.
   Stored summary size, source hash, byte count and representative claim
   locations are spot-checked and recorded in the readings.
