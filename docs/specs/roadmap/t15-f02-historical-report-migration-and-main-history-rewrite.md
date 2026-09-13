@@ -1,6 +1,6 @@
 # T15.F02 — Historical Report Migration and Main-History Rewrite
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-13
 **Feature**: T15.F02
 **Track**: [T15 — Benchmark Evidence Storage](../../roadmaps/t15-benchmark-evidence-storage.md)
@@ -130,10 +130,11 @@ protection needs separate authorization.
 Ordinary close's fast-forward, automatic rebase and branch deletion do not apply.
 Keep the original feature worktree/branch as recovery evidence; never merge its
 old ancestry into the candidate. Source status stays `In Progress` pending
-permission. The verified disposable candidate may stage `Complete` metadata and
-the checked row as proposed release state. Its checkboxes attest completed
-preparation/checks, not an unobserved push. This staging exception allows approval
-of the exact tip before the sole force-push. Actual cutover proof stays in an
+permission. In the disposable candidate, feature, track and master completion
+markers express the proposed post-cutover state. They become effective only
+after explicit authorization, the exact leased push, and successful external
+postpush verification. Before that receipt passes, these markers do not attest
+that cutover occurred. Actual cutover proof stays in an
 external receipt, avoiding self-referential OIDs or another push. Overall
 completion requires that receipt to pass.
 
@@ -166,12 +167,13 @@ retain their audited state.
   independently recoverable export package.
 - [x] Filter a disposable fresh clone, export its maps, restore summaries and
   scoped feature files only afterward, and prove history/tree preservation.
-- [ ] Complete final review and required checks; assemble the immutable cutover
+- [x] Complete final review and required checks; assemble the immutable cutover
   candidate, staged closure metadata, exact ref audit and approval package.
 
 ## Verification
 
-Results live in the readings and hashed local receipts named above.
+Implementation `29170014b3e167a215fdfeabb746fad79ef74065`: `make check`
+exit 0; log and workflow counts are in the readings.
 
 - [x] Focused inventory/export/verifier fixtures and stored-artifact parity
   checks pass; record exact commands. New behavior uses TDD, including deleted,
@@ -182,13 +184,13 @@ Results live in the readings and hashed local receipts named above.
 - [x] Every raw version matches Git bytes/hash/length and is ignored; each
   selected conversion is byte-identical across repeats, with correct provenance
   and unchanged stored comparisons. Series references resolve to summaries.
-- [ ] Pre-rewrite backup restores independently; external exports and map
+- [x] Pre-rewrite backup restores independently; external exports and map
   hashes verify; only inventoried full-report history is removed, mapped
   unrelated trees match, and candidate contains no tracked raw artifacts.
-- [ ] A separate fresh candidate clone passes raw-blob/path absence,
+- [x] A separate fresh candidate clone passes raw-blob/path absence,
   manifest/summary completeness and tree checks. Record raw absence scoped to
   rewritten main, not global object deletion.
-- [ ] `make check` passes on the final source/script content; record its tested
+- [x] `make check` passes on the final source/script content; record its tested
   revision. After staged closure edits, `make check-docs` and
   `make roadmap-check` pass on the exact cutover candidate.
 - [x] Mutation: not applicable while the diff has no mutation-testable Rust
@@ -198,7 +200,7 @@ Results live in the readings and hashed local receipts named above.
 - [x] Benchmark runs: not applicable. Only historical stored artifacts are
   converted; no `make bench`, historical simulation rerun or new baseline is
   permitted. Existing normal regression tests remain required.
-- [ ] The approval package names the verified candidate, exact lease and
+- [x] The approval package names the verified candidate, exact lease and
   commands, ref/worktree audit, backups and recovery instructions. It requires
   an external receipt of authorization, remote recheck, push result, main/origin
   equality, postpush fresh-clone proof, unchanged other refs and clean main.
@@ -233,12 +235,12 @@ for census evidence, exact dispositions, checks, and pending cutover work.
 
 ## Success Criteria
 
-- [ ] Every inventoried raw version is preserved, every valid logical report
+- [x] Every inventoried raw version is preserved, every valid logical report
   has its concise committed summary, and the manifest accounts for all paths,
   identities, availability evidence and raw-only dispositions.
-- [ ] The exact proposed rewritten main preserves unrelated history/content,
+- [x] The exact proposed rewritten main preserves unrelated history/content,
   excludes inventoried raw blobs, and passes separate fresh-clone verification.
-- [ ] The staged Complete spec, checked row, applicable rollups and immutable
+- [x] The staged Complete spec, checked row, applicable rollups and immutable
   approval package agree on the candidate and required cutover; overall delivery
   requires the external receipt proving approved local/remote replacement,
   matching `origin/main`, unchanged unauthorized refs and clean main.
@@ -253,5 +255,5 @@ for census evidence, exact dispositions, checks, and pending cutover work.
   worktree remains In Progress until live cutover passes the external receipt.
 - Exception: No new benchmark is permitted for this stored-artifact migration;
   verification reuses T15.F01 conversion/comparison and existing measurements.
-- Cost: Closure usage and role/review/advice counts are pending; planning and
-  readiness self-review are not advisor consultations.
+- Cost: Usage unavailable; five advisor consultations, one review and one
+  remediation pass. Models, findings and permissions are recorded in the readings.
