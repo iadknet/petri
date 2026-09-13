@@ -186,7 +186,7 @@ that reason. Any genotype/size/exposure difference remains a stated limitation.
 - [x] `cargo test -p v3-cli recruitment_paths`: goal-only report wiring,
   deterministic reduced-size results, explicit absence and truthful totals;
   readings as above. No stochastic discovery success is an invariant.
-- [x] `make check` on `575b8ab8` and closure documentation checks pass;
+- [x] `make check` on `0448db5c` and closure documentation checks pass;
   environment-specific retry and logs are recorded below and in readings.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: 94 survivors killed by
   tests; 12 equivalent; 0 deferred. Counts, output path and full disposition
@@ -205,10 +205,12 @@ make bench PROFILE=goal FEATURE=t13-f02-recruitment-paths-and-replicated-baselin
 
 | Closure record | Value |
 | --- | --- |
-| Tested commit | `575b8ab898a791194b6c79006150ca65d5bb91fa` |
-| Full gate | `make check`, 2026-09-13: authorized outside-sandbox retry exits 0 on unchanged content; Rust/server suites, frontend 61 files / 322 tests, build and scans pass. |
-| Sandbox attempt | `make check` exits 2: seven WebSocket tests cannot bind local listeners (`PermissionDenied`); no feature assertion failure. No waiver or command change. |
-| Full-gate logs | `/private/tmp/t13-f02-make-check.log`; successful retry `/private/tmp/t13-f02-make-check-escalated.log` (2,159 lines). Local logs have no persistence guarantee. |
+| Tested commit | `0448db5c3fab6dd4e331dc37de9e84fa93412ead` |
+| Rebase | Main advanced from `5262acf427f0e0e7df13881c65e6832a0b1ef9c9` to `e635c3df93e1a70253b2daa5fdb0ed391de5b405`; `codex/t13-f02` rebased cleanly, with no conflicts. |
+| Full gate | Authorized outside-sandbox `make check` on the rebased tested commit exits 0, captured 2026-09-13; content remained unchanged during the run. Log: `/private/tmp/t13-f02-make-check-rebased.log` (2,162 lines). |
+| Pre-rebase full gate | Authorized outside-sandbox `make check` on `575b8ab898a791194b6c79006150ca65d5bb91fa` exits 0; Rust/server suites, frontend 61 files / 322 tests, build and scans pass. |
+| Pre-rebase sandbox attempt | `make check` on `575b8ab8` exits 2: seven WebSocket tests cannot bind local listeners (`PermissionDenied`); no feature assertion failure. No waiver or command change. |
+| Pre-rebase logs | `/private/tmp/t13-f02-make-check.log`; successful retry `/private/tmp/t13-f02-make-check-escalated.log` (2,159 lines). Local logs have no persistence guarantee. |
 | Closure documentation checks | `make roadmap-check`, `make check-docs`, `git diff --check`: exit 0. |
 | Orchestrator | `gpt-5.6-sol`, `medium` |
 | Persistent spec owner/advisor | `gpt-6-astra`, `xhigh` |
@@ -253,7 +255,7 @@ specialists run sequentially without competing builds, tests or servers.
 
 | Measured verdict | Evidence and limitation |
 | --- | --- |
-| Final-code profiles | Each ran once at `7f4c54fb`, exited 0 and has `comparison.severe=false`. No threshold, baseline or epoch changed. |
+| Original benchmark profiles | Each ran once at `7f4c54fb`, exited 0 and has `comparison.severe=false`. No threshold, baseline or epoch changed. This measurement identity is preserved after rebase. |
 | Gate flag investigation | Simulation wall 570.409→745.293 ms versus T14.F03 (+30.659%, new and non-severe). Deterministic results and work counters match; recruitment observation is absent in gate. Cause remains unattributed, with no established host-noise attribution. |
 | Goal work counters | Unchanged versus T14.F03; inherited epoch plasticity flag retained. |
 | Individual observation caps | All pass; separate timings and verdicts are in readings. |

@@ -35,13 +35,15 @@ Documentation-only checks, 2026-09-12:
 | `make check-docs` | Exit 0; roadmap, policy, quality and documentation gate regression checks passed. |
 | `git diff --check` | Exit 0; no whitespace errors. |
 
-Full completion gate, 2026-09-13, tested commit
-`575b8ab898a791194b6c79006150ca65d5bb91fa`:
+Completion checks, 2026-09-13; current tested commit
+`0448db5c3fab6dd4e331dc37de9e84fa93412ead`:
 
 | Command / environment | Result and evidence |
 | --- | --- |
-| `make check`, sandbox | Exit 2; seven v3-server WebSocket tests fail at `tests/server.rs:36` while binding a local listener: `PermissionDenied (Operation not permitted)`. No feature assertion fails. Log: `/private/tmp/t13-f02-make-check.log`. |
-| `make check`, authorized outside-sandbox retry | Exit 0 on the same commit and content; all Rust/server suites, frontend 61 files / 322 tests, build and scans pass. Log: `/private/tmp/t13-f02-make-check-escalated.log`, 2,159 lines, through final dependency and skill scans. Advisor consultation 8 approves this environment retry, not a waiver or altered command. |
+| Clean rebase | Main advanced from `5262acf427f0e0e7df13881c65e6832a0b1ef9c9` to `e635c3df93e1a70253b2daa5fdb0ed391de5b405`; `codex/t13-f02` rebased with no conflicts. |
+| `make check`, authorized outside-sandbox, rebased `0448db5c` | Captured exit 0 on exactly `0448db5c3fab6dd4e331dc37de9e84fa93412ead`, with no content changes during the run. Log: `/private/tmp/t13-f02-make-check-rebased.log`, 2,162 lines, through final dependency and skill scans. |
+| `make check`, pre-rebase sandbox, `575b8ab8` | Exit 2; seven v3-server WebSocket tests fail at `tests/server.rs:36` while binding a local listener: `PermissionDenied (Operation not permitted)`. No feature assertion fails. Log: `/private/tmp/t13-f02-make-check.log`. |
+| `make check`, pre-rebase authorized outside-sandbox retry | Exit 0 on `575b8ab898a791194b6c79006150ca65d5bb91fa`, unchanged from the sandbox attempt; all Rust/server suites, frontend 61 files / 322 tests, build and scans pass. Log: `/private/tmp/t13-f02-make-check-escalated.log`, 2,159 lines, through final dependency and skill scans. Advisor consultation 8 approves this environment retry, not a waiver or altered command. |
 | Closure `make roadmap-check` / `make check-docs` / `git diff --check` | Exit 0 on the documentation-only closure edits; no production content change. |
 | Log availability | Local files, inspected 2026-09-13; persistence is not promised. |
 
@@ -243,11 +245,12 @@ is reported rather than inferred without evidence.
 
 ## Closure measurements
 
-The final-code profiles were each launched exactly once, sequentially, through
+The original benchmark profiles were each launched exactly once, sequentially, through
 the unchanged `scripts/bench-wait` host preflight with the repository tool
 paths prefixed to `PATH`. The measurement commit was
 `7f4c54fb78cb16c7bf462e46d85a017f4addf8c5`; no competing benchmark, server,
-build, test, or mutation process was started by this specialist.
+build, test, or mutation process was started by this specialist. This original
+measurement identity is preserved after the clean rebase and full recheck.
 
 | Profile and command | Exit / report | Comparison and thresholds |
 | --- | --- | --- |
