@@ -166,9 +166,39 @@ checks own that boundary, not a generic storage framework.
   locations are spot-checked and recorded in the readings.
 - [ ] `make check` and `make roadmap-check` pass; closure inspection confirms
   no new full benchmark artifact is staged. Results live in the readings.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: pending; record summary,
-  output path and every survivor here, resolved as killed, equivalent or
-  explicitly deferred under the shared workflow.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` ran once on final production
+  content in `fresh` mode: `126 mutants tested in 29m: 21 missed, 94 caught, 11
+  unviable`; no mutant timed out. Output:
+  `/Users/istefanek/.local/share/petri-tools/mutants/t15-f01/mutants.out`.
+  Test-only remediation used two permitted incremental feedback passes: `21
+  mutants tested in 5m: 3 missed, 18 caught`, then `3 mutants tested in 3m: 2
+  missed, 1 caught`. The final two survivors are equivalent; all other fresh-run
+  survivors were killed. No second fresh run was required because production
+  code, test selection/tool configuration, and existing tests were unchanged.
+
+| Fresh-run survivor | Disposition |
+| --- | --- |
+| `crates/v3-cli/src/bench.rs:3891:9: replace ComparisonInputs::validate -> Result<(), String> with Ok(())` | Killed: an invalid numeric reading under an undeclared case key must still be rejected by summary validation. |
+| `crates/v3-cli/src/bench/artifacts.rs:147:44: replace += with -= in mesh_summary` | Killed: exact two-genome mesh totals assert the genome count. |
+| `crates/v3-cli/src/bench/artifacts.rs:136:5: replace mesh_summary -> Value with Default::default()` | Killed: exact mesh-summary projection asserts every retained aggregate. |
+| `crates/v3-cli/src/bench/artifacts.rs:147:44: replace += with *= in mesh_summary` | Killed: exact two-genome mesh totals assert the genome count. |
+| `crates/v3-cli/src/bench/artifacts.rs:157:49: replace += with -= in mesh_summary` | Killed: exact nonzero totals assert every measured mesh counter. |
+| `crates/v3-cli/src/bench/artifacts.rs:157:49: replace += with *= in mesh_summary` | Killed: exact nonzero totals assert every measured mesh counter. |
+| `crates/v3-cli/src/bench/artifacts.rs:160:48: replace += with -= in mesh_summary` | Killed: exact route-variation count is asserted. |
+| `crates/v3-cli/src/bench/artifacts.rs:160:48: replace += with *= in mesh_summary` | Killed: exact route-variation count is asserted. |
+| `crates/v3-cli/src/bench/artifacts.rs:160:92: replace == with != in mesh_summary` | Killed: mixed true/false route-variation rows assert the true-row count. |
+| `crates/v3-cli/src/bench/artifacts.rs:170:5: replace neighborhood -> Value with Default::default()` | Killed: exact neighborhood projection asserts retained founder, battery, and evolved fields. |
+| `crates/v3-cli/src/bench/artifacts.rs:170:8: delete ! in neighborhood` | Killed: the object fixture asserts raw fields are omitted and evolved rows are projected. |
+| `crates/v3-cli/src/bench/artifacts.rs:261:5: replace constructed_stage -> Value with Default::default()` | Killed: recruitment projection asserts every retained field of a non-default constructed stage. |
+| `crates/v3-cli/src/bench/artifacts.rs:404:5: replace claims -> Vec<Claim> with vec![]` | Killed: exact scalar claims are asserted. |
+| `crates/v3-cli/src/bench/artifacts.rs:418:100: replace && with \|\| in claims` | Killed: exact claims exclude fixed-location arrays and objects. |
+| `crates/v3-cli/src/bench/artifacts.rs:418:82: delete ! in claims` | Killed: exact claims exclude a fixed-location array. |
+| `crates/v3-cli/src/bench/artifacts.rs:418:103: delete ! in claims` | Killed: exact claims exclude a fixed-location object. |
+| `crates/v3-cli/src/bench/artifacts.rs:450:31: replace * with + in summarize` | Equivalent: for immutable stored artifact bytes, changing the internal read buffer from 65,536 to 65,540 bytes changes only chunk boundaries; the loop still compares and hashes every byte through EOF and returns the same result. |
+| `crates/v3-cli/src/bench/artifacts.rs:535:13: replace \|\| with && in comparison_inputs_from_bytes` | Killed: a summary whose feature alone disagrees with its comparison-input identity is rejected. |
+| `crates/v3-cli/src/bench/artifacts.rs:587:31: replace match guard e.kind() == std::io::ErrorKind::NotFound with true in resolved_path` | Killed: a permission-denied ancestor lookup is asserted to fail rather than be treated as an absent path. |
+| `crates/v3-cli/src/bench/artifacts.rs:604:19: replace match guard e.kind() == std::io::ErrorKind::NotFound with true in same_path` | Equivalent: after `resolved_path` succeeds on a stable filesystem, each path is either canonicalized so identity metadata succeeds or absent so identity lookup returns `NotFound`; another error requires an external race outside this path-resolution contract. |
+| `crates/v3-cli/src/bench/artifacts.rs:754:20: delete ! in measurement_evidence` | Killed: clean and untracked-dirty temporary Git worktrees assert opposite `dirty` values. |
 - [x] Gate and goal summaries are stored at the paths below; raw provenance
   matches locally verified files and the series index points to the summaries.
 
