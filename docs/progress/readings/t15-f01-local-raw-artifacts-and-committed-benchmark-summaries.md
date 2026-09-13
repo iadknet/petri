@@ -111,10 +111,20 @@ conversion time. No threshold, recipe, default, counter or observation changed.
 
 | Profile | Committed summary | Local raw artifact | Status |
 | --- | --- | --- | --- |
-| Gate | `docs/progress/features/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries.json` | `<main-checkout>/.bench-artifacts/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries/gate.json` | Pending benchmark specialist |
-| Goal | `docs/progress/features/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries-goal.json` | `<main-checkout>/.bench-artifacts/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries/goal.json` | Pending benchmark specialist |
+| Gate | `docs/progress/features/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries.json` (96,914 bytes; SHA-256 `5c0439bea76b99a3fdca08778497ee4b3e94afc046fc9b9cc1ee618a56eb573f`) | `<main-checkout>/.bench-artifacts/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries/gate.json` (94,029 bytes; SHA-256 `531198d66fa6e11c3d245aafcc7a616e12f28ff242e15b0480504e8f939056fc`) | Pass: `comparison.severe=false`; both fixed references and all counters are `ok`. |
+| Goal | `docs/progress/features/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries-goal.json` (4,230,990 bytes; SHA-256 `fa728ab0a82c56819bf58778d50ee2c7482c2ea2e19c3951fef1124c56364ca6`) | `<main-checkout>/.bench-artifacts/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries/goal.json` (356,727,236 bytes; SHA-256 `53bb31396babc71870b18e006951e3b1138c7a5217cb7d6ea8d2550632ec08bc`) | Pass: `comparison.severe=false`; the T12.F04 `plasticity_updates` +40.886836% flag is inherited because the T14.F03 reference is exactly 0.000000%; all other counters are `ok`. |
 
-Record both byte counts, raw hashes, original revision/time, CLI and observed
-outer statuses with their sources, severe/inherited flags and sources,
-threshold/cap verdicts, and per-world readings here after measurement. Existing
-T13.F02's local-only goal exception is not a substitute reference.
+Both raw artifacts were available and re-hashed locally at 2026-09-13T15:58:55Z;
+their summaries retain the original local-availability verification at
+2026-09-13T15:49:51Z (gate) and 2026-09-13T15:58:20Z (goal). Both measurements
+identify revision `58392e9b34d33d16d0cb1ac9d770982783154c00`; the gate was clean
+and the goal records `dirty=true` because the newly generated gate summary was
+present before the required sequential goal run.
+
+- Gate command: `make bench PROFILE=gate FEATURE=t15-f01-local-raw-artifacts-and-committed-benchmark-summaries`; observed outer `make` exit 0 from the Codex `exec_command` terminal status; CLI exit 0 from `measurement_evidence.cli_exit` (`v3-cli` successful artifact-pair completion). It compared only the fixed epoch `remove-complementary-nutrition.json` and last-closed `t13-f02-recruitment-paths-and-replicated-baseline.json` references; neither is severe.
+- Goal command: `make bench PROFILE=goal FEATURE=t15-f01-local-raw-artifacts-and-committed-benchmark-summaries`; observed outer `make` exit 0 from the Codex `exec_command` terminal status; CLI exit 0 from `measurement_evidence.cli_exit` (`v3-cli` successful artifact-pair completion). It compared only the fixed T12.F04 epoch and T14.F03 last-stored goal references; T13.F02's omitted goal was not substituted.
+- Thresholds retained from `measurement_evidence`: work flag/severe `>10%`/`>50%`; host-matched wall flag/severe `>25%`/`>100%`, nonfatal. The goal's founder observation was 70.652 ms (10 s cap), evolved observation total 379.418 ms (180 s cap), drift 17.775 s (30 s-per-world cap), recruitment 6.593 s (120 s cap), and total goal measurement 474.859 s (15-minute investigation threshold): all within their unchanged caps. No new pressure applies; Orchards, Canyon and Confluence ran once each.
+
+The series index names these committed summaries, not raw files. No full raw
+artifact is staged. Existing T13.F02's local-only goal exception is not a
+substitute reference.
