@@ -1,6 +1,6 @@
 # T15 — Benchmark Evidence Storage
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-09-13
 **Master**: [Program Roadmap](../roadmap.md)
 
@@ -66,9 +66,9 @@ truthful provenance and availability.
 
 - Decision: Added at the user's direction on 2026-09-12 after T13.F02's single
   goal run produced a 356,934,683-byte report; its [readings](../progress/readings/t13-f02-recruitment-paths-and-replicated-baseline.md)
-  record the narrow current exception. This track is Planned and unscheduled;
-  it changes no live workflow or benchmark behavior until its feature executes.
-  Write the flat spec just in time. T13.F02 is evidence, not a prerequisite.
+  record the narrow current exception. T15.F01 is In Progress under its flat
+  spec; T15.F02 remains unscheduled. Storage and workflow changes land through
+  T15.F01. T13.F02 is evidence, not a prerequisite.
 - Decision: Local inspection on 2026-09-12 found existing output overrides in
   `Makefile` and full `Report` deserialization in
   `crates/v3-cli/src/bench.rs::compare_against_path`. Extend those producers and
