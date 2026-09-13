@@ -1,6 +1,7 @@
 use std::num::NonZeroUsize;
 
 use clap::Parser;
+use v3_cli::bench::artifacts;
 use v3_cli::bench::{self, NeighborhoodSizes, ProfileParams};
 use v3_cli::RunError;
 use v3_core::config::SimulationConfig;
@@ -16,6 +17,8 @@ struct Cli {
 enum Commands {
     Run(RunArgs),
     Bench(BenchArgs),
+    /// Convert a full benchmark artifact without rerunning observations.
+    BenchSummarize(SummarizeArgs),
     /// Saved-world tooling.
     World(WorldArgs),
 }
@@ -61,6 +64,9 @@ struct BenchArgs {
     profile: BenchProfile,
     #[arg(long)]
     out: Option<std::path::PathBuf>,
+    /// Summary destination; --out controls the local full report.
+    #[arg(long)]
+    summary_out: Option<std::path::PathBuf>,
     #[arg(long)]
     feature: Option<String>,
     #[arg(long)]
@@ -89,6 +95,17 @@ struct BenchArgs {
     /// rayon global pool. Accepted for both profiles.
     #[arg(long)]
     threads: Option<usize>,
+}
+
+#[derive(clap::Args)]
+struct SummarizeArgs {
+    #[arg(long)]
+    input: std::path::PathBuf,
+    #[arg(long)]
+    out: std::path::PathBuf,
+    /// Fixed converter identity and verification time; see docs/benchmark-artifacts.md.
+    #[arg(long)]
+    provenance: std::path::PathBuf,
 }
 
 #[derive(clap::Args)]
@@ -148,6 +165,26 @@ fn main() {
             }
         }
         Commands::Bench(args) => run_bench(args),
+        Commands::BenchSummarize(args) => {
+            let result = std::fs::read(&args.provenance)
+                .map_err(|e| format!("failed to read {}: {e}", args.provenance.display()))
+                .and_then(|bytes| {
+                    serde_json::from_slice(&bytes).map_err(|e| format!("invalid provenance: {e}"))
+                })
+                .and_then(|provenance| artifacts::convert(&args.input, &args.out, &provenance));
+            match result {
+                Ok(summary) => println!(
+                    "wrote {} ({} raw bytes; sha256 {})",
+                    args.out.display(),
+                    summary.raw.bytes,
+                    summary.raw.sha256
+                ),
+                Err(e) => {
+                    eprintln!("error: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
         Commands::World(args) => match args.command {
             WorldCommands::Inspect(args) => {
                 if let Err(message) = run_world_inspect(&args, &mut std::io::stdout()) {
@@ -336,36 +373,31 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
 }
 
 fn run_bench(args: BenchArgs) {
+    if let Err(e) = run_bench_result(args) {
+        eprintln!("error: {e}");
+        std::process::exit(1);
+    }
+}
+
+fn run_bench_result(args: BenchArgs) -> Result<(), String> {
     let ResolvedBench {
         params,
         feature,
         threads,
-    } = match resolve_bench_profile(&args) {
-        Ok(resolved) => resolved,
-        Err(message) => {
-            eprintln!("error: {message}");
-            std::process::exit(1);
-        }
+    } = resolve_bench_profile(&args)?;
+    let invocation = artifacts::Invocation::capture()?;
+    let profile = match args.profile {
+        BenchProfile::Gate => "gate",
+        BenchProfile::Goal => "goal",
+        BenchProfile::Sweep => "sweep",
     };
-
-    let out_path = args.out.clone().unwrap_or_else(|| {
-        if args.profile == BenchProfile::Gate {
-            std::path::PathBuf::from(format!("docs/progress/features/{feature}.json"))
-        } else if args.profile == BenchProfile::Goal {
-            std::path::PathBuf::from(format!("docs/progress/features/{feature}-goal.json"))
-        } else {
-            eprintln!("error: --out is required for --profile sweep");
-            std::process::exit(1);
-        }
-    });
-
-    let mut report = match bench::build_report_with_threads(&params, &feature, threads) {
-        Ok(report) => report,
-        Err(e) => {
-            eprintln!("error: {e}");
-            std::process::exit(1);
-        }
-    };
+    let paths = artifacts::output_paths(
+        &invocation.working_directory,
+        profile,
+        args.feature.as_deref(),
+        args.out.as_deref(),
+        args.summary_out.as_deref(),
+    )?;
 
     let mut explicit_paths = args.baseline.clone();
     explicit_paths.extend(args.compare.clone());
@@ -382,41 +414,62 @@ fn run_bench(args: BenchArgs) {
             BenchProfile::Sweep => Ok(bench::ReferenceSelection::default()),
         }
     };
-    let selection = match selection {
-        Ok(selection) => selection,
-        Err(e) => {
-            eprintln!("error: {e}");
-            std::process::exit(1);
-        }
-    };
-
-    let severe = match bench::apply_comparisons(&mut report, &selection, &out_path) {
-        Ok(severe) => severe,
-        Err(e) => {
-            eprintln!("error: {e}");
-            std::process::exit(1);
-        }
-    };
-
-    if let Some(parent) = out_path.parent() {
-        if !parent.as_os_str().is_empty() {
-            if let Err(e) = std::fs::create_dir_all(parent) {
-                eprintln!("error: failed to create {}: {e}", parent.display());
-                std::process::exit(1);
+    let selection = selection?;
+    if args.out.is_some() {
+        for reference in &selection.paths {
+            if artifacts::same_path(&paths.raw, reference)? {
+                return Err(format!(
+                    "explicit raw output would overwrite comparison reference {}",
+                    reference.display()
+                ));
             }
         }
     }
-    let json = bench::report_json_pretty(&report);
-    if let Err(e) = std::fs::write(&out_path, format!("{json}\n")) {
-        eprintln!("error: failed to write {}: {e}", out_path.display());
-        std::process::exit(1);
+    let mut report = bench::build_report_with_threads(&params, &feature, threads)?;
+    let severe = bench::apply_comparisons_for_outputs(
+        &mut report,
+        &selection,
+        &[&paths.raw, &paths.summary],
+    )?;
+    #[derive(serde::Serialize)]
+    struct MeasuredReport<'a> {
+        #[serde(flatten)]
+        report: &'a bench::Report,
+        measurement_evidence: serde_json::Value,
     }
+    let mut measurement_evidence = artifacts::measurement_evidence(&invocation, severe);
+    // World-set identities are already captured per case. Other profiles also
+    // retain the effective config identity without changing comparison inputs.
+    if report.deterministic.profile.cases.is_empty() {
+        measurement_evidence["effective_config_digest"] = serde_json::json!(
+            v3_core::config::config_digest(&bench::build_config(&params))
+        );
+    }
+    artifacts::write_json(
+        &paths.raw,
+        &MeasuredReport {
+            report: &report,
+            measurement_evidence,
+        },
+    )?;
+    let comparison = std::mem::take(&mut report.comparison);
+    drop(report);
+    let provenance = artifacts::ConversionProvenance {
+        verified_at: bench::rfc3339_now(),
+        converter: invocation,
+        supplied_evidence: None,
+    };
+    artifacts::convert(&paths.raw, &paths.summary, &provenance)?;
 
-    println!("wrote {}", out_path.display());
-    if let Some(cause) = &report.comparison.reference_absence {
+    println!(
+        "wrote raw {} and summary {}",
+        paths.raw.display(),
+        paths.summary.display()
+    );
+    if let Some(cause) = &comparison.reference_absence {
         println!("no comparison reference: {cause}");
     }
-    for reference in &report.comparison.references {
+    for reference in &comparison.references {
         println!(
             "compared against {}: severe={}",
             reference.path, reference.severe
@@ -437,6 +490,7 @@ fn run_bench(args: BenchArgs) {
         eprintln!("error: severe work-counter regression against a stored reference");
         std::process::exit(3);
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -448,6 +502,7 @@ mod tests {
             profile,
             config: None,
             out: None,
+            summary_out: None,
             feature: Some("t01-f11-baseline-persistence-characterization".to_string()),
             compare: Vec::new(),
             baseline: Vec::new(),
@@ -467,7 +522,9 @@ mod tests {
             .command
         {
             Commands::Bench(args) => args,
-            Commands::Run(_) | Commands::World(_) => panic!("expected the bench subcommand"),
+            Commands::Run(_) | Commands::World(_) | Commands::BenchSummarize(_) => {
+                panic!("expected the bench subcommand")
+            }
         }
     }
 

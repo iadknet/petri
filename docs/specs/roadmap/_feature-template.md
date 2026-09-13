@@ -14,8 +14,11 @@ later pass superseded rather than annotating it; the history is in git.
 There is no readiness-review log, no implementation-deviation log, and no
 pass-by-pass narrative. `scripts/roadmap-check.mjs` enforces a **15 KB budget of
 non-table prose** per spec: tables and fenced blocks are free, narration is not.
-Measured evidence lives in `docs/progress/features/<id>.json` (machine-written)
-and `docs/progress/readings/<id>.md` (tables and transcripts, not narrative).
+Measured summaries live in `docs/progress/features/<id>.json` (machine-written)
+and concise readings in `docs/progress/readings/<id>.md`. Full gate/goal/sweep
+reports stay in the main checkout's ignored `.bench-artifacts/<id>/`;
+[`docs/benchmark-artifacts.md`](../../benchmark-artifacts.md) defines paths,
+provenance and conversion. New full reports are never committed.
 
 ## Goal
 
@@ -45,7 +48,9 @@ implementer chooses the design and records what it actually ran.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
-- [ ] Benchmark report stored at `docs/progress/features/<id>.json`, or
+- [ ] Benchmark summary stored at `docs/progress/features/<id>.json`, local raw
+      hash/byte count and verification time checked, series entry points to the
+      summary, and no new full report staged; or
       `Not applicable: <reason>`.
 
 Keep this section under about 3 KB excluding the survivor list. Pass-by-pass
@@ -65,14 +70,16 @@ this feature's closing commit. If this feature introduces a diversity or
 cognition measure, wire its indicator into the goal profile here or state that it
 remains `Undefined` and why.
 
-**Measured verdict.** One line per profile: exit status, the `severe` flag,
+**Measured verdict.** One line per profile: CLI and observed outer-process exit
+statuses with their sources, the `severe` flag,
 whether any threshold was crossed, and whether the epoch was re-pinned.
 
-- Reports: [gate](../../progress/features/<id>.json),
+- Summaries: [gate](../../progress/features/<id>.json),
   [goal](../../progress/features/<id>-goal.json).
 - Full readings: [`docs/progress/readings/<id>.md`](../../progress/readings/<id>.md).
 
-Comparison tables, per-seed dumps, and neighborhood rows belong in the readings
+Raw paths, hashes, raw/summary byte counts, comparison tables and concise
+per-seed/neighborhood readings belong in the readings
 file, not here. A user decision that accepts a measured cost, grants an
 exception, or re-pins a baseline stays in this section verbatim: it is a
 contract, not evidence.

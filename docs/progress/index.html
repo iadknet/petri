@@ -294,6 +294,18 @@
     return r.json();
   }
 
+  const artifactNotice = (report) => report.kind === 'petri-benchmark-summary'
+    ? `Committed summary. Detailed ${report.omitted_details.join('; ')} unavailable here. Raw bytes were verified locally at ${report.raw.verified_at}; this is not a download or a current availability guarantee.`
+    : '';
+
+  function validateArtifact(report) {
+    if (report.kind !== undefined && (report.kind !== 'petri-benchmark-summary' || report.summary_version !== 1)) {
+      throw new Error(`Unsupported benchmark summary version ${report.summary_version} (${report.kind})`);
+    }
+    if (!isObj(report.deterministic) || !isObj(report.environment)) throw new Error('Malformed benchmark artifact');
+    return report;
+  }
+
   async function loadAll() {
     const index = await fetchJson('benchmark-series.json');
     const order = [];
@@ -309,8 +321,10 @@
     // failing the whole page.
     const missing = [];
     const loaded = await Promise.all(order.map(async (o) => {
-      try { return { ...o, report: await fetchJson(rel(o.path)) }; }
+      let report;
+      try { report = await fetchJson(rel(o.path)); }
       catch (e) { missing.push(o.path); return null; }
+      return { ...o, report: validateArtifact(report) };
     }));
     const reports = loaded.filter(Boolean);
 
@@ -752,14 +766,21 @@
     if (!Array.isArray(per)) return null;
     const out = { genomes: 0, total: 0, reachable: 0, executed: 0, knockout: 0, routeVaries: 0, capHits: 0, execs: 0 };
     let any = false;
-    per.forEach((s) => (s.sampled_genomes || []).forEach((g) => {
+    per.forEach((s) => {
+      if (isObj(s.mesh_summary)) {
+        any = true;
+        Object.keys(out).forEach((key) => { out[key] += num(s.mesh_summary[key]) || 0; });
+        return;
+      }
+      (s.sampled_genomes || []).forEach((g) => {
       const me = g.mesh_execution; if (!isObj(me)) return;
       any = true; out.genomes += 1;
       out.total += num(me.total_node_count) || 0; out.reachable += num(me.reachable_node_count) || 0;
       out.executed += num(me.executed_node_count) || 0; out.knockout += num(me.knockout_count) || 0;
       out.routeVaries += me.route_varies_with_input ? 1 : 0; out.capHits += num(me.hop_cap_hits) || 0;
       out.execs += num(me.executions_per_genome) || 0;
-    }));
+      });
+    });
     return any ? out : null;
   };
 
@@ -1057,6 +1078,8 @@
   function render(data, profile) {
     const app = document.getElementById('app');
     app.replaceChildren();
+    const latestSummary = data.features.map((feature) => feature[profile]).filter((report) => report && report.kind === 'petri-benchmark-summary').at(-1);
+    if (latestSummary) app.appendChild(el('p', 'lede', artifactNotice(latestSummary)));
     if (profile === 'goal_worlds') { renderWorlds(data, app); return; }
     const all = data.features;
     const feats = all.filter((f) => f[profile]);

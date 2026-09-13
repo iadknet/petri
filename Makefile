@@ -77,19 +77,17 @@ rust-test-vm-all-opcodes: ## Run v3-core VM opcode integration tests.
 rust-test-cli: ## Run v3-cli tests.
 	@cargo test -p v3-cli
 
-bench: ## Run the deterministic benchmark harness. Gate: `make bench PROFILE=gate FEATURE=<tNN-fNN-slug> [OUT=<path>]`; goal: `make bench PROFILE=goal FEATURE=<tNN-fNN-slug> [OUT=<path>]`; sweep: `make bench PROFILE=sweep BENCH_ARGS="--width 128 --height 128 --founders 256 --seeds 11,22,33 --ticks 300" OUT=<path>`. Goal rejects all profile-parameter overrides; gate rejects food coverage only; all profiles accept `--threads <n>` through BENCH_ARGS.
-	@if [ "$(PROFILE)" = "gate" ]; then \
-		if [ -z "$(FEATURE)" ]; then echo "error: FEATURE is required for PROFILE=gate" >&2; exit 1; fi; \
-		scripts/bench-wait cargo run --release -p v3-cli -- bench --profile gate --feature "$(FEATURE)" --out "$(if $(OUT),$(OUT),docs/progress/features/$(FEATURE).json)" $(BENCH_ARGS); \
-	elif [ "$(PROFILE)" = "goal" ]; then \
-		if [ -z "$(FEATURE)" ]; then echo "error: FEATURE is required for PROFILE=goal" >&2; exit 1; fi; \
-		scripts/bench-wait cargo run --release -p v3-cli -- bench --profile goal --feature "$(FEATURE)" --out "$(if $(OUT),$(OUT),docs/progress/features/$(FEATURE)-goal.json)" $(BENCH_ARGS); \
-	elif [ "$(PROFILE)" = "sweep" ]; then \
-		if [ -z "$(OUT)" ]; then echo "error: OUT is required for PROFILE=sweep" >&2; exit 1; fi; \
-		scripts/bench-wait cargo run --release -p v3-cli -- bench --profile sweep --out "$(OUT)" $(BENCH_ARGS); \
-	else \
-		echo "error: set PROFILE=gate, goal, or sweep" >&2; exit 1; \
-	fi
+bench: ## Run gate/goal/sweep. FEATURE labels the run; OUT overrides local raw output, SUMMARY_OUT overrides its summary; BENCH_ARGS supplies sweep parameters or --threads.
+	@case "$(PROFILE)" in \
+		gate|goal) if [ -z "$(FEATURE)" ]; then echo "error: FEATURE is required for PROFILE=$(PROFILE)" >&2; exit 1; fi ;; \
+		sweep) if [ -z "$(FEATURE)" ] && [ -z "$(OUT)" ]; then echo "error: FEATURE or OUT is required for PROFILE=sweep" >&2; exit 1; fi ;; \
+		*) echo "error: set PROFILE=gate, goal, or sweep" >&2; exit 1 ;; \
+	esac; \
+	set -- --profile "$(PROFILE)"; \
+	if [ -n "$(FEATURE)" ]; then set -- "$$@" --feature "$(FEATURE)"; fi; \
+	if [ -n "$(OUT)" ]; then set -- "$$@" --out "$(OUT)"; fi; \
+	if [ -n "$(SUMMARY_OUT)" ]; then set -- "$$@" --summary-out "$(SUMMARY_OUT)"; fi; \
+	scripts/bench-wait cargo run --release -p v3-cli -- bench "$$@" $(BENCH_ARGS)
 
 rust-test-server: ## Run v3-server tests.
 	@cargo test -p v3-server
@@ -136,6 +134,7 @@ policy-check: ## Validate roadmap, repository, provenance, and retirement policy
 
 quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
 	@scripts/quality-check
+	@$(AQUA_ROOT_DIR)/bin/node --test scripts/benchmark-artifacts.test.mjs
 	@scripts/bench-wait-test
 	@sh scripts/rust-mutants-test
 	@sh scripts/dev-sh-test

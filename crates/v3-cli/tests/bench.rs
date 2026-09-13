@@ -352,7 +352,10 @@ fn bench_subcommand_writes_a_report_and_rejects_zero_threads() {
             "t10-f09-bench-cli-check",
             "--out",
         ]);
-        command.arg(out);
+        command
+            .arg(out)
+            .arg("--summary-out")
+            .arg(out.with_extension("summary.json"));
         command.output().expect("the v3-cli binary must run")
     };
 
@@ -367,6 +370,7 @@ fn bench_subcommand_writes_a_report_and_rejects_zero_threads() {
     );
     let written = std::fs::read_to_string(&out).expect("--out must name a written report");
     let _ = std::fs::remove_file(&out);
+    let _ = std::fs::remove_file(out.with_extension("summary.json"));
     let report: bench::Report = serde_json::from_str(&written).expect("the report must parse");
     assert_eq!(report.environment.threads, Some(1));
     assert_eq!(report.deterministic.profile.ticks, 5);
@@ -419,7 +423,7 @@ fn sweep_output_and_reference_selection_stay_separate_from_goal() {
         "a sweep without --out must fail"
     );
     assert!(
-        String::from_utf8_lossy(&rejected.stderr).contains("--out is required for --profile sweep"),
+        String::from_utf8_lossy(&rejected.stderr).contains("usable Git checkout required"),
         "stderr: {}",
         String::from_utf8_lossy(&rejected.stderr)
     );
@@ -431,6 +435,8 @@ fn sweep_output_and_reference_selection_stay_separate_from_goal() {
     let accepted = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"))
         .args(base_args)
         .args(["--out", out.to_str().expect("UTF-8 output path")])
+        .arg("--summary-out")
+        .arg(out.with_extension("summary.json"))
         .current_dir(repo_root())
         .output()
         .expect("the v3-cli binary must run");
@@ -444,6 +450,7 @@ fn sweep_output_and_reference_selection_stay_separate_from_goal() {
     )
     .expect("the sweep report must parse");
     let _ = std::fs::remove_file(&out);
+    let _ = std::fs::remove_file(out.with_extension("summary.json"));
     assert!(
         report.comparison.references.is_empty(),
         "a sweep without --baseline/--compare must not auto-select goal references"
@@ -1061,7 +1068,9 @@ fn an_explicit_compare_path_is_preferred_over_the_profile_default_selection() {
                 "t14-f01-explicit-compare-check",
                 "--out",
             ])
-            .arg(out);
+            .arg(out)
+            .arg("--summary-out")
+            .arg(out.with_extension("summary.json"));
         if let Some(compare) = compare {
             command.arg("--compare").arg(compare);
         }
@@ -1098,6 +1107,8 @@ fn an_explicit_compare_path_is_preferred_over_the_profile_default_selection() {
     .expect("the sweep report must parse");
     let _ = std::fs::remove_file(&reference_out);
     let _ = std::fs::remove_file(&current_out);
+    let _ = std::fs::remove_file(reference_out.with_extension("summary.json"));
+    let _ = std::fs::remove_file(current_out.with_extension("summary.json"));
 
     assert_eq!(
         report

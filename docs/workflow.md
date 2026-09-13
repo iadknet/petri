@@ -290,17 +290,30 @@ where the record is final, with one reader rather than two.)
 
 ### Benchmark gate
 
-Every feature closed after T10.F10 stores a benchmark report and completes the
+Every feature closed after T10.F10 stores benchmark evidence and completes the
 spec's Performance and Goal Impact section. A severe compute regression without
 a predeclared, justified cost is a P1. Never weaken a threshold or edit a stored
 baseline to make a feature pass.
+
+From T15.F01 onward, each run writes a full local report under the main
+checkout's ignored `.bench-artifacts/<feature>/<profile>.json` and a committed
+summary under the calling checkout's `docs/progress/features/`. Gate uses
+`<feature>.json`, goal `<feature>-goal.json`, and sweep `<feature>-sweep.json`.
+`OUT` changes raw output only; `SUMMARY_OUT` changes the summary. Both `make bench`
+and direct CLI share these defaults. Commit summaries, concise readings and
+series entries pointing to summaries; do not stage new full reports, even gate
+reports. Existing historical reports remain valid references. The versioned
+projection, provenance and deterministic conversion command are documented in
+[`docs/benchmark-artifacts.md`](benchmark-artifacts.md).
 
 After the implementer has finished benchmark-affecting work and before final
 review, delegate the spec's required gate and goal profiles to a fresh
 `roadmap-benchmark-specialist`. Give it the worktree and spec paths, feature ID
 and slug, exact commands, and only the spec's Verification and Performance and
-Goal Impact sections. It owns the runs, stored reports and concise readings, and
-the recorded exit status, `severe` flag, threshold verdict, and report paths. It
+Goal Impact sections. It owns the runs, local raw artifacts, committed summaries
+and concise readings, and
+the recorded CLI and observed outer-process exit statuses with their sources,
+`severe` flag, threshold verdict, raw/summary byte counts and paths. It
 does not change thresholds or baselines, remediate code, or interpret unexpected
 results into a new requirement. Route those results through the orchestrator to
 the advisor and a fresh implementer as appropriate. If later production
@@ -399,6 +412,11 @@ the full suite was just run on the same code), and commit. Then:
    `timeout.txt` at the recorded path agreeing with the list. A `#[mutants::skip]`
    or `exclude_re` without a written justification blocks closure. This replaces
    the reviewer's former survivor audit.
+   Verify each new summary's raw hash/byte count against the available local
+   file, its original measured identity and verification time, and its preserved
+   comparison verdicts. Availability is local and time-stamped, not a download
+   guarantee. Confirm series entries point to summaries and no new full
+   benchmark artifact is staged; historical migration is a separate feature.
 1. `ExitWorktree` with `action: "keep"` — the session returns to the main
    checkout. While inside a worktree, Claude Code blocks every git command
    aimed at the main checkout, so the merge cannot happen before this step.

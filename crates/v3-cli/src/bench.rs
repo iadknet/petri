@@ -1,6 +1,6 @@
 //! Deterministic benchmark harness (T10.F10).
 //!
-//! Runs a fixed set of seeded simulations and emits one compact JSON report
+//! Runs a fixed set of seeded simulations and emits a full JSON report
 //! per feature. The report's `deterministic` block is byte-identical for the
 //! same commit and inputs; the `environment` block records host identity and
 //! wall-clock as an unasserted secondary signal.
@@ -28,6 +28,8 @@ use v3_core::neighborhood::{
 use v3_core::simulation::{
     observe_final_actions, run_tick, seed_simulation, FinalActionObservation,
 };
+
+pub mod artifacts;
 
 pub const SCHEMA_VERSION: u32 = 1;
 
@@ -414,7 +416,7 @@ pub struct Totals {
     pub births: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PerCreatureTick {
     #[serde(default)]
     pub mesh_hops: Option<String>,
@@ -2187,6 +2189,9 @@ pub struct Comparison {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReferenceComparison {
     pub path: String,
+    /// Original measurement identity, unavailable in historical comparisons.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub measured_identity: Option<MeasuredIdentity>,
     pub counters: Vec<CounterComparison>,
     /// One entry per world in the `goal-worlds-v1` profile; empty for the gate
     /// and single-config profiles, which have no cases to compare.
@@ -3353,7 +3358,7 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 
 /// Render the current wall-clock time as an RFC 3339 UTC timestamp without
 /// pulling in a date/time dependency.
-fn rfc3339_now() -> String {
+pub fn rfc3339_now() -> String {
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -3759,24 +3764,23 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
 
 /// Compare every world in `current` against the same-named world in
 /// `reference`. Empty outside the world-set profile.
-fn compare_cases(current: &Report, reference: &Report) -> Vec<CaseComparison> {
-    if current.deterministic.profile.name != GOAL_WORLD_SET {
+fn compare_cases(current: &ComparisonInputs, reference: &ComparisonInputs) -> Vec<CaseComparison> {
+    if current.profile.name != GOAL_WORLD_SET {
         return Vec::new();
     }
     current
-        .deterministic
         .profile
         .cases
         .iter()
         .map(|case| {
             let reference_case = reference
-                .deterministic
                 .profile
                 .cases
                 .iter()
                 .find(|other| other.name == case.name);
-            let reference_readings = case_readings(reference, &case.name);
-            let readings = case_readings(current, &case.name)
+            let reference_readings = reference.readings(&case.name);
+            let readings = current
+                .readings(&case.name)
                 .into_iter()
                 .map(|(name, current_value)| {
                     let reference_value = reference_readings
@@ -3817,14 +3821,122 @@ pub fn compare_against(
     reference_path: &Path,
     reference: &Report,
 ) -> ReferenceComparison {
+    compare_inputs(&current.into(), reference_path, &reference.into())
+}
+
+/// Minimal measured inputs shared by full reports and summaries. Case readings
+/// and wall time use round-trip decimal strings, not six-decimal display values.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComparisonInputs {
+    pub identity: MeasuredIdentity,
+    pub profile: ProfileBlock,
+    pub per_creature_tick: PerCreatureTick,
+    pub host: Host,
+    pub wall_clock_ms_per_creature_tick: String,
+    pub case_readings: BTreeMap<String, Vec<(String, Option<String>)>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MeasuredIdentity {
+    pub feature: String,
+    pub git_revision: String,
+    pub generated_at: String,
+}
+
+impl From<&Report> for ComparisonInputs {
+    fn from(report: &Report) -> Self {
+        Self {
+            identity: MeasuredIdentity {
+                feature: report.feature.clone(),
+                git_revision: report.environment.git_revision.clone(),
+                generated_at: report.environment.generated_at.clone(),
+            },
+            profile: report.deterministic.profile.clone(),
+            per_creature_tick: report.deterministic.per_creature_tick.clone(),
+            host: report.environment.host.clone(),
+            wall_clock_ms_per_creature_tick: report
+                .environment
+                .wall_clock_ms_per_creature_tick
+                .to_string(),
+            case_readings: report
+                .deterministic
+                .profile
+                .cases
+                .iter()
+                .map(|case| {
+                    (
+                        case.name.clone(),
+                        case_readings(report, &case.name)
+                            .into_iter()
+                            .map(|(name, value)| (name, value.map(|v| v.to_string())))
+                            .collect(),
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
+impl ComparisonInputs {
+    fn readings(&self, case: &str) -> Vec<(String, Option<f64>)> {
+        self.case_readings
+            .get(case)
+            .into_iter()
+            .flatten()
+            .map(|(name, value)| (name.clone(), value.as_deref().and_then(parse_reading)))
+            .collect()
+    }
+
+    pub(crate) fn validate(&self) -> Result<(), String> {
+        let normalized = &self.per_creature_tick;
+        for value in std::iter::once(self.wall_clock_ms_per_creature_tick.as_str())
+            .chain(
+                [
+                    &normalized.mesh_hops,
+                    &normalized.vm_steps,
+                    &normalized.graph_relax_iters,
+                    &normalized.plasticity_updates,
+                    &normalized.actions_applied,
+                    &normalized.births,
+                ]
+                .into_iter()
+                .filter_map(|value| value.as_deref()),
+            )
+            .chain(
+                self.case_readings
+                    .values()
+                    .flatten()
+                    .filter_map(|(_, value)| value.as_deref()),
+            )
+        {
+            if !value.parse::<f64>().is_ok_and(f64::is_finite) {
+                return Err(format!("invalid lossless comparison reading: {value}"));
+            }
+        }
+        if self
+            .profile
+            .cases
+            .iter()
+            .any(|case| !self.case_readings.contains_key(&case.name))
+        {
+            return Err("summary is missing comparison readings for a declared case".into());
+        }
+        Ok(())
+    }
+}
+
+fn compare_inputs(
+    current: &ComparisonInputs,
+    reference_path: &Path,
+    reference: &ComparisonInputs,
+) -> ReferenceComparison {
     let mut counters = Vec::with_capacity(COUNTER_NAMES.len());
     let mut any_severe = false;
 
     for &name in &COUNTER_NAMES {
-        let current_value = per_creature_tick_value(&current.deterministic.per_creature_tick, name)
+        let current_value = per_creature_tick_value(&current.per_creature_tick, name)
             .expect("a freshly built report always populates every per_creature_tick counter");
-        let reference_value =
-            per_creature_tick_value(&reference.deterministic.per_creature_tick, name);
+        let reference_value = per_creature_tick_value(&reference.per_creature_tick, name);
 
         let (level, reference_str, delta_str) = match reference_value {
             None => (ComparisonLevel::New, None, None),
@@ -3857,9 +3969,15 @@ pub fn compare_against(
         });
     }
 
-    let wall_clock = if current.environment.host == reference.environment.host {
-        let current_ms = current.environment.wall_clock_ms_per_creature_tick;
-        let reference_ms = reference.environment.wall_clock_ms_per_creature_tick;
+    let wall_clock = if current.host == reference.host {
+        let current_ms = current
+            .wall_clock_ms_per_creature_tick
+            .parse()
+            .expect("validated wall reading");
+        let reference_ms = reference
+            .wall_clock_ms_per_creature_tick
+            .parse()
+            .expect("validated wall reading");
         let delta = percent_delta(current_ms, reference_ms).unwrap_or(0.0);
         let level = if delta > WALL_CLOCK_SEVERE_PERCENT {
             ComparisonLevel::Severe
@@ -3880,6 +3998,7 @@ pub fn compare_against(
 
     ReferenceComparison {
         path: reference_path.display().to_string(),
+        measured_identity: Some(reference.identity.clone()),
         counters,
         cases: compare_cases(current, reference),
         wall_clock,
@@ -3912,14 +4031,13 @@ pub fn compare_against_path(
 ) -> Result<ReferenceComparison, String> {
     let content = std::fs::read_to_string(reference_path)
         .map_err(|e| format!("failed to read reference {}: {e}", reference_path.display()))?;
-    let reference: Report = serde_json::from_str(&content).map_err(|e| {
+    let reference = artifacts::comparison_inputs_from_bytes(content.as_bytes()).map_err(|e| {
         format!(
             "failed to parse reference {}: {e}",
             reference_path.display()
         )
     })?;
-    if comparable_profile(&reference.deterministic.profile)
-        != comparable_profile(&current.deterministic.profile)
+    if comparable_profile(&reference.profile) != comparable_profile(&current.deterministic.profile)
     {
         return Err(format!(
             "reference {} was generated with a different profile ({:?}) than the \
@@ -3927,11 +4045,11 @@ pub fn compare_against_path(
              size, founder count, seeds, ticks, or food coverage is meaningless. \
              Re-pin the reference or exclude it.",
             reference_path.display(),
-            reference.deterministic.profile,
+            reference.profile,
             current.deterministic.profile
         ));
     }
-    Ok(compare_against(current, reference_path, &reference))
+    Ok(compare_inputs(&current.into(), reference_path, &reference))
 }
 
 /// The reference paths a run compares against, with the cause when the
@@ -3952,36 +4070,6 @@ impl ReferenceSelection {
     }
 }
 
-/// Whether `path` and `output` name the same file: canonical paths when both
-/// exist, otherwise the lexically normalized paths. The output file normally
-/// does not exist yet when a comparison runs, so the lexical rule is the one
-/// that usually decides.
-fn resolves_to_same_file(path: &Path, output: &Path) -> bool {
-    if let (Ok(a), Ok(b)) = (path.canonicalize(), output.canonicalize()) {
-        return a == b;
-    }
-    normalize_lexically(path) == normalize_lexically(output)
-}
-
-/// Join a relative path to the current directory and resolve `.` and `..`
-/// components without touching the filesystem.
-fn normalize_lexically(path: &Path) -> PathBuf {
-    // `std::path::absolute` joins the current directory but, on Unix, keeps
-    // `.` and `..` components; those are resolved below.
-    let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
-    let mut normalized = PathBuf::new();
-    for component in absolute.components() {
-        match component {
-            std::path::Component::CurDir => {}
-            std::path::Component::ParentDir => {
-                normalized.pop();
-            }
-            other => normalized.push(other),
-        }
-    }
-    normalized
-}
-
 /// Compare `current` against every selected reference that is not the report's
 /// own output path, folding the results into `current.comparison`, and return
 /// whether any reference was severe. A skipped self-reference is never an
@@ -3992,11 +4080,24 @@ pub fn apply_comparisons(
     selection: &ReferenceSelection,
     out_path: &Path,
 ) -> Result<bool, String> {
+    apply_comparisons_for_outputs(current, selection, &[out_path])
+}
+
+/// Both artifacts identify this run and are excluded from its references.
+pub fn apply_comparisons_for_outputs(
+    current: &mut Report,
+    selection: &ReferenceSelection,
+    outputs: &[&Path],
+) -> Result<bool, String> {
     let mut references = Vec::with_capacity(selection.paths.len());
     let mut overall_severe = false;
     let mut skipped_self = false;
     for path in &selection.paths {
-        if resolves_to_same_file(path, out_path) {
+        let mut is_output = false;
+        for output in outputs {
+            is_output |= artifacts::same_path(path, output)?;
+        }
+        if is_output {
             skipped_self = true;
             continue;
         }
@@ -4011,7 +4112,11 @@ pub fn apply_comparisons(
             if skipped_self {
                 format!(
                     "the only candidate reference is this report's own output path {}",
-                    out_path.display()
+                    outputs
+                        .iter()
+                        .map(|path| path.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(" or ")
                 )
             } else {
                 "no reference paths were given".to_string()
@@ -4337,8 +4442,8 @@ mod tests {
             case.tracking.cognition = None;
         }
         assert_eq!(
-            compare_cases(&report, &report),
-            compare_cases(&report, &historical)
+            compare_cases(&(&report).into(), &(&report).into()),
+            compare_cases(&(&report).into(), &(&historical).into())
         );
         let value = serde_json::to_value(&historical).unwrap();
         assert!(value["deterministic"]["goal_indicators"]

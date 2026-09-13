@@ -183,8 +183,13 @@ and spec paths, feature ID and slug, the exact gate and goal commands required b
 the spec, and only the spec's Verification and Performance and Goal Impact
 sections. Instruct it to read the shared "Benchmark gate" section and, when applicable,
 "Environmental pressures in the standard baseline." Its scope is to run each
-required profile once, store the generated reports and concise readings, and
-record the exit status, `severe` flag, threshold verdict, and report paths. It
+required profile once, retain full reports in the main checkout's ignored
+`.bench-artifacts/<feature>/`, and store generated summaries and concise readings
+in the feature worktree. Record CLI and observed outer-process exit statuses
+with their sources, `severe`, threshold verdict, both paths, hashes and byte
+counts. `OUT` overrides raw only; `SUMMARY_OUT` overrides the summary. Follow
+[`docs/benchmark-artifacts.md`](benchmark-artifacts.md); new series entries name
+summaries, and no new full report is committed. It
 does not change thresholds or stored baselines and does not remediate code or
 unexpected results; it reports them to the orchestrator. The orchestrator routes
 a regression or malformed report to the spec owner and persistent implementer as
@@ -250,6 +255,10 @@ the tested commit, then complete the shared closure document updates and run
 `make check-docs` in the feature worktree. Commit the final content, inspect
 any pre-commit changes, and rerun the relevant check if the committed content
 differs from what passed. Wait for all agents to finish writing before merging.
+Inspect summary provenance against available local raw files, preserve measured
+revision/time separately from converter identity, and confirm no new full
+benchmark artifact is staged. The local artifact root remains in main when the
+feature worktree is removed.
 
 From the main checkout, recheck that main is clean, still on `main`, and still
 at its recorded starting commit. If it moved, rebase `codex/<tnn-fnn>` onto
