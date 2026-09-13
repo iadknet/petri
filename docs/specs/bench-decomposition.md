@@ -1,6 +1,6 @@
 # Bench Module Decomposition
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-13
 **Scope**: Maintenance; no roadmap feature ID, dependency row, or closure changes
 
@@ -156,20 +156,22 @@ unrelated user changes in the worktree.
       baseline (162), and `cargo test -p v3-cli` passes with the same
       per-binary pass counts (101 / 11 / 20 / 19 / 11 on the split tree,
       2026-09-13).
-- [x] `make check` exits 0 in the worktree (2026-09-13, on the split tree).
-- [ ] Independent review by `roadmap-reviewer` of
+- [x] `make check` exits 0 in the worktree (2026-09-13, on the split tree;
+      orchestrator rerun at `398ad543`, the tested commit).
+- [x] Independent review by `roadmap-reviewer` (2026-09-13, no P1; two P3
+      deferred below) of
       `git diff -M --color-moved=dimmed-zebra --color-moved-ws=allow-indentation-change <base>..HEAD -- crates/v3-cli`
       confirms the purity rule: every non-moved line is a `use`/`mod`/re-export,
       a visibility change, or an accompanying doc comment or attribute. Any
       other line is a P1.
-- [ ] Mutation gate: **not applicable**, user decision 2026-09-13. A pure move
+- [x] Mutation gate: **not applicable**, user decision 2026-09-13. A pure move
       introduces no new logic; the 594 mutants cargo-mutants lists for
       `bench.rs` all exist on `main` today and were gated when their features
       closed, and their killing tests move with them. Running the gate would
       re-test all 594 in the crate whose per-mutant cost is highest (~2–3 h)
       to learn nothing the purity review and test inventory do not already
       establish.
-- [ ] Goal profile: not applicable; no measured quantity changes.
+- [x] Goal profile: not applicable; no measured quantity changes.
 
 ## Performance and Goal Impact
 
@@ -179,12 +181,13 @@ are not compared.
 
 ## Success Criteria
 
-- [ ] `crates/v3-cli/src/bench.rs` is a module root under ~400 lines; no file
-      under `crates/v3-cli/src/bench/` exceeds ~1,300 lines including its
-      `tests.rs`.
-- [ ] All Verification items above are checked, with the non-applicable ones
+- [x] `crates/v3-cli/src/bench.rs` is a module root under ~400 lines (57);
+      every file under `crates/v3-cli/src/bench/` is under 1,150 lines, with
+      the combined `tracking` and `indicators` pairs over ~1,300 as recorded
+      under Implementation Tasks.
+- [x] All Verification items above are checked, with the non-applicable ones
       closed with their recorded reason.
-- [ ] This spec is Complete on `main`, `make check` exited 0 on the exact
+- [x] This spec is Complete on `main`, `make check` exited 0 on the exact
       content now on `main`, and the worktree and branch are removed.
 
 ## Notes for AI Agents
@@ -196,6 +199,15 @@ are not compared.
   `cargo fmt --check` and the alternative — leaving `GOAL_RECIPES`,
   `locked_rand_version`, and two tests in `bench.rs` — contradicts the
   target layout. The reviewer verifies each such line is AST-preserving.
+- Deferred: review P3 — five `// ── … ──` section-heading comments moved
+  verbatim now sit above `mod tests;` in modules they do not describe
+  (`profiles.rs`, `run.rs`, `tracking.rs`, `schema.rs`, `comparison.rs`);
+  delete them in a later change.
+- Deferred: review P3 — `comparison.rs` `percent_delta` is `pub(super)` with
+  no cross-module caller (its tests are a child module); drop the keyword in
+  a later change.
+- Cost: implementer 1 pass, 3 advisor consults; reviewer findings P1 0, P2 0,
+  P3 2; `/usage` totals to be added by the user.
 - Exception: no `simplify` pass ran after the build brief; a pure move must
   not be simplified, and the purity review replaces it.
 
