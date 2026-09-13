@@ -84,6 +84,11 @@ gate report enters `benchmark-series.json`. The latest available committed
 goal-worlds reference remains T14.F03, not T13.F02; later comparisons must name
 that reference honestly. T15 remains Planned and unscheduled.
 
+T13.F02's tested commit is `0448db5c3fab6dd4e331dc37de9e84fa93412ead`:
+the feature rebased cleanly onto main `e635c3df93e1a70253b2daa5fdb0ed391de5b405`,
+then authorized `make check` exited 0 on unchanged content. Benchmark evidence
+retains its original measurement identity, `7f4c54fb`.
+
 ## Baseline worlds
 
 One row per closure per world from the `goal-worlds-v1` reports; the
