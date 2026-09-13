@@ -1,7 +1,7 @@
 # T13.F02 — Recruitment Paths and Replicated Baseline
 
-**Status**: In Progress
-**Last updated**: 2026-09-12
+**Status**: Complete
+**Last updated**: 2026-09-13
 **Feature**: T13.F02
 **Track**: [T13 — Neutral Module Recruitment](../../roadmaps/t13-neutral-module-recruitment.md)
 
@@ -174,7 +174,7 @@ that reason. Any genotype/size/exposure difference remains a stated limitation.
   with explicit config/task identity and separate observation wall timing;
   keep the gate and existing drift/profile parameters unchanged. Historical
   absence is unmeasured, not zero. Register focused tests in existing gates.
-- [ ] Complete verification and stored readings; update `docs/progress.md`,
+- [x] Complete verification and stored readings; update `docs/progress.md`,
   `docs/progress/benchmark-series.json` and the owning roadmap at closure.
 
 ## Verification
@@ -186,8 +186,8 @@ that reason. Any genotype/size/exposure difference remains a stated limitation.
 - [x] `cargo test -p v3-cli recruitment_paths`: goal-only report wiring,
   deterministic reduced-size results, explicit absence and truthful totals;
   readings as above. No stochastic discovery success is an invariant.
-- [ ] `make check` and `make roadmap-check`; results in readings. Use TDD and
-  proptest for pure invariants; preserve any generated regression files.
+- [x] `make check` on `575b8ab8` and closure documentation checks pass;
+  environment-specific retry and logs are recorded below and in readings.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: 94 survivors killed by
   tests; 12 equivalent; 0 deferred. Counts, output path and full disposition
   are in the [readings](../../progress/readings/t13-f02-recruitment-paths-and-replicated-baseline.md#mutation-gate).
@@ -205,13 +205,26 @@ make bench PROFILE=goal FEATURE=t13-f02-recruitment-paths-and-replicated-baselin
 
 | Closure record | Value |
 | --- | --- |
-| Orchestrator and mutation specialist | `gpt-5.6-sol`, `medium` |
-| Persistent spec owner/advisor and implementer; fresh reviewer | `gpt-6-astra`, `xhigh` |
+| Tested commit | `575b8ab898a791194b6c79006150ca65d5bb91fa` |
+| Full gate | `make check`, 2026-09-13: authorized outside-sandbox retry exits 0 on unchanged content; Rust/server suites, frontend 61 files / 322 tests, build and scans pass. |
+| Sandbox attempt | `make check` exits 2: seven WebSocket tests cannot bind local listeners (`PermissionDenied`); no feature assertion failure. No waiver or command change. |
+| Full-gate logs | `/private/tmp/t13-f02-make-check.log`; successful retry `/private/tmp/t13-f02-make-check-escalated.log` (2,159 lines). Local logs have no persistence guarantee. |
+| Closure documentation checks | `make roadmap-check`, `make check-docs`, `git diff --check`: exit 0. |
+| Orchestrator | `gpt-5.6-sol`, `medium` |
+| Persistent spec owner/advisor | `gpt-6-astra`, `xhigh` |
+| Persistent implementer | `gpt-6-astra`, `xhigh` |
+| Fresh reviewer | `gpt-6-astra`, `xhigh` |
 | Benchmark specialist | `gpt-5.6-terra`, `high` |
-| Advisor consultations | 7 |
+| Mutation specialist | `gpt-5.6-sol`, `medium` |
+| Advisor consultations | 8; planning/readiness excluded. |
 | Initial review findings | P1=1, P2=2, P3=1 |
-| Post-review remediation | One documentation-only pass; typed persisted event outcome remains deferred. |
-| Requirement corrections / user interventions | 1 / 1: local-only raw goal evidence. |
+| Final review disposition | No P1 or new findings after one documentation-only pass; one typed-outcome P2 deferred to T15.F01. |
+| Remediation passes | Production: 0; post-review documentation: 1; mutation test-only incremental feedback: 2. |
+| Fresh mutation result | 322 mutants: 163 caught, 106 missed, 53 unviable, 0 timeout. Fresh survivors resolved as 94 killed / 12 equivalent / 0 deferred; complete list in readings. |
+| Mutation output | `/Users/istefanek/.local/share/petri-tools/mutants/t13-f02/mutants.out` |
+| Requirement corrections | 1: local-only raw goal evidence and Planned, unscheduled T15. |
+| User interventions | Explicit local-commit authorization confirmation; storage-policy correction/clarification; repeated mutation-approval messages needed to unblock tool prompts. |
+| Task-specific usage | Unavailable. |
 
 ## Performance and Goal Impact
 
@@ -222,7 +235,7 @@ Only experiment fields and separate timing are additive: no existing indicator
 movement or cognition claim. The new descriptive goal measure has no floor
 and is unmeasured in gate.
 
-The benchmark commands use the unchanged series index: gate epoch
+The measured commands used the then-current series index: gate epoch
 `remove-complementary-nutrition.json` and previous
 `t14-f03-applied-mortality-and-energy-accounting.json`; goal epoch
 `t12-f04-baseline-world-set-goal.json` and previous
@@ -261,22 +274,23 @@ belongs to Planned, unscheduled T15.F01.
 | Bytes | `356934683` |
 | SHA-256 | `bc7f039febdae9c6e32e9f5f83485d3705f0a1ff30181dbba32fa509fa6bb849` |
 | Availability | Present and checksum-verified locally on 2026-09-12; neither portable nor promised to persist. |
+| Series exception | Only gate is indexed. Goal-worlds retains T14.F03 as the latest available committed reference, not as a T13.F02 measurement; epochs are unchanged. |
 
 ## Success Criteria
 
-- [ ] Both backends have an explicit viable inert/prepared/effect/useful path,
+- [x] Both backends have an explicit viable inert/prepared/effect/useful path,
   and matched changed-task controls distinguish dormant preparation.
-- [ ] The predeclared replicated baseline records all proposals, exposure,
+- [x] The predeclared replicated baseline records all proposals, exposure,
   lineage variation, damage, costs, useful contribution and retention; nulls
   and capability gaps remain explicit without a cognition or repair claim.
-- [ ] Required checks, review, mutation adjudication and benchmark records
+- [x] Required checks, review, mutation adjudication and benchmark records
   are complete and truthful; only then mark the roadmap row and spec Complete.
 
 ## Notes for AI Agents
 
 - Decision: This is the pre-repair baseline. Applicability, direct Graph
   activation and recruitment-path repairs remain with T13.F03–F05.
-- Exception: One user intervention/requirement correction on 2026-09-12:
+- Exception: One requirement correction on 2026-09-12:
   local-only goal evidence above; broader work moves to [T15](../../roadmaps/t15-benchmark-evidence-storage.md).
   Experiment parameters, thresholds, baselines and runtime behavior are unchanged.
 - Deferred: `Event.outcome` is a debug-derived string; current accounting and

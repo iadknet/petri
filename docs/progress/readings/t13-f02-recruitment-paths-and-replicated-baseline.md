@@ -35,6 +35,16 @@ Documentation-only checks, 2026-09-12:
 | `make check-docs` | Exit 0; roadmap, policy, quality and documentation gate regression checks passed. |
 | `git diff --check` | Exit 0; no whitespace errors. |
 
+Full completion gate, 2026-09-13, tested commit
+`575b8ab898a791194b6c79006150ca65d5bb91fa`:
+
+| Command / environment | Result and evidence |
+| --- | --- |
+| `make check`, sandbox | Exit 2; seven v3-server WebSocket tests fail at `tests/server.rs:36` while binding a local listener: `PermissionDenied (Operation not permitted)`. No feature assertion fails. Log: `/private/tmp/t13-f02-make-check.log`. |
+| `make check`, authorized outside-sandbox retry | Exit 0 on the same commit and content; all Rust/server suites, frontend 61 files / 322 tests, build and scans pass. Log: `/private/tmp/t13-f02-make-check-escalated.log`, 2,159 lines, through final dependency and skill scans. Advisor consultation 8 approves this environment retry, not a waiver or altered command. |
+| Closure `make roadmap-check` / `make check-docs` / `git diff --check` | Exit 0 on the documentation-only closure edits; no production content change. |
+| Log availability | Local files, inspected 2026-09-13; persistence is not promised. |
+
 ## Mutation gate
 
 The required fresh command was `MUTANTS_ITERATE=0 make rust-mutants`. Its
@@ -182,21 +192,24 @@ No survivor was deferred.
 | `make roadmap-check` | Exit 0; validation and prose budget passed. |
 | `git diff --check` | Exit 0; no whitespace errors. |
 
-No production defaults, founder behavior or tick-loop mechanics changed, so
-the implementer's viability-first rule did not apply. The orchestrator owns
-`make check`; the separate specialists own the final mutation and benchmark
-gates.
+No production defaults, founder behavior or tick-loop mechanics changed;
+viability-first was not triggered. The completed gates are recorded above.
 
 | Closure record | Value |
 | --- | --- |
 | Orchestrator | `gpt-5.6-sol`, `medium` |
-| Persistent spec owner/advisor and implementer; fresh reviewer | `gpt-6-astra`, `xhigh` |
+| Persistent spec owner/advisor | `gpt-6-astra`, `xhigh` |
+| Persistent implementer | `gpt-6-astra`, `xhigh` |
+| Fresh reviewer | `gpt-6-astra`, `xhigh` |
 | Mutation specialist | `gpt-5.6-sol`, `medium` |
 | Benchmark specialist | `gpt-5.6-terra`, `high` |
-| Advisor consultations | 7 |
+| Advisor consultations | 8; planning/readiness excluded. |
 | Initial review findings | P1=1, P2=2, P3=1 |
-| Post-review remediation | One documentation-only pass; typed persisted event outcome deferred to T15.F01. |
-| Requirement corrections / user interventions | 1 / 1: local-only raw goal evidence, detailed below. |
+| Final review disposition | No P1 or new findings after one documentation-only pass; one typed-outcome P2 deferred to T15.F01. |
+| Remediation passes | Production: 0; post-review documentation: 1; mutation test-only incremental feedback: 2. |
+| Mutation disposition | 94 fresh survivors killed / 12 equivalent / 0 deferred / 0 timeout. |
+| Requirement corrections | 1: local-only raw goal evidence and Planned, unscheduled T15. |
+| User interventions | Explicit local-commit authorization confirmation; storage-policy correction/clarification; repeated mutation-approval messages needed to unblock tool prompts. |
 | Task-specific usage | Unavailable |
 
 ## Observation interpretation
@@ -263,6 +276,7 @@ unverified. T15.F01 owns the broader policy and summary implementation later.
 | Path | `/Users/istefanek/projects/petri/tmp/bench-artifacts/t13-f02/t13-f02-recruitment-paths-and-replicated-baseline-goal.json` |
 | Bytes | `356934683` |
 | SHA-256 | `bc7f039febdae9c6e32e9f5f83485d3705f0a1ff30181dbba32fa509fa6bb849` |
+| Series disposition | Gate is indexed; goal is omitted by exception. `goal_worlds.closed` retains T14.F03 as the latest available committed goal reference, not a T13.F02 measurement. No epoch changes. |
 
 | Observation timing | Measurement / individual cap verdict |
 | --- | --- |
