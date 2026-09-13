@@ -204,6 +204,16 @@ make bench PROFILE=gate FEATURE=t13-f02-recruitment-paths-and-replicated-baselin
 make bench PROFILE=goal FEATURE=t13-f02-recruitment-paths-and-replicated-baseline
 ```
 
+| Closure record | Value |
+| --- | --- |
+| Orchestrator and mutation specialist | `gpt-5.6-sol`, `medium` |
+| Persistent spec owner/advisor and implementer; fresh reviewer | `gpt-6-astra`, `xhigh` |
+| Benchmark specialist | `gpt-5.6-terra`, `high` |
+| Advisor consultations | 7 |
+| Initial review findings | P1=1, P2=2, P3=1 |
+| Post-review remediation | One documentation-only pass; typed persisted event outcome remains deferred. |
+| Requirement corrections / user interventions | 1 / 1: local-only raw goal evidence. |
+
 ## Performance and Goal Impact
 
 **Predeclaration — written before the run.** Observation only; no natural analog
@@ -229,10 +239,14 @@ across seeds, and historical drift under 30 s per world. The complete goal
 profile retains the 15-minute investigation threshold. Benchmark and mutation
 specialists run sequentially without competing builds, tests or servers.
 
-**Measured verdict.** Each final-code profile ran once at `7f4c54fb`, exited 0,
-and has `comparison.severe=false`. Gate has a new non-severe wall flag; goal is
-unchanged versus T14.F03 and retains an inherited epoch plasticity flag. All
-caps pass. No threshold, baseline or epoch changed; readings hold details.
+| Measured verdict | Evidence and limitation |
+| --- | --- |
+| Final-code profiles | Each ran once at `7f4c54fb`, exited 0 and has `comparison.severe=false`. No threshold, baseline or epoch changed. |
+| Gate flag investigation | Simulation wall 570.409→745.293 ms versus T14.F03 (+30.659%, new and non-severe). Deterministic results and work counters match; recruitment observation is absent in gate. Cause remains unattributed, with no established host-noise attribution. |
+| Goal work counters | Unchanged versus T14.F03; inherited epoch plasticity flag retained. |
+| Individual observation caps | All pass; separate timings and verdicts are in readings. |
+| Goal simulation timing | 515,641.938 ms, not full elapsed time. |
+| Goal through completed observations and report writing | `<9m40s`, conservatively bounded by preceding gate completion `2026-09-13T04:06:19Z` and complete goal artifact mtime `2026-09-13T04:15:58Z`. Exact process-exit duration was not captured. The 15-minute investigation threshold is reviewed against this bound. |
 
 - Report: [gate](../../progress/features/t13-f02-recruitment-paths-and-replicated-baseline.json).
 - Full readings: [t13-f02-recruitment-paths-and-replicated-baseline.md](../../progress/readings/t13-f02-recruitment-paths-and-replicated-baseline.md).
@@ -266,3 +280,8 @@ belongs to Planned, unscheduled T15.F01.
 - Exception: One user intervention/requirement correction on 2026-09-12:
   local-only goal evidence above; broader work moves to [T15](../../roadmaps/t15-benchmark-evidence-storage.md).
   Experiment parameters, thresholds, baselines and runtime behavior are unchanged.
+- Deferred: `Event.outcome` is a debug-derived string; current accounting and
+  replay use typed engine records and no parser exists. T15.F01 owns the future
+  persisted representation/summary; T13.F03/F06 consumers must not parse this
+  debug string.
+- Cost: Task-specific usage unavailable.

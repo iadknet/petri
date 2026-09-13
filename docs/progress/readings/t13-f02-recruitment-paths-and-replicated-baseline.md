@@ -8,21 +8,13 @@ The complete historical drift walk and the three ecological profiles are
 unchanged. The report-level experiment has its own configuration digest and
 wall-clock field; gate and older reports remain explicitly unmeasured.
 
-TDD evidence:
-
-- `cargo test -p v3-core --test recruitment_paths` first failed because the new
-  observation module was absent. After implementation, both applied-scene and
-  constructed-path tests passed.
-- `cargo test -p v3-cli recruitment_paths` first failed because the report and
-  timing fields were absent. After wiring, its goal-only and historical-absence
-  test passed.
-- `cargo test -p v3-core recruitment_paths_retention --lib` first failed because
-  the retention classifier was absent; the final verification below covers its
-  implementation.
-- The first expanded core pass, `cargo test -p v3-core recruitment_paths --lib`,
-  passed eight tests: selection and Wilson invariants, complete-delta replay,
-  matched starts/history, exact-copy activation, stationary wrong actions,
-  complete reduced supply, and independent production-engine sibling replay.
+| Verification coverage | Result |
+| --- | --- |
+| Applied scenes and constructed paths | Both backends, matched starts/history, exact-copy activation and stationary wrong actions covered. |
+| Pure invariants and replay | Selection, Wilson intervals, retention, complete genome deltas, reduced supply and independent production-engine sibling replay covered. |
+| Missing observations | Removed-subject energy and memory are absent, not observed zero; paired memory effect is unmeasured if any required observation is missing. Living/dead controls and property tests preserve the distinction, including a measured difference followed by an unavailable scene. |
+| Report wiring | Goal-only, once-per-world-set observation; deterministic reduced results and explicit historical absence covered. |
+| TDD and regression files | Behavior changes used red/green tests; no new proptest regression file was generated. |
 
 Final implementation checks, 2026-09-12:
 
@@ -35,42 +27,30 @@ Final implementation checks, 2026-09-12:
 | `cargo clippy --workspace --all-targets -- -D warnings` | Exit 0, no warnings. |
 | `make roadmap-check` | Exit 0, validation passed; repeated after the verification record update. |
 
+Documentation-only checks, 2026-09-12:
+
+| Command | Result |
+| --- | --- |
+| `make roadmap-check` | Exit 0; validation passed, including the spec prose budget. |
+| `make check-docs` | Exit 0; roadmap, policy, quality and documentation gate regression checks passed. |
+| `git diff --check` | Exit 0; no whitespace errors. |
+
 No production defaults, founder behavior or tick-loop mechanics changed, so
 the implementer's viability-first rule did not apply. The orchestrator owns
 `make check`; the separate specialists own the final mutation and benchmark
-gates. No new proptest regression file was generated.
+gates.
 
-The explicit reuse/simplification/efficiency review retained existing mutation,
-trace, bypass, tracker, battery, config-digest and serialization seams. It
-removed task-dead subjects from useful-module labels while retaining their
-outcomes; represented removed-subject ending energy as absent; exposed separate
-genotype/RNG divergence and backend-discard resolution; translated tracker-local
-lineage IDs at the report boundary; corrected the F03/F04/F05 ownership labels;
-and added useful-incumbent exact-copy activation coverage. A bounded sibling
-helper satisfies the repository's function-length limit. The delta property
-test now constructs its tiny genome directly, avoiding repeated task/battery
-fixture execution inside a pure invariant. Affected focused tests and the
-workspace compiler/lint checks were rerun successfully.
-
-Advisor consultations: three complete — initial approach, repeated diagnostic,
-and before-done review. Accepted guidance kept
-constructed creation out of production proposal totals, registered copies
-before preparation, and retained complete whole-birth replay including node
-order and unselected terminal siblings. The repeated compiler diagnostic was
-resolved through the existing public config-digest re-export; integer benefit
-checks use strict comparison while the permitted one-scene loss remains intact.
-The before-done review identified one blocker: unavailable memory after subject
-removal must not become an observed zero. The focused removed-subject test first
-failed against the former array representation. The observation now distinguishes
-`Some([0; 16])` from unavailable memory and returns an unmeasured paired memory
-effect if any required observation is missing. Living/dead controls and a pure
-property test cover that distinction, including a measured difference followed
-by an unavailable scene. The remediation self-review confirmed that the optional
-state stays confined to observation records and consumes no mutation RNG. The
-compiler, all focused tests, lint checks and roadmap validation passed again.
-All three consultations' recommendations were accepted because they resolve
-concrete reporting or verification requirements; none was rejected. No optional
-architecture or requirement changes were introduced.
+| Closure record | Value |
+| --- | --- |
+| Orchestrator | `gpt-5.6-sol`, `medium` |
+| Persistent spec owner/advisor and implementer; fresh reviewer | `gpt-6-astra`, `xhigh` |
+| Mutation specialist | `gpt-5.6-sol`, `medium` |
+| Benchmark specialist | `gpt-5.6-terra`, `high` |
+| Advisor consultations | 7 |
+| Initial review findings | P1=1, P2=2, P3=1 |
+| Post-review remediation | One documentation-only pass; typed persisted event outcome deferred to T15.F01. |
+| Requirement corrections / user interventions | 1 / 1: local-only raw goal evidence, detailed below. |
+| Task-specific usage | Unavailable |
 
 ## Observation interpretation
 
@@ -137,14 +117,21 @@ unverified. T15.F01 owns the broader policy and summary implementation later.
 | Bytes | `356934683` |
 | SHA-256 | `bc7f039febdae9c6e32e9f5f83485d3705f0a1ff30181dbba32fa509fa6bb849` |
 
-All observation timing caps pass. Gate has no recruitment-path measurement by
-design: founder neighborhood is 51.388 ms (<10 s), evolved neighborhood is
-unmeasured/0, and no drift or recruitment value is present. Goal: founder
-neighborhood 122.067 ms (<10 s); evolved neighborhood 550.998 ms summed across
-seeds (<180 s); drift 21,265.834 ms total (therefore below the 30 s per-world
-cap); recruitment-path observation 7,750.448 ms (<120 s); and full goal wall
-time 515,641.938 ms / 8.594 min (<15 min). The 858.761 ms final-state reading
-has no separate cap.
+| Observation timing | Measurement / individual cap verdict |
+| --- | --- |
+| Gate founder neighborhood | 51.388 ms; passes <10 s. |
+| Gate evolved neighborhood | Unmeasured/0; no drift or recruitment measurement is present. |
+| Goal founder neighborhood | 122.067 ms; passes <10 s. |
+| Goal evolved neighborhood | 550.998 ms summed across seeds; passes <180 s. |
+| Goal drift | 21,265.834 ms total; therefore passes <30 s per world. |
+| Goal recruitment paths | 7,750.448 ms; passes <120 s. |
+| Goal final-state reading | 858.761 ms; no separate cap. |
+
+| Overall timing / investigation | Evidence and limitation |
+| --- | --- |
+| Goal simulation timing | 515,641.938 ms; this is simulation timing, not full goal elapsed time. |
+| Goal through completed observations and report writing | `<9m40s`, conservatively bounded by preceding gate completion `2026-09-13T04:06:19Z` and complete goal artifact mtime `2026-09-13T04:15:58Z`. Exact process-exit duration was not captured. The 15-minute investigation threshold is reviewed against this bound, separately from individual observation caps. |
+| New gate wall-time flag versus T14.F03 | Simulation wall 570.409→745.293 ms, +30.659%; deterministic results and work counters match, and recruitment observation is absent in gate. Cause remains unattributed; no host-noise attribution is established. The flag is non-severe. |
 
 The `recruitment-paths-v1` experiment identifies configuration
 `sha256:c9ebc462c9c6e74aa34e6935055e70d65708c83d3b3d236b6e60e4c4764f68e9` and
@@ -156,9 +143,10 @@ unprepared Task B arms were null: 0/32 proposal discoveries (Wilson 95%
 0.000-0.107) under both policies. The prepared Task B arms each discovered
 19/32 (0.594, 0.423-0.745): Graph drift retained 14/32 and useful-retained
 1/32; Graph selection 19/32 and 16/32; VM drift 15/32 and 2/32; VM selection
-19/32 and 15/32. The four batch numerators vary from 4-6 discoveries per eight
-lineages; complete per-batch intervals and paths remain only in the local raw
-report identified above, not in the committed readings.
+19/32 and 15/32. Batch proposal-discovery numerators range from 4–7 per eight
+lineages: Graph under both policies `[5, 4, 6, 4]`; VM under both policies
+`[4, 4, 7, 4]`. Complete per-batch intervals and paths remain only in the local
+raw report identified above, not in the committed readings.
 
 Paired policy comparisons are not causal treatment estimates: 20/32 Graph and
 25/32 VM prepared lineages first diverged in parent history, with mutation/RNG
@@ -168,6 +156,6 @@ differences remain reported as uncertainty rather than superiority. The sham
 RNG control remains not applicable: observations consume no mutation RNG.
 Construction-only registration remains excluded from all proposal totals.
 
-Actionable exception for the orchestrator: the gate wall-time flag versus the
-immediately preceding closure is new. It is not severe and this specialist did
-not change code, thresholds, or baselines to explain or suppress it.
+`Event.outcome` is a debug-derived string. Current accounting and replay use
+typed engine records; no parser exists. T15.F01 owns the future persisted
+representation/summary; T13.F03/F06 consumers must not parse the debug string.
