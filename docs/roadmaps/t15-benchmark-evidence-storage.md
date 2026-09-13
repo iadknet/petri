@@ -1,7 +1,7 @@
 # T15 — Benchmark Evidence Storage
 
 **Status**: Planned
-**Last updated**: 2026-09-12
+**Last updated**: 2026-09-13
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -34,8 +34,23 @@ truthful provenance and availability.
   with identical normalized counters, per-case readings and verdicts from the
   same source. Profile/recipe compatibility, absent-reading semantics and
   missing-reference errors are preserved; no thresholds or epochs are changed
-  to accommodate storage. Existing history is untouched and current report
-  consumers remain functional, with omitted detail explicitly unavailable.
+  to accommodate storage. Current report consumers remain functional, with
+  omitted detail explicitly unavailable.
+- [ ] Every full benchmark report reachable from the pre-migration `main` is
+  inventoried. For each logical report, its final valid version has a generated
+  committed summary and a byte-identical copy under the main checkout's ignored
+  `.bench-artifacts/historical/`; the inventory records original path, blob and
+  file hashes, byte count, summary path and local raw path. Historical-only or
+  unparsable reports are retained locally and called out rather than silently
+  dropped.
+- [ ] Full benchmark report paths and blobs are absent from rewritten `main`
+  history, while the post-rewrite tip contains the generated summaries and no
+  tracked raw report. The remote update is limited to `main`, uses an explicit
+  expected-old-tip force-with-lease, and is verified from a fresh clone. Any
+  other advertised branch or tag retaining an affected object blocks cutover
+  until its disposition is explicitly authorized; cached pull-request views,
+  forks and existing clones are reported as outside what a `main` force-push
+  can erase.
 - [ ] The shared workflow, Codex adapter, feature template, output conventions
   and ignore rules describe this one contract; closure review verifies summary
   provenance and that no new raw artifact is staged.
@@ -44,6 +59,8 @@ truthful provenance and availability.
 
 - [ ] **T15.F01 — Local Raw Artifacts and Committed Benchmark Summaries** — Depends on: T14.F01
   - Goal: The world's measured outcomes remain readable and comparable across closures from concise committed summaries, while full experiment records stay local and their availability is stated honestly.
+- [ ] **T15.F02 — Historical Report Migration and Main-History Rewrite** — Depends on: T15.F01
+  - Goal: Every earlier benchmark report is reduced to concise committed evidence and preserved as a local ignored raw artifact, then the full reports are removed from `main` history and the rewritten branch replaces `origin/main` without overwriting an unseen remote update.
 
 ## Notes for AI Agents
 
@@ -64,6 +81,35 @@ truthful provenance and availability.
   correctness; T13 retains recruitment science. Reuse existing reports,
   dependencies and the static progress page; no runtime/default/RNG change,
   experiment reduction, dashboard redesign or new campaign is in scope.
-- Deferred: Historical migration, Git-history rewriting and durable external
-  hosting are optional later decisions, not executable work or prerequisites
-  in this track. Historical full reports stay readable and unchanged.
+- Decision: T15.F02 is the one-time retroactive migration requested by the user
+  on 2026-09-13. T15.F01 lands the parser, summary format, comparison support,
+  ignored artifact root and deterministic conversion first; F02 reuses that
+  implementation and does not rerun any benchmark. The migration inventories
+  reports from the exact pre-rewrite `main`, exports raw copies and generated
+  summaries outside the rewrite clone, rewrites a disposable fresh clone, then
+  adds summaries to the rewritten tip. This ordering prevents a path filter
+  from deleting summaries restored at the same paths.
+- Decision: Use `git-filter-repo` for the rewrite. Options reviewed on
+  2026-09-13 were `git-filter-repo`, BFG Repo-Cleaner and Git's legacy
+  `filter-branch`; the [Git project recommends `git-filter-repo`](https://github.com/newren/git-filter-repo/blob/main/README.md#why-filter-repo-instead-of-other-alternatives),
+  whose fresh-clone safety and path filtering fit this migration, while BFG is
+  narrower and `filter-branch` is documented as slow and hazardous. Perform
+  the remote cutover as a single-ref force-push guarded by the explicitly
+  captured old `origin/main` object ID; Git documents that exact-value
+  [`--force-with-lease`](https://git-scm.com/docs/git-push#Documentation/git-push.txt---force-with-leaseltrefnamegtltexpectgt)
+  as protection against overwriting an unseen update.
+- Decision: F02 is an exceptional cutover, not an ordinary feature merge. Its
+  dry run must prove the inventory, byte-identical raw copies, deterministic
+  summaries, changed-ref set, rewritten-tree checks and a recoverable local
+  backup before asking for separate explicit authorization to rewrite local
+  `main` and force-push `origin/main`. No commit, remote or branch-protection
+  change is implied by adding this roadmap row.
+- Decision: A force-push makes the reports unreachable from rewritten
+  `origin/main`; it does not promise physical erasure from forks, old clones,
+  pull-request refs or hosting caches. GitHub's
+  [history-rewrite guidance](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository#side-effects-of-rewriting-history)
+  requires collaborator coordination, warns that commit IDs and signatures
+  change, and notes that old clones can recontaminate the repository. F02
+  records the old-to-new commit map and clone recovery instructions, pauses
+  writes during cutover, and verifies all advertised refs it is authorized to
+  change; durable external raw-artifact hosting remains out of scope.
