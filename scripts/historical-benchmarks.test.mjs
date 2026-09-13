@@ -208,6 +208,33 @@ test('a selected report cannot verify without its exported summary', async (t) =
   assert.throws(() => verifyPackage(manifest), /missing summary/);
 });
 
+test('a historical root-level series preserves its baseline and closed references after deletion', async (t) => {
+  const h = history(t);
+  h.put('unlabelled-baseline', 'partial baseline bytes');
+  h.put('unlabelled-closed', 'partial closed bytes');
+  h.put('docs/progress/benchmark-series.json', JSON.stringify({
+    epoch_baseline: 'unlabelled-baseline', closed: ['unlabelled-closed'],
+  }));
+  h.commit('old root-level series');
+  h.git('rm', 'unlabelled-baseline', 'unlabelled-closed');
+  h.put('docs/progress/benchmark-series.json', '{}');
+  h.commit('old references and reports removed');
+
+  const manifest = await h.scan();
+
+  const references = JSON.parse(readFileSync(manifest.enumeration.report_references.path));
+  assert.deepEqual(references.map(r => [r.pointer, r.path]), [
+    ['/epoch_baseline', 'unlabelled-baseline'], ['/closed/0', 'unlabelled-closed'],
+  ]);
+  assert.equal(new Set(references.map(r => r.source_blob)).size, 1);
+  assert.ok(references.every(r => r.occurrences.length === 1));
+  assert.deepEqual(manifest.blobs.map(b => readFileSync(b.raw.path, 'utf8')).sort(),
+    ['partial baseline bytes', 'partial closed bytes']);
+  assert.equal(manifest.reports.length, 2);
+  assert.ok(manifest.reports.every(r => r.historical_only && r.selected_blob === null));
+  assert.equal(manifest.unresolved.length, 2);
+});
+
 test('unsupported raw-only reports need an explicit historical disposition', async (t) => {
   const h = history(t);
   h.report('report.json', undefined, { schema_version: 999 });

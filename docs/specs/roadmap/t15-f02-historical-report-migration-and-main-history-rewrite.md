@@ -164,7 +164,7 @@ retain their audited state.
 - [x] Preserve every raw version, convert each selected valid report twice,
   verify identity and offline comparison parity, and assemble the manifest and
   independently recoverable export package.
-- [ ] Filter a disposable fresh clone, export its maps, restore summaries and
+- [x] Filter a disposable fresh clone, export its maps, restore summaries and
   scoped feature files only afterward, and prove history/tree preservation.
 - [ ] Complete final review and required checks; assemble the immutable cutover
   candidate, staged closure metadata, exact ref audit and approval package.

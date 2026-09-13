@@ -61,10 +61,10 @@ function classify(bytes, paths) {
     if (typeof reference.path === 'string') references.push({ pointer: `/comparison/references/${i}/path`, path: reference.path });
   });
   if (paths.some(path => path.endsWith('/benchmark-series.json'))) {
-    for (const [name, series] of Object.entries(value ?? {})) {
+    for (const [prefix, series] of [['', value], ...Object.entries(value ?? {}).map(([name, series]) => [`/${name}`, series])]) {
       if (!series || Array.isArray(series) || typeof series !== 'object') continue;
-      if (typeof series.epoch_baseline === 'string') references.push({ pointer: `/${name}/epoch_baseline`, path: series.epoch_baseline });
-      if (Array.isArray(series.closed)) series.closed.forEach((path, i) => references.push({ pointer: `/${name}/closed/${i}`, path }));
+      if (typeof series.epoch_baseline === 'string') references.push({ pointer: `${prefix}/epoch_baseline`, path: series.epoch_baseline });
+      if (Array.isArray(series.closed)) series.closed.forEach((path, i) => references.push({ pointer: `${prefix}/closed/${i}`, path }));
     }
   }
   if (value?.kind === 'petri-benchmark-summary') return { reason: 'existing benchmark summary', evidence: `summary version ${value.summary_version}`, references };
