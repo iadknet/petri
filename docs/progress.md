@@ -1,5 +1,11 @@
 # Benchmark Progress
 
+Planned, unscheduled infrastructure: [T15 — Benchmark Evidence Storage](roadmaps/t15-benchmark-evidence-storage.md)
+has one unchecked feature, T15.F01, for local raw artifacts and committed
+summaries. This is a planning rollup, not a closure or a measured result; the
+current benchmark contract remains unchanged apart from T13.F02's explicit
+goal-report storage exception.
+
 [progress/index.html](progress/index.html) charts every closure below over
 time: work counters, wall clock, population, lineage, memory sensitivity,
 mutational neighborhood, and indicator coverage, read from the same reports.
