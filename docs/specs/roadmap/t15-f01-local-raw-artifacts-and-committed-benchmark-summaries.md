@@ -169,8 +169,8 @@ checks own that boundary, not a generic storage framework.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: pending; record summary,
   output path and every survivor here, resolved as killed, equivalent or
   explicitly deferred under the shared workflow.
-- [ ] Gate and goal summaries are stored at the paths below; raw provenance
-  matches local files and the series index points to the summaries.
+- [x] Gate and goal summaries are stored at the paths below; raw provenance
+  matches locally verified files and the series index points to the summaries.
 
 ## Performance and Goal Impact
 
@@ -196,8 +196,16 @@ goal still measures Orchards, Canyon and Confluence and the existing recruitment
 experiment once. T13.F02's omitted goal artifact is not silently substituted
 as a reference. No second goal determinism run or historical rerun is added.
 
-**Measured verdict.** Pending the required gate and goal measurements; no
-threshold or epoch change is predeclared.
+**Measured verdict.** The prescribed gate and single goal measurements both
+completed with outer `make` and CLI exit 0 and `comparison.severe=false`.
+All fixed-reference gate counters are `ok`. Goal retains the historical
+T12.F04 `plasticity_updates` +40.886836% flag, while the fixed T14.F03
+comparison is exactly 0.000000%; it is therefore inherited, non-severe, and
+does not justify a threshold or epoch change. All unchanged observation caps
+passed, including founder (70.652 ms / 10 s), evolved (379.418 ms / 180 s),
+drift (17.775 s / 30 s per world), recruitment (6.593 s / 120 s), and the
+474.859 s goal total / 15-minute investigation threshold. The readings record
+paths, byte counts, hashes, measurement identities and local availability.
 
 - Summaries: [gate](../../progress/features/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries.json),
   [goal](../../progress/features/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries-goal.json).

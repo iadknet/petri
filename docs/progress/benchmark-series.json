@@ -29,7 +29,8 @@
       "docs/progress/features/t11-f09-learned-state-inheritance-integrity.json",
       "docs/progress/features/t14-f01-closure-comparison-and-indicator-coverage-integrity.json",
       "docs/progress/features/t14-f03-applied-mortality-and-energy-accounting.json",
-      "docs/progress/features/t13-f02-recruitment-paths-and-replicated-baseline.json"
+      "docs/progress/features/t13-f02-recruitment-paths-and-replicated-baseline.json",
+      "docs/progress/features/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries.json"
     ]
   },
   "goal": {
@@ -80,7 +81,8 @@
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
       "docs/progress/features/t11-f09-learned-state-inheritance-integrity-goal.json",
       "docs/progress/features/t14-f01-closure-comparison-and-indicator-coverage-integrity-goal.json",
-      "docs/progress/features/t14-f03-applied-mortality-and-energy-accounting-goal.json"
+      "docs/progress/features/t14-f03-applied-mortality-and-energy-accounting-goal.json",
+      "docs/progress/features/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries-goal.json"
     ]
   }
 }
