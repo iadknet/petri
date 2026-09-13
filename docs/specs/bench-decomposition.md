@@ -144,13 +144,14 @@ unrelated user changes in the worktree.
       (raw output under the local default). Exit 0 on 2026-09-13; summary
       96,493 bytes at `/tmp/bench-decomposition-before.json`, all 12 metric
       levels `ok`.
-- [ ] Post-move gate profile on the final code:
+- [x] Post-move gate profile on the final code (`a8611434`):
       `make bench PROFILE=gate FEATURE=bench-decomposition` (summary at
       `docs/progress/features/bench-decomposition.json`, committed with its
-      reading and series entry per the workflow). Exit 0.
-- [ ] The two summaries' `deterministic` blocks are byte-identical:
+      reading and series entry per the workflow). Exit 0 on 2026-09-13;
+      summary 96,820 bytes, all 12 metric levels `ok`, `severe=false`.
+- [x] The two summaries' `deterministic` blocks are byte-identical:
       `node -e 'const fs=require("fs"); for (const [f,o] of [[process.argv[1],"/tmp/bench-decomposition-before.det"],[process.argv[2],"/tmp/bench-decomposition-after.det"]]) fs.writeFileSync(o, JSON.stringify(JSON.parse(fs.readFileSync(f,"utf8")).deterministic, null, 1))' /tmp/bench-decomposition-before.json docs/progress/features/bench-decomposition.json && cmp /tmp/bench-decomposition-before.det /tmp/bench-decomposition-after.det`
-      exits 0.
+      exits 0. `cmp` exit 0; before 96,493 bytes, after 96,820 bytes.
 - [x] Test inventory unchanged: the `--list` count equals the recorded
       baseline (162), and `cargo test -p v3-cli` passes with the same
       per-binary pass counts (101 / 11 / 20 / 19 / 11 on the split tree,
