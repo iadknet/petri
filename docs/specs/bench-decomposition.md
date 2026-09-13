@@ -1,6 +1,6 @@
 # Bench Module Decomposition
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-09-13
 **Scope**: Maintenance; no roadmap feature ID, dependency row, or closure changes
 
@@ -81,9 +81,11 @@ unrelated user changes in the worktree.
 
 ## Implementation Tasks
 
-- [ ] Record the baseline: `cargo test -p v3-cli -- --list 2>/dev/null | grep -c ': test$'`
-      (expected 151 on `c0332d77`: 101 unit, 20 `bench`, 19 `bench_artifacts`,
-      11 `cli`) and the pre-move gate summary (Verification, first item).
+- [x] Record the baseline: `cargo test -p v3-cli -- --list 2>/dev/null | grep -c ': test$'`
+      is 162 on `c100db3b` (101 `lib.rs` unit, 11 `main.rs` unit, 20 `bench`,
+      19 `bench_artifacts`, 11 `cli`; the earlier estimate of 151 omitted the
+      `main.rs` unit binary) and the pre-move gate summary (Verification,
+      first item).
 - [ ] Create the six modules per the target layout, moving whole items; add
       `pub use` re-exports in `bench.rs` so every current `bench::` path resolves.
 - [ ] Distribute the test module per the Tests rule; fix `use` paths only.
@@ -95,10 +97,12 @@ unrelated user changes in the worktree.
 
 ## Verification
 
-- [ ] Pre-move gate profile on the starting commit, summary written outside
+- [x] Pre-move gate profile on the starting commit (`c100db3b`), summary written outside
       the tree:
       `make bench PROFILE=gate FEATURE=bench-decomposition SUMMARY_OUT=/tmp/bench-decomposition-before.json`
-      (raw output under the local default). Exit 0.
+      (raw output under the local default). Exit 0 on 2026-09-13; summary
+      96,493 bytes at `/tmp/bench-decomposition-before.json`, all 12 metric
+      levels `ok`.
 - [ ] Post-move gate profile on the final code:
       `make bench PROFILE=gate FEATURE=bench-decomposition` (summary at
       `docs/progress/features/bench-decomposition.json`, committed with its
@@ -107,7 +111,7 @@ unrelated user changes in the worktree.
       `node -e 'const fs=require("fs"); for (const [f,o] of [[process.argv[1],"/tmp/bench-decomposition-before.det"],[process.argv[2],"/tmp/bench-decomposition-after.det"]]) fs.writeFileSync(o, JSON.stringify(JSON.parse(fs.readFileSync(f,"utf8")).deterministic, null, 1))' /tmp/bench-decomposition-before.json docs/progress/features/bench-decomposition.json && cmp /tmp/bench-decomposition-before.det /tmp/bench-decomposition-after.det`
       exits 0.
 - [ ] Test inventory unchanged: the `--list` count equals the recorded
-      baseline (151), and `cargo test -p v3-cli` passes with the same
+      baseline (162), and `cargo test -p v3-cli` passes with the same
       per-binary pass counts.
 - [ ] `make check` exits 0 in the worktree.
 - [ ] Independent review by `roadmap-reviewer` of
