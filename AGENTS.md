@@ -14,3 +14,4 @@
 - Use `$rust-skills` for every Rust change, loading only the rule files relevant to the affected code.
 - Run `cargo test -p v3-core --test viability` first when production defaults, founder behavior, or tick-loop mechanics change.
 - Shell automation must be POSIX `sh` compatible; do not add Bash or Zsh runtime dependencies.
+- All `wait_agent` tool calls MUST use at least 10 minutes timeout. `wait_agent` calls are considered non-blocking and will be interrupted when a subagent responds or a new user message comes in; hence, this does not violate the developer instruction.
