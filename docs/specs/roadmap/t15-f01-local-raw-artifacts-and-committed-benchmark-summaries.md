@@ -271,4 +271,5 @@ paths, byte counts, hashes, measurement identities and local availability.
   one implementation self-review pass, one post-review remediation pass, and
   one mutation test-only remediation pass; no production-code remediation,
   requirement correction, or user intervention after launch. Review P1/P2/P3
-  counts 0/1/1, both advisory findings resolved. Task-specific usage unavailable.
+  counts 0/1/1, both advisory findings resolved. Task-specific usage at the
+  closure query: 1,331,456 tokens.
