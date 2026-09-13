@@ -1,0 +1,1643 @@
+{
+  "kind": "petri-benchmark-summary",
+  "summary_version": 1,
+  "source_schema_version": 1,
+  "feature": "t13-f01-module-recruitment-observability",
+  "deterministic": {
+    "goal_indicators": {
+      "adaptive_novelty": "Undefined",
+      "births_per_100_ticks": "5112.000000",
+      "drift_depth": "Undefined",
+      "evolutionary_activity": "Undefined",
+      "information_integration": "Undefined",
+      "learning_dependence": "Undefined",
+      "lineage_diversity": "Undefined",
+      "memory_dependence": "Undefined",
+      "memory_sensitivity": "Undefined",
+      "mutational_neighborhood": {
+        "battery": {
+          "evolved_birth_count": 200,
+          "evolved_operator_trials": 20,
+          "evolved_sample_size": 12,
+          "executions_per_genome": 80,
+          "founder_birth_count": 500,
+          "founder_operator_trials": 50,
+          "sequence_count": 8,
+          "sequence_len": 4,
+          "sequence_seed": 8,
+          "snapshot_count": 48,
+          "snapshot_seed": 7,
+          "version": "neighborhood-v1"
+        },
+        "evolved": "Undefined",
+        "founder": {
+          "births": {
+            "any_events": {
+              "applied": 208,
+              "changed": 93,
+              "changed_fraction": "0.447115",
+              "changed_only_in_sequences": 2,
+              "dead": 0,
+              "dead_fraction": "0.000000",
+              "mean_fraction_differing": "0.266801",
+              "silent": 115,
+              "silent_fraction": "0.552885",
+              "skipped": 0,
+              "trials": 208
+            },
+            "births_total": 500,
+            "by_events": [
+              {
+                "applied_events": 1,
+                "tally": {
+                  "applied": 164,
+                  "changed": 66,
+                  "changed_fraction": "0.402439",
+                  "changed_only_in_sequences": 1,
+                  "dead": 0,
+                  "dead_fraction": "0.000000",
+                  "mean_fraction_differing": "0.245833",
+                  "silent": 98,
+                  "silent_fraction": "0.597561",
+                  "skipped": 0,
+                  "trials": 164
+                }
+              },
+              {
+                "applied_events": 2,
+                "tally": {
+                  "applied": 33,
+                  "changed": 19,
+                  "changed_fraction": "0.575758",
+                  "changed_only_in_sequences": 0,
+                  "dead": 0,
+                  "dead_fraction": "0.000000",
+                  "mean_fraction_differing": "0.276316",
+                  "silent": 14,
+                  "silent_fraction": "0.424242",
+                  "skipped": 0,
+                  "trials": 33
+                }
+              },
+              {
+                "applied_events": 3,
+                "tally": {
+                  "applied": 10,
+                  "changed": 7,
+                  "changed_fraction": "0.700000",
+                  "changed_only_in_sequences": 1,
+                  "dead": 0,
+                  "dead_fraction": "0.000000",
+                  "mean_fraction_differing": "0.458929",
+                  "silent": 3,
+                  "silent_fraction": "0.300000",
+                  "skipped": 0,
+                  "trials": 10
+                }
+              },
+              {
+                "applied_events": 4,
+                "tally": {
+                  "applied": 1,
+                  "changed": 1,
+                  "changed_fraction": "1.000000",
+                  "changed_only_in_sequences": 0,
+                  "dead": 0,
+                  "dead_fraction": "0.000000",
+                  "mean_fraction_differing": "0.125000",
+                  "silent": 0,
+                  "silent_fraction": "0.000000",
+                  "skipped": 0,
+                  "trials": 1
+                }
+              }
+            ],
+            "by_requested_events": [
+              {
+                "births": 292,
+                "requested_events": 0
+              },
+              {
+                "births": 164,
+                "requested_events": 1
+              },
+              {
+                "births": 33,
+                "requested_events": 2
+              },
+              {
+                "births": 10,
+                "requested_events": 3
+              },
+              {
+                "births": 1,
+                "requested_events": 4
+              }
+            ],
+            "zero_event_births": 292
+          },
+          "generation": 0,
+          "mesh_execution": {
+            "backends": {
+              "graph": {
+                "contributing": 1,
+                "executed": 1,
+                "total": 1
+              },
+              "vm": {
+                "contributing": 1,
+                "executed": 1,
+                "total": 1
+              }
+            },
+            "executed_node_count": 2,
+            "executions_per_genome": 80,
+            "hop_cap_hits": 0,
+            "knockout_count": 0,
+            "knockout_method": "static-successor-bypass-v1",
+            "reachable_node_count": 2,
+            "route_varies_with_input": false,
+            "snapshot_route_probes": 48,
+            "total_node_count": 2,
+            "version": "mesh-execution-v1"
+          },
+          "operator_rows": [
+            {
+              "family": "vm",
+              "operator": "VmConstantMutation",
+              "tally": {
+                "applied": 50,
+                "changed": 13,
+                "changed_fraction": "0.260000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.202885",
+                "silent": 37,
+                "silent_fraction": "0.740000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmInstructionMutation",
+              "tally": {
+                "applied": 50,
+                "changed": 30,
+                "changed_fraction": "0.600000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.148750",
+                "silent": 20,
+                "silent_fraction": "0.400000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmDeleteInstruction",
+              "tally": {
+                "applied": 50,
+                "changed": 44,
+                "changed_fraction": "0.880000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.143466",
+                "silent": 6,
+                "silent_fraction": "0.120000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmRegisterCountMutation",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmInstructionRawFieldMutation",
+              "tally": {
+                "applied": 50,
+                "changed": 42,
+                "changed_fraction": "0.840000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.197024",
+                "silent": 8,
+                "silent_fraction": "0.160000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmCopyInstructionBlock",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmCopyInstructionBlockRemapped",
+              "tally": {
+                "applied": 50,
+                "changed": 33,
+                "changed_fraction": "0.660000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.275758",
+                "silent": 17,
+                "silent_fraction": "0.340000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmCopyConstantBlock",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmCopyGeneBackwardSlice",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmCopyGeneForwardSlice",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmInsertReadStoreMotif",
+              "tally": {
+                "applied": 50,
+                "changed": 5,
+                "changed_fraction": "0.100000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.160000",
+                "silent": 45,
+                "silent_fraction": "0.900000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmInsertReadBidMotif",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmInsertLoadCompareMotif",
+              "tally": {
+                "applied": 50,
+                "changed": 7,
+                "changed_fraction": "0.140000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.132143",
+                "silent": 43,
+                "silent_fraction": "0.860000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmMutateSlotAddress",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "vm",
+              "operator": "VmMutatePairedSlotAddress",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "AlterGraphEdgeWeight",
+              "tally": {
+                "applied": 50,
+                "changed": 15,
+                "changed_fraction": "0.300000",
+                "changed_only_in_sequences": 7,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.027500",
+                "silent": 35,
+                "silent_fraction": "0.700000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "SwapGraphOperator",
+              "tally": {
+                "applied": 50,
+                "changed": 43,
+                "changed_fraction": "0.860000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.304651",
+                "silent": 7,
+                "silent_fraction": "0.140000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "MutateGraphOperatorParam",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "MutateActionSlotBehavior",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "AddInternalGraphNode",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "RemoveInternalGraphNode",
+              "tally": {
+                "applied": 50,
+                "changed": 50,
+                "changed_fraction": "1.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.237500",
+                "silent": 0,
+                "silent_fraction": "0.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "AddGraphEdge",
+              "tally": {
+                "applied": 50,
+                "changed": 3,
+                "changed_fraction": "0.060000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.375000",
+                "silent": 47,
+                "silent_fraction": "0.940000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "RetargetGraphEdge",
+              "tally": {
+                "applied": 50,
+                "changed": 47,
+                "changed_fraction": "0.940000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.330053",
+                "silent": 3,
+                "silent_fraction": "0.060000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "RemoveGraphEdge",
+              "tally": {
+                "applied": 50,
+                "changed": 50,
+                "changed_fraction": "1.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.226250",
+                "silent": 0,
+                "silent_fraction": "0.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "GraphRawFieldMutation",
+              "tally": {
+                "applied": 50,
+                "changed": 40,
+                "changed_fraction": "0.800000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.263750",
+                "silent": 10,
+                "silent_fraction": "0.200000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "CopyInternalNode",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "CopySubgraph",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "CopyEdgeBundle",
+              "tally": {
+                "applied": 50,
+                "changed": 28,
+                "changed_fraction": "0.560000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.159821",
+                "silent": 22,
+                "silent_fraction": "0.440000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "EnableHebbian",
+              "tally": {
+                "applied": 50,
+                "changed": 22,
+                "changed_fraction": "0.440000",
+                "changed_only_in_sequences": 22,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.038636",
+                "silent": 28,
+                "silent_fraction": "0.560000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "DisableHebbian",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "MutateHebbianRule",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "MutateHebbianRate",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "ToggleHebbianLamarckian",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "EnableRewardModulation",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "DisableRewardModulation",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "MutateRewardSource",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "graph",
+              "operator": "MutateTraceDecay",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "AddNode",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "RemoveNode",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "RetargetNodeTarget",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "AddRouteTarget",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "RemoveRouteTarget",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "ChangeEntryNode",
+              "tally": {
+                "applied": 50,
+                "changed": 50,
+                "changed_fraction": "1.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.800000",
+                "silent": 0,
+                "silent_fraction": "0.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "SwapNodeBackend",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "CopyNode",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "CopyMeshBackwardSlice",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "CopyMeshForwardSlice",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "SpliceNode",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "SwapRouteTargets",
+              "tally": {
+                "applied": 0,
+                "changed": 0,
+                "changed_fraction": "Undefined",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "Undefined",
+                "mean_fraction_differing": "0.000000",
+                "silent": 0,
+                "silent_fraction": "Undefined",
+                "skipped": 50,
+                "trials": 50
+              }
+            },
+            {
+              "family": "topology",
+              "operator": "MutateGateBias",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "input_ref",
+              "operator": "Add",
+              "tally": {
+                "applied": 50,
+                "changed": 0,
+                "changed_fraction": "0.000000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.000000",
+                "silent": 50,
+                "silent_fraction": "1.000000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "input_ref",
+              "operator": "Remove",
+              "tally": {
+                "applied": 50,
+                "changed": 46,
+                "changed_fraction": "0.920000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.300815",
+                "silent": 4,
+                "silent_fraction": "0.080000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "input_ref",
+              "operator": "Swap",
+              "tally": {
+                "applied": 50,
+                "changed": 45,
+                "changed_fraction": "0.900000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.339722",
+                "silent": 5,
+                "silent_fraction": "0.100000",
+                "skipped": 0,
+                "trials": 50
+              }
+            },
+            {
+              "family": "input_ref",
+              "operator": "RawFieldMutation",
+              "tally": {
+                "applied": 50,
+                "changed": 32,
+                "changed_fraction": "0.640000",
+                "changed_only_in_sequences": 0,
+                "dead": 0,
+                "dead_fraction": "0.000000",
+                "mean_fraction_differing": "0.240234",
+                "silent": 18,
+                "silent_fraction": "0.360000",
+                "skipped": 0,
+                "trials": 50
+              }
+            }
+          ],
+          "reachable_node_count": 2
+        }
+      },
+      "population_persistence": {
+        "per_seed": [
+          {
+            "extinction_tick": null,
+            "final_population": 3053,
+            "mean_energy": "11.618999",
+            "minimum_population": 256,
+            "peak_population": 3791,
+            "peak_tick": 65,
+            "plateau_population": "3593.894737",
+            "samples": [
+              {
+                "births_total": 3917,
+                "food_density_total": [
+                  "186.113922"
+                ],
+                "mean_energy": "11.618999",
+                "move_attempts_with_barrier_neighbor_by_reader_state": {
+                  "has_barrier_reader": 0,
+                  "no_barrier_reader": 0
+                },
+                "moves_attempted_total": 130399,
+                "moves_blocked_avoidable_by_reader_state": {
+                  "has_barrier_reader": 198,
+                  "no_barrier_reader": 48654
+                },
+                "moves_blocked_barrier_total": 0,
+                "moves_blocked_barrier_with_barrier_neighbor_by_reader_state": {
+                  "has_barrier_reader": 0,
+                  "no_barrier_reader": 0
+                },
+                "moves_blocked_total_by_cause": {
+                  "barrier": 0,
+                  "occupied": 50075,
+                  "out_of_bounds": 0
+                },
+                "population": 3053,
+                "tick": 75,
+                "typed_eats_total": [
+                  37853
+                ]
+              }
+            ],
+            "seed": 11
+          },
+          {
+            "extinction_tick": null,
+            "final_population": 2983,
+            "mean_energy": "12.368865",
+            "minimum_population": 256,
+            "peak_population": 3605,
+            "peak_tick": 66,
+            "plateau_population": "3448.210526",
+            "samples": [
+              {
+                "births_total": 3766,
+                "food_density_total": [
+                  "174.099548"
+                ],
+                "mean_energy": "12.368865",
+                "move_attempts_with_barrier_neighbor_by_reader_state": {
+                  "has_barrier_reader": 0,
+                  "no_barrier_reader": 0
+                },
+                "moves_attempted_total": 125615,
+                "moves_blocked_avoidable_by_reader_state": {
+                  "has_barrier_reader": 282,
+                  "no_barrier_reader": 46949
+                },
+                "moves_blocked_barrier_total": 0,
+                "moves_blocked_barrier_with_barrier_neighbor_by_reader_state": {
+                  "has_barrier_reader": 0,
+                  "no_barrier_reader": 0
+                },
+                "moves_blocked_total_by_cause": {
+                  "barrier": 0,
+                  "occupied": 48300,
+                  "out_of_bounds": 0
+                },
+                "population": 2983,
+                "tick": 75,
+                "typed_eats_total": [
+                  37483
+                ]
+              }
+            ],
+            "seed": 22
+          },
+          {
+            "extinction_tick": null,
+            "final_population": 3020,
+            "mean_energy": "13.294510",
+            "minimum_population": 256,
+            "peak_population": 3698,
+            "peak_tick": 64,
+            "plateau_population": "3514.578947",
+            "samples": [
+              {
+                "births_total": 3819,
+                "food_density_total": [
+                  "213.947311"
+                ],
+                "mean_energy": "13.294510",
+                "move_attempts_with_barrier_neighbor_by_reader_state": {
+                  "has_barrier_reader": 0,
+                  "no_barrier_reader": 0
+                },
+                "moves_attempted_total": 126423,
+                "moves_blocked_avoidable_by_reader_state": {
+                  "has_barrier_reader": 195,
+                  "no_barrier_reader": 49627
+                },
+                "moves_blocked_barrier_total": 0,
+                "moves_blocked_barrier_with_barrier_neighbor_by_reader_state": {
+                  "has_barrier_reader": 0,
+                  "no_barrier_reader": 0
+                },
+                "moves_blocked_total_by_cause": {
+                  "barrier": 0,
+                  "occupied": 51182,
+                  "out_of_bounds": 0
+                },
+                "population": 3020,
+                "tick": 75,
+                "typed_eats_total": [
+                  38690
+                ]
+              }
+            ],
+            "seed": 33
+          }
+        ]
+      },
+      "prediction_dependence": "Undefined",
+      "reachable_structure_size_distribution": {
+        "max": 172,
+        "mean": "65.076855",
+        "median": 63,
+        "min": 42,
+        "p25": 63,
+        "p75": 63
+      },
+      "reciprocal_interaction": "Undefined",
+      "strategy_causal_distinctness": "Undefined",
+      "strategy_count": "Undefined",
+      "temporal_memory_sensitivity": "Undefined"
+    },
+    "graph_work_definition": "graph_relax_iters: entered nonempty single-evaluation visits, including unaffordable visits (T11.F06); historical deltas cross definitions",
+    "per_creature_tick": {
+      "actions_applied": "1.272860",
+      "births": "0.026902",
+      "graph_relax_iters": "0.994920",
+      "mesh_hops": "2.028954",
+      "plasticity_updates": "0.009880",
+      "vm_steps": "22.425973"
+    },
+    "per_seed": [
+      {
+        "actions_applied": 183879,
+        "births": 3917,
+        "creature_ticks": 144752,
+        "extinction_tick": null,
+        "final_population": 3053,
+        "graph_relax_iters": 143960,
+        "mesh_hops": 294162,
+        "plasticity_updates": 1398,
+        "seed": 11,
+        "tick_zero_connectivity": {
+          "largest_component_cells": 16384,
+          "largest_component_fraction_of_passable": 1.0,
+          "passable_cells": 16384,
+          "passable_fraction": 1.0,
+          "total_cells": 16384
+        },
+        "ticks": 75,
+        "vm_steps": 3237352
+      },
+      {
+        "actions_applied": 179052,
+        "births": 3766,
+        "creature_ticks": 140629,
+        "extinction_tick": null,
+        "final_population": 2983,
+        "graph_relax_iters": 139710,
+        "mesh_hops": 284529,
+        "plasticity_updates": 924,
+        "seed": 22,
+        "tick_zero_connectivity": {
+          "largest_component_cells": 16384,
+          "largest_component_fraction_of_passable": 1.0,
+          "passable_cells": 16384,
+          "passable_fraction": 1.0,
+          "total_cells": 16384
+        },
+        "ticks": 75,
+        "vm_steps": 3161633
+      },
+      {
+        "actions_applied": 181275,
+        "births": 3819,
+        "creature_ticks": 142165,
+        "extinction_tick": null,
+        "final_population": 3020,
+        "graph_relax_iters": 141704,
+        "mesh_hops": 288780,
+        "plasticity_updates": 1902,
+        "seed": 33,
+        "tick_zero_connectivity": {
+          "largest_component_cells": 16384,
+          "largest_component_fraction_of_passable": 1.0,
+          "passable_cells": 16384,
+          "passable_fraction": 1.0,
+          "total_cells": 16384
+        },
+        "ticks": 75,
+        "vm_steps": 3189150
+      }
+    ],
+    "profile": {
+      "food_coverage": "1.000000",
+      "founders": 256,
+      "name": "gate",
+      "seeds": [
+        11,
+        22,
+        33
+      ],
+      "ticks": 75,
+      "world_height": 128,
+      "world_width": 128
+    },
+    "totals": {
+      "actions_applied": 544206,
+      "births": 11502,
+      "creature_ticks": 427546,
+      "graph_relax_iters": 425374,
+      "mesh_hops": 867471,
+      "plasticity_updates": 4224,
+      "ticks": 225,
+      "vm_steps": 9588135
+    }
+  },
+  "environment": {
+    "build_profile": "release",
+    "drift_depth_wall_clock_ms": null,
+    "final_state_observation_ms_per_seed": [],
+    "final_state_observation_ms_total": -0.0,
+    "generated_at": "2026-09-10T16:15:23Z",
+    "git_revision": "ea0044d5f4390ada662b0506caf020191fea9252",
+    "host": {
+      "arch": "aarch64",
+      "cpu_model": "Apple M1 Pro",
+      "hostname": "Isaacs-MacBook-Pro-2.local",
+      "logical_cores": 8,
+      "os": "macos"
+    },
+    "neighborhood_evolved_wall_clock_ms_per_seed": [],
+    "neighborhood_evolved_wall_clock_ms_total": -0.0,
+    "neighborhood_founder_wall_clock_ms": 60.623666,
+    "phase_wall_clock_ms_per_seed": [
+      {
+        "actions_ms": 74.730834,
+        "cognition_ms": 43.102956,
+        "reward_learning_ms": 3.0613770000000002,
+        "seed": 11,
+        "sensor_assembly_ms": 43.186371,
+        "world_update_ms": 31.626711
+      },
+      {
+        "actions_ms": 65.43787800000001,
+        "cognition_ms": 41.436622,
+        "reward_learning_ms": 2.955081,
+        "seed": 22,
+        "sensor_assembly_ms": 35.603624,
+        "world_update_ms": 31.535296
+      },
+      {
+        "actions_ms": 65.166875,
+        "cognition_ms": 41.279374,
+        "reward_learning_ms": 3.128249,
+        "seed": 33,
+        "sensor_assembly_ms": 36.480872999999995,
+        "world_update_ms": 31.639
+      }
+    ],
+    "rand_version": "0.8.6",
+    "threads": 8,
+    "throughput": {
+      "per_seed": [
+        {
+          "births_per_hour": 67538000.03933156,
+          "creature_ticks_per_second": 693292.8106610304,
+          "seed": 11,
+          "ticks_per_hour": 1293170.7947280742,
+          "ticks_per_second": 359.2141096466873
+        },
+        {
+          "births_per_hour": 71771434.4714617,
+          "creature_ticks_per_second": 744463.994976042,
+          "seed": 22,
+          "ticks_per_hour": 1429330.2138501399,
+          "ticks_per_second": 397.03617051392774
+        },
+        {
+          "births_per_hour": 71989867.88321884,
+          "creature_ticks_per_second": 744409.4998412767,
+          "seed": 33,
+          "ticks_per_hour": 1413783.736905319,
+          "ticks_per_second": 392.71770469592195
+        }
+      ],
+      "total": {
+        "births_per_hour": 70340776.30350403,
+        "creature_ticks_per_second": 726296.8166274932,
+        "ticks_per_hour": 1375993.2766726143,
+        "ticks_per_second": 382.22035463128174
+      }
+    },
+    "wall_clock_ms_per_creature_tick": 0.0013768475602625213,
+    "wall_clock_ms_per_seed": [
+      {
+        "seed": 11,
+        "wall_clock_ms": 208.78912599999998
+      },
+      {
+        "seed": 22,
+        "wall_clock_ms": 188.899666
+      },
+      {
+        "seed": 33,
+        "wall_clock_ms": 190.97687499999998
+      }
+    ],
+    "wall_clock_ms_total": 588.665667
+  },
+  "comparison": {
+    "references": [
+      {
+        "counters": [
+          {
+            "current": "2.028954",
+            "level": "ok",
+            "name": "mesh_hops",
+            "percent_delta": "0.083512",
+            "reference": "2.027261"
+          },
+          {
+            "current": "22.425973",
+            "level": "ok",
+            "name": "vm_steps",
+            "percent_delta": "-1.429996",
+            "reference": "22.751316"
+          },
+          {
+            "current": "0.994920",
+            "level": "ok",
+            "name": "graph_relax_iters",
+            "percent_delta": "-0.031550",
+            "reference": "0.995234"
+          },
+          {
+            "current": "0.009880",
+            "level": "ok",
+            "name": "plasticity_updates",
+            "percent_delta": "-11.556709",
+            "reference": "0.011171"
+          },
+          {
+            "current": "1.272860",
+            "level": "ok",
+            "name": "actions_applied",
+            "percent_delta": "-0.208934",
+            "reference": "1.275525"
+          },
+          {
+            "current": "0.026902",
+            "level": "ok",
+            "name": "births",
+            "percent_delta": "0.455564",
+            "reference": "0.026780"
+          }
+        ],
+        "path": "docs/progress/features/remove-complementary-nutrition.json",
+        "severe": false,
+        "wall_clock": {
+          "current_ms_per_creature_tick": 0.0013768475602625213,
+          "level": "ok",
+          "percent_delta": -11.730980004764167,
+          "reference_ms_per_creature_tick": 0.0015598310260347677
+        }
+      },
+      {
+        "counters": [
+          {
+            "current": "2.028954",
+            "level": "ok",
+            "name": "mesh_hops",
+            "percent_delta": "0.000000",
+            "reference": "2.028954"
+          },
+          {
+            "current": "22.425973",
+            "level": "ok",
+            "name": "vm_steps",
+            "percent_delta": "0.000000",
+            "reference": "22.425973"
+          },
+          {
+            "current": "0.994920",
+            "level": "ok",
+            "name": "graph_relax_iters",
+            "percent_delta": "0.000000",
+            "reference": "0.994920"
+          },
+          {
+            "current": "0.009880",
+            "level": "ok",
+            "name": "plasticity_updates",
+            "percent_delta": "0.000000",
+            "reference": "0.009880"
+          },
+          {
+            "current": "1.272860",
+            "level": "ok",
+            "name": "actions_applied",
+            "percent_delta": "0.000000",
+            "reference": "1.272860"
+          },
+          {
+            "current": "0.026902",
+            "level": "ok",
+            "name": "births",
+            "percent_delta": "0.000000",
+            "reference": "0.026902"
+          }
+        ],
+        "path": "docs/progress/features/t11-f18-backend-neutral-mesh-node-growth.json",
+        "severe": false,
+        "wall_clock": {
+          "current_ms_per_creature_tick": 0.0013768475602625213,
+          "level": "ok",
+          "percent_delta": -30.39774678726018,
+          "reference_ms_per_creature_tick": 0.0019781652126320912
+        }
+      }
+    ],
+    "severe": false
+  },
+  "comparison_inputs": {
+    "identity": {
+      "feature": "t13-f01-module-recruitment-observability",
+      "git_revision": "ea0044d5f4390ada662b0506caf020191fea9252",
+      "generated_at": "2026-09-10T16:15:23Z"
+    },
+    "profile": {
+      "name": "gate",
+      "world_width": 128,
+      "world_height": 128,
+      "founders": 256,
+      "seeds": [
+        11,
+        22,
+        33
+      ],
+      "ticks": 75,
+      "food_coverage": "1.000000"
+    },
+    "per_creature_tick": {
+      "mesh_hops": "2.028954",
+      "vm_steps": "22.425973",
+      "graph_relax_iters": "0.994920",
+      "plasticity_updates": "0.009880",
+      "actions_applied": "1.272860",
+      "births": "0.026902"
+    },
+    "host": {
+      "hostname": "Isaacs-MacBook-Pro-2.local",
+      "os": "macos",
+      "arch": "aarch64",
+      "cpu_model": "Apple M1 Pro",
+      "logical_cores": 8
+    },
+    "wall_clock_ms_per_creature_tick": "0.0013768475602625213",
+    "case_readings": {}
+  },
+  "measurement_evidence": {
+    "cli_exit": null,
+    "command": null,
+    "dirty": null,
+    "inheritance": null,
+    "outer_exit": null,
+    "thresholds": null,
+    "wall_caps": null
+  },
+  "conversion": {
+    "verified_at": "2026-09-13T19:36:06.347Z",
+    "converter": {
+      "executable": "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-complete/converter/v3-cli",
+      "arguments": [
+        "bench-summarize",
+        "--input",
+        "/Users/istefanek/projects/petri/.bench-artifacts/historical/blobs/356524d6e04d4e3703cda30f44e3b19e727274d1.json",
+        "--out",
+        "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-complete/versions/356524d6e04d4e3703cda30f44e3b19e727274d1.json",
+        "--provenance",
+        "/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-complete/provenance/356524d6e04d4e3703cda30f44e3b19e727274d1.json"
+      ],
+      "working_directory": "/Users/istefanek/projects/petri/.worktrees/t15-f02"
+    },
+    "supplied_evidence": null
+  },
+  "raw": {
+    "sha256": "ef10b851040ec1a3857328b880f5fc941519658f1b5bd095c779793de6e1475c",
+    "bytes": 49966,
+    "path": "/Users/istefanek/projects/petri/.bench-artifacts/historical/blobs/356524d6e04d4e3703cda30f44e3b19e727274d1.json",
+    "availability": "verified_local",
+    "verified_at": "2026-09-13T19:36:06.347Z"
+  },
+  "claims": [
+    {
+      "pointer": "/deterministic/totals/creature_ticks",
+      "value": 427546
+    },
+    {
+      "pointer": "/deterministic/totals/births",
+      "value": 11502
+    },
+    {
+      "pointer": "/deterministic/per_creature_tick/vm_steps",
+      "value": "22.425973"
+    },
+    {
+      "pointer": "/comparison/severe",
+      "value": false
+    },
+    {
+      "pointer": "/deterministic/goal_indicators/population_persistence/per_seed/0/final_population",
+      "value": 3053
+    },
+    {
+      "pointer": "/deterministic/goal_indicators/population_persistence/per_seed/0/minimum_population",
+      "value": 256
+    },
+    {
+      "pointer": "/environment/wall_clock_ms_total",
+      "value": 588.665667
+    }
+  ],
+  "omitted_details": [
+    "full genomes and genome deltas",
+    "per-proposal rows",
+    "scene, signature, route and state traces",
+    "replay paths",
+    "per-genome neighborhood rows (pooled readings retained)",
+    "persistence checkpoints beyond 21 evenly spaced source indices"
+  ]
+}

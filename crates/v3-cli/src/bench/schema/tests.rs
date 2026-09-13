@@ -25,7 +25,7 @@ fn comparison_level_displays_as_its_serialized_string() {
 #[test]
 fn historical_goal_indicators_default_temporal_memory_to_undefined() {
     let report: Report = serde_json::from_str(include_str!(
-        "../../../../../docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold.json"
+        "../../../tests/fixtures/synthetic-full-benchmark-v1.json"
     ))
     .unwrap();
     assert_eq!(
@@ -147,56 +147,48 @@ fn new_reports_carry_indicator_version_tokens() {
     );
 }
 
-/// T12.F04's stored goal report predates the version tokens: it loads with
-/// `version` absent on all three indicators and re-serializes those blocks
-/// exactly as stored, with no `version` key.
+/// T12.F04 predates the version tokens. Its retained historical aggregates
+/// load and reserialize exactly as stored, with no `version` key; the artifact
+/// container is now a summary, while these aggregate types remain unchanged.
 #[test]
-fn historical_goal_report_loads_without_versions_and_reserializes_them_absent() {
+fn historical_goal_aggregates_load_without_versions_and_reserialize_them_absent() {
     let stored: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../../docs/progress/features/t12-f04-baseline-world-set-goal.json"
     ))
     .unwrap();
-    let report: Report = serde_json::from_value(stored.clone()).unwrap();
-    let indicators = &report.deterministic.goal_indicators;
     let stored_indicators = &stored["deterministic"]["goal_indicators"];
 
-    let Indicator::Defined(lineage) = &indicators.lineage_diversity else {
-        panic!("the stored report defines lineage diversity");
-    };
+    let lineage: LineageDiversity =
+        serde_json::from_value(stored_indicators["lineage_diversity"].clone()).unwrap();
     assert_eq!(lineage.version, None);
     assert_eq!(
-        serde_json::to_value(lineage).unwrap(),
+        serde_json::to_value(&lineage).unwrap(),
         stored_indicators["lineage_diversity"]
     );
-    let Indicator::Defined(memory) = &indicators.memory_sensitivity else {
-        panic!("the stored report defines memory sensitivity");
-    };
+    let memory: MemorySensitivity =
+        serde_json::from_value(stored_indicators["memory_sensitivity"].clone()).unwrap();
     assert_eq!(memory.version, None);
     assert_eq!(
-        serde_json::to_value(memory).unwrap(),
+        serde_json::to_value(&memory).unwrap(),
         stored_indicators["memory_sensitivity"]
     );
+    let structure: StructureSizeDistribution =
+        serde_json::from_value(stored_indicators["reachable_structure_size_distribution"].clone())
+            .unwrap();
+    assert_eq!(structure.version, None);
     assert_eq!(
-        indicators.reachable_structure_size_distribution.version,
-        None
-    );
-    assert_eq!(
-        serde_json::to_value(&indicators.reachable_structure_size_distribution).unwrap(),
+        serde_json::to_value(&structure).unwrap(),
         stored_indicators["reachable_structure_size_distribution"]
     );
-    assert!(!indicators.cases.is_empty());
-    for (case, stored_case) in indicators
-        .cases
-        .iter()
-        .zip(stored_indicators["cases"].as_array().unwrap())
-    {
-        let distribution = case
-            .reachable_structure_size_distribution
-            .as_ref()
-            .expect("the stored report measured every case");
+    let cases = stored_indicators["cases"].as_array().unwrap();
+    assert!(!cases.is_empty());
+    for stored_case in cases {
+        let distribution: StructureSizeDistribution =
+            serde_json::from_value(stored_case["reachable_structure_size_distribution"].clone())
+                .expect("the stored report measured every case");
         assert_eq!(distribution.version, None);
         assert_eq!(
-            serde_json::to_value(distribution).unwrap(),
+            serde_json::to_value(&distribution).unwrap(),
             stored_case["reachable_structure_size_distribution"]
         );
     }

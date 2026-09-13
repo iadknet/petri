@@ -325,7 +325,7 @@ relocated 2026-09-09 to
   regression also failed before the fix. It now checks parsing and deterministic
   block preservation, not bit-exact reserialization of wall-clock floats.
   Original gate bytes are preserved as
-  [pre-schema-fix gate evidence](../../progress/features/t11-f04-mutation-supply-and-neutral-scaffold-pre-schema-fix.json)
+  [pre-schema-fix gate disposition](../../progress/readings/t15-f02-historical-report-migration-and-main-history-rewrite.md#unsupported-historical-shapes)
   (the intentionally unreadable original report shape, not a series reference).
   Regeneration uses explicit historical comparison paths to avoid loading the
   old canonical report through the newly pinned reference. Explicit self-review
