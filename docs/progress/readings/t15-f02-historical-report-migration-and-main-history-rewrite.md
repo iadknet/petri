@@ -1,8 +1,9 @@
 # T15.F02 — historical report migration and main-history rewrite
 
-Preparation is in progress. No live ref has been rewritten and no cutover is
-authorized. Frozen main is `84c9c7e2afad3f1621d1ada2988f9fe851af4cb9`;
-the source feature branch starts with plan commit `bcbb248495e3f22f33e542d56b81b0b90b8c12dc`.
+This disposable candidate stages the proposed post-cutover state. No live ref
+has been rewritten and no cutover is authorized. Frozen main is
+`84c9c7e2afad3f1621d1ada2988f9fe851af4cb9`; the clean source export is
+`0b1248bed832be6adcfac3ea73c8be044f0a300c`, without importing its old ancestry.
 No historical simulation, assay, benchmark, or baseline was rerun for this migration.
 
 ## Inventory and preserved evidence
@@ -85,9 +86,10 @@ document blob IDs are included in each manifest disposition.
 
 Commands ran from `/Users/istefanek/projects/petri/.worktrees/t15-f02`.
 Migration-specific tests exercised stored or synthetic bytes only; ordinary regression checks are
-separate from historical measurement. The source remained uncommitted atop the
-plan revision during this pass; final tested revision and candidate checks are
-pending.
+separate from historical measurement. Initial preparation checks ran on
+uncommitted source. The final implementation check below is bound to immutable
+commit `29170014b3e167a215fdfeabb746fad79ef74065`; closure-candidate checks
+remain separate and pending.
 
 | Command | Observed result |
 | --- | --- |
@@ -109,6 +111,14 @@ pending.
 | Second `make check` | Exit 2: seven server listener tests could not bind in the sandbox; no production defect. |
 | Approved unrestricted `make check` | Exit 0: all gates passed, including 95 server tests, 61 frontend test files / 322 tests, and the frontend build. |
 | `make check-docs` | Exit 0 after adding the check outcomes and ref/worktree audit evidence. |
+| Final unrestricted `make check` at `29170014b3e167a215fdfeabb746fad79ef74065` | Exit 0; all Rust/server suites, 61 frontend test files / 322 tests, frontend build, dependency checks and the cached skill-scan gate passed. Source worktree remained clean. |
+
+The final implementation log is
+`/private/tmp/t15-f02-make-check-29170014.log`: 2,201 lines, 168,307 bytes,
+SHA-256 `461506d442070ecf7ba8241e8ee2842f660997348ae21b5f7210fa749b7370b6`.
+Its size/hash were rechecked during documentation bookkeeping. A byte-identical
+copy is preserved as `make-check-29170014.log` in the final package below.
+The full gate was not rerun; later bookkeeping/closure changes are documentation-only.
 
 `<package>` expands to the absolute package path above. Mutation is not
 applicable: no mutation-testable production Rust changed. Benchmark runs are
@@ -125,7 +135,7 @@ as non-authoritative preparation evidence; use the `-complete` package above.
 The pre-rewrite bundle is 10,477,647 bytes, SHA-256
 `2fea87b5691d05414f435178d952d77b96cc2083a6d470e9d37e3e6c677a4646`.
 To recover the frozen source independently, clone that bundle with the exact
-single-branch command recorded above. The unmodified source feature branch and
+single-branch command recorded above. The unrewritten source feature branch and
 all other original refs/worktrees are retained.
 
 The generated `ref-worktree-audit.json` records 42 exact local refs and 13 linked
@@ -154,7 +164,7 @@ the ambiguous-merge fixture's edited manifest with an actual merged history.
 It also follows historical references before classifying unrecognizable bytes;
 an independently regenerated census produced identical report/exclusion sets
 and enumeration hashes. The nine focused fixtures pass after those changes.
-Advisor consultations: 4;
+Advisor consultations: 5;
 the accepted identity rule and four unsupported dispositions are recorded above.
 
 ## Disposable rewrite and review preparation
@@ -228,8 +238,9 @@ differences in four manifest disposition entries. Parsed manifests match exactly
 the verifier now checks those contents and separately enforces the exact exported
 tip bytes. No historical data, summary, or production code changed. Self-review
 kept the callback bounded to saved pairs, copies restricted to explicit source
-paths, and scans batched; it reuses the existing package verifier. Final-review
-remediation and closure remain pending, with task 4 unchecked.
+paths, and scans batched; it reuses the existing package verifier. That review
+snapshot preceded the single remediation pass below; closure remains pending,
+with task 4 unchecked.
 
 ## Single post-review remediation
 
@@ -259,5 +270,66 @@ the nonexistent consolidated filename. New command-specific receipts are
 written only after their commands run and identify the exact candidate revision
 and exit. The original reviewed candidate and bundles remain unchanged; the
 versioned replacement candidate and evidence are under the supplementary
-package. Source status remains In Progress. Final implementation commit, its
-full `make check`, closure staging, fresh lease and authorization remain pending.
+package. Remediation candidate `652c50c6d8f3197b1db005a7c19143f503930f61`
+is preserved evidence, not the final closure candidate. The source implementation
+is now committed and its exact-commit full gate passed as recorded above.
+The preserved source status remains In Progress. The final candidate's staging
+condition and external verification records are described below; direct lease
+capture and authorization remain pending.
+
+## Workflow bookkeeping
+
+Final-review findings were P1: 0, P2: 1, P3: 1, addressed in one authorized
+post-final-review remediation pass. Five advisor consultations completed;
+planning/readiness self-review is not counted as advice. Requirement decisions
+include one candidate-only requirement clarification in consultation 5: feature,
+track and master markers express conditional post-cutover state. No goal, scope,
+converter semantics, baseline or acceptance requirement changed. Implementation self-review
+covered reuse, simplification and efficiency.
+
+The requested orchestrator setting is Sol at medium effort; this root task does
+not expose independent model/effort metadata, so that setting is unavailable
+for verification rather than recorded as observed. Explicitly selected Astra
+xhigh agents filled three separate roles: persistent spec owner/advisor,
+persistent implementation/remediation owner, and fresh final reviewer. Benchmark
+and mutation specialists were not used:
+benchmark runs are N/A and prohibited for this stored-artifact migration;
+mutation is N/A because no production Rust changed. Usage/token/cost accounting
+is unavailable, not zero.
+
+The user authorized worktree/branch creation, commits and the disposable dry
+run. The `git-filter-repo` download and outside-sandbox checks were approved.
+These permissions do not authorize live-main replacement, remote force-push,
+other-ref cleanup or changes to other worktrees. Remote cutover remains
+unauthorized and requires the final exact candidate, direct lease capture and
+explicit approval package. In the preserved source, Status stays In Progress,
+the T15.F02 roadmap row stays unchecked, and cutover-dependent items stay open.
+
+## Final staged candidate and authorization boundary
+
+The versioned final package is
+`/Users/istefanek/projects/petri/.bench-artifacts/historical/t15-f02-20260913-final-v3/`.
+It preserves the exact source export and separate closure edits, final single-main
+bundle, final/fresh-clone structural proofs, command-specific revision-bound
+receipts, recovery instructions and lease-placeholder command templates.
+The final OID and receipt hashes belong in its external `approval-package.json`,
+not in this self-containing tracked document. Original and remediation packages
+remain immutable dependencies for raw/provenance and historical rewrite evidence.
+
+Consultation 5 stages the feature Complete and checked, all eight T15 criteria
+checked, T15 Complete, and the master T15 row checked. Master Status remains
+Active; unrelated completion markers are untouched. These markers express the
+proposed post-cutover state and become effective only after explicit
+authorization, the exact leased push and successful external postpush
+verification. Until that receipt passes, they do not attest that cutover
+occurred; a failed postpush check does not establish completion.
+
+The final package verifies the 1,011-reference census, all 97 preserved raws,
+93 unchanged summaries, 54 current series references, exact scoped/closure tree
+changes and mapped unrelated history. Final doc gates and a separate fresh
+single-main clone are recorded against the exact final OID outside the candidate.
+No new full implementation gate, benchmark or mutation run is part of closure.
+The remaining external blockers are a freshly captured direct remote-main OID,
+approval of the exact replacement/leased-push package, and the eventual
+authorization/postpush receipt. No remote query or live mutation is performed
+while assembling this package.

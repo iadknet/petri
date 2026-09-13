@@ -29,7 +29,8 @@ feature whose closure moved it.
 - [ ] **T12 — World Composition and Baseline Worlds** — [Roadmap](roadmaps/t12-world-composition-and-baseline-worlds.md) — Depends on: None
 - [ ] **T13 — Neutral Module Recruitment** — [Roadmap](roadmaps/t13-neutral-module-recruitment.md) — Depends on: None
 - [ ] **T14 — Runtime Telemetry and Report Integrity** — [Roadmap](roadmaps/t14-runtime-telemetry-and-report-integrity.md) — Depends on: None
-- [ ] **T15 — Benchmark Evidence Storage** — [Roadmap](roadmaps/t15-benchmark-evidence-storage.md) — Depends on: None
+- [x] **T15 — Benchmark Evidence Storage** — [Roadmap](roadmaps/t15-benchmark-evidence-storage.md) — Depends on: None
+  - Staged post-cutover rollup; effective only after authorization, the exact leased push and successful external postpush verification under [T15.F02's staging condition](specs/roadmap/t15-f02-historical-report-migration-and-main-history-rewrite.md#inputs-and-invariants).
 
 ## Final Success Criteria
 
