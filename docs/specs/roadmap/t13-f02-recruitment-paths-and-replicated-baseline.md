@@ -36,15 +36,11 @@ selection, and variation between independent lineages in one bounded baseline.
   `tests/temporal_fixtures.rs`, `mutation/vm/f08_tests.rs`,
   `mutation/graph/tests/f08.rs` and `mutation/topology/f08_tests.rs`.
   Mutation/runtime/simulation never depend on observation types.
-- Research decision, 2026-09-12: extend these in-process seams rather than
-  introduce a separate evolutionary simulator or add task selection to the
-  historical unconditional drift walk. Only the extension preserves Petri's
-  applied mutation and cost semantics without changing that walk. The
-  alternatives would change the substrate or the comparison being measured.
-  [Lenski et al. 2003](https://doi.org/10.1038/nature01568) motivates recording
-  actual intermediates, including damage; [Blount et al. 2008](https://pubmed.ncbi.nlm.nih.gov/18524956/)
-  motivates replicated replay from matched histories. Neither supplies a Petri
-  discovery floor. Use existing crates and `std`; no new dependency.
+- Research decision, 2026-09-12: extend these seams with existing crates/`std`.
+  A separate simulator or selection in historical drift would change the
+  substrate or comparison. [Lenski et al. 2003](https://doi.org/10.1038/nature01568)
+  motivates recording intermediates including damage; [Blount et al. 2008](https://pubmed.ncbi.nlm.nih.gov/18524956/)
+  motivates matched-history replication. Neither supplies a discovery floor.
 
 **Tasks and applied outcomes.** Task A is T11.F05's A1: `Move(E)` when
 `FoodHere(type 0) > 0`, otherwise `NoOp`. Task B changes only the relevant cue
@@ -144,6 +140,7 @@ the full battery reading and T13.F01 cohort facts, with resolution/censoring
 explicit. For each lineage's first observed successful path, store replayable
 seeds, exact mutations and before/after affected values, including prior
 silent edits; do not substitute an operator name for the mutation itself.
+Detailed records are local-only under the storage exception below.
 
 Report 95% Wilson intervals for the 32-lineage discovery/retention fractions,
 the four separate batch results, paired lineage outcome differences, and
@@ -195,9 +192,9 @@ that reason. Any genotype/size/exposure difference remains a stated limitation.
   output path and full survivor list here, each killed, equivalent with
   evidence, or deferred with user agreement. The separate specialist owns
   test-only remediation; no unexplained skips or exclusions.
-- [ ] The two benchmark commands below store complete reports and concise
-  readings, including sibling totals, batch/lineage uncertainty, constructed
-  and observed paths, control applicability, wall caps and comparison verdicts.
+- [x] Both benchmark commands generated the required outcomes, uncertainty,
+  paths, controls, caps and verdicts; readings are linked above. The goal
+  artifact is local-only by exception; retain the gate report for closure.
 - [x] A second full goal run for determinism is not applicable: the shared
   workflow's 2026-09-05 decision requires one goal run; `make check` retains
   cross-process reproducibility and the gate's two-run check.
@@ -209,14 +206,12 @@ make bench PROFILE=goal FEATURE=t13-f02-recruitment-paths-and-replicated-baselin
 
 ## Performance and Goal Impact
 
-**Predeclaration — written before the run.** Observation-only feature; no new
-mechanism or environmental pressure, hence no natural analog or recipe
-integration change. All six normalized simulation counters and every existing
-deterministic observation must remain unchanged against T14.F03's corresponding
-report. New experiment fields and its separate timing are additive; there is
-no expected movement in persistence, diversity, memory, neighborhood or drift
-indicators and no cognition claim. The new task measure is descriptive with
-no floor and is wired into the standard goal report; it is unmeasured in gate.
+**Predeclaration — written before the run.** Observation only; no natural analog
+or recipe integration applies. All six normalized simulation counters and
+existing deterministic observations must remain unchanged against T14.F03.
+Only experiment fields and separate timing are additive: no existing indicator
+movement or cognition claim. The new descriptive goal measure has no floor
+and is unmeasured in gate.
 
 The benchmark commands use the unchanged series index: gate epoch
 `remove-complementary-nutrition.json` and previous
@@ -234,13 +229,25 @@ across seeds, and historical drift under 30 s per world. The complete goal
 profile retains the 15-minute investigation threshold. Benchmark and mutation
 specialists run sequentially without competing builds, tests or servers.
 
-**Measured verdict.** Pending the final-code gate and single goal run; record
-each exit status, `comparison.severe`, threshold crossings, cap verdict and
-whether the epoch was re-pinned. No measured claim is made at planning time.
+**Measured verdict.** Each final-code profile ran once at `7f4c54fb`, exited 0,
+and has `comparison.severe=false`. Gate has a new non-severe wall flag; goal is
+unchanged versus T14.F03 and retains an inherited epoch plasticity flag. All
+caps pass. No threshold, baseline or epoch changed; readings hold details.
 
-- Reports: [gate](../../progress/features/t13-f02-recruitment-paths-and-replicated-baseline.json),
-  [goal](../../progress/features/t13-f02-recruitment-paths-and-replicated-baseline-goal.json).
+- Report: [gate](../../progress/features/t13-f02-recruitment-paths-and-replicated-baseline.json).
 - Full readings: [t13-f02-recruitment-paths-and-replicated-baseline.md](../../progress/readings/t13-f02-recruitment-paths-and-replicated-baseline.md).
+
+**User storage exception, 2026-09-12.** Commit the gate report and readings,
+not the raw goal report; do not compact, rerun or index the omitted goal file.
+Detailed sibling/path evidence is local-only. Summary/storage implementation
+belongs to Planned, unscheduled T15.F01.
+
+| Local raw goal provenance | Value |
+| --- | --- |
+| Path | `/Users/istefanek/projects/petri/tmp/bench-artifacts/t13-f02/t13-f02-recruitment-paths-and-replicated-baseline-goal.json` |
+| Bytes | `356934683` |
+| SHA-256 | `bc7f039febdae9c6e32e9f5f83485d3705f0a1ff30181dbba32fa509fa6bb849` |
+| Availability | Present and checksum-verified locally on 2026-09-12; neither portable nor promised to persist. |
 
 ## Success Criteria
 
@@ -256,3 +263,6 @@ whether the epoch was re-pinned. No measured claim is made at planning time.
 
 - Decision: This is the pre-repair baseline. Applicability, direct Graph
   activation and recruitment-path repairs remain with T13.F03–F05.
+- Exception: One user intervention/requirement correction on 2026-09-12:
+  local-only goal evidence above; broader work moves to [T15](../../roadmaps/t15-benchmark-evidence-storage.md).
+  Experiment parameters, thresholds, baselines and runtime behavior are unchanged.

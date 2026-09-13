@@ -103,11 +103,71 @@ is reported rather than inferred without evidence.
 
 ## Closure measurements
 
-Pending the final-code gate and single standard goal run. The goal experiment
-must contain 18 arms, four batches of eight lineages, 48 generations and two
-siblings: 55,296 proposals. Its complete observation wall time must be at most
-120 seconds. No discovery or retention value is claimed before that run.
+The final-code profiles were each launched exactly once, sequentially, through
+the unchanged `scripts/bench-wait` host preflight with the repository tool
+paths prefixed to `PATH`. The measurement commit was
+`7f4c54fb78cb16c7bf462e46d85a017f4addf8c5`; no competing benchmark, server,
+build, test, or mutation process was started by this specialist.
 
-The closure record will include per-arm and per-batch denominators, Wilson
-intervals, paired lineage differences, observed discovery paths and retention,
-null/low-exposure outcomes, applicable F03/F04/F05 gaps, and comparison verdicts.
+| Profile and command | Exit / report | Comparison and thresholds |
+| --- | --- | --- |
+| `make bench PROFILE=gate FEATURE=t13-f02-recruitment-paths-and-replicated-baseline` | Exit 0; [gate report](../features/t13-f02-recruitment-paths-and-replicated-baseline.json) | `comparison.severe=false`. All six counters are `ok` against both `remove-complementary-nutrition.json` and T14.F03. Wall/creature-tick is `ok` against the epoch (+11.755%) and `flag` against T14.F03 (+30.659%); this is a new prior-closure flag, not a threshold change. |
+| `make bench PROFILE=goal FEATURE=t13-f02-recruitment-paths-and-replicated-baseline` | Exit 0; local raw artifact identified below, not committed by user exception | `comparison.severe=false`. All six counters are unchanged (`ok`) against T14.F03; wall/creature-tick is `ok` against the goal epoch (+14.188%) and T14.F03 (+10.102%). Against the T12.F04 epoch, `plasticity_updates` is `flag` (+40.887%) while all other counters are `ok`; it is inherited because the T14.F03 comparison is exactly 0.000000%. |
+
+Both reports were generated at the expected Makefile-derived paths. The benchmark executor
+detached its output handle after launching each child process, but the gate
+artifact and its `comparison.severe=false` record establish its completed
+non-severe CLI outcome; the CLI writes the report before its only post-write
+nonzero (severe) exit. The goal artifact likewise records a non-severe outcome.
+No epoch was re-pinned, and no baseline or threshold was changed.
+
+User storage exception, 2026-09-12: one intervention and requirement correction
+excludes the 356,934,683-byte goal report from Git. These single-run measurements
+remain the evidence; no compaction or benchmark rerun is required. The small
+gate report remains a closure artifact under the current contract. Raw source
+availability and checksum were checked locally on 2026-09-12; this temporary
+path is not a persistence promise or a portable link. A checksum identifies
+the source, not independent proof of its contents. Claims needing omitted
+detail must be checked against the raw source while available, otherwise marked
+unverified. T15.F01 owns the broader policy and summary implementation later.
+
+| Local raw goal provenance | Value |
+| --- | --- |
+| Path | `/Users/istefanek/projects/petri/tmp/bench-artifacts/t13-f02/t13-f02-recruitment-paths-and-replicated-baseline-goal.json` |
+| Bytes | `356934683` |
+| SHA-256 | `bc7f039febdae9c6e32e9f5f83485d3705f0a1ff30181dbba32fa509fa6bb849` |
+
+All observation timing caps pass. Gate has no recruitment-path measurement by
+design: founder neighborhood is 51.388 ms (<10 s), evolved neighborhood is
+unmeasured/0, and no drift or recruitment value is present. Goal: founder
+neighborhood 122.067 ms (<10 s); evolved neighborhood 550.998 ms summed across
+seeds (<180 s); drift 21,265.834 ms total (therefore below the 30 s per-world
+cap); recruitment-path observation 7,750.448 ms (<120 s); and full goal wall
+time 515,641.938 ms / 8.594 min (<15 min). The 858.761 ms final-state reading
+has no separate cap.
+
+The `recruitment-paths-v1` experiment identifies configuration
+`sha256:c9ebc462c9c6e74aa34e6935055e70d65708c83d3b3d236b6e60e4c4764f68e9` and
+ran the fixed 18 arms, four batches, eight lineages, 32 discovery generations,
+16 follow-up generations, and two siblings: 55,296 complete proposals. It
+recorded 30,726 attempted and 27,768 applied events, 2,958 skips (all Graph
+no-eligible-node), and 30,888 zero-event births. All blank/copy Task A and
+unprepared Task B arms were null: 0/32 proposal discoveries (Wilson 95%
+0.000-0.107) under both policies. The prepared Task B arms each discovered
+19/32 (0.594, 0.423-0.745): Graph drift retained 14/32 and useful-retained
+1/32; Graph selection 19/32 and 16/32; VM drift 15/32 and 2/32; VM selection
+19/32 and 15/32. The four batch numerators vary from 4-6 discoveries per eight
+lineages; complete per-batch intervals and paths remain only in the local raw
+report identified above, not in the committed readings.
+
+Paired policy comparisons are not causal treatment estimates: 20/32 Graph and
+25/32 VM prepared lineages first diverged in parent history, with mutation/RNG
+divergence following where recorded. Each prepared-policy pair has zero summed
+proposal-discovery difference, while post-divergence retention/useful
+differences remain reported as uncertainty rather than superiority. The sham
+RNG control remains not applicable: observations consume no mutation RNG.
+Construction-only registration remains excluded from all proposal totals.
+
+Actionable exception for the orchestrator: the gate wall-time flag versus the
+immediately preceding closure is new. It is not severe and this specialist did
+not change code, thresholds, or baselines to explain or suppress it.
