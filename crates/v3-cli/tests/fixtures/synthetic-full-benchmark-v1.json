@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "feature": "synthetic-test-only-full-report",
+  "deterministic": {
+    "profile": {
+      "name": "gate",
+      "world_width": 8,
+      "world_height": 8,
+      "founders": 2,
+      "seeds": [11, 22],
+      "ticks": 1,
+      "food_coverage": "default"
+    },
+    "per_seed": [
+      {
+        "seed": 11, "ticks": 1, "creature_ticks": 2,
+        "mesh_hops": 2, "vm_steps": 2, "graph_relax_iters": 0,
+        "plasticity_updates": 0, "actions_applied": 2, "births": 0,
+        "final_population": 0, "extinction_tick": 1,
+        "tick_zero_connectivity": {
+          "total_cells": 64, "passable_cells": 64, "passable_fraction": 1.0,
+          "largest_component_cells": 63,
+          "largest_component_fraction_of_passable": 0.9805590711984373
+        }
+      },
+      {
+        "seed": 22, "ticks": 1, "creature_ticks": 2,
+        "mesh_hops": 2, "vm_steps": 2, "graph_relax_iters": 0,
+        "plasticity_updates": 0, "actions_applied": 2, "births": 0,
+        "final_population": 1, "extinction_tick": null,
+        "tick_zero_connectivity": {
+          "total_cells": 64, "passable_cells": 64, "passable_fraction": 1.0,
+          "largest_component_cells": 64,
+          "largest_component_fraction_of_passable": 0.9953555281754939
+        }
+      }
+    ],
+    "totals": {
+      "ticks": 2, "creature_ticks": 4,
+      "mesh_hops": 4, "vm_steps": 4, "graph_relax_iters": 0,
+      "plasticity_updates": 0, "actions_applied": 4, "births": 0
+    },
+    "per_creature_tick": {
+      "mesh_hops": "1.000000", "vm_steps": "1.000000",
+      "graph_relax_iters": "0.000000", "plasticity_updates": "0.000000",
+      "actions_applied": "1.000000", "births": "0.000000"
+    },
+    "goal_indicators": {
+      "population_persistence": {
+        "per_seed": [
+          {
+            "seed": 11, "extinction_tick": 1,
+            "minimum_population": 0, "final_population": 0,
+            "peak_population": 2,
+            "samples": [{"tick": 1, "population": 0, "mean_energy": null, "births_total": 0}]
+          },
+          {
+            "seed": 22, "extinction_tick": null,
+            "minimum_population": 1, "final_population": 1,
+            "peak_population": 2,
+            "samples": [{"tick": 1, "population": 1, "mean_energy": "1.000000", "births_total": 0}]
+          }
+        ]
+      },
+      "births_per_100_ticks": "0.000000",
+      "reachable_structure_size_distribution": {
+        "min": 1, "p25": 1, "median": 1, "p75": 1, "max": 1, "mean": "1.000000"
+      },
+      "memory_sensitivity": "Undefined",
+      "strategy_count": "Undefined",
+      "strategy_causal_distinctness": "Undefined",
+      "evolutionary_activity": "Undefined",
+      "adaptive_novelty": "Undefined",
+      "memory_dependence": "Undefined",
+      "learning_dependence": "Undefined",
+      "prediction_dependence": "Undefined",
+      "information_integration": "Undefined",
+      "reciprocal_interaction": "Undefined"
+    }
+  },
+  "environment": {
+    "generated_at": "2001-02-03T04:05:06Z",
+    "git_revision": "synthetic-test-only-revision",
+    "host": {
+      "hostname": "synthetic-test-host", "os": "test", "arch": "test",
+      "cpu_model": null, "logical_cores": 1
+    },
+    "build_profile": "test",
+    "wall_clock_ms_per_seed": [{"seed": 11, "wall_clock_ms": 1.0}, {"seed": 22, "wall_clock_ms": 1.0}],
+    "wall_clock_ms_total": 2.0,
+    "wall_clock_ms_per_creature_tick": 0.5
+  },
+  "comparison": {"references": [], "severe": false}
+}

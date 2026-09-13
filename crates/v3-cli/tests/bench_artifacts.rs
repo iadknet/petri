@@ -27,11 +27,10 @@ impl Drop for Temp {
     }
 }
 
-fn historical_gate() -> Vec<u8> {
-    std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join(
-        "../../docs/progress/features/t13-f02-recruitment-paths-and-replicated-baseline.json",
-    ))
-    .unwrap()
+fn synthetic_full_report() -> Vec<u8> {
+    // Test-only schema fixture, not an ecological run. Literal decimal inputs
+    // exercise historical JSON fidelity; omitted fields must stay unmeasured.
+    include_bytes!("fixtures/synthetic-full-benchmark-v1.json").to_vec()
 }
 
 fn provenance() -> artifacts::ConversionProvenance {
@@ -45,7 +44,7 @@ fn provenance() -> artifacts::ConversionProvenance {
 }
 
 fn world_source() -> Value {
-    let mut raw: Value = serde_json::from_slice(&historical_gate()).unwrap();
+    let mut raw: Value = serde_json::from_slice(&synthetic_full_report()).unwrap();
     let seed = raw["deterministic"]["per_seed"][0]["seed"].clone();
     let case = json!({"name":"test world", "seed":seed, "recipe_path":"test.json", "config_digest":"abc", "food_type_count":1});
     raw["deterministic"]["profile"]["name"] = json!("goal-worlds-v1");
@@ -64,7 +63,7 @@ fn conversion_is_deterministic_hashes_exact_bytes_and_keeps_historical_unknowns(
     );
     let dir = Temp::new();
     let path = dir.0.join("raw.json");
-    let raw = historical_gate();
+    let raw = synthetic_full_report();
     std::fs::write(&path, &raw).unwrap();
     let first = artifacts::summarize(&raw, &path, &provenance()).unwrap();
     let second = artifacts::summarize(&raw, &path, &provenance()).unwrap();
@@ -108,7 +107,7 @@ fn conversion_is_deterministic_hashes_exact_bytes_and_keeps_historical_unknowns(
 fn historical_absence_and_measured_zero_survive_projection() {
     let dir = Temp::new();
     let path = dir.0.join("raw.json");
-    let mut raw: Value = serde_json::from_slice(&historical_gate()).unwrap();
+    let mut raw: Value = serde_json::from_slice(&synthetic_full_report()).unwrap();
     raw["deterministic"]["goal_indicators"]["population_persistence"]["per_seed"][0]
         .as_object_mut()
         .unwrap()
@@ -130,25 +129,37 @@ fn historical_absence_and_measured_zero_survive_projection() {
         summary.deterministic["per_seed"],
         raw["deterministic"]["per_seed"]
     );
+    assert_eq!(summary.deterministic["per_seed"][0]["final_population"], 0);
+    assert_eq!(
+        summary.deterministic["goal_indicators"]["population_persistence"]["per_seed"][0]
+            ["final_population"],
+        0
+    );
+    assert!(summary.environment.get("threads").is_none());
+    assert!(
+        summary.deterministic["goal_indicators"]["reachable_structure_size_distribution"]
+            .get("version")
+            .is_none()
+    );
 }
 
 #[test]
 fn retained_float_readings_preserve_historical_numeric_values() {
-    let raw_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(
-        "../../docs/progress/features/t14-f03-applied-mortality-and-energy-accounting-goal.json",
-    );
-    let raw = std::fs::read(&raw_path).unwrap();
+    let dir = Temp::new();
+    let raw_path = dir.0.join("raw.json");
+    let raw = synthetic_full_report();
+    std::fs::write(&raw_path, &raw).unwrap();
     let summary = artifacts::summarize(&raw, &raw_path, &provenance()).unwrap();
     let json = artifacts::summary_bytes(&summary).unwrap();
     let roundtrip: artifacts::Summary = serde_json::from_slice(&json).unwrap();
     assert_eq!(
-        roundtrip.deterministic["per_seed"][1]["tick_zero_connectivity"]
+        roundtrip.deterministic["per_seed"][0]["tick_zero_connectivity"]
             ["largest_component_fraction_of_passable"]
             .as_f64(),
         Some(0.9805590711984373)
     );
     assert_eq!(
-        roundtrip.deterministic["per_seed"][2]["tick_zero_connectivity"]
+        roundtrip.deterministic["per_seed"][1]["tick_zero_connectivity"]
             ["largest_component_fraction_of_passable"]
             .as_f64(),
         Some(0.9953555281754939)
@@ -187,7 +198,7 @@ fn stored_summary_compares_without_raw_and_rejects_bad_versions() {
     let dir = Temp::new();
     let raw_path = dir.0.join("raw.json");
     let summary_path = dir.0.join("summary.json");
-    let raw = historical_gate();
+    let raw = synthetic_full_report();
     std::fs::write(&raw_path, &raw).unwrap();
     let current: bench::Report = serde_json::from_slice(&raw).unwrap();
     let expected = bench::compare_against_path(&current, &raw_path).unwrap();
@@ -212,7 +223,7 @@ fn stored_summary_compares_without_raw_and_rejects_bad_versions() {
 fn summary_rejects_inconsistent_measured_metadata() {
     let dir = Temp::new();
     let path = dir.0.join("raw.json");
-    let raw = historical_gate();
+    let raw = synthetic_full_report();
     std::fs::write(&path, &raw).unwrap();
     let report: bench::Report = serde_json::from_slice(&raw).unwrap();
     let original =
@@ -247,7 +258,7 @@ fn summary_rejects_inconsistent_measured_metadata() {
 fn raw_verification_rejects_changed_shorter_and_longer_files() {
     let dir = Temp::new();
     let path = dir.0.join("raw.json");
-    let raw = historical_gate();
+    let raw = synthetic_full_report();
     let mut changed = raw.clone();
     changed[0] = b' ';
     let mut longer = raw.clone();
@@ -265,7 +276,7 @@ fn hardlink_aliases_are_rejected_before_any_file_is_truncated() {
     let dir = Temp::new();
     let raw_path = dir.0.join("raw.json");
     let alias_path = dir.0.join("alias.json");
-    let raw = historical_gate();
+    let raw = synthetic_full_report();
     std::fs::write(&raw_path, &raw).unwrap();
     std::fs::hard_link(&raw_path, &alias_path).unwrap();
     assert!(artifacts::convert(&raw_path, &alias_path, &provenance()).is_err());
@@ -299,10 +310,10 @@ fn hardlink_aliases_are_rejected_before_any_file_is_truncated() {
 fn self_reference_resolution_errors_are_not_ignored() {
     let dir = Temp::new();
     let raw_path = dir.0.join("raw.json");
-    std::fs::write(&raw_path, historical_gate()).unwrap();
+    std::fs::write(&raw_path, synthetic_full_report()).unwrap();
     let loop_path = dir.0.join("loop");
     std::os::unix::fs::symlink(&loop_path, &loop_path).unwrap();
-    let mut report: bench::Report = serde_json::from_slice(&historical_gate()).unwrap();
+    let mut report: bench::Report = serde_json::from_slice(&synthetic_full_report()).unwrap();
     let selection = bench::ReferenceSelection {
         paths: vec![raw_path],
         absence: None,
@@ -478,7 +489,7 @@ fn both_output_identities_are_excluded_and_explicit_raw_cannot_overwrite_referen
     let dir = Temp::new();
     let raw_path = dir.0.join("raw.json");
     let summary_path = dir.0.join("summary.json");
-    let mut report: bench::Report = serde_json::from_slice(&historical_gate()).unwrap();
+    let mut report: bench::Report = serde_json::from_slice(&synthetic_full_report()).unwrap();
     let selection = bench::ReferenceSelection {
         paths: vec![raw_path.clone(), summary_path.clone()],
         absence: None,
