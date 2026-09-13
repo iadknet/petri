@@ -247,7 +247,7 @@ impl Battery {
 
 /// One genome's complete signature against a [`Battery`]: the 48 single-tick
 /// snapshot outputs, then the 8 sequences of 4 chained-tick outputs.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
     pub snapshots: Vec<Vec<WorldAction>>,
     pub sequences: Vec<Vec<Vec<WorldAction>>>,

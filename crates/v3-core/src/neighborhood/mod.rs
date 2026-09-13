@@ -23,6 +23,7 @@ pub mod drift;
 pub mod mesh_execution;
 pub mod operators;
 pub mod recruitment;
+pub mod recruitment_paths;
 pub mod sample;
 
 pub use battery::{Battery, Signature};
