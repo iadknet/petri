@@ -1,7 +1,7 @@
 # T13 — Neutral Module Recruitment
 
 **Status**: In Progress
-**Last updated**: 2026-09-10
+**Last updated**: 2026-09-13
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -14,18 +14,18 @@ selection can be distinguished before changing the substrate.
 
 ## Track Success Criteria
 
-- [ ] Stored readings distinguish module creation, mutation opportunity, input/effect acquisition, execution, behavioral contribution, useful contribution, retention and loss, with backend, lineage depth, denominators and observation limits.
+- [x] Stored readings distinguish module creation, mutation opportunity, input/effect acquisition, execution, behavioral contribution, useful contribution, retention and loss, with backend, lineage depth, denominators and observation limits.
 - [ ] A replicated recruitment baseline separates variation between lineages from offspring sampling, and drift from selection; every repair has a comparable reading without replacing historical results.
 - [ ] Adding modules that cannot accept an operator does not suppress that operator on valid targets elsewhere; growth and connection operations still reach silent scaffold.
 - [ ] Wired Graph effects can execute without an unrelated compute node, while truly inert Graph modules remain pass-through and every applied effect obeys the existing routing, state and energy contracts.
-- [ ] Both Graph and VM modules have demonstrated short, viable mutation paths from neutral creation to useful contribution in named tasks, preserving the incumbent behavior during the neutral steps.
+- [x] Both Graph and VM modules have demonstrated short, viable mutation paths from neutral creation to useful contribution in named tasks, preserving the incumbent behavior during the neutral steps.
 - [ ] A bounded qualification records discovery and retention of newly recruited modules under selection, alongside damage, maintenance and execution cost; unresolved recruitment gaps remain explicit and do not become cognition claims.
 
 ## Executable Features
 
 - [x] **T13.F01 — Module Recruitment Observability** — Depends on: T11.F14, T11.F16
   - Goal: Observe a new brain module from its creation through mutation, expression, contribution and loss, so each closure shows where recruitment advances or stalls.
-- [ ] **T13.F02 — Recruitment Paths and Replicated Baseline** — Depends on: T13.F01, T11.F05, T11.F08
+- [x] **T13.F02 — Recruitment Paths and Replicated Baseline** — Depends on: T13.F01, T11.F05, T11.F08
   - Goal: Measure how often new Graph and VM modules acquire useful behavior through viable steps, separating lineage variation, dormant preparation and selection from mere growth.
 - [ ] **T13.F03 — Mutation Target Applicability** — Depends on: T13.F02
   - Goal: Point mutations alter existing molecular sites: refinement reaches a module with a suitable site while silent tissue keeps its own opportunities to grow and connect.

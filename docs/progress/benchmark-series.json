@@ -28,7 +28,8 @@
       "docs/progress/features/t13-f01-module-recruitment-observability.json",
       "docs/progress/features/t11-f09-learned-state-inheritance-integrity.json",
       "docs/progress/features/t14-f01-closure-comparison-and-indicator-coverage-integrity.json",
-      "docs/progress/features/t14-f03-applied-mortality-and-energy-accounting.json"
+      "docs/progress/features/t14-f03-applied-mortality-and-energy-accounting.json",
+      "docs/progress/features/t13-f02-recruitment-paths-and-replicated-baseline.json"
     ]
   },
   "goal": {
@@ -53,6 +54,15 @@
       "docs/progress/features/t11-f18-backend-neutral-mesh-node-growth-goal.json"
     ]
   },
+  "report_omissions": [
+    {
+      "feature": "T13.F02",
+      "series": "goal-worlds-v1",
+      "reason": "Explicit user exception: the 356934683-byte goal report is local-only and is not a committed comparison reference.",
+      "readings": "docs/progress/readings/t13-f02-recruitment-paths-and-replicated-baseline.md",
+      "retained_previous_reference": "docs/progress/features/t14-f03-applied-mortality-and-energy-accounting-goal.json"
+    }
+  ],
   "counter_definition_changes": [
     {
       "feature": "T11.F06",
