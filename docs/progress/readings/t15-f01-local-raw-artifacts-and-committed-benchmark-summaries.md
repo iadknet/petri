@@ -12,15 +12,20 @@ and [artifact format/commands](../../benchmark-artifacts.md).
 | `cargo test -p v3-cli` | Passed after self-review: library 98/98 (8.60 s), binary 11/11, benchmark integration 20/20 (215.47 s), artifacts 18/18 (8.48 s), CLI integration 11/11 (0.20 s), 0 doctests; 158 passed overall, exit 0. |
 | `cargo test -p v3-cli --test cli` | 11 passed, 0 failed. |
 | `cargo test -p v3-cli --doc` | Passed; 0 doctests. |
-| `cargo test -p v3-cli --test bench_artifacts` | 18 passed, 0 failed, 0 ignored; 7.69 s. Includes generated unrounded-ratio parity and fixed checkpoint/claim bounds, deterministic conversion, historical float fidelity, retained recruitment counts, metadata consistency, symlink/hardlink output aliases and write failures. |
+| `cargo test -p v3-cli --test bench_artifacts` | 18 passed, 0 failed, 0 ignored; 1.06 s. Includes generated unrounded-ratio parity and fixed checkpoint/claim bounds, deterministic conversion, historical float fidelity, retained recruitment counts, metadata consistency, symlink/hardlink output aliases and write failures. |
+| Synthetic full-report fixture | `crates/v3-cli/tests/fixtures/synthetic-full-benchmark-v1.json`, 3,462 bytes; explicitly test-only identity, two literal decimal regressions, extinction zero and absent historical fields. Embedded bytes replace progress-inventory reads. |
+| Fixture test-code self-review | One reusable embedded source; independent Rust float literals; no current-type serialization/defaults to generate input; existing temporary-file cleanup retained. No additional issue found. |
+| `cargo test -p v3-cli --test bench_artifacts historical_absence_and_measured_zero_survive_projection` | Strengthened zero assertion exposed the former fixture's nonzero population (3,053); synthetic-fixture run passes with preserved zero, absent peak/threads/version and `Undefined` memory. |
 | `cargo clippy -p v3-cli --all-targets -- -D warnings` | Passed after self-review remediation; exit 0. |
 | `cargo fmt --all -- --check`; `git diff --check` | Passed after self-review remediation. |
 | `scripts/dependency-policy-check` | Passed with existing locked `sha2`, direct `same-file` 1.0.6 and `serde_json`'s `float_roundtrip` feature. |
 | `cargo test -p v3-cli --test bench_artifacts checked_in_goal_recipe_identities_are_unchanged_by_json_precision -- --nocapture` | Passed both before and after `float_roundtrip`; all three effective identities unchanged (table below). No simulation/observation runs. |
 | `make quality-check` | Passed: ShellCheck/actionlint, 3 progress-page/Makefile tests, existing benchmark-wait, mutation-wrapper, development-shutdown and skill-cache tests. Aqua's metadata timestamp writes were unavailable in the sandbox; checks themselves passed. |
 | `make roadmap-check` | Passed after workflow/template/output documentation edits. |
+| `make check-docs` | Passed: roadmap/policy/hook checks and repository quality checks, including all 3 progress-page/Makefile tests. |
 | `make check` | Pending orchestrator closure gate. |
 | Mutation gate | Pending separate mutation specialist. |
+| Runtime scope | Simulation defaults, counters, recipes, observation work and thresholds unchanged. |
 
 The output-path integration fixture creates temporary main and linked Git
 checkouts whose names contain spaces, resolves gate/goal/sweep defaults from
@@ -42,15 +47,6 @@ Makefile is exercised with a stub of `scripts/bench-wait` in a temporary
 | Recruitment backend/operator inapplicability was dropped with proposals | Bounded enum-keyed arm cross-tabs plus unresolved count; existing opportunity totals remain untouched. Synthetic first-arm fixture checks 18 selected-inapplicable and 21 unresolved counts independently of random mutations. Regression was red, then green. |
 | Review of remediation itself | Checked ownership/drop order, flush/error propagation, alias checks before writes, finite numeric inputs, fixed-buffer byte equality, enum-keyed deterministic ordering, preserved estimates/denominators and historical absence. No additional finding requiring production changes. |
 
-All four correctness regressions failed before implementation; the artifact
-suite then passed all 18 tests. The spec owner's fifth consultation approved
-these scoped fixes; its sixth required no further correction and confirmed
-typed raw field ordering is acceptable when actual written bytes are hashed.
-All guidance was accepted. Simulation defaults, counters,
-recipes, observation work and threshold rules remain unchanged. Independent
-final review, measured baselines, mutation testing and `make check` remain
-separate closure gates.
-
 ## Historical conversion and consumer check
 
 | Evidence | Reading |
@@ -64,6 +60,7 @@ separate closure gates.
 | Summary SHA-256, both fixed-input conversions | `9a220da5a9c056886c6dfb1ad7cf99abc8596d3ee828bf232ba2ae2cd36bd5c2` |
 | Original measured revision/time | `6ee48ed8a75f7fda2922cd9e7309f182add85b04` / `2026-09-12T17:59:52Z` |
 | Repeat conversion and independent consumer comparison | Passed twice with identical summary bytes. Actual page loader reads 2 mixed artifacts, with no raw fetch; all 8 available claims resolve, and complete original environment, comparisons, per-seed readings, totals and normalized counters match independently parsed raw JSON. |
+| JSON numeric fidelity | `float_roundtrip` preserves the original decimal values; literal regressions include `0.9805590711984373` and `0.9953555281754939`. Measured identity remains separate from conversion time. |
 
 ```sh
 target/debug/v3-cli bench-summarize \
@@ -80,12 +77,6 @@ JSON, checks original measurement identity and stored comparisons, and loads
 both artifacts through the actual progress page's loader/mesh extractor. The
 mock fetch accepts only the index and the two report paths; accessing local raw
 provenance would fail the check.
-
-The independent numeric check found a one-ULP loss in default Serde JSON float
-parsing. The existing `float_roundtrip` feature preserves the original values;
-the literal regressions include `0.9805590711984373` and
-`0.9953555281754939`. Measured identity is retained, not relabelled as the
-conversion time. No threshold, recipe, default, counter or observation changed.
 
 | Goal recipe | Effective config SHA-256 before and after JSON precision change |
 | --- | --- |

@@ -172,6 +172,13 @@ checks own that boundary, not a generic storage framework.
 - [x] Gate and goal summaries are stored at the paths below; raw provenance
   matches locally verified files and the series index points to the summaries.
 
+Final review counts: P1 0, P2 1, P3 1. Post-review remediation passes: 1.
+
+| Finding | Disposition |
+| --- | --- |
+| P2: artifact tests assumed progress inventory entries remain full reports | Resolved: one small, explicitly synthetic full-report fixture supplies literal decimals, measured zero and historical absences; conversion/hash/parity tests no longer read production progress artifacts. Focused suite: 18 passed. |
+| P3: readings included consultation and implementation chronology | Resolved: chronology removed; concrete verification and numeric-fidelity results retained in tables. |
+
 ## Performance and Goal Impact
 
 **Predeclaration — written before the run.** Storage/reporting only; no natural
