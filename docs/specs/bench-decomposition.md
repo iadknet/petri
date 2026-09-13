@@ -71,9 +71,13 @@ do not change; only `use` lines do.
 **Purity rule.** Excluding the new files' first lines, the diff consists only
 of moved lines and: `use`/`pub use`/`mod` lines, visibility widening
 (`pub(super)` or `pub(crate)`) on items that now cross a module boundary, and
-doc comments or attributes that must accompany a moved item. No other
-insertion or deletion. Existing `#[allow]` attributes move with their items;
-none are added.
+doc comments or attributes that must accompany a moved item, plus two
+mechanical consequences of the move that `make check` forces: `cargo fmt`
+rewraps of lines whose length changed only by a visibility keyword or by
+dedenting out of `mod tests` (AST-preserving), and `include_str!` literals
+gaining one `../` per extra directory level (source-file-relative, included
+bytes unchanged). No other insertion or deletion. Existing `#[allow]`
+attributes move with their items; none are added.
 
 **Constraints.** Workspace lints (`clippy::too_many_lines` at 167, correctness
 and suspicious denied) apply unchanged. Shell remains POSIX `sh`. Preserve any
@@ -183,6 +187,16 @@ are not compared.
       content now on `main`, and the worktree and branch are removed.
 
 ## Notes for AI Agents
+
+- Exception: the orchestrator ran as Opus 5 (not Fable 5.1), authorized by
+  the user on 2026-09-13 for this spec only; not a precedent.
+- Decision: the purity rule admits rustfmt rewraps and `include_str!` prefix
+  changes (orchestrator, 2026-09-13) because `make check` runs
+  `cargo fmt --check` and the alternative — leaving `GOAL_RECIPES`,
+  `locked_rand_version`, and two tests in `bench.rs` — contradicts the
+  target layout. The reviewer verifies each such line is AST-preserving.
+- Exception: no `simplify` pass ran after the build brief; a pure move must
+  not be simplified, and the purity review replaces it.
 
 - Roles: Fable 5.1 `medium` orchestrator in the main checkout; feature
   implementation and any remediation by fresh Opus 5 `medium`
