@@ -231,6 +231,7 @@ fn summary_rejects_inconsistent_measured_metadata() {
     let summary_path = dir.0.join("summary.json");
     for (pointer, replacement) in [
         ("/source_schema_version", json!(999)),
+        ("/feature", json!("wrong feature")),
         ("/environment/git_revision", json!("wrong revision")),
         ("/environment/generated_at", json!("wrong time")),
         ("/environment/host/hostname", json!("wrong host")),
@@ -252,6 +253,17 @@ fn summary_rejects_inconsistent_measured_metadata() {
             "accepted inconsistent {pointer}"
         );
     }
+
+    let mut invalid_reading = original;
+    invalid_reading["comparison_inputs"]["case_readings"]["undeclared"] =
+        json!([["reading", "not a number"]]);
+    std::fs::write(&summary_path, serde_json::to_vec(&invalid_reading).unwrap()).unwrap();
+    assert!(
+        bench::compare_against_path(&report, &summary_path)
+            .unwrap_err()
+            .contains("invalid lossless comparison reading"),
+        "every stored comparison reading is validated, including undeclared case keys"
+    );
 }
 
 #[test]
@@ -308,6 +320,8 @@ fn hardlink_aliases_are_rejected_before_any_file_is_truncated() {
 #[cfg(unix)]
 #[test]
 fn self_reference_resolution_errors_are_not_ignored() {
+    use std::os::unix::fs::PermissionsExt;
+
     let dir = Temp::new();
     let raw_path = dir.0.join("raw.json");
     std::fs::write(&raw_path, synthetic_full_report()).unwrap();
@@ -322,6 +336,63 @@ fn self_reference_resolution_errors_are_not_ignored() {
         bench::apply_comparisons_for_outputs(&mut report, &selection, &[&loop_path])
             .unwrap_err()
             .contains("cannot resolve")
+    );
+
+    let blocked = dir.0.join("blocked");
+    std::fs::create_dir(&blocked).unwrap();
+    std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let blocked_result = artifacts::resolved_path(&blocked.join("child"));
+    std::fs::set_permissions(&blocked, std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(
+        blocked_result.unwrap_err().contains("cannot resolve"),
+        "non-NotFound resolution errors must not be treated as absent paths"
+    );
+}
+
+#[test]
+fn measurement_evidence_distinguishes_clean_and_dirty_git_worktrees() {
+    let dir = Temp::new();
+    let run_git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(&dir.0)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run_git(&["init", "--quiet"]);
+    std::fs::write(dir.0.join("tracked"), b"clean").unwrap();
+    run_git(&["add", "tracked"]);
+    run_git(&[
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--quiet",
+        "-m",
+        "fixture",
+    ]);
+    let invocation = artifacts::Invocation {
+        executable: "v3-cli".into(),
+        arguments: Vec::new(),
+        working_directory: dir.0.clone(),
+    };
+
+    assert_eq!(
+        artifacts::measurement_evidence(&invocation, false)["dirty"],
+        false
+    );
+    std::fs::write(dir.0.join("untracked"), b"dirty").unwrap();
+    assert_eq!(
+        artifacts::measurement_evidence(&invocation, false)["dirty"],
+        true
     );
 }
 
@@ -769,6 +840,19 @@ fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloa
     assert_eq!(
         compact["opportunities"],
         serde_json::to_value(&experiment.opportunities).unwrap()
+    );
+    let stage = &experiment.constructed[0].stages[0];
+    assert_eq!(
+        compact["constructed"][0]["stages"][0],
+        json!({
+            "name": stage.name,
+            "edits": stage.edits,
+            "seed": stage.seed,
+            "task_summary": stage.task.summary(),
+            "battery_class": stage.battery_class,
+            "incumbent_actions_unchanged": stage.incumbent_actions_unchanged,
+            "useful": stage.useful,
+        })
     );
     let mut total = 0;
     for (index, arm) in experiment.arms.iter().enumerate() {

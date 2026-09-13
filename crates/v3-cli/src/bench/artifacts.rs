@@ -763,3 +763,119 @@ pub fn measurement_evidence(invocation: &Invocation, severe: bool) -> Value {
             "recruitment_seconds_per_report":120,"goal_investigation_seconds":900},
         "inheritance":null})
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mesh_summary_counts_every_measured_genome_field() {
+        let source = json!([
+            {"mesh_execution": {
+                "total_node_count": 2,
+                "reachable_node_count": 3,
+                "executed_node_count": 5,
+                "knockout_count": 7,
+                "hop_cap_hits": 11,
+                "executions_per_genome": 13,
+                "route_varies_with_input": true
+            }},
+            {"mesh_execution": {
+                "total_node_count": 17,
+                "reachable_node_count": 19,
+                "executed_node_count": 23,
+                "knockout_count": 29,
+                "hop_cap_hits": 31,
+                "executions_per_genome": 37,
+                "route_varies_with_input": false
+            }},
+            {"unmeasured": true}
+        ]);
+
+        assert_eq!(
+            mesh_summary(&source),
+            json!({
+                "genomes": 2,
+                "total": 19,
+                "reachable": 22,
+                "executed": 28,
+                "knockout": 36,
+                "capHits": 42,
+                "execs": 50,
+                "routeVaries": 1
+            })
+        );
+    }
+
+    #[test]
+    fn neighborhood_projects_evolved_rows_and_drops_raw_payloads() {
+        let source = json!({
+            "battery": {"name": "tiny"},
+            "founder": {"measured": true},
+            "raw_trace": [1, 2, 3],
+            "evolved": {"per_seed": [{
+                "generation_distribution": [1, 2],
+                "seed": 7,
+                "final_population_size": 3,
+                "pooled_operator_rows": [{"operator": "copy"}],
+                "pooled_births": 4,
+                "sampled_genomes": [{"mesh_execution": {
+                    "total_node_count": 2,
+                    "reachable_node_count": 3,
+                    "executed_node_count": 5,
+                    "knockout_count": 7,
+                    "hop_cap_hits": 11,
+                    "executions_per_genome": 13,
+                    "route_varies_with_input": true
+                }}],
+                "raw_genome_rows": ["omitted"]
+            }]}
+        });
+
+        assert_eq!(
+            neighborhood(&source),
+            json!({
+                "battery": {"name": "tiny"},
+                "founder": {"measured": true},
+                "evolved": {"per_seed": [{
+                    "generation_distribution": [1, 2],
+                    "seed": 7,
+                    "final_population_size": 3,
+                    "pooled_operator_rows": [{"operator": "copy"}],
+                    "pooled_births": 4,
+                    "mesh_summary": {
+                        "genomes": 1,
+                        "total": 2,
+                        "reachable": 3,
+                        "executed": 5,
+                        "knockout": 7,
+                        "capHits": 11,
+                        "execs": 13,
+                        "routeVaries": 1
+                    }
+                }]}
+            })
+        );
+    }
+
+    #[test]
+    fn claims_keep_only_scalar_values_at_fixed_locations() {
+        let source = json!({
+            "deterministic": {
+                "totals": {"creature_ticks": 12, "births": [3]},
+                "per_creature_tick": {"vm_steps": {"raw": 4}}
+            },
+            "comparison": {"severe": false},
+            "environment": {"wall_clock_ms_total": "9.5"}
+        });
+
+        assert_eq!(
+            serde_json::to_value(claims(&source)).unwrap(),
+            json!([
+                {"pointer": "/deterministic/totals/creature_ticks", "value": 12},
+                {"pointer": "/comparison/severe", "value": false},
+                {"pointer": "/environment/wall_clock_ms_total", "value": "9.5"}
+            ])
+        );
+    }
+}
