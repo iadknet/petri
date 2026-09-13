@@ -169,11 +169,11 @@ that reason. Any genotype/size/exposure difference remains a stated limitation.
 
 ## Implementation Tasks
 
-- [ ] Add the constructed paths and paired task evaluation through existing
+- [x] Add the constructed paths and paired task evaluation through existing
   runtime/tick seams, with behavior and invariant coverage.
-- [ ] Add the bounded replicated observation, per-sibling records, exact path
+- [x] Add the bounded replicated observation, per-sibling records, exact path
   replay and honest discovery/retention/uncertainty accounting.
-- [ ] Add `recruitment-paths-v1` to the standard goal report once per report,
+- [x] Add `recruitment-paths-v1` to the standard goal report once per report,
   with explicit config/task identity and separate observation wall timing;
   keep the gate and existing drift/profile parameters unchanged. Historical
   absence is unmeasured, not zero. Register focused tests in existing gates.
@@ -182,11 +182,11 @@ that reason. Any genotype/size/exposure difference remains a stated limitation.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core recruitment_paths` and
+- [x] `cargo test -p v3-core recruitment_paths` and
   `cargo test -p v3-core --test recruitment_paths`: constructed paths, applied
   task results, controls, path replay and pure accounting/selection invariants;
   commands/results in [readings](../../progress/readings/t13-f02-recruitment-paths-and-replicated-baseline.md).
-- [ ] `cargo test -p v3-cli recruitment_paths`: goal-only report wiring,
+- [x] `cargo test -p v3-cli recruitment_paths`: goal-only report wiring,
   deterministic reduced-size results, explicit absence and truthful totals;
   readings as above. No stochastic discovery success is an invariant.
 - [ ] `make check` and `make roadmap-check`; results in readings. Use TDD and

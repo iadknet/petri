@@ -495,6 +495,9 @@ pub struct GoalIndicators {
     pub mutational_neighborhood: Indicator<MutationalNeighborhood>,
     #[serde(default = "undefined_drift_depth")]
     pub drift_depth: Indicator<DriftDepth>,
+    /// One explicit default-task experiment per goal report, outside its worlds.
+    #[serde(default = "undefined_recruitment_paths")]
+    pub recruitment_paths: Indicator<neighborhood::recruitment_paths::Report>,
     pub strategy_count: String,
     pub strategy_causal_distinctness: String,
     pub evolutionary_activity: String,
@@ -619,6 +622,29 @@ fn undefined_mutational_neighborhood() -> Indicator<MutationalNeighborhood> {
 
 fn undefined_evolved_neighborhood() -> Indicator<EvolvedNeighborhoodHalf> {
     Indicator::Undefined(UNDEFINED.to_string())
+}
+
+fn undefined_recruitment_paths() -> Indicator<neighborhood::recruitment_paths::Report> {
+    Indicator::Undefined("unmeasured; recruitment-paths-v1 is goal-only".into())
+}
+
+fn timed_recruitment_paths(
+    goal: bool,
+) -> (
+    Indicator<neighborhood::recruitment_paths::Report>,
+    Option<f64>,
+) {
+    if !goal {
+        return (undefined_recruitment_paths(), None);
+    }
+    // Reduced sizes exist only in the test build; the CLI has no override.
+    #[cfg(test)]
+    let sizes = neighborhood::recruitment_paths::Sizes::TEST;
+    #[cfg(not(test))]
+    let sizes = neighborhood::recruitment_paths::Sizes::PRODUCTION;
+    let start = Instant::now();
+    let reading = neighborhood::recruitment_paths::observe(sizes);
+    (Indicator::Defined(reading), Some(millis(start.elapsed())))
 }
 
 fn undefined_drift_depth() -> Indicator<DriftDepth> {
@@ -2053,6 +2079,9 @@ pub struct Environment {
     /// Complete goal-only mutation walk and readings; absent when unrun.
     #[serde(default)]
     pub drift_depth_wall_clock_ms: Option<f64>,
+    /// Entire report-level task experiment, outside all ecological observations.
+    #[serde(default)]
+    pub recruitment_paths_wall_clock_ms: Option<f64>,
     /// Evolved-half neighborhood wall time per seed (goal profile only).
     #[serde(default)]
     pub neighborhood_evolved_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
@@ -2409,6 +2438,7 @@ pub struct RunTimings {
     pub neighborhood_founder_wall_clock_ms: f64,
     /// Complete goal-only mutation walk and readings; absent when unrun.
     pub drift_depth_wall_clock_ms: Option<f64>,
+    pub recruitment_paths_wall_clock_ms: Option<f64>,
     /// Evolved-half neighborhood wall time per seed (goal profile only).
     pub neighborhood_evolved_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
 }
@@ -3059,6 +3089,7 @@ fn assemble_goal_indicators(
             )
         },
         drift_depth,
+        recruitment_paths: undefined_recruitment_paths(),
         strategy_count: UNDEFINED.to_string(),
         strategy_causal_distinctness: UNDEFINED.to_string(),
         evolutionary_activity: UNDEFINED.to_string(),
@@ -3200,7 +3231,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
     let totals = accumulate_totals(&per_seed);
     let per_creature_tick = normalized_totals(&totals);
 
-    let goal_indicators = assemble_goal_indicators(
+    let mut goal_indicators = assemble_goal_indicators(
         params,
         &totals,
         GoalIndicatorInputs {
@@ -3216,6 +3247,10 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
             case_observations,
         },
     );
+
+    let (recruitment_paths, recruitment_paths_wall_clock_ms) =
+        timed_recruitment_paths(observe_goal_indicators);
+    goal_indicators.recruitment_paths = recruitment_paths;
 
     let deterministic = Deterministic {
         graph_work_definition: "graph_relax_iters: entered nonempty single-evaluation visits, including unaffordable visits (T11.F06); historical deltas cross definitions".to_string(),
@@ -3233,6 +3268,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
         final_state_observation_ms_per_seed,
         neighborhood_founder_wall_clock_ms,
         drift_depth_wall_clock_ms,
+        recruitment_paths_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
     };
 
@@ -3339,6 +3375,7 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         final_state_observation_ms_per_seed,
         neighborhood_founder_wall_clock_ms,
         drift_depth_wall_clock_ms,
+        recruitment_paths_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
     } = timings;
     let wall_clock_ms_total: f64 = wall_clock_ms_per_seed.iter().map(|s| s.wall_clock_ms).sum();
@@ -3384,6 +3421,7 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         final_state_observation_ms_total,
         neighborhood_founder_wall_clock_ms,
         drift_depth_wall_clock_ms,
+        recruitment_paths_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
         neighborhood_evolved_wall_clock_ms_total,
     }
@@ -5012,6 +5050,7 @@ mod tests {
             final_state_observation_ms_per_seed: Vec::new(),
             neighborhood_founder_wall_clock_ms: 0.0,
             drift_depth_wall_clock_ms: None,
+            recruitment_paths_wall_clock_ms: None,
             neighborhood_evolved_wall_clock_ms_per_seed: Vec::new(),
         }
     }
@@ -6031,6 +6070,71 @@ mod tests {
     }
 
     // ── Mutational neighborhood (T11.F01) ───────────────────────────────
+
+    #[test]
+    fn recruitment_paths_is_goal_only_and_historical_absence_is_unmeasured() {
+        let goal = build_report(&small_profile("goal"), "recruitment_paths-test").unwrap();
+        let reading = goal
+            .deterministic
+            .goal_indicators
+            .recruitment_paths
+            .defined()
+            .unwrap();
+        assert_eq!(reading.version, "recruitment-paths-v1");
+        assert_eq!(reading.total_proposals, reading.sizes.proposals());
+        assert!(goal.environment.recruitment_paths_wall_clock_ms.unwrap() > 0.0);
+        for name in ["gate", "sweep", "synthetic"] {
+            let report = build_report(&small_profile(name), "recruitment_paths-test").unwrap();
+            assert!(report
+                .deterministic
+                .goal_indicators
+                .recruitment_paths
+                .defined()
+                .is_none());
+            assert_eq!(report.environment.recruitment_paths_wall_clock_ms, None);
+        }
+        let mut old = serde_json::to_value(goal).unwrap();
+        old["deterministic"]["goal_indicators"]
+            .as_object_mut()
+            .unwrap()
+            .remove("recruitment_paths");
+        old["environment"]
+            .as_object_mut()
+            .unwrap()
+            .remove("recruitment_paths_wall_clock_ms");
+        let old: Report = serde_json::from_value(old).unwrap();
+        assert!(old
+            .deterministic
+            .goal_indicators
+            .recruitment_paths
+            .defined()
+            .is_none());
+        assert_eq!(old.environment.recruitment_paths_wall_clock_ms, None);
+    }
+
+    #[test]
+    fn recruitment_paths_is_once_per_world_set_and_reduced_results_are_deterministic() {
+        let mut params = small_profile(GOAL_WORLD_SET);
+        params.seeds = goal_recipe_seeds();
+        let (report, timings) = run_deterministic(&params).unwrap();
+        assert_eq!(report.goal_indicators.cases.len(), 3);
+        let reading = report.goal_indicators.recruitment_paths.defined().unwrap();
+        assert_eq!(
+            reading.total_proposals,
+            neighborhood::recruitment_paths::Sizes::TEST.proposals()
+        );
+        let encoded = serde_json::to_value(&report.goal_indicators).unwrap();
+        for case in encoded["cases"].as_array().unwrap() {
+            assert!(case.get("recruitment_paths").is_none());
+        }
+        let (again, elapsed) = timed_recruitment_paths(true);
+        assert_eq!(
+            serde_json::to_value(&again).unwrap(),
+            serde_json::to_value(&report.goal_indicators.recruitment_paths).unwrap()
+        );
+        assert!(timings.recruitment_paths_wall_clock_ms.unwrap() > 0.0);
+        assert!(elapsed.unwrap() > 0.0);
+    }
 
     fn small_profile(name: &str) -> ProfileParams {
         ProfileParams {

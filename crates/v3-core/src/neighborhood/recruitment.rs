@@ -33,7 +33,9 @@ pub const PROVENANCE_RULE: &str =
      backend_def equals some pre-birth node's, otherwise new";
 
 /// The backend a module carries when it is created.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum ModuleBackend {
     Graph,
     Vm,
@@ -59,7 +61,9 @@ impl From<&BackendDef> for ModuleBackend {
 }
 
 /// Where a module came from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum Provenance {
     /// Present in the founder genome at depth 0.
     Founder,
@@ -93,7 +97,7 @@ impl Provenance {
 /// The facts are separate and never merged: a selection is not an applicable
 /// selection, an applicable selection is not an internal change, dispatch is
 /// not an effect, and a contribution is battery sensitivity only.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Module {
     pub lineage: u32,
     pub node: NodeId,
@@ -237,7 +241,7 @@ impl CohortFact {
 /// operator the engine threw away for reporting no applicable site, whether or
 /// not a later operator of the same domain then applied, so a module selected
 /// by an operator that found no site is visible in them alone.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Opportunities {
     pub births: u64,
     pub zero_event_births: u64,
@@ -364,7 +368,7 @@ impl Opportunities {
 /// Cohort counts: creation, loss, and the exclusive state ladder over the
 /// modules still present. `created == deleted + present`, and the six ladder
 /// rungs partition `present`.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CohortCounts {
     pub created: u64,
     pub deleted: u64,
@@ -403,7 +407,7 @@ impl CohortCounts {
 }
 
 /// Founder modules as a reference row beside the recruited cohort.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FounderCounts {
     pub created: u64,
     pub deleted: u64,
@@ -417,7 +421,7 @@ pub struct FounderCounts {
 ///
 /// `reached + censored_deleted + censored_present == created`: no module is
 /// dropped from the denominator.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct TimeToFirst {
     pub reached: u64,
     pub median_generations: Option<u64>,
@@ -429,7 +433,7 @@ pub struct TimeToFirst {
 /// checkpoint. Founder modules are outside the cohort and never counted here,
 /// so `contributing_before` equals the earlier checkpoint's
 /// [`CohortCounts::contributing`].
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Retention {
     pub from_depth: u64,
     pub contributing_before: u64,
@@ -439,7 +443,7 @@ pub struct Retention {
 }
 
 /// One lineage's cohort row at a checkpoint.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LineageRow {
     pub lineage: u32,
     pub created: u64,
@@ -449,7 +453,7 @@ pub struct LineageRow {
 }
 
 /// Everything the recruitment observation reports at one checkpoint.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RecruitmentCheckpoint {
     pub depth: u64,
     /// `new` + `copy` modules created at or before this checkpoint, pooled.

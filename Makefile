@@ -57,6 +57,7 @@ rust-test-creature-workflow: ## Run v3-core creature workflow integration tests.
 
 rust-test-temporal-fixtures: ## Run v3-core temporal controller fixture tests (T11.F05).
 	@cargo test -p v3-core --test temporal_fixtures
+	@cargo test -p v3-core --test recruitment_paths
 
 rust-test-priority-bid: ## Run v3-core priority-bid integration tests.
 	@cargo test -p v3-core --test priority_bid_reachability
