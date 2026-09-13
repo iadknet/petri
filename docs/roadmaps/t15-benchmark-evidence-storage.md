@@ -67,8 +67,10 @@ truthful provenance and availability.
 - Decision: Added at the user's direction on 2026-09-12 after T13.F02's single
   goal run produced a 356,934,683-byte report; its [readings](../progress/readings/t13-f02-recruitment-paths-and-replicated-baseline.md)
   record the narrow current exception. T15.F01 is Complete under its flat spec;
-  T15.F02 remains unscheduled. Storage and workflow changes landed through
-  T15.F01. T13.F02 is evidence, not a prerequisite.
+  T15.F02 is In Progress under its
+  [flat spec](../specs/roadmap/t15-f02-historical-report-migration-and-main-history-rewrite.md).
+  Storage and workflow changes landed through T15.F01. T13.F02 is evidence,
+  not a prerequisite.
 - Decision: Local inspection on 2026-09-12 found existing output overrides in
   `Makefile` and full `Report` deserialization in
   `crates/v3-cli/src/bench.rs::compare_against_path`. Extend those producers and

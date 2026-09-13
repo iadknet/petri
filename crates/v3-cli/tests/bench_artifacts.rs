@@ -219,6 +219,138 @@ fn stored_summary_compares_without_raw_and_rejects_bad_versions() {
     assert!(bench::compare_against_path(&current, &summary_path).is_err());
 }
 
+fn assert_offline_reference_parity(
+    current: &bench::Report,
+    raw_path: &Path,
+    summary_path: &Path,
+) -> bool {
+    let expected = bench::compare_against_path(current, raw_path);
+    let actual = bench::compare_against_path(current, summary_path);
+    match (expected, actual) {
+        (Ok(expected), Ok(actual)) => {
+            let expected = serde_json::to_value(expected).unwrap();
+            let mut actual = serde_json::to_value(actual).unwrap();
+            actual["path"] = expected["path"].clone();
+            assert_eq!(actual, expected, "reference {}", raw_path.display());
+            true
+        }
+        (Err(expected), Err(actual)) => {
+            assert_eq!(
+                actual.replace(summary_path.to_str().unwrap(), raw_path.to_str().unwrap()),
+                expected
+            );
+            false
+        }
+        (expected, actual) => panic!(
+            "full/summary behavior differs for {}: {expected:?} / {actual:?}",
+            raw_path.display()
+        ),
+    }
+}
+
+#[test]
+fn offline_pair_parity_preserves_compatible_incompatible_and_absent_references() {
+    let dir = Temp::new();
+    let raw_path = dir.0.join("raw.json");
+    let summary_path = dir.0.join("summary.json");
+    let raw = synthetic_full_report();
+    std::fs::write(&raw_path, &raw).unwrap();
+    artifacts::convert(&raw_path, &summary_path, &provenance()).unwrap();
+    let mut current: bench::Report = serde_json::from_slice(&raw).unwrap();
+
+    assert!(assert_offline_reference_parity(
+        &current,
+        &raw_path,
+        &summary_path
+    ));
+    current.deterministic.profile.ticks += 1;
+    assert!(!assert_offline_reference_parity(
+        &current,
+        &raw_path,
+        &summary_path
+    ));
+    assert!(!assert_offline_reference_parity(
+        &current,
+        &dir.0.join("absent-full.json"),
+        &dir.0.join("absent-summary.json")
+    ));
+}
+
+/// Explicitly opt in with the saved migration manifest; only stored bytes and
+/// the existing comparison API are exercised. No simulation or assay runs.
+#[test]
+#[ignore = "requires PETRI_HISTORICAL_MANIFEST pointing to the preserved T15.F02 corpus"]
+fn historical_corpus_preserves_claims_identity_and_all_reference_comparisons() {
+    let manifest_path = std::env::var_os("PETRI_HISTORICAL_MANIFEST")
+        .expect("PETRI_HISTORICAL_MANIFEST must name the preserved manifest");
+    let manifest: Value = serde_json::from_slice(&std::fs::read(manifest_path).unwrap()).unwrap();
+    let blobs = manifest["blobs"].as_array().unwrap();
+    let pairs: Vec<_> = manifest["reports"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|report| {
+            let selected = report["selected_blob"].as_str()?;
+            let blob = blobs
+                .iter()
+                .find(|blob| blob["git_blob"] == selected)
+                .unwrap();
+            Some((
+                PathBuf::from(blob["raw"]["path"].as_str().unwrap()),
+                PathBuf::from(report["summary"]["path"].as_str().unwrap()),
+            ))
+        })
+        .collect();
+    assert!(!pairs.is_empty(), "the selected corpus must not be empty");
+    let mut compatible = 0;
+    let mut incompatible = 0;
+    for (raw_path, summary_path) in &pairs {
+        let raw = std::fs::read(raw_path).unwrap();
+        let source: Value = serde_json::from_slice(&raw).unwrap();
+        let current: bench::Report = serde_json::from_slice(&raw).unwrap();
+        let summary: Value = serde_json::from_slice(&std::fs::read(summary_path).unwrap()).unwrap();
+        assert_eq!(summary["raw"]["sha256"], artifacts::sha256(&raw));
+        assert_eq!(summary["raw"]["bytes"], raw.len());
+        assert_eq!(summary["feature"], source["feature"]);
+        assert_eq!(summary["comparison"], source["comparison"]);
+        for field in ["profile", "per_seed", "totals", "per_creature_tick"] {
+            assert_eq!(
+                summary["deterministic"][field],
+                source["deterministic"][field]
+            );
+        }
+        for field in ["git_revision", "generated_at", "host", "threads"] {
+            assert_eq!(summary["environment"][field], source["environment"][field]);
+        }
+        for claim in summary["claims"].as_array().unwrap() {
+            assert_eq!(
+                source.pointer(claim["pointer"].as_str().unwrap()).unwrap(),
+                &claim["value"]
+            );
+        }
+        if let Some(evidence) = source.get("measurement_evidence") {
+            assert_eq!(&summary["measurement_evidence"], evidence);
+        } else {
+            assert!(summary["measurement_evidence"]
+                .as_object()
+                .unwrap()
+                .values()
+                .all(Value::is_null));
+        }
+        for (reference_raw, reference_summary) in &pairs {
+            if assert_offline_reference_parity(&current, reference_raw, reference_summary) {
+                compatible += 1;
+            } else {
+                incompatible += 1;
+            }
+        }
+    }
+    println!(
+        "historical corpus parity: {} selected reports, {compatible} compatible pairs, {incompatible} incompatible pairs",
+        pairs.len()
+    );
+}
+
 #[test]
 fn summary_rejects_inconsistent_measured_metadata() {
     let dir = Temp::new();
