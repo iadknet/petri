@@ -440,6 +440,7 @@ mod tests {
         cfg.world.width = 48;
         cfg.world.height = 48;
         cfg.population.initial_creatures = 200;
+        cfg.mutation.per_unit_supply_enabled = false;
         cfg.mutation.mutation_probability = mutation_probability;
         let mut sim = seed_simulation(cfg, 2026);
         for _ in 0..40 {
@@ -690,6 +691,7 @@ mod tests {
         use rand::SeedableRng;
         let mut cfg = SimulationConfig::default();
         cfg.population.initial_creatures = 1;
+        cfg.mutation.per_unit_supply_enabled = false;
         cfg.mutation.mutation_probability = 0.0;
         let mut sim = seed_simulation(cfg, 83);
         let parent_id = sim.creatures.keys().next().unwrap();

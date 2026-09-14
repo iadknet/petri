@@ -89,6 +89,8 @@ export const MOCK_CONFIG: SimulationConfig = {
 		perception: { vision_radius: 5 },
 	},
 	mutation: {
+		per_unit_supply_enabled: true,
+		per_unit_rate: 0.005,
 		mutation_probability: 0.01,
 		per_birth_mutation_events_min: 1,
 		per_birth_mutation_events_max: 4,

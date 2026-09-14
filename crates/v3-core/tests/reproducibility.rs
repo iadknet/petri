@@ -40,6 +40,7 @@ fn reproducibility_config() -> SimulationConfig {
     cfg.population.initial_creatures = 150;
     cfg.world.food.initial_coverage = 1.0;
     cfg.world.food.initial_density = 1.0;
+    cfg.mutation.per_unit_supply_enabled = false;
     cfg.mutation.mutation_probability = 1.0;
     cfg.mutation.per_birth_mutation_events_min = 4;
     cfg.mutation.per_birth_mutation_events_max = 10;

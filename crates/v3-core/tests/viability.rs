@@ -215,6 +215,7 @@ fn canonical_founder_consumes_primary_food_and_reproduces() {
     let mut cfg = viability_config();
     cfg.population.initial_creatures = 20;
     cfg.world.food.growth_rate = 0.0;
+    cfg.mutation.per_unit_supply_enabled = false;
     cfg.mutation.mutation_probability = 0.0;
     let mut sim = seed_simulation(cfg, 2026);
     let primary_before = sim
@@ -573,6 +574,7 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
 #[test]
 fn mutation_offspring_diverge_from_parent_over_time() {
     let mut cfg = viability_config();
+    cfg.mutation.per_unit_supply_enabled = false;
     cfg.mutation.mutation_probability = 1.0;
     cfg.mutation.per_birth_mutation_events_min = 1;
     cfg.mutation.per_birth_mutation_events_max = 2;
@@ -605,6 +607,7 @@ fn mutation_accounting_invariant_in_viability() {
     use v3_core::creature::founder::v3alpha1_founder_genome;
 
     let mut cfg = SimulationConfig::default().mutation;
+    cfg.per_unit_supply_enabled = false;
     cfg.mutation_probability = 1.0;
     cfg.per_birth_mutation_events_min = 1;
     cfg.per_birth_mutation_events_max = 5;
@@ -637,6 +640,7 @@ fn mutation_reachability_telemetry_accumulates() {
     use v3_core::creature::genome::analysis::mesh_reachable_nodes;
 
     let mut cfg = SimulationConfig::default().mutation;
+    cfg.per_unit_supply_enabled = false;
     cfg.mutation_probability = 1.0;
     cfg.per_birth_mutation_events_min = 3;
     cfg.per_birth_mutation_events_max = 8;
@@ -698,6 +702,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
     let mut cfg = SimulationConfig::default();
     cfg.world.width = 10;
     cfg.world.height = 10;
+    cfg.mutation.per_unit_supply_enabled = false;
     cfg.mutation.mutation_probability = 0.0;
     cfg.energy.lifecycle.initial_energy = 80.0;
     cfg.energy.lifecycle.max_energy = 120.0;
@@ -752,6 +757,7 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
     let mut cfg = SimulationConfig::default();
     cfg.world.width = 10;
     cfg.world.height = 10;
+    cfg.mutation.per_unit_supply_enabled = false;
     cfg.mutation.mutation_probability = 0.0;
     cfg.energy.lifecycle.initial_energy = 80.0;
     cfg.energy.lifecycle.max_energy = 120.0;
@@ -798,6 +804,7 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
 #[test]
 fn viability_still_passes_with_real_mutations() {
     let mut cfg = viability_config();
+    cfg.mutation.per_unit_supply_enabled = false;
     cfg.mutation.mutation_probability = 1.0;
     cfg.mutation.per_birth_mutation_events_min = 1;
     cfg.mutation.per_birth_mutation_events_max = 2;
@@ -927,6 +934,7 @@ fn mutation_skip_reason_tracking_accumulates_correctly() {
     cfg.world.width = 32;
     cfg.world.height = 32;
     cfg.population.initial_creatures = 10;
+    cfg.mutation.per_unit_supply_enabled = false;
     cfg.mutation.mutation_probability = 1.0;
     cfg.mutation.per_birth_mutation_events_min = 3;
     cfg.mutation.per_birth_mutation_events_max = 3;

@@ -205,6 +205,11 @@ fn drift_is_goal_only_once_and_historical_fields_are_unavailable() {
         "walk: depth 0 and every 10 generations; births: derived at each checkpoint"
     );
     assert_eq!(
+        drift.supply_rule,
+        "legacy per-birth rule (per_unit_supply_enabled forced false): \
+         mutation_probability 0.44, events 1 to 10, continuation 0.2"
+    );
+    assert_eq!(
         (
             drift.executions_per_genome,
             drift.snapshot_count,

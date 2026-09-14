@@ -71,6 +71,21 @@ describe("ConfigPanel", () => {
 		).toBe(0.35);
 	});
 
+	it("edits the per-unit supply toggle and rate in the runtime draft", () => {
+		render(<ConfigPanel />);
+		const enabled = screen.getByTestId("config-field-mutation-per-unit-supply-enabled");
+		const rate = screen.getByTestId("config-field-mutation-per-unit-rate");
+		expect(enabled).toBeChecked();
+		expect(rate).toHaveValue(0.005);
+
+		fireEvent.click(enabled);
+		fireEvent.change(rate, { target: { value: "0.01" } });
+
+		const mutation = useConfigStore.getState().localDraft?.mutation;
+		expect(mutation?.per_unit_supply_enabled).toBe(false);
+		expect(mutation?.per_unit_rate).toBe(0.01);
+	});
+
 	it("edits the executed-target bias and window in the runtime draft", () => {
 		render(<ConfigPanel />);
 		const bias = screen.getByTestId("config-field-mutation-executed-bias");

@@ -24,6 +24,7 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
         config.population.initial_creatures = 24;
         config.world.food.initial_coverage = 1.0;
         config.world.food.initial_density = 1.0;
+        config.mutation.per_unit_supply_enabled = false;
         config.mutation.mutation_probability = 1.0;
         config.mutation.per_birth_mutation_events_min = 2;
         config.mutation.per_birth_mutation_events_max = 4;

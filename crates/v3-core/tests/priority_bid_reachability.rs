@@ -25,6 +25,7 @@ struct ProbeCase {
 
 fn search_config() -> v3_core::config::MutationConfig {
     let mut config = SimulationConfig::default().mutation;
+    config.per_unit_supply_enabled = false;
     config.mutation_probability = 1.0;
     config
 }
