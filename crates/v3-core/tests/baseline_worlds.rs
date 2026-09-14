@@ -91,6 +91,10 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
     assert_eq!(points.len(), 6);
 }
 
+/// T13.F03 re-pin: applicability-first target selection changes which
+/// operator applies at each node-internal mutation event, so a 30-tick run
+/// with births diverges from the pre-repair one. The hash below was measured
+/// on the repaired code; the identity the test pins is unchanged.
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -118,7 +122,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 13138541837675773035);
+    assert_eq!(hash.finish(), 12330723111342885916);
 }
 
 use proptest::prelude::*;

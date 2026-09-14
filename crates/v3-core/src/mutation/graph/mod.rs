@@ -4,6 +4,8 @@ pub(crate) mod operators;
 use rand::Rng;
 
 use crate::config::MutationConfig;
+use crate::contracts::InputReference;
+use crate::creature::genome::cgp::CgpGraphBackendDef;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
@@ -149,14 +151,78 @@ impl GraphOperator {
     }
 }
 
+impl GraphOperator {
+    /// Whether this operator has a site to apply to on one Graph-backend
+    /// node. Each arm delegates to the same enumeration the operator draws
+    /// its target from, so a node this accepts never skips at application.
+    fn applies_to(
+        self,
+        def: &CgpGraphBackendDef,
+        input_refs: &[InputReference],
+        config: &MutationConfig,
+    ) -> bool {
+        match self {
+            Self::AlterGraphEdgeWeight | Self::RetargetGraphEdge | Self::RemoveGraphEdge => {
+                operators::has_edge_site(def)
+            }
+            Self::SwapGraphOperator | Self::RemoveInternalGraphNode => {
+                operators::has_compute_node(def)
+            }
+            Self::MutateGraphOperatorParam => operators::has_parameterized_compute_node(def),
+            Self::MutateActionSlotBehavior => operators::has_action_slot(def),
+            Self::AddInternalGraphNode => operators::can_add_compute_node(def),
+            Self::AddGraphEdge => operators::can_add_edge(def),
+            Self::GraphRawFieldMutation => operators::has_raw_field_site(def, input_refs, config),
+            Self::CopyInternalNode => operators::can_copy_compute_node(def),
+            Self::CopySubgraph => operators::can_copy_subgraph(def),
+            Self::CopyEdgeBundle => operators::can_copy_edge_bundle(def),
+            Self::EnableHebbian => hebbian::any_node(def, hebbian::can_enable_hebbian),
+            Self::DisableHebbian
+            | Self::MutateHebbianRule
+            | Self::MutateHebbianRate
+            | Self::ToggleHebbianLamarckian => hebbian::any_node(def, hebbian::is_plastic),
+            Self::EnableRewardModulation => {
+                hebbian::any_node(def, hebbian::can_enable_reward_modulation)
+            }
+            Self::DisableRewardModulation | Self::MutateRewardSource | Self::MutateTraceDecay => {
+                hebbian::any_node(def, hebbian::is_reward_modulated)
+            }
+        }
+    }
+}
+
 /// Graph domain mutator.
 pub struct GraphMutator;
 
 impl GraphMutator {
+    /// The Graph-backend node indices `op` can apply to, ascending.
+    ///
+    /// Selection draws from this set rather than from every Graph-backend
+    /// node, so a refinement operator reaches a module that has a suitable
+    /// site instead of landing on one that does not (T13.F03).
+    pub(crate) fn applicable_indices(
+        genome: &CreatureGenome,
+        op: GraphOperator,
+        config: &MutationConfig,
+    ) -> Vec<usize> {
+        genome
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| match &n.backend_def {
+                BackendDef::Graph(def) => op.applies_to(def, &n.input_refs, config),
+                BackendDef::Vm(_) => false,
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
     /// Apply a graph operator to the genome.
     ///
     /// Returns `Ok(TargetReachability)` on success, or `Err(MutationSkipReason::NoApplicableTarget)`
-    /// if the genome has no Graph-backend nodes or no applicable internal target.
+    /// if no Graph-backend node has a site this operator can apply to. The
+    /// skip happens before the draw, so the engine records it as
+    /// no-eligible-node with no selected target.
     pub fn apply(
         genome: &mut CreatureGenome,
         op: GraphOperator,
@@ -164,22 +230,26 @@ impl GraphMutator {
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        // Pre-guard: must have at least one Graph-backend node.
-        let graph_indices: Vec<usize> = genome
-            .nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, n)| matches!(n.backend_def, BackendDef::Graph(_)))
-            .map(|(i, _)| i)
-            .collect();
-        if graph_indices.is_empty() {
+        let applicable = Self::applicable_indices(genome, op, config);
+        if applicable.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
         let (node_idx, reachability) = targets
-            .select(&graph_indices, rng)
+            .select(&applicable, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        let result = match op {
+        Self::apply_to_node(genome, op, node_idx, rng, config).map(|()| reachability)
+    }
+
+    /// Dispatch `op` onto one already-selected node.
+    pub(crate) fn apply_to_node(
+        genome: &mut CreatureGenome,
+        op: GraphOperator,
+        node_idx: usize,
+        rng: &mut impl Rng,
+        config: &MutationConfig,
+    ) -> Result<(), MutationSkipReason> {
+        match op {
             GraphOperator::AlterGraphEdgeWeight => {
                 operators::alter_edge_weight(genome, node_idx, rng)
             }
@@ -228,8 +298,7 @@ impl GraphMutator {
                 hebbian::mutate_reward_source(genome, node_idx, rng)
             }
             GraphOperator::MutateTraceDecay => hebbian::mutate_trace_decay(genome, node_idx, rng),
-        };
-        result.map(|()| reachability)
+        }
     }
 }
 

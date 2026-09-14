@@ -4,7 +4,7 @@ use std::ops::Range;
 use crate::config::MutationConfig;
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
-use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
+use crate::creature::genome::{BackendDef, CreatureGenome, VmBackendDef, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
 
 pub(super) fn apply_constant_mutation(
@@ -26,6 +26,28 @@ pub(super) fn apply_constant_mutation(
     Ok(())
 }
 
+/// The register-count moves a VM def admits, as `(can_grow, can_shrink)`.
+/// Growing needs room under the 32-register bound; shrinking needs a width
+/// above 1 and a program that, canonicalized modulo the current width,
+/// never reads or writes the register that would disappear. The
+/// applicability predicate and `apply_register_count_mutation`'s direction
+/// draw read the same answer.
+pub(super) fn register_count_moves(vm: &VmBackendDef) -> (bool, bool) {
+    let old_width = vm.register_count;
+    if !(1..=32).contains(&old_width) {
+        return (false, false);
+    }
+    let removed_register = old_width - 1;
+    let mut uses_removed_register = false;
+    for instruction in &vm.program {
+        let mut canonical: VmInstruction = instruction.clone();
+        for_each_register_ref(&mut canonical, &mut |register| {
+            uses_removed_register |= *register % old_width == removed_register;
+        });
+    }
+    (old_width < 32, old_width > 1 && !uses_removed_register)
+}
+
 pub(super) fn apply_register_count_mutation(
     genome: &mut CreatureGenome,
     node_idx: usize,
@@ -34,29 +56,21 @@ pub(super) fn apply_register_count_mutation(
     let node = &mut genome.nodes[node_idx];
     if let BackendDef::Vm(ref mut vm) = node.backend_def {
         let old_width = vm.register_count;
-        if !(1..=32).contains(&old_width) {
-            return Err(MutationSkipReason::NoApplicableTarget);
-        }
-        let grow = rng.gen_bool(0.5);
-        let new_width = if grow {
-            old_width.checked_add(1)
-        } else {
-            old_width.checked_sub(1)
-        }
-        .filter(|width| (1..=32).contains(width))
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+        // The direction is drawn only among the feasible ones, so a def with
+        // either move available never skips here.
+        let grow = match register_count_moves(vm) {
+            (true, true) => rng.gen_bool(0.5),
+            (true, false) => true,
+            (false, true) => false,
+            (false, false) => return Err(MutationSkipReason::NoApplicableTarget),
+        };
+        let new_width = if grow { old_width + 1 } else { old_width - 1 };
 
         let mut canonical_program = vm.program.clone();
-        let removed_register = old_width - 1;
-        let mut uses_removed_register = false;
         for instruction in &mut canonical_program {
             for_each_register_ref(instruction, &mut |register| {
                 *register %= old_width;
-                uses_removed_register |= !grow && *register == removed_register;
             });
-        }
-        if uses_removed_register {
-            return Err(MutationSkipReason::NoApplicableTarget);
         }
         vm.program = canonical_program;
         vm.register_count = new_width;
@@ -69,7 +83,7 @@ pub(super) fn apply_register_count_mutation(
 /// All register indices are bounded by `register_count`, constant indices by `constants_len`,
 /// and input indices by `input_refs_len`. Zero-length parameters are clamped to produce
 /// index 0 (safe — the VM treats out-of-range as a soft default).
-pub(super) fn random_vm_instruction(
+pub(crate) fn random_vm_instruction(
     rng: &mut impl Rng,
     register_count: u8,
     constants_len: usize,
@@ -506,15 +520,7 @@ pub(super) fn apply_instruction_raw_field_mutation(
         .program
         .iter()
         .enumerate()
-        .filter(|(_, instruction)| {
-            !matches!(
-                instruction,
-                VmInstruction::Noop
-                    | VmInstruction::Halt
-                    | VmInstruction::ExecuteActionQueue
-                    | VmInstruction::PopAction
-            )
-        })
+        .filter(|(_, instruction)| has_mutable_field(instruction))
         .map(|(index, _)| index)
         .collect();
     let index = *eligible
@@ -525,6 +531,20 @@ pub(super) fn apply_instruction_raw_field_mutation(
     } else {
         Err(MutationSkipReason::NoApplicableTarget)
     }
+}
+
+/// Whether `mutate_one_instruction_field` has a field to nudge on this
+/// instruction: the four field-less instructions have none. The eligible
+/// set `apply_instruction_raw_field_mutation` draws from and the
+/// `VmInstructionRawFieldMutation` applicability predicate share it.
+pub(super) fn has_mutable_field(instruction: &VmInstruction) -> bool {
+    !matches!(
+        instruction,
+        VmInstruction::Noop
+            | VmInstruction::Halt
+            | VmInstruction::ExecuteActionQueue
+            | VmInstruction::PopAction
+    )
 }
 
 /// Remap all register-typed fields: `(reg + offset) % register_count`.
@@ -1020,42 +1040,7 @@ pub(super) fn apply_mutate_paired_slot_address(
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
     if let BackendDef::Vm(ref mut vm) = node.backend_def {
-        // Group immediate-addressed slot instructions by slot_idx, tracking which have
-        // loads and stores. Register-indirect variants (LoadSlot/StoreSlot) are excluded
-        // because they have no static slot_idx field to co-mutate.
-        //
-        // The map is ordered (not a std HashMap) so that `eligible` below is ordered by
-        // ascending slot index, making the candidate the seeded draw picks a function of
-        // genome content alone rather than of per-process hash order (T10.F11).
-        let mut groups: std::collections::BTreeMap<u8, (Vec<usize>, bool, bool)> =
-            std::collections::BTreeMap::new();
-        for (i, instr) in vm.program.iter().enumerate() {
-            match instr {
-                VmInstruction::LoadSlotImm { slot_idx, .. }
-                | VmInstruction::LoadSlotPrev { slot_idx, .. } => {
-                    let entry = groups
-                        .entry(*slot_idx)
-                        .or_insert((Vec::new(), false, false));
-                    entry.0.push(i);
-                    entry.1 = true; // has load
-                }
-                VmInstruction::StoreSlotImm { slot_idx, .. }
-                | VmInstruction::ClearSlot { slot_idx } => {
-                    let entry = groups
-                        .entry(*slot_idx)
-                        .or_insert((Vec::new(), false, false));
-                    entry.0.push(i);
-                    entry.2 = true; // has store
-                }
-                _ => {}
-            }
-        }
-        // Filter to groups with both load and store.
-        let eligible: Vec<(u8, Vec<usize>)> = groups
-            .into_iter()
-            .filter(|(_, (_, has_load, has_store))| *has_load && *has_store)
-            .map(|(slot, (indices, _, _))| (slot, indices))
-            .collect();
+        let eligible = paired_slot_groups(&vm.program);
         if eligible.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -1070,7 +1055,48 @@ pub(super) fn apply_mutate_paired_slot_address(
     Ok(())
 }
 
-fn is_slot_instruction(instr: &VmInstruction) -> bool {
+/// The slot groups `VmMutatePairedSlotAddress` can co-mutate: immediate
+/// addressed slot instructions grouped by `slot_idx`, keeping only groups
+/// that carry both a load and a store. Register-indirect variants
+/// (`LoadSlot`/`StoreSlot`) are excluded because they have no static
+/// `slot_idx` field to co-mutate.
+///
+/// The map is ordered (not a std `HashMap`) so the result is ordered by
+/// ascending slot index, making the candidate the seeded draw picks a
+/// function of genome content alone rather than of per-process hash order
+/// (T10.F11). The applicability predicate and the operator share it.
+pub(super) fn paired_slot_groups(program: &[VmInstruction]) -> Vec<(u8, Vec<usize>)> {
+    let mut groups: std::collections::BTreeMap<u8, (Vec<usize>, bool, bool)> =
+        std::collections::BTreeMap::new();
+    for (i, instr) in program.iter().enumerate() {
+        match instr {
+            VmInstruction::LoadSlotImm { slot_idx, .. }
+            | VmInstruction::LoadSlotPrev { slot_idx, .. } => {
+                let entry = groups
+                    .entry(*slot_idx)
+                    .or_insert((Vec::new(), false, false));
+                entry.0.push(i);
+                entry.1 = true; // has load
+            }
+            VmInstruction::StoreSlotImm { slot_idx, .. }
+            | VmInstruction::ClearSlot { slot_idx } => {
+                let entry = groups
+                    .entry(*slot_idx)
+                    .or_insert((Vec::new(), false, false));
+                entry.0.push(i);
+                entry.2 = true; // has store
+            }
+            _ => {}
+        }
+    }
+    groups
+        .into_iter()
+        .filter(|(_, (_, has_load, has_store))| *has_load && *has_store)
+        .map(|(slot, (indices, _, _))| (slot, indices))
+        .collect()
+}
+
+pub(super) fn is_slot_instruction(instr: &VmInstruction) -> bool {
     matches!(
         instr,
         VmInstruction::LoadSlot { .. }

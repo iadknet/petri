@@ -1,6 +1,12 @@
-//! Pins the pre-T14.F03 trajectory, including stochastic descendants and actions.
-//! The expected digest was measured on planning commit f76c3f6 before accepting
-//! the instrumentation. Telemetry and wall-clock fields are deliberately excluded.
+//! Pins the sampled trajectory, including stochastic descendants and actions.
+//! Telemetry and wall-clock fields are deliberately excluded.
+//!
+//! T13.F03 re-pin: applicability-first target selection changes which
+//! operator applies at each node-internal mutation event and what it
+//! consumes from the RNG, so every evolved trajectory after the first
+//! affected birth differs from the pre-repair one. The digest below was
+//! measured on the repaired code; the pin's purpose — that the accounting
+//! keeps the trajectory reproducible — is unchanged.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -65,6 +71,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "5898914f4106b258d26d724379ac3cc50cf2f811f9b505294098e9cc137f41f7"
+        "86eee62ceca74ab840577183ae154af998e047ce687b866f23485e95363d7cec"
     );
 }
