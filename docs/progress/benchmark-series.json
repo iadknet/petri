@@ -35,7 +35,8 @@
       "docs/progress/features/t13-f03-mutation-target-applicability.json",
       "docs/progress/features/t13-f04-direct-graph-effect-activation.json",
       "docs/progress/features/t13-f05-function-preserving-module-recruitment.json",
-      "docs/progress/features/t13-f06-recruitment-and-retention-qualification.json"
+      "docs/progress/features/t13-f06-recruitment-and-retention-qualification.json",
+      "docs/progress/features/t14-f12-neighborhood-read-of-selected-genomes.json"
     ]
   },
   "goal": {
@@ -91,7 +92,8 @@
       "docs/progress/features/t13-f03-mutation-target-applicability-goal.json",
       "docs/progress/features/t13-f04-direct-graph-effect-activation-goal.json",
       "docs/progress/features/t13-f05-function-preserving-module-recruitment-goal.json",
-      "docs/progress/features/t13-f06-recruitment-and-retention-qualification-goal.json"
+      "docs/progress/features/t13-f06-recruitment-and-retention-qualification-goal.json",
+      "docs/progress/features/t14-f12-neighborhood-read-of-selected-genomes-goal.json"
     ]
   }
 }
