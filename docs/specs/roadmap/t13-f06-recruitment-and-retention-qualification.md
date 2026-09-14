@@ -1,6 +1,6 @@
 # T13.F06 — Recruitment and Retention Qualification
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-14
 **Feature**: T13.F06
 **Track**: [T13 — Neutral Module Recruitment](../../roadmaps/t13-neutral-module-recruitment.md)
@@ -176,7 +176,7 @@ typed.
       `summary` block, new readings included, folds into the committed
       summary; `cargo fmt --all -- --check`, `cargo clippy --workspace
       --all-targets` and `cargo check --workspace --all-targets` -> clean.
-- [ ] `make check` -> pass.
+- [x] `make check` -> pass (exit 0 on tested commit 3fe9a069).
 - [x] Byte-identity of the eighteen F02 arms against the previous closure:
       per-arm `retained_discovery` / `retained_useful` numerators and
       `outcome_counts` equal the T13.F05 goal summary's, recorded in the
@@ -270,7 +270,7 @@ assumed accepted. Full tables and transcripts in the readings file.
       where they are implementation failures, and no cognition or universal
       emergence claim is made; T11.F10 and T11.F13 can cite the exposure and
       retention readings by summary path and arm name.
-- [ ] Required checks, review, mutation adjudication and benchmark records
+- [x] Required checks, review, mutation adjudication and benchmark records
       are complete and truthful; only then mark the roadmap row, the track's
       qualification criterion and this spec Complete.
 
