@@ -142,12 +142,15 @@ the T14.F12 gate and goal reports (previous closure), the pinned goal epoch
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first, then `make check`
-      -> results in [`docs/progress/readings/t11-f19.md`](../../progress/readings/t11-f19.md).
-- [ ] Focused tests: engine count draw (rate 0, rate 1, founder mean, legacy
+- [x] `cargo test -p v3-core --test viability` first (24 passed), then
+      `make check` (exit 0) -> command table in
+      [`docs/progress/readings/t11-f19.md`](../../progress/readings/t11-f19.md).
+- [x] Focused tests: engine count draw (rate 0, rate 1, founder mean, legacy
       byte-identity), config normalization and serde defaults, founder pin,
       drift-walk supply override, frontend panel fields -> test names and
-      results in the readings file.
+      results (all pass) in the readings file, with the determinism re-pins
+      (`legacy_default_short_run_identity` 11753828254793484309 ->
+      1397923697343438469, three goal recipe digests).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.

@@ -26,8 +26,8 @@ use crate::mutation::vm::{VmMutator, VmOperator};
 fn requested_event_count(config: &MutationConfig, genome_size: u32, rng: &mut impl Rng) -> u32 {
     if config.per_unit_supply_enabled {
         return (0..genome_size)
-            .filter(|_| rng.gen_bool(config.per_unit_rate))
-            .count() as u32;
+            .map(|_| u32::from(rng.gen_bool(config.per_unit_rate)))
+            .sum();
     }
     if !rng.gen_bool(config.mutation_probability) {
         return 0;

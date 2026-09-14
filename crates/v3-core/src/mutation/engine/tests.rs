@@ -1108,7 +1108,6 @@ proptest::proptest! {
         config.per_birth_mutation_events_min = min + extra;
         config.per_birth_mutation_event_continuation_probability = 0.2;
         proptest::prop_assert_eq!(requested_event_count(&config, 111, &mut rng(seed)), min + extra);
-        config.per_unit_supply_enabled = false;
         config.mutation_probability = 0.0;
         proptest::prop_assert_eq!(requested_event_count(&config, 111, &mut rng(seed)), 0);
     }
