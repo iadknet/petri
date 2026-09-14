@@ -25,6 +25,7 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 use v3_core::config::{MutationConfig, SimulationConfig};
 use v3_core::creature::founder::founder_genome;
+use v3_core::creature::genome::analysis::mesh_reachable_nodes;
 use v3_core::neighborhood::{
     self, evaluate_genome, evolved_sample_ranks, read_sample_ranks, structural_companions, Battery,
     BirthResult, EvalContext, GenomeEvaluation, OperatorRow, StructuralCompanions, Tally,
@@ -537,6 +538,16 @@ pub(super) fn compute_founder_neighborhood(
     }
 }
 
+/// The living population's ids in ascending order: the rank space every
+/// final-population sample is drawn from.
+fn sorted_creature_ids(
+    sim: &v3_core::simulation::Simulation,
+) -> Vec<v3_core::contracts::CreatureId> {
+    let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
+    creature_ids.sort();
+    creature_ids
+}
+
 /// The evolved half for one seed's final living population: the predeclared
 /// rank sample, each sampled genome's full reading and structural
 /// companions, and the pooled per-operator and per-birth tallies across the
@@ -549,8 +560,7 @@ pub(super) fn evolved_neighborhood_for_seed(
     context: &EvalContext,
     sizes: NeighborhoodSizes,
 ) -> NeighborhoodEvolvedSeed {
-    let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
-    creature_ids.sort();
+    let creature_ids = sorted_creature_ids(sim);
     let population_size = creature_ids.len();
     let ranks = evolved_sample_ranks(population_size);
     let catalog = v3_core::neighborhood::operator_catalog();
@@ -632,8 +642,7 @@ pub(super) fn neighborhood_read_for_seed(
     context: &EvalContext,
     sizes: NeighborhoodSizes,
 ) -> NeighborhoodRead {
-    let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
-    creature_ids.sort();
+    let creature_ids = sorted_creature_ids(sim);
     let population_size = creature_ids.len();
     let ranks = read_sample_ranks(population_size, sizes.read_sample as usize, seed);
 
@@ -663,7 +672,7 @@ pub(super) fn neighborhood_read_for_seed(
         let executed = battery
             .executed_indices(genome, context.runtime, context.shared_memory_decay_rate)
             .len() as u64;
-        let reachable = structural_companions(genome).reachable_node_count as u64;
+        let reachable = mesh_reachable_nodes(genome).len() as u64;
         let nodes = genome.nodes.len() as u64;
         let genome_size = genome.genome_size();
 

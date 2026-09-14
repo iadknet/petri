@@ -94,15 +94,7 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     });
 
     // Act
-    let run = run_one_seed(
-        &config,
-        SEED,
-        HORIZON,
-        false,
-        None,
-        NeighborhoodSizes::default(),
-        false,
-    );
+    let run = run_one_seed(&config, SEED, HORIZON, false, None);
     let mut oracle = seed_simulation(config.clone(), SEED);
     for _ in 0..HORIZON {
         run_tick(&mut oracle, &mut None);
@@ -181,15 +173,7 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     });
 
     // Act
-    let run = run_one_seed(
-        &config,
-        SEED,
-        HORIZON,
-        false,
-        None,
-        NeighborhoodSizes::default(),
-        false,
-    );
+    let run = run_one_seed(&config, SEED, HORIZON, false, None);
     let mut oracle = seed_simulation(config.clone(), SEED);
     for _ in 0..HORIZON {
         run_tick(&mut oracle, &mut None);
@@ -296,15 +280,7 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     });
 
     // Act
-    let run = run_one_seed(
-        &config,
-        SEED,
-        HORIZON,
-        false,
-        None,
-        NeighborhoodSizes::default(),
-        false,
-    );
+    let run = run_one_seed(&config, SEED, HORIZON, false, None);
     let mut oracle = seed_simulation(config.clone(), SEED);
     for _ in 0..HORIZON {
         run_tick(&mut oracle, &mut None);
