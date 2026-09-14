@@ -149,7 +149,10 @@ Topology connection semantics (T11.F15, T11.F18):
 
 ### VM domain
 
-- `VmInstructionMutation` (insert/delete/replace opcode, mutate operands)
+- `VmInstructionMutation` (insert/delete/replace opcode, mutate operands);
+  a new `PushAction` draws `action_type` in `0..=4`, the range
+  `decode_world_action` admits (T13.F05); existing values above 4 stay in
+  the genome and the raw-field unit step is unchanged
 - `VmConstantMutation`
 - `VmRegisterCountMutation`
 - `VmInstructionRawFieldMutation` (raw representable-field mutation for
