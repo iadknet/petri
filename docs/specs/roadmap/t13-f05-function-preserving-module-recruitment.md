@@ -21,9 +21,9 @@ creatures only through the body: birth mutation of the genome.
 
 ## Non-Goals
 
-- No new blank-template catalog, macro operator, authored controller, novelty
-  reward, global speciation, fan-out, or guarantee that every neutral node
-  becomes useful.
+- No blank-template catalog, macro operator, authored controller, novelty
+  reward, speciation, fan-out, or guarantee that every neutral node becomes
+  useful.
 - No change to operator weights, domain shares, the executed/reachable bias,
   T11.F18's constructors or odds, T13.F03's applicability rule or T13.F04's
   entry rule; T13.F03's deferred executed-applicable bias question stays a
@@ -57,7 +57,7 @@ creatures only through the body: birth mutation of the genome.
   `SwapRouteTargets` — adopted, each step is proved with the operator that
   makes it in production; (2) automated operator × seed search — rejected, a
   transition's existence is decided by site enumeration; (3) new template or
-  motif operators — excluded by the track. Existing crates and `std` suffice.
+  motif operators — excluded by the track.
 - Baseline facts. After T13.F03/F04 every blank, copy, split and unprepared
   experiment arm is still null (0/32, Wilson 0.000–0.107) while prepared arms
   discover 17–19/32; Graph `contributing` stayed 0 in 5 of 6 drift cells.
@@ -77,17 +77,16 @@ qualification, never chosen for an observed outcome:
 | Unprepared copy | Graph, VM | B | F02 changed-task unprepared arm: exact copy of the Task A-correct incumbent (8/8 A, 4/8 B) at the recorded fork. |
 | Inline detour | Graph, VM | A | Production `AddNode` on the entry-to-incumbent edge with a recorded seed; the detour is dispatched every tick and forwards to the incumbent. |
 
-The inline detour is what production creates most often (T11.F18) and the
-only form whose neutral steps run under execution; the others are neutral by
-non-dispatch until activation.
+The inline detour is the only form whose neutral steps run under execution;
+the others are neutral by non-dispatch until activation.
 
 **Path contract.** A path is an ordered list of at most **six** production
 events after the starting form, each one call of `TopologyMutator`,
 `GraphMutator`, `VmMutator` or the InputRef mutator's `apply` with an explicit
 operator and a recorded seed, and each recorded as an F02 `ConstructionStage`
 with its `GenomeDelta`. Six is twice F02's longest constructed stage count after
-creation and about a third of the ~16 applied events a lineage retains across
-the 32-generation discovery horizon (27,768 applied over 55,296 proposals).
+creation and about a third of the ~16 applied events a lineage retains over
+the 32-generation discovery horizon.
 For every step before the last the subject is task-live, loses at most 1/8 of
 the active task score against the preceding stage, and keeps the incumbent's
 complete battery signature; where the module writes shared memory, queues an
@@ -130,10 +129,9 @@ transition is a blocker for the user's decision, not a repair.
 
 **Regression coverage.** Every qualified path is a maintained test in
 `crates/v3-core/src/neighborhood/recruitment_paths/` replaying each step
-through the production operator with its recorded seed and asserting the
-per-step facts; the path also replays through `GenomeDelta::apply`. Existing
-`recruitment_paths`, F08 and F15 fixtures are reused. Mutation, runtime and
-simulation never depend on observation types.
+through the production operator with its recorded seed, asserting the
+per-step facts, and replaying through `GenomeDelta::apply`. Mutation, runtime
+and simulation never depend on observation types.
 
 **Measured, not preserved.** With a repair: applied mixes, RNG consumption
 per event, every evolved trajectory after the first affected birth, drift,
@@ -144,22 +142,16 @@ one, every simulation counter and observation reading equals the previous
 closure's exactly.
 
 **Reference.** A repair updates the operator's paragraph in
-`docs/reference/v3-mutation-spec.md` §3 and, for a Graph surface change,
-`v3-graph-backend-spec.md`; path lengths live in the readings.
+`docs/reference/v3-mutation-spec.md` §3; path lengths live in the readings.
 
 ## Implementation Tasks
 
 - [x] Freeze the nine starting forms and add the seed-selected step harness
-      beside `fixtures.rs` (`recruitment_paths/qualification.rs`), reusing
-      `ConstructionStage`, `GenomeDelta`, `evaluate` and
-      `static_successor_bypass`.
+      (`recruitment_paths/qualification.rs`) on F02's stage seams.
 - [x] Qualify each form: record the shortest path found, per-step readings,
       and every missing transition or growth gap in the readings.
-- [x] For each missing transition, TDD the repair in the existing operator:
-      failing path test first, predicate extension, property tests, reference
-      update; run `cargo test -p v3-core --test viability` first when production
-      code changes. One: the `PushAction.action_type` draw (readings, "Seed
-      search").
+- [x] TDD each missing transition's repair in the existing operator with
+      viability run first; one found, the `PushAction.action_type` draw.
 - [x] Turn every qualified path into the maintained regression tests above.
 - [ ] `cargo check --workspace --all-targets`, `cargo clippy`, `cargo fmt`,
       `make roadmap-check`; update `docs/progress.md`,
@@ -182,11 +174,8 @@ closure's exactly.
       `docs/progress/features/t13-f05-function-preserving-module-recruitment.json`
       and `-goal.json`, raw hash/byte count and verification time checked,
       series entries point to them from the closing commit, no full report
-      staged; exits, `severe`, caps, drift floors and experiment fractions in
-      the readings.
-- [x] A second goal run for determinism: not applicable under the shared
-      workflow's 2026-09-05 one-goal-run decision; `make check` retains
-      cross-process reproducibility and the gate's two-run check.
+      staged; exits, `severe`, caps, floors and experiment fractions in the
+      readings. One goal run per the 2026-09-05 decision.
 
 ```sh
 make bench PROFILE=gate FEATURE=t13-f05-function-preserving-module-recruitment
@@ -233,11 +222,17 @@ below 0.005 do not extend here, so such a reading is escalated.
 | T13.F01 rungs and Graph/VM contributing counts | Same rule: identical or measured consequence, no floor. |
 | Neighborhood, diversity and cognition indicators | No predeclared direction. |
 
-**Measured verdict.** Gate: exit 0, `severe=false`, no flags. Goal: exit 0,
-`severe=false`, one expected work-band flag; founder VM silent share/dead
-unchanged as predeclared, but per-birth silent and depth-2,000 drift are
-unchanged from T13.F04 and miss their predeclared floors — escalated, see
-readings.
+**Measured verdict.** Gate: exit 0, `severe=false`, no flag, counters
+byte-identical to T13.F04. Goal: exit 0, `severe=false`, `plasticity_updates`
++22.75% flag against T13.F04 only, every cap held, founder
+`VmInstructionMutation` silent share and dead unchanged as predeclared. The
+founder row above mis-cited T11 floor (e): it is the single-event floor and,
+like (d), track-level, met by T11.F10; the per-feature rule is no regression,
+and the founder readings (per-birth silent 54.3/57.7/54.3%, single-event
+59.1/62.2/59.1%) are byte-identical to T13.F04's, so this is not a miss.
+Depth-2,000 drift 7/9/7 per 2,000 is identical to T13.F04's and below the
+0.005 floor; the T13.F03/F04 acceptances do not extend, so closure and merge
+wait for the user's decision while review and the mutation gate proceed.
 
 - Summaries: [gate](../../progress/features/t13-f05-function-preserving-module-recruitment.json),
   [goal](../../progress/features/t13-f05-function-preserving-module-recruitment-goal.json).
