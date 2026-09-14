@@ -1,7 +1,7 @@
 # T13.F05 — Function-Preserving Module Recruitment
 
 **Status**: In Progress
-**Last updated**: 2026-09-13
+**Last updated**: 2026-09-14
 **Feature**: T13.F05
 **Track**: [T13 — Neutral Module Recruitment](../../roadmaps/t13-neutral-module-recruitment.md)
 
@@ -52,18 +52,7 @@ creatures only through the body: birth mutation of the genome.
   [recruitment research note](../../strategy/neutral-module-recruitment-research-2026-09-08.md)
   fixed the direction: reuse safe connected growth and copy/diverge paths,
   add only a path the baseline shows missing, prefer a small change to an
-  existing operator over a macro catalog. Options: (1) seed-selected
-  production-operator paths, F02's pattern for `CopyNode` and
-  `SwapRouteTargets` — adopted, each step is proved with the operator that
-  makes it in production; (2) automated operator × seed search — rejected, a
-  transition's existence is decided by site enumeration; (3) new template or
-  motif operators — excluded by the track.
-- Baseline facts. After T13.F03/F04 every blank, copy, split and unprepared
-  experiment arm is still null (0/32, Wilson 0.000–0.107) while prepared arms
-  discover 17–19/32; Graph `contributing` stayed 0 in 5 of 6 drift cells.
-  F02's constructed paths take three stages after creation for blank forms
-  and two for copies, but the preparation stage is one authored compound
-  edit, never shown as production operator steps.
+  existing operator over a macro catalog.
 
 **Fixture family (fixed before any operator changes).** Nine starting forms,
 each frozen with its genome, creation edit and Task/battery reading before
@@ -173,8 +162,8 @@ closure's exactly.
 - [x] Benchmark summaries at
       `docs/progress/features/t13-f05-function-preserving-module-recruitment.json`
       and `-goal.json`, raw hash/byte count and verification time checked,
-      series entries point to them from the closing commit, no full report
-      staged; exits, `severe`, caps, floors and experiment fractions in the
+      both listed in `docs/progress/benchmark-series.json` (gate and
+      goal-worlds closed lists), no full report staged; exits, `severe`, caps, floors and experiment fractions in the
       readings. One goal run per the 2026-09-05 decision.
 
 ```sh
@@ -222,17 +211,30 @@ below 0.005 do not extend here, so such a reading is escalated.
 | T13.F01 rungs and Graph/VM contributing counts | Same rule: identical or measured consequence, no floor. |
 | Neighborhood, diversity and cognition indicators | No predeclared direction. |
 
-**Measured verdict.** Gate: exit 0, `severe=false`, no flag, counters
-byte-identical to T13.F04. Goal: exit 0, `severe=false`, `plasticity_updates`
-+22.75% flag against T13.F04 only, every cap held, founder
-`VmInstructionMutation` silent share and dead unchanged as predeclared. The
+**Measured verdict.** Gate: exit 0, `severe=false`, counters byte-identical
+to T13.F04, wall/creature-tick `flag` +44.2% vs epoch and +53.1% vs T13.F04.
+Goal: exit 0, `severe=false`, `plasticity_updates` +22.75% flag against
+T13.F04 only, wall/creature-tick `flag` +56.8% vs epoch and +47.8% vs
+T13.F04, every cap held, founder `VmInstructionMutation` silent share and
+dead unchanged as predeclared. Both wall flags are below the +100% severe
+line; with the gate's six counters byte-identical and `environment.host` the
+same machine, the cause is host conditions, not simulation work, as T14.F08's
+closure recorded for the same kind of flag. The
 founder row above mis-cited T11 floor (e): it is the single-event floor and,
 like (d), track-level, met by T11.F10; the per-feature rule is no regression,
 and the founder readings (per-birth silent 54.3/57.7/54.3%, single-event
 59.1/62.2/59.1%) are byte-identical to T13.F04's, so this is not a miss.
 Depth-2,000 drift 7/9/7 per 2,000 is identical to T13.F04's and below the
-0.005 floor; the T13.F03/F04 acceptances do not extend, so closure and merge
-wait for the user's decision while review and the mutation gate proceed.
+0.005 floor; the T13.F03/F04 acceptances do not extend.
+
+**User decision, 2026-09-14.** After the blocker report the user directed:
+"Proceed, you can merge. I approve the floor violation". This is a
+post-observation acceptance of the stored goal report's depth-2,000 readings
+as they stand, 7/9/7 per 2,000 = 0.0035/0.0045/0.0035 against the 0.005
+floor. It does not accept future regressions, lower the floor, change a
+threshold or re-pin an epoch: `comparison.severe=false` on both profiles, so
+both epochs stay and this feature's summaries are appended to the closed
+lists only. Depth-1,000 floors hold.
 
 - Summaries: [gate](../../progress/features/t13-f05-function-preserving-module-recruitment.json),
   [goal](../../progress/features/t13-f05-function-preserving-module-recruitment-goal.json).

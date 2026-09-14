@@ -882,7 +882,9 @@ fn form_plans() -> Vec<FormPlan> {
             }
             "graph_unprepared" => (graph_unprepared_plan(), GRAPH_UNPREPARED_SEEDS, None),
             "vm_unprepared" => (vm_unprepared_plan(), VM_UNPREPARED_SEEDS, None),
-            _ => continue,
+            // F02's prepared controls already dispatch: no path to qualify.
+            "graph_prepared" | "vm_prepared" => continue,
+            _ => unreachable!("unplanned form {name}"),
         };
         if name.ends_with("_blank") {
             bases.push((start.backend, start.creation_base.clone()));

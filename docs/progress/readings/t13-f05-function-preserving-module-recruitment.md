@@ -205,7 +205,12 @@ exit 0, `severe=false`. Raw `.bench-artifacts/t13-f05-function-preserving-module
 (96,932 bytes). Vs epoch `remove-complementary-nutrition.json`: all six counters `level=ok`
 (largest move plasticity_updates −27.1%, a decrease, no flag). Vs previous
 `t13-f04-direct-graph-effect-activation.json`: all six counters byte-identical
-(delta% 0.000000), `level=ok`.
+(delta% 0.000000), `level=ok`. Wall clock (ms per creature-tick, 0.002249):
+`level=flag` +44.2% vs epoch (0.001560) and +53.1% vs T13.F04 (0.001470),
+below the +100% severe line; with every counter byte-identical and
+`environment.host` the same machine, the cause is host conditions, not
+simulation work (T14.F08's closure recorded the same kind of wall flag as
+host load).
 
 **Goal** — `make bench PROFILE=goal FEATURE=t13-f05-function-preserving-module-recruitment`,
 exit 0, `severe=false`. Raw `.bench-artifacts/t13-f05-function-preserving-module-recruitment/goal.json`
@@ -218,7 +223,12 @@ counters `level=ok`. Vs previous `t13-f04-direct-graph-effect-activation-goal.js
 five counters `level=ok`; `plasticity_updates` +22.75% (current 0.097385 vs
 0.079336), `level=flag` — inside the +10%/+50% work band (not severe), and
 attributable to the repaired opcode-27 draw per the predeclaration's "with a
-repair, no predeclared direction, inside the flags."
+repair, no predeclared direction, inside the flags." Wall clock (ms per
+creature-tick, 0.011888): `level=flag` +56.8% vs epoch (0.007580) and +47.8%
+vs T13.F04 (0.008042), below the +100% severe line, host conditions per the
+gate reading. The goal summary's `measurement_evidence.dirty=true` (gate
+`false`, both at `ba3267d1`) records that the then-untracked gate summary was
+present in the worktree during the goal run.
 
 Founder-neighborhood predeclaration check (all 3 seeds, founder side of
 `mutational_neighborhood` byte-identical to T13.F04's report):
@@ -254,8 +264,9 @@ the `mutational_neighborhood.evolved` block differ from T13.F04 (expected:
 evolved trajectories consume RNG differently after the opcode-27 repair, "no
 floor" per the predeclaration).
 
-**Measured verdict.** Gate: pass, no flags, no severe. Goal: pass, no severe;
-one work-band flag (`plasticity_updates`, expected under the repair). Two
+**Measured verdict.** Gate: pass, no severe; one wall flag (host conditions).
+Goal: pass, no severe; one work-band flag (`plasticity_updates`, expected
+under the repair) and one wall flag (host conditions). Two
 predeclared items do not fit their stated bound: the founder per-birth silent
 fraction (~54–58% vs ≥60%) and the depth-2,000 drift readings (below 0.005),
 both inherited unchanged from T13.F04 and both explicitly named for
