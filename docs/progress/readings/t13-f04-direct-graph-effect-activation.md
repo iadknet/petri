@@ -20,7 +20,7 @@ Tables and transcripts for the feature spec
 
 | Test | Change | Reason |
 | --- | --- | --- |
-| `crates/v3-core/tests/baseline_worlds.rs::legacy_default_short_run_identity` | `12330723111342885916` -> `11753828254793484309` | Wired zero-compute Graph modules now enter their visit, so the 30-tick run with births diverges in trajectory and charge. The new hash reproduced across three separate processes before re-pinning; the identity the test pins is unchanged. `AddRouteTarget` supplies one such genome directly: it attaches a fresh blank Graph detour carrying a weight-1 router-gate edge, whose gate write was skipped before this repair. |
+| `crates/v3-core/tests/baseline_worlds.rs::legacy_default_short_run_identity` | `12330723111342885916` -> `11753828254793484309` | Wired zero-compute Graph modules now enter their visit, so the 30-tick run with births diverges in trajectory and charge. The new hash reproduced across three separate processes before re-pinning; the identity the test pins is unchanged. `AddRouteTarget` writes its weight-1 router-gate edge onto the selected source node; when that node is a zero-compute Graph (an earlier blank detour), that gate write was skipped before this repair. |
 
 ## Closure measurements
 
@@ -68,7 +68,7 @@ No epoch was re-pinned.
 | Summary path | `docs/progress/features/t13-f04-direct-graph-effect-activation-goal.json` |
 | Summary bytes | 4,136,698 |
 | Verification time (`conversion.verified_at`) | 2026-09-14T04:00:39Z |
-| Worktree dirty at goal measurement (`measurement_evidence.dirty`) — untracked gate summary file present at run time | true |
+| Worktree dirty at goal measurement (`measurement_evidence.dirty`) — untracked gate summary file present at run time (attributed from timestamps; the summary does not record which paths were dirty) | true |
 
 Goal threshold verdicts, against the single predeclared reference (both epoch and previous point at `t13-f03-mutation-target-applicability-goal.json`, matching that closure's epoch re-pin):
 
@@ -94,7 +94,7 @@ Cap timings (source: `environment.*` in the goal summary; caps from `measurement
 | T13.F02 recruitment-paths experiment | 7,321.305 ms (`recruitment_paths_wall_clock_ms`) | < 120 s | ok |
 | Goal end-to-end | 551,060.555 ms ≈ 9.18 min (`wall_clock_ms_total`) | < 15 min | ok |
 
-`graph_relax_iters` and `graph_compute` energy per creature-tick: this summary schema reports `graph_relax_iters` only (no separately reported `graph_compute` energy counter). Gate `graph_relax_iters` per creature-tick is 0.993159 (vs epoch -0.208%, vs previous 0.003%); goal is 1.022229 (vs the single reference -0.718%). Both are inside the +10% flag with no floor, as predeclared.
+`graph_relax_iters` and `graph_compute` energy per creature-tick: this summary schema reports `graph_relax_iters` only (no separately reported `graph_compute` energy counter). Gate `graph_relax_iters` per creature-tick is 0.993159 (vs epoch -0.208%, vs previous 0.003%); goal is 1.022229 (vs the single reference -0.718%). Both are inside the +10% flag with no floor; the predeclared direction was "up" and both moved slightly down.
 
 Drift changed/all births per world, against floors 0.0015 (depth 1,000) and 0.005 (depth 2,000) (source: `deterministic.goal_indicators.cases[i].drift_depth.readings[]`, field `changed_per_all_births`):
 
