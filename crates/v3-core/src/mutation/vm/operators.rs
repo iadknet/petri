@@ -37,6 +37,10 @@ pub(super) fn register_count_moves(vm: &VmBackendDef) -> (bool, bool) {
     if !(1..=32).contains(&old_width) {
         return (false, false);
     }
+    if old_width == 1 {
+        // Nothing to shrink into, so the program scan cannot change the answer.
+        return (true, false);
+    }
     let removed_register = old_width - 1;
     let mut uses_removed_register = false;
     for instruction in &vm.program {
@@ -44,8 +48,11 @@ pub(super) fn register_count_moves(vm: &VmBackendDef) -> (bool, bool) {
         for_each_register_ref(&mut canonical, &mut |register| {
             uses_removed_register |= *register % old_width == removed_register;
         });
+        if uses_removed_register {
+            break;
+        }
     }
-    (old_width < 32, old_width > 1 && !uses_removed_register)
+    (old_width < 32, !uses_removed_register)
 }
 
 pub(super) fn apply_register_count_mutation(

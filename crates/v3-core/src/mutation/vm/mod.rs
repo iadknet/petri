@@ -126,9 +126,7 @@ impl VmOperator {
         }
         unreachable!()
     }
-}
 
-impl VmOperator {
     /// Whether this operator has a site to apply to on one VM-backend node.
     /// Each arm delegates to the same enumeration the operator draws its
     /// target from, so a node this accepts never skips at application.
