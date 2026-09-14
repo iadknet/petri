@@ -196,3 +196,68 @@ Production changes: the `PushAction.action_type` draw above and the
 `mutation/engine/mod.rs` visibility change (four `*_operator_key` functions
 `pub(crate)` so the harness records the same `MutationOperator` the engine
 records). Weights, biases, selectors and the F02 experiment are unchanged.
+
+## Benchmark readings (2026-09-14, tested commit `ba3267d1`)
+
+**Gate** — `make bench PROFILE=gate FEATURE=t13-f05-function-preserving-module-recruitment`,
+exit 0, `severe=false`. Raw `.bench-artifacts/t13-f05-function-preserving-module-recruitment/gate.json`
+(94,071 bytes), summary `docs/progress/features/t13-f05-function-preserving-module-recruitment.json`
+(96,932 bytes). Vs epoch `remove-complementary-nutrition.json`: all six counters `level=ok`
+(largest move plasticity_updates −27.1%, a decrease, no flag). Vs previous
+`t13-f04-direct-graph-effect-activation.json`: all six counters byte-identical
+(delta% 0.000000), `level=ok`.
+
+**Goal** — `make bench PROFILE=goal FEATURE=t13-f05-function-preserving-module-recruitment`,
+exit 0, `severe=false`. Raw `.bench-artifacts/t13-f05-function-preserving-module-recruitment/goal.json`
+(350,790,069 bytes, sha256 `2b5be7b4…`), summary
+`docs/progress/features/t13-f05-function-preserving-module-recruitment-goal.json`
+(4,161,635 bytes). Wall caps: founder 128.8 ms (<10 s), evolved-neighborhood
+614.0 ms total across 3 seeds (<180 s), goal total 706,145.8 ms ≈ 11.77 min
+(<15 min). Vs epoch `t13-f03-mutation-target-applicability-goal.json`: all six
+counters `level=ok`. Vs previous `t13-f04-direct-graph-effect-activation-goal.json`:
+five counters `level=ok`; `plasticity_updates` +22.75% (current 0.097385 vs
+0.079336), `level=flag` — inside the +10%/+50% work band (not severe), and
+attributable to the repaired opcode-27 draw per the predeclaration's "with a
+repair, no predeclared direction, inside the flags."
+
+Founder-neighborhood predeclaration check (all 3 seeds, founder side of
+`mutational_neighborhood` byte-identical to T13.F04's report):
+- `VmInstructionMutation` silent share: 0.420 (seed 11), 0.400 (seed 22),
+  0.420 (seed 33) — unchanged from T13.F04 (fall = 0, within "at most ~1/41").
+- Per-birth (`any_events`) dead fraction: 0.000 all seeds — within the ≤5%
+  floor (d).
+- Per-birth (`any_events`) silent fraction: 0.543269 (seed 11), 0.576923
+  (seed 22), 0.543269 (seed 33) — below the predeclared ≥60% floor (e). This
+  reading is byte-identical to T13.F04's own report (same field, same
+  values), so it is an inherited condition, not a regression introduced by
+  this feature; flagged here because the spec's own floor language names 60%
+  and the reading does not fit it. Escalate to the orchestrator rather than
+  resolving here.
+
+Drift-depth predeclaration check (`changed_per_all_births`, all 3 seeds,
+`drift_depth` block byte-identical to T13.F04's report at every checkpoint):
+- Depth 1,000: 0.0045 / 0.0085 / 0.0045 — all above the 0.0015 floor.
+- Depth 2,000: 0.0035 / 0.0045 / 0.0035 (7/9/7 per 2,000) — all below the
+  0.005 floor. This is exactly the predeclaration's "without a repair"
+  branch ("equal T13.F04's (7/9/7 per 2,000, below the floor) and are
+  escalated as such"), even though a repair did land elsewhere: the
+  drift-depth battery's draws were not touched by the `PushAction` fix, so
+  the reading did not move. Per the spec's own wording this is escalated,
+  not silently accepted; T13.F03/F04's acceptances of sub-0.005 readings do
+  not extend to this closure.
+
+Other predeclared items, checked byte-for-byte against T13.F04's goal report:
+T13.F01 rungs/backends (`graph`/`vm` contributing, executed, total per
+checkpoint) identical; T13.F02 `recruitment_paths.total_proposals` (55,296)
+and `opportunities.attempted` (30,726) identical; per-arm/per-pair detail and
+the `mutational_neighborhood.evolved` block differ from T13.F04 (expected:
+evolved trajectories consume RNG differently after the opcode-27 repair, "no
+floor" per the predeclaration).
+
+**Measured verdict.** Gate: pass, no flags, no severe. Goal: pass, no severe;
+one work-band flag (`plasticity_updates`, expected under the repair). Two
+predeclared items do not fit their stated bound: the founder per-birth silent
+fraction (~54–58% vs ≥60%) and the depth-2,000 drift readings (below 0.005),
+both inherited unchanged from T13.F04 and both explicitly named for
+escalation by the predeclaration's own text — reported to the orchestrator,
+not resolved here.
