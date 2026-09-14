@@ -85,10 +85,12 @@ draws from.
 | `EnableRewardModulation` | `any_node(can_enable_reward_modulation)` | no unmodulated plastic node |
 | `DisableRewardModulation`, `MutateRewardSource`, `MutateTraceDecay` | `any_node(is_reward_modulated)` | no modulated node |
 
-`has_raw_field_site` is the one predicate that is not constant time: it tests
-the parameterized nodes first and only then walks edges, worst case `O(edges)`
-on a module with no parameterized compute node. Every other predicate is a
-constant-time check or a short-circuiting scan of compute nodes.
+No predicate is worse than linear in the module: `has_raw_field_site` tests
+the parameterized nodes first and only then walks edges (worst case
+`O(edges)` on a module with no parameterized compute node); `any_node`, the
+VM `any(...)` scans and `paired_slot_groups` (one `BTreeMap` per node per
+event) scan the module's compute nodes or program once; the rest are
+constant-time checks.
 
 ## VM applicability audit
 
@@ -197,9 +199,9 @@ Per-world depth-2,000 discard/attempted/applied table (source: `deterministic.go
 
 | World | discarded_selected_inapplicable_by_operator | discarded_no_eligible_node_by_operator (total events) | Graph attempted/applied | VM attempted/applied | Topology attempted/applied | InputRef attempted/applied |
 | --- | --- | --- | --- | --- | --- | --- |
-| Orchards in grassland | `{}` (0 for every repaired Graph/VM operator) | 27 operators, sum 2,738 | 14,816 / 14,816 | 14,681 / 14,681 | 11,199 / 11,199 | 14,553 / 14,553 |
-| Canyon country | `{}` (0 for every repaired Graph/VM operator) | 24 operators, sum 2,694 | 14,770 / 14,770 | 14,701 / 14,701 | 10,969 / 10,969 | 14,559 / 14,559 |
-| Confluence | `{}` (0 for every repaired Graph/VM operator) | 27 operators, sum 2,738 | 14,816 / 14,816 | 14,681 / 14,681 | 11,199 / 11,199 | 14,553 / 14,553 |
+| Orchards in grassland | `{}` (0 for every repaired Graph/VM operator) | 27 operators, sum 3,252 | 14,816 / 14,816 | 14,681 / 14,681 | 11,199 / 11,199 | 14,553 / 14,553 |
+| Canyon country | `{}` (0 for every repaired Graph/VM operator) | 25 operators, sum 3,195 | 14,770 / 14,770 | 14,701 / 14,701 | 10,969 / 10,969 | 14,559 / 14,559 |
+| Confluence | `{}` (0 for every repaired Graph/VM operator) | 27 operators, sum 3,252 | 14,816 / 14,816 | 14,681 / 14,681 | 11,199 / 11,199 | 14,553 / 14,553 |
 
 `discarded_selected_inapplicable_by_operator` is `{}` (empty map, i.e. 0) for every repaired Graph/VM operator in all three worlds at depth 2,000, matching the predeclared "Exactly 0" direction. All attempted-vs-applied events are equal per domain (no post-draw discards left in the applied path); attempted==applied confirms the repair.
 
