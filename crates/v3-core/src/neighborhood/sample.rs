@@ -69,7 +69,7 @@ mod tests {
 }
 
 /// Seed base for the neighborhood read (T14.F12): the sample draw seeds
-/// `SmallRng` with `READ_SEED_BASE + world_seed`, and sampled genome `i`
+/// `SmallRng` with `READ_SEED_BASE.wrapping_add(world_seed)`, and sampled genome `i`
 /// births with offset `READ_SEED_BASE + READ_GENOME_MULTIPLIER * (i + 1)`,
 /// disjoint from the evolved half's `100_000 * (i + 1)` and the drift walk's
 /// `7_000_000 + …` offsets.
@@ -79,9 +79,9 @@ pub const READ_GENOME_MULTIPLIER: u64 = 1_000;
 /// The 0-based ranks, ascending, of the id-sorted living population the
 /// neighborhood read samples: a uniform draw without replacement of
 /// `min(sample_size, population_size)` ranks from
-/// `SmallRng::seed_from_u64(READ_SEED_BASE + world_seed)`. Pure over its
-/// arguments; the draw algorithm is pinned by a unit test and a change to it
-/// bumps the read's version.
+/// `SmallRng::seed_from_u64(READ_SEED_BASE.wrapping_add(world_seed))`, total
+/// over `u64` by wrapping. Pure over its arguments; the draw algorithm is
+/// pinned by a unit test and a change to it bumps the read's version.
 #[must_use]
 pub fn read_sample_ranks(
     population_size: usize,
@@ -95,7 +95,7 @@ pub fn read_sample_ranks(
     if amount == 0 {
         return Vec::new();
     }
-    let mut rng = SmallRng::seed_from_u64(READ_SEED_BASE + world_seed);
+    let mut rng = SmallRng::seed_from_u64(READ_SEED_BASE.wrapping_add(world_seed));
     let mut ranks = rand::seq::index::sample(&mut rng, population_size, amount).into_vec();
     ranks.sort_unstable();
     ranks
@@ -120,7 +120,7 @@ mod read_tests {
     }
 
     /// Pins the draw algorithm (`rand::seq::index::sample` from
-    /// `SmallRng::seed_from_u64(8_000_000 + world_seed)`, sorted ascending)
+    /// `SmallRng::seed_from_u64(8_000_000.wrapping_add(world_seed))`, sorted ascending)
     /// for one `(n, sample, seed)` triple; a change here must bump the read
     /// version.
     #[test]
