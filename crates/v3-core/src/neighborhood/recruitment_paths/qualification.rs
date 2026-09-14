@@ -1,10 +1,10 @@
 //! T13.F05: seed-selected production-operator paths from each fixed starting
 //! form to a useful, bypass-sensitive contribution. Observation only.
 
-use super::fixtures::stage_for;
+use super::fixtures::{cue, stage_for};
 use super::*;
 use crate::config::MutationConfig;
-use crate::contracts::{InputReference, NodeId, OrdinaryFoodTypeId, WorldInputKey};
+use crate::contracts::NodeId;
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::cgp::{
     ActionSlotBehavior, CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource,
@@ -97,13 +97,23 @@ impl ProductionEvent {
 #[derive(Debug, Clone)]
 pub struct PathStep {
     pub event: ProductionEvent,
-    pub operator: MutationOperator,
     pub seed: u64,
     pub stage: ConstructionStage,
     /// Per-scene actions, shared memory and routing equal the previous stage.
     pub surfaces_unchanged: bool,
-    pub charges: TaskSummary,
-    pub genome_size: u32,
+}
+
+impl PathStep {
+    /// Real charges the step's subject incurred on the task battery.
+    #[must_use]
+    pub fn charges(&self) -> TaskSummary {
+        self.stage.task.summary()
+    }
+
+    #[must_use]
+    pub fn genome_size(&self) -> u32 {
+        self.stage.genome.genome_size()
+    }
 }
 
 /// A form whose shortest complete path exceeds [`MAX_PATH_EVENTS`].
@@ -210,8 +220,7 @@ fn qualify(plan: FormPlan) -> QualifiedPath {
     } = plan;
     assert_eq!(specs.len(), seeds.len(), "{form}: one pinned seed per step");
     let mut genome = start.genome.clone();
-    let mut previous = start.task.clone();
-    let mut steps = Vec::with_capacity(specs.len());
+    let mut steps: Vec<PathStep> = Vec::with_capacity(specs.len());
     for (spec, &seed) in specs.iter().zip(seeds) {
         let after = accepted(&genome, spec.event, seed, &spec.accept)
             .unwrap_or_else(|| panic!("{form} {}: seed {seed} is not accepted", spec.name));
@@ -223,16 +232,13 @@ fn qualify(plan: FormPlan) -> QualifiedPath {
             &genome,
             after.clone(),
         );
+        let previous = steps.last().map_or(&start.task, |step| &step.stage.task);
         steps.push(PathStep {
             event: spec.event,
-            operator: spec.event.operator(),
             seed,
-            surfaces_unchanged: surfaces_unchanged(&previous, &stage.task),
-            charges: stage.task.summary(),
-            genome_size: after.genome_size(),
+            surfaces_unchanged: surfaces_unchanged(previous, &stage.task),
             stage,
         });
-        previous = steps.last().expect("just pushed").stage.task.clone();
         genome = after;
     }
     QualifiedPath {
@@ -280,11 +286,7 @@ pub fn search_seeds() -> Vec<SeedSearch> {
 // ── Genome readers used by acceptance predicates ────────────────────────────
 
 fn node(genome: &CreatureGenome, id: NodeId) -> &NodeGenome {
-    genome
-        .nodes
-        .iter()
-        .find(|node| node.node_id == id)
-        .expect("fixture node exists")
+    genome.find_node(id).expect("fixture node exists")
 }
 
 fn vm(genome: &CreatureGenome) -> &VmBackendDef {
@@ -314,17 +316,6 @@ fn only_scaffold_backend_changed(before: &CreatureGenome, after: &CreatureGenome
 /// The entry node's first (statically winning) target is the scaffold.
 fn scaffold_is_incumbent(after: &CreatureGenome) -> bool {
     node(after, NodeId::new(0)).targets[0].target_id == SCAFFOLD
-}
-
-fn cue(task: Task) -> InputReference {
-    InputReference::World(match task {
-        Task::A => WorldInputKey::FoodHere {
-            type_idx: OrdinaryFoodTypeId::default(),
-        },
-        Task::B => WorldInputKey::NeighborFoodRing {
-            type_idx: OrdinaryFoodTypeId::default(),
-        },
-    })
 }
 
 fn cue_leaf(task: Task) -> GraphSource {
@@ -711,95 +702,52 @@ fn insert_step(name: &'static str, edits: &'static str, expected: Vec<Expect>) -
 /// the module by inserting the push last: six events.
 fn vm_blank_plan(dispatched: bool) -> Vec<StepSpec> {
     use Expect::{Exact, JumpToHalt};
-    let halt = Exact(VmInstruction::Halt);
-    let mut plan = vec![cue_added()];
-    let read = (
-        "read_cue",
-        "VmInstructionMutation insert: ReadInput of the cue into register 0",
-    );
-    let jump = (
-        "skip_when_zero",
-        "VmInstructionMutation insert: JumpIfZero on the cue, landing on the Halt",
-    );
-    let double = (
-        "double_to_east",
-        "VmInstructionMutation insert: Add doubling the cue to the east code 2",
-    );
-    let write = (
-        "write_direction",
-        "VmInstructionMutation insert: WriteWorldActionMeta slot 0 from register 0",
-    );
-    let push = (
-        "push_move",
-        "VmInstructionMutation insert: PushAction(Move); the module now emits",
-    );
-    let programs: Vec<((&'static str, &'static str), Vec<Expect>)> = if dispatched {
-        vec![
-            (read, vec![Exact(READ_CUE), halt.clone()]),
-            (double, vec![Exact(READ_CUE), Exact(DOUBLE), halt.clone()]),
-            (
-                write,
-                vec![
-                    Exact(READ_CUE),
-                    Exact(DOUBLE),
-                    Exact(WRITE_DIRECTION),
-                    halt.clone(),
-                ],
-            ),
-            (
-                jump,
-                vec![
-                    Exact(READ_CUE),
-                    JumpToHalt,
-                    Exact(DOUBLE),
-                    Exact(WRITE_DIRECTION),
-                    halt.clone(),
-                ],
-            ),
-            (
-                push,
-                vec![
-                    Exact(READ_CUE),
-                    JumpToHalt,
-                    Exact(DOUBLE),
-                    Exact(WRITE_DIRECTION),
-                    Exact(PUSH_MOVE),
-                    halt,
-                ],
-            ),
-        ]
+    /// The finished program in position order: each instruction's insert
+    /// step name and edit note.
+    const PROGRAM: [(&str, &str); 5] = [
+        (
+            "read_cue",
+            "VmInstructionMutation insert: ReadInput of the cue into register 0",
+        ),
+        (
+            "skip_when_zero",
+            "VmInstructionMutation insert: JumpIfZero on the cue, landing on the Halt",
+        ),
+        (
+            "double_to_east",
+            "VmInstructionMutation insert: Add doubling the cue to the east code 2",
+        ),
+        (
+            "write_direction",
+            "VmInstructionMutation insert: WriteWorldActionMeta slot 0 from register 0",
+        ),
+        (
+            "push_move",
+            "VmInstructionMutation insert: PushAction(Move); the module now emits",
+        ),
+    ];
+    let expects = [
+        Exact(READ_CUE),
+        JumpToHalt,
+        Exact(DOUBLE),
+        Exact(WRITE_DIRECTION),
+        Exact(PUSH_MOVE),
+    ];
+    // Program positions in insertion order.
+    let order: [usize; 5] = if dispatched {
+        [0, 2, 3, 1, 4]
     } else {
-        vec![
-            (read, vec![Exact(READ_CUE), halt.clone()]),
-            (jump, vec![Exact(READ_CUE), JumpToHalt, halt.clone()]),
-            (
-                double,
-                vec![Exact(READ_CUE), JumpToHalt, Exact(DOUBLE), halt.clone()],
-            ),
-            (
-                write,
-                vec![
-                    Exact(READ_CUE),
-                    JumpToHalt,
-                    Exact(DOUBLE),
-                    Exact(WRITE_DIRECTION),
-                    halt.clone(),
-                ],
-            ),
-            (
-                push,
-                vec![
-                    Exact(READ_CUE),
-                    JumpToHalt,
-                    Exact(DOUBLE),
-                    Exact(WRITE_DIRECTION),
-                    Exact(PUSH_MOVE),
-                    halt,
-                ],
-            ),
-        ]
+        [0, 1, 2, 3, 4]
     };
-    for ((name, edits), expected) in programs {
+    let mut plan = vec![cue_added()];
+    for inserted in 1..=order.len() {
+        let present = &order[..inserted];
+        let (name, edits) = PROGRAM[present[inserted - 1]];
+        let expected = (0..expects.len())
+            .filter(|position| present.contains(position))
+            .map(|position| expects[position].clone())
+            .chain([Exact(VmInstruction::Halt)])
+            .collect();
         plan.push(insert_step(name, edits, expected));
     }
     if !dispatched {
@@ -807,6 +755,7 @@ fn vm_blank_plan(dispatched: bool) -> Vec<StepSpec> {
     }
     plan
 }
+
 /// Pinned `Topology.AddNode` seeds drawing each blank backend on the
 /// entry-to-incumbent edge: the first accepted in the search range.
 fn detour_seed(backend: ModuleBackend) -> u64 {

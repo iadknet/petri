@@ -184,11 +184,13 @@ halts at the jump both before and after the push.
 | `cargo test -p v3-core --test reproducibility` | ok, 3 passed |
 | `cargo test -p v3-cli` | ok: 101 + 11 + 20 + 20 + 11 passed, 0 failed |
 | `cargo test -p v3-core recruitment_paths` | ok: 25 lib tests (1 ignored search), 3 integration tests, 0 failed |
-| `cargo test --release -p v3-core --lib -- --ignored recruitment_paths_seed_search` | ok, 1 passed: the search reproduces every pinned seed |
+| `cargo test --release -p v3-core --lib -- --ignored recruitment_paths_seed_search` | ok, 1 passed: the search reproduces every pinned seed. Run before the harness simplification; it still holds because the acceptance predicates are unchanged in meaning (the derived expected programs equal the former literals, as the pinned record test replaying every seed against the current predicates shows), so the first accepted seed per step cannot have moved |
 | `cargo check --workspace --all-targets` | clean |
 | `cargo clippy --workspace --all-targets` | clean, no warnings |
 | `cargo fmt --all --check` | clean |
 | `make roadmap-check` | pass |
+
+The table reflects the current harness, seed-search row excepted.
 
 Production changes: the `PushAction.action_type` draw above and the
 `mutation/engine/mod.rs` visibility change (four `*_operator_key` functions
