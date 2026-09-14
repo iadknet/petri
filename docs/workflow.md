@@ -14,12 +14,17 @@ Claude:
 
 | Role | Model | Where it is defined |
 | --- | --- | --- |
-| Orchestrator | Fable 5.1, effort `medium` | the session you paste the goal into |
+| Orchestrator | Opus 5, effort `medium` | the session you paste the goal into |
+| Spec owner and advisor | Fable 5.1, effort `high`, persistent | `.claude/agents/roadmap-spec-owner.md` |
 | Implementer | Opus 5, effort `medium`, Fable 5.1 advisor | `.claude/agents/roadmap-implementer.md` |
 | Benchmark specialist | Sonnet 5, default effort | `.claude/agents/roadmap-benchmark-specialist.md` |
 | Mutation specialist | Opus 5, effort `medium` | `.claude/agents/roadmap-mutation-specialist.md` |
 | Reviewer | Fable 5.1, effort `high`, read-only | `.claude/agents/roadmap-reviewer.md` |
 
+The orchestrator delegates, verifies, and integrates; the thinking that needs
+the frontier model — writing the spec, judging readiness, and resolving
+requirement questions during implementation — lives in one persistent Fable
+spec owner, resumed by `SendMessage`, and in the fresh Fable reviewer.
 `.claude/settings.json` sets `advisorModel: fable` and `worktree.baseRef: head`.
 The intended advisor effort is `medium`, but neither Claude Code nor the API
 exposes an advisor effort setting, so that intent is recorded here and not
@@ -47,12 +52,13 @@ In Codex, use the [Codex launch instructions](workflow-codex.md#launch-and-goal-
    roadmap feature."** It applies the next-feature rule below and returns one
    `/goal` command for Claude, or the Codex goal prompt when requested in Codex.
 2. Open a new session in the **main checkout** (not a worktree), on a clean,
-   current `main`. Select Fable 5.1, effort `medium`, and auto mode. Keep agent
+   current `main`. Select Opus 5, effort `medium`, and auto mode. Keep agent
    teams disabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` unset or `0`).
 3. Confirm the startup notice `Advisor Tool (experimental) is on`. If it is
    missing, run `/advisor fable` once (a Fable advisor bills to usage
    credits on plans where Fable usage does). Do not consult the advisor
-   yourself; its value is on the Opus implementer.
+   yourself; its value is on the Opus implementer, and the orchestrator's
+   Fable channel is the spec owner.
 4. Paste the goal command. Nothing else to paste: the goal tells the
    orchestrator to read this file.
 
@@ -81,7 +87,7 @@ completion conditions. Generating either template does not execute it.
 Substitute `<TNN.FNN>` and the lowercase `<tnn-fnn>` worktree name.
 
 ```
-/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Fable 5.1 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; plan and commit the flat spec there; delegate feature implementation and production-code remediation to roadmap-implementer, the gate and goal baseline runs and their records to roadmap-benchmark-specialist, the final diff review to roadmap-reviewer, and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
+/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec to roadmap-spec-owner, verify it, and commit it there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, the gate and goal baseline runs and their records to roadmap-benchmark-specialist, the final diff review to roadmap-reviewer, and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
 ```
 
 The `/goal` evaluator reads only this conversation and runs no commands, so
@@ -99,12 +105,15 @@ when running in Codex.
 ### Start
 
 Verify before doing anything else, and stop with the reason if any check fails:
-you are Fable 5.1 at effort `medium`; `git rev-parse --show-toplevel` is the
+you are Opus 5 at effort `medium`; `git rev-parse --show-toplevel` is the
 main checkout, not a
 path under `.claude/worktrees/`; `git status` is clean on `main`; the target
 feature is unchecked and every dependency in its track row is checked. If the
 session is already inside a worktree, stop and ask the user to relaunch from
 the main checkout — a worktree session cannot merge into the main checkout.
+Load `SendMessage` with `ToolSearch select:SendMessage`; the spec owner is
+resumed through it. If the tool is absent in this build, continue, and apply the
+fallback in "Plan" below.
 
 Then call `EnterWorktree` with the feature name. The session moves to
 `.claude/worktrees/<tnn-fnn>` on branch `worktree-<tnn-fnn>`, branched from
@@ -114,26 +123,53 @@ Prefix `PATH` with `~/.local/share/petri-tools/bin` and
 
 ### Plan
 
-Read the roadmap contract (`docs/roadmaps/README.md`). From the owning track read
-only the feature's own row, the rows of its dependencies, and the entries in the
-track's "Notes for AI Agents" that name this feature or one of its dependencies —
-not the whole track, and not the whole Notes section, which is the bulk of a
-track file. From each dependency spec read the Goal, Inputs and Invariants, and
-the Performance predeclaration; open its readings file only when a specific
-number is needed. Create the flat feature spec at
-`docs/specs/roadmap/tnn-fnn-<slug>.md` from the template, run one readiness
-review yourself, allow one revision, and commit it. Set the spec to
-`In Progress` and promote a `Planned` track and a `Planning` master.
+Delegate the Plan step to `roadmap-spec-owner`, spawned in the foreground
+(`run_in_background: false`) so nothing else touches the worktree while it
+writes. Give it the feature ID, the worktree path, and the original requirement
+from the goal; its agent definition names the sections it reads — the roadmap
+contract, the feature's own track row, its dependency rows, the track Notes
+entries that name them, and the Goal, Inputs and Invariants, and Performance
+predeclaration of each dependency spec. Do not read those documents yourself to
+pre-digest them: the point of the delegation is that the planning inputs never
+enter the orchestrator's context.
+
+The spec owner creates the flat feature spec at
+`docs/specs/roadmap/tnn-fnn-<slug>.md` from the template, runs one readiness
+review, allows one revision, sets the spec to `In Progress`, promotes a
+`Planned` track and a `Planning` master, and runs `make roadmap-check`. Verify
+its report against the files — the spec exists, the statuses moved, the checker
+passed — and commit the plan. Quote the spec owner's agent name or ID in your own
+message after the spawn so the resume address survives context compaction.
+
+**The spec owner stays on the feature.** It is the orchestrator's channel for
+requirement questions for the rest of the run. Resume it by `SendMessage`,
+never while an implementer or specialist is running, for: a proposed change to
+requirements or acceptance criteria, conflicting technical advice, a request for
+a verification exception, a benchmark or mutation result that does not fit the
+predeclaration, or an integration conflict that changes behavior. Wait for its
+answer before the dependent work proceeds. It resolves against the original
+feature contract and records any spec revision as an explicit, checked edit; it
+cannot expand user scope or waive a required check, and it is never reused as
+the final reviewer. Send it the question and the evidence, not documents it
+already read.
+
+**Fallback.** If `SendMessage` is not exposed in the running build, each
+escalation goes to a fresh `roadmap-spec-owner` whose brief carries the
+committed spec path, the sections at issue, and the question; record the
+deviation once in the spec's "Notes for AI Agents" as a `Decision:` bullet.
 
 ### Implement
 
 Delegate feature implementation and production-code remediation to
 `roadmap-implementer`. Mutation-gate test-only remediation belongs to
-`roadmap-mutation-specialist`. Write no feature code yourself. `SendMessage` is not exposed in the current Claude
-desktop client, so an implementer cannot be kept alive across passes: every pass
-starts a fresh agent and its brief carries what it needs. (This applies to Claude
-only. The Codex adapter has `followup_task` and `send_message` and keeps one
-persistent implementer; see `docs/workflow-codex.md`.)
+`roadmap-mutation-specialist`. Write no feature code yourself. Every implementer
+pass starts a fresh agent and its brief carries what it needs. This is a cost
+decision, not a tool limit: measured first launches carried ~300k tokens of
+context against 89–142k for later ones, and a continued agent carries the large
+context forward on every turn. `SendMessage` is available and is used for the
+spec owner, whose context is small and worth keeping; it is deliberately not
+used to keep an implementer alive. (The Codex adapter keeps one persistent
+implementer; see `docs/workflow-codex.md`.)
 
 **Brief 1 — build.** Give it the feature ID, the spec path, the change requested,
 and the exact spec sections this pass needs — normally Goal, Inputs and
@@ -162,9 +198,7 @@ and any remediation, on the code that ships. See "Mutation gate" below.
 
 Splitting the work this way is a cost measure, not a correctness one: first
 launches were the expensive ones in the sessions this rule came from. If it
-proves worse in practice, collapse the two briefs back into one — the part that
-cannot be restored is the `SendMessage` persistence, which the client does not
-support.
+proves worse in practice, collapse the two briefs back into one.
 
 **Name the sections, never just the path.** "Read the spec's Inputs and
 Invariants and Implementation Tasks" costs a fraction of "read the spec at
@@ -316,7 +350,7 @@ the recorded CLI and observed outer-process exit statuses with their sources,
 `severe` flag, threshold verdict, raw/summary byte counts and paths. It
 does not change thresholds or baselines, remediate code, or interpret unexpected
 results into a new requirement. Route those results through the orchestrator to
-the advisor and a fresh implementer as appropriate. If later production
+the spec owner and a fresh implementer as appropriate. If later production
 remediation invalidates a report, return only the affected final-code
 measurement to a fresh benchmark specialist before closure; this is not a
 second determinism check.
@@ -442,7 +476,8 @@ pushing, opening or updating a pull request, or any other remote mutation.
 After the feature closes, add one line to that feature spec's "Notes for AI
 Agents": the `/usage` totals at closure (ask the user; `/usage` is a user
 command), each implementer brief's self-reported advisor consult count and the
-number of passes, and the reviewer's finding counts by severity. Telemetry only, never a success
+number of passes, the number of spec-owner resumes after the Plan step, and the
+reviewer's finding counts by severity. Telemetry only, never a success
 criterion.
 
 ## Codex, rationale, and history
