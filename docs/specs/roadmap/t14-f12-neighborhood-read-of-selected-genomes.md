@@ -170,23 +170,25 @@ the drift chart drops its two floor lines and the floor wording in its subtitle.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
-- [ ] The stored goal report carries `neighborhood_read` on all three worlds
+- [x] The stored goal report carries `neighborhood_read` on all three worlds
       with `sample_size == 50`, `birth_trials == 100`, `births_total == 5000`,
       the per-genome rows summing to the pooled tally, and the three fractions
       dividing by 5,000; jq transcript and the per-world table in the readings
       file, with the sample's and the population's mean generation beside it.
-- [ ] The comparison block lists the three `neighborhood_read_*` keys per world
+      Confirmed: sample 47.0/48.5/52.7 vs population 46.77/48.07/52.73.
+- [x] The comparison block lists the three `neighborhood_read_*` keys per world
       with `reference: null`, and `evolved_*_per_mutated_births` with the same
-      values the previous closure stored under the old names.
-- [ ] The predeclared direction of none, checked as T14.F04 did: with the
+      values the previous closure stored under the old names. Yes.
+- [x] The predeclared direction of none, checked as T14.F04 did: with the
       `neighborhood_read` keys deleted, the stored goal report's
       `deterministic.goal_indicators` is byte-identical to T13.F06's (no
       simulation change lies between them on main); jq diff in the readings
-      file.
-- [ ] Benchmark summary stored at `docs/progress/features/<id>.json` and its
+      file. Zero-length diff.
+- [x] Benchmark summary stored at `docs/progress/features/<id>.json` and its
       `-goal` companion, local raw hash/byte count and verification time
       checked, series entry points to the summary, the goal summary's byte
       growth against T13.F06's recorded, and no new full report staged.
+      Confirmed; series entries added.
 
 Transcripts and per-genome tables go to
 [`docs/progress/readings/t14-f12.md`](../../progress/readings/t14-f12.md).
@@ -226,7 +228,15 @@ stored and compared but carries no floor. T03.F11 reads this floor: a
 replication rate that lowers the fraction below it, or shrinks the executed
 core while the fraction holds, is rejected there.
 
-**Measured verdict.** Pending.
+**Decision.** First-reading floors for `neighborhood_read.changed_per_all_births`,
+standing from the next closure on: Orchards in grassland (11) = 0.146400,
+Canyon country (22) = 0.130000, Confluence (33) = 0.143400.
+
+**Measured verdict.** Gate and goal exit 0, `severe=false`, both predeclared
+caps and the direction-of-none check hold (zero-length diff vs T13.F06);
+`neighborhood_read` defined per world as predeclared. Sample vs population
+mean generation: 47.0/46.77, 48.5/48.07, 52.7/52.73. Full details:
+[`docs/progress/readings/t14-f12.md`](../../progress/readings/t14-f12.md).
 
 - Summaries: [gate](../../progress/features/t14-f12-neighborhood-read-of-selected-genomes.json),
   [goal](../../progress/features/t14-f12-neighborhood-read-of-selected-genomes-goal.json).
