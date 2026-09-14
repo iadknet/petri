@@ -177,14 +177,14 @@ typed.
       summary; `cargo fmt --all -- --check`, `cargo clippy --workspace
       --all-targets` and `cargo check --workspace --all-targets` -> clean.
 - [ ] `make check` -> pass.
-- [ ] Byte-identity of the eighteen F02 arms against the previous closure:
+- [x] Byte-identity of the eighteen F02 arms against the previous closure:
       per-arm `retained_discovery` / `retained_useful` numerators and
       `outcome_counts` equal the T13.F05 goal summary's, recorded in the
       readings file with the twenty-seven-arm table.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
-- [ ] Benchmark summary stored at `docs/progress/features/<id>.json`, local raw
+- [x] Benchmark summary stored at `docs/progress/features/<id>.json`, local raw
       hash/byte count and verification time checked, series entry points to the
       summary, and no new full report staged.
 
@@ -224,7 +224,16 @@ experiment under 120 s, goal profile under 15 minutes.
 | Summary byte count | Grows by the nine arms and 98 pairs of 32 rows; recorded beside T13.F05's 4,161,635 bytes, no cap. Shrinking the summary representation stays with T15.F01, never a per-feature exception. |
 | Diversity and cognition indicators | Byte-identical to T13.F05. |
 
-**Measured verdict.** Not yet measured.
+**Measured verdict.** Gate and goal: exit 0, `severe=false`, no wall/work
+flags against either reference (F05's goal wall flag did not recur). Six
+counters, founder/evolved neighborhood, drift-walk blocks, reachable-
+structure distribution and every diversity/cognition indicator are byte-
+identical to F05; the eighteen F02 arms are byte-identical; the nine new
+`CostSelection` arms and 98 new pairs read as predeclared; the experiment
+ran in 10,275 ms (cap 120 s). One escalation carries forward unchanged from
+F05: depth-2,000 drift reads 0.0035/0.0045/0.0035, byte-identical to F05
+and still below the 0.005 floor — escalated per the spec's own text, not
+assumed accepted. Full tables and transcripts in the readings file.
 
 - Summaries: [gate](../../progress/features/t13-f06-recruitment-and-retention-qualification.json),
   [goal](../../progress/features/t13-f06-recruitment-and-retention-qualification-goal.json).
