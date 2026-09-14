@@ -144,10 +144,19 @@ or world change is involved.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t13-f03-mutation-target-applicability.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
-      series entries point to the summaries, no full report staged.
+      series entries point to the summaries, no full report staged. Gate:
+      exit 0, `comparison.severe=false`, all counters `ok`. **Goal:
+      `comparison.severe=true`** — `plasticity_updates` +100.068% vs epoch
+      `t12-f04-baseline-world-set-goal.json` (severe), +42.006% vs previous
+      `t15-f01-...-goal.json` (flag); CLI exit 3, outer `make` exit 2; drift
+      changed/all births at depth 2,000 is below the 0.005 floor in Orchards
+      in grassland and Confluence (0.0035 each) and at the floor in Canyon
+      country (0.0050). Full tables in
+      [readings](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements).
+      Not remediated by the benchmark specialist; routed to the orchestrator.
 - [ ] A second goal run for determinism: not applicable under the shared
       workflow's 2026-09-05 one-goal-run decision; `make check` retains
       cross-process reproducibility and the gate's two-run check.
@@ -191,7 +200,24 @@ world, T13.F02 experiment under 120 s, goal profile under 15 minutes.
 | T13.F02 in-report experiment fractions | Move; reported as consequences, no floor or superiority claim. |
 | Six normalized simulation counters, wall/creature-tick, neighborhood, diversity and cognition indicators | No predeclared direction; the evolved populations differ from the first affected birth on. |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate: `comparison.severe=false` against both
+`remove-complementary-nutrition.json` (epoch) and `bench-decomposition.json`
+(previous); every counter `ok`; CLI and outer exit 0. Goal:
+`comparison.severe=true` against epoch `t12-f04-baseline-world-set-goal.json`
+— `plasticity_updates` +100.068% (severe); +42.006% (flag) against previous
+`t15-f01-local-raw-artifacts-and-committed-benchmark-summaries-goal.json`;
+all other counters and wall_clock `ok`; CLI exit 3, outer `make` exit 2. Caps
+all held (founder 100.349 ms, evolved 506.998 ms summed, drift 15,105.108 ms
+total across 3 worlds, T13.F02 experiment 7,183.770 ms, goal end-to-end
+≈8.26 min). `discarded_selected_inapplicable_by_operator` is 0 for every
+repaired Graph/VM operator in all three worlds at depth 2,000, matching the
+predeclaration. Drift changed/all births at depth 2,000 is below the 0.005
+floor in Orchards in grassland and Confluence (0.0035 each) and at the floor
+in Canyon country (0.0050); depth 1,000 holds the 0.0015 floor everywhere.
+No epoch was re-pinned. The severe plasticity_updates regression and the
+depth-2,000 drift-floor misses are reported as facts, not remediated; see
+[readings](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements)
+for full tables.
 
 - Summaries: [gate](../../progress/features/t13-f03-mutation-target-applicability.json),
   [goal](../../progress/features/t13-f03-mutation-target-applicability-goal.json).
