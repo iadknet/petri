@@ -1,6 +1,6 @@
 # T14.F12 — Neighborhood Read of Selected Genomes
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-14
 **Feature**: T14.F12
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -148,8 +148,7 @@ the drift chart drops its two floor lines and the floor wording in its subtitle.
 
 ## Verification
 
-- [ ] `make check` -> exit 0 on the final feature code; commit named here.
-      Uncommitted post-simplify worktree on fd38f20c: `make check` exit 0
+- [x] `make check` -> exit 0 on the final feature code at `ccc8433c`
       (2026-09-14).
 - [x] Focused tests: `cargo test -p v3-core -p v3-cli` -> exit 0, with
       `cargo clippy -p v3-core -p v3-cli --all-targets` and
@@ -249,21 +248,21 @@ mean generation: 47.0/46.77, 48.5/48.07, 52.7/52.73. Full details in the
 
 ## Success Criteria
 
-- [ ] Every goal-profile world stores a `neighborhood_read` block with fixed
+- [x] Every goal-profile world stores a `neighborhood_read` block with fixed
       sample and birth seeds, 50 genomes, 100 births each, per-all-births
       fractions with their denominators, per-genome rows and the sample's depth.
-- [ ] The three `neighborhood_read_*` readings are visible to the comparison
+- [x] The three `neighborhood_read_*` readings are visible to the comparison
       chain, the first reading is recorded as the per-world floor, and the
       evolved-half keys name the denominator they divide by.
-- [ ] Every pre-existing indicator, counter and stored reading is byte-identical
+- [x] Every pre-existing indicator, counter and stored reading is byte-identical
       to a run without this feature, and the block reproduces across thread
       counts.
-- [ ] The progress page draws the reading with its first-reading reference and
+- [x] The progress page draws the reading with its first-reading reference and
       the drift chart draws no floor lines.
 
 ## Notes for AI Agents
 
-- Decision: T14.F12 was scheduled by the user on 2026-09-14 out of the order of
-  new starts, together with the T11 floor amendment that makes this reading the
-  closure indicator for changed births at depth.
+- Decision: scheduled by the user on 2026-09-14 out of the order of new starts,
+  with the T11 floor amendment that makes this reading the closure indicator.
 - Deferred: `neighborhood_read_wall_clock_ms_total` serializes as `-0.0` on the gate summary (empty f64 sum, inherited from the evolved total); the sample.rs read tests sit in a second test module after the existing one.
+- Cost: `/usage` not collected; implementer passes 3 (advisor consults 0/0/1, the last against its brief); spec-owner resumes 1; reviewer P1 0, P2 0, P3 4.
