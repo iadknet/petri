@@ -171,7 +171,7 @@ make bench PROFILE=goal FEATURE=t13-f03-mutation-target-applicability
 | Tested commit | pending |
 | Mutation output | pending |
 | Closure documentation checks | pending |
-| Goal compute cost (2026-09-13), accepted by the user below | Goal `plasticity_updates` per creature-tick 0.093984 is +100.068% (severe) against epoch `t12-f04-baseline-world-set-goal.json` (0.046976) and +42.006% (flag) against previous `t15-f01-...-goal.json` (0.066183), with no predeclared severe allowance; the epoch→previous +41% inherited flag recorded by T13.F02 compounds with this feature's own +42%. Per seed (current vs previous): Orchards 0.1628 vs 0.0894 with final population 17,774 vs 11,313, Canyon 0.0540 vs 0.0806, Confluence 0.0453 vs 0.0300. Every other counter and wall/creature-tick `ok`. Accepted; see [closure measurements](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements). |
+| Goal compute cost (2026-09-13), accepted by the user below | Goal `plasticity_updates` per creature-tick 0.093984 is +100.068% (severe) against epoch `t12-f04-baseline-world-set-goal.json` (0.046976) and +42.006% (flag) against previous `t15-f01-...-goal.json` (0.066183), with no predeclared severe allowance; T13.F02's inherited +41% epoch flag compounds with this +42%. Every other counter and wall/creature-tick `ok`. Accepted; see [closure measurements](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements). |
 | Depth-2,000 drift floor (2026-09-13), accepted by the user below | Depth-2,000 drift changed/all births 7/2,000 = 0.0035 in Orchards and Confluence (byte-identical walks) against the 0.005 floor and the epoch's 12/2,000 = 0.006; Canyon 10/2,000 = 0.0050 at the floor. Depth-1,000 floors hold. The predeclared "hold or rise" direction is not met; the predeclared zero selected-but-inapplicable discards is met (attempted equals applied in every domain and world). Same-reading facts at depth 2,000 in Orchards: executed-target events 31,841 vs 37,949 (−16%), unreachable-target events 17,826 vs 11,705 (+52%); the plasticity operators previously discarded selected-but-inapplicable hundreds of times each (`EnableHebbian` 612, `EnableRewardModulation` 739, `MutateTraceDecay` 2,746) now show only no-eligible-node discards (13, 124, 787). A hypothesis, not a finding: refinement events that used to be discarded on the executed core and re-rolled onto other operators now land on silent tissue that carries the site. |
 
 ## Performance and Goal Impact
@@ -202,24 +202,17 @@ world, T13.F02 experiment under 120 s, goal profile under 15 minutes.
 | T13.F02 in-report experiment fractions | Move; reported as consequences, no floor or superiority claim. |
 | Six normalized simulation counters, wall/creature-tick, neighborhood, diversity and cognition indicators | No predeclared direction; the evolved populations differ from the first affected birth on. |
 
-**Measured verdict.** Gate: `comparison.severe=false` against both
-`remove-complementary-nutrition.json` (epoch) and `bench-decomposition.json`
-(previous); every counter `ok`; CLI and outer exit 0. Goal:
-`comparison.severe=true` against epoch `t12-f04-baseline-world-set-goal.json`
-— `plasticity_updates` +100.068% (severe); +42.006% (flag) against previous
-`t15-f01-local-raw-artifacts-and-committed-benchmark-summaries-goal.json`;
-all other counters and wall_clock `ok`; CLI exit 3, outer `make` exit 2. Caps
-all held (founder 100.349 ms, evolved 506.998 ms summed, drift 15,105.108 ms
-total across 3 worlds, T13.F02 experiment 7,183.770 ms, goal end-to-end
-≈8.26 min). `discarded_selected_inapplicable_by_operator` is 0 for every
-repaired Graph/VM operator in all three worlds at depth 2,000, matching the
-predeclaration. Drift changed/all births at depth 2,000 is below the 0.005
-floor in Orchards in grassland and Confluence (0.0035 each) and at the floor
-in Canyon country (0.0050); depth 1,000 holds the 0.0015 floor everywhere.
-No epoch was re-pinned. The severe plasticity_updates regression and the
-depth-2,000 drift-floor misses are reported as facts, not remediated; see
-[readings](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements)
-for full tables.
+**Measured verdict.** Gate: CLI and outer exit 0, `comparison.severe=false`
+against both references, every counter `ok`, no gate re-pin. Goal: CLI exit 3,
+outer `make` exit 2, `comparison.severe=true` — `plasticity_updates`
++100.068% (severe) against the T12.F04 goal-worlds epoch and +42.006% (flag)
+against the previous closure; all other counters and wall_clock `ok`; every
+cap held; zero selected-but-inapplicable discards for every repaired operator
+in all three worlds at depth 2,000; depth-2,000 drift changed/all births
+0.0035 in Orchards in grassland and Confluence against the 0.005 floor, Canyon
+country at the floor. Both misses are accepted below and the goal-worlds epoch
+is re-pinned to this summary; details are in the
+[readings](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements).
 
 **User decision, 2026-09-13.** After the blocker report the user directed:
 "Let's proceed and merge." This is a post-observation acceptance of the stored
