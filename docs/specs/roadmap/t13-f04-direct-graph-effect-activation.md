@@ -43,7 +43,10 @@ already write.
   already exists: `pick_random_surface` offers sink, action and execute-gate
   surfaces on a zero-compute def and `random_graph_source` draws input-leaf
   and shared-memory sources when `compute_count == 0`
-  (`mutation/graph/operators.rs`), and InputRef `Add` supplies the leaves.
+  (`mutation/graph/operators.rs`), InputRef `Add` supplies the leaves, and
+  `AddRouteTarget` creates one such genome directly: its fresh blank Graph
+  detour carries a weight-1 router-gate edge whose write the old early return
+  skipped, so the branch it wrote was never steered by its own gate.
   The [research note](../../strategy/neutral-module-recruitment-research-2026-09-08.md)
   records the inspection.
 - The repair. One derived predicate on `CgpGraphBackendDef` — true when
@@ -166,7 +169,8 @@ transmission, a sensory or memory signal wired straight onto an effector; it
 reaches creatures through the body (the executor reads the genome that birth
 mutation already writes) and through no sensor. Expected compute cost: small
 and positive. Zero-compute Graph modules with a wired effect surface exist in
-evolved populations only where a blank detour gained an edge; each such visit
+evolved populations where a blank detour gained an edge and in every
+`AddRouteTarget` detour, so the affected class is common; each such visit
 now pays one node-equivalent charge, counts one `graph_relax_iters`, and runs
 one effects pass. No severe allowance, threshold change or epoch re-pin is
 predeclared. Both profiles compare against the series index at run time: gate
