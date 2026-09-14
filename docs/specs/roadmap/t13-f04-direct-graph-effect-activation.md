@@ -131,12 +131,12 @@ already write.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> result in
-      [readings](../../progress/readings/t13-f04-direct-graph-effect-activation.md).
-- [ ] `cargo test -p v3-core` (cgp, mesh, plasticity, neighborhood, property
+- [x] `cargo test -p v3-core --test viability` -> ok, 24 passed; run first, row
+      in [readings](../../progress/readings/t13-f04-direct-graph-effect-activation.md).
+- [x] `cargo test -p v3-core` (cgp, mesh, plasticity, neighborhood, property
       tests), `cargo test -p v3-core --test reproducibility` and
-      `cargo test -p v3-cli` -> commands, results and any re-pinned
-      expectations in the readings.
+      `cargo test -p v3-cli` -> all pass; commands, counts and the one re-pinned
+      expectation in the readings.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
       output path and every survivor resolved in the closure record below.
