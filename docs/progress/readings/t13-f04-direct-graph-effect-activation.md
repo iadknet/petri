@@ -123,3 +123,40 @@ T13.F02 in-report experiment (`deterministic.goal_indicators.recruitment_paths.a
 - Graph backend `contributing` count stays at 0 in 5 of 6 world/depth cells (nonzero only at Canyon country depth 1,000, contributing=2), despite the repair entering more zero-compute wired visits (`executed` rose relative to `contributing`); the predeclared "contributing share rises" direction did not materialize in this run's Graph rungs.
 - T13.F02 in-report discovery fractions are unchanged from the T13.F03 closure figures for every arm.
 - These are reported to the orchestrator as facts; no threshold, baseline, or epoch was changed, and no remediation was attempted.
+
+## Mutation gate
+
+Fresh gate on the final feature code, `MUTANTS_ITERATE=0 make rust-mutants`.
+
+| Field | Value |
+| --- | --- |
+| Summary line | `20 mutants tested in 5m: 1 missed, 16 caught, 3 unviable` |
+| Timeouts | 0 (`mutants.out/timeout.txt` empty) |
+| Run mode (`run-mode.txt`) | `fresh` |
+| Diff base | `6ad57c30eab60bca1bdb0e0505b9e3df8d2e243f` |
+| Output path | `~/.local/share/petri-tools/mutants/t13-f04/mutants.out` |
+| Fresh runs used | 1 (no production content, test selection or tool configuration changed; no test deleted or weakened) |
+
+### Survivor disposition
+
+| # | Survivor (`mutants.out/missed.txt`) | Disposition | Resolution |
+| --- | --- | --- | --- |
+| 1 | `crates/v3-core/src/creature/genome/cgp.rs:297:58: replace \|\| with && in CgpGraphBackendDef::enters_visit` | killed | The inner `\|\|` in the action-bank predicate (`!slot.gate_inputs.is_empty() \|\| !slot.param_inputs.is_empty()`). Every prior action-slot fixture wired both lists, so `&&` still entered. `action_slot_enters_a_visit_on_a_gate_edge_or_a_param_edge_alone` in `crates/v3-core/src/runtime/cgp/f04_tests.rs` builds a zero-compute def with an `Emit(Move)` slot wired on one edge list only — once gate-only, once param-only — and asserts `enters_visit()`, `graph_relax_iters == 1`, the one node-equivalent energy charge and the matching `graph_compute` observation. Under `&&` both cases fail to enter: the counter stays 0 and energy is unchanged. |
+
+Equivalent: none. Deferred: none.
+
+No existing test was deleted or weakened; one test was added. No production code,
+`.cargo/mutants.toml`, test selection, `#[mutants::skip]` or `exclude_re` entry
+was touched.
+
+### Post-remediation checks
+
+| Command | Result |
+| --- | --- |
+| `MUTANTS_ITERATE=1 make rust-mutants` (feedback only, not closure evidence) | `1 mutant tested in 79s: 1 caught`; 19 prior caught/unviable excluded |
+| `cargo test -p v3-core` | ok. 1429 lib passed (was 1428; +1 f04 test) plus all integration targets; 0 failed; 2 ignored |
+| `cargo fmt --all -- --check` | clean |
+| `cargo clippy -p v3-core --all-targets` | clean (no warnings) |
+| `make roadmap-check` | validation passed |
+
+`cargo test -p v3-cli` was not rerun: no `v3-cli` file was touched by this gate.

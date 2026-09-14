@@ -139,7 +139,7 @@ already write.
       `cargo test -p v3-cli` -> all pass; commands, counts and the one re-pinned
       expectation in the readings.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
       output path and every survivor resolved in the closure record below.
 - [x] Benchmark summaries stored at
       `docs/progress/features/t13-f04-direct-graph-effect-activation.json` and
@@ -162,7 +162,7 @@ make bench PROFILE=goal FEATURE=t13-f04-direct-graph-effect-activation
 | Closure record | Value |
 | --- | --- |
 | Tested commit | pending |
-| Mutation gate | pending |
+| Mutation gate | Fresh run (`run-mode.txt`: `fresh`) against base `6ad57c30`, output `~/.local/share/petri-tools/mutants/t13-f04/mutants.out`: `20 mutants tested in 5m: 1 missed, 16 caught, 3 unviable`, 0 timeouts. The one survivor, `cgp.rs:297:58 replace \|\| with && in CgpGraphBackendDef::enters_visit`, was killed by the added test `action_slot_enters_a_visit_on_a_gate_edge_or_a_param_edge_alone`; no equivalent or deferred survivors. Full record in the [readings](../../progress/readings/t13-f04-direct-graph-effect-activation.md#mutation-gate). |
 | Closure documentation checks | pending |
 | Mutation output audit | pending |
 
