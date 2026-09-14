@@ -2300,4 +2300,69 @@ mod tests {
             }
         );
     }
+
+    /// `has_raw_field_site` is a disjunction: either arm alone makes a def a
+    /// raw-field target. Each case below satisfies exactly one arm, so a def
+    /// that only has a parameterized compute node and a def that only has a
+    /// movable edge must both be accepted, and `raw_field_mutation` must then
+    /// apply without skipping.
+    #[test]
+    fn has_raw_field_site_accepts_either_arm_alone() {
+        let config = MutationConfig::default();
+        let input_refs = sample_input_refs();
+
+        // Arm 1 only: a parameterized compute node, and no edge anywhere.
+        let mut params_only = CgpGraphBackendDef {
+            birth_weights: None,
+            compute_nodes: vec![ComputeNode {
+                kind: ComputeNodeKind::Constant(0.5),
+                inputs: Vec::new(),
+                plasticity: None,
+            }],
+            output_sinks: Vec::new(),
+            action_bank: Vec::new(),
+            execute_gate: ExecuteGate { inputs: Vec::new() },
+        };
+        assert_eq!(total_edge_count(&params_only), 0);
+        assert!(has_parameterized_compute_node(&params_only));
+        assert!(
+            has_raw_field_site(&params_only, &input_refs, &config),
+            "a parameterized compute node alone is a raw-field site"
+        );
+        assert!(
+            raw_field_mutation(&mut params_only, &input_refs, &config, &mut test_rng()).is_ok()
+        );
+
+        // Arm 2 only: no parameterized compute node, but a movable edge.
+        let mut edges_only = CgpGraphBackendDef {
+            birth_weights: None,
+            compute_nodes: vec![
+                ComputeNode {
+                    kind: ComputeNodeKind::Add,
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 1.0,
+                    }],
+                    plasticity: None,
+                },
+                ComputeNode {
+                    kind: ComputeNodeKind::Add,
+                    inputs: Vec::new(),
+                    plasticity: None,
+                },
+            ],
+            output_sinks: Vec::new(),
+            action_bank: Vec::new(),
+            execute_gate: ExecuteGate { inputs: Vec::new() },
+        };
+        assert!(!has_parameterized_compute_node(&edges_only));
+        assert!(raw_field_edge_sites(&edges_only, &input_refs, &config)
+            .next()
+            .is_some());
+        assert!(
+            has_raw_field_site(&edges_only, &input_refs, &config),
+            "a movable edge alone is a raw-field site"
+        );
+        assert!(raw_field_mutation(&mut edges_only, &input_refs, &config, &mut test_rng()).is_ok());
+    }
 }

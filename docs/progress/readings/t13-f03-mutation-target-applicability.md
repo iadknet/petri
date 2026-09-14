@@ -228,3 +228,44 @@ T13.F02 in-report experiment (`deterministic.goal_indicators.recruitment_paths.a
 - The goal-profile `make bench` command exited non-zero (CLI exit 3, outer/make exit 2) because `comparison.severe=true` against the pinned epoch reference: `plasticity_updates` +100.068% (severe) vs epoch, +42.006% (flag) vs the previous closure. This is a severe compute regression without a predeclared severe allowance (the predeclaration states "no severe allowance, threshold change or epoch re-pin is predeclared").
 - Drift changed/all births at depth 2,000 is below the 0.005 floor in Orchards in grassland (0.0035) and Confluence (0.0035), and exactly at the floor in Canyon country (0.0050).
 - These are reported to the orchestrator as facts; no threshold, baseline, or epoch was changed, and no remediation was attempted.
+
+## Mutation gate
+
+Fresh gate on the final feature code, `MUTANTS_ITERATE=0 make rust-mutants`.
+
+| Field | Value |
+| --- | --- |
+| Summary line | `145 mutants tested in 26m: 3 missed, 130 caught, 12 unviable` |
+| Timeouts | 0 (`mutants.out/timeout.txt` empty) |
+| Run mode (`run-mode.txt`) | `fresh` |
+| Diff base | `2f1bedf944bc7baf6de825eed78b3e1f871e5b44` |
+| Output path | `~/.local/share/petri-tools/mutants/t13-f03/mutants.out` |
+| Fresh runs used | 1 (no production content, test selection or tool configuration changed; no test deleted or weakened) |
+
+### Survivor disposition
+
+| # | Survivor (`mutants.out/missed.txt`) | Disposition | Resolution |
+| --- | --- | --- | --- |
+| 1 | `crates/v3-core/src/mutation/graph/hebbian.rs:250:5: replace mutate_hebbian_rate_in_def -> Result<(), MutationSkipReason> with Ok(())` | killed | `mutate_rate_skips_when_no_node_is_plastic` pins `Err(NoApplicableTarget)` on a def with no plastic node; `mutate_rate_stays_in_bounds_and_moves_the_rate` uses a fresh node per seed and asserts the learning rate leaves its 0.1 baseline. The stub returns `Ok(())` and leaves the rate at 0.1, so both fail. |
+| 2 | `crates/v3-core/src/mutation/graph/hebbian.rs:336:5: replace mutate_trace_decay_in_def -> Result<(), MutationSkipReason> with Ok(())` | killed | `mutate_trace_decay_skips_when_no_node_is_reward_modulated` pins `Err(NoApplicableTarget)` on a plastic node with `modulation = None`; `mutate_trace_decay_stays_in_bounds_and_moves_the_decay` asserts the decay leaves its 0.9 baseline. |
+| 3 | `crates/v3-core/src/mutation/graph/operators.rs:1092:9: replace \|\| with && in has_raw_field_site` | killed | `has_raw_field_site_accepts_either_arm_alone` builds one def satisfying only the parameterized-compute-node arm (a `Constant(0.5)` node, zero edges) and one satisfying only the movable-edge arm (two `Add` nodes, one `ComputeNode(0)` edge), asserts the predicate accepts both, and asserts `raw_field_mutation` then applies without skipping. `&&` rejects both defs. |
+
+Equivalent: none. Deferred: none.
+
+The two pre-existing bounds tests were strengthened, not replaced: each keeps its
+`(0.0..=1.0)` assertion and gains an independent per-seed baseline plus a
+"something changed" assertion. No test was deleted or weakened and no production
+code, `.cargo/mutants.toml`, test selection, `#[mutants::skip]` or `exclude_re`
+entry was touched.
+
+### Post-remediation checks
+
+| Command | Result |
+| --- | --- |
+| `MUTANTS_ITERATE=1 make rust-mutants` (feedback only, not closure evidence) | `3 mutants tested in 2m: 3 caught`; 142 prior caught/unviable excluded |
+| `cargo test -p v3-core` | ok. 1416 lib passed (was 1412; +4 hebbian/operators tests) plus all integration targets; 0 failed; 2 ignored |
+| `cargo clippy --workspace --all-targets` | clean (no warnings) |
+| `cargo fmt --all -- --check` | clean |
+| `make roadmap-check` | validation passed |
+
+`cargo test -p v3-cli` was not rerun: no `v3-cli` file was touched.
