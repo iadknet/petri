@@ -181,9 +181,27 @@ typed.
       per-arm `retained_discovery` / `retained_useful` numerators and
       `outcome_counts` equal the T13.F05 goal summary's, recorded in the
       readings file with the twenty-seven-arm table.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here; `docs/workflow.md` requires it in the spec.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` (2026-09-14, one run):
+
+```text
+110 mutants tested in 16m: 19 missed, 82 caught, 8 unviable, 1 timeouts
+run mode: fresh (run-mode.txt); diff against 52c7db79
+output: ~/.local/share/petri-tools/mutants/t13-f06/mutants.out
+        (fresh-run-2026-09-14.log beside it; a later MUTANTS_ITERATE=1 pass
+        re-tested the 20 survivors: 19 caught, 1 timeout; not closure evidence)
+```
+
+| Survivor (`crates/v3-core/src/neighborhood/recruitment_paths/`) | Resolution |
+| --- | --- |
+| `records.rs:169` `TaskSummary::live` -> `true`; -> `false`; `==` -> `!=` | killed: `recruitment_paths_task_summary_is_live_only_with_all_eight_scenes` (tests.rs) |
+| `records.rs:173` `TaskSummary::correct` -> `0`; -> `1` | killed: `recruitment_paths_task_summary_correct_reads_the_named_task_count` (tests.rs) |
+| `records.rs:478-480` `RetentionOutcomes::record` `+=` -> `*=` (no_longer_useful), `-=`/`*=` (deleted), `-=`/`*=` (task_dead) | killed: proptest `recruitment_paths_retention_outcomes_count_each_outcome_and_total_them` (tests.rs) |
+| `records.rs:485` `RetentionOutcomes::total` `+` -> `-` (x3), `+` -> `*` (x2) | killed: the same proptest asserts `total()` equals the recorded count |
+| `records.rs:627` `choose` `<` -> `<=` | killed: `recruitment_paths_choose_gates_siblings_but_never_the_parent_by_liveness` (tests.rs) pins that liveness gates siblings only |
+| `qualification.rs:193` `CostVerdict::neutral` -> `true` | killed: `recruitment_paths_cost_verdict_is_neutral_only_at_equal_scores` (tests.rs) |
+| `experiment.rs:499` damage fold `+` -> `*`; `experiment.rs:505` `-` -> `+` | killed: `summary_damage_counts_task_death_over_all_and_loss_over_the_task_live` (experiment.rs `#[cfg(test)]` module, synthetic lineages; the reduced run draws no task-dead proposal) |
+| `experiment.rs:307` `discovery + followup` -> `discovery * followup` (TIMEOUT, 120 s cap, both passes) | deferred: see Notes for AI Agents; detected by `recruitment_paths_reduced_run_has_complete_supply_and_replay` (`2 * 1` generations give 4 proposals, not the asserted 6) but the production-size pins in the same binary run 512 instead of 48 generations and exceed the cap first |
+
 - [x] Benchmark summary stored at `docs/progress/features/<id>.json`, local raw
       hash/byte count and verification time checked, series entry points to the
       summary, and no new full report staged.
@@ -269,3 +287,6 @@ assumed accepted. Full tables and transcripts in the readings file.
   (`Policy::ALL` would drop the `chain`); `checkpoint_cost` asserts inside a
   `map` and `filter_map`s a never-`None` `Spread::of`; the fixture-verdict
   test recomputes the retention rule the proptest already owns.
+- Deferred: mutant `experiment.rs:307` times out instead of dying (see the
+  Verification table); a kill needs a timeout or test-selection change the
+  gate forbids. The user accepted this deferral on 2026-09-14.

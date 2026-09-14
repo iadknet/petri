@@ -1008,4 +1008,78 @@ mod tests {
             );
         }
     }
+
+    fn synthetic_proposal(generation: u32, parent_score: u8, outcome: TaskSummary) -> Proposal {
+        Proposal {
+            generation,
+            sibling: 0,
+            seed: 0,
+            parent_live: true,
+            parent_score,
+            chosen: false,
+            outcome,
+            modules: 0,
+            genome_size: 0,
+            opportunities: Opportunities::default(),
+            events: Vec::new(),
+            useful_modules: Vec::new(),
+            discovery: false,
+            viable_path: true,
+            mutation_fingerprint: String::new(),
+            parent_fingerprint: String::new(),
+            rng_after: 0,
+            selected_inapplicable_by_backend_operator: Default::default(),
+            selected_inapplicable_backend_unresolved: 0,
+        }
+    }
+
+    fn synthetic_outcome(surviving_scenes: u8, correct_a: u8, correct_b: u8) -> TaskSummary {
+        TaskSummary {
+            correct_a,
+            correct_b,
+            surviving_scenes,
+            ending_energy_sum: 0.0,
+            maintenance_sum: 0.0,
+            carrying_sum: 0.0,
+            work: Work::default(),
+        }
+    }
+
+    /// Damage counts task death over every proposal and a score loss against
+    /// the parent over the task-live proposals only; the reduced run never
+    /// draws a task-dead proposal, so this pins the fold on synthetic lineages.
+    #[test]
+    fn summary_damage_counts_task_death_over_all_and_loss_over_the_task_live() {
+        // Arrange: three task-dead proposals (one of them also below the parent
+        // score on Task A), then a live loss, a live neutral step and a live gain.
+        let proposals = vec![
+            synthetic_proposal(1, 4, synthetic_outcome(7, 4, 0)),
+            synthetic_proposal(1, 4, synthetic_outcome(0, 1, 8)),
+            synthetic_proposal(2, 4, synthetic_outcome(5, 8, 8)),
+            synthetic_proposal(2, 4, synthetic_outcome(8, 3, 8)),
+            synthetic_proposal(3, 4, synthetic_outcome(8, 4, 0)),
+            synthetic_proposal(3, 4, synthetic_outcome(8, 5, 0)),
+        ];
+        let lineage = Lineage {
+            batch: 0,
+            lineage: 0,
+            proposals,
+            checkpoints: Vec::new(),
+            proposal_discovery: None,
+            retained_discovery: None,
+            viable_retained_discovery: false,
+            retention: None,
+            first_successful_path: Vec::new(),
+        };
+
+        // Act
+        let aggregate = summary(Task::A, &[&lineage]);
+
+        // Assert
+        assert_eq!(aggregate.damage.task_dead, estimate(3, 6));
+        assert_eq!(aggregate.damage.task_live_loss, estimate(1, 3));
+        assert_eq!(aggregate.retention_outcomes, RetentionOutcomes::default());
+        assert!(aggregate.checkpoint_cost.is_empty());
+        assert_eq!(aggregate.retained_discovery, estimate(0, 1));
+    }
 }

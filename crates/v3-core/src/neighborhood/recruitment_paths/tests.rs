@@ -1242,3 +1242,133 @@ fn recruitment_paths_qualified_cost_verdicts_retain_every_useful_last_step() {
         eprintln!("{backend:?} {form}: {rejected} of {neutral} neutral steps rejected");
     }
 }
+
+fn task_summary(surviving_scenes: u8, correct_a: u8, correct_b: u8) -> TaskSummary {
+    TaskSummary {
+        correct_a,
+        correct_b,
+        surviving_scenes,
+        ending_energy_sum: 0.0,
+        maintenance_sum: 0.0,
+        carrying_sum: 0.0,
+        work: Work::default(),
+    }
+}
+
+#[test]
+fn recruitment_paths_task_summary_is_live_only_with_all_eight_scenes() {
+    // Arrange
+    let all_scenes = task_summary(8, 3, 5);
+    let one_death = task_summary(7, 3, 5);
+    let no_scenes = task_summary(0, 0, 0);
+
+    // Act & Assert
+    assert!(all_scenes.live());
+    assert!(!one_death.live());
+    assert!(!no_scenes.live());
+}
+
+#[test]
+fn recruitment_paths_task_summary_correct_reads_the_named_task_count() {
+    // Arrange
+    let summary = task_summary(8, 3, 5);
+
+    // Act & Assert
+    assert_eq!(summary.correct(Task::A), 3);
+    assert_eq!(summary.correct(Task::B), 5);
+    assert_eq!(task_summary(8, 0, 8).correct(Task::A), 0);
+    assert_eq!(task_summary(8, 0, 8).correct(Task::B), 8);
+}
+
+#[test]
+fn recruitment_paths_cost_verdict_is_neutral_only_at_equal_scores() {
+    // Arrange
+    let verdict = |score, previous_score| CostVerdict {
+        step: "step".into(),
+        retained: false,
+        score,
+        previous_score,
+        carrying_sum: 0.0,
+        ending_energy_sum: 0.0,
+        previous_ending_energy_sum: 0.0,
+    };
+
+    // Act & Assert
+    assert!(verdict(4, 4).neutral());
+    assert!(!verdict(5, 4).neutral());
+    assert!(!verdict(3, 4).neutral());
+}
+
+#[test]
+fn recruitment_paths_choose_gates_siblings_but_never_the_parent_by_liveness() {
+    // Arrange: a task-dead parent that still holds more ending energy than a
+    // live, score-neutral sibling.
+    let dead_parent = Candidate {
+        live: false,
+        score: 4,
+        ending_energy_sum: 300.0,
+    };
+    let neutral_sibling = Candidate {
+        live: true,
+        score: 4,
+        ending_energy_sum: 200.0,
+    };
+    let dead_sibling = Candidate {
+        live: false,
+        score: 8,
+        ending_energy_sum: 400.0,
+    };
+    let children = [neutral_sibling, dead_sibling];
+
+    // Act & Assert: only sibling candidates are dropped for being dead; the
+    // parent's candidate always enters the tie, so its higher energy rejects
+    // the neutral sibling under `CostSelection` and ties go to the sibling
+    // under `Selection`.
+    assert_eq!(choose(Policy::CostSelection, dead_parent, children), None);
+    assert_eq!(choose(Policy::Selection, dead_parent, children), Some(0));
+    let richer_sibling = Candidate {
+        ending_energy_sum: 300.0,
+        ..neutral_sibling
+    };
+    assert_eq!(
+        choose(
+            Policy::CostSelection,
+            dead_parent,
+            [richer_sibling, dead_sibling]
+        ),
+        Some(0)
+    );
+}
+
+proptest! {
+    #[test]
+    fn recruitment_paths_retention_outcomes_count_each_outcome_and_total_them(
+        outcomes in prop::collection::vec(0u8..4, 0..24)
+    ) {
+        let outcomes: Vec<_> = outcomes.iter().map(|outcome| match outcome {
+            0 => RetentionOutcome::Useful,
+            1 => RetentionOutcome::NoLongerUseful,
+            2 => RetentionOutcome::Deleted,
+            _ => RetentionOutcome::TaskDead,
+        }).collect();
+        let count = |wanted: RetentionOutcome| {
+            outcomes.iter().filter(|&&outcome| outcome == wanted).count() as u32
+        };
+
+        let mut recorded = RetentionOutcomes::default();
+        for &outcome in &outcomes {
+            recorded.record(outcome);
+        }
+
+        prop_assert_eq!(
+            recorded.clone(),
+            RetentionOutcomes {
+                useful: count(RetentionOutcome::Useful),
+                no_longer_useful: count(RetentionOutcome::NoLongerUseful),
+                deleted: count(RetentionOutcome::Deleted),
+                task_dead: count(RetentionOutcome::TaskDead),
+            }
+        );
+        prop_assert_eq!(recorded.total() as usize, outcomes.len());
+    }
+}
