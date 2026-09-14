@@ -138,7 +138,7 @@ already write.
       tests), `cargo test -p v3-core --test reproducibility` and
       `cargo test -p v3-cli` -> all pass; commands, counts and the one re-pinned
       expectation in the readings.
-- [ ] `make check` on the final feature code -> tested commit recorded below.
+- [x] `make check` on the final feature code -> tested commit recorded below.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
       output path and every survivor resolved in the closure record below.
 - [x] Benchmark summaries stored at
@@ -161,10 +161,10 @@ make bench PROFILE=goal FEATURE=t13-f04-direct-graph-effect-activation
 
 | Closure record | Value |
 | --- | --- |
-| Tested commit | pending |
+| Tested commit | `9c453ab4` (`make check` exit 0, log `/private/tmp/t13-f04-make-check.log`) |
 | Mutation gate | Fresh run (`run-mode.txt`: `fresh`) against base `6ad57c30`, output `~/.local/share/petri-tools/mutants/t13-f04/mutants.out`: `20 mutants tested in 5m: 1 missed, 16 caught, 3 unviable`, 0 timeouts. The one survivor, `cgp.rs:297:58 replace \|\| with && in CgpGraphBackendDef::enters_visit`, was killed by the added test `action_slot_enters_a_visit_on_a_gate_edge_or_a_param_edge_alone`; no equivalent or deferred survivors. Full record in the [readings](../../progress/readings/t13-f04-direct-graph-effect-activation.md#mutation-gate). |
-| Closure documentation checks | pending |
-| Mutation output audit | pending |
+| Closure documentation checks | `make roadmap-check` exit 0 at `9c453ab4`; `make check-docs` on the closing commit pending the user decision below |
+| Mutation output audit | Fresh survivor list recovered from `/private/tmp/t13-f04-mutants.log` (1 `MISSED`, no `TIMEOUT`) and matched against the readings table; the recorded `mutants.out` directory now holds the later `MUTANTS_ITERATE=1` pass (`run-mode.txt` `incremental`, `missed.txt` and `timeout.txt` empty). No `#[mutants::skip]` or `exclude_re`. |
 
 ## Performance and Goal Impact
 
@@ -195,6 +195,17 @@ experiment under 120 s, goal profile under 15 minutes.
 
 **Measured verdict.** Gate: exit 0, `severe=false` against both references, all counters `ok`. Goal: exit 0, `severe=false` against the single predeclared reference, all caps held, but drift changed/all births at depth 2,000 fell below the 0.005 floor in all three worlds (0.0035/0.0045/0.0035, walks not identical to T13.F03's), Graph `contributing` stayed at 0 in 5 of 6 world/depth cells, and `graph_relax_iters` per creature-tick moved down (gate -0.208%, goal -0.718%) against the predeclared "up"; the summary schema has no `graph_compute` energy counter. Reported as facts without remediation.
 
+**Blocker awaiting a user decision, 2026-09-14.** T13.F03's decision keeps
+the 0.005 depth-2,000 drift floor in force for later closures against this
+epoch, and this run reads 7/2,000 = 0.0035 in Orchards in grassland, 9/2,000
+= 0.0045 in Canyon country and 7/2,000 = 0.0035 in Confluence (T13.F03 read
+7 / 10 / 7). The walks are not identical to T13.F03's: Graph executed
+modules at depth 2,000 rose 92 to 96, 96 to 108 and 92 to 96 while Graph
+contributing modules stayed 0, so the newly entered visits express no
+battery-visible behavior in these walks. Depth-1,000 floors hold. The
+orchestrator cannot accept a floor miss; closure waits for the user to accept
+or reject this reading. No threshold, baseline or epoch is changed here.
+
 - Summaries: [gate](../../progress/features/t13-f04-direct-graph-effect-activation.json),
   [goal](../../progress/features/t13-f04-direct-graph-effect-activation-goal.json).
 - Full readings: [`docs/progress/readings/t13-f04-direct-graph-effect-activation.md`](../../progress/readings/t13-f04-direct-graph-effect-activation.md).
@@ -216,3 +227,11 @@ experiment under 120 s, goal profile under 15 minutes.
 - Decision: The Graph entry rule is one derived predicate over the genome
   (compute nodes present or any effect surface wired); T13.F05/F06 read it
   and never add a stored activation flag beside it.
+- Deferred: The activated class expresses nothing battery-visible in the
+  goal-world drift walks at this depth (Graph contributing 0 while executed
+  rose); whether the activated surfaces need T13.F05's connection paths to
+  reach a controller is a track question, not a T13.F04 change.
+- Cost: `/usage` unavailable. Implementer briefs 2 (advisor consults 2 + 2);
+  benchmark specialist 1 pass; mutation specialist 1 pass (2 consults).
+  Review P1 0 / P2 1 / P3 2. Remediation: production 0, documentation 1
+  (orchestrator), mutation test-only 1. Fresh mutation runs 1.
