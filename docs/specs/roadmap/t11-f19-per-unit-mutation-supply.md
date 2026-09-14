@@ -1,6 +1,6 @@
 # T11.F19 — Per-Unit Mutation Supply
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-14
 **Feature**: T11.F19
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -158,7 +158,7 @@ the T14.F12 gate and goal reports (previous closure), the pinned goal epoch
       in 6m: 12 caught, 5 unviable`, no survivors;
       `~/.local/share/petri-tools/mutants/t11-f19/mutants.out`, mode
       `fresh`; one fresh run, no test edits.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t11-f19-per-unit-mutation-supply.json` and
       `docs/progress/features/t11-f19-per-unit-mutation-supply-goal.json`,
       local raw hash/byte count and verification time checked, series entries
@@ -245,15 +245,15 @@ The user confirmed items 2 and 3 on 2026-09-14; the default rate stands.
 
 ## Success Criteria
 
-- [ ] Production births request `Binomial(genome_size(), 0.005)` events, the
+- [x] Production births request `Binomial(genome_size(), 0.005)` events, the
       founder's requested supply is within 1% of 0.55 per birth, and the
       legacy rule runs only when explicitly selected.
-- [ ] The drift walk's checkpoint rows are field-for-field identical to
+- [x] The drift walk's checkpoint rows are field-for-field identical to
       T14.F12's per world and its metadata names the legacy rule it ran.
-- [ ] T14.F12's `changed_per_all_births` is above its floor on all three
+- [x] T14.F12's `changed_per_all_births` is above its floor on all three
       worlds, and every other predeclared reading is met or its miss is
       recorded with the user's decision.
-- [ ] Reference documents, the config panel, and the runtime patch path carry
+- [x] Reference documents, the config panel, and the runtime patch path carry
       the two fields with the per-unit rule as production.
 
 ## Notes for AI Agents
