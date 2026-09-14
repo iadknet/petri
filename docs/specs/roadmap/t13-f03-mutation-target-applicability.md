@@ -83,15 +83,12 @@ or world change is involved.
   5. Executed and reachable bias apply within the applicable set through the
      unchanged `TargetSelector::select`; `first_pick` records the selected
      applicable node.
-- Consequences that are measured, not preserved: applied operator mixes, RNG
-  consumption per event (an operator that used to fail on a node now applies,
-  and the applicable-set draw replaces the backend-set draw), every evolved
-  trajectory after the first affected birth, drift-walk readings, and the
-  T13.F02 in-report experiment. Cross-process determinism
-  (`crates/v3-core/tests/reproducibility.rs`) and the gate's two-run
-  byte-identical check still hold. Pinned expectations in existing tests that
-  encode the old draw (`mutational_neighborhood`, `recruitment_paths`,
-  engine and neighborhood fixtures) are re-pinned with the reason in the test.
+- Measured, not preserved: applied operator mixes, RNG consumption per
+  event, every evolved trajectory after the first affected birth, drift-walk
+  readings and the T13.F02 in-report experiment. Cross-process determinism
+  (`crates/v3-core/tests/reproducibility.rs`) and the gate two-run check
+  still hold; pinned expectations that encoded the old draw are re-pinned
+  with the reason in the test.
 - Observation. An operator with an empty applicable set discards with a
   `None` pick and is classified no-eligible-node; the engine fixture in
   `mutation/engine/tests.rs` asserts this on an edgeless-only genome and that
