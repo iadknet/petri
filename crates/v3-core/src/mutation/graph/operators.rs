@@ -270,11 +270,11 @@ pub(crate) enum EdgeSurface {
     ExecuteGate,
 }
 
-/// Every edge site on the def, in the canonical surface order
-/// `pick_random_edge` walks: compute inputs, sink inputs, per action slot
-/// gate then param inputs, execute gate. The single enumeration the
-/// edge-site applicability predicates and the operators that draw from
-/// filtered edge sets both read.
+/// Every edge site on the def, defining the canonical surface order:
+/// compute inputs, sink inputs, per action slot gate then param inputs,
+/// execute gate. The single enumeration [`total_edge_count`],
+/// [`pick_random_edge`], the edge-site applicability predicates and the
+/// operators that draw from filtered edge sets all read.
 fn edge_sites(def: &CgpGraphBackendDef) -> impl Iterator<Item = (EdgeSurface, usize)> + '_ {
     let compute = def.compute_nodes.iter().enumerate().flat_map(|(i, node)| {
         (0..node.inputs.len()).map(move |edge| (EdgeSurface::ComputeInput(i), edge))
