@@ -209,7 +209,9 @@ fn input_leaf_writes_and_clears_shared_memory_slots() {
 
 #[test]
 fn shared_memory_router_gate_steers_a_two_target_route() {
-    for (gate_input, expected_slot) in [(1.0, 11usize), (-1.0, 10usize)] {
+    for (gate_input, taken_slot, skipped_slot) in
+        [(1.0, 11usize, 10usize), (-1.0, 10usize, 11usize)]
+    {
         let mut router = blank();
         wire(&mut router, OutputSinkKind::RouterGate(1), memory(0, 1.0));
         let mut first = blank();
@@ -231,8 +233,8 @@ fn shared_memory_router_gate_steers_a_two_target_route() {
             &config(),
         );
 
-        assert_eq!(memory_in[expected_slot], LEAF_VALUE);
-        assert_eq!(memory_in[21 - expected_slot], 0.0);
+        assert_eq!(memory_in[taken_slot], LEAF_VALUE);
+        assert_eq!(memory_in[skipped_slot], 0.0);
     }
 }
 
