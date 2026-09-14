@@ -98,8 +98,10 @@ Topology connection semantics (T11.F15, T11.F18):
   independently of the source backend, using the existing mutation RNG after
   eligibility and attachment preparation. Graph detours have configured unwired
   fixed outputs and no compute nodes; VM detours have one register and `Halt`.
-  Both add a mesh hop when visited. Empty Graph dispatch has no compute charge;
-  VM dispatch retains its Halt charge. Their genome sizes add two and three
+  Both add a mesh hop when visited. Unwired Graph dispatch has no compute
+  charge; a zero-compute Graph with a wired effect surface is entered and pays
+  `graph_node_base_cost * max(compute_nodes.len(), 1)`. VM dispatch retains its
+  Halt charge. Their genome sizes add two and three
   units respectively. State neutrality excludes exhausted budgets and downstream
   live energy introspection; node-local metadata stays local.
 - `AddRouteTarget` selects a node with exactly one valid non-self successor,
