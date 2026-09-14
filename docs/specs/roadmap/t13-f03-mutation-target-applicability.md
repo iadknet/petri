@@ -35,8 +35,8 @@ or world change is involved.
 
 - Owning row: T13.F03 in the track; the track's **F03 scope** note defines
   acceptance. Dependency [T13.F02](t13-f02-recruitment-paths-and-replicated-baseline.md)
-  supplies the pre-repair baseline; its Decision names this feature as the
-  applicability repair and its Deferred note forbids parsing `Event.outcome`.
+  supplies the pre-repair baseline; its Deferred note forbids parsing
+  `Event.outcome`.
 - The defect. `GraphMutator::apply` (`crates/v3-core/src/mutation/graph/mod.rs`)
   and `VmMutator::apply` (`mutation/vm/mod.rs`) draw one backend node through
   `TargetSelector::select` and then dispatch the operator to that node; when
