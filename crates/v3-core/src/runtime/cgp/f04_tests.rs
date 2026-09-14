@@ -258,6 +258,33 @@ fn memory_gate_and_leaf_param_emit_move_through_a_wired_execute_gate() {
     assert_eq!(visited.energy, 100.0 - BASE_COST);
 }
 
+/// Either action-slot edge list alone activates the slot's surface: a gate edge
+/// with no param edge, and a param edge with no gate edge, each enter the visit
+/// and pay its one node-equivalent charge.
+#[test]
+fn action_slot_enters_a_visit_on_a_gate_edge_or_a_param_edge_alone() {
+    for (label, gate_only) in [("gate edge only", true), ("param edge only", false)] {
+        let mut def = blank();
+        def.action_bank[0].behavior = ActionSlotBehavior::Emit(WorldActionKind::Move);
+        if gate_only {
+            def.action_bank[0].gate_inputs.push(leaf(1.0));
+        } else {
+            def.action_bank[0].param_inputs.push(leaf(1.0));
+        }
+        assert!(def.enters_visit(), "{label}");
+
+        let visited = visit_with(&def, [0.0; 16], 100.0, [0.0; OUTPUT_SLOT_COUNT]);
+
+        assert_eq!(visited.side.work_counters.graph_relax_iters, 1, "{label}");
+        assert_eq!(visited.energy, 100.0 - BASE_COST, "{label}");
+        assert_eq!(
+            visited.side.energy_observation.graph_compute,
+            f64::from(BASE_COST),
+            "{label}"
+        );
+    }
+}
+
 #[test]
 fn wired_blank_detour_forwards_its_bus_and_executes_its_successor() {
     let mut detour = blank();
