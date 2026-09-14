@@ -329,6 +329,61 @@ proptest! {
         }
     }
 
+    /// Invariant 5 under a firing bias layer: with the reachable bias at 1.0
+    /// over a reachable subset, the draw stays inside the applicable set and,
+    /// whenever the applicable set meets the reachable one, inside that
+    /// intersection.
+    #[test]
+    fn a_biased_draw_stays_inside_the_applicable_set(
+        seed in any::<u64>(),
+        sizes in prop::collection::vec(module_size(), 1..5),
+    ) {
+        let config = MutationConfig::default();
+        let base = genome(seed, &sizes, &config);
+        // Every other node index, ascending, as `TargetSelector` requires.
+        let reachable: Vec<usize> = (0..base.nodes.len()).step_by(2).collect();
+        for &op in &GraphOperator::ALL {
+            let applicable = GraphMutator::applicable_indices(&base, op, &config);
+            if applicable.is_empty() {
+                continue;
+            }
+            let mut genome = base.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let mut targets = TargetSelector::reachable_only(&reachable, 1.0);
+            prop_assert!(
+                GraphMutator::apply(&mut genome, op, &mut targets, &mut rng, &config).is_ok()
+            );
+            let pick = targets.first_pick().expect("an applied event records its pick");
+            prop_assert!(applicable.contains(&pick), "{op:?} picked {pick} outside {applicable:?}");
+            if applicable.iter().any(|i| reachable.contains(i)) {
+                prop_assert!(
+                    reachable.contains(&pick),
+                    "{op:?} ignored the reachable bias: picked {pick}"
+                );
+            }
+        }
+        for &op in &VmOperator::ALL {
+            let applicable = VmMutator::applicable_indices(&base, op);
+            if applicable.is_empty() {
+                continue;
+            }
+            let mut genome = base.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let mut targets = TargetSelector::reachable_only(&reachable, 1.0);
+            prop_assert!(
+                VmMutator::apply(&mut genome, op, &mut targets, &mut rng, &config).is_ok()
+            );
+            let pick = targets.first_pick().expect("an applied event records its pick");
+            prop_assert!(applicable.contains(&pick), "{op:?} picked {pick} outside {applicable:?}");
+            if applicable.iter().any(|i| reachable.contains(i)) {
+                prop_assert!(
+                    reachable.contains(&pick),
+                    "{op:?} ignored the reachable bias: picked {pick}"
+                );
+            }
+        }
+    }
+
     /// Invariant 3: appending blank modules never removes an applicable node
     /// from an operator's eligible set, and an operator that had a target
     /// still applies.
