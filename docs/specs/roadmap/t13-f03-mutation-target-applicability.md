@@ -132,8 +132,8 @@ or world change is involved.
       [InputRef](../../progress/readings/t13-f03-mutation-target-applicability.md#inputref-audit--no-change)).
       The InputRef domain shows none of the defect and is unchanged.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
+      output path and every survivor resolved in the mutation gate row below.
 - [x] Benchmark summaries stored at
       `docs/progress/features/t13-f03-mutation-target-applicability.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
@@ -160,7 +160,7 @@ make bench PROFILE=goal FEATURE=t13-f03-mutation-target-applicability
 | Closure record | Value |
 | --- | --- |
 | Tested commit | pending |
-| Mutation output | pending |
+| Mutation gate | Summary line `145 mutants tested in 26m: 3 missed, 130 caught, 12 unviable`, 0 timeouts (`timeout.txt` empty). Run mode `fresh` (`run-mode.txt`), diff base `2f1bedf9`. Output `~/.local/share/petri-tools/mutants/t13-f03/mutants.out`. All 3 survivors killed by added or strengthened tests in `mutation/graph/hebbian.rs` and `mutation/graph/operators.rs`; none equivalent, none deferred. One fresh run: no production content, test selection or tool configuration changed, no test deleted or weakened. [Survivor dispositions](../../progress/readings/t13-f03-mutation-target-applicability.md#mutation-gate). |
 | Closure documentation checks | pending |
 | Goal compute cost (2026-09-13), accepted by the user below | Goal `plasticity_updates` per creature-tick 0.093984 is +100.068% (severe) against epoch `t12-f04-baseline-world-set-goal.json` (0.046976) and +42.006% (flag) against previous `t15-f01-...-goal.json` (0.066183), with no predeclared severe allowance; T13.F02's inherited +41% epoch flag compounds with this +42%. Every other counter and wall/creature-tick `ok`. Accepted; see [closure measurements](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements). |
 | Depth-2,000 drift floor (2026-09-13), accepted by the user below | Depth-2,000 drift changed/all births 7/2,000 = 0.0035 in Orchards and Confluence (byte-identical walks) against the 0.005 floor and the epoch's 12/2,000 = 0.006; Canyon 10/2,000 = 0.0050 at the floor. Depth-1,000 floors hold. The predeclared "hold or rise" direction is not met; the predeclared zero selected-but-inapplicable discards is met (attempted equals applied in every domain and world). Same-reading facts at depth 2,000 in Orchards: executed-target events 31,841 vs 37,949 (−16%), unreachable-target events 17,826 vs 11,705 (+52%); the plasticity operators previously discarded selected-but-inapplicable hundreds of times each (`EnableHebbian` 612, `EnableRewardModulation` 739, `MutateTraceDecay` 2,746) now show only no-eligible-node discards (13, 124, 787). A hypothesis, not a finding: refinement events that used to be discarded on the executed core and re-rolled onto other operators now land on silent tissue that carries the site. |

@@ -477,10 +477,20 @@ mod tests {
         assert_ne!(new_rule, HebbianRule::Classic);
     }
 
+    /// Each seed starts from the same node so the perturbation is measured
+    /// against a known baseline: the rate stays in `[0.0, 1.0]`, and the
+    /// operator actually moves it rather than reporting success and leaving
+    /// the node untouched.
     #[test]
-    fn mutate_rate_stays_in_bounds() {
-        let mut def = def_with_nodes(vec![node_with_hebbian()]);
+    fn mutate_rate_stays_in_bounds_and_moves_the_rate() {
+        let baseline = node_with_hebbian()
+            .plasticity
+            .as_ref()
+            .unwrap()
+            .learning_rate;
+        let mut changed = 0usize;
         for seed in 0u64..100 {
+            let mut def = def_with_nodes(vec![node_with_hebbian()]);
             let mut r = rng(seed);
             mutate_hebbian_rate_in_def(&mut def, &mut r).unwrap();
             let rate = def.compute_nodes[0]
@@ -492,7 +502,24 @@ mod tests {
                 (0.0..=1.0).contains(&rate),
                 "rate {rate} out of bounds at seed {seed}"
             );
+            if rate != baseline {
+                changed += 1;
+            }
         }
+        assert!(
+            changed > 0,
+            "no seed changed the learning rate from {baseline}"
+        );
+    }
+
+    #[test]
+    fn mutate_rate_skips_when_no_node_is_plastic() {
+        let mut def = def_with_nodes(vec![node_without_hebbian()]);
+        let mut r = rng(42);
+        assert_eq!(
+            mutate_hebbian_rate_in_def(&mut def, &mut r),
+            Err(MutationSkipReason::NoApplicableTarget)
+        );
     }
 
     #[test]
@@ -551,10 +578,21 @@ mod tests {
         assert_ne!(channel, OutcomeChannel::EnergyDelta);
     }
 
+    /// As with the learning rate: a fresh node per seed, bounds held, and the
+    /// decay actually moved off its baseline.
     #[test]
-    fn mutate_trace_decay_stays_in_bounds() {
-        let mut def = def_with_nodes(vec![node_with_reward_modulation()]);
+    fn mutate_trace_decay_stays_in_bounds_and_moves_the_decay() {
+        let baseline = node_with_reward_modulation()
+            .plasticity
+            .as_ref()
+            .unwrap()
+            .modulation
+            .as_ref()
+            .unwrap()
+            .trace_decay;
+        let mut changed = 0usize;
         for seed in 0u64..100 {
+            let mut def = def_with_nodes(vec![node_with_reward_modulation()]);
             let mut r = rng(seed);
             mutate_trace_decay_in_def(&mut def, &mut r).unwrap();
             let decay = def.compute_nodes[0]
@@ -569,6 +607,25 @@ mod tests {
                 (0.0..=1.0).contains(&decay),
                 "decay {decay} out of bounds at seed {seed}"
             );
+            if decay != baseline {
+                changed += 1;
+            }
         }
+        assert!(
+            changed > 0,
+            "no seed changed the trace decay from {baseline}"
+        );
+    }
+
+    /// A plastic node with `modulation = None` is not a trace-decay site, so
+    /// the operator must skip before the draw rather than report success.
+    #[test]
+    fn mutate_trace_decay_skips_when_no_node_is_reward_modulated() {
+        let mut def = def_with_nodes(vec![node_with_hebbian()]);
+        let mut r = rng(42);
+        assert_eq!(
+            mutate_trace_decay_in_def(&mut def, &mut r),
+            Err(MutationSkipReason::NoApplicableTarget)
+        );
     }
 }
