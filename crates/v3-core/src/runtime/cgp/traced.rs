@@ -124,7 +124,8 @@ pub(crate) fn execute_graph_node_traced(
 ) -> (NodeResult, GraphTrace) {
     let node_count = def.compute_nodes.len();
 
-    if node_count == 0 {
+    // Neither compute nodes nor a wired effect surface: no work, no charge.
+    if !def.enters_visit() {
         let trace = GraphTrace {
             passes: Vec::new(),
             converged: false,

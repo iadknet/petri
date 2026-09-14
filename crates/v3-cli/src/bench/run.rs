@@ -440,7 +440,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
     goal_indicators.recruitment_paths = recruitment_paths;
 
     let deterministic = Deterministic {
-        graph_work_definition: "graph_relax_iters: entered nonempty single-evaluation visits, including unaffordable visits (T11.F06); historical deltas cross definitions".to_string(),
+        graph_work_definition: "graph_relax_iters: entered single-evaluation visits, entered when the graph has a compute node or a wired effect surface (T13.F04), including unaffordable visits (T11.F06); historical deltas cross definitions".to_string(),
         profile: profile_block(params, &config, recipes),
         per_seed,
         totals,

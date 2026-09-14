@@ -1,6 +1,8 @@
 pub(crate) mod effects;
 pub(crate) mod eval;
 pub(crate) mod execute;
+#[cfg(test)]
+mod f04_tests;
 pub(crate) mod sources;
 pub(crate) mod traced;
 

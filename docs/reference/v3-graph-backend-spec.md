@@ -251,8 +251,12 @@ evolvable only through edge mutations on the execute gate.
 Phase 0 calls `graph_runtime.begin_tick(&genome.nodes)`, also used by neighborhood
 sequences, standalone multi-tick callers, and cloned observations. It snapshots
 committed operator state and outputs and decays initialized eligibility. Mesh entry and
-module visits do not advance this clock. Each nonempty graph visit evaluates
-all compute nodes once in index order, including disconnected nodes.
+module visits do not advance this clock. A visit is entered when the graph has
+at least one compute node or a wired effect surface (an output sink, action-slot
+gate or param list, or execute gate carrying at least one edge). An entered
+visit evaluates all compute nodes once in index order, including disconnected
+nodes; with zero compute nodes that evaluation is empty and the effects pass
+still runs.
 
 - Lower-index compute sources read the current visit's computed outputs.
 - Self and higher-index sources read frozen tick-start outputs.
@@ -262,7 +266,8 @@ all compute nodes once in index order, including disconnected nodes.
   re-entry still recomputes from the frozen base; its last successful call
   supplies next tick's state. Effects and learning remain per backend call.
 - Unvisited modules hold values without catch-up, fabricated inputs, or charge.
-- Newborn temporal state is zero. Empty graphs do no work.
+- Newborn temporal state is zero. Graphs with no compute node and no wired
+  effect surface do no work: no charge, no counter, upstream slots pass through.
 
 The former relaxation and convergence config fields remain accepted and
 validated but are ignored by evaluation and allocation; see
@@ -273,7 +278,9 @@ validated but are ignored by evaluation and allocation; see
 ## 9. Post-Evaluation Effects
 
 After the ordered evaluation and its plasticity cost are affordable, a
-three-phase effects pass processes all fixed structural outputs.
+three-phase effects pass processes all fixed structural outputs. A zero-compute
+entered visit runs the same pass with `compute_count = 0`, where a `ComputeNode`
+source resolves to `0.0` as any out-of-range compute source does.
 
 ### Phase 1: Value outputs
 
@@ -357,7 +364,9 @@ candidate outputs with the frozen tick-start outputs, not a convergence test.
 ## 12. Energy Cost
 
 Graph node cost is charged per compute-node-per-visit evaluation
-(`graph_node_base_cost` or equivalent config-driven scalar).
+(`graph_node_base_cost` or equivalent config-driven scalar). An entered visit
+pays for at least one node equivalent, so a wired zero-compute visit costs what
+the same graph costs with a single dummy compute node.
 Canonical owner for graph runtime cost config:
 `v3-runtime-config-spec.md`.
 
@@ -365,7 +374,7 @@ Equivalent requested energy:
 
 ```text
 graph_energy_requested =
-  graph_node_base_cost * compute_nodes.len() * entered_visits
+  graph_node_base_cost * max(compute_nodes.len(), 1) * entered_visits
 ```
 
 If energy is exhausted during graph evaluation, node evaluation halts and mesh

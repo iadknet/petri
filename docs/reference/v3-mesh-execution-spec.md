@@ -136,8 +136,10 @@ Safety rules:
 
 Graph internal recurrence rule:
 - Phase 0 snapshots committed graph temporal state once per world tick.
-- Each visit evaluates once in index order; self/higher-index edges read the
-  tick-start outputs, lower-index edges read current-visit outputs.
+- A visit is entered when the graph has a compute node or a wired effect
+  surface; each entered visit evaluates once in index order, self/higher-index
+  edges reading the tick-start outputs and lower-index edges the current-visit
+  outputs. A zero-compute entered visit evaluates nothing and applies effects.
 - Production mesh dispatch visits each node at most once; skipped modules hold state.
   Direct backend harness calls retain the frozen-base clock contract.
 - Legacy convergence settings are accepted but ignored. Canonical semantics:
@@ -207,7 +209,10 @@ Arbitration)`).
 
 T11.F15 pairs new branches with backend gates and pass-through detours. T11.F18
 chooses an empty Graph or Halt-only VM detour with equal probability independent
-of the source backend; both preserve the bus and queued actions within budget. See
+of the source backend; both preserve the bus and queued actions within budget.
+An unwired Graph detour stays free; once mutation wires one of its effect
+surfaces the detour is entered, pays one node equivalent and applies that
+effect. See
 `v3-mutation-spec.md`. Extra dispatches/instructions retain their normal
 work and energy accounting. Neutrality requires sufficient budgets and does
 not promise equal downstream live-energy introspection or exhaustion outcomes.
