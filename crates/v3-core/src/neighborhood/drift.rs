@@ -110,14 +110,13 @@ fn forced_legacy_supply(mutation: &MutationConfig) -> MutationConfig {
 /// `supply_rule` metadata.
 #[must_use]
 pub fn supply_rule(mutation: &MutationConfig) -> String {
-    let forced = forced_legacy_supply(mutation);
     format!(
         "legacy per-birth rule (per_unit_supply_enabled forced false): \
          mutation_probability {}, events {} to {}, continuation {}",
-        forced.mutation_probability,
-        forced.per_birth_mutation_events_min,
-        forced.per_birth_mutation_events_max,
-        forced.per_birth_mutation_event_continuation_probability,
+        mutation.mutation_probability,
+        mutation.per_birth_mutation_events_min,
+        mutation.per_birth_mutation_events_max,
+        mutation.per_birth_mutation_event_continuation_probability,
     )
 }
 
