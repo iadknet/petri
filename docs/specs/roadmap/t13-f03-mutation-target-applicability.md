@@ -44,10 +44,8 @@ or world change is involved.
   and `MutationEngine::apply_mutations_with_food_type_count`
   (`mutation/engine/mod.rs`) discards the operator for that event. T13.F01's
   goal reading records 27,096 / 28,380 / 27,096 such selected-but-inapplicable
-  discards per world by depth 2,000 (about one per two attempted events)
-  against 356 / 139 / 356 no-eligible-node discards, dominated by
-  `Graph.MutateTraceDecay`, `Graph.MutateHebbianRate` and
-  `Graph.MutateGraphOperatorParam`.
+  discards per world by depth 2,000
+  against 356 / 139 / 356 no-eligible-node discards.
 - The repair. For each Graph operator, an applicability predicate over one
   node's `CgpGraphBackendDef` (and `input_refs` where the operator reads them)
   names the sites the operator will draw from; `GraphMutator::apply` filters
