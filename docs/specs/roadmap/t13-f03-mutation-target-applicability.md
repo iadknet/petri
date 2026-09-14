@@ -1,6 +1,6 @@
 # T13.F03 — Mutation Target Applicability
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-13
 **Feature**: T13.F03
 **Track**: [T13 — Neutral Module Recruitment](../../roadmaps/t13-neutral-module-recruitment.md)
@@ -13,18 +13,17 @@ with the existing executed/reachable bias applied within that set, so a
 refinement operator reaches a module that has a suitable site instead of being
 discarded after landing on one that does not. Silent tissue keeps its own
 opportunities: growth operators still reach blank modules, and an operator with
-no applicable module anywhere in the genome skips atomically. The change
-reaches creatures only through birth mutation of the genome; no sensor, runtime
-or world change is involved.
+no applicable module anywhere in the genome skips atomically. It reaches
+creatures only through birth mutation of the genome.
 
 ## Non-Goals
 
 - No change to domain shares (`mesh_layer_probability`, the equal VM/Graph/
   InputRef split), operator weights, requested-event draws, complexity-pressure
   restriction, or the executed/reachable bias values and their layer order.
-- No change to the engine's retry of the drawn domain's other operators after a
-  genuine `NoApplicableTarget`, nor to the `MutationEventRecord` shape, the
-  T13.F01 report fields, or the T13.F02 experiment design.
+- No change to the engine's retry of other operators after a genuine
+  `NoApplicableTarget`, the `MutationEventRecord` shape, the T13.F01 report
+  fields, or the T13.F02 experiment design.
 - No direct Graph effect activation (T13.F04), no growth-semantics change
   (T11.F18, T13.F05), no Topology-domain change, and no generic applicability
   trait, registry or mutation framework: existing enum dispatch and local
@@ -131,7 +130,7 @@ or world change is involved.
       [VM](../../progress/readings/t13-f03-mutation-target-applicability.md#vm-applicability-audit),
       [InputRef](../../progress/readings/t13-f03-mutation-target-applicability.md#inputref-audit--no-change)).
       The InputRef domain shows none of the defect and is unchanged.
-- [ ] `make check` on the final feature code -> tested commit recorded below.
+- [x] `make check` on the final feature code -> tested commit recorded below.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
       output path and every survivor resolved in the mutation gate row below.
 - [x] Benchmark summaries stored at
@@ -148,7 +147,7 @@ or world change is involved.
       country (0.0050). Full tables in
       [readings](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements).
       Not remediated by the benchmark specialist; routed to the orchestrator.
-- [ ] A second goal run for determinism: not applicable under the shared
+- [x] A second goal run for determinism: not applicable under the shared
       workflow's 2026-09-05 one-goal-run decision; `make check` retains
       cross-process reproducibility and the gate's two-run check.
 
@@ -159,9 +158,10 @@ make bench PROFILE=goal FEATURE=t13-f03-mutation-target-applicability
 
 | Closure record | Value |
 | --- | --- |
-| Tested commit | pending |
+| Tested commit | `52d646ac` (`make check` exit 0, log `/private/tmp/t13-f03-make-check.log`) |
 | Mutation gate | Summary line `145 mutants tested in 26m: 3 missed, 130 caught, 12 unviable`, 0 timeouts (`timeout.txt` empty). Run mode `fresh` (`run-mode.txt`), diff base `2f1bedf9`. Output `~/.local/share/petri-tools/mutants/t13-f03/mutants.out`. All 3 survivors killed by added or strengthened tests in `mutation/graph/hebbian.rs` and `mutation/graph/operators.rs`; none equivalent, none deferred. One fresh run: no production content, test selection or tool configuration changed, no test deleted or weakened. [Survivor dispositions](../../progress/readings/t13-f03-mutation-target-applicability.md#mutation-gate). |
-| Closure documentation checks | pending |
+| Closure documentation checks | `make roadmap-check`, `make check-docs`: exit 0 on the closing commit |
+| Mutation output audit | Fresh survivor list recovered from `/private/tmp/t13-f03-mutants.log` (3 `MISSED`, no `TIMEOUT`) and matched against the readings table; the recorded `mutants.out` directory now holds the later `MUTANTS_ITERATE=1` pass (`run-mode.txt` `incremental`, `previously_caught.txt` 142 entries, `missed.txt` empty). No `#[mutants::skip]` or `exclude_re`. |
 | Goal compute cost (2026-09-13), accepted by the user below | Goal `plasticity_updates` per creature-tick 0.093984 is +100.068% (severe) against epoch `t12-f04-baseline-world-set-goal.json` (0.046976) and +42.006% (flag) against previous `t15-f01-...-goal.json` (0.066183), with no predeclared severe allowance; T13.F02's inherited +41% epoch flag compounds with this +42%. Every other counter and wall/creature-tick `ok`. Accepted; see [closure measurements](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements). |
 | Depth-2,000 drift floor (2026-09-13), accepted by the user below | Depth-2,000 drift changed/all births 7/2,000 = 0.0035 in Orchards and Confluence (byte-identical walks) against the 0.005 floor and the epoch's 12/2,000 = 0.006; Canyon 10/2,000 = 0.0050 at the floor. Depth-1,000 floors hold. The predeclared "hold or rise" direction is not met; the predeclared zero selected-but-inapplicable discards is met (attempted equals applied in every domain and world). Same-reading facts at depth 2,000 in Orchards: executed-target events 31,841 vs 37,949 (−16%), unreachable-target events 17,826 vs 11,705 (+52%); the plasticity operators previously discarded selected-but-inapplicable hundreds of times each (`EnableHebbian` 612, `EnableRewardModulation` 739, `MutateTraceDecay` 2,746) now show only no-eligible-node discards (13, 124, 787). A hypothesis, not a finding: refinement events that used to be discarded on the executed core and re-rolled onto other operators now land on silent tissue that carries the site. |
 
@@ -227,14 +227,14 @@ T13.F04/F05, not a requirement widened into this feature.
 
 ## Success Criteria
 
-- [ ] Invariants 1–5 hold as property tests on generated genomes, and the
+- [x] Invariants 1–5 hold as property tests on generated genomes, and the
       fixture flip and per-operator TDD tests pass.
-- [ ] The goal report shows zero selected-but-inapplicable discards for every
+- [x] The goal report shows zero selected-but-inapplicable discards for every
       repaired operator in all three worlds at depth 2,000, with the remaining
       discards classified no-eligible-node.
-- [ ] Domain shares, operator weights, requested-event counts and growth reach
+- [x] Domain shares, operator weights, requested-event counts and growth reach
       to blank modules are unchanged (Non-Goals and invariant 4).
-- [ ] Reference updated, `make check` exits 0 on the tested commit, benchmark
+- [x] Reference updated, `make check` exits 0 on the tested commit, benchmark
       and mutation gates recorded.
 
 ## Notes for AI Agents
@@ -250,11 +250,12 @@ T13.F04/F05, not a requirement widened into this feature.
   applicable set; whether a bias over executed *applicable* modules or the
   T13.F04/F05 activation and recruitment paths should absorb this is a track
   decision, not a T13.F03 change.
-- Deferred: Review P3 — `has_raw_field_site`
-  (`crates/v3-core/src/mutation/graph/operators.rs`) evaluates the allocating
-  `valid_edge_field_moves` per edge on a module with no parameterized compute
-  node; a `bool` twin would avoid the allocation. Cost measured `ok` in both
-  profiles; not needed for this feature.
+- Deferred: Review P3 — `has_raw_field_site` allocates per edge on a module
+  with no parameterized compute node; a `bool` twin would avoid it. Cost
+  measured `ok`.
 - Decision: The applicability predicate is the single source of truth for an
   operator's sites on a node; T13.F04/F05 extend these predicates for any
   operator they add and never reintroduce a select-then-fail path.
+- Cost: `/usage` unavailable. Implementer briefs 2 (advisor consults 2 + 2);
+  specialists 1 pass each, 0 consults. Review P1 0 / P2 1 / P3 4. Remediation:
+  production 0, documentation 1, mutation test-only 1. Fresh mutation runs 1.
