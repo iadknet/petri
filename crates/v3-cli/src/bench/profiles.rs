@@ -37,6 +37,10 @@ pub struct NeighborhoodSizes {
     pub founder_births: u32,
     pub evolved_operator_trials: u32,
     pub evolved_births: u32,
+    /// Neighborhood read (T14.F12): genomes sampled per world and production
+    /// births per sampled genome.
+    pub read_sample: u32,
+    pub read_births: u32,
 }
 
 impl NeighborhoodSizes {
@@ -55,6 +59,8 @@ impl NeighborhoodSizes {
         founder_births: 500,
         evolved_operator_trials: 20,
         evolved_births: 200,
+        read_sample: 50,
+        read_births: 100,
     };
 }
 
@@ -67,6 +73,8 @@ impl Default for NeighborhoodSizes {
             founder_births: 5,
             evolved_operator_trials: 2,
             evolved_births: 5,
+            read_sample: 3,
+            read_births: 4,
         }
     }
 }

@@ -334,6 +334,75 @@ fn case_readings_follow_the_case_seed_and_observation() {
     );
 }
 
+/// The evolved pooled fractions divide by mutated births and are compared
+/// under names that say so (T14.F12 rename, values unchanged); the
+/// neighborhood read's fractions divide by all births and are compared under
+/// their own three keys, unmeasured when the block is absent.
+#[test]
+fn evolved_and_neighborhood_read_keys_name_their_denominators() {
+    let mut report = small_world_set_report();
+    for observation in &mut report.deterministic.goal_indicators.cases {
+        let seed = observation.case.seed;
+        if let Indicator::Defined(neighborhood) = &mut observation.mutational_neighborhood {
+            if let Indicator::Defined(evolved) = &mut neighborhood.evolved {
+                let pooled = &mut evolved.per_seed[0].pooled_births.any_events;
+                pooled.changed_fraction = six(f64::from(seed as u32) / 1_600.0);
+                pooled.dead_fraction = six(f64::from(seed as u32) / 3_200.0);
+            }
+        }
+        if let Indicator::Defined(read) = &mut observation.neighborhood_read {
+            read.changed_per_all_births = six(f64::from(seed as u32) / 640.0);
+            read.dead_per_all_births = six(f64::from(seed as u32) / 320.0);
+            read.silent_per_all_births = six(f64::from(seed as u32) / 160.0);
+        }
+    }
+    let second = report.deterministic.profile.cases[1].name.clone();
+    let seeded = f64::from(report.deterministic.profile.cases[1].seed as u32);
+    let value = |report: &Report, name: &str| {
+        case_readings(report, &second)
+            .into_iter()
+            .find(|(reading, _)| reading == name)
+            .unwrap_or_else(|| panic!("{name} must be a compared reading"))
+            .1
+    };
+
+    assert_eq!(
+        value(&report, "evolved_changed_per_mutated_births"),
+        Some(seeded / 1_600.0)
+    );
+    assert_eq!(
+        value(&report, "evolved_dead_per_mutated_births"),
+        Some(seeded / 3_200.0)
+    );
+    assert!(
+        case_readings(&report, &second)
+            .iter()
+            .all(|(name, _)| !name.starts_with("evolved_") || name.ends_with("_per_mutated_births")),
+        "the mislabelled evolved_*_per_all_births keys are gone"
+    );
+    assert_eq!(
+        value(&report, "neighborhood_read_changed_per_all_births"),
+        Some(seeded / 640.0)
+    );
+    assert_eq!(
+        value(&report, "neighborhood_read_dead_per_all_births"),
+        Some(seeded / 320.0)
+    );
+    assert_eq!(
+        value(&report, "neighborhood_read_silent_per_all_births"),
+        Some(seeded / 160.0)
+    );
+
+    let mut unread = report.clone();
+    unread.deterministic.goal_indicators.cases[1].neighborhood_read =
+        Indicator::Undefined(UNDEFINED.to_string());
+    assert_eq!(
+        value(&unread, "neighborhood_read_changed_per_all_births"),
+        None,
+        "a report without the read is unmeasured, not zero"
+    );
+}
+
 /// The three temporal memory fractions are compared per case by their fixed
 /// names, read from the outer row whose seed is the case seed, and sit
 /// immediately after `memory_different_from_either_fraction`.

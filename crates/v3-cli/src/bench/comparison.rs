@@ -184,6 +184,7 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
         .find(|row| row.seed == seed);
     let neighborhood = observation.mutational_neighborhood.defined();
     let evolved = neighborhood.and_then(|reading| reading.evolved.defined()?.per_seed.first());
+    let neighborhood_read = observation.neighborhood_read.defined();
     let per_creature_tick = |count: fn(&PerSeed) -> u64| {
         run.and_then(|row| {
             (row.creature_ticks > 0).then(|| count(row) as f64 / row.creature_ticks as f64)
@@ -288,13 +289,27 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
                 parse_reading(&reading.founder.births.any_events.dead_fraction)
             }),
         ),
+        // `any_events.*_fraction` divides by mutated births (`applied`), so the
+        // key names that denominator (T14.F12); the values are unchanged.
         (
-            "evolved_changed_per_all_births".to_string(),
+            "evolved_changed_per_mutated_births".to_string(),
             evolved.and_then(|row| parse_reading(&row.pooled_births.any_events.changed_fraction)),
         ),
         (
-            "evolved_dead_per_all_births".to_string(),
+            "evolved_dead_per_mutated_births".to_string(),
             evolved.and_then(|row| parse_reading(&row.pooled_births.any_events.dead_fraction)),
+        ),
+        (
+            "neighborhood_read_changed_per_all_births".to_string(),
+            neighborhood_read.and_then(|read| parse_reading(&read.changed_per_all_births)),
+        ),
+        (
+            "neighborhood_read_dead_per_all_births".to_string(),
+            neighborhood_read.and_then(|read| parse_reading(&read.dead_per_all_births)),
+        ),
+        (
+            "neighborhood_read_silent_per_all_births".to_string(),
+            neighborhood_read.and_then(|read| parse_reading(&read.silent_per_all_births)),
         ),
         (
             "reachable_structure_size_median".to_string(),

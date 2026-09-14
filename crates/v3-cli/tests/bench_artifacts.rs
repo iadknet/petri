@@ -1063,3 +1063,58 @@ fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloa
             < artifacts::summary_bytes(&summary).unwrap().len() + 300
     );
 }
+
+/// A world's `neighborhood_read` block (T14.F12) is projected into the
+/// summary whole, beside `drift_depth`, and a source without it projects
+/// none rather than an empty or zero block.
+#[test]
+fn world_neighborhood_read_is_projected_whole() {
+    let dir = Temp::new();
+    let path = dir.0.join("raw.json");
+    let mut source = world_source();
+    let tally = json!({
+        "trials": 1, "skipped": 0, "applied": 1, "silent": 0, "changed": 1, "dead": 0,
+        "changed_only_in_sequences": 0, "silent_fraction": "0.000000",
+        "changed_fraction": "1.000000", "dead_fraction": "0.000000",
+        "mean_fraction_differing": "0.500000"
+    });
+    let read = json!({
+        "version": "neighborhood-read-v1", "battery_version": "neighborhood-v1",
+        "sample_seed_formula": "8000000 + world_seed",
+        "birth_seed_formula": "8000000 + 1000 * (sample_index + 1) + 9000 + birth_index",
+        "population_size": 5, "sample_size_requested": 2, "sample_size": 2, "birth_trials": 3,
+        "births": {"births_total": 6, "by_requested_events": [{"requested_events": 0, "births": 5},
+                   {"requested_events": 1, "births": 1}], "zero_event_births": 5,
+                   "any_events": tally, "by_events": [{"applied_events": 1, "tally": tally}]},
+        "silent_per_all_births": "0.000000", "changed_per_all_births": "0.166667",
+        "dead_per_all_births": "0.000000",
+        "generation_sum": 7, "mean_generation": "3.500000",
+        "genome_size_sum": 222, "mean_genome_size": "111.000000",
+        "total_nodes": 20, "mean_total_nodes": "10.000000",
+        "reachable_nodes": 14, "mean_reachable_nodes": "7.000000",
+        "executed_nodes": 10, "mean_executed_nodes": "5.000000",
+        "genomes": [
+            {"rank": 0, "creature_id": "CreatureId(1)", "lineage_id": 1, "generation": 3,
+             "genome_size": 111, "total_nodes": 10, "reachable_nodes": 7, "executed_nodes": 5,
+             "births_total": 3, "zero_event_births": 2, "silent": 0, "changed": 1, "dead": 0},
+            {"rank": 4, "creature_id": "CreatureId(9)", "lineage_id": 2, "generation": 4,
+             "genome_size": 111, "total_nodes": 10, "reachable_nodes": 7, "executed_nodes": 5,
+             "births_total": 3, "zero_event_births": 3, "silent": 0, "changed": 0, "dead": 0}
+        ]
+    });
+    source["deterministic"]["goal_indicators"]["cases"][0]["neighborhood_read"] = read.clone();
+    let raw = serde_json::to_vec(&source).unwrap();
+    std::fs::write(&path, &raw).unwrap();
+    let summary = artifacts::summarize(&raw, &path, &provenance()).unwrap();
+    assert_eq!(
+        summary.deterministic["goal_indicators"]["cases"][0]["neighborhood_read"],
+        read
+    );
+
+    let historical = serde_json::to_vec(&world_source()).unwrap();
+    std::fs::write(&path, &historical).unwrap();
+    let summary = artifacts::summarize(&historical, &path, &provenance()).unwrap();
+    assert!(summary.deterministic["goal_indicators"]["cases"][0]
+        .get("neighborhood_read")
+        .is_none());
+}

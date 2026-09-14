@@ -4,6 +4,7 @@ use crate::bench::profiles::{
 };
 use crate::bench::schema::MeshExecution;
 use crate::bench::tests::small_profile;
+use crate::{fraction_or_undefined, UNDEFINED};
 use proptest::prelude::*;
 use v3_core::neighborhood;
 
@@ -11,7 +12,15 @@ use v3_core::neighborhood;
 fn empty_measured_population_reports_zero_companion_counts() {
     let mut config = SimulationConfig::default();
     config.population.initial_creatures = 0;
-    let run = run_one_seed(&config, 11, 0, true, None, NeighborhoodSizes::default());
+    let run = run_one_seed(
+        &config,
+        11,
+        0,
+        true,
+        None,
+        NeighborhoodSizes::default(),
+        false,
+    );
     let observation = run.goal_observation.expect("measured final population");
     assert_eq!(observation.memory_sensitivity.final_creature_count, 0);
     assert_eq!(
@@ -62,6 +71,7 @@ fn goal_cases_keep_distinct_full_population_structure_distributions() {
             false,
             None,
             params.neighborhood,
+            false,
         );
         assert_eq!(run.complexities.len() as u64, run.per_seed.final_population);
         assert!(run.complexities.len() > neighborhood::SAMPLE_SIZE);
@@ -324,6 +334,7 @@ fn synthetic_timings(seed_wall_clock_ms: &[f64]) -> RunTimings {
         drift_depth_wall_clock_ms: None,
         recruitment_paths_wall_clock_ms: None,
         neighborhood_evolved_wall_clock_ms_per_seed: Vec::new(),
+        neighborhood_read_wall_clock_ms_per_seed: Vec::new(),
     }
 }
 
@@ -611,4 +622,83 @@ proptest! {
         prop_assert_eq!(totals.actions_applied, rows.iter().map(|r| r.6).sum::<u64>());
         prop_assert_eq!(totals.births, rows.iter().map(|r| r.7).sum::<u64>());
     }
+}
+
+/// The neighborhood read (T14.F12) is defined on every world of the goal
+/// world set, sized from `NeighborhoodSizes`, pooled from its own rows over
+/// all births, byte-identical across thread counts, and absent — never zero
+/// — off the world set and in reports stored before it.
+#[test]
+fn world_set_neighborhood_read_is_defined_per_world_and_byte_identical_across_thread_counts() {
+    let params = crate::bench::tests::small_world_set_params();
+    let one = rayon::ThreadPoolBuilder::new()
+        .num_threads(1)
+        .build()
+        .unwrap()
+        .install(|| run_deterministic(&params).expect("a valid profile"));
+    let two = rayon::ThreadPoolBuilder::new()
+        .num_threads(2)
+        .build()
+        .unwrap()
+        .install(|| run_deterministic(&params).expect("a valid profile").0);
+    assert_eq!(
+        serde_json::to_vec(&one.0).unwrap(),
+        serde_json::to_vec(&two).unwrap()
+    );
+    let (report, timings) = one;
+    assert_eq!(report.goal_indicators.cases.len(), 3);
+    assert_eq!(timings.neighborhood_read_wall_clock_ms_per_seed.len(), 3);
+    for (case, timing) in report
+        .goal_indicators
+        .cases
+        .iter()
+        .zip(&timings.neighborhood_read_wall_clock_ms_per_seed)
+    {
+        assert_eq!(timing.seed, case.case.seed);
+        let read = case.neighborhood_read.defined().expect("a defined read");
+        assert_eq!(read.version, "neighborhood-read-v1");
+        assert_eq!(read.sample_size_requested, params.neighborhood.read_sample);
+        assert_eq!(read.birth_trials, params.neighborhood.read_births);
+        assert_eq!(
+            u64::from(read.sample_size),
+            read.population_size
+                .min(u64::from(params.neighborhood.read_sample))
+        );
+        assert_eq!(read.genomes.len(), read.sample_size as usize);
+        assert_eq!(
+            read.births.births_total,
+            read.sample_size * read.birth_trials
+        );
+        assert_eq!(
+            read.genomes.iter().map(|row| row.changed).sum::<u32>(),
+            read.births.any_events.changed
+        );
+        assert_eq!(
+            read.changed_per_all_births,
+            fraction_or_undefined(
+                u64::from(read.births.any_events.changed),
+                u64::from(read.births.births_total)
+            )
+        );
+        assert!(read
+            .genomes
+            .windows(2)
+            .all(|pair| pair[0].rank < pair[1].rank));
+    }
+
+    let goal = run_deterministic(&small_profile("goal"))
+        .expect("a valid profile")
+        .1;
+    assert!(goal.neighborhood_read_wall_clock_ms_per_seed.is_empty());
+
+    let mut historical = serde_json::to_value(&report).unwrap();
+    historical["goal_indicators"]["cases"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("neighborhood_read");
+    let historical: Deterministic = serde_json::from_value(historical).unwrap();
+    assert!(matches!(
+        historical.goal_indicators.cases[0].neighborhood_read,
+        Indicator::Undefined(ref reason) if reason == UNDEFINED
+    ));
 }

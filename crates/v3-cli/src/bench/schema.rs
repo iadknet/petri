@@ -111,6 +111,10 @@ pub struct GoalCaseObservation {
     pub fractions: TrackedFractions,
     pub mutational_neighborhood: Indicator<MutationalNeighborhood>,
     pub drift_depth: Indicator<DriftDepth>,
+    /// The seeded births-only read of this world's terminal population
+    /// (T14.F12); unmeasured, never zero, in reports stored before it.
+    #[serde(default = "undefined_neighborhood_read")]
+    pub neighborhood_read: Indicator<NeighborhoodRead>,
 }
 
 /// The rates [`WorldTracking`] implies, derived once so a total and its
@@ -315,6 +319,62 @@ pub(super) fn timed_recruitment_paths(
 
 pub(super) fn undefined_drift_depth() -> Indicator<DriftDepth> {
     Indicator::Undefined(UNDEFINED.to_string())
+}
+
+pub(super) fn undefined_neighborhood_read() -> Indicator<NeighborhoodRead> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
+pub const NEIGHBORHOOD_READ_VERSION: &str = "neighborhood-read-v1";
+
+/// The neighborhood read (T14.F12): a seeded sample of the id-sorted living
+/// population at the end of a goal-profile world, each genome's production
+/// births classified by the `neighborhood-v1` battery, pooled over the
+/// sample. Every fraction divides by `births.births_total`, all births, as
+/// the drift checkpoint's do.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodRead {
+    pub version: String,
+    pub battery_version: String,
+    pub sample_seed_formula: String,
+    pub birth_seed_formula: String,
+    pub population_size: u64,
+    pub sample_size_requested: u32,
+    pub sample_size: u32,
+    pub birth_trials: u32,
+    pub births: NeighborhoodBirths,
+    pub silent_per_all_births: String,
+    pub changed_per_all_births: String,
+    pub dead_per_all_births: String,
+    pub generation_sum: u64,
+    pub mean_generation: String,
+    pub genome_size_sum: u64,
+    pub mean_genome_size: String,
+    pub total_nodes: u64,
+    pub mean_total_nodes: String,
+    pub reachable_nodes: u64,
+    pub mean_reachable_nodes: String,
+    pub executed_nodes: u64,
+    pub mean_executed_nodes: String,
+    pub genomes: Vec<NeighborhoodReadGenome>,
+}
+
+/// One sampled genome's identity, structure, and integer birth tallies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NeighborhoodReadGenome {
+    pub rank: u64,
+    pub creature_id: String,
+    pub lineage_id: u32,
+    pub generation: u64,
+    pub genome_size: u32,
+    pub total_nodes: u64,
+    pub reachable_nodes: u64,
+    pub executed_nodes: u64,
+    pub births_total: u32,
+    pub zero_event_births: u32,
+    pub silent: u32,
+    pub changed: u32,
+    pub dead: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -833,6 +893,11 @@ pub struct Environment {
     pub neighborhood_evolved_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
     #[serde(default)]
     pub neighborhood_evolved_wall_clock_ms_total: f64,
+    /// Neighborhood-read wall time per seed (goal world set only).
+    #[serde(default)]
+    pub neighborhood_read_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
+    #[serde(default)]
+    pub neighborhood_read_wall_clock_ms_total: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

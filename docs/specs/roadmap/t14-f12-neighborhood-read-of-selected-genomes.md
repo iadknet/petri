@@ -126,18 +126,18 @@ the drift chart drops its two floor lines and the floor wording in its subtitle.
 
 ## Implementation Tasks
 
-- [ ] `v3-core`: the seeded sample-rank function in `neighborhood/sample.rs`
+- [x] `v3-core`: the seeded sample-rank function in `neighborhood/sample.rs`
       with unit and property tests (empty, below, at and above the sample size;
       strictly ascending, in bounds, distinct, fixed by seed).
-- [ ] `v3-cli`: the `NeighborhoodRead` schema with `Undefined` default, its
+- [x] `v3-cli`: the `NeighborhoodRead` schema with `Undefined` default, its
       per-seed reader in `indicators.rs` reusing `per_birth_result`,
       `structural_companions` and `Battery::executed_indices`, the timed call in
       `run_one_seed` under the goal world set, sizes on `NeighborhoodSizes`, the
       block on the case projection in `artifacts.rs`, the three new and two
       renamed comparison keys, and the environment wall-clock fields.
-- [ ] `docs/progress/index.html`: the new chart and the drift-chart floor
+- [x] `docs/progress/index.html`: the new chart and the drift-chart floor
       removal.
-- [ ] Tests: `Undefined` outside the goal world set and defined per world on
+- [x] Tests: `Undefined` outside the goal world set and defined per world on
       it; pooled tallies equal the sum of the per-genome rows with
       `births_total == sample_size × birth_trials`; fractions divide by
       `births_total`; a report without the block loads unmeasured; a reduced
@@ -149,9 +149,23 @@ the drift chart drops its two floor lines and the floor wording in its subtitle.
 ## Verification
 
 - [ ] `make check` -> exit 0 on the final feature code; commit named here.
+      Build pass, uncommitted worktree: `make check` exit 0 (2026-09-14).
 - [ ] Focused tests: `cargo test -p v3-core -p v3-cli` -> exit 0, with
       `cargo clippy -p v3-core -p v3-cli --all-targets` and
       `cargo fmt --all -- --check` clean; test names in the readings file.
+      Build pass: `cargo test -p v3-core -p v3-cli` exit 0 (1,453 v3-core
+      unit, 105 v3-cli unit, every integration binary ok);
+      `cargo clippy --workspace --all-targets -- -D warnings` clean;
+      `cargo fmt --all` applied; `cargo check --workspace --all-targets`
+      clean. New tests: `neighborhood::sample::read_tests::{empty_population_or_zero_sample_reads_nothing,
+      population_at_or_below_sample_size_takes_every_rank,
+      draw_is_pinned_for_one_population_and_seed,
+      ranks_are_ascending_distinct_in_bounds_and_seed_fixed}` (v3-core);
+      `bench::indicators::tests::{neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births,
+      neighborhood_read_of_an_empty_population_has_no_rows_and_undefined_fractions}`,
+      `bench::run::tests::world_set_neighborhood_read_is_defined_per_world_and_byte_identical_across_thread_counts`,
+      `bench::comparison::tests::evolved_and_neighborhood_read_keys_name_their_denominators`
+      (v3-cli); `world_neighborhood_read_is_projected_whole` (`tests/bench_artifacts.rs`).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.

@@ -970,14 +970,26 @@
           })),
       });
       chart({
-        title: 'Drift depth: changed per all births', sub: 'drift_depth.readings[] at depth 1,000 and 2,000, against the standing floors (T11.F17; depth-2,000 re-based to 0.005 on 2026-09-09)',
+        title: 'Drift depth: changed per all births', sub: 'drift_depth.readings[] at depth 1,000 and 2,000 (T11.F17)',
         tipFmt: pct, yFmt: pct,
-        refLines: [{ y: 0.0015, label: 'depth-1,000 floor' }, { y: 0.005, label: 'depth-2,000 floor' }],
         series: [
           { name: 'depth 1,000', color: 'var(--s1)', values: series((rep, obs) => driftAt(obs, 1000)) },
           { name: 'depth 2,000', color: 'var(--s2)', values: series((rep, obs) => driftAt(obs, 2000)) },
         ],
       });
+      {
+        // The closure indicator for changed births at depth (T14.F12), read
+        // on the world's own terminal population; the reference line is the
+        // first closure that measured it.
+        const changed = series((rep, obs) => get(obs, 'neighborhood_read.changed_per_all_births'));
+        const first = changed.find(Number.isFinite);
+        chart({
+          title: 'Neighborhood read: changed per all births', sub: 'neighborhood_read.changed_per_all_births (T14.F12); the line is the first reading',
+          tipFmt: pct, yFmt: pct,
+          refLines: Number.isFinite(first) ? [{ y: first, label: 'first reading' }] : [],
+          series: [{ name: 'changed', color: 'var(--s1)', values: changed }],
+        });
+      }
       chart({
         title: 'Mutated births by outcome', sub: 'founder and pooled evolved changed/dead fractions for this world',
         tipFmt: pct, yFmt: pct,

@@ -841,3 +841,188 @@ fn population_depth_uses_u64_upper_median_and_extinction_is_undefined() {
         })
     );
 }
+
+/// `neighborhood_read_for_seed` samples `read_sample_ranks(n, sample, seed)`
+/// of the id-sorted population and seeds sampled genome `i` by
+/// `READ_SEED_BASE + READ_GENOME_MULTIPLIER * (i + 1)` through the unchanged
+/// `per_birth_result`. This reconstructs every row independently and checks
+/// the pooled block is the integer sum of its rows with every fraction over
+/// all births.
+#[test]
+fn neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births() {
+    let mut config = SimulationConfig::default();
+    config.world.width = 16;
+    config.world.height = 16;
+    config.population.initial_creatures = 6;
+    let sim = seed_simulation(config.clone(), 11);
+    let battery = Battery::generate(config.world.food.types.len());
+    let context = EvalContext::from_config(&config);
+    let sizes = NeighborhoodSizes {
+        read_sample: 4,
+        read_births: 60,
+        ..NeighborhoodSizes::default()
+    };
+
+    let actual = neighborhood_read_for_seed(11, &sim, &battery, &config.mutation, &context, sizes);
+
+    let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
+    creature_ids.sort();
+    let ranks = read_sample_ranks(creature_ids.len(), 4, 11);
+    assert_eq!(ranks.len(), 4, "six creatures, four sampled");
+    assert_eq!(actual.version, "neighborhood-read-v1");
+    assert_eq!(actual.battery_version, "neighborhood-v1");
+    assert_eq!(actual.sample_seed_formula, "8000000 + world_seed");
+    assert_eq!(
+        actual.birth_seed_formula,
+        "8000000 + 1000 * (sample_index + 1) + 9000 + birth_index"
+    );
+    assert_eq!(actual.population_size, 6);
+    assert_eq!(actual.sample_size_requested, 4);
+    assert_eq!(actual.sample_size, 4);
+    assert_eq!(actual.birth_trials, 60);
+    assert_eq!(actual.births.births_total, 240);
+    assert_eq!(actual.genomes.len(), 4);
+
+    let mut pooled = BirthResult::default();
+    let mut sums = (0u64, 0u64, 0u64, 0u64, 0u64);
+    for (genome_index, &rank) in ranks.iter().enumerate() {
+        let creature_id = creature_ids[rank];
+        let creature = &sim.creatures[creature_id];
+        let base = battery.signature(
+            &creature.genome,
+            context.runtime,
+            context.shared_memory_decay_rate,
+        );
+        let expected = neighborhood::births::per_birth_result(
+            &creature.genome,
+            &base,
+            &battery,
+            &config.mutation,
+            &context,
+            60,
+            READ_SEED_BASE + READ_GENOME_MULTIPLIER * (genome_index as u64 + 1),
+        );
+        let row = &actual.genomes[genome_index];
+        assert_eq!(row.rank, rank as u64);
+        assert_eq!(row.creature_id, format!("{creature_id:?}"));
+        assert_eq!(row.lineage_id, creature.identity.lineage_id);
+        assert_eq!(row.generation, creature.generation);
+        assert_eq!(row.genome_size, creature.genome.genome_size());
+        assert_eq!(row.total_nodes, creature.genome.nodes.len() as u64);
+        assert_eq!(
+            row.reachable_nodes,
+            structural_companions(&creature.genome).reachable_node_count as u64
+        );
+        assert_eq!(
+            row.executed_nodes,
+            battery
+                .executed_indices(
+                    &creature.genome,
+                    context.runtime,
+                    context.shared_memory_decay_rate
+                )
+                .len() as u64
+        );
+        assert_eq!(
+            (
+                row.births_total,
+                row.zero_event_births,
+                row.silent,
+                row.changed,
+                row.dead
+            ),
+            (
+                expected.births_total,
+                expected.zero_event_births,
+                expected.any_events.silent,
+                expected.any_events.changed,
+                expected.any_events.dead
+            ),
+            "genome_index {genome_index}"
+        );
+        pooled = pooled.merge(&expected);
+        sums.0 += row.generation;
+        sums.1 += u64::from(row.genome_size);
+        sums.2 += row.total_nodes;
+        sums.3 += row.reachable_nodes;
+        sums.4 += row.executed_nodes;
+    }
+    assert_eq!(actual.births, to_neighborhood_births(&pooled));
+    let row_sum =
+        |field: fn(&NeighborhoodReadGenome) -> u32| actual.genomes.iter().map(field).sum::<u32>();
+    assert_eq!(row_sum(|row| row.births_total), actual.births.births_total);
+    assert_eq!(
+        row_sum(|row| row.zero_event_births),
+        actual.births.zero_event_births
+    );
+    assert_eq!(row_sum(|row| row.silent), actual.births.any_events.silent);
+    assert_eq!(row_sum(|row| row.changed), actual.births.any_events.changed);
+    assert_eq!(row_sum(|row| row.dead), actual.births.any_events.dead);
+    assert_eq!(
+        actual.silent_per_all_births,
+        fraction_or_undefined(u64::from(pooled.any_events.silent), 240)
+    );
+    assert_eq!(
+        actual.changed_per_all_births,
+        fraction_or_undefined(u64::from(pooled.any_events.changed), 240)
+    );
+    assert_eq!(
+        actual.dead_per_all_births,
+        fraction_or_undefined(u64::from(pooled.any_events.dead), 240)
+    );
+    assert_eq!(
+        (
+            actual.generation_sum,
+            actual.genome_size_sum,
+            actual.total_nodes,
+            actual.reachable_nodes,
+            actual.executed_nodes
+        ),
+        sums
+    );
+    assert_eq!(actual.mean_generation, fraction_or_undefined(sums.0, 4));
+    assert_eq!(actual.mean_genome_size, fraction_or_undefined(sums.1, 4));
+    assert_eq!(actual.mean_total_nodes, fraction_or_undefined(sums.2, 4));
+    assert_eq!(
+        actual.mean_reachable_nodes,
+        fraction_or_undefined(sums.3, 4)
+    );
+    assert_eq!(actual.mean_executed_nodes, fraction_or_undefined(sums.4, 4));
+}
+
+#[test]
+fn neighborhood_read_of_an_empty_population_has_no_rows_and_undefined_fractions() {
+    let mut config = SimulationConfig::default();
+    config.world.width = 16;
+    config.world.height = 16;
+    config.population.initial_creatures = 0;
+    let sim = seed_simulation(config.clone(), 11);
+    let battery = Battery::generate(config.world.food.types.len());
+    let context = EvalContext::from_config(&config);
+
+    let actual = neighborhood_read_for_seed(
+        11,
+        &sim,
+        &battery,
+        &config.mutation,
+        &context,
+        NeighborhoodSizes::default(),
+    );
+
+    assert_eq!(actual.population_size, 0);
+    assert_eq!(actual.sample_size, 0);
+    assert!(actual.genomes.is_empty());
+    assert_eq!(actual.births.births_total, 0);
+    for fraction in [
+        &actual.silent_per_all_births,
+        &actual.changed_per_all_births,
+        &actual.dead_per_all_births,
+        &actual.mean_generation,
+        &actual.mean_genome_size,
+        &actual.mean_total_nodes,
+        &actual.mean_reachable_nodes,
+        &actual.mean_executed_nodes,
+    ] {
+        assert_eq!(fraction, UNDEFINED);
+    }
+}
