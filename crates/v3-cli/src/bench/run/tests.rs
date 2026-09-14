@@ -12,15 +12,7 @@ use v3_core::neighborhood;
 fn empty_measured_population_reports_zero_companion_counts() {
     let mut config = SimulationConfig::default();
     config.population.initial_creatures = 0;
-    let run = run_one_seed(
-        &config,
-        11,
-        0,
-        true,
-        None,
-        NeighborhoodSizes::default(),
-        false,
-    );
+    let run = run_one_seed(&config, 11, 0, true, None);
     let observation = run.goal_observation.expect("measured final population");
     assert_eq!(observation.memory_sensitivity.final_creature_count, 0);
     assert_eq!(
@@ -64,15 +56,7 @@ fn goal_cases_keep_distinct_full_population_structure_distributions() {
     let mut pooled = Vec::new();
     for (index, case) in report.goal_indicators.cases.iter().enumerate() {
         let (_, config) = goal_case(&params, &GOAL_RECIPES[index]);
-        let run = run_one_seed(
-            &config,
-            params.seeds[index],
-            params.ticks,
-            false,
-            None,
-            params.neighborhood,
-            false,
-        );
+        let run = run_one_seed(&config, params.seeds[index], params.ticks, false, None);
         assert_eq!(run.complexities.len() as u64, run.per_seed.final_population);
         assert!(run.complexities.len() > neighborhood::SAMPLE_SIZE);
         pooled.extend_from_slice(&run.complexities);
