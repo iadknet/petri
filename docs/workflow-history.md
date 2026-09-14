@@ -148,6 +148,34 @@ triage, and test-only remediation. Production remediation remains with a fresh
 Opus 5 `medium` roadmap implementer. The two mechanical specialists use narrow
 briefs and run sequentially without competing workloads.
 
+On 2026-09-13, the user moved the Claude orchestrator from Fable 5.1 to Opus 5
+at `medium` and added a persistent Fable 5.1 `high` spec owner
+(`.claude/agents/roadmap-spec-owner.md`), the Claude equivalent of the Codex
+role adopted on 2026-09-06. The observation behind it: most orchestrator turns
+are bookkeeping — briefs, verification of reports, commits, status edits, the
+merge — and the frontier model was paying for context on every one of them,
+while the work that needs it is the Plan step and the requirement decisions
+during implementation. Those now live in the spec owner, spawned in the
+foreground for the Plan step and resumed with `SendMessage` for escalations, so
+the planning inputs (roughly 60–100k tokens of track, dependency, and code
+reading in earlier sessions) no longer enter the orchestrator context at all.
+The orchestrator's "do not consult the advisor" rule stands; the spec owner is
+its Fable channel, so there is one escalation path rather than two. The fresh
+Fable `high` reviewer is unchanged and is never the spec owner.
+
+This was possible because `SendMessage` is exposed in the current desktop
+client (it was absent on 2026-09-04, which is why the persistent implementer
+rule was retired on 2026-09-09). The implementer stays fresh per pass on the
+measured cost rationale — first launches carried ~300k tokens against 89–142k
+for later ones — and the contract now says so instead of citing the tool. A
+fallback to a fresh spec owner per escalation is written into the contract for
+builds where the tool is missing again. Two figures from the 2026-09-07 research
+temper the expectation: at API rates a Fable→Opus swap on a cache-read-dominated
+session saves about 17% because Fable cache reads are priced at 0.025× base, so
+the saving is mostly plan-side (Fable bills to credits) plus the removed Plan
+context; it is a one-line reversal if the next measurement window does not show
+it.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the
