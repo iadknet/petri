@@ -2,7 +2,9 @@ use super::*;
 use crate::config::SimulationConfig;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::genome::cgp::{CgpGraphBackendDef, ExecuteGate, OutputSink, OutputSinkKind};
+use crate::creature::genome::cgp::{
+    CgpGraphBackendDef, ExecuteGate, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
+};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::{
     MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationOperator,
@@ -1415,11 +1417,14 @@ fn first_event_in_domain(
     panic!("no seed drew the {domain:?} domain");
 }
 
+/// T13.F03 re-pin: this fixture used to assert that every decreasing Graph
+/// operator selected the edgeless module and only then reported no site.
+/// The applicable set is now empty for all of them, so the event is a
+/// no-eligible-node skip carrying no pick at all.
 #[test]
-fn a_selected_module_with_no_applicable_site_is_recorded_with_its_node_id() {
+fn a_module_with_no_applicable_site_is_never_selected() {
     // Size pressure at the cap leaves only decreasing Graph operators, and an
-    // edgeless Graph node offers none of them a site: every operator selects
-    // the node and then reports NoApplicableTarget.
+    // edgeless Graph node offers none of them a site.
     let mut config = single_node_internal_event_config();
     config.genome_size_pressure_enabled = true;
     config.genome_size_cap = 1;
@@ -1432,21 +1437,22 @@ fn a_selected_module_with_no_applicable_site_is_recorded_with_its_node_id() {
     };
     assert_eq!(event.domain, MutationDomain::Graph);
     assert_eq!(event.operator, None);
-    assert_eq!(event.target, Some(NodeId::new(0)));
+    assert_eq!(event.target, None);
     assert_eq!(
         event.outcome,
         MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget)
     );
-    // Every operator of the domain was tried and thrown away, and at least one
-    // of them had already selected the edgeless node.
+    // Every operator of the domain was tried and thrown away, and none of
+    // them drew a node before doing so.
     assert!(!event.discarded.is_empty());
     assert!(event
         .discarded
         .iter()
         .all(|&(operator, _)| operator.domain() == MutationDomain::Graph));
-    assert_eq!(
-        event.discarded.iter().find_map(|&(_, pick)| pick),
-        Some(NodeId::new(0))
+    assert!(
+        event.discarded.iter().all(|&(_, pick)| pick.is_none()),
+        "no operator selected a module it cannot apply to: {:?}",
+        event.discarded
     );
     let operators: BTreeSet<MutationOperator> = event
         .discarded
@@ -1458,6 +1464,54 @@ fn a_selected_module_with_no_applicable_site_is_recorded_with_its_node_id() {
         event.discarded.len(),
         "no operator retried"
     );
+}
+
+/// The other half of the flip: beside the edgeless module, a module that has
+/// an edge takes every edge operator's event.
+#[test]
+fn an_edge_operator_selects_the_module_that_has_an_edge() {
+    let config = single_node_internal_event_config();
+    let mut genome = single_graph_genome_with_inputs(vec![]);
+    let mut edged = genome.nodes[0].clone();
+    edged.node_id = NodeId::new(1);
+    let BackendDef::Graph(ref mut def) = edged.backend_def else {
+        panic!("fixture must be a Graph module");
+    };
+    def.output_sinks[0].inputs.push(GraphEdge {
+        source: GraphSource::SharedMemory {
+            slot: 0,
+            previous: false,
+        },
+        weight: 0.5,
+    });
+    genome.nodes.push(edged);
+
+    let edge_operators = [
+        MutationOperator::GraphRemoveGraphEdge,
+        MutationOperator::GraphRetargetGraphEdge,
+        MutationOperator::GraphAlterGraphEdgeWeight,
+    ];
+    let mut applied = 0;
+    for seed in 0u64..2_000 {
+        let summary =
+            MutationEngine::apply_mutations(&mut genome.clone(), &config, &[0], &mut rng(seed));
+        for event in &summary.events {
+            let Some(operator) = event.operator else {
+                continue;
+            };
+            if !edge_operators.contains(&operator) {
+                continue;
+            }
+            assert!(event.outcome.is_applied(), "{event:?}");
+            assert_eq!(
+                event.target,
+                Some(NodeId::new(1)),
+                "an edge operator must reach the module that has the edge: {event:?}"
+            );
+            applied += 1;
+        }
+    }
+    assert!(applied > 0, "no seed drew an edge operator");
 }
 
 #[test]
@@ -1497,12 +1551,15 @@ fn an_event_with_no_eligible_node_records_no_target() {
     );
 }
 
+/// T13.F03 re-pin: the discarded edge operators no longer carry the edgeless
+/// module as their pick, because they never select it. The T13.F01 fact the
+/// fixture exists for — a discard survives the retry that applied — is
+/// unchanged.
 #[test]
 fn a_discarded_operator_stays_visible_when_a_later_operator_applied() {
-    // An edgeless Graph node offers the edge operators no site, so they select
-    // it and report NoApplicableTarget; the engine then retries another Graph
-    // operator, which applies. The discard is the T13.F01 fact and it must
-    // survive the retry.
+    // An edgeless Graph node offers the edge operators no site, so they are
+    // discarded without a pick; the engine then retries another Graph
+    // operator, which applies.
     let config = single_node_internal_event_config();
     let genome = single_graph_genome_with_inputs(vec![]);
     let mut seen = 0;
@@ -1530,9 +1587,9 @@ fn a_discarded_operator_stays_visible_when_a_later_operator_applied() {
                 .iter()
                 .all(
                     |&(operator, pick)| operator.domain() == MutationDomain::Graph
-                        && pick == Some(NodeId::new(0))
+                        && pick.is_none()
                 ),
-            "every discarded operator selected the edgeless module: {event:?}"
+            "no discarded operator selected the edgeless module: {event:?}"
         );
         edge_operator_discarded += u32::from(event.discarded.iter().any(|&(operator, _)| {
             matches!(
@@ -1642,7 +1699,7 @@ proptest::proptest! {
 
 #[test]
 fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
-    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, GraphSource};
+    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind};
     use crate::simulation::actions::cgp_reproduction::capture_birth_weights;
     use rand::RngCore;
     let mut original = single_graph_genome_with_inputs(vec![]);

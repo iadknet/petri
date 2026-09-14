@@ -700,24 +700,23 @@ mod tests {
         assert!(changed_use[0].routing_effect);
     }
 
+    /// T13.F03 re-pin: applicability-first selection changes the operator
+    /// mix and the RNG stream, so every lineage diverges from the T13.F02
+    /// baseline; the selected-inapplicable discard counts are now exactly
+    /// zero on both backends, which is the repair this experiment measures.
     #[test]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [19, 14, 12, 1], [372, 332]),
+            ("graph_prepared", Policy::Drift, [17, 13, 12, 2], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [19, 19, 19, 16],
-                [331, 350],
+                [17, 17, 17, 16],
+                [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [19, 15, 15, 2], [355, 228]),
-            (
-                "vm_prepared",
-                Policy::Selection,
-                [19, 19, 19, 15],
-                [297, 228],
-            ),
+            ("vm_prepared", Policy::Drift, [18, 14, 14, 1], [0, 0]),
+            ("vm_prepared", Policy::Selection, [18, 18, 18, 15], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
             let start = starts.iter().find(|start| start.name == name).unwrap();

@@ -699,27 +699,31 @@ mod tests {
         );
         let reading = &walk.recruitment[1];
         assert_eq!(reading.depth, 20);
-        assert_eq!(reading.cohort.created, 14);
-        assert_eq!(reading.cohort.dispatched(), 4);
-        // Four cohort modules were dispatched, the median four generations
+        // T13.F03 re-pin: applicability-first selection changes which
+        // operator applies at each node-internal event, so this walk's
+        // lineages differ from the pre-repair ones; the dating properties
+        // the test exists for are asserted on the new walk.
+        assert_eq!(reading.cohort.created, 8);
+        assert_eq!(reading.cohort.dispatched(), 2);
+        // Three cohort modules reached dispatch, the median four generations
         // after the birth that created them: later births, or a dispatch date
         // taken only at the closing checkpoint, would both read higher.
         assert_eq!(
             reading.time_to_first(CohortFact::Dispatch),
             &TimeToFirst {
-                reached: 4,
+                reached: 3,
                 median_generations: Some(4),
                 censored_deleted: 0,
-                censored_present: 10,
+                censored_present: 5,
             },
         );
         assert_eq!(
             reading.time_to_first(CohortFact::InternalChange),
             &TimeToFirst {
-                reached: 6,
-                median_generations: Some(6),
-                censored_deleted: 0,
-                censored_present: 8,
+                reached: 2,
+                median_generations: Some(14),
+                censored_deleted: 1,
+                censored_present: 5,
             },
         );
     }

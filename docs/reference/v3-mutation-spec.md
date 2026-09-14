@@ -178,6 +178,15 @@ Topology connection semantics (T11.F15, T11.F18):
 
 VM structural-edit contract:
 
+- Applicable targets (T13.F03): `VmDeleteInstruction` needs a program of more
+  than one instruction; the block and constant copies need a non-empty
+  program or constant pool; the gene slices need an output instruction
+  (backward) or a register-writing instruction (forward); the `ReadInput`
+  motifs need an input reference; `VmMutateSlotAddress` needs a slot
+  instruction and `VmMutatePairedSlotAddress` a slot carrying both a load and
+  a store. `VmConstantMutation`, `VmInstructionMutation` and
+  `VmInsertLoadCompareMotif` apply to any VM module, including a dormant one.
+
 - Every instruction insertion, deletion, replacement, or copy resolves old
   jump targets using the VM runtime's signed relative-target rule before the
   edit and re-encodes surviving references afterward. Insertion preserves old
@@ -202,13 +211,18 @@ VM structural-edit contract:
   `Halt` step, and the longer program can reach the step cap or exhaust energy
   where the original did not.
 - `VmInstructionRawFieldMutation` changes one encoded operand by one bounded
-  unit and never replaces the opcode. Fieldless instructions skip. The paired
+  unit and never replaces the opcode. Fieldless instructions are excluded
+  from the draw, and a program of nothing but fieldless instructions is not
+  an applicable target. The paired
   slot-address operator remains a linked-address macro; the standalone slot
   address operator moves one address by one unit.
 - Register capacity changes only between widths 1 and 32. Raw register fields
-  are canonicalized under the old width, and a shrink skips when any read or
-  write uses the removed effective register. Widths outside that range skip
-  without changing the genome.
+  are canonicalized under the old width. The direction is drawn among the
+  feasible moves only: a program in which some read or write uses the
+  register a shrink would remove can still grow, and grows instead of
+  skipping. A def with neither move available — a width outside 1..=32, or
+  width 1 or 32 with the other direction blocked — is not an applicable
+  target.
 
 ### Node-type evolvability contract
 
@@ -312,19 +326,22 @@ only their edges are evolvable.
   in f32 (the new node's output passes through `sanitize_output` like every
   compute node's, so exact reproduction holds for values already within its
   NaN→0/±1e9-clamp range), and the old edge retargeted to the new node at its
-  old weight. When the split edge's consumer is a compute node at index `c`,
+  old weight. The split draws from the splittable edges only. When the split
+  edge's consumer is a compute node at index `c`,
   the new node is inserted at index `c` and every `ComputeNode(i >= c)`
   reference is remapped to `i + 1` across all five surfaces
   (`CgpGraphBackendDef::insert_compute_node_at`, the insert-with-remap
   inverse of `remove_compute_node_at`), preserving Gauss-Seidel pass order; a
   sink/action/execute-gate consumer appends instead. A split of a backward or
-  self edge may extend convergence by at most one pass. Skips with
-  `NoApplicableTarget` when the graph has no edge, or when the picked edge's
-  source is an out-of-range `ComputeNode` (a prior removal's sentinel).
-  **Split exclusion** (T11.F08, replacing T11.F03's documented exception): it
-  also skips with `NoApplicableTarget` when the graph carries plasticity, the
-  picked edge's consumer is a sink, action slot, or execute gate, and its
-  source is an `InputLeaf` resolving to
+  self edge may extend convergence by at most one pass. An edge whose source
+  is an out-of-range `ComputeNode` (a prior removal's sentinel) is not
+  splittable and is excluded from the draw; when the graph has no splittable
+  edge the split form is not offered and `AddComputeNode` draws one of the
+  other two forms, both of which apply to any graph.
+  **Split exclusion** (T11.F08, replacing T11.F03's documented exception): an
+  edge is also unsplittable when the graph carries plasticity, the edge's
+  consumer is a sink, action slot, or execute gate, and its source is an
+  `InputLeaf` resolving to
   `DynamicIntrospection(EnergyCurrent)`. An identity node between them caches
   the value during evaluation, while the direct edge resolves it in the
   post-convergence effects context after the plasticity-cost deduction, so the
@@ -353,8 +370,9 @@ only their edges are evolvable.
   `0..input_refs.len()`, offered only when the current `sub_idx` stays within
   the candidate reference's width; `InputLeaf.sub_idx` by ±1 inward within the
   reference's width; `SharedMemory.slot` by ±1 modulo 16; `SharedMemory.previous`
-  flipped. Skips with `NoApplicableTarget` when the picked target has no valid
-  unit move.
+  flipped. Edges with no valid unit move are excluded from the draw, so the
+  operator selects only a module that has a parameterized compute node or a
+  movable edge, and never skips after selecting one.
 - `CopyComputeNode` — a growth operator; inserts a faithful copy (kind,
   inputs, plasticity) of one random compute node directly after its source
   and nothing else. The copy reads whatever its source read and is read by
@@ -378,9 +396,12 @@ only their edges are evolvable.
   Copied nodes start as dead genes: nothing reads them until a connection
   operator does, and when every edge that read a member from outside the
   cluster is retargeted to that member's copy, the copies reproduce the
-  originals. Both copy operators skip with `NoApplicableTarget` rather than
-  produce an index at or above the `u16::MAX` dangling-reference sentinel.
-- `CopyEdgeBundle` (copies edge set between surfaces)
+  originals. Both copy operators reserve room for their copies before
+  selection, so a graph that would produce an index at or above the
+  `u16::MAX` dangling-reference sentinel is not an applicable target.
+- `CopyEdgeBundle` (copies one compute node's edge set onto another; the
+  source is drawn from the nodes that have edges, and a graph with fewer than
+  two compute nodes or no edge-bearing node is not an applicable target)
 - `EnableHebbian` (add `PlasticityConfig` to a non-plasticity compute node)
 - `DisableHebbian` (remove `PlasticityConfig` from a plasticity compute node)
 - `MutateHebbianRule` (change the `HebbianRule` variant)
@@ -462,8 +483,12 @@ for each selected event:
   1) choose mutation domain
   2) choose operator (may fail under complexity restriction if the
      domain has no eligible operators — skip with NoApplicableTarget)
-  2b) select mutation target with executed and reachability bias (Section 4.3)
-  3) run domain pre-guards (construction constraints)
+  2b) build the operator's applicable set: the nodes carrying a site this
+      operator can act on (Section 5 pre-guards). An empty set skips with
+      NoApplicableTarget before any draw, so the event records no target
+  2c) select mutation target from that applicable set with executed and
+      reachability bias (Section 4.3)
+  3) run the remaining domain pre-guards (construction constraints)
   4) snapshot local mutation target (or full genome)
   5) apply candidate mutation
   6) run ParseabilityGate
@@ -490,6 +515,13 @@ Selection randomization rules (internal to `MutationEngine`):
   select VM, graph, or input-reference mutation with equal probability.
 - Select operators with their existing weights, preserving eligibility and
   pressure handling.
+- A node-internal operator (VM, Graph) selects from the nodes on which it can
+  actually apply, not from every node of its backend: its applicability
+  predicate is the same site enumeration the operator draws from, so a
+  selected node never reports `NoApplicableTarget` afterwards (T13.F03). An
+  operator with no applicable node anywhere in the genome is discarded for
+  the event with no target recorded, and the engine retries the domain's
+  other operators as before.
 - Operator-specific mutation fields are randomized per event according to that
   operator's mutator implementation.
 - Canonical owner for mutation config keys/defaults: `v3-runtime-config-spec.md`.
@@ -508,6 +540,12 @@ Complexity pressure gate:
 Mutation target selection runs two layers over the operator's eligible set:
 an executed layer (T11.F17) at `mutation.executed_bias`, then the established
 reachability layer at the domain's `ReachableBiasConfig` threshold.
+
+For VM and Graph operators the eligible set is the operator's applicable set
+— the backend's nodes filtered by the operator's applicability predicate
+(T13.F03) — so both biases apply within the modules that carry a suitable
+site. For Topology, and for InputRef `Add`/`Remove`/`Swap`, the eligible set
+is unchanged.
 
 Executed layer (`TargetSelector::select`), applied in all four domains:
 1. An empty eligible set selects nothing.
@@ -587,7 +625,15 @@ Prevent obviously invalid events before apply, for example:
 - Do not choose mutation targets from empty candidate sets.
 - Keep type-level payload construction valid for the target domain.
 
-If no target can be selected, event is skipped with `NoApplicableTarget`.
+Every VM and Graph operator's pre-guard is an applicability predicate over one
+node, evaluated before selection: it names the sites the operator will draw
+from, and application draws only from those sites (T13.F03). The predicate is
+the single source of truth for an operator's sites on a node — a new or
+extended operator adds its sites to the predicate rather than failing after
+the draw.
+
+If no node is applicable, the event is skipped with `NoApplicableTarget` and
+records no target.
 
 ### Post-apply parseability check (global)
 
