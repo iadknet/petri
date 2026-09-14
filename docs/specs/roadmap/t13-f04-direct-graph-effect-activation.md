@@ -44,9 +44,10 @@ already write.
   surfaces on a zero-compute def and `random_graph_source` draws input-leaf
   and shared-memory sources when `compute_count == 0`
   (`mutation/graph/operators.rs`), InputRef `Add` supplies the leaves, and
-  `AddRouteTarget` creates one such genome directly: its fresh blank Graph
-  detour carries a weight-1 router-gate edge whose write the old early return
-  skipped, so the branch it wrote was never steered by its own gate.
+  `AddRouteTarget` writes its weight-1 router-gate edge onto the selected
+  source node (`mutation/topology/routing.rs`): when that node is a
+  zero-compute Graph, such as an earlier blank detour, the gate write was
+  skipped and the branch it wrote was never steered by its own gate.
   The [research note](../../strategy/neutral-module-recruitment-research-2026-09-08.md)
   records the inspection.
 - The repair. One derived predicate on `CgpGraphBackendDef` — true when
@@ -172,8 +173,7 @@ transmission, a sensory or memory signal wired straight onto an effector; it
 reaches creatures through the body (the executor reads the genome that birth
 mutation already writes) and through no sensor. Expected compute cost: small
 and positive. Zero-compute Graph modules with a wired effect surface exist in
-evolved populations where a blank detour gained an edge and in every
-`AddRouteTarget` detour, so the affected class is common; each such visit
+evolved populations only where a blank detour gained an edge; each such visit
 now pays one node-equivalent charge, counts one `graph_relax_iters`, and runs
 one effects pass. No severe allowance, threshold change or epoch re-pin is
 predeclared. Both profiles compare against the series index at run time: gate
@@ -193,7 +193,7 @@ experiment under 120 s, goal profile under 15 minutes.
 | T13.F02 in-report Graph blank-start discovery fractions | Move; reported as consequences, no floor or superiority claim. |
 | Other normalized counters, wall/creature-tick, neighborhood, diversity and cognition indicators | No predeclared direction; evolved populations differ from the first affected visit on. |
 
-**Measured verdict.** Gate: exit 0, `severe=false` against both references, all counters `ok`. Goal: exit 0, `severe=false` against the single predeclared reference, all caps held, but drift changed/all births at depth 2,000 fell below the 0.005 floor in all three worlds (0.0035/0.0045/0.0035) and Graph `contributing` stayed at 0 in 5 of 6 world/depth cells, reported as facts without remediation.
+**Measured verdict.** Gate: exit 0, `severe=false` against both references, all counters `ok`. Goal: exit 0, `severe=false` against the single predeclared reference, all caps held, but drift changed/all births at depth 2,000 fell below the 0.005 floor in all three worlds (0.0035/0.0045/0.0035, walks not identical to T13.F03's), Graph `contributing` stayed at 0 in 5 of 6 world/depth cells, and `graph_relax_iters` per creature-tick moved down (gate -0.208%, goal -0.718%) against the predeclared "up"; the summary schema has no `graph_compute` energy counter. Reported as facts without remediation.
 
 - Summaries: [gate](../../progress/features/t13-f04-direct-graph-effect-activation.json),
   [goal](../../progress/features/t13-f04-direct-graph-effect-activation-goal.json).
