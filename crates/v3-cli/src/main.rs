@@ -356,6 +356,7 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
                 food_coverage: args.food_coverage,
                 neighborhood: NeighborhoodSizes::default(),
                 drift: Default::default(),
+                recruitment: v3_core::neighborhood::recruitment_paths::Sizes::PRODUCTION,
             };
             if params.recipe.is_some() {
                 let config = bench::build_config(&params);
