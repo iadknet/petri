@@ -854,7 +854,13 @@ fn neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births() {
     config.world.width = 16;
     config.world.height = 16;
     config.population.initial_creatures = 6;
-    let sim = seed_simulation(config.clone(), 11);
+    let mut sim = seed_simulation(config.clone(), 11);
+    // Founders are all generation 0, which no additive tally can tell from a
+    // product; give the population distinct positive generations so the sum
+    // is observable.
+    for (index, creature) in sim.creatures.values_mut().enumerate() {
+        creature.generation = index as u64 + 2;
+    }
     let battery = Battery::generate(config.world.food.types.len());
     let context = EvalContext::from_config(&config);
     let sizes = NeighborhoodSizes {
@@ -979,6 +985,11 @@ fn neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births() {
             actual.executed_nodes
         ),
         sums
+    );
+    assert!(
+        sums.0 >= 2 + 3 + 4 + 5,
+        "four distinct generations from 2.. sum to at least 14, got {}",
+        sums.0
     );
     assert_eq!(actual.mean_generation, fraction_or_undefined(sums.0, 4));
     assert_eq!(actual.mean_genome_size, fraction_or_undefined(sums.1, 4));
