@@ -1,7 +1,9 @@
 use rand::Rng;
 
 use crate::config::MutationConfig;
-use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::contracts::InputReference;
+use crate::creature::genome::analysis::{vm_is_output_instruction, vm_register_write};
+use crate::creature::genome::{BackendDef, CreatureGenome, VmBackendDef};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
@@ -126,14 +128,69 @@ impl VmOperator {
     }
 }
 
+impl VmOperator {
+    /// Whether this operator has a site to apply to on one VM-backend node.
+    /// Each arm delegates to the same enumeration the operator draws its
+    /// target from, so a node this accepts never skips at application.
+    fn applies_to(self, vm: &VmBackendDef, input_refs: &[InputReference]) -> bool {
+        match self {
+            // Infallible on any VM def: the constant pool is seeded when
+            // empty, instruction mutation inserts into an empty program, the
+            // load/compare motif needs no existing site, and an insert-only
+            // splice always repairs.
+            Self::VmConstantMutation
+            | Self::VmInstructionMutation
+            | Self::VmInsertLoadCompareMotif => true,
+            Self::VmDeleteInstruction => vm.program.len() > 1,
+            Self::VmRegisterCountMutation => {
+                let (grow, shrink) = register_count_moves(vm);
+                grow || shrink
+            }
+            Self::VmInstructionRawFieldMutation => vm.program.iter().any(has_mutable_field),
+            Self::VmCopyInstructionBlock | Self::VmCopyInstructionBlockRemapped => {
+                !vm.program.is_empty()
+            }
+            Self::VmCopyConstantBlock => !vm.constants.is_empty(),
+            Self::VmCopyGeneBackwardSlice => vm.program.iter().any(vm_is_output_instruction),
+            Self::VmCopyGeneForwardSlice => vm
+                .program
+                .iter()
+                .any(|instr| vm_register_write(instr).is_some()),
+            Self::VmInsertReadStoreMotif | Self::VmInsertReadBidMotif => !input_refs.is_empty(),
+            Self::VmMutateSlotAddress => vm.program.iter().any(is_slot_instruction),
+            Self::VmMutatePairedSlotAddress => !paired_slot_groups(&vm.program).is_empty(),
+        }
+    }
+}
+
 /// VM domain mutator.
 pub struct VmMutator;
 
 impl VmMutator {
+    /// The VM-backend node indices `op` can apply to, ascending.
+    ///
+    /// Selection draws from this set rather than from every VM-backend node,
+    /// so a refinement operator reaches a module that has a suitable site
+    /// instead of landing on one that does not (T13.F03).
+    pub(crate) fn applicable_indices(genome: &CreatureGenome, op: VmOperator) -> Vec<usize> {
+        genome
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| match &n.backend_def {
+                BackendDef::Vm(vm) => op.applies_to(vm, &n.input_refs),
+                BackendDef::Graph(_) => false,
+            })
+            .map(|(i, _)| i)
+            .collect()
+    }
+
     /// Apply a VM operator to the genome.
     ///
     /// Returns `Ok(TargetReachability)` on success, or `Err(MutationSkipReason::NoApplicableTarget)`
-    /// if the genome contains no VM-backend nodes.
+    /// if no VM-backend node has a site this operator can apply to. The skip
+    /// happens before the draw, so the engine records it as no-eligible-node
+    /// with no selected target.
     pub fn apply(
         genome: &mut CreatureGenome,
         op: VmOperator,
@@ -141,22 +198,26 @@ impl VmMutator {
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        // Pre-guard: must have at least one VM-backend node.
-        let vm_indices: Vec<usize> = genome
-            .nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, n)| matches!(n.backend_def, BackendDef::Vm(_)))
-            .map(|(i, _)| i)
-            .collect();
-        if vm_indices.is_empty() {
+        let applicable = Self::applicable_indices(genome, op);
+        if applicable.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
         let (node_idx, reachability) = targets
-            .select(&vm_indices, rng)
+            .select(&applicable, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        let result = match op {
+        Self::apply_to_node(genome, op, node_idx, rng, config).map(|()| reachability)
+    }
+
+    /// Dispatch `op` onto one already-selected node.
+    pub(crate) fn apply_to_node(
+        genome: &mut CreatureGenome,
+        op: VmOperator,
+        node_idx: usize,
+        rng: &mut impl Rng,
+        config: &MutationConfig,
+    ) -> Result<(), MutationSkipReason> {
+        match op {
             VmOperator::VmConstantMutation => apply_constant_mutation(genome, node_idx, rng),
             VmOperator::VmInstructionMutation => apply_instruction_mutation(genome, node_idx, rng),
             VmOperator::VmDeleteInstruction => apply_delete_instruction(genome, node_idx, rng),
@@ -190,8 +251,7 @@ impl VmMutator {
             VmOperator::VmMutatePairedSlotAddress => {
                 apply_mutate_paired_slot_address(genome, node_idx, rng)
             }
-        };
-        result.map(|()| reachability)
+        }
     }
 }
 

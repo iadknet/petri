@@ -2540,8 +2540,12 @@ fn register_fields(instruction: &VmInstruction) -> Vec<u8> {
 }
 
 proptest! {
+    /// T13.F03 re-pin: a program that uses the register a shrink would remove
+    /// no longer skips; the direction draw offers only the feasible move, so
+    /// the operator grows instead. Canonicalization of every register field
+    /// is unchanged in both directions.
     #[test]
-    fn register_count_shrink_canonicalizes_every_register_field_or_skips_atomically(raw in any::<u8>()) {
+    fn register_count_shrink_canonicalizes_every_register_field_or_grows_instead(raw in any::<u8>()) {
         let expected = raw % 4;
         for instruction in register_bearing_instructions(raw) {
             let register_field_count = register_fields(&instruction).len();
@@ -2550,33 +2554,29 @@ proptest! {
                 unreachable!("fixture must contain a VM");
             };
             vm.register_count = 4;
-            let mut found_shrink = false;
+            let mut found_move = false;
             for seed in 0..128 {
                 let mut genome = original.clone();
-                let before = genome.clone();
                 let mut r = rng(seed);
                 let result = apply_register_count_mutation(&mut genome, 0, &mut r);
+                prop_assert_eq!(result, Ok(()));
                 let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
                     unreachable!("fixture must remain a VM");
                 };
                 if expected == 3 {
-                    if result != Err(MutationSkipReason::NoApplicableTarget) {
-                        continue;
-                    }
-                    found_shrink = true;
-                    prop_assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
-                    prop_assert_eq!(genome, before);
-                } else {
-                    if vm.register_count != 3 {
-                        continue;
-                    }
-                    found_shrink = true;
-                    prop_assert_eq!(result, Ok(()));
-                    prop_assert_eq!(register_fields(&vm.program[0]), vec![expected; register_field_count]);
+                    // The removed register is in use: only growth is offered.
+                    prop_assert_eq!(vm.register_count, 5);
+                } else if vm.register_count != 3 {
+                    continue;
                 }
+                found_move = true;
+                prop_assert_eq!(
+                    register_fields(&vm.program[0]),
+                    vec![expected; register_field_count]
+                );
                 break;
             }
-            prop_assert!(found_shrink, "a bounded seed search must find a decrement");
+            prop_assert!(found_move, "a bounded seed search must find the feasible move");
         }
     }
 }
@@ -2595,8 +2595,11 @@ fn register_count_result_for_seed(
     (genome, result)
 }
 
+/// T13.F03 re-pin: a program using the register a shrink would remove grows
+/// on every seed instead of skipping, because the direction is drawn only
+/// among the feasible moves.
 #[test]
-fn register_count_direction_seeds_distinguish_growth_from_shrink() {
+fn register_count_grows_when_shrink_is_blocked_and_shrinks_otherwise() {
     let neutral = vec![VmInstruction::Move { dst: 0, src: 0 }];
     let shrink_seed = (0..128)
         .find(|&seed| {
@@ -2613,15 +2616,19 @@ fn register_count_direction_seeds_distinguish_growth_from_shrink() {
         })
         .expect("bounded calibration must find an increment seed");
 
+    // r7 canonicalizes to r3, the register a shrink from width 4 removes, so
+    // the shrink is not offered and even the shrink seed grows.
     let raw7 = vec![VmInstruction::Move { dst: 7, src: 7 }];
     let (blocked, blocked_result) = register_count_result_for_seed(raw7.clone(), shrink_seed);
-    assert_eq!(blocked_result, Err(MutationSkipReason::NoApplicableTarget));
-    let mut expected_blocked = slot_program_genome(raw7.clone());
-    let BackendDef::Vm(expected_vm) = &mut expected_blocked.nodes[0].backend_def else {
+    assert_eq!(blocked_result, Ok(()));
+    let BackendDef::Vm(blocked_vm) = &blocked.nodes[0].backend_def else {
         unreachable!();
     };
-    expected_vm.register_count = 4;
-    assert_eq!(blocked, expected_blocked);
+    assert_eq!(blocked_vm.register_count, 5);
+    assert_eq!(
+        blocked_vm.program,
+        vec![VmInstruction::Move { dst: 3, src: 3 }]
+    );
 
     let (grown, grown_result) = register_count_result_for_seed(raw7, grow_seed);
     assert_eq!(grown_result, Ok(()));
@@ -2647,17 +2654,18 @@ fn register_count_direction_seeds_distinguish_growth_from_shrink() {
     );
 }
 
+/// T13.F03 re-pin: a blocked shrink is no longer a skip. The node is only
+/// selected for a move it can make, so the operator grows on every seed and
+/// the effective register identity of the permitted shrink is unchanged.
 #[test]
-fn register_count_shrink_preserves_or_skips_effective_register_identity() {
+fn register_count_grows_when_shrink_is_blocked_and_preserves_register_identity() {
     let mut blocked = slot_program_genome(vec![VmInstruction::Move { dst: 7, src: 6 }]);
     let BackendDef::Vm(vm) = &mut blocked.nodes[0].backend_def else {
         panic!("expected VM backend");
     };
     vm.register_count = 4;
-    let mut saw_blocked_shrink = false;
     for seed in 0..128 {
         let mut genome = blocked.clone();
-        let before = genome.clone();
         let mut r = rng(seed);
         let result = VmMutator::apply(
             &mut genome,
@@ -2666,13 +2674,15 @@ fn register_count_shrink_preserves_or_skips_effective_register_identity() {
             &mut r,
             &MutationConfig::default(),
         );
-        if result == Err(MutationSkipReason::NoApplicableTarget) {
-            assert_eq!(genome, before, "blocked shrink must be atomic");
-            saw_blocked_shrink = true;
-            break;
-        }
+        assert!(
+            result.is_ok(),
+            "seed {seed}: blocked shrink must grow, not skip"
+        );
+        let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+            panic!("expected VM backend");
+        };
+        assert_eq!(vm.register_count, 5, "seed {seed}: only growth is feasible");
     }
-    assert!(saw_blocked_shrink, "expected a seeded decrement attempt");
 
     let mut permitted = slot_program_genome(vec![VmInstruction::Move { dst: 6, src: 6 }]);
     let BackendDef::Vm(vm) = &mut permitted.nodes[0].backend_def else {

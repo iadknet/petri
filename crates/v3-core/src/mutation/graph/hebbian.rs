@@ -130,6 +130,45 @@ const ALL_CHANNELS: [OutcomeChannel; 4] = [
     OutcomeChannel::OffspringSuccess,
 ];
 
+// ─── Applicability predicates ───────────────────────────────────────────────
+//
+// The per-node predicates the plasticity operators draw their target from.
+// `GraphMutator::apply` filters Graph-backend nodes by [`any_node`] over the
+// same predicate, so an operator is never selected onto a module whose
+// compute nodes it cannot touch.
+
+/// `EnableHebbian`: a node with edges to learn on and no plasticity yet.
+pub(super) fn can_enable_hebbian(node: &ComputeNode) -> bool {
+    node.plasticity.is_none() && !node.inputs.is_empty()
+}
+
+/// `DisableHebbian`, `MutateHebbianRule`, `MutateHebbianRate`,
+/// `ToggleHebbianLamarckian`: a node that already carries plasticity.
+pub(super) fn is_plastic(node: &ComputeNode) -> bool {
+    node.plasticity.is_some()
+}
+
+/// `EnableRewardModulation`: a plastic node without modulation.
+pub(super) fn can_enable_reward_modulation(node: &ComputeNode) -> bool {
+    node.plasticity
+        .as_ref()
+        .is_some_and(|p| p.modulation.is_none())
+}
+
+/// `DisableRewardModulation`, `MutateRewardSource`, `MutateTraceDecay`: a
+/// plastic node that carries modulation.
+pub(super) fn is_reward_modulated(node: &ComputeNode) -> bool {
+    node.plasticity
+        .as_ref()
+        .is_some_and(|p| p.modulation.is_some())
+}
+
+/// Whether any compute node in `def` matches `predicate`: the def-level form
+/// of the predicates above, and what [`select_eligible`] needs to succeed.
+pub(super) fn any_node(def: &CgpGraphBackendDef, predicate: fn(&ComputeNode) -> bool) -> bool {
+    def.compute_nodes.iter().any(predicate)
+}
+
 /// Pick a random compute node matching `predicate`. Returns its index or
 /// `NoApplicableTarget` if none match. Two-pass count-then-select avoids
 /// allocating a Vec of eligible indices.
@@ -157,11 +196,7 @@ pub(crate) fn enable_hebbian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(
-        &def.compute_nodes,
-        |n| n.plasticity.is_none() && !n.inputs.is_empty(),
-        rng,
-    )?;
+    let idx = select_eligible(&def.compute_nodes, can_enable_hebbian, rng)?;
 
     let rule = ALL_RULES[rng.gen_range(0..ALL_RULES.len())];
     def.compute_nodes[idx].plasticity = Some(PlasticityConfig {
@@ -179,7 +214,7 @@ pub(crate) fn disable_hebbian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, |n| n.plasticity.is_some(), rng)?;
+    let idx = select_eligible(&def.compute_nodes, is_plastic, rng)?;
     def.compute_nodes[idx].plasticity = None;
     Ok(())
 }
@@ -189,7 +224,7 @@ pub(crate) fn mutate_hebbian_rule_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, |n| n.plasticity.is_some(), rng)?;
+    let idx = select_eligible(&def.compute_nodes, is_plastic, rng)?;
 
     if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
         let others: Vec<HebbianRule> = ALL_RULES
@@ -212,7 +247,7 @@ pub(crate) fn mutate_hebbian_rate_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, |n| n.plasticity.is_some(), rng)?;
+    let idx = select_eligible(&def.compute_nodes, is_plastic, rng)?;
 
     if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
         if cfg.learning_rate.abs() > 0.01 {
@@ -230,7 +265,7 @@ pub(crate) fn toggle_hebbian_lamarckian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(&def.compute_nodes, |n| n.plasticity.is_some(), rng)?;
+    let idx = select_eligible(&def.compute_nodes, is_plastic, rng)?;
 
     if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
         cfg.lamarckian = !cfg.lamarckian;
@@ -243,15 +278,7 @@ pub(crate) fn enable_reward_modulation_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(
-        &def.compute_nodes,
-        |n| {
-            n.plasticity
-                .as_ref()
-                .is_some_and(|p| p.modulation.is_none())
-        },
-        rng,
-    )?;
+    let idx = select_eligible(&def.compute_nodes, can_enable_reward_modulation, rng)?;
 
     if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
         let channel = ALL_CHANNELS[rng.gen_range(0..ALL_CHANNELS.len())];
@@ -268,15 +295,7 @@ pub(crate) fn disable_reward_modulation_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(
-        &def.compute_nodes,
-        |n| {
-            n.plasticity
-                .as_ref()
-                .is_some_and(|p| p.modulation.is_some())
-        },
-        rng,
-    )?;
+    let idx = select_eligible(&def.compute_nodes, is_reward_modulated, rng)?;
 
     if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
         cfg.modulation = None;
@@ -289,15 +308,7 @@ pub(crate) fn mutate_reward_source_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(
-        &def.compute_nodes,
-        |n| {
-            n.plasticity
-                .as_ref()
-                .is_some_and(|p| p.modulation.is_some())
-        },
-        rng,
-    )?;
+    let idx = select_eligible(&def.compute_nodes, is_reward_modulated, rng)?;
 
     if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
         if let Some(ref mut modulation) = cfg.modulation {
@@ -322,15 +333,7 @@ pub(crate) fn mutate_trace_decay_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let idx = select_eligible(
-        &def.compute_nodes,
-        |n| {
-            n.plasticity
-                .as_ref()
-                .is_some_and(|p| p.modulation.is_some())
-        },
-        rng,
-    )?;
+    let idx = select_eligible(&def.compute_nodes, is_reward_modulated, rng)?;
 
     if let Some(ref mut cfg) = def.compute_nodes[idx].plasticity {
         if let Some(ref mut modulation) = cfg.modulation {

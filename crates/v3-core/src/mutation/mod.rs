@@ -10,6 +10,9 @@ pub mod topology;
 pub mod types;
 pub mod vm;
 
+#[cfg(test)]
+mod applicability_tests;
+
 pub use engine::MutationEngine;
 pub use types::{
     MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationEventRecord,

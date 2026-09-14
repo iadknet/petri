@@ -270,6 +270,40 @@ pub(crate) enum EdgeSurface {
     ExecuteGate,
 }
 
+/// Every edge site on the def, in the canonical surface order
+/// `pick_random_edge` walks: compute inputs, sink inputs, per action slot
+/// gate then param inputs, execute gate. The single enumeration the
+/// edge-site applicability predicates and the operators that draw from
+/// filtered edge sets both read.
+fn edge_sites(def: &CgpGraphBackendDef) -> impl Iterator<Item = (EdgeSurface, usize)> + '_ {
+    let compute = def.compute_nodes.iter().enumerate().flat_map(|(i, node)| {
+        (0..node.inputs.len()).map(move |edge| (EdgeSurface::ComputeInput(i), edge))
+    });
+    let sinks = def.output_sinks.iter().enumerate().flat_map(|(i, sink)| {
+        (0..sink.inputs.len()).map(move |edge| (EdgeSurface::SinkInput(i), edge))
+    });
+    let actions = def.action_bank.iter().enumerate().flat_map(|(i, slot)| {
+        (0..slot.gate_inputs.len())
+            .map(move |edge| (EdgeSurface::ActionGate(i), edge))
+            .chain(
+                (0..slot.param_inputs.len()).map(move |edge| (EdgeSurface::ActionParam(i), edge)),
+            )
+    });
+    let gate = (0..def.execute_gate.inputs.len()).map(|edge| (EdgeSurface::ExecuteGate, edge));
+    compute.chain(sinks).chain(actions).chain(gate)
+}
+
+/// Read-only twin of [`get_edge_vec_mut`].
+fn edge_vec(def: &CgpGraphBackendDef, surface: EdgeSurface) -> &[GraphEdge] {
+    match surface {
+        EdgeSurface::ComputeInput(i) => &def.compute_nodes[i].inputs,
+        EdgeSurface::SinkInput(i) => &def.output_sinks[i].inputs,
+        EdgeSurface::ActionGate(i) => &def.action_bank[i].gate_inputs,
+        EdgeSurface::ActionParam(i) => &def.action_bank[i].param_inputs,
+        EdgeSurface::ExecuteGate => &def.execute_gate.inputs,
+    }
+}
+
 /// Count total edges across all 5 surfaces.
 fn total_edge_count(def: &CgpGraphBackendDef) -> usize {
     let mut count = 0;
@@ -378,13 +412,21 @@ pub(crate) fn get_edge_vec_mut(
 /// NEAT-style insertion into an existing edge that reproduces the edge's
 /// prior behavior exactly). None of the three forms sprays edges into the
 /// output surfaces; only the split form retargets the one edge it splits.
+///
+/// The form is drawn among the forms this def admits: disconnected and
+/// bootstrap append to any def (so a blank module keeps its growth reach),
+/// while split is offered only when the def has a splittable edge and room
+/// for the identity node.
 pub(crate) fn add_compute_node(
     def: &mut CgpGraphBackendDef,
     input_refs: &[InputReference],
     config: &MutationConfig,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    match rng.gen_range(0u8..3) {
+    let can_split = check_compute_node_capacity(def, 1).is_ok()
+        && splittable_edge_sites(def, input_refs).next().is_some();
+    let forms = if can_split { 3u8 } else { 2u8 };
+    match rng.gen_range(0u8..forms) {
         0 => add_disconnected_node(def, rng),
         1 => add_bootstrap_node(def, input_refs, config, rng),
         _ => split_existing_edge(def, input_refs, rng),
@@ -458,21 +500,12 @@ pub(crate) fn split_existing_edge(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     check_compute_node_capacity(def, 1)?;
-    let (surface, edge_idx) =
-        pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let old_source = get_edge_vec_mut(def, surface)[edge_idx].source;
-    if let GraphSource::ComputeNode(idx) = old_source {
-        if idx as usize >= def.compute_nodes.len() {
-            // Dangling reference (e.g. a prior removal's sentinel): never a
-            // split target.
-            return Err(MutationSkipReason::NoApplicableTarget);
-        }
-    }
-    if !matches!(surface, EdgeSurface::ComputeInput(_))
-        && is_excluded_introspection_split(def, input_refs, old_source)
-    {
+    let sites: Vec<(EdgeSurface, usize)> = splittable_edge_sites(def, input_refs).collect();
+    if sites.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
+    let (surface, edge_idx) = sites[rng.gen_range(0..sites.len())];
+    let old_source = edge_vec(def, surface)[edge_idx].source;
 
     if let EdgeSurface::ComputeInput(consumer_idx) = surface {
         // Insert an empty placeholder first so the global index remap (which
@@ -504,6 +537,27 @@ pub(crate) fn split_existing_edge(
         get_edge_vec_mut(def, surface)[edge_idx].source = GraphSource::ComputeNode(new_idx);
     }
     Ok(())
+}
+
+/// The edges `split_existing_edge` can split: every edge except one whose
+/// `ComputeNode` source dangles (a prior removal's sentinel) and one whose
+/// shape a split cannot preserve
+/// ([`is_excluded_introspection_split`], which only applies off the compute
+/// surfaces).
+fn splittable_edge_sites<'a>(
+    def: &'a CgpGraphBackendDef,
+    input_refs: &'a [InputReference],
+) -> impl Iterator<Item = (EdgeSurface, usize)> + 'a {
+    edge_sites(def).filter(move |&(surface, edge_idx)| {
+        let source = edge_vec(def, surface)[edge_idx].source;
+        if let GraphSource::ComputeNode(idx) = source {
+            if idx as usize >= def.compute_nodes.len() {
+                return false;
+            }
+        }
+        matches!(surface, EdgeSurface::ComputeInput(_))
+            || !is_excluded_introspection_split(def, input_refs, source)
+    })
 }
 
 /// True for the one edge shape a split cannot preserve (T11.F08, replacing
@@ -604,6 +658,10 @@ fn check_compute_node_capacity(
     Ok(())
 }
 
+/// The largest random-walk cluster `copy_cgp_subgraph` can build, and so the
+/// capacity `can_copy_subgraph` must reserve.
+const MAX_SUBGRAPH_CLUSTER: usize = 4;
+
 /// Copy a random-walk cluster of 2-4 compute nodes (CopySubgraph).
 /// Internal edges remapped, external edges preserved. Copies not wired to sinks.
 pub(crate) fn copy_cgp_subgraph(
@@ -614,7 +672,9 @@ pub(crate) fn copy_cgp_subgraph(
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let seed = rng.gen_range(0..def.compute_nodes.len());
-    let target_size = rng.gen_range(2..=4).min(def.compute_nodes.len());
+    let target_size = rng
+        .gen_range(2..=MAX_SUBGRAPH_CLUSTER)
+        .min(def.compute_nodes.len());
 
     // Random walk to build cluster.
     let mut cluster = vec![seed];
@@ -743,7 +803,19 @@ pub(crate) fn alter_edge_weight_in_def(
     Ok(())
 }
 
-/// Copy all edges from one compute node to another.
+/// The compute nodes `copy_edge_bundle` can copy a bundle from: those that
+/// have at least one edge to copy.
+fn bundle_source_indices(def: &CgpGraphBackendDef) -> impl Iterator<Item = usize> + '_ {
+    def.compute_nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, node)| !node.inputs.is_empty())
+        .map(|(i, _)| i)
+}
+
+/// Copy all edges from one compute node to another. The source is drawn
+/// from [`bundle_source_indices`], so a def with an edge-bearing node never
+/// skips here.
 pub(crate) fn copy_edge_bundle(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
@@ -751,10 +823,11 @@ pub(crate) fn copy_edge_bundle(
     if def.compute_nodes.len() < 2 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let source = rng.gen_range(0..def.compute_nodes.len());
-    if def.compute_nodes[source].inputs.is_empty() {
+    let sources: Vec<usize> = bundle_source_indices(def).collect();
+    if sources.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
+    let source = sources[rng.gen_range(0..sources.len())];
     let mut target = rng.gen_range(0..def.compute_nodes.len() - 1);
     if target >= source {
         target += 1;
@@ -931,14 +1004,34 @@ fn apply_edge_field_move(source: &mut GraphSource, mv: EdgeFieldMove) {
     }
 }
 
+/// The edge sites `raw_field_mutation` can move a field on: those whose
+/// `GraphSource` has at least one valid unit move.
+fn raw_field_edge_sites<'a>(
+    def: &'a CgpGraphBackendDef,
+    input_refs: &'a [InputReference],
+    config: &'a MutationConfig,
+) -> impl Iterator<Item = (EdgeSurface, usize)> + 'a {
+    let compute_count = def.compute_nodes.len() as u16;
+    edge_sites(def).filter(move |&(surface, edge_idx)| {
+        !valid_edge_field_moves(
+            edge_vec(def, surface)[edge_idx].source,
+            compute_count,
+            input_refs,
+            config,
+        )
+        .is_empty()
+    })
+}
+
 /// Change exactly one field of one target by one unit: a parameterized
 /// compute node's parameter (the existing `MutateGraphOperatorParam` step),
 /// or one field of one edge's `GraphSource` (a `ComputeNode` index, an
 /// `InputLeaf` ref or sub index, a `SharedMemory` slot, or its previous-tick
 /// flag). The target and, for edges, the field are both selected uniformly
 /// among the moves that are valid for the picked target; the source variant
-/// is never replaced. Skips with `NoApplicableTarget` when the picked target
-/// has no valid unit move.
+/// is never replaced. Edges with no valid unit move are excluded from the
+/// draw by [`raw_field_edge_sites`], so a def [`has_raw_field_site`] accepts
+/// never skips here.
 pub(crate) fn raw_field_mutation(
     def: &mut CgpGraphBackendDef,
     input_refs: &[InputReference],
@@ -950,8 +1043,8 @@ pub(crate) fn raw_field_mutation(
         .iter()
         .filter(|n| is_compute_parameterized(&n.kind))
         .count();
-    let edge_count = total_edge_count(def);
-    let total = param_count + edge_count;
+    let edges: Vec<(EdgeSurface, usize)> = raw_field_edge_sites(def, input_refs, config).collect();
+    let total = param_count + edges.len();
 
     if total == 0 {
         return Err(MutationSkipReason::NoApplicableTarget);
@@ -962,20 +1055,96 @@ pub(crate) fn raw_field_mutation(
         return mutate_compute_param(def, rng);
     }
 
-    let (surface, edge_idx) =
-        pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let source = get_edge_vec_mut(def, surface)[edge_idx].source;
+    let (surface, edge_idx) = edges[pick - param_count];
+    let source = edge_vec(def, surface)[edge_idx].source;
     let compute_count = def.compute_nodes.len() as u16;
     let moves = valid_edge_field_moves(source, compute_count, input_refs, config);
-    if moves.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
     let chosen = moves[rng.gen_range(0..moves.len())];
     apply_edge_field_move(&mut get_edge_vec_mut(def, surface)[edge_idx].source, chosen);
     if get_edge_vec_mut(def, surface)[edge_idx].source != source {
         reset_inherited_edge(def, surface, edge_idx);
     }
     Ok(())
+}
+
+// ─── Applicability predicates ───────────────────────────────────────────────
+//
+// One predicate per Graph operator, over a single node's backend def (and
+// its `input_refs` where the operator reads them). `GraphMutator::apply`
+// filters the Graph-backend node indices by the operator's predicate before
+// the biased draw, so an operator is never selected onto a node it cannot
+// apply to. Each predicate tests exactly the site enumeration its operator
+// draws from, so a predicate that accepts a node guarantees application
+// succeeds on it.
+
+/// `AlterGraphEdgeWeight`, `RetargetGraphEdge`, `RemoveGraphEdge`: any edge
+/// on any surface is a site, which is exactly what `pick_random_edge` draws.
+pub(super) fn has_edge_site(def: &CgpGraphBackendDef) -> bool {
+    total_edge_count(def) > 0
+}
+
+/// `SwapGraphOperator`, `RemoveInternalGraphNode`: any compute node.
+pub(super) fn has_compute_node(def: &CgpGraphBackendDef) -> bool {
+    !def.compute_nodes.is_empty()
+}
+
+/// `MutateGraphOperatorParam`: a compute node carrying a float parameter,
+/// the set `mutate_compute_param` draws from.
+pub(super) fn has_parameterized_compute_node(def: &CgpGraphBackendDef) -> bool {
+    def.compute_nodes
+        .iter()
+        .any(|node| is_compute_parameterized(&node.kind))
+}
+
+/// `MutateActionSlotBehavior`: any action slot.
+pub(super) fn has_action_slot(def: &CgpGraphBackendDef) -> bool {
+    !def.action_bank.is_empty()
+}
+
+/// `CopyInternalNode`: a compute node to copy, with room for the copy.
+pub(super) fn can_copy_compute_node(def: &CgpGraphBackendDef) -> bool {
+    !def.compute_nodes.is_empty() && check_compute_node_capacity(def, 1).is_ok()
+}
+
+/// `CopySubgraph`: at least two compute nodes to walk, with room for the
+/// largest cluster the walk can build (`target_size` is capped at 4 and at
+/// the node count).
+pub(super) fn can_copy_subgraph(def: &CgpGraphBackendDef) -> bool {
+    def.compute_nodes.len() >= 2
+        && check_compute_node_capacity(def, MAX_SUBGRAPH_CLUSTER.min(def.compute_nodes.len()))
+            .is_ok()
+}
+
+/// `CopyEdgeBundle`: a compute node with edges to copy, plus a second node
+/// to receive them.
+pub(super) fn can_copy_edge_bundle(def: &CgpGraphBackendDef) -> bool {
+    def.compute_nodes.len() >= 2 && bundle_source_indices(def).next().is_some()
+}
+
+/// `GraphRawFieldMutation`: a parameterized compute node, or an edge with at
+/// least one valid unit move. The parameter check comes first so the common
+/// case never walks the edges.
+pub(super) fn has_raw_field_site(
+    def: &CgpGraphBackendDef,
+    input_refs: &[InputReference],
+    config: &MutationConfig,
+) -> bool {
+    has_parameterized_compute_node(def)
+        || raw_field_edge_sites(def, input_refs, config)
+            .next()
+            .is_some()
+}
+
+/// `AddInternalGraphNode`: the disconnected form appends to any def, so
+/// every Graph node is a target and blank modules keep their growth reach.
+pub(super) const fn can_add_compute_node(_def: &CgpGraphBackendDef) -> bool {
+    true
+}
+
+/// `AddGraphEdge`: the execute gate is always an available surface, so
+/// every Graph node is a target.
+pub(super) const fn can_add_edge(_def: &CgpGraphBackendDef) -> bool {
+    true
 }
 
 #[cfg(test)]

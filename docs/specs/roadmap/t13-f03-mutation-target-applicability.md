@@ -107,27 +107,28 @@ or world change is involved.
 
 ## Implementation Tasks
 
-- [ ] Graph: per-operator applicability predicates in
+- [x] Graph: per-operator applicability predicates in
       `mutation/graph/operators.rs` / `hebbian.rs`, shared by application;
       `GraphMutator::apply` selects from the applicable Graph indices.
-- [ ] VM: same for the VM operators listed above in `mutation/vm/operators.rs`
+- [x] VM: same for the VM operators listed above in `mutation/vm/operators.rs`
       and `VmMutator::apply`; InputRef audit recorded in the readings.
-- [ ] Property tests for invariants 1–5 (proptest; commit any
+- [x] Property tests for invariants 1–5 (proptest; commit any
       `proptest-regressions/` file), the fixture flip above, and TDD tests for
       each repaired operator; run `cargo test -p v3-core --test viability`
       first.
-- [ ] Reference updates in `docs/reference/v3-mutation-spec.md`; re-pinned
+- [x] Reference updates in `docs/reference/v3-mutation-spec.md`; re-pinned
       expectations carry their reason.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> result in
+- [x] `cargo test -p v3-core --test viability` -> result in
       [readings](../../progress/readings/t13-f03-mutation-target-applicability.md).
-- [ ] `cargo test -p v3-core mutation` (graph, vm, input_ref, engine, property
-      tests) and `cargo test -p v3-core --test reproducibility` -> results in
-      readings, with the re-pinned expectations listed.
-- [ ] VM and InputRef audit table (operator, post-draw failure condition,
-      disposition) in readings.
+- [x] `cargo test -p v3-core` (graph, vm, input_ref, engine, property tests),
+      `cargo test -p v3-core --test reproducibility` and `cargo test -p v3-cli`
+      -> results in readings, with the re-pinned expectations listed.
+- [x] Graph, VM and InputRef audit tables (operator, applicability predicate,
+      post-draw failure condition, disposition) in readings. The InputRef
+      domain shows none of the defect and is unchanged.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
