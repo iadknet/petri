@@ -304,60 +304,19 @@ fn edge_vec(def: &CgpGraphBackendDef, surface: EdgeSurface) -> &[GraphEdge] {
     }
 }
 
-/// Count total edges across all 5 surfaces.
+/// Count total edges across all 5 surfaces: the length of [`edge_sites`].
 fn total_edge_count(def: &CgpGraphBackendDef) -> usize {
-    let mut count = 0;
-    for node in &def.compute_nodes {
-        count += node.inputs.len();
-    }
-    for sink in &def.output_sinks {
-        count += sink.inputs.len();
-    }
-    for slot in &def.action_bank {
-        count += slot.gate_inputs.len();
-        count += slot.param_inputs.len();
-    }
-    count += def.execute_gate.inputs.len();
-    count
+    edge_sites(def).count()
 }
 
-/// Pick a random edge surface that has at least one edge.
+/// Pick a random edge uniformly among [`edge_sites`].
 /// Returns the surface and the index of the edge within that surface.
 fn pick_random_edge(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Option<(EdgeSurface, usize)> {
     let total = total_edge_count(def);
     if total == 0 {
         return None;
     }
-
-    let mut pick = rng.gen_range(0..total);
-
-    for (i, node) in def.compute_nodes.iter().enumerate() {
-        if pick < node.inputs.len() {
-            return Some((EdgeSurface::ComputeInput(i), pick));
-        }
-        pick -= node.inputs.len();
-    }
-    for (i, sink) in def.output_sinks.iter().enumerate() {
-        if pick < sink.inputs.len() {
-            return Some((EdgeSurface::SinkInput(i), pick));
-        }
-        pick -= sink.inputs.len();
-    }
-    for (i, slot) in def.action_bank.iter().enumerate() {
-        if pick < slot.gate_inputs.len() {
-            return Some((EdgeSurface::ActionGate(i), pick));
-        }
-        pick -= slot.gate_inputs.len();
-        if pick < slot.param_inputs.len() {
-            return Some((EdgeSurface::ActionParam(i), pick));
-        }
-        pick -= slot.param_inputs.len();
-    }
-    if pick < def.execute_gate.inputs.len() {
-        return Some((EdgeSurface::ExecuteGate, pick));
-    }
-
-    None // shouldn't reach here
+    edge_sites(def).nth(rng.gen_range(0..total))
 }
 
 /// Pick a random edge container (surface) to add an edge to.

@@ -53,8 +53,14 @@ or world change is involved.
   names the sites the operator will draw from; `GraphMutator::apply` filters
   the Graph-backend indices by that predicate before `targets.select`, and
   application draws only from the sites the predicate enumerated. The
-  predicate is shared with application, not duplicated beside it. VM operators
-  whose `apply_*` can fail after the node draw (register-count bounds and
+  predicate is shared with application, not duplicated beside it. That same
+  rule binds the sub-choices an operator makes after the node draw:
+  `AddInternalGraphNode` draws its form among the forms the def admits, and
+  `VmRegisterCountMutation` draws its direction among the feasible moves, so a
+  blocked shrink grows rather than skipping. `AddInternalGraphNode` is
+  therefore applicable to every Graph node — the disconnected and bootstrap
+  forms append to any def, and compute-node capacity gates only the split
+  form. VM operators whose `apply_*` can fail after the node draw (register-count bounds and
   removed-register use, delete on a program of at most one instruction, raw
   field on a program with no mutable instruction, copy on an empty program or
   constant pool, gene slices without a slice, motifs and slot operators
@@ -125,10 +131,16 @@ or world change is involved.
       [readings](../../progress/readings/t13-f03-mutation-target-applicability.md).
 - [x] `cargo test -p v3-core` (graph, vm, input_ref, engine, property tests),
       `cargo test -p v3-core --test reproducibility` and `cargo test -p v3-cli`
-      -> results in readings, with the re-pinned expectations listed.
+      -> commands and results in
+      [readings](../../progress/readings/t13-f03-mutation-target-applicability.md#build-pass-verification),
+      re-pinned expectations in
+      [readings](../../progress/readings/t13-f03-mutation-target-applicability.md#re-pinned-expectations).
 - [x] Graph, VM and InputRef audit tables (operator, applicability predicate,
-      post-draw failure condition, disposition) in readings. The InputRef
-      domain shows none of the defect and is unchanged.
+      post-draw failure condition, disposition) in readings
+      ([Graph](../../progress/readings/t13-f03-mutation-target-applicability.md#graph-applicability-audit),
+      [VM](../../progress/readings/t13-f03-mutation-target-applicability.md#vm-applicability-audit),
+      [InputRef](../../progress/readings/t13-f03-mutation-target-applicability.md#inputref-audit--no-change)).
+      The InputRef domain shows none of the defect and is unchanged.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
