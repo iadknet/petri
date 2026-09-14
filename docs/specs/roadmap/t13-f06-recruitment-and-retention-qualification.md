@@ -152,7 +152,7 @@ typed.
       fold them through `bench/artifacts.rs` into the committed summary.
 - [x] Extend the qualified-path tests with the per-step cost verdicts and the
       last-step assertion (`QualifiedPath::cost_verdicts`).
-- [ ] Add the readings file and the `docs/progress.md` row, and tick the
+- [x] Add the readings file and the `docs/progress.md` row, and tick the
       track's qualification success criterion at closure. No reference doc
       describes this observation, so none changes.
 
@@ -241,14 +241,14 @@ assumed accepted. Full tables and transcripts in the readings file.
 
 ## Success Criteria
 
-- [ ] The stored goal report carries the fixed T13.F02 comparison unchanged
+- [x] The stored goal report carries the fixed T13.F02 comparison unchanged
       and, for every starting form, a `CostSelection` arm with probability and
       time to first useful contribution, retention and loss at discovery + 16,
       damage, checkpoint cost and paired differences, on Task A and Task B.
-- [ ] The maintained fixtures show both backends' qualified useful paths with
+- [x] The maintained fixtures show both backends' qualified useful paths with
       per-step cost verdicts, and the readings file separates assay selection
       from the goal worlds' ecological reading with both limits stated.
-- [ ] Nulls, censoring and gaps are explicit, mapped to their owning feature
+- [x] Nulls, censoring and gaps are explicit, mapped to their owning feature
       where they are implementation failures, and no cognition or universal
       emergence claim is made; T11.F10 and T11.F13 can cite the exposure and
       retention readings by summary path and arm name.
@@ -261,3 +261,7 @@ assumed accepted. Full tables and transcripts in the readings file.
 - Decision: The cost-bearing reading is a third selection policy on the
   existing assay, ordered by score then summed ending energy; it is a bound,
   not an ecology estimate, and no energy-to-score conversion is introduced.
+- Decision: the user accepted the depth-2,000 drift reading
+  0.0035/0.0045/0.0035 against the 0.005 floor for this feature on
+  2026-09-14 ("I approve the same floor violation from previous features"),
+  matching the T13.F03–F05 acceptances; the epoch is unchanged.
