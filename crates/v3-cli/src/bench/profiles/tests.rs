@@ -16,6 +16,7 @@ fn omitting_food_coverage_leaves_production_coverage_untouched() {
         food_coverage: None,
         neighborhood: NeighborhoodSizes::default(),
         drift: Default::default(),
+        recruitment: neighborhood::recruitment_paths::Sizes::TEST,
     };
     let config = build_config(&params);
 

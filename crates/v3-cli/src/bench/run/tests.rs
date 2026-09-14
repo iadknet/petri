@@ -51,6 +51,7 @@ fn goal_cases_keep_distinct_full_population_structure_distributions() {
     params.ticks = 60;
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
+    params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let mut expected_cases = Vec::new();
     let mut pooled = Vec::new();
@@ -91,6 +92,7 @@ fn goal_world_set_executes_three_named_configs_with_case_observations() {
     params.ticks = 1;
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
+    params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
     let (report, timings) = run_deterministic(&params).expect("a valid profile");
     assert_eq!(report.profile.name, "goal-worlds-v1");
     assert_eq!(report.per_seed.len(), 3);
@@ -426,7 +428,8 @@ fn recruitment_paths_is_once_per_world_set_and_reduced_results_are_deterministic
     for case in encoded["cases"].as_array().unwrap() {
         assert!(case.get("recruitment_paths").is_none());
     }
-    let (again, elapsed) = timed_recruitment_paths(true);
+    let (again, elapsed) =
+        timed_recruitment_paths(true, neighborhood::recruitment_paths::Sizes::TEST);
     assert_eq!(
         serde_json::to_value(&again).unwrap(),
         serde_json::to_value(&report.goal_indicators.recruitment_paths).unwrap()
