@@ -21,11 +21,13 @@ use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::vm::{VmMutator, VmOperator};
 use crate::mutation::{MutationOperator, MutationSkipReason, TargetReachability};
 use crate::neighborhood::recruitment::ModuleBackend;
+use crate::runtime::vm::jump_target;
 use rand::{rngs::SmallRng, SeedableRng};
 
-/// Every step's seed is the first in `0..SEED_RANGE` whose applied event
-/// matches the step's structural acceptance predicate.
-pub const SEED_RANGE: u64 = 10_000;
+/// Every pinned step seed is the first in `0..SEARCH_RANGE` whose applied
+/// event matches the step's structural acceptance predicate; the one-off
+/// search ([`search_seeds`]) finds them, the maintained tests replay them.
+pub const SEARCH_RANGE: u64 = 1_000_000;
 
 /// Paths longer than this are recorded growth gaps, not qualified paths.
 pub const MAX_PATH_EVENTS: usize = 6;
@@ -119,15 +121,13 @@ pub struct QualifiedPath {
     pub start: ConstructionStage,
     pub steps: Vec<PathStep>,
     pub gap: Option<GrowthGap>,
-    /// The step whose seed range was exhausted, if the path is incomplete.
-    pub exhausted: Option<String>,
 }
 
 impl QualifiedPath {
     /// Complete within the bound.
     #[must_use]
     pub fn qualified(&self) -> bool {
-        self.exhausted.is_none() && self.gap.is_none() && self.steps.len() <= MAX_PATH_EVENTS
+        self.gap.is_none() && self.steps.len() <= MAX_PATH_EVENTS
     }
 }
 
@@ -154,17 +154,26 @@ fn step(
     }
 }
 
-/// The first seed in the range whose applied event the predicate accepts.
-fn select_seed(
+/// The event applied with `seed`, if the predicate accepts the result.
+fn accepted(
+    genome: &CreatureGenome,
+    event: ProductionEvent,
+    seed: u64,
+    accept: &Accept,
+) -> Option<CreatureGenome> {
+    let mut candidate = genome.clone();
+    event.apply(&mut candidate, seed).ok()?;
+    accept(genome, &candidate).then_some(candidate)
+}
+
+/// The first seed in `0..SEARCH_RANGE` whose applied event the predicate
+/// accepts: the one-off search, not the maintained replay.
+fn first_seed(
     genome: &CreatureGenome,
     event: ProductionEvent,
     accept: &Accept,
 ) -> Option<(u64, CreatureGenome)> {
-    (0..SEED_RANGE).find_map(|seed| {
-        let mut candidate = genome.clone();
-        event.apply(&mut candidate, seed).ok()?;
-        accept(genome, &candidate).then_some((seed, candidate))
-    })
+    (0..SEARCH_RANGE).find_map(|seed| Some((seed, accepted(genome, event, seed, accept)?)))
 }
 
 fn surfaces_unchanged(previous: &TaskReading, current: &TaskReading) -> bool {
@@ -174,23 +183,38 @@ fn surfaces_unchanged(previous: &TaskReading, current: &TaskReading) -> bool {
         })
 }
 
-fn qualify(
-    form: &str,
+/// One starting form's plan with its pinned seeds, one per step.
+struct FormPlan {
+    form: String,
     task: Task,
     backend: ModuleBackend,
     start: ConstructionStage,
     specs: Vec<StepSpec>,
+    seeds: &'static [u64],
     gap: Option<GrowthGap>,
-) -> QualifiedPath {
+}
+
+/// Replay every step with its pinned seed.
+///
+/// # Panics
+/// When a pinned seed's applied event fails the step's acceptance predicate.
+fn qualify(plan: FormPlan) -> QualifiedPath {
+    let FormPlan {
+        form,
+        task,
+        backend,
+        start,
+        specs,
+        seeds,
+        gap,
+    } = plan;
+    assert_eq!(specs.len(), seeds.len(), "{form}: one pinned seed per step");
     let mut genome = start.genome.clone();
     let mut previous = start.task.clone();
     let mut steps = Vec::with_capacity(specs.len());
-    let mut exhausted = None;
-    for spec in specs {
-        let Some((seed, after)) = select_seed(&genome, spec.event, &spec.accept) else {
-            exhausted = Some(spec.name.to_string());
-            break;
-        };
+    for (spec, &seed) in specs.iter().zip(seeds) {
+        let after = accepted(&genome, spec.event, seed, &spec.accept)
+            .unwrap_or_else(|| panic!("{form} {}: seed {seed} is not accepted", spec.name));
         let stage = stage_for(
             task,
             spec.name,
@@ -212,14 +236,45 @@ fn qualify(
         genome = after;
     }
     QualifiedPath {
-        form: form.into(),
+        form,
         task,
         backend,
         start,
         steps,
         gap,
-        exhausted,
     }
+}
+
+/// One form's one-off seed search: the first accepted seed per step in
+/// `0..SEARCH_RANGE`, `None` where the range is exhausted (the search stops
+/// at the first exhausted step).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SeedSearch {
+    pub form: String,
+    pub seeds: Vec<(&'static str, Option<u64>)>,
+}
+
+/// The one-off search behind every pinned seed: walk each form's plan taking
+/// the first accepted seed per step. Slow; run by the ignored test only.
+#[must_use]
+pub fn search_seeds() -> Vec<SeedSearch> {
+    form_plans()
+        .into_iter()
+        .map(|plan| {
+            let mut genome = plan.start.genome.clone();
+            let mut seeds = Vec::with_capacity(plan.specs.len());
+            for spec in &plan.specs {
+                let found = first_seed(&genome, spec.event, &spec.accept);
+                seeds.push((spec.name, found.as_ref().map(|(seed, _)| *seed)));
+                let Some((_, after)) = found else { break };
+                genome = after;
+            }
+            SeedSearch {
+                form: plan.form,
+                seeds,
+            }
+        })
+        .collect()
 }
 
 // ── Genome readers used by acceptance predicates ────────────────────────────
@@ -579,20 +634,27 @@ fn graph_blank_plan(dispatched: bool) -> Vec<StepSpec> {
 #[derive(Clone)]
 enum Expect {
     Exact(VmInstruction),
-    /// A `JumpIfZero` on register 0 whose offset is one of the listed values.
-    JumpOffsetIn(&'static [i32]),
+    /// A `JumpIfZero` on register 0 that resolves to the program's closing
+    /// Halt. The drawn offset is any of the `-16..=16` values landing there
+    /// modulo the length; every later insert before the Halt goes through
+    /// `splice_program_with_reference_repair`, which rewrites the offset so
+    /// the jump keeps that target.
+    JumpToHalt,
 }
 
 fn program_matches(program: &[VmInstruction], expected: &[Expect]) -> bool {
-    program.len() == expected.len()
+    let len = program.len();
+    len == expected.len()
         && program
             .iter()
+            .enumerate()
             .zip(expected)
-            .all(|(actual, expected)| match expected {
+            .all(|((pc, actual), expected)| match expected {
                 Expect::Exact(instruction) => actual == instruction,
-                Expect::JumpOffsetIn(offsets) => matches!(
+                Expect::JumpToHalt => matches!(
                     actual,
-                    VmInstruction::JumpIfZero { cond: 0, offset } if offsets.contains(offset)
+                    VmInstruction::JumpIfZero { cond: 0, offset }
+                        if jump_target(pc, *offset, len) + 1 == len
                 ),
             })
 }
@@ -608,16 +670,6 @@ const WRITE_DIRECTION: VmInstruction = VmInstruction::WriteWorldActionMeta {
     src: 0,
 };
 const PUSH_MOVE: VmInstruction = VmInstruction::PushAction { action_type: 2 };
-
-/// In the final six-instruction program the jump sits at index 1 and must
-/// land on the closing Halt at index 5: `jump_target` wraps modulo the
-/// length, so the offset is 3 modulo 6.
-const FINAL_JUMP_OFFSETS: &[i32] = &[-15, -9, -3, 3, 9, 15];
-/// While a dispatched detour still lacks its push (length five, jump at
-/// index 1), a zero cue must land on the doubling, the meta write or the
-/// Halt (indices 2..=4) rather than loop back: offset 0, 1 or 2 modulo 5.
-/// Intersected with the final offsets above.
-const DETOUR_JUMP_OFFSETS: &[i32] = &[-15, -9, -3, 15];
 
 fn cue_added() -> StepSpec {
     step(
@@ -655,10 +707,10 @@ fn insert_step(name: &'static str, edits: &'static str, expected: Vec<Expect>) -
 /// Blank tissue is not dispatched, so the program is built in reading order
 /// and the route swap exposes it: seven events, a recorded growth gap. A
 /// dispatched detour builds the neutral instructions first, adds the jump
-/// with an offset that is harmless at length five, and exposes the module
-/// by inserting the push last: six events.
+/// to the Halt (a zero cue then does nothing at length five), and exposes
+/// the module by inserting the push last: six events.
 fn vm_blank_plan(dispatched: bool) -> Vec<StepSpec> {
-    use Expect::{Exact, JumpOffsetIn};
+    use Expect::{Exact, JumpToHalt};
     let halt = Exact(VmInstruction::Halt);
     let mut plan = vec![cue_added()];
     let read = (
@@ -698,7 +750,7 @@ fn vm_blank_plan(dispatched: bool) -> Vec<StepSpec> {
                 jump,
                 vec![
                     Exact(READ_CUE),
-                    JumpOffsetIn(DETOUR_JUMP_OFFSETS),
+                    JumpToHalt,
                     Exact(DOUBLE),
                     Exact(WRITE_DIRECTION),
                     halt.clone(),
@@ -708,7 +760,7 @@ fn vm_blank_plan(dispatched: bool) -> Vec<StepSpec> {
                 push,
                 vec![
                     Exact(READ_CUE),
-                    JumpOffsetIn(DETOUR_JUMP_OFFSETS),
+                    JumpToHalt,
                     Exact(DOUBLE),
                     Exact(WRITE_DIRECTION),
                     Exact(PUSH_MOVE),
@@ -719,28 +771,16 @@ fn vm_blank_plan(dispatched: bool) -> Vec<StepSpec> {
     } else {
         vec![
             (read, vec![Exact(READ_CUE), halt.clone()]),
-            (
-                jump,
-                vec![
-                    Exact(READ_CUE),
-                    JumpOffsetIn(FINAL_JUMP_OFFSETS),
-                    halt.clone(),
-                ],
-            ),
+            (jump, vec![Exact(READ_CUE), JumpToHalt, halt.clone()]),
             (
                 double,
-                vec![
-                    Exact(READ_CUE),
-                    JumpOffsetIn(FINAL_JUMP_OFFSETS),
-                    Exact(DOUBLE),
-                    halt.clone(),
-                ],
+                vec![Exact(READ_CUE), JumpToHalt, Exact(DOUBLE), halt.clone()],
             ),
             (
                 write,
                 vec![
                     Exact(READ_CUE),
-                    JumpOffsetIn(FINAL_JUMP_OFFSETS),
+                    JumpToHalt,
                     Exact(DOUBLE),
                     Exact(WRITE_DIRECTION),
                     halt.clone(),
@@ -750,7 +790,7 @@ fn vm_blank_plan(dispatched: bool) -> Vec<StepSpec> {
                 push,
                 vec![
                     Exact(READ_CUE),
-                    JumpOffsetIn(FINAL_JUMP_OFFSETS),
+                    JumpToHalt,
                     Exact(DOUBLE),
                     Exact(WRITE_DIRECTION),
                     Exact(PUSH_MOVE),
@@ -767,6 +807,15 @@ fn vm_blank_plan(dispatched: bool) -> Vec<StepSpec> {
     }
     plan
 }
+/// Pinned `Topology.AddNode` seeds drawing each blank backend on the
+/// entry-to-incumbent edge: the first accepted in the search range.
+fn detour_seed(backend: ModuleBackend) -> u64 {
+    match backend {
+        ModuleBackend::Graph => 1,
+        ModuleBackend::Vm => 0,
+    }
+}
+
 fn detour_start(backend: ModuleBackend, base: &CreatureGenome) -> ConstructionStage {
     let accept: Accept = Box::new(move |_, after: &CreatureGenome| {
         after.nodes.len() == 3
@@ -778,12 +827,14 @@ fn detour_start(backend: ModuleBackend, base: &CreatureGenome) -> ConstructionSt
                 BackendDef::Vm(_) => backend == ModuleBackend::Vm,
             }
     });
-    let (seed, genome) = select_seed(
+    let seed = detour_seed(backend);
+    let genome = accepted(
         base,
         ProductionEvent::Topology(TopologyOperator::AddNode),
+        seed,
         &accept,
     )
-    .expect("AddNode draws each blank backend within the seed range");
+    .expect("the pinned AddNode seed draws the blank backend on the entry edge");
     stage_for(
         Task::A,
         "inline_detour",
@@ -830,54 +881,93 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
         .collect()
 }
 
-/// Every starting form's seed-selected path, in the fixed family order.
-#[must_use]
-pub fn qualified_paths() -> Vec<QualifiedPath> {
-    let mut paths = Vec::with_capacity(9);
+// ── Pinned seeds: the first accepted in `0..SEARCH_RANGE` per step ──────────
+
+const SWAP: u64 = 0;
+const GRAPH_BLANK_SEEDS: &[u64] = &[1, 25, 1020, 1650, 3612, 102, SWAP];
+const GRAPH_DETOUR_SEEDS: &[u64] = &[1, 25, 1020, 1650, 3612, 102];
+const GRAPH_COPY_SEEDS: &[u64] = &[102, SWAP];
+const GRAPH_SPLIT_SEEDS: &[u64] = &[1762, SWAP];
+const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
+const GRAPH_UNPREPARED_SEEDS: &[u64] = &[25, 32, 64, 6718, 4, SWAP];
+const VM_UNPREPARED_SEEDS: &[u64] = &[25, 72, 223, 13, 13, SWAP];
+/// Reading order: cue, read, jump, double, write, push, swap.
+const VM_BLANK_SEEDS: &[u64] = &[1, 238, 9940, 800, 41_854, 4126, SWAP];
+/// Neutral-first order: cue, read, double, write, jump, push.
+const VM_DETOUR_SEEDS: &[u64] = &[1, 238, 800, 21_017, 3709, 4126];
+
+/// Every starting form's plan with its pinned seeds, in the fixed family
+/// order.
+fn form_plans() -> Vec<FormPlan> {
+    let mut plans = Vec::with_capacity(9);
     let mut bases = Vec::new();
     for start in starting_forms() {
         let name = start.name.as_str();
         let last = start.history.last().expect("history").clone();
-        let (plan, gap) = match name {
+        let (specs, seeds, gap) = match name {
             "graph_blank" => (
                 graph_blank_plan(false),
+                GRAPH_BLANK_SEEDS,
                 Some(blank_growth_gap(start.backend)),
             ),
-            "vm_blank" => (vm_blank_plan(false), Some(blank_growth_gap(start.backend))),
+            "vm_blank" => (
+                vm_blank_plan(false),
+                VM_BLANK_SEEDS,
+                Some(blank_growth_gap(start.backend)),
+            ),
             "graph_copy" => (
                 graph_copy_plan(vec![GraphSource::ComputeNode(0), cue_leaf(Task::A)]),
+                GRAPH_COPY_SEEDS,
                 None,
             ),
-            "vm_copy" => (vm_copy_plan(), None),
+            "vm_copy" => (vm_copy_plan(), VM_COPY_SEEDS, None),
             "graph_split" => {
                 let BackendDef::Graph(graph) = &node(&start.genome, SCAFFOLD).backend_def else {
                     unreachable!()
                 };
-                (graph_copy_plan(cue_valued_compute_sources(graph)), None)
+                (
+                    graph_copy_plan(cue_valued_compute_sources(graph)),
+                    GRAPH_SPLIT_SEEDS,
+                    None,
+                )
             }
-            "graph_unprepared" => (graph_unprepared_plan(), None),
-            "vm_unprepared" => (vm_unprepared_plan(), None),
+            "graph_unprepared" => (graph_unprepared_plan(), GRAPH_UNPREPARED_SEEDS, None),
+            "vm_unprepared" => (vm_unprepared_plan(), VM_UNPREPARED_SEEDS, None),
             _ => continue,
         };
         if name.ends_with("_blank") {
             bases.push((start.backend, start.creation_base.clone()));
         }
-        paths.push(qualify(name, start.task, start.backend, last, plan, gap));
+        plans.push(FormPlan {
+            form: name.into(),
+            task: start.task,
+            backend: start.backend,
+            start: last,
+            specs,
+            seeds,
+            gap,
+        });
     }
     for (backend, base) in bases {
-        let start = detour_start(backend, &base);
-        let (plan, gap) = match backend {
-            ModuleBackend::Graph => (graph_blank_plan(true), None),
-            ModuleBackend::Vm => (vm_blank_plan(true), None),
+        let (specs, seeds) = match backend {
+            ModuleBackend::Graph => (graph_blank_plan(true), GRAPH_DETOUR_SEEDS),
+            ModuleBackend::Vm => (vm_blank_plan(true), VM_DETOUR_SEEDS),
         };
-        paths.push(qualify(
-            &format!("{}_detour", backend.as_key()),
-            Task::A,
+        plans.push(FormPlan {
+            form: format!("{}_detour", backend.as_key()),
+            task: Task::A,
             backend,
-            start,
-            plan,
-            gap,
-        ));
+            start: detour_start(backend, &base),
+            specs,
+            seeds,
+            gap: None,
+        });
     }
-    paths
+    plans
+}
+
+/// Every starting form's pinned-seed path, in the fixed family order.
+#[must_use]
+pub fn qualified_paths() -> Vec<QualifiedPath> {
+    form_plans().into_iter().map(qualify).collect()
 }

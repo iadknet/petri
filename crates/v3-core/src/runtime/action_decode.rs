@@ -1,6 +1,11 @@
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{Direction, WorldAction};
 
+/// The largest `action_type` that decodes to an action; every value above
+/// it is the soft `NoOp` default, so mutation draws new pushes in
+/// `0..=MAX_DECODED_ACTION_TYPE` (T13.F05).
+pub(crate) const MAX_DECODED_ACTION_TYPE: u8 = 4;
+
 /// Decode a WorldAction from the raw action_type discriminant and metadata buffer.
 ///
 /// Per v3-vm-isa-spec.md Section 7 action encoding table.
@@ -64,6 +69,19 @@ mod tests {
 
     fn zero_meta() -> [f32; 8] {
         [0.0; 8]
+    }
+
+    #[test]
+    fn max_decoded_action_type_is_the_last_non_noop_discriminant() {
+        let meta = [1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        assert_ne!(
+            decode_world_action(MAX_DECODED_ACTION_TYPE, &meta),
+            WorldAction::NoOp
+        );
+        assert_eq!(
+            decode_world_action(MAX_DECODED_ACTION_TYPE + 1, &meta),
+            WorldAction::NoOp
+        );
     }
 
     #[test]
