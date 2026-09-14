@@ -139,6 +139,59 @@ impl QualifiedPath {
     pub fn qualified(&self) -> bool {
         self.gap.is_none() && self.steps.len() <= MAX_PATH_EVENTS
     }
+
+    /// T13.F06: each step judged by `Policy::CostSelection` against its
+    /// predecessor as a lone sibling, with the charges the step incurred.
+    #[must_use]
+    pub fn cost_verdicts(&self) -> Vec<CostVerdict> {
+        let dead = Candidate {
+            live: false,
+            score: 0,
+            ending_energy_sum: 0.0,
+        };
+        let mut previous = &self.start;
+        self.steps
+            .iter()
+            .map(|step| {
+                let charges = step.charges();
+                let verdict = CostVerdict {
+                    step: step.stage.name.clone(),
+                    retained: choose(
+                        Policy::CostSelection,
+                        Candidate::new(&previous.task, self.task),
+                        [Candidate::new(&step.stage.task, self.task), dead],
+                    ) == Some(0),
+                    score: step.stage.task.correct(self.task),
+                    previous_score: previous.task.correct(self.task),
+                    carrying_sum: charges.carrying_sum,
+                    ending_energy_sum: charges.ending_energy_sum,
+                    previous_ending_energy_sum: previous.task.summary().ending_energy_sum,
+                };
+                previous = &step.stage;
+                verdict
+            })
+            .collect()
+    }
+}
+
+/// One path step's cost-visible selection verdict against its predecessor.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CostVerdict {
+    pub step: String,
+    pub retained: bool,
+    pub score: u8,
+    pub previous_score: u8,
+    pub carrying_sum: f64,
+    pub ending_energy_sum: f64,
+    pub previous_ending_energy_sum: f64,
+}
+
+impl CostVerdict {
+    /// Equal score against the predecessor: the step only costs or saves.
+    #[must_use]
+    pub fn neutral(&self) -> bool {
+        self.score == self.previous_score
+    }
 }
 
 type Accept = Box<dyn Fn(&CreatureGenome, &CreatureGenome) -> bool>;

@@ -9,6 +9,7 @@ use crate::neighborhood::mesh_execution::indices_for_node_ids;
 use crate::neighborhood::recruitment::ModuleBackend;
 use proptest::prelude::*;
 use rand::{rngs::SmallRng, SeedableRng};
+use std::collections::BTreeMap;
 
 proptest! {
     #[test]
@@ -40,21 +41,116 @@ proptest! {
 
     #[test]
     fn recruitment_paths_selection_never_reduces_score_and_resolves_ties(
-        parent in 0u8..=8, a in 0u8..=8, b in 0u8..=8, alive_a in any::<bool>(), alive_b in any::<bool>()
+        parent in 0u8..=8, a in 0u8..=8, b in 0u8..=8, alive_a in any::<bool>(), alive_b in any::<bool>(),
+        energies in prop::collection::vec(0.0f64..400.0, 3)
     ) {
-        let children = [(alive_a, a), (alive_b, b)];
-        let selected = choose(Policy::Selection, (true, parent), children);
+        let parent_candidate = Candidate { live: true, score: parent, ending_energy_sum: energies[0] };
+        let children = [
+            Candidate { live: alive_a, score: a, ending_energy_sum: energies[1] },
+            Candidate { live: alive_b, score: b, ending_energy_sum: energies[2] },
+        ];
+        let selected = choose(Policy::Selection, parent_candidate, children);
         if let Some(index) = selected {
-            prop_assert!(children[index].0);
-            prop_assert!(children[index].1 >= parent);
-            for (other, &(live, score)) in children.iter().enumerate() {
-                if live && score >= parent {
-                    prop_assert!(children[index].1 >= score);
-                    if score == children[index].1 { prop_assert!(index <= other); }
+            prop_assert!(children[index].live);
+            prop_assert!(children[index].score >= parent);
+            for (other, child) in children.iter().enumerate() {
+                if child.live && child.score >= parent {
+                    prop_assert!(children[index].score >= child.score);
+                    if child.score == children[index].score { prop_assert!(index <= other); }
                 }
             }
-        } else { prop_assert!(children.iter().all(|&(live, score)| !live || score < parent)); }
-        prop_assert_eq!(choose(Policy::Drift, (true, parent), children), Some(0));
+        } else { prop_assert!(children.iter().all(|child| !child.live || child.score < parent)); }
+        // Selection never reads energy.
+        let flat = |candidate: Candidate| Candidate { live: candidate.live, score: candidate.score, ending_energy_sum: 0.0 };
+        prop_assert_eq!(
+            choose(Policy::Selection, flat(parent_candidate), [flat(children[0]), flat(children[1])]),
+            selected
+        );
+        prop_assert_eq!(choose(Policy::Drift, parent_candidate, children), Some(0));
+    }
+
+    #[test]
+    fn recruitment_paths_cost_selection_orders_by_score_then_strictly_higher_energy(
+        parent in 0u8..=8, a in 0u8..=8, b in 0u8..=8, alive_a in any::<bool>(), alive_b in any::<bool>(),
+        energies in prop::collection::vec(0u8..4, 3)
+    ) {
+        // Small integer energies make equal-energy draws common.
+        let energy = |index: usize| f64::from(energies[index]) * 100.0;
+        let parent_candidate = Candidate { live: true, score: parent, ending_energy_sum: energy(0) };
+        let children = [
+            Candidate { live: alive_a, score: a, ending_energy_sum: energy(1) },
+            Candidate { live: alive_b, score: b, ending_energy_sum: energy(2) },
+        ];
+        let selected = choose(Policy::CostSelection, parent_candidate, children);
+        let eligible: Vec<_> = children.iter().enumerate()
+            .filter(|(_, child)| child.live && child.score >= parent).collect();
+        match selected {
+            Some(index) => {
+                let chosen = children[index];
+                prop_assert!(chosen.live);
+                prop_assert!(chosen.score >= parent);
+                // Beats the parent: higher score, or equal score with at least the parent's energy (ties go to siblings).
+                prop_assert!(chosen.score > parent || chosen.ending_energy_sum >= parent_candidate.ending_energy_sum);
+                for &(other, child) in &eligible {
+                    prop_assert!(chosen.score >= child.score);
+                    if chosen.score == child.score {
+                        prop_assert!(chosen.ending_energy_sum >= child.ending_energy_sum);
+                        if chosen.ending_energy_sum == child.ending_energy_sum { prop_assert!(index <= other); }
+                    }
+                }
+            }
+            None => {
+                for (_, child) in &eligible {
+                    prop_assert!(child.score == parent && child.ending_energy_sum < parent_candidate.ending_energy_sum);
+                }
+            }
+        }
+        // With every energy equal the rule is exactly F02's selection.
+        let flat = |candidate: Candidate| Candidate { live: candidate.live, score: candidate.score, ending_energy_sum: 1.0 };
+        let tied = [flat(children[0]), flat(children[1])];
+        prop_assert_eq!(
+            choose(Policy::CostSelection, flat(parent_candidate), tied),
+            choose(Policy::Selection, flat(parent_candidate), tied)
+        );
+    }
+
+    #[test]
+    fn recruitment_paths_time_to_first_sorts_and_censors_every_lineage(
+        first in prop::collection::vec(prop::option::of(1u32..=32), 0..40)
+    ) {
+        let reading = TimeToFirst::of(first.iter().copied());
+        prop_assert_eq!(reading.generations.len() + reading.censored as usize, first.len());
+        prop_assert_eq!(reading.censored as usize, first.iter().filter(|value| value.is_none()).count());
+        prop_assert!(reading.generations.windows(2).all(|pair| pair[0] <= pair[1]));
+        let mut expected: Vec<_> = first.iter().flatten().copied().collect();
+        expected.sort_unstable();
+        prop_assert_eq!(&reading.generations, &expected);
+        match reading.median {
+            None => prop_assert!(expected.is_empty()),
+            Some(median) => {
+                let n = expected.len();
+                let expected_median = if n % 2 == 1 { f64::from(expected[n / 2]) }
+                    else { (f64::from(expected[n / 2 - 1]) + f64::from(expected[n / 2])) / 2.0 };
+                prop_assert_eq!(median, expected_median);
+            }
+        }
+    }
+
+    #[test]
+    fn recruitment_paths_spread_brackets_the_median(values in prop::collection::vec(-1000.0f64..1000.0, 0..40)) {
+        match Spread::of(values.clone()) {
+            None => prop_assert!(values.is_empty()),
+            Some(spread) => {
+                let min = values.iter().copied().fold(f64::INFINITY, f64::min);
+                let max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+                prop_assert_eq!(spread.min, min);
+                prop_assert_eq!(spread.max, max);
+                prop_assert!(spread.min <= spread.median && spread.median <= spread.max);
+                let below = values.iter().filter(|&&value| value <= spread.median).count();
+                let above = values.iter().filter(|&&value| value >= spread.median).count();
+                prop_assert!(below * 2 >= values.len() && above * 2 >= values.len());
+            }
+        }
     }
 
     #[test]
@@ -331,12 +427,149 @@ fn recruitment_paths_every_observed_sibling_replays_the_unmodified_engine() {
     }
 }
 
+/// The T13.F06 readings are derived from the same lineages as the estimates;
+/// check each against its source rows.
+pub(super) fn assert_summary_readings_are_consistent(arm: &Arm) {
+    let summary = &arm.summary;
+    let lineages = arm.lineages.len() as u32;
+    let first = |reading: &TimeToFirst, discovery: fn(&Lineage) -> Option<&Discovery>| {
+        let mut expected: Vec<_> = arm
+            .lineages
+            .iter()
+            .filter_map(|lineage| discovery(lineage).map(|discovery| discovery.generation))
+            .collect();
+        expected.sort_unstable();
+        assert_eq!(reading.generations, expected, "{}", arm.start);
+        assert_eq!(
+            reading.generations.len() as u32 + reading.censored,
+            lineages
+        );
+        assert!(reading
+            .generations
+            .iter()
+            .all(|&generation| generation >= 1));
+    };
+    first(&summary.time_to_first_retained, |lineage| {
+        lineage.retained_discovery.as_ref()
+    });
+    first(&summary.time_to_first_proposal, |lineage| {
+        lineage.proposal_discovery.as_ref()
+    });
+    assert_eq!(
+        summary.time_to_first_retained.generations.len() as u32,
+        summary.retained_discovery.numerator
+    );
+    assert_eq!(
+        summary.time_to_first_proposal.generations.len() as u32,
+        summary.proposal_discovery.numerator
+    );
+    assert_eq!(
+        summary.retention_outcomes.total(),
+        summary.retained_discovery.numerator,
+        "retention never censors: every discoverer has an outcome"
+    );
+    assert_eq!(
+        summary.retention_outcomes.useful,
+        summary.retained_useful.numerator
+    );
+    let proposals: Vec<_> = arm
+        .lineages
+        .iter()
+        .flat_map(|lineage| &lineage.proposals)
+        .collect();
+    let dead = proposals
+        .iter()
+        .filter(|proposal| !proposal.outcome.live())
+        .count() as u32;
+    assert_eq!(summary.damage.task_dead.denominator, proposals.len() as u32);
+    assert_eq!(summary.damage.task_dead.numerator, dead);
+    assert_eq!(
+        summary.damage.task_live_loss.denominator,
+        proposals.len() as u32 - dead
+    );
+    let loss = proposals
+        .iter()
+        .filter(|proposal| proposal.outcome.live())
+        .filter(|proposal| proposal.outcome.correct(arm.task) < proposal.parent_score)
+        .count() as u32;
+    assert_eq!(summary.damage.task_live_loss.numerator, loss);
+    assert_eq!(
+        summary
+            .checkpoint_cost
+            .iter()
+            .map(|cost| cost.generation)
+            .collect::<Vec<_>>(),
+        arm.lineages[0]
+            .checkpoints
+            .iter()
+            .map(|checkpoint| checkpoint.generation)
+            .collect::<Vec<_>>()
+    );
+    for (index, cost) in summary.checkpoint_cost.iter().enumerate() {
+        let at: Vec<_> = arm
+            .lineages
+            .iter()
+            .map(|lineage| &lineage.checkpoints[index])
+            .collect();
+        let bracket = |spread: Spread, value: &dyn Fn(&Checkpoint) -> f64| {
+            let values: Vec<_> = at.iter().map(|checkpoint| value(checkpoint)).collect();
+            assert_eq!(
+                spread.min,
+                values.iter().copied().fold(f64::INFINITY, f64::min)
+            );
+            assert_eq!(
+                spread.max,
+                values.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+            );
+            assert!(spread.min <= spread.median && spread.median <= spread.max);
+        };
+        bracket(cost.genome_size, &|checkpoint| {
+            f64::from(checkpoint.genome.genome_size())
+        });
+        bracket(cost.modules, &|checkpoint| {
+            checkpoint.genome.nodes.len() as f64
+        });
+        bracket(cost.carrying_sum, &|checkpoint| {
+            checkpoint.task.summary().carrying_sum
+        });
+        bracket(cost.ending_energy_sum, &|checkpoint| {
+            checkpoint.task.summary().ending_energy_sum
+        });
+    }
+}
+
 #[test]
 fn recruitment_paths_reduced_run_has_complete_supply_and_replay() {
     let report = observe(Sizes::TEST);
     assert_eq!(report.total_proposals, Sizes::TEST.proposals());
-    assert_eq!(report.arms.len(), 18);
-    assert_eq!(report.pairs.len(), 73);
+    assert_eq!(report.arms.len(), ARMS);
+    assert_eq!(report.starts.len(), STARTS);
+    // The eighteen T13.F02 arms lead in their original order (start-major,
+    // drift then selection); the nine cost arms follow in start order.
+    let order: Vec<_> = report
+        .arms
+        .iter()
+        .map(|arm| (arm.start.as_str(), arm.policy))
+        .collect();
+    let mut expected: Vec<_> = report
+        .starts
+        .iter()
+        .flat_map(|start| Policy::F02.map(|policy| (start.name.as_str(), policy)))
+        .collect();
+    expected.extend(
+        report
+            .starts
+            .iter()
+            .map(|start| (start.name.as_str(), Policy::CostSelection)),
+    );
+    assert_eq!(order, expected);
+    assert_eq!((order[0].0, order[0].1), ("graph_blank", Policy::Drift));
+    // Five Task A starts and four Task B starts: C(15,2) + C(12,2).
+    assert_eq!(report.pairs.len(), 105 + 66);
+    assert_eq!(
+        (report.pairs[0].left_arm, report.pairs[0].right_arm),
+        (0, 1)
+    );
     assert!(report.pairs.iter().all(|pair| {
         pair.left_arm < pair.right_arm
             && report.arms[pair.left_arm].task == report.arms[pair.right_arm].task
@@ -348,6 +581,7 @@ fn recruitment_paths_reduced_run_has_complete_supply_and_replay() {
     for arm in &report.arms {
         assert_eq!(arm.summary.retained_discovery.denominator, 1);
         assert_eq!(arm.batches.len(), 1);
+        assert_summary_readings_are_consistent(arm);
         assert_eq!(
             [
                 arm.batches[0].proposal_discovery.numerator,
@@ -419,7 +653,8 @@ fn recruitment_paths_seed_streams_cover_the_fixed_disjoint_replicates() {
     assert_eq!(seeds.len(), 4 * 8 * 48 * 2);
     assert_eq!(seeds.first(), Some(&13_020_000));
     assert_eq!(seeds.last(), Some(&16_090_095));
-    assert_eq!(Sizes::PRODUCTION.proposals(), 55_296);
+    // T13.F06 re-pin: the nine `CostSelection` arms raise 18 arms to 27.
+    assert_eq!(Sizes::PRODUCTION.proposals(), 82_944);
     let zero = estimate(0, 32);
     assert!((zero.wilson_95.unwrap()[1] - 0.107_179_198_255_070_6).abs() < 1e-12);
 }
@@ -954,5 +1189,56 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
             path.form
         );
         assert_eq!(bypass.correct(path.task), 4, "{}", path.form);
+    }
+}
+
+/// T13.F06 fixture cost reading. The last-step assertion is a regression
+/// guard against energy ever overriding score; the neutral-step rejection
+/// counts by form and backend are the barrier reading and are printed, not
+/// scored.
+#[test]
+fn recruitment_paths_qualified_cost_verdicts_retain_every_useful_last_step() {
+    let mut rejected_neutral: BTreeMap<(ModuleBackend, &str), (usize, usize)> = BTreeMap::new();
+    for path in paths() {
+        let verdicts = path.cost_verdicts();
+        assert_eq!(verdicts.len(), path.steps.len(), "{}", path.form);
+        for (verdict, step) in verdicts.iter().zip(&path.steps) {
+            let label = format!("{} step {}", path.form, verdict.step);
+            assert_eq!(verdict.step, step.stage.name, "{label}");
+            assert_eq!(verdict.carrying_sum, step.charges().carrying_sum, "{label}");
+            assert_eq!(
+                verdict.ending_energy_sum,
+                step.charges().ending_energy_sum,
+                "{label}"
+            );
+            let expected = verdict.score > verdict.previous_score
+                || (verdict.neutral()
+                    && verdict.ending_energy_sum >= verdict.previous_ending_energy_sum);
+            assert_eq!(verdict.retained, expected, "{label}");
+            if verdict.neutral() {
+                let entry = rejected_neutral
+                    .entry((path.backend, path.form.as_str()))
+                    .or_default();
+                entry.1 += 1;
+                entry.0 += usize::from(!verdict.retained);
+            }
+            eprintln!(
+                "{:<16} {:<28} retained={:<5} score {}->{} carrying {:.4} energy {:.4}->{:.4}",
+                path.form,
+                verdict.step,
+                verdict.retained,
+                verdict.previous_score,
+                verdict.score,
+                verdict.carrying_sum,
+                verdict.previous_ending_energy_sum,
+                verdict.ending_energy_sum
+            );
+        }
+        let last = verdicts.last().expect("every path has a step");
+        assert!(last.retained, "{} last step {}", path.form, last.step);
+        assert!(last.score > last.previous_score, "{}", path.form);
+    }
+    for ((backend, form), (rejected, neutral)) in &rejected_neutral {
+        eprintln!("{backend:?} {form}: {rejected} of {neutral} neutral steps rejected");
     }
 }

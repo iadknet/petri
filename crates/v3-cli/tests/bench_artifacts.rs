@@ -1000,6 +1000,18 @@ fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloa
             projected["summary"],
             serde_json::to_value(&arm.summary).unwrap()
         );
+        // T13.F06 readings ride the whole `summary` block into the summary.
+        assert_eq!(
+            projected["summary"]["checkpoint_cost"]
+                .as_array()
+                .unwrap()
+                .len(),
+            3
+        );
+        assert_eq!(
+            projected["summary"]["damage"]["task_dead"]["denominator"],
+            actual_count
+        );
         assert_eq!(
             projected["batches"],
             serde_json::to_value(&arm.batches).unwrap()
