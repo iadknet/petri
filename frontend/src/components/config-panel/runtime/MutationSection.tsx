@@ -12,7 +12,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		testId: "config-field-mutation-per-unit-rate",
 		defaultValue: 0.005,
 		tooltip:
-			"Chance that each genome unit requests one mutation event at birth; the founder's 111 units expect about 0.55 events",
+			"Chance that each genome unit requests one mutation event at birth; the founder's 111 units expect about 0.55 events. This field caps at 0.1; the runtime accepts up to 1.",
 	},
 	{
 		path: "mutation.mutation_probability",
