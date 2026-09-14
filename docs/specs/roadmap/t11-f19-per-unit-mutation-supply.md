@@ -161,6 +161,19 @@ the T14.F12 gate and goal reports (previous closure), the pinned goal epoch
       point to the summaries, no new full report staged; every predeclared
       reading above checked against the stored reports and tabulated in the
       readings file, including the field-for-field drift-block comparison.
+      Benchmark specialist pass (2026-09-14): summaries and hashes stored and
+      tabulated (see readings file, "Benchmark gate and goal runs" section);
+      the drift-block, `recruitment_paths`, `changed_per_all_births` floor,
+      goal persistence band, `events_applied_total` per birth, and founder
+      block readings all matched their predeclarations. Left unchecked
+      because three predeclared readings did not clear: the goal profile's
+      `plasticity_updates` work counter is `severe` (+82.3% vs T13.F03,
+      +75.9% vs T14.F12) though the spec budgeted no severe on the six work
+      counters; Confluence's `dead_per_all_births` is 0.0104 (52 of 5,000),
+      above the 0.010000 ceiling; and Orchards' terminal `mean_genome_size`
+      is 340.944597 units, above its 320.0 ceiling (1.5x the 213.343255
+      reference). All three are reported here for the orchestrator/spec
+      owner, not remediated or reinterpreted.
 
 ## Performance and Goal Impact
 
@@ -188,7 +201,23 @@ recruitment) is reported with no direction, because the population evolves
 under a different supply and any movement is ecology, not this mechanism's
 measure.
 
-**Measured verdict.** Not yet measured.
+**Measured verdict.** Gate: not severe (`comparison.severe=false` against both
+`remove-complementary-nutrition` and `t14-f12-neighborhood-read-of-selected-genomes`
+epochs); the flagged `plasticity_updates` delta is +24.4% against T14.F12
+(under the +50% severe threshold). Goal: **severe** — `comparison.severe=true`
+against both `t13-f03-mutation-target-applicability-goal` and
+`t14-f12-neighborhood-read-of-selected-genomes-goal`; `plasticity_updates`
+reads +82.3% and +75.9% respectively, both above the +50% severe threshold,
+against a predeclaration that budgeted no severe on the six work counters.
+Two predeclared ceilings are also exceeded: Confluence `dead_per_all_births`
+0.0104 (ceiling 0.010000) and Orchards terminal `mean_genome_size` 340.944597
+units (ceiling 320.0149). Every other predeclared reading (drift-block
+field-for-field identity, `recruitment_paths` identity modulo `config`/
+`config_digest`/`mutation_context`, `changed_per_all_births` floors, goal
+persistence band, `events_applied_total` per birth, founder block, wall-clock
+caps) is met. Reported to the orchestrator as a regression and two
+threshold exceedances; not remediated here. Full tabulation in
+[`docs/progress/readings/t11-f19.md`](../../progress/readings/t11-f19.md).
 
 - Summaries: [gate](../../progress/features/t11-f19-per-unit-mutation-supply.json),
   [goal](../../progress/features/t11-f19-per-unit-mutation-supply-goal.json).
