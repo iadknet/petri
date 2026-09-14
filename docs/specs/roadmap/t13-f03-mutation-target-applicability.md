@@ -171,8 +171,8 @@ make bench PROFILE=goal FEATURE=t13-f03-mutation-target-applicability
 | Tested commit | pending |
 | Mutation output | pending |
 | Closure documentation checks | pending |
-| Closure blocker (2026-09-13): compute | Goal `plasticity_updates` per creature-tick 0.093984 is +100.068% (severe) against epoch `t12-f04-baseline-world-set-goal.json` (0.046976) and +42.006% (flag) against previous `t15-f01-...-goal.json` (0.066183), with no predeclared severe allowance; the epoch→previous +41% inherited flag recorded by T13.F02 compounds with this feature's own +42%. Per seed (current vs previous): Orchards 0.1628 vs 0.0894 with final population 17,774 vs 11,313, Canyon 0.0540 vs 0.0806, Confluence 0.0453 vs 0.0300. Every other counter and wall/creature-tick `ok`. Awaiting the user's decision; see [closure measurements](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements). |
-| Closure blocker (2026-09-13): drift floor | Depth-2,000 drift changed/all births 7/2,000 = 0.0035 in Orchards and Confluence (byte-identical walks) against the 0.005 floor and the epoch's 12/2,000 = 0.006; Canyon 10/2,000 = 0.0050 at the floor. Depth-1,000 floors hold. The predeclared "hold or rise" direction is not met; the predeclared zero selected-but-inapplicable discards is met (attempted equals applied in every domain and world). Same-reading facts at depth 2,000 in Orchards: executed-target events 31,841 vs 37,949 (−16%), unreachable-target events 17,826 vs 11,705 (+52%); the plasticity operators previously discarded selected-but-inapplicable hundreds of times each (`EnableHebbian` 612, `EnableRewardModulation` 739, `MutateTraceDecay` 2,746) now show only no-eligible-node discards (13, 124, 787). A hypothesis, not a finding: refinement events that used to be discarded on the executed core and re-rolled onto other operators now land on silent tissue that carries the site. |
+| Goal compute cost (2026-09-13), accepted by the user below | Goal `plasticity_updates` per creature-tick 0.093984 is +100.068% (severe) against epoch `t12-f04-baseline-world-set-goal.json` (0.046976) and +42.006% (flag) against previous `t15-f01-...-goal.json` (0.066183), with no predeclared severe allowance; the epoch→previous +41% inherited flag recorded by T13.F02 compounds with this feature's own +42%. Per seed (current vs previous): Orchards 0.1628 vs 0.0894 with final population 17,774 vs 11,313, Canyon 0.0540 vs 0.0806, Confluence 0.0453 vs 0.0300. Every other counter and wall/creature-tick `ok`. Accepted; see [closure measurements](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements). |
+| Depth-2,000 drift floor (2026-09-13), accepted by the user below | Depth-2,000 drift changed/all births 7/2,000 = 0.0035 in Orchards and Confluence (byte-identical walks) against the 0.005 floor and the epoch's 12/2,000 = 0.006; Canyon 10/2,000 = 0.0050 at the floor. Depth-1,000 floors hold. The predeclared "hold or rise" direction is not met; the predeclared zero selected-but-inapplicable discards is met (attempted equals applied in every domain and world). Same-reading facts at depth 2,000 in Orchards: executed-target events 31,841 vs 37,949 (−16%), unreachable-target events 17,826 vs 11,705 (+52%); the plasticity operators previously discarded selected-but-inapplicable hundreds of times each (`EnableHebbian` 612, `EnableRewardModulation` 739, `MutateTraceDecay` 2,746) now show only no-eligible-node discards (13, 124, 787). A hypothesis, not a finding: refinement events that used to be discarded on the executed core and re-rolled onto other operators now land on silent tissue that carries the site. |
 
 ## Performance and Goal Impact
 
@@ -221,6 +221,23 @@ depth-2,000 drift-floor misses are reported as facts, not remediated; see
 [readings](../../progress/readings/t13-f03-mutation-target-applicability.md#closure-measurements)
 for full tables.
 
+**User decision, 2026-09-13.** After the blocker report the user directed:
+"Let's proceed and merge." This is a post-observation acceptance of the stored
+goal report's measured readings as they stand: `plasticity_updates` 0.093984
+per creature-tick (+100.068%, severe) against the goal-worlds epoch and
++42.006% (flag) against the previous closure, and depth-2,000 drift changed/all
+births of 0.0035 in Orchards in grassland and Confluence against the 0.005
+floor (Canyon country 0.0050, at the floor). It does not accept future
+regressions, does not touch the gate (`severe=false`, no gate re-pin), does not
+lower the drift floor, and is not an assertion that the predeclaration
+authorized this cost; the predeclaration, thresholds and the stored report's
+severe comparison stand unchanged. Under the existing series mechanism the
+goal-worlds `epoch_baseline` in `docs/progress/benchmark-series.json` points to
+this feature's goal summary from the closing commit, and both summaries are
+appended to their closed lists; no report is regenerated against itself. The
+supply shift onto silent tissue recorded above is a track finding for
+T13.F04/F05, not a requirement widened into this feature.
+
 - Summaries: [gate](../../progress/features/t13-f03-mutation-target-applicability.json),
   [goal](../../progress/features/t13-f03-mutation-target-applicability-goal.json).
 - Full readings: [`docs/progress/readings/t13-f03-mutation-target-applicability.md`](../../progress/readings/t13-f03-mutation-target-applicability.md).
@@ -239,6 +256,17 @@ for full tables.
 
 ## Notes for AI Agents
 
+- Decision: The user accepted the goal-profile `plasticity_updates` cost
+  (+100.068% severe versus the T12.F04 goal-worlds epoch) and the depth-2,000
+  drift-floor readings of 0.0035 in Orchards and Confluence on 2026-09-13, with
+  the goal-worlds epoch re-pinned to this feature's goal summary; the 0.005
+  floor itself is unchanged and applies to later closures against this epoch.
+- Deferred: At depth 2,000 the repair moves refinement events off the executed
+  core (executed-target events 37,949 to 31,841, unreachable-target events
+  11,705 to 17,826 in Orchards) because the executed layer draws only from the
+  applicable set; whether a bias over executed *applicable* modules or the
+  T13.F04/F05 activation and recruitment paths should absorb this is a track
+  decision, not a T13.F03 change.
 - Decision: The applicability predicate is the single source of truth for an
   operator's sites on a node; T13.F04/F05 extend these predicates for any
   operator they add and never reintroduce a select-then-fail path.
