@@ -19,7 +19,7 @@ selection can be distinguished before changing the substrate.
 - [ ] Adding modules that cannot accept an operator does not suppress that operator on valid targets elsewhere; growth and connection operations still reach silent scaffold.
 - [ ] Wired Graph effects can execute without an unrelated compute node, while truly inert Graph modules remain pass-through and every applied effect obeys the existing routing, state and energy contracts.
 - [x] Both Graph and VM modules have demonstrated short, viable mutation paths from neutral creation to useful contribution in named tasks, preserving the incumbent behavior during the neutral steps.
-- [ ] A bounded qualification records discovery and retention of newly recruited modules under selection, alongside damage, maintenance and execution cost; unresolved recruitment gaps remain explicit and do not become cognition claims.
+- [x] A bounded qualification records discovery and retention of newly recruited modules under selection, alongside damage, maintenance and execution cost; unresolved recruitment gaps remain explicit and do not become cognition claims.
 
 ## Executable Features
 
@@ -33,7 +33,7 @@ selection can be distinguished before changing the substrate.
   - Goal: Direct synaptic transmission: a wired signal can affect a controller without first growing an unrelated processing cell, while unwired tissue preserves the incumbent decision.
 - [x] **T13.F05 — Function-Preserving Module Recruitment** — Depends on: T13.F03, T13.F04, T11.F18
   - Goal: Gene duplication and circuit growth: new Graph and VM tissue can extend working computation through short viable mutation paths and then diverge into a useful contribution.
-- [ ] **T13.F06 — Recruitment and Retention Qualification** — Depends on: T13.F05, T03.F08
+- [x] **T13.F06 — Recruitment and Retention Qualification** — Depends on: T13.F05, T03.F08
   - Goal: Measure whether newly recruited tissue is discovered and retained because it helps a creature, including the cost of carrying it and its response to a changed task.
 
 ## Notes for AI Agents
