@@ -36,7 +36,8 @@
       "docs/progress/features/t13-f04-direct-graph-effect-activation.json",
       "docs/progress/features/t13-f05-function-preserving-module-recruitment.json",
       "docs/progress/features/t13-f06-recruitment-and-retention-qualification.json",
-      "docs/progress/features/t14-f12-neighborhood-read-of-selected-genomes.json"
+      "docs/progress/features/t14-f12-neighborhood-read-of-selected-genomes.json",
+      "docs/progress/features/t11-f19-per-unit-mutation-supply.json"
     ]
   },
   "goal": {
@@ -81,7 +82,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t13-f03-mutation-target-applicability-goal.json",
+    "epoch_baseline": "docs/progress/features/t11-f19-per-unit-mutation-supply-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
@@ -93,7 +94,8 @@
       "docs/progress/features/t13-f04-direct-graph-effect-activation-goal.json",
       "docs/progress/features/t13-f05-function-preserving-module-recruitment-goal.json",
       "docs/progress/features/t13-f06-recruitment-and-retention-qualification-goal.json",
-      "docs/progress/features/t14-f12-neighborhood-read-of-selected-genomes-goal.json"
+      "docs/progress/features/t14-f12-neighborhood-read-of-selected-genomes-goal.json",
+      "docs/progress/features/t11-f19-per-unit-mutation-supply-goal.json"
     ]
   }
 }
