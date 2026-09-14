@@ -691,6 +691,12 @@ fn recruitment_paths_qualified_steps_hold_the_per_step_invariants() {
             assert!(step.seed < SEARCH_RANGE, "{label}");
             assert_eq!(step.stage.seed, Some(step.seed), "{label}");
             assert_eq!(step.stage.delta.nodes.len(), 1, "{label}");
+            assert_eq!(step.charges(), step.stage.task.summary(), "{label}");
+            assert_eq!(
+                step.genome_size(),
+                step.stage.genome.genome_size(),
+                "{label}"
+            );
             assert!(step.stage.task.live(), "{label}");
             let score = step.stage.task.correct(path.task);
             assert!(score + 1 >= previous, "{label}");
