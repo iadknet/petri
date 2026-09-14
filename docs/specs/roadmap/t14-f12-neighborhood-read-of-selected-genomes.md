@@ -149,15 +149,16 @@ the drift chart drops its two floor lines and the floor wording in its subtitle.
 ## Verification
 
 - [ ] `make check` -> exit 0 on the final feature code; commit named here.
-      Build pass, uncommitted worktree: `make check` exit 0 (2026-09-14).
-- [ ] Focused tests: `cargo test -p v3-core -p v3-cli` -> exit 0, with
+      Uncommitted post-simplify worktree on fd38f20c: `make check` exit 0
+      (2026-09-14).
+- [x] Focused tests: `cargo test -p v3-core -p v3-cli` -> exit 0, with
       `cargo clippy -p v3-core -p v3-cli --all-targets` and
       `cargo fmt --all -- --check` clean; test names in the readings file.
-      Build pass: `cargo test -p v3-core -p v3-cli` exit 0 (1,453 v3-core
-      unit, 105 v3-cli unit, every integration binary ok);
-      `cargo clippy --workspace --all-targets -- -D warnings` clean;
-      `cargo fmt --all` applied; `cargo check --workspace --all-targets`
-      clean. New tests: `neighborhood::sample::read_tests::{empty_population_or_zero_sample_reads_nothing,
+      Post-simplify worktree: `cargo test -p v3-core -p v3-cli` exit 0
+      (1,453 v3-core unit, 105 v3-cli unit, every integration binary ok, 0
+      failed); `cargo clippy --workspace --all-targets -- -D warnings` clean;
+      `cargo fmt --all -- --check` clean; `cargo check --workspace
+      --all-targets` clean. New tests: `neighborhood::sample::read_tests::{empty_population_or_zero_sample_reads_nothing,
       population_at_or_below_sample_size_takes_every_rank,
       draw_is_pinned_for_one_population_and_seed,
       ranks_are_ascending_distinct_in_bounds_and_seed_fixed}` (v3-core);

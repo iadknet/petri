@@ -107,14 +107,22 @@ pub struct RunTimings {
     pub neighborhood_read_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
 }
 
+/// The neighborhood work a seed's goal observation runs on its final
+/// population: the evolved half always, the neighborhood read (T14.F12) on
+/// the goal world set only. `None` skips both.
+#[derive(Clone, Copy)]
+pub(super) struct NeighborhoodObservation<'a> {
+    pub battery: &'a Battery,
+    pub sizes: NeighborhoodSizes,
+    pub read: bool,
+}
+
 pub(super) fn run_one_seed(
     config: &SimulationConfig,
     seed: u64,
     horizon: u64,
     observe_goal_indicators: bool,
-    neighborhood_battery: Option<&Battery>,
-    neighborhood_sizes: NeighborhoodSizes,
-    read_neighborhood: bool,
+    neighborhood: Option<NeighborhoodObservation<'_>>,
 ) -> SeedRun {
     let start = Instant::now();
     let mut sim = seed_simulation(config.clone(), seed);
@@ -169,34 +177,34 @@ pub(super) fn run_one_seed(
         let temporal_memory_sensitivity = temporal_memory_sensitivity(seed, &sim);
         let wall_clock_ms = millis(observation_started.elapsed());
 
+        let context = EvalContext::from_config(config);
         let evolved_neighborhood_started = Instant::now();
-        let evolved_neighborhood = neighborhood_battery.map(|battery| {
-            let context = EvalContext::from_config(config);
+        let evolved_neighborhood = neighborhood.map(|observation| {
             evolved_neighborhood_for_seed(
                 seed,
                 &sim,
-                battery,
+                observation.battery,
                 &config.mutation,
                 &context,
-                neighborhood_sizes,
+                observation.sizes,
             )
         });
         let evolved_neighborhood_wall_clock_ms = millis(evolved_neighborhood_started.elapsed());
 
         let neighborhood_read_started = Instant::now();
-        let neighborhood_read = neighborhood_battery
-            .filter(|_| read_neighborhood)
-            .map(|battery| {
-                let context = EvalContext::from_config(config);
-                neighborhood_read_for_seed(
-                    seed,
-                    &sim,
-                    battery,
-                    &config.mutation,
-                    &context,
-                    neighborhood_sizes,
-                )
-            });
+        let neighborhood_read =
+            neighborhood
+                .filter(|observation| observation.read)
+                .map(|observation| {
+                    neighborhood_read_for_seed(
+                        seed,
+                        &sim,
+                        observation.battery,
+                        &config.mutation,
+                        &context,
+                        observation.sizes,
+                    )
+                });
         let neighborhood_read_wall_clock_ms = millis(neighborhood_read_started.elapsed());
 
         GoalObservation {
@@ -376,22 +384,25 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
             )
         });
         let case_config = case.as_ref().map_or(&config, |case| &case.config);
-        let battery = case
-            .as_ref()
-            .map(|case| &case.battery)
-            .or(neighborhood_battery.as_ref());
-        // `run_one_seed` only reads `neighborhood_battery` inside its own
+        // `run_one_seed` only reads `neighborhood` inside its own
         // `observe_goal_indicators`-gated closure, so passing it unconditionally
         // here is equivalent to nulling it out for non-goal profiles and one
         // branch simpler.
+        let neighborhood = case
+            .as_ref()
+            .map(|case| &case.battery)
+            .or(neighborhood_battery.as_ref())
+            .map(|battery| NeighborhoodObservation {
+                battery,
+                sizes: params.neighborhood,
+                read: world_set,
+            });
         let run = run_one_seed(
             case_config,
             seed,
             params.ticks,
             observe_goal_indicators,
-            battery,
-            params.neighborhood,
-            world_set,
+            neighborhood,
         );
         pooled_complexities.extend(run.complexities.iter().copied());
         wall_clock.push(SeedWallClock {
