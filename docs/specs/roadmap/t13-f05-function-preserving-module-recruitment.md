@@ -114,10 +114,11 @@ the operator draws a field over values the runtime decodes to nothing
 (`PushAction.action_type` as a full `u8` where `decode_world_action` admits
 0..=4): the repair draws from the decodable range only, leaving existing
 out-of-range genome values and the raw-field unit step unchanged. A repair
-aligns that operator's site set or draw with the values it admits, extending
-the predicate in the same change, with a property test that the change is
-function-preserving wherever a path uses it as a neutral step plus the F03
-invariants 1–3 for the extended predicate. A repair that
+aligns that operator's site set or draw with the values it admits. A site
+change extends the predicate in the same change and carries the F03
+invariants 1–3; a draw change carries a property test that the draw covers
+exactly the admitted range; either carries a function-preservation property
+wherever a path uses the repaired step as a neutral one. A repair that
 would need a new operator, a template, or a change to weights or bias is out
 of scope and is reported, not built.
 
@@ -264,5 +265,8 @@ below 0.005 do not extend here, so such a reading is escalated.
   since T13.F03 the biases only reweight the applicable set, so they change
   no path's existence. `graph_blank` and `vm_blank` at seven events are
   growth gaps, not failures. The full-`u8` `PushAction.action_type` draw is a
-  transition missing in practice and is repaired as above; a rare but
-  well-formed draw (jump offset, meta slot) is met by the larger seed search.
+  transition missing in practice and is repaired as above, justified by
+  decodability (5/256 to 5/5) alone. Of the other exhausted steps, the meta
+  slot draw was rare and is met by the larger seed search; the jump steps
+  were a harness acceptance defect (reference repair rewrites offsets),
+  corrected in the harness, not a draw defect.
