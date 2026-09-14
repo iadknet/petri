@@ -140,12 +140,15 @@ already write.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
       output path and every survivor resolved in the closure record below.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t13-f04-direct-graph-effect-activation.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
       series entries point to the summaries from the closing commit, no full
-      report staged; verdicts in the closure record and full tables in the
-      readings.
+      report staged; gate exit 0, `severe=false` against both references;
+      goal exit 0, `severe=false` against the single reference; all wall caps
+      held; drift changed/all births at depth 2,000 fell below the 0.005
+      floor in all three worlds; full tables and the fact list in the
+      [readings](../../progress/readings/t13-f04-direct-graph-effect-activation.md).
 - [ ] A second goal run for determinism: not applicable under the shared
       workflow's 2026-09-05 one-goal-run decision; `make check` retains
       cross-process reproducibility and the gate's two-run check.
@@ -190,7 +193,7 @@ experiment under 120 s, goal profile under 15 minutes.
 | T13.F02 in-report Graph blank-start discovery fractions | Move; reported as consequences, no floor or superiority claim. |
 | Other normalized counters, wall/creature-tick, neighborhood, diversity and cognition indicators | No predeclared direction; evolved populations differ from the first affected visit on. |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate: exit 0, `severe=false` against both references, all counters `ok`. Goal: exit 0, `severe=false` against the single predeclared reference, all caps held, but drift changed/all births at depth 2,000 fell below the 0.005 floor in all three worlds (0.0035/0.0045/0.0035) and Graph `contributing` stayed at 0 in 5 of 6 world/depth cells, reported as facts without remediation.
 
 - Summaries: [gate](../../progress/features/t13-f04-direct-graph-effect-activation.json),
   [goal](../../progress/features/t13-f04-direct-graph-effect-activation-goal.json).

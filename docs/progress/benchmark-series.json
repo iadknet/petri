@@ -32,7 +32,8 @@
       "docs/progress/features/t13-f02-recruitment-paths-and-replicated-baseline.json",
       "docs/progress/features/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries.json",
       "docs/progress/features/bench-decomposition.json",
-      "docs/progress/features/t13-f03-mutation-target-applicability.json"
+      "docs/progress/features/t13-f03-mutation-target-applicability.json",
+      "docs/progress/features/t13-f04-direct-graph-effect-activation.json"
     ]
   },
   "goal": {
@@ -85,7 +86,8 @@
       "docs/progress/features/t14-f01-closure-comparison-and-indicator-coverage-integrity-goal.json",
       "docs/progress/features/t14-f03-applied-mortality-and-energy-accounting-goal.json",
       "docs/progress/features/t15-f01-local-raw-artifacts-and-committed-benchmark-summaries-goal.json",
-      "docs/progress/features/t13-f03-mutation-target-applicability-goal.json"
+      "docs/progress/features/t13-f03-mutation-target-applicability-goal.json",
+      "docs/progress/features/t13-f04-direct-graph-effect-activation-goal.json"
     ]
   }
 }
