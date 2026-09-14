@@ -1,0 +1,193 @@
+//! PROBE (scratch worktree only): per-unit mutation supply counterfactuals.
+//! Part A: neighborhoods of baseline-walked genomes under supply arms.
+//! Part B: drift walks under per-unit arms (growth and exposure).
+use rand::{rngs::SmallRng, SeedableRng};
+use std::collections::BTreeSet;
+use v3_core::config::{FounderProfile, MutationConfig, SimulationConfig};
+use v3_core::contracts::NodeId;
+use v3_core::creature::founder::founder_genome;
+use v3_core::creature::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
+use v3_core::mutation::reachability::ParentExecuted;
+use v3_core::mutation::MutationEngine;
+use v3_core::neighborhood::mesh_execution::indices_for_node_ids;
+use v3_core::neighborhood::{births, Battery, EvalContext};
+
+const LINEAGES: usize = 50;
+const BIRTH_LINEAGES: usize = 20;
+const BIRTHS: u32 = 100;
+
+fn arm_config(base: &MutationConfig, arm: &str) -> MutationConfig {
+    // arm grammar: baseline | pu<rate>_b<bias>[_h][_w]
+    let mut c = base.clone();
+    if arm == "baseline" {
+        return c;
+    }
+    let mut parts = arm.split('_');
+    let rate = parts.next().unwrap().trim_start_matches("pu").parse::<f64>().unwrap();
+    c.per_unit_rate = rate;
+    for p in parts {
+        if let Some(b) = p.strip_prefix('b') {
+            c.executed_bias = b.parse::<f64>().unwrap();
+        } else if p == "h" {
+            c.structural_per_birth = true;
+        } else if p == "w" {
+            c.unit_weighted_targets = true;
+        }
+    }
+    c
+}
+
+fn refresh(genomes: &[CreatureGenome], battery: &Battery, ctx: &EvalContext) -> Vec<BTreeSet<NodeId>> {
+    genomes
+        .iter()
+        .map(|g| battery.executed_node_ids(g, ctx.runtime, ctx.shared_memory_decay_rate))
+        .collect()
+}
+
+fn walk_step(
+    genomes: &mut [CreatureGenome],
+    rngs: &mut [SmallRng],
+    ids: &[BTreeSet<NodeId>],
+    cfg: &MutationConfig,
+    ctx: &EvalContext,
+) {
+    for ((g, rng), id) in genomes.iter_mut().zip(rngs.iter_mut()).zip(ids) {
+        let reach = mesh_reachable_nodes(g);
+        let exec = indices_for_node_ids(g, id);
+        MutationEngine::apply_mutations_with_food_type_count(
+            g,
+            cfg,
+            &reach,
+            ParentExecuted::Indices(&exec),
+            rng,
+            ctx.food_type_count,
+        );
+    }
+}
+
+fn structure(genomes: &[CreatureGenome], battery: &Battery, ctx: &EvalContext) -> (f64, f64, f64, f64) {
+    let (mut nodes, mut units, mut reach, mut exec) = (0usize, 0u64, 0usize, 0usize);
+    for g in genomes {
+        let m = battery.mesh_execution(g, ctx.runtime, ctx.shared_memory_decay_rate);
+        nodes += m.total_node_count;
+        reach += m.reachable_node_count;
+        exec += m.executed_node_count;
+        units += g.genome_size() as u64;
+    }
+    let n = genomes.len() as f64;
+    (nodes as f64 / n, units as f64 / n, reach as f64 / n, exec as f64 / n)
+}
+
+fn births_row(
+    genomes: &[CreatureGenome],
+    battery: &Battery,
+    cfg: &MutationConfig,
+    ctx: &EvalContext,
+    depth: u64,
+) -> String {
+    let mut total = births::BirthResult {
+        births_total: 0,
+        zero_event_births: 0,
+        by_requested_events: Default::default(),
+        any_events: Default::default(),
+        by_events: Default::default(),
+    };
+    for (i, g) in genomes.iter().take(BIRTH_LINEAGES).enumerate() {
+        let base = battery.signature(g, ctx.runtime, ctx.shared_memory_decay_rate);
+        let r = births::per_birth_result(g, &base, battery, cfg, ctx, BIRTHS, 7_000_000 + 1000 * (i as u64 + 1) + depth);
+        total = total.merge(&r);
+    }
+    let t = f64::from(total.births_total);
+    let a = total.any_events;
+    let requested: u64 = total.by_requested_events.iter().map(|(&k, &v)| u64::from(k) * u64::from(v)).sum();
+    format!(
+        "births={} zero={} mean_requested={:.2} mutated={} silent={} changed={} dead={} changed_per_all={:.4} dead_per_all={:.4} silent_per_all={:.4}",
+        total.births_total,
+        total.zero_event_births,
+        requested as f64 / t,
+        a.trials - a.skipped,
+        a.silent,
+        a.changed,
+        a.dead,
+        f64::from(a.changed) / t,
+        f64::from(a.dead) / t,
+        f64::from(a.silent) / t,
+    )
+}
+
+#[test]
+fn probe_a_neighborhoods_on_baseline_walk() {
+    let config = SimulationConfig::default();
+    let ctx = EvalContext::from_config(&config);
+    let battery = Battery::generate(ctx.food_type_count);
+    let founder = founder_genome(FounderProfile::V3Alpha1);
+    let arms: Vec<String> = std::env::var("PETRI_ARMS")
+        .unwrap_or_else(|_| "baseline,pu0.005_b0.9,pu0.005_b0.0,pu0.005_b0.0_w,pu0.005_b0.0_h,pu0.01_b0.0,pu0.0025_b0.0".into())
+        .split(',')
+        .map(String::from)
+        .collect();
+    let mut genomes: Vec<CreatureGenome> = (0..LINEAGES).map(|_| founder.clone()).collect();
+    let mut rngs: Vec<SmallRng> = (0..LINEAGES).map(|l| SmallRng::seed_from_u64(90_000 + l as u64)).collect();
+    let mut ids = refresh(&genomes, &battery, &ctx);
+    let mut depth = 0u64;
+    let started = std::time::Instant::now();
+    for &checkpoint in &[0u64, 22, 250, 1000, 2000] {
+        while depth < checkpoint {
+            if depth > 0 && depth % 10 == 0 {
+                ids = refresh(&genomes, &battery, &ctx);
+            }
+            walk_step(&mut genomes, &mut rngs, &ids, &config.mutation, &ctx);
+            depth += 1;
+        }
+        let (nodes, units, reach, exec) = structure(&genomes, &battery, &ctx);
+        println!("A-STRUCT depth={depth} mean_nodes={nodes:.2} mean_units={units:.1} mean_reachable={reach:.2} mean_executed={exec:.2}");
+        for arm in &arms {
+            let cfg = arm_config(&config.mutation, arm);
+            println!("A-BIRTHS depth={depth} arm={arm} {} ({:.0}s)", births_row(&genomes, &battery, &cfg, &ctx, depth), started.elapsed().as_secs_f64());
+        }
+    }
+}
+
+#[test]
+fn probe_b_walks_under_arms() {
+    let config = SimulationConfig::default();
+    let ctx = EvalContext::from_config(&config);
+    let battery = Battery::generate(ctx.food_type_count);
+    let founder = founder_genome(FounderProfile::V3Alpha1);
+    let arms: Vec<String> = std::env::var("PETRI_WALK_ARMS")
+        .unwrap_or_else(|_| "pu0.005_b0.0,pu0.005_b0.0_h,pu0.005_b0.9_h".into())
+        .split(',')
+        .map(String::from)
+        .collect();
+    let max_depth: u64 = std::env::var("PETRI_WALK_DEPTH").ok().and_then(|v| v.parse().ok()).unwrap_or(1000);
+    for arm in &arms {
+        let cfg = arm_config(&config.mutation, arm);
+        let mut genomes: Vec<CreatureGenome> = (0..LINEAGES).map(|_| founder.clone()).collect();
+        let mut rngs: Vec<SmallRng> = (0..LINEAGES).map(|l| SmallRng::seed_from_u64(95_000 + l as u64)).collect();
+        let mut ids = refresh(&genomes, &battery, &ctx);
+        let mut depth = 0u64;
+        let started = std::time::Instant::now();
+        let checkpoints: Vec<u64> = [22u64, 250, 1000, 2000].into_iter().filter(|&c| c <= max_depth).collect();
+        'arm: for &checkpoint in &checkpoints {
+            while depth < checkpoint {
+                if depth > 0 && depth % 10 == 0 {
+                    ids = refresh(&genomes, &battery, &ctx);
+                }
+                walk_step(&mut genomes, &mut rngs, &ids, &cfg, &ctx);
+                depth += 1;
+                if depth % 10 == 0 {
+                    let nodes = genomes.iter().map(|g| g.nodes.len()).sum::<usize>() as f64 / LINEAGES as f64;
+                    let units = genomes.iter().map(|g| g.genome_size() as u64).sum::<u64>() as f64 / LINEAGES as f64;
+                    println!("B-GROW arm={arm} depth={depth} mean_nodes={nodes:.1} mean_units={units:.1} ({:.0}s)", started.elapsed().as_secs_f64());
+                    if units > 12_000.0 || nodes > 400.0 {
+                        println!("B-ABORT arm={arm} depth={depth} mean_nodes={nodes:.1} mean_units={units:.1}");
+                        break 'arm;
+                    }
+                }
+            }
+            let (nodes, units, reach, exec) = structure(&genomes, &battery, &ctx);
+            println!("B-STRUCT arm={arm} depth={depth} mean_nodes={nodes:.2} mean_units={units:.1} mean_reachable={reach:.2} mean_executed={exec:.2}");
+            println!("B-BIRTHS arm={arm} depth={depth} {} ({:.0}s)", births_row(&genomes, &battery, &cfg, &ctx, depth), started.elapsed().as_secs_f64());
+        }
+    }
+}

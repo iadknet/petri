@@ -1,0 +1,241 @@
+diff --git a/crates/v3-core/src/config/simulation.rs b/crates/v3-core/src/config/simulation.rs
+index 93ee8d23..7b9207bd 100644
+--- a/crates/v3-core/src/config/simulation.rs
++++ b/crates/v3-core/src/config/simulation.rs
+@@ -765,6 +765,15 @@ pub struct MutationConfig {
+     /// How many ticks back a dispatch still counts as "recently executed".
+     #[serde(default = "default_executed_window_ticks")]
+     pub executed_window_ticks: u64,
++    /// PROBE: per-`genome_size()`-unit event rate; 0.0 keeps the per-birth rule.
++    #[serde(default)]
++    pub per_unit_rate: f64,
++    /// PROBE: when per-unit is on, keep Topology events on the per-birth rule.
++    #[serde(default)]
++    pub structural_per_birth: bool,
++    /// PROBE: draw target nodes weighted by their unit size instead of uniformly.
++    #[serde(default)]
++    pub unit_weighted_targets: bool,
+ }
+
+ fn default_mutation_event_continuation_probability() -> f64 {
+@@ -795,6 +804,9 @@ impl Default for MutationConfig {
+             reachable_bias: ReachableBiasConfig::default(),
+             executed_bias: default_executed_bias(),
+             executed_window_ticks: default_executed_window_ticks(),
++            per_unit_rate: 0.0,
++            structural_per_birth: false,
++            unit_weighted_targets: false,
+         }
+     }
+ }
+diff --git a/crates/v3-core/src/mutation/engine/mod.rs b/crates/v3-core/src/mutation/engine/mod.rs
+index d1b94034..25eb96bd 100644
+--- a/crates/v3-core/src/mutation/engine/mod.rs
++++ b/crates/v3-core/src/mutation/engine/mod.rs
+@@ -31,6 +31,37 @@ fn requested_event_count(config: &MutationConfig, rng: &mut impl Rng) -> u32 {
+     count
+ }
+
++/// PROBE: one node's contribution to `genome_size()`.
++fn node_unit_size(node: &crate::creature::genome::NodeGenome) -> u32 {
++    let mut score: u32 = 1 + node.input_refs.len() as u32 + node.targets.len() as u32;
++    match &node.backend_def {
++        BackendDef::Vm(vm) => {
++            score += vm.program.len() as u32 + vm.constants.len() as u32;
++        }
++        BackendDef::Graph(graph) => {
++            score += graph.compute_nodes.len() as u32;
++            for cn in &graph.compute_nodes {
++                score += cn.inputs.len() as u32;
++            }
++            for sink in &graph.output_sinks {
++                if !sink.inputs.is_empty() {
++                    score += 1 + sink.inputs.len() as u32;
++                }
++            }
++            for slot in &graph.action_bank {
++                let edges = slot.gate_inputs.len() + slot.param_inputs.len();
++                if edges > 0 {
++                    score += 1 + edges as u32;
++                }
++            }
++            if !graph.execute_gate.inputs.is_empty() {
++                score += 1 + graph.execute_gate.inputs.len() as u32;
++            }
++        }
++    }
++    score
++}
++
+ /// What one attempted mutation event produced, once an operator of the drawn
+ /// domain accepted the attempt.
+ struct SelectedEvent {
+@@ -86,10 +117,47 @@ impl MutationEngine {
+         rng: &mut impl Rng,
+         food_type_count: usize,
+     ) -> MutationSummary {
+-        let event_count = requested_event_count(config, rng);
++        // PROBE: per-unit supply. Node-internal events ~ Binomial(genome_size, rate);
++        // Topology events either share that draw (pure) or keep the per-birth rule
++        // scaled by mesh_layer_probability (structural_per_birth).
++        let plan: Option<Vec<bool>> = if config.per_unit_rate > 0.0 {
++            let units = genome.genome_size();
++            let mut plan = Vec::new();
++            if config.structural_per_birth {
++                let per_birth = requested_event_count(config, rng);
++                for _ in 0..per_birth {
++                    if rng.gen_bool(config.mesh_layer_probability) {
++                        plan.push(true);
++                    }
++                }
++                for _ in 0..units {
++                    if rng.gen_bool(config.per_unit_rate.min(1.0)) {
++                        plan.push(false);
++                    }
++                }
++            } else {
++                for _ in 0..units {
++                    if rng.gen_bool(config.per_unit_rate.min(1.0)) {
++                        plan.push(rng.gen_bool(config.mesh_layer_probability));
++                    }
++                }
++            }
++            Some(plan)
++        } else {
++            None
++        };
++        let event_count = match &plan {
++            Some(plan) => plan.len() as u32,
++            None => requested_event_count(config, rng),
++        };
+         if event_count == 0 {
+             return MutationSummary::zero();
+         }
++        let node_weights: Vec<u32> = if config.unit_weighted_targets {
++            genome.nodes.iter().map(node_unit_size).collect()
++        } else {
++            Vec::new()
++        };
+
+         // Genome size pressure: compute once before the event loop.
+         let restricted = config.genome_size_pressure_enabled
+@@ -106,6 +174,11 @@ impl MutationEngine {
+             config.executed_bias
+         };
+         let sets = TargetSets::new(parent_reachable_nodes, executed.as_ref());
++        let sets = if config.unit_weighted_targets {
++            sets.with_weights(&node_weights)
++        } else {
++            sets
++        };
+         let selector = |domain_bias: f64| {
+             sets.selector(
+                 pressure_adjusted_bias(domain_bias, restricted),
+@@ -117,7 +190,7 @@ impl MutationEngine {
+         // Reused across events: the ids the genome carries before each event,
+         // so a selected index can be recorded as the node it named (T13.F01).
+         let mut node_ids: Vec<NodeId> = Vec::with_capacity(genome.nodes.len());
+-        for _ in 0..event_count {
++        for event_index in 0..event_count {
+             node_ids.clear();
+             node_ids.extend(genome.nodes.iter().map(|node| node.node_id));
+             // Every operator this event tried and threw away for reporting no
+@@ -125,7 +198,11 @@ impl MutationEngine {
+             let mut discarded: Vec<(MutationOperator, Option<NodeId>)> = Vec::new();
+             // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
+             let rb = &config.reachable_bias;
+-            let (domain, selected) = if rng.gen_bool(config.mesh_layer_probability) {
++            let topology_now = match &plan {
++                Some(plan) => plan[event_index as usize],
++                None => rng.gen_bool(config.mesh_layer_probability),
++            };
++            let (domain, selected) = if topology_now {
+                 // Layer 1: Mesh (Topology)
+                 let mut available: Vec<TopologyOperator> = TopologyOperator::ALL
+                     .iter()
+diff --git a/crates/v3-core/src/mutation/reachability.rs b/crates/v3-core/src/mutation/reachability.rs
+index 520c93c2..f1963ec0 100644
+--- a/crates/v3-core/src/mutation/reachability.rs
++++ b/crates/v3-core/src/mutation/reachability.rs
+@@ -106,6 +106,8 @@ pub fn biased_select_from(
+ pub struct TargetSets<'a> {
+     reachable: &'a [usize],
+     executed: &'a [usize],
++    /// PROBE: per-node unit sizes for a unit-weighted draw (None = uniform).
++    weights: Option<&'a [u32]>,
+ }
+
+ impl<'a> TargetSets<'a> {
+@@ -115,13 +117,24 @@ impl<'a> TargetSets<'a> {
+         Self {
+             reachable,
+             executed,
++            weights: None,
+         }
+     }
+
++    /// PROBE: attach per-node unit sizes (indexed by node index).
++    #[must_use]
++    pub const fn with_weights(mut self, weights: &'a [u32]) -> Self {
++        self.weights = Some(weights);
++        self
++    }
++
+     /// A selector over these sets at the given domain biases.
+     #[must_use]
+     pub fn selector(&self, reachable_bias: f64, executed_bias: f64) -> TargetSelector<'a> {
+-        TargetSelector::new(self.reachable, self.executed, reachable_bias, executed_bias)
++        let mut selector =
++            TargetSelector::new(self.reachable, self.executed, reachable_bias, executed_bias);
++        selector.weights = self.weights;
++        selector
+     }
+ }
+
+@@ -141,8 +154,12 @@ pub struct TargetSelector<'a> {
+     executed_bias: f64,
+     executed_hits: u32,
+     first_pick: Option<usize>,
++    weights: Option<&'a [usize_w]>,
+ }
+
++#[allow(non_camel_case_types)]
++type usize_w = u32;
++
+ impl<'a> TargetSelector<'a> {
+     /// Build a selector over the parent's node sets and the domain's biases.
+     const fn new(
+@@ -158,6 +175,7 @@ impl<'a> TargetSelector<'a> {
+             executed_bias,
+             executed_hits: 0,
+             first_pick: None,
++            weights: None,
+         }
+     }
+
+@@ -217,6 +235,25 @@ impl<'a> TargetSelector<'a> {
+                 return Some((index, classify_target(index, self.reachable)));
+             }
+         }
++        if let Some(weights) = self.weights {
++            // PROBE: unit-weighted draw over eligible nodes.
++            let total: u64 = eligible.iter().map(|&i| u64::from(weights.get(i).copied().unwrap_or(1).max(1))).sum();
++            let mut roll = rng.gen_range(0..total);
++            let mut chosen = eligible[eligible.len() - 1];
++            for &i in eligible {
++                let w = u64::from(weights.get(i).copied().unwrap_or(1).max(1));
++                if roll < w {
++                    chosen = i;
++                    break;
++                }
++                roll -= w;
++            }
++            if self.executed.binary_search(&chosen).is_ok() {
++                self.executed_hits += 1;
++            }
++            self.remember(chosen);
++            return Some((chosen, classify_target(chosen, self.reachable)));
++        }
+         let picked = biased_select_from(eligible, self.reachable, self.reachable_bias, rng)?;
+         if self.executed.binary_search(&picked.0).is_ok() {
+             self.executed_hits += 1;
