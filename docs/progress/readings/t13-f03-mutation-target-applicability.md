@@ -7,7 +7,7 @@ Tables and transcripts for the feature spec
 
 | Command | Result |
 | --- | --- |
-| `cargo test -p v3-core --test viability` (run first, before any edit) | ok. 24 passed; 0 failed; 2 ignored=0; 0.42 s |
+| `cargo test -p v3-core --test viability` (run first, before any edit) | ok. 24 passed; 0 failed; 0 ignored; 0.42 s |
 | `cargo test -p v3-core --test viability` (after the repair) | ok. 24 passed; 0 failed; 0.29 s |
 | `cargo test -p v3-core` | ok. 1412 lib + all integration targets passed; 0 failed; 2 ignored |
 | `cargo test -p v3-core --test reproducibility` | ok. 3 passed; 0 failed; 8.95 s |
@@ -17,11 +17,16 @@ Tables and transcripts for the feature spec
 | `cargo fmt --all` | applied |
 | `make roadmap-check` | validation passed |
 
-Property tests (`crates/v3-core/src/mutation/applicability_tests.rs`) cover
-invariants 1–5. Red-then-green was checked by forcing every predicate to
-`true` (the pre-repair select-then-fail behavior): all six tests fail; with
-the predicates in place all six pass. No `proptest-regressions` file was
-produced by a genuine failure.
+Property tests (`crates/v3-core/src/mutation/applicability_tests.rs`, 7 tests)
+cover invariants 1–5, looping over `GraphOperator::ALL` and `VmOperator::ALL`
+so every repaired operator is exercised on every generated genome. Invariant 5
+is asserted twice: under the uniform draw, and under a firing reachable bias
+(`reachable_only(&reachable, 1.0)`) where the pick must also stay inside
+`applicable ∩ reachable` whenever that intersection is non-empty.
+Red-then-green was checked by forcing every predicate to `true` (the
+pre-repair select-then-fail behavior): all six tests that existed at that
+point fail; with the predicates in place all pass. No `proptest-regressions`
+file was produced by a genuine failure.
 
 ## Re-pinned expectations
 
