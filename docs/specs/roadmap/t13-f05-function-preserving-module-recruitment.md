@@ -1,6 +1,6 @@
 # T13.F05 — Function-Preserving Module Recruitment
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-14
 **Feature**: T13.F05
 **Track**: [T13 — Neutral Module Recruitment](../../roadmaps/t13-neutral-module-recruitment.md)
@@ -142,7 +142,7 @@ closure's exactly.
 - [x] TDD each missing transition's repair in the existing operator with
       viability run first; one found, the `PushAction.action_type` draw.
 - [x] Turn every qualified path into the maintained regression tests above.
-- [ ] `cargo check --workspace --all-targets`, `cargo clippy`, `cargo fmt`,
+- [x] `cargo check --workspace --all-targets`, `cargo clippy`, `cargo fmt`,
       `make roadmap-check`; update `docs/progress.md`,
       `docs/progress/benchmark-series.json` and the owning row at closure.
 
@@ -156,7 +156,7 @@ closure's exactly.
 - [x] One production draw repaired (`PushAction.action_type` in `0..=4`,
       readings "Seed search"): viability ok before and after, `cargo test -p
       v3-core`, `--test reproducibility` and `-p v3-cli` ok, one test re-pinned.
-- [ ] `make check` on the final feature code -> tested commit recorded below.
+- [x] `make check` on the final feature code -> tested commit recorded below.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
       output path and every survivor resolved in the closure record below.
 - [x] Benchmark summaries at
@@ -173,10 +173,10 @@ make bench PROFILE=goal FEATURE=t13-f05-function-preserving-module-recruitment
 
 | Closure record | Value |
 | --- | --- |
-| Tested commit | pending |
+| Tested commit | `3d9b13fb` (`make check` exit 0, 2026-09-14) |
 | Mutation gate | Fresh run (`run-mode.txt`: `fresh`) against base `12bee429`, output `~/.local/share/petri-tools/mutants/t13-f05/mutants.out`: `202 mutants tested in 29m: 60 missed, 109 caught, 33 unviable`, 0 timeouts. All 60 survivors are in `recruitment_paths/qualification.rs` (the production draw's mutants were all caught): 39 killed in `recruitment_paths/tests.rs` by un-ignoring `recruitment_paths_seed_search_finds_the_pinned_seeds` (1.5 s, not minutes; reads every acceptance predicate), the new `recruitment_paths_qualified_requires_no_gap_and_at_most_the_bound`, and a `!surfaces_unchanged` assertion on each useful last step; 21 equivalent (four `detour_start` conjuncts guard an `expect` on a pinned seed, and 17 dropped conjuncts of private search predicates whose remaining conjuncts reject every seed below the pinned one, so `search_seeds` and `qualified_paths` are unchanged); none deferred. One fresh run; the `MUTANTS_ITERATE=1` pass caught 39 of 60. Full list in the [readings](../../progress/readings/t13-f05-function-preserving-module-recruitment.md#mutation-gate). |
-| Closure documentation checks | pending |
-| Mutation output audit | pending |
+| Closure documentation checks | `make check-docs` exit 0 at the closing commit; spec `Complete`, T13.F05 row checked, track and master rollups unchanged (T13.F06 open) |
+| Mutation output audit | `missed.txt` at the recorded path holds exactly the 21 equivalent survivors (lines 308/310/312/313/318/410/411/530–535/613/614×2/674/771–774), `timeout.txt` empty, no `#[mutants::skip]` or `exclude_re`; raw sha256/bytes of both summaries match the local `.bench-artifacts` files (verified 2026-09-14) |
 
 ## Performance and Goal Impact
 
@@ -242,18 +242,18 @@ lists only. Depth-1,000 floors hold.
 
 ## Success Criteria
 
-- [ ] Every dormant-copy, unprepared-copy and neutral-split form has a
+- [x] Every dormant-copy, unprepared-copy and neutral-split form has a
       qualified path of at most six production events whose neutral steps keep
       the incumbent's battery, queue, memory and routing effects and whose
       last step is one connection or parameter edit exposing a useful,
       bypass-sensitive contribution.
-- [ ] Every blank and inline form has a qualified path or a recorded shortest
+- [x] Every blank and inline form has a qualified path or a recorded shortest
       path with its growth gap named; every missing transition is repaired
       inside the existing operator with the predicate extended and property
       coverage, or the spec records that no production operator changed.
-- [ ] Every qualified path is a maintained replaying test; reference specs
+- [x] Every qualified path is a maintained replaying test; reference specs
       state any repaired operator's semantics.
-- [ ] Benchmark evidence stored, drift floors read, and the mutation gate
+- [x] Benchmark evidence stored, drift floors read, and the mutation gate
       recorded.
 
 ## Notes for AI Agents
@@ -271,3 +271,7 @@ lists only. Depth-1,000 floors hold.
   slot draw was rare and is met by the larger seed search; the jump steps
   were a harness acceptance defect (reference repair rewrites offsets),
   corrected in the harness, not a draw defect.
+- Cost: `/usage` totals not collected (non-interactive goal run);
+  implementer passes 4 (build, repair, self-review, post-review remediation)
+  with advisor consults 2/2/2/2; spec-owner resumes after Plan 3; reviewer
+  findings P1 1, P2 2, P3 3.
