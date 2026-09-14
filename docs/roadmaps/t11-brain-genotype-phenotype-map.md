@@ -73,7 +73,7 @@ representation only where the neighborhood reading still shows a gap.
 
 - [x] **T11.F18 — Backend-Neutral Mesh Node Growth** — Depends on: T11.F15, T11.F17
   - Goal: Developmental variation in new neural tissue. A creature can grow either kind of brain module along a working decision path without losing its current behavior, so graph computation has the same direct opportunity as VM computation to enter an evolving controller.
-- [ ] **T11.F19 — Per-Unit Mutation Supply** — Depends on: T11.F04, T11.F17, T03.F08, T14.F12
+- [x] **T11.F19 — Per-Unit Mutation Supply** — Depends on: T11.F04, T11.F17, T03.F08, T14.F12
   - Goal: Copy errors per base. Every `genome_size()` unit a parent carries is an independent chance of one mutation event at birth, so the expected number of events grows with the genome instead of being a fixed count per birth; the founder's supply is unchanged, a larger genome pays its size in exposure, and the per-birth minimum, maximum, and continuation rule are retired.
 
 ## Notes for AI Agents
