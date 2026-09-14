@@ -1,0 +1,268 @@
+{
+ "world": {
+  "width": 1600,
+  "height": 1600,
+  "edge_mode": "Wrap",
+  "terrain": [],
+  "world_seed": 1104,
+  "food": {
+   "shared": {
+    "growth_rate": 0.09,
+    "initial_density": 0.4,
+    "initial_coverage": 0.65,
+    "spread_threshold_ratio": 0.8,
+    "spread_density_ratio": 0.25,
+    "recovery_spawn_rate": 0.01,
+    "recovery_floor_ratio": 0.01,
+    "max_density": 1.0,
+    "occupancy_depletion": {
+     "enabled": true,
+     "deposit_per_occupied_tick": 0.08
+    },
+    "fertility": {
+     "enabled": true,
+     "min_fertility": 0.0,
+     "max_fertility": 2.0,
+     "layers": [
+      {
+       "algorithm": {
+        "Uniform": {
+         "value": 1.0
+        }
+       },
+       "weight": 0.08,
+       "target": {
+        "SingleType": {
+         "type_idx": 0
+        }
+       }
+      },
+      {
+       "algorithm": {
+        "PoissonBlobs": {
+         "blob_count": 60,
+         "min_radius": 40.0,
+         "max_radius": 90.0,
+         "falloff": 0.5,
+         "seed": null
+        }
+       },
+       "weight": 1.0,
+       "target": {
+        "SingleType": {
+         "type_idx": 0
+        }
+       }
+      },
+      {
+       "algorithm": {
+        "PoissonBlobs": {
+         "blob_count": 24,
+         "min_radius": 50.0,
+         "max_radius": 110.0,
+         "falloff": 0.6,
+         "seed": null
+        }
+       },
+       "weight": 1.0,
+       "target": {
+        "SingleType": {
+         "type_idx": 1
+        }
+       }
+      }
+     ]
+    },
+    "annealing": {
+     "enabled": false,
+     "ramp_ticks": 5000,
+     "initial_min_fertility": 0.3,
+     "initial_max_fertility": 1.5
+    }
+   },
+   "types": [
+    {
+     "name": "Grass",
+     "color": "#84cc16",
+     "initial_density": 0.4,
+     "initial_coverage": 0.65,
+     "growth_inhibitor": 0.1,
+     "energy_per_unit": 4.0,
+     "growth_rate": 0.05,
+     "recovery_spawn_rate": 0.001,
+     "initial_fertility_only": false
+    },
+    {
+     "name": "Fruit",
+     "color": "#f97316",
+     "initial_density": 1.0,
+     "initial_coverage": 0.85,
+     "growth_inhibitor": 0.0,
+     "energy_per_unit": 15.0,
+     "growth_rate": 0.12,
+     "recovery_spawn_rate": 0.0,
+     "initial_fertility_only": true
+    }
+   ],
+   "fertility": {
+    "enabled": true,
+    "min_fertility": 0.0,
+    "max_fertility": 2.0,
+    "layers": [
+     {
+      "algorithm": {
+       "Uniform": {
+        "value": 1.0
+       }
+      },
+      "weight": 0.08,
+      "target": {
+       "SingleType": {
+        "type_idx": 0
+       }
+      }
+     },
+     {
+      "algorithm": {
+       "PoissonBlobs": {
+        "blob_count": 60,
+        "min_radius": 40.0,
+        "max_radius": 90.0,
+        "falloff": 0.5,
+        "seed": null
+       }
+      },
+      "weight": 1.0,
+      "target": {
+       "SingleType": {
+        "type_idx": 0
+       }
+      }
+     },
+     {
+      "algorithm": {
+       "PoissonBlobs": {
+        "blob_count": 24,
+        "min_radius": 50.0,
+        "max_radius": 110.0,
+        "falloff": 0.6,
+        "seed": null
+       }
+      },
+      "weight": 1.0,
+      "target": {
+       "SingleType": {
+        "type_idx": 1
+       }
+      }
+     }
+    ]
+   },
+   "annealing": {
+    "enabled": false,
+    "ramp_ticks": 5000,
+    "initial_min_fertility": 0.3,
+    "initial_max_fertility": 1.5
+   }
+  }
+ },
+ "energy": {
+  "lifecycle": {
+   "initial_energy": 20.0,
+   "max_energy": 200.0,
+   "energy_decay_per_tick": 0.5,
+   "min_reproduce_energy": 30.0,
+   "min_reproduce_age": 20,
+   "default_offspring_energy": 100.0,
+   "genome_carry_cost_per_unit": 0.0001
+  },
+  "costs": {
+   "move_cost": 0.2,
+   "eat_cost": 0.0,
+   "eat_reward_per_food": 5.0,
+   "noop_cost": 0.05,
+   "reproduce_cost": 0.1,
+   "failed_action_penalty": 1.0
+  },
+  "complexity_cost": {
+   "enabled": false,
+   "threshold": 50,
+   "scaling_factor": 0.002
+  },
+  "age_cost": {
+   "enabled": true,
+   "age_cap": 500,
+   "max_multiplier": 10.0
+  }
+ },
+ "startup": {
+  "ramps": {
+   "failed_action_penalty": {
+    "enabled": true,
+    "start": 0.0,
+    "end": 1.0,
+    "target_tick": 62680
+   }
+  }
+ },
+ "runtime": {
+  "max_mesh_hops": 1024,
+  "max_vm_steps": 10000,
+  "max_graph_relax_iters": 15,
+  "graph_convergence_epsilon": 0.001,
+  "graph_convergence_stable_passes": 2,
+  "graph_node_base_cost": 1e-05,
+  "plasticity_update_cost": 0.0,
+  "reward_learning_cost": 0.0,
+  "max_actions_per_turn": 10,
+  "vm": {
+   "opcode_cost_multiplier": 1e-06,
+   "step_ramp_allowance": 100,
+   "step_ramp_cost": 1e-06
+  },
+  "perception": {
+   "vision_radius": 5
+  }
+ },
+ "mutation": {
+  "mutation_probability": 0.44,
+  "per_birth_mutation_events_min": 1,
+  "per_birth_mutation_events_max": 10,
+  "per_birth_mutation_event_continuation_probability": 0.2,
+  "mesh_layer_probability": 0.2,
+  "genome_size_cap": 1200,
+  "genome_size_pressure_enabled": false,
+  "action_queue_cap": 4,
+  "phenotype": {
+   "channel_step": 1,
+   "channel_change_chance": 0.001,
+   "polarity_flip_chance": 0.0002
+  },
+  "reachable_bias": {
+   "topology": 0.0,
+   "vm": 0.0,
+   "graph": 0.0,
+   "input_ref": 0.0
+  },
+  "executed_bias": 0.0,
+  "executed_window_ticks": 100,
+  "per_unit_rate": 0.005,
+  "structural_per_birth": false,
+  "unit_weighted_targets": false
+ },
+ "population": {
+  "initial_creatures": 10000,
+  "max_creatures": 100000,
+  "founder_profile": "v3_alpha1"
+ },
+ "predation": {
+  "steal_cost_rate": 0.05,
+  "kill_complexity_bonus_multiplier": 0.0
+ },
+ "action_log": {
+  "capacity": 500
+ },
+ "shared_memory": {
+  "decay_rate": 0.0
+ }
+}
