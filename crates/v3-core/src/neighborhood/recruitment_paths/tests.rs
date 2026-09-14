@@ -597,11 +597,11 @@ fn recruitment_paths_wilson_midpoint_has_the_predeclared_interval() {
 }
 
 /// The one-off seed search behind every pinned seed: the first accepted
-/// seed per step in `0..SEARCH_RANGE`. Minutes long, so ignored;
-/// run with `cargo test -p v3-core --lib -- --ignored --nocapture
-/// recruitment_paths_seed_search`.
+/// seed per step in `0..SEARCH_RANGE`. It walks about 110,000 applied
+/// events (the largest pinned seed is 41,854) in under two seconds, and it
+/// is the only reading of each step's acceptance predicate: a weakened
+/// predicate accepts an earlier seed, a broken one exhausts the range.
 #[test]
-#[ignore = "one-off search over up to 1,000,000 seeds per step"]
 fn recruitment_paths_seed_search_finds_the_pinned_seeds() {
     let found: Vec<_> = search_seeds()
         .into_iter()
@@ -707,6 +707,7 @@ fn recruitment_paths_qualified_steps_hold_the_per_step_invariants() {
                     "{label}"
                 );
                 assert!(score > path.start.task.correct(path.task), "{label}");
+                assert!(!step.surfaces_unchanged, "{label}");
             } else {
                 assert!(step.stage.incumbent_actions_unchanged, "{label}");
                 assert!(step.surfaces_unchanged, "{label}");
@@ -719,6 +720,24 @@ fn recruitment_paths_qualified_steps_hold_the_per_step_invariants() {
             previous = score;
         }
     }
+}
+
+#[test]
+fn recruitment_paths_qualified_requires_no_gap_and_at_most_the_bound() {
+    let complete = paths()
+        .iter()
+        .find(|path| path.form == "graph_copy")
+        .unwrap();
+    assert!(complete.qualified());
+    let mut gapped = complete.clone();
+    gapped.gap = Some(GrowthGap {
+        length: 7,
+        lengthening_step: "cue_added".into(),
+    });
+    assert!(!gapped.qualified());
+    let mut long = complete.clone();
+    long.steps = vec![complete.steps[0].clone(); MAX_PATH_EVENTS + 1];
+    assert!(!long.qualified());
 }
 
 #[test]
