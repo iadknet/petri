@@ -21,15 +21,14 @@ neither can touch.
 
 - No change to the mutation engine, battery, classifier, any rate, cost or
   default; no production RNG consumed.
-- No change to T11.F01's evolved half or the drift walk's readings; both stay
-  byte-identical. Only the drift chart's floor lines go, per the T11 amendment.
+- T11.F01's evolved half and the drift walk's readings stay byte-identical;
+  only the drift chart's floor lines go, per the T11 amendment.
 - No clade stratification, per-unit supply arm, 12,000-tick run or checkpoint
   reading. One read, at the horizon, per world.
 - No floor enforced in code: floors are read at closure from the stored report,
   as the drift floor was.
 - No use of the live creature's dispatch record as the executed set; the
-  classifier's battery-derived stand-in keeps the reading comparable in kind to
-  the drift walk and the evolved half.
+  classifier's battery-derived stand-in keeps the reading comparable in kind.
 
 ## Inputs and Invariants
 
@@ -73,13 +72,14 @@ change to the draw bumps `version`. An empty population yields no rows and
 `UNDEFINED` fractions. Sample and birth counts travel on `NeighborhoodSizes`
 (production 50 and 100; the tiny test fixture keeps its own small values) and
 are recorded truthfully in the block, never in `ProfileBlock`. The read runs
-wherever the evolved half runs: the goal profile, today the three-world set.
+on the goal world set only, per world, as `drift_depth` does; the plain `goal`
+profile and the gate record it `Undefined`.
 
 **Births.** Genome `i` in sample order uses `seed_offset = 8_000_000 + 1_000 × (i + 1)`
 through the unchanged `per_birth_result`, a range disjoint from the evolved
 half's (`100_000 × (i + 1)`) and the drift walk's (`7_000_000 + …`) offsets.
-Seeds are fixed, so a zero-event count is a property of the seed stream, as it
-already is for the evolved half.
+Seeds are fixed, so a zero-event count is a property of the seed stream, as
+for the evolved half.
 
 **Block.** `GoalCaseObservation` gains `neighborhood_read: Indicator<NeighborhoodRead>`,
 `Undefined` outside the goal world set and `#[serde(default)]` so stored reports
@@ -157,8 +157,7 @@ the drift chart drops its two floor lines and the floor wording in its subtitle.
       Post-simplify worktree: `cargo test -p v3-core -p v3-cli` exit 0
       (1,453 v3-core unit, 105 v3-cli unit, every integration binary ok, 0
       failed); `cargo clippy --workspace --all-targets -- -D warnings` clean;
-      `cargo fmt --all -- --check` clean; `cargo check --workspace
-      --all-targets` clean. New tests: `neighborhood::sample::read_tests::{empty_population_or_zero_sample_reads_nothing,
+      `cargo fmt --all -- --check` clean. New tests: `neighborhood::sample::read_tests::{empty_population_or_zero_sample_reads_nothing,
       population_at_or_below_sample_size_takes_every_rank,
       draw_is_pinned_for_one_population_and_seed,
       ranks_are_ascending_distinct_in_bounds_and_seed_fixed}` (v3-core);
@@ -169,7 +168,7 @@ the drift chart drops its two floor lines and the floor wording in its subtitle.
       (v3-cli); `world_neighborhood_read_is_projected_whole` (`tests/bench_artifacts.rs`).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here; `docs/workflow.md` requires it in the spec.
+      survivor list stays here, as `docs/workflow.md` requires.
 - [x] The stored goal report carries `neighborhood_read` on all three worlds
       with `sample_size == 50`, `birth_trials == 100`, `births_total == 5000`,
       the per-genome rows summing to the pooled tally, and the three fractions
@@ -182,15 +181,15 @@ the drift chart drops its two floor lines and the floor wording in its subtitle.
 - [x] The predeclared direction of none, checked as T14.F04 did: with the
       `neighborhood_read` keys deleted, the stored goal report's
       `deterministic.goal_indicators` is byte-identical to T13.F06's (no
-      simulation change lies between them on main); jq diff in the readings
-      file. Zero-length diff.
+      simulation change between them on main); jq diff in the readings file.
+      Zero-length diff.
 - [x] Benchmark summary stored at `docs/progress/features/<id>.json` and its
       `-goal` companion, local raw hash/byte count and verification time
       checked, series entry points to the summary, the goal summary's byte
       growth against T13.F06's recorded, and no new full report staged.
       Confirmed; series entries added.
 
-Transcripts and per-genome tables go to
+Transcripts and per-world tables go to
 [`docs/progress/readings/t14-f12.md`](../../progress/readings/t14-f12.md).
 
 ## Performance and Goal Impact
@@ -211,8 +210,8 @@ so the new read is expected under one second per world. Predeclared cap: 10 seco
 founder 10-second caps. Exceeding it is resolved before closure, never absorbed.
 
 Predeclared direction for every existing goal indicator and counter: **none**;
-all are expected byte-identical to a run without this feature, and any movement
-is a defect, not a result.
+all are expected byte-identical to a run without this feature; any movement is
+a defect, not a result.
 
 Expected range of the new reading, a sanity check and not a threshold: pooled
 `changed_per_all_births` per world between the drift walk's depth-22 reading
@@ -235,12 +234,11 @@ Canyon country (22) = 0.130000, Confluence (33) = 0.143400.
 **Measured verdict.** Gate and goal exit 0, `severe=false`, both predeclared
 caps and the direction-of-none check hold (zero-length diff vs T13.F06);
 `neighborhood_read` defined per world as predeclared. Sample vs population
-mean generation: 47.0/46.77, 48.5/48.07, 52.7/52.73. Full details:
-[`docs/progress/readings/t14-f12.md`](../../progress/readings/t14-f12.md).
+mean generation: 47.0/46.77, 48.5/48.07, 52.7/52.73. Full details in the
+[readings](../../progress/readings/t14-f12.md).
 
 - Summaries: [gate](../../progress/features/t14-f12-neighborhood-read-of-selected-genomes.json),
   [goal](../../progress/features/t14-f12-neighborhood-read-of-selected-genomes-goal.json).
-- Full readings: [`docs/progress/readings/t14-f12.md`](../../progress/readings/t14-f12.md).
 
 ## Success Criteria
 
@@ -261,3 +259,4 @@ mean generation: 47.0/46.77, 48.5/48.07, 52.7/52.73. Full details:
 - Decision: T14.F12 was scheduled by the user on 2026-09-14 out of the order of
   new starts, together with the T11 floor amendment that makes this reading the
   closure indicator for changed births at depth.
+- Deferred: `neighborhood_read_wall_clock_ms_total` serializes as `-0.0` on the gate summary (empty f64 sum, inherited from the evolved total); the sample.rs read tests sit in a second test module after the existing one.
