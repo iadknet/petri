@@ -31,7 +31,9 @@ pub use births::BirthResult;
 pub use classify::{classify, Class, Classification, Tally};
 pub use companions::{structural_companions, StructuralCompanions};
 pub use operators::{operator_catalog, OperatorRow};
-pub use sample::{evolved_sample_ranks, SAMPLE_SIZE};
+pub use sample::{
+    evolved_sample_ranks, read_sample_ranks, READ_GENOME_MULTIPLIER, READ_SEED_BASE, SAMPLE_SIZE,
+};
 
 use crate::config::{RuntimeConfig, SimulationConfig};
 

@@ -12,11 +12,13 @@ use super::schema::{
     MemorySensitivity, MemorySensitivitySeed, MeshExecution, ModuleRecruitment,
     MutationOpportunities, MutationalNeighborhood, NeighborhoodBattery, NeighborhoodBirthBucket,
     NeighborhoodBirths, NeighborhoodCompanions, NeighborhoodEvolvedSeed, NeighborhoodFounderHalf,
-    NeighborhoodOperatorRow, NeighborhoodRequestedBirthBucket, NeighborhoodSampledGenome,
-    NeighborhoodTally, OperatorOpportunityRow, PopulationPersistence, PopulationPersistenceSeed,
-    RetentionRow, StructuralCompanionsCensus, StructuralCompanionsSeed, StructureSizeDistribution,
+    NeighborhoodOperatorRow, NeighborhoodRead, NeighborhoodReadGenome,
+    NeighborhoodRequestedBirthBucket, NeighborhoodSampledGenome, NeighborhoodTally,
+    OperatorOpportunityRow, PopulationPersistence, PopulationPersistenceSeed, RetentionRow,
+    StructuralCompanionsCensus, StructuralCompanionsSeed, StructureSizeDistribution,
     TemporalMemorySensitivity, TemporalMemorySensitivitySeed, TimeToFirstRow, Totals,
-    LINEAGE_DIVERSITY_VERSION, MEMORY_SENSITIVITY_VERSION, REACHABLE_STRUCTURE_VERSION,
+    LINEAGE_DIVERSITY_VERSION, MEMORY_SENSITIVITY_VERSION, NEIGHBORHOOD_READ_VERSION,
+    REACHABLE_STRUCTURE_VERSION,
 };
 use crate::{fraction_or_undefined, six, UNDEFINED};
 use std::collections::BTreeMap;
@@ -24,8 +26,9 @@ use std::time::Instant;
 use v3_core::config::{MutationConfig, SimulationConfig};
 use v3_core::creature::founder::founder_genome;
 use v3_core::neighborhood::{
-    self, evaluate_genome, evolved_sample_ranks, structural_companions, Battery, BirthResult,
-    EvalContext, GenomeEvaluation, OperatorRow, StructuralCompanions, Tally, BATTERY_VERSION,
+    self, evaluate_genome, evolved_sample_ranks, read_sample_ranks, structural_companions, Battery,
+    BirthResult, EvalContext, GenomeEvaluation, OperatorRow, StructuralCompanions, Tally,
+    BATTERY_VERSION, READ_GENOME_MULTIPLIER, READ_SEED_BASE,
 };
 use v3_core::simulation::FinalActionObservation;
 
@@ -613,6 +616,116 @@ pub(super) fn evolved_neighborhood_for_seed(
         sampled_genomes,
         pooled_operator_rows,
         pooled_births: to_neighborhood_births(&pooled_births),
+    }
+}
+
+/// The neighborhood read (T14.F12) for one world's final living population:
+/// a seeded uniform sample of the id-sorted population, each genome's
+/// production births through the unchanged `per_birth_result`, pooled by
+/// integer merge in sample order. Reads the terminal population only; the
+/// evolved half's reading is untouched.
+pub(super) fn neighborhood_read_for_seed(
+    seed: u64,
+    sim: &v3_core::simulation::Simulation,
+    battery: &Battery,
+    mutation_config: &MutationConfig,
+    context: &EvalContext,
+    sizes: NeighborhoodSizes,
+) -> NeighborhoodRead {
+    let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
+    creature_ids.sort();
+    let population_size = creature_ids.len();
+    let ranks = read_sample_ranks(population_size, sizes.read_sample as usize, seed);
+
+    let mut genomes = Vec::with_capacity(ranks.len());
+    let mut pooled = BirthResult::default();
+    let mut generation_sum = 0u64;
+    let mut genome_size_sum = 0u64;
+    let mut total_nodes = 0u64;
+    let mut reachable_nodes = 0u64;
+    let mut executed_nodes = 0u64;
+
+    for (genome_index, &rank) in ranks.iter().enumerate() {
+        let creature_id = creature_ids[rank];
+        let creature = &sim.creatures[creature_id];
+        let genome = &creature.genome;
+        let seed_offset = READ_SEED_BASE + READ_GENOME_MULTIPLIER * (genome_index as u64 + 1);
+        let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
+        let births = neighborhood::births::per_birth_result(
+            genome,
+            &base,
+            battery,
+            mutation_config,
+            context,
+            sizes.read_births,
+            seed_offset,
+        );
+        let executed = battery
+            .executed_indices(genome, context.runtime, context.shared_memory_decay_rate)
+            .len() as u64;
+        let reachable = structural_companions(genome).reachable_node_count as u64;
+        let nodes = genome.nodes.len() as u64;
+        let genome_size = genome.genome_size();
+
+        generation_sum += creature.generation;
+        genome_size_sum += u64::from(genome_size);
+        total_nodes += nodes;
+        reachable_nodes += reachable;
+        executed_nodes += executed;
+        pooled = pooled.merge(&births);
+
+        genomes.push(NeighborhoodReadGenome {
+            rank: rank as u64,
+            creature_id: format!("{creature_id:?}"),
+            lineage_id: creature.identity.lineage_id,
+            generation: creature.generation,
+            genome_size,
+            total_nodes: nodes,
+            reachable_nodes: reachable,
+            executed_nodes: executed,
+            births_total: births.births_total,
+            zero_event_births: births.zero_event_births,
+            silent: births.any_events.silent,
+            changed: births.any_events.changed,
+            dead: births.any_events.dead,
+        });
+    }
+
+    let sample_size = ranks.len() as u64;
+    let births_total = u64::from(pooled.births_total);
+    NeighborhoodRead {
+        version: NEIGHBORHOOD_READ_VERSION.to_string(),
+        battery_version: BATTERY_VERSION.to_string(),
+        sample_seed_formula: format!("{READ_SEED_BASE} + world_seed"),
+        birth_seed_formula: format!(
+            "{READ_SEED_BASE} + {READ_GENOME_MULTIPLIER} * (sample_index + 1) + {} + birth_index",
+            neighborhood::births::BIRTH_SEED_BASE
+        ),
+        population_size: population_size as u64,
+        sample_size_requested: sizes.read_sample,
+        sample_size: sample_size as u32,
+        birth_trials: sizes.read_births,
+        silent_per_all_births: fraction_or_undefined(
+            u64::from(pooled.any_events.silent),
+            births_total,
+        ),
+        changed_per_all_births: fraction_or_undefined(
+            u64::from(pooled.any_events.changed),
+            births_total,
+        ),
+        dead_per_all_births: fraction_or_undefined(u64::from(pooled.any_events.dead), births_total),
+        births: to_neighborhood_births(&pooled),
+        generation_sum,
+        mean_generation: fraction_or_undefined(generation_sum, sample_size),
+        genome_size_sum,
+        mean_genome_size: fraction_or_undefined(genome_size_sum, sample_size),
+        total_nodes,
+        mean_total_nodes: fraction_or_undefined(total_nodes, sample_size),
+        reachable_nodes,
+        mean_reachable_nodes: fraction_or_undefined(reachable_nodes, sample_size),
+        executed_nodes,
+        mean_executed_nodes: fraction_or_undefined(executed_nodes, sample_size),
+        genomes,
     }
 }
 
