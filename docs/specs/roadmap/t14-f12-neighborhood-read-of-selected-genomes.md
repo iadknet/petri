@@ -166,9 +166,16 @@ the drift chart drops its two floor lines and the floor wording in its subtitle.
       `bench::run::tests::world_set_neighborhood_read_is_defined_per_world_and_byte_identical_across_thread_counts`,
       `bench::comparison::tests::evolved_and_neighborhood_read_keys_name_their_denominators`
       (v3-cli); `world_neighborhood_read_is_projected_whole` (`tests/bench_artifacts.rs`).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here, as `docs/workflow.md` requires.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`; one survivor, killed by a
+      strengthened test, no second fresh run (test-only change).
+
+      | Field | Value |
+      | --- | --- |
+      | Summary | `41 mutants tested in 7m: 1 missed, 31 caught, 9 unviable` |
+      | Run mode | `fresh` (diff against 930ce9be; 2026-09-14) |
+      | Output | `~/.local/share/petri-tools/mutants/t14-f12/mutants.out` |
+      | Survivor | `crates/v3-cli/src/bench/indicators.rs:679:24: replace += with *= in neighborhood_read_for_seed` |
+      | Resolution | killed: `bench::indicators::tests::neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births` now assigns distinct positive generations before the read (founders were all 0, so a product matched the sum); `MUTANTS_ITERATE=1` pass: 1 tested, 1 caught |
 - [x] The stored goal report carries `neighborhood_read` on all three worlds
       with `sample_size == 50`, `birth_trials == 100`, `births_total == 5000`,
       the per-genome rows summing to the pooled tally, and the three fractions
