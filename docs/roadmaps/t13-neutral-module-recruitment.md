@@ -1,7 +1,7 @@
 # T13 — Neutral Module Recruitment
 
 **Status**: In Progress
-**Last updated**: 2026-09-13
+**Last updated**: 2026-09-14
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -29,7 +29,7 @@ selection can be distinguished before changing the substrate.
   - Goal: Measure how often new Graph and VM modules acquire useful behavior through viable steps, separating lineage variation, dormant preparation and selection from mere growth.
 - [x] **T13.F03 — Mutation Target Applicability** — Depends on: T13.F02
   - Goal: Point mutations alter existing molecular sites: refinement reaches a module with a suitable site while silent tissue keeps its own opportunities to grow and connect.
-- [ ] **T13.F04 — Direct Graph Effect Activation** — Depends on: T13.F02
+- [x] **T13.F04 — Direct Graph Effect Activation** — Depends on: T13.F02
   - Goal: Direct synaptic transmission: a wired signal can affect a controller without first growing an unrelated processing cell, while unwired tissue preserves the incumbent decision.
 - [ ] **T13.F05 — Function-Preserving Module Recruitment** — Depends on: T13.F03, T13.F04, T11.F18
   - Goal: Gene duplication and circuit growth: new Graph and VM tissue can extend working computation through short viable mutation paths and then diverge into a useful contribution.

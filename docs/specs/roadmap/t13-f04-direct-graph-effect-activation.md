@@ -1,7 +1,7 @@
 # T13.F04 — Direct Graph Effect Activation
 
-**Status**: In Progress
-**Last updated**: 2026-09-13
+**Status**: Complete
+**Last updated**: 2026-09-14
 **Feature**: T13.F04
 **Track**: [T13 — Neutral Module Recruitment](../../roadmaps/t13-neutral-module-recruitment.md)
 
@@ -150,7 +150,7 @@ already write.
       held; drift changed/all births at depth 2,000 fell below the 0.005
       floor in all three worlds; full tables and the fact list in the
       [readings](../../progress/readings/t13-f04-direct-graph-effect-activation.md).
-- [ ] A second goal run for determinism: not applicable under the shared
+- [x] A second goal run for determinism: not applicable under the shared
       workflow's 2026-09-05 one-goal-run decision; `make check` retains
       cross-process reproducibility and the gate's two-run check.
 
@@ -163,7 +163,7 @@ make bench PROFILE=goal FEATURE=t13-f04-direct-graph-effect-activation
 | --- | --- |
 | Tested commit | `9c453ab4` (`make check` exit 0, log `/private/tmp/t13-f04-make-check.log`) |
 | Mutation gate | Fresh run (`run-mode.txt`: `fresh`) against base `6ad57c30`, output `~/.local/share/petri-tools/mutants/t13-f04/mutants.out`: `20 mutants tested in 5m: 1 missed, 16 caught, 3 unviable`, 0 timeouts. The one survivor, `cgp.rs:297:58 replace \|\| with && in CgpGraphBackendDef::enters_visit`, was killed by the added test `action_slot_enters_a_visit_on_a_gate_edge_or_a_param_edge_alone`; no equivalent or deferred survivors. Full record in the [readings](../../progress/readings/t13-f04-direct-graph-effect-activation.md#mutation-gate). |
-| Closure documentation checks | `make roadmap-check` exit 0 at `9c453ab4`; `make check-docs` on the closing commit pending the user decision below |
+| Closure documentation checks | `make roadmap-check`, `make check-docs`: exit 0 on the closing commit (log `/private/tmp/t13-f04-check-docs.log`) |
 | Mutation output audit | Fresh survivor list recovered from `/private/tmp/t13-f04-mutants.log` (1 `MISSED`, no `TIMEOUT`) and matched against the readings table; the recorded `mutants.out` directory now holds the later `MUTANTS_ITERATE=1` pass (`run-mode.txt` `incremental`, `missed.txt` and `timeout.txt` empty). No `#[mutants::skip]` or `exclude_re`. |
 
 ## Performance and Goal Impact
@@ -195,16 +195,18 @@ experiment under 120 s, goal profile under 15 minutes.
 
 **Measured verdict.** Gate: exit 0, `severe=false` against both references, all counters `ok`. Goal: exit 0, `severe=false` against the single predeclared reference, all caps held, but drift changed/all births at depth 2,000 fell below the 0.005 floor in all three worlds (0.0035/0.0045/0.0035, walks not identical to T13.F03's), Graph `contributing` stayed at 0 in 5 of 6 world/depth cells, and `graph_relax_iters` per creature-tick moved down (gate -0.208%, goal -0.718%) against the predeclared "up"; the summary schema has no `graph_compute` energy counter. Reported as facts without remediation.
 
-**Blocker awaiting a user decision, 2026-09-14.** T13.F03's decision keeps
-the 0.005 depth-2,000 drift floor in force for later closures against this
-epoch, and this run reads 7/2,000 = 0.0035 in Orchards in grassland, 9/2,000
-= 0.0045 in Canyon country and 7/2,000 = 0.0035 in Confluence (T13.F03 read
-7 / 10 / 7). The walks are not identical to T13.F03's: Graph executed
-modules at depth 2,000 rose 92 to 96, 96 to 108 and 92 to 96 while Graph
-contributing modules stayed 0, so the newly entered visits express no
-battery-visible behavior in these walks. Depth-1,000 floors hold. The
-orchestrator cannot accept a floor miss; closure waits for the user to accept
-or reject this reading. No threshold, baseline or epoch is changed here.
+**User decision, 2026-09-14.** After the blocker report the user directed:
+"proceed". This is a post-observation acceptance of the stored goal report's
+depth-2,000 drift readings as they stand: 7/2,000 = 0.0035 in Orchards in
+grassland, 9/2,000 = 0.0045 in Canyon country and 7/2,000 = 0.0035 in
+Confluence against the 0.005 floor that T13.F03's decision kept in force
+(T13.F03 read 7 / 10 / 7; the walks are not identical, Graph executed modules
+at depth 2,000 rose 92 to 96, 96 to 108 and 92 to 96 while Graph contributing
+modules stayed 0). It does not accept future regressions, lower the floor,
+change a threshold or re-pin an epoch: `comparison.severe=false` on both
+profiles, so the goal-worlds epoch stays at T13.F03's summary and this
+feature's summaries are appended to the closed lists only. Depth-1,000 floors
+hold.
 
 - Summaries: [gate](../../progress/features/t13-f04-direct-graph-effect-activation.json),
   [goal](../../progress/features/t13-f04-direct-graph-effect-activation-goal.json).
@@ -212,21 +214,25 @@ or reject this reading. No threshold, baseline or epoch is changed here.
 
 ## Success Criteria
 
-- [ ] A zero-compute Graph module whose sink, gate, memory sink, action slot
+- [x] A zero-compute Graph module whose sink, gate, memory sink, action slot
       or execute gate is wired from an input leaf or shared memory applies
       that effect under the nonzero-compute ordering, charge and exhaustion
       rules, in production and traced execution.
-- [ ] Unwired blank modules, stateful graphs, successor execution,
+- [x] Unwired blank modules, stateful graphs, successor execution,
       once-per-world-tick state, queues and budget exhaustion are unchanged.
-- [ ] The dummy-neutrality, blank-identity, exhaustion and nonzero-unchanged
+- [x] The dummy-neutrality, blank-identity, exhaustion and nonzero-unchanged
       invariants hold as property tests; reference specs state the entry rule.
-- [ ] Benchmark evidence stored and the mutation gate recorded.
+- [x] Benchmark evidence stored and the mutation gate recorded.
 
 ## Notes for AI Agents
 
 - Decision: The Graph entry rule is one derived predicate over the genome
   (compute nodes present or any effect surface wired); T13.F05/F06 read it
   and never add a stored activation flag beside it.
+- Decision: The user accepted the depth-2,000 drift readings 0.0035 / 0.0045 /
+  0.0035 against the 0.005 floor on 2026-09-14 ("proceed"); the floor, the
+  thresholds and the T13.F03 goal-worlds epoch are unchanged and the floor
+  applies to later closures.
 - Deferred: The activated class expresses nothing battery-visible in the
   goal-world drift walks at this depth (Graph contributing 0 while executed
   rose); whether the activated surfaces need T13.F05's connection paths to
