@@ -127,10 +127,11 @@ transitions.
 
 ## Seed search
 
-The one-off search is the ignored test
+The one-off search is the test
 `recruitment_paths_seed_search_finds_the_pinned_seeds`
-(`cargo test --release -p v3-core --lib -- --ignored --nocapture
-recruitment_paths_seed_search`, about 3 minutes including the build): it walks
+(`cargo test -p v3-core --lib -- --nocapture recruitment_paths_seed_search`;
+it was `#[ignore]`d until the mutation gate measured it at 1.5 s, the
+former "3 minutes" being the build): it walks
 every form's plan taking the first accepted seed per step in `0..1_000_000`
 and asserts the result equals the pinned record. The seven Graph, copy, split
 and unprepared forms keep the seeds the 10,000-seed range found. The VM
@@ -272,3 +273,53 @@ fraction (~54–58% vs ≥60%) and the depth-2,000 drift readings (below 0.005),
 both inherited unchanged from T13.F04 and both explicitly named for
 escalation by the predeclaration's own text — reported to the orchestrator,
 not resolved here.
+
+## Mutation gate
+
+Fresh gate on the final feature code, `MUTANTS_ITERATE=0 make rust-mutants`.
+
+| Field | Value |
+| --- | --- |
+| Summary line | `202 mutants tested in 29m: 60 missed, 109 caught, 33 unviable` |
+| Timeouts | 0 (`mutants.out/timeout.txt` empty) |
+| Run mode (`run-mode.txt`) | `fresh` |
+| Diff base | `12bee429f28869cc180b39c2fdaa3e8cf9a25e65` |
+| Output path | `~/.local/share/petri-tools/mutants/t13-f05/mutants.out` |
+| Fresh runs used | 1 (no production content, test selection or tool configuration changed; no test deleted or weakened) |
+
+All 60 survivors are in
+`crates/v3-core/src/neighborhood/recruitment_paths/qualification.rs`; none
+touches the production draw (`operators.rs`, `action_decode.rs`), whose
+mutants were all caught. The file's acceptance predicates are read in two
+places only: `qualify` replays each pinned seed and asserts the predicate
+(which the pinned seed satisfies under the original and every weaker
+mutant), and `search_seeds` walks `0..SEARCH_RANGE` per step taking the
+first accepted seed. The search's test was `#[ignore]`d as "minutes long";
+measured at 1.5 s (about 110,000 applied events; the build was the minutes),
+so un-ignoring it is the one strengthening that reads every predicate.
+
+### Survivor disposition
+
+| # | Survivor (`missed.txt` line) | Disposition | Resolution |
+| --- | --- | --- | --- |
+| 1 | `140:28 replace && with \|\| in QualifiedPath::qualified` | killed | `recruitment_paths_qualified_requires_no_gap_and_at_most_the_bound`: a clone of `graph_copy` with a `GrowthGap` set, and one with `MAX_PATH_EVENTS + 1` steps and no gap, are both not qualified. |
+| 2–3 | `186:5 first_seed -> None`, `267:5 search_seeds -> vec![]` | killed | `recruitment_paths_seed_search_finds_the_pinned_seeds` un-ignored: the search must return the pinned seed for every step of every form. |
+| 4 | `190:5 surfaces_unchanged -> true` | killed | `recruitment_paths_qualified_steps_hold_the_per_step_invariants` now asserts `!step.surfaces_unchanged` on every path's useful last step (its actions differ from the previous stage). |
+| 5–7 | `191:9`, `192:36`, `192:74 replace && with \|\|` in `surfaces_unchanged` | killed | Same assertion: with either `\|\|` an equal scene count or equal shared memory or routing lets the changed actions read as unchanged. |
+| 8–39 | 32 predicate weakenings the un-ignored search now reads: `311:9 only_scaffold_backend_changed`; `342:5 decodes_east -> true`; `346:38 appended`; `404:13`, `405:13`, `406:13 vm_unprepared_plan`; `448:5 sums_inputs -> true`; `472:17`–`479:17`, `492:17`, `497:17 direction_node_steps`; `511:17`–`513:17 cue_swapped`; `529:17`, `536:17 graph_unprepared_plan`; `575:17`, `581:25`, `608:17 graph_blank_plan`; `637:5 program_matches -> true`, `639:9 program_matches`; `673:17`, `675:17 cue_added`; `687:17`–`689:17 insert_step` | killed | `recruitment_paths_seed_search_finds_the_pinned_seeds`: under each of these an earlier seed is accepted (or a step exhausts the range), so the search no longer returns the pinned seeds. Confirmed by the `MUTANTS_ITERATE=1` pass (39 caught of the 60). |
+| 40–60 | 21 predicate weakenings the search cannot distinguish: `308:5 only_scaffold_backend_changed -> true`, `310:9`, `312:9`, `313:9 only_scaffold_backend_changed`; `318:5 scaffold_is_incumbent -> true`; `410:13`, `411:13 vm_unprepared_plan` (`constant_moved`); `530:17`–`535:17 graph_unprepared_plan` (`direction_read`); `613:57 == -> !=`, `614:25`, `614:40 > -> >= graph_blank_plan` (`gate_edge_added`); `674:17 cue_added`; `771:13`–`774:13 detour_start` | equivalent | The four `detour_start` conjuncts guard an `expect` on a pinned seed (0 or 1) that already passes, so no returned stage can change. The other 17 drop one conjunct of a search predicate whose remaining conjuncts reject every seed below the pinned one and whose pinned seed passes either way (the un-ignored search test passed under each in the `MUTANTS_ITERATE=1` pass), so `search_seeds` and `qualified_paths` return the same values; the predicates are private, and a direct reading would need a `#[cfg(test)]` child module declared inside `qualification.rs`, which this gate does not add. |
+
+Deferred: none. No existing test was deleted or weakened (one `#[ignore]`
+was removed); one test was added and one assertion strengthened, all in
+`crates/v3-core/src/neighborhood/recruitment_paths/tests.rs`. No production
+code, `.cargo/mutants.toml`, test selection, `#[mutants::skip]` or
+`exclude_re` entry was touched.
+
+### Post-remediation checks
+
+| Command | Result |
+| --- | --- |
+| `MUTANTS_ITERATE=1 make rust-mutants` (feedback only, not closure evidence) | `60 mutants tested in 10m: 21 missed, 39 caught`; 142 prior caught/unviable excluded; the 21 are rows 40–60 |
+| `cargo test -p v3-core` | ok: 1438 lib passed (was 1436; +1 un-ignored, +1 new), 2 ignored, every integration binary passed, 0 failed |
+| `cargo fmt --all --check`, `cargo clippy --workspace --all-targets` | clean |
+| `make roadmap-check` | pass |

@@ -157,7 +157,7 @@ closure's exactly.
       readings "Seed search"): viability ok before and after, `cargo test -p
       v3-core`, `--test reproducibility` and `-p v3-cli` ok, one test re-pinned.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
       output path and every survivor resolved in the closure record below.
 - [x] Benchmark summaries at
       `docs/progress/features/t13-f05-function-preserving-module-recruitment.json`
@@ -174,7 +174,7 @@ make bench PROFILE=goal FEATURE=t13-f05-function-preserving-module-recruitment
 | Closure record | Value |
 | --- | --- |
 | Tested commit | pending |
-| Mutation gate | pending |
+| Mutation gate | Fresh run (`run-mode.txt`: `fresh`) against base `12bee429`, output `~/.local/share/petri-tools/mutants/t13-f05/mutants.out`: `202 mutants tested in 29m: 60 missed, 109 caught, 33 unviable`, 0 timeouts. All 60 survivors are in `recruitment_paths/qualification.rs` (the production draw's mutants were all caught): 39 killed in `recruitment_paths/tests.rs` by un-ignoring `recruitment_paths_seed_search_finds_the_pinned_seeds` (1.5 s, not minutes; reads every acceptance predicate), the new `recruitment_paths_qualified_requires_no_gap_and_at_most_the_bound`, and a `!surfaces_unchanged` assertion on each useful last step; 21 equivalent (four `detour_start` conjuncts guard an `expect` on a pinned seed, and 17 dropped conjuncts of private search predicates whose remaining conjuncts reject every seed below the pinned one, so `search_seeds` and `qualified_paths` are unchanged); none deferred. One fresh run; the `MUTANTS_ITERATE=1` pass caught 39 of 60. Full list in the [readings](../../progress/readings/t13-f05-function-preserving-module-recruitment.md#mutation-gate). |
 | Closure documentation checks | pending |
 | Mutation output audit | pending |
 
