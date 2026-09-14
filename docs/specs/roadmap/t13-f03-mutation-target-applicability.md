@@ -29,7 +29,7 @@ or world change is involved.
   (T11.F18, T13.F05), no Topology-domain change, and no generic applicability
   trait, registry or mutation framework: existing enum dispatch and local
   per-operator helpers only.
-- No new profile, indicator floor, threshold, baseline or epoch.
+- No new profile, floor, threshold or baseline.
 
 ## Inputs and Invariants
 
@@ -99,8 +99,7 @@ or world change is involved.
   applicable set before the biased draw), §4.3 (the operator's eligible set is
   its applicable set), §5 (pre-guards), and the per-operator
   `NoApplicableTarget` sentences in the Graph and VM domain sections are
-  updated to the repaired semantics. `docs/reference/v3-runtime-config-spec.md`
-  is unchanged: no key is added.
+  updated to the repaired semantics. No runtime-config key is added.
 
 ## Implementation Tasks
 
