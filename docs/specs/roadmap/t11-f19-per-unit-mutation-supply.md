@@ -219,7 +219,8 @@ file's "Escalation readings" table; the predeclaration is unchanged).**
    carry a plasticity-bearing lineage where one did before. Read as ecological
    composition; it does not reject the mechanism or the rate. Recommendation
    to the user: accept the observed cost and re-pin the goal-worlds epoch to
-   this report, as at T13.F03 on the same counter. No closure until decided.
+   this report, as at T13.F03 on the same counter. Accepted by the user on
+   2026-09-14; the goal-worlds epoch is re-pinned to this report at closure.
 2. Confluence `dead_per_all_births` 52 / 5,000 against 50: pooled dead across
    worlds is 0.0067, the excess is 0.3 standard deviations, and 13 sampled
    genomes carry every dead birth. Lineage fragility in the sample, not
@@ -232,8 +233,7 @@ file's "Escalation readings" table; the predeclaration is unchanged).**
    scaffold grows, which is the load T03.F11 brakes next. Not runaway; an
    exceedance, ceiling and rate unchanged.
 
-Items 2 and 3 go to the user beside item 1; a rejection of either reopens the
-default rate.
+The user confirmed items 2 and 3 on 2026-09-14; the default rate stands.
 
 - Summaries: [gate](../../progress/features/t11-f19-per-unit-mutation-supply.json),
   [goal](../../progress/features/t11-f19-per-unit-mutation-supply-goal.json).
@@ -257,13 +257,16 @@ default rate.
 - Decision: (user, 2026-09-14) the default rate is the founder equivalent
   0.005 per `genome_size()` unit, not 0.01; no cap or pruning rule is added;
   T03.F11 is sequenced directly after this feature and depends on it.
+- Decision: (user, 2026-09-14) the severe goal `plasticity_updates` cost
+  (+82.3% against the pinned epoch) is accepted as ecological composition and
+  the goal-worlds epoch is re-pinned to this feature's goal summary.
 - Decision: (user, 2026-09-14) the depth-1,000 and depth-2,000 drift floors
   are withdrawn as closure gates; the walk stays a mutation-map regression
   instrument and T14.F12's neighborhood read is the changed-births indicator.
-- Exception: (spec owner, 2026-09-14, put to the user) Confluence
+- Exception: (spec owner, 2026-09-14; confirmed by the user the same day) Confluence
   `dead_per_all_births` 0.010400 against the 0.010000 ceiling is an
   exceedance, not a rate rejection; applies to this closure only.
-- Exception: (spec owner, 2026-09-14, put to the user) Orchards terminal
+- Exception: (spec owner, 2026-09-14; confirmed by the user the same day) Orchards terminal
   `mean_genome_size` 1.60 times T14.F12's against the 1.5 ceiling is an
   exceedance, not a rate rejection; applies to this closure only, and T03.F11
   reads it as the size it brakes.
