@@ -161,19 +161,9 @@ the T14.F12 gate and goal reports (previous closure), the pinned goal epoch
       point to the summaries, no new full report staged; every predeclared
       reading above checked against the stored reports and tabulated in the
       readings file, including the field-for-field drift-block comparison.
-      Benchmark specialist pass (2026-09-14): summaries and hashes stored and
-      tabulated (see readings file, "Benchmark gate and goal runs" section);
-      the drift-block, `recruitment_paths`, `changed_per_all_births` floor,
-      goal persistence band, `events_applied_total` per birth, and founder
-      block readings all matched their predeclarations. Left unchecked
-      because three predeclared readings did not clear: the goal profile's
-      `plasticity_updates` work counter is `severe` (+82.3% vs T13.F03,
-      +75.9% vs T14.F12) though the spec budgeted no severe on the six work
-      counters; Confluence's `dead_per_all_births` is 0.0104 (52 of 5,000),
-      above the 0.010000 ceiling; and Orchards' terminal `mean_genome_size`
-      is 340.944597 units, above its 320.0 ceiling (1.5x the 213.343255
-      reference). All three are reported here for the orchestrator/spec
-      owner, not remediated or reinterpreted.
+      Benchmark specialist pass (2026-09-14): stored, hashed, and tabulated
+      in the readings file; left unchecked pending the user's decision on the
+      three exceedances recorded under Performance and Goal Impact.
 
 ## Performance and Goal Impact
 
@@ -219,6 +209,32 @@ caps) is met. Reported to the orchestrator as a regression and two
 threshold exceedances; not remediated here. Full tabulation in
 [`docs/progress/readings/t11-f19.md`](../../progress/readings/t11-f19.md).
 
+**Escalation decisions (spec owner, 2026-09-14; readings in the readings
+file's "Escalation readings" table; the predeclaration is unchanged).**
+
+1. `plasticity_updates` severe: not the mutation-time cost (the six counters
+   do not count mutation work, and the goal wall total fell 3.6% against
+   T14.F12). The reference itself spans five times across worlds, so the
+   counter tracks which clade dominates, and under the new supply two worlds
+   carry a plasticity-bearing lineage where one did before. Read as ecological
+   composition; it does not reject the mechanism or the rate. Recommendation
+   to the user: accept the observed cost and re-pin the goal-worlds epoch to
+   this report, as at T13.F03 on the same counter. No closure until decided.
+2. Confluence `dead_per_all_births` 52 / 5,000 against 50: pooled dead across
+   worlds is 0.0067, the excess is 0.3 standard deviations, and 13 sampled
+   genomes carry every dead birth. Lineage fragility in the sample, not
+   supply-wide lethality; not confirmed, so an exceedance, ceiling and rate
+   unchanged.
+3. Orchards terminal `mean_genome_size` 1.60 times T14.F12's against 1.5: the
+   series decelerates (increments 98, 78, 25 units per 500 ticks against a
+   drift doubling that would read about 3.6 times by this generation), mesh
+   nodes sit under their ceiling, and the executed core is flat while
+   scaffold grows, which is the load T03.F11 brakes next. Not runaway; an
+   exceedance, ceiling and rate unchanged.
+
+Items 2 and 3 go to the user beside item 1; a rejection of either reopens the
+default rate.
+
 - Summaries: [gate](../../progress/features/t11-f19-per-unit-mutation-supply.json),
   [goal](../../progress/features/t11-f19-per-unit-mutation-supply-goal.json).
 - Full readings: [`docs/progress/readings/t11-f19.md`](../../progress/readings/t11-f19.md).
@@ -244,3 +260,10 @@ threshold exceedances; not remediated here. Full tabulation in
 - Decision: (user, 2026-09-14) the depth-1,000 and depth-2,000 drift floors
   are withdrawn as closure gates; the walk stays a mutation-map regression
   instrument and T14.F12's neighborhood read is the changed-births indicator.
+- Exception: (spec owner, 2026-09-14, put to the user) Confluence
+  `dead_per_all_births` 0.010400 against the 0.010000 ceiling is an
+  exceedance, not a rate rejection; applies to this closure only.
+- Exception: (spec owner, 2026-09-14, put to the user) Orchards terminal
+  `mean_genome_size` 1.60 times T14.F12's against the 1.5 ceiling is an
+  exceedance, not a rate rejection; applies to this closure only, and T03.F11
+  reads it as the size it brakes.
