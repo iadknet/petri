@@ -27,7 +27,7 @@ selection can be distinguished before changing the substrate.
   - Goal: Observe a new brain module from its creation through mutation, expression, contribution and loss, so each closure shows where recruitment advances or stalls.
 - [x] **T13.F02 — Recruitment Paths and Replicated Baseline** — Depends on: T13.F01, T11.F05, T11.F08
   - Goal: Measure how often new Graph and VM modules acquire useful behavior through viable steps, separating lineage variation, dormant preparation and selection from mere growth.
-- [ ] **T13.F03 — Mutation Target Applicability** — Depends on: T13.F02
+- [x] **T13.F03 — Mutation Target Applicability** — Depends on: T13.F02
   - Goal: Point mutations alter existing molecular sites: refinement reaches a module with a suitable site while silent tissue keeps its own opportunities to grow and connect.
 - [ ] **T13.F04 — Direct Graph Effect Activation** — Depends on: T13.F02
   - Goal: Direct synaptic transmission: a wired signal can affect a controller without first growing an unrelated processing cell, while unwired tissue preserves the incumbent decision.
