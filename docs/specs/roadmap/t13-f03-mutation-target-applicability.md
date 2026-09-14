@@ -94,15 +94,11 @@ or world change is involved.
   byte-identical check still hold. Pinned expectations in existing tests that
   encode the old draw (`mutational_neighborhood`, `recruitment_paths`,
   engine and neighborhood fixtures) are re-pinned with the reason in the test.
-- Observation flip. T13.F01's engine fixture at
-  `mutation/engine/tests.rs` (~1421–1535) asserts that edge operators on an
-  edgeless Graph module select it and are discarded with that node as their
-  pick. After the repair an edgeless-only genome yields an empty applicable set
-  for those operators, so the discard carries `None` and is classified
-  no-eligible-node. The fixture is rewritten to assert the new classification
-  on the same genome, and a second genome with one edgeless and one edged
-  Graph module asserts the operator applies to the edged one. The
-  `selected_inapplicable` report fields stay, now reading zero for repaired
+- Observation. An operator with an empty applicable set discards with a
+  `None` pick and is classified no-eligible-node; the engine fixture in
+  `mutation/engine/tests.rs` asserts this on an edgeless-only genome and that
+  the operator applies to the edged module when one exists. The
+  `selected_inapplicable` report fields stay and read zero for repaired
   operators.
 - Reference: `docs/reference/v3-mutation-spec.md` §4.2 (pre-guards define the
   applicable set before the biased draw), §4.3 (the operator's eligible set is
@@ -221,10 +217,9 @@ per creature-tick (+100.068%, severe) against the goal-worlds epoch and
 +42.006% (flag) against the previous closure, and depth-2,000 drift changed/all
 births of 0.0035 in Orchards in grassland and Confluence against the 0.005
 floor (Canyon country 0.0050, at the floor). It does not accept future
-regressions, does not touch the gate (`severe=false`, no gate re-pin), does not
-lower the drift floor, and is not an assertion that the predeclaration
-authorized this cost; the predeclaration, thresholds and the stored report's
-severe comparison stand unchanged. Under the existing series mechanism the
+regressions, touch the gate, lower the drift floor, or assert that the
+predeclaration authorized this cost; thresholds and the stored severe
+comparison stand unchanged. Under the existing series mechanism the
 goal-worlds `epoch_baseline` in `docs/progress/benchmark-series.json` points to
 this feature's goal summary from the closing commit, and both summaries are
 appended to their closed lists; no report is regenerated against itself. The
