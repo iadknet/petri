@@ -31,7 +31,7 @@ selection can be distinguished before changing the substrate.
   - Goal: Point mutations alter existing molecular sites: refinement reaches a module with a suitable site while silent tissue keeps its own opportunities to grow and connect.
 - [x] **T13.F04 — Direct Graph Effect Activation** — Depends on: T13.F02
   - Goal: Direct synaptic transmission: a wired signal can affect a controller without first growing an unrelated processing cell, while unwired tissue preserves the incumbent decision.
-- [ ] **T13.F05 — Function-Preserving Module Recruitment** — Depends on: T13.F03, T13.F04, T11.F18
+- [x] **T13.F05 — Function-Preserving Module Recruitment** — Depends on: T13.F03, T13.F04, T11.F18
   - Goal: Gene duplication and circuit growth: new Graph and VM tissue can extend working computation through short viable mutation paths and then diverge into a useful contribution.
 - [ ] **T13.F06 — Recruitment and Retention Qualification** — Depends on: T13.F05, T03.F08
   - Goal: Measure whether newly recruited tissue is discovered and retained because it helps a creature, including the cost of carrying it and its response to a changed task.
