@@ -178,13 +178,13 @@ closure's exactly.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
       output path and every survivor resolved in the closure record below.
-- [ ] Benchmark summaries at
+- [x] Benchmark summaries at
       `docs/progress/features/t13-f05-function-preserving-module-recruitment.json`
       and `-goal.json`, raw hash/byte count and verification time checked,
       series entries point to them from the closing commit, no full report
       staged; exits, `severe`, caps, drift floors and experiment fractions in
       the readings.
-- [ ] A second goal run for determinism: not applicable under the shared
+- [x] A second goal run for determinism: not applicable under the shared
       workflow's 2026-09-05 one-goal-run decision; `make check` retains
       cross-process reproducibility and the gate's two-run check.
 
@@ -233,7 +233,11 @@ below 0.005 do not extend here, so such a reading is escalated.
 | T13.F01 rungs and Graph/VM contributing counts | Same rule: identical or measured consequence, no floor. |
 | Neighborhood, diversity and cognition indicators | No predeclared direction. |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate: exit 0, `severe=false`, no flags. Goal: exit 0,
+`severe=false`, one expected work-band flag; founder VM silent share/dead
+unchanged as predeclared, but per-birth silent and depth-2,000 drift are
+unchanged from T13.F04 and miss their predeclared floors — escalated, see
+readings.
 
 - Summaries: [gate](../../progress/features/t13-f05-function-preserving-module-recruitment.json),
   [goal](../../progress/features/t13-f05-function-preserving-module-recruitment-goal.json).
