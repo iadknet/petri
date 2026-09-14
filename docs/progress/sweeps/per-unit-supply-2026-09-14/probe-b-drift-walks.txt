@@ -1,0 +1,53 @@
+B-STRUCT arm=pu0.005_b0.0_h depth=22 mean_nodes=3.36 mean_units=177.2 mean_reachable=2.70 mean_executed=2.28
+B-BIRTHS arm=pu0.005_b0.0_h depth=22 births=2000 zero=754 mean_requested=1.07 mutated=1246 silent=990 changed=255 dead=1 changed_per_all=0.1275 dead_per_all=0.0005 silent_per_all=0.4950 (0s)
+B-GROW arm=pu0.005_b0.0_h depth=50 mean_nodes=4.7 mean_units=247.7 (0s)
+B-GROW arm=pu0.005_b0.0_h depth=100 mean_nodes=7.3 mean_units=381.9 (0s)
+B-GROW arm=pu0.005_b0.0_h depth=150 mean_nodes=10.0 mean_units=620.5 (0s)
+B-GROW arm=pu0.005_b0.0_h depth=200 mean_nodes=12.6 mean_units=835.6 (0s)
+B-GROW arm=pu0.005_b0.0_h depth=250 mean_nodes=15.5 mean_units=1114.6 (0s)
+B-STRUCT arm=pu0.005_b0.0_h depth=250 mean_nodes=15.52 mean_units=1114.6 mean_reachable=5.30 mean_executed=2.50
+B-BIRTHS arm=pu0.005_b0.0_h depth=250 births=2000 zero=55 mean_requested=5.60 mutated=1945 silent=1925 changed=20 dead=0 changed_per_all=0.0100 dead_per_all=0.0000 silent_per_all=0.9625 (1s)
+B-GROW arm=pu0.005_b0.0_h depth=300 mean_nodes=19.0 mean_units=1604.6 (1s)
+B-GROW arm=pu0.005_b0.0_h depth=400 mean_nodes=24.2 mean_units=2896.1 (2s)
+B-GROW arm=pu0.005_b0.0_h depth=500 mean_nodes=30.8 mean_units=5856.6 (5s)
+B-GROW arm=pu0.005_b0.0_h depth=600 mean_nodes=37.1 mean_units=12152.0 (12s)
+B-ABORT arm=pu0.005_b0.0_h depth=600 mean_nodes=37.1 mean_units=12152.0
+B-STRUCT arm=pu0.005_b0.9_h depth=22 mean_nodes=3.08 mean_units=167.6 mean_reachable=2.74 mean_executed=2.18
+B-BIRTHS arm=pu0.005_b0.9_h depth=22 births=2000 zero=802 mean_requested=0.96 mutated=1198 silent=911 changed=284 dead=3 changed_per_all=0.1420 dead_per_all=0.0015 silent_per_all=0.4555 (0s)
+B-GROW arm=pu0.005_b0.9_h depth=50 mean_nodes=4.6 mean_units=249.3 (0s)
+B-GROW arm=pu0.005_b0.9_h depth=100 mean_nodes=7.0 mean_units=414.5 (0s)
+B-GROW arm=pu0.005_b0.9_h depth=150 mean_nodes=11.2 mean_units=805.9 (0s)
+B-GROW arm=pu0.005_b0.9_h depth=200 mean_nodes=14.2 mean_units=1227.2 (0s)
+B-GROW arm=pu0.005_b0.9_h depth=250 mean_nodes=17.8 mean_units=1931.7 (1s)
+B-STRUCT arm=pu0.005_b0.9_h depth=250 mean_nodes=17.76 mean_units=1931.7 mean_reachable=5.56 mean_executed=3.16
+B-BIRTHS arm=pu0.005_b0.9_h depth=250 births=2000 zero=39 mean_requested=9.97 mutated=1961 silent=1911 changed=42 dead=8 changed_per_all=0.0210 dead_per_all=0.0040 silent_per_all=0.9555 (1s)
+B-GROW arm=pu0.005_b0.9_h depth=300 mean_nodes=21.5 mean_units=3001.2 (2s)
+B-GROW arm=pu0.005_b0.9_h depth=400 mean_nodes=28.7 mean_units=7110.6 (5s)
+B-ABORT arm=pu0.005_b0.9_h depth=460 mean_nodes=32.8 mean_units=12331.1
+B-STRUCT arm=pu0.005_b0.9 depth=22 mean_nodes=3.76 mean_units=183.2 mean_reachable=3.06 mean_executed=2.28
+B-BIRTHS arm=pu0.005_b0.9 depth=22 births=2000 zero=829 mean_requested=1.02 mutated=1171 silent=842 changed=323 dead=6 changed_per_all=0.1615 dead_per_all=0.0030 silent_per_all=0.4210 (0s)
+B-GROW arm=pu0.005_b0.9 depth=50 mean_nodes=7.7 mean_units=349.4 (0s)
+B-GROW arm=pu0.005_b0.9 depth=100 mean_nodes=23.1 mean_units=995.2 (0s)
+B-GROW arm=pu0.005_b0.9 depth=150 mean_nodes=109.2 mean_units=4618.9 (5s)
+B-ABORT arm=pu0.005_b0.9 depth=190 mean_nodes=373.3 mean_units=16319.8
+B-STRUCT arm=pu0.005_b0.0 depth=22 mean_nodes=3.66 mean_units=177.7 mean_reachable=2.96 mean_executed=2.30
+B-BIRTHS arm=pu0.005_b0.0 depth=22 births=2000 zero=855 mean_requested=0.93 mutated=1145 silent=910 changed=229 dead=6 changed_per_all=0.1145 dead_per_all=0.0030 silent_per_all=0.4550 (0s)
+B-GROW arm=pu0.005_b0.0 depth=50 mean_nodes=6.6 mean_units=276.5 (0s)
+B-GROW arm=pu0.005_b0.0 depth=100 mean_nodes=19.7 mean_units=703.6 (0s)
+B-GROW arm=pu0.005_b0.0 depth=150 mean_nodes=55.6 mean_units=1873.8 (1s)
+B-GROW arm=pu0.005_b0.0 depth=200 mean_nodes=170.9 mean_units=5749.5 (4s)
+B-ABORT arm=pu0.005_b0.0 depth=240 mean_nodes=442.3 mean_units=14622.7
+B-STRUCT arm=pu0.0025_b0.9 depth=22 mean_nodes=2.74 mean_units=139.5 mean_reachable=2.68 mean_executed=2.28
+B-BIRTHS arm=pu0.0025_b0.9 depth=22 births=2000 zero=1388 mean_requested=0.37 mutated=612 silent=424 changed=187 dead=1 changed_per_all=0.0935 dead_per_all=0.0005 silent_per_all=0.2120 (0s)
+B-GROW arm=pu0.0025_b0.9 depth=50 mean_nodes=3.6 mean_units=177.0 (0s)
+B-GROW arm=pu0.0025_b0.9 depth=100 mean_nodes=6.4 mean_units=274.2 (0s)
+B-GROW arm=pu0.0025_b0.9 depth=150 mean_nodes=11.6 mean_units=483.4 (0s)
+B-GROW arm=pu0.0025_b0.9 depth=200 mean_nodes=21.3 mean_units=858.5 (0s)
+B-GROW arm=pu0.0025_b0.9 depth=250 mean_nodes=39.1 mean_units=1583.4 (0s)
+B-STRUCT arm=pu0.0025_b0.9 depth=250 mean_nodes=39.12 mean_units=1583.4 mean_reachable=6.52 mean_executed=3.16
+B-BIRTHS arm=pu0.0025_b0.9 depth=250 births=2000 zero=299 mean_requested=3.82 mutated=1701 silent=1568 changed=115 dead=18 changed_per_all=0.0575 dead_per_all=0.0090 silent_per_all=0.7840 (1s)
+B-GROW arm=pu0.0025_b0.9 depth=300 mean_nodes=83.0 mean_units=3783.2 (2s)
+B-ABORT arm=pu0.0025_b0.9 depth=370 mean_nodes=266.7 mean_units=13655.6
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 213.52s
+
+[exited with code 0]
