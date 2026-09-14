@@ -826,6 +826,31 @@ fn viability_still_passes_with_real_mutations() {
     );
 }
 
+/// Existing viability profile still works on the production per-unit supply
+/// rule, at a rate high enough that every founder birth expects events.
+#[test]
+fn viability_still_passes_with_per_unit_mutations() {
+    let mut cfg = viability_config();
+    cfg.mutation.per_unit_supply_enabled = true;
+    cfg.mutation.per_unit_rate = 0.05;
+
+    let mut sim = seed_simulation(cfg, 42);
+    let metrics = run_ticks_with_metrics(&mut sim, 20);
+    let births_total: usize = metrics.iter().map(|m| m.newborns).sum();
+
+    assert!(
+        sim.creature_count() > 0,
+        "population went extinct with per-unit mutations by tick {}.\n{}",
+        sim.tick_number(),
+        format_tick_metrics(&metrics)
+    );
+    assert!(
+        births_total > 0,
+        "no reproduction occurred with per-unit mutations.\n{}",
+        format_tick_metrics(&metrics)
+    );
+}
+
 /// Two simulations seeded with the same seed must produce identical initial
 /// creature placement and per-cell food densities.
 #[test]
