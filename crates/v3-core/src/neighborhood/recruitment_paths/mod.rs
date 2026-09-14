@@ -8,8 +8,8 @@ mod records;
 pub use experiment::observe;
 pub use fixtures::{constructed_paths, starting_forms, ConstructedPath, ConstructionStage, Start};
 pub use qualification::{
-    qualified_paths, search_seeds, GrowthGap, PathStep, ProductionEvent, QualifiedPath, SeedSearch,
-    MAX_PATH_EVENTS, SEARCH_RANGE,
+    qualified_paths, search_seeds, CostVerdict, GrowthGap, PathStep, ProductionEvent,
+    QualifiedPath, SeedSearch, MAX_PATH_EVENTS, SEARCH_RANGE,
 };
 pub use records::*;
 

@@ -136,7 +136,7 @@ fn checkpoint(
     }
 }
 
-struct Candidate {
+struct Sibling {
     genome: CreatureGenome,
     task: TaskReading,
     tracker: RecruitmentTracker,
@@ -158,7 +158,7 @@ fn propose_siblings(
     position: ProposalPosition,
     viable_path: bool,
     config: &crate::config::SimulationConfig,
-) -> Vec<Candidate> {
+) -> Vec<Sibling> {
     let ProposalPosition {
         batch,
         lineage,
@@ -259,7 +259,7 @@ fn propose_siblings(
                 && child_task.live()
                 && child_task.correct(start.task) + 1 >= parent_score,
         };
-        children.push(Candidate {
+        children.push(Sibling {
             genome: child,
             task: child_task,
             tracker: child_tracker,
@@ -305,8 +305,6 @@ fn lineage(
     let mut viable_path = task.live();
     let mut history = Vec::new();
     for generation in 1..=sizes.discovery + sizes.followup {
-        let parent_score = task.correct(start.task);
-        let parent_live = task.live();
         let mut children = propose_siblings(
             start,
             &genome,
@@ -322,16 +320,10 @@ fn lineage(
         );
         let winner = choose(
             policy,
-            (parent_live, parent_score),
+            Candidate::new(&task, start.task),
             [
-                (
-                    children[0].task.live(),
-                    children[0].task.correct(start.task),
-                ),
-                (
-                    children[1].task.live(),
-                    children[1].task.correct(start.task),
-                ),
+                Candidate::new(&children[0].task, start.task),
+                Candidate::new(&children[1].task, start.task),
             ],
         );
         if let Some(index) = winner {
@@ -448,22 +440,86 @@ fn lineage(
     result
 }
 
-fn summary(lineages: &[&Lineage]) -> Summary {
+/// Retained-parent cost at each checkpoint generation, spread over lineages.
+/// Every lineage checkpoints at the same generations.
+fn checkpoint_cost(lineages: &[&Lineage]) -> Vec<CheckpointCost> {
+    let Some(first) = lineages.first() else {
+        return Vec::new();
+    };
+    first
+        .checkpoints
+        .iter()
+        .enumerate()
+        .filter_map(|(index, reference)| {
+            let at: Vec<_> = lineages
+                .iter()
+                .map(|lineage| {
+                    let checkpoint = &lineage.checkpoints[index];
+                    assert_eq!(checkpoint.generation, reference.generation);
+                    checkpoint
+                })
+                .collect();
+            let spread = |value: fn(&Checkpoint) -> f64| {
+                Spread::of(at.iter().map(|checkpoint| value(checkpoint)).collect())
+            };
+            Some(CheckpointCost {
+                generation: reference.generation,
+                genome_size: spread(|checkpoint| f64::from(checkpoint.genome.genome_size()))?,
+                modules: spread(|checkpoint| checkpoint.genome.nodes.len() as f64)?,
+                carrying_sum: spread(|checkpoint| checkpoint.task.summary().carrying_sum)?,
+                ending_energy_sum: spread(|checkpoint| {
+                    checkpoint.task.summary().ending_energy_sum
+                })?,
+            })
+        })
+        .collect()
+}
+
+fn summary(task: Task, lineages: &[&Lineage]) -> Summary {
     let count = lineages.len() as u32;
     let discoveries: Vec<_> = lineages
         .iter()
         .filter_map(|lineage| lineage.retained_discovery.as_ref())
         .collect();
-    let useful = lineages
+    let mut retention_outcomes = RetentionOutcomes::default();
+    for retention in lineages
         .iter()
-        .filter(|lineage| {
-            lineage
-                .retention
-                .as_ref()
-                .is_some_and(|retention| retention.outcome == RetentionOutcome::Useful)
-        })
-        .count() as u32;
+        .filter_map(|lineage| lineage.retention.as_ref())
+    {
+        retention_outcomes.record(retention.outcome);
+    }
+    let useful = retention_outcomes.useful;
+    let (proposals, task_dead, task_live_loss) = lineages
+        .iter()
+        .flat_map(|lineage| &lineage.proposals)
+        .fold((0, 0, 0), |(total, dead, loss), proposal| {
+            let outcome = &proposal.outcome;
+            (
+                total + 1,
+                dead + u32::from(!outcome.live()),
+                loss + u32::from(outcome.live() && outcome.correct(task) < proposal.parent_score),
+            )
+        });
+    let damage = Damage {
+        task_dead: estimate(task_dead, proposals),
+        task_live_loss: estimate(task_live_loss, proposals - task_dead),
+    };
     Summary {
+        time_to_first_retained: TimeToFirst::of(lineages.iter().map(|lineage| {
+            lineage
+                .retained_discovery
+                .as_ref()
+                .map(|discovery| discovery.generation)
+        })),
+        time_to_first_proposal: TimeToFirst::of(lineages.iter().map(|lineage| {
+            lineage
+                .proposal_discovery
+                .as_ref()
+                .map(|discovery| discovery.generation)
+        })),
+        retention_outcomes,
+        damage,
+        checkpoint_cost: checkpoint_cost(lineages),
         proposal_discovery: estimate(
             lineages
                 .iter()
@@ -551,47 +607,52 @@ pub fn observe(sizes: Sizes) -> Report {
     let battery = Battery::generate(config.world.food.types.len());
     let constructed = constructed_paths();
     let starts = fixtures::starts_from_paths(&constructed);
-    let mut arms = Vec::with_capacity(18);
+    let mut arms = Vec::with_capacity(ARMS);
     let mut opportunities = Opportunities::default();
-    for start in &starts {
-        for policy in [Policy::Drift, Policy::Selection] {
-            let mut lineages = Vec::new();
-            for batch in 0..sizes.batches {
-                for index in 0..sizes.lineages {
-                    lineages.push(lineage(
-                        start, policy, sizes, batch, index, &battery, &config,
-                    ));
-                }
+    // The eighteen T13.F02 arms keep their order and indices (`arms/0` is
+    // `graph_blank` under drift); the nine T13.F06 cost arms are appended.
+    let f02 = starts
+        .iter()
+        .flat_map(|start| Policy::F02.map(|policy| (start, policy)));
+    let cost = starts.iter().map(|start| (start, Policy::CostSelection));
+    for (start, policy) in f02.chain(cost) {
+        let mut lineages = Vec::new();
+        for batch in 0..sizes.batches {
+            for index in 0..sizes.lineages {
+                lineages.push(lineage(
+                    start, policy, sizes, batch, index, &battery, &config,
+                ));
             }
-            let all: Vec<_> = lineages.iter().collect();
-            let summary = summary(&all);
-            let batches = (0..sizes.batches)
-                .map(|batch| {
-                    self::summary(
-                        &all.iter()
-                            .copied()
-                            .filter(|lineage| lineage.batch == batch)
-                            .collect::<Vec<_>>(),
-                    )
-                })
-                .collect();
-            let mut supply = Opportunities::default();
-            for lineage in &lineages {
-                for proposal in &lineage.proposals {
-                    supply.merge(&proposal.opportunities);
-                }
-            }
-            opportunities.merge(&supply);
-            arms.push(Arm {
-                start: start.name.clone(),
-                task: start.task,
-                policy,
-                lineages,
-                summary,
-                batches,
-                opportunities: supply,
-            });
         }
+        let all: Vec<_> = lineages.iter().collect();
+        let summary = summary(start.task, &all);
+        let batches = (0..sizes.batches)
+            .map(|batch| {
+                self::summary(
+                    start.task,
+                    &all.iter()
+                        .copied()
+                        .filter(|lineage| lineage.batch == batch)
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect();
+        let mut supply = Opportunities::default();
+        for lineage in &lineages {
+            for proposal in &lineage.proposals {
+                supply.merge(&proposal.opportunities);
+            }
+        }
+        opportunities.merge(&supply);
+        arms.push(Arm {
+            start: start.name.clone(),
+            task: start.task,
+            policy,
+            lineages,
+            summary,
+            batches,
+            opportunities: supply,
+        });
     }
     // Every treatment comparison uses the same original lineage pairs. These
     // rows expose dependent contrasts, never new independent replicates.
@@ -722,7 +783,7 @@ mod tests {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, policy);
             let refs: Vec<_> = lineages.iter().collect();
-            let aggregate = summary(&refs);
+            let aggregate = summary(start.task, &refs);
             assert_eq!(
                 [
                     aggregate.proposal_discovery.numerator,
@@ -730,7 +791,8 @@ mod tests {
                     aggregate.viable_retained_discovery.numerator,
                     aggregate.retained_useful.numerator,
                 ],
-                expected
+                expected,
+                "{name} {policy:?}"
             );
 
             let mut graph_discards = 0;
@@ -818,6 +880,53 @@ mod tests {
         }
     }
 
+    /// T13.F06 pin from the first run: under cost-visible selection the two
+    /// prepared forms keep every retained discovery useful (17/17 against
+    /// 16/17 and 15/18 under F02 selection); `vm_prepared` proposal
+    /// discovery is 17, not 18, because rejected neutral steps move the
+    /// lineage trajectories.
+    #[test]
+    fn production_cost_selection_lineages_pin_the_first_reading() {
+        let starts = starting_forms();
+        for (name, expected) in [
+            ("graph_prepared", [17, 17, 17, 17]),
+            ("vm_prepared", [17, 17, 17, 17]),
+        ] {
+            let start = starts.iter().find(|start| start.name == name).unwrap();
+            let lineages = production_lineages(start, Policy::CostSelection);
+            let refs: Vec<_> = lineages.iter().collect();
+            let aggregate = summary(start.task, &refs);
+            assert_eq!(
+                [
+                    aggregate.proposal_discovery.numerator,
+                    aggregate.retained_discovery.numerator,
+                    aggregate.viable_retained_discovery.numerator,
+                    aggregate.retained_useful.numerator,
+                ],
+                expected,
+                "{name}"
+            );
+            assert_eq!(
+                aggregate.retention_outcomes,
+                RetentionOutcomes {
+                    useful: 17,
+                    ..RetentionOutcomes::default()
+                },
+                "{name}"
+            );
+            assert_eq!(aggregate.time_to_first_retained.censored, 15, "{name}");
+            super::super::tests::assert_summary_readings_are_consistent(&Arm {
+                start: start.name.clone(),
+                task: start.task,
+                policy: Policy::CostSelection,
+                summary: aggregate,
+                batches: vec![],
+                opportunities: Opportunities::default(),
+                lineages,
+            });
+        }
+    }
+
     #[test]
     fn paired_lineages_report_each_first_divergence_and_signed_difference() {
         let start = starting_forms()
@@ -832,7 +941,7 @@ mod tests {
                 start: start.name.clone(),
                 task: start.task,
                 policy,
-                summary: summary(&refs),
+                summary: summary(start.task, &refs),
                 batches: vec![],
                 opportunities: Opportunities::default(),
                 lineages,

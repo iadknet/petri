@@ -94,7 +94,7 @@ selection. It is observation only: nothing reaches creatures.
 | Consequence | A neutral child that carries or runs more than its parent is not retained; a neutral child that sheds units is. A child whose score rises is retained whatever it costs, as long as it is task-live. |
 | Charges seen | Everything the eight production ticks subtract: decay, carrying (T03.F08), ramped execution (T03.F10), action costs. Recorded as a limitation: at equal score, differing wrong-scene action patterns also move ending energy. |
 | Seeds and RNG | Same proposal seed formula and generation index as the other two policies; the arm reuses each lineage's seeds and is paired with them. Observation consumes no mutation RNG. |
-| Unchanged | Discovery, usefulness (bypass loss at least 1/8, active score at least 1/8 above the starting form, task-live), the retention classification at discovery + 16, checkpoints at 0/32/48, and the eighteen existing arms, whose per-proposal records, fingerprints and summaries are byte-identical to the previous closure's. |
+| Unchanged | Discovery, usefulness (bypass loss at least 1/8, active score at least 1/8 above the starting form, task-live), the retention classification at discovery + 16, checkpoints at 0/32/48, and the eighteen existing arms, whose per-proposal records, fingerprints, `outcome_counts` and every F02 estimate (numerators, denominators, intervals, depth range) equal the previous closure's; their `summary` and `batches` blocks gain only the new keys below, and `Selection` never reads energy. |
 
 **Readings added to the report (per arm, in `Summary` and the committed
 summary).**
@@ -132,33 +132,50 @@ T13.F02's 120 s wall cap; `Sizes::proposals` counts 27 arms (82,944 at
 production; the test pinning 55,296 is re-pinned with that reason) and still
 equals `total_proposals`; the conversion's fixed claim pointers keep meaning
 (`arms/0` is still `graph_blank` / `Drift`); the summary file grows only by
-the nine arms and the 98 added pairs.
+the nine arms, the 98 added pairs and the new `summary` / `batches` keys on
+all 27 arms. `CheckpointCost.modules` is `genome.nodes.len()`, as
+`Proposal.modules` is; an even-count median is the mean of the two middle
+values; the new `Summary` fields carry no `serde(default)`, since the
+committed summaries are read untyped and older reports are not re-loaded
+typed.
 
 ## Implementation Tasks
 
-- [ ] Add `Policy::CostSelection` and extend `choose` to take each
+- [x] Add `Policy::CostSelection` and extend `choose` to take each
       candidate's `ending_energy_sum`; property tests (proptest) that the rule
       never retains a task-dead or lower-scoring child, never prefers a
       strictly lower ending energy at equal score, and reduces to F02's
       `Selection` choice when energies tie.
-- [ ] Run the third policy for every starting form in `observe`; keep the
+- [x] Run the third policy for every starting form in `observe`; keep the
       eighteen existing arms first in order; extend `Summary` with the
       time-to-first, retention-outcome, damage and checkpoint-cost readings;
       fold them through `bench/artifacts.rs` into the committed summary.
-- [ ] Extend the qualified-path tests with the per-step cost verdicts and the
-      last-step assertion.
+- [x] Extend the qualified-path tests with the per-step cost verdicts and the
+      last-step assertion (`QualifiedPath::cost_verdicts`).
 - [ ] Add the readings file and the `docs/progress.md` row, and tick the
       track's qualification success criterion at closure. No reference doc
       describes this observation, so none changes.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core recruitment_paths` and the property tests ->
-      pass, including the existing pinned-baseline test
+- [x] `cargo test -p v3-core recruitment_paths` and the property tests ->
+      pass (32 passed in the crate plus 3 in the integration binaries,
+      2026-09-14), including the pinned-baseline test
       `production_prepared_lineages_match_the_recorded_baseline_and_metadata`
-      unchanged and the `Sizes::TEST` report tests at 27 arms.
-- [ ] `cargo test -p v3-core --test reproducibility` -> pass (observation
-      consumes no production RNG).
+      unchanged, the sibling pin
+      `production_cost_selection_lineages_pin_the_first_reading`
+      (`graph_prepared` and `vm_prepared` under `CostSelection` both
+      17/17/17/17), the `Sizes::TEST` report tests at 27 arms and 171 pairs,
+      and the committed
+      `crates/v3-core/proptest-regressions/neighborhood/recruitment_paths/tests.txt`
+      seed replayed.
+- [x] `cargo test -p v3-core --test reproducibility` -> pass (3 passed;
+      observation consumes no production RNG).
+- [x] `cargo test -p v3-cli --test bench_artifacts` (20 passed, 1 ignored) and
+      `cargo test -p v3-cli recruitment_paths` (2 passed) -> the whole
+      `summary` block, new readings included, folds into the committed
+      summary; `cargo fmt --all -- --check`, `cargo clippy --workspace
+      --all-targets` and `cargo check --workspace --all-targets` -> clean.
 - [ ] `make check` -> pass.
 - [ ] Byte-identity of the eighteen F02 arms against the previous closure:
       per-arm `retained_discovery` / `retained_useful` numerators and

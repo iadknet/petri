@@ -16,7 +16,20 @@ pub enum Task {
 pub enum Policy {
     Drift,
     Selection,
+    /// Score first, then the summed ending energy the production charges leave.
+    CostSelection,
 }
+
+impl Policy {
+    /// The two T13.F02 policies; their eighteen arms lead the report.
+    pub const F02: [Self; 2] = [Self::Drift, Self::Selection];
+    pub const COUNT: usize = Self::F02.len() + 1;
+}
+
+/// Starting forms in the fixed family.
+pub const STARTS: usize = 9;
+/// Arms per observation: every starting form under every policy.
+pub const ARMS: usize = STARTS * Policy::COUNT;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sizes {
@@ -44,7 +57,7 @@ impl Sizes {
             * u64::from(self.lineages)
             * u64::from(self.discovery + self.followup)
             * 2
-            * 18
+            * ARMS as u64
     }
 }
 
@@ -147,6 +160,21 @@ pub struct TaskSummary {
     pub maintenance_sum: f64,
     pub carrying_sum: f64,
     pub work: Work,
+}
+
+impl TaskSummary {
+    /// Every scene survived the eight production ticks.
+    #[must_use]
+    pub fn live(&self) -> bool {
+        self.surviving_scenes == 8
+    }
+    #[must_use]
+    pub fn correct(&self, task: Task) -> u8 {
+        match task {
+            Task::A => self.correct_a,
+            Task::B => self.correct_b,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -392,6 +420,111 @@ pub fn estimate(numerator: u32, denominator: u32) -> Estimate {
     }
 }
 
+/// Median of a non-empty sorted sample; an even count averages the two
+/// middle values.
+fn median<T: Copy + Into<f64>>(sorted: &[T]) -> Option<f64> {
+    let middle = sorted.len() / 2;
+    match sorted.len() {
+        0 => None,
+        len if len % 2 == 1 => Some(sorted[middle].into()),
+        _ => Some((sorted[middle - 1].into() + sorted[middle].into()) / 2.0),
+    }
+}
+
+/// Time to first discovery over an arm's lineages, censored at the discovery
+/// horizon for lineages that never discover.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TimeToFirst {
+    /// Sorted first-discovery generations of the discovering lineages.
+    pub generations: Vec<u32>,
+    pub median: Option<f64>,
+    /// Lineages without a discovery by the discovery horizon.
+    pub censored: u32,
+}
+
+impl TimeToFirst {
+    #[must_use]
+    pub fn of(first: impl IntoIterator<Item = Option<u32>>) -> Self {
+        let mut censored = 0;
+        let mut generations = Vec::new();
+        for generation in first {
+            match generation {
+                Some(generation) => generations.push(generation),
+                None => censored += 1,
+            }
+        }
+        generations.sort_unstable();
+        Self {
+            median: median(&generations),
+            generations,
+            censored,
+        }
+    }
+}
+
+/// Retention outcomes at discovery + follow-up among retained discoverers.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RetentionOutcomes {
+    pub useful: u32,
+    pub no_longer_useful: u32,
+    pub deleted: u32,
+    pub task_dead: u32,
+}
+
+impl RetentionOutcomes {
+    pub fn record(&mut self, outcome: RetentionOutcome) {
+        match outcome {
+            RetentionOutcome::Useful => self.useful += 1,
+            RetentionOutcome::NoLongerUseful => self.no_longer_useful += 1,
+            RetentionOutcome::Deleted => self.deleted += 1,
+            RetentionOutcome::TaskDead => self.task_dead += 1,
+        }
+    }
+    #[must_use]
+    pub fn total(&self) -> u32 {
+        self.useful + self.no_longer_useful + self.deleted + self.task_dead
+    }
+}
+
+/// Proposal damage: task death over all proposals, and a loss of at least the
+/// 1/8 margin against the parent over task-live proposals.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Damage {
+    pub task_dead: Estimate,
+    pub task_live_loss: Estimate,
+}
+
+/// Min / median / max over an arm's lineages.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Spread {
+    pub min: f64,
+    pub median: f64,
+    pub max: f64,
+}
+
+impl Spread {
+    #[must_use]
+    pub fn of(mut values: Vec<f64>) -> Option<Self> {
+        values.sort_unstable_by(f64::total_cmp);
+        Some(Self {
+            min: *values.first()?,
+            median: median(&values)?,
+            max: *values.last()?,
+        })
+    }
+}
+
+/// Cost of the retained parent at one checkpoint generation. `modules` is the
+/// genome's node count, the same count `Proposal::modules` records.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CheckpointCost {
+    pub generation: u32,
+    pub genome_size: Spread,
+    pub modules: Spread,
+    pub carrying_sum: Spread,
+    pub ending_energy_sum: Spread,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Summary {
     pub proposal_discovery: Estimate,
@@ -400,6 +533,11 @@ pub struct Summary {
     pub retained_useful: Estimate,
     pub retention_among_discoverers: Estimate,
     pub discovery_depth_range: Option<[u32; 2]>,
+    pub time_to_first_retained: TimeToFirst,
+    pub time_to_first_proposal: TimeToFirst,
+    pub retention_outcomes: RetentionOutcomes,
+    pub damage: Damage,
+    pub checkpoint_cost: Vec<CheckpointCost>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -453,19 +591,51 @@ pub struct Report {
     pub opportunities: Opportunities,
 }
 
+/// One selection candidate: task-live, exact correct-scene count on the arm's
+/// task, and the energy the eight production ticks left
+/// (`TaskSummary::ending_energy_sum`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Candidate {
+    pub live: bool,
+    pub score: u8,
+    pub ending_energy_sum: f64,
+}
+
+impl Candidate {
+    #[must_use]
+    pub fn new(reading: &TaskReading, task: Task) -> Self {
+        Self {
+            live: reading.live(),
+            score: reading.correct(task),
+            ending_energy_sum: reading.summary().ending_energy_sum,
+        }
+    }
+}
+
 /// Sibling preference is explicit; selection's score comparison uses exact
 /// correct-scene counts, so one point is the predeclared 1/8 margin.
-pub fn choose(policy: Policy, parent: (bool, u8), children: [(bool, u8); 2]) -> Option<usize> {
+/// `Selection` never reads energy. `CostSelection` orders by score, then by
+/// strictly higher ending energy, then sibling 0, sibling 1, parent, so a
+/// neutral child that carries or runs more than its parent is not retained.
+pub fn choose(policy: Policy, parent: Candidate, children: [Candidate; 2]) -> Option<usize> {
     if policy == Policy::Drift {
         return Some(0);
     }
-    let mut winner = None;
-    let mut score = parent.1;
-    for (index, &(live, child_score)) in children.iter().enumerate() {
-        if live && child_score >= parent.1 && (winner.is_none() || child_score > score) {
-            winner = Some(index);
-            score = child_score;
+    // Candidates in tie order: sibling 0, sibling 1, then the parent (index 2).
+    let mut best: Option<(usize, Candidate)> = None;
+    for (index, candidate) in children.into_iter().chain([parent]).enumerate() {
+        if index < 2 && (!candidate.live || candidate.score < parent.score) {
+            continue;
+        }
+        let beats = best.is_none_or(|(_, current)| {
+            candidate.score > current.score
+                || (policy == Policy::CostSelection
+                    && candidate.score == current.score
+                    && candidate.ending_energy_sum > current.ending_energy_sum)
+        });
+        if beats {
+            best = Some((index, candidate));
         }
     }
-    winner
+    best.and_then(|(index, _)| (index < 2).then_some(index))
 }
