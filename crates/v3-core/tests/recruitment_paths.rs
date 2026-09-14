@@ -41,7 +41,9 @@ fn recruitment_paths_apply_both_cues_with_irrelevant_north_food() {
 
 #[test]
 fn recruitment_paths_qualified_paths_replay_through_the_production_operators() {
-    use v3_core::neighborhood::recruitment_paths::{qualified_paths, MAX_PATH_EVENTS, SEED_RANGE};
+    use v3_core::neighborhood::recruitment_paths::{
+        qualified_paths, MAX_PATH_EVENTS, SEARCH_RANGE,
+    };
 
     let paths = qualified_paths();
     assert_eq!(paths.len(), 9);
@@ -50,7 +52,7 @@ fn recruitment_paths_qualified_paths_replay_through_the_production_operators() {
         let mut genome = path.start.genome.clone();
         assert_eq!(evaluate(&genome), path.start.task);
         for step in &path.steps {
-            assert!(step.seed < SEED_RANGE, "{}", path.form);
+            assert!(step.seed < SEARCH_RANGE, "{}", path.form);
             step.event
                 .apply(&mut genome, step.seed)
                 .unwrap_or_else(|reason| panic!("{} {}: {reason:?}", path.form, step.stage.name));
@@ -74,12 +76,9 @@ fn recruitment_paths_qualified_paths_replay_through_the_production_operators() {
             assert!(last.stage.useful, "{}", path.form);
             assert_eq!(last.stage.task.correct(path.task), 8, "{}", path.form);
         } else {
-            assert!(
-                path.gap.is_some() || path.exhausted.is_some(),
-                "{}",
-                path.form
-            );
+            assert!(path.gap.is_some(), "{}", path.form);
+            assert_eq!(path.steps.last().unwrap().stage.task.correct(path.task), 8);
         }
     }
-    assert_eq!(qualified, 6);
+    assert_eq!(qualified, 7);
 }

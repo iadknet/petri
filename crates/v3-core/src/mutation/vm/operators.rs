@@ -6,6 +6,7 @@ use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmBackendDef, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
+use crate::runtime::action_decode::MAX_DECODED_ACTION_TYPE;
 
 pub(super) fn apply_constant_mutation(
     genome: &mut CreatureGenome,
@@ -220,7 +221,7 @@ pub(crate) fn random_vm_instruction(
             src: rng.gen_range(0..rc),
         },
         27 => VmInstruction::PushAction {
-            action_type: rng.gen(),
+            action_type: rng.gen_range(0..=MAX_DECODED_ACTION_TYPE),
         },
         28 => VmInstruction::PopAction,
         29 => VmInstruction::ReadActionQueueLength {

@@ -157,8 +157,8 @@ closure's exactly.
 - [x] For each missing transition, TDD the repair in the existing operator:
       failing path test first, predicate extension, property tests, reference
       update; run `cargo test -p v3-core --test viability` first when production
-      code changes. None found: every needed transition is inside an existing
-      operator's site set and draw range (readings).
+      code changes. One: the `PushAction.action_type` draw (readings, "Seed
+      search").
 - [x] Turn every qualified path into the maintained regression tests above.
 - [ ] `cargo check --workspace --all-targets`, `cargo clippy`, `cargo fmt`,
       `make roadmap-check`; update `docs/progress.md`,
@@ -166,22 +166,14 @@ closure's exactly.
 
 ## Verification
 
-- [x] `cargo test -p v3-core recruitment_paths` (ok: 25 lib, 3 integration,
-      0 failed) and `cargo test -p v3-core --test recruitment_paths` (ok, 3
-      passed) -> every qualified path replays through its production operator
-      and `GenomeDelta::apply`, and its per-step facts hold; six of nine forms
-      qualify (copies and split in 2 events, unprepared copies and the Graph
-      detour in 6), the Graph blank is a complete 7-event growth gap, and the
-      VM blank and VM detour exhaust the seed range on draws that are rare, not
-      missing; path table per form (operators, seeds, length, neutral
-      mechanism, gap or repair) in
+- [x] `cargo test -p v3-core recruitment_paths` (ok: 25 lib, 3 integration)
+      -> every path replays its pinned seeds through the production operators
+      and `GenomeDelta::apply`; seven of nine forms qualify, both blanks are
+      complete 7-event growth gaps; path, per-step and seed-search tables in
       [readings](../../progress/readings/t13-f05-function-preserving-module-recruitment.md).
-- [x] Production unchanged: no operator, draw or RNG consumption changed. The
-      diff touches `crates/v3-core/src/neighborhood/recruitment_paths/{mod.rs,
-      fixtures.rs, qualification.rs, tests.rs}`, `crates/v3-core/tests/recruitment_paths.rs`,
-      `crates/v3-core/src/mutation/engine/mod.rs` (four `*_operator_key`
-      functions made `pub(crate)`, no behavior change), this spec and the
-      readings.
+- [x] One production draw repaired (`PushAction.action_type` in `0..=4`,
+      readings "Seed search"): viability ok before and after, `cargo test -p
+      v3-core`, `--test reproducibility` and `-p v3-cli` ok, one test re-pinned.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
       output path and every survivor resolved in the closure record below.

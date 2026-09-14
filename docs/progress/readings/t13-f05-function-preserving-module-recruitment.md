@@ -7,10 +7,10 @@ Every path is replayed by `crates/v3-core/src/neighborhood/recruitment_paths/qua
 
 ## Path table
 
-Seeds are the first in `0..10_000` whose applied production event matches the
-step's structural acceptance predicate; the search applies the operator only,
-and the accepted genome is then evaluated. Start score is 4/8 on the active
-task for every form. "Neutral mechanism" is why the steps before the last keep
+Seeds are the first in `0..1_000_000` whose applied production event matches
+the step's structural acceptance predicate (the one-off search under "Seed
+search" below); the maintained tests replay the pinned seed only. Start score
+is 4/8 on the active task for every form. "Neutral mechanism" is why the steps before the last keep
 the incumbent's battery signature and its per-scene actions, shared memory
 and routing.
 
@@ -23,17 +23,18 @@ and routing.
 | vm_unprepared | B | InputRef.Swap:25, VmInstructionRawFieldMutation:72, VmInstructionRawFieldMutation:223, VmConstantMutation:13, VmConstantMutation:13, SwapRouteTargets:0 | 6 | scaffold not dispatched until the swap | qualified, 8/8, no operator changed |
 | graph_detour | A | InputRef.Add:1, MutateActionSlotBehavior:25, AddInternalGraphNode:1020, AddGraphEdge:1650, AddGraphEdge:3612, AddGraphEdge:102 | 6 | dispatched every tick; action slot 0 has no gate edge until the last event, so it never fires | qualified, 8/8, no operator changed |
 | graph_blank | A | InputRef.Add:1, MutateActionSlotBehavior:25, AddInternalGraphNode:1020, AddGraphEdge:1650, AddGraphEdge:3612, AddGraphEdge:102, SwapRouteTargets:0 | 7 | scaffold not dispatched until the swap | growth gap: complete path of 7, 8/8 |
-| vm_blank | A | InputRef.Add:1, VmInstructionMutation:238, then exhausted at `skip_when_zero` | 7 planned | scaffold not dispatched until the swap | growth gap: planned path of 7; seed range exhausted (below) |
-| vm_detour | A | InputRef.Add:1, VmInstructionMutation:238, VmInstructionMutation:800, then exhausted at `write_direction` | 6 planned | dispatched every tick; every inserted instruction is neutral until `PushAction` (the last event) | not qualified: seed range exhausted (below) |
+| vm_blank | A | InputRef.Add:1, VmInstructionMutation:238, VmInstructionMutation:9940, VmInstructionMutation:800, VmInstructionMutation:41854, VmInstructionMutation:4126, SwapRouteTargets:0 | 7 | scaffold not dispatched until the swap | growth gap: complete path of 7, 8/8 |
+| vm_detour | A | InputRef.Add:1, VmInstructionMutation:238, VmInstructionMutation:800, VmInstructionMutation:21017, VmInstructionMutation:3709, VmInstructionMutation:4126 | 6 | dispatched every tick; the jump lands on the Halt, so every inserted instruction is neutral until `PushAction(Move)` (the last event) | qualified, 8/8, `PushAction` draw repaired |
 
 Detour creation: production `Topology.AddNode` (`apply_splice_node`) on the
 entry-to-incumbent edge of the Task A dead-incumbent base; seed 1 draws the
 blank Graph backend, seed 0 the minimal VM backend. Both detours are
 dispatched every tick and forward to the incumbent.
 
-Six of nine forms qualify. No production operator was changed: every
-transition the paths need is inside an existing operator's site set and draw
-range.
+Seven of nine forms qualify; the two blanks are complete seven-event growth
+gaps. One production draw changed: `random_vm_instruction` draws
+`PushAction.action_type` in `0..=4` (`MAX_DECODED_ACTION_TYPE`), the range
+`decode_world_action` admits, instead of the full `u8` ("Seed search" below).
 
 ## Per-step readings
 
@@ -82,17 +83,26 @@ each complete path dispatches node 2, is useful by `static_successor_bypass`
 | vm_blank | start (F02 blank) | | | 4/8 | 21 | 16 | 0 | 395.58 |
 | vm_blank | cue_added | InputRefAdd | 1 | 4/8 | 22 | 16 | 0 | 395.58 |
 | vm_blank | read_cue | VmInstructionMutation | 238 | 4/8 | 23 | 16 | 0 | 395.58 |
+| vm_blank | skip_when_zero | VmInstructionMutation | 9940 | 4/8 | 24 | 16 | 0 | 395.58 |
+| vm_blank | double_to_east | VmInstructionMutation | 800 | 4/8 | 25 | 16 | 0 | 395.58 |
+| vm_blank | write_direction | VmInstructionMutation | 41854 | 4/8 | 26 | 16 | 0 | 395.58 |
+| vm_blank | push_move | VmInstructionMutation | 4126 | 4/8 | 27 | 16 | 0 | 395.58 |
+| vm_blank | activated | TopologySwapRouteTargets | 0 | 8/8 | 27 | 44 | 0 | 394.98 |
 | vm_detour | start (AddNode) | TopologyAddNode | 0 | 4/8 | 21 | 24 | 0 | 395.58 |
 | vm_detour | cue_added | InputRefAdd | 1 | 4/8 | 22 | 24 | 0 | 395.58 |
 | vm_detour | read_cue | VmInstructionMutation | 238 | 4/8 | 23 | 32 | 0 | 395.58 |
 | vm_detour | double_to_east | VmInstructionMutation | 800 | 4/8 | 24 | 40 | 0 | 395.58 |
+| vm_detour | write_direction | VmInstructionMutation | 21017 | 4/8 | 25 | 48 | 0 | 395.58 |
+| vm_detour | skip_when_zero | VmInstructionMutation | 3709 | 4/8 | 26 | 48 | 0 | 395.58 |
+| vm_detour | push_move | VmInstructionMutation | 4126 | 8/8 | 27 | 52 | 0 | 394.98 |
 
 The graph relax iterations of the Graph detour rise from 8 to 16 once the
 detour carries a compute node (a wired zero-compute visit pays one
 node-equivalent, T13.F04); the VM detour pays one VM step per inserted
-instruction per scene. No charge made a subject task-dead.
+instruction per scene until the jump, after which the four zero-cue scenes
+halt at the jump. No charge made a subject task-dead.
 
-## Growth gaps and range exhaustion
+## Growth gaps
 
 **Direction on the Graph backend.** A Graph `Emit(Move)` slot decodes its
 direction from `param_inputs[0]` alone (`runtime/cgp/effects.rs`,
@@ -112,44 +122,75 @@ least fifteen events; the three-event node is the shortest route found.
 | graph_blank | the six graph_detour events plus `SwapRouteTargets` | 7 | activation: undispatched tissue needs the route swap on top of the sensor, the Move behavior, the three-event direction node and the gate edge |
 | vm_blank | `InputRef.Add`, five `VmInstructionMutation` inserts (`ReadInput`, `JumpIfZero`, `Add`, `WriteWorldActionMeta`, `PushAction(2)`), `SwapRouteTargets` | 7 | activation: the one-register Task A program needs five instructions and each VM event inserts at most one of them (the read/store, read/bid and load/compare motifs carry none of the jump, meta write or push) |
 
-The Graph blank path is complete and reaches 8/8 (a growth gap, not a
-missing transition). The VM blank path and the six-event VM detour path
-(`InputRef.Add`, `ReadInput`, `Add`, `WriteWorldActionMeta`, `JumpIfZero`,
-`PushAction(2)` last, with the jump's offset drawn so that a zero cue lands on
-the doubling, the meta write or the Halt at both lengths five and six) exhaust
-the 10,000-seed range. Every needed instruction is inside
-`random_vm_instruction`'s draw (41 kinds; `JumpIfZero` offset in `-16..=16`;
-`WriteWorldActionMeta` slot in `0..8`; `PushAction` action type as a full
-`u8`), so by the spec's definition no transition is missing; the draws are
-rare. Enumerated per-seed odds, with three applicable VM nodes (entry,
-incumbent, scaffold), the 1/3 insert choice and the uniform position draw:
+Both blank paths are complete and reach 8/8: growth gaps, not missing
+transitions.
 
-| Step | Program before | Draw | Odds per seed | Expected seeds |
-| --- | --- | --- | --- | --- |
-| vm_blank `skip_when_zero` | `[ReadInput, Halt]` | node 1/3, insert 1/3, position 1/3, kind 1/41, offset 6/33 (3 mod 6) | 1/6,100 | 6,100 (exhausted at 10,000) |
-| vm_detour `write_direction` | `[ReadInput, Add, Halt]` | node 1/3, insert 1/3, position 1/4, kind 1/41, slot 1/8 | 1/11,808 | 11,808 (exhausted) |
-| vm_detour `skip_when_zero` | `[ReadInput, Add, WriteWorldActionMeta, Halt]` | node 1/3, insert 1/3, position 1/5, kind 1/41, offset 4/33 | 1/15,200 | 15,200 (not reached) |
-| either `push_move` | five instructions | node 1/3, insert 1/3, position 1/6, kind 1/41, action type 1/256 | 1/566,784 | 566,784 (not reached) |
+## Seed search
 
-`PushAction { action_type }` is drawn as a full `u8` while only 0..=4 decode to
-an action (`runtime/action_decode.rs`), so an insert event that lands on the
-module draws a Move push once in 41 x 256 = 10,496 draws; on the copy forms
-the push is inherited and the path is two events. Narrowing that
-draw would be a production draw change, not a site or draw extension, and is
-reported rather than built.
+The one-off search is the ignored test
+`recruitment_paths_seed_search_finds_the_pinned_seeds`
+(`cargo test --release -p v3-core --lib -- --ignored --nocapture
+recruitment_paths_seed_search`, about 3 minutes including the build): it walks
+every form's plan taking the first accepted seed per step in `0..1_000_000`
+and asserts the result equals the pinned record. The seven Graph, copy, split
+and unprepared forms keep the seeds the 10,000-seed range found. The VM
+insert steps need the draws below; odds are enumerated per seed with three
+applicable VM nodes (entry, incumbent, scaffold), the 1/3 insert choice, the
+uniform position draw over `len + 1` slots, the 1/41 kind draw and the
+kind's own field draws (register count 1, so every register field is 0).
 
-## Build-pass verification
+| Step | Program before | Draw | Odds per seed | Expected seeds | First seed |
+| --- | --- | --- | --- | --- | --- |
+| vm_blank `skip_when_zero` | `[ReadInput, Halt]` | position 1/3, `JumpIfZero` offset landing on the Halt: 0 mod 3, 11/33 | 1/3,321 | 3,321 | 9,940 |
+| vm_blank `double_to_east` | `[ReadInput, JumpIfZero, Halt]` | position 1/4, `Add` | 1/1,476 | 1,476 | 800 |
+| vm_blank `write_direction` | four instructions | position 1/5, `WriteWorldActionMeta` slot 1/8 | 1/14,760 | 14,760 | 41,854 |
+| vm_blank `push_move` | five instructions | position 1/6, `PushAction` action type 1/5 | 1/11,070 | 11,070 | 4,126 |
+| vm_detour `write_direction` | `[ReadInput, Add, Halt]` | position 1/4, slot 1/8 | 1/11,808 | 11,808 | 21,017 |
+| vm_detour `skip_when_zero` | `[ReadInput, Add, WriteWorldActionMeta, Halt]` | position 1/5, offset landing on the Halt: 2 mod 5, 6/33 | 1/10,148 | 10,148 | 3,709 |
+| vm_detour `push_move` | five instructions | position 1/6, action type 1/5 | 1/11,070 | 11,070 | 4,126 |
+
+**Repaired draw.** `random_vm_instruction` drew `PushAction { action_type }`
+over the full `u8` while `decode_world_action` (`runtime/action_decode.rs`)
+admits only 0..=4 and treats the rest as a soft `NoOp`, so a Move push had
+odds 1/256 per `PushAction` draw (1/566,784 per seed on the push step): a
+transition missing in practice under the spec's "Missing transition". The
+draw is now `rng.gen_range(0..=MAX_DECODED_ACTION_TYPE)`
+(`mutation/vm/operators.rs`, constant in `runtime/action_decode.rs`), pinned by
+the property test `random_vm_instruction_never_draws_an_undecodable_action_type`
+and the coverage test `random_vm_instruction_reaches_every_decodable_action_type`
+(which re-pins the former `random_vm_instruction_widens_push_action_range`,
+whose "above 3" expectation encoded the full-`u8` draw). Existing genome
+values above 4 and `VmInstructionRawFieldMutation`'s unit step are unchanged;
+the reference paragraph is `docs/reference/v3-mutation-spec.md` §3, VM domain.
+RNG consumption changes on every opcode-27 draw; no other pinned expectation
+in `v3-core` or `v3-cli` moved.
+
+**Jump acceptance.** The build pass expected a drawn jump offset to survive
+later inserts, but `VmInstructionMutation` inserts go through
+`splice_program_with_reference_repair` (T11.F02), which rewrites every
+surviving jump's offset so it keeps its resolved target; a path step's
+acceptance is therefore "the `JumpIfZero` resolves to the closing Halt"
+(`Expect::JumpToHalt`, via `runtime::vm::jump_target`) at every length, and
+the pinned VM detour's last event repairs the jump from offset 2 to 3 while
+inserting the push. That repair is what keeps the detour neutral: a zero cue
+halts at the jump both before and after the push.
+
+## Verification
 
 | Command | Result |
 | --- | --- |
-| `cargo test -p v3-core recruitment_paths` | ok: 25 lib tests (5 new), 3 integration tests (1 new), 0 failed |
-| `cargo test -p v3-core --test recruitment_paths` | ok, 3 passed |
+| `cargo test -p v3-core --test viability` (before and after the draw change) | ok, 24 passed |
+| `cargo test -p v3-core` | ok: 1436 lib tests passed (3 ignored), every integration binary passed, 0 failed |
+| `cargo test -p v3-core --test reproducibility` | ok, 3 passed |
+| `cargo test -p v3-cli` | ok: 101 + 11 + 20 + 20 + 11 passed, 0 failed |
+| `cargo test -p v3-core recruitment_paths` | ok: 25 lib tests (1 ignored search), 3 integration tests, 0 failed |
+| `cargo test --release -p v3-core --lib -- --ignored recruitment_paths_seed_search` | ok, 1 passed: the search reproduces every pinned seed |
 | `cargo check --workspace --all-targets` | clean |
 | `cargo clippy --workspace --all-targets` | clean, no warnings |
 | `cargo fmt --all --check` | clean |
 | `make roadmap-check` | pass |
 
-Production code unchanged except visibility: `mutation/engine/mod.rs` makes
-its four `*_operator_key` functions `pub(crate)` so the harness records the
-same `MutationOperator` the engine records; no behavior, draw or RNG
-consumption changed, so no viability run, re-pin or reference update applies.
+Production changes: the `PushAction.action_type` draw above and the
+`mutation/engine/mod.rs` visibility change (four `*_operator_key` functions
+`pub(crate)` so the harness records the same `MutationOperator` the engine
+records). Weights, biases, selectors and the F02 experiment are unchanged.

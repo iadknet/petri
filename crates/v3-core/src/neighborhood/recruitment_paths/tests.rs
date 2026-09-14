@@ -596,6 +596,44 @@ fn recruitment_paths_wilson_midpoint_has_the_predeclared_interval() {
     assert!((upper - 0.905_468_794_265_769_3).abs() < 1e-14);
 }
 
+/// Seeds the one-off search found for the VM insert steps after the
+/// `JumpToHalt` acceptance fix and the `PushAction` draw repair (readings,
+/// "Seed search"); only the two `write_direction` seeds exceed 10,000.
+const VM_BLANK_JUMP: u64 = 9940;
+const VM_BLANK_DOUBLE: u64 = 800;
+const VM_BLANK_WRITE: u64 = 41_854;
+const VM_BLANK_PUSH: u64 = 4126;
+const VM_DETOUR_WRITE: u64 = 21_017;
+const VM_DETOUR_JUMP: u64 = 3709;
+const VM_DETOUR_PUSH: u64 = 4126;
+
+/// The one-off seed search behind every pinned seed: the first accepted
+/// seed per step in `0..SEARCH_RANGE`. Minutes long, so ignored;
+/// run with `cargo test -p v3-core --lib -- --ignored --nocapture
+/// recruitment_paths_seed_search`.
+#[test]
+#[ignore = "one-off search over up to 1,000,000 seeds per step"]
+fn recruitment_paths_seed_search_finds_the_pinned_seeds() {
+    let found: Vec<_> = search_seeds()
+        .into_iter()
+        .inspect(|search| println!("{}: {:?}", search.form, search.seeds))
+        .map(|search| (search.form, search.seeds))
+        .collect();
+    let pinned: Vec<_> = paths()
+        .iter()
+        .map(|path| {
+            (
+                path.form.clone(),
+                path.steps
+                    .iter()
+                    .map(|step| (step.stage.name.as_str(), Some(step.seed)))
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect();
+    assert_eq!(found, pinned);
+}
+
 fn paths() -> &'static [QualifiedPath] {
     static PATHS: std::sync::OnceLock<Vec<QualifiedPath>> = std::sync::OnceLock::new();
     PATHS.get_or_init(qualified_paths)
@@ -658,11 +696,10 @@ fn recruitment_paths_qualified_family_is_the_fixed_nine_forms() {
 fn recruitment_paths_qualified_steps_hold_the_per_step_invariants() {
     for path in paths() {
         let mut previous = path.start.task.correct(path.task);
-        let complete = path.exhausted.is_none();
         for (index, step) in path.steps.iter().enumerate() {
-            let last = complete && index + 1 == path.steps.len();
+            let last = index + 1 == path.steps.len();
             let label = format!("{} step {}", path.form, step.stage.name);
-            assert!(step.seed < SEED_RANGE, "{label}");
+            assert!(step.seed < SEARCH_RANGE, "{label}");
             assert_eq!(step.stage.seed, Some(step.seed), "{label}");
             assert_eq!(step.stage.delta.nodes.len(), 1, "{label}");
             assert!(step.stage.task.live(), "{label}");
@@ -719,7 +756,6 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     .map(|step| (step.operator, step.seed))
                     .collect::<Vec<_>>(),
                 path.gap.as_ref().map(|gap| gap.length),
-                path.exhausted.as_deref(),
             )
         })
         .collect();
@@ -739,27 +775,23 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     swap,
                 ],
                 Some(7),
-                None,
             ),
-            (
-                "graph_copy",
-                vec![(GraphAddGraphEdge, 102), swap],
-                None,
-                None
-            ),
-            (
-                "graph_split",
-                vec![(GraphAddGraphEdge, 1762), swap],
-                None,
-                None
-            ),
+            ("graph_copy", vec![(GraphAddGraphEdge, 102), swap], None),
+            ("graph_split", vec![(GraphAddGraphEdge, 1762), swap], None),
             (
                 "vm_blank",
-                vec![(InputRefAdd, 1), (VmInstructionMutation, 238)],
+                vec![
+                    (InputRefAdd, 1),
+                    (VmInstructionMutation, 238),
+                    (VmInstructionMutation, VM_BLANK_JUMP),
+                    (VmInstructionMutation, VM_BLANK_DOUBLE),
+                    (VmInstructionMutation, VM_BLANK_WRITE),
+                    (VmInstructionMutation, VM_BLANK_PUSH),
+                    swap,
+                ],
                 Some(7),
-                Some("skip_when_zero"),
             ),
-            ("vm_copy", vec![(VmDeleteInstruction, 1), swap], None, None),
+            ("vm_copy", vec![(VmDeleteInstruction, 1), swap], None),
             (
                 "graph_unprepared",
                 vec![
@@ -770,7 +802,6 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     (GraphRetargetGraphEdge, 4),
                     swap,
                 ],
-                None,
                 None,
             ),
             (
@@ -784,7 +815,6 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     swap,
                 ],
                 None,
-                None,
             ),
             (
                 "graph_detour",
@@ -797,7 +827,6 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     (GraphAddGraphEdge, 102),
                 ],
                 None,
-                None,
             ),
             (
                 "vm_detour",
@@ -805,9 +834,11 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     (InputRefAdd, 1),
                     (VmInstructionMutation, 238),
                     (VmInstructionMutation, 800),
+                    (VmInstructionMutation, VM_DETOUR_WRITE),
+                    (VmInstructionMutation, VM_DETOUR_JUMP),
+                    (VmInstructionMutation, VM_DETOUR_PUSH),
                 ],
                 None,
-                Some("write_direction"),
             ),
         ]
     );
@@ -824,7 +855,8 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             "vm_copy",
             "graph_unprepared",
             "vm_unprepared",
-            "graph_detour"
+            "graph_detour",
+            "vm_detour"
         ]
     );
     for path in paths().iter().filter(|path| path.qualified()) {
@@ -835,7 +867,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
 
 #[test]
 fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_module() {
-    for path in paths().iter().filter(|path| path.exhausted.is_none()) {
+    for path in paths() {
         let last = path.steps.last().unwrap();
         let before = path
             .steps
@@ -871,6 +903,24 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
                     a.action_bank[0].gate_inputs.len(),
                     b.action_bank[0].gate_inputs.len() + 1
                 );
+            }
+            MutationOperator::VmInstructionMutation => {
+                assert_eq!(change.node, NodeId::new(2));
+                assert_eq!(before_node.targets, after_node.targets);
+                let (BackendDef::Vm(b), BackendDef::Vm(a)) =
+                    (&before_node.backend_def, &after_node.backend_def)
+                else {
+                    panic!()
+                };
+                assert_eq!(a.constants, b.constants);
+                assert_eq!(a.program.len(), b.program.len() + 1);
+                assert_eq!(a.program[4], VmInstruction::PushAction { action_type: 2 });
+                assert_eq!(a.program[0], b.program[0]);
+                assert_eq!(a.program[2..4], b.program[2..4]);
+                assert_eq!(a.program[5..], b.program[4..]);
+                // The insert's reference repair keeps the jump on the Halt.
+                let jump = |offset| VmInstruction::JumpIfZero { cond: 0, offset };
+                assert_eq!((&b.program[1], &a.program[1]), (&jump(2), &jump(3)));
             }
             other => panic!("{}: unexpected exposing operator {other:?}", path.form),
         }

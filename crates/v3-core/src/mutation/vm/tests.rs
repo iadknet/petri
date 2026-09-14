@@ -11,6 +11,7 @@ use crate::creature::genome::{
 };
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::types::MutationSkipReason;
+use crate::runtime::action_decode::MAX_DECODED_ACTION_TYPE;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -350,22 +351,34 @@ fn random_vm_instruction_covers_all_families() {
     );
 }
 
+/// Re-pinned by T13.F05: the draw used to cover the full `u8` (the old test
+/// only asked for a value above 3); it now covers exactly the action types
+/// `decode_world_action` admits, so every one of 0..=4 must be reachable.
 #[test]
-fn random_vm_instruction_widens_push_action_range() {
-    let mut saw_above_3 = false;
-    for seed in 0u64..1024 {
+fn random_vm_instruction_reaches_every_decodable_action_type() {
+    let mut reached = [false; 5];
+    for seed in 0u64..4096 {
+        if let VmInstruction::PushAction { action_type } =
+            random_vm_instruction(&mut rng(seed), 4, 4, 4)
+        {
+            reached[usize::from(action_type)] = true;
+        }
+    }
+    assert_eq!(reached, [true; 5]);
+}
+
+proptest! {
+    /// T13.F05: `PushAction.action_type` is drawn over the decodable range
+    /// only; anything above 4 is a soft `NoOp` at runtime.
+    #[test]
+    fn random_vm_instruction_never_draws_an_undecodable_action_type(seed in any::<u64>()) {
         let mut r = rng(seed);
-        if let VmInstruction::PushAction { action_type } = random_vm_instruction(&mut r, 4, 4, 4) {
-            if action_type > 3 {
-                saw_above_3 = true;
-                break;
+        for _ in 0..64 {
+            if let VmInstruction::PushAction { action_type } = random_vm_instruction(&mut r, 4, 4, 4) {
+                prop_assert!(action_type <= MAX_DECODED_ACTION_TYPE, "action_type {action_type}");
             }
         }
     }
-    assert!(
-        saw_above_3,
-        "random instruction generation should reach action_type values above 3"
-    );
 }
 
 #[test]
