@@ -323,3 +323,11 @@ code, `.cargo/mutants.toml`, test selection, `#[mutants::skip]` or
 | `cargo test -p v3-core` | ok: 1438 lib passed (was 1436; +1 un-ignored, +1 new), 2 ignored, every integration binary passed, 0 failed |
 | `cargo fmt --all --check`, `cargo clippy --workspace --all-targets` | clean |
 | `make roadmap-check` | pass |
+
+**Closure outcome (2026-09-14).** The founder per-birth silent reading is not
+a miss: the predeclared row mis-cited T11 floor (e), which bounds
+single-event births (59.1 / 62.2 / 59.1 % here, byte-identical to T13.F04)
+at track level; the per-feature rule is no regression, which holds. The
+depth-2,000 drift readings were escalated and accepted by the user
+("Proceed, you can merge. I approve the floor violation"); floor and epoch
+unchanged. Tested commit `3d9b13fb` (`make check` exit 0).
