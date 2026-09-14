@@ -4,19 +4,21 @@ use super::comparison::{locked_rand_version, Comparison};
 use super::indicators::{
     assemble_goal_indicators, build_mutational_neighborhood_indicator,
     compute_founder_neighborhood, evolved_neighborhood_for_seed, lineage_diversity,
-    memory_sensitivity, structural_companions_census, structure_size_distribution,
-    temporal_memory_sensitivity, timed_drift_depth, GoalIndicatorInputs,
+    memory_sensitivity, neighborhood_read_for_seed, structural_companions_census,
+    structure_size_distribution, temporal_memory_sensitivity, timed_drift_depth,
+    GoalIndicatorInputs,
 };
 use super::profiles::{
     build_config, goal_case, goal_recipes_for, profile_block, GoalCase, GoalRecipe,
     NeighborhoodSizes, ProfileParams, GOAL_WORLD_SET, SCHEMA_VERSION,
 };
 use super::schema::{
-    ratio, timed_recruitment_paths, Deterministic, DriftDepth, Environment, GoalCaseObservation,
-    Host, Indicator, LineageDiversitySeed, MemorySensitivitySeed, NeighborhoodEvolvedSeed,
-    NeighborhoodFounderHalf, PerCreatureTick, PerSeed, PopulationPersistenceSeed, Report,
-    SeedFinalStateObservation, SeedPhaseWallClock, SeedThroughput, SeedWallClock,
-    StructuralCompanionsSeed, TemporalMemorySensitivitySeed, Throughput, ThroughputRates, Totals,
+    ratio, timed_recruitment_paths, undefined_neighborhood_read, Deterministic, DriftDepth,
+    Environment, GoalCaseObservation, Host, Indicator, LineageDiversitySeed, MemorySensitivitySeed,
+    NeighborhoodEvolvedSeed, NeighborhoodFounderHalf, NeighborhoodRead, PerCreatureTick, PerSeed,
+    PopulationPersistenceSeed, Report, SeedFinalStateObservation, SeedPhaseWallClock,
+    SeedThroughput, SeedWallClock, StructuralCompanionsSeed, TemporalMemorySensitivitySeed,
+    Throughput, ThroughputRates, Totals,
 };
 use super::tracking::{PersistenceAccumulator, PopulationReadings, WorldTracking};
 use std::num::NonZeroUsize;
@@ -74,6 +76,9 @@ struct GoalObservation {
     /// mutational-neighborhood indicator runs.
     evolved_neighborhood: Option<NeighborhoodEvolvedSeed>,
     evolved_neighborhood_wall_clock_ms: f64,
+    /// `Some` only on the goal world set (T14.F12), timed on its own.
+    neighborhood_read: Option<NeighborhoodRead>,
+    neighborhood_read_wall_clock_ms: f64,
 }
 
 /// `Duration` as fractional milliseconds, the unit every wall-clock field in
@@ -98,6 +103,8 @@ pub struct RunTimings {
     pub recruitment_paths_wall_clock_ms: Option<f64>,
     /// Evolved-half neighborhood wall time per seed (goal profile only).
     pub neighborhood_evolved_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
+    /// Neighborhood-read wall time per seed (goal world set only).
+    pub neighborhood_read_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
 }
 
 pub(super) fn run_one_seed(
@@ -107,6 +114,7 @@ pub(super) fn run_one_seed(
     observe_goal_indicators: bool,
     neighborhood_battery: Option<&Battery>,
     neighborhood_sizes: NeighborhoodSizes,
+    read_neighborhood: bool,
 ) -> SeedRun {
     let start = Instant::now();
     let mut sim = seed_simulation(config.clone(), seed);
@@ -175,6 +183,22 @@ pub(super) fn run_one_seed(
         });
         let evolved_neighborhood_wall_clock_ms = millis(evolved_neighborhood_started.elapsed());
 
+        let neighborhood_read_started = Instant::now();
+        let neighborhood_read = neighborhood_battery
+            .filter(|_| read_neighborhood)
+            .map(|battery| {
+                let context = EvalContext::from_config(config);
+                neighborhood_read_for_seed(
+                    seed,
+                    &sim,
+                    battery,
+                    &config.mutation,
+                    &context,
+                    neighborhood_sizes,
+                )
+            });
+        let neighborhood_read_wall_clock_ms = millis(neighborhood_read_started.elapsed());
+
         GoalObservation {
             lineage_diversity: lineage_diversity_seed,
             memory_sensitivity: memory_sensitivity_seed,
@@ -183,6 +207,8 @@ pub(super) fn run_one_seed(
             wall_clock_ms,
             evolved_neighborhood,
             evolved_neighborhood_wall_clock_ms,
+            neighborhood_read,
+            neighborhood_read_wall_clock_ms,
         }
     });
 
@@ -309,6 +335,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
     let mut final_state_observation_ms_per_seed = Vec::with_capacity(params.seeds.len());
     let mut evolved_neighborhood_per_seed = Vec::with_capacity(params.seeds.len());
     let mut neighborhood_evolved_wall_clock_ms_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut neighborhood_read_wall_clock_ms_per_seed = Vec::with_capacity(params.seeds.len());
     let world_set = params.name == GOAL_WORLD_SET;
     let observe_goal_indicators = params.name == "goal" || world_set;
     let mut case_observations = Vec::new();
@@ -364,6 +391,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
             observe_goal_indicators,
             battery,
             params.neighborhood,
+            world_set,
         );
         pooled_complexities.extend(run.complexities.iter().copied());
         wall_clock.push(SeedWallClock {
@@ -374,6 +402,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
         phase_wall_clock.push(run.phase_wall_clock);
         population_persistence_per_seed.push(run.persistence);
         let mut case_evolved = Vec::new();
+        let mut case_read = undefined_neighborhood_read();
         if let Some(observation) = run.goal_observation {
             lineage_diversity_per_seed.push(observation.lineage_diversity);
             memory_sensitivity_per_seed.push(observation.memory_sensitivity);
@@ -394,6 +423,13 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
                     wall_clock_ms: observation.evolved_neighborhood_wall_clock_ms,
                 });
             }
+            if let Some(read) = observation.neighborhood_read {
+                case_read = Indicator::Defined(read);
+                neighborhood_read_wall_clock_ms_per_seed.push(SeedFinalStateObservation {
+                    seed,
+                    wall_clock_ms: observation.neighborhood_read_wall_clock_ms,
+                });
+            }
         }
         if let Some(case) = case {
             case_observations.push(GoalCaseObservation {
@@ -410,6 +446,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
                     case_evolved,
                 ),
                 drift_depth: case.drift,
+                neighborhood_read: case_read,
             });
         }
         per_seed.push(run.per_seed);
@@ -457,6 +494,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
         drift_depth_wall_clock_ms,
         recruitment_paths_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
+        neighborhood_read_wall_clock_ms_per_seed,
     };
 
     Ok((deterministic, timings))
@@ -564,6 +602,7 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         drift_depth_wall_clock_ms,
         recruitment_paths_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
+        neighborhood_read_wall_clock_ms_per_seed,
     } = timings;
     let wall_clock_ms_total: f64 = wall_clock_ms_per_seed.iter().map(|s| s.wall_clock_ms).sum();
     let wall_clock_ms_per_creature_tick = if totals.creature_ticks == 0 {
@@ -585,6 +624,10 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         .map(|observation| observation.wall_clock_ms)
         .sum();
     let neighborhood_evolved_wall_clock_ms_total = neighborhood_evolved_wall_clock_ms_per_seed
+        .iter()
+        .map(|observation| observation.wall_clock_ms)
+        .sum();
+    let neighborhood_read_wall_clock_ms_total = neighborhood_read_wall_clock_ms_per_seed
         .iter()
         .map(|observation| observation.wall_clock_ms)
         .sum();
@@ -611,6 +654,8 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         recruitment_paths_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
         neighborhood_evolved_wall_clock_ms_total,
+        neighborhood_read_wall_clock_ms_per_seed,
+        neighborhood_read_wall_clock_ms_total,
     }
 }
 
