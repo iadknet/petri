@@ -96,16 +96,6 @@ pub struct DriftWalk {
     pub recruitment: Vec<RecruitmentCheckpoint>,
 }
 
-/// The mutation config the walk actually runs (T11.F19): the legacy per-birth
-/// rule forced on, so the walk stays the fixed-count control whatever supply
-/// rule production selects. Nothing else is overridden.
-fn forced_legacy_supply(mutation: &MutationConfig) -> MutationConfig {
-    MutationConfig {
-        per_unit_supply_enabled: false,
-        ..mutation.clone()
-    }
-}
-
 /// The supply rule and values a walk over `mutation` runs, for the report's
 /// `supply_rule` metadata.
 #[must_use]
@@ -135,7 +125,9 @@ pub fn observe(
 ) -> DriftWalk {
     assert!(sizes.birth_lineages <= sizes.lineages);
     assert!(sizes.checkpoints.windows(2).all(|pair| pair[0] < pair[1]));
-    let mutation = &forced_legacy_supply(mutation);
+    // The walk stays the fixed-count control whatever supply rule production
+    // selects (T11.F19); nothing else is overridden.
+    let mutation = &mutation.clone().with_legacy_supply();
     let mut genomes: Vec<_> = (0..sizes.lineages).map(|_| founder.clone()).collect();
     let mut rngs: Vec<_> = (0..sizes.lineages)
         .map(|index| SmallRng::seed_from_u64(WALK_SEED_BASE + u64::from(index)))
@@ -282,7 +274,7 @@ mod tests {
     /// hand replay of the walk's births draws the same counts.
     fn replay_config() -> SimulationConfig {
         let mut config = SimulationConfig::default();
-        config.mutation = forced_legacy_supply(&config.mutation);
+        config.mutation = config.mutation.with_legacy_supply();
         config
     }
 

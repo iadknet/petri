@@ -154,10 +154,7 @@ struct ProposalPosition {
 /// per-birth supply rule, the fixed-count control the recorded baselines were
 /// taken on, like the drift walk (T11.F19).
 pub(super) fn proposal_mutation_config() -> crate::config::MutationConfig {
-    crate::config::MutationConfig {
-        per_unit_supply_enabled: false,
-        ..crate::config::MutationConfig::default()
-    }
+    crate::config::MutationConfig::default().with_legacy_supply()
 }
 
 fn propose_siblings(

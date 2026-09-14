@@ -778,6 +778,17 @@ pub struct MutationConfig {
     pub executed_window_ticks: u64,
 }
 
+impl MutationConfig {
+    /// This config on the legacy per-birth supply rule: `per_unit_supply_enabled`
+    /// forced `false`, every other field kept. The fixed-count control the
+    /// drift walk and `recruitment_paths` run on (T11.F19).
+    #[must_use]
+    pub fn with_legacy_supply(mut self) -> Self {
+        self.per_unit_supply_enabled = false;
+        self
+    }
+}
+
 fn default_per_unit_supply_enabled() -> bool {
     true
 }
@@ -1340,6 +1351,21 @@ mod tests {
         let config: MutationConfig = serde_json::from_value(json).unwrap();
         assert!(config.per_unit_supply_enabled);
         assert_eq!(config.per_unit_rate, default_per_unit_rate());
+    }
+
+    #[test]
+    fn with_legacy_supply_flips_only_the_supply_flag() {
+        let config = MutationConfig {
+            per_unit_rate: 0.25,
+            mutation_probability: 0.75,
+            ..MutationConfig::default()
+        };
+        let mut expected = serde_json::to_value(&config).unwrap();
+        expected["per_unit_supply_enabled"] = serde_json::Value::Bool(false);
+
+        let legacy = config.with_legacy_supply();
+
+        assert_eq!(serde_json::to_value(&legacy).unwrap(), expected);
     }
 
     #[test]

@@ -142,8 +142,9 @@ the T14.F12 gate and goal reports (previous closure), the pinned goal epoch
 
 ## Verification
 
-- [x] `cargo test -p v3-core --test viability` first (24 passed), then
-      `make check` (exit 0) -> command table in
+- [x] `cargo test -p v3-core --test viability` first (24 passed; 25 once
+      the remediation pass adds the per-unit sibling), then
+      `make check` (exit 0) -> command tables in
       [`docs/progress/readings/t11-f19.md`](../../progress/readings/t11-f19.md).
 - [x] Focused tests: engine count draw (rate 0, rate 1, founder mean, legacy
       byte-identity), config normalization and serde defaults, founder pin,
@@ -162,8 +163,8 @@ the T14.F12 gate and goal reports (previous closure), the pinned goal epoch
       reading above checked against the stored reports and tabulated in the
       readings file, including the field-for-field drift-block comparison.
       Benchmark specialist pass (2026-09-14): stored, hashed, and tabulated
-      in the readings file; left unchecked pending the user's decision on the
-      three exceedances recorded under Performance and Goal Impact.
+      in the readings file; decisions recorded under Performance and Goal
+      Impact; box closes with the closure checklist.
 
 ## Performance and Goal Impact
 
@@ -220,7 +221,7 @@ file's "Escalation readings" table; the predeclaration is unchanged).**
    composition; it does not reject the mechanism or the rate. Recommendation
    to the user: accept the observed cost and re-pin the goal-worlds epoch to
    this report, as at T13.F03 on the same counter. Accepted by the user on
-   2026-09-14; the goal-worlds epoch is re-pinned to this report at closure.
+   2026-09-14; the goal-worlds epoch is re-pinned in commit f4d9f644.
 2. Confluence `dead_per_all_births` 52 / 5,000 against 50: pooled dead across
    worlds is 0.0067, the excess is 0.3 standard deviations, and 13 sampled
    genomes carry every dead birth. Lineage fragility in the sample, not
