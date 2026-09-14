@@ -265,3 +265,7 @@ assumed accepted. Full tables and transcripts in the readings file.
   0.0035/0.0045/0.0035 against the 0.005 floor for this feature on
   2026-09-14 ("I approve the same floor violation from previous features"),
   matching the T13.F03–F05 acceptances; the epoch is unchanged.
+- Deferred: review P3s — `Policy::COUNT`/`STARTS` are hand-maintained
+  (`Policy::ALL` would drop the `chain`); `checkpoint_cost` asserts inside a
+  `map` and `filter_map`s a never-`None` `Spread::of`; the fixture-verdict
+  test recomputes the retention rule the proptest already owns.
