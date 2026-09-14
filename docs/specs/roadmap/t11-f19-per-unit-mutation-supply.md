@@ -152,9 +152,12 @@ the T14.F12 gate and goal reports (previous closure), the pinned goal epoch
       results (all pass) in the readings file, with the determinism re-pins
       (`legacy_default_short_run_identity` 11753828254793484309 ->
       1397923697343438469, three goal recipe digests).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here.
+      survivor list stays here. 2026-09-14 on 0471fa80: `17 mutants tested
+      in 6m: 12 caught, 5 unviable`, no survivors;
+      `~/.local/share/petri-tools/mutants/t11-f19/mutants.out`, mode
+      `fresh`; one fresh run, no test edits.
 - [ ] Benchmark summaries stored at
       `docs/progress/features/t11-f19-per-unit-mutation-supply.json` and
       `docs/progress/features/t11-f19-per-unit-mutation-supply-goal.json`,
