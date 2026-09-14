@@ -2,10 +2,15 @@
 
 mod experiment;
 mod fixtures;
+mod qualification;
 mod records;
 
 pub use experiment::observe;
 pub use fixtures::{constructed_paths, starting_forms, ConstructedPath, ConstructionStage, Start};
+pub use qualification::{
+    qualified_paths, GrowthGap, PathStep, ProductionEvent, QualifiedPath, MAX_PATH_EVENTS,
+    SEED_RANGE,
+};
 pub use records::*;
 
 use crate::config::SimulationConfig;

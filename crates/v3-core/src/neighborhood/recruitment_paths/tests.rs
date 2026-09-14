@@ -4,8 +4,9 @@ use crate::contracts::NodeId;
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::mutation::reachability::ParentExecuted;
-use crate::mutation::MutationEngine;
+use crate::mutation::{MutationEngine, MutationOperator};
 use crate::neighborhood::mesh_execution::indices_for_node_ids;
+use crate::neighborhood::recruitment::ModuleBackend;
 use proptest::prelude::*;
 use rand::{rngs::SmallRng, SeedableRng};
 
@@ -593,4 +594,300 @@ fn recruitment_paths_wilson_midpoint_has_the_predeclared_interval() {
     let [lower, upper] = reading.wilson_95.unwrap();
     assert!((lower - 0.094_531_205_734_230_74).abs() < 1e-14);
     assert!((upper - 0.905_468_794_265_769_3).abs() < 1e-14);
+}
+
+fn paths() -> &'static [QualifiedPath] {
+    static PATHS: std::sync::OnceLock<Vec<QualifiedPath>> = std::sync::OnceLock::new();
+    PATHS.get_or_init(qualified_paths)
+}
+
+#[test]
+fn recruitment_paths_qualified_family_is_the_fixed_nine_forms() {
+    let family: Vec<_> = paths()
+        .iter()
+        .map(|path| (path.form.as_str(), path.task, path.backend))
+        .collect();
+    assert_eq!(
+        family,
+        [
+            ("graph_blank", Task::A, ModuleBackend::Graph),
+            ("graph_copy", Task::A, ModuleBackend::Graph),
+            ("graph_split", Task::A, ModuleBackend::Graph),
+            ("vm_blank", Task::A, ModuleBackend::Vm),
+            ("vm_copy", Task::A, ModuleBackend::Vm),
+            ("graph_unprepared", Task::B, ModuleBackend::Graph),
+            ("vm_unprepared", Task::B, ModuleBackend::Vm),
+            ("graph_detour", Task::A, ModuleBackend::Graph),
+            ("vm_detour", Task::A, ModuleBackend::Vm),
+        ]
+    );
+    for path in paths() {
+        assert_eq!(path.start.task.correct(path.task), 4, "{}", path.form);
+        assert!(path.start.task.live());
+        let scaffold = path
+            .start
+            .genome
+            .nodes
+            .iter()
+            .find(|node| node.node_id == NodeId::new(2));
+        assert!(scaffold.is_some(), "{}", path.form);
+        let dispatched = path.start.task.dispatched().contains(&NodeId::new(2));
+        assert_eq!(dispatched, path.form.ends_with("_detour"), "{}", path.form);
+    }
+    let detour_seeds: Vec<_> = paths()
+        .iter()
+        .filter(|path| path.form.ends_with("_detour"))
+        .map(|path| {
+            assert_eq!(path.start.name, "inline_detour");
+            assert!(path.start.incumbent_actions_unchanged);
+            assert_eq!(
+                path.start.genome.nodes[0].targets[0].target_id,
+                NodeId::new(2)
+            );
+            assert_eq!(
+                path.start.genome.nodes[2].targets[0].target_id,
+                NodeId::new(1)
+            );
+            path.start.seed.unwrap()
+        })
+        .collect();
+    assert_eq!(detour_seeds, [1, 0]);
+}
+
+#[test]
+fn recruitment_paths_qualified_steps_hold_the_per_step_invariants() {
+    for path in paths() {
+        let mut previous = path.start.task.correct(path.task);
+        let complete = path.exhausted.is_none();
+        for (index, step) in path.steps.iter().enumerate() {
+            let last = complete && index + 1 == path.steps.len();
+            let label = format!("{} step {}", path.form, step.stage.name);
+            assert!(step.seed < SEED_RANGE, "{label}");
+            assert_eq!(step.stage.seed, Some(step.seed), "{label}");
+            assert_eq!(step.stage.delta.nodes.len(), 1, "{label}");
+            assert!(step.stage.task.live(), "{label}");
+            let score = step.stage.task.correct(path.task);
+            assert!(score + 1 >= previous, "{label}");
+            assert_eq!(step.charges, step.stage.task.summary(), "{label}");
+            assert_eq!(step.genome_size, step.stage.genome.genome_size(), "{label}");
+            if last {
+                assert!(step.stage.useful, "{label}");
+                assert!(
+                    step.stage.task.dispatched().contains(&NodeId::new(2)),
+                    "{label}"
+                );
+                assert!(score > path.start.task.correct(path.task), "{label}");
+            } else {
+                assert!(step.stage.incumbent_actions_unchanged, "{label}");
+                assert!(step.surfaces_unchanged, "{label}");
+                assert_eq!(
+                    step.stage.task.dispatched().contains(&NodeId::new(2)),
+                    path.form.ends_with("_detour"),
+                    "{label}"
+                );
+            }
+            previous = score;
+        }
+    }
+}
+
+#[test]
+fn recruitment_paths_qualified_paths_replay_through_deltas() {
+    for path in paths() {
+        let mut genome = path.start.genome.clone();
+        for step in &path.steps {
+            genome = step.stage.delta.apply(&genome).unwrap();
+            assert_eq!(
+                genome, step.stage.genome,
+                "{} {}",
+                path.form, step.stage.name
+            );
+        }
+    }
+}
+
+#[test]
+fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
+    use MutationOperator::*;
+    let record: Vec<_> = paths()
+        .iter()
+        .map(|path| {
+            (
+                path.form.as_str(),
+                path.steps
+                    .iter()
+                    .map(|step| (step.operator, step.seed))
+                    .collect::<Vec<_>>(),
+                path.gap.as_ref().map(|gap| gap.length),
+                path.exhausted.as_deref(),
+            )
+        })
+        .collect();
+    let swap = (TopologySwapRouteTargets, 0);
+    assert_eq!(
+        record,
+        [
+            (
+                "graph_blank",
+                vec![
+                    (InputRefAdd, 1),
+                    (GraphMutateActionSlotBehavior, 25),
+                    (GraphAddInternalGraphNode, 1020),
+                    (GraphAddGraphEdge, 1650),
+                    (GraphAddGraphEdge, 3612),
+                    (GraphAddGraphEdge, 102),
+                    swap,
+                ],
+                Some(7),
+                None,
+            ),
+            (
+                "graph_copy",
+                vec![(GraphAddGraphEdge, 102), swap],
+                None,
+                None
+            ),
+            (
+                "graph_split",
+                vec![(GraphAddGraphEdge, 1762), swap],
+                None,
+                None
+            ),
+            (
+                "vm_blank",
+                vec![(InputRefAdd, 1), (VmInstructionMutation, 238)],
+                Some(7),
+                Some("skip_when_zero"),
+            ),
+            ("vm_copy", vec![(VmDeleteInstruction, 1), swap], None, None),
+            (
+                "graph_unprepared",
+                vec![
+                    (InputRefSwap, 25),
+                    (GraphRetargetGraphEdge, 32),
+                    (GraphAddInternalGraphNode, 64),
+                    (GraphAddGraphEdge, 6718),
+                    (GraphRetargetGraphEdge, 4),
+                    swap,
+                ],
+                None,
+                None,
+            ),
+            (
+                "vm_unprepared",
+                vec![
+                    (InputRefSwap, 25),
+                    (VmInstructionRawFieldMutation, 72),
+                    (VmInstructionRawFieldMutation, 223),
+                    (VmConstantMutation, 13),
+                    (VmConstantMutation, 13),
+                    swap,
+                ],
+                None,
+                None,
+            ),
+            (
+                "graph_detour",
+                vec![
+                    (InputRefAdd, 1),
+                    (GraphMutateActionSlotBehavior, 25),
+                    (GraphAddInternalGraphNode, 1020),
+                    (GraphAddGraphEdge, 1650),
+                    (GraphAddGraphEdge, 3612),
+                    (GraphAddGraphEdge, 102),
+                ],
+                None,
+                None,
+            ),
+            (
+                "vm_detour",
+                vec![
+                    (InputRefAdd, 1),
+                    (VmInstructionMutation, 238),
+                    (VmInstructionMutation, 800),
+                ],
+                None,
+                Some("write_direction"),
+            ),
+        ]
+    );
+    let qualified: Vec<_> = paths()
+        .iter()
+        .filter(|path| path.qualified())
+        .map(|path| path.form.as_str())
+        .collect();
+    assert_eq!(
+        qualified,
+        [
+            "graph_copy",
+            "graph_split",
+            "vm_copy",
+            "graph_unprepared",
+            "vm_unprepared",
+            "graph_detour"
+        ]
+    );
+    for path in paths().iter().filter(|path| path.qualified()) {
+        assert!(path.steps.len() <= MAX_PATH_EVENTS);
+        assert_eq!(path.steps.last().unwrap().stage.task.correct(path.task), 8);
+    }
+}
+
+#[test]
+fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_module() {
+    for path in paths().iter().filter(|path| path.exhausted.is_none()) {
+        let last = path.steps.last().unwrap();
+        let before = path
+            .steps
+            .len()
+            .checked_sub(2)
+            .map_or(&path.start, |i| &path.steps[i].stage);
+        let change = &last.stage.delta.nodes[0];
+        let (before_node, after_node) = (
+            change.before.as_ref().unwrap(),
+            change.after.as_ref().unwrap(),
+        );
+        assert_eq!(
+            before_node.input_refs, after_node.input_refs,
+            "{}",
+            path.form
+        );
+        match last.operator {
+            MutationOperator::TopologySwapRouteTargets => {
+                assert_eq!(change.node, NodeId::new(0));
+                assert_eq!(before_node.backend_def, after_node.backend_def);
+                assert_eq!(before_node.targets.len(), after_node.targets.len());
+            }
+            MutationOperator::GraphAddGraphEdge => {
+                assert_eq!(change.node, NodeId::new(2));
+                assert_eq!(before_node.targets, after_node.targets);
+                let (BackendDef::Graph(b), BackendDef::Graph(a)) =
+                    (&before_node.backend_def, &after_node.backend_def)
+                else {
+                    panic!()
+                };
+                assert_eq!(a.compute_nodes, b.compute_nodes);
+                assert_eq!(
+                    a.action_bank[0].gate_inputs.len(),
+                    b.action_bank[0].gate_inputs.len() + 1
+                );
+            }
+            other => panic!("{}: unexpected exposing operator {other:?}", path.form),
+        }
+        assert!(
+            !before.task.dispatched().contains(&NodeId::new(2)) || path.form.ends_with("_detour")
+        );
+        let bypass = evaluate(
+            &crate::neighborhood::mesh_execution::static_successor_bypass(
+                &last.stage.genome,
+                NodeId::new(2),
+            ),
+        );
+        assert!(
+            bypass.correct(path.task) < last.stage.task.correct(path.task),
+            "{}",
+            path.form
+        );
+        assert_eq!(bypass.correct(path.task), 4, "{}", path.form);
+    }
 }

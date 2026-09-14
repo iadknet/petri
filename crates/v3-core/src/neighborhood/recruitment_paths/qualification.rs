@@ -1,0 +1,883 @@
+//! T13.F05: seed-selected production-operator paths from each fixed starting
+//! form to a useful, bypass-sensitive contribution. Observation only.
+
+use super::fixtures::stage_for;
+use super::*;
+use crate::config::MutationConfig;
+use crate::contracts::{InputReference, NodeId, OrdinaryFoodTypeId, WorldInputKey};
+use crate::creature::genome::analysis::mesh_reachable_nodes;
+use crate::creature::genome::cgp::{
+    ActionSlotBehavior, CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource,
+    WorldActionKind,
+};
+use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
+use crate::mutation::engine::{
+    graph_operator_key, input_ref_operator_key, topology_operator_key, vm_operator_key,
+};
+use crate::mutation::graph::{GraphMutator, GraphOperator};
+use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
+use crate::mutation::reachability::TargetSets;
+use crate::mutation::topology::{TopologyMutator, TopologyOperator};
+use crate::mutation::vm::{VmMutator, VmOperator};
+use crate::mutation::{MutationOperator, MutationSkipReason, TargetReachability};
+use crate::neighborhood::recruitment::ModuleBackend;
+use rand::{rngs::SmallRng, SeedableRng};
+
+/// Every step's seed is the first in `0..SEED_RANGE` whose applied event
+/// matches the step's structural acceptance predicate.
+pub const SEED_RANGE: u64 = 10_000;
+
+/// Paths longer than this are recorded growth gaps, not qualified paths.
+pub const MAX_PATH_EVENTS: usize = 6;
+
+/// The scaffold node every starting form carries.
+const SCAFFOLD: NodeId = NodeId(2);
+
+/// One production mutation event: an explicit operator applied through its
+/// domain mutator's production entry point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProductionEvent {
+    Topology(TopologyOperator),
+    Graph(GraphOperator),
+    Vm(VmOperator),
+    InputRef(InputRefOperator),
+}
+
+impl ProductionEvent {
+    #[must_use]
+    pub fn operator(self) -> MutationOperator {
+        match self {
+            Self::Topology(op) => topology_operator_key(op),
+            Self::Graph(op) => graph_operator_key(op),
+            Self::Vm(op) => vm_operator_key(op),
+            Self::InputRef(op) => input_ref_operator_key(op),
+        }
+    }
+
+    /// Apply through the production mutator with a uniform target draw over
+    /// the operator's own applicable set, as the constructed F02 stages did.
+    ///
+    /// # Errors
+    /// The operator's own skip when it has no applicable site.
+    pub fn apply(
+        self,
+        genome: &mut CreatureGenome,
+        seed: u64,
+    ) -> Result<TargetReachability, MutationSkipReason> {
+        let reachable = mesh_reachable_nodes(genome);
+        let mut selector = TargetSets::new(&reachable, &[]).selector(0.0, 0.0);
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let config = MutationConfig::default();
+        match self {
+            Self::Topology(op) => TopologyMutator::apply_with_food_type_count(
+                genome,
+                op,
+                &mut selector,
+                &mut rng,
+                &config,
+                1,
+            ),
+            Self::Graph(op) => GraphMutator::apply(genome, op, &mut selector, &mut rng, &config),
+            Self::Vm(op) => VmMutator::apply(genome, op, &mut selector, &mut rng, &config),
+            Self::InputRef(op) => InputRefMutator::apply_with_food_type_count(
+                genome,
+                op,
+                &mut selector,
+                &mut rng,
+                &config,
+                1,
+            ),
+        }
+    }
+}
+
+/// One applied path event with its per-step facts.
+#[derive(Debug, Clone)]
+pub struct PathStep {
+    pub event: ProductionEvent,
+    pub operator: MutationOperator,
+    pub seed: u64,
+    pub stage: ConstructionStage,
+    /// Per-scene actions, shared memory and routing equal the previous stage.
+    pub surfaces_unchanged: bool,
+    pub charges: TaskSummary,
+    pub genome_size: u32,
+}
+
+/// A form whose shortest complete path exceeds [`MAX_PATH_EVENTS`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrowthGap {
+    pub length: usize,
+    pub lengthening_step: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct QualifiedPath {
+    pub form: String,
+    pub task: Task,
+    pub backend: ModuleBackend,
+    pub start: ConstructionStage,
+    pub steps: Vec<PathStep>,
+    pub gap: Option<GrowthGap>,
+    /// The step whose seed range was exhausted, if the path is incomplete.
+    pub exhausted: Option<String>,
+}
+
+impl QualifiedPath {
+    /// Complete within the bound.
+    #[must_use]
+    pub fn qualified(&self) -> bool {
+        self.exhausted.is_none() && self.gap.is_none() && self.steps.len() <= MAX_PATH_EVENTS
+    }
+}
+
+type Accept = Box<dyn Fn(&CreatureGenome, &CreatureGenome) -> bool>;
+
+struct StepSpec {
+    name: &'static str,
+    edits: &'static str,
+    event: ProductionEvent,
+    accept: Accept,
+}
+
+fn step(
+    name: &'static str,
+    edits: &'static str,
+    event: ProductionEvent,
+    accept: impl Fn(&CreatureGenome, &CreatureGenome) -> bool + 'static,
+) -> StepSpec {
+    StepSpec {
+        name,
+        edits,
+        event,
+        accept: Box::new(accept),
+    }
+}
+
+/// The first seed in the range whose applied event the predicate accepts.
+fn select_seed(
+    genome: &CreatureGenome,
+    event: ProductionEvent,
+    accept: &Accept,
+) -> Option<(u64, CreatureGenome)> {
+    (0..SEED_RANGE).find_map(|seed| {
+        let mut candidate = genome.clone();
+        event.apply(&mut candidate, seed).ok()?;
+        accept(genome, &candidate).then_some((seed, candidate))
+    })
+}
+
+fn surfaces_unchanged(previous: &TaskReading, current: &TaskReading) -> bool {
+    previous.scenes.len() == current.scenes.len()
+        && previous.scenes.iter().zip(&current.scenes).all(|(a, b)| {
+            a.actions == b.actions && a.shared_memory == b.shared_memory && a.routing == b.routing
+        })
+}
+
+fn qualify(
+    form: &str,
+    task: Task,
+    backend: ModuleBackend,
+    start: ConstructionStage,
+    specs: Vec<StepSpec>,
+    gap: Option<GrowthGap>,
+) -> QualifiedPath {
+    let mut genome = start.genome.clone();
+    let mut previous = start.task.clone();
+    let mut steps = Vec::with_capacity(specs.len());
+    let mut exhausted = None;
+    for spec in specs {
+        let Some((seed, after)) = select_seed(&genome, spec.event, &spec.accept) else {
+            exhausted = Some(spec.name.to_string());
+            break;
+        };
+        let stage = stage_for(
+            task,
+            spec.name,
+            spec.edits,
+            Some(seed),
+            &genome,
+            after.clone(),
+        );
+        steps.push(PathStep {
+            event: spec.event,
+            operator: spec.event.operator(),
+            seed,
+            surfaces_unchanged: surfaces_unchanged(&previous, &stage.task),
+            charges: stage.task.summary(),
+            genome_size: after.genome_size(),
+            stage,
+        });
+        previous = steps.last().expect("just pushed").stage.task.clone();
+        genome = after;
+    }
+    QualifiedPath {
+        form: form.into(),
+        task,
+        backend,
+        start,
+        steps,
+        gap,
+        exhausted,
+    }
+}
+
+// ── Genome readers used by acceptance predicates ────────────────────────────
+
+fn node(genome: &CreatureGenome, id: NodeId) -> &NodeGenome {
+    genome
+        .nodes
+        .iter()
+        .find(|node| node.node_id == id)
+        .expect("fixture node exists")
+}
+
+fn vm(genome: &CreatureGenome) -> &VmBackendDef {
+    match &node(genome, SCAFFOLD).backend_def {
+        BackendDef::Vm(vm) => vm,
+        BackendDef::Graph(_) => unreachable!("VM form"),
+    }
+}
+
+fn graph(genome: &CreatureGenome) -> &CgpGraphBackendDef {
+    match &node(genome, SCAFFOLD).backend_def {
+        BackendDef::Graph(graph) => graph,
+        BackendDef::Vm(_) => unreachable!("Graph form"),
+    }
+}
+
+/// Only the scaffold node differs, and only in its backend definition.
+fn only_scaffold_backend_changed(before: &CreatureGenome, after: &CreatureGenome) -> bool {
+    let delta = GenomeDelta::between(before, after);
+    delta.order_before == delta.order_after
+        && delta.nodes.len() == 1
+        && delta.nodes[0].node == SCAFFOLD
+        && node(before, SCAFFOLD).input_refs == node(after, SCAFFOLD).input_refs
+        && node(before, SCAFFOLD).targets == node(after, SCAFFOLD).targets
+}
+
+/// The entry node's first (statically winning) target is the scaffold.
+fn scaffold_is_incumbent(after: &CreatureGenome) -> bool {
+    node(after, NodeId::new(0)).targets[0].target_id == SCAFFOLD
+}
+
+fn cue(task: Task) -> InputReference {
+    InputReference::World(match task {
+        Task::A => WorldInputKey::FoodHere {
+            type_idx: OrdinaryFoodTypeId::default(),
+        },
+        Task::B => WorldInputKey::NeighborFoodRing {
+            type_idx: OrdinaryFoodTypeId::default(),
+        },
+    })
+}
+
+fn cue_leaf(task: Task) -> GraphSource {
+    GraphSource::InputLeaf {
+        ref_idx: 0,
+        sub_idx: match task {
+            Task::A => 0,
+            Task::B => 2,
+        },
+    }
+}
+
+/// Weight the edges of one surface contribute when the cue reads 1.0.
+fn cue_weight(edges: &[GraphEdge], sources: &[GraphSource]) -> f32 {
+    edges
+        .iter()
+        .filter(|edge| sources.contains(&edge.source))
+        .map(|edge| edge.weight)
+        .sum()
+}
+
+/// A Move parameter of `[1.5, 2.5)` decodes to east.
+fn decodes_east(weight: f32) -> bool {
+    (1.5..2.5).contains(&weight)
+}
+
+fn appended<'a>(before: &[GraphEdge], after: &'a [GraphEdge]) -> Option<&'a GraphEdge> {
+    (after.len() == before.len() + 1 && after[..before.len()] == *before)
+        .then(|| &after[before.len()])
+}
+
+fn swap_activation() -> StepSpec {
+    step(
+        "activated",
+        "Topology.SwapRouteTargets on the entry node: the tied scaffold becomes the static winner",
+        ProductionEvent::Topology(TopologyOperator::SwapRouteTargets),
+        |_, after| scaffold_is_incumbent(after),
+    )
+}
+
+// ── Path plans per starting form ────────────────────────────────────────────
+
+fn vm_copy_plan() -> Vec<StepSpec> {
+    vec![
+        step(
+            "leading_halt_removed",
+            "VmDeleteInstruction on the dormant copy's leading Halt",
+            ProductionEvent::Vm(VmOperator::VmDeleteInstruction),
+            |before, after| {
+                only_scaffold_backend_changed(before, after)
+                    && vm(after).program == vm(before).program[1..]
+            },
+        ),
+        swap_activation(),
+    ]
+}
+
+/// Graph copy and split: one gate edge from a cue-valued compute node.
+fn graph_copy_plan(cue_sources: Vec<GraphSource>) -> Vec<StepSpec> {
+    vec![
+        step(
+            "gate_edge_added",
+            "Graph.AddGraphEdge onto action slot 0's gate from a cue-valued source, positive weight",
+            ProductionEvent::Graph(GraphOperator::AddGraphEdge),
+            move |before, after| {
+                only_scaffold_backend_changed(before, after)
+                    && appended(
+                        &graph(before).action_bank[0].gate_inputs,
+                        &graph(after).action_bank[0].gate_inputs,
+                    )
+                    .is_some_and(|edge| cue_sources.contains(&edge.source) && edge.weight > 0.0)
+            },
+        ),
+        swap_activation(),
+    ]
+}
+
+fn vm_unprepared_plan() -> Vec<StepSpec> {
+    let read = |sub_idx: u16| VmInstruction::ReadInput {
+        dst: 0,
+        ref_idx: 0,
+        sub_idx,
+    };
+    let sub_idx_moved = move |before: &CreatureGenome, after: &CreatureGenome, to: u16| {
+        only_scaffold_backend_changed(before, after)
+            && vm(after).program[0] == read(to)
+            && vm(after).program[1..] == vm(before).program[1..]
+            && vm(after).constants == vm(before).constants
+    };
+    let constant_moved = |before: &CreatureGenome, after: &CreatureGenome| {
+        only_scaffold_backend_changed(before, after)
+            && vm(after).program == vm(before).program
+            && vm(after).constants[0] == vm(before).constants[0]
+    };
+    vec![
+        cue_swapped(),
+        step(
+            "read_sub_idx_1",
+            "VmInstructionRawFieldMutation: ReadInput sub_idx 0 to 1",
+            ProductionEvent::Vm(VmOperator::VmInstructionRawFieldMutation),
+            move |before, after| sub_idx_moved(before, after, 1),
+        ),
+        step(
+            "read_sub_idx_2",
+            "VmInstructionRawFieldMutation: ReadInput sub_idx 1 to 2 (east)",
+            ProductionEvent::Vm(VmOperator::VmInstructionRawFieldMutation),
+            move |before, after| sub_idx_moved(before, after, 2),
+        ),
+        step(
+            "direction_half",
+            "VmConstantMutation on the direction constant: at least 0.5 of the way to east",
+            ProductionEvent::Vm(VmOperator::VmConstantMutation),
+            move |before, after| constant_moved(before, after) && vm(after).constants[1] >= 0.5,
+        ),
+        step(
+            "direction_east",
+            "VmConstantMutation on the direction constant: lands in [1.5, 2.5)",
+            ProductionEvent::Vm(VmOperator::VmConstantMutation),
+            move |before, after| {
+                constant_moved(before, after) && decodes_east(vm(after).constants[1])
+            },
+        ),
+        swap_activation(),
+    ]
+}
+
+/// Compute kinds whose single- or two-input output is the weighted sum of
+/// a non-negative cue, so a node of that kind can carry the east code.
+fn sums_inputs(kind: &ComputeNodeKind) -> bool {
+    matches!(
+        kind,
+        ComputeNodeKind::Add | ComputeNodeKind::WeightedSum | ComputeNodeKind::Relu
+    )
+}
+
+/// The Move direction is `param_inputs[0]` alone (positional, not summed)
+/// and an edge weight is drawn in `[-1, 1]`, so east (2) needs a compute
+/// node reading the cue twice: a bootstrap node with one cue edge, a second
+/// cue edge onto it, then the parameter edge that reads the node. `at` is
+/// the index the new node takes; `param_step` supplies the third event.
+fn direction_node_steps(
+    cue_sources: Vec<GraphSource>,
+    at: usize,
+    param_step: StepSpec,
+) -> Vec<StepSpec> {
+    let sources = cue_sources.clone();
+    let bootstrap = step(
+        "direction_node",
+        "Graph.AddInternalGraphNode bootstrap form: a summing node reading the cue at weight at least 0.9",
+        ProductionEvent::Graph(GraphOperator::AddInternalGraphNode),
+        move |before, after| {
+            let (b, a) = (graph(before), graph(after));
+            only_scaffold_backend_changed(before, after)
+                && a.compute_nodes.len() == b.compute_nodes.len() + 1
+                && a.compute_nodes[..at] == b.compute_nodes[..at]
+                && a.action_bank == b.action_bank
+                && a.output_sinks == b.output_sinks
+                && a.execute_gate == b.execute_gate
+                && sums_inputs(&a.compute_nodes[at].kind)
+                && a.compute_nodes[at].plasticity.is_none()
+                && matches!(
+                    a.compute_nodes[at].inputs.as_slice(),
+                    [edge] if sources.contains(&edge.source) && edge.weight >= 0.9
+                )
+        },
+    );
+    let sources = cue_sources;
+    let second_edge = step(
+        "direction_doubled",
+        "Graph.AddGraphEdge onto the direction node from the cue: cue-weighted sum at least 1.7",
+        ProductionEvent::Graph(GraphOperator::AddGraphEdge),
+        move |before, after| {
+            only_scaffold_backend_changed(before, after)
+                && appended(
+                    &graph(before).compute_nodes[at].inputs,
+                    &graph(after).compute_nodes[at].inputs,
+                )
+                .is_some_and(|edge| sources.contains(&edge.source))
+                && cue_weight(&graph(after).compute_nodes[at].inputs, &sources) >= 1.7
+        },
+    );
+    vec![bootstrap, second_edge, param_step]
+}
+
+fn cue_swapped() -> StepSpec {
+    step(
+        "cue_swapped",
+        "InputRef.Swap on the copy: FoodHere to NeighborFoodRing (type 0)",
+        ProductionEvent::InputRef(InputRefOperator::Swap),
+        |before, after| {
+            let delta = GenomeDelta::between(before, after);
+            delta.nodes.len() == 1
+                && delta.nodes[0].node == SCAFFOLD
+                && node(after, SCAFFOLD).input_refs == [cue(Task::B)]
+                && node(after, SCAFFOLD).backend_def == node(before, SCAFFOLD).backend_def
+        },
+    )
+}
+
+/// The Task A-correct copy: cue to the ring, its sensing edge to the east
+/// sub-index, a direction node in place of the zeroed constant, activation.
+fn graph_unprepared_plan() -> Vec<StepSpec> {
+    let sources = vec![GraphSource::ComputeNode(0), cue_leaf(Task::B)];
+    let retarget_param = step(
+        "direction_read",
+        "Graph.RetargetGraphEdge: the Move parameter edge reads the direction node instead of the zeroed constant",
+        ProductionEvent::Graph(GraphOperator::RetargetGraphEdge),
+        |before, after| {
+            let (b, a) = (graph(before), graph(after));
+            only_scaffold_backend_changed(before, after)
+                && a.compute_nodes == b.compute_nodes
+                && a.output_sinks == b.output_sinks
+                && a.execute_gate == b.execute_gate
+                && a.action_bank[1..] == b.action_bank[1..]
+                && a.action_bank[0].gate_inputs == b.action_bank[0].gate_inputs
+                && a.action_bank[0].param_inputs.len() == 1
+                && a.action_bank[0].param_inputs[0].source == GraphSource::ComputeNode(2)
+                && a.action_bank[0].param_inputs[0].weight == b.action_bank[0].param_inputs[0].weight
+        },
+    );
+    let mut plan = vec![
+        cue_swapped(),
+        step(
+            "cue_edge_retargeted",
+            "Graph.RetargetGraphEdge: the sensing node's leaf edge to ring sub-index 2 (east)",
+            ProductionEvent::Graph(GraphOperator::RetargetGraphEdge),
+            |before, after| {
+                let (b, a) = (graph(before), graph(after));
+                only_scaffold_backend_changed(before, after)
+                    && a.compute_nodes[0].inputs.len() == 1
+                    && a.compute_nodes[0].inputs[0].source == cue_leaf(Task::B)
+                    && a.compute_nodes[0].inputs[0].weight == b.compute_nodes[0].inputs[0].weight
+                    && a.compute_nodes[1..] == b.compute_nodes[1..]
+                    && a.action_bank == b.action_bank
+                    && a.execute_gate == b.execute_gate
+                    && a.output_sinks == b.output_sinks
+            },
+        ),
+    ];
+    plan.extend(direction_node_steps(sources, 2, retarget_param));
+    plan.push(swap_activation());
+    plan
+}
+
+/// Blank Graph tissue: sensor, Move behavior, the three-event direction
+/// node, then the gate edge. A dispatched detour is exposed by the gate edge
+/// (six events); undispatched blank tissue also needs the route swap (seven,
+/// a recorded growth gap).
+fn graph_blank_plan(dispatched: bool) -> Vec<StepSpec> {
+    let leaf = cue_leaf(Task::A);
+    let param_edge = step(
+        "direction_read",
+        "Graph.AddGraphEdge onto action slot 0's parameter from the direction node: product in [1.5, 2.5)",
+        ProductionEvent::Graph(GraphOperator::AddGraphEdge),
+        move |before, after| {
+            only_scaffold_backend_changed(before, after)
+                && appended(
+                    &graph(before).action_bank[0].param_inputs,
+                    &graph(after).action_bank[0].param_inputs,
+                )
+                .is_some_and(|edge| {
+                    edge.source == GraphSource::ComputeNode(0)
+                        && decodes_east(
+                            edge.weight * cue_weight(&graph(after).compute_nodes[0].inputs, &[leaf]),
+                        )
+                })
+        },
+    );
+    let mut plan = vec![
+        cue_added(),
+        step(
+            "slot_emits_move",
+            "Graph.MutateActionSlotBehavior: action slot 0 NoOp to Emit(Move)",
+            ProductionEvent::Graph(GraphOperator::MutateActionSlotBehavior),
+            |before, after| {
+                let (b, a) = (graph(before), graph(after));
+                only_scaffold_backend_changed(before, after)
+                    && a.action_bank[0].behavior == ActionSlotBehavior::Emit(WorldActionKind::Move)
+                    && a.action_bank[1..] == b.action_bank[1..]
+            },
+        ),
+    ];
+    plan.extend(direction_node_steps(vec![leaf], 0, param_edge));
+    plan.push(step(
+        "gate_edge_added",
+        "Graph.AddGraphEdge onto action slot 0's gate from the cue, positive weight",
+        ProductionEvent::Graph(GraphOperator::AddGraphEdge),
+        move |before, after| {
+            only_scaffold_backend_changed(before, after)
+                && appended(
+                    &graph(before).action_bank[0].gate_inputs,
+                    &graph(after).action_bank[0].gate_inputs,
+                )
+                .is_some_and(|edge| {
+                    (edge.source == leaf || edge.source == GraphSource::ComputeNode(0))
+                        && edge.weight > 0.0
+                })
+        },
+    ));
+    if !dispatched {
+        plan.push(swap_activation());
+    }
+    plan
+}
+
+/// One expected instruction of a VM program under construction.
+#[derive(Clone)]
+enum Expect {
+    Exact(VmInstruction),
+    /// A `JumpIfZero` on register 0 whose offset is one of the listed values.
+    JumpOffsetIn(&'static [i32]),
+}
+
+fn program_matches(program: &[VmInstruction], expected: &[Expect]) -> bool {
+    program.len() == expected.len()
+        && program
+            .iter()
+            .zip(expected)
+            .all(|(actual, expected)| match expected {
+                Expect::Exact(instruction) => actual == instruction,
+                Expect::JumpOffsetIn(offsets) => matches!(
+                    actual,
+                    VmInstruction::JumpIfZero { cond: 0, offset } if offsets.contains(offset)
+                ),
+            })
+}
+
+const READ_CUE: VmInstruction = VmInstruction::ReadInput {
+    dst: 0,
+    ref_idx: 0,
+    sub_idx: 0,
+};
+const DOUBLE: VmInstruction = VmInstruction::Add { dst: 0, a: 0, b: 0 };
+const WRITE_DIRECTION: VmInstruction = VmInstruction::WriteWorldActionMeta {
+    slot_idx: 0,
+    src: 0,
+};
+const PUSH_MOVE: VmInstruction = VmInstruction::PushAction { action_type: 2 };
+
+/// In the final six-instruction program the jump sits at index 1 and must
+/// land on the closing Halt at index 5: `jump_target` wraps modulo the
+/// length, so the offset is 3 modulo 6.
+const FINAL_JUMP_OFFSETS: &[i32] = &[-15, -9, -3, 3, 9, 15];
+/// While a dispatched detour still lacks its push (length five, jump at
+/// index 1), a zero cue must land on the doubling, the meta write or the
+/// Halt (indices 2..=4) rather than loop back: offset 0, 1 or 2 modulo 5.
+/// Intersected with the final offsets above.
+const DETOUR_JUMP_OFFSETS: &[i32] = &[-15, -9, -3, 15];
+
+fn cue_added() -> StepSpec {
+    step(
+        "cue_added",
+        "InputRef.Add on the scaffold: FoodHere (type 0)",
+        ProductionEvent::InputRef(InputRefOperator::Add),
+        |before, after| {
+            let delta = GenomeDelta::between(before, after);
+            delta.nodes.len() == 1
+                && delta.nodes[0].node == SCAFFOLD
+                && node(after, SCAFFOLD).input_refs == [cue(Task::A)]
+                && node(after, SCAFFOLD).backend_def == node(before, SCAFFOLD).backend_def
+        },
+    )
+}
+
+fn insert_step(name: &'static str, edits: &'static str, expected: Vec<Expect>) -> StepSpec {
+    step(
+        name,
+        edits,
+        ProductionEvent::Vm(VmOperator::VmInstructionMutation),
+        move |before, after| {
+            only_scaffold_backend_changed(before, after)
+                && vm(after).constants == vm(before).constants
+                && vm(after).register_count == vm(before).register_count
+                && program_matches(&vm(after).program, &expected)
+        },
+    )
+}
+
+/// The one-register Task A program: read the cue, skip to the Halt when it
+/// is zero, double it to the east direction code, write the Move parameter,
+/// push the Move. Five instructions, each one `VmInstructionMutation` insert.
+///
+/// Blank tissue is not dispatched, so the program is built in reading order
+/// and the route swap exposes it: seven events, a recorded growth gap. A
+/// dispatched detour builds the neutral instructions first, adds the jump
+/// with an offset that is harmless at length five, and exposes the module
+/// by inserting the push last: six events.
+fn vm_blank_plan(dispatched: bool) -> Vec<StepSpec> {
+    use Expect::{Exact, JumpOffsetIn};
+    let halt = Exact(VmInstruction::Halt);
+    let mut plan = vec![cue_added()];
+    let read = (
+        "read_cue",
+        "VmInstructionMutation insert: ReadInput of the cue into register 0",
+    );
+    let jump = (
+        "skip_when_zero",
+        "VmInstructionMutation insert: JumpIfZero on the cue, landing on the Halt",
+    );
+    let double = (
+        "double_to_east",
+        "VmInstructionMutation insert: Add doubling the cue to the east code 2",
+    );
+    let write = (
+        "write_direction",
+        "VmInstructionMutation insert: WriteWorldActionMeta slot 0 from register 0",
+    );
+    let push = (
+        "push_move",
+        "VmInstructionMutation insert: PushAction(Move); the module now emits",
+    );
+    let programs: Vec<((&'static str, &'static str), Vec<Expect>)> = if dispatched {
+        vec![
+            (read, vec![Exact(READ_CUE), halt.clone()]),
+            (double, vec![Exact(READ_CUE), Exact(DOUBLE), halt.clone()]),
+            (
+                write,
+                vec![
+                    Exact(READ_CUE),
+                    Exact(DOUBLE),
+                    Exact(WRITE_DIRECTION),
+                    halt.clone(),
+                ],
+            ),
+            (
+                jump,
+                vec![
+                    Exact(READ_CUE),
+                    JumpOffsetIn(DETOUR_JUMP_OFFSETS),
+                    Exact(DOUBLE),
+                    Exact(WRITE_DIRECTION),
+                    halt.clone(),
+                ],
+            ),
+            (
+                push,
+                vec![
+                    Exact(READ_CUE),
+                    JumpOffsetIn(DETOUR_JUMP_OFFSETS),
+                    Exact(DOUBLE),
+                    Exact(WRITE_DIRECTION),
+                    Exact(PUSH_MOVE),
+                    halt,
+                ],
+            ),
+        ]
+    } else {
+        vec![
+            (read, vec![Exact(READ_CUE), halt.clone()]),
+            (
+                jump,
+                vec![
+                    Exact(READ_CUE),
+                    JumpOffsetIn(FINAL_JUMP_OFFSETS),
+                    halt.clone(),
+                ],
+            ),
+            (
+                double,
+                vec![
+                    Exact(READ_CUE),
+                    JumpOffsetIn(FINAL_JUMP_OFFSETS),
+                    Exact(DOUBLE),
+                    halt.clone(),
+                ],
+            ),
+            (
+                write,
+                vec![
+                    Exact(READ_CUE),
+                    JumpOffsetIn(FINAL_JUMP_OFFSETS),
+                    Exact(DOUBLE),
+                    Exact(WRITE_DIRECTION),
+                    halt.clone(),
+                ],
+            ),
+            (
+                push,
+                vec![
+                    Exact(READ_CUE),
+                    JumpOffsetIn(FINAL_JUMP_OFFSETS),
+                    Exact(DOUBLE),
+                    Exact(WRITE_DIRECTION),
+                    Exact(PUSH_MOVE),
+                    halt,
+                ],
+            ),
+        ]
+    };
+    for ((name, edits), expected) in programs {
+        plan.push(insert_step(name, edits, expected));
+    }
+    if !dispatched {
+        plan.push(swap_activation());
+    }
+    plan
+}
+fn detour_start(backend: ModuleBackend, base: &CreatureGenome) -> ConstructionStage {
+    let accept: Accept = Box::new(move |_, after: &CreatureGenome| {
+        after.nodes.len() == 3
+            && node(after, NodeId::new(0)).targets[0].target_id == SCAFFOLD
+            && node(after, SCAFFOLD).targets.len() == 1
+            && node(after, SCAFFOLD).targets[0].target_id == NodeId::new(1)
+            && match &node(after, SCAFFOLD).backend_def {
+                BackendDef::Graph(_) => backend == ModuleBackend::Graph,
+                BackendDef::Vm(_) => backend == ModuleBackend::Vm,
+            }
+    });
+    let (seed, genome) = select_seed(
+        base,
+        ProductionEvent::Topology(TopologyOperator::AddNode),
+        &accept,
+    )
+    .expect("AddNode draws each blank backend within the seed range");
+    stage_for(
+        Task::A,
+        "inline_detour",
+        "production Topology.AddNode on the entry-to-incumbent edge; the detour is dispatched every tick and forwards to the incumbent",
+        Some(seed),
+        base,
+        genome,
+    )
+}
+
+/// Undispatched blank tissue needs every event a dispatched detour needs
+/// plus the route swap that dispatches it.
+fn blank_growth_gap(backend: ModuleBackend) -> GrowthGap {
+    GrowthGap {
+        length: 7,
+        lengthening_step: match backend {
+            ModuleBackend::Graph => "activation: the sensor, the Move behavior, the three-event direction node (a positional Move parameter reads one edge of weight at most 1, so east needs a node summing two cue edges), the gate edge, then the route swap",
+            ModuleBackend::Vm => "activation: the sensor, the five-instruction program (one VmInstructionMutation insert each; the motif pairs carry none of the jump, meta write or push), then the route swap",
+        }
+        .into(),
+    }
+}
+
+/// Split-form cue sources: any compute node that reads the cue leaf at weight
+/// 1.0 and forwards it unchanged (the sensing WeightedSum or the identity Add
+/// the split inserted before it).
+fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
+    graph
+        .compute_nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, node)| {
+            node.inputs.len() == 1
+                && node.inputs[0].weight == 1.0
+                && matches!(
+                    node.inputs[0].source,
+                    GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx: 0
+                    }
+                )
+        })
+        .map(|(index, _)| GraphSource::ComputeNode(index as u16))
+        .collect()
+}
+
+/// Every starting form's seed-selected path, in the fixed family order.
+#[must_use]
+pub fn qualified_paths() -> Vec<QualifiedPath> {
+    let mut paths = Vec::with_capacity(9);
+    let mut bases = Vec::new();
+    for start in starting_forms() {
+        let name = start.name.as_str();
+        let last = start.history.last().expect("history").clone();
+        let (plan, gap) = match name {
+            "graph_blank" => (
+                graph_blank_plan(false),
+                Some(blank_growth_gap(start.backend)),
+            ),
+            "vm_blank" => (vm_blank_plan(false), Some(blank_growth_gap(start.backend))),
+            "graph_copy" => (
+                graph_copy_plan(vec![GraphSource::ComputeNode(0), cue_leaf(Task::A)]),
+                None,
+            ),
+            "vm_copy" => (vm_copy_plan(), None),
+            "graph_split" => {
+                let BackendDef::Graph(graph) = &node(&start.genome, SCAFFOLD).backend_def else {
+                    unreachable!()
+                };
+                (graph_copy_plan(cue_valued_compute_sources(graph)), None)
+            }
+            "graph_unprepared" => (graph_unprepared_plan(), None),
+            "vm_unprepared" => (vm_unprepared_plan(), None),
+            _ => continue,
+        };
+        if name.ends_with("_blank") {
+            bases.push((start.backend, start.creation_base.clone()));
+        }
+        paths.push(qualify(name, start.task, start.backend, last, plan, gap));
+    }
+    for (backend, base) in bases {
+        let start = detour_start(backend, &base);
+        let (plan, gap) = match backend {
+            ModuleBackend::Graph => (graph_blank_plan(true), None),
+            ModuleBackend::Vm => (vm_blank_plan(true), None),
+        };
+        paths.push(qualify(
+            &format!("{}_detour", backend.as_key()),
+            Task::A,
+            backend,
+            start,
+            plan,
+            gap,
+        ));
+    }
+    paths
+}

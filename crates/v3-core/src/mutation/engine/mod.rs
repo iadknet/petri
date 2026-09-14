@@ -618,7 +618,7 @@ fn apply_input_ref_event(
     }
 }
 
-fn topology_operator_key(op: TopologyOperator) -> MutationOperator {
+pub(crate) fn topology_operator_key(op: TopologyOperator) -> MutationOperator {
     match op {
         TopologyOperator::AddNode => MutationOperator::TopologyAddNode,
         TopologyOperator::RemoveNode => MutationOperator::TopologyRemoveNode,
@@ -636,7 +636,7 @@ fn topology_operator_key(op: TopologyOperator) -> MutationOperator {
     }
 }
 
-fn vm_operator_key(op: VmOperator) -> MutationOperator {
+pub(crate) fn vm_operator_key(op: VmOperator) -> MutationOperator {
     match op {
         VmOperator::VmConstantMutation => MutationOperator::VmConstantMutation,
         VmOperator::VmInstructionMutation => MutationOperator::VmInstructionMutation,
@@ -660,7 +660,7 @@ fn vm_operator_key(op: VmOperator) -> MutationOperator {
     }
 }
 
-fn graph_operator_key(op: GraphOperator) -> MutationOperator {
+pub(crate) fn graph_operator_key(op: GraphOperator) -> MutationOperator {
     match op {
         GraphOperator::AlterGraphEdgeWeight => MutationOperator::GraphAlterGraphEdgeWeight,
         GraphOperator::SwapGraphOperator => MutationOperator::GraphSwapGraphOperator,
@@ -687,7 +687,7 @@ fn graph_operator_key(op: GraphOperator) -> MutationOperator {
     }
 }
 
-fn input_ref_operator_key(op: InputRefOperator) -> MutationOperator {
+pub(crate) fn input_ref_operator_key(op: InputRefOperator) -> MutationOperator {
     match op {
         InputRefOperator::Add => MutationOperator::InputRefAdd,
         InputRefOperator::Remove => MutationOperator::InputRefRemove,

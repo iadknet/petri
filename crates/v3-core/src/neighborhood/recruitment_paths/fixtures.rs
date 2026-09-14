@@ -276,6 +276,18 @@ fn stage(
     before: &CreatureGenome,
     genome: CreatureGenome,
 ) -> ConstructionStage {
+    stage_for(Task::A, name, edits, seed, before, genome)
+}
+
+/// One recorded edit; `useful` reads the scaffold's bypass on the active task.
+pub(super) fn stage_for(
+    active: Task,
+    name: &str,
+    edits: &str,
+    seed: Option<u64>,
+    before: &CreatureGenome,
+    genome: CreatureGenome,
+) -> ConstructionStage {
     let config = task_config();
     let battery = super::super::Battery::generate(1);
     let previous = battery.signature(before, &config.runtime, config.shared_memory.decay_rate);
@@ -290,7 +302,7 @@ fn stage(
         edits: edits.into(),
         seed,
         delta: GenomeDelta::between(before, &genome),
-        useful: task.live() && task.correct(Task::A) > bypass.correct(Task::A),
+        useful: task.live() && task.correct(active) > bypass.correct(active),
         battery_class: format!("{:?}", super::super::classify(&previous, &signature).class),
         incumbent_actions_unchanged: previous == signature,
         genome,
