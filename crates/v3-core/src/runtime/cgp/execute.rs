@@ -81,8 +81,8 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
 ) -> NodeResult {
     let node_count = def.compute_nodes.len();
 
-    // Empty graph: no work, no energy charge.
-    if node_count == 0 {
+    // Neither compute nodes nor a wired effect surface: no work, no charge.
+    if !def.enters_visit() {
         return NodeResult::halted(*upstream_slots, RouteGateMap::default());
     }
 
@@ -114,9 +114,12 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
 
     let mut w_inputs_buf = std::mem::take(&mut graph_runtime.scratch_w_inputs);
 
-    // The wire counter records entered nonempty graph visits, even when unaffordable.
+    // The wire counter records entered graph visits, even when unaffordable.
     side_outputs.work_counters.graph_relax_iters += 1;
-    let pass_cost = config.graph_node_base_cost * node_count as f32;
+    // A wired zero-compute visit pays one node-equivalent: what the same graph
+    // pays with a single dummy compute node, so removing the dummy is free of
+    // work-accounting consequence.
+    let pass_cost = config.graph_node_base_cost * node_count.max(1) as f32;
     let before = *energy;
     *energy -= pass_cost;
     side_outputs.energy_observation.graph_compute += applied_debit(before, *energy);

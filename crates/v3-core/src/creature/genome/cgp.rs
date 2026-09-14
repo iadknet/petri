@@ -280,6 +280,24 @@ impl CgpGraphBackendDef {
         }
     }
 
+    /// Whether a visit to this graph enters evaluation and the effects pass.
+    ///
+    /// True with at least one compute node, and true for a zero-compute graph
+    /// whose effect surface carries an edge: a wired output sink, an action
+    /// slot with a gate or param edge, or a wired execute gate. A graph with
+    /// neither computes nothing and applies nothing, so its visit is free.
+    /// Derived from the genome on every visit and stored nowhere.
+    #[must_use]
+    pub fn enters_visit(&self) -> bool {
+        !self.compute_nodes.is_empty()
+            || self.output_sinks.iter().any(|sink| !sink.inputs.is_empty())
+            || self
+                .action_bank
+                .iter()
+                .any(|slot| !slot.gate_inputs.is_empty() || !slot.param_inputs.is_empty())
+            || !self.execute_gate.inputs.is_empty()
+    }
+
     /// Remove a compute node at `idx`. Remaps `GraphSource::ComputeNode`
     /// indices across ALL edge containers: compute inputs, sink inputs,
     /// action gate/param inputs, and execute gate inputs.

@@ -117,13 +117,13 @@ already write.
 
 ## Implementation Tasks
 
-- [ ] Run `cargo test -p v3-core --test viability` first and record it.
-- [ ] Add the entry predicate on `CgpGraphBackendDef` and route both
+- [x] Run `cargo test -p v3-core --test viability` first and record it.
+- [x] Add the entry predicate on `CgpGraphBackendDef` and route both
       executors through it; charge `graph_node_base_cost × max(n, 1)` on entry.
-- [ ] Add the fixtures and the three property tests (TDD: the direct fixtures
+- [x] Add the fixtures and the three property tests (TDD: the direct fixtures
       fail before the repair).
-- [ ] Update the three reference specs and the bench provenance string.
-- [ ] `cargo check --workspace --all-targets`, `cargo clippy`, `cargo fmt`,
+- [x] Update the three reference specs and the bench provenance string.
+- [x] `cargo check --workspace --all-targets`, `cargo clippy`, `cargo fmt`,
       `make roadmap-check`.
 
 ## Verification
