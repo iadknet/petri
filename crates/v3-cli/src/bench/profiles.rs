@@ -111,6 +111,10 @@ pub struct ProfileParams {
     pub food_coverage: Option<f32>,
     pub neighborhood: NeighborhoodSizes,
     pub drift: neighborhood::drift::DriftSizes,
+    /// Sizes of the goal-only recruitment-paths experiment. Production
+    /// profiles run `Sizes::PRODUCTION`; test fixtures pass `Sizes::TEST`,
+    /// which `cfg(test)` cannot select for integration tests.
+    pub recruitment: neighborhood::recruitment_paths::Sizes,
 }
 
 /// Predeclared gate profile constants (T10.F10 Inputs and Invariants).
@@ -133,6 +137,7 @@ pub fn gate_profile_params() -> ProfileParams {
         food_coverage: Some(1.0),
         neighborhood: NeighborhoodSizes::PRODUCTION,
         drift: neighborhood::drift::DriftSizes::PRODUCTION,
+        recruitment: neighborhood::recruitment_paths::Sizes::PRODUCTION,
     }
 }
 
@@ -149,6 +154,7 @@ pub fn goal_profile_params() -> ProfileParams {
         food_coverage: None,
         neighborhood: NeighborhoodSizes::PRODUCTION,
         drift: neighborhood::drift::DriftSizes::PRODUCTION,
+        recruitment: neighborhood::recruitment_paths::Sizes::PRODUCTION,
     }
 }
 

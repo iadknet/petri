@@ -484,7 +484,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
     );
 
     let (recruitment_paths, recruitment_paths_wall_clock_ms) =
-        timed_recruitment_paths(observe_goal_indicators);
+        timed_recruitment_paths(observe_goal_indicators, params.recruitment);
     goal_indicators.recruitment_paths = recruitment_paths;
 
     let deterministic = Deterministic {

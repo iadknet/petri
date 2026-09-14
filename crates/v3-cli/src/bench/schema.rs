@@ -300,6 +300,7 @@ pub(super) fn undefined_recruitment_paths() -> Indicator<neighborhood::recruitme
 
 pub(super) fn timed_recruitment_paths(
     goal: bool,
+    sizes: neighborhood::recruitment_paths::Sizes,
 ) -> (
     Indicator<neighborhood::recruitment_paths::Report>,
     Option<f64>,
@@ -307,11 +308,6 @@ pub(super) fn timed_recruitment_paths(
     if !goal {
         return (undefined_recruitment_paths(), None);
     }
-    // Reduced sizes exist only in the test build; the CLI has no override.
-    #[cfg(test)]
-    let sizes = neighborhood::recruitment_paths::Sizes::TEST;
-    #[cfg(not(test))]
-    let sizes = neighborhood::recruitment_paths::Sizes::PRODUCTION;
     let start = Instant::now();
     let reading = neighborhood::recruitment_paths::observe(sizes);
     (Indicator::Defined(reading), Some(millis(start.elapsed())))
