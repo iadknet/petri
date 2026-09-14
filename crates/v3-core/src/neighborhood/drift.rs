@@ -96,8 +96,36 @@ pub struct DriftWalk {
     pub recruitment: Vec<RecruitmentCheckpoint>,
 }
 
+/// The mutation config the walk actually runs (T11.F19): the legacy per-birth
+/// rule forced on, so the walk stays the fixed-count control whatever supply
+/// rule production selects. Nothing else is overridden.
+fn forced_legacy_supply(mutation: &MutationConfig) -> MutationConfig {
+    MutationConfig {
+        per_unit_supply_enabled: false,
+        ..mutation.clone()
+    }
+}
+
+/// The supply rule and values a walk over `mutation` runs, for the report's
+/// `supply_rule` metadata.
+#[must_use]
+pub fn supply_rule(mutation: &MutationConfig) -> String {
+    let forced = forced_legacy_supply(mutation);
+    format!(
+        "legacy per-birth rule (per_unit_supply_enabled forced false): \
+         mutation_probability {}, events {} to {}, continuation {}",
+        forced.mutation_probability,
+        forced.per_birth_mutation_events_min,
+        forced.per_birth_mutation_events_max,
+        forced.per_birth_mutation_event_continuation_probability,
+    )
+}
+
 /// Retain every production birth unconditionally. Checkpoint reads borrow genomes
 /// and use separate trial RNGs; they never consume the persistent walk streams.
+///
+/// Every walk birth and checkpoint birth runs the legacy per-birth supply rule
+/// (see [`supply_rule`]); the config's per-unit fields are ignored here.
 #[must_use]
 pub fn observe(
     founder: &CreatureGenome,
@@ -108,6 +136,7 @@ pub fn observe(
 ) -> DriftWalk {
     assert!(sizes.birth_lineages <= sizes.lineages);
     assert!(sizes.checkpoints.windows(2).all(|pair| pair[0] < pair[1]));
+    let mutation = &forced_legacy_supply(mutation);
     let mut genomes: Vec<_> = (0..sizes.lineages).map(|_| founder.clone()).collect();
     let mut rngs: Vec<_> = (0..sizes.lineages)
         .map(|index| SmallRng::seed_from_u64(WALK_SEED_BASE + u64::from(index)))
@@ -250,6 +279,14 @@ mod tests {
 
     use proptest::prelude::*;
 
+    /// The production config on the legacy supply rule the walk forces, so a
+    /// hand replay of the walk's births draws the same counts.
+    fn replay_config() -> SimulationConfig {
+        let mut config = SimulationConfig::default();
+        config.mutation = forced_legacy_supply(&config.mutation);
+        config
+    }
+
     /// Mirror [`observe`]'s executed-set cadence for a single-lineage replay:
     /// refresh at depth 0 and at every positive multiple of the interval,
     /// otherwise reuse the cached node ids mapped to the current genome.
@@ -306,7 +343,7 @@ mod tests {
     fn checkpoint_reads_preserve_lineage_genomes_and_do_not_restart_dead_parents() {
         use crate::contracts::WorldAction;
         use crate::creature::genome::{BackendDef, VmInstruction};
-        let config = SimulationConfig::default();
+        let config = replay_config();
         let context = EvalContext::from_config(&config);
         let battery = Battery::generate(context.food_type_count);
         let mut dead = founder_genome(FounderProfile::V3Alpha1);
@@ -413,7 +450,7 @@ mod tests {
 
     #[test]
     fn checkpoints_replay_the_production_walk_and_fixed_birth_subset() {
-        let config = SimulationConfig::default();
+        let config = replay_config();
         let founder = founder_genome(FounderProfile::V3Alpha1);
         let before = founder.clone();
         let battery = Battery::generate(2);
@@ -488,7 +525,7 @@ mod tests {
     /// [`observe`], while the replay on the real cadence reproduces it.
     #[test]
     fn the_walk_refreshes_executed_sets_along_the_way_not_only_at_depth_zero() {
-        let config = SimulationConfig::default();
+        let config = replay_config();
         let founder = founder_genome(FounderProfile::V3Alpha1);
         let battery = Battery::generate(2);
         let context = EvalContext::from_config(&config);
@@ -555,7 +592,7 @@ mod tests {
     /// those replayed genomes carry.
     #[test]
     fn recruitment_readings_track_the_walk_without_changing_it() {
-        let config = SimulationConfig::default();
+        let config = replay_config();
         let founder = founder_genome(FounderProfile::V3Alpha1);
         let battery = Battery::generate(2);
         let context = EvalContext::from_config(&config);
@@ -670,6 +707,38 @@ mod tests {
         let zero = observe(&founder, &battery, &config.mutation, &context, sizes).checkpoints;
         assert_eq!(zero[0].mesh, zero[1].mesh);
         assert!(zero.iter().all(|r| r.births.zero_event_births == 2));
+    }
+
+    /// The walk is the fixed-count control (T11.F19): it runs the legacy
+    /// per-birth rule whatever supply rule the config it receives selects, so
+    /// its births and checkpoint rows are identical either way, and its
+    /// metadata names the rule and values in force.
+    #[test]
+    fn the_walk_forces_the_legacy_supply_rule_whatever_the_config_selects() {
+        let config = SimulationConfig::default();
+        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let battery = Battery::generate(2);
+        let sizes = DriftSizes {
+            lineages: 3,
+            birth_lineages: 2,
+            births: 3,
+            checkpoints: &[0, 5],
+        };
+        let context = EvalContext::from_config(&config);
+        let mut production_mutation = config.mutation.clone();
+        assert!(production_mutation.per_unit_supply_enabled);
+        production_mutation.per_unit_rate = 1.0;
+        let production = observe(&founder, &battery, &production_mutation, &context, sizes);
+        let mut legacy_mutation = config.mutation.clone();
+        legacy_mutation.per_unit_supply_enabled = false;
+        let legacy = observe(&founder, &battery, &legacy_mutation, &context, sizes);
+        assert_eq!(production.checkpoints, legacy.checkpoints);
+        assert_eq!(production.recruitment, legacy.recruitment);
+        assert_eq!(
+            supply_rule(&production_mutation),
+            "legacy per-birth rule (per_unit_supply_enabled forced false): \
+             mutation_probability 0.44, events 1 to 10, continuation 0.2"
+        );
     }
 
     /// The walk dates a module from the generation its birth produced, and it

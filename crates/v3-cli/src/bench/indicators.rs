@@ -276,6 +276,7 @@ fn compute_drift_depth(
         recruitment_version: recruitment::RECRUITMENT_VERSION.to_string(),
         module_identity: recruitment::MODULE_IDENTITY.to_string(),
         provenance_rule: recruitment::PROVENANCE_RULE.to_string(),
+        supply_rule: drift::supply_rule(&config.mutation),
         executions_per_genome: neighborhood_battery_execution_count(),
         snapshot_count: fixed_battery::SNAPSHOT_COUNT as u32,
         sequence_count: fixed_battery::SEQUENCE_COUNT as u32,

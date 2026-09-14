@@ -94,10 +94,12 @@ Type posture:
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `mutation.mutation_probability` | `f64` | `0.44` | Clamp to `[0.0, 1.0]`. Uses `f64` (not `f32`) to preserve precision for very small probability values used in low-mutation-rate experiments. |
-| `mutation.per_birth_mutation_events_min` | `u32` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
-| `mutation.per_birth_mutation_events_max` | `u32` | `10` | Must be `>= per_birth_mutation_events_min`; lower values normalize to min. |
-| `mutation.per_birth_mutation_event_continuation_probability` | `f64` | `0.2` | After the minimum, probability of requesting another event up to the maximum. Missing field defaults to `0.2`; finite values clamp to `[0.0, 1.0]`, NaN/infinite normalize to `0.2`. |
+| `mutation.per_unit_supply_enabled` | `bool` | `true` | Production supply rule (T11.F19): one Bernoulli trial per `genome_size()` unit at `per_unit_rate`. Missing field defaults to `true`. When `false`, the four legacy per-birth fields below run instead. |
+| `mutation.per_unit_rate` | `f64` | `0.005` | Chance that one genome unit requests a mutation event. Missing field defaults to `0.005`; finite values clamp to `[0.0, 1.0]`, NaN/infinite normalize to `0.005`. Sized so the 111-unit founder expects about 0.555 events per birth. |
+| `mutation.mutation_probability` | `f64` | `0.44` | Legacy per-birth trigger, read only when `per_unit_supply_enabled` is `false`. Clamp to `[0.0, 1.0]`. Uses `f64` (not `f32`) to preserve precision for very small probability values used in low-mutation-rate experiments. |
+| `mutation.per_birth_mutation_events_min` | `u32` | `1` | Legacy per-birth rule only. Must be `>= 1`; invalid values fall back to `1`. |
+| `mutation.per_birth_mutation_events_max` | `u32` | `10` | Legacy per-birth rule only. Must be `>= per_birth_mutation_events_min`; lower values normalize to min. |
+| `mutation.per_birth_mutation_event_continuation_probability` | `f64` | `0.2` | Legacy per-birth rule only. After the minimum, probability of requesting another event up to the maximum. Missing field defaults to `0.2`; finite values clamp to `[0.0, 1.0]`, NaN/infinite normalize to `0.2`. |
 | `mutation.action_queue_cap` | `usize` | `4` | Must be clamped to `1..=min(21845, runtime.max_actions_per_turn)`. `21845` preserves `InputReference::ActionQueue` width (`cap * 3`) within `u16`. |
 | `mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
@@ -116,13 +118,21 @@ triggered by genome mutation. Phenotype algorithm and trigger semantics are
 canonical in `v3-phenotype-spec.md`.
 
 Mutation randomization semantics:
-1. Roll mutation trigger from `mutation_probability`.
-2. If triggered, start at `per_birth_mutation_events_min`. While below
+1. With `per_unit_supply_enabled` (production): read the parent's
+   `genome_size()` once and draw one Bernoulli trial at `per_unit_rate` per
+   unit; each success requests one event, so the count is
+   `Binomial(genome_size(), per_unit_rate)` with no trigger, minimum,
+   maximum, or continuation. Rate 0 requests nothing, rate 1 one event per
+   unit. The default requests about 0.555 events per founder birth.
+2. Otherwise (legacy per-birth rule, disabled in production): roll the
+   trigger from `mutation_probability`; if triggered, start at
+   `per_birth_mutation_events_min` and, while below
    `per_birth_mutation_events_max`, add one event when a Bernoulli draw with
    `per_birth_mutation_event_continuation_probability` succeeds; stop on its
    first failure. Continuation 0 requests the minimum, 1 the maximum; equal
-   bounds request that count. The provisional defaults request approximately
-   0.55 events per all births, with 80% of triggered births requesting one.
+   bounds request that count. The defaults request approximately 0.55 events
+   per all births, with 80% of triggered births requesting one. The drift
+   walk forces this rule as its fixed-count control.
 3. For each event, select topology with `mesh_layer_probability`; otherwise
    select VM, graph, or input-reference mutation with equal probability.
 4. Select among eligible operators using their existing operator weights.

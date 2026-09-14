@@ -188,6 +188,8 @@ Request (conceptual v3alpha2 shape):
     }
   },
   "mutation": {
+    "per_unit_supply_enabled": true,
+    "per_unit_rate": 0.005,
     "mutation_probability": 0.303,
     "per_birth_mutation_events_min": 1,
     "per_birth_mutation_events_max": 10,
@@ -500,6 +502,8 @@ Response:
       }
     },
     "mutation": {
+      "per_unit_supply_enabled": true,
+      "per_unit_rate": 0.005,
       "mutation_probability": 0.303,
       "per_birth_mutation_events_min": 1,
       "per_birth_mutation_events_max": 10,

@@ -171,15 +171,15 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     for (name, expected) in [
         (
             "orchards-in-grassland",
-            "sha256:8141056a33bc30445fd29340fa40498372835e08459b7c04c347f9724b445423",
+            "sha256:f381535d015d03233912db89b3537d3f2c70389f795afbdf27e521c507f0e64e",
         ),
         (
             "canyon-country",
-            "sha256:ee72c5532cb947fad7349a3a4d3c5a5b5bef2c501ebe5b299b5de12ad26bd99d",
+            "sha256:197b16478dbea062d3ecb3ad6b8d8125845dbf9db9ec587726af5cf4eaca8370",
         ),
         (
             "confluence",
-            "sha256:25fb4d0baf34719c0f1e657c98b4e8a7932216510d69651c6fd58d4f6d318676",
+            "sha256:0922635cee5709c46e58a8cc379d95be4223c22785e36809fbc67ad1e30f0933",
         ),
     ] {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))

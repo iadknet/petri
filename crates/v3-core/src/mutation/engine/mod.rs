@@ -18,7 +18,17 @@ use crate::mutation::types::{
 use crate::mutation::vm::{VmMutator, VmOperator};
 
 /// Draw requested supply from normalized config, independently of operator success.
-fn requested_event_count(config: &MutationConfig, rng: &mut impl Rng) -> u32 {
+///
+/// Production rule (T11.F19): one Bernoulli trial per genome unit at
+/// `per_unit_rate`, so the count is `Binomial(genome_size, per_unit_rate)`
+/// with no trigger, minimum, maximum, or continuation. The disabled legacy
+/// rule below keeps its exact RNG consumption for the drift walk and T11.F13.
+fn requested_event_count(config: &MutationConfig, genome_size: u32, rng: &mut impl Rng) -> u32 {
+    if config.per_unit_supply_enabled {
+        return (0..genome_size)
+            .filter(|_| rng.gen_bool(config.per_unit_rate))
+            .count() as u32;
+    }
     if !rng.gen_bool(config.mutation_probability) {
         return 0;
     }
@@ -86,7 +96,9 @@ impl MutationEngine {
         rng: &mut impl Rng,
         food_type_count: usize,
     ) -> MutationSummary {
-        let event_count = requested_event_count(config, rng);
+        // The genome is immutable after birth, so its size read once here is
+        // the count's population.
+        let event_count = requested_event_count(config, genome.genome_size(), rng);
         if event_count == 0 {
             return MutationSummary::zero();
         }

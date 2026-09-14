@@ -452,16 +452,17 @@ apply_mutations(genome, mutation_config, parent_reachable_nodes,
 
 Call semantics:
 - `MutationEngine` is called unconditionally for every offspring. Internally,
-  it rolls `mutation_probability` to decide whether any mutation events are
-  attempted. If the probability gate fails, it returns a zero-event summary
-  immediately. Callers never skip the `MutationEngine` call.
+  it draws the requested event count from the supply rule (production: one
+  Bernoulli trial per `genome_size()` unit at `per_unit_rate`, T11.F19). If
+  the count is zero, it returns a zero-event summary immediately. Callers
+  never skip the `MutationEngine` call.
 - `parent_reachable_nodes` is a sorted ascending slice of node indices that
   were reachable in the parent's genome (computed via BFS from entry node).
   Used for reachability-biased target selection (see Section 4.3).
 - `parent_executed` names the parent's recently executed nodes: either an
   explicit sorted index slice (observation harnesses) or the live parent's
   dispatch record read at its current age. It is resolved to indices only
-  after the probability gate draws at least one event, so a zero-event birth
+  after the supply draw requests at least one event, so a zero-event birth
   derives nothing.
 
 `MutationSummary` minimum fields:
@@ -505,15 +506,26 @@ for each selected event:
 ```
 
 Selection randomization rules (internal to `MutationEngine`):
-- Mutation trigger rolls global `mutation_probability` internally. If the roll
-  fails, `MutationEngine` returns `MutationSummary { attempted_events: 0,
+- Production supply (T11.F19, `per_unit_supply_enabled = true`): read the
+  parent's `genome_size()` once, draw one Bernoulli trial at `per_unit_rate`
+  per unit, and request one event per success, so the count is
+  `Binomial(genome_size(), per_unit_rate)` with no trigger, minimum, maximum,
+  or continuation. Rate 0.0 requests nothing (every birth is a clone); rate
+  1.0 requests one event per unit. The default 0.005 keeps the 111-unit
+  founder at about 0.555 requested events per birth; a genome pays its size
+  in exposure. Natural analog: per-base copy error. If the count is zero,
+  `MutationEngine` returns `MutationSummary { attempted_events: 0,
   applied_events: 0, skipped_events: 0, ... }` immediately.
-- If triggered, request the configured minimum, then continue with the configured
+- Legacy per-birth supply (`per_unit_supply_enabled = false`, disabled in
+  production; the drift walk, the recruitment-paths experiment, and T11.F13
+  use it as the fixed-count control): roll `mutation_probability`; if the roll
+  fails, return the zero summary. If triggered, request the configured
+  minimum, then continue with the configured
   `per_birth_mutation_event_continuation_probability` until the first failed
   draw or the maximum count. Defaults are trigger 0.44, continuation 0.2,
   bounds 1–10: approximately 0.55 requested events per birth, with 80% of
-  triggered births requesting exactly one. This is a provisional comparison
-  baseline, not an optimum or an inherited-policy minimum (T11.F13, T08.F05).
+  triggered births requesting exactly one. Its RNG consumption is unchanged
+  from before T11.F19, so the walk's rows are reproducible byte for byte.
 - Every requested event becomes one attempted event; a skip does not cause an
   extra requested event. `attempted_events = applied_events + skipped_events`.
 - For each event, select topology with `mesh_layer_probability`; otherwise

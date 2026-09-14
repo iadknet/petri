@@ -98,11 +98,13 @@ Fixed design, decided before implementation:
 | Founder pin | A unit test asserts `MutationConfig::default().per_unit_rate * founder.genome_size()` is within 1% of 0.55, where the founder is the canonical V3Alpha1 genome whose size the state test pins at 111 (0.005 × 111 = 0.555). The rate is never a bare literal in a second place. |
 | Everything else in the engine | Unchanged: the executed-set derivation, `TargetSets`, the layer split, operator selection, pressure handling, and the event loop run as they do today on the drawn count. |
 | Drift walk | `drift::observe` clones the mutation config it is handed and forces `per_unit_supply_enabled = false`, so every walk birth and every checkpoint birth uses the legacy rule at the config's per-birth fields, whose defaults are the founder-equivalent 0.55. Nothing else in the config is overridden. `DriftDepth` gains a `#[serde(default)]` string `supply_rule` recording the rule and the four values in force; `VERSION` stays `drift-depth-v3` because the rows are byte-identical when nothing else changes. |
+| Fixture walks | The `recruitment_paths` experiment (T13.F06 goal indicator, `neighborhood/recruitment_paths/experiment.rs`) walks authored lineages with no selection and pins recorded baselines, so it is a mutation-map instrument of the same kind as the drift walk: it builds its proposal config from the default on the legacy rule (`per_unit_supply_enabled` forced `false`) and says so in its `mutation_context` string. Every other instrument that reads genomes the world produced uses the production rule. |
 | Neighborhood readings | The founder and evolved halves and T14.F12's neighborhood read pass the production config unchanged, so they read the per-unit supply. |
+| Determinism | Every production birth's RNG consumption changes, so the short-run identity hash in `crates/v3-core/tests/baseline_worlds.rs` (`legacy_default_short_run_identity`) is re-pinned once, as at T13.F04, after two runs agree. The two new fields enter every `config_digest`, so the three goal recipes' digests in `crates/v3-cli/tests/bench_artifacts.rs` are re-pinned; the comparator reports the digest change per case as `inputs_changed` and keeps the cases comparable. |
 | Frontend | `MutationSection.tsx`: a toggle "Per-Unit Supply" (default on, tooltip naming the Binomial rule) in `MUTATION_TOGGLES`, and a numeric row "Rate / Unit" (min 0, max 0.1, step 0.0001, default 0.005) in `MUTATION_FIELDS`; the four legacy rows stay with tooltips stating they apply only when the toggle is off. `types/config.ts`, `test/fixtures.ts`, and the `ControlBar.test.tsx` fixture carry both fields. |
 | Runtime patch path | Both fields are patchable through the existing config-apply route; normalization of an out-of-range rate is reported by field path like the existing mutation fields. |
 | Reference docs | `docs/reference/v3-mutation-spec.md` Section 4.1 and the selection randomization rules; `docs/reference/v3-runtime-config-spec.md` mutation table and "Mutation randomization semantics" steps 1 and 2; the supply paragraph in `docs/reference/v3-reproduction-spec.md`; the mutation example in `docs/reference/v3-server-api-protocol-spec.md`. Each states the per-unit rule as production and the per-birth rule as the disabled legacy rule. |
-| Tests that need a fixed count | Existing tests that set `mutation_probability` and the min/max bounds to force an exact count (engine, actions, viability, reproducibility, server) select the legacy rule explicitly; tests of the per-unit rule are added beside them. Property tests (proptest) cover: `0 <= requested <= genome_size()`, rate 0.0 requests 0, rate 1.0 requests `genome_size()`, and normalization of the rate. |
+| Tests that need a fixed count | Existing tests that set `mutation_probability` and the min/max bounds to force an exact count (engine, actions, viability, reproducibility, server) select the legacy rule explicitly; tests of the per-unit rule are added beside them. Property tests (proptest) cover: `0 <= requested <= genome_size()`, rate 0.0 requests 0, rate 1.0 requests `genome_size()`, and normalization of the rate. Zero-supply fixtures may select the legacy rule with `mutation_probability` 0.0 (no RNG draw, existing streams preserved) or `per_unit_rate` 0.0; the clone invariant under `per_unit_rate` 0.0 is covered by its own engine test. |
 
 Predeclared readings, taken from the stored closure reports and read against
 the T14.F12 gate and goal reports (previous closure), the pinned goal epoch
@@ -119,23 +121,24 @@ the T14.F12 gate and goal reports (previous closure), the pinned goal epoch
 | Goal `mutation_supply.events_applied_total` per birth (`births_total` at tick 2,000) | 210,880 / 384,054 = 0.549; 203,442 / 369,038 = 0.551; 198,771 / 359,734 = 0.553 | Up on every world; reported. Expected about 0.8 to 1.0 (the prototype's interval rate at tick 2,000 was 1.01) |
 | Founder neighborhood block, gate and goal | 500 births; zero-event 292; changed 88 (0.176 of all) gate, 95 (0.190) goal; dead 0 in both | Unchanged in outcome, not byte-identical (the founder now consumes 111 draws per birth): pooled changed per all births within 0.04 of the reference; dead not above 2 of 500; zero-event births between 250 and 320 (expectation 0.574 × 500 = 287) |
 | Drift walk block, per world | `drift-depth-v3`; changed/all 0.004500 / 0.003500, 0.008500 / 0.004500, 0.004500 / 0.003500 at depths 1,000 / 2,000 | Every checkpoint row byte-identical to T14.F12's per world; only the new `supply_rule` metadata string differs. Regression instrument under the no-regression rule; the withdrawn floors are not gates |
+| `recruitment_paths` block (goal, one block) | `recruitment-paths-v1` at T14.F12 | `arms`, `pairs`, `starts`, `opportunities`, `constructed`, and `total_proposals` byte-identical to T14.F12's; only `config`, `config_digest`, and the `mutation_context` string differ, because the serialized config carries the two new fields and the string names the legacy rule |
 | Evolved half (12 genomes, 200 births) | reported per world | Reported; confounded by the changed population, as every closure since T11.F17 records |
 | Observation budgets | workflow caps | Founder neighborhood below 10 s; summed evolved below 180 s; drift walk below 30 s; neighborhood read below 10 s summed; whole goal run below 15 minutes |
 
 ## Implementation Tasks
 
-- [ ] Add `per_unit_supply_enabled` and `per_unit_rate` to `MutationConfig`
+- [x] Add `per_unit_supply_enabled` and `per_unit_rate` to `MutationConfig`
       with defaults, serde defaults, normalization, and the founder pin test;
       route `requested_event_count` through the per-unit draw when enabled and
       the untouched legacy draw otherwise; add the engine unit and property
       tests.
-- [ ] Force the legacy rule inside `drift::observe`, record `supply_rule` in
+- [x] Force the legacy rule inside `drift::observe`, record `supply_rule` in
       `DriftDepth`, and pin with a test that the walk's births are identical
       whether or not the config it receives enables the per-unit rule.
-- [ ] Switch existing fixed-count tests to the legacy rule explicitly; add
+- [x] Switch existing fixed-count tests to the legacy rule explicitly; add
       server patch and normalization coverage for both fields.
-- [ ] Frontend: toggle, rate row, types, fixtures, tests.
-- [ ] Update the four reference documents.
+- [x] Frontend: toggle, rate row, types, fixtures, tests.
+- [x] Update the four reference documents.
 
 ## Verification
 
@@ -173,8 +176,9 @@ must not reach severe (+100%); a wall comparison is only made on a matching
 host. Gate references: T14.F12 gate and the gate epoch. Goal references:
 T14.F12 goal and the pinned goal epoch. No epoch re-pin is budgeted. The
 `deterministic` blocks of both profiles differ from every prior report for
-every seed, since every birth's RNG consumption changes; the drift-walk block
-is predeclared identical as tabulated above. Expected directions for every
+every seed, since every birth's RNG consumption changes; the drift-walk and
+`recruitment_paths` rows are predeclared identical as tabulated above, and
+every goal case's `config_digest` changes (`inputs_changed`, comparable). Expected directions for every
 indicator this feature can move are in the readings table; every other stored
 indicator (lineage diversity, memory and temporal sensitivity, cognition,
 recruitment) is reported with no direction, because the population evolves

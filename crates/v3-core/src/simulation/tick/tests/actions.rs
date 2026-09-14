@@ -839,6 +839,7 @@ fn reproduction_resets_reward_credit_including_frozen_tick_base() {
             }],
         };
         let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
+        sim.config.mutation.per_unit_supply_enabled = false;
         sim.config.mutation.mutation_probability = 0.0;
         sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
         sim.creatures[parent].graph_runtime.eligibility_traces = vec![vec![Box::new([3.0])]];

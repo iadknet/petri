@@ -1390,6 +1390,7 @@ async fn health_payload_contains_mutation_skip_by_reason() {
     cfg.world.width = 16;
     cfg.world.height = 16;
     cfg.population.initial_creatures = 5;
+    cfg.mutation.per_unit_supply_enabled = false;
     cfg.mutation.mutation_probability = 1.0;
     cfg.mutation.per_birth_mutation_events_min = 3;
     cfg.mutation.per_birth_mutation_events_max = 3;
@@ -3482,10 +3483,14 @@ async fn from_config_normalizes_before_storing_and_seeding() {
 /// used to offer, must name its own path (2026-09-07 apply audit, item 4).
 #[tokio::test]
 async fn patch_config_names_each_bound_constrained_field_patched_alone() {
-    let cases: [(&str, &str); 7] = [
+    let cases: [(&str, &str); 8] = [
         (
             "population.max_creatures",
             r#"{"population":{"max_creatures":32}}"#,
+        ),
+        (
+            "mutation.per_unit_rate",
+            r#"{"mutation":{"per_unit_rate":1.5}}"#,
         ),
         (
             "world.food.shared.max_density",
@@ -3619,6 +3624,37 @@ async fn patch_config_applies_a_fully_valid_mixed_patch() {
         &after["config"]["world"]["food"]["shared"]["growth_rate"],
         0.12,
     );
+}
+
+/// Both per-unit supply fields (T11.F19) are live-patchable and echoed back;
+/// the defaults are the production rule.
+#[tokio::test]
+async fn patch_config_applies_the_per_unit_supply_fields() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (_, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+    assert_eq!(
+        before["config"]["mutation"]["per_unit_supply_enabled"],
+        true
+    );
+    assert_json_f64_close(&before["config"]["mutation"]["per_unit_rate"], 0.005);
+
+    let patch = r#"{"mutation":{"per_unit_supply_enabled":false,"per_unit_rate":0.02}}"#;
+    let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(body["config"]["mutation"]["per_unit_supply_enabled"], false);
+    assert_json_f64_close(&body["config"]["mutation"]["per_unit_rate"], 0.02);
+
+    let (_, after) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(
+        after["config"]["mutation"]["per_unit_supply_enabled"],
+        false
+    );
+    assert_json_f64_close(&after["config"]["mutation"]["per_unit_rate"], 0.02);
 }
 
 #[tokio::test]

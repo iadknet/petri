@@ -1,5 +1,4 @@
 use super::*;
-use crate::config::MutationConfig;
 use crate::contracts::NodeId;
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
@@ -399,7 +398,7 @@ fn recruitment_paths_every_observed_sibling_replays_the_unmodified_engine() {
                 let mut child = parent.clone();
                 let summary = MutationEngine::apply_mutations_with_food_type_count(
                     &mut child,
-                    &MutationConfig::default(),
+                    &super::experiment::proposal_mutation_config(),
                     &reachable,
                     ParentExecuted::Indices(&executed),
                     &mut SmallRng::seed_from_u64(record.seed),

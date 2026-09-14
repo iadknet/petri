@@ -70,17 +70,21 @@ This document does not define:
     return
   build OffspringDraft
   call MutationEngine unconditionally on child genome
-    (MutationEngine internally handles mutation_probability gate)
+    (MutationEngine internally draws the requested event count)
   spawn child immediately, mutate occupancy now
 ```
 
 ---
 
 Mutation supply is owned by `v3-mutation-spec.md` and configured by
-`v3-runtime-config-spec.md`. The production engine triggers with probability
-0.44 and requests a bounded geometric count (minimum 1, maximum 10,
-continuation probability 0.2). The approximately 0.55 requested events per
-birth is a provisional comparison baseline. Requested events become attempts;
+`v3-runtime-config-spec.md`. The production engine requests
+`Binomial(genome_size(), per_unit_rate)` events per birth (T11.F19): every
+unit of structure the parent carries is an independent 0.005 chance of one
+event, so the 111-unit founder expects about 0.555 requested events per birth
+and a larger genome pays its size in exposure. The legacy per-birth rule
+(trigger 0.44, bounded geometric count with minimum 1, maximum 10,
+continuation 0.2) is disabled in production and kept as the drift walk's
+fixed-count control. Requested events become attempts;
 skipped events are not extra requests, and applied count governs downstream
 mutation effects. Compare both conditional mutated-birth outcomes and absolute
 outcomes per all births when interpreting this supply.
@@ -209,7 +213,7 @@ runtime config contract: `v3-runtime-config-spec.md`.
      -> [reject RejectedEnergyConstraints; return]
   8. deduct transfer from parent; build OffspringDraft with initial_energy = transfer
   9. call MutationEngine unconditionally on child genome -> MutationSummary
-     (MutationEngine internally handles the mutation_probability gate;
+     (MutationEngine internally draws the requested event count;
       see v3-mutation-spec.md Section 4.1)
  10. derive child identity from parent identity:
        - inherit lineage_id unchanged

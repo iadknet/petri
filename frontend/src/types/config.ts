@@ -182,6 +182,8 @@ export interface ReachableBiasConfig {
 }
 
 export interface MutationConfig {
+	per_unit_supply_enabled: boolean;
+	per_unit_rate: number;
 	mutation_probability: number;
 	per_birth_mutation_events_min: number;
 	per_birth_mutation_events_max: number;
