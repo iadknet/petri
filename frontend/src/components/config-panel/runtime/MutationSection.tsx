@@ -1,6 +1,19 @@
 import type { BooleanFieldDef, FieldDef } from "../shared/types.ts";
 
+const LEGACY_ONLY = "Legacy per-birth rule; applies only when Per-Unit Supply is off.";
+
 export const MUTATION_FIELDS: FieldDef[] = [
+	{
+		path: "mutation.per_unit_rate",
+		label: "Rate / Unit",
+		min: 0,
+		max: 0.1,
+		step: 0.0001,
+		testId: "config-field-mutation-per-unit-rate",
+		defaultValue: 0.005,
+		tooltip:
+			"Chance that each genome unit requests one mutation event at birth; the founder's 111 units expect about 0.55 events",
+	},
 	{
 		path: "mutation.mutation_probability",
 		label: "Mutation Prob.",
@@ -9,7 +22,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 0.001,
 		testId: "config-field-mutation-mutation-probability",
 		defaultValue: 0.44,
-		tooltip: "Probability that a newborn genome undergoes mutation",
+		tooltip: `Probability that a newborn genome undergoes mutation. ${LEGACY_ONLY}`,
 	},
 	{
 		path: "mutation.per_birth_mutation_events_min",
@@ -19,7 +32,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 1,
 		testId: "config-field-mutation-events-min",
 		defaultValue: 1,
-		tooltip: "Minimum number of mutation events per birth when mutation triggers",
+		tooltip: `Minimum number of mutation events per birth when mutation triggers. ${LEGACY_ONLY}`,
 	},
 	{
 		path: "mutation.per_birth_mutation_events_max",
@@ -29,7 +42,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 1,
 		testId: "config-field-mutation-events-max",
 		defaultValue: 10,
-		tooltip: "Maximum number of mutation events per birth when mutation triggers",
+		tooltip: `Maximum number of mutation events per birth when mutation triggers. ${LEGACY_ONLY}`,
 	},
 	{
 		path: "mutation.per_birth_mutation_event_continuation_probability",
@@ -39,7 +52,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 0.01,
 		testId: "config-field-mutation-event-continuation-probability",
 		defaultValue: 0.2,
-		tooltip: "After the minimum, chance to request another mutation event up to the maximum",
+		tooltip: `After the minimum, chance to request another mutation event up to the maximum. ${LEGACY_ONLY}`,
 	},
 	{
 		path: "mutation.mesh_layer_probability",
@@ -169,6 +182,14 @@ export const MUTATION_FIELDS: FieldDef[] = [
 ];
 
 export const MUTATION_TOGGLES: BooleanFieldDef[] = [
+	{
+		path: "mutation.per_unit_supply_enabled",
+		label: "Per-Unit Supply",
+		testId: "config-field-mutation-per-unit-supply-enabled",
+		defaultValue: true,
+		tooltip:
+			"When enabled, each birth requests Binomial(genome size, Rate / Unit) mutation events; when off, the legacy per-birth fields apply",
+	},
 	{
 		path: "mutation.genome_size_pressure_enabled",
 		label: "Genome Size Pressure",

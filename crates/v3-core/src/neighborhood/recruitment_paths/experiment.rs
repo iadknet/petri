@@ -150,6 +150,16 @@ struct ProposalPosition {
     generation: u32,
 }
 
+/// The mutation config every proposal runs: the default config on the legacy
+/// per-birth supply rule, the fixed-count control the recorded baselines were
+/// taken on, like the drift walk (T11.F19).
+pub(super) fn proposal_mutation_config() -> crate::config::MutationConfig {
+    crate::config::MutationConfig {
+        per_unit_supply_enabled: false,
+        ..crate::config::MutationConfig::default()
+    }
+}
+
 fn propose_siblings(
     start: &Start,
     genome: &CreatureGenome,
@@ -164,7 +174,7 @@ fn propose_siblings(
         lineage,
         generation,
     } = position;
-    let mutation = crate::config::MutationConfig::default();
+    let mutation = proposal_mutation_config();
     let starting_score = start.task_reading.correct(start.task);
     let reachable = mesh_reachable_nodes(genome);
     let executed = indices_for_node_ids(genome, &task.dispatched());
@@ -666,7 +676,7 @@ pub fn observe(sizes: Sizes) -> Report {
     }
     Report { version: VERSION.into(), config_digest: crate::config::config_digest(&config), config, sizes,
         task_definition: "Eight fresh 12x12 one-tick scenes; energy 50; zero learned state; here/east/north food 0/1. A: FoodHere(0)>0; B: NeighborFood(E,0)>0. Exact [Move(E)] plus east displacement or [NoOp] plus no displacement. Score=correct/8; practical margin=1/8.".into(),
-        mutation_context: "Default MutationConfig; SmallRng seed=13020000+batch*1000000+lineage*10000+generation_zero_based*2+sibling. Reachability and ParentExecuted indices from all eight task ticks recomputed before each sibling pair; observations consume no mutation RNG.".into(),
+        mutation_context: "Default MutationConfig on the legacy per-birth supply rule (per_unit_supply_enabled forced false); SmallRng seed=13020000+batch*1000000+lineage*10000+generation_zero_based*2+sibling. Reachability and ParentExecuted indices from all eight task ticks recomputed before each sibling pair; observations consume no mutation RNG.".into(),
         construction_resolution: "Constructed authored fixtures and controlled helper seeds; genomes frozen before discovery. Construction-only tracker opportunities are excluded from proposal totals; creation registration precedes preparation.".into(),
         observation_resolution: "Both siblings every generation; first discovery by discovery horizon; retention on same (lineage,node,creation-depth) after followup generations including held parents. Full 80-execution battery/cohort checkpoints at 0/discovery/end; first-fact dates are observation-censored. Replay deltas are complete whole-birth transitions with ordered events, not per-event field causation. Selected-inapplicable backend comes from Graph/VM domain or the target's before/after node; transient deleted targets without backend evidence remain explicitly unresolved.".into(),
         rng_control: "NotApplicable: no added-draw or constructor intervention; observation never advances mutation RNG. Equal seeds need not produce equal transitions after genotype/site divergence; paired fingerprints include complete deltas, ordered events and a draw from a clone of the post-call RNG.".into(),
