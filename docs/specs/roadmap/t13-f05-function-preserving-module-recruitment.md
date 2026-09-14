@@ -25,13 +25,12 @@ creatures only through the body: birth mutation of the genome.
   reward, global speciation, fan-out, or guarantee that every neutral node
   becomes useful.
 - No change to operator weights, domain shares, the executed/reachable bias,
-  T11.F18's constructors or backend odds, T13.F03's applicability rule or
-  T13.F04's entry rule; the executed-applicable bias question deferred by
-  T13.F03 stays a track decision.
-- No change to the T13.F02 experiment's parameters, seeds, tasks or margins,
-  and no discovery or retention floor (T13.F06).
-- No shortening of a path that exists but is long: a transition every step of
-  which some production operator already makes is not a missing transition.
+  T11.F18's constructors or odds, T13.F03's applicability rule or T13.F04's
+  entry rule; T13.F03's deferred executed-applicable bias question stays a
+  track decision.
+- No change to the T13.F02 experiment's parameters, seeds, tasks or margins;
+  no discovery or retention floor (T13.F06).
+- No shortening of a path that exists but is long.
 - No environmental pressure: nothing to integrate into the three standard
   goal environments.
 
@@ -53,20 +52,18 @@ creatures only through the body: birth mutation of the genome.
   [recruitment research note](../../strategy/neutral-module-recruitment-research-2026-09-08.md)
   fixed the direction: reuse safe connected growth and copy/diverge paths,
   add only a path the baseline shows missing, prefer a small change to an
-  existing operator over a macro catalog. Options weighed: (1) seed-selected
-  production-operator paths, the pattern F02 used for `CopyNode` and
-  `SwapRouteTargets` — adopted, since each step is proved with the operator
-  that would make it in production; (2) automated search over operators ×
-  seeds — rejected, a transition's existence is decided by the operator's site
-  enumeration, not by search; (3) new template or motif operators — excluded
-  by the track. Existing crates and `std` suffice.
+  existing operator over a macro catalog. Options: (1) seed-selected
+  production-operator paths, F02's pattern for `CopyNode` and
+  `SwapRouteTargets` — adopted, each step is proved with the operator that
+  makes it in production; (2) automated operator × seed search — rejected, a
+  transition's existence is decided by site enumeration; (3) new template or
+  motif operators — excluded by the track. Existing crates and `std` suffice.
 - Baseline facts. After T13.F03/F04 every blank, copy, split and unprepared
-  arm of the in-report experiment is still null (0/32 proposal discoveries,
-  Wilson 0.000–0.107) while prepared arms discover 17–19/32; Graph
-  `contributing` stayed 0 in 5 of 6 drift cells. F02's constructed paths take
-  three stages after creation for blank forms and two for copies, but the
-  preparation stage is one authored compound edit, so the baseline never
-  showed production operators making it step by step.
+  experiment arm is still null (0/32, Wilson 0.000–0.107) while prepared arms
+  discover 17–19/32; Graph `contributing` stayed 0 in 5 of 6 drift cells.
+  F02's constructed paths take three stages after creation for blank forms
+  and two for copies, but the preparation stage is one authored compound
+  edit, never shown as production operator steps.
 
 **Fixture family (fixed before any operator changes).** Nine starting forms,
 each frozen with its genome, creation edit and Task/battery reading before
@@ -82,7 +79,7 @@ qualification, never chosen for an observed outcome:
 
 The inline detour is what production creates most often (T11.F18) and the
 only form whose neutral steps run under execution; the others are neutral by
-non-dispatch until their activating edit.
+non-dispatch until activation.
 
 **Path contract.** A path is an ordered list of at most **six** production
 events after the starting form, each one call of `TopologyMutator`,
@@ -102,27 +99,33 @@ subject task-dead. The last step is exactly one connection or parameter edit
 edge, weight, param or action-slot edit; a VM instruction, raw-field or
 delete edit) after which the module is dispatched, its bypass loses at least
 1/8, and the active task score is at least 1/8 above the starting form's. A
-seed is chosen from a range of at most 10,000 recorded in the test; exhausting
-the range is not evidence of a missing transition.
+seed is found by a one-off search of at most 1,000,000 seeds per step, recorded
+in the readings with the odds the operator's draws imply; only the pinned seed
+replays in the maintained test. Exhausting the range is not evidence of a
+missing transition.
 
 **Missing transition.** A path step is missing when the genome delta it needs
 is one that no production operator can produce from the preceding genome:
 shown by enumerating the operator's applicable sites (the F03 predicate and
 the operator's own site enumeration) and citing the documented range of each
 draw it makes, recorded as the operator, the site or range it lacks and the
-enumeration that proves it. A repair extends that operator's site set or
-draw, extending the predicate in the same change, with a property test that
-the extension is function-preserving wherever a path uses it as a neutral
-step plus the F03 invariants 1–3 for the extended predicate. A repair that
+enumeration that proves it. A transition is also missing in practice when
+the operator draws a field over values the runtime decodes to nothing
+(`PushAction.action_type` as a full `u8` where `decode_world_action` admits
+0..=4): the repair draws from the decodable range only, leaving existing
+out-of-range genome values and the raw-field unit step unchanged. A repair
+aligns that operator's site set or draw with the values it admits, extending
+the predicate in the same change, with a property test that the change is
+function-preserving wherever a path uses it as a neutral step plus the F03
+invariants 1–3 for the extended predicate. A repair that
 would need a new operator, a template, or a change to weights or bias is out
 of scope and is reported, not built.
 
 **Growth gap.** A form whose shortest complete path exceeds six events is not
-missing a transition; its shortest path, its length and the step that
-lengthens it are recorded in the readings and it fails no criterion below.
-Copy and split forms are expected to qualify in at most three events; one
-that exceeds six with no missing transition is a blocker for the user's
-decision, not a repair.
+missing a transition; its path, length and lengthening step are recorded in
+the readings and it fails no criterion below. Copy and split forms are
+expected to qualify in at most three; one that exceeds six with no missing
+transition is a blocker for the user's decision, not a repair.
 
 **Regression coverage.** Every qualified path is a maintained test in
 `crates/v3-core/src/neighborhood/recruitment_paths/` replaying each step
@@ -133,11 +136,11 @@ simulation never depend on observation types.
 
 **Measured, not preserved.** With a repair: applied mixes, RNG consumption
 per event, every evolved trajectory after the first affected birth, drift,
-neighborhood and in-report experiment readings; cross-process determinism
-(`tests/reproducibility.rs`) and the gate two-run check still hold, and a
-pinned expectation that encoded the old draw is re-pinned with its reason.
-Without one, every simulation counter and observation reading in both
-profiles equals the previous closure's exactly; a difference is a defect.
+neighborhood and experiment readings; cross-process determinism
+(`tests/reproducibility.rs`) and the gate two-run check still hold; a pinned
+expectation that encoded the old draw is re-pinned with its reason. Without
+one, every simulation counter and observation reading equals the previous
+closure's exactly.
 
 **Reference.** A repair updates the operator's paragraph in
 `docs/reference/v3-mutation-spec.md` §3 and, for a Graph surface change,
@@ -145,31 +148,40 @@ profiles equals the previous closure's exactly; a difference is a defect.
 
 ## Implementation Tasks
 
-- [ ] Freeze the nine starting forms and add the seed-selected step harness
-      beside `fixtures.rs`, reusing `ConstructionStage`, `GenomeDelta`,
-      `evaluate` and `static_successor_bypass`.
-- [ ] Qualify each form: record the shortest path found, per-step readings,
+- [x] Freeze the nine starting forms and add the seed-selected step harness
+      beside `fixtures.rs` (`recruitment_paths/qualification.rs`), reusing
+      `ConstructionStage`, `GenomeDelta`, `evaluate` and
+      `static_successor_bypass`.
+- [x] Qualify each form: record the shortest path found, per-step readings,
       and every missing transition or growth gap in the readings.
-- [ ] For each missing transition, TDD the repair in the existing operator:
+- [x] For each missing transition, TDD the repair in the existing operator:
       failing path test first, predicate extension, property tests, reference
       update; run `cargo test -p v3-core --test viability` first when production
-      code changes.
-- [ ] Turn every qualified path into the maintained regression tests above.
+      code changes. None found: every needed transition is inside an existing
+      operator's site set and draw range (readings).
+- [x] Turn every qualified path into the maintained regression tests above.
 - [ ] `cargo check --workspace --all-targets`, `cargo clippy`, `cargo fmt`,
       `make roadmap-check`; update `docs/progress.md`,
       `docs/progress/benchmark-series.json` and the owning row at closure.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core recruitment_paths` and
-      `cargo test -p v3-core --test recruitment_paths` -> every qualified path
-      replays and its per-step facts hold; path table per form (operators,
-      seeds, length, neutral mechanism, gap or repair) in
+- [x] `cargo test -p v3-core recruitment_paths` (ok: 25 lib, 3 integration,
+      0 failed) and `cargo test -p v3-core --test recruitment_paths` (ok, 3
+      passed) -> every qualified path replays through its production operator
+      and `GenomeDelta::apply`, and its per-step facts hold; six of nine forms
+      qualify (copies and split in 2 events, unprepared copies and the Graph
+      detour in 6), the Graph blank is a complete 7-event growth gap, and the
+      VM blank and VM detour exhaust the seed range on draws that are rare, not
+      missing; path table per form (operators, seeds, length, neutral
+      mechanism, gap or repair) in
       [readings](../../progress/readings/t13-f05-function-preserving-module-recruitment.md).
-- [ ] Production changed: `cargo test -p v3-core --test viability` first,
-      then `cargo test -p v3-core`, `--test reproducibility`, `cargo test -p
-      v3-cli` -> pass, re-pins listed in the readings. Unchanged: say so,
-      with the diff's file list.
+- [x] Production unchanged: no operator, draw or RNG consumption changed. The
+      diff touches `crates/v3-core/src/neighborhood/recruitment_paths/{mod.rs,
+      fixtures.rs, qualification.rs, tests.rs}`, `crates/v3-core/tests/recruitment_paths.rs`,
+      `crates/v3-core/src/mutation/engine/mod.rs` (four `*_operator_key`
+      functions made `pub(crate)`, no behavior change), this spec and the
+      readings.
 - [ ] `make check` on the final feature code -> tested commit recorded below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` -> summary line, run mode,
       output path and every survivor resolved in the closure record below.
@@ -222,6 +234,7 @@ below 0.005 do not extend here, so such a reading is escalated.
 | --- | --- |
 | Qualified path length per form | Copy and split forms at most 3 events; blank and inline forms recorded, growth gaps named. Deterministic, not a floor. |
 | Six normalized simulation counters, wall/creature-tick | No operator repaired: identical to the previous closure. Repaired: no predeclared direction, inside the flags. |
+| Founder neighborhood: `VmInstructionMutation` silent share, per-birth silent and dead fractions | The `PushAction` draw repair makes inserted pushes decode 5/5 instead of 5/256, so that operator's silent share falls by at most its `PushAction` share of inserts (about 1/41); per-birth silent and dead stay within the T11 floors (d) at most 5% dead, (e) at least 60% silent. Justified as a draw alignment; no other component is expected to move. |
 | Drift changed / all births at depths 1,000 and 2,000 | Floors 0.0015 and 0.005 apply. Without a repair the readings equal T13.F04's (7/9/7 per 2,000, below the floor) and are escalated as such; with one, expected to hold or rise. |
 | T13.F02 in-report experiment fractions (blank, copy, split, unprepared arms) | Identical without a repair; move with one, reported as consequences, no floor. |
 | T13.F01 rungs and Graph/VM contributing counts | Same rule: identical or measured consequence, no floor. |
@@ -254,3 +267,10 @@ below 0.005 do not extend here, so such a reading is escalated.
 - Decision: Module identity and usefulness are T13.F02's (one mesh node,
   `static_successor_bypass`, 1/8 margin); intra-module split and copy
   operators are path steps, not separately scored modules.
+- Decision: 2026-09-13, build-pass escalation. A path's node draw may use the
+  uniform `TargetSets::new(&reachable, &[]).selector(0.0, 0.0)` F02 used:
+  since T13.F03 the biases only reweight the applicable set, so they change
+  no path's existence. `graph_blank` and `vm_blank` at seven events are
+  growth gaps, not failures. The full-`u8` `PushAction.action_type` draw is a
+  transition missing in practice and is repaired as above; a rare but
+  well-formed draw (jump offset, meta slot) is met by the larger seed search.
