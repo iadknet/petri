@@ -110,7 +110,7 @@ fn sites(genome: &CreatureGenome) -> MutableSites {
     sites
 }
 
-fn cue(task: Task) -> InputReference {
+pub(super) fn cue(task: Task) -> InputReference {
     InputReference::World(match task {
         Task::A => WorldInputKey::FoodHere {
             type_idx: OrdinaryFoodTypeId::default(),

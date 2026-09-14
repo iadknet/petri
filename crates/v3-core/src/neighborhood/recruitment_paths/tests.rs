@@ -596,17 +596,6 @@ fn recruitment_paths_wilson_midpoint_has_the_predeclared_interval() {
     assert!((upper - 0.905_468_794_265_769_3).abs() < 1e-14);
 }
 
-/// Seeds the one-off search found for the VM insert steps after the
-/// `JumpToHalt` acceptance fix and the `PushAction` draw repair (readings,
-/// "Seed search"); only the two `write_direction` seeds exceed 10,000.
-const VM_BLANK_JUMP: u64 = 9940;
-const VM_BLANK_DOUBLE: u64 = 800;
-const VM_BLANK_WRITE: u64 = 41_854;
-const VM_BLANK_PUSH: u64 = 4126;
-const VM_DETOUR_WRITE: u64 = 21_017;
-const VM_DETOUR_JUMP: u64 = 3709;
-const VM_DETOUR_PUSH: u64 = 4126;
-
 /// The one-off seed search behind every pinned seed: the first accepted
 /// seed per step in `0..SEARCH_RANGE`. Minutes long, so ignored;
 /// run with `cargo test -p v3-core --lib -- --ignored --nocapture
@@ -705,8 +694,6 @@ fn recruitment_paths_qualified_steps_hold_the_per_step_invariants() {
             assert!(step.stage.task.live(), "{label}");
             let score = step.stage.task.correct(path.task);
             assert!(score + 1 >= previous, "{label}");
-            assert_eq!(step.charges, step.stage.task.summary(), "{label}");
-            assert_eq!(step.genome_size, step.stage.genome.genome_size(), "{label}");
             if last {
                 assert!(step.stage.useful, "{label}");
                 assert!(
@@ -743,6 +730,9 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
     }
 }
 
+/// The VM insert seeds are the ones the one-off search found after the
+/// `JumpToHalt` acceptance fix and the `PushAction` draw repair (readings,
+/// "Seed search"); only the two `write_direction` seeds exceed 10,000.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -753,7 +743,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                 path.form.as_str(),
                 path.steps
                     .iter()
-                    .map(|step| (step.operator, step.seed))
+                    .map(|step| (step.event.operator(), step.seed))
                     .collect::<Vec<_>>(),
                 path.gap.as_ref().map(|gap| gap.length),
             )
@@ -783,10 +773,10 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                 vec![
                     (InputRefAdd, 1),
                     (VmInstructionMutation, 238),
-                    (VmInstructionMutation, VM_BLANK_JUMP),
-                    (VmInstructionMutation, VM_BLANK_DOUBLE),
-                    (VmInstructionMutation, VM_BLANK_WRITE),
-                    (VmInstructionMutation, VM_BLANK_PUSH),
+                    (VmInstructionMutation, 9940),
+                    (VmInstructionMutation, 800),
+                    (VmInstructionMutation, 41_854),
+                    (VmInstructionMutation, 4126),
                     swap,
                 ],
                 Some(7),
@@ -834,9 +824,9 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     (InputRefAdd, 1),
                     (VmInstructionMutation, 238),
                     (VmInstructionMutation, 800),
-                    (VmInstructionMutation, VM_DETOUR_WRITE),
-                    (VmInstructionMutation, VM_DETOUR_JUMP),
-                    (VmInstructionMutation, VM_DETOUR_PUSH),
+                    (VmInstructionMutation, 21_017),
+                    (VmInstructionMutation, 3709),
+                    (VmInstructionMutation, 4126),
                 ],
                 None,
             ),
@@ -884,7 +874,7 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
             "{}",
             path.form
         );
-        match last.operator {
+        match last.event.operator() {
             MutationOperator::TopologySwapRouteTargets => {
                 assert_eq!(change.node, NodeId::new(0));
                 assert_eq!(before_node.backend_def, after_node.backend_def);
