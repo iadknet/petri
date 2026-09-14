@@ -221,8 +221,8 @@ VM structural-edit contract:
   feasible moves only: a program in which some read or write uses the
   register a shrink would remove can still grow, and grows instead of
   skipping. A def with neither move available — a width outside 1..=32, or
-  width 1 or 32 with the other direction blocked — is not an applicable
-  target.
+  width 32 with the shrink blocked (growth is never blocked at width 1) —
+  is not an applicable target.
 
 ### Node-type evolvability contract
 

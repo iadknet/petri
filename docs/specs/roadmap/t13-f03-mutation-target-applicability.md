@@ -141,7 +141,8 @@ or world change is involved.
 - [x] Benchmark summaries stored at
       `docs/progress/features/t13-f03-mutation-target-applicability.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
-      series entries point to the summaries, no full report staged. Gate:
+      series entries point to the summaries from the closing commit, no full
+      report staged. Gate:
       exit 0, `comparison.severe=false`, all counters `ok`. **Goal:
       `comparison.severe=true`** — `plasticity_updates` +100.068% vs epoch
       `t12-f04-baseline-world-set-goal.json` (severe), +42.006% vs previous
@@ -253,6 +254,11 @@ T13.F04/F05, not a requirement widened into this feature.
   applicable set; whether a bias over executed *applicable* modules or the
   T13.F04/F05 activation and recruitment paths should absorb this is a track
   decision, not a T13.F03 change.
+- Deferred: Review P3 — `has_raw_field_site`
+  (`crates/v3-core/src/mutation/graph/operators.rs`) evaluates the allocating
+  `valid_edge_field_moves` per edge on a module with no parameterized compute
+  node; a `bool` twin would avoid the allocation. Cost measured `ok` in both
+  profiles; not needed for this feature.
 - Decision: The applicability predicate is the single source of truth for an
   operator's sites on a node; T13.F04/F05 extend these predicates for any
   operator they add and never reintroduce a select-then-fail path.
