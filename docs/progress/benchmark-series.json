@@ -37,7 +37,8 @@
       "docs/progress/features/t13-f05-function-preserving-module-recruitment.json",
       "docs/progress/features/t13-f06-recruitment-and-retention-qualification.json",
       "docs/progress/features/t14-f12-neighborhood-read-of-selected-genomes.json",
-      "docs/progress/features/t11-f19-per-unit-mutation-supply.json"
+      "docs/progress/features/t11-f19-per-unit-mutation-supply.json",
+      "docs/progress/features/t03-f11-genome-replication-cost.json"
     ]
   },
   "goal": {
@@ -95,7 +96,8 @@
       "docs/progress/features/t13-f05-function-preserving-module-recruitment-goal.json",
       "docs/progress/features/t13-f06-recruitment-and-retention-qualification-goal.json",
       "docs/progress/features/t14-f12-neighborhood-read-of-selected-genomes-goal.json",
-      "docs/progress/features/t11-f19-per-unit-mutation-supply-goal.json"
+      "docs/progress/features/t11-f19-per-unit-mutation-supply-goal.json",
+      "docs/progress/features/t03-f11-genome-replication-cost-goal.json"
     ]
   }
 }
