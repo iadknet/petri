@@ -92,7 +92,7 @@ Fixed design, decided before implementation:
 | Cache | Reads `cached_genome_size` from `CreatureState`, the field Step 13 already hands to the child. No new cached field. |
 | Frontend | `LifecycleEnergyConfig` gains the field; `EnergyLifecycleSection.tsx` gains one row beside "Carry Cost / Unit" (label "Replication Cost / Unit", min 0, max 1, step 0.001, default 0.1, tooltip naming the per-birth multiplier above the founder's 111 units); `test/fixtures.ts` and the `ControlBar.test.tsx` fixture carry it. |
 | Reference docs | `v3-runtime-config-spec.md` Section 4 gains the row, a "Genome replication cost" note (formula, anchor, site, composition with the age and complexity multipliers, charged before the energy gates), and the reproduction-transfer sequencing step 2 names the factor; `v3-reproduction-spec.md` step 5 names it. |
-| Determinism | Every charged attempt by a parent above 111 units moves that parent's energy, so the gate and goal `deterministic` blocks differ from every prior report; the founder neighborhood, drift-walk, and `recruitment_paths` blocks run no reproduction action and are predeclared identical to T11.F19's. The new field enters every `config_digest`, so the goal recipes' digests in `crates/v3-cli/tests/bench_artifacts.rs` are re-pinned and the comparator reports `inputs_changed`, comparable. The short-run identity hash in `crates/v3-core/tests/baseline_worlds.rs` moves only if that run contains a charged attempt by a parent above 111 units; if it moves it is re-pinned once after two runs agree, the T11.F19 procedure. |
+| Determinism | Every charged attempt by a parent above 111 units moves that parent's energy, so the gate and goal `deterministic` blocks differ from every prior report; the founder neighborhood, drift-walk, and `recruitment_paths` blocks run no reproduction action and are predeclared identical to T11.F19's. The new field enters every `config_digest`, so the goal recipes' digests in `crates/v3-cli/tests/bench_artifacts.rs` are re-pinned and the comparator reports `inputs_changed`, comparable. The short-run identity hash in `crates/v3-core/tests/baseline_worlds.rs` moves only if that run contains a charged attempt by a parent above 111 units; if it moves it is re-pinned once after two runs agree, the T11.F19 procedure. The applied-trajectory digest in `crates/v3-core/tests/applied_trajectory.rs` forces 2 to 4 mutation events per birth over 64 ticks, so mutated parents above the anchor reproduce inside it and pay the charge: its digest moves for the same reason and is re-pinned once by the same two-run procedure, with the founder bit-identity check at rate 0.1 against 0.0 as the evidence that the founder is untouched. |
 
 Rate sizing, recorded before any run. The reference genome is the T03.F08
 cost arm's 386 units at generation 177: 275 units above the founder, factor
@@ -122,14 +122,15 @@ cited from the note's Section 4, not re-read here.
 
 ## Implementation Tasks
 
-- [ ] Add `FOUNDER_GENOME_SIZE_UNITS` and extend the founder-size test to pin it.
-- [ ] Add `genome_replication_cost_per_unit` to `EnergyLifecycleConfig` with
+- [x] Add `FOUNDER_GENOME_SIZE_UNITS` and extend the founder-size test to pin it.
+- [x] Add `genome_replication_cost_per_unit` to `EnergyLifecycleConfig` with
       default, serde default, and normalization; add the multiplier and apply it
       at Step 5, with unit tests (founder 1.0, 386 units 28.5, rate 0.0, sizes
       below the anchor) and proptest invariants (factor ≥ 1, non-decreasing in
       size, exactly 1.0 at or below the anchor).
-- [ ] Frontend field, row, fixtures; reference docs; re-pin the recipe digests
-      and, if moved, the short-run identity hash.
+- [x] Frontend field, row, fixtures; reference docs; re-pin the recipe digests
+      and, if moved, the short-run identity hash (it did not move; the
+      `applied_trajectory` digest did and is re-pinned).
 - [ ] Run the paired Orchards run and store its artifacts under
       `docs/progress/sweeps/t03-f11/`.
 
@@ -137,7 +138,7 @@ cited from the note's Section 4, not re-read here.
 
 - [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
       results in [`docs/progress/readings/t03-f11.md`](../../progress/readings/t03-f11.md).
-- [ ] Focused tests: the founder pin, the multiplier unit and property tests,
+- [x] Focused tests: the founder pin, the multiplier unit and property tests,
       a reproduction test showing a parent above the anchor is charged the
       factor and the child receives the unchanged transfer, and a rate-0.0
       identity check -> test names and results in the readings file.

@@ -11,6 +11,12 @@ use super::cgp_founder::build_cgp_founder_graph_with_thresholds;
 
 const DEFAULT_MIN_REPRODUCE_AGE_TICKS: u64 = 20;
 
+/// `genome_size()` of the canonical V3Alpha1 founder. The genome replication
+/// cost (T03.F11) charges only the units above this anchor, so the founder's
+/// reproduce charge is unchanged; `creature::state` tests pin the founder's
+/// measured size to this constant.
+pub const FOUNDER_GENOME_SIZE_UNITS: u32 = 111;
+
 /// Return the canonical v3alpha1 founder genome.
 ///
 /// 2-node mesh: Node 0 (Graph sensor aggregator) -> Node 1 (VM decision emitter).

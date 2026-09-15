@@ -3,6 +3,7 @@ use rand::Rng;
 use super::cgp_reproduction;
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::action_log::ActionLog;
+use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
@@ -33,6 +34,21 @@ fn build_child_plasticity_weights(child_genome: &mut CreatureGenome) -> Vec<Vec<
         }
     }
     result
+}
+
+/// Genome replication cost multiplier on the parent's reproduce charge:
+/// `1 + rate * max(genome_size - FOUNDER_GENOME_SIZE_UNITS, 0)`.
+///
+/// Exactly `1.0` for every genome at or below the founder's size and for
+/// `rate == 0.0`, so the founder's charge is bit-identical to the base charge;
+/// non-decreasing in `genome_size`. Composes multiplicatively with the
+/// complexity and age multipliers of `adjusted_action_cost` (T03.F11).
+#[inline]
+#[must_use]
+pub(crate) fn genome_replication_cost_multiplier(rate: f32, genome_size: u32) -> f32 {
+    let units_above_founder = genome_size.saturating_sub(FOUNDER_GENOME_SIZE_UNITS);
+    // u32 -> f32 is exact for every genome size that fits in memory.
+    1.0 + rate * units_above_founder as f32
 }
 
 /// Result of an attempted reproduction action.
@@ -147,12 +163,16 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedAgeConstraints;
     }
 
-    // Step 5: Deduct reproduce_cost from parent (scaled by genome complexity and age).
+    // Step 5: Deduct reproduce_cost from parent (scaled by genome complexity,
+    // age, and the genome replication cost on units above the founder's size).
     let before = sim.creatures[parent_id].energy;
     sim.creatures[parent_id].energy -= sim.config.energy.adjusted_action_cost(
         sim.config.energy.costs.reproduce_cost,
         sim.creatures[parent_id].cached_complexity,
         sim.creatures[parent_id].age,
+    ) * genome_replication_cost_multiplier(
+        sim.config.energy.lifecycle.genome_replication_cost_per_unit,
+        sim.creatures[parent_id].cached_genome_size,
     );
     sim.stats.energy_flows.action_charges.reproduce += sim.creatures[parent_id].observe_energy(
         before,
@@ -458,6 +478,68 @@ mod tests {
                 "generation {} caches a stale genome size",
                 creature.generation
             );
+        }
+    }
+
+    // The multiplier's identity cases are exact products of `1.0 + rate * 0.0`
+    // (or `0.0 * n`), so `==` is the intended bit-exact check there.
+    #[test]
+    fn replication_multiplier_is_exactly_one_for_the_founder() {
+        assert_eq!(
+            genome_replication_cost_multiplier(0.1, FOUNDER_GENOME_SIZE_UNITS),
+            1.0
+        );
+    }
+
+    #[test]
+    fn replication_multiplier_is_exactly_one_below_the_founder_anchor() {
+        for size in [0, 1, 7, 110] {
+            assert_eq!(genome_replication_cost_multiplier(0.1, size), 1.0);
+        }
+    }
+
+    #[test]
+    fn replication_multiplier_is_exactly_one_at_rate_zero() {
+        for size in [0, 111, 386, 10_000] {
+            assert_eq!(genome_replication_cost_multiplier(0.0, size), 1.0);
+        }
+    }
+
+    #[test]
+    fn replication_multiplier_charges_the_reference_genome_28_5_times() {
+        // The T03.F08 cost arm's 386-unit genome: 275 units above the founder.
+        let factor = genome_replication_cost_multiplier(0.1, 386);
+        assert!((factor - 28.5).abs() < 1e-4, "factor {factor}");
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn replication_multiplier_is_at_least_one(
+            rate in 0.0f32..10.0,
+            size in proptest::prelude::any::<u32>(),
+        ) {
+            proptest::prop_assert!(genome_replication_cost_multiplier(rate, size) >= 1.0);
+        }
+
+        #[test]
+        fn replication_multiplier_is_non_decreasing_in_size(
+            rate in 0.0f32..10.0,
+            a in proptest::prelude::any::<u32>(),
+            b in proptest::prelude::any::<u32>(),
+        ) {
+            let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
+            proptest::prop_assert!(
+                genome_replication_cost_multiplier(rate, lo)
+                    <= genome_replication_cost_multiplier(rate, hi)
+            );
+        }
+
+        #[test]
+        fn replication_multiplier_is_exactly_one_at_or_below_the_anchor(
+            rate in 0.0f32..10.0,
+            size in 0u32..=FOUNDER_GENOME_SIZE_UNITS,
+        ) {
+            proptest::prop_assert_eq!(genome_replication_cost_multiplier(rate, size), 1.0);
         }
     }
 
