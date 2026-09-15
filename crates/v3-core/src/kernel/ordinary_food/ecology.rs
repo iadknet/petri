@@ -19,6 +19,11 @@ pub struct FoodTypeTelemetry {
     pub type_idx: OrdinaryFoodTypeId,
     pub occupied_cells: u32,
     pub total_density: f32,
+    /// Mean grazing modifier over passable cells after this pass's recovery
+    /// step; 1.0 while grazing is disabled.
+    pub mean_grazing_modifier: f32,
+    /// Passable cells whose grazing modifier is below 1.0 after recovery.
+    pub grazed_cells: u32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -28,6 +33,8 @@ pub struct FoodGrowthSummary {
     pub growth_suppressed_by_occupancy_depletion: f32,
     pub cells_with_type_inhibition: u32,
     pub growth_suppressed_by_type_inhibition: f32,
+    /// Non-barrier cells: the denominator of each type's grazed-cell share.
+    pub passable_cells: u32,
     pub per_type: Vec<FoodTypeTelemetry>,
 }
 
@@ -195,9 +202,13 @@ pub(super) fn apply_config_transition(
     let previous_max_density = current_shared.max_density.max(0.0);
     let reset_depletion =
         current_shared.occupancy_depletion.enabled != next.shared.occupancy_depletion.enabled;
+    let reset_grazing = current_shared.grazing.enabled != next.shared.grazing.enabled;
     *current_shared = next.shared.clone();
     if reset_depletion || catalog_changed {
         occupancy_depletion.reset();
+    }
+    if reset_grazing && !catalog_changed {
+        state.grazing_mut().reset();
     }
     if catalog_changed {
         state.clear_density();
@@ -221,6 +232,7 @@ pub(super) fn seed_density(
 
     state.clear_density();
     occupancy_depletion.reset();
+    state.grazing_mut().reset();
 
     let width = state.width();
     let height = state.height();
@@ -331,6 +343,12 @@ pub(super) fn grow<T: Clone>(
 
     let depletion_summary =
         occupancy_depletion.recover_and_deposit(barriers, occupancy, &shared.occupancy_depletion);
+    // Grazing heals before any fertility read, on every passable cell: the
+    // grazed cell is empty by construction and the growth loop below skips
+    // empty cells.
+    let (grazing_summaries, passable_cells) =
+        state.grazing_mut().recover(barriers, &shared.grazing);
+    let grazing_enabled = shared.grazing.enabled;
 
     let max_density = shared.max_density.max(0.0);
     if max_density <= 0.0 || catalog.is_empty() {
@@ -364,6 +382,8 @@ pub(super) fn grow<T: Clone>(
             type_idx: entry.id,
             occupied_cells: 0,
             total_density: 0.0,
+            mean_grazing_modifier: 1.0,
+            grazed_cells: 0,
         })
         .collect();
 
@@ -405,14 +425,17 @@ pub(super) fn grow<T: Clone>(
                     continue;
                 }
 
-                let base_cell_fertility = if full_config.fertility.enabled {
-                    state
-                        .fertility_grid(type_idx)
-                        .map(|grid| fertility::map_fertility(*grid.get(x, y), eff_min, eff_max))
-                        .unwrap_or(1.0)
-                } else {
-                    1.0
-                };
+                let base_cell_fertility =
+                    if full_config.fertility.enabled {
+                        state
+                            .fertility_grid(type_idx)
+                            .map(|grid| fertility::map_fertility(*grid.get(x, y), eff_min, eff_max))
+                            .unwrap_or(1.0)
+                    } else {
+                        1.0
+                    } * state
+                        .grazing()
+                        .multiplier_at(x, y, type_idx, grazing_enabled);
                 let cell_inhibition_penalty =
                     inhibition_penalty(inhibition_weighted_sums[idx], source, type_inhibitor);
                 let cell_fertility = (base_cell_fertility - cell_inhibition_penalty).max(0.0);
@@ -466,7 +489,12 @@ pub(super) fn grow<T: Clone>(
                         .unwrap_or(1.0)
                 } else {
                     1.0
-                };
+                } * state.grazing().multiplier_at(
+                    target.x,
+                    target.y,
+                    type_idx,
+                    grazing_enabled,
+                );
                 let target_source = state.food_at_type(target, type_idx).clamp(0.0, max_density);
                 let neighbor_penalty = inhibition_penalty(
                     inhibition_weighted_sums[target_idx],
@@ -503,14 +531,17 @@ pub(super) fn grow<T: Clone>(
                     continue;
                 }
 
-                let base_cell_fertility = if full_config.fertility.enabled {
-                    state
-                        .fertility_grid(type_idx)
-                        .map(|grid| fertility::map_fertility(*grid.get(x, y), eff_min, eff_max))
-                        .unwrap_or(1.0)
-                } else {
-                    1.0
-                };
+                let base_cell_fertility =
+                    if full_config.fertility.enabled {
+                        state
+                            .fertility_grid(type_idx)
+                            .map(|grid| fertility::map_fertility(*grid.get(x, y), eff_min, eff_max))
+                            .unwrap_or(1.0)
+                    } else {
+                        1.0
+                    } * state
+                        .grazing()
+                        .multiplier_at(x, y, type_idx, grazing_enabled);
                 let recovery_source = state
                     .food_at_type(Position::new(x, y), type_idx)
                     .clamp(0.0, max_density);
@@ -535,10 +566,16 @@ pub(super) fn grow<T: Clone>(
             }
         }
 
+        let grazing_summary = grazing_summaries
+            .get(usize::from(type_idx.get()))
+            .copied()
+            .unwrap_or_default();
         let mut telemetry = FoodTypeTelemetry {
             type_idx,
             occupied_cells: 0,
             total_density: 0.0,
+            mean_grazing_modifier: grazing_summary.mean_modifier,
+            grazed_cells: grazing_summary.grazed_cells,
         };
         for y in 0..state.height() {
             for x in 0..state.width() {
@@ -562,6 +599,7 @@ pub(super) fn grow<T: Clone>(
         growth_suppressed_by_occupancy_depletion: suppressed_by_occupancy_total,
         cells_with_type_inhibition: inhibited_cells,
         growth_suppressed_by_type_inhibition: suppressed_by_inhibition_total,
+        passable_cells,
         per_type,
     }
 }
@@ -922,5 +960,260 @@ mod tests {
         );
 
         assert!(state.food_at_type(pos, OrdinaryFoodTypeId::new(0)) > 0.0);
+    }
+
+    /// One growth pass on a `Bounded` 2x1 world with a dense source at (0,0):
+    /// the only passable neighbor is (1,0), so the spread target is fixed and
+    /// the delta landing there is measurable.
+    fn spread_target_delta_with_grazing(
+        grazing: crate::config::GrazingConfig,
+        bites_on_target: u32,
+    ) -> (f32, FoodGrowthSummary) {
+        let mut config = FoodConfig::default();
+        config.fertility.enabled = false;
+        config.shared.growth_rate = 0.5;
+        config.shared.spread_density_ratio = 1.0;
+        config.shared.spread_threshold_ratio = 0.0;
+        config.shared.recovery_spawn_rate = 0.0;
+        config.shared.recovery_floor_ratio = 0.0;
+        config.shared.max_density = 10.0;
+        config.shared.occupancy_depletion.enabled = false;
+        config.shared.grazing = grazing;
+        config.types = vec![crate::config::FoodTypeConfig {
+            growth_inhibitor: 0.0,
+            ..crate::config::FoodTypeConfig::default()
+        }];
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let mut state = OrdinaryFoodState::new(2, 1, catalog.len());
+        let source = Position::new(0, 0);
+        let target = Position::new(1, 0);
+        let type_idx = OrdinaryFoodTypeId::new(0);
+        state.set_food_type_density(source, type_idx, 1.0);
+        for _ in 0..bites_on_target {
+            state.set_food_type_density(target, type_idx, 1.0);
+            let _ = state.consume_type(target, type_idx, &config.shared.grazing);
+        }
+        let mut occupancy_depletion = OccupancyDepletionLayer::new(2, 1);
+        let barriers = barrier_grid(2, 1);
+        let occupancy = occupancy_grid::<()>(2, 1);
+        let mut rng = StdRng::seed_from_u64(5);
+        let summary = grow(
+            &mut state,
+            &catalog,
+            &config.shared,
+            &config,
+            &mut occupancy_depletion,
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &barriers,
+            &occupancy,
+            WorldEdgeMode::Bounded,
+            0,
+            &mut rng,
+        );
+        (state.food_at_type(target, type_idx), summary)
+    }
+
+    #[test]
+    fn bitten_cell_recolonizes_at_factor_of_the_unbitten_rate() {
+        // recovery_ticks large enough that the one recovery step is negligible
+        // against the bite while the cell still reads as grazed.
+        let grazing = crate::config::GrazingConfig {
+            recovery_ticks: 1_000_000,
+            ..crate::config::GrazingConfig::default()
+        };
+        let (unbitten, _) = spread_target_delta_with_grazing(grazing.clone(), 0);
+        let (bitten, summary) = spread_target_delta_with_grazing(grazing, 1);
+        assert!(unbitten > 0.0);
+        assert!(
+            (bitten / unbitten - 0.5).abs() < 1e-4,
+            "{bitten} vs {unbitten}"
+        );
+        assert_eq!(summary.per_type[0].grazed_cells, 1);
+        assert!(summary.per_type[0].mean_grazing_modifier < 1.0);
+        assert_eq!(summary.passable_cells, 2);
+    }
+
+    #[test]
+    fn floored_cell_recolonizes_at_floor() {
+        let grazing = crate::config::GrazingConfig {
+            recovery_ticks: 1_000_000,
+            ..crate::config::GrazingConfig::default()
+        };
+        let (unbitten, _) = spread_target_delta_with_grazing(grazing.clone(), 0);
+        let (floored, _) = spread_target_delta_with_grazing(grazing, 9);
+        assert!(
+            (floored / unbitten - 0.05).abs() < 1e-4,
+            "{floored} vs {unbitten}"
+        );
+    }
+
+    #[test]
+    fn empty_grazed_cell_recovers_each_growth_pass() {
+        let grazing = crate::config::GrazingConfig {
+            recovery_ticks: 4,
+            ..crate::config::GrazingConfig::default()
+        };
+        let mut config = FoodConfig::default();
+        config.fertility.enabled = false;
+        config.shared.spread_density_ratio = 0.0;
+        config.shared.spread_threshold_ratio = 1.0;
+        config.shared.recovery_spawn_rate = 0.0;
+        config.shared.occupancy_depletion.enabled = false;
+        config.shared.grazing = grazing;
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let mut state = OrdinaryFoodState::new(1, 1, catalog.len());
+        let pos = Position::new(0, 0);
+        let type_idx = OrdinaryFoodTypeId::new(0);
+        state.set_food_type_density(pos, type_idx, 1.0);
+        assert_eq!(
+            state.consume_type(pos, type_idx, &config.shared.grazing),
+            1.0
+        );
+        assert_eq!(state.grazing().modifier_at(0, 0, type_idx), 0.5);
+        let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
+        let barriers = barrier_grid(1, 1);
+        let occupancy = occupancy_grid::<()>(1, 1);
+        let mut rng = StdRng::seed_from_u64(1);
+        let mut readings = Vec::new();
+        for tick in 0..3 {
+            let summary = grow(
+                &mut state,
+                &catalog,
+                &config.shared,
+                &config,
+                &mut occupancy_depletion,
+                &mut Vec::new(),
+                &mut Vec::new(),
+                &mut Vec::new(),
+                &barriers,
+                &occupancy,
+                WorldEdgeMode::Wrap,
+                tick,
+                &mut rng,
+            );
+            readings.push((
+                state.grazing().modifier_at(0, 0, type_idx),
+                summary.per_type[0].mean_grazing_modifier,
+                summary.per_type[0].grazed_cells,
+                summary.passable_cells,
+            ));
+        }
+        // The cell stayed empty (no growth source) yet recovered by 0.25 per pass.
+        assert_eq!(state.food_at_type(pos, type_idx), 0.0);
+        assert_eq!(
+            readings,
+            vec![(0.75, 0.75, 1, 1), (1.0, 1.0, 0, 1), (1.0, 1.0, 0, 1)]
+        );
+    }
+
+    #[test]
+    fn disabled_grazing_reads_one_and_re_enabling_starts_from_one() {
+        let disabled = crate::config::GrazingConfig {
+            enabled: false,
+            ..crate::config::GrazingConfig::default()
+        };
+        let (unbitten, _) = spread_target_delta_with_grazing(disabled.clone(), 0);
+        let (bitten, summary) = spread_target_delta_with_grazing(disabled, 3);
+        assert_eq!(bitten, unbitten);
+        assert_eq!(summary.per_type[0].mean_grazing_modifier, 1.0);
+        assert_eq!(summary.per_type[0].grazed_cells, 0);
+
+        let mut current = FoodConfig::default();
+        let catalog = OrdinaryFoodCatalog::new(&current);
+        let mut state = OrdinaryFoodState::new(1, 1, catalog.len());
+        let pos = Position::new(0, 0);
+        let type_idx = OrdinaryFoodTypeId::new(0);
+        state.set_food_type_density(pos, type_idx, 1.0);
+        let _ = state.consume_type(pos, type_idx, &current.shared.grazing);
+        assert_eq!(state.grazing().modifier_at(0, 0, type_idx), 0.5);
+        let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
+
+        let mut next = current.clone();
+        next.shared.grazing.enabled = false;
+        apply_config_transition(
+            &mut current.shared,
+            &next,
+            &mut state,
+            &mut occupancy_depletion,
+            false,
+        );
+        assert_eq!(state.grazing().modifier_at(0, 0, type_idx), 1.0);
+
+        state.set_food_type_density(pos, type_idx, 1.0);
+        next.shared.grazing.enabled = true;
+        apply_config_transition(
+            &mut current.shared,
+            &next,
+            &mut state,
+            &mut occupancy_depletion,
+            false,
+        );
+        let _ = state.consume_type(pos, type_idx, &current.shared.grazing);
+        assert_eq!(state.grazing().modifier_at(0, 0, type_idx), 0.5);
+
+        // Live edits to factor, floor, and recovery_ticks leave the grid alone.
+        next.shared.grazing.factor = 0.9;
+        next.shared.grazing.floor = 0.7;
+        next.shared.grazing.recovery_ticks = 7;
+        apply_config_transition(
+            &mut current.shared,
+            &next,
+            &mut state,
+            &mut occupancy_depletion,
+            false,
+        );
+        assert_eq!(state.grazing().modifier_at(0, 0, type_idx), 0.5);
+        assert_eq!(current.shared.grazing.recovery_ticks, 7);
+    }
+
+    #[test]
+    fn occupancy_depletion_multiplies_beside_grazing() {
+        let mut config = FoodConfig::default();
+        config.fertility.enabled = false;
+        config.shared.growth_rate = 0.5;
+        config.shared.spread_density_ratio = 0.0;
+        config.shared.spread_threshold_ratio = 1.0;
+        config.shared.recovery_spawn_rate = 0.0;
+        config.shared.recovery_floor_ratio = 0.0;
+        config.shared.max_density = 10.0;
+        config.shared.occupancy_depletion.enabled = true;
+        config.shared.occupancy_depletion.deposit_per_occupied_tick = 1.0;
+        config.shared.grazing.recovery_ticks = 1_000_000;
+        config.types = vec![crate::config::FoodTypeConfig {
+            growth_inhibitor: 0.0,
+            ..crate::config::FoodTypeConfig::default()
+        }];
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let mut state = OrdinaryFoodState::new(1, 1, catalog.len());
+        let pos = Position::new(0, 0);
+        let type_idx = OrdinaryFoodTypeId::new(0);
+        state.set_food_type_density(pos, type_idx, 1.0);
+        let _ = state.consume_type(pos, type_idx, &config.shared.grazing);
+        state.set_food_type_density(pos, type_idx, 1.0);
+        let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
+        let barriers = barrier_grid(1, 1);
+        let occupancy = Grid::new(1, 1, Some(()));
+        let mut rng = StdRng::seed_from_u64(1);
+        grow(
+            &mut state,
+            &catalog,
+            &config.shared,
+            &config,
+            &mut occupancy_depletion,
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &barriers,
+            &occupancy,
+            WorldEdgeMode::Wrap,
+            0,
+            &mut rng,
+        );
+        // local delta = source * rate * grazing (0.5) * occupancy multiplier
+        // (MIN_GROWTH_MULTIPLIER at full depletion).
+        let expected = 1.0 + 1.0 * 0.5 * 0.5 * MIN_GROWTH_MULTIPLIER;
+        assert!((state.food_at_type(pos, type_idx) - expected).abs() < 1e-5);
     }
 }

@@ -227,6 +227,8 @@ fn case_readings_follow_the_case_seed_and_observation() {
                 out_of_bounds: seed * 5,
             });
         observation.fractions.typed_eat_share = vec![six(f64::from(seed as u32) / 50.0)];
+        observation.tracking.grazing_modifier_mean = vec![six(f64::from(seed as u32) / 64.0)];
+        observation.tracking.grazed_cell_share = vec![six(f64::from(seed as u32) / 80.0)];
         observation.fractions.blocked_move_fraction = six(f64::from(seed as u32) / 200.0);
         observation
             .fractions
@@ -286,6 +288,14 @@ fn case_readings_follow_the_case_seed_and_observation() {
         Some(seeded / 100.0)
     );
     assert_eq!(value(second, "typed_eat_share_type_0"), Some(seeded / 50.0));
+    assert_eq!(
+        value(second, "grazing_modifier_mean_type_0"),
+        Some(seeded / 64.0)
+    );
+    assert_eq!(
+        value(second, "grazed_cell_share_type_0"),
+        Some(seeded / 80.0)
+    );
     assert_eq!(value(second, "blocked_move_fraction"), Some(seeded / 200.0));
     assert_eq!(
         value(second, "barrier_blocked_fraction_has_barrier_reader"),

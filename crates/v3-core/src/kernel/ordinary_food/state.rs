@@ -1,6 +1,8 @@
-use crate::config::OrdinaryFoodTypeId;
+use crate::config::{GrazingConfig, OrdinaryFoodTypeId};
 use crate::contracts::Position;
 use crate::kernel::Grid;
+
+use super::grazing::GrazingLayer;
 
 #[derive(Debug)]
 pub struct OrdinaryFoodState {
@@ -8,6 +10,7 @@ pub struct OrdinaryFoodState {
     height: u16,
     density_by_type: Vec<Grid<f32>>,
     fertility_by_type: Vec<Grid<f32>>,
+    grazing: GrazingLayer,
 }
 
 impl OrdinaryFoodState {
@@ -22,6 +25,7 @@ impl OrdinaryFoodState {
             fertility_by_type: (0..type_count)
                 .map(|_| Grid::new(width, height, 0.0))
                 .collect(),
+            grazing: GrazingLayer::new(width, height, type_count),
         }
     }
 
@@ -34,6 +38,16 @@ impl OrdinaryFoodState {
         self.fertility_by_type = (0..type_count)
             .map(|_| Grid::new(width, height, 0.0))
             .collect();
+        self.grazing.resize_type_storage(type_count);
+    }
+
+    #[must_use]
+    pub fn grazing(&self) -> &GrazingLayer {
+        &self.grazing
+    }
+
+    pub fn grazing_mut(&mut self) -> &mut GrazingLayer {
+        &mut self.grazing
     }
 
     #[must_use]
@@ -97,24 +111,43 @@ impl OrdinaryFoodState {
         }
     }
 
+    /// Remove every type's density at the cell; each type that had a positive
+    /// amount is bitten so no caller bypasses the grazing rule.
     #[must_use]
-    pub fn consume_any(&mut self, pos: Position) -> f32 {
+    pub fn consume_any(&mut self, pos: Position, grazing: &GrazingConfig) -> f32 {
         let mut amount = 0.0;
-        for grid in &mut self.density_by_type {
-            amount += *grid.get(pos.x, pos.y);
+        for (type_index, grid) in self.density_by_type.iter_mut().enumerate() {
+            let removed = *grid.get(pos.x, pos.y);
+            if removed <= 0.0 {
+                continue;
+            }
+            amount += removed;
             grid.set(pos.x, pos.y, 0.0);
+            let Ok(type_raw) = u16::try_from(type_index) else {
+                continue;
+            };
+            self.grazing
+                .bite(pos.x, pos.y, OrdinaryFoodTypeId::new(type_raw), grazing);
         }
         amount
     }
 
+    /// Remove one type's density at the cell. A positive removal is one bite;
+    /// an empty cell is not.
     #[must_use]
-    pub fn consume_type(&mut self, pos: Position, type_idx: OrdinaryFoodTypeId) -> f32 {
+    pub fn consume_type(
+        &mut self,
+        pos: Position,
+        type_idx: OrdinaryFoodTypeId,
+        grazing: &GrazingConfig,
+    ) -> f32 {
         let Some(grid) = self.density_by_type.get_mut(usize::from(type_idx.get())) else {
             return 0.0;
         };
         let amount = *grid.get(pos.x, pos.y);
         if amount > 0.0 {
             grid.set(pos.x, pos.y, 0.0);
+            self.grazing.bite(pos.x, pos.y, type_idx, grazing);
         }
         amount
     }
@@ -207,7 +240,7 @@ mod tests {
         state.set_food_type_density(pos(0, 0), OrdinaryFoodTypeId::new(0), 1.0);
         state.set_food_type_density(pos(0, 0), OrdinaryFoodTypeId::new(1), 2.0);
 
-        assert_eq!(state.consume_any(pos(0, 0)), 3.0);
+        assert_eq!(state.consume_any(pos(0, 0), &GrazingConfig::default()), 3.0);
         assert_eq!(state.density_at(pos(0, 0)), 0.0);
         assert_eq!(
             state.food_at_type(pos(0, 0), OrdinaryFoodTypeId::new(0)),
@@ -226,7 +259,11 @@ mod tests {
         state.set_food_type_density(pos(1, 1), OrdinaryFoodTypeId::new(1), 2.5);
 
         assert_eq!(
-            state.consume_type(pos(1, 1), OrdinaryFoodTypeId::new(0)),
+            state.consume_type(
+                pos(1, 1),
+                OrdinaryFoodTypeId::new(0),
+                &GrazingConfig::default()
+            ),
             1.5
         );
         assert_eq!(
@@ -238,6 +275,107 @@ mod tests {
             2.5
         );
         assert_eq!(state.density_at(pos(1, 1)), 2.5);
+    }
+
+    #[test]
+    fn consume_type_bites_only_the_removed_type_and_only_when_positive() {
+        let grazing = GrazingConfig::default();
+        let mut state = OrdinaryFoodState::new(2, 2, 2);
+        state.set_food_type_density(pos(1, 1), OrdinaryFoodTypeId::new(0), 1.5);
+
+        assert_eq!(
+            state.consume_type(pos(1, 1), OrdinaryFoodTypeId::new(0), &grazing),
+            1.5
+        );
+        assert_eq!(
+            state
+                .grazing()
+                .modifier_at(1, 1, OrdinaryFoodTypeId::new(0)),
+            0.5
+        );
+        assert_eq!(
+            state
+                .grazing()
+                .modifier_at(1, 1, OrdinaryFoodTypeId::new(1)),
+            1.0
+        );
+        assert_eq!(
+            state
+                .grazing()
+                .modifier_at(0, 0, OrdinaryFoodTypeId::new(0)),
+            1.0
+        );
+
+        // The cell is empty now: no bite.
+        assert_eq!(
+            state.consume_type(pos(1, 1), OrdinaryFoodTypeId::new(0), &grazing),
+            0.0
+        );
+        assert_eq!(
+            state
+                .grazing()
+                .modifier_at(1, 1, OrdinaryFoodTypeId::new(0)),
+            0.5
+        );
+        assert_eq!(
+            state.consume_type(pos(1, 1), OrdinaryFoodTypeId::new(1), &grazing),
+            0.0
+        );
+        assert_eq!(
+            state
+                .grazing()
+                .modifier_at(1, 1, OrdinaryFoodTypeId::new(1)),
+            1.0
+        );
+    }
+
+    #[test]
+    fn consume_any_bites_each_type_it_removed() {
+        let grazing = GrazingConfig::default();
+        let mut state = OrdinaryFoodState::new(2, 2, 3);
+        state.set_food_type_density(pos(0, 0), OrdinaryFoodTypeId::new(0), 1.0);
+        state.set_food_type_density(pos(0, 0), OrdinaryFoodTypeId::new(2), 2.0);
+
+        assert_eq!(state.consume_any(pos(0, 0), &grazing), 3.0);
+        assert_eq!(
+            state
+                .grazing()
+                .modifier_at(0, 0, OrdinaryFoodTypeId::new(0)),
+            0.5
+        );
+        assert_eq!(
+            state
+                .grazing()
+                .modifier_at(0, 0, OrdinaryFoodTypeId::new(1)),
+            1.0
+        );
+        assert_eq!(
+            state
+                .grazing()
+                .modifier_at(0, 0, OrdinaryFoodTypeId::new(2)),
+            0.5
+        );
+    }
+
+    #[test]
+    fn resize_type_storage_resets_grazing_to_one() {
+        let grazing = GrazingConfig::default();
+        let mut state = OrdinaryFoodState::new(2, 2, 1);
+        state.set_food_type_density(pos(0, 0), OrdinaryFoodTypeId::new(0), 1.0);
+        let _ = state.consume_type(pos(0, 0), OrdinaryFoodTypeId::new(0), &grazing);
+        state.resize_type_storage(2);
+        assert_eq!(
+            state
+                .grazing()
+                .modifier_at(0, 0, OrdinaryFoodTypeId::new(0)),
+            1.0
+        );
+        assert_eq!(
+            state
+                .grazing()
+                .modifier_at(0, 0, OrdinaryFoodTypeId::new(1)),
+            1.0
+        );
     }
 
     #[test]

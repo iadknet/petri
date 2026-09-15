@@ -908,6 +908,93 @@ async fn patch_config_rejects_invalid_food_occupancy_depletion_values() {
     );
 }
 
+// ── 11g2. get_config_includes_food_grazing_defaults ────────────────────────
+
+#[tokio::test]
+async fn get_config_includes_food_grazing_defaults() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    let grazing = &body["config"]["world"]["food"]["shared"]["grazing"];
+    assert!(grazing.is_object(), "missing grazing: {body}");
+    assert_eq!(grazing["enabled"].as_bool(), Some(true));
+    assert_json_f64_close(&grazing["factor"], 0.5);
+    assert_json_f64_close(&grazing["floor"], 0.05);
+    assert_eq!(grazing["recovery_ticks"].as_u64(), Some(1000));
+}
+
+// ── 11g3. patch_config_roundtrips_food_grazing_fields ──────────────────────
+
+#[tokio::test]
+async fn patch_config_roundtrips_food_grazing_fields() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "world": {
+            "food": {
+                "shared": {
+                    "grazing": {
+                        "enabled": false,
+                        "factor": 0.25,
+                        "floor": 0.1,
+                        "recovery_ticks": 250
+                    }
+                }
+            }
+        }
+    }"#;
+
+    let (patch_status, patch_body) =
+        do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(patch_status, StatusCode::OK, "body: {patch_body}");
+    let patched = &patch_body["config"]["world"]["food"]["shared"]["grazing"];
+    assert_eq!(patched["enabled"].as_bool(), Some(false));
+    assert_json_f64_close(&patched["factor"], 0.25);
+    assert_json_f64_close(&patched["floor"], 0.1);
+    assert_eq!(patched["recovery_ticks"].as_u64(), Some(250));
+
+    let (get_status, get_body) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(get_status, StatusCode::OK, "body: {get_body}");
+    let fetched = &get_body["config"]["world"]["food"]["shared"]["grazing"];
+    assert_eq!(fetched["enabled"].as_bool(), Some(false));
+    assert_json_f64_close(&fetched["factor"], 0.25);
+    assert_json_f64_close(&fetched["floor"], 0.1);
+    assert_eq!(fetched["recovery_ticks"].as_u64(), Some(250));
+}
+
+// ── 11g4. patch_config_rejects_invalid_food_grazing_values ─────────────────
+
+#[tokio::test]
+async fn patch_config_rejects_invalid_food_grazing_values() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    for patch in [
+        r#"{"world":{"food":{"shared":{"grazing":{"factor":1.5}}}}}"#,
+        r#"{"world":{"food":{"shared":{"grazing":{"recovery_ticks":0}}}}}"#,
+    ] {
+        let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+        assert_eq!(
+            body["error"]["code"].as_str(),
+            Some("validation_rejected"),
+            "body: {body}"
+        );
+    }
+}
+
 // ── 11h. startup_accepts_founder_profile_and_get_config_roundtrips ─────────
 
 #[tokio::test]

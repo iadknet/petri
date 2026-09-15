@@ -190,6 +190,32 @@ describe("ConfigPanel", () => {
 		});
 	});
 
+	it("supports grazing runtime controls", () => {
+		render(<ConfigPanel />);
+
+		const enabled = screen.getByTestId("config-field-food-grazing-enabled");
+		const factor = screen.getByTestId("config-field-food-grazing-factor");
+		const floor = screen.getByTestId("config-field-food-grazing-floor");
+		const recoveryTicks = screen.getByTestId("config-field-food-grazing-recovery-ticks");
+
+		expect(enabled).toBeChecked();
+		expect(factor).toHaveValue(0.5);
+		expect(floor).toHaveValue(0.05);
+		expect(recoveryTicks).toHaveValue(1000);
+
+		fireEvent.click(enabled);
+		fireEvent.change(factor, { target: { value: "0.25" } });
+		fireEvent.change(floor, { target: { value: "0.1" } });
+		fireEvent.change(recoveryTicks, { target: { value: "250" } });
+
+		expect(useConfigStore.getState().localDraft?.world.food.shared.grazing).toEqual({
+			enabled: false,
+			factor: 0.25,
+			floor: 0.1,
+			recovery_ticks: 250,
+		});
+	});
+
 	it("does not render legacy input auto-connect runtime field", () => {
 		render(<ConfigPanel />);
 		expect(

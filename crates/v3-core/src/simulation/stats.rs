@@ -367,6 +367,13 @@ pub struct SimStats {
     /// [`OrdinaryFoodTypeId`]. Read from the applied growth summary, so it is
     /// post-growth and pre-action for the tick that just ran.
     pub last_tick_food_total_density_by_type: Vec<f32>,
+    /// Mean grazing fertility modifier over passable cells per food type after
+    /// the Phase 0 recovery step, indexed by [`OrdinaryFoodTypeId`]; 1.0 while
+    /// grazing is disabled.
+    pub last_tick_food_grazing_modifier_mean_by_type: Vec<f32>,
+    /// Share of passable cells whose grazing modifier is below 1.0 per food
+    /// type after the Phase 0 recovery step, indexed by [`OrdinaryFoodTypeId`].
+    pub last_tick_food_grazed_cell_share_by_type: Vec<f32>,
 }
 
 const OUTCOME_GENERATION_BUCKET_WIDTH: u64 = 128;
@@ -401,6 +408,8 @@ impl SimStats {
         self.last_tick_food_cells_with_type_inhibition = 0;
         self.last_tick_food_growth_suppressed_by_type_inhibition = 0.0;
         self.last_tick_food_total_density_by_type.clear();
+        self.last_tick_food_grazing_modifier_mean_by_type.clear();
+        self.last_tick_food_grazed_cell_share_by_type.clear();
     }
 
     pub fn record_food_growth_summary(&mut self, summary: FoodGrowthSummary) {
@@ -415,6 +424,22 @@ impl SimStats {
         self.last_tick_food_total_density_by_type.clear();
         self.last_tick_food_total_density_by_type
             .extend(summary.per_type.iter().map(|entry| entry.total_density));
+        self.last_tick_food_grazing_modifier_mean_by_type.clear();
+        self.last_tick_food_grazing_modifier_mean_by_type.extend(
+            summary
+                .per_type
+                .iter()
+                .map(|entry| entry.mean_grazing_modifier),
+        );
+        self.last_tick_food_grazed_cell_share_by_type.clear();
+        self.last_tick_food_grazed_cell_share_by_type
+            .extend(summary.per_type.iter().map(|entry| {
+                if summary.passable_cells == 0 {
+                    0.0
+                } else {
+                    entry.grazed_cells as f32 / summary.passable_cells as f32
+                }
+            }));
     }
 
     #[must_use]
@@ -556,7 +581,23 @@ mod tests {
             growth_suppressed_by_occupancy_depletion: 0.7,
             cells_with_type_inhibition: 2,
             growth_suppressed_by_type_inhibition: 0.4,
-            per_type: vec![],
+            passable_cells: 8,
+            per_type: vec![
+                crate::kernel::ordinary_food::FoodTypeTelemetry {
+                    type_idx: crate::config::OrdinaryFoodTypeId::new(0),
+                    occupied_cells: 4,
+                    total_density: 2.5,
+                    mean_grazing_modifier: 0.75,
+                    grazed_cells: 2,
+                },
+                crate::kernel::ordinary_food::FoodTypeTelemetry {
+                    type_idx: crate::config::OrdinaryFoodTypeId::new(1),
+                    occupied_cells: 0,
+                    total_density: 0.0,
+                    mean_grazing_modifier: 1.0,
+                    grazed_cells: 0,
+                },
+            ],
         });
 
         assert!((stats.last_tick_food_occupancy_depletion_mean - 0.12).abs() < 1e-6);
@@ -564,5 +605,20 @@ mod tests {
         assert!((stats.last_tick_food_growth_suppressed_by_occupancy_depletion - 0.7).abs() < 1e-6);
         assert_eq!(stats.last_tick_food_cells_with_type_inhibition, 2);
         assert!((stats.last_tick_food_growth_suppressed_by_type_inhibition - 0.4).abs() < 1e-6);
+        assert_eq!(stats.last_tick_food_total_density_by_type, vec![2.5, 0.0]);
+        assert_eq!(
+            stats.last_tick_food_grazing_modifier_mean_by_type,
+            vec![0.75, 1.0]
+        );
+        assert_eq!(
+            stats.last_tick_food_grazed_cell_share_by_type,
+            vec![0.25, 0.0]
+        );
+
+        stats.reset_tick_counters();
+        assert!(stats
+            .last_tick_food_grazing_modifier_mean_by_type
+            .is_empty());
+        assert!(stats.last_tick_food_grazed_cell_share_by_type.is_empty());
     }
 }

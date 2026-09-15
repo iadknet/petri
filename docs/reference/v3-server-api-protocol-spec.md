@@ -115,6 +115,12 @@ Request (conceptual v3alpha2 shape):
         "occupancy_depletion": {
           "enabled": true,
           "deposit_per_occupied_tick": 0.08
+        },
+        "grazing": {
+          "enabled": true,
+          "factor": 0.5,
+          "floor": 0.05,
+          "recovery_ticks": 1000
         }
       },
       "types": [
@@ -439,6 +445,12 @@ Response:
           "occupancy_depletion": {
             "enabled": true,
             "deposit_per_occupied_tick": 0.08
+          },
+          "grazing": {
+            "enabled": true,
+            "factor": 0.5,
+            "floor": 0.05,
+            "recovery_ticks": 1000
           }
         },
       "types": [
@@ -527,8 +539,9 @@ Rules:
 - `energy.costs.eat_reward_per_food` is live-editable and applies to types inheriting it (`energy_per_unit` absent/null). Food type `energy_per_unit`, `growth_rate`, `recovery_spawn_rate` overrides and `initial_fertility_only` are startup/restart-only fields; optional/null rates inherit their shared live values and explicit zero overrides.
 - PATCH supports the full canonical keyspace from `GET /config`, including all
   top-level `mutation.*` keys owned by `v3-runtime-config-spec.md`, plus the
-  runtime-editable `world.food.shared.occupancy_depletion.*` keys
-  cross-referenced by `v3-runtime-config-spec.md` and semantically owned by
+  runtime-editable `world.food.shared.occupancy_depletion.*` and
+  `world.food.shared.grazing.*` keys cross-referenced by
+  `v3-runtime-config-spec.md` and semantically owned by
   `v3-world-grid-spec.md`.
 - PATCH uses deep merge: only specified keys are updated; unspecified keys
   retain their existing values at every nesting level.

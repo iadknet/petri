@@ -46,6 +46,7 @@ export interface FoodSharedConfig {
 	recovery_floor_ratio: number;
 	max_density: number;
 	occupancy_depletion: OccupancyDepletionConfig;
+	grazing: GrazingConfig;
 }
 
 export interface FoodTypeConfig {
@@ -94,6 +95,14 @@ export interface AnnealingConfig {
 export interface OccupancyDepletionConfig {
 	enabled: boolean;
 	deposit_per_occupied_tick: number;
+}
+
+/** Grazing recovery and overuse (T02.F04): `world.food.shared.grazing`. */
+export interface GrazingConfig {
+	enabled: boolean;
+	factor: number;
+	floor: number;
+	recovery_ticks: number;
 }
 
 export interface FoodConfig {

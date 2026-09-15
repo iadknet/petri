@@ -1,13 +1,12 @@
 //! Pins the sampled trajectory, including stochastic descendants and actions.
 //! Telemetry and wall-clock fields are deliberately excluded.
 //!
-//! T03.F11 re-pin: the genome replication cost multiplies the reproduce
-//! charge of every parent above the founder's 111 units, and this forced-
-//! mutation run has such parents reproducing inside its 64 ticks, so their
-//! energy and every trajectory after the first such birth differ from the
-//! pre-feature ones. The digest below was measured on the T03.F11 code after
-//! two runs agreed (previously re-pinned at T13.F03); the pin's purpose — that
-//! the accounting keeps the trajectory reproducible — is unchanged.
+//! T02.F04 re-pin: grazing ships enabled, so every applied Eat halves the
+//! bitten cell's fertility modifier and the food grid regrows differently
+//! from the first bite onward, moving every sampled trajectory after it. The
+//! digest below was measured on the T02.F04 code after two runs agreed
+//! (previously re-pinned at T03.F11); the pin's purpose — that the accounting
+//! keeps the trajectory reproducible — is unchanged.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -73,6 +72,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "96497a4fbe59ff4fb397c54ede7dd4e93e36d790d9090f9eaa3ea25c77ae2fa9"
+        "1174f677c2965c38b7a039017bc6db8e4800a2bddfa8364498e335722a23d88e"
     );
 }
