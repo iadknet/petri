@@ -40,7 +40,7 @@ fitness bonuses.
   - Goal: Deferred proof phase. Replicated confirmatory runs that specialists coexist rather than one generalist winning.
 - [x] **T03.F10 — Activity-Ramped Compute Cost** — Depends on: None
   - Goal: Thinking burns fuel and fatigue sets in. A brain pays for each instruction it runs, cheaply for ordinary programs and at a rising rate for sustained execution within one dispatch, so a runaway loop starves its creature instead of being silently cut off at the step cap.
-- [ ] **T03.F11 — Genome Replication Cost** — Depends on: T03.F08, T14.F12, T11.F19
+- [x] **T03.F11 — Genome Replication Cost** — Depends on: T03.F08, T14.F12, T11.F19
   - Goal: Copying a longer genome costs more, as in Avida and Tierra. Every unit of brain structure beyond the founder's raises the parent's energy cost to reproduce, so a large genome pays at every birth as well as every tick, and structure that does not earn its copy is bred out.
 
 ## Notes for AI Agents
