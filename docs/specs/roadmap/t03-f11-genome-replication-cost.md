@@ -1,6 +1,6 @@
 # T03.F11 — Genome Replication Cost
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-15
 **Feature**: T03.F11
 **Track**: [T03 — Functional Traits and Metabolism](../../roadmaps/t03-functional-traits-and-metabolism.md)
@@ -136,7 +136,7 @@ cited from the note's Section 4, not re-read here.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
+- [x] `cargo test -p v3-core --test viability` first, then `make check` ->
       results in [`docs/progress/readings/t03-f11.md`](../../progress/readings/t03-f11.md).
 - [x] Focused tests: the founder pin, the multiplier unit and property tests,
       a reproduction test showing a parent above the anchor is charged the
@@ -232,15 +232,15 @@ tick 4,500), while `mean_mesh_nodes` rises 10.44 → 25.29 with no plateau
 
 ## Success Criteria
 
-- [ ] A parent above 111 units pays the multiplied reproduce charge, the
+- [x] A parent above 111 units pays the multiplied reproduce charge, the
       founder pays exactly the pre-feature charge, and the offspring transfer
       is unchanged, shown by tests and by `action_charges.reproduce` rising in
       all three standard worlds.
-- [ ] `changed_per_all_births` is not below its floor and
+- [x] `changed_per_all_births` is not below its floor and
       `mean_executed_nodes` is not below 2.5 on any world; no world extinct.
-- [ ] The paired Orchards run is stored and read as predeclared, with the
+- [x] The paired Orchards run is stored and read as predeclared, with the
       levelling-off question answered either way.
-- [ ] Mutation gate and benchmark summaries recorded as the Verification items
+- [x] Mutation gate and benchmark summaries recorded as the Verification items
       require.
 
 ## Notes for AI Agents
