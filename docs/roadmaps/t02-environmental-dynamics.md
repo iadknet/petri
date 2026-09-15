@@ -1,6 +1,6 @@
 # T02 — Environmental Dynamics
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-09-15
 **Master**: [Program Roadmap](../roadmap.md)
 
