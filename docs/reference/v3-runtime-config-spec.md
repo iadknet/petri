@@ -25,8 +25,9 @@ This document is the canonical owner for config keys/defaults used by:
 - VM step limits and opcode cost scaling,
 - retained inactive graph convergence controls,
 - perception radius for frozen extended sensing,
-- runtime-editable `world.food.shared.occupancy_depletion.*` knobs
-  (cross-referenced from `v3-world-grid-spec.md`),
+- runtime-editable `world.food.shared.occupancy_depletion.*` and
+  `world.food.shared.grazing.*` knobs (cross-referenced from
+  `v3-world-grid-spec.md`),
 - mutation tuning,
 - reproduction energy transfer gates/caps.
 
@@ -358,6 +359,10 @@ knobs visible in the runtime-config contract.
 | --- | --- | --- | --- | --- |
 | `world.food.shared.occupancy_depletion.enabled` | `bool` | `true` | Enables the occupancy depletion mask that suppresses regrowth on occupied cells. | `v3-world-grid-spec.md`, `v3-tick-orchestration-spec.md` |
 | `world.food.shared.occupancy_depletion.deposit_per_occupied_tick` | `f32` | `0.08` | Must be finite; clamp to `[0.0, 1.0]`; invalid values fall back to `0.08`. | `v3-world-grid-spec.md`, `v3-tick-orchestration-spec.md` |
+| `world.food.shared.grazing.enabled` | `bool` | `true` | Enables the per-type, per-cell grazing fertility modifier; flipping it resets every modifier to `1.0`. | `v3-world-grid-spec.md` |
+| `world.food.shared.grazing.factor` | `f32` | `0.5` | Must be finite; clamp to `[0.0, 1.0]`; invalid values fall back to `0.5`. Live edits leave stored modifiers untouched. | `v3-world-grid-spec.md` |
+| `world.food.shared.grazing.floor` | `f32` | `0.05` | Must be finite; clamp to `[0.0, 1.0]`; invalid values fall back to `0.05`. Live edits leave stored modifiers untouched. | `v3-world-grid-spec.md` |
+| `world.food.shared.grazing.recovery_ticks` | `u32` | `1000` | Minimum `1`; zero falls back to `1000`. Live edits leave stored modifiers untouched. | `v3-world-grid-spec.md` |
 
 Runtime config transport posture:
 - These fields are editable through v3alpha2 config GET/PATCH transport.

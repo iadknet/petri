@@ -23,6 +23,12 @@ export const MOCK_CONFIG: SimulationConfig = {
 					enabled: true,
 					deposit_per_occupied_tick: 0.08,
 				},
+				grazing: {
+					enabled: true,
+					factor: 0.5,
+					floor: 0.05,
+					recovery_ticks: 1000,
+				},
 			},
 			types: [
 				{

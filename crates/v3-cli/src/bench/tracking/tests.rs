@@ -1035,6 +1035,8 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
         tracking: WorldTracking {
             typed_eats_total: vec![7],
             food_density_total: vec![six(2.0)],
+            grazing_modifier_mean: vec![six(0.875)],
+            grazed_cell_share: vec![six(0.125)],
             moves_attempted_total: 9,
             moves_blocked_barrier_total: 1,
             moves_blocked_total_by_cause: Some(MovesBlockedByCause {
@@ -1108,6 +1110,11 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
         wire["mutation_supply"]["executed_target_total"], 2,
         "the mutation target split is on the wire under its own key: {wire}"
     );
+    assert_eq!(
+        wire["grazing_modifier_mean"][0], "0.875000",
+        "the grazing reading is on the wire beside the food density: {wire}"
+    );
+    assert_eq!(wire["grazed_cell_share"][0], "0.125000");
     assert_eq!(
         wire["typed_eats_failed_total"][0], 4,
         "failed eats are indexed by food type: {wire}"

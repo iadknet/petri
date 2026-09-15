@@ -178,6 +178,16 @@ pub struct WorldTracking {
     /// Standing density per food type after the last executed tick's growth.
     #[serde(default)]
     pub food_density_total: Vec<String>,
+    /// Mean grazing fertility modifier per food type over passable cells
+    /// after the last executed tick's recovery step (T02.F04); 1.0 for a type
+    /// nothing grazed and everywhere while grazing is disabled. Empty in
+    /// reports stored before T02.F04.
+    #[serde(default)]
+    pub grazing_modifier_mean: Vec<String>,
+    /// Share of passable cells whose grazing modifier is below 1.0 per food
+    /// type, read at the same tick. Empty in reports stored before T02.F04.
+    #[serde(default)]
+    pub grazed_cell_share: Vec<String>,
     /// Move actions executed, blocked or not.
     #[serde(default)]
     pub moves_attempted_total: u64,
@@ -312,6 +322,16 @@ impl WorldTracking {
                 .last_tick_food_total_density_by_type
                 .iter()
                 .map(|density| six(f64::from(*density)))
+                .collect(),
+            grazing_modifier_mean: stats
+                .last_tick_food_grazing_modifier_mean_by_type
+                .iter()
+                .map(|modifier| six(f64::from(*modifier)))
+                .collect(),
+            grazed_cell_share: stats
+                .last_tick_food_grazed_cell_share_by_type
+                .iter()
+                .map(|share| six(f64::from(*share)))
                 .collect(),
             moves_attempted_total: stats.move_actions_attempted_total,
             moves_blocked_barrier_total: by_cause.barrier,

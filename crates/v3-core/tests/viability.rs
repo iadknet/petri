@@ -910,6 +910,32 @@ fn stats_accounting_invariant_holds_over_50_ticks() {
     );
 }
 
+/// Grazing ships enabled (T02.F04): a default-config run with applied Eats
+/// reports grazed cells and a sub-1.0 mean modifier through `SimStats`, and
+/// the bite count is the applied typed-eat total.
+#[test]
+fn default_run_reports_grazing_through_sim_stats() {
+    let mut sim = seed_simulation(viability_config(), 88);
+    assert!(sim.config.world.food.grazing.enabled);
+    for _ in 0..40 {
+        run_tick(&mut sim, &mut None);
+    }
+    let eats: u64 = sim.stats.eat_actions_applied_total_by_type.values().sum();
+    assert!(eats > 0, "the run must apply at least one Eat");
+    let type_count = sim.config.world.food.types.len();
+    let modifiers = &sim.stats.last_tick_food_grazing_modifier_mean_by_type;
+    let shares = &sim.stats.last_tick_food_grazed_cell_share_by_type;
+    assert_eq!(modifiers.len(), type_count);
+    assert_eq!(shares.len(), type_count);
+    assert!(
+        modifiers.iter().any(|m| *m < 1.0),
+        "some type must read grazed: {modifiers:?}"
+    );
+    assert!(shares.iter().any(|s| *s > 0.0), "{shares:?}");
+    assert!(modifiers.iter().all(|m| (0.05..=1.0).contains(m)));
+    assert!(shares.iter().all(|s| (0.0..=1.0).contains(s)));
+}
+
 #[test]
 fn stats_last_tick_counters_reset_each_tick() {
     let mut sim = seed_simulation(viability_config(), 88);

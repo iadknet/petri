@@ -34,6 +34,12 @@ describe("StartupConfigStore", () => {
 			enabled: true,
 			deposit_per_occupied_tick: 0.08,
 		});
+		expect(state.preset.world.food.shared.grazing).toEqual({
+			enabled: true,
+			factor: 0.5,
+			floor: 0.05,
+			recovery_ticks: 1000,
+		});
 		expect(state.preset.world.food.types[0]).toMatchObject({
 			name: "Primary Food",
 			color: "#22c55e",
@@ -54,6 +60,12 @@ describe("StartupConfigStore", () => {
 		expect(preset.world.food.shared.occupancy_depletion).toEqual({
 			enabled: true,
 			deposit_per_occupied_tick: 0.08,
+		});
+		expect(preset.world.food.shared.grazing).toEqual({
+			enabled: true,
+			factor: 0.5,
+			floor: 0.05,
+			recovery_ticks: 1000,
 		});
 		expect(preset.world.food.types).toHaveLength(1);
 		expect(preset.world.food.types[0]).toMatchObject({
@@ -295,6 +307,12 @@ describe("StartupConfigStore", () => {
 				occupancy_depletion: {
 					enabled: true,
 					deposit_per_occupied_tick: 0.08,
+				},
+				grazing: {
+					enabled: true,
+					factor: 0.5,
+					floor: 0.05,
+					recovery_ticks: 1000,
 				},
 			},
 			types: expect.arrayContaining([

@@ -72,6 +72,18 @@ fn parse_reading(value: &str) -> Option<f64> {
     value.parse::<f64>().ok()
 }
 
+/// A per-food-type reading is followed as one reading per type, named
+/// `{name}_type_{index}`, so each type is compared against its own history.
+fn per_food_type_readings<'a>(
+    name: &'a str,
+    values: &'a [String],
+) -> impl Iterator<Item = (String, Option<f64>)> + 'a {
+    values
+        .iter()
+        .enumerate()
+        .map(move |(index, value)| (format!("{name}_type_{index}"), parse_reading(value)))
+}
+
 /// A reader-state fraction is followed as one reading per state, named for the
 /// state, so each is compared against its own history.
 fn by_reader_state_readings(
@@ -240,12 +252,18 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
             per_creature_tick(count),
         ));
     }
-    for (index, share) in observation.fractions.typed_eat_share.iter().enumerate() {
-        readings.push((
-            format!("typed_eat_share_type_{index}"),
-            parse_reading(share),
-        ));
-    }
+    readings.extend(per_food_type_readings(
+        "typed_eat_share",
+        &observation.fractions.typed_eat_share,
+    ));
+    readings.extend(per_food_type_readings(
+        "grazing_modifier_mean",
+        &observation.tracking.grazing_modifier_mean,
+    ));
+    readings.extend(per_food_type_readings(
+        "grazed_cell_share",
+        &observation.tracking.grazed_cell_share,
+    ));
     readings.extend(by_reader_state_readings(
         "barrier_blocked_fraction",
         &observation

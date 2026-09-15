@@ -10,6 +10,8 @@ import {
 import { ENERGY_COSTS_FIELDS } from "./EnergyCostsSection.tsx";
 import { ENERGY_LIFECYCLE_FIELDS } from "./EnergyLifecycleSection.tsx";
 import {
+	FOOD_GRAZING_FIELDS,
+	FOOD_GRAZING_TOGGLES,
 	FOOD_OCCUPANCY_DEPLETION_FIELDS,
 	FOOD_OCCUPANCY_DEPLETION_TOGGLES,
 	FOOD_PARAMETERS_FIELDS,
@@ -24,6 +26,8 @@ import { SHARED_MEMORY_FIELDS } from "./SharedMemorySection.tsx";
 export const RUNTIME_PATCH_FIELDS: (FieldDef | BooleanFieldDef)[] = [
 	...FOOD_OCCUPANCY_DEPLETION_TOGGLES,
 	...FOOD_OCCUPANCY_DEPLETION_FIELDS,
+	...FOOD_GRAZING_TOGGLES,
+	...FOOD_GRAZING_FIELDS,
 	...FOOD_PARAMETERS_FIELDS,
 	...POPULATION_FIELDS,
 	...ENERGY_LIFECYCLE_FIELDS,
@@ -44,6 +48,7 @@ const RUNTIME_GROUPS: { title: string; fields: FieldDef[]; toggles?: BooleanFiel
 		fields: FOOD_OCCUPANCY_DEPLETION_FIELDS,
 		toggles: FOOD_OCCUPANCY_DEPLETION_TOGGLES,
 	},
+	{ title: "Food > Grazing", fields: FOOD_GRAZING_FIELDS, toggles: FOOD_GRAZING_TOGGLES },
 	{ title: "Food Parameters", fields: FOOD_PARAMETERS_FIELDS },
 	{ title: "Population", fields: POPULATION_FIELDS },
 	{ title: "Energy > Lifecycle", fields: ENERGY_LIFECYCLE_FIELDS },

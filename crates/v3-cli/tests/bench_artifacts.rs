@@ -166,30 +166,40 @@ fn retained_float_readings_preserve_historical_numeric_values() {
     );
 }
 
+const GOAL_RECIPE_NAMES: [&str; 3] = ["orchards-in-grassland", "canyon-country", "confluence"];
+
+fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../experiments/worlds/{name}.json"));
+    let recipe = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    v3_cli::inspect::resolve_baseline_world(recipe, path.to_str().unwrap()).unwrap()
+}
+
+/// T02.F04 re-pin: the resolved config now serializes the `grazing` block the
+/// byte-identical recipes inherit from the production default, so every
+/// digest moved once. Measured on the T02.F04 code.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
-    for (name, expected) in [
-        (
-            "orchards-in-grassland",
-            "sha256:f1b9fe5ae4f1c1a1698fee18983152334500a5b531d3d0d322998a890a5295ab",
-        ),
-        (
-            "canyon-country",
-            "sha256:9c8fcf58ed47e5307ca04cd41f4f0d8dc597f9036381c6482504c1b8da587e58",
-        ),
-        (
-            "confluence",
-            "sha256:a870b08a9d54e82c78d49c85e9e3c689d471c6ce4fc2dac6223fa3adb0d24250",
-        ),
-    ] {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join(format!("../../experiments/worlds/{name}.json"));
-        let recipe = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-        let config =
-            v3_cli::inspect::resolve_baseline_world(recipe, path.to_str().unwrap()).unwrap();
-        let digest = v3_core::config::config_digest(&config);
+    for (name, expected) in GOAL_RECIPE_NAMES.into_iter().zip([
+        "sha256:81450ac8a7d4ed087d7f888fa992c486ecc2257d3db85fa17715619a8f1bbe80",
+        "sha256:c8d2ab9402e2eb74a2bf7ffbdfa3b071a989680d47e39b7d5cf2ec8cb3b81b2a",
+        "sha256:a8b84ed7b3a4f2319bea8f76870a452dc5ae83582192a0110727cde872ae072d",
+    ]) {
+        let digest = v3_core::config::config_digest(&resolve_checked_in_recipe(name));
         println!("{name}: {digest}");
         assert_eq!(digest, expected);
+    }
+}
+
+/// Every checked-in goal world carries grazing at the production defaults
+/// without a recipe edit (T02.F04).
+#[test]
+fn checked_in_goal_recipes_resolve_with_grazing_enabled_at_production_defaults() {
+    let defaults = v3_core::config::GrazingConfig::default();
+    assert!(defaults.enabled);
+    for name in GOAL_RECIPE_NAMES {
+        let config = resolve_checked_in_recipe(name);
+        assert_eq!(config.world.food.shared.grazing, defaults, "{name}");
     }
 }
 

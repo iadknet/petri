@@ -1,5 +1,6 @@
 mod catalog;
 mod ecology;
+mod grazing;
 mod state;
 
 use rand::Rng;
@@ -81,7 +82,7 @@ impl FoodResource {
 
     #[must_use]
     pub fn consume(&mut self, pos: Position) -> f32 {
-        self.state.consume_any(pos)
+        self.state.consume_any(pos, &self.config.shared.grazing)
     }
 
     #[must_use]
@@ -89,7 +90,23 @@ impl FoodResource {
         if !self.catalog.is_valid(type_idx) {
             return 0.0;
         }
-        self.state.consume_type(pos, type_idx)
+        self.state
+            .consume_type(pos, type_idx, &self.config.shared.grazing)
+    }
+
+    /// The grazing fertility modifier of `type_idx` at `pos`: 1.0 for an
+    /// ungrazed cell, an unknown type, or while grazing is disabled.
+    #[must_use]
+    pub fn grazing_modifier_at(&self, pos: Position, type_idx: OrdinaryFoodTypeId) -> f32 {
+        if !self.catalog.is_valid(type_idx) {
+            return 1.0;
+        }
+        self.state.grazing().multiplier_at(
+            pos.x,
+            pos.y,
+            type_idx,
+            self.config.shared.grazing.enabled,
+        )
     }
 
     pub fn set_food(&mut self, pos: Position, value: f32) {
@@ -132,12 +149,14 @@ impl FoodResource {
         self.state.fertility_grid(type_idx)
     }
 
-    /// The fertility multiplier food growth applies to `type_idx` at `tick`,
-    /// as a grid over the whole world.
+    /// The habitat fertility multiplier for `type_idx` at `tick`, as a grid
+    /// over the whole world, before grazing.
     ///
-    /// This is the same reading `grow` uses: `1.0` everywhere when fertility is
-    /// disabled or the type has no fertility grid, otherwise the raw layer value
-    /// mapped through the annealed range for `tick`. Callers that want the
+    /// `1.0` everywhere when fertility is disabled or the type has no fertility
+    /// grid, otherwise the raw layer value mapped through the annealed range
+    /// for `tick`. `grow` multiplies this reading by the per-cell grazing
+    /// modifier ([`FoodResource::grazing_modifier_at`]); this grid stays the
+    /// ungrazed habitat the recipes and the app show. Callers that want the
     /// tick-zero habitat (an unrun world's map) pass `0`.
     #[must_use]
     pub fn effective_fertility_grid(&self, type_idx: OrdinaryFoodTypeId, tick: u64) -> Grid<f32> {

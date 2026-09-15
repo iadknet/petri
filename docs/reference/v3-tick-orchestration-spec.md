@@ -97,8 +97,11 @@ runtime backends or reproduction internals.
 ```
 
 Phase 0 sub-steps (canonical order):
-1. Occupancy depletion update for food regrowth memory.
-2. Food growth (per-cell, world-level), using the updated depletion layer.
+1. Occupancy depletion update for food regrowth memory, then the grazing
+   fertility modifier recovery step on every non-barrier cell of every food
+   type.
+2. Food growth (per-cell, world-level), using the updated depletion layer and
+   the recovered grazing modifiers.
 3. Creature aging (`age_ticks += 1` for each living creature).
 4. Energy decay and genome carrying cost, as one combined subtraction for each
    living creature:
@@ -113,7 +116,7 @@ Phase 0 sub-steps (canonical order):
 Canonical food growth behavior is owned by `v3-world-grid-spec.md`.
 Canonical `energy_decay_per_tick` and `genome_carry_cost_per_unit` defaults are
 owned by `v3-runtime-config-spec.md`.
-Canonical occupancy depletion behavior and defaults are owned by
+Canonical occupancy depletion and grazing behavior and defaults are owned by
 `v3-world-grid-spec.md`.
 
 Only creatures surviving Phase 0 (including death removal) are eligible for the

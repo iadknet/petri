@@ -43,6 +43,12 @@ const MOCK_CONFIG: SimulationConfig = {
 					enabled: true,
 					deposit_per_occupied_tick: 0.08,
 				},
+				grazing: {
+					enabled: true,
+					factor: 0.5,
+					floor: 0.05,
+					recovery_ticks: 1000,
+				},
 			},
 			types: [
 				{
@@ -355,6 +361,12 @@ describe("ControlBar", () => {
 									enabled: true,
 									deposit_per_occupied_tick: 0.08,
 								},
+								grazing: {
+									enabled: true,
+									factor: 0.5,
+									floor: 0.05,
+									recovery_ticks: 1000,
+								},
 							}),
 							types: expect.arrayContaining([
 								expect.objectContaining({
@@ -486,6 +498,12 @@ describe("ControlBar", () => {
 							enabled?: boolean;
 							deposit_per_occupied_tick?: number;
 						};
+						grazing?: {
+							enabled?: boolean;
+							factor?: number;
+							floor?: number;
+							recovery_ticks?: number;
+						};
 					};
 				};
 			};
@@ -494,6 +512,12 @@ describe("ControlBar", () => {
 		expect(patch.world?.food?.shared?.occupancy_depletion).toEqual({
 			enabled: true,
 			deposit_per_occupied_tick: 0.08,
+		});
+		expect(patch.world?.food?.shared?.grazing).toEqual({
+			enabled: true,
+			factor: 0.5,
+			floor: 0.05,
+			recovery_ticks: 1000,
 		});
 		expect(patch.energy?.costs?.failed_action_penalty).toBeUndefined();
 	});
@@ -615,6 +639,12 @@ describe("ControlBar", () => {
 								occupancy_depletion: expect.objectContaining({
 									enabled: true,
 									deposit_per_occupied_tick: 0.08,
+								}),
+								grazing: expect.objectContaining({
+									enabled: true,
+									factor: 0.5,
+									floor: 0.05,
+									recovery_ticks: 1000,
 								}),
 							}),
 							types: expect.arrayContaining([
