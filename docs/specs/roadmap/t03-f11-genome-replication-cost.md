@@ -1,7 +1,7 @@
 # T03.F11 — Genome Replication Cost
 
 **Status**: In Progress
-**Last updated**: 2026-09-14
+**Last updated**: 2026-09-15
 **Feature**: T03.F11
 **Track**: [T03 — Functional Traits and Metabolism](../../roadmaps/t03-functional-traits-and-metabolism.md)
 
@@ -131,7 +131,7 @@ cited from the note's Section 4, not re-read here.
 - [x] Frontend field, row, fixtures; reference docs; re-pin the recipe digests
       and, if moved, the short-run identity hash (it did not move; the
       `applied_trajectory` digest did and is re-pinned).
-- [ ] Run the paired Orchards run and store its artifacts under
+- [x] Run the paired Orchards run and store its artifacts under
       `docs/progress/sweeps/t03-f11/`.
 
 ## Verification
@@ -152,18 +152,18 @@ cited from the note's Section 4, not re-read here.
       `mean_mesh_nodes` per world beside T11.F19's -> readings file. All pass.
 - [x] Paired 12,000-tick Orchards run, seed 11, cost against control, as
       specified below -> artifacts under `docs/progress/sweeps/t03-f11/`, final
-      and per-sample table in the readings file. Per the user decision below:
-      the cost arm runs to tick 12,000; the control arm is stopped at 12:00
-      local time on 2026-09-15 and its last sampled tick (at least 4,000) is
-      the common tick at which the cost-versus-control `mean_genome_size` and
-      `mean_mesh_nodes` comparison is read; the levelling-off question
-      (increment over ticks 8,000–12,000 against 4,000–8,000) is answered from
-      the cost arm alone; each arm's wall time is recorded in `timing.txt`, the
-      control's to its stop with the truncation stated. Control stopped at
-      tick 4,500; cost complete to 12,000. Cost strictly below control at the
-      common tick; neither arm extinct; configs differ only in the one field.
-      Levelling-off ratio 2.29 — **not** levelling off. Full tables in the
-      readings file.
+      and per-sample table in the readings file. Per the user decision below,
+      the control arm is stopped at tick 4,500 and the comparison is read
+      there; the cost arm is complete to 12,000 and answers the levelling-off
+      question alone; `timing.txt` states the truncation. Cost strictly below
+      control at the common tick; neither arm extinct; configs differ only in
+      the one field. Levelling-off ratio 2.29 (increments 4,000–8,000 = 4.02
+      units, 8,000–12,000 = 9.21 units) — **not** levelling off; the ratio
+      is a quotient of increments of 0.85% and 1.9% of the base while
+      `mean_genome_size` sits in a 462–506 band from tick 4,500, and
+      `mean_mesh_nodes` rises 10.44 → 25.29 with no plateau (one 0.08-node
+      dip at tick 7,500; units per node falling ~45 → ~19). Full tables in
+      the readings file.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here. (Not in the benchmark specialist's scope;
@@ -215,9 +215,11 @@ extinct; persistence, neighborhood-read guard, terminal
 as predeclared, no ceiling crossed. Founder neighborhood, drift-walk, and
 `recruitment_paths` blocks byte-identical to T11.F19 (config echo excepted).
 Paired Orchards run: cost complete to tick 12,000, control stopped by user
-decision at tick 4,500 (2026-09-15 11:59) — control-citing readings are
-truncated there. Cost strictly below control at the common tick; cost arm
-alone does **not** level off (ratio 2.29). Full detail in
+decision at tick 4,500 — control-citing readings are truncated there. Cost strictly below control at the common tick; cost arm
+alone does **not** level off (ratio 2.29 from increments of 4.02 and 9.21
+units, 0.85% and 1.9% of a `mean_genome_size` held in a 462–506 band from
+tick 4,500), while `mean_mesh_nodes` rises 10.44 → 25.29 with no plateau
+(units per node ~45 → ~19). Full detail in
 [`docs/progress/readings/t03-f11.md`](../../progress/readings/t03-f11.md).
 
 - Summaries: [gate](../../progress/features/t03-f11-genome-replication-cost.json),
