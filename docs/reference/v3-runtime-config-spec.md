@@ -167,6 +167,7 @@ Queue-shape coupling invariant:
 | `energy.lifecycle.min_reproduce_age` | `u64` | `20` | Minimum parent age (ticks) required before reproduce can be accepted. No normalization fallback; value is consumed as configured. |
 | `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. |
 | `energy.lifecycle.genome_carry_cost_per_unit` | `f32` | `1e-4` | Must be finite and `>= 0.0`; invalid values fall back to `1e-4`. A missing field defaults to `1e-4`. `0.0` is allowed and disables the charge. Energy charged per tick per unit of total genome size. |
+| `energy.lifecycle.genome_replication_cost_per_unit` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. A missing field defaults to `0.1`. `0.0` is allowed and disables the surcharge. Per-birth multiplier on the parent's reproduce charge per unit of total genome size above the founder's 111. |
 | `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
 | `energy.costs.eat_reward_per_food` | `f32` | `5.0` | Live shared reward per consumed density for ordinary food types whose `energy_per_unit` is absent/null. Must be finite and `>= 0.0`; invalid values fall back to `5.0`. |
@@ -198,6 +199,26 @@ Genome carrying cost:
   the reachability-aware `complexity()` and is disabled at canonical defaults.
 - At the default rate the canonical founder genome (111 units) pays 0.0111 per
   tick, 2.22% of the default 0.5 decay.
+
+Genome replication cost:
+- At reproduction step 5 (`v3-reproduction-spec.md`) the parent's charge is
+  `adjusted_action_cost(reproduce_cost, complexity, age) *
+  (1 + genome_replication_cost_per_unit * max(genome_size() - 111, 0))`,
+  computed at the charge site in
+  `crates/v3-core/src/simulation/actions/reproduction.rs` from the parent's
+  cached `genome_size()` and `FOUNDER_GENOME_SIZE_UNITS` (111, the canonical
+  V3Alpha1 founder's size, pinned in `crates/v3-core/src/creature/founder.rs`).
+- The factor is exactly `1.0` for every genome of 111 units or fewer and at
+  rate `0.0`, so the founder's charge and a rate-0.0 world are bit-identical to
+  the pre-feature engine; it is non-decreasing in genome size.
+- Composes multiplicatively with the complexity and age action multipliers
+  (`energy.complexity_cost`, `energy.age_cost`), which are untouched.
+- Charged before the `min_reproduce_energy` and transfer gates (steps 6 and
+  7), so an attempt those gates reject still burns the multiplied charge; the
+  whole charge lands in `energy_flows.action_charges.reproduce` and none of it
+  reaches the offspring, whose transfer is unchanged.
+- At the default rate a 386-unit genome (275 above the founder) pays 28.5x the
+  base charge per charged attempt.
 
 Complexity energy cost:
 - When enabled, all action energy costs (noop, eat, move, reproduce, steal, and
@@ -246,7 +267,9 @@ Reproduction transfer sequencing:
 This sequencing is evaluated only after spawn target validity succeeds, as
 defined in `v3-reproduction-spec.md`.
 1. Enforce `energy.lifecycle.min_reproduce_age` gate on parent age.
-2. Pay `energy.costs.reproduce_cost`.
+2. Pay `energy.costs.reproduce_cost`, scaled by the complexity and age
+   multipliers and by the genome replication cost factor
+   `1 + energy.lifecycle.genome_replication_cost_per_unit * max(genome_size() - 111, 0)`.
 3. Enforce `energy.lifecycle.min_reproduce_energy` gate.
 4. Compute
    `requested_energy_sanitized = clamp_non_negative_finite(requested_energy)`,

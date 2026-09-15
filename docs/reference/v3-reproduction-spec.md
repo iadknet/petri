@@ -204,7 +204,11 @@ runtime config contract: `v3-runtime-config-spec.md`.
      -> reached : [reject RejectedPopulationCap; return]
   4. enforce minimum parent age
      -> below threshold : [reject RejectedAgeConstraints; return]
-  5. pay energy.costs.reproduce_cost from parent
+  5. pay energy.costs.reproduce_cost from parent, scaled by the complexity and
+     age multipliers and by the genome replication cost factor
+     (1 + energy.lifecycle.genome_replication_cost_per_unit
+        * max(genome_size() - 111, 0)); the extra energy is burned, not
+     transferred
   6. enforce energy.lifecycle.min_reproduce_energy gate on parent
      -> below threshold : [reject RejectedEnergyConstraints; return]
   7. compute transfer = min(clamp_non_negative_finite(requested_energy),

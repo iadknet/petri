@@ -2,12 +2,13 @@ use super::super::run_tick;
 use super::support::*;
 use crate::contracts::{Direction, InputReference, NodeId, Position, WorldInputKey};
 use crate::creature::action_log::{ActionResult, ActionType};
+use crate::creature::founder::{v3alpha1_founder_genome, FOUNDER_GENOME_SIZE_UNITS};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::simulation::actions::{
     apply_move, apply_reproduce, apply_steal_energy, apply_typed_eat, BarrierReaderState,
-    MoveBlockedCause, ReproductionInvalidTargetCause,
+    MoveBlockedCause, ReproductionActionResult, ReproductionInvalidTargetCause,
 };
 use crate::simulation::seeding::seed_simulation;
 use rand::SeedableRng;
@@ -859,6 +860,109 @@ fn reproduction_resets_reward_credit_including_frozen_tick_base() {
             3.0
         );
     }
+}
+
+/// A one-node VM genome padded with `Noop`s so its `genome_size()` clears the
+/// founder anchor by a known margin; `apply_reproduce` is called directly, so
+/// the program never runs.
+fn oversized_vm_genome() -> CreatureGenome {
+    vm_program_genome(vec![VmInstruction::Noop; 300])
+}
+
+/// One direct `apply_reproduce` on a fresh 1000-energy parent at reproduce
+/// age; returns the parent's energy after the birth, the child's energy, and
+/// the recorded `action_charges.reproduce`.
+fn charged_reproduction(
+    genome: CreatureGenome,
+    rate: f32,
+    transfer_request: f32,
+) -> (f32, f32, f32) {
+    let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
+    sim.config.energy.lifecycle.genome_replication_cost_per_unit = rate;
+    sim.config.mutation.per_unit_supply_enabled = false;
+    sim.config.mutation.mutation_probability = 0.0;
+    sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+    let result = apply_reproduce(parent, &mut sim, Direction::N, transfer_request, &mut rng);
+    assert_eq!(result, ReproductionActionResult::Spawned);
+    let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
+    (
+        sim.creatures[parent].energy,
+        child.energy,
+        sim.stats.energy_flows.action_charges.reproduce as f32,
+    )
+}
+
+/// The Step 5 base charge for a fresh parent of this genome at reproduce age.
+fn base_reproduce_charge(genome: &CreatureGenome) -> f32 {
+    let (sim, parent) = make_sim_with_custom_genome(1000.0, genome.clone());
+    sim.config.energy.adjusted_action_cost(
+        sim.config.energy.costs.reproduce_cost,
+        sim.creatures[parent].cached_complexity,
+        sim.config.energy.lifecycle.min_reproduce_age,
+    )
+}
+
+#[test]
+fn parent_above_the_founder_anchor_pays_the_replication_factor_and_child_gets_the_transfer() {
+    let genome = oversized_vm_genome();
+    let size = genome.genome_size();
+    assert!(
+        size > FOUNDER_GENOME_SIZE_UNITS,
+        "fixture must exceed the anchor"
+    );
+    let rate = 0.1;
+    let factor = 1.0 + rate * (size - FOUNDER_GENOME_SIZE_UNITS) as f32;
+    let base = base_reproduce_charge(&genome);
+    assert!(base > 0.0);
+    let transfer = 20.0;
+
+    let (parent_after, child_energy, charged) = charged_reproduction(genome, rate, transfer);
+
+    assert!(
+        (charged - base * factor).abs() < 1e-4,
+        "charge {charged} vs base {base} x factor {factor}"
+    );
+    let parent_delta = 1000.0 - parent_after;
+    assert!(
+        (parent_delta - (base * factor + transfer)).abs() < 1e-4,
+        "parent delta {parent_delta}"
+    );
+    assert_eq!(
+        child_energy, transfer,
+        "nothing of the surcharge reaches the child"
+    );
+}
+
+#[test]
+fn rate_zero_charges_an_oversized_parent_exactly_the_base_charge() {
+    let genome = oversized_vm_genome();
+    let base = base_reproduce_charge(&genome);
+    let (parent_after, child_energy, charged) = charged_reproduction(genome, 0.0, 20.0);
+    // `1.0 * base` is bit-exact, so the parent lands exactly where the
+    // pre-feature engine left it.
+    assert_eq!(parent_after.to_bits(), (1000.0f32 - base - 20.0).to_bits());
+    assert!(
+        (charged - base).abs() < 1e-5,
+        "charge {charged} vs base {base}"
+    );
+    assert_eq!(child_energy, 20.0);
+}
+
+#[test]
+fn founder_reproduce_charge_is_bit_identical_with_and_without_the_replication_rate() {
+    let (parent_default, child_default, charged_default) =
+        charged_reproduction(v3alpha1_founder_genome(), 0.1, 20.0);
+    let (parent_zero, child_zero, charged_zero) =
+        charged_reproduction(v3alpha1_founder_genome(), 0.0, 20.0);
+    let base = base_reproduce_charge(&v3alpha1_founder_genome());
+    assert_eq!(parent_default.to_bits(), parent_zero.to_bits());
+    assert_eq!(
+        parent_default.to_bits(),
+        (1000.0f32 - base - 20.0).to_bits()
+    );
+    assert_eq!(charged_default.to_bits(), charged_zero.to_bits());
+    assert_eq!(child_default, child_zero);
 }
 
 /// A one-node VM genome that eats the named food type: load the type index

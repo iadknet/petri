@@ -30,6 +30,16 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 			"Energy charged each tick per unit of genome_size() \u2014 maintenance on carried structure, junk included",
 	},
 	{
+		path: "energy.lifecycle.genome_replication_cost_per_unit",
+		label: "Replication Cost / Unit",
+		min: 0,
+		max: 1,
+		step: 0.001,
+		defaultValue: 0.1,
+		tooltip:
+			"Per-birth multiplier on the parent's reproduce charge: 1 + rate \u00d7 units of genome_size() above the founder's 111",
+	},
+	{
 		path: "energy.lifecycle.min_reproduce_energy",
 		label: "Min Reproduce Energy",
 		min: 0,

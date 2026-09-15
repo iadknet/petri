@@ -364,6 +364,12 @@ pub struct EnergyLifecycleConfig {
     /// Phase 0 beside `energy_decay_per_tick`. `0.0` disables the charge.
     #[serde(default = "default_genome_carry_cost_per_unit")]
     pub genome_carry_cost_per_unit: f32,
+    /// Per-birth surcharge on the parent's reproduce charge: the Step 5 charge
+    /// is multiplied by `1 + rate * max(genome_size() - founder size, 0)`, so
+    /// the founder pays the base charge and every unit above it costs more to
+    /// copy. `0.0` disables the surcharge.
+    #[serde(default = "default_genome_replication_cost_per_unit")]
+    pub genome_replication_cost_per_unit: f32,
 }
 
 fn default_min_reproduce_age() -> u64 {
@@ -372,6 +378,10 @@ fn default_min_reproduce_age() -> u64 {
 
 fn default_genome_carry_cost_per_unit() -> f32 {
     1e-4
+}
+
+fn default_genome_replication_cost_per_unit() -> f32 {
+    0.1
 }
 
 impl Default for EnergyLifecycleConfig {
@@ -384,6 +394,7 @@ impl Default for EnergyLifecycleConfig {
             min_reproduce_age: default_min_reproduce_age(),
             default_offspring_energy: 100.0,
             genome_carry_cost_per_unit: default_genome_carry_cost_per_unit(),
+            genome_replication_cost_per_unit: default_genome_replication_cost_per_unit(),
         }
     }
 }
@@ -970,6 +981,10 @@ impl SimulationConfig {
             el.genome_carry_cost_per_unit,
             default_genome_carry_cost_per_unit(),
         );
+        el.genome_replication_cost_per_unit = normalize_f32_finite_nonneg(
+            el.genome_replication_cost_per_unit,
+            default_genome_replication_cost_per_unit(),
+        );
 
         let ec = &mut self.energy.costs;
         ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 0.2);
@@ -1453,6 +1468,7 @@ mod tests {
         assert_eq!(cfg.energy.lifecycle.min_reproduce_age, 20);
         assert!((cfg.energy.lifecycle.default_offspring_energy - 100.0).abs() < 1e-6);
         assert_eq!(cfg.energy.lifecycle.genome_carry_cost_per_unit, 1e-4);
+        assert_eq!(cfg.energy.lifecycle.genome_replication_cost_per_unit, 0.1);
         // Complexity energy cost
         assert!(!cfg.energy.complexity_cost.enabled);
         assert_eq!(cfg.energy.complexity_cost.threshold, 50);
@@ -2084,6 +2100,44 @@ mod tests {
         let json = serde_json::to_string(&lifecycle).unwrap();
         let parsed: EnergyLifecycleConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.genome_carry_cost_per_unit, 0.25);
+    }
+
+    #[test]
+    fn energy_lifecycle_serde_defaults_genome_replication_cost_when_missing() {
+        let json = r#"{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":30.0,"default_offspring_energy":100.0}"#;
+        let lifecycle: EnergyLifecycleConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(lifecycle.genome_replication_cost_per_unit, 0.1);
+    }
+
+    #[test]
+    fn energy_lifecycle_serde_roundtrip_preserves_genome_replication_cost() {
+        let lifecycle = EnergyLifecycleConfig {
+            genome_replication_cost_per_unit: 0.25,
+            ..EnergyLifecycleConfig::default()
+        };
+        let json = serde_json::to_string(&lifecycle).unwrap();
+        let parsed: EnergyLifecycleConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.genome_replication_cost_per_unit, 0.25);
+    }
+
+    #[test]
+    fn normalize_invalid_genome_replication_cost_falls_back() {
+        for bad in [f32::NAN, f32::INFINITY, -1.0] {
+            let mut cfg = SimulationConfig::default();
+            cfg.energy.lifecycle.genome_replication_cost_per_unit = bad;
+            cfg.normalize();
+            assert_eq!(cfg.energy.lifecycle.genome_replication_cost_per_unit, 0.1);
+        }
+    }
+
+    #[test]
+    fn normalize_genome_replication_cost_preserves_zero_and_configured_values() {
+        for rate in [0.0, 0.25] {
+            let mut cfg = SimulationConfig::default();
+            cfg.energy.lifecycle.genome_replication_cost_per_unit = rate;
+            cfg.normalize();
+            assert_eq!(cfg.energy.lifecycle.genome_replication_cost_per_unit, rate);
+        }
     }
 
     #[test]
