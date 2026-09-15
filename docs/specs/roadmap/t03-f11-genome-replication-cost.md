@@ -164,10 +164,14 @@ cited from the note's Section 4, not re-read here.
       `mean_mesh_nodes` rises 10.44 → 25.29 with no plateau (one 0.08-node
       dip at tick 7,500; units per node falling ~45 → ~19). Full tables in
       the readings file.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here. (Not in the benchmark specialist's scope;
-      owned by the mutation specialist.)
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` at 9eee4583, run mode
+      `fresh`; `missed.txt` and `timeout.txt` empty; survivor list: none.
+
+  ```text
+  14 mutants tested in 5m: 13 caught, 1 unviable
+  rust-mutants: no survivors
+  output: ~/.local/share/petri-tools/mutants/t03-f11/mutants.out
+  ```
 - [x] Benchmark summaries stored at `docs/progress/features/t03-f11-genome-replication-cost.json`
       and `-goal.json`, local raw hash/byte count and verification time checked,
       series entry points to the summary, and no new full report staged. See
