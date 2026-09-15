@@ -25,6 +25,8 @@ pub struct FoodResourceConfig {
     #[serde(default)]
     pub occupancy_depletion: OccupancyDepletionConfig,
     #[serde(default)]
+    pub grazing: GrazingConfig,
+    #[serde(default)]
     pub fertility: FertilityConfig,
     #[serde(default)]
     pub annealing: AnnealingConfig,
@@ -42,6 +44,7 @@ impl Default for FoodResourceConfig {
             recovery_floor_ratio: 0.01,
             max_density: 1.0,
             occupancy_depletion: OccupancyDepletionConfig::default(),
+            grazing: GrazingConfig::default(),
             fertility: FertilityConfig::default(),
             annealing: AnnealingConfig::default(),
         }
@@ -110,6 +113,36 @@ impl Default for OccupancyDepletionConfig {
         }
     }
 }
+
+/// Grazing recovery and overuse (T02.F04): a per-food-type, per-cell fertility
+/// modifier in `[floor, 1.0]` that each consuming bite multiplies by `factor`
+/// and that recovers linearly toward 1.0 by `1 / recovery_ticks` per tick.
+/// Every field is serde-defaulted so stored recipes without the block load.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct GrazingConfig {
+    /// Whether bites lower the modifier and growth reads it.
+    pub enabled: bool,
+    /// Multiplier a consuming bite applies to the cell's modifier.
+    pub factor: f32,
+    /// Lowest value repeated bites can drive the modifier to.
+    pub floor: f32,
+    /// Ticks a fully floored modifier needs to recover from 0.0 to 1.0.
+    pub recovery_ticks: u32,
+}
+
+impl Default for GrazingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            factor: 0.5,
+            floor: 0.05,
+            recovery_ticks: DEFAULT_GRAZING_RECOVERY_TICKS,
+        }
+    }
+}
+
+const DEFAULT_GRAZING_RECOVERY_TICKS: u32 = 1000;
 
 /// Fertility layer algorithm variants.
 #[non_exhaustive]
@@ -1153,6 +1186,11 @@ fn normalize_food_shared(shared: &mut FoodResourceConfig) {
         1.0,
         0.08,
     );
+    shared.grazing.factor = normalize_f32_clamp(shared.grazing.factor, 0.0, 1.0, 0.5);
+    shared.grazing.floor = normalize_f32_clamp(shared.grazing.floor, 0.0, 1.0, 0.05);
+    if shared.grazing.recovery_ticks == 0 {
+        shared.grazing.recovery_ticks = DEFAULT_GRAZING_RECOVERY_TICKS;
+    }
     shared.initial_density = normalize_f32_clamp(
         shared.initial_density,
         0.0,
@@ -2489,6 +2527,61 @@ mod tests {
         cfg.world.food.occupancy_depletion.deposit_per_occupied_tick = f32::NAN;
         cfg.normalize();
         assert!((cfg.world.food.occupancy_depletion.deposit_per_occupied_tick - 0.08).abs() < 1e-6);
+    }
+
+    #[test]
+    fn grazing_defaults_are_the_production_values() {
+        let cfg = SimulationConfig::default();
+        let grazing = &cfg.world.food.grazing;
+        assert!(grazing.enabled);
+        assert!((grazing.factor - 0.5).abs() < 1e-6);
+        assert!((grazing.floor - 0.05).abs() < 1e-6);
+        assert_eq!(grazing.recovery_ticks, 1000);
+    }
+
+    #[test]
+    fn grazing_block_and_its_fields_are_serde_defaulted() {
+        let without_block: FoodResourceConfig = serde_json::from_str(
+            r#"{"growth_rate":0.1,"initial_density":1.0,"initial_coverage":0.5,
+                "spread_threshold_ratio":0.8,"spread_density_ratio":0.25,
+                "recovery_spawn_rate":0.01,"recovery_floor_ratio":0.01,"max_density":1.0}"#,
+        )
+        .unwrap();
+        assert!(without_block.grazing.enabled);
+        assert_eq!(without_block.grazing.recovery_ticks, 1000);
+
+        let partial: GrazingConfig = serde_json::from_str(r#"{"factor":0.25}"#).unwrap();
+        assert!(partial.enabled);
+        assert!((partial.factor - 0.25).abs() < 1e-6);
+        assert!((partial.floor - 0.05).abs() < 1e-6);
+        assert_eq!(partial.recovery_ticks, 1000);
+    }
+
+    #[test]
+    fn normalize_grazing_clamps_ratios_and_restores_defaults() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.grazing.factor = 1.5;
+        cfg.world.food.grazing.floor = -0.5;
+        cfg.world.food.grazing.recovery_ticks = 0;
+        cfg.normalize();
+        assert!((cfg.world.food.grazing.factor - 1.0).abs() < 1e-6);
+        assert!((cfg.world.food.grazing.floor - 0.0).abs() < 1e-6);
+        assert_eq!(cfg.world.food.grazing.recovery_ticks, 1000);
+
+        cfg.world.food.grazing.factor = f32::NAN;
+        cfg.world.food.grazing.floor = f32::INFINITY;
+        cfg.world.food.grazing.recovery_ticks = 1;
+        cfg.normalize();
+        assert!((cfg.world.food.grazing.factor - 0.5).abs() < 1e-6);
+        assert!((cfg.world.food.grazing.floor - 0.05).abs() < 1e-6);
+        assert_eq!(cfg.world.food.grazing.recovery_ticks, 1);
+
+        // `floor <= factor` is not required.
+        cfg.world.food.grazing.factor = 0.2;
+        cfg.world.food.grazing.floor = 0.9;
+        cfg.normalize();
+        assert!((cfg.world.food.grazing.factor - 0.2).abs() < 1e-6);
+        assert!((cfg.world.food.grazing.floor - 0.9).abs() < 1e-6);
     }
 
     #[test]

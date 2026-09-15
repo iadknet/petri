@@ -79,3 +79,47 @@ export const FOOD_OCCUPANCY_DEPLETION_FIELDS: FieldDef[] = [
 		testId: "config-field-food-occupancy-depletion-deposit-per-occupied-tick",
 	},
 ];
+
+export const FOOD_GRAZING_TOGGLES: BooleanFieldDef[] = [
+	{
+		path: "world.food.shared.grazing.enabled",
+		label: "Grazing Enabled",
+		defaultValue: true,
+		tooltip:
+			"Toggle the per-cell grazing fertility modifier: each bite slows regrowth where it landed until the cell rests",
+		testId: "config-field-food-grazing-enabled",
+	},
+];
+
+export const FOOD_GRAZING_FIELDS: FieldDef[] = [
+	{
+		path: "world.food.shared.grazing.factor",
+		label: "Grazing Bite Factor",
+		min: 0,
+		max: 1,
+		step: 0.01,
+		defaultValue: 0.5,
+		tooltip: "Multiplier a consuming bite applies to the cell's fertility modifier",
+		testId: "config-field-food-grazing-factor",
+	},
+	{
+		path: "world.food.shared.grazing.floor",
+		label: "Grazing Floor",
+		min: 0,
+		max: 1,
+		step: 0.01,
+		defaultValue: 0.05,
+		tooltip: "Lowest fertility modifier repeated bites can drive a cell to",
+		testId: "config-field-food-grazing-floor",
+	},
+	{
+		path: "world.food.shared.grazing.recovery_ticks",
+		label: "Grazing Recovery Ticks",
+		min: 1,
+		max: 100000,
+		step: 1,
+		defaultValue: 1000,
+		tooltip: "Ticks a fully floored cell needs to recover its fertility modifier from 0 to 1",
+		testId: "config-field-food-grazing-recovery-ticks",
+	},
+];

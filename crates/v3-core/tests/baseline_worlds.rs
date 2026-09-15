@@ -91,11 +91,11 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
     assert_eq!(points.len(), 6);
 }
 
-/// T11.F19 re-pin: every birth now draws one Bernoulli trial per genome unit
-/// (the per-unit supply rule), so a 30-tick run with births consumes a
-/// different RNG stream from the per-birth rule's and diverges in trajectory.
-/// The hash below was measured on the per-unit code; the identity the test
-/// pins is unchanged (previously re-pinned at T13.F04).
+/// T02.F04 re-pin: grazing ships enabled, so each applied Eat halves the
+/// bitten cell's fertility modifier and the hashed food grid regrows
+/// differently from the first bite onward. The hash below was measured on the
+/// T02.F04 code; the identity the test pins is unchanged (previously
+/// re-pinned at T11.F19).
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -123,7 +123,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 1397923697343438469);
+    assert_eq!(hash.finish(), 1819237026958739067);
 }
 
 use proptest::prelude::*;

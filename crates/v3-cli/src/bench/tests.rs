@@ -387,6 +387,15 @@ fn world_set_case_tracking_matches_a_replayed_run() {
             case.tracking.food_density_total.len(),
             case.case.food_type_count
         );
+        assert_eq!(
+            case.tracking.grazing_modifier_mean.len(),
+            case.case.food_type_count,
+            "one grazing modifier reading per configured food type"
+        );
+        assert_eq!(
+            case.tracking.grazed_cell_share.len(),
+            case.case.food_type_count
+        );
         assert_eq!(case.fractions, expected.fractions());
 
         // The transferred blocks come from the replayed run above (the

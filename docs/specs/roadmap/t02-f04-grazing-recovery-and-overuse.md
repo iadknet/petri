@@ -131,38 +131,42 @@ for any other reason is a defect.
 
 ## Implementation Tasks
 
-- [ ] Run `cargo test -p v3-core --test viability` first, then TDD the
+- [x] Run `cargo test -p v3-core --test viability` first, then TDD the
       modifier: config struct, defaults, normalization, storage, bite,
       recovery, three read sites, telemetry.
-- [ ] Property tests (proptest, v3-core): modifier always within
+- [x] Property tests (proptest, v3-core): modifier always within
       `[floor, 1.0]`; a bite is non-increasing and a recovery tick is
       non-decreasing; from any value, recovery reaches exactly 1.0 within
       `ceil((1 - m) * recovery_ticks) + 1` ticks (the extra tick absorbs f32
-      accumulation); a type-A bite leaves type B bit-identical.
-- [ ] Focused fixtures: a bitten cell recolonizes from a dense neighbor at
+      accumulation; `recovery_ticks` drawn from `1..=10_000`, since past
+      roughly `1e7` the f32 step no longer moves a value near 1.0); a type-A
+      bite leaves type B bit-identical.
+- [x] Focused fixtures: a bitten cell recolonizes from a dense neighbor at
       `factor` of the unbitten rate; a floored cell at `floor`; the empty
       grazed cell recovers; disabled reads 1.0 everywhere and re-enabling
       starts from 1.0; occupancy depletion still multiplies beside it.
-- [ ] Goal-world integration: a v3-cli bench test asserts each checked-in
+- [x] Goal-world integration: a v3-cli bench test asserts each checked-in
       recipe resolves with grazing enabled at the production defaults; the
-      per-case grazing readings appear in the goal report schema and
-      comparison block.
-- [ ] Config surface: reference-spec rows, runtime panel fields and tests,
+      per-case grazing readings (`WorldTracking::grazing_modifier_mean` and
+      `grazed_cell_share`, per-type strings beside `food_density_total`)
+      appear in the goal report schema and as `grazing_modifier_mean_type_{i}`
+      and `grazed_cell_share_type_{i}` in the comparison block.
+- [x] Config surface: reference-spec rows, runtime panel fields and tests,
       frontend types/fixtures, `patch_config` round-trip.
-- [ ] Re-pin the moved trajectory identities and record old/new in
+- [x] Re-pin the moved trajectory identities and record old/new in
       `docs/progress/readings/t02-f04.md`.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` (first) -> result in
+- [x] `cargo test -p v3-core --test viability` (first) -> result in
       [`docs/progress/readings/t02-f04.md`](../../progress/readings/t02-f04.md).
-- [ ] Focused and property tests named above -> test names and results in
+- [x] Focused and property tests named above -> test names and results in
       the readings file.
-- [ ] `cargo test -p v3-cli --test bench_artifacts` including the
+- [x] `cargo test -p v3-cli --test bench_artifacts` including the
       recipe-carries-grazing assertion -> readings file.
-- [ ] Frontend: `npx vitest run` on the touched config-panel tests, `npx tsc
+- [x] Frontend: `npx vitest run` on the touched config-panel tests, `npx tsc
       --noEmit -p .`, `npx biome check src` -> readings file.
-- [ ] `make check` -> clean.
+- [x] `make check` -> clean.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.

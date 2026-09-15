@@ -89,6 +89,12 @@ function defaultFoodShared(): FoodSharedConfig {
 			enabled: true,
 			deposit_per_occupied_tick: 0.08,
 		},
+		grazing: {
+			enabled: true,
+			factor: 0.5,
+			floor: 0.05,
+			recovery_ticks: 1000,
+		},
 	};
 }
 
@@ -184,6 +190,10 @@ function normalizeFoodConfig(food: StartupFoodConfig): StartupFoodConfig {
 			...sharedDefaults.occupancy_depletion,
 			...food.shared.occupancy_depletion,
 		},
+		grazing: {
+			...sharedDefaults.grazing,
+			...food.shared.grazing,
+		},
 	};
 	const types =
 		food.types.length > 0
@@ -205,6 +215,9 @@ function normalizeFoodConfig(food: StartupFoodConfig): StartupFoodConfig {
 			max_density: shared.max_density,
 			occupancy_depletion: {
 				...shared.occupancy_depletion,
+			},
+			grazing: {
+				...shared.grazing,
 			},
 		},
 		types,
@@ -255,6 +268,12 @@ function fromServerFoodConfig(config: SimulationConfig["world"]["food"]): Startu
 			occupancy_depletion: {
 				enabled: config.shared.occupancy_depletion.enabled,
 				deposit_per_occupied_tick: config.shared.occupancy_depletion.deposit_per_occupied_tick,
+			},
+			grazing: {
+				enabled: config.shared.grazing.enabled,
+				factor: config.shared.grazing.factor,
+				floor: config.shared.grazing.floor,
+				recovery_ticks: config.shared.grazing.recovery_ticks,
 			},
 		},
 		types: config.types.length > 0 ? config.types.map(cloneFoodType) : [createFoodType(0)],
@@ -388,6 +407,9 @@ function buildStartupFoodRequest(food: StartupFoodConfig): StartupFoodRequest {
 			max_density: normalized.shared.max_density,
 			occupancy_depletion: {
 				...normalized.shared.occupancy_depletion,
+			},
+			grazing: {
+				...normalized.shared.grazing,
 			},
 		},
 		types: normalized.types.map(cloneFoodType),
