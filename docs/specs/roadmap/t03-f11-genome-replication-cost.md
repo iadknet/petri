@@ -142,23 +142,36 @@ cited from the note's Section 4, not re-read here.
       a reproduction test showing a parent above the anchor is charged the
       factor and the child receives the unchanged transfer, and a rate-0.0
       identity check -> test names and results in the readings file.
-- [ ] Persistence re-read: goal persistence per world beside T11.F19's finals
+- [x] Persistence re-read: goal persistence per world beside T11.F19's finals
       (13,808 / 10,546 / 13,789) and plateaus and the T11.F04 `w1600` sweep
-      (11,610 / 10,398 / 11,093) -> readings file.
-- [ ] Neighborhood-read guard: `neighborhood_read.changed_per_all_births` per
+      (11,610 / 10,398 / 11,093) -> readings file. No world extinct.
+- [x] Neighborhood-read guard: `neighborhood_read.changed_per_all_births` per
       world against the standing floors and `mean_executed_nodes` against the
       threshold in the table below; the goal
       `reachable_structure_size_distribution` and terminal `mean_genome_size` /
-      `mean_mesh_nodes` per world beside T11.F19's -> readings file.
-- [ ] Paired 12,000-tick Orchards run, seed 11, cost against control, as
+      `mean_mesh_nodes` per world beside T11.F19's -> readings file. All pass.
+- [x] Paired 12,000-tick Orchards run, seed 11, cost against control, as
       specified below -> artifacts under `docs/progress/sweeps/t03-f11/`, final
-      and per-sample table in the readings file.
+      and per-sample table in the readings file. Per the user decision below:
+      the cost arm runs to tick 12,000; the control arm is stopped at 12:00
+      local time on 2026-09-15 and its last sampled tick (at least 4,000) is
+      the common tick at which the cost-versus-control `mean_genome_size` and
+      `mean_mesh_nodes` comparison is read; the levelling-off question
+      (increment over ticks 8,000–12,000 against 4,000–8,000) is answered from
+      the cost arm alone; each arm's wall time is recorded in `timing.txt`, the
+      control's to its stop with the truncation stated. Control stopped at
+      tick 4,500; cost complete to 12,000. Cost strictly below control at the
+      common tick; neither arm extinct; configs differ only in the one field.
+      Levelling-off ratio 2.29 — **not** levelling off. Full tables in the
+      readings file.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here.
-- [ ] Benchmark summaries stored at `docs/progress/features/t03-f11-genome-replication-cost.json`
+      survivor list stays here. (Not in the benchmark specialist's scope;
+      owned by the mutation specialist.)
+- [x] Benchmark summaries stored at `docs/progress/features/t03-f11-genome-replication-cost.json`
       and `-goal.json`, local raw hash/byte count and verification time checked,
-      series entry points to the summary, and no new full report staged.
+      series entry points to the summary, and no new full report staged. See
+      readings file for byte counts, exit statuses, and severe flags.
 
 ## Performance and Goal Impact
 
@@ -194,7 +207,18 @@ reported with no direction.
 | Paired Orchards run, seed 11, 12,000 ticks | T03.F08 pair on plains (386.5 vs 1,093.8 units at tick 12,000) is a reference, not this pair's control | Two `v3-cli run` arms from the release binary, each under `scripts/bench-wait`, sequential: `--ticks 12000 --sample-every 500 --seed 11 --config <recipe>`, the cost arm on `experiments/worlds/orchards-in-grassland.json` unchanged (defaults carry the rate) and the control arm on a stored copy of that recipe with `energy.lifecycle.genome_replication_cost_per_unit` 0.0 as its only addition. At tick 12,000 the cost arm's `mean_genome_size` and `mean_mesh_nodes` are strictly below the control's; neither arm extinct at any sample; `mean_generation`, units per generation `(size − 111) / generation`, and node slope `(nodes − 2) / generation` reported. Closure question, answered either way: the cost arm's `mean_genome_size` increment over ticks 8,000–12,000 against its increment over 4,000–8,000; below one quarter reads as levelling off. Budget 3 hours wall for the pair (the T11.F19 probe's 6,000-tick Orchards arm ran 2,052 s with the population at 85,000); a pair that exceeds it is reported and stops there. Each arm runs with `--save-config`, and the two applied configs are checked to differ in that one value only. Artifacts `cost.ndjson`, `control.ndjson`, `control-recipe.json`, `cost-config.json`, `control-config.json`, `timing.txt`, `run.sh` under `docs/progress/sweeps/t03-f11/`. |
 | Observation budgets | Workflow caps | Founder neighborhood below 10 s; summed evolved below 180 s; neighborhood read below 10 s summed; drift walk below 30 s; goal run below 15 minutes. |
 
-**Measured verdict.** Not yet measured.
+**Measured verdict.** Gate and goal both exit 0, `severe=false`, all six work
+counters `ok` (goal counters all decreased; `plasticity_updates` -57% is
+composition, not compute). All observation budgets under cap. No world
+extinct; persistence, neighborhood-read guard, terminal
+`mean_genome_size`/`mean_mesh_nodes`, and `action_charges.reproduce` all read
+as predeclared, no ceiling crossed. Founder neighborhood, drift-walk, and
+`recruitment_paths` blocks byte-identical to T11.F19 (config echo excepted).
+Paired Orchards run: cost complete to tick 12,000, control stopped by user
+decision at tick 4,500 (2026-09-15 11:59) — control-citing readings are
+truncated there. Cost strictly below control at the common tick; cost arm
+alone does **not** level off (ratio 2.29). Full detail in
+[`docs/progress/readings/t03-f11.md`](../../progress/readings/t03-f11.md).
 
 - Summaries: [gate](../../progress/features/t03-f11-genome-replication-cost.json),
   [goal](../../progress/features/t03-f11-genome-replication-cost-goal.json).
@@ -219,3 +243,20 @@ reported with no direction.
   reproduce charge anchored at the founder's 111 units, cached size is read,
   `complexity_cost` stays untouched, and the feature is sequenced directly
   after T11.F19 and depends on it; the drift walk is not its instrument.
+- Decision: (user, 2026-09-15) the paired Orchards run exceeds the spec's
+  3-hour wall budget: the cost arm completed 12,000 ticks in 8,506 s, and the
+  control arm, at tick 4,000 after 32 minutes with 68,592 creatures carrying
+  1,501.3 units in 43.19 nodes (generation 80.97; the cost arm at the same
+  tick: 80,131 creatures, 473.5 units, 10.44 nodes, generation 93.3), then
+  produced no sample for over an hour as its genomes grew (4.2 GB resident,
+  CPU-bound on a quiet host), projecting more than 14 hours to finish. The
+  user chose: the control arm runs until 12:00 local time and is then
+  stopped; the size and node comparison is read at the last tick the control
+  reached (at least 4,000), the cost arm is read in full to 12,000 and the
+  levelling-off question is answered from it alone, and the control's wall
+  time is recorded to the stop with its truncation stated. The truncated
+  control is a limit on the pair's comparison depth, stated wherever the
+  reading is cited. The 3-hour budget was the spec owner's sizing guard from
+  the T11.F19 probe (2,052 s for 6,000 ticks at a population of 20,746 at
+  tick 4,000), and the overrun is the population and genome growth on this
+  substrate, not the host. Applies to this closure only.
