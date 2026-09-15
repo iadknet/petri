@@ -1,12 +1,13 @@
 //! Pins the sampled trajectory, including stochastic descendants and actions.
 //! Telemetry and wall-clock fields are deliberately excluded.
 //!
-//! T13.F03 re-pin: applicability-first target selection changes which
-//! operator applies at each node-internal mutation event and what it
-//! consumes from the RNG, so every evolved trajectory after the first
-//! affected birth differs from the pre-repair one. The digest below was
-//! measured on the repaired code; the pin's purpose — that the accounting
-//! keeps the trajectory reproducible — is unchanged.
+//! T03.F11 re-pin: the genome replication cost multiplies the reproduce
+//! charge of every parent above the founder's 111 units, and this forced-
+//! mutation run has such parents reproducing inside its 64 ticks, so their
+//! energy and every trajectory after the first such birth differ from the
+//! pre-feature ones. The digest below was measured on the T03.F11 code after
+//! two runs agreed (previously re-pinned at T13.F03); the pin's purpose — that
+//! the accounting keeps the trajectory reproducible — is unchanged.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -72,6 +73,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "86eee62ceca74ab840577183ae154af998e047ce687b866f23485e95363d7cec"
+        "96497a4fbe59ff4fb397c54ede7dd4e93e36d790d9090f9eaa3ea25c77ae2fa9"
     );
 }

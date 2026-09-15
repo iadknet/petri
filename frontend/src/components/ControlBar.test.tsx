@@ -73,6 +73,7 @@ const MOCK_CONFIG: SimulationConfig = {
 			max_energy: 100,
 			energy_decay_per_tick: 0.01,
 			genome_carry_cost_per_unit: 0.0001,
+			genome_replication_cost_per_unit: 0.1,
 			min_reproduce_energy: 1,
 			default_offspring_energy: 8,
 		},
