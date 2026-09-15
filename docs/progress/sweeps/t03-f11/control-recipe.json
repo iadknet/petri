@@ -1,0 +1,89 @@
+{
+  "world": {
+    "world_seed": 1104,
+    "food": {
+      "types": [
+        {
+          "name": "Grass",
+          "color": "#84cc16",
+          "initial_density": 0.4,
+          "initial_coverage": 0.65,
+          "growth_inhibitor": 0.1,
+          "energy_per_unit": 4.0,
+          "growth_rate": 0.05,
+          "recovery_spawn_rate": 0.001,
+          "initial_fertility_only": false
+        },
+        {
+          "name": "Fruit",
+          "color": "#f97316",
+          "initial_density": 1.0,
+          "initial_coverage": 0.85,
+          "growth_inhibitor": 0.0,
+          "energy_per_unit": 15.0,
+          "growth_rate": 0.12,
+          "recovery_spawn_rate": 0.0,
+          "initial_fertility_only": true
+        }
+      ],
+      "fertility": {
+        "min_fertility": 0.0,
+        "max_fertility": 2.0,
+        "layers": [
+          {
+            "target": {
+              "SingleType": {
+                "type_idx": 0
+              }
+            },
+            "weight": 0.08,
+            "algorithm": {
+              "Uniform": {
+                "value": 1.0
+              }
+            }
+          },
+          {
+            "target": {
+              "SingleType": {
+                "type_idx": 0
+              }
+            },
+            "weight": 1.0,
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 60,
+                "min_radius": 40,
+                "max_radius": 90,
+                "falloff": 0.5,
+                "seed": null
+              }
+            }
+          },
+          {
+            "target": {
+              "SingleType": {
+                "type_idx": 1
+              }
+            },
+            "weight": 1.0,
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 24,
+                "min_radius": 50,
+                "max_radius": 110,
+                "falloff": 0.6,
+                "seed": null
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "energy": {
+    "lifecycle": {
+      "genome_replication_cost_per_unit": 0.0
+    }
+  }
+}
