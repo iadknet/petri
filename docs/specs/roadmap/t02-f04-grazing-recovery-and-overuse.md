@@ -56,18 +56,19 @@ skips empty cells, so re-grazing is already paced by recolonization and the
 floor is the only thing that bounds repeated damage; (b) lowering the type's
 fertility grid itself, rejected because the habitat map is pinned by
 `world_seed` and must stay the tick-zero reading recipes and the app show.
-Theory already read in full for T12.F04 (Charnov 1976, marginal value; a
-patch is worth revisiting when its intake rate recovers to the habitat mean)
-is what makes a slow-returning grazed patch a memory problem: the median goal
-generation is 141 ticks, so a 500-tick single-bite recovery spans several
-generations. No external dependency is involved.
+Theory read in full for T12.F04 (Charnov 1976: a patch is worth revisiting
+when its intake rate recovers to the habitat mean) makes a slow-returning
+grazed patch a memory problem: the median goal generation is 141 ticks, so a
+500-tick recovery spans several generations. No external dependency.
 
 **Mechanics (source of truth for the implementer).**
 
 - State: one `Grid<f32>` modifier per configured food type, initialized to
   1.0, owned by the ordinary-food module beside `density_by_type`. Resized to
-  1.0 when the catalog changes; reset to 1.0 when `enabled` flips; untouched
-  by live changes to `factor`, `floor`, or `recovery_ticks`.
+  1.0 when the catalog changes; reset to 1.0 when `enabled` flips and when
+  `seed_density` seeds a fresh world (no grazing history, as occupancy
+  depletion is reset there); untouched by live changes to `factor`, `floor`,
+  or `recovery_ticks`.
 - Bite: whenever a consume path removes a positive amount of type `t` at a
   cell, `m[t][cell] = max(floor, m[t][cell] * factor)`. `consume_type` is the
   production path (`apply_typed_eat` → `World::consume_food_type`);
@@ -98,11 +99,16 @@ generations. No external dependency is involved.
   every stored recipe and config loads. Normalization mirrors
   `normalize_food_shared`: `factor` and `floor` finite and clamped to
   `[0.0, 1.0]`, invalid falls back to the default; `floor <= factor` is not
-  required; `recovery_ticks` minimum 1, zero or missing falls back to 1000.
-  Reference rows go into `docs/reference/v3-world-grid-spec.md` Section 4 and
-  the runtime-editable table and knob list of
-  `docs/reference/v3-runtime-config-spec.md`; the config examples in
-  `docs/reference/v3-server-api-protocol-spec.md` gain the block.
+  required; `recovery_ticks` is clamped to `[1, 10_000]`, zero or missing
+  falls back to 1000: the cap is the domain the property test below covers,
+  and past roughly `1e7` the f32 step stalls short of 1.0, breaking
+  "recovers toward 1.0". The panel field carries the same bounds. Reference
+  rows go into
+  `docs/reference/v3-world-grid-spec.md` Section 4 and the runtime-editable
+  table and knob list of `docs/reference/v3-runtime-config-spec.md`; the
+  config examples in `docs/reference/v3-server-api-protocol-spec.md` gain
+  the block; `docs/reference/v3-tick-orchestration-spec.md` Phase 0 names
+  the recovery step between the occupancy depletion update and food growth.
 - Runtime panel: `FoodParametersSection.tsx` gains a grazing toggle and the
   three numeric fields beside the occupancy depletion ones, with the
   `types/config.ts`, `startupConfig.ts` merge/normalize, and fixture
@@ -114,10 +120,12 @@ generations. No external dependency is involved.
   recovery pass, and `SimStats` records them like the depletion fields. The
   existing applied typed-eat totals are the bite count: an applied `Eat`
   with food is exactly one bite while grazing is enabled, so no second
-  counter is added. The goal report records, per case, the final-tick mean
-  modifier and grazed-cell share by type next to `typed_eat_share`. That
-  reading, the typed-eat totals, and the changed per-case `config_digest`
-  are the evidence the pressure is enabled and acting in each world.
+  counter is added. The goal report records, per case, the mean modifier
+  and grazed-cell share by type on `WorldTracking` (final-tick state, also
+  sampled into every checkpoint block as two small per-type vectors), with
+  comparison rows following `typed_eat_share_type_{i}`. That reading, the
+  typed-eat totals, and the changed per-case `config_digest` are the
+  evidence the pressure is enabled and acting in each world.
 - Determinism: the layer uses no RNG; seeded runs stay reproducible.
 
 **Trajectory pins that legitimately move.** Because the default is on, these
@@ -138,9 +146,8 @@ for any other reason is a defect.
       `[floor, 1.0]`; a bite is non-increasing and a recovery tick is
       non-decreasing; from any value, recovery reaches exactly 1.0 within
       `ceil((1 - m) * recovery_ticks) + 1` ticks (the extra tick absorbs f32
-      accumulation; `recovery_ticks` drawn from `1..=10_000`, since past
-      roughly `1e7` the f32 step no longer moves a value near 1.0); a type-A
-      bite leaves type B bit-identical.
+      accumulation; `recovery_ticks` drawn from the whole accepted domain
+      `1..=10_000`); a type-A bite leaves type B bit-identical.
 - [x] Focused fixtures: a bitten cell recolonizes from a dense neighbor at
       `factor` of the unbitten rate; a floored cell at `floor`; the empty
       grazed cell recovers; disabled reads 1.0 everywhere and re-enabling
