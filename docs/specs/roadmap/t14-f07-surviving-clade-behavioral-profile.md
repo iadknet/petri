@@ -1,6 +1,6 @@
 # T14.F07 — Surviving-Clade Behavioral Profile
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-15
 **Feature**: T14.F07
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -152,7 +152,7 @@ unchanged.
 
 ## Verification
 
-- [ ] `make check` -> exit 0 on the final feature code; commit named here.
+- [x] `make check` -> exit 0 on the final feature code at `d9e0c6ef`.
 - [x] Focused tests: `cargo test -p v3-core -p v3-cli` -> exit 0 at `53d68f92`
       (every target passing; test names and counts in
       [`docs/progress/readings/t14-f07.md`](../../progress/readings/t14-f07.md));
@@ -249,15 +249,15 @@ apples-to-apples comparison.
 
 ## Success Criteria
 
-- [ ] Every living creature carries lifetime attempts by action type, applied
+- [x] Every living creature carries lifetime attempts by action type, applied
       eats by food type, predation kills and hits taken, incremented only in
       sequential Phase 2 and zero at birth.
-- [ ] Each goal case's end-of-run block carries `surviving_clade_profiles`
+- [x] Each goal case's end-of-run block carries `surviving_clade_profiles`
       with one row per surviving founder clade, sorted, sizes summing to the
       final population; checkpoint samples are unchanged.
-- [ ] Both benchmark profiles pass with `severe=false`, every indicator
+- [x] Both benchmark profiles pass with `severe=false`, every indicator
       unmoved, and no epoch re-pin.
-- [ ] The readings file shows the per-world row table with the cross-checks.
+- [x] The readings file shows the per-world row table with the cross-checks.
 
 ## Notes for AI Agents
 
