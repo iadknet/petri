@@ -1,6 +1,6 @@
 # T02.F04 — Grazing Recovery and Overuse
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-15
 **Feature**: T02.F04
 **Track**: [T02 — Environmental Dynamics](../../roadmaps/t02-environmental-dynamics.md)
@@ -147,7 +147,7 @@ a defect.
       recipe-carries-grazing assertion -> readings file.
 - [x] Frontend: `npx vitest run` on the touched config-panel tests, `npx tsc
       --noEmit -p .`, `npx biome check src` -> readings file.
-- [x] `make check` -> exit 0 after each pass (readings file).
+- [x] `make check` -> exit 0 after each pass (readings file); tested commit `e6c3579b`.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on `9ccdf996`: `101 mutants
       tested in 26m: 4 missed, 95 caught, 2 unviable`, no timeouts; output
       `~/.local/share/petri-tools/mutants/t02-f04/mutants.out`, run mode
@@ -224,17 +224,17 @@ Details: [`docs/progress/readings/t02-f04.md`](../../progress/readings/t02-f04.m
 
 ## Success Criteria
 
-- [ ] A bite multiplies only its type's modifier at that cell, clamped to
+- [x] A bite multiplies only its type's modifier at that cell, clamped to
       the floor; the modifier recovers linearly to 1.0.
-- [ ] The modifier multiplies fertility at local growth, spread target, and
+- [x] The modifier multiplies fertility at local growth, spread target, and
       recovery spawn; occupancy depletion still applies beside it.
-- [ ] The four values are normalized config under
+- [x] The four values are normalized config under
       `world.food.shared.grazing`, round-trip through the panel and
       `patch_config`, and are in the reference specs.
-- [ ] The gate world and all three goal worlds run with grazing enabled at
+- [x] The gate world and all three goal worlds run with grazing enabled at
       production defaults; the goal report shows applied eats and grazed
       cells in each.
-- [ ] Verification items above pass; mutation and benchmark records exist.
+- [x] Verification items above pass; mutation and benchmark records exist.
 
 ## Notes for AI Agents
 
@@ -253,3 +253,4 @@ Details: [`docs/progress/readings/t02-f04.md`](../../progress/readings/t02-f04.m
   passable cells over the barrier grid every tick, disabled included, and
   rewrites barrier cells to 1.0 each pass; within predeclared cost, a cache on
   the layer would remove a full pass.
+- Cost: `/usage` not collected in this session; implementer passes 2 (advisor consults 2/2); spec-owner resumes after Plan 4; reviewer P1 0, P2 0, P3 3; one fresh mutation run, one incremental feedback pass.
