@@ -121,17 +121,17 @@ unchanged.
 
 ## Implementation Tasks
 
-- [ ] Add the four per-creature counters to `CreatureState`, zero them in both
+- [x] Add the four per-creature counters to `CreatureState`, zero them in both
       constructors, and increment them at the sites named above.
-- [ ] Add `SurvivingCladeProfiles` and its row type to `tracking.rs`, the
+- [x] Add `SurvivingCladeProfiles` and its row type to `tracking.rs`, the
       `surviving_clade_profiles` field on `WorldTracking`, and its construction
       in `with_transferred_counters`.
-- [ ] Tests: counter increments at each Phase 2 site including the failed-eat,
+- [x] Tests: counter increments at each Phase 2 site including the failed-eat,
       rejected-steal and kill branches, child counters start at zero, the
       by-type/attempted sum invariant after a mixed action sequence, a
       two-clade fixture producing sorted rows whose sizes sum to the population,
       and the extinction case yielding `rows: []`.
-- [ ] The bucketing is a pure function over an iterator of per-creature
+- [x] The bucketing is a pure function over an iterator of per-creature
       readings (`lineage_id` plus the counted fields) with a proptest in
       `v3-cli`: rows ascending and unique by `lineage_id`, one row per distinct
       input lineage, sizes summing to the input count, and each row's integer

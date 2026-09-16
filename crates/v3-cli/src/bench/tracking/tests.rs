@@ -6,6 +6,7 @@ use crate::UNDEFINED;
 use proptest::prelude::*;
 use v3_core::config::SimulationConfig;
 use v3_core::contracts::Position;
+use v3_core::creature::action_log::ActionType;
 use v3_core::kernel::occupancy_grid::OCCUPANCY_CELL_COUNT;
 use v3_core::simulation::seed_simulation;
 
@@ -710,7 +711,7 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
 fn checkpoint_tracking_omits_every_transferred_block() {
     use v3_core::simulation::seed_simulation;
 
-    const TRANSFERRED_KEYS: [&str; 10] = [
+    const TRANSFERRED_KEYS: [&str; 11] = [
         "typed_eats_failed_total",
         "mesh_dispatches_energy_exhausted_total",
         "mutation_supply",
@@ -721,6 +722,7 @@ fn checkpoint_tracking_omits_every_transferred_block() {
         "energy_flows",
         "cognition",
         "reproductive_success_by_cognitive_class",
+        "surviving_clade_profiles",
     ];
 
     let sim = seed_simulation(SimulationConfig::default(), 7);
@@ -1091,9 +1093,28 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
             reproductive_success_by_cognitive_class: None,
             energy_flows: None,
             cognition: None,
+            surviving_clade_profiles: Some(SurvivingCladeProfiles {
+                definition: "surviving-clade-profile-v1".into(),
+                rows: vec![SurvivingCladeProfileRow {
+                    lineage_id: 4,
+                    size: 2,
+                    mean_energy: six(1.5),
+                    mean_age: six(10.0),
+                    mean_generation: six(3.0),
+                    mean_genome_size: six(111.0),
+                    eats_by_type: vec![6],
+                    actions_by_type: BTreeMap::from([("Eat".to_string(), 6)]),
+                    predation_kills: 0,
+                    predation_hits_taken: 1,
+                }],
+            }),
         },
     };
     let wire = serde_json::to_value(&sample).unwrap();
+    assert_eq!(
+        wire["surviving_clade_profiles"]["rows"][0]["lineage_id"], 4,
+        "the profile rows are on the wire under their own key: {wire}"
+    );
     assert_eq!(
         wire["moves_attempted_total"], 9,
         "tracking stays flat: {wire}"
@@ -1145,10 +1166,241 @@ fn transferred_tracking_blocks_are_absent_not_zero_in_a_historical_report() {
         legacy.tracking.reproductive_success_by_cognitive_class,
         None
     );
+    assert_eq!(legacy.tracking.surviving_clade_profiles, None);
     let encoded = serde_json::to_value(legacy).unwrap();
+    assert!(encoded.get("surviving_clade_profiles").is_none());
     assert!(encoded.get("mortality").is_none());
     assert!(encoded.get("energy_flows").is_none());
     assert!(encoded
         .get("reproductive_success_by_cognitive_class")
         .is_none());
+}
+
+// ── T14.F07 surviving-clade profiles ─────────────────────────────────────────
+
+fn member(lineage_id: u32, energy: f32, eats: Vec<u64>, actions: [u64; 5]) -> CladeMemberReading {
+    CladeMemberReading {
+        lineage_id,
+        energy,
+        age: 10,
+        generation: 2,
+        genome_size: 111,
+        eats_by_type: eats,
+        actions_by_type: actions,
+        predation_kills: 1,
+        predation_hits_taken: 3,
+    }
+}
+
+#[test]
+fn surviving_clade_rows_are_sorted_by_lineage_and_padded_to_the_food_type_count() {
+    let rows = bucket_surviving_clades(
+        3,
+        vec![
+            member(7, 4.0, vec![1], [1, 1, 0, 0, 0]),
+            member(2, 1.0, vec![0, 2, 5, 9], [0, 2, 3, 0, 1]),
+            member(7, 2.0, vec![], [0, 0, 0, 1, 0]),
+        ],
+    );
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].lineage_id, 2);
+    assert_eq!(rows[0].size, 1);
+    assert_eq!(
+        rows[0].eats_by_type,
+        vec![0, 2, 5],
+        "a type index past the configured food types is not a food type"
+    );
+    assert_eq!(rows[0].mean_energy, six(1.0));
+    assert_eq!(rows[1].lineage_id, 7);
+    assert_eq!(rows[1].size, 2);
+    assert_eq!(rows[1].eats_by_type, vec![1, 0, 0]);
+    assert_eq!(rows[1].mean_energy, six(3.0));
+    assert_eq!(rows[1].mean_age, six(10.0));
+    assert_eq!(rows[1].mean_generation, six(2.0));
+    assert_eq!(rows[1].mean_genome_size, six(111.0));
+    assert_eq!(rows[1].predation_kills, 2);
+    assert_eq!(rows[1].predation_hits_taken, 6);
+    assert_eq!(
+        rows[1].actions_by_type,
+        BTreeMap::from([
+            ("NoOp".to_string(), 1),
+            ("Eat".to_string(), 1),
+            ("Move".to_string(), 0),
+            ("Reproduce".to_string(), 1),
+            ("StealEnergy".to_string(), 0),
+        ])
+    );
+}
+
+proptest! {
+    /// The bucketing is a partition of its input: rows ascend and are
+    /// unique by lineage, one per distinct lineage, their sizes sum to the
+    /// input count, and every integer column is the sum over the row's
+    /// members, whatever the draw.
+    #[test]
+    fn surviving_clade_bucketing_partitions_its_input(
+        members in proptest::collection::vec(
+            (
+                0u32..6,
+                0.0f32..100.0,
+                0u64..1_000,
+                0u64..50,
+                1u32..500,
+                proptest::collection::vec(0u64..20, 0..4),
+                proptest::array::uniform5(0u64..20),
+                0u64..5,
+                0u64..5,
+            ),
+            0..40,
+        ),
+        food_type_count in 0usize..5,
+    ) {
+        let members: Vec<CladeMemberReading> = members
+            .into_iter()
+            .map(|(lineage_id, energy, age, generation, genome_size, eats, actions, kills, hits)| {
+                CladeMemberReading {
+                    lineage_id,
+                    energy,
+                    age,
+                    generation,
+                    genome_size,
+                    eats_by_type: eats,
+                    actions_by_type: actions,
+                    predation_kills: kills,
+                    predation_hits_taken: hits,
+                }
+            })
+            .collect();
+        let rows = bucket_surviving_clades(food_type_count, members.iter().cloned());
+
+        let lineages: Vec<u32> = rows.iter().map(|row| row.lineage_id).collect();
+        prop_assert!(lineages.windows(2).all(|pair| pair[0] < pair[1]));
+        let distinct: std::collections::BTreeSet<u32> =
+            members.iter().map(|m| m.lineage_id).collect();
+        prop_assert_eq!(lineages, distinct.into_iter().collect::<Vec<_>>());
+        prop_assert_eq!(rows.iter().map(|row| row.size).sum::<u64>(), members.len() as u64);
+
+        for row in &rows {
+            let mine: Vec<&CladeMemberReading> =
+                members.iter().filter(|m| m.lineage_id == row.lineage_id).collect();
+            prop_assert_eq!(row.size, mine.len() as u64);
+            prop_assert_eq!(row.predation_kills, mine.iter().map(|m| m.predation_kills).sum::<u64>());
+            prop_assert_eq!(
+                row.predation_hits_taken,
+                mine.iter().map(|m| m.predation_hits_taken).sum::<u64>()
+            );
+            prop_assert_eq!(row.actions_by_type.len(), 5);
+            for (slot, action) in ActionType::ALL.iter().enumerate() {
+                prop_assert_eq!(
+                    row.actions_by_type[action.as_key()],
+                    mine.iter().map(|m| m.actions_by_type[slot]).sum::<u64>()
+                );
+            }
+            prop_assert_eq!(row.eats_by_type.len(), food_type_count);
+            for (index, eaten) in row.eats_by_type.iter().enumerate() {
+                prop_assert_eq!(
+                    *eaten,
+                    mine.iter()
+                        .map(|m| m.eats_by_type.get(index).copied().unwrap_or(0))
+                        .sum::<u64>()
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn the_terminal_block_profiles_each_surviving_clade_in_lineage_order() {
+    let mut cfg = SimulationConfig::default();
+    cfg.world.width = 32;
+    cfg.world.height = 32;
+    cfg.population.initial_creatures = 5;
+    let mut sim = seed_simulation(cfg, 42);
+    assert_eq!(sim.creatures.len(), 5);
+    let food_type_count = sim.config.world.food.types.len();
+    // Two clades: founder 3 keeps its lineage, everyone else joins lineage 1.
+    for (index, creature) in sim.creatures.values_mut().enumerate() {
+        creature.identity.lineage_id = if index == 3 { 3 } else { 1 };
+        creature.energy = index as f32;
+        creature.lifetime_action_attempted_count = 1;
+        creature.lifetime_actions_attempted_by_type = [0, 0, 1, 0, 0];
+        if index == 3 {
+            creature.lifetime_eats_applied_by_type = vec![1];
+            creature.lifetime_predation_kills_count = 2;
+        } else {
+            creature.lifetime_predation_hits_taken_count = 1;
+        }
+    }
+
+    let terminal = WorldTracking::observe(&sim).with_transferred_counters(&sim);
+    let profiles = terminal
+        .surviving_clade_profiles
+        .clone()
+        .expect("terminal block");
+    assert_eq!(profiles.definition, "surviving-clade-profile-v1");
+    assert_eq!(
+        profiles.rows.len() as u64,
+        clade_diversity(sim.creatures.values().map(|c| c.identity.lineage_id)).0
+    );
+    assert_eq!(
+        profiles
+            .rows
+            .iter()
+            .map(|row| row.lineage_id)
+            .collect::<Vec<_>>(),
+        vec![1, 3]
+    );
+    assert_eq!(
+        profiles.rows.iter().map(|row| row.size).sum::<u64>(),
+        sim.creatures.len() as u64
+    );
+    let [big, small] = profiles.rows.as_slice() else {
+        panic!("two rows")
+    };
+    assert_eq!(big.size, 4);
+    assert_eq!(big.mean_energy, six((0.0 + 1.0 + 2.0 + 4.0) / 4.0));
+    assert_eq!(big.predation_hits_taken, 4);
+    assert_eq!(big.predation_kills, 0);
+    assert_eq!(big.eats_by_type, vec![0; food_type_count]);
+    assert_eq!(big.actions_by_type["Move"], 4);
+    assert_eq!(small.size, 1);
+    assert_eq!(small.mean_energy, six(3.0));
+    assert_eq!(small.predation_kills, 2);
+    assert_eq!(small.eats_by_type.len(), food_type_count);
+    assert_eq!(small.eats_by_type[0], 1);
+    assert_eq!(small.mean_generation, six(0.0));
+    assert_eq!(
+        small.mean_genome_size,
+        six(f64::from(
+            sim.creatures.values().nth(3).unwrap().cached_genome_size
+        ))
+    );
+
+    let value = serde_json::to_value(&terminal).unwrap();
+    assert_eq!(
+        value["surviving_clade_profiles"]["rows"][1]["actions_by_type"]
+            .as_object()
+            .unwrap()
+            .len(),
+        5
+    );
+    assert!(
+        serde_json::to_value(WorldTracking::observe(&sim))
+            .unwrap()
+            .get("surviving_clade_profiles")
+            .is_none(),
+        "checkpoint samples never carry the profile block"
+    );
+}
+
+#[test]
+fn extinction_yields_an_empty_profile_table_not_an_absent_one() {
+    let mut sim = seed_simulation(SimulationConfig::default(), 7);
+    sim.creatures.clear();
+    let terminal = WorldTracking::observe(&sim).with_transferred_counters(&sim);
+    let value = serde_json::to_value(&terminal).unwrap();
+    assert_eq!(
+        value["surviving_clade_profiles"],
+        serde_json::json!({ "definition": "surviving-clade-profile-v1", "rows": [] })
+    );
 }
