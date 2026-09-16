@@ -148,9 +148,19 @@ a defect.
 - [x] Frontend: `npx vitest run` on the touched config-panel tests, `npx tsc
       --noEmit -p .`, `npx biome check src` -> readings file.
 - [x] `make check` -> exit 0 after each pass (readings file).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on `9ccdf996`: `101 mutants
+      tested in 26m: 4 missed, 95 caught, 2 unviable`, no timeouts; output
+      `~/.local/share/petri-tools/mutants/t02-f04/mutants.out`, run mode
+      `fresh` (a later `MUTANTS_ITERATE=1` pass left the directory reading
+      `incremental` with an empty `missed.txt`); transcript in the readings
+      file. Survivors, all killed by one test with no production change:
+
+      | Survivor (`crates/v3-core/src/kernel/ordinary_food/mod.rs`) | Resolution |
+      | --- | --- |
+      | `101:9` replace `FoodResource::grazing_modifier_at -> f32` with `0.0` | killed: `grazing_modifier_at_reads_the_bitten_cell_and_one_elsewhere` (`kernel/world.rs`) |
+      | `101:9` replace `FoodResource::grazing_modifier_at -> f32` with `-1.0` | killed: same test |
+      | `101:9` replace `FoodResource::grazing_modifier_at -> f32` with `1.0` | killed: same test (bitten cell reads 0.5) |
+      | `101:12` delete `!` in `FoodResource::grazing_modifier_at` | killed: same test (valid type on a bitten cell reads 0.5, not 1.0) |
 - [x] Benchmark summaries stored, verified -> readings file.
 
 ## Performance and Goal Impact
