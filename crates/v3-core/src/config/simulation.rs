@@ -128,6 +128,7 @@ pub struct GrazingConfig {
     /// Lowest value repeated bites can drive the modifier to.
     pub floor: f32,
     /// Ticks a fully floored modifier needs to recover from 0.0 to 1.0.
+    /// Normalized to `[1, 10_000]`; zero falls back to 1000.
     pub recovery_ticks: u32,
 }
 
@@ -143,6 +144,9 @@ impl Default for GrazingConfig {
 }
 
 const DEFAULT_GRAZING_RECOVERY_TICKS: u32 = 1000;
+/// Upper bound `normalize` clamps `recovery_ticks` to; the grazing property
+/// tests cover exactly `1..=MAX_GRAZING_RECOVERY_TICKS`.
+pub(crate) const MAX_GRAZING_RECOVERY_TICKS: u32 = 10_000;
 
 /// Fertility layer algorithm variants.
 #[non_exhaustive]
@@ -1188,9 +1192,10 @@ fn normalize_food_shared(shared: &mut FoodResourceConfig) {
     );
     shared.grazing.factor = normalize_f32_clamp(shared.grazing.factor, 0.0, 1.0, 0.5);
     shared.grazing.floor = normalize_f32_clamp(shared.grazing.floor, 0.0, 1.0, 0.05);
-    if shared.grazing.recovery_ticks == 0 {
-        shared.grazing.recovery_ticks = DEFAULT_GRAZING_RECOVERY_TICKS;
-    }
+    shared.grazing.recovery_ticks = match shared.grazing.recovery_ticks {
+        0 => DEFAULT_GRAZING_RECOVERY_TICKS,
+        ticks => ticks.min(MAX_GRAZING_RECOVERY_TICKS),
+    };
     shared.initial_density = normalize_f32_clamp(
         shared.initial_density,
         0.0,
@@ -2582,6 +2587,19 @@ mod tests {
         cfg.normalize();
         assert!((cfg.world.food.grazing.factor - 0.2).abs() < 1e-6);
         assert!((cfg.world.food.grazing.floor - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_grazing_caps_recovery_ticks_at_the_property_domain() {
+        let mut cfg = SimulationConfig::default();
+        for (input, expected) in [(10_000, 10_000), (10_001, 10_000), (u32::MAX, 10_000)] {
+            cfg.world.food.grazing.recovery_ticks = input;
+            cfg.normalize();
+            assert_eq!(
+                cfg.world.food.grazing.recovery_ticks, expected,
+                "input {input}"
+            );
+        }
     }
 
     #[test]

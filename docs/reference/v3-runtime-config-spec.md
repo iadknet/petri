@@ -362,7 +362,7 @@ knobs visible in the runtime-config contract.
 | `world.food.shared.grazing.enabled` | `bool` | `true` | Enables the per-type, per-cell grazing fertility modifier; flipping it resets every modifier to `1.0`. | `v3-world-grid-spec.md` |
 | `world.food.shared.grazing.factor` | `f32` | `0.5` | Must be finite; clamp to `[0.0, 1.0]`; invalid values fall back to `0.5`. Live edits leave stored modifiers untouched. | `v3-world-grid-spec.md` |
 | `world.food.shared.grazing.floor` | `f32` | `0.05` | Must be finite; clamp to `[0.0, 1.0]`; invalid values fall back to `0.05`. Live edits leave stored modifiers untouched. | `v3-world-grid-spec.md` |
-| `world.food.shared.grazing.recovery_ticks` | `u32` | `1000` | Minimum `1`; zero falls back to `1000`. Live edits leave stored modifiers untouched. | `v3-world-grid-spec.md` |
+| `world.food.shared.grazing.recovery_ticks` | `u32` | `1000` | Clamped to `[1, 10000]`; zero falls back to `1000`. Live edits leave stored modifiers untouched. | `v3-world-grid-spec.md` |
 
 Runtime config transport posture:
 - These fields are editable through v3alpha2 config GET/PATCH transport.

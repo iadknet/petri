@@ -116,7 +116,7 @@ export const FOOD_GRAZING_FIELDS: FieldDef[] = [
 		path: "world.food.shared.grazing.recovery_ticks",
 		label: "Grazing Recovery Ticks",
 		min: 1,
-		max: 100000,
+		max: 10000,
 		step: 1,
 		defaultValue: 1000,
 		tooltip: "Ticks a fully floored cell needs to recover its fertility modifier from 0 to 1",
