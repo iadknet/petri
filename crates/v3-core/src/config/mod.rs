@@ -5,6 +5,8 @@ pub use recipe::{
 mod simulation;
 
 pub use crate::contracts::OrdinaryFoodTypeId;
+#[cfg(test)]
+pub(crate) use simulation::MAX_GRAZING_RECOVERY_TICKS;
 pub use simulation::{
     AnnealingConfig, EnergyConfig, EnergyCostsConfig, EnergyLifecycleConfig, FertilityAlgorithm,
     FertilityConfig, FertilityLayer, FertilityLayerTarget, FoodConfig, FoodResourceConfig,
