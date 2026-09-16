@@ -31,9 +31,9 @@ in each.
 - A grazing sensor, a grazing input to any brain, or a change to `Eat`.
 - Server health or frontend telemetry for the modifier; the goal report and
   `SimStats` carry the readings, the runtime panel carries only the config.
-- Retiring the orphaned `crates/v3-core/src/kernel/food_resource/{depletion,
-  growth,reconfigure}.rs` (not compiled; `mod.rs` re-exports
-  `ordinary_food`). Do not edit them.
+- Retiring the orphaned, uncompiled
+  `crates/v3-core/src/kernel/food_resource/{depletion,growth,reconfigure}.rs`;
+  do not edit them.
 
 ## Inputs and Invariants
 
@@ -50,12 +50,12 @@ art: one `Grid<f32>` per world, deposited by standing, decayed per tick,
 multiplied into every growth delta. The grazing layer is its per-type,
 bite-driven sibling with the opposite sign convention (a modifier that
 starts at 1.0 and is pulled down), and the two multiply beside each other.
-Alternatives weighed and rejected: (a) a bite rate limit per cell instead of
-a compounding floor, rejected because a bite zeroes the cell and local growth
-skips empty cells, so re-grazing is already paced by recolonization and the
-floor is the only thing that bounds repeated damage; (b) lowering the type's
-fertility grid itself, rejected because the habitat map is pinned by
-`world_seed` and must stay the tick-zero reading recipes and the app show.
+Alternatives rejected: (a) a per-cell bite rate limit instead of a
+compounding floor, because a bite zeroes the cell and local growth skips
+empty cells, so re-grazing is already paced by recolonization and only the
+floor bounds repeated damage; (b) lowering the fertility grid itself, because
+the habitat map is pinned by `world_seed` and must stay the tick-zero reading
+recipes and the app show.
 Theory read in full for T12.F04 (Charnov 1976: a patch is worth revisiting
 when its intake rate recovers to the habitat mean) makes a slow-returning
 grazed patch a memory problem: the median goal generation is 141 ticks, so a
@@ -145,9 +145,10 @@ for any other reason is a defect.
 - [x] Property tests (proptest, v3-core): modifier always within
       `[floor, 1.0]`; a bite is non-increasing and a recovery tick is
       non-decreasing; from any value, recovery reaches exactly 1.0 within
-      `ceil((1 - m) * recovery_ticks) + 1` ticks (the extra tick absorbs f32
-      accumulation; `recovery_ticks` drawn from the whole accepted domain
-      `1..=10_000`); a type-A bite leaves type B bit-identical.
+      `ceil((1 - m) * n) + ceil(n^2 * f32::EPSILON)` ticks for
+      `n = recovery_ticks` (accumulated f32 rounding, at most 12 ticks at the
+      cap; derivation in the test's doc comment); `n` drawn from the whole
+      accepted domain `1..=10_000`; a type-A bite leaves type B bit-identical.
 - [x] Focused fixtures: a bitten cell recolonizes from a dense neighbor at
       `factor` of the unbitten rate; a floored cell at `floor`; the empty
       grazed cell recovers; disabled reads 1.0 everywhere and re-enabling
