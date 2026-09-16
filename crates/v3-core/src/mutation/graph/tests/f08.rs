@@ -220,6 +220,7 @@ pub(super) fn phase_def() -> CgpGraphBackendDef {
                 source: GraphSource::ComputeNode(1),
                 weight: 1.0,
             }],
+            direction_bids: Vec::new(),
         }],
         execute_gate: ExecuteGate {
             inputs: vec![GraphEdge {
@@ -477,6 +478,7 @@ fn introspection_edge_def(plasticity: bool, on_compute_input: bool) -> CgpGraphB
             } else {
                 vec![edge]
             },
+            direction_bids: Vec::new(),
         }],
         execute_gate: ExecuteGate { inputs: Vec::new() },
     }

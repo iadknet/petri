@@ -1,20 +1,22 @@
 //! CGP-style graph mutation operators.
 //!
 //! Topology mutations operate on `compute_nodes` only. Edge mutations work
-//! across all 5 edge-bearing surfaces: compute inputs, sink inputs, action
-//! gate edges, action param edges, and execute gate inputs.
+//! across all 6 edge-bearing surfaces: compute inputs, sink inputs, action
+//! gate edges, action param edges, action direction-bank edges, and execute
+//! gate inputs.
 
 use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference};
 use crate::creature::genome::cgp::{
-    ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
-    WorldActionKind,
+    ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, DirectionBidEdge,
+    GraphEdge, GraphSource, WorldActionKind,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::types::MutationSkipReason;
+use crate::runtime::action_decode::DIRECTION_BANK_SLOTS;
 
 #[inline]
 fn graph_def_mut(
@@ -261,18 +263,21 @@ fn random_world_action_kind(rng: &mut impl Rng) -> WorldActionKind {
 // ─── Edge surface helpers ───────────────────────────────────────────────────
 
 /// Identifies which edge-bearing surface an edge belongs to.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum EdgeSurface {
     ComputeInput(usize),
     SinkInput(usize),
     ActionGate(usize),
     ActionParam(usize),
+    /// A slot's direction bank (T11.F21): edges carry a `direction` beside
+    /// the `GraphEdge`.
+    ActionBid(usize),
     ExecuteGate,
 }
 
 /// Every edge site on the def, defining the canonical surface order:
-/// compute inputs, sink inputs, per action slot gate then param inputs,
-/// execute gate. The single enumeration [`total_edge_count`],
+/// compute inputs, sink inputs, per action slot gate, param, then bank
+/// inputs, execute gate. The single enumeration [`total_edge_count`],
 /// [`pick_random_edge`], the edge-site applicability predicates and the
 /// operators that draw from filtered edge sets all read.
 fn edge_sites(def: &CgpGraphBackendDef) -> impl Iterator<Item = (EdgeSurface, usize)> + '_ {
@@ -288,23 +293,39 @@ fn edge_sites(def: &CgpGraphBackendDef) -> impl Iterator<Item = (EdgeSurface, us
             .chain(
                 (0..slot.param_inputs.len()).map(move |edge| (EdgeSurface::ActionParam(i), edge)),
             )
+            .chain(
+                (0..slot.direction_bids.len()).map(move |edge| (EdgeSurface::ActionBid(i), edge)),
+            )
     });
     let gate = (0..def.execute_gate.inputs.len()).map(|edge| (EdgeSurface::ExecuteGate, edge));
     compute.chain(sinks).chain(actions).chain(gate)
 }
 
-/// Read-only twin of [`get_edge_vec_mut`].
-fn edge_vec(def: &CgpGraphBackendDef, surface: EdgeSurface) -> &[GraphEdge] {
+/// The edge at `idx` on `surface`; read-only twin of [`edge_at_mut`].
+fn edge_at(def: &CgpGraphBackendDef, surface: EdgeSurface, idx: usize) -> &GraphEdge {
     match surface {
-        EdgeSurface::ComputeInput(i) => &def.compute_nodes[i].inputs,
-        EdgeSurface::SinkInput(i) => &def.output_sinks[i].inputs,
-        EdgeSurface::ActionGate(i) => &def.action_bank[i].gate_inputs,
-        EdgeSurface::ActionParam(i) => &def.action_bank[i].param_inputs,
-        EdgeSurface::ExecuteGate => &def.execute_gate.inputs,
+        EdgeSurface::ComputeInput(i) => &def.compute_nodes[i].inputs[idx],
+        EdgeSurface::SinkInput(i) => &def.output_sinks[i].inputs[idx],
+        EdgeSurface::ActionGate(i) => &def.action_bank[i].gate_inputs[idx],
+        EdgeSurface::ActionParam(i) => &def.action_bank[i].param_inputs[idx],
+        EdgeSurface::ActionBid(i) => &def.action_bank[i].direction_bids[idx].edge,
+        EdgeSurface::ExecuteGate => &def.execute_gate.inputs[idx],
     }
 }
 
-/// Count total edges across all 5 surfaces: the length of [`edge_sites`].
+/// The `direction` field of a bank edge; `None` on every other surface.
+fn bid_direction_mut(
+    def: &mut CgpGraphBackendDef,
+    surface: EdgeSurface,
+    idx: usize,
+) -> Option<&mut u8> {
+    match surface {
+        EdgeSurface::ActionBid(i) => Some(&mut def.action_bank[i].direction_bids[idx].direction),
+        _ => None,
+    }
+}
+
+/// Count total edges across all 6 surfaces: the length of [`edge_sites`].
 fn total_edge_count(def: &CgpGraphBackendDef) -> usize {
     edge_sites(def).count()
 }
@@ -320,14 +341,15 @@ fn pick_random_edge(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Option<(Edg
 }
 
 /// Pick a random edge container (surface) to add an edge to.
-/// Uniform across all surfaces (compute inputs, sink inputs, action gate/param, execute gate).
+/// Uniform across all surfaces (compute inputs, sink inputs, action
+/// gate/param/bank, execute gate).
 pub(crate) fn pick_random_surface(
     def: &CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Option<EdgeSurface> {
     // Build list of all available surfaces
     let mut surfaces = Vec::with_capacity(
-        def.compute_nodes.len() + def.output_sinks.len() + def.action_bank.len() * 2 + 1,
+        def.compute_nodes.len() + def.output_sinks.len() + def.action_bank.len() * 3 + 1,
     );
 
     for i in 0..def.compute_nodes.len() {
@@ -339,6 +361,7 @@ pub(crate) fn pick_random_surface(
     for i in 0..def.action_bank.len() {
         surfaces.push(EdgeSurface::ActionGate(i));
         surfaces.push(EdgeSurface::ActionParam(i));
+        surfaces.push(EdgeSurface::ActionBid(i));
     }
     surfaces.push(EdgeSurface::ExecuteGate);
 
@@ -349,17 +372,64 @@ pub(crate) fn pick_random_surface(
     Some(surfaces[rng.gen_range(0..surfaces.len())])
 }
 
-/// Get mutable reference to the edge vec for a given surface.
-pub(crate) fn get_edge_vec_mut(
+/// Mutable access to the edge at `idx` on `surface`.
+pub(crate) fn edge_at_mut(
     def: &mut CgpGraphBackendDef,
     surface: EdgeSurface,
-) -> &mut Vec<GraphEdge> {
+    idx: usize,
+) -> &mut GraphEdge {
     match surface {
-        EdgeSurface::ComputeInput(i) => &mut def.compute_nodes[i].inputs,
-        EdgeSurface::SinkInput(i) => &mut def.output_sinks[i].inputs,
-        EdgeSurface::ActionGate(i) => &mut def.action_bank[i].gate_inputs,
-        EdgeSurface::ActionParam(i) => &mut def.action_bank[i].param_inputs,
-        EdgeSurface::ExecuteGate => &mut def.execute_gate.inputs,
+        EdgeSurface::ComputeInput(i) => &mut def.compute_nodes[i].inputs[idx],
+        EdgeSurface::SinkInput(i) => &mut def.output_sinks[i].inputs[idx],
+        EdgeSurface::ActionGate(i) => &mut def.action_bank[i].gate_inputs[idx],
+        EdgeSurface::ActionParam(i) => &mut def.action_bank[i].param_inputs[idx],
+        EdgeSurface::ActionBid(i) => &mut def.action_bank[i].direction_bids[idx].edge,
+        EdgeSurface::ExecuteGate => &mut def.execute_gate.inputs[idx],
+    }
+}
+
+/// Append `edge` to `surface`; a bank edge draws its `direction` uniformly
+/// over the eight bank slots.
+fn push_edge(
+    def: &mut CgpGraphBackendDef,
+    surface: EdgeSurface,
+    edge: GraphEdge,
+    rng: &mut impl Rng,
+) {
+    match surface {
+        EdgeSurface::ComputeInput(i) => def.compute_nodes[i].inputs.push(edge),
+        EdgeSurface::SinkInput(i) => def.output_sinks[i].inputs.push(edge),
+        EdgeSurface::ActionGate(i) => def.action_bank[i].gate_inputs.push(edge),
+        EdgeSurface::ActionParam(i) => def.action_bank[i].param_inputs.push(edge),
+        EdgeSurface::ActionBid(i) => def.action_bank[i].direction_bids.push(DirectionBidEdge {
+            edge,
+            direction: rng.gen_range(0..DIRECTION_BANK_SLOTS as u8),
+        }),
+        EdgeSurface::ExecuteGate => def.execute_gate.inputs.push(edge),
+    }
+}
+
+/// Remove the edge at `idx` from `surface`.
+fn remove_edge_at(def: &mut CgpGraphBackendDef, surface: EdgeSurface, idx: usize) {
+    match surface {
+        EdgeSurface::ComputeInput(i) => {
+            def.compute_nodes[i].inputs.remove(idx);
+        }
+        EdgeSurface::SinkInput(i) => {
+            def.output_sinks[i].inputs.remove(idx);
+        }
+        EdgeSurface::ActionGate(i) => {
+            def.action_bank[i].gate_inputs.remove(idx);
+        }
+        EdgeSurface::ActionParam(i) => {
+            def.action_bank[i].param_inputs.remove(idx);
+        }
+        EdgeSurface::ActionBid(i) => {
+            def.action_bank[i].direction_bids.remove(idx);
+        }
+        EdgeSurface::ExecuteGate => {
+            def.execute_gate.inputs.remove(idx);
+        }
     }
 }
 
@@ -464,7 +534,7 @@ pub(crate) fn split_existing_edge(
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let (surface, edge_idx) = sites[rng.gen_range(0..sites.len())];
-    let old_source = edge_vec(def, surface)[edge_idx].source;
+    let old_source = edge_at(def, surface, edge_idx).source;
 
     if let EdgeSurface::ComputeInput(consumer_idx) = surface {
         // Insert an empty placeholder first so the global index remap (which
@@ -493,7 +563,7 @@ pub(crate) fn split_existing_edge(
                 weight: 1.0,
             }]),
         );
-        get_edge_vec_mut(def, surface)[edge_idx].source = GraphSource::ComputeNode(new_idx);
+        edge_at_mut(def, surface, edge_idx).source = GraphSource::ComputeNode(new_idx);
     }
     Ok(())
 }
@@ -508,7 +578,7 @@ fn splittable_edge_sites<'a>(
     input_refs: &'a [InputReference],
 ) -> impl Iterator<Item = (EdgeSurface, usize)> + 'a {
     edge_sites(def).filter(move |&(surface, edge_idx)| {
-        let source = edge_vec(def, surface)[edge_idx].source;
+        let source = edge_at(def, surface, edge_idx).source;
         if let GraphSource::ComputeNode(idx) = source {
             if idx as usize >= def.compute_nodes.len() {
                 return false;
@@ -695,8 +765,7 @@ pub(crate) fn add_edge(
     let compute_count = def.compute_nodes.len() as u16;
     let source = random_graph_source(compute_count, input_refs, config, rng);
     let weight = rng.gen_range(-1.0f32..=1.0);
-    let edges = get_edge_vec_mut(def, surface);
-    edges.push(GraphEdge { source, weight });
+    push_edge(def, surface, GraphEdge { source, weight }, rng);
     if let (Some(weights), EdgeSurface::ComputeInput(node)) = (&mut def.birth_weights, surface) {
         weights[node].push(None);
     }
@@ -710,8 +779,7 @@ pub(crate) fn remove_edge(
 ) -> Result<(), MutationSkipReason> {
     let (surface, edge_idx) =
         pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let edges = get_edge_vec_mut(def, surface);
-    edges.remove(edge_idx);
+    remove_edge_at(def, surface, edge_idx);
     if let (Some(weights), EdgeSurface::ComputeInput(node)) = (&mut def.birth_weights, surface) {
         weights[node].remove(edge_idx);
     }
@@ -729,9 +797,9 @@ pub(crate) fn retarget_edge(
         pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     let compute_count = def.compute_nodes.len() as u16;
     let new_source = random_graph_source(compute_count, input_refs, config, rng);
-    let edges = get_edge_vec_mut(def, surface);
-    let changed = edges[edge_idx].source != new_source;
-    edges[edge_idx].source = new_source;
+    let edge = edge_at_mut(def, surface, edge_idx);
+    let changed = edge.source != new_source;
+    edge.source = new_source;
     if changed {
         reset_inherited_edge(def, surface, edge_idx);
     }
@@ -752,8 +820,7 @@ pub(crate) fn alter_edge_weight_in_def(
     let (surface, edge_idx) =
         pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     reset_inherited_edge(def, surface, edge_idx);
-    let edges = get_edge_vec_mut(def, surface);
-    let w = &mut edges[edge_idx].weight;
+    let w = &mut edge_at_mut(def, surface, edge_idx).weight;
     if w.abs() > 0.01 {
         *w *= 1.0 + rng.gen_range(-0.2f32..=0.2);
     } else {
@@ -873,6 +940,48 @@ enum EdgeFieldMove {
     SubIdx(i32),
     SharedSlot(i32),
     FlipPrevious,
+    /// A bank edge's `direction` slot (T11.F21); bank surfaces only.
+    Direction(i32),
+}
+
+/// Every field-level move valid for the edge at `edge_idx` on `surface`:
+/// the source moves of [`valid_edge_field_moves`] plus, on a direction bank,
+/// the `direction` moves of [`valid_direction_moves`].
+fn valid_edge_moves(
+    def: &CgpGraphBackendDef,
+    surface: EdgeSurface,
+    edge_idx: usize,
+    input_refs: &[InputReference],
+    config: &MutationConfig,
+) -> Vec<EdgeFieldMove> {
+    let compute_count = def.compute_nodes.len() as u16;
+    let mut moves = valid_edge_field_moves(
+        edge_at(def, surface, edge_idx).source,
+        compute_count,
+        input_refs,
+        config,
+    );
+    if let EdgeSurface::ActionBid(slot) = surface {
+        moves.extend(valid_direction_moves(
+            def.action_bank[slot].direction_bids[edge_idx].direction,
+        ));
+    }
+    moves
+}
+
+/// The one-unit `direction` moves of a bank edge (T11.F21): bounded like a
+/// `ComputeNode` index, no wrap, and none for an out-of-range direction.
+fn valid_direction_moves(direction: u8) -> Vec<EdgeFieldMove> {
+    let mut moves = Vec::new();
+    if (direction as usize) < DIRECTION_BANK_SLOTS {
+        if direction > 0 {
+            moves.push(EdgeFieldMove::Direction(-1));
+        }
+        if (direction as usize) + 1 < DIRECTION_BANK_SLOTS {
+            moves.push(EdgeFieldMove::Direction(1));
+        }
+    }
+    moves
 }
 
 /// Enumerate every field-level move that is a valid single-step change for
@@ -957,8 +1066,8 @@ fn apply_edge_field_move(source: &mut GraphSource, mv: EdgeFieldMove) {
             *previous = !*previous;
         }
         (source, mv) => unreachable!(
-            "valid_edge_field_moves only returns moves matching the source variant; \
-             got {source:?} with {mv:?}"
+            "valid_edge_field_moves only returns moves matching the source variant and \
+             direction moves are applied to the bank edge, not its source; got {source:?} with {mv:?}"
         ),
     }
 }
@@ -970,15 +1079,8 @@ fn raw_field_edge_sites<'a>(
     input_refs: &'a [InputReference],
     config: &'a MutationConfig,
 ) -> impl Iterator<Item = (EdgeSurface, usize)> + 'a {
-    let compute_count = def.compute_nodes.len() as u16;
     edge_sites(def).filter(move |&(surface, edge_idx)| {
-        !valid_edge_field_moves(
-            edge_vec(def, surface)[edge_idx].source,
-            compute_count,
-            input_refs,
-            config,
-        )
-        .is_empty()
+        !valid_edge_moves(def, surface, edge_idx, input_refs, config).is_empty()
     })
 }
 
@@ -1015,12 +1117,17 @@ pub(crate) fn raw_field_mutation(
     }
 
     let (surface, edge_idx) = edges[pick - param_count];
-    let source = edge_vec(def, surface)[edge_idx].source;
-    let compute_count = def.compute_nodes.len() as u16;
-    let moves = valid_edge_field_moves(source, compute_count, input_refs, config);
+    let moves = valid_edge_moves(def, surface, edge_idx, input_refs, config);
     let chosen = moves[rng.gen_range(0..moves.len())];
-    apply_edge_field_move(&mut get_edge_vec_mut(def, surface)[edge_idx].source, chosen);
-    if get_edge_vec_mut(def, surface)[edge_idx].source != source {
+    if let EdgeFieldMove::Direction(delta) = chosen {
+        let direction = bid_direction_mut(def, surface, edge_idx)
+            .expect("direction moves are offered on bank edges only");
+        *direction = (i32::from(*direction) + delta) as u8;
+        return Ok(());
+    }
+    let source = edge_at(def, surface, edge_idx).source;
+    apply_edge_field_move(&mut edge_at_mut(def, surface, edge_idx).source, chosen);
+    if edge_at(def, surface, edge_idx).source != source {
         reset_inherited_edge(def, surface, edge_idx);
     }
     Ok(())
@@ -1152,6 +1259,7 @@ mod tests {
                     weight: 1.0,
                 }],
                 param_inputs: Vec::new(),
+                direction_bids: Vec::new(),
             }],
             execute_gate: ExecuteGate { inputs: Vec::new() },
         }
@@ -2364,5 +2472,125 @@ mod tests {
             "a movable edge alone is a raw-field site"
         );
         assert!(raw_field_mutation(&mut edges_only, &input_refs, &config, &mut test_rng()).is_ok());
+    }
+
+    // ── Direction bank surface (T11.F21) ────────────────────────────────────
+
+    /// A def whose only edge-bearing surfaces are one slot's bank and the
+    /// compute node it reads, so every edge draw lands on the bank.
+    fn bank_only_def(direction: u8) -> CgpGraphBackendDef {
+        let mut def = CgpGraphBackendDef {
+            birth_weights: None,
+            compute_nodes: vec![ComputeNode {
+                kind: ComputeNodeKind::Add,
+                inputs: Vec::new(),
+                plasticity: None,
+            }],
+            output_sinks: Vec::new(),
+            action_bank: vec![ActionSlot::inert(ActionSlotBehavior::Emit(
+                WorldActionKind::Move,
+            ))],
+            execute_gate: ExecuteGate { inputs: Vec::new() },
+        };
+        def.action_bank[0].direction_bids.push(DirectionBidEdge {
+            edge: GraphEdge {
+                source: GraphSource::ComputeNode(0),
+                weight: 1.0,
+            },
+            direction,
+        });
+        def
+    }
+
+    #[test]
+    fn add_edge_lands_on_the_bank_surface_with_a_direction_in_range() {
+        let input_refs = sample_input_refs();
+        let config = MutationConfig::default();
+        let mut landed = false;
+        for seed in 0..64u64 {
+            let mut def = minimal_def();
+            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+            let surface = pick_random_surface(&def, &mut rng).unwrap();
+            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+            add_edge(&mut def, &input_refs, &config, &mut rng).unwrap();
+            if let EdgeSurface::ActionBid(slot) = surface {
+                landed = true;
+                let bids = &def.action_bank[slot].direction_bids;
+                assert_eq!(bids.len(), 1);
+                assert!((bids[0].direction as usize) < DIRECTION_BANK_SLOTS);
+            }
+        }
+        assert!(landed, "no seed in 0..64 drew the bank surface");
+    }
+
+    #[test]
+    fn edge_operators_act_on_a_bank_edge() {
+        let input_refs = sample_input_refs();
+        let config = MutationConfig::default();
+
+        let mut def = bank_only_def(3);
+        remove_edge(&mut def, &mut test_rng()).unwrap();
+        assert!(def.action_bank[0].direction_bids.is_empty());
+
+        let mut def = bank_only_def(3);
+        let mut retargeted = false;
+        for seed in 0..32u64 {
+            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+            retarget_edge(&mut def, &input_refs, &config, &mut rng).unwrap();
+            if def.action_bank[0].direction_bids[0].edge.source != GraphSource::ComputeNode(0) {
+                retargeted = true;
+                break;
+            }
+        }
+        assert!(retargeted);
+        assert_eq!(def.action_bank[0].direction_bids[0].direction, 3);
+
+        let mut def = bank_only_def(3);
+        let mut rng = test_rng();
+        for _ in 0..10 {
+            alter_edge_weight_in_def(&mut def, &mut rng).unwrap();
+        }
+        assert!((def.action_bank[0].direction_bids[0].edge.weight - 1.0).abs() > f32::EPSILON);
+
+        let mut def = bank_only_def(3);
+        split_existing_edge(&mut def, &input_refs, &mut test_rng()).unwrap();
+        assert_eq!(def.compute_nodes.len(), 2);
+        assert_eq!(
+            def.action_bank[0].direction_bids[0].edge.source,
+            GraphSource::ComputeNode(1)
+        );
+    }
+
+    #[test]
+    fn raw_field_mutation_moves_a_bank_direction_by_one_unit() {
+        let input_refs = sample_input_refs();
+        let config = MutationConfig::default();
+        // A single unparameterized compute node offers no source move and no
+        // parameter, so the direction is the only raw field on the def.
+        let def = bank_only_def(3);
+        assert_eq!(
+            valid_edge_moves(&def, EdgeSurface::ActionBid(0), 0, &input_refs, &config),
+            vec![EdgeFieldMove::Direction(-1), EdgeFieldMove::Direction(1)]
+        );
+        let mut seen = std::collections::BTreeSet::new();
+        for seed in 0..16u64 {
+            let mut def = bank_only_def(3);
+            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+            raw_field_mutation(&mut def, &input_refs, &config, &mut rng).unwrap();
+            seen.insert(def.action_bank[0].direction_bids[0].direction);
+        }
+        assert_eq!(seen.into_iter().collect::<Vec<_>>(), vec![2, 4]);
+    }
+
+    #[test]
+    fn direction_moves_are_bounded_and_absent_out_of_range() {
+        assert_eq!(valid_direction_moves(0), vec![EdgeFieldMove::Direction(1)]);
+        assert_eq!(valid_direction_moves(7), vec![EdgeFieldMove::Direction(-1)]);
+        assert!(valid_direction_moves(8).is_empty());
+        assert!(!has_raw_field_site(
+            &bank_only_def(8),
+            &sample_input_refs(),
+            &MutationConfig::default()
+        ));
     }
 }

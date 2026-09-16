@@ -15,10 +15,10 @@ use super::schema::{
     NeighborhoodOperatorRow, NeighborhoodRead, NeighborhoodReadGenome,
     NeighborhoodRequestedBirthBucket, NeighborhoodSampledGenome, NeighborhoodTally,
     OperatorOpportunityRow, PopulationPersistence, PopulationPersistenceSeed, RetentionRow,
-    StructuralCompanionsCensus, StructuralCompanionsSeed, StructureSizeDistribution,
-    TemporalMemorySensitivity, TemporalMemorySensitivitySeed, TimeToFirstRow, Totals,
-    LINEAGE_DIVERSITY_VERSION, MEMORY_SENSITIVITY_VERSION, NEIGHBORHOOD_READ_VERSION,
-    REACHABLE_STRUCTURE_VERSION,
+    Steering, SteeringChance, SteeringPooled, StructuralCompanionsCensus, StructuralCompanionsSeed,
+    StructureSizeDistribution, TemporalMemorySensitivity, TemporalMemorySensitivitySeed,
+    TimeToFirstRow, Totals, LINEAGE_DIVERSITY_VERSION, MEMORY_SENSITIVITY_VERSION,
+    NEIGHBORHOOD_READ_VERSION, REACHABLE_STRUCTURE_VERSION,
 };
 use crate::{fraction_or_undefined, six, UNDEFINED};
 use std::collections::BTreeMap;
@@ -26,6 +26,7 @@ use std::time::Instant;
 use v3_core::config::{MutationConfig, SimulationConfig};
 use v3_core::creature::founder::founder_genome;
 use v3_core::creature::genome::analysis::mesh_reachable_nodes;
+use v3_core::neighborhood::steering::{self, SteeringBattery};
 use v3_core::neighborhood::{
     self, evaluate_genome, evolved_sample_ranks, read_sample_ranks, structural_companions, Battery,
     BirthResult, EvalContext, GenomeEvaluation, OperatorRow, StructuralCompanions, Tally,
@@ -303,14 +304,20 @@ pub(super) fn generation_distribution(
     })
 }
 
-pub(super) fn mesh_execution(
+/// One genome's `mesh_execution` block and its `steering-v1` reading from a
+/// single observed battery pass: the T11.F14 executed set feeds the
+/// steering `bank_written` flag, so the knockout pass runs once.
+pub(super) fn mesh_execution_and_steering(
     battery: &Battery,
+    steering_battery: &SteeringBattery,
     genome: &v3_core::creature::genome::CreatureGenome,
     context: &EvalContext,
-) -> Indicator<MeshExecution> {
+) -> (Indicator<MeshExecution>, Indicator<Steering>) {
     use v3_core::neighborhood::mesh_execution::{KNOCKOUT_METHOD, MESH_EXECUTION_VERSION};
-    let reading = battery.mesh_execution(genome, context.runtime, context.shared_memory_decay_rate);
-    Indicator::Defined(MeshExecution {
+    let sets =
+        battery.mesh_execution_sets(genome, context.runtime, context.shared_memory_decay_rate);
+    let reading = sets.reading;
+    let mesh = MeshExecution {
         backends: Some(reading.backends),
         version: MESH_EXECUTION_VERSION.to_string(),
         executions_per_genome: neighborhood_battery_execution_count(),
@@ -322,6 +329,36 @@ pub(super) fn mesh_execution(
         knockout_count: reading.knockout_count as u64,
         route_varies_with_input: reading.route_varies_with_input,
         hop_cap_hits: reading.hop_cap_hits as u64,
+    };
+    let steering = Steering {
+        version: steering::STEERING_VERSION.to_string(),
+        seed: steering::STEERING_SEED,
+        base_count: steering::STEERING_BASE_COUNT as u32,
+        reading: steering_battery.read(genome, context.runtime, &sets.executed),
+    };
+    (Indicator::Defined(mesh), Indicator::Defined(steering))
+}
+
+/// The pooled `steering-v1` block for one seed's sample.
+pub(super) fn steering_pooled(pooled: steering::SteeringPooled) -> Indicator<SteeringPooled> {
+    Indicator::Defined(SteeringPooled {
+        version: steering::STEERING_VERSION.to_string(),
+        genomes: pooled.genomes,
+        scenarios: pooled.scenarios,
+        moves: pooled.moves,
+        exact_hits: pooled.exact_hits,
+        within_45: pooled.within_45,
+        avoidance_trials: pooled.avoidance_trials,
+        avoided: pooled.avoided,
+        bank_written: pooled.bank_written,
+        exact_hit_fraction: fraction_or_undefined(pooled.exact_hits, pooled.moves),
+        within_45_fraction: fraction_or_undefined(pooled.within_45, pooled.moves),
+        avoidance_fraction: fraction_or_undefined(pooled.avoided, pooled.avoidance_trials),
+        bank_written_fraction: fraction_or_undefined(pooled.bank_written, pooled.genomes),
+        chance: SteeringChance {
+            exact: steering::CHANCE_EXACT,
+            within_45: steering::CHANCE_WITHIN_45,
+        },
     })
 }
 
@@ -530,9 +567,13 @@ pub(super) fn compute_founder_neighborhood(
         sizes.founder_births,
         0,
     );
+    let steering_battery = SteeringBattery::generate(context.food_type_count);
+    let (mesh_execution, steering) =
+        mesh_execution_and_steering(battery, &steering_battery, &subject, &context);
     NeighborhoodFounderHalf {
         generation: Some(0),
-        mesh_execution: mesh_execution(battery, &subject, &context),
+        mesh_execution,
+        steering,
         reachable_node_count: structural_companions(&subject).reachable_node_count as u64,
         operator_rows: to_neighborhood_operator_rows(&evaluation.operator_rows),
         births: to_neighborhood_births(&evaluation.births),
@@ -569,6 +610,8 @@ pub(super) fn evolved_neighborhood_for_seed(
     let mut sampled_genomes = Vec::with_capacity(ranks.len());
     let mut pooled_operator_tallies: Vec<Tally> = vec![Tally::default(); catalog.len()];
     let mut pooled_births = BirthResult::default();
+    let steering_battery = SteeringBattery::generate(context.food_type_count);
+    let mut pooled_steering = steering::SteeringPooled::default();
 
     for (genome_index, &rank) in ranks.iter().enumerate() {
         let creature_id = creature_ids[rank];
@@ -593,10 +636,16 @@ pub(super) fn evolved_neighborhood_for_seed(
             *pooled = pooled.merge(row.tally);
         }
         pooled_births = pooled_births.merge(&evaluation.births);
+        let (mesh_execution, steering) =
+            mesh_execution_and_steering(battery, &steering_battery, &creature.genome, context);
+        if let Indicator::Defined(steering) = &steering {
+            pooled_steering = pooled_steering.merge(steering.reading);
+        }
 
         sampled_genomes.push(NeighborhoodSampledGenome {
             generation: Some(creature.generation),
-            mesh_execution: mesh_execution(battery, &creature.genome, context),
+            mesh_execution,
+            steering,
             rank: rank as u64,
             creature_id: format!("{creature_id:?}"),
             operator_rows: to_neighborhood_operator_rows(&evaluation.operator_rows),
@@ -627,6 +676,7 @@ pub(super) fn evolved_neighborhood_for_seed(
         sampled_genomes,
         pooled_operator_rows,
         pooled_births: to_neighborhood_births(&pooled_births),
+        steering_pooled: steering_pooled(pooled_steering),
     }
 }
 

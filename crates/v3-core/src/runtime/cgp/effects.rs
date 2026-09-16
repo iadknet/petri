@@ -1,11 +1,12 @@
 //! Post-convergence effect pass for CGP-style graph backend evaluation.
 
-use crate::config::OrdinaryFoodTypeId;
-use crate::contracts::{Direction, InputReference, WorldAction, MAX_GATE_SLOTS};
+use crate::contracts::{InputReference, WorldAction, MAX_GATE_SLOTS};
 use crate::creature::genome::cgp::{
-    ActionSlotBehavior, CgpGraphBackendDef, GraphEdge, OutputSinkKind, WorldActionKind,
+    ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, DirectionBidEdge, GraphEdge,
+    OutputSinkKind, WorldActionKind,
 };
-use crate::runtime::cgp::sources::{resolve_source, resolve_source_post_convergence};
+use crate::runtime::action_decode::{decode_world_action, DirectionBank, DIRECTION_BANK_SLOTS};
+use crate::runtime::cgp::sources::resolve_source_post_convergence;
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::trace::domain::{
@@ -49,53 +50,133 @@ fn edges_wsum(
     buf.iter().copied().sum()
 }
 
-#[inline]
-fn decode_direction(raw: f32) -> Direction {
-    let clamped = if raw.is_nan() {
-        0.0
-    } else {
-        raw.round().clamp(0.0, 7.0)
-    };
-    Direction::ALL[clamped as usize]
+/// The direction bank a movement slot writes (T11.F21): bid `d` is the
+/// weighted sum of the edges with `direction == d`, and the bank exists once
+/// any edge lands in `0..8`. `Eat`, `NoOp`, and out-of-range edges write
+/// nothing.
+#[allow(clippy::too_many_arguments)]
+fn direction_bank(
+    kind: WorldActionKind,
+    bids: &[DirectionBidEdge],
+    compute_count: usize,
+    curr_outputs: &[f32],
+    input_refs: &[InputReference],
+    resolve_ctx: &ResolveCtx<'_>,
+    shared_memory: &[f32; 16],
+    prev_shared_memory: &[f32; 16],
+) -> Option<DirectionBank> {
+    let movement = matches!(
+        kind,
+        WorldActionKind::Move | WorldActionKind::Reproduce | WorldActionKind::StealEnergy
+    );
+    let mut bank: Option<DirectionBank> = None;
+    for bid in bids
+        .iter()
+        .filter(|bid| movement && (bid.direction as usize) < DIRECTION_BANK_SLOTS)
+    {
+        let v = resolve_source_post_convergence(
+            &bid.edge.source,
+            compute_count,
+            curr_outputs,
+            input_refs,
+            resolve_ctx,
+            shared_memory,
+            prev_shared_memory,
+        );
+        bank.get_or_insert([0.0; DIRECTION_BANK_SLOTS])[bid.direction as usize] +=
+            v * bid.edge.weight;
+    }
+    bank
 }
 
-#[inline]
-fn clamp_non_negative_finite(v: f32) -> f32 {
-    if v.is_finite() && v >= 0.0 {
-        v
-    } else {
-        0.0
+/// A fired `Emit(kind)` slot's decoded action beside the values it decoded
+/// from: the two parameter sums and the direction bank, if one was written.
+struct EmittedAction {
+    param_values: [f32; 2],
+    bank: Option<DirectionBank>,
+    action: WorldAction,
+}
+
+/// Resolve a fired `Emit(kind)` slot: `param_inputs[i]` fills `param[i]` for
+/// `i < 2`, the direction bank sums `direction_bids`, and the shared decode
+/// table turns both into the action.
+#[allow(clippy::too_many_arguments)]
+fn emit_action(
+    kind: WorldActionKind,
+    slot: &ActionSlot,
+    compute_count: usize,
+    curr_outputs: &[f32],
+    input_refs: &[InputReference],
+    resolve_ctx: &ResolveCtx<'_>,
+    shared_memory: &[f32; 16],
+    prev_shared_memory: &[f32; 16],
+) -> EmittedAction {
+    let mut param_values = [0.0f32; 2];
+    for (value, edge) in param_values.iter_mut().zip(&slot.param_inputs) {
+        let v = resolve_source_post_convergence(
+            &edge.source,
+            compute_count,
+            curr_outputs,
+            input_refs,
+            resolve_ctx,
+            shared_memory,
+            prev_shared_memory,
+        );
+        *value = v * edge.weight;
+    }
+    let bank = direction_bank(
+        kind,
+        &slot.direction_bids,
+        compute_count,
+        curr_outputs,
+        input_refs,
+        resolve_ctx,
+        shared_memory,
+        prev_shared_memory,
+    );
+    let action = decode_action_from_kind(kind, &param_values, bank.as_ref());
+    EmittedAction {
+        param_values,
+        bank,
+        action,
     }
 }
 
-#[inline]
-fn decode_food_type_idx(raw: f32) -> OrdinaryFoodTypeId {
-    if raw.is_finite() && raw >= 0.0 {
-        OrdinaryFoodTypeId::new(raw.round().clamp(0.0, u16::MAX as f32) as u16)
-    } else {
-        OrdinaryFoodTypeId::default()
+/// The `Direction::ALL` index a movement action commits; `None` for the rest.
+fn movement_direction(action: &WorldAction) -> Option<u8> {
+    match action {
+        WorldAction::Move(direction)
+        | WorldAction::Reproduce { direction, .. }
+        | WorldAction::StealEnergy { direction, .. } => Some(direction.to_index() as u8),
+        WorldAction::NoOp | WorldAction::Eat { .. } => None,
     }
 }
 
+/// The `action_type` discriminant of the shared decode table
+/// (v3-vm-isa-spec.md Section 7) for a slot's emit kind.
 #[inline]
-fn decode_action_from_kind(kind: WorldActionKind, param_values: &[f32]) -> WorldAction {
-    let p0 = param_values.first().copied().unwrap_or(0.0);
-    let p1 = param_values.get(1).copied().unwrap_or(0.0);
+fn action_type_of(kind: WorldActionKind) -> u8 {
     match kind {
-        WorldActionKind::NoOp => WorldAction::NoOp,
-        WorldActionKind::Eat => WorldAction::Eat {
-            type_idx: decode_food_type_idx(p0),
-        },
-        WorldActionKind::Move => WorldAction::Move(decode_direction(p0)),
-        WorldActionKind::Reproduce => WorldAction::Reproduce {
-            direction: decode_direction(p0),
-            energy_transfer: clamp_non_negative_finite(p1),
-        },
-        WorldActionKind::StealEnergy => WorldAction::StealEnergy {
-            direction: decode_direction(p0),
-            amount: clamp_non_negative_finite(p1),
-        },
+        WorldActionKind::NoOp => 0,
+        WorldActionKind::Eat => 1,
+        WorldActionKind::Move => 2,
+        WorldActionKind::Reproduce => 3,
+        WorldActionKind::StealEnergy => 4,
     }
+}
+
+/// Decode a slot's action through the same table the VM uses: the two param
+/// values fill meta slots 0 and 1, and the bank (when written) selects the
+/// direction of a movement action.
+#[inline]
+fn decode_action_from_kind(
+    kind: WorldActionKind,
+    param_values: &[f32; 2],
+    bank: Option<&DirectionBank>,
+) -> WorldAction {
+    let mut meta = [0.0f32; 8];
+    meta[..2].copy_from_slice(param_values);
+    decode_world_action(action_type_of(kind), &meta, bank)
 }
 
 /// Apply post-convergence effects from CGP graph evaluation.
@@ -191,7 +272,7 @@ pub(crate) fn apply_cgp_graph_effects(
 
     // Phase 2: action bank scan
     for slot in &def.action_bank {
-        let wired = !slot.gate_inputs.is_empty() || !slot.param_inputs.is_empty();
+        let wired = slot.is_wired();
         let queue_len_before = side_outputs.action_queue.len();
         let gate_wsum = if !slot.gate_inputs.is_empty() {
             edges_wsum(
@@ -210,6 +291,8 @@ pub(crate) fn apply_cgp_graph_effects(
         let fired = !slot.gate_inputs.is_empty() && gate_wsum > 0.0;
         let mut param_values = [0.0f32; 2];
         let mut emitted_action = None;
+        let mut bank = None;
+        let mut chosen_direction = None;
 
         if fired {
             match slot.behavior {
@@ -217,27 +300,21 @@ pub(crate) fn apply_cgp_graph_effects(
                     side_outputs.action_queue.pop();
                 }
                 ActionSlotBehavior::Emit(kind) => {
-                    for (i, edge) in slot.param_inputs.iter().enumerate() {
-                        if i >= 2 {
-                            break;
-                        }
-                        let v = resolve_source(
-                            &edge.source,
-                            compute_count,
-                            compute_count,
-                            curr_outputs,
-                            curr_outputs,
-                            input_refs,
-                            resolve_ctx,
-                            shared_memory,
-                            prev_shared_memory,
-                        );
-                        param_values[i] = v * edge.weight;
-                    }
-
-                    let action = decode_action_from_kind(kind, &param_values);
-                    emitted_action = Some(action);
-                    side_outputs.action_queue.push(action);
+                    let emitted = emit_action(
+                        kind,
+                        slot,
+                        compute_count,
+                        curr_outputs,
+                        input_refs,
+                        resolve_ctx,
+                        shared_memory,
+                        prev_shared_memory,
+                    );
+                    param_values = emitted.param_values;
+                    bank = emitted.bank;
+                    chosen_direction = bank.and_then(|_| movement_direction(&emitted.action));
+                    emitted_action = Some(emitted.action);
+                    side_outputs.action_queue.push(emitted.action);
                 }
             }
         }
@@ -252,6 +329,8 @@ pub(crate) fn apply_cgp_graph_effects(
             queue_len_before,
             queue_len_after: side_outputs.action_queue.len(),
             emitted_action,
+            direction_bids: bank.map(|bids| bids.map(sanitize_f32)),
+            chosen_direction,
         });
     }
 
@@ -298,12 +377,29 @@ pub(crate) fn apply_cgp_graph_effects(
 mod tests {
     use super::decode_action_from_kind;
     use crate::config::OrdinaryFoodTypeId;
-    use crate::contracts::WorldAction;
+    use crate::contracts::{Direction, WorldAction};
     use crate::creature::genome::cgp::WorldActionKind;
 
     #[test]
+    fn decode_action_from_kind_move_reads_the_bank_when_written() {
+        let bank = [0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0];
+        assert_eq!(
+            decode_action_from_kind(WorldActionKind::Move, &[1.0, 0.0], Some(&bank)),
+            WorldAction::Move(Direction::ALL[5])
+        );
+        assert_eq!(
+            decode_action_from_kind(WorldActionKind::Move, &[1.0, 0.0], None),
+            WorldAction::Move(Direction::ALL[1])
+        );
+        assert_eq!(
+            decode_action_from_kind(WorldActionKind::Eat, &[1.0, 0.0], Some(&bank)),
+            decode_action_from_kind(WorldActionKind::Eat, &[1.0, 0.0], None)
+        );
+    }
+
+    #[test]
     fn decode_action_from_kind_eat_uses_first_param_slot_for_type_idx() {
-        let action = decode_action_from_kind(WorldActionKind::Eat, &[3.0, 8.0]);
+        let action = decode_action_from_kind(WorldActionKind::Eat, &[3.0, 8.0], None);
         assert_eq!(
             action,
             WorldAction::Eat {

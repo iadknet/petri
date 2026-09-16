@@ -69,6 +69,7 @@ fn mutate_action_slot_behavior_operator_changes_slot_behavior() {
         behavior: original,
         gate_inputs: Vec::new(),
         param_inputs: Vec::new(),
+        direction_bids: Vec::new(),
     }]);
 
     let mut changed = false;

@@ -119,17 +119,17 @@ the existing observation caps; other profiles acquire nothing.
 
 ## Implementation Tasks
 
-- [ ] Decode rule: shared direction selection in `runtime/action_decode.rs`
+- [x] Decode rule: shared direction selection in `runtime/action_decode.rs`
       with property tests; `cgp/effects.rs` calls it.
-- [ ] Graph form: `DirectionBidEdge`, `ActionSlot::direction_bids`, effects
+- [x] Graph form: `DirectionBidEdge`, `ActionSlot::direction_bids`, effects
       pass, trace fields, blank/founder construction, serde tests.
-- [ ] VM form: opcode, executor buffer and flag, cost, analysis, annotation,
+- [x] VM form: opcode, executor buffer and flag, cost, analysis, annotation,
       Display, proptest strategy, mutation draw and nudge.
-- [ ] Graph surface: `EdgeSurface::ActionBid`, `edge_sites`,
+- [x] Graph surface: `EdgeSurface::ActionBid`, `edge_sites`,
       `pick_random_surface`, edge accessors, raw-field `direction`.
-- [ ] `steering-v1`: `neighborhood/steering.rs`, bench schema, indicators,
+- [x] `steering-v1`: `neighborhood/steering.rs`, bench schema, indicators,
       run assembly, JSON and thread-count tests, gate and goal wiring.
-- [ ] Reference documents: `v3-vm-isa-spec.md` (opcode row, cost table,
+- [x] Reference documents: `v3-vm-isa-spec.md` (opcode row, cost table,
       action encoding), `v3-graph-backend-spec.md` (`ActionSlot`, Section 6
       decode, trace), `v3-mutation-spec.md` (six surfaces, `direction` raw
       field, the opcode in the insertion pool).
@@ -153,7 +153,7 @@ the existing observation caps; other profiles acquire nothing.
       surface and the four edge operators and the raw-field operator act on
       it; the VM fresh draw can produce `WriteDirectionBid`; the nudge covers
       both operands; genomes without `direction_bids` deserialize.
-- [ ] `steering-v1` unit tests: the one-edge fixtures read above chance; old
+- [x] `steering-v1` unit tests: the one-edge fixtures read above chance; old
       reports read `Undefined`; byte-identical across thread counts.
 - [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
       exit 0 on the final feature commit (hash in the readings file).
@@ -226,7 +226,7 @@ and the feature still closes.
 - [ ] Every gate and goal report carries `steering-v1` beside the T11.F14
       block with chance levels printed, and the predeclared directions are
       read and recorded, including the finding-7 or not-exposed case.
-- [ ] Reference documents describe the bank, the opcode, and the sixth surface.
+- [x] Reference documents describe the bank, the opcode, and the sixth surface.
 
 ## Notes for AI Agents
 

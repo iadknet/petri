@@ -1,7 +1,7 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, MAX_GATE_SLOTS};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
-use crate::runtime::action_decode::decode_world_action;
+use crate::runtime::action_decode::{decode_world_action, DirectionBank, DIRECTION_BANK_SLOTS};
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{
@@ -121,7 +121,7 @@ impl VmTraceSink for NoopVmTraceSink {
 #[allow(clippy::too_many_arguments)]
 #[allow(
     clippy::too_many_lines,
-    reason = "the opcode dispatch match covers all 41 VM instructions; keeping \
+    reason = "the opcode dispatch match covers all 42 VM instructions; keeping \
               them in one interpreter loop keeps the stack and trace sink local"
 )]
 pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
@@ -161,6 +161,10 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
     let mut regs = [0.0f32; MAX_REGS];
     let mut payload: [f32; OUTPUT_SLOT_COUNT] = *upstream_slots;
     let mut meta: [f32; 8] = [0.0; 8];
+    // Direction bank for movement pushes (T11.F21): `None` until a
+    // `WriteDirectionBid` lands, then persists between pushes within this
+    // dispatch and resets with `meta` at node end.
+    let mut bank: Option<DirectionBank> = None;
     let mut route_gates = RouteGateMap::default();
     let mut pc: usize = 0;
     let mut steps: usize = 0;
@@ -413,8 +417,16 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 // invalid slot: write ignored
             }
 
+            VmInstruction::WriteDirectionBid { direction, src } => {
+                if (*direction as usize) < DIRECTION_BANK_SLOTS {
+                    bank.get_or_insert([0.0; DIRECTION_BANK_SLOTS])[*direction as usize] =
+                        regs[nr(*src, reg_count)];
+                }
+                // invalid slot: write ignored, bank stays unwritten
+            }
+
             VmInstruction::PushAction { action_type } => {
-                let action = decode_world_action(*action_type, &meta);
+                let action = decode_world_action(*action_type, &meta, bank.as_ref());
                 side_outputs.action_queue.push(action);
             }
 
@@ -656,6 +668,7 @@ pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -
         VmInstruction::ReadInput { .. } => 0.12,
         VmInstruction::WriteInternalPayload { .. } => 0.14,
         VmInstruction::WriteWorldActionMeta { .. } => 0.14,
+        VmInstruction::WriteDirectionBid { .. } => 0.14,
         VmInstruction::PushAction { .. } => 0.24,
         VmInstruction::PopAction => 0.10,
         VmInstruction::ReadActionQueueLength { .. } => 0.08,

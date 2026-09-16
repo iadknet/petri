@@ -831,8 +831,8 @@ fn recruitment_paths_wilson_midpoint_has_the_predeclared_interval() {
 }
 
 /// The one-off seed search behind every pinned seed: the first accepted
-/// seed per step in `0..SEARCH_RANGE`. It walks about 110,000 applied
-/// events (the largest pinned seed is 41,854) in under two seconds, and it
+/// seed per step in `0..SEARCH_RANGE`. It walks about 70,000 applied
+/// events (the largest pinned seed is 31,060) in under two seconds, and it
 /// is the only reading of each step's acceptance predicate: a weakened
 /// predicate accepts an earlier seed, a broken one exhausts the range.
 #[test]
@@ -989,9 +989,11 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
     }
 }
 
-/// The VM insert seeds are the ones the one-off search found after the
-/// `JumpToHalt` acceptance fix and the `PushAction` draw repair (readings,
-/// "Seed search"); only the two `write_direction` seeds exceed 10,000.
+/// The VM insert and `AddGraphEdge` seeds are the ones the one-off search
+/// found after T11.F21 added `WriteDirectionBid` to the fresh-instruction draw
+/// and the `ActionBid` edge surface (both remap every seeded draw, as the
+/// T11.F21 spec predeclares); only the `vm_detour` `write_direction` seed
+/// exceeds 10,000.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1019,22 +1021,22 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     (GraphMutateActionSlotBehavior, 25),
                     (GraphAddInternalGraphNode, 1020),
                     (GraphAddGraphEdge, 1650),
-                    (GraphAddGraphEdge, 3612),
-                    (GraphAddGraphEdge, 102),
+                    (GraphAddGraphEdge, 2300),
+                    (GraphAddGraphEdge, 596),
                     swap,
                 ],
                 Some(7),
             ),
-            ("graph_copy", vec![(GraphAddGraphEdge, 102), swap], None),
-            ("graph_split", vec![(GraphAddGraphEdge, 1762), swap], None),
+            ("graph_copy", vec![(GraphAddGraphEdge, 1202), swap], None),
+            ("graph_split", vec![(GraphAddGraphEdge, 3518), swap], None),
             (
                 "vm_blank",
                 vec![
                     (InputRefAdd, 1),
-                    (VmInstructionMutation, 238),
-                    (VmInstructionMutation, 9940),
+                    (VmInstructionMutation, 1869),
+                    (VmInstructionMutation, 5608),
                     (VmInstructionMutation, 800),
-                    (VmInstructionMutation, 41_854),
+                    (VmInstructionMutation, 9361),
                     (VmInstructionMutation, 4126),
                     swap,
                 ],
@@ -1072,8 +1074,8 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     (GraphMutateActionSlotBehavior, 25),
                     (GraphAddInternalGraphNode, 1020),
                     (GraphAddGraphEdge, 1650),
-                    (GraphAddGraphEdge, 3612),
-                    (GraphAddGraphEdge, 102),
+                    (GraphAddGraphEdge, 2300),
+                    (GraphAddGraphEdge, 596),
                 ],
                 None,
             ),
@@ -1081,10 +1083,10 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                 "vm_detour",
                 vec![
                     (InputRefAdd, 1),
-                    (VmInstructionMutation, 238),
+                    (VmInstructionMutation, 1869),
                     (VmInstructionMutation, 800),
-                    (VmInstructionMutation, 21_017),
-                    (VmInstructionMutation, 3709),
+                    (VmInstructionMutation, 31_060),
+                    (VmInstructionMutation, 521),
                     (VmInstructionMutation, 4126),
                 ],
                 None,
@@ -1167,9 +1169,12 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
                 assert_eq!(a.program[0], b.program[0]);
                 assert_eq!(a.program[2..4], b.program[2..4]);
                 assert_eq!(a.program[5..], b.program[4..]);
-                // The insert's reference repair keeps the jump on the Halt.
+                // The insert's reference repair keeps the jump on the Halt: the
+                // drawn offset 12 wraps onto the Halt of the five-instruction
+                // program (1 + 1 + 12 = 14, 14 mod 5 = 4) and is rewritten to
+                // the direct offset 3 once the push sits before the Halt.
                 let jump = |offset| VmInstruction::JumpIfZero { cond: 0, offset };
-                assert_eq!((&b.program[1], &a.program[1]), (&jump(2), &jump(3)));
+                assert_eq!((&b.program[1], &a.program[1]), (&jump(12), &jump(3)));
             }
             other => panic!("{}: unexpected exposing operator {other:?}", path.form),
         }

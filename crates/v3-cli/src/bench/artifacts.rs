@@ -174,7 +174,7 @@ fn neighborhood(source: &Value) -> Value {
     if let Some(evolved) = source.get("evolved") {
         out["evolved"] = if let Some(rows) = evolved.get("per_seed").and_then(Value::as_array) {
             json!({"per_seed": rows.iter().map(|row| {
-                let mut projected = pick(row, &["generation_distribution", "seed", "final_population_size", "pooled_operator_rows", "pooled_births"]);
+                let mut projected = pick(row, &["generation_distribution", "seed", "final_population_size", "pooled_operator_rows", "pooled_births", "steering_pooled"]);
                 projected["mesh_summary"] = mesh_summary(&row["sampled_genomes"]);
                 projected
             }).collect::<Vec<_>>()})
@@ -820,6 +820,7 @@ mod tests {
                 "final_population_size": 3,
                 "pooled_operator_rows": [{"operator": "copy"}],
                 "pooled_births": 4,
+                "steering_pooled": {"version": "steering-v1", "moves": 9},
                 "sampled_genomes": [{"mesh_execution": {
                     "total_node_count": 2,
                     "reachable_node_count": 3,
@@ -844,6 +845,7 @@ mod tests {
                     "final_population_size": 3,
                     "pooled_operator_rows": [{"operator": "copy"}],
                     "pooled_births": 4,
+                    "steering_pooled": {"version": "steering-v1", "moves": 9},
                     "mesh_summary": {
                         "genomes": 1,
                         "total": 2,

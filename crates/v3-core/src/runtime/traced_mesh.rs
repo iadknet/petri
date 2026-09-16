@@ -447,6 +447,7 @@ mod tests {
                                 weight: 1.0,
                             }],
                             param_inputs: vec![],
+                            direction_bids: Vec::new(),
                         },
                         crate::creature::genome::cgp::ActionSlot {
                             behavior: crate::creature::genome::cgp::ActionSlotBehavior::Pop,
@@ -455,6 +456,7 @@ mod tests {
                                 weight: 1.0,
                             }],
                             param_inputs: vec![],
+                            direction_bids: Vec::new(),
                         },
                     ],
                     execute_gate: ExecuteGate {
@@ -547,6 +549,7 @@ mod tests {
                             weight: 1.0,
                         }],
                         param_inputs: vec![],
+                        direction_bids: Vec::new(),
                     }],
                     execute_gate: ExecuteGate {
                         inputs: vec![GraphEdge {
@@ -639,6 +642,7 @@ mod tests {
                             source: GraphSource::ComputeNode(0),
                             weight: f32::INFINITY,
                         }],
+                        direction_bids: Vec::new(),
                     }],
                     execute_gate: ExecuteGate {
                         inputs: vec![GraphEdge {
@@ -813,6 +817,7 @@ mod tests {
                             weight: 1.0,
                         }],
                         param_inputs: vec![],
+                        direction_bids: Vec::new(),
                     }],
                     execute_gate: ExecuteGate {
                         inputs: vec![GraphEdge {

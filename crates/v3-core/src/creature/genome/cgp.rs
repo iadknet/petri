@@ -149,6 +149,16 @@ pub enum WorldActionKind {
     NoOp,
 }
 
+/// One edge into a slot's direction bank (T11.F21): a weighted source and
+/// the bank slot (`Direction::ALL` index) its value is summed into.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DirectionBidEdge {
+    pub edge: GraphEdge,
+    /// Bank slot in `0..8`; an out-of-range edge is summed nowhere and does
+    /// not write the bank.
+    pub direction: u8,
+}
+
 /// Action slot in the fixed action bank.
 /// Each slot is fully self-contained: own gate, own params, fixed behavior.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -159,6 +169,44 @@ pub struct ActionSlot {
     pub gate_inputs: Vec<GraphEdge>,
     /// Decoded per WorldActionKind (ignored for Pop).
     pub param_inputs: Vec<GraphEdge>,
+    /// Direction bank for `Move`, `Reproduce`, and `StealEnergy` (T11.F21):
+    /// bid d is the weighted sum of the edges with `direction == d`. Empty on
+    /// every founder and on every genome stored before the bank existed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub direction_bids: Vec<DirectionBidEdge>,
+}
+
+impl ActionSlot {
+    /// A slot with the given behavior and no edges on any surface.
+    #[must_use]
+    pub fn inert(behavior: ActionSlotBehavior) -> Self {
+        Self {
+            behavior,
+            gate_inputs: Vec::new(),
+            param_inputs: Vec::new(),
+            direction_bids: Vec::new(),
+        }
+    }
+
+    /// Every edge on the slot: gate, then param, then direction-bank edges.
+    pub fn edges(&self) -> impl Iterator<Item = &GraphEdge> {
+        self.gate_inputs
+            .iter()
+            .chain(&self.param_inputs)
+            .chain(self.direction_bids.iter().map(|bid| &bid.edge))
+    }
+
+    /// Number of edges across the slot's three surfaces.
+    #[must_use]
+    pub fn edge_count(&self) -> usize {
+        self.gate_inputs.len() + self.param_inputs.len() + self.direction_bids.len()
+    }
+
+    /// Whether any surface of the slot carries an edge.
+    #[must_use]
+    pub fn is_wired(&self) -> bool {
+        self.edge_count() > 0
+    }
 }
 
 // ── Execute gate ────────────────────────────────────────────────────────────
@@ -264,11 +312,9 @@ impl CgpGraphBackendDef {
         let bank_size = config.action_queue_cap;
         let mut action_bank = Vec::with_capacity(bank_size);
         for _ in 0..bank_size {
-            action_bank.push(ActionSlot {
-                behavior: ActionSlotBehavior::Emit(WorldActionKind::NoOp),
-                gate_inputs: Vec::new(),
-                param_inputs: Vec::new(),
-            });
+            action_bank.push(ActionSlot::inert(ActionSlotBehavior::Emit(
+                WorldActionKind::NoOp,
+            )));
         }
 
         Self {
@@ -291,10 +337,7 @@ impl CgpGraphBackendDef {
     pub fn enters_visit(&self) -> bool {
         !self.compute_nodes.is_empty()
             || self.output_sinks.iter().any(|sink| !sink.inputs.is_empty())
-            || self
-                .action_bank
-                .iter()
-                .any(|slot| !slot.gate_inputs.is_empty() || !slot.param_inputs.is_empty())
+            || self.action_bank.iter().any(ActionSlot::is_wired)
             || !self.execute_gate.inputs.is_empty()
     }
 
@@ -471,6 +514,7 @@ impl CgpGraphBackendDef {
         for slot in &mut self.action_bank {
             slot.gate_inputs.retain_mut(&mut keep);
             slot.param_inputs.retain_mut(&mut keep);
+            slot.direction_bids.retain_mut(|bid| keep(&mut bid.edge));
         }
         self.execute_gate.inputs.retain_mut(keep);
     }
@@ -505,6 +549,9 @@ impl CgpGraphBackendDef {
             }
             for edge in &mut slot.param_inputs {
                 f(edge);
+            }
+            for bid in &mut slot.direction_bids {
+                f(&mut bid.edge);
             }
         }
         for edge in &mut self.execute_gate.inputs {
@@ -616,6 +663,54 @@ mod tests {
         let json = serde_json::to_string(&kinds).unwrap();
         let decoded: Vec<ComputeNodeKind> = serde_json::from_str(&json).unwrap();
         assert_eq!(kinds, decoded);
+    }
+
+    fn any_graph_source() -> impl proptest::strategy::Strategy<Value = GraphSource> {
+        use proptest::prelude::*;
+        prop_oneof![
+            (any::<u16>(), any::<u16>())
+                .prop_map(|(ref_idx, sub_idx)| GraphSource::InputLeaf { ref_idx, sub_idx }),
+            (any::<u8>(), any::<bool>())
+                .prop_map(|(slot, previous)| GraphSource::SharedMemory { slot, previous }),
+            any::<u16>().prop_map(GraphSource::ComputeNode),
+        ]
+    }
+
+    fn any_direction_bid_edge() -> impl proptest::strategy::Strategy<Value = DirectionBidEdge> {
+        use proptest::prelude::*;
+        (any_graph_source(), -10.0f32..10.0, any::<u8>()).prop_map(|(source, weight, direction)| {
+            DirectionBidEdge {
+                edge: GraphEdge { source, weight },
+                direction,
+            }
+        })
+    }
+
+    proptest::proptest! {
+        /// Serde round-trip is the identity for every bank edge and for a slot
+        /// carrying any bank (T11.F21).
+        #[test]
+        fn action_slot_with_a_bank_serde_roundtrip(
+            bids in proptest::collection::vec(any_direction_bid_edge(), 0..6)
+        ) {
+            let mut slot = ActionSlot::inert(ActionSlotBehavior::Emit(WorldActionKind::Move));
+            slot.direction_bids = bids;
+            let json = serde_json::to_string(&slot).unwrap();
+            let decoded: ActionSlot = serde_json::from_str(&json).unwrap();
+            proptest::prop_assert_eq!(decoded, slot);
+        }
+    }
+
+    #[test]
+    fn action_slot_without_direction_bids_deserializes_with_an_empty_bank() {
+        let json = r#"{"behavior":{"Emit":"Move"},"gate_inputs":[],"param_inputs":[]}"#;
+        let slot: ActionSlot = serde_json::from_str(json).unwrap();
+        assert!(slot.direction_bids.is_empty());
+        assert_eq!(
+            serde_json::to_string(&slot).unwrap(),
+            json,
+            "an empty bank is not serialized, so stored genomes keep their bytes"
+        );
     }
 
     #[test]

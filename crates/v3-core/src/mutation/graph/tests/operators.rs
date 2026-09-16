@@ -201,6 +201,7 @@ pub(super) fn base_def() -> CgpGraphBackendDef {
                 source: GraphSource::ComputeNode(2),
                 weight: 1.0,
             }],
+            direction_bids: Vec::new(),
         }],
         execute_gate: ExecuteGate {
             inputs: vec![GraphEdge {
@@ -280,6 +281,7 @@ pub(super) fn plasticity_def() -> CgpGraphBackendDef {
                 },
                 weight: 1.0,
             }],
+            direction_bids: Vec::new(),
         }],
         execute_gate: ExecuteGate {
             inputs: vec![GraphEdge {

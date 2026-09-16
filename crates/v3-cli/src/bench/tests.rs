@@ -266,7 +266,10 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
 
 #[test]
 fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
-    const SEED: u64 = 13;
+    // Re-pinned by T11.F21: one more VM opcode and one more graph edge surface
+    // remap every seeded mutation draw, and seed 13's 32x32 population now
+    // ends the horizon on a single cell; seed 18 keeps a spread population.
+    const SEED: u64 = 18;
     const HORIZON: u64 = 250;
     let config = build_config(&ProfileParams {
         recipe: None,

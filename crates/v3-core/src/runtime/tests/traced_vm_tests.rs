@@ -953,6 +953,28 @@ fn result_equivalence_all_41_opcodes() {
             zero_mem,
         ),
         (
+            "WriteDirectionBid",
+            VmBackendDef {
+                register_count: 1,
+                constants: vec![2.0],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::WriteDirectionBid {
+                        direction: 5,
+                        src: 0,
+                    },
+                    VmInstruction::PushAction { action_type: 2 },
+                    VmInstruction::ExecuteActionQueue,
+                ],
+            },
+            vec![],
+            zero_upstream,
+            zero_mem,
+        ),
+        (
             "PushAction",
             VmBackendDef {
                 register_count: 1,
@@ -1203,7 +1225,7 @@ fn result_equivalence_all_41_opcodes() {
 
     assert_eq!(
         cases.len(),
-        41,
+        42,
         "every VmInstruction opcode must be covered"
     );
 

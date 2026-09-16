@@ -349,6 +349,7 @@ fn first_tick_repeated_visits_have_zero_base_and_ordinary_traced_parity() {
                 weight: 1.0,
             }],
             param_inputs: vec![],
+            direction_bids: Vec::new(),
         });
     let runtime = RuntimeConfig::default();
     let mut ordinary = GraphRuntimeState::new();
@@ -474,11 +475,13 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
             behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
             gate_inputs: vec![edge(1, 1.0)],
             param_inputs: vec![],
+            direction_bids: Vec::new(),
         },
         ActionSlot {
             behavior: ActionSlotBehavior::Emit(WorldActionKind::NoOp),
             gate_inputs: vec![edge(0, 1.0), edge(1, -1.0)],
             param_inputs: vec![],
+            direction_bids: Vec::new(),
         },
     ];
     def.execute_gate.inputs = vec![edge(0, 1.0)];

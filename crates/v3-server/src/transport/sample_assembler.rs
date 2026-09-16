@@ -348,6 +348,8 @@ mod tests {
                             emitted_action: Some(v3_core::contracts::WorldAction::Eat {
                                 type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
                             }),
+                            direction_bids: None,
+                            chosen_direction: None,
                         }],
                         execute_gate: GraphExecuteGateTrace {
                             wired: true,

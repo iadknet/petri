@@ -345,8 +345,8 @@ fn random_vm_instruction_covers_all_families() {
     }
     assert_eq!(
         discriminants.len(),
-        41,
-        "all 41 VmInstruction variants must be reachable; got {}",
+        42,
+        "all 42 VmInstruction variants must be reachable; got {}",
         discriminants.len()
     );
 }
@@ -1983,6 +1983,10 @@ fn operand_bearing_instructions() -> Vec<VmInstruction> {
             slot_idx: 4,
             src: 8,
         },
+        VmInstruction::WriteDirectionBid {
+            direction: 4,
+            src: 8,
+        },
         VmInstruction::WriteRouteGate { slot: 4, src: 8 },
         VmInstruction::PushAction { action_type: 4 },
         VmInstruction::ReadActionQueueLength { dst: 4 },
@@ -2071,7 +2075,11 @@ fn encoded_fields(instruction: &VmInstruction) -> Vec<i64> {
             vec![i64::from(*dst), i64::from(*ref_idx), i64::from(*sub_idx)]
         }
         VmInstruction::WriteInternalPayload { slot_idx, src }
-        | VmInstruction::WriteWorldActionMeta { slot_idx, src } => {
+        | VmInstruction::WriteWorldActionMeta { slot_idx, src }
+        | VmInstruction::WriteDirectionBid {
+            direction: slot_idx,
+            src,
+        } => {
             vec![i64::from(*slot_idx), i64::from(*src)]
         }
         VmInstruction::WriteRouteGate { slot, src } => vec![i64::from(*slot), i64::from(*src)],
@@ -2467,6 +2475,10 @@ fn register_bearing_instructions(raw: u8) -> Vec<VmInstruction> {
             slot_idx: 0,
             src: raw,
         },
+        VmInstruction::WriteDirectionBid {
+            direction: 0,
+            src: raw,
+        },
         VmInstruction::WriteRouteGate { slot: 0, src: raw },
         VmInstruction::ReadActionQueueLength { dst: raw },
         VmInstruction::ReadActionQueueType {
@@ -2545,6 +2557,7 @@ fn register_fields(instruction: &VmInstruction) -> Vec<u8> {
         }
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
+        | VmInstruction::WriteDirectionBid { src, .. }
         | VmInstruction::WriteRouteGate { src, .. }
         | VmInstruction::StoreSlotImm { src, .. } => vec![*src],
         VmInstruction::ReadActionQueueParam { index_src, dst, .. } => vec![*index_src, *dst],

@@ -9,7 +9,7 @@ pub use companions::{structural_companions, StructuralCompanions};
 
 use crate::contracts::{InputReference, NodeId, RouteTarget};
 
-/// A single VM instruction. 41 opcodes per v3-vm-isa-spec.md.
+/// A single VM instruction. 42 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum VmInstruction {
     // ── Arithmetic and Data Movement ─────────────────────────────────────────
@@ -75,6 +75,10 @@ pub enum VmInstruction {
     WriteInternalPayload { slot_idx: u8, src: u8 },
     /// Write world-action metadata slot (0..7); invalid slot write ignored.
     WriteWorldActionMeta { slot_idx: u8, src: u8 },
+    /// Write `regs[src]` into direction-bank slot `direction` (0..7) for the
+    /// next movement `PushAction` (T11.F21); an invalid slot writes nothing
+    /// and leaves the bank unwritten.
+    WriteDirectionBid { direction: u8, src: u8 },
     /// Write a route gate score for a specific target slot.
     WriteRouteGate { slot: u8, src: u8 },
 
@@ -290,7 +294,7 @@ impl CreatureGenome {
                     }
                     // Count wired action slots
                     for slot in &graph.action_bank {
-                        let edges = slot.gate_inputs.len() + slot.param_inputs.len();
+                        let edges = slot.edge_count();
                         if edges > 0 {
                             score += 1 + edges as u32;
                         }
@@ -324,7 +328,7 @@ mod tests {
     use proptest::strategy::Union;
 
     #[test]
-    fn vm_instruction_all_41_variants_constructible() {
+    fn vm_instruction_all_42_variants_constructible() {
         let instructions: Vec<VmInstruction> = vec![
             VmInstruction::Noop,
             VmInstruction::LoadConst {
@@ -370,6 +374,10 @@ mod tests {
                 slot_idx: 0,
                 src: 1,
             },
+            VmInstruction::WriteDirectionBid {
+                direction: 0,
+                src: 1,
+            },
             VmInstruction::WriteRouteGate { slot: 0, src: 0 },
             VmInstruction::PushAction { action_type: 1 },
             VmInstruction::PopAction,
@@ -408,7 +416,7 @@ mod tests {
             },
             VmInstruction::ClearSlot { slot_idx: 2 },
         ];
-        assert_eq!(instructions.len(), 41, "must have exactly 41 opcodes");
+        assert_eq!(instructions.len(), 42, "must have exactly 42 opcodes");
     }
 
     #[test]
@@ -444,7 +452,7 @@ mod tests {
             .boxed()
     }
 
-    /// Every one of the 41 opcodes with arbitrary operands.
+    /// Every one of the 42 opcodes with arbitrary operands.
     fn any_vm_instruction() -> impl Strategy<Value = VmInstruction> {
         use VmInstruction::*;
         Union::new(vec![
@@ -484,6 +492,7 @@ mod tests {
                 .boxed(),
             binary(|slot_idx, src| WriteInternalPayload { slot_idx, src }),
             binary(|slot_idx, src| WriteWorldActionMeta { slot_idx, src }),
+            binary(|direction, src| WriteDirectionBid { direction, src }),
             binary(|slot, src| WriteRouteGate { slot, src }),
             unary(|action_type| PushAction { action_type }),
             nullary(PopAction),

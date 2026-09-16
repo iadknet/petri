@@ -179,6 +179,7 @@ fn swap_graph_input_ref_clamps_out_of_range_sub_indices() {
                 },
                 weight: 1.0,
             }],
+            direction_bids: Vec::new(),
         }],
         execute_gate: ExecuteGate {
             inputs: vec![GraphEdge {
@@ -436,6 +437,7 @@ fn graph_node_genome_zero_refs() -> CreatureGenome {
                     behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
                     gate_inputs: vec![],
                     param_inputs: vec![],
+                    direction_bids: Vec::new(),
                 }],
                 execute_gate: ExecuteGate { inputs: vec![] },
             }),

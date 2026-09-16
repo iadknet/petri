@@ -43,9 +43,9 @@ const ENERGY_CHOICES: [f32; 6] = [5.0, 15.0, 25.0, 31.0, 45.0, 80.0];
 /// every genome's execution, since it is fixed for the whole battery) and the
 /// per-tick creature state a genome is evaluated against.
 #[derive(Debug, Clone, PartialEq)]
-struct Scenario {
-    sensors: SensorSnapshot,
-    energy: f32,
+pub(super) struct Scenario {
+    pub(super) sensors: SensorSnapshot,
+    pub(super) energy: f32,
 }
 
 /// `Some(x)` with probability `1 - p_zero`, else `0.0`, matching Appendix A's
@@ -91,7 +91,7 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
     Scenario { sensors, energy }
 }
 
-fn draw_scenarios(seed: u64, count: usize, food_type_count: usize) -> Vec<Scenario> {
+pub(super) fn draw_scenarios(seed: u64, count: usize, food_type_count: usize) -> Vec<Scenario> {
     let mut rng = SmallRng::seed_from_u64(seed);
     (0..count)
         .map(|_| draw_scenario(&mut rng, food_type_count))
@@ -127,6 +127,12 @@ impl Battery {
             snapshots,
             sequences,
         }
+    }
+
+    /// The single-tick snapshot scenarios, in battery order.
+    #[cfg(test)]
+    pub(super) fn snapshots(&self) -> &[Scenario] {
+        &self.snapshots
     }
 
     /// Evaluate `genome`'s complete execution signature against this battery.
@@ -191,20 +197,7 @@ impl Battery {
         runtime: &RuntimeConfig,
         mode: M,
     ) -> M::Output {
-        let mut energy = scenario.energy;
-        let mut shared_memory = [0.0f32; 16];
-        let prev_shared_memory = [0.0f32; 16];
-        let mut graph_runtime = GraphRuntimeState::new();
-        execute_creature_mesh_impl(
-            genome,
-            &scenario.sensors,
-            &mut energy,
-            &mut shared_memory,
-            &prev_shared_memory,
-            &mut graph_runtime,
-            runtime,
-            mode,
-        )
+        execute_scenario_tick(genome, scenario, runtime, mode)
     }
 
     /// Execute one sequence of ticks, applying the production shared-memory
@@ -243,6 +236,31 @@ impl Battery {
             })
             .collect()
     }
+}
+
+/// One tick of `genome` against `scenario` from zeroed shared memory, zeroed
+/// previous memory, and fresh graph state: the footing every single-tick
+/// battery reading (`neighborhood-v1` snapshots, `steering-v1`) shares.
+pub(super) fn execute_scenario_tick<M: MeshExecutionMode>(
+    genome: &CreatureGenome,
+    scenario: &Scenario,
+    runtime: &RuntimeConfig,
+    mode: M,
+) -> M::Output {
+    let mut energy = scenario.energy;
+    let mut shared_memory = [0.0f32; 16];
+    let prev_shared_memory = [0.0f32; 16];
+    let mut graph_runtime = GraphRuntimeState::new();
+    execute_creature_mesh_impl(
+        genome,
+        &scenario.sensors,
+        &mut energy,
+        &mut shared_memory,
+        &prev_shared_memory,
+        &mut graph_runtime,
+        runtime,
+        mode,
+    )
 }
 
 /// One genome's complete signature against a [`Battery`]: the 48 single-tick
