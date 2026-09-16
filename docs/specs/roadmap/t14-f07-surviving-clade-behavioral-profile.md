@@ -136,8 +136,19 @@ unchanged.
       `v3-cli`: rows ascending and unique by `lineage_id`, one row per distinct
       input lineage, sizes summing to the input count, and each row's integer
       sums equal to the sums of its members' inputs, for any drawn input.
-- [ ] Confirm every checkpoint sample's key set is unchanged and the new block
-      is present in each case's end-of-run block on both profiles.
+- [x] Confirm every checkpoint sample's key set is unchanged and the new block
+      is present in each case's end-of-run block on both profiles. Benchmark
+      specialist pass, 2026-09-15/16, at `bdfb7675`: the gate profile carries
+      zero cases (`deterministic.profile.cases` and `.goal_indicators.cases`
+      both empty), so the claim holds vacuously there; on the goal profile, no
+      element of any of the 60 `population_persistence.per_seed[].samples[]`
+      checkpoint entries (3 seeds x 20 samples each) carries the
+      `surviving_clade_profiles` key at all (`jq '[... | select(has(...))] |
+      length'` -> `0`), and `deterministic.goal_indicators.cases[]` (the
+      end-of-run block, one per world) carries a populated
+      `surviving_clade_profiles` block in every one of the three cases. Full
+      transcript in
+      [`docs/progress/readings/t14-f07.md`](../../progress/readings/t14-f07.md).
 
 ## Verification
 
@@ -152,18 +163,23 @@ unchanged.
       under `~/.local/share/petri-tools/mutants/t14-f07/`, and every survivor
       resolved as killed, equivalent, or deferred. The full survivor list stays
       here.
-- [ ] Stored goal report: for each of the three worlds, the row count equals
-      the horizon checkpoint's `surviving_founder_clade_count`, the sizes sum to
-      the final population, every row's `actions_by_type` carries five keys, and
-      the three inequality cross-checks above hold; no checkpoint sample carries
-      `surviving_clade_profiles`. jq transcript and the per-world row table in
-      `docs/progress/readings/t14-f07.md`.
-- [ ] Benchmark summaries stored at
+- [x] Stored goal report: for each of the three worlds, the row count equals
+      the horizon checkpoint's `surviving_founder_clade_count` (27/28/17 on
+      Orchards in grassland / Canyon country / Confluence), the sizes sum to
+      the final population (9,772 / 11,534 / 14,110), every row's
+      `actions_by_type` carries five keys, and the three inequality
+      cross-checks above hold on all three worlds; no checkpoint sample
+      carries `surviving_clade_profiles`. jq transcript and the per-world row
+      table in `docs/progress/readings/t14-f07.md`. Every surviving-clade row
+      also shows nonzero `predation_kills` on all three worlds (2/4/6 summed),
+      the track's trigger to schedule T05.F03.
+- [x] Benchmark summaries stored at
       `docs/progress/features/t14-f07-surviving-clade-behavioral-profile.json`
-      and its `-goal` companion, raw reports left in the main checkout's ignored
-      `.bench-artifacts/t14-f07/`, series entry pointing at the summaries, no
-      full report staged.
-- [ ] Second goal run: `Not applicable`: the goal profile runs once per closure
+      (96,810 bytes) and its `-goal` companion (6,866,520 bytes), raw reports
+      left in the main checkout's ignored `.bench-artifacts/t14-f07/`
+      (`gate.json` 94,073 bytes, `goal.json` 511,912,703 bytes), series entry
+      pointing at the summaries, no full report staged.
+- [x] Second goal run: `Not applicable`: the goal profile runs once per closure
       under the one-goal-run rule.
 
 ## Performance and Goal Impact
@@ -196,6 +212,33 @@ schedule T05.F03.
 **Measured verdict.** Written after the runs: one line per profile with CLI and
 observed exit statuses, the `severe` flag, whether any threshold was crossed,
 and whether the epoch was re-pinned.
+
+- Gate (`make bench PROFILE=gate FEATURE=t14-f07` at `bdfb7675`): CLI exit 0
+  (`measurement_evidence.cli_exit.code`), observed outer `make` exit 0 (own
+  shell capture); `comparison.severe` false against both
+  `remove-complementary-nutrition.json` (gate epoch baseline) and
+  `t03-f11-genome-replication-cost.json`; no threshold crossed (all six
+  normalized counters `level: ok`, deltas from -15.5% to +0.45% against the
+  gate epoch, `0.000000%` against T03.F11); no epoch re-pin.
+- Goal (`make bench PROFILE=goal FEATURE=t14-f07` at `bdfb7675`): CLI exit 0,
+  observed outer `make` exit 0 (background-task completion notification);
+  `comparison.severe` false against both
+  `t11-f19-per-unit-mutation-supply-goal.json` and
+  `t03-f11-genome-replication-cost-goal.json`; no threshold crossed (all six
+  normalized counters `level: ok`); every one of the six counters and every
+  top-level goal indicator (`population_persistence`, `births_per_100_ticks`,
+  `lineage_diversity`, `memory_sensitivity`, `structural_companions`,
+  `temporal_memory_sensitivity`, `drift_depth`, and the eight named-string
+  indicators) is `0.000000%`/byte-identical against the T03.F11 epoch
+  baseline, matching the none-predeclared direction; no epoch re-pin.
+
+Per-world large per-case blocks (`mutational_neighborhood`, `recruitment_paths`)
+differ in byte size between this run's raw report and the stored T03.F11
+*summary* file because the summary intentionally strips full per-proposal/
+per-genome detail that only a raw report retains (`docs/benchmark-artifacts.md`,
+Summary version 1); this is an artifact-type difference, not a measured
+regression, and the byte-identical top-level indicators above are the
+apples-to-apples comparison.
 
 - Summaries: [gate](../../progress/features/t14-f07-surviving-clade-behavioral-profile.json),
   [goal](../../progress/features/t14-f07-surviving-clade-behavioral-profile-goal.json).
