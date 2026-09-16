@@ -26,7 +26,7 @@ the microscope: it records applied behavior and adds no mechanism.
 - [ ] Reproductive success and lifespan are stored by cognitive class, so whether memory-carrying brains out-reproduce reactive ones is read from applied outcomes rather than from perturbation alone.
 - [ ] Each surviving founder clade has a stored behavioral profile — what it eats, what it does, where it lives, and when it would have gone extinct — so "many coexisting ways of making a living" is readable as differentiation and duration, not only as a count.
 - [x] The living population's sensor usage is stored at the persistence checkpoints, so whether creatures can perceive what a niche or a memory requires is read before either is looked for.
-- [ ] The progress page is organized by the questions the success definition asks rather than by data source; its headline tiles are diversity and cognition indicators, not verification artifacts; every indicator is shown across the three baseline worlds side by side against its floor and first reading; a delta on a single run says so; and compute is one section at the end — still one static file in Git reading the stored JSON, with no composite score, no build step and no service.
+- [x] The progress page is organized by the questions the success definition asks rather than by data source; its headline tiles are diversity and cognition indicators, not verification artifacts; every indicator is shown across the three baseline worlds side by side against its floor and first reading; a delta on a single run says so; and compute is one section at the end — still one static file in Git reading the stored JSON, with no composite score, no build step and no service.
 - [ ] Every reading added here derives from applied simulation behavior, consumes no production RNG, selects no survivors, changes no execution, and preserves byte-for-byte reproducibility across processes and thread counts.
 
 ## Executable Features
@@ -51,7 +51,7 @@ the microscope: it records applied behavior and adds no mechanism.
   - Goal: Coexistence is read as duration: each founder clade's peak and, if it ends, its extinction tick, so a closure shows whether clades are lost in the founding crash or excluded one by one over the run.
 - [x] **T14.F10 — Spatial Occupancy by Clade** — Depends on: T14.F04
   - Goal: Where life is becomes readable on the worlds built to shape it — a coarse grid of population and clade count at each checkpoint — so habitat partitioning shows as a way of coexisting rather than staying invisible.
-- [ ] **T14.F11 — Progress Page Information Design** — Depends on: T14.F01, T14.F07
+- [x] **T14.F11 — Progress Page Information Design** — Depends on: T14.F01, T14.F07
   - Goal: `docs/progress/index.html` reads as answers rather than a spray of charts: it leads with the questions the success definition asks, shows each indicator across the three worlds side by side against its floor and first reading, labels a single-run delta as single-run, and puts compute last — so a reader sees in one screen whether the world is more alive, more diverse and more cognitive than at the last closure.
 - [x] **T14.F12 — Neighborhood Read of Selected Genomes** — Depends on: T14.F04
   - Goal: Whether evolution is still finding behavior at depth is read on the genomes the world actually kept: at closure, fresh births from a sample of each world's surviving population are classified as silent, changed or dead, so the depth reading is taken on the substrate selection and cost produce rather than on a walk that neither can touch.

@@ -1092,7 +1092,7 @@
       tiles.appendChild(tile('Is the world alive?', 'Creatures alive at the last tick', per((w, obs, rep) => ({
         world: w.short,
         value: Number.isFinite(num(pop(rep, w.seed).final_population)) ? fmt(num(pop(rep, w.seed).final_population), 0) : NOT_MEASURED,
-        beside: `lowest ${fmt(num(pop(rep, w.seed).minimum_population), 0)} across 20 checkpoints`,
+        beside: `lowest ${fmt(num(pop(rep, w.seed).minimum_population), 0)} across ${samplesOf(rep, w.seed).length} checkpoints`,
         delta: deltaText(ref, readingDelta(ref, w.name, 'final_population')),
         ref: refText(finals[M.worlds.indexOf(w)], (v) => fmt(v, 0)),
       }))));
@@ -1244,6 +1244,7 @@
       const xs = checkpointTicks(M);
       const grazers = worldPts.filter((pt) => M.worlds.some((w) => samplesOf(pt.rep, w.seed).some((s) => Array.isArray(s.grazed_cell_share))));
       const shown = grazers.length ? worldPts.slice(worldPts.indexOf(grazers[0])) : worldPts.slice(-1);
+      const unmeasured = shown.filter((pt) => !grazers.includes(pt));
       q.cards.appendChild(row({
         title: 'Grazed cells and the grazing modifier at each checkpoint, by food type', sub: 'samples[].{grazed_cell_share[],grazing_modifier_mean[]} (T02.F04); a closure stored before the fields is not measured', yFmt: pctTick, tipFmt: pct, yMax: 1, height: 190,
         axis: { labels: xs.map(String), title: 'tick', meta: (i, panel) => panel.meta },
@@ -1260,7 +1261,7 @@
             ];
           }).flat()),
         })),
-        note: `${M.latest.label} reads not measured: its report was stored before grazing was recorded. ${grazers.length ? 'Grazing is recorded for ' + grazers.map((pt) => pt.label).join(', ') : 'No stored closure records grazing yet'}.`,
+        note: `${unmeasured.length ? unmeasured.map((pt) => pt.label).join(', ') + ' not measured: stored before grazing was recorded. ' : ''}${grazers.length ? 'Grazing is recorded for ' + grazers.map((pt) => pt.label).join(', ') : 'No stored closure records grazing yet'}.`,
       }));
     }
     app.appendChild(q.section);
