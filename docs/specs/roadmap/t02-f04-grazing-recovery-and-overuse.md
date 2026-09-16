@@ -19,9 +19,8 @@ carry it, and the goal report shows it acting in each.
 
 ## Non-Goals
 
-- Per-type grazing parameters, per-world recipe overrides, or a recipe edit:
-  the three checked-in recipes stay byte-identical and inherit the production
-  default.
+- Per-type grazing parameters or recipe overrides: the three checked-in
+  recipes stay byte-identical and inherit the production default.
 - Any change to the occupancy depletion layer or to the shared growth,
   spread, and recovery-spawn rules beyond the multiplication.
 - Rebalancing a goal world the pressure collapses: a recorded blocker for
@@ -43,88 +42,65 @@ three goal worlds, and the `goal-worlds-v1` series. The workflow's
 applies.
 
 **Research and options.** The occupancy depletion layer
-(`OccupancyDepletionLayer` in `ordinary_food/ecology.rs`) is the local prior
-art: one `Grid<f32>`, deposited by standing, decayed per tick, multiplied
-into every growth delta. The grazing layer is its per-type, bite-driven
-sibling with the opposite sign (starts at 1.0, pulled down), and the two
-multiply beside each other.
-Alternatives rejected: (a) a per-cell bite rate limit instead of a
-compounding floor, because a bite zeroes the cell and local growth skips
-empty cells, so re-grazing is already paced by recolonization and only the
-floor bounds repeated damage; (b) lowering the fertility grid itself, because
-the habitat map is pinned by `world_seed` and must stay the tick-zero reading
-recipes and the app show.
-Charnov 1976 (read in full for T12.F04: a patch is worth revisiting when
-its intake rate recovers to the habitat mean) makes a slow-returning grazed
-patch a memory problem: the median goal generation is 141 ticks, so a
-500-tick recovery spans several generations. No external dependency.
+(`OccupancyDepletionLayer`, `ordinary_food/ecology.rs`) is the local prior
+art: one `Grid<f32>` deposited by standing, decayed per tick, multiplied into
+every growth delta; the grazing layer is its per-type, bite-driven sibling
+with the opposite sign, and the two multiply beside each other. Rejected: a
+per-cell bite rate limit (a bite zeroes the cell and local growth skips empty
+cells, so re-grazing is already paced by recolonization; only the floor
+bounds repeated damage) and lowering the fertility grid itself (the habitat
+map is pinned by `world_seed`). Charnov 1976 (read in full for T12.F04) makes
+a slow-returning patch a memory problem: the median goal generation is 141
+ticks, so a 500-tick recovery spans several generations.
 
-**Mechanics (source of truth for the implementer).**
+**Mechanics.**
 
-- State: one `Grid<f32>` modifier per configured food type, initialized to
-  1.0, owned by the ordinary-food module beside `density_by_type`. Resized to
-  1.0 when the catalog changes; reset to 1.0 when `enabled` flips and when
-  `seed_density` seeds a fresh world (no grazing history, as occupancy
-  depletion is reset there); untouched by live changes to `factor`, `floor`,
-  or `recovery_ticks`.
-- Bite: whenever a consume path removes a positive amount of type `t` at a
-  cell, `m[t][cell] = max(floor, m[t][cell] * factor)`. `consume_type` is the
-  production path (`apply_typed_eat` → `World::consume_food_type`);
-  `consume_any` applies the same rule to each type it removed so no future
-  caller bypasses it. A zero-amount consume is not a bite. Disabled: no bite
-  is recorded.
-- Recovery: at the start of each food growth pass, before any fertility read,
+- State: one `Grid<f32>` modifier per food type in the ordinary-food module,
+  1.0 at start; reset to 1.0 when the catalog changes, when `enabled` flips,
+  and when `seed_density` seeds a fresh world; untouched by live edits to
+  `factor`, `floor`, or `recovery_ticks`.
+- Bite: a consume path that removes a positive amount of type `t` at a cell
+  sets `m[t][cell] = max(floor, m[t][cell] * factor)`. `consume_type` is the
+  production path (`apply_typed_eat`); `consume_any` applies the same rule
+  per type removed. Zero-amount consumes and disabled grazing record no bite.
+- Recovery: at the start of each growth pass, before any fertility read,
   every non-barrier cell of every type advances
-  `m = min(1.0, m + 1 / recovery_ticks)`. This runs for empty cells too: the
-  grazed cell is empty by construction, and the growth loop's
-  `source <= 0.0 → continue` must not skip it. Barrier cells stay 1.0.
-- Read: the modifier multiplies the mapped fertility value
-  (`map_fertility(...)`) at its three read sites in `grow` — the source cell
-  for local growth, the target cell for spread, and the spawned cell for
-  recovery spawns — so both `base_cell_fertility` and the post-inhibition
-  `cell_fertility` carry it and the type-inhibition telemetry does not absorb
-  grazing's share. Disabled: the read is 1.0. `effective_fertility_grid`
-  keeps returning the ungrazed habitat reading; its doc comment says so
-  instead of "the same reading `grow` uses".
-- Isolation: a bite of type A never changes type B's modifier; the occupancy
-  depletion multiplier is unchanged and multiplies beside the grazing read.
+  `m = min(1.0, m + 1 / recovery_ticks)`, empty cells included (the grazed
+  cell is empty by construction). Barrier cells stay 1.0.
+- Read: the modifier multiplies the mapped fertility at the three read sites
+  in `grow` (local source cell, spread target, recovery spawn cell), so both
+  `base_cell_fertility` and post-inhibition `cell_fertility` carry it and the
+  inhibition telemetry does not absorb grazing's share. Disabled reads 1.0.
+  `effective_fertility_grid` stays the ungrazed habitat reading.
+- Isolation: a type-A bite never changes type B; the occupancy depletion
+  multiplier is unchanged and multiplies beside the grazing read.
 - Defaults (production, user-fixed): `enabled` true, `factor` 0.5, `floor`
-  0.05, `recovery_ticks` 1000. From 1.0 the floor is reached on the fifth
-  bite (0.5, 0.25, 0.125, 0.0625, 0.05); a single bite recovers in 500 ticks,
-  a floored cell in 950.
-- Config: `world.food.shared.grazing.{enabled: bool, factor: f32, floor:
-  f32, recovery_ticks: u32}` on `FoodResourceConfig`, `#[serde(default)]` so
-  every stored recipe and config loads. Normalization mirrors
-  `normalize_food_shared`: `factor` and `floor` finite and clamped to
-  `[0.0, 1.0]`, invalid falls back to the default; `floor <= factor` is not
-  required; `recovery_ticks` is clamped to `[1, 10_000]`, zero or missing
-  falls back to 1000: the cap is the domain the property test below covers,
-  and past roughly `1e7` the f32 step stalls short of 1.0, breaking
-  "recovers toward 1.0". The panel field carries the same bounds. Reference
-  rows go into
-  `docs/reference/v3-world-grid-spec.md` Section 4 and the runtime-editable
-  table and knob list of `docs/reference/v3-runtime-config-spec.md`; the
-  config examples in `docs/reference/v3-server-api-protocol-spec.md` gain
-  the block; `docs/reference/v3-tick-orchestration-spec.md` Phase 0 names
-  the recovery step between the occupancy depletion update and food growth.
-- Runtime panel: `FoodParametersSection.tsx` gains a grazing toggle and the
-  three numeric fields beside the occupancy depletion ones, with the
-  `types/config.ts`, `startupConfig.ts` merge/normalize, and fixture
-  carry-through. The server's `patch_config` already reaches
-  `reconfigure_food`, so a live edit applies through
-  `apply_config_transition`.
-- Telemetry: `FoodGrowthSummary` gains per-type `mean_grazing_modifier` over
-  passable cells and `grazed_cells` (modifier below 1.0), gathered in the
-  recovery pass, and `SimStats` records them like the depletion fields. The
-  existing applied typed-eat totals are the bite count: an applied `Eat`
-  with food is exactly one bite while grazing is enabled, so no second
-  counter is added. The goal report records, per case, the mean modifier
-  and grazed-cell share by type on `WorldTracking` (final-tick state, also
-  sampled into every checkpoint block as two small per-type vectors), with
-  comparison rows following `typed_eat_share_type_{i}`. That reading, the
-  typed-eat totals, and the changed per-case `config_digest` are the
-  evidence the pressure is enabled and acting in each world.
-- Determinism: the layer uses no RNG; seeded runs stay reproducible.
+  0.05, `recovery_ticks` 1000. The floor is reached on the fifth bite; one
+  bite recovers in 500 ticks, a floored cell in 950.
+- Config: `world.food.shared.grazing.{enabled, factor, floor,
+  recovery_ticks}` on `FoodResourceConfig`, `#[serde(default)]`. `factor` and
+  `floor` finite, clamped to `[0.0, 1.0]`, invalid falls back to the default;
+  `floor <= factor` is not required; `recovery_ticks` clamped to
+  `[1, 10_000]`, zero or missing falls back to 1000 (the cap is the domain the
+  property test covers; past about `1e7` the f32 step stalls short of 1.0).
+  Documented in `v3-world-grid-spec.md` Section 4, the runtime-editable table
+  of `v3-runtime-config-spec.md`, the `v3-server-api-protocol-spec.md`
+  examples, and `v3-tick-orchestration-spec.md` Phase 0 (recovery between the
+  depletion update and growth).
+- Runtime panel: `FoodParametersSection.tsx` carries the toggle and three
+  fields beside the occupancy depletion ones, with `types/config.ts`,
+  `startupConfig.ts`, and fixture carry-through; `patch_config` applies live
+  edits through `reconfigure_food`.
+- Telemetry: `FoodGrowthSummary` carries per-type `mean_grazing_modifier`
+  (passable cells) and `grazed_cells` (below 1.0), gathered in the recovery
+  pass; `SimStats` records them. The applied typed-eat totals are the bite
+  count (an applied `Eat` with food is one bite). The goal report records the
+  mean modifier and grazed-cell share by type on `WorldTracking` (final tick,
+  also in each checkpoint block), comparison rows after
+  `typed_eat_share_type_{i}`; with the typed-eat totals and the changed
+  per-case `config_digest` this is the evidence the pressure acts in each
+  world.
+- Determinism: no RNG; seeded runs stay reproducible.
 
 **Trajectory pins that legitimately move.** With the default on, these
 stored identities change and are re-pinned once, old and new values in the
@@ -137,26 +113,24 @@ a defect.
 
 ## Implementation Tasks
 
-- [x] Run `cargo test -p v3-core --test viability` first, then TDD the
-      modifier: config struct, defaults, normalization, storage, bite,
-      recovery, three read sites, telemetry.
+- [x] Viability first, then TDD the modifier: config, normalization,
+      storage, bite, recovery, three read sites, telemetry.
 - [x] Property tests (proptest, v3-core): modifier always within
       `[floor, 1.0]`; a bite is non-increasing and a recovery tick is
       non-decreasing; from any value, recovery reaches exactly 1.0 within
       `ceil((1 - m) * n) + ceil(n^2 * f32::EPSILON)` ticks for
-      `n = recovery_ticks` (accumulated f32 rounding, at most 12 ticks at the
-      cap; derivation in the test's doc comment); `n` drawn from the whole
-      accepted domain `1..=10_000`; a type-A bite leaves type B bit-identical.
-- [x] Focused fixtures: a bitten cell recolonizes from a dense neighbor at
-      `factor` of the unbitten rate; a floored cell at `floor`; the empty
-      grazed cell recovers; disabled reads 1.0 everywhere and re-enabling
-      starts from 1.0; occupancy depletion still multiplies beside it.
+      `n = recovery_ticks` (f32 rounding slack, at most 12 ticks at the cap;
+      derivation in the test's doc comment), `n` drawn from `1..=10_000`; a
+      type-A bite leaves type B bit-identical.
+- [x] Focused fixtures: a bitten cell recolonizes at `factor` of the
+      unbitten rate, a floored cell at `floor`; the empty grazed cell
+      recovers; disabled reads 1.0 and re-enabling starts from 1.0; occupancy
+      depletion still multiplies beside it.
 - [x] Goal-world integration: a v3-cli bench test asserts each checked-in
       recipe resolves with grazing enabled at the production defaults; the
-      per-case grazing readings (`WorldTracking::grazing_modifier_mean` and
-      `grazed_cell_share`, per-type strings beside `food_density_total`)
-      appear in the goal report schema and as `grazing_modifier_mean_type_{i}`
-      and `grazed_cell_share_type_{i}` in the comparison block.
+      per-case readings are `WorldTracking::grazing_modifier_mean` and
+      `grazed_cell_share`, compared as `grazing_modifier_mean_type_{i}` and
+      `grazed_cell_share_type_{i}`.
 - [x] Config surface: reference-spec rows, runtime panel fields and tests,
       frontend types/fixtures, `patch_config` round-trip.
 - [x] Re-pin the moved trajectory identities and record old/new in
@@ -240,16 +214,16 @@ Details: [`docs/progress/readings/t02-f04.md`](../../progress/readings/t02-f04.m
 
 ## Success Criteria
 
-- [ ] A consuming bite multiplies only its type's modifier at that cell,
-      clamped to the floor, and the modifier recovers linearly to 1.0.
+- [ ] A bite multiplies only its type's modifier at that cell, clamped to
+      the floor; the modifier recovers linearly to 1.0.
 - [ ] The modifier multiplies fertility at local growth, spread target, and
       recovery spawn; occupancy depletion still applies beside it.
-- [ ] The four values are config under `world.food.shared.grazing`, are
-      normalized, round-trip through the runtime panel and `patch_config`,
-      and are documented in the reference specs.
+- [ ] The four values are normalized config under
+      `world.food.shared.grazing`, round-trip through the panel and
+      `patch_config`, and are in the reference specs.
 - [ ] The gate world and all three goal worlds run with grazing enabled at
-      the production defaults, and the goal report shows applied eats and
-      grazed cells in each.
+      production defaults; the goal report shows applied eats and grazed
+      cells in each.
 - [ ] Verification items above pass; mutation and benchmark records exist.
 
 ## Notes for AI Agents
@@ -257,3 +231,15 @@ Details: [`docs/progress/readings/t02-f04.md`](../../progress/readings/t02-f04.m
 - Decision: the defaults (`factor` 0.5, `floor` 0.05, `recovery_ticks`
   1000, enabled) and the T12.F04-only dependency are the user's 2026-09-15
   re-scope; only the user changes them.
+- Deferred: review P3, `FoodResource::grazing_modifier_at`
+  (`ordinary_food/mod.rs`) is public API with no workspace caller; drop it or
+  give it a consumer in the feature that needs it.
+- Deferred: review P3, `bite_modifier = (m * factor).max(floor)`
+  (`ordinary_food/grazing.rs`) with a live `floor` raised above a floored
+  cell makes the next bite raise that cell (0.05 to 0.9), unseen by the
+  proptest (draws modifier >= floor); fix in a later pass by a sentence in
+  the `floor` row of `v3-world-grid-spec.md` or a `.min(modifier)` guard.
+- Deferred: review P3, `recover` (`ordinary_food/grazing.rs`) recounts
+  passable cells over the barrier grid every tick, disabled included, and
+  rewrites barrier cells to 1.0 each pass; within predeclared cost, a cache on
+  the layer would remove a full pass.
