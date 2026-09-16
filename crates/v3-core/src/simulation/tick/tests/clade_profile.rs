@@ -172,3 +172,39 @@ fn a_mixed_sequence_keeps_the_by_type_sum_equal_to_the_attempt_count() {
     );
     assert_eq!(creature.lifetime_eats_applied_by_type, vec![1]);
 }
+
+#[test]
+fn a_child_starts_at_zero_while_its_parent_keeps_its_counters() {
+    use crate::simulation::actions::{apply_reproduce, ReproductionActionResult};
+    let (mut sim, parent) = make_sim_with_one_creature(1000.0);
+    sim.config.mutation.mutation_probability = 0.0;
+    sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
+    let pos = sim.creatures[parent].position;
+    sim.world
+        .set_food_type(pos, OrdinaryFoodTypeId::new(0), 1.0);
+    execute(
+        &mut sim,
+        parent,
+        vec![WorldAction::eat(OrdinaryFoodTypeId::new(0))],
+    );
+    sim.creatures[parent].lifetime_predation_kills_count = 3;
+    sim.creatures[parent].lifetime_predation_hits_taken_count = 2;
+
+    let mut rng = SmallRng::seed_from_u64(42);
+    let result = apply_reproduce(parent, &mut sim, Direction::N, 10.0, &mut rng);
+    assert_eq!(result, ReproductionActionResult::Spawned);
+    let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
+
+    assert_eq!(child.lifetime_actions_attempted_by_type, [0; 5]);
+    assert!(child.lifetime_eats_applied_by_type.is_empty());
+    assert_eq!(child.lifetime_predation_kills_count, 0);
+    assert_eq!(child.lifetime_predation_hits_taken_count, 0);
+    let parent = &sim.creatures[parent];
+    assert_eq!(
+        parent.lifetime_actions_attempted_by_type,
+        slot(ActionType::Eat)
+    );
+    assert_eq!(parent.lifetime_eats_applied_by_type, vec![1]);
+    assert_eq!(parent.lifetime_predation_kills_count, 3);
+    assert_eq!(parent.lifetime_predation_hits_taken_count, 2);
+}
