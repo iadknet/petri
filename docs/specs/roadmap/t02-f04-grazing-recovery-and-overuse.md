@@ -179,10 +179,7 @@ for any other reason is a defect.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.
-- [ ] Benchmark summaries stored at
-      `docs/progress/features/t02-f04-grazing-recovery-and-overuse.json` and
-      `-goal.json`, local raw hash/byte count and verification time checked,
-      series entries point to the summaries, no new full report staged.
+- [x] Benchmark summaries stored, verified -> readings file.
 
 ## Performance and Goal Impact
 
@@ -231,7 +228,10 @@ so `inputs_changed` is true in every case and the gate counters move.
   and the food-type count, not the world.
 - No new diversity or cognition indicator; nothing stays `Undefined`.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Both runs exit 0, not severe. No extinction;
+`plateau_population`/`births` fall in all three worlds as predeclared.
+Mismatch: Orchards `final_population` rose (+12%), not severe. Details:
+[`docs/progress/readings/t02-f04.md`](../../progress/readings/t02-f04.md).
 
 - Summaries: [gate](../../progress/features/t02-f04-grazing-recovery-and-overuse.json),
   [goal](../../progress/features/t02-f04-grazing-recovery-and-overuse-goal.json).
