@@ -34,9 +34,9 @@ A `steering-v1` battery reads seeking and avoidance beside the T11.F14 block.
   for T11.F21" (form, decode rule, backend shapes, readings, predeclared
   directions); the [live survey](../../strategy/live-survey-2026-09-16.md) it
   repairs (Appendix B is the reference probe for readings (a) and (b));
-  [T11.F14](t11-f14-mesh-execution-observability.md) for the battery seam and
-  executed set; [T11.F15](t11-f15-mesh-routing-connection-semantics.md) and
-  [T11.F18](t11-f18-backend-neutral-mesh-node-growth.md) for conventions.
+  [T11.F14](t11-f14-mesh-execution-observability.md),
+  [T11.F15](t11-f15-mesh-routing-connection-semantics.md), and
+  [T11.F18](t11-f18-backend-neutral-mesh-node-growth.md).
 - Research: the note weighs per-direction winner-take-all (TPG/SBB bids, NEAT
   one-output-per-action) against heading vectors, egocentric turns, and a
   discretized scalar and adopts the bank; existing seams carry it, no package.
@@ -51,38 +51,31 @@ is 0 and selects d when it is positive; one negative edge `barrier[d] -> bid d`
 alone never selects d and otherwise leaves the scalar decode in force. `Eat`,
 `Pop`, and `NoOp` never consult a bank.
 
-**Graph form.** `ActionSlot` gains `#[serde(default)] direction_bids:
-Vec<DirectionBidEdge>` (a `GraphEdge` plus `direction: u8`) on every slot,
-evaluated in the effects pass beside `param_inputs`: bid d is the weighted sum
-of the edges with `direction == d`, unwired 0, and the bank is written when at
-least one edge has `direction < 8`. It is the sixth edge surface,
-`EdgeSurface::ActionBid(slot)`, for `AddGraphEdge` (`direction` uniform in
-`0..8`, source through `random_graph_source`), `RemoveGraphEdge`,
-`RetargetGraphEdge`, `AlterGraphEdgeWeight`, and `GraphRawFieldMutation`
-(`direction` is one more one-unit field); applicability follows
-`param_inputs`, so `pick_random_surface` gains one surface per slot.
-`GraphActionSlotTrace` gains
-`direction_bids: Option<[f32; 8]>` and `chosen_direction: Option<u8>`, `Some`
-only when the bank was written; the server payload is unchanged.
+**Graph form** (`v3-graph-backend-spec.md`, `v3-mutation-spec.md`).
+`ActionSlot::direction_bids: Vec<DirectionBidEdge>` (a `GraphEdge` plus
+`direction: u8`, serde-defaulted) on every slot, evaluated beside
+`param_inputs`: bid d is the weighted sum of the edges with `direction == d`,
+and the bank is written when any edge has `direction < 8`. It is the sixth
+edge surface, `EdgeSurface::ActionBid(slot)`, for every graph edge operator
+and the raw-field operator (`direction` is a one-unit field; `AddGraphEdge`
+draws it uniformly), so `pick_random_surface` gains one surface per slot.
+`GraphActionSlotTrace` carries the bids and chosen index when written; the
+server payload is unchanged.
 
-**VM form.** One opcode, `WriteDirectionBid { direction: u8, src }`, writes
-`bids[direction] = regs[src]` into a per-dispatch eight-slot buffer beside
-`meta` and marks the bank written; `direction >= 8` is ignored and marks
-nothing. `PushAction` for `action_type` 2, 3, or 4 applies the decode rule;
-buffer and flag persist between pushes within a dispatch and reset with `meta`
-at node end. Cost 0.14 beside `WriteWorldActionMeta`. The opcode joins the
-fresh-instruction draw, the operand nudge (`direction` or `src`), the proptest
-strategy, Display, register-use analysis, and the existing `action` write
-class (no new `MeshWriteClass`, so the frontend is unchanged).
+**VM form** (`v3-vm-isa-spec.md`). `WriteDirectionBid { direction, src }`
+writes a per-dispatch eight-slot buffer beside `meta` and marks the bank
+written (`direction >= 8` ignored); `PushAction` for types 2–4 applies the
+rule; buffer and flag reset with `meta` at node end; cost 0.14. It joins the
+fresh-instruction draw, operand nudge, analysis, and the existing `action`
+write class (no new `MeshWriteClass`; frontend unchanged).
 
-**Neutral at birth.** Founder programs and graphs write no bank and every
-stored genome deserializes with empty banks; for them the decode is
-bit-identical, so the unmutated founder's battery signature, `mesh_execution`,
-and `steering` readings are unchanged. Because the fresh-instruction draw is
-`gen_range(0..N)` over the opcode catalog and `pick_random_surface` is uniform
-over surfaces, one more opcode and surface change the mapping of every such
-draw: founder rows for VM insertion-class operators and `AddGraphEdge`, the
-gate and goal trajectories, and the drift walk diverge from the previous
+**Neutral at birth.** Founders and every stored genome carry empty banks, for
+which the decode is bit-identical, so the unmutated founder's battery
+signature, `mesh_execution`, and `steering` readings are unchanged. Because
+the fresh-instruction draw is `gen_range(0..N)` and `pick_random_surface` is
+uniform over surfaces, one more opcode and surface change the mapping of every
+such draw: founder rows for VM insertion-class operators and `AddGraphEdge`,
+the gate and goal trajectories, and the drift walk diverge from the previous
 closure, as at T13.F05; the contract's "founder rows and the gate trajectory
 unchanged" holds for the unmutated founder's readings.
 
@@ -95,16 +88,15 @@ as the `neighborhood-v1` snapshots run; a move is a queue leading with `Move(c)`
 exact hit `c == d`, within-45 `c` in `{d-1, d, d+1}` mod 8. (b) For each (a)
 scenario leading with `Move(c)`: the same scenario with `barrier[c] = 1`;
 avoided when the lead is no longer `Move(c)`. (c) `bank_written`: a node in
-the T11.F14 executed set structurally writes a bank (a VM program containing
-`WriteDirectionBid`, or a graph slot with `Emit(Move | Reproduce |
-StealEnergy)` behavior and a non-empty bank). Per genome the counts and
+the T11.F14 executed set contains `WriteDirectionBid` or a movement slot with
+a non-empty bank. Per genome the counts and
 `bank_written`; per seed, pooled over the sampled genomes, the sums and
 `exact_hit_fraction`, `within_45_fraction`, `avoidance_fraction`,
 `bank_written_fraction`, with `chance: {exact: 0.125, within_45: 0.375}`
-beside them; a zero denominator gives `Undefined`, never 0. Stored in
-`deterministic` as `steering` beside `mesh_execution` (founder half in the
-gate report, each sampled genome in the goal report) and `steering_pooled` on
-each evolved seed, serde-defaulted to `Undefined` on old reports.
+beside them; a zero denominator gives `Undefined`, never 0. Stored as
+`steering` beside `mesh_execution` (founder half in the gate report, sampled
+genomes in the goal report) and `steering_pooled` per evolved seed,
+serde-defaulted to `Undefined` on old reports.
 
 ## Implementation Tasks
 
@@ -199,20 +191,20 @@ and the feature still closes.
 ok against the epochs, so no re-pin; founder `mesh_execution` byte-identical
 to T14.F07, founder `steering` deterministic with `bank_written` false.
 Spec-owner rulings, 2026-09-16: (1) no sampled genome writes a bank, so the
-exact-hit values are scalar-decode seeking, not attributable to the feature;
-the predeclaration's "at chance by construction" was wrong, the founder reads
-0.5 with no bank (ring-derived direction), and the founder's 0.5 and the
-table, not 0.125, are the next closure's reference.
-(2) Canyon and Confluence read `changed` down and `dead` up against T14.F07:
-a predeclaration miss recorded, not remediated; the mechanism cannot produce
-a dead birth, the samples are post-bottleneck lineages, and the T14.F12
-floors are cleared. (3) Minimum populations 8 / 171 / 8 against 880–4,275 in
-every stored goal summary; Orchards never recovered and its sample is eight
-generation-1–2 creatures. A user-authorized control at 72845446 with the two
-draws restored reproduced the T02.F04 goal closure integer-for-integer
-(readings file), so the collapse is the diverged trajectory of the draw
-re-mapping, not the bank. Goal `wall_clock` flags (+95% / +83%), not severe;
-T02.F04 already read +82% on this epoch (readings file).
+exact-hit values are scalar-decode seeking, not the feature's; the
+predeclaration's "at chance by construction" was wrong (the founder reads 0.5
+with no bank), and the founder's 0.5 and the table, not 0.125, are the next
+closure's reference. (2) Canyon and Confluence read `changed` down and `dead`
+up against T14.F07: a predeclaration miss recorded, not remediated; the
+mechanism cannot produce a dead birth, the samples are post-bottleneck
+lineages, and the T14.F12 floors are cleared. (3) Minimum populations
+8 / 171 / 8 against 880–4,275 in every stored goal summary; Orchards never
+recovered and its sample is eight generation-1–2 creatures. A user-authorized
+control at 72845446 with the two draws restored reproduced the T02.F04 goal
+closure integer-for-integer (readings file), so the collapse is the diverged
+trajectory of the draw re-mapping, not the bank. (4) Goal `wall_clock` flags
+(+95% / +83%), not severe, ruled pre-existing and not this feature's: T02.F04
+read +82% on this epoch and the control +56% (readings file).
 
 | World | exact_hit | avoidance | bank_written | pop min / tick-200 / final (prev min / final) | changed cur / prev | dead cur / prev | neighborhood_read cur / prev / floor |
 | --- | --- | --- | --- | --- | --- | --- | --- |
