@@ -30,7 +30,10 @@ fn execute(
     );
 }
 
-fn by_type(sim: &crate::simulation::Simulation, id: crate::contracts::CreatureId) -> [u64; 5] {
+fn by_type(
+    sim: &crate::simulation::Simulation,
+    id: crate::contracts::CreatureId,
+) -> [u64; ACTION_TYPE_COUNT as usize] {
     sim.creatures[id].lifetime_actions_attempted_by_type
 }
 

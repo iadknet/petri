@@ -711,7 +711,7 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
 fn checkpoint_tracking_omits_every_transferred_block() {
     use v3_core::simulation::seed_simulation;
 
-    const TRANSFERRED_KEYS: [&str; 11] = [
+    const TRANSFERRED_KEYS: &[&str] = &[
         "typed_eats_failed_total",
         "mesh_dispatches_energy_exhausted_total",
         "mutation_supply",
