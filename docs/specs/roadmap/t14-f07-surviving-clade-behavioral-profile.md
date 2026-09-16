@@ -152,7 +152,7 @@ unchanged.
 
 ## Verification
 
-- [x] `make check` -> exit 0 on the final feature code at `d9e0c6ef`.
+- [x] `make check` -> exit 0 on the final feature code at `fb7f480e`, rebased onto T02.F04.
 - [x] Focused tests: `cargo test -p v3-core -p v3-cli` -> exit 0 at `53d68f92`
       (every target passing; test names and counts in
       [`docs/progress/readings/t14-f07.md`](../../progress/readings/t14-f07.md));
