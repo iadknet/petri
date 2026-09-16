@@ -29,12 +29,22 @@ pub(super) fn recovery_step(recovery_ticks: u32) -> f32 {
 }
 
 /// Final-tick grazing reading for one food type, gathered in the recovery pass.
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+/// The default is the ungrazed reading.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct GrazingTypeSummary {
     /// Mean modifier over passable cells (1.0 when nothing is grazed).
     pub mean_modifier: f32,
     /// Passable cells whose modifier is below 1.0.
     pub grazed_cells: u32,
+}
+
+impl Default for GrazingTypeSummary {
+    fn default() -> Self {
+        Self {
+            mean_modifier: 1.0,
+            grazed_cells: 0,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -58,8 +68,7 @@ impl GrazingLayer {
 
     /// Every modifier back to 1.0, keeping the type count.
     pub(super) fn reset(&mut self) {
-        let type_count = self.by_type.len();
-        *self = Self::new(self.width, self.height, type_count);
+        self.resize_type_storage(self.by_type.len());
     }
 
     /// Fresh 1.0 grids for a changed catalog.
@@ -121,13 +130,7 @@ impl GrazingLayer {
         let passable_cells = barriers.as_slice().iter().filter(|b| !**b).count() as u32;
         if !config.enabled {
             return (
-                vec![
-                    GrazingTypeSummary {
-                        mean_modifier: 1.0,
-                        grazed_cells: 0
-                    };
-                    self.by_type.len()
-                ],
+                vec![GrazingTypeSummary::default(); self.by_type.len()],
                 passable_cells,
             );
         }
@@ -169,6 +172,7 @@ impl GrazingLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::MAX_GRAZING_RECOVERY_TICKS;
     use proptest::prelude::*;
 
     fn type_id(raw: u16) -> OrdinaryFoodTypeId {
@@ -195,7 +199,7 @@ mod tests {
         #[test]
         fn recovery_stays_within_range_and_is_non_decreasing(
             (floor, modifier) in floor_and_modifier(),
-            recovery_ticks in 1u32..=10_000,
+            recovery_ticks in 1u32..=MAX_GRAZING_RECOVERY_TICKS,
         ) {
             let recovered = recover_modifier(modifier, recovery_step(recovery_ticks));
             prop_assert!(recovered >= floor && recovered <= 1.0);
@@ -203,14 +207,20 @@ mod tests {
         }
 
         /// Bounded to realistic `recovery_ticks`: past roughly 1e7 the f32 step
-        /// falls under half an ulp near 1.0 and the sum stops moving.
+        /// falls under half an ulp near 1.0 and the sum stops moving. Within
+        /// the domain, each of the up-to-`n` additions rounds by at most
+        /// `EPSILON / 2`, so the sum can trail by `n * EPSILON / 2` and need
+        /// that many more `1 / n` steps: at most `n^2 * EPSILON / 2` ticks.
         #[test]
         fn recovery_reaches_exactly_one_within_the_ceiling(
             modifier in 0.0f32..=1.0,
-            recovery_ticks in 1u32..=10_000,
+            recovery_ticks in 1u32..=MAX_GRAZING_RECOVERY_TICKS,
         ) {
             let step = recovery_step(recovery_ticks);
-            let bound = ((1.0 - f64::from(modifier)) * f64::from(recovery_ticks)).ceil() as u32 + 1;
+            let ticks_f64 = f64::from(recovery_ticks);
+            let rounding_slack = (ticks_f64 * ticks_f64 * f64::from(f32::EPSILON)).ceil() as u32;
+            let bound =
+                ((1.0 - f64::from(modifier)) * ticks_f64).ceil() as u32 + 1 + rounding_slack;
             let mut current = modifier;
             let mut ticks = 0u32;
             while current < 1.0 && ticks <= bound {
@@ -297,13 +307,7 @@ mod tests {
         assert_eq!(layer.modifier_at(1, 1, type_id(1)), 1.0);
         assert_eq!(summary[0].grazed_cells, 1);
         assert!((summary[0].mean_modifier - 2.5 / 3.0).abs() < 1e-6);
-        assert_eq!(
-            summary[1],
-            GrazingTypeSummary {
-                mean_modifier: 1.0,
-                grazed_cells: 0
-            }
-        );
+        assert_eq!(summary[1], GrazingTypeSummary::default());
     }
 
     #[test]

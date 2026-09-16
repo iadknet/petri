@@ -167,13 +167,14 @@ for any other reason is a defect.
 
 - [x] `cargo test -p v3-core --test viability` (first) -> result in
       [`docs/progress/readings/t02-f04.md`](../../progress/readings/t02-f04.md).
-- [x] Focused and property tests named above -> test names and results in
-      the readings file.
+- [x] Focused and property tests named above, plus the cap test
+      `normalize_grazing_caps_recovery_ticks_at_the_property_domain` ->
+      readings file.
 - [x] `cargo test -p v3-cli --test bench_artifacts` including the
       recipe-carries-grazing assertion -> readings file.
 - [x] Frontend: `npx vitest run` on the touched config-panel tests, `npx tsc
       --noEmit -p .`, `npx biome check src` -> readings file.
-- [x] `make check` -> clean.
+- [x] `make check` -> exit 0 after each pass (readings file).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.

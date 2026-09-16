@@ -207,7 +207,7 @@ pub(super) fn apply_config_transition(
     if reset_depletion || catalog_changed {
         occupancy_depletion.reset();
     }
-    if reset_grazing && !catalog_changed {
+    if reset_grazing {
         state.grazing_mut().reset();
     }
     if catalog_changed {
@@ -314,6 +314,32 @@ fn inhibition_penalty(weighted_sum: f32, own_density: f32, own_inhibitor: f32) -
     (weighted_sum - own_density * own_inhibitor).max(0.0)
 }
 
+/// The fertility multiplier growth applies at one cell: the annealed habitat
+/// fertility (1.0 when fertility is disabled or the type has no grid) times
+/// the cell's grazing modifier.
+#[inline]
+fn grazed_habitat_fertility(
+    state: &OrdinaryFoodState,
+    full_config: &FoodConfig,
+    type_idx: OrdinaryFoodTypeId,
+    x: u16,
+    y: u16,
+    (eff_min, eff_max): (f32, f32),
+) -> f32 {
+    let habitat = if full_config.fertility.enabled {
+        state
+            .fertility_grid(type_idx)
+            .map(|grid| fertility::map_fertility(*grid.get(x, y), eff_min, eff_max))
+            .unwrap_or(1.0)
+    } else {
+        1.0
+    };
+    habitat
+        * state
+            .grazing()
+            .multiplier_at(x, y, type_idx, full_config.shared.grazing.enabled)
+}
+
 #[allow(clippy::too_many_arguments)]
 #[allow(
     clippy::too_many_lines,
@@ -348,7 +374,6 @@ pub(super) fn grow<T: Clone>(
     // empty cells.
     let (grazing_summaries, passable_cells) =
         state.grazing_mut().recover(barriers, &shared.grazing);
-    let grazing_enabled = shared.grazing.enabled;
 
     let max_density = shared.max_density.max(0.0);
     if max_density <= 0.0 || catalog.is_empty() {
@@ -425,17 +450,14 @@ pub(super) fn grow<T: Clone>(
                     continue;
                 }
 
-                let base_cell_fertility =
-                    if full_config.fertility.enabled {
-                        state
-                            .fertility_grid(type_idx)
-                            .map(|grid| fertility::map_fertility(*grid.get(x, y), eff_min, eff_max))
-                            .unwrap_or(1.0)
-                    } else {
-                        1.0
-                    } * state
-                        .grazing()
-                        .multiplier_at(x, y, type_idx, grazing_enabled);
+                let base_cell_fertility = grazed_habitat_fertility(
+                    state,
+                    full_config,
+                    type_idx,
+                    x,
+                    y,
+                    (eff_min, eff_max),
+                );
                 let cell_inhibition_penalty =
                     inhibition_penalty(inhibition_weighted_sums[idx], source, type_inhibitor);
                 let cell_fertility = (base_cell_fertility - cell_inhibition_penalty).max(0.0);
@@ -476,24 +498,13 @@ pub(super) fn grow<T: Clone>(
                 let target_multiplier =
                     occupancy_depletion.multiplier_at(target.x, target.y, occupancy_enabled);
                 let target_idx = target.y as usize * state.width() as usize + target.x as usize;
-                let base_neighbor_fertility = if full_config.fertility.enabled {
-                    state
-                        .fertility_grid(type_idx)
-                        .map(|grid| {
-                            fertility::map_fertility(
-                                *grid.get(target.x, target.y),
-                                eff_min,
-                                eff_max,
-                            )
-                        })
-                        .unwrap_or(1.0)
-                } else {
-                    1.0
-                } * state.grazing().multiplier_at(
+                let base_neighbor_fertility = grazed_habitat_fertility(
+                    state,
+                    full_config,
+                    type_idx,
                     target.x,
                     target.y,
-                    type_idx,
-                    grazing_enabled,
+                    (eff_min, eff_max),
                 );
                 let target_source = state.food_at_type(target, type_idx).clamp(0.0, max_density);
                 let neighbor_penalty = inhibition_penalty(
@@ -531,17 +542,14 @@ pub(super) fn grow<T: Clone>(
                     continue;
                 }
 
-                let base_cell_fertility =
-                    if full_config.fertility.enabled {
-                        state
-                            .fertility_grid(type_idx)
-                            .map(|grid| fertility::map_fertility(*grid.get(x, y), eff_min, eff_max))
-                            .unwrap_or(1.0)
-                    } else {
-                        1.0
-                    } * state
-                        .grazing()
-                        .multiplier_at(x, y, type_idx, grazing_enabled);
+                let base_cell_fertility = grazed_habitat_fertility(
+                    state,
+                    full_config,
+                    type_idx,
+                    x,
+                    y,
+                    (eff_min, eff_max),
+                );
                 let recovery_source = state
                     .food_at_type(Position::new(x, y), type_idx)
                     .clamp(0.0, max_density);
