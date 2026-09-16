@@ -145,7 +145,7 @@ the existing observation caps; other profiles acquire nothing.
       d and changes no other battery action; one negative
       `neighbor_barrier[d] -> bid d` edge avoids on every base where the
       founder leads with `Move(d)` and changes nothing else.
-- [ ] Neutrality: the gate summary's founder `mesh_execution` block is
+- [x] Neutrality: the gate summary's founder `mesh_execution` block is
       byte-identical to the previous closure's (jq transcript in the readings
       file), and the founder's `steering` reading is deterministic with
       `bank_written` false; its values are the recorded reference.
@@ -160,7 +160,7 @@ the existing observation caps; other profiles acquire nothing.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
-- [ ] `make bench PROFILE=gate FEATURE=t11-f21-per-direction-motor-output`
+- [x] `make bench PROFILE=gate FEATURE=t11-f21-per-direction-motor-output`
       and one `PROFILE=goal` run: summaries at
       `docs/progress/features/t11-f21-per-direction-motor-output.json` and
       `...-goal.json`, local raw hash/byte count and verification time checked,
@@ -173,9 +173,9 @@ per-world tables live in `docs/progress/readings/t11-f21.md`. Working-tree
 results on 2026-09-16: viability 26 passed; `cargo test --workspace
 --no-fail-fast` 1950 passed, 0 failed, 4 ignored; clippy `-D warnings`,
 `cargo fmt --check`, `make roadmap-check`, and `make check-docs` clean; no
-`proptest-regressions/` file. The neutrality jq transcript waits on the gate
-summary; the founder half of that item (deterministic `steering`,
-`bank_written` false) is unit-tested.
+`proptest-regressions/` file. The neutrality jq transcript ran clean against
+the gate summary (readings file); the founder half (deterministic `steering`,
+`bank_written` false) matches its unit-tested reference.
 
 ## Performance and Goal Impact
 
@@ -217,7 +217,15 @@ user's running world). If (a) and (b) stay at chance while (c) is above 0, the
 note's finding 7 (the ecology keeps steering rare) is the recorded explanation
 and the feature still closes.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate/goal `severe=false`; founder neutral; no extinction;
+bank not yet written (predeclared); Canyon/Confluence `changed`/`dead` moved
+against the previous closure — flagged in the readings, not resolved here.
+
+| World | exact_hit_fraction | avoidance_fraction | bank_written_fraction | final_population | changed (cur/prev) | dead (cur/prev) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Orchards in grassland | 0.484375 | 0.000000 | 0.000000 | 8 | 0.386332 / 0.354354 | 0.000000 / 0.004505 |
+| Canyon country | 0.285012 | 0.000000 | 0.000000 | 4121 | 0.283382 / 0.328422 | 0.005831 / 0.001842 |
+| Confluence | 0.238208 | 0.000000 | 0.000000 | 8105 | 0.360515 / 0.389446 | 0.016452 / 0.002672 |
 
 - Summaries: `docs/progress/features/t11-f21-per-direction-motor-output.json`
   and `...-goal.json`; full readings `docs/progress/readings/t11-f21.md`.
