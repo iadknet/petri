@@ -1,4 +1,5 @@
 mod actions;
+mod clade_profile;
 mod dispatch_record;
 mod energy_accounting;
 mod logging;

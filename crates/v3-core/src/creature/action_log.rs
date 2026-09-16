@@ -16,6 +16,15 @@ pub enum ActionType {
 }
 
 impl ActionType {
+    /// Every action type in discriminant order, for fixed-order reports.
+    pub const ALL: [Self; ACTION_TYPE_COUNT as usize] = [
+        Self::NoOp,
+        Self::Eat,
+        Self::Move,
+        Self::Reproduce,
+        Self::StealEnergy,
+    ];
+
     /// Stable diagnostics key for this action type.
     ///
     /// Matches the variant name emitted by the derived `Serialize` impl.

@@ -146,6 +146,7 @@ pub fn apply_steal_energy(
         // Remove victim from world, slotmap, and action logs.
         sim.remove_creature(victim_id);
 
+        sim.creatures[attacker_id].lifetime_predation_kills_count += 1;
         sim.stats.predation_kills_total += 1;
         sim.stats.last_tick_predation_kills += 1;
         sim.stats.predation_actions_transferred_total += 1;
@@ -167,6 +168,7 @@ pub fn apply_steal_energy(
     }
 
     // Step 9: Victim survived.
+    sim.creatures[victim_id].lifetime_predation_hits_taken_count += 1;
     sim.stats.predation_actions_transferred_total += 1;
     *sim.stats
         .predation_actions_by_result
@@ -315,6 +317,63 @@ mod tests {
         assert!(
             (sim.creatures[victim_id].energy - 20.0).abs() < 1e-6,
             "victim should lose 10"
+        );
+    }
+
+    #[test]
+    fn a_survived_transfer_counts_one_hit_on_the_victim_and_no_kill() {
+        let (mut sim, attacker_id, victim_id) =
+            make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
+        sim.config.predation.steal_cost_rate = 0.0;
+
+        let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
+
+        assert_eq!(result, PredationActionResult::Transferred);
+        assert_eq!(
+            sim.creatures[victim_id].lifetime_predation_hits_taken_count,
+            1
+        );
+        assert_eq!(sim.creatures[attacker_id].lifetime_predation_kills_count, 0);
+        assert_eq!(
+            sim.creatures[attacker_id].lifetime_predation_hits_taken_count,
+            0
+        );
+        assert_eq!(sim.creatures[victim_id].lifetime_predation_kills_count, 0);
+    }
+
+    #[test]
+    fn a_kill_counts_on_the_attacker_beside_the_population_total() {
+        let (mut sim, attacker_id, victim_id) =
+            make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 5.0);
+        sim.config.predation.steal_cost_rate = 0.0;
+
+        let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0);
+
+        assert_eq!(result, PredationActionResult::TransferredAndKilled);
+        assert!(!sim.creatures.contains_key(victim_id));
+        assert_eq!(sim.creatures[attacker_id].lifetime_predation_kills_count, 1);
+        assert_eq!(
+            sim.creatures[attacker_id].lifetime_predation_kills_count,
+            sim.stats.predation_kills_total
+        );
+        assert_eq!(
+            sim.creatures[attacker_id].lifetime_predation_hits_taken_count,
+            0
+        );
+    }
+
+    #[test]
+    fn a_rejected_steal_counts_no_kill_and_no_hit() {
+        let (mut sim, attacker_id) = make_sim_one_creature(Position::new(5, 5), 50.0);
+        sim.config.predation.steal_cost_rate = 0.0;
+
+        let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
+
+        assert_eq!(result, PredationActionResult::RejectedNoVictim);
+        assert_eq!(sim.creatures[attacker_id].lifetime_predation_kills_count, 0);
+        assert_eq!(
+            sim.creatures[attacker_id].lifetime_predation_hits_taken_count,
+            0
         );
     }
 
