@@ -25,7 +25,7 @@ the world becoming a scripted puzzle with one permanent solution.
   - Goal: Terrain blocks sight. On T12.F01's seeded terrain, barriers hide food and creatures behind them, creatures may be opaque too, and sensor noise is an off-by-default treatment, so a creature must act on what it last saw.
 - [ ] **T02.F03 — Regional Season Offsets** — Depends on: T02.F01
   - Goal: Latitude and terrain. Spring arrives at different times in different places, so a creature that remembers where it fed last year can move ahead of the season.
-- [ ] **T02.F04 — Grazing Recovery and Overuse** — Depends on: T12.F04
+- [x] **T02.F04 — Grazing Recovery and Overuse** — Depends on: T12.F04
   - Goal: Overgrazing. Every bite halves the grazed cell's fertility for that food type, repeated bites compound down to a floor, and a bitten cell takes about 500 ticks to recover, so a patch grazed too recently yields less and the value of a place depends on its history and not only on what is visible now.
 - [ ] **T02.F05 — Natural Disturbance and Recovery** — Depends on: T02.F01
   - Goal: Fire and flood. Rare stochastic events clear regions of food, which then recolonize, so resilience, recolonization, and strategy turnover can be measured.
