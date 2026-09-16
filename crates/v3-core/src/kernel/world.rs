@@ -396,6 +396,28 @@ mod tests {
     }
 
     #[test]
+    fn grazing_modifier_at_reads_the_bitten_cell_and_one_elsewhere() {
+        // Arrange: one default-config bite (factor 0.5) on a single-type cell.
+        let mut w = small_wrap_world();
+        let bitten = Position::new(3, 3);
+        let type0 = OrdinaryFoodTypeId::new(0);
+        w.set_food_type(bitten, type0, 0.42);
+
+        // Act
+        w.consume_food_type(bitten, type0);
+
+        // Assert: the bitten cell reads the stored modifier, an ungrazed cell
+        // and an unknown type read the ungrazed 1.0.
+        let food = w.food();
+        assert_eq!(food.grazing_modifier_at(bitten, type0), 0.5);
+        assert_eq!(food.grazing_modifier_at(Position::new(4, 3), type0), 1.0);
+        assert_eq!(
+            food.grazing_modifier_at(bitten, OrdinaryFoodTypeId::new(9)),
+            1.0
+        );
+    }
+
+    #[test]
     fn seed_food_uses_exact_coverage_count() {
         let mut w = WorldState::new(10, 1, WorldEdgeMode::Wrap);
         let mut food_cfg = default_config().world.food;
