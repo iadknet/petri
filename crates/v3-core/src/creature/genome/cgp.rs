@@ -149,6 +149,15 @@ pub enum WorldActionKind {
     NoOp,
 }
 
+impl WorldActionKind {
+    /// Whether the kind commits a direction, so a slot's direction bank
+    /// (T11.F21) applies to it: `Move`, `Reproduce`, and `StealEnergy`.
+    #[must_use]
+    pub fn is_movement(self) -> bool {
+        matches!(self, Self::Move | Self::Reproduce | Self::StealEnergy)
+    }
+}
+
 /// One edge into a slot's direction bank (T11.F21): a weighted source and
 /// the bank slot (`Direction::ALL` index) its value is summed into.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]

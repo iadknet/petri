@@ -312,7 +312,7 @@ pub(super) fn mesh_execution_and_steering(
     steering_battery: &SteeringBattery,
     genome: &v3_core::creature::genome::CreatureGenome,
     context: &EvalContext,
-) -> (Indicator<MeshExecution>, Indicator<Steering>) {
+) -> (MeshExecution, Steering) {
     use v3_core::neighborhood::mesh_execution::{KNOCKOUT_METHOD, MESH_EXECUTION_VERSION};
     let sets =
         battery.mesh_execution_sets(genome, context.runtime, context.shared_memory_decay_rate);
@@ -336,21 +336,14 @@ pub(super) fn mesh_execution_and_steering(
         base_count: steering::STEERING_BASE_COUNT as u32,
         reading: steering_battery.read(genome, context.runtime, &sets.executed),
     };
-    (Indicator::Defined(mesh), Indicator::Defined(steering))
+    (mesh, steering)
 }
 
 /// The pooled `steering-v1` block for one seed's sample.
 pub(super) fn steering_pooled(pooled: steering::SteeringPooled) -> Indicator<SteeringPooled> {
     Indicator::Defined(SteeringPooled {
         version: steering::STEERING_VERSION.to_string(),
-        genomes: pooled.genomes,
-        scenarios: pooled.scenarios,
-        moves: pooled.moves,
-        exact_hits: pooled.exact_hits,
-        within_45: pooled.within_45,
-        avoidance_trials: pooled.avoidance_trials,
-        avoided: pooled.avoided,
-        bank_written: pooled.bank_written,
+        sums: pooled,
         exact_hit_fraction: fraction_or_undefined(pooled.exact_hits, pooled.moves),
         within_45_fraction: fraction_or_undefined(pooled.within_45, pooled.moves),
         avoidance_fraction: fraction_or_undefined(pooled.avoided, pooled.avoidance_trials),
@@ -572,8 +565,8 @@ pub(super) fn compute_founder_neighborhood(
         mesh_execution_and_steering(battery, &steering_battery, &subject, &context);
     NeighborhoodFounderHalf {
         generation: Some(0),
-        mesh_execution,
-        steering,
+        mesh_execution: Indicator::Defined(mesh_execution),
+        steering: Indicator::Defined(steering),
         reachable_node_count: structural_companions(&subject).reachable_node_count as u64,
         operator_rows: to_neighborhood_operator_rows(&evaluation.operator_rows),
         births: to_neighborhood_births(&evaluation.births),
@@ -638,14 +631,12 @@ pub(super) fn evolved_neighborhood_for_seed(
         pooled_births = pooled_births.merge(&evaluation.births);
         let (mesh_execution, steering) =
             mesh_execution_and_steering(battery, &steering_battery, &creature.genome, context);
-        if let Indicator::Defined(steering) = &steering {
-            pooled_steering = pooled_steering.merge(steering.reading);
-        }
+        pooled_steering = pooled_steering.merge(steering.reading);
 
         sampled_genomes.push(NeighborhoodSampledGenome {
             generation: Some(creature.generation),
-            mesh_execution,
-            steering,
+            mesh_execution: Indicator::Defined(mesh_execution),
+            steering: Indicator::Defined(steering),
             rank: rank as u64,
             creature_id: format!("{creature_id:?}"),
             operator_rows: to_neighborhood_operator_rows(&evaluation.operator_rows),

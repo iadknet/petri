@@ -43,6 +43,18 @@ impl WorldAction {
         }
     }
 
+    /// The direction a movement action commits; `None` for `NoOp` and `Eat`.
+    #[inline]
+    #[must_use]
+    pub fn direction(&self) -> Option<Direction> {
+        match self {
+            WorldAction::Move(direction)
+            | WorldAction::Reproduce { direction, .. }
+            | WorldAction::StealEnergy { direction, .. } => Some(*direction),
+            WorldAction::NoOp | WorldAction::Eat { .. } => None,
+        }
+    }
+
     /// Read back a parameter slot, mirroring the meta buffer layout used during encoding.
     /// Slot 0 = direction index (as f32), slot 1 = amount/energy_transfer. Returns 0.0 for
     /// unknown slots or variants without that parameter.

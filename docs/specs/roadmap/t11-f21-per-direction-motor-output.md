@@ -136,11 +136,11 @@ the existing observation caps; other profiles acquire nothing.
 
 ## Verification
 
-- [ ] Decode property tests (`runtime::action_decode`): no bank equals the
+- [x] Decode property tests (`runtime::action_decode`): no bank equals the
       scalar decode; all-tie yields the scalar direction; a unique maximum its
       index; a tie containing the scalar the scalar, else the lowest tied
       index; non-finite bids sanitized. Test names in the readings file.
-- [ ] One-edge fixtures on both backends from the founder: one positive
+- [x] One-edge fixtures on both backends from the founder: one positive
       `neighbor_food[d] -> bid d` edge gives an exact hit on food-at-d for every
       d and changes no other battery action; one negative
       `neighbor_barrier[d] -> bid d` edge avoids on every base where the
@@ -149,7 +149,7 @@ the existing observation caps; other profiles acquire nothing.
       byte-identical to the previous closure's (jq transcript in the readings
       file), and the founder's `steering` reading is deterministic with
       `bank_written` false; its values are the recorded reference.
-- [ ] Mutation coverage with controlled RNG: `AddGraphEdge` lands on a bank
+- [x] Mutation coverage with controlled RNG: `AddGraphEdge` lands on a bank
       surface and the four edge operators and the raw-field operator act on
       it; the VM fresh draw can produce `WriteDirectionBid`; the nudge covers
       both operands; genomes without `direction_bids` deserialize.
@@ -168,8 +168,14 @@ the existing observation caps; other profiles acquire nothing.
       run by the 2026-09-05 decision.
 - [ ] `make roadmap-check` and `make check-docs` on the document edits.
 
-Transcripts, test names, jq checks, and per-world tables go to
-`docs/progress/readings/t11-f21.md`.
+Test names per item, the self-review command table, jq checks, and
+per-world tables live in `docs/progress/readings/t11-f21.md`. Working-tree
+results on 2026-09-16: viability 26 passed; `cargo test --workspace
+--no-fail-fast` 1950 passed, 0 failed, 4 ignored; clippy `-D warnings`,
+`cargo fmt --check`, `make roadmap-check`, and `make check-docs` clean; no
+`proptest-regressions/` file. The neutrality jq transcript waits on the gate
+summary; the founder half of that item (deterministic `steering`,
+`bank_written` false) is unit-tested.
 
 ## Performance and Goal Impact
 
