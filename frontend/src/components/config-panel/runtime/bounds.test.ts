@@ -27,7 +27,7 @@ describe("resolveRuntimeBounds", () => {
 	});
 
 	it.each([
-		["population.max_creatures", { min: 50, max: 100000 }],
+		["population.max_creatures", { min: 50, max: 10000000 }],
 		["world.food.shared.max_density", { min: 1, max: 1 }],
 		["runtime.max_actions_per_turn", { min: 4, max: 20 }],
 		["mutation.action_queue_cap", { min: 1, max: 10 }],
@@ -60,12 +60,12 @@ describe("resolveRuntimeBounds", () => {
 
 	it("keeps the resolved pair ordered when the derived min exceeds the static max", () => {
 		const draft = draftWith((d) => {
-			d.population.initial_creatures = 200000;
+			d.population.initial_creatures = 20000000;
 		});
 
 		expect(resolveRuntimeBounds(fieldFor("population.max_creatures"), draft)).toEqual({
-			min: 200000,
-			max: 200000,
+			min: 20000000,
+			max: 20000000,
 		});
 	});
 
