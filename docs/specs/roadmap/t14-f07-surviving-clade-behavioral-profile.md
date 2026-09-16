@@ -154,15 +154,15 @@ unchanged.
 
 - [ ] `make check` -> exit 0 on the final feature code; commit named here.
 - [x] Focused tests: `cargo test -p v3-core -p v3-cli` -> exit 0 at `53d68f92`
-      (v3-core lib 1,492 passed, v3-cli lib 109 passed, every integration
-      target passing), test names and counts in
-      [`docs/progress/readings/t14-f07.md`](../../progress/readings/t14-f07.md);
+      (every target passing; test names and counts in
+      [`docs/progress/readings/t14-f07.md`](../../progress/readings/t14-f07.md));
       `cargo clippy -p v3-core -p v3-cli --all-targets`, `cargo fmt --all --
       --check` and `cargo check --workspace --all-targets` -> exit 0.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path
-      under `~/.local/share/petri-tools/mutants/t14-f07/`, and every survivor
-      resolved as killed, equivalent, or deferred. The full survivor list stays
-      here.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` at `c84df027`, mode
+      `fresh`: `55 mutants tested in 11m: 51 caught, 4 unviable`, `no
+      survivors`. Survivor list: none (`missed.txt`, `timeout.txt` empty at
+      `~/.local/share/petri-tools/mutants/t14-f07/mutants.out`). One run
+      stands; unviable list and log in the readings file.
 - [x] Stored goal report: for each of the three worlds, the row count equals
       the horizon checkpoint's `surviving_founder_clade_count` (27/28/17 on
       Orchards in grassland / Canyon country / Confluence), the sizes sum to
