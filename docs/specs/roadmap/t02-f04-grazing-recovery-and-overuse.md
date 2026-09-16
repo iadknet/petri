@@ -7,30 +7,28 @@
 
 ## Goal
 
-Overgrazing, the natural analog: a bitten patch regrows more slowly than an
-unbitten one, repeated bites compound the damage down to a floor, and the
-damage heals with rest. Each food type at each cell carries a fertility
-modifier in `[floor, 1.0]` that a consuming bite multiplies by `factor`, that
-recovers linearly toward 1.0 by `1 / recovery_ticks` per tick, and that
-multiplies the type's fertility wherever growth reads it. The pressure reaches
-creatures only through how fast food returns to the ground they graze; there
-is no grazing sensor. It ships enabled at production defaults, so the gate
-world and all three goal worlds carry it, and the goal report shows it acting
-in each.
+Overgrazing, the natural analog: a bitten patch regrows more slowly,
+repeated bites compound the damage down to a floor, and rest heals it. Each
+food type at each cell carries a fertility modifier in `[floor, 1.0]` that a
+consuming bite multiplies by `factor`, that recovers linearly toward 1.0 by
+`1 / recovery_ticks` per tick, and that multiplies the type's fertility
+wherever growth reads it. The pressure reaches creatures only through how
+fast food returns to grazed ground; there is no grazing sensor. It ships
+enabled at production defaults, so the gate world and all three goal worlds
+carry it, and the goal report shows it acting in each.
 
 ## Non-Goals
 
 - Per-type grazing parameters, per-world recipe overrides, or a recipe edit:
   the three checked-in recipes stay byte-identical and inherit the production
   default.
-- Any change to the occupancy depletion layer (`deposit_per_occupied_tick`
-  0.08, `RECOVERY_PER_TICK` 0.03, `MIN_GROWTH_MULTIPLIER` 0.35) or to the
-  shared growth, spread, and recovery-spawn rules beyond the multiplication.
-- Rebalancing a goal world that the pressure collapses: that is a recorded
-  blocker for the user, not a quiet retune.
+- Any change to the occupancy depletion layer or to the shared growth,
+  spread, and recovery-spawn rules beyond the multiplication.
+- Rebalancing a goal world the pressure collapses: a recorded blocker for
+  the user, not a quiet retune.
 - A grazing sensor, a grazing input to any brain, or a change to `Eat`.
 - Server health or frontend telemetry for the modifier; the goal report and
-  `SimStats` carry the readings, the runtime panel carries only the config.
+  `SimStats` carry the readings, the panel only the config.
 - Retiring the orphaned, uncompiled
   `crates/v3-core/src/kernel/food_resource/{depletion,growth,reconfigure}.rs`;
   do not edit them.
@@ -44,21 +42,21 @@ three goal worlds, and the `goal-worlds-v1` series. The workflow's
 [standard-baseline contract](../../workflow.md#environmental-pressures-in-the-standard-baseline)
 applies.
 
-**Research and options.** The existing occupancy depletion layer
+**Research and options.** The occupancy depletion layer
 (`OccupancyDepletionLayer` in `ordinary_food/ecology.rs`) is the local prior
-art: one `Grid<f32>` per world, deposited by standing, decayed per tick,
-multiplied into every growth delta. The grazing layer is its per-type,
-bite-driven sibling with the opposite sign convention (a modifier that
-starts at 1.0 and is pulled down), and the two multiply beside each other.
+art: one `Grid<f32>`, deposited by standing, decayed per tick, multiplied
+into every growth delta. The grazing layer is its per-type, bite-driven
+sibling with the opposite sign (starts at 1.0, pulled down), and the two
+multiply beside each other.
 Alternatives rejected: (a) a per-cell bite rate limit instead of a
 compounding floor, because a bite zeroes the cell and local growth skips
 empty cells, so re-grazing is already paced by recolonization and only the
 floor bounds repeated damage; (b) lowering the fertility grid itself, because
 the habitat map is pinned by `world_seed` and must stay the tick-zero reading
 recipes and the app show.
-Theory read in full for T12.F04 (Charnov 1976: a patch is worth revisiting
-when its intake rate recovers to the habitat mean) makes a slow-returning
-grazed patch a memory problem: the median goal generation is 141 ticks, so a
+Charnov 1976 (read in full for T12.F04: a patch is worth revisiting when
+its intake rate recovers to the habitat mean) makes a slow-returning grazed
+patch a memory problem: the median goal generation is 141 ticks, so a
 500-tick recovery spans several generations. No external dependency.
 
 **Mechanics (source of truth for the implementer).**
@@ -128,14 +126,14 @@ grazed patch a memory problem: the median goal generation is 141 ticks, so a
   evidence the pressure is enabled and acting in each world.
 - Determinism: the layer uses no RNG; seeded runs stay reproducible.
 
-**Trajectory pins that legitimately move.** Because the default is on, these
-stored identities change and are re-pinned once, old and new values recorded
-in the readings file: `legacy_default_short_run_identity` (baseline_worlds),
-`accounting_preserves_pre_feature_sampled_trajectories_and_actions`
-(applied_trajectory), the three digests in
+**Trajectory pins that legitimately move.** With the default on, these
+stored identities change and are re-pinned once, old and new values in the
+readings file: `legacy_default_short_run_identity`,
+`accounting_preserves_pre_feature_sampled_trajectories_and_actions`, the
+three digests in
 `checked_in_goal_recipe_identities_are_unchanged_by_json_precision`, and any
-reproducibility fixture that hashes a default-config run. A pin that moves
-for any other reason is a defect.
+reproducibility fixture hashing a default-config run. Any other moved pin is
+a defect.
 
 ## Implementation Tasks
 
@@ -168,7 +166,7 @@ for any other reason is a defect.
 
 - [x] `cargo test -p v3-core --test viability` (first) -> result in
       [`docs/progress/readings/t02-f04.md`](../../progress/readings/t02-f04.md).
-- [x] Focused and property tests named above, plus the cap test
+- [x] Focused and property tests named above and the cap test
       `normalize_grazing_caps_recovery_ticks_at_the_property_domain` ->
       readings file.
 - [x] `cargo test -p v3-cli --test bench_artifacts` including the
@@ -191,8 +189,8 @@ through the world alone: how much food returns to a cell they or their
 ancestors already ate from.
 
 Compute cost: one full-grid recovery pass per food type per tick (2.56M cells
-per type at 1600²) plus one multiply at each fertility read and one clamp per
-bite. Expected under 3% of goal wall-clock and negligible on the 128² gate.
+per type at 1600²) plus one multiply per fertility read and one clamp per
+bite. Expected under 3% of goal wall-clock, negligible on the 128² gate.
 `ms_per_creature_tick` may flag on either profile without a work-counter
 move: a lower plateau spreads the fixed per-tick food cost over fewer
 creatures, and the last two goal readings already flag on host load.
@@ -230,8 +228,11 @@ so `inputs_changed` is true in every case and the gate counters move.
 
 **Measured verdict.** Both runs exit 0, not severe. No extinction;
 `plateau_population`/`births` fall in all three worlds as predeclared.
-Mismatch: Orchards `final_population` rose (+12%), not severe. Details:
-[`docs/progress/readings/t02-f04.md`](../../progress/readings/t02-f04.md).
+Mismatch: Orchards `final_population` rose (+12%), not severe. Ruling: a
+direction miss on one single-tick snapshot; the predeclaration stands
+unedited, the plateau and births readings carry its intent, and no
+threshold, cost, or exception is involved, so no user decision is needed.
+Details: [`docs/progress/readings/t02-f04.md`](../../progress/readings/t02-f04.md).
 
 - Summaries: [gate](../../progress/features/t02-f04-grazing-recovery-and-overuse.json),
   [goal](../../progress/features/t02-f04-grazing-recovery-and-overuse-goal.json).
