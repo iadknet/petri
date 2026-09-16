@@ -884,19 +884,23 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 }
 
 // ── Pinned seeds: the first accepted in `0..SEARCH_RANGE` per step ──────────
+//
+// Re-pinned by T11.F21: one more VM opcode in the fresh-instruction draw and
+// one more graph edge surface (`ActionBid`) remap every seeded draw of the
+// VM insertion-class operators and `AddGraphEdge`, as the spec predeclares.
 
 const SWAP: u64 = 0;
-const GRAPH_BLANK_SEEDS: &[u64] = &[1, 25, 1020, 1650, 3612, 102, SWAP];
-const GRAPH_DETOUR_SEEDS: &[u64] = &[1, 25, 1020, 1650, 3612, 102];
-const GRAPH_COPY_SEEDS: &[u64] = &[102, SWAP];
-const GRAPH_SPLIT_SEEDS: &[u64] = &[1762, SWAP];
+const GRAPH_BLANK_SEEDS: &[u64] = &[1, 25, 1020, 1650, 2300, 596, SWAP];
+const GRAPH_DETOUR_SEEDS: &[u64] = &[1, 25, 1020, 1650, 2300, 596];
+const GRAPH_COPY_SEEDS: &[u64] = &[1202, SWAP];
+const GRAPH_SPLIT_SEEDS: &[u64] = &[3518, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
 const GRAPH_UNPREPARED_SEEDS: &[u64] = &[25, 32, 64, 6718, 4, SWAP];
 const VM_UNPREPARED_SEEDS: &[u64] = &[25, 72, 223, 13, 13, SWAP];
 /// Reading order: cue, read, jump, double, write, push, swap.
-const VM_BLANK_SEEDS: &[u64] = &[1, 238, 9940, 800, 41_854, 4126, SWAP];
+const VM_BLANK_SEEDS: &[u64] = &[1, 1869, 5608, 800, 9361, 4126, SWAP];
 /// Neutral-first order: cue, read, double, write, jump, push.
-const VM_DETOUR_SEEDS: &[u64] = &[1, 238, 800, 21_017, 3709, 4126];
+const VM_DETOUR_SEEDS: &[u64] = &[1, 1869, 800, 31_060, 521, 4126];
 
 /// Every starting form's plan with its pinned seeds, in the fixed family
 /// order.

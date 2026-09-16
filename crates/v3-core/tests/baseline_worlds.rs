@@ -91,11 +91,12 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
     assert_eq!(points.len(), 6);
 }
 
-/// T02.F04 re-pin: grazing ships enabled, so each applied Eat halves the
-/// bitten cell's fertility modifier and the hashed food grid regrows
-/// differently from the first bite onward. The hash below was measured on the
-/// T02.F04 code; the identity the test pins is unchanged (previously
-/// re-pinned at T11.F19).
+/// T11.F21 re-pin: `WriteDirectionBid` joins the fresh-instruction draw and
+/// `ActionBid` the edge-surface draw, so every seeded VM insert and
+/// `AddGraphEdge` lands elsewhere and the hashed genomes diverge from the
+/// first such birth onward, as the T11.F21 spec predeclares. The hash below
+/// was measured on the T11.F21 code after two runs agreed; the identity the
+/// test pins is unchanged (previously re-pinned at T02.F04 and T11.F19).
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -123,7 +124,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 1819237026958739067);
+    assert_eq!(hash.finish(), 11216971115431479696);
 }
 
 use proptest::prelude::*;

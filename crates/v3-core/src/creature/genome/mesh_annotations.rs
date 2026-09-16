@@ -106,6 +106,7 @@ fn derive_node_annotation(node: &NodeGenome, reachable: bool) -> MeshNodeAnnotat
                         write_classes.insert(MeshWriteClass::Payload);
                     }
                     super::VmInstruction::WriteWorldActionMeta { .. }
+                    | super::VmInstruction::WriteDirectionBid { .. }
                     | super::VmInstruction::PushAction { .. }
                     | super::VmInstruction::PopAction
                     | super::VmInstruction::ExecuteActionQueue

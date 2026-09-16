@@ -72,6 +72,14 @@ pub struct ActionSlot {
     pub behavior: ActionSlotBehavior,
     pub gate_inputs: Vec<GraphEdge>,
     pub param_inputs: Vec<GraphEdge>,
+    /// Direction bank (T11.F21); serde-defaulted, empty on founders.
+    pub direction_bids: Vec<DirectionBidEdge>,
+}
+
+pub struct DirectionBidEdge {
+    pub edge: GraphEdge,
+    /// Bank slot in `0..8` (`Direction::ALL` index).
+    pub direction: u8,
 }
 
 pub struct ExecuteGate {
@@ -224,8 +232,20 @@ weighted sums:
 | `StealEnergy` | direction index (0-7) | steal amount | Non-negative |
 | `NoOp` | — | — | Real action with costs |
 
-Direction decoding matches the VM `PushAction` convention:
+Direction decoding matches the VM `PushAction` convention: both backends call
+`runtime::action_decode::decode_world_action`, and
 `meta[0].round().clamp(0.0, 7.0)` maps to `Direction::ALL`.
+
+### Direction bank (T11.F21)
+
+A `Move`, `Reproduce`, or `StealEnergy` slot may carry `direction_bids`: bid
+`d` is the weighted sum of the edges with `direction == d` (unwired `0.0`),
+and the bank is written when at least one edge has `direction < 8`. With a
+written bank the committed direction is the index of the maximum sanitized
+bid; on a tie at the maximum the scalar-decoded `param[0]` direction wins if
+it is among the tied slots, else the lowest tied index. A slot with no bank
+decodes from `param[0]` exactly as above. `Eat`, `NoOp`, and `Pop` slots
+never consult a bank. Founder and blank graphs carry empty banks.
 
 ---
 
@@ -306,7 +326,9 @@ Iterate `action_bank` in order (index 0 to N-1). For each slot:
 2. If `gate_wsum > 0.0` (slot fires):
    - If `behavior` is `Pop`: remove last queued item. No-op if queue empty.
    - If `behavior` is `Emit(kind)`: gather `param_wsum[i]` from
-     `param_inputs`, decode world action from `kind` + params, push to queue.
+     `param_inputs` and, for a movement kind, the direction bank from
+     `direction_bids`; decode world action from `kind` + params (+ bank), push
+     to queue.
 3. If `gate_inputs` is empty: `gate_wsum = 0.0`, slot doesn't fire.
 
 ### Phase 3: Execute gate
@@ -324,7 +346,10 @@ addition to the single entered evaluation:
   - fields: `wired`, `weighted_sum`, `applied`, `applied_value`
 - `action_slots: Vec<GraphActionSlotTrace>` (1:1 with `action_bank`)
   - fields: `wired`, `gate_weighted_sum`, `fired`, `param_values`,
-    `queue_len_before`, `queue_len_after`, `emitted_action`
+    `queue_len_before`, `queue_len_after`, `emitted_action`,
+    `direction_bids: Option<[f32; 8]>` and `chosen_direction: Option<u8>`
+    (`Some` only when the slot fired a movement action with a written bank;
+    omitted from the serialized trace otherwise)
 - `execute_gate: GraphExecuteGateTrace`
   - fields: `wired`, `weighted_sum`, `queue_non_empty`, `fired`
 
@@ -545,6 +570,8 @@ Two-layer validation: mutation-time (bound values at creation) and runtime
 | `Pop` on empty queue | Silent no-op |
 | ActionSlot with empty `gate_inputs` | gate wsum = 0.0, slot doesn't fire |
 | ActionSlot with empty `param_inputs` | all params = 0.0 |
+| ActionSlot with empty `direction_bids` | no bank; scalar direction decode |
+| `DirectionBidEdge` with `direction >= 8` | summed nowhere; does not write the bank |
 | ExecuteGate with empty `inputs` | wsum = 0.0, hop doesn't terminate |
 | Edge with NaN/Inf weight | `sanitize_f32()` to 0.0 |
 | Sink with empty `inputs` | Inert — does not write |

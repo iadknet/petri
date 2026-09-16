@@ -28,7 +28,7 @@ contract are defined in `v3-mutation-spec.md`.
 
 ## 2. Instruction Set
 
-The VM defines **41 opcodes**.
+The VM defines **42 opcodes**.
 
 ### Arithmetic and Data Movement
 
@@ -111,6 +111,12 @@ The VM defines **41 opcodes**.
 | 39 | `LoadSlotPrev` | dst, slot_idx | `dst = prev_shared_memory[slot_idx % 16]` |
 | 40 | `ClearSlot` | slot_idx | `shared_memory[slot_idx % 16] = 0.0` |
 
+### Direction Bank (T11.F21)
+
+| # | Opcode | Operands | Semantics |
+|---|---|---|---|
+| 41 | `WriteDirectionBid` | direction, src | `bids[direction] = regs[src]` in the eight-slot direction bank and marks the bank written (`direction` in `0..7`; an invalid slot writes nothing and marks nothing) |
+
 Removed from active V3 mesh ISA:
 - `ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`
 - `ReadNeighborCreature`
@@ -174,6 +180,7 @@ All genome-derived indexes are handled without panic:
 - **Constant index**: if `constants` empty -> `0.0`; else modulo `constants.len()`.
 - **Payload slot index**: valid when `< 12`; otherwise write ignored.
 - **World-action metadata slot index**: valid when `< 8`; otherwise write ignored.
+- **Direction bank slot index**: valid when `< 8`; otherwise write ignored and the bank stays unwritten.
 
 If `register_count == 0`, VM halts immediately (no action emission).
 
@@ -218,7 +225,7 @@ authoritative soft-default matrix).
 
 Soft defaults / graceful behavior:
 - invalid register/constant/index operands use normalization rules
-- invalid payload/meta writes are ignored
+- invalid payload/meta/direction-bank writes are ignored
 - out-of-range jump targets wrap into valid program range (when program non-empty)
 - invalid `ReadInput` `ref_idx` or `sub_idx` yields `0.0`
 
@@ -275,6 +282,7 @@ Defined numeric rules:
 | ReadInput | 0.12 |
 | WriteInternalPayload | 0.14 |
 | WriteWorldActionMeta | 0.14 |
+| WriteDirectionBid | 0.14 |
 | WriteRouteTarget | 0.10 |
 | PushAction | 0.24 |
 | PopAction | 0.10 |
@@ -322,11 +330,13 @@ Canonical owner for `runtime.vm.opcode_cost_multiplier`,
 VM node evaluation maintains:
 - internal payload buffer (12 slots)
 - world action metadata buffer (8 slots)
+- direction bank (8 bids plus a written flag; T11.F21)
 - eight route gate scores
 
 Initialization at the start of each VM node evaluation:
 - internal payload buffer is copied from incoming `upstream_slots`
 - world action metadata buffer is zeroed
+- the direction bank is unwritten (no bids)
 - all eight route gate scores start at `0.0`
 
 All writes are last-write-wins per slot/register.
@@ -346,9 +356,9 @@ mapping below:
 |---|---|---|
 | `0` | `NoOp` | none |
 | `1` | `Eat` | `meta[0]` = food type index |
-| `2` | `Move` | `meta[0]` = direction index |
-| `3` | `Reproduce` | `meta[0]` = direction index, `meta[1]` = offspring transfer energy (scalar `f32`) |
-| `4` | `StealEnergy` | `meta[0]` = direction index, `meta[1]` = steal amount |
+| `2` | `Move` | `meta[0]` = direction index, or the direction bank when written |
+| `3` | `Reproduce` | `meta[0]` = direction index (or the bank), `meta[1]` = offspring transfer energy (scalar `f32`) |
+| `4` | `StealEnergy` | `meta[0]` = direction index (or the bank), `meta[1]` = steal amount |
 | other | `NoOp` | none |
 
 Each `PushAction` decodes from the *current* metadata buffer state and appends
@@ -363,13 +373,20 @@ Metadata decode rules:
 - unspecified metadata slots are reserved and ignored by current runtime action
   decoding
 - `WriteWorldActionMeta` to `slot_idx >= 8` is ignored
+- direction bank (T11.F21): when at least one `WriteDirectionBid` landed in
+  `0..8` during this dispatch, `Move`, `Reproduce`, and `StealEnergy` take the
+  index of the maximum bid (non-finite bids read as `0.0`); on a tie at the
+  maximum, the scalar-decoded `meta[0]` direction wins if it is among the tied
+  slots, else the lowest tied index. `Eat`, `NoOp`, and unknown types never
+  consult the bank. The bank persists between pushes within a dispatch.
+- `WriteDirectionBid` to `direction >= 8` is ignored and leaves the bank unwritten
 
 At node end:
 - if `ExecuteActionQueue` was called: `NodeResult.terminal` is true, mesh
   returns accumulated action queue
 - otherwise internal payload buffer is emitted as `NodeResult.output_slots`
 - per-slot scores are returned in `NodeResult.route_gates`
-- payload/meta buffers are discarded after node dispatch
+- payload/meta buffers and the direction bank are discarded after node dispatch
 
 This makes `WriteInternalPayload` the VM path for producing routed output slots.
 

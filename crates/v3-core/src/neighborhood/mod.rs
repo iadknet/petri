@@ -25,6 +25,7 @@ pub mod operators;
 pub mod recruitment;
 pub mod recruitment_paths;
 pub mod sample;
+pub mod steering;
 
 pub use battery::{Battery, Signature};
 pub use births::BirthResult;

@@ -79,9 +79,11 @@ fn historical_mesh_fields_default_to_unmeasured() {
     };
     let mut founder = serde_json::to_value(&neighborhood.founder).unwrap();
     founder.as_object_mut().unwrap().remove("mesh_execution");
+    founder.as_object_mut().unwrap().remove("steering");
     founder.as_object_mut().unwrap().remove("generation");
     let founder: NeighborhoodFounderHalf = serde_json::from_value(founder).unwrap();
     assert!(matches!(founder.mesh_execution, Indicator::Undefined(_)));
+    assert!(matches!(founder.steering, Indicator::Undefined(_)));
     assert_eq!(founder.generation, None);
     let Indicator::Defined(evolved) = neighborhood.evolved else {
         panic!("evolved reading");
@@ -90,8 +92,10 @@ fn historical_mesh_fields_default_to_unmeasured() {
     seed.as_object_mut()
         .unwrap()
         .remove("generation_distribution");
+    seed.as_object_mut().unwrap().remove("steering_pooled");
     for sample in seed["sampled_genomes"].as_array_mut().unwrap() {
         sample.as_object_mut().unwrap().remove("mesh_execution");
+        sample.as_object_mut().unwrap().remove("steering");
         sample.as_object_mut().unwrap().remove("generation");
     }
     let seed: NeighborhoodEvolvedSeed = serde_json::from_value(seed).unwrap();
@@ -99,9 +103,11 @@ fn historical_mesh_fields_default_to_unmeasured() {
         seed.generation_distribution,
         Indicator::Undefined(_)
     ));
+    assert!(matches!(seed.steering_pooled, Indicator::Undefined(_)));
     for sample in seed.sampled_genomes {
         assert_eq!(sample.generation, None);
         assert!(matches!(sample.mesh_execution, Indicator::Undefined(_)));
+        assert!(matches!(sample.steering, Indicator::Undefined(_)));
     }
 }
 

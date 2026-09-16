@@ -6,7 +6,7 @@ use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmBackendDef, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
-use crate::runtime::action_decode::MAX_DECODED_ACTION_TYPE;
+use crate::runtime::action_decode::{DIRECTION_BANK_SLOTS, MAX_DECODED_ACTION_TYPE};
 
 pub(super) fn apply_constant_mutation(
     genome: &mut CreatureGenome,
@@ -91,6 +91,11 @@ pub(super) fn apply_register_count_mutation(
 /// All register indices are bounded by `register_count`, constant indices by `constants_len`,
 /// and input indices by `input_refs_len`. Zero-length parameters are clamped to produce
 /// index 0 (safe — the VM treats out-of-range as a soft default).
+#[allow(
+    clippy::too_many_lines,
+    reason = "one match arm per opcode in the 42-entry catalog; the uniform draw \
+              over the catalog is the whole function"
+)]
 pub(crate) fn random_vm_instruction(
     rng: &mut impl Rng,
     register_count: u8,
@@ -102,7 +107,7 @@ pub(crate) fn random_vm_instruction(
     let cl = constants_len.clamp(1, 255) as u8;
     let il = input_refs_len.clamp(1, 255) as u8;
 
-    match rng.gen_range(0u8..41) {
+    match rng.gen_range(0u8..42) {
         0 => VmInstruction::Noop,
         1 => VmInstruction::LoadConst {
             dst: rng.gen_range(0..rc),
@@ -264,7 +269,11 @@ pub(crate) fn random_vm_instruction(
         40 => VmInstruction::ClearSlot {
             slot_idx: rng.gen_range(0..16),
         },
-        _ => unreachable!("gen_range(0..41) cannot produce values >= 41"),
+        41 => VmInstruction::WriteDirectionBid {
+            direction: rng.gen_range(0u8..DIRECTION_BANK_SLOTS as u8),
+            src: rng.gen_range(0..rc),
+        },
+        _ => unreachable!("gen_range(0..42) cannot produce values >= 42"),
     }
 }
 
@@ -370,7 +379,11 @@ pub(crate) fn mutate_one_instruction_field(
             true
         }
         VmInstruction::WriteInternalPayload { slot_idx, src }
-        | VmInstruction::WriteWorldActionMeta { slot_idx, src } => {
+        | VmInstruction::WriteWorldActionMeta { slot_idx, src }
+        | VmInstruction::WriteDirectionBid {
+            direction: slot_idx,
+            src,
+        } => {
             nudge_one_u8(&mut [slot_idx, src], rng);
             true
         }
@@ -608,6 +621,7 @@ fn for_each_register_ref(instruction: &mut VmInstruction, callback: &mut impl Fn
         VmInstruction::JumpIfZero { cond, .. } => callback(cond),
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
+        | VmInstruction::WriteDirectionBid { src, .. }
         | VmInstruction::WriteRouteGate { src, .. }
         | VmInstruction::SetPriorityBid { src }
         | VmInstruction::StoreSlotImm { src, .. } => callback(src),

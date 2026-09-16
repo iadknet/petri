@@ -150,7 +150,10 @@ Topology connection semantics (T11.F15, T11.F18):
 ### VM domain
 
 - `VmInstructionMutation` (insert/delete/replace opcode, mutate operands);
-  a new `PushAction` draws `action_type` in `0..=4`, the range
+  the fresh-instruction draw is uniform over the 42-opcode catalog, which
+  includes `WriteDirectionBid { direction in 0..8, src }` (T11.F21), and the
+  operand nudge moves its `direction` or `src`; a new `PushAction` draws
+  `action_type` in `0..=4`, the range
   `decode_world_action` admits (T13.F05); existing values above 4 stay in
   the genome and the raw-field unit step is unchanged
 - `VmConstantMutation`
@@ -314,8 +317,9 @@ Topology mutations operate on `compute_nodes` only. Fixed structural outputs
 (output sinks, action bank, execute gate) are never added/removed/retyped —
 only their edges are evolvable.
 
-- `AlterGraphEdgeWeight` (all 5 edge-bearing surfaces: compute inputs, sink
-  inputs, action gate, action param, execute gate)
+- `AlterGraphEdgeWeight` (all 6 edge-bearing surfaces: compute inputs, sink
+  inputs, action gate, action param, action direction bank (T11.F21), execute
+  gate)
 - `SwapGraphOperator` (compute nodes only, 17 `ComputeNodeKind` variants)
 - `MutateGraphOperatorParam` (compute params: Constant, Threshold,
   DecayIntegrator, Momentum, Oscillator)
@@ -325,7 +329,7 @@ only their edges are evolvable.
   function-preserving forms with equal probability: (a) disconnected, a
   random kind appended with no inputs; (b) bootstrap, a random kind appended
   with one input edge from `random_graph_source`, read by no surface; (c)
-  split, a NEAT-style insertion into one existing edge (any of the five
+  split, a NEAT-style insertion into one existing edge (any of the six
   surfaces, source any `GraphSource`) with an identity `Add` node whose
   single input (weight 1.0) reproduces the split edge's prior source exactly
   in f32 (the new node's output passes through `sanitize_output` like every
@@ -334,7 +338,7 @@ only their edges are evolvable.
   old weight. The split draws from the splittable edges only. When the split
   edge's consumer is a compute node at index `c`,
   the new node is inserted at index `c` and every `ComputeNode(i >= c)`
-  reference is remapped to `i + 1` across all five surfaces
+  reference is remapped to `i + 1` across all six surfaces
   (`CgpGraphBackendDef::insert_compute_node_at`, the insert-with-remap
   inverse of `remove_compute_node_at`), preserving Gauss-Seidel pass order; a
   sink/action/execute-gate consumer appends instead. A split of a backward or
@@ -359,14 +363,17 @@ only their edges are evolvable.
   split's neutrality property holds unconditionally.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
-- `AddGraphEdge` (all 5 edge-bearing surfaces; source sampled by
+- `AddGraphEdge` (all 6 edge-bearing surfaces, `pick_random_surface` uniform
+  over one surface per compute node and sink, three per action slot (gate,
+  param, direction bank), and the execute gate; a direction-bank edge draws
+  its `direction` uniformly in `0..8`; source sampled by
   `random_graph_source`, which draws a compound `InputLeaf` source's
   `sub_idx` uniformly across the reference's full width via
   `mutation::compound::sub_value_count`, so new edges can reach every
   sub-value, not just index 0)
-- `RetargetGraphEdge` (all 5 edge-bearing surfaces; same `sub_idx` sampling
+- `RetargetGraphEdge` (all 6 edge-bearing surfaces; same `sub_idx` sampling
   as `AddGraphEdge`)
-- `RemoveGraphEdge` (all 5 edge-bearing surfaces)
+- `RemoveGraphEdge` (all 6 edge-bearing surfaces)
 - `GraphRawFieldMutation` — selects one parameterized compute node or one
   edge uniformly, then changes exactly one field by one unit and never
   replaces the `GraphSource` variant: a parameter by the existing
@@ -375,7 +382,10 @@ only their edges are evolvable.
   `0..input_refs.len()`, offered only when the current `sub_idx` stays within
   the candidate reference's width; `InputLeaf.sub_idx` by ±1 inward within the
   reference's width; `SharedMemory.slot` by ±1 modulo 16; `SharedMemory.previous`
-  flipped. Edges with no valid unit move are excluded from the draw, so the
+  flipped; a direction-bank edge's `direction` by ±1 inward within `0..8`
+  (one more one-unit field beside its source moves; a `direction >= 8` edge
+  offers no direction move). Edges with no valid unit move are excluded from
+  the draw, so the
   operator selects only a module that has a parameterized compute node or a
   movable edge, and never skips after selecting one.
 - `CopyComputeNode` — a growth operator; inserts a faithful copy (kind,

@@ -433,6 +433,7 @@ fn temporal_report_keeps_substrate_counts_separate() {
                     behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
                     gate_inputs: vec![edge],
                     param_inputs: vec![],
+                    direction_bids: Vec::new(),
                 }],
                 execute_gate: ExecuteGate { inputs: vec![edge] },
             }),

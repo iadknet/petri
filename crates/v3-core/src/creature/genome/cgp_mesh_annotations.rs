@@ -84,8 +84,7 @@ pub(crate) fn derive_cgp_annotations(
 
     // Write classes from wired action bank
     for slot in &def.action_bank {
-        let wired = !slot.gate_inputs.is_empty() || !slot.param_inputs.is_empty();
-        if !wired {
+        if !slot.is_wired() {
             continue;
         }
         write_classes.insert(MeshWriteClass::Action);
@@ -239,6 +238,7 @@ mod tests {
                     weight: 1.0,
                 }],
                 param_inputs: Vec::new(),
+                direction_bids: Vec::new(),
             }],
             execute_gate: ExecuteGate { inputs: Vec::new() },
         };
@@ -315,6 +315,7 @@ mod tests {
                     weight: 1.0,
                 }],
                 param_inputs: Vec::new(),
+                direction_bids: Vec::new(),
             }],
             execute_gate: ExecuteGate {
                 inputs: vec![GraphEdge {

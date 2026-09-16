@@ -710,6 +710,52 @@ fn undefined_mesh_execution() -> Indicator<MeshExecution> {
     Indicator::Undefined(UNDEFINED.to_string())
 }
 
+/// Chance levels printed beside the `steering-v1` seeking fractions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SteeringChance {
+    pub exact: f64,
+    pub within_45: f64,
+}
+
+/// One genome's `steering-v1` reading (T11.F21), beside its `mesh_execution`
+/// block on the same sample; never a fitness signal.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Steering {
+    pub version: String,
+    pub seed: u64,
+    pub base_count: u32,
+    #[serde(flatten)]
+    pub reading: neighborhood::steering::SteeringReading,
+}
+
+/// The `steering-v1` sums over one seed's sampled genomes and the fractions
+/// they give; a zero denominator prints `Undefined`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SteeringPooled {
+    pub version: String,
+    pub genomes: u64,
+    pub scenarios: u64,
+    pub moves: u64,
+    pub exact_hits: u64,
+    pub within_45: u64,
+    pub avoidance_trials: u64,
+    pub avoided: u64,
+    pub bank_written: u64,
+    pub exact_hit_fraction: String,
+    pub within_45_fraction: String,
+    pub avoidance_fraction: String,
+    pub bank_written_fraction: String,
+    pub chance: SteeringChance,
+}
+
+fn undefined_steering() -> Indicator<Steering> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
+fn undefined_steering_pooled() -> Indicator<SteeringPooled> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GenerationDistribution {
     pub median: u64,
@@ -728,6 +774,8 @@ pub struct NeighborhoodFounderHalf {
     pub generation: Option<u64>,
     #[serde(default = "undefined_mesh_execution")]
     pub mesh_execution: Indicator<MeshExecution>,
+    #[serde(default = "undefined_steering")]
+    pub steering: Indicator<Steering>,
     pub reachable_node_count: u64,
     pub operator_rows: Vec<NeighborhoodOperatorRow>,
     pub births: NeighborhoodBirths,
@@ -740,6 +788,8 @@ pub struct NeighborhoodSampledGenome {
     pub generation: Option<u64>,
     #[serde(default = "undefined_mesh_execution")]
     pub mesh_execution: Indicator<MeshExecution>,
+    #[serde(default = "undefined_steering")]
+    pub steering: Indicator<Steering>,
     pub rank: u64,
     pub creature_id: String,
     pub operator_rows: Vec<NeighborhoodOperatorRow>,
@@ -758,6 +808,8 @@ pub struct NeighborhoodEvolvedSeed {
     pub sampled_genomes: Vec<NeighborhoodSampledGenome>,
     pub pooled_operator_rows: Vec<NeighborhoodOperatorRow>,
     pub pooled_births: NeighborhoodBirths,
+    #[serde(default = "undefined_steering_pooled")]
+    pub steering_pooled: Indicator<SteeringPooled>,
 }
 
 /// The evolved half: `Undefined` outside the goal profile.

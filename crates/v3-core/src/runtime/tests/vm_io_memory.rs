@@ -1,4 +1,5 @@
 use super::*;
+use crate::contracts::WorldAction;
 use crate::creature::identity::CreatureIdentityState;
 
 // ── PushAction + ExecuteActionQueue ────────────────────────────────────────
@@ -83,6 +84,114 @@ fn emit_move_with_meta() {
     assert_eq!(
         actions[0],
         crate::contracts::WorldAction::Move(Direction::E)
+    );
+}
+
+// ── WriteDirectionBid opcode (T11.F21) ─────────────────────────────────────
+
+/// One program, three pushes: meta says East, one bank bid at slot 5 (SW)
+/// wins the first push; the bank persists for the second push; an
+/// out-of-range write and an `Eat` push never consult it.
+#[test]
+fn write_direction_bid_selects_the_winning_slot_and_persists_within_a_dispatch() {
+    let program = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        }, // r0 = 2.0 (East)
+        VmInstruction::LoadConst {
+            dst: 1,
+            const_idx: 1,
+        }, // r1 = 0.5
+        VmInstruction::WriteWorldActionMeta {
+            slot_idx: 0,
+            src: 0,
+        },
+        VmInstruction::WriteDirectionBid {
+            direction: 5,
+            src: 1,
+        },
+        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::PushAction { action_type: 3 },
+        VmInstruction::PushAction { action_type: 1 },
+        VmInstruction::ExecuteActionQueue,
+    ];
+    let (_r, _, aq) = run_vm(program, 2, vec![2.0, 0.5], &[], zeroed_upstream(), 100.0);
+    let actions = aq.action_queue.into_actions();
+    assert_eq!(actions.len(), 3);
+    assert_eq!(actions[0], WorldAction::Move(Direction::SW));
+    assert!(matches!(
+        actions[1],
+        WorldAction::Reproduce {
+            direction: Direction::SW,
+            ..
+        }
+    ));
+    assert_eq!(
+        actions[2].param(0),
+        2.0,
+        "Eat reads meta slot 0, not the bank"
+    );
+}
+
+#[test]
+fn write_direction_bid_out_of_range_leaves_the_bank_unwritten() {
+    let program = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        }, // r0 = 2.0 (East)
+        VmInstruction::WriteWorldActionMeta {
+            slot_idx: 0,
+            src: 0,
+        },
+        VmInstruction::WriteDirectionBid {
+            direction: 8,
+            src: 0,
+        },
+        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::ExecuteActionQueue,
+    ];
+    let (_r, _, aq) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
+    let actions = aq.action_queue.into_actions();
+    assert_eq!(actions, vec![WorldAction::Move(Direction::E)]);
+}
+
+#[test]
+fn write_direction_bid_resets_between_dispatches() {
+    // The bank is per-dispatch state like `meta`: a second run of a program
+    // that only pushes decodes from the scalar again.
+    let program = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::WriteDirectionBid {
+            direction: 7,
+            src: 0,
+        },
+        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::ExecuteActionQueue,
+    ];
+    let (_r, _, aq) = run_vm(program, 1, vec![1.0], &[], zeroed_upstream(), 100.0);
+    assert_eq!(
+        aq.action_queue.into_actions(),
+        vec![WorldAction::Move(Direction::NW)]
+    );
+    let (_r, _, aq) = run_vm(
+        vec![
+            VmInstruction::PushAction { action_type: 2 },
+            VmInstruction::ExecuteActionQueue,
+        ],
+        1,
+        vec![],
+        &[],
+        zeroed_upstream(),
+        100.0,
+    );
+    assert_eq!(
+        aq.action_queue.into_actions(),
+        vec![WorldAction::Move(Direction::N)]
     );
 }
 

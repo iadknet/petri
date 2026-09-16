@@ -1299,6 +1299,7 @@ mod final_action_observation_tests {
                         behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
                         gate_inputs: vec![runtime_output],
                         param_inputs: vec![],
+                        direction_bids: Vec::new(),
                     }],
                     execute_gate: ExecuteGate {
                         inputs: vec![runtime_output],

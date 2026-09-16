@@ -486,6 +486,14 @@ fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names()
     assert_eq!(mesh.executions_per_genome, 80);
     assert_eq!(mesh.snapshot_route_probes, 48);
     assert_eq!(mesh.knockout_method, "static-successor-bypass-v1");
+    let Indicator::Defined(steering) = &gate_neighborhood.founder.steering else {
+        panic!("founder steering reading");
+    };
+    assert_eq!(steering.version, "steering-v1");
+    assert_eq!(steering.seed, 9);
+    assert_eq!(steering.base_count, 6);
+    assert_eq!(steering.reading.scenarios, 48);
+    assert!(!steering.reading.bank_written, "the founder writes no bank");
     assert!(
         matches!(gate_neighborhood.evolved, Indicator::Undefined(_)),
         "the evolved half never runs in the gate profile"
@@ -496,10 +504,29 @@ fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names()
     else {
         panic!("the goal profile must define mutational_neighborhood");
     };
-    assert!(
-        matches!(goal_neighborhood.evolved, Indicator::Defined(_)),
-        "the evolved half runs in the goal profile"
-    );
+    let Indicator::Defined(evolved) = &goal_neighborhood.evolved else {
+        panic!("the evolved half runs in the goal profile");
+    };
+    for seed in &evolved.per_seed {
+        let Indicator::Defined(pooled) = &seed.steering_pooled else {
+            panic!("pooled steering on every evolved seed");
+        };
+        assert_eq!(pooled.version, "steering-v1");
+        assert_eq!(pooled.genomes, seed.sampled_genomes.len() as u64);
+        assert_eq!(pooled.chance.exact, 0.125);
+        assert_eq!(pooled.chance.within_45, 0.375);
+        let mut moves = 0;
+        for sample in &seed.sampled_genomes {
+            let Indicator::Defined(steering) = &sample.steering else {
+                panic!("steering on every sampled genome");
+            };
+            moves += steering.reading.moves;
+        }
+        assert_eq!(pooled.moves, moves);
+        if pooled.moves == 0 {
+            assert_eq!(pooled.exact_hit_fraction, "Undefined");
+        }
+    }
 
     let (synthetic_det, _) =
         run_deterministic(&small_profile("synthetic")).expect("a valid profile");

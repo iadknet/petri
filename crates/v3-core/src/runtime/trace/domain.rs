@@ -192,6 +192,13 @@ pub struct GraphActionSlotTrace {
     pub queue_len_before: usize,
     pub queue_len_after: usize,
     pub emitted_action: Option<WorldAction>,
+    /// The eight direction bids, `Some` only when the slot fired a movement
+    /// action with a written bank (T11.F21).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direction_bids: Option<[f32; 8]>,
+    /// `Direction::ALL` index the bank committed, paired with `direction_bids`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chosen_direction: Option<u8>,
 }
 
 /// Effect-phase trace for the execute gate.

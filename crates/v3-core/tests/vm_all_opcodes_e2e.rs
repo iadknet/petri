@@ -1,6 +1,6 @@
 //! End-to-end VM opcode coverage test.
 //!
-//! Uses one sample VM program containing all 41 opcodes. The program's final
+//! Uses one sample VM program containing all 42 opcodes. The program's final
 //! branch reads `FoodHere`: with food it executes `PushAction` + `ExecuteActionQueue`,
 //! without food it executes `Halt`. Running both scenarios yields full opcode coverage
 //! through the simulation tick path.
@@ -122,6 +122,10 @@ fn sample_vm_program() -> Vec<VmInstruction> {
             slot_idx: 0,
             src: 15,
         },
+        VmInstruction::WriteDirectionBid {
+            direction: 0,
+            src: 15,
+        },
         VmInstruction::WriteRouteGate { slot: 0, src: 0 },
         // ── Priority bid ────────────────────────────────────────────────────
         VmInstruction::SetPriorityBid { src: 13 }, // r13 = 0.0, so no energy deducted
@@ -220,6 +224,10 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
             slot_idx: 0,
             src: 0,
         },
+        VmInstruction::WriteDirectionBid {
+            direction: 0,
+            src: 0,
+        },
         VmInstruction::WriteRouteGate { slot: 0, src: 0 },
         VmInstruction::PushAction { action_type: 0 },
         VmInstruction::PopAction,
@@ -260,7 +268,7 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
     ];
 
     let set: HashSet<Discriminant<VmInstruction>> = instructions.iter().map(discriminant).collect();
-    assert_eq!(set.len(), 41, "expected 41 unique VM opcode discriminants");
+    assert_eq!(set.len(), 42, "expected 42 unique VM opcode discriminants");
     set
 }
 
@@ -384,7 +392,7 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
         emit_seen.union(&halt_seen).copied().collect();
     assert_eq!(
         observed, expected,
-        "sample VM program should cover all 41 opcodes across emit/halt runs"
+        "sample VM program should cover all 42 opcodes across emit/halt runs"
     );
 
     // Verify unconditional Jump was actually taken (pc + 2 because offset=1).

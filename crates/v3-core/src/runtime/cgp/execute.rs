@@ -503,6 +503,7 @@ mod work_counter_tests {
                             weight: 1.0,
                         }],
                         param_inputs: vec![],
+                        direction_bids: Vec::new(),
                     }],
                     execute_gate: ExecuteGate {
                         inputs: vec![GraphEdge {

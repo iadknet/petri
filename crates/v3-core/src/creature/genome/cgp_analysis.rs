@@ -1,20 +1,20 @@
 //! CGP graph backend analysis: backward/forward slicing and functional complexity.
 //!
 //! Backward slicing anchors on all wired behavioral surfaces:
-//! output_sinks + action_bank gate/param edges + execute_gate inputs.
+//! output_sinks + action_bank gate/param/direction-bank edges + execute_gate inputs.
 //! Slicing traverses `GraphSource::ComputeNode` references, stopping at
 //! `InputLeaf` and `SharedMemory` (implicit sources, not nodes).
 
 use std::collections::{HashSet, VecDeque};
 
-use super::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource};
+use super::cgp::{ActionSlot, CgpGraphBackendDef, GraphEdge, GraphSource};
 
 // ── Backward slicing ────────────────────────────────────────────────────────
 
 /// Collect all compute node indices referenced as `GraphSource::ComputeNode`
 /// in the given edges (one level only, not recursive).
-fn enqueue_compute_sources(
-    edges: &[GraphEdge],
+fn enqueue_compute_sources<'a>(
+    edges: impl IntoIterator<Item = &'a GraphEdge>,
     compute_count: usize,
     visited: &mut [bool],
     queue: &mut VecDeque<usize>,
@@ -52,14 +52,9 @@ pub(crate) fn cgp_live_compute_indices(def: &CgpGraphBackendDef) -> Vec<usize> {
         }
     }
 
-    // Anchor: wired action bank (gate + param edges)
+    // Anchor: wired action bank (gate, param, and direction-bank edges)
     for slot in &def.action_bank {
-        if !slot.gate_inputs.is_empty() {
-            enqueue_compute_sources(&slot.gate_inputs, n, &mut visited, &mut queue);
-        }
-        if !slot.param_inputs.is_empty() {
-            enqueue_compute_sources(&slot.param_inputs, n, &mut visited, &mut queue);
-        }
+        enqueue_compute_sources(slot.edges(), n, &mut visited, &mut queue);
     }
 
     // Anchor: wired execute gate
@@ -97,11 +92,7 @@ pub(crate) fn wired_surface_edges<'a>(
     live.iter()
         .flat_map(|&idx| &def.compute_nodes[idx].inputs)
         .chain(def.output_sinks.iter().flat_map(|sink| &sink.inputs))
-        .chain(
-            def.action_bank
-                .iter()
-                .flat_map(|slot| slot.gate_inputs.iter().chain(slot.param_inputs.iter())),
-        )
+        .chain(def.action_bank.iter().flat_map(ActionSlot::edges))
         .chain(&def.execute_gate.inputs)
 }
 
@@ -142,7 +133,7 @@ pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
 
     // Count wired action slots
     for slot in &def.action_bank {
-        if !slot.gate_inputs.is_empty() || !slot.param_inputs.is_empty() {
+        if slot.is_wired() {
             score += 1;
         }
     }
@@ -237,6 +228,7 @@ mod tests {
                     weight: 1.0,
                 }],
                 param_inputs: Vec::new(),
+                direction_bids: Vec::new(),
             }],
             execute_gate: ExecuteGate {
                 inputs: vec![GraphEdge {

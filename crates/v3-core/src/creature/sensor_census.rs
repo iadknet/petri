@@ -508,6 +508,7 @@ mod tests {
             behavior: ActionSlotBehavior::Emit(WorldActionKind::Move),
             gate_inputs: vec![leaf(0)],
             param_inputs: vec![],
+            direction_bids: Vec::new(),
         });
         graph.execute_gate.inputs.push(leaf(1));
         let census = census_of(&graph_node(
