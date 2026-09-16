@@ -170,9 +170,11 @@ unchanged.
       `actions_by_type` carries five keys, and the three inequality
       cross-checks above hold on all three worlds; no checkpoint sample
       carries `surviving_clade_profiles`. jq transcript and the per-world row
-      table in `docs/progress/readings/t14-f07.md`. Every surviving-clade row
-      also shows nonzero `predation_kills` on all three worlds (2/4/6 summed),
-      the track's trigger to schedule T05.F03.
+      table in `docs/progress/readings/t14-f07.md`. Rows with nonzero
+      `predation_kills` are 2 of 27, 1 of 28 and 2 of 17 (1–4 kills each, row
+      sums 2/4/6) against thousands to tens of thousands of applied eats on
+      each of those rows; predation is not a way any surviving clade makes its
+      living, so the track's T05.F03 trigger is not met.
 - [x] Benchmark summaries stored at
       `docs/progress/features/t14-f07-surviving-clade-behavioral-profile.json`
       (96,810 bytes) and its `-goal` companion (6,866,520 bytes), raw reports
@@ -205,9 +207,10 @@ is authorized. Stored report growth is bounded by surviving clades: about one
 row per clade, once per case.
 
 Goal impact: the master success definition's "many coexisting ways of making a
-living" becomes readable as differentiation rather than as a count, and if any
-surviving clade's row shows predation kills, that is the track's trigger to
-schedule T05.F03.
+living" becomes readable as differentiation rather than as a count. The track's
+pull-forward trigger is that the rows show predation to be a way some surviving
+clade makes its living — kills that stand beside, not vanishingly under, that
+clade's eats — not that any row carries a nonzero kill count.
 
 **Measured verdict.** Written after the runs: one line per profile with CLI and
 observed exit statuses, the `severe` flag, whether any threshold was crossed,
