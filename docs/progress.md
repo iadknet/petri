@@ -7,14 +7,18 @@ sweep reports stay in the main checkout's ignored `.bench-artifacts/`; the
 calling checkout stores concise summaries with exact raw hashes and recorded
 local verification times. Existing historical reports remain unchanged.
 
-[progress/index.html](progress/index.html) charts every closure below over
-time: work counters, wall clock, population, lineage, memory sensitivity,
-mutational neighborhood, and indicator coverage, read from the same reports.
-Its Goal worlds tab follows each baseline world separately over closure order —
-population, births, mean energy, lineage, memory, drift against its floors,
-neighborhood, structure, typed eat share, blocked moves, per-case work counters
-and wall clock, plus a population-trajectory overlay by closure — and marks
-every closure where that world's recipe inputs changed. A reading a report did
+[progress/index.html](progress/index.html) answers the five questions the
+success definition asks, one section each in order — is the world alive; how
+many ways of living, for how long; is cognition present and paying; is the
+substrate still evolvable; what did this closure cost — from the same reports
+listed below (T14.F11, 2026-09-15). A headline row of five tiles answers the
+first four for Orchards, Canyon and Confluence side by side; every indicator
+below it is one row of three world panels over closure order, with the
+`goal-v1` history drawn left of a labelled break inside the same chart, the
+gate profile folded into the cost section, and barrier and blocked-move rates
+in a collapsed per-world detail block. Only the T14.F12 neighborhood-read
+floors are drawn as floors; other references are first readings; every delta
+is a stored single-run comparison and is labelled so. A reading a report did
 not measure is drawn as "not measured", never as zero.
 Browsers block `fetch()` under `file://`, so serve the directory first:
 `python3 -m http.server 8000 --directory docs/progress`, then open
