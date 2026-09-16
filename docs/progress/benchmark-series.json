@@ -38,7 +38,8 @@
       "docs/progress/features/t13-f06-recruitment-and-retention-qualification.json",
       "docs/progress/features/t14-f12-neighborhood-read-of-selected-genomes.json",
       "docs/progress/features/t11-f19-per-unit-mutation-supply.json",
-      "docs/progress/features/t03-f11-genome-replication-cost.json"
+      "docs/progress/features/t03-f11-genome-replication-cost.json",
+      "docs/progress/features/t02-f04-grazing-recovery-and-overuse.json"
     ]
   },
   "goal": {
@@ -97,7 +98,8 @@
       "docs/progress/features/t13-f06-recruitment-and-retention-qualification-goal.json",
       "docs/progress/features/t14-f12-neighborhood-read-of-selected-genomes-goal.json",
       "docs/progress/features/t11-f19-per-unit-mutation-supply-goal.json",
-      "docs/progress/features/t03-f11-genome-replication-cost-goal.json"
+      "docs/progress/features/t03-f11-genome-replication-cost-goal.json",
+      "docs/progress/features/t02-f04-grazing-recovery-and-overuse-goal.json"
     ]
   }
 }
