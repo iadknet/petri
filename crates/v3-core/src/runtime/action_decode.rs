@@ -56,12 +56,12 @@ pub fn select_direction(raw: f32, bank: Option<&DirectionBank>) -> Direction {
     };
     let bids = bank.map(sanitize_bid);
     let max = bids.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let tied = |index: usize| bids[index] == max;
-    if tied(scalar.to_index()) {
+    if bids[scalar.to_index()] == max {
         return scalar;
     }
-    let lowest = (0..DIRECTION_BANK_SLOTS)
-        .find(|&index| tied(index))
+    let lowest = bids
+        .iter()
+        .position(|&bid| bid == max)
         .expect("the maximum of a finite array is attained");
     Direction::ALL[lowest]
 }

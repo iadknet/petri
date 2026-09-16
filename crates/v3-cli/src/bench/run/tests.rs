@@ -512,7 +512,7 @@ fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names()
             panic!("pooled steering on every evolved seed");
         };
         assert_eq!(pooled.version, "steering-v1");
-        assert_eq!(pooled.genomes, seed.sampled_genomes.len() as u64);
+        assert_eq!(pooled.sums.genomes, seed.sampled_genomes.len() as u64);
         assert_eq!(pooled.chance.exact, 0.125);
         assert_eq!(pooled.chance.within_45, 0.375);
         let mut moves = 0;
@@ -522,8 +522,8 @@ fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names()
             };
             moves += steering.reading.moves;
         }
-        assert_eq!(pooled.moves, moves);
-        if pooled.moves == 0 {
+        assert_eq!(pooled.sums.moves, moves);
+        if pooled.sums.moves == 0 {
             assert_eq!(pooled.exact_hit_fraction, "Undefined");
         }
     }

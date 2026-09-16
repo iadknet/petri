@@ -23,7 +23,7 @@ use std::collections::BTreeSet;
 use super::battery::{draw_scenarios, execute_scenario_tick, Scenario};
 use crate::config::RuntimeConfig;
 use crate::contracts::{Direction, NodeId, WorldAction};
-use crate::creature::genome::cgp::{ActionSlotBehavior, WorldActionKind};
+use crate::creature::genome::cgp::ActionSlotBehavior;
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::runtime::mesh::UntracedMeshExecution;
 
@@ -65,7 +65,7 @@ pub struct SteeringReading {
 }
 
 /// The sums of [`SteeringReading`]s over a sample of genomes.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SteeringPooled {
     pub genomes: u64,
     pub scenarios: u64,
@@ -110,14 +110,8 @@ pub fn writes_bank(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool
                 .iter()
                 .any(|instruction| matches!(instruction, VmInstruction::WriteDirectionBid { .. })),
             BackendDef::Graph(graph) => graph.action_bank.iter().any(|slot| {
-                matches!(
-                    slot.behavior,
-                    ActionSlotBehavior::Emit(
-                        WorldActionKind::Move
-                            | WorldActionKind::Reproduce
-                            | WorldActionKind::StealEnergy
-                    )
-                ) && !slot.direction_bids.is_empty()
+                matches!(slot.behavior, ActionSlotBehavior::Emit(kind) if kind.is_movement())
+                    && !slot.direction_bids.is_empty()
             }),
         })
 }
@@ -213,7 +207,7 @@ mod tests {
     use crate::creature::founder::founder_genome;
     use crate::creature::genome::cgp::{
         ActionSlot, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, DirectionBidEdge,
-        ExecuteGate, GraphEdge, GraphSource,
+        ExecuteGate, GraphEdge, GraphSource, WorldActionKind,
     };
     use crate::creature::genome::NodeGenome;
     use crate::neighborhood::Battery;
@@ -407,15 +401,6 @@ mod tests {
         genome
     }
 
-    fn movement_direction(action: &WorldAction) -> Option<Direction> {
-        match action {
-            WorldAction::Move(direction)
-            | WorldAction::Reproduce { direction, .. }
-            | WorldAction::StealEnergy { direction, .. } => Some(*direction),
-            WorldAction::NoOp | WorldAction::Eat { .. } => None,
-        }
-    }
-
     /// On the `neighborhood-v1` snapshots, `with` differs from `without` only
     /// where the base's `ring[d]` is nonzero, and there only by moving every
     /// movement action to `d`.
@@ -445,7 +430,7 @@ mod tests {
             assert_eq!(a.len(), b.len());
             for (x, y) in a.iter().zip(b) {
                 assert_eq!(x.action_type(), y.action_type());
-                if let Some(direction) = movement_direction(x) {
+                if let Some(direction) = x.direction() {
                     assert_eq!(direction.to_index(), d);
                 }
                 if x != y {

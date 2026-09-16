@@ -2,8 +2,7 @@
 
 use crate::contracts::{InputReference, WorldAction, MAX_GATE_SLOTS};
 use crate::creature::genome::cgp::{
-    ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, DirectionBidEdge, GraphEdge,
-    OutputSinkKind, WorldActionKind,
+    ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, GraphEdge, OutputSinkKind, WorldActionKind,
 };
 use crate::runtime::action_decode::{decode_world_action, DirectionBank, DIRECTION_BANK_SLOTS};
 use crate::runtime::cgp::sources::resolve_source_post_convergence;
@@ -50,56 +49,20 @@ fn edges_wsum(
     buf.iter().copied().sum()
 }
 
-/// The direction bank a movement slot writes (T11.F21): bid `d` is the
-/// weighted sum of the edges with `direction == d`, and the bank exists once
-/// any edge lands in `0..8`. `Eat`, `NoOp`, and out-of-range edges write
-/// nothing.
-#[allow(clippy::too_many_arguments)]
-fn direction_bank(
-    kind: WorldActionKind,
-    bids: &[DirectionBidEdge],
-    compute_count: usize,
-    curr_outputs: &[f32],
-    input_refs: &[InputReference],
-    resolve_ctx: &ResolveCtx<'_>,
-    shared_memory: &[f32; 16],
-    prev_shared_memory: &[f32; 16],
-) -> Option<DirectionBank> {
-    let movement = matches!(
-        kind,
-        WorldActionKind::Move | WorldActionKind::Reproduce | WorldActionKind::StealEnergy
-    );
-    let mut bank: Option<DirectionBank> = None;
-    for bid in bids
-        .iter()
-        .filter(|bid| movement && (bid.direction as usize) < DIRECTION_BANK_SLOTS)
-    {
-        let v = resolve_source_post_convergence(
-            &bid.edge.source,
-            compute_count,
-            curr_outputs,
-            input_refs,
-            resolve_ctx,
-            shared_memory,
-            prev_shared_memory,
-        );
-        bank.get_or_insert([0.0; DIRECTION_BANK_SLOTS])[bid.direction as usize] +=
-            v * bid.edge.weight;
-    }
-    bank
-}
-
 /// A fired `Emit(kind)` slot's decoded action beside the values it decoded
 /// from: the two parameter sums and the direction bank, if one was written.
 struct EmittedAction {
     param_values: [f32; 2],
     bank: Option<DirectionBank>,
+    /// `Direction::ALL` index the bank committed; `None` without a bank.
+    chosen_direction: Option<u8>,
     action: WorldAction,
 }
 
 /// Resolve a fired `Emit(kind)` slot: `param_inputs[i]` fills `param[i]` for
-/// `i < 2`, the direction bank sums `direction_bids`, and the shared decode
-/// table turns both into the action.
+/// `i < 2`; on a movement kind the direction bank (T11.F21) sums each edge
+/// of `direction_bids` into bid `direction` and exists once any edge lands
+/// in `0..8`; the shared decode table turns both into the action.
 #[allow(clippy::too_many_arguments)]
 fn emit_action(
     kind: WorldActionKind,
@@ -111,9 +74,8 @@ fn emit_action(
     shared_memory: &[f32; 16],
     prev_shared_memory: &[f32; 16],
 ) -> EmittedAction {
-    let mut param_values = [0.0f32; 2];
-    for (value, edge) in param_values.iter_mut().zip(&slot.param_inputs) {
-        let v = resolve_source_post_convergence(
+    let resolve = |edge: &GraphEdge| {
+        resolve_source_post_convergence(
             &edge.source,
             compute_count,
             curr_outputs,
@@ -121,34 +83,30 @@ fn emit_action(
             resolve_ctx,
             shared_memory,
             prev_shared_memory,
-        );
-        *value = v * edge.weight;
+        ) * edge.weight
+    };
+    let mut param_values = [0.0f32; 2];
+    for (value, edge) in param_values.iter_mut().zip(&slot.param_inputs) {
+        *value = resolve(edge);
     }
-    let bank = direction_bank(
-        kind,
-        &slot.direction_bids,
-        compute_count,
-        curr_outputs,
-        input_refs,
-        resolve_ctx,
-        shared_memory,
-        prev_shared_memory,
-    );
+    let mut bank: Option<DirectionBank> = None;
+    if kind.is_movement() {
+        for bid in &slot.direction_bids {
+            let direction = bid.direction as usize;
+            if direction < DIRECTION_BANK_SLOTS {
+                bank.get_or_insert([0.0; DIRECTION_BANK_SLOTS])[direction] += resolve(&bid.edge);
+            }
+        }
+    }
     let action = decode_action_from_kind(kind, &param_values, bank.as_ref());
+    let chosen_direction = bank
+        .and(action.direction())
+        .map(|direction| direction.to_index() as u8);
     EmittedAction {
         param_values,
         bank,
+        chosen_direction,
         action,
-    }
-}
-
-/// The `Direction::ALL` index a movement action commits; `None` for the rest.
-fn movement_direction(action: &WorldAction) -> Option<u8> {
-    match action {
-        WorldAction::Move(direction)
-        | WorldAction::Reproduce { direction, .. }
-        | WorldAction::StealEnergy { direction, .. } => Some(direction.to_index() as u8),
-        WorldAction::NoOp | WorldAction::Eat { .. } => None,
     }
 }
 
@@ -312,7 +270,7 @@ pub(crate) fn apply_cgp_graph_effects(
                     );
                     param_values = emitted.param_values;
                     bank = emitted.bank;
-                    chosen_direction = bank.and_then(|_| movement_direction(&emitted.action));
+                    chosen_direction = emitted.chosen_direction;
                     emitted_action = Some(emitted.action);
                     side_outputs.action_queue.push(emitted.action);
                 }

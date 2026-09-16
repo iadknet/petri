@@ -733,14 +733,8 @@ pub struct Steering {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SteeringPooled {
     pub version: String,
-    pub genomes: u64,
-    pub scenarios: u64,
-    pub moves: u64,
-    pub exact_hits: u64,
-    pub within_45: u64,
-    pub avoidance_trials: u64,
-    pub avoided: u64,
-    pub bank_written: u64,
+    #[serde(flatten)]
+    pub sums: neighborhood::steering::SteeringPooled,
     pub exact_hit_fraction: String,
     pub within_45_fraction: String,
     pub avoidance_fraction: String,
