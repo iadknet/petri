@@ -142,9 +142,12 @@ unchanged.
 ## Verification
 
 - [ ] `make check` -> exit 0 on the final feature code; commit named here.
-- [ ] Focused tests: `cargo test -p v3-core -p v3-cli` -> exit 0, test names
-      and counts in the readings file; `cargo clippy -p v3-core -p v3-cli
-      --all-targets` and `cargo fmt --all -- --check` -> exit 0.
+- [x] Focused tests: `cargo test -p v3-core -p v3-cli` -> exit 0 at `53d68f92`
+      (v3-core lib 1,492 passed, v3-cli lib 109 passed, every integration
+      target passing), test names and counts in
+      [`docs/progress/readings/t14-f07.md`](../../progress/readings/t14-f07.md);
+      `cargo clippy -p v3-core -p v3-cli --all-targets`, `cargo fmt --all --
+      --check` and `cargo check --workspace --all-targets` -> exit 0.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path
       under `~/.local/share/petri-tools/mutants/t14-f07/`, and every survivor
       resolved as killed, equivalent, or deferred. The full survivor list stays
