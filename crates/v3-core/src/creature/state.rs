@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 use std::mem::size_of;
 
-use crate::contracts::{CreatureId, Position, WorldInputKey};
+use crate::contracts::{CreatureId, OrdinaryFoodTypeId, Position, WorldInputKey};
+use crate::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::mesh_annotations::{
     collect_live_vm_instruction_indices, derive_mesh_annotations_with_reachable_indices,
@@ -189,6 +190,17 @@ pub struct CreatureState {
     pub offspring_spawned_count: u64,
     /// Lifetime action attempts executed by this creature.
     pub lifetime_action_attempted_count: u64,
+    /// The same attempts split by `ActionType` discriminant; the array's sum
+    /// always equals `lifetime_action_attempted_count` (T14.F07).
+    pub lifetime_actions_attempted_by_type: [u64; ACTION_TYPE_COUNT as usize],
+    /// Lifetime applied Eat actions indexed by `OrdinaryFoodTypeId`, grown
+    /// lazily on the first applied eat of a type; a type index past the end
+    /// reads as zero.
+    pub lifetime_eats_applied_by_type: Vec<u64>,
+    /// Lifetime predation kills this creature made as the attacker.
+    pub lifetime_predation_kills_count: u64,
+    /// Lifetime predation transfers this creature absorbed and outlived.
+    pub lifetime_predation_hits_taken_count: u64,
     /// Lifetime move actions rejected as blocked.
     pub lifetime_blocked_move_count: u64,
     /// Lifetime reproduction actions rejected as invalid target.
@@ -200,6 +212,23 @@ pub struct CreatureState {
 }
 
 impl CreatureState {
+    /// Count one Phase 2 action attempt in both the lifetime total and its
+    /// per-type slot, so the two can never disagree.
+    pub(crate) fn record_action_attempt(&mut self, action: ActionType) {
+        self.lifetime_action_attempted_count += 1;
+        self.lifetime_actions_attempted_by_type[action as usize] += 1;
+    }
+
+    /// Count one applied Eat of `type_idx`, growing the by-type vector on
+    /// the first eat of a type index past its current end.
+    pub(crate) fn record_applied_eat(&mut self, type_idx: OrdinaryFoodTypeId) {
+        let index = usize::from(type_idx.get());
+        if index >= self.lifetime_eats_applied_by_type.len() {
+            self.lifetime_eats_applied_by_type.resize(index + 1, 0);
+        }
+        self.lifetime_eats_applied_by_type[index] += 1;
+    }
+
     /// Observe the already-applied arithmetic without changing the stored energy.
     pub(crate) fn observe_energy(
         &mut self,
@@ -261,6 +290,10 @@ impl CreatureState {
             birth_mutation_operators: Vec::new().into_boxed_slice(),
             offspring_spawned_count: 0,
             lifetime_action_attempted_count: 0,
+            lifetime_actions_attempted_by_type: [0; ACTION_TYPE_COUNT as usize],
+            lifetime_eats_applied_by_type: Vec::new(),
+            lifetime_predation_kills_count: 0,
+            lifetime_predation_hits_taken_count: 0,
             lifetime_blocked_move_count: 0,
             lifetime_invalid_reproduce_count: 0,
             lifetime_energy_sum: 0.0,
@@ -314,6 +347,10 @@ impl CreatureState {
             birth_mutation_operators: Vec::new().into_boxed_slice(),
             offspring_spawned_count: 0,
             lifetime_action_attempted_count: 0,
+            lifetime_actions_attempted_by_type: [0; ACTION_TYPE_COUNT as usize],
+            lifetime_eats_applied_by_type: Vec::new(),
+            lifetime_predation_kills_count: 0,
+            lifetime_predation_hits_taken_count: 0,
             lifetime_blocked_move_count: 0,
             lifetime_invalid_reproduce_count: 0,
             lifetime_energy_sum: 0.0,
@@ -623,6 +660,37 @@ mod tests {
         assert_eq!(&*state.cached_reachable_nodes, &[0, 2, 5]);
         assert_eq!(state.cached_complexity, 42);
         assert_eq!(state.cached_genome_size, 7);
+        assert_eq!(state.lifetime_actions_attempted_by_type, [0; 5]);
+        assert!(state.lifetime_eats_applied_by_type.is_empty());
+        assert_eq!(state.lifetime_predation_kills_count, 0);
+        assert_eq!(state.lifetime_predation_hits_taken_count, 0);
+    }
+
+    #[test]
+    fn typed_attempts_and_eats_grow_their_own_slots() {
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+        let mut state = CreatureState::new(
+            id,
+            minimal_genome(),
+            Position::new(0, 0),
+            20.0,
+            0,
+            [0; 6],
+            0,
+            [true; 6],
+            CreatureIdentityState::default(),
+            [0.0; SHARED_MEMORY_SLOTS],
+        );
+        state.record_action_attempt(ActionType::StealEnergy);
+        state.record_action_attempt(ActionType::Eat);
+        state.record_action_attempt(ActionType::Eat);
+        assert_eq!(state.lifetime_action_attempted_count, 3);
+        assert_eq!(state.lifetime_actions_attempted_by_type, [0, 2, 0, 0, 1]);
+        state.record_applied_eat(OrdinaryFoodTypeId::new(2));
+        state.record_applied_eat(OrdinaryFoodTypeId::new(0));
+        state.record_applied_eat(OrdinaryFoodTypeId::new(2));
+        assert_eq!(state.lifetime_eats_applied_by_type, vec![1, 0, 2]);
     }
 
     #[test]

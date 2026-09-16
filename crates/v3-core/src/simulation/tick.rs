@@ -732,7 +732,7 @@ impl BarrierContext {
 /// NoOp cannot fail; no `failed_action_penalty` is possible.
 fn execute_noop(sim: &mut Simulation, ctx: &ActionContext, outcome_acc: &mut OutcomeAccumulator) {
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
-        creature.lifetime_action_attempted_count += 1;
+        creature.record_action_attempt(ActionType::NoOp);
         apply_noop(creature, &sim.config, &mut sim.stats.energy_flows);
         sim.stats.last_tick_noop += 1;
         outcome_acc.record_action_result(ctx.id, true);
@@ -757,7 +757,7 @@ fn execute_eat(
     let mut action_result = ActionResult::Success;
     let mut amount = 0.0;
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
-        creature.lifetime_action_attempted_count += 1;
+        creature.record_action_attempt(ActionType::Eat);
         let food_before = sim.world.food_at_type(creature.position, type_idx);
         let succeeded = apply_typed_eat(
             creature,
@@ -770,6 +770,7 @@ fn execute_eat(
         outcome_acc.record_action_result(ctx.id, succeeded);
         if succeeded {
             amount = food_before;
+            creature.record_applied_eat(type_idx);
             *sim.stats
                 .eat_actions_applied_total_by_type
                 .entry(type_idx)
@@ -811,7 +812,7 @@ fn execute_move(
             .or_insert(0) += 1;
     }
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
-        creature.lifetime_action_attempted_count += 1;
+        creature.record_action_attempt(ActionType::Move);
         let from = creature.position;
         let succeeded = apply_move(
             ctx.id,
@@ -882,7 +883,7 @@ fn execute_reproduce(
     }
     let result = apply_reproduce(ctx.id, sim, direction, energy_transfer, reproduce_rng);
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
-        creature.lifetime_action_attempted_count += 1;
+        creature.record_action_attempt(ActionType::Reproduce);
     }
     let succeeded = result == ReproductionActionResult::Spawned;
     outcome_acc.record_action_result(ctx.id, succeeded);
@@ -953,7 +954,7 @@ fn execute_steal_energy(
     // Snapshot predation events length to extract damage info.
     let pred_events_before = sim.stats.last_tick_predation_events.len();
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
-        creature.lifetime_action_attempted_count += 1;
+        creature.record_action_attempt(ActionType::StealEnergy);
     }
     let result = apply_steal_energy(ctx.id, sim, direction, amount);
     let succeeded = result != PredationActionResult::RejectedNoVictim;

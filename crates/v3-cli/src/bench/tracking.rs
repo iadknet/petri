@@ -10,6 +10,7 @@ use crate::{fraction_or_undefined, six};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use v3_core::contracts::WorldInputKey;
+use v3_core::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
 use v3_core::creature::sensor_census::{
     creature_sensor_census, world_input_key_label, world_input_key_universe,
 };
@@ -256,6 +257,136 @@ pub struct WorldTracking {
     /// Terminal-only applied learning and changed-memory-write events.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cognition: Option<CognitionTracking>,
+    /// Terminal-only per-clade profile of the living population (T14.F07);
+    /// absent means unmeasured, an empty `rows` means extinction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surviving_clade_profiles: Option<SurvivingCladeProfiles>,
+}
+
+/// How each founder clade with at least one living creature made its living,
+/// one row per surviving `lineage_id` in ascending order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SurvivingCladeProfiles {
+    pub definition: String,
+    pub rows: Vec<SurvivingCladeProfileRow>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SurvivingCladeProfileRow {
+    pub lineage_id: u32,
+    pub size: u64,
+    pub mean_energy: String,
+    pub mean_age: String,
+    pub mean_generation: String,
+    pub mean_genome_size: String,
+    /// Applied eats indexed by food type like
+    /// [`WorldTracking::typed_eats_total`].
+    pub eats_by_type: Vec<u64>,
+    /// Attempts keyed by `ActionType::as_key`, all five keys always present.
+    pub actions_by_type: BTreeMap<String, u64>,
+    pub predation_kills: u64,
+    pub predation_hits_taken: u64,
+}
+
+/// One living creature's contribution to its clade's row: its lineage and
+/// the lifetime counters `CreatureState` carries.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct CladeMemberReading {
+    pub(super) lineage_id: u32,
+    pub(super) energy: f32,
+    pub(super) age: u64,
+    pub(super) generation: u64,
+    pub(super) genome_size: u32,
+    pub(super) eats_by_type: Vec<u64>,
+    pub(super) actions_by_type: [u64; ACTION_TYPE_COUNT as usize],
+    pub(super) predation_kills: u64,
+    pub(super) predation_hits_taken: u64,
+}
+
+impl CladeMemberReading {
+    fn observe(creature: &v3_core::creature::state::CreatureState) -> Self {
+        Self {
+            lineage_id: creature.identity.lineage_id,
+            energy: creature.energy,
+            age: creature.age,
+            generation: creature.generation,
+            genome_size: creature.cached_genome_size,
+            eats_by_type: creature.lifetime_eats_applied_by_type.clone(),
+            actions_by_type: creature.lifetime_actions_attempted_by_type,
+            predation_kills: creature.lifetime_predation_kills_count,
+            predation_hits_taken: creature.lifetime_predation_hits_taken_count,
+        }
+    }
+}
+
+#[derive(Default)]
+struct CladeAccumulator {
+    size: u64,
+    energy_sum: f64,
+    age_sum: u64,
+    generation_sum: u64,
+    genome_size_sum: u64,
+    eats_by_type: Vec<u64>,
+    actions_by_type: [u64; ACTION_TYPE_COUNT as usize],
+    predation_kills: u64,
+    predation_hits_taken: u64,
+}
+
+/// Bucket living creatures by `lineage_id` into rows ascending by lineage.
+/// Pure over its input: sizes sum to the member count, every integer column
+/// is the sum over the row's members, and `eats_by_type` is exactly
+/// `food_type_count` long (a member's lazily grown vector may be shorter, and
+/// a type index past the configured types is not a food type of this run).
+/// Energy is summed in `f64` in input order, so feeding `creatures.values()`
+/// keeps the order the checkpoint `mean_energy` uses.
+pub(super) fn bucket_surviving_clades(
+    food_type_count: usize,
+    members: impl IntoIterator<Item = CladeMemberReading>,
+) -> Vec<SurvivingCladeProfileRow> {
+    let mut clades: BTreeMap<u32, CladeAccumulator> = BTreeMap::new();
+    for member in members {
+        let clade = clades
+            .entry(member.lineage_id)
+            .or_insert_with(|| CladeAccumulator {
+                eats_by_type: vec![0; food_type_count],
+                ..CladeAccumulator::default()
+            });
+        clade.size += 1;
+        clade.energy_sum += f64::from(member.energy);
+        clade.age_sum += member.age;
+        clade.generation_sum += member.generation;
+        clade.genome_size_sum += u64::from(member.genome_size);
+        for (total, eaten) in clade.eats_by_type.iter_mut().zip(&member.eats_by_type) {
+            *total += eaten;
+        }
+        for (total, attempted) in clade.actions_by_type.iter_mut().zip(member.actions_by_type) {
+            *total += attempted;
+        }
+        clade.predation_kills += member.predation_kills;
+        clade.predation_hits_taken += member.predation_hits_taken;
+    }
+    clades
+        .into_iter()
+        .map(|(lineage_id, clade)| {
+            let size = clade.size as f64;
+            SurvivingCladeProfileRow {
+                lineage_id,
+                size: clade.size,
+                mean_energy: six(clade.energy_sum / size),
+                mean_age: six(clade.age_sum as f64 / size),
+                mean_generation: six(clade.generation_sum as f64 / size),
+                mean_genome_size: six(clade.genome_size_sum as f64 / size),
+                eats_by_type: clade.eats_by_type,
+                actions_by_type: ActionType::ALL
+                    .into_iter()
+                    .zip(clade.actions_by_type)
+                    .map(|(action, count)| (action.as_key().to_string(), count))
+                    .collect(),
+                predation_kills: clade.predation_kills,
+                predation_hits_taken: clade.predation_hits_taken,
+            }
+        })
+        .collect()
 }
 
 /// Applied assignments and changes, without claiming useful learning or memory.
@@ -355,6 +486,7 @@ impl WorldTracking {
             reproductive_success_by_cognitive_class: None,
             energy_flows: None,
             cognition: None,
+            surviving_clade_profiles: None,
         }
     }
 
@@ -434,6 +566,13 @@ impl WorldTracking {
                     .iter()
                     .map(|(result, count)| (result.as_key().to_string(), *count))
                     .collect(),
+            }),
+            surviving_clade_profiles: Some(SurvivingCladeProfiles {
+                definition: "surviving-clade-profile-v1".into(),
+                rows: bucket_surviving_clades(
+                    sim.config.world.food.types.len(),
+                    sim.creatures.values().map(CladeMemberReading::observe),
+                ),
             }),
             ..self
         }
