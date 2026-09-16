@@ -211,7 +211,8 @@ every stored goal summary; Orchards never recovered and its sample is eight
 generation-1–2 creatures. A user-authorized control at 72845446 with the two
 draws restored reproduced the T02.F04 goal closure integer-for-integer
 (readings file), so the collapse is the diverged trajectory of the draw
-re-mapping, not the bank; closure proceeds and the epoch is not re-pinned.
+re-mapping, not the bank. Goal `wall_clock` flags (+95% / +83%), not severe;
+T02.F04 already read +82% on this epoch (readings file).
 
 | World | exact_hit | avoidance | bank_written | pop min / tick-200 / final (prev min / final) | changed cur / prev | dead cur / prev | neighborhood_read cur / prev / floor |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -220,7 +221,7 @@ re-mapping, not the bank; closure proceeds and the epoch is not re-pinned.
 | Confluence | 0.238208 | 0.000000 | 0.000000 | 8 / 3,012 / 8,105 (1,010 / 14,110) | 0.360515 / 0.389446 | 0.016452 / 0.002672 | 0.190000 / 0.201400 / 0.143400 |
 
 - Summaries: `docs/progress/features/t11-f21-per-direction-motor-output.json`
-  and `...-goal.json`; full readings `docs/progress/readings/t11-f21.md`.
+  and `...-goal.json`.
 
 ## Success Criteria
 
@@ -247,3 +248,8 @@ re-mapping, not the bank; closure proceeds and the epoch is not re-pinned.
   summary, explains previous-closure flags against this summary by the
   collapse, and compares steering against this spec's table and the
   founder's 0.5. Orchards' fragility is a T12/T02 finding.
+- Deferred: `WorldActionKind::action_type` to replace `action_type_of`
+  (`effects.rs`; readings file).
+- Deferred: `surface_vec_mut` for the seven `direction_bids` match sites in
+  graph `operators.rs`, only if a later feature adds a surface.
+- Deferred: review counts P1 0, P2 1 (recorded), P3 5.
