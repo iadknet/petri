@@ -1,6 +1,6 @@
 # T14.F11 — Progress Page Information Design
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-15
 **Feature**: T14.F11
 **Track**: [T14 — Runtime Telemetry and Report Integrity](../../roadmaps/t14-runtime-telemetry-and-report-integrity.md)
@@ -154,8 +154,8 @@ panels per row and stacks panels below about 900 px.
 | | Births and deaths per closure | `deterministic.per_seed[<s>].births`, `mortality.deaths_total` |
 | | Deaths by cause, stacked columns over closures | `mortality.by_cause` |
 | | Energy flows: the thirteen charge keys as a stacked column per closure, total food intake as a marker or line over it | `energy_flows` |
-| | Food density by type and grazed-cell share at checkpoints | `samples[].food_density_total`, `grazed_cell_share`, `grazing_modifier_mean` |
-| 2 How many ways of living, for how long? | Surviving clades and entropy over closures (two panels sharing the row) | `lineage_diversity.per_seed` |
+| | Food density summed over types, and grazed-cell share and grazing modifier by type, at checkpoints | `samples[].food_density_total`, `grazed_cell_share`, `grazing_modifier_mean` |
+| 2 How many ways of living, for how long? | Surviving clades over closures, and lineage entropy over closures (two three-panel rows) | `lineage_diversity.per_seed` |
 | | Clades and entropy at checkpoints, latest closure emphasized | `samples[]` |
 | | Surviving-clade profile: one table per world, rows by `size` descending, eats and actions as in-row shares, kills and hits | `surviving_clade_profiles.rows` |
 | | Occupancy: distinct clades per cell, 16 × 16 heatmap at the last checkpoint | `occupancy_grid` |
@@ -208,7 +208,7 @@ panels per row and stacks panels below about 900 px.
 ## Verification
 
 - [x] `make check-docs` -> exit 0 on 2026-09-15, rerun after the simplify
-      pass, including `node --test scripts/benchmark-artifacts.test.mjs`
+      pass and after the review remediation, including `node --test scripts/benchmark-artifacts.test.mjs`
       (3 pass) against the rewritten page with the test file unchanged; the
       detector reported no finding and a headless Chrome load over HTTP logged
       nothing ([readings](../../progress/readings/t14-f11.md)).
@@ -217,7 +217,7 @@ panels per row and stacks panels below about 900 px.
       before and after ([readings](../../progress/readings/t14-f11.md),
       "Verification commands").
 - [x] Orchestrator browser check over HTTP before review — passed
-      2026-09-15 on port 8791; every item below observed
+      2026-09-15, port 8791
       (`python3 -m http.server --directory docs/progress <port>`; port 8765 is
       taken on this host by a service that answers "ok" to every path): no
       console error; the headline row and section 1's first card in the first
@@ -227,9 +227,8 @@ panels per row and stacks panels below about 900 px.
       every delta labelled single-run; T13.F02 drawn as a gap; a table toggle
       and a hover readout showing host and date; the tick-zero map inside world
       detail. The orchestrator ticks this item with the date and port.
-- [x] Copy check — passed 2026-09-15 on port 8791 (404 notice checked from a
-      data-less copy on port 8792); no line failed a rule. The check read
-      the page title, status line,
+- [x] Copy check — passed 2026-09-15, port 8791 (404 notice via a data-less
+      copy on 8792), no failing line: the page title, status line,
       every `h2` and lede, the five tile captions, one card note per section,
       one hover readout and the load-failure notice (serve with
       `benchmark-series.json` unreadable) against the static-copy rules in the
@@ -255,18 +254,18 @@ reports; it runs no benchmark, re-pins no epoch and moves no indicator
 
 ## Success Criteria
 
-- [ ] A reader at 1280 × 800 sees, without scrolling, whether each world is
+- [x] A reader at 1280 × 800 sees, without scrolling, whether each world is
       more alive, more diverse, more cognitive and still evolvable than at the
       previous closure, with every delta labelled single-run and the
       evolvability floor shown as pass or fail.
-- [ ] Every indicator card is one row across the three worlds; no chart or tile
+- [x] Every indicator card is one row across the three worlds; no chart or tile
       is repeated per world in separate stacks; there are no tabs.
-- [ ] The `goal-v1` history is visible inside the charts behind a labelled
+- [x] The `goal-v1` history is visible inside the charts behind a labelled
       break; T13.F02 and every `Undefined` indicator read as not measured.
-- [ ] Each landed T14 reading (F03, F05, F06, F07, F08, F10, F12) and T02.F04's
+- [x] Each landed T14 reading (F03, F05, F06, F07, F08, F10, F12) and T02.F04's
       grazing fields appear under the section named above, from the stored
       paths, with denominators printed; nothing is rendered for F09.
-- [ ] The chart, heatmap, table-toggle, hover-readout and tick-zero-map helpers
+- [x] The chart, heatmap, table-toggle, hover-readout and tick-zero-map helpers
       remain and the page test passes unchanged.
 
 ## Notes for AI Agents
@@ -308,8 +307,16 @@ reports; it runs no benchmark, re-pins no epoch and moves no indicator
   `~/.claude/skills/i-have-adhd/SKILL.md`; the static-copy rules in the
   Implementation Tasks are that direction applied to a page rather than to a
   chat reply, and JSON-path subtitles are exempt as provenance.
-- Decision: the impeccable `shape` interview was replaced by the F11 scope
-  note as the brief, since the spec owner runs without a user channel; no
-  PRODUCT.md or DESIGN.md is written, as neither is in the amendment's file set.
+- Decision: the F11 scope note stood in for the impeccable `shape` interview
+  (no user channel); no PRODUCT.md or DESIGN.md is written.
 - Decision: the closure entry in `docs/progress.md` also refreshes that file's
   page description (lines 10–17), which names the removed tabs.
+- Deferred: the energy row's hand-copied `CHARGES` list could derive from the
+  latest report's `energy_flows` keys.
+- Deferred: the clade-profile table's hand-copied `ACTIONS` list could derive
+  from the `surviving_clade_profiles` row keys.
+- Deferred: `F12_FLOORS` keeps the T14.F12 per-world floor values in the page as
+  a second place beside the T14.F12 spec; a stored floor in the summary would
+  remove the duplicate.
+- Cost: `/usage` pending; 4 implementer passes (build, simplify, copy,
+  remediation) at 2 consults each; 2 spec-owner resumes; review P1 0, P2 1, P3 4.
