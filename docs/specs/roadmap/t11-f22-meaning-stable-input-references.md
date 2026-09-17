@@ -216,13 +216,14 @@ Canyon country (9 of 1,548 against 4 of 1,356), at or below T11.F21 in every
 world, and `changed_fraction` still falls by less than `B`. Every dead birth
 comes from VM instruction and topology operators this feature does not touch
 (the same families as in T02.F04 and T11.F21); `Swap` and `Prune` read 0
-dead in every evolved trial and `Prune` is silent in all of them. The pooled `InputRef.Swap` helpful-share gap is 0.100767,
-at or above 0.054 in every world and pooled — the T11.F11 trigger, recorded
-per the spec, not remediated. `InputRef.Prune`'s share sits near the
+dead in every evolved trial and `Prune` is silent in all of them. The pooled
+`InputRef.Swap` helpful-share gap (h/(h+d), invariant 6) is 0.118852, at or
+above 0.054 in every world and pooled — the T11.F11 trigger, recorded per
+the spec, not remediated. `InputRef.Prune`'s share sits near the
 all-operator share, matching "neutral at birth". `selected_inapplicable`
 discards are exactly 0. `plasticity_updates` and wall-clock/tick flag (not
 severe) against the previous closure only, within the work-counter
-allowance. Full figures and per-world tables in the readings file.
+allowance.
 
 - Summaries: `docs/progress/features/t11-f22-meaning-stable-input-references.json`
   and `...-goal.json`.
@@ -263,3 +264,9 @@ allowance. Full figures and per-world tables in the readings file.
   exception, no re-pin. The next closure reads evolved per-birth and
   `neighborhood_read` against this summary's own values, taken from the JSON,
   not from a prior spec's table.
+- Deferred: `apply_to_node` in `crates/v3-core/src/mutation/input_ref/mod.rs`
+  keeps an `unreachable!` arm for `InputRefOperator::RawFieldMutation`;
+  return `Err(NoApplicableTarget)` or take a node-targeted newtype.
+- Deferred: `swappable_indices`/`apply_swap` rebuild `input_reference_universe`
+  (~20 items) per node per event, no measured cost; pass one universe into
+  `applicable_indices`.
