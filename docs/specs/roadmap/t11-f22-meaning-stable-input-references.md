@@ -1,6 +1,6 @@
 # T11.F22 — Meaning-Stable Input References
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-16
 **Feature**: T11.F22
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -133,7 +133,7 @@ report gains the per-operator value counters the closure reading needs.
       fixture (invariants 2, 3); rename (invariant 5).
 - [x] Task 4: the three value-total fields in the bench tracking (invariant 6)
       and the reference-document edits.
-- [ ] Task 5: verification below, readings file, gate and goal runs, Performance
+- [x] Task 5: verification below, readings file, gate and goal runs, Performance
       verdict.
 
 ## Verification
@@ -149,7 +149,7 @@ report gains the per-operator value counters the closure reading needs.
       each form's length, gap, and lengthening step in the readings file.
 - [x] Old-draw pins re-pinned with the reason in the test; values in the
       readings file.
-- [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
+- [x] `cargo test -p v3-core --test viability` first, then `make check` ->
       exit 0 on the final feature commit (hash in the readings file).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on `9bb19d1f`: `70 mutants
       tested in 15m: 2 missed, 49 caught, 19 unviable`, no timeouts, output
@@ -159,7 +159,7 @@ report gains the per-operator value counters the closure reading needs.
       and one `PROFILE=goal` run: both exit 0, `severe=false`; summaries and
       series entries recorded; byte counts and raw paths in the readings
       file.
-- [ ] `make roadmap-check` and `make check-docs` on the document edits.
+- [x] `make roadmap-check` and `make check-docs` on the document edits.
 
 Test names, transcripts, and per-world tables: `docs/progress/readings/t11-f22.md`.
 
@@ -233,15 +233,15 @@ allowance.
 
 ## Success Criteria
 
-- [ ] `Swap` never changes an entry's kind or touches a consumer; `Prune`
+- [x] `Swap` never changes an entry's kind or touches a consumer; `Prune`
       never removes a referenced entry or shifts an index a consumer reads;
       both proven by property tests and applicable by predicate.
-- [ ] `Add`, `RawFieldMutation`, the per-consumer retargets, creation, copy,
+- [x] `Add`, `RawFieldMutation`, the per-consumer retargets, creation, copy,
       and the founder are unchanged.
-- [ ] `c` and `B` recorded before the runs; the goal run's evolved per-birth,
+- [x] `c` and `B` recorded before the runs; the goal run's evolved per-birth,
       `neighborhood_read`, and helpful-share readings recorded against the
       predeclaration, including a miss.
-- [ ] The goal report carries per-operator helpful, neutral, and detrimental
+- [x] The goal report carries per-operator helpful, neutral, and detrimental
       totals, and the reference documents state the kind and prune rules.
 
 ## Notes for AI Agents
