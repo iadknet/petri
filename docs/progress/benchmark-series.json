@@ -41,7 +41,8 @@
       "docs/progress/features/t03-f11-genome-replication-cost.json",
       "docs/progress/features/t02-f04-grazing-recovery-and-overuse.json",
       "docs/progress/features/t14-f07-surviving-clade-behavioral-profile.json",
-      "docs/progress/features/t11-f21-per-direction-motor-output.json"
+      "docs/progress/features/t11-f21-per-direction-motor-output.json",
+      "docs/progress/features/t11-f22-meaning-stable-input-references.json"
     ]
   },
   "goal": {
@@ -103,7 +104,8 @@
       "docs/progress/features/t03-f11-genome-replication-cost-goal.json",
       "docs/progress/features/t02-f04-grazing-recovery-and-overuse-goal.json",
       "docs/progress/features/t14-f07-surviving-clade-behavioral-profile-goal.json",
-      "docs/progress/features/t11-f21-per-direction-motor-output-goal.json"
+      "docs/progress/features/t11-f21-per-direction-motor-output-goal.json",
+      "docs/progress/features/t11-f22-meaning-stable-input-references-goal.json"
     ]
   }
 }
