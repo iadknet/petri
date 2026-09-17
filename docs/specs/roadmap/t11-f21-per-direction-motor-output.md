@@ -1,6 +1,6 @@
 # T11.F21 — Per-Direction Motor Output
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-16
 **Feature**: T11.F21
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -133,7 +133,7 @@ serde-defaulted to `Undefined` on old reports.
       `direction_bids` deserialize.
 - [x] `steering-v1` unit tests: the one-edge fixtures read above chance; old
       reports read `Undefined`; byte-identical across thread counts.
-- [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
+- [x] `cargo test -p v3-core --test viability` first, then `make check` ->
       exit 0 on the final feature commit (hash in the readings file).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `233 mutants tested in
       32m: 5 missed, 165 caught, 63 unviable`, no timeouts; output
@@ -149,7 +149,7 @@ serde-defaulted to `Undefined` on old reports.
       `docs/progress/features/t11-f21-per-direction-motor-output.json` and
       `...-goal.json`, raw hash/byte count checked, series entries added, no
       full report staged.
-- [ ] `make roadmap-check` and `make check-docs` on the document edits.
+- [x] `make roadmap-check` and `make check-docs` on the document edits.
 
 Test names, command tables, jq checks, and per-world tables live in
 `docs/progress/readings/t11-f21.md`; no `proptest-regressions/` file.
@@ -224,12 +224,12 @@ read +82% on this epoch and the control +56% (readings file).
 
 ## Success Criteria
 
-- [ ] Both backends decode a written bank by the shared rule and an unwritten
+- [x] Both backends decode a written bank by the shared rule and an unwritten
       bank by the unchanged scalar decode; the unmutated founder's readings
       are bit-identical to the previous closure.
-- [ ] One bank edge from a neighbor-food slot seeks and one negative edge from
+- [x] One bank edge from a neighbor-food slot seeks and one negative edge from
       a neighbor-barrier slot avoids, on each backend, proven by fixtures.
-- [ ] Every gate and goal report carries `steering-v1` beside the T11.F14
+- [x] Every gate and goal report carries `steering-v1` beside the T11.F14
       block with chance levels, and the predeclared directions are read and
       recorded, including the finding-7 or not-exposed case.
 - [x] Reference documents describe the bank, the opcode, and the sixth surface.
