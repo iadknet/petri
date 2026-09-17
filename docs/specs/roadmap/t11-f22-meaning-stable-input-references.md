@@ -167,11 +167,10 @@ report gains the per-operator value counters the closure reading needs.
       exit 0 on the final feature commit (hash in the readings file).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and each survivor killed, equivalent, or deferred, listed here.
-- [ ] `make bench PROFILE=gate FEATURE=t11-f22-meaning-stable-input-references`
-      and one `PROFILE=goal` run: summaries at
-      `docs/progress/features/t11-f22-meaning-stable-input-references.json`
-      and `...-goal.json`, raw hash/byte count checked, series entries added,
-      no full report staged.
+- [x] `make bench PROFILE=gate FEATURE=t11-f22-meaning-stable-input-references`
+      and one `PROFILE=goal` run: both exit 0, `severe=false`; summaries and
+      series entries recorded; byte counts and raw paths in the readings
+      file.
 - [ ] `make roadmap-check` and `make check-docs` on the document edits.
 
 Test names, probe transcript, jq checks, and per-world tables:
@@ -220,7 +219,19 @@ a barrier ring" rule, so it is a user decision under the blocker rule. A
 helpful-share gap at or above 0.054 is the T11.F11 trigger, recorded, not
 remediated here.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate and goal both exit 0, `severe=false`, no
+extinction. Founder `Swap`/`Prune` rows and every other founder operator
+match the predeclaration. `changed_fraction` and the `neighborhood_read`
+floor hold in all three worlds. `dead_fraction` **exceeds** its predeclared
+T02.F04 bound in Canyon country and Confluence (not Orchards) — outside the
+spec's blocker-rule sentence, recorded for the orchestrator/spec owner, not
+remediated here. The pooled `InputRef.Swap` helpful-share gap is 0.100767,
+at or above 0.054 in every world and pooled — the T11.F11 trigger, recorded
+per the spec, not remediated. `InputRef.Prune`'s share sits near the
+all-operator share, matching "neutral at birth". `selected_inapplicable`
+discards are exactly 0. `plasticity_updates` and wall-clock/tick flag (not
+severe) against the previous closure only, within the work-counter
+allowance. Full figures and per-world tables in the readings file.
 
 - Summaries: `docs/progress/features/t11-f22-meaning-stable-input-references.json`
   and `...-goal.json`.
