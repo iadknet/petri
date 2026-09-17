@@ -499,12 +499,19 @@ proptest! {
                 prop_assert_eq!(consumer_count(after), consumer_count(before), "a consumer was removed");
                 prop_assert_eq!(noop_count(after), noop_count(before), "a ReadInput became Noop");
                 prop_assert_eq!(resolved_consumers(after), resolved_consumers(before));
-                let removed = (0..before.input_refs.len())
-                    .find(|&i| after.input_refs.get(i) != Some(&before.input_refs[i]))
-                    .unwrap_or(after.input_refs.len());
+                // Duplicate entries make the deleted index ambiguous by
+                // position, so ask whether deleting any unreferenced entry
+                // reproduces the table instead of inferring one index.
+                let deleted_an_unreferenced_entry = prunable_indices(before).into_iter().any(|i| {
+                    let mut expected = before.input_refs.clone();
+                    expected.remove(i);
+                    expected == after.input_refs
+                });
                 prop_assert!(
-                    prunable_indices(before).contains(&removed),
-                    "entry {removed} had a consumer"
+                    deleted_an_unreferenced_entry,
+                    "the deleted entry had a consumer: {:?} -> {:?}",
+                    before.input_refs,
+                    after.input_refs
                 );
             }
         }
@@ -1089,5 +1096,27 @@ fn input_ref_raw_field_mutation_can_mutate_food_type_idx() {
     assert!(
         result.is_ok() && any_non_default_food_type(&genome.nodes[0].input_refs),
         "InputRef.RawFieldMutation should be able to mutate food sensor type_idx when multiple food types exist"
+    );
+}
+
+#[test]
+fn input_reference_universe_caps_food_types_at_the_full_u16_range() {
+    // The cap is one past `u16::MAX`: every representable food type id,
+    // including the last one, has its keys in the universe.
+    let full_range = usize::from(u16::MAX) + 1;
+    let last_food_type =
+        InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::new(u16::MAX)));
+
+    let at_cap = input_reference_universe(full_range);
+
+    assert!(
+        at_cap.contains(&last_food_type),
+        "food type {} must be enumerated at {full_range} food types",
+        u16::MAX
+    );
+    assert_eq!(
+        input_reference_universe(full_range + 7),
+        at_cap,
+        "food type counts above the cap add nothing to the universe"
     );
 }
