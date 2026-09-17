@@ -573,6 +573,15 @@ impl CgpGraphBackendDef {
 mod tests {
     use super::*;
 
+    #[test]
+    fn is_movement_holds_for_exactly_the_direction_committing_kinds() {
+        assert!(WorldActionKind::Move.is_movement());
+        assert!(WorldActionKind::Reproduce.is_movement());
+        assert!(WorldActionKind::StealEnergy.is_movement());
+        assert!(!WorldActionKind::Eat.is_movement());
+        assert!(!WorldActionKind::NoOp.is_movement());
+    }
+
     // ── Construction tests ──────────────────────────────────────────────────
 
     #[test]

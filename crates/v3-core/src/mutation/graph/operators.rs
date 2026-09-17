@@ -2580,6 +2580,13 @@ mod tests {
             seen.insert(def.action_bank[0].direction_bids[0].direction);
         }
         assert_eq!(seen.into_iter().collect::<Vec<_>>(), vec![2, 4]);
+        // At either bound only one move is offered, so the delta's sign is
+        // observable regardless of the draw.
+        for (start, expected) in [(0u8, 1u8), (7, 6)] {
+            let mut def = bank_only_def(start);
+            raw_field_mutation(&mut def, &input_refs, &config, &mut test_rng()).unwrap();
+            assert_eq!(def.action_bank[0].direction_bids[0].direction, expected);
+        }
     }
 
     #[test]

@@ -468,6 +468,45 @@ mod tests {
     }
 
     #[test]
+    fn writes_bank_needs_an_executed_movement_emit_with_a_non_empty_bank() {
+        let node0: BTreeSet<NodeId> = [NodeId::new(0)].into_iter().collect();
+        // A movement slot with an empty bank writes nothing.
+        assert!(!writes_bank(&graph_mover(2), &node0));
+        // A movement slot with a bank edge writes, but only when executed.
+        let with_bid = graph_mover_with_bid(2, 0, 3, 1.0);
+        assert!(writes_bank(&with_bid, &node0));
+        assert!(!writes_bank(&with_bid, &BTreeSet::new()));
+        // A bank on a non-movement slot never writes.
+        let mut eater = with_bid;
+        let BackendDef::Graph(graph) = &mut eater.nodes[0].backend_def else {
+            unreachable!()
+        };
+        graph.action_bank[0].behavior = ActionSlotBehavior::Emit(WorldActionKind::Eat);
+        assert!(!writes_bank(&eater, &node0));
+    }
+
+    #[test]
+    fn graph_out_of_range_bid_direction_is_summed_nowhere() {
+        let config = config();
+        let battery = SteeringBattery::generate(config.world.food.types.len());
+        let scalar = 2;
+        let plain = battery.read(&graph_mover(scalar), &config.runtime, &BTreeSet::new());
+        let mut genome = graph_mover(scalar);
+        let BackendDef::Graph(graph) = &mut genome.nodes[0].backend_def else {
+            unreachable!()
+        };
+        graph.action_bank[0].direction_bids.push(DirectionBidEdge {
+            edge: GraphEdge {
+                source: GraphSource::ComputeNode(0),
+                weight: 1.0,
+            },
+            direction: 8,
+        });
+        let reading = battery.read(&genome, &config.runtime, &BTreeSet::new());
+        assert_eq!(reading, plain, "a direction-8 edge must not write the bank");
+    }
+
+    #[test]
     fn graph_one_positive_food_edge_hits_every_direction_exactly() {
         let config = config();
         let battery = SteeringBattery::generate(config.world.food.types.len());
