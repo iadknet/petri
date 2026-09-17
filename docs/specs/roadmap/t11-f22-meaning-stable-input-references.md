@@ -151,8 +151,10 @@ report gains the per-operator value counters the closure reading needs.
       readings file.
 - [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
       exit 0 on the final feature commit (hash in the readings file).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and each survivor killed, equivalent, or deferred, listed here.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on `9bb19d1f`: `70 mutants
+      tested in 15m: 2 missed, 49 caught, 19 unviable`, no timeouts, output
+      `~/.local/share/petri-tools/mutants/t11-f22/mutants.out`; both
+      survivors killed by one added test (table in the readings file).
 - [x] `make bench PROFILE=gate FEATURE=t11-f22-meaning-stable-input-references`
       and one `PROFILE=goal` run: both exit 0, `severe=false`; summaries and
       series entries recorded; byte counts and raw paths in the readings
