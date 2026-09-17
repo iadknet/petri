@@ -777,13 +777,18 @@ mod tests {
                 censored_present: 5,
             },
         );
+        // T11.F22 re-pin: the within-kind `Swap` and consumer-preserving
+        // `Prune` draw differently from the old `Swap`/`Remove`, so the walk's
+        // lineages diverge at their first input-reference event; one cohort
+        // module now reaches an internal change, five generations after its
+        // birth.
         assert_eq!(
             reading.time_to_first(CohortFact::InternalChange),
             &TimeToFirst {
-                reached: 2,
-                median_generations: Some(14),
+                reached: 1,
+                median_generations: Some(5),
                 censored_deleted: 1,
-                censored_present: 5,
+                censored_present: 6,
             },
         );
     }

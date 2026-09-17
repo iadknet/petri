@@ -497,6 +497,18 @@ impl CgpGraphBackendDef {
         });
     }
 
+    /// Every edge on every container `retain_edges` walks: all compute
+    /// nodes (live or not), output sinks, action-bank gate, param and
+    /// direction-bid edges, and the execute gate.
+    pub fn edges(&self) -> impl Iterator<Item = &GraphEdge> {
+        self.compute_nodes
+            .iter()
+            .flat_map(|node| &node.inputs)
+            .chain(self.output_sinks.iter().flat_map(|sink| &sink.inputs))
+            .chain(self.action_bank.iter().flat_map(ActionSlot::edges))
+            .chain(&self.execute_gate.inputs)
+    }
+
     fn retain_edges(&mut self, mut keep: impl FnMut(&mut GraphEdge) -> bool) {
         for (idx, node) in self.compute_nodes.iter_mut().enumerate() {
             let mut values = self.birth_weights.as_mut().map(|rows| &mut rows[idx]);

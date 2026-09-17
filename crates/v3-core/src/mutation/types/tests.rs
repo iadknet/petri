@@ -140,7 +140,7 @@ fn complexity_effect_known_classifications() {
         ComplexityEffect::Increasing
     );
     assert_eq!(
-        MutationOperator::InputRefRemove.complexity_effect(),
+        MutationOperator::InputRefPrune.complexity_effect(),
         ComplexityEffect::Decreasing
     );
     // Copy operators are increasing
@@ -236,7 +236,7 @@ fn operator_domain_mapping_is_consistent() {
                 assert_eq!(operator.domain(), MutationDomain::Graph)
             }
             MutationOperator::InputRefAdd
-            | MutationOperator::InputRefRemove
+            | MutationOperator::InputRefPrune
             | MutationOperator::InputRefSwap
             | MutationOperator::InputRefRawFieldMutation => {
                 assert_eq!(operator.domain(), MutationDomain::InputRef)
@@ -356,7 +356,7 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
     for &ir in &InputRefOperator::ALL {
         let mo = match ir {
             InputRefOperator::Add => MutationOperator::InputRefAdd,
-            InputRefOperator::Remove => MutationOperator::InputRefRemove,
+            InputRefOperator::Prune => MutationOperator::InputRefPrune,
             InputRefOperator::Swap => MutationOperator::InputRefSwap,
             InputRefOperator::RawFieldMutation => MutationOperator::InputRefRawFieldMutation,
         };

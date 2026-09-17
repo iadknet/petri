@@ -1,6 +1,5 @@
 use super::*;
-use crate::config::MutationConfig;
-use crate::config::OrdinaryFoodTypeId;
+use crate::config::{MutationConfig, OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::{NodeId, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{
@@ -11,9 +10,11 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::creature::parseability::ParseabilityGate;
-use crate::mutation::compound::sub_value_count;
+use crate::mutation::applicability_tests::{genome as generated_genome, module_size};
 use crate::mutation::sampling::{random_input_reference, random_input_reference_for_food_types};
+use crate::neighborhood::{Battery, Signature};
 use crate::runtime::OUTPUT_SLOT_COUNT;
+use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -58,15 +59,227 @@ fn add_input_ref_increases_count() {
     assert_eq!(after, before + 1);
 }
 
+fn battery_signature(genome: &CreatureGenome) -> Signature {
+    Battery::generate(1).signature(genome, &RuntimeConfig::default(), 0.0)
+}
+
+/// Every consumer on the node, in container order, resolved through the
+/// node's table: `None` for a dangling index. A prune must leave this
+/// sequence identical.
+fn resolved_consumers(node: &NodeGenome) -> Vec<Option<InputReference>> {
+    let resolve = |ref_idx: u16| node.input_refs.get(usize::from(ref_idx)).cloned();
+    match &node.backend_def {
+        BackendDef::Graph(def) => def
+            .edges()
+            .filter_map(|edge| match edge.source {
+                GraphSource::InputLeaf { ref_idx, .. } => Some(resolve(ref_idx)),
+                _ => None,
+            })
+            .collect(),
+        BackendDef::Vm(vm) => vm
+            .program
+            .iter()
+            .filter_map(|instruction| match instruction {
+                VmInstruction::ReadInput { ref_idx, .. } => Some(resolve(*ref_idx)),
+                _ => None,
+            })
+            .collect(),
+    }
+}
+
+fn consumer_count(node: &NodeGenome) -> usize {
+    resolved_consumers(node).len()
+}
+
+fn noop_count(node: &NodeGenome) -> usize {
+    match &node.backend_def {
+        BackendDef::Vm(vm) => vm
+            .program
+            .iter()
+            .filter(|instruction| matches!(instruction, VmInstruction::Noop))
+            .count(),
+        BackendDef::Graph(_) => 0,
+    }
+}
+
+// ─── Kind partition (T11.F22) ───────────────────────────────────────────────
+
 #[test]
-fn remove_input_ref_decreases_count() {
+fn swap_alternatives_follow_the_kind_table() {
+    let config = default_config();
+    let food_here =
+        |t: u16| InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::new(t)));
+    // Typed food is swappable only with more than one food type.
+    assert!(swap_alternatives(&food_here(0), &config, 1).is_empty());
+    assert_eq!(
+        swap_alternatives(&food_here(0), &config, 2),
+        vec![food_here(1)]
+    );
+    assert_eq!(
+        swap_alternatives(
+            &InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
+                1
+            ))),
+            &config,
+            3
+        ),
+        vec![
+            InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
+                0
+            ))),
+            InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
+                2
+            ))),
+        ]
+    );
+    // The four introspection scalars form one kind.
+    let energy = InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent);
+    let others = swap_alternatives(&energy, &config, 1);
+    assert_eq!(others.len(), 3);
+    assert!(!others.contains(&energy));
+    assert!(others
+        .iter()
+        .all(|r| input_ref_kind(r, &config) == input_ref_kind(&energy, &config)));
+    // Upstream slots form one kind.
+    let upstream = swap_alternatives(&InputReference::UpstreamSlot(2), &config, 1);
+    assert_eq!(upstream.len(), OUTPUT_SLOT_COUNT - 1);
+    assert!(!upstream.contains(&InputReference::UpstreamSlot(2)));
+    // Single-member kinds are never swappable.
+    for lone in [
+        InputReference::World(WorldInputKey::NeighborBarrierRing),
+        InputReference::World(WorldInputKey::AreaBarrierSummary),
+        InputReference::World(WorldInputKey::NeighborOccupiedRing),
+        InputReference::World(WorldInputKey::AreaOccupancySummary),
+        InputReference::World(WorldInputKey::NearbyCreatureCore),
+        InputReference::World(WorldInputKey::NearbyCreatureVitals),
+        InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+        InputReference::ActionQueue,
+    ] {
+        assert!(
+            swap_alternatives(&lone, &config, 4).is_empty(),
+            "{lone:?} must not be swappable"
+        );
+    }
+}
+
+/// Every reference in the sampling pool has the kind the spec table gives
+/// it: a swap can never cross a class or a width.
+#[test]
+fn kind_is_class_and_width() {
+    let config = default_config();
+    let ring = InputReference::World(WorldInputKey::neighbor_food_ring(
+        OrdinaryFoodTypeId::default(),
+    ));
+    let summary = InputReference::World(WorldInputKey::area_food_summary(
+        OrdinaryFoodTypeId::default(),
+    ));
+    assert_eq!(
+        input_ref_kind(&ring, &config),
+        InputRefKind {
+            class: MeshReadClass::Food,
+            width: 8
+        }
+    );
+    assert_eq!(
+        input_ref_kind(&summary, &config),
+        InputRefKind {
+            class: MeshReadClass::Food,
+            width: 7
+        }
+    );
+    assert_ne!(
+        input_ref_kind(&ring, &config),
+        input_ref_kind(&summary, &config)
+    );
+    assert_eq!(
+        input_ref_kind(&InputReference::ActionQueue, &config),
+        InputRefKind {
+            class: MeshReadClass::ActionQueue,
+            width: config.action_queue_cap as u16 * 3
+        }
+    );
+}
+
+// ─── Founder fixture (T11.F22 Verification) ─────────────────────────────────
+
+/// `Swap` applies on both founder nodes: node 0 carries two introspection
+/// scalars, node 1 six upstream slots.
+#[test]
+fn swap_applies_on_both_founder_nodes() {
+    let genome = v3alpha1_founder_genome();
+    assert_eq!(
+        InputRefMutator::applicable_indices(&genome, InputRefOperator::Swap, &default_config(), 1),
+        vec![0, 1]
+    );
+}
+
+/// `Prune` applies to founder node 0 only (`NeighborOccupiedRing` at ref 4
+/// has no consumer; node 1 reads all six slots), and the pruned genome's
+/// battery signature is identical.
+#[test]
+fn prune_applies_to_founder_node_zero_only_and_is_silent() {
+    let genome = v3alpha1_founder_genome();
+    let config = default_config();
+    assert_eq!(
+        InputRefMutator::applicable_indices(&genome, InputRefOperator::Prune, &config, 1),
+        vec![0]
+    );
+    assert_eq!(prunable_indices(&genome.nodes[0]), vec![4]);
+    assert_eq!(
+        genome.nodes[0].input_refs[4],
+        InputReference::World(WorldInputKey::NeighborOccupiedRing)
+    );
+    assert!(prunable_indices(&genome.nodes[1]).is_empty());
+
+    let base = battery_signature(&genome);
+    let mut pruned = genome.clone();
+    let mut r = rng(7);
+    InputRefMutator::apply(
+        &mut pruned,
+        InputRefOperator::Prune,
+        &mut TargetSelector::reachable_only(&[], 0.0),
+        &mut r,
+        &config,
+    )
+    .unwrap();
+    assert_eq!(pruned.nodes[0].input_refs.len(), 4);
+    assert_eq!(pruned.nodes[0].backend_def, genome.nodes[0].backend_def);
+    assert_eq!(pruned.nodes[1], genome.nodes[1]);
+    assert_eq!(battery_signature(&pruned), base);
+}
+
+/// The VM half of the fixture: an unread entry added to the founder's VM
+/// node is the only prunable one; pruning it leaves the program and the
+/// battery signature identical.
+#[test]
+fn prune_on_the_founder_vm_node_is_silent() {
+    let config = default_config();
+    let mut genome = v3alpha1_founder_genome();
+    genome.nodes[1].input_refs.push(InputReference::ActionQueue);
+    assert_eq!(prunable_indices(&genome.nodes[1]), vec![6]);
+    let base = battery_signature(&genome);
+
+    let mut pruned = genome.clone();
+    let mut r = rng(11);
+    InputRefMutator::apply_to_node(&mut pruned, InputRefOperator::Prune, 1, &mut r, &config, 1)
+        .unwrap();
+    assert_eq!(
+        pruned.nodes[1].input_refs,
+        v3alpha1_founder_genome().nodes[1].input_refs
+    );
+    assert_eq!(pruned.nodes[1].backend_def, genome.nodes[1].backend_def);
+    assert_eq!(battery_signature(&pruned), base);
+}
+
+#[test]
+fn prune_input_ref_decreases_count() {
     let mut genome = v3alpha1_founder_genome();
     let before: usize = genome.nodes.iter().map(|n| n.input_refs.len()).sum();
     assert!(before > 0, "founder must have input_refs");
     let mut r = rng(0);
     InputRefMutator::apply(
         &mut genome,
-        InputRefOperator::Remove,
+        InputRefOperator::Prune,
         &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &default_config(),
@@ -77,7 +290,7 @@ fn remove_input_ref_decreases_count() {
 }
 
 #[test]
-fn remove_input_ref_on_empty_returns_no_applicable_target() {
+fn prune_input_ref_on_empty_returns_no_applicable_target() {
     let mut genome = v3alpha1_founder_genome();
     for node in &mut genome.nodes {
         node.input_refs.clear();
@@ -85,7 +298,7 @@ fn remove_input_ref_on_empty_returns_no_applicable_target() {
     let mut r = rng(0);
     let result = InputRefMutator::apply(
         &mut genome,
-        InputRefOperator::Remove,
+        InputRefOperator::Prune,
         &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &default_config(),
@@ -128,128 +341,174 @@ fn swap_input_ref_changes_value() {
     assert!(changed, "swap must change at least one input ref");
 }
 
+/// A within-kind swap keeps the width, so every edge on every container
+/// survives: the T11.F22 replacement for the pre-feature clamp test, whose
+/// premise (a swap could shrink the width) no longer holds.
 #[test]
-fn swap_graph_input_ref_clamps_out_of_range_sub_indices() {
+fn swap_on_the_graph_backend_keeps_every_edge() {
     let config = default_config();
+    let leaf = |sub_idx: u16| GraphEdge {
+        source: GraphSource::InputLeaf {
+            ref_idx: 0,
+            sub_idx,
+        },
+        weight: 1.0,
+    };
     let def = CgpGraphBackendDef {
         birth_weights: None,
         compute_nodes: vec![ComputeNode {
             kind: ComputeNodeKind::Add,
-            inputs: vec![
-                GraphEdge {
-                    source: GraphSource::InputLeaf {
-                        ref_idx: 0,
-                        sub_idx: 3,
-                    },
-                    weight: 1.0,
-                },
-                GraphEdge {
-                    source: GraphSource::InputLeaf {
-                        ref_idx: 0,
-                        sub_idx: 0,
-                    },
-                    weight: 1.0,
-                },
-            ],
+            inputs: vec![leaf(3), leaf(0)],
             plasticity: None,
         }],
         output_sinks: vec![OutputSink {
             kind: OutputSinkKind::CustomOutput(0),
-            inputs: vec![GraphEdge {
-                source: GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx: 2,
-                },
-                weight: 1.0,
-            }],
+            inputs: vec![leaf(2)],
         }],
         action_bank: vec![ActionSlot {
             behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
-            gate_inputs: vec![GraphEdge {
-                source: GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx: 4,
-                },
-                weight: 1.0,
-            }],
-            param_inputs: vec![GraphEdge {
-                source: GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx: 0,
-                },
-                weight: 1.0,
-            }],
+            gate_inputs: vec![leaf(4)],
+            param_inputs: vec![leaf(0)],
             direction_bids: Vec::new(),
         }],
         execute_gate: ExecuteGate {
-            inputs: vec![GraphEdge {
-                source: GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx: 5,
-                },
-                weight: 1.0,
-            }],
+            inputs: vec![leaf(7)],
         },
     };
     let base_genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
-            input_refs: vec![InputReference::ActionQueue],
+            input_refs: vec![InputReference::World(WorldInputKey::neighbor_food_ring(
+                OrdinaryFoodTypeId::new(0),
+            ))],
             backend_def: BackendDef::Graph(def),
             targets: vec![],
         }],
     };
 
-    for seed in 0u64..5_000 {
+    for seed in 0u64..64 {
         let mut genome = base_genome.clone();
         let mut r = rng(seed);
-        InputRefMutator::apply(
+        InputRefMutator::apply_with_food_type_count(
             &mut genome,
             InputRefOperator::Swap,
             &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &config,
+            2,
         )
         .unwrap();
+        assert_eq!(
+            genome.nodes[0].input_refs,
+            vec![InputReference::World(WorldInputKey::neighbor_food_ring(
+                OrdinaryFoodTypeId::new(1)
+            ))],
+            "the only other member of (Food, 8) at two food types"
+        );
+        assert_eq!(
+            genome.nodes[0].backend_def,
+            base_genome.nodes[0].backend_def
+        );
+    }
+}
 
-        let new_ref = genome.nodes[0].input_refs[0].clone();
-        if sub_value_count(&new_ref, &config) != 1 {
-            continue;
+// ─── Invariants 1 and 2 over generated genomes (T11.F22) ────────────────────
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(48))]
+
+    /// Invariant 1: an applied `Swap` changes exactly one entry, to a
+    /// different member of the same kind; the table length, every other
+    /// entry, every edge and every instruction are unchanged.
+    #[test]
+    fn swap_changes_one_entry_within_its_kind(
+        seed in any::<u64>(),
+        sizes in prop::collection::vec(module_size(), 1..4),
+        food_type_count in 1usize..4,
+    ) {
+        let config = default_config();
+        let base = generated_genome(seed, &sizes, &config);
+        let applicable = InputRefMutator::applicable_indices(
+            &base, InputRefOperator::Swap, &config, food_type_count,
+        );
+        for node_idx in applicable {
+            for apply_seed in 0u64..4 {
+                let mut genome = base.clone();
+                let mut r = rng(seed ^ apply_seed);
+                InputRefMutator::apply_to_node(
+                    &mut genome, InputRefOperator::Swap, node_idx, &mut r, &config, food_type_count,
+                )
+                .expect("an accepted node applies");
+                for (idx, node) in genome.nodes.iter().enumerate() {
+                    if idx != node_idx {
+                        prop_assert_eq!(node, &base.nodes[idx], "an untargeted node changed");
+                    }
+                }
+                let before = &base.nodes[node_idx];
+                let after = &genome.nodes[node_idx];
+                prop_assert_eq!(&after.backend_def, &before.backend_def, "a swap touched an edge or instruction");
+                prop_assert_eq!(after.input_refs.len(), before.input_refs.len());
+                let changed: Vec<usize> = (0..before.input_refs.len())
+                    .filter(|&i| before.input_refs[i] != after.input_refs[i])
+                    .collect();
+                prop_assert_eq!(changed.len(), 1, "exactly one entry changes");
+                let i = changed[0];
+                prop_assert!(
+                    swap_alternatives(&before.input_refs[i], &config, food_type_count)
+                        .contains(&after.input_refs[i]),
+                    "{:?} -> {:?} is not a within-kind step",
+                    before.input_refs[i],
+                    after.input_refs[i]
+                );
+                prop_assert_eq!(
+                    input_ref_kind(&after.input_refs[i], &config),
+                    input_ref_kind(&before.input_refs[i], &config)
+                );
+            }
         }
-
-        let BackendDef::Graph(graph) = &genome.nodes[0].backend_def else {
-            panic!("expected graph backend");
-        };
-
-        // Compute input with sub_idx 3 should be removed, sub_idx 0 should remain.
-        assert_eq!(graph.compute_nodes[0].inputs.len(), 1);
-        assert!(matches!(
-            graph.compute_nodes[0].inputs[0].source,
-            GraphSource::InputLeaf {
-                ref_idx: 0,
-                sub_idx: 0
-            }
-        ));
-
-        // Wired surface edges with out-of-range sub_idx should be removed.
-        assert!(graph.output_sinks[0].inputs.is_empty());
-        assert!(graph.action_bank[0].gate_inputs.is_empty());
-        assert!(graph.execute_gate.inputs.is_empty());
-
-        // Valid sub_idx 0 action param edge should remain.
-        assert_eq!(graph.action_bank[0].param_inputs.len(), 1);
-        assert!(matches!(
-            graph.action_bank[0].param_inputs[0].source,
-            GraphSource::InputLeaf {
-                ref_idx: 0,
-                sub_idx: 0
-            }
-        ));
-        return;
     }
 
-    panic!("did not hit scalar swap target in tested seeds");
+    /// Invariant 2: an applied `Prune` deletes one entry no consumer
+    /// addresses and renumbers; every consumer resolves to the same reference
+    /// before and after, and no edge or instruction is removed or rewritten.
+    #[test]
+    fn prune_deletes_an_unreferenced_entry_and_keeps_every_consumer(
+        seed in any::<u64>(),
+        sizes in prop::collection::vec(module_size(), 1..4),
+    ) {
+        let config = default_config();
+        let base = generated_genome(seed, &sizes, &config);
+        let applicable = InputRefMutator::applicable_indices(&base, InputRefOperator::Prune, &config, 1);
+        for node_idx in applicable {
+            for apply_seed in 0u64..4 {
+                let mut genome = base.clone();
+                let mut r = rng(seed ^ apply_seed);
+                InputRefMutator::apply_to_node(
+                    &mut genome, InputRefOperator::Prune, node_idx, &mut r, &config, 1,
+                )
+                .expect("an accepted node applies");
+                for (idx, node) in genome.nodes.iter().enumerate() {
+                    if idx != node_idx {
+                        prop_assert_eq!(node, &base.nodes[idx], "an untargeted node changed");
+                    }
+                }
+                let before = &base.nodes[node_idx];
+                let after = &genome.nodes[node_idx];
+                prop_assert_eq!(after.input_refs.len() + 1, before.input_refs.len());
+                prop_assert_eq!(consumer_count(after), consumer_count(before), "a consumer was removed");
+                prop_assert_eq!(noop_count(after), noop_count(before), "a ReadInput became Noop");
+                prop_assert_eq!(resolved_consumers(after), resolved_consumers(before));
+                let removed = (0..before.input_refs.len())
+                    .find(|&i| after.input_refs.get(i) != Some(&before.input_refs[i]))
+                    .unwrap_or(after.input_refs.len());
+                prop_assert!(
+                    prunable_indices(before).contains(&removed),
+                    "entry {removed} had a consumer"
+                );
+            }
+        }
+    }
 }
 
 #[test]
@@ -343,7 +602,7 @@ fn raw_field_mutation_upstream_slot_bounded() {
 fn input_ref_after_mutation_passes_parseability_gate() {
     let operators = [
         InputRefOperator::Add,
-        InputRefOperator::Remove,
+        InputRefOperator::Prune,
         InputRefOperator::Swap,
         InputRefOperator::RawFieldMutation,
     ];

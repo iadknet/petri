@@ -10,6 +10,10 @@
 //! 5. the executed/reachable draw stays inside the applicable set and
 //!    `first_pick` records the node it selected.
 //!
+//! T11.F22 extends invariants 1, 2, 3 and 5 to the input-reference `Swap`
+//! (a node with a swappable entry) and `Prune` (a node with an entry no
+//! consumer addresses) operators, whose predicates are per entry.
+//!
 //! Genomes are generated from a proptest seed plus structural sizes: the
 //! seed drives the same `random_*` samplers the operators use, so the cases
 //! are drawn from the shapes mutation actually produces. No assertion below
@@ -40,7 +44,7 @@ use crate::mutation::vm::{VmMutator, VmOperator};
 /// How large a generated module is. Zero sizes are in range on purpose:
 /// blank modules are exactly the case the applicability filter exists for.
 #[derive(Debug, Clone, Copy)]
-struct ModuleSize {
+pub(in crate::mutation) struct ModuleSize {
     compute_nodes: usize,
     edges_per_node: usize,
     sinks: usize,
@@ -51,7 +55,7 @@ struct ModuleSize {
     constants: usize,
 }
 
-fn module_size() -> impl Strategy<Value = ModuleSize> {
+pub(in crate::mutation) fn module_size() -> impl Strategy<Value = ModuleSize> {
     (
         0usize..4,
         0usize..3,
@@ -171,7 +175,11 @@ fn vm_def(rng: &mut SmallRng, size: ModuleSize) -> VmBackendDef {
 }
 
 /// A genome of `sizes.len()` nodes, alternating Graph and VM backends.
-fn genome(seed: u64, sizes: &[ModuleSize], config: &MutationConfig) -> CreatureGenome {
+pub(in crate::mutation) fn genome(
+    seed: u64,
+    sizes: &[ModuleSize],
+    config: &MutationConfig,
+) -> CreatureGenome {
     let mut rng = SmallRng::seed_from_u64(seed);
     let nodes = sizes
         .iter()
@@ -225,6 +233,9 @@ fn selector<'a>() -> TargetSelector<'a> {
     TargetSelector::reachable_only(&[], 0.0)
 }
 
+/// The input-reference operators whose applicability is per entry (T11.F22).
+const INPUT_REF_OPS: [InputRefOperator; 2] = [InputRefOperator::Swap, InputRefOperator::Prune];
+
 // ─── Invariants 1, 2 and 5 ──────────────────────────────────────────────────
 
 proptest! {
@@ -246,6 +257,34 @@ proptest! {
                     let mut rng = SmallRng::seed_from_u64(seed ^ apply_seed);
                     let result =
                         GraphMutator::apply_to_node(&mut genome, op, node_idx, &mut rng, &config);
+                    prop_assert!(
+                        result.is_ok(),
+                        "{op:?} accepted node {node_idx} but skipped: {result:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Invariant 1 for `InputRef.Swap` and `InputRef.Prune` (T11.F22).
+    #[test]
+    fn accepted_input_ref_node_always_applies(
+        seed in any::<u64>(),
+        sizes in prop::collection::vec(module_size(), 1..4),
+        food_type_count in 1usize..4,
+    ) {
+        let config = MutationConfig::default();
+        let base = genome(seed, &sizes, &config);
+        for &op in &INPUT_REF_OPS {
+            for node_idx in
+                InputRefMutator::applicable_indices(&base, op, &config, food_type_count)
+            {
+                for apply_seed in 0u64..8 {
+                    let mut genome = base.clone();
+                    let mut rng = SmallRng::seed_from_u64(seed ^ apply_seed);
+                    let result = InputRefMutator::apply_to_node(
+                        &mut genome, op, node_idx, &mut rng, &config, food_type_count,
+                    );
                     prop_assert!(
                         result.is_ok(),
                         "{op:?} accepted node {node_idx} but skipped: {result:?}"
@@ -327,6 +366,25 @@ proptest! {
                 );
             }
         }
+        for &op in &INPUT_REF_OPS {
+            let applicable = InputRefMutator::applicable_indices(&base, op, &config, 1);
+            let mut genome = base.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let mut targets = selector();
+            let result = InputRefMutator::apply(&mut genome, op, &mut targets, &mut rng, &config);
+            if applicable.is_empty() {
+                prop_assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+                prop_assert_eq!(&genome, &base, "{:?} mutated on a skip", op);
+                prop_assert_eq!(targets.first_pick(), None, "{:?} drew before skipping", op);
+            } else {
+                prop_assert!(result.is_ok(), "{op:?} had targets {applicable:?} but skipped");
+                let pick = targets.first_pick();
+                prop_assert!(
+                    pick.is_some_and(|i| applicable.contains(&i)),
+                    "{op:?} picked {pick:?} outside {applicable:?}"
+                );
+            }
+        }
     }
 
     /// Invariant 5 under a firing bias layer: with the reachable bias at 1.0
@@ -372,6 +430,26 @@ proptest! {
             let mut targets = TargetSelector::reachable_only(&reachable, 1.0);
             prop_assert!(
                 VmMutator::apply(&mut genome, op, &mut targets, &mut rng, &config).is_ok()
+            );
+            let pick = targets.first_pick().expect("an applied event records its pick");
+            prop_assert!(applicable.contains(&pick), "{op:?} picked {pick} outside {applicable:?}");
+            if applicable.iter().any(|i| reachable.contains(i)) {
+                prop_assert!(
+                    reachable.contains(&pick),
+                    "{op:?} ignored the reachable bias: picked {pick}"
+                );
+            }
+        }
+        for &op in &INPUT_REF_OPS {
+            let applicable = InputRefMutator::applicable_indices(&base, op, &config, 1);
+            if applicable.is_empty() {
+                continue;
+            }
+            let mut genome = base.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let mut targets = TargetSelector::reachable_only(&reachable, 1.0);
+            prop_assert!(
+                InputRefMutator::apply(&mut genome, op, &mut targets, &mut rng, &config).is_ok()
             );
             let pick = targets.first_pick().expect("an applied event records its pick");
             prop_assert!(applicable.contains(&pick), "{op:?} picked {pick} outside {applicable:?}");
@@ -432,6 +510,22 @@ proptest! {
                 let mut targets = selector();
                 prop_assert!(
                     VmMutator::apply(&mut genome, op, &mut targets, &mut rng, &config).is_ok(),
+                    "{op:?} skipped on the padded genome"
+                );
+            }
+        }
+        for &op in &INPUT_REF_OPS {
+            let before = InputRefMutator::applicable_indices(&base, op, &config, 1);
+            let after = InputRefMutator::applicable_indices(&padded, op, &config, 1);
+            for idx in &before {
+                prop_assert!(after.contains(idx), "{op:?} lost node {idx} to padding");
+            }
+            if !before.is_empty() {
+                let mut genome = padded.clone();
+                let mut rng = SmallRng::seed_from_u64(seed);
+                let mut targets = selector();
+                prop_assert!(
+                    InputRefMutator::apply(&mut genome, op, &mut targets, &mut rng, &config).is_ok(),
                     "{op:?} skipped on the padded genome"
                 );
             }

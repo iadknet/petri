@@ -993,7 +993,11 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 /// found after T11.F21 added `WriteDirectionBid` to the fresh-instruction draw
 /// and the `ActionBid` edge surface (both remap every seeded draw, as the
 /// T11.F21 spec predeclares); only the `vm_detour` `write_direction` seed
-/// exceeds 10,000.
+/// exceeds 10,000. T11.F22 keeps `InputRef.Swap` within a kind, so the
+/// unprepared forms open with `InputRef.Add` of the ring beside the copied
+/// `FoodHere` and move each consumer onto it: `graph_unprepared` still
+/// qualifies in six, `vm_unprepared` needs a seventh event for the read's
+/// `ref_idx` nudge and is a recorded growth gap.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1046,7 +1050,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             (
                 "graph_unprepared",
                 vec![
-                    (InputRefSwap, 25),
+                    (InputRefAdd, 68),
                     (GraphRetargetGraphEdge, 32),
                     (GraphAddInternalGraphNode, 64),
                     (GraphAddGraphEdge, 6718),
@@ -1058,14 +1062,15 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             (
                 "vm_unprepared",
                 vec![
-                    (InputRefSwap, 25),
+                    (InputRefAdd, 68),
+                    (VmInstructionRawFieldMutation, 94),
                     (VmInstructionRawFieldMutation, 72),
                     (VmInstructionRawFieldMutation, 223),
                     (VmConstantMutation, 13),
                     (VmConstantMutation, 13),
                     swap,
                 ],
-                None,
+                Some(7),
             ),
             (
                 "graph_detour",
@@ -1105,7 +1110,6 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             "graph_split",
             "vm_copy",
             "graph_unprepared",
-            "vm_unprepared",
             "graph_detour",
             "vm_detour"
         ]

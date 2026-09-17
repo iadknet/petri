@@ -192,7 +192,7 @@ pub enum MutationOperator {
     GraphMutateTraceDecay,
     // InputRef
     InputRefAdd,
-    InputRefRemove,
+    InputRefPrune,
     InputRefSwap,
     InputRefRawFieldMutation,
 }
@@ -252,7 +252,7 @@ impl MutationOperator {
             Self::GraphMutateRewardSource => "Graph.MutateRewardSource",
             Self::GraphMutateTraceDecay => "Graph.MutateTraceDecay",
             Self::InputRefAdd => "InputRef.Add",
-            Self::InputRefRemove => "InputRef.Remove",
+            Self::InputRefPrune => "InputRef.Prune",
             Self::InputRefSwap => "InputRef.Swap",
             Self::InputRefRawFieldMutation => "InputRef.RawFieldMutation",
         }
@@ -312,7 +312,7 @@ impl MutationOperator {
             | Self::GraphMutateRewardSource
             | Self::GraphMutateTraceDecay => MutationDomain::Graph,
             Self::InputRefAdd
-            | Self::InputRefRemove
+            | Self::InputRefPrune
             | Self::InputRefSwap
             | Self::InputRefRawFieldMutation => MutationDomain::InputRef,
         }
@@ -382,7 +382,7 @@ impl MutationOperator {
             | Self::GraphMutateTraceDecay => ComplexityEffect::Neutral,
             // InputRef: add / remove / neutral
             Self::InputRefAdd => ComplexityEffect::Increasing,
-            Self::InputRefRemove => ComplexityEffect::Decreasing,
+            Self::InputRefPrune => ComplexityEffect::Decreasing,
             Self::InputRefSwap | Self::InputRefRawFieldMutation => ComplexityEffect::Neutral,
         }
     }
@@ -441,7 +441,7 @@ impl MutationOperator {
             Self::GraphMutateRewardSource,
             Self::GraphMutateTraceDecay,
             Self::InputRefAdd,
-            Self::InputRefRemove,
+            Self::InputRefPrune,
             Self::InputRefSwap,
             Self::InputRefRawFieldMutation,
         ]
