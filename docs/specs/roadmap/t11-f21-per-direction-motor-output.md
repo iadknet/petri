@@ -135,8 +135,15 @@ serde-defaulted to `Undefined` on old reports.
       reports read `Undefined`; byte-identical across thread counts.
 - [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
       exit 0 on the final feature commit (hash in the readings file).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor listed here as killed, equivalent, or deferred.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `233 mutants tested in
+      32m: 5 missed, 165 caught, 63 unviable`, no timeouts; output
+      `~/.local/share/petri-tools/mutants/t11-f21/mutants.out` (fresh files
+      now at `mutants.out.old`; tests only, no second fresh run). Survivors:
+      - killed: `contracts/actions.rs:50` `direction -> None`
+      - killed: `neighborhood/steering.rs:114` `&& -> ||` in `writes_bank`
+      - killed: `genome/cgp.rs:157` `is_movement -> true`
+      - killed: `graph/operators.rs:1125` `+ -> -` in `raw_field_mutation`
+      - killed: `cgp/effects.rs:96` `< -> <=` in `emit_action`
 - [x] `make bench PROFILE=gate FEATURE=t11-f21-per-direction-motor-output`
       and one `PROFILE=goal` run (the 2026-09-05 decision): summaries at
       `docs/progress/features/t11-f21-per-direction-motor-output.json` and

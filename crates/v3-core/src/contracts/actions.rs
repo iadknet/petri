@@ -107,6 +107,38 @@ mod tests {
     }
 
     #[test]
+    fn direction_is_the_committed_direction_of_movement_variants_only() {
+        assert_eq!(
+            WorldAction::Move(Direction::N).direction(),
+            Some(Direction::N)
+        );
+        assert_eq!(
+            WorldAction::Reproduce {
+                direction: Direction::SE,
+                energy_transfer: 1.0
+            }
+            .direction(),
+            Some(Direction::SE)
+        );
+        assert_eq!(
+            WorldAction::StealEnergy {
+                direction: Direction::W,
+                amount: 1.0
+            }
+            .direction(),
+            Some(Direction::W)
+        );
+        assert_eq!(WorldAction::NoOp.direction(), None);
+        assert_eq!(
+            WorldAction::Eat {
+                type_idx: OrdinaryFoodTypeId::default()
+            }
+            .direction(),
+            None
+        );
+    }
+
+    #[test]
     fn reproduce_fields_accessible() {
         let action = WorldAction::Reproduce {
             direction: Direction::SE,
