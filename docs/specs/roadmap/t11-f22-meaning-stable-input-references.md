@@ -21,7 +21,7 @@ report gains the per-operator value counters the closure reading needs.
 ## Non-Goals
 
 - Retiring `Swap` or `Remove` outright (the note's option B, the follow-on
-  arm if this feature's swap stays net detrimental).
+  arm if this swap stays net detrimental).
 - Any change to which sensors exist, `sub_idx` sampling, `Add`,
   `RawFieldMutation`, the edge operators, VM operand mutation, weights, or
   `TargetSelector`.
@@ -39,39 +39,31 @@ report gains the per-operator value counters the closure reading needs.
   [T11.F08](t11-f08-function-preserving-duplication-and-module-growth.md)
   (`copy_attached` clones `input_refs`);
   [T13.F03](t13-f03-mutation-target-applicability.md) (a predicate shared
-  with application enumerates the applicable set, the biased draw happens
-  inside it, no applicable node skips atomically);
-  [T11.F21](t11-f21-per-direction-motor-output.md)'s second Decision
-  (comparison references, applied below); `docs/reference/v3-mutation-spec.md`
+  with application enumerates the applicable set; no applicable node skips
+  atomically); [T11.F21](t11-f21-per-direction-motor-output.md)'s second
+  Decision (comparison references); `docs/reference/v3-mutation-spec.md`
   ("InputRef domain", §4.3, §5) and `v3-genome-spec.md` (shared indirection).
 - Research basis (note, five primary sources): NEAT only adds genes; CGP and
-  LGP rewire one consumer at a time; SignalGP's inexact binding beats exact
-  (87.5% and 100% thresholds significantly worse); no precedent rewrites a
-  many-consumer entry in one event. Options: A freeze (loses `Add`, breaks
-  copy neutrality); B retire both (removes 38.4% of behavior-changing events:
-  `Swap` 25.9%, `Remove` 12.5%, cheap proof on 100 survey genomes); C
-  per-consumer rewiring only (same as B); D within-kind swap plus neutral
-  prune (selected); E as is (live helpful shares 0.446 and 0.457 against a
+  LGP rewire one consumer at a time; SignalGP's inexact binding beats exact;
+  no precedent rewrites a many-consumer entry in one event. Options: A freeze
+  (loses `Add`, breaks copy neutrality); B retire both (removes 38.4% of
+  behavior-changing events: `Swap` 25.9%, `Remove` 12.5%); C per-consumer
+  rewiring only (same as B); D within-kind swap plus neutral prune
+  (selected); E as is (live helpful shares 0.446 and 0.457 against a
   0.50–0.53 baseline).
-- The seam (`crates/v3-core/src/mutation/input_ref/mod.rs`). Old `apply_swap`
-  overwrote a uniformly drawn entry with
-  `sampling::random_input_reference_for_food_types` and
-  `clamp_sub_idx_after_swap` dropped out-of-width graph edges; old
-  `apply_remove` deleted an entry and `reindex_input_refs_after_removal`
-  dropped matching graph edges, turned matching VM `ReadInput` into `Noop`,
-  and decremented higher indices. Consumers are `GraphSource::InputLeaf
-  { ref_idx, sub_idx }` on every container `CgpGraphBackendDef::retain_edges`
-  walks and `VmInstruction::ReadInput { ref_idx, .. }` anywhere in the
-  program, live or not. `birth::detour` creates a node with an empty table,
-  `AddInternalGraphNode` adds no entry, `copy_attached` clones the table: the
-  row's "new nodes draw their references at creation" is today's behavior, one
-  `Add` draw per entry, and creation and copy code do not change.
+- The seam (`crates/v3-core/src/mutation/input_ref/mod.rs`). Consumers are
+  `GraphSource::InputLeaf { ref_idx, sub_idx }` on every container
+  `CgpGraphBackendDef::retain_edges` walks and `VmInstruction::ReadInput
+  { ref_idx, .. }` anywhere in the program, live or not. `birth::detour`
+  creates a node with an empty table, `AddInternalGraphNode` adds no entry,
+  `copy_attached` clones the table: the row's "new nodes draw their references
+  at creation" is one `Add` draw per entry, and creation and copy do not
+  change.
 - Kind. One function, `InputReference` to `(MeshReadClass, u16 width)`, is the
-  partition: the class is `mesh_annotations::classify_input_ref`'s
-  (`Food`, `Barrier`, `Occupancy`, `Neighbor`, `Introspection`, `Upstream`,
-  `ActionQueue`) and the width is `compound::sub_value_count`. The operator,
-  its applicability predicate, and the probe in Task 1 all call it. Members
-  at `food_type_count = n` (1 in Canyon country and the gate profile, 2 in
+  partition: the class is `mesh_annotations::classify_input_ref`'s and the
+  width is `compound::sub_value_count`. The operator, its applicability
+  predicate, and the Task 1 probe all call it. Members at
+  `food_type_count = n` (1 in Canyon country and the gate profile, 2 in
   Orchards in grassland and Confluence):
 
 | Kind (class, width) | Members | Swappable |
@@ -89,11 +81,12 @@ report gains the per-operator value counters the closure reading needs.
 - Invariants, each a property test over generated genomes and seeds unless
   marked:
   1. Within-kind swap. An applied `Swap` changes exactly one entry, to a
-     different member of the same kind drawn uniformly from the others (so
-     typed-food and upstream entries overlap `RawFieldMutation`'s step; that
-     overlap is accepted); table length, every other entry, every edge, and
-     every instruction are unchanged, and `clamp_sub_idx_after_swap` removes
-     nothing (kept as a debug assertion).
+     different member of the same kind drawn uniformly from the others
+     (typed-food and upstream entries overlap `RawFieldMutation`'s step;
+     accepted); table length, every other entry, every edge, and every
+     instruction are unchanged. `apply_swap` asserts the width is preserved
+     (`debug_assert_eq!`); `CgpGraphBackendDef::clamp_sub_idx_after_swap`
+     has no production caller and stays only as a tested helper.
   2. Prune. An applied `Prune` deletes one entry that no consumer on either
      backend addresses, then renumbers; every consumer resolves to the same
      `InputReference` before and after, no edge or instruction is removed or
@@ -103,10 +96,9 @@ report gains the per-operator value counters the closure reading needs.
      `mutation/applicability_tests.rs`): `Swap` is applicable to a node with at
      least one swappable entry and draws only among them; `Prune` to a node
      with at least one unreferenced entry and draws only among them; every
-     accepted node applies without `NoApplicableTarget`; when no node is
-     accepted the operator returns `Err(NoApplicableTarget)` and the genome is
-     unchanged; padding with inapplicable nodes never removes an applicable
-     one from the eligible set.
+     accepted node applies; when no node is accepted the operator returns
+     `Err(NoApplicableTarget)` and the genome is unchanged; padding with
+     inapplicable nodes never removes an applicable one.
   4. Unchanged: `Add`, `RawFieldMutation`, `RetargetGraphEdge`, VM `ReadInput`
      nudges, weights (`Prune` keeps `Remove`'s 2 and `Decreasing`; `Swap` 4,
      `Neutral`), the founder, creation, and copy.
@@ -115,50 +107,40 @@ report gains the per-operator value counters the closure reading needs.
      `InputRef.Prune`; `Swap` keeps its name so value counters compare by key;
      stored reports keep `InputRef.Remove` rows as history.
   6. Observation. The bench tracking's per-operator `MutationOutcomeTotals`
-     gains `helpful_total`, `neutral_total`, and `detrimental_total` from
-     `stats::MutationValueTotals`, passed through to the goal summary, so the
-     helpful share helpful / (helpful + detrimental) per operator per world is
-     readable at closure. The fields are optional in the schema, so older
-     summaries read them as absent, never as zero.
+     carries `helpful_total`, `neutral_total`, and `detrimental_total` from
+     `stats::MutationValueTotals` through to the goal summary, so the helpful
+     share helpful / (helpful + detrimental) per operator per world is
+     readable at closure. The fields are optional; older summaries read them
+     as absent, never as zero.
 - T13.F05's recruitment-path family (`recruitment_paths/qualification.rs`).
-  `graph_unprepared` and `vm_unprepared` open with a cross-kind `Swap`
-  (`FoodHere` to `NeighborFoodRing`), impossible under invariant 1. Both are
-  re-planned on this feature's new-sensor route: `InputRef.Add` of
-  `NeighborFoodRing { 0 }` (table `[FoodHere, NeighborFoodRing]`, neutral like
-  the blank forms' `cue_added`), then the consumer moves: graph
-  `RetargetGraphEdge` of the sensing leaf edge to `InputLeaf { ref_idx: 1,
-  sub_idx: 2 }` in one draw (the direction node's cue leaf is `ref_idx` 1);
-  VM `VmInstructionRawFieldMutation` nudging `ReadInput.ref_idx` 0 to 1, then
-  the two existing `sub_idx` nudges. The stale `FoodHere` entry stays.
-  `MAX_PATH_EVENTS` stays 6 and the nine names stay. `graph_unprepared`
-  qualifies in 6 (add, retarget, three direction-node steps, activation);
-  `vm_unprepared` is 7 unless a 6-event route exists with existing
-  operators, else a recorded `GrowthGap { length: 7 }` with the
-  consumer move as its lengthening step, the outcome T13.F05's "Growth gap"
-  paragraph defines and the shape its two blank forms have. Pinned seeds are
-  re-pinned with this reason in the test.
+  `graph_unprepared` and `vm_unprepared` no longer open with a cross-kind
+  `Swap`; they take this feature's new-sensor route: `InputRef.Add` of
+  `NeighborFoodRing { 0 }` (table `[FoodHere, NeighborFoodRing]`, neutral),
+  then the consumer moves: graph `RetargetGraphEdge` of the sensing leaf edge
+  to `InputLeaf { ref_idx: 1, sub_idx: 2 }` in one draw; VM
+  `VmInstructionRawFieldMutation` nudging `ReadInput.ref_idx` 0 to 1, then the
+  two `sub_idx` nudges. The stale `FoodHere` entry stays. `MAX_PATH_EVENTS`
+  stays 6 and the nine names stay; `graph_unprepared` qualifies in 6 and
+  `vm_unprepared` is a recorded `GrowthGap { length: 7 }` (lengthening step:
+  the consumer move), the outcome T13.F05's "Growth gap" paragraph defines
+  and the shape its two blank forms have.
 - Measured, not preserved: RNG consumption per InputRef event, every evolved
   trajectory after the first `Swap` or `Prune` event, the operator mix, the
-  drift walk, and the T13.F06 in-report experiment fractions. Cross-process determinism and the gate two-run check still hold;
-  pinned expectations that encoded the old draw are re-pinned with the reason
-  in the test.
+  drift walk, and the T13.F06 in-report experiment fractions. Cross-process
+  determinism and the gate two-run check still hold; pinned expectations that
+  encoded the old draw are re-pinned with the reason in the test.
 - Reference documents: the mutation spec's "InputRef domain" bullets, §4.3's
   InputRef eligible-set sentence, the §5 pre-guard, and the genome spec's
   shared-indirection line state the kind and prune rules.
 
 ## Implementation Tasks
 
-- [x] Task 1, before the operator changes: extend the note's appendix probe
-      (temporary test, not committed; source and output in the readings file)
-      so each applied pre-change `Swap` trial records whether the old and new
-      entries share a kind; over the population below, `c` = cross-kind
-      changed trials / all changed trials, and the bound `B = 0.125 + 0.259 c`.
-      Population: the survey's 400 dumped genomes if the orchestrator supplies
-      their path; otherwise a depth-2,000 population from
-      `neighborhood/drift.rs`'s walk per goal world, reproduced in the probe
-      and stated as such. Record `c`, `B`, and the per-kind breakdown in the
-      readings file, and write `B` into the Performance table; that entry is
-      the only edit to the predeclaration and precedes any gate or goal run.
+- [x] Task 1, before the operator changes: the note's appendix probe
+      (temporary; source and output in the readings file) classified each
+      pre-change `Swap` trial as within- or cross-kind on the survey's 400
+      genomes; `c` = cross-kind changed / all changed, `B = 0.125 + 0.259 c`.
+      `B` in the Performance table is the only edit to the predeclaration and
+      preceded every run.
 - [x] Task 2: the kind function; within-kind `Swap` with its applicability
       predicate shared with application (invariants 1, 3).
 - [x] Task 3: `Prune` with its predicate, neutrality property, and battery
@@ -171,10 +153,9 @@ report gains the per-operator value counters the closure reading needs.
 ## Verification
 
 - [x] Property and fixture tests for invariants 1–3 (`mutation/input_ref/tests.rs`,
-      `mutation/applicability_tests.rs`) and a founder fixture: `Swap` applies
-      on both founder nodes; `Prune` applies to node 0 only (ref 4,
-      `NeighborOccupiedRing`, has no consumer) and is silent; test names in
-      the readings file.
+      `mutation/applicability_tests.rs`) and a founder fixture (`Swap` applies
+      on both nodes; `Prune` on node 0 only, ref 4, silent); test names in the
+      readings file.
 - [x] Bench tracking unit test: a report carries the three new fields and a
       pre-feature summary reads them as absent.
 - [x] Recruitment-path family (`neighborhood/recruitment_paths/tests.rs`):
