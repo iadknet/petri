@@ -632,6 +632,9 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
         carriers_observed_total: 5,
         survival_ticks_sum: 120,
         offspring_spawned_sum: 4,
+        helpful_total: 2,
+        neutral_total: 1,
+        detrimental_total: 2,
         // Excluded from the report: zero on every benchmark path.
         final_energy_sum: 9.5,
         ..MutationValueTotals::default()
@@ -641,6 +644,8 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
         MutationValueTotals {
             carriers_observed_total: 2,
             invalid_action_total: 1,
+            helpful_total: 1,
+            detrimental_total: 1,
             ..MutationValueTotals::default()
         },
     );
@@ -676,6 +681,9 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
             carriers_observed_total: 5,
             survival_ticks_sum: 120,
             offspring_spawned_sum: 4,
+            helpful_total: Some(2),
+            neutral_total: Some(1),
+            detrimental_total: Some(2),
             ..MutationOutcomeTotals::default()
         })
     );
@@ -686,6 +694,9 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
             MutationOutcomeTotals {
                 carriers_observed_total: 2,
                 invalid_action_total: 1,
+                helpful_total: Some(1),
+                neutral_total: Some(0),
+                detrimental_total: Some(1),
                 ..MutationOutcomeTotals::default()
             },
         )]))
@@ -702,6 +713,43 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
     );
     assert_eq!(tracking.mesh_dispatches_energy_exhausted_total, Some(14));
     assert_eq!(tracking.typed_eats_failed_total, Some(vec![6]));
+}
+
+/// T11.F22: a report block carries the three value counters, and a summary
+/// written before the feature reads them as absent, never as zero.
+#[test]
+fn mutation_outcome_value_counters_are_optional_in_the_schema() {
+    let with_counters = MutationOutcomeTotals {
+        carriers_observed_total: 3,
+        helpful_total: Some(2),
+        neutral_total: Some(0),
+        detrimental_total: Some(1),
+        ..MutationOutcomeTotals::default()
+    };
+    let json = serde_json::to_value(&with_counters).unwrap();
+    assert_eq!(json["helpful_total"], 2);
+    assert_eq!(json["neutral_total"], 0);
+    assert_eq!(json["detrimental_total"], 1);
+    assert_eq!(
+        serde_json::from_value::<MutationOutcomeTotals>(json).unwrap(),
+        with_counters
+    );
+
+    let pre_feature: MutationOutcomeTotals = serde_json::from_str(
+        r#"{"carriers_observed_total":3,"survival_ticks_sum":10,"offspring_spawned_sum":1,
+            "survived_short_horizon_total":2,"survived_long_horizon_total":1,
+            "reproduced_once_total":1,"action_attempted_total":9,"blocked_move_total":0,
+            "invalid_reproduce_total":0,"invalid_action_total":0}"#,
+    )
+    .unwrap();
+    assert_eq!(pre_feature.helpful_total, None);
+    assert_eq!(pre_feature.neutral_total, None);
+    assert_eq!(pre_feature.detrimental_total, None);
+    let rewritten = serde_json::to_value(&pre_feature).unwrap();
+    assert!(
+        rewritten.get("helpful_total").is_none(),
+        "absent stays absent"
+    );
 }
 
 /// A checkpoint sample carries exactly the keys it carried before T14.F02:

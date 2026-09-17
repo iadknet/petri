@@ -1,14 +1,15 @@
 //! Pins the sampled trajectory, including stochastic descendants and actions.
 //! Telemetry and wall-clock fields are deliberately excluded.
 //!
-//! T11.F21 re-pin: `WriteDirectionBid` joins the 42-opcode fresh-instruction
-//! draw and `ActionBid` the six-surface `pick_random_surface` draw, so every
-//! seeded VM insert and `AddGraphEdge` lands elsewhere and the sampled
-//! trajectory moves from the first such event onward, as the T11.F21 spec
-//! predeclares. The digest below was measured on the T11.F21 code after two
-//! runs agreed (previously re-pinned at T02.F04 and T03.F11); the pin's
-//! purpose — that the accounting keeps the trajectory reproducible — is
-//! unchanged.
+//! T11.F22 re-pin: `InputRef.Swap` draws its replacement from the entry's
+//! own kind (`swap_alternatives`) instead of the whole reference pool, and
+//! `InputRef.Prune` draws among the node's unreferenced entries instead of
+//! every entry, so RNG consumption per input-reference event changes and the
+//! sampled trajectory moves from the first such event onward, as the T11.F22
+//! spec predeclares ("Measured, not preserved"). The digest below was
+//! measured on the T11.F22 code after two runs agreed (previously re-pinned
+//! at T02.F04, T03.F11, and T11.F21); the pin's purpose — that the accounting
+//! keeps the trajectory reproducible — is unchanged.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -74,6 +75,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "0f21b62e4b9705f6f853199a589e9587796c43c4acb13b65d35978319de916aa"
+        "35d2928667a5086b224a35089a66ddc1c669108b729a8ae2ae519f3bc89d954e"
     );
 }

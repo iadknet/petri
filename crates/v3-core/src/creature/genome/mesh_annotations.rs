@@ -153,7 +153,7 @@ pub(crate) fn collect_live_vm_instruction_indices(vm: &VmBackendDef) -> Vec<usiz
     live.into_iter().collect()
 }
 
-fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
+pub(crate) fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
     match input_ref {
         InputReference::World(key) => classify_world_input(key),
         InputReference::StaticIntrospection(_) | InputReference::DynamicIntrospection(_) => {

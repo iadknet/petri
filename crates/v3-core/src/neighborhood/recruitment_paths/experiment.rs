@@ -768,23 +768,25 @@ mod tests {
         assert!(changed_use[0].routing_effect);
     }
 
-    /// T13.F03 re-pin: applicability-first selection changes the operator
-    /// mix and the RNG stream, so every lineage diverges from the T13.F02
-    /// baseline; the selected-inapplicable discard counts are now exactly
-    /// zero on both backends, which is the repair this experiment measures.
+    /// T11.F22 re-pin: the within-kind `InputRef.Swap` and the
+    /// consumer-preserving `InputRef.Prune` draw differently from the old
+    /// `Swap`/`Remove`, so every lineage diverges at its first
+    /// input-reference event; the selected-inapplicable discard counts stay
+    /// exactly zero on both backends (T13.F03's repair, kept by the
+    /// per-entry predicates).
     #[test]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [17, 13, 12, 2], [0, 0]),
+            ("graph_prepared", Policy::Drift, [19, 15, 13, 6], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [17, 17, 17, 16],
+                [20, 20, 20, 19],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [18, 14, 14, 1], [0, 0]),
-            ("vm_prepared", Policy::Selection, [18, 18, 18, 15], [0, 0]),
+            ("vm_prepared", Policy::Drift, [20, 16, 14, 3], [0, 0]),
+            ("vm_prepared", Policy::Selection, [20, 20, 20, 16], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
             let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -887,17 +889,17 @@ mod tests {
         }
     }
 
-    /// T13.F06 pin from the first run: under cost-visible selection the two
-    /// prepared forms keep every retained discovery useful (17/17 against
-    /// 16/17 and 15/18 under F02 selection); `vm_prepared` proposal
-    /// discovery is 17, not 18, because rejected neutral steps move the
-    /// lineage trajectories.
+    /// T13.F06 reading, re-pinned at T11.F22 (the within-kind swap and the
+    /// prune move every lineage at its first input-reference event): under
+    /// cost-visible selection the two prepared forms keep every retained
+    /// discovery useful (22/22 and 20/20 against 19/20 and 16/20 under F02
+    /// selection).
     #[test]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
-        for (name, expected) in [
-            ("graph_prepared", [17, 17, 17, 17]),
-            ("vm_prepared", [17, 17, 17, 17]),
+        for (name, expected, censored) in [
+            ("graph_prepared", [22, 22, 22, 22], 10),
+            ("vm_prepared", [20, 20, 20, 20], 12),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, Policy::CostSelection);
@@ -916,12 +918,15 @@ mod tests {
             assert_eq!(
                 aggregate.retention_outcomes,
                 RetentionOutcomes {
-                    useful: 17,
+                    useful: expected[3],
                     ..RetentionOutcomes::default()
                 },
                 "{name}"
             );
-            assert_eq!(aggregate.time_to_first_retained.censored, 15, "{name}");
+            assert_eq!(
+                aggregate.time_to_first_retained.censored, censored,
+                "{name}"
+            );
             super::super::tests::assert_summary_readings_are_consistent(&Arm {
                 start: start.name.clone(),
                 task: start.task,

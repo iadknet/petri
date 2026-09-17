@@ -39,7 +39,11 @@ pub struct NodeGenome {
 ```
 
 Semantics:
-- `input_refs` is shared indirection for VM and Graph backends.
+- `input_refs` is shared indirection for VM and Graph backends. An entry
+  keeps its kind (mesh read class and compound width) for the node's life and
+  its copies': mutation replaces it only with another member of the same
+  kind, and deletes it only while no edge or `ReadInput` addresses it
+  (T11.F22).
 - `targets` are candidate route destinations chosen at runtime.
 - `targets` may include dangling ids (junk DNA); runtime handles safely.
 

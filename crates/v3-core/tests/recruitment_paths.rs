@@ -80,5 +80,6 @@ fn recruitment_paths_qualified_paths_replay_through_the_production_operators() {
             assert_eq!(path.steps.last().unwrap().stage.task.correct(path.task), 8);
         }
     }
-    assert_eq!(qualified, 7);
+    // T11.F22: vm_unprepared is a recorded growth gap (seven events).
+    assert_eq!(qualified, 6);
 }

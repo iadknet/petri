@@ -227,15 +227,6 @@ impl BackendDef {
             }
         }
     }
-
-    /// After an input_ref swap, remove edges whose InputLeaf sub_idx is
-    /// out of range for the new input width.
-    pub fn clamp_sub_idx_after_swap(&mut self, ref_idx: u16, new_width: u16) {
-        match self {
-            BackendDef::Graph(gd) => gd.clamp_sub_idx_after_swap(ref_idx, new_width),
-            BackendDef::Vm(_) => {}
-        }
-    }
 }
 
 /// A single node in the creature genome.

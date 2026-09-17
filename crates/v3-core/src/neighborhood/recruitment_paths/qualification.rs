@@ -4,7 +4,7 @@
 use super::fixtures::{cue, stage_for};
 use super::*;
 use crate::config::MutationConfig;
-use crate::contracts::NodeId;
+use crate::contracts::{InputReference, NodeId};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::cgp::{
     ActionSlotBehavior, CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource,
@@ -446,15 +446,19 @@ fn graph_copy_plan(cue_sources: Vec<GraphSource>) -> Vec<StepSpec> {
     ]
 }
 
+/// The Task A-correct copy: the ring added to the table, the read's
+/// reference then its sub-index moved one raw-field nudge at a time, the
+/// direction constant moved twice, activation: seven events, a recorded
+/// growth gap (no six-event route exists with the existing operators).
 fn vm_unprepared_plan() -> Vec<StepSpec> {
-    let read = |sub_idx: u16| VmInstruction::ReadInput {
+    let read = |ref_idx: u16, sub_idx: u16| VmInstruction::ReadInput {
         dst: 0,
-        ref_idx: 0,
+        ref_idx,
         sub_idx,
     };
-    let sub_idx_moved = move |before: &CreatureGenome, after: &CreatureGenome, to: u16| {
+    let read_moved = move |before: &CreatureGenome, after: &CreatureGenome, to: VmInstruction| {
         only_scaffold_backend_changed(before, after)
-            && vm(after).program[0] == read(to)
+            && vm(after).program[0] == to
             && vm(after).program[1..] == vm(before).program[1..]
             && vm(after).constants == vm(before).constants
     };
@@ -464,18 +468,24 @@ fn vm_unprepared_plan() -> Vec<StepSpec> {
             && vm(after).constants[0] == vm(before).constants[0]
     };
     vec![
-        cue_swapped(),
+        ring_added(),
+        step(
+            "read_ref_idx_1",
+            "VmInstructionRawFieldMutation: ReadInput ref_idx 0 to 1 (the ring)",
+            ProductionEvent::Vm(VmOperator::VmInstructionRawFieldMutation),
+            move |before, after| read_moved(before, after, read(1, 0)),
+        ),
         step(
             "read_sub_idx_1",
             "VmInstructionRawFieldMutation: ReadInput sub_idx 0 to 1",
             ProductionEvent::Vm(VmOperator::VmInstructionRawFieldMutation),
-            move |before, after| sub_idx_moved(before, after, 1),
+            move |before, after| read_moved(before, after, read(1, 1)),
         ),
         step(
             "read_sub_idx_2",
             "VmInstructionRawFieldMutation: ReadInput sub_idx 1 to 2 (east)",
             ProductionEvent::Vm(VmOperator::VmInstructionRawFieldMutation),
-            move |before, after| sub_idx_moved(before, after, 2),
+            move |before, after| read_moved(before, after, read(1, 2)),
         ),
         step(
             "direction_half",
@@ -553,25 +563,18 @@ fn direction_node_steps(
     vec![bootstrap, second_edge, param_step]
 }
 
-fn cue_swapped() -> StepSpec {
-    step(
-        "cue_swapped",
-        "InputRef.Swap on the copy: FoodHere to NeighborFoodRing (type 0)",
-        ProductionEvent::InputRef(InputRefOperator::Swap),
-        |before, after| {
-            let delta = GenomeDelta::between(before, after);
-            delta.nodes.len() == 1
-                && delta.nodes[0].node == SCAFFOLD
-                && node(after, SCAFFOLD).input_refs == [cue(Task::B)]
-                && node(after, SCAFFOLD).backend_def == node(before, SCAFFOLD).backend_def
-        },
-    )
-}
+/// The ring cue's leaf on the unprepared copy: the table entry `Add`
+/// appended after the copied `FoodHere`, at the east sub-index.
+const RING_EAST: GraphSource = GraphSource::InputLeaf {
+    ref_idx: 1,
+    sub_idx: 2,
+};
 
-/// The Task A-correct copy: cue to the ring, its sensing edge to the east
-/// sub-index, a direction node in place of the zeroed constant, activation.
+/// The Task A-correct copy: the ring added to the table, the sensing edge to
+/// its east sub-index, a direction node in place of the zeroed constant,
+/// activation. The copied `FoodHere` entry stays, unread.
 fn graph_unprepared_plan() -> Vec<StepSpec> {
-    let sources = vec![GraphSource::ComputeNode(0), cue_leaf(Task::B)];
+    let sources = vec![GraphSource::ComputeNode(0), RING_EAST];
     let retarget_param = step(
         "direction_read",
         "Graph.RetargetGraphEdge: the Move parameter edge reads the direction node instead of the zeroed constant",
@@ -590,16 +593,16 @@ fn graph_unprepared_plan() -> Vec<StepSpec> {
         },
     );
     let mut plan = vec![
-        cue_swapped(),
+        ring_added(),
         step(
             "cue_edge_retargeted",
-            "Graph.RetargetGraphEdge: the sensing node's leaf edge to ring sub-index 2 (east)",
+            "Graph.RetargetGraphEdge: the sensing node's leaf edge to the ring entry, sub-index 2 (east)",
             ProductionEvent::Graph(GraphOperator::RetargetGraphEdge),
             |before, after| {
                 let (b, a) = (graph(before), graph(after));
                 only_scaffold_backend_changed(before, after)
                     && a.compute_nodes[0].inputs.len() == 1
-                    && a.compute_nodes[0].inputs[0].source == cue_leaf(Task::B)
+                    && a.compute_nodes[0].inputs[0].source == RING_EAST
                     && a.compute_nodes[0].inputs[0].weight == b.compute_nodes[0].inputs[0].weight
                     && a.compute_nodes[1..] == b.compute_nodes[1..]
                     && a.action_bank == b.action_bank
@@ -715,18 +718,44 @@ const WRITE_DIRECTION: VmInstruction = VmInstruction::WriteWorldActionMeta {
 };
 const PUSH_MOVE: VmInstruction = VmInstruction::PushAction { action_type: 2 };
 
-fn cue_added() -> StepSpec {
+/// `InputRef.Add` on the scaffold, accepted when the table becomes exactly
+/// `expected` and nothing else on the node changes: the entry is wired into
+/// nothing yet, so the step is neutral.
+fn input_ref_added(
+    name: &'static str,
+    edits: &'static str,
+    expected: Vec<InputReference>,
+) -> StepSpec {
     step(
-        "cue_added",
-        "InputRef.Add on the scaffold: FoodHere (type 0)",
+        name,
+        edits,
         ProductionEvent::InputRef(InputRefOperator::Add),
-        |before, after| {
+        move |before, after| {
             let delta = GenomeDelta::between(before, after);
             delta.nodes.len() == 1
                 && delta.nodes[0].node == SCAFFOLD
-                && node(after, SCAFFOLD).input_refs == [cue(Task::A)]
+                && node(after, SCAFFOLD).input_refs == expected
                 && node(after, SCAFFOLD).backend_def == node(before, SCAFFOLD).backend_def
         },
+    )
+}
+
+fn cue_added() -> StepSpec {
+    input_ref_added(
+        "cue_added",
+        "InputRef.Add on the scaffold: FoodHere (type 0)",
+        vec![cue(Task::A)],
+    )
+}
+
+/// T11.F22: `Swap` stays within a kind, so the copied `FoodHere` entry
+/// cannot become the ring in one event; the ring is added beside it and each
+/// consumer moves to it on its own.
+fn ring_added() -> StepSpec {
+    input_ref_added(
+        "ring_added",
+        "InputRef.Add on the copy: NeighborFoodRing (type 0) beside the copied FoodHere",
+        vec![cue(Task::A), cue(Task::B)],
     )
 }
 
@@ -847,6 +876,16 @@ fn detour_start(backend: ModuleBackend, base: &CreatureGenome) -> ConstructionSt
     )
 }
 
+/// The unprepared VM copy's read moves one raw field per event: the table
+/// entry, then the sub-index twice. Seven events with the existing
+/// operators (`nudge_u16` moves one, a constant mutation moves at most one).
+fn vm_unprepared_growth_gap() -> GrowthGap {
+    GrowthGap {
+        length: 7,
+        lengthening_step: "read_ref_idx_1: the ring added beside the copied FoodHere, the read's ref_idx nudged onto it, its sub_idx nudged twice to east, the direction constant moved twice, then the route swap".into(),
+    }
+}
+
 /// Undispatched blank tissue needs every event a dispatched detour needs
 /// plus the route swap that dispatches it.
 fn blank_growth_gap(backend: ModuleBackend) -> GrowthGap {
@@ -888,6 +927,11 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 // Re-pinned by T11.F21: one more VM opcode in the fresh-instruction draw and
 // one more graph edge surface (`ActionBid`) remap every seeded draw of the
 // VM insertion-class operators and `AddGraphEdge`, as the spec predeclares.
+//
+// Re-pinned by T11.F22: `InputRef.Swap` stays within a kind, so the
+// unprepared forms open with `InputRef.Add` of the ring (a different draw
+// from the retired cross-kind swap) and the VM read gains a `ref_idx` nudge;
+// every later seed on both forms is unchanged.
 
 const SWAP: u64 = 0;
 const GRAPH_BLANK_SEEDS: &[u64] = &[1, 25, 1020, 1650, 2300, 596, SWAP];
@@ -895,8 +939,9 @@ const GRAPH_DETOUR_SEEDS: &[u64] = &[1, 25, 1020, 1650, 2300, 596];
 const GRAPH_COPY_SEEDS: &[u64] = &[1202, SWAP];
 const GRAPH_SPLIT_SEEDS: &[u64] = &[3518, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
-const GRAPH_UNPREPARED_SEEDS: &[u64] = &[25, 32, 64, 6718, 4, SWAP];
-const VM_UNPREPARED_SEEDS: &[u64] = &[25, 72, 223, 13, 13, SWAP];
+const GRAPH_UNPREPARED_SEEDS: &[u64] = &[68, 32, 64, 6718, 4, SWAP];
+/// Ring, ref_idx, sub_idx, sub_idx, half, east, swap.
+const VM_UNPREPARED_SEEDS: &[u64] = &[68, 94, 72, 223, 13, 13, SWAP];
 /// Reading order: cue, read, jump, double, write, push, swap.
 const VM_BLANK_SEEDS: &[u64] = &[1, 1869, 5608, 800, 9361, 4126, SWAP];
 /// Neutral-first order: cue, read, double, write, jump, push.
@@ -938,7 +983,11 @@ fn form_plans() -> Vec<FormPlan> {
                 )
             }
             "graph_unprepared" => (graph_unprepared_plan(), GRAPH_UNPREPARED_SEEDS, None),
-            "vm_unprepared" => (vm_unprepared_plan(), VM_UNPREPARED_SEEDS, None),
+            "vm_unprepared" => (
+                vm_unprepared_plan(),
+                VM_UNPREPARED_SEEDS,
+                Some(vm_unprepared_growth_gap()),
+            ),
             // F02's prepared controls already dispatch: no path to qualify.
             "graph_prepared" | "vm_prepared" => continue,
             _ => unreachable!("unplanned form {name}"),

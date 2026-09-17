@@ -435,11 +435,23 @@ only their edges are evolvable.
   becomes addressable only by a later connection operator (`AddGraphEdge` or
   `RetargetGraphEdge` on the graph backend; the VM operators that construct
   `ReadInput` on the VM backend).
-- `Remove` (removes from `input_refs`; walks all edge containers to remove
-  edges where `ref_idx == removed` and decrements `ref_idx` for edges where
-  `ref_idx > removed`)
-- `Swap` (replaces an input_ref variant; updates edges where `sub_idx` exceeds
-  new width across all edge containers)
+- `Prune` (T11.F22) — deletes one entry that no consumer addresses: no
+  `GraphSource::InputLeaf { ref_idx }` on any edge container and no VM
+  `ReadInput { ref_idx }` anywhere in the program, live or not. Higher
+  `ref_idx` values are decremented on both backends, so every consumer
+  resolves to the same reference afterwards and none is removed or rewritten;
+  the event is neutral at birth. A node with no unreferenced entry is not a
+  target.
+- `Swap` (T11.F22) — replaces one entry with another member of its kind,
+  drawn uniformly from the others. The kind is the entry's mesh read class
+  (`Food`, `Barrier`, `Occupancy`, `Neighbor`, `Introspection`, `Upstream`,
+  `ActionQueue`) and compound width, so a food ring may become another type's
+  food ring, an energy scalar an age scalar, an upstream slot another slot,
+  never a scalar for a ring or a barrier ring for a food ring. Rings,
+  summaries, neighbor blocks and the action queue are the only members of
+  their kind and are never swapped; typed food is swappable only with more
+  than one food type. The width never changes, so no edge falls out of range.
+  An entry keeps its kind for the node's life and its copies'.
 - `RawFieldMutation` (raw representable-field mutation for tolerant
   `UpstreamSlot(usize)` values)
 
@@ -571,8 +583,10 @@ reachability layer at the domain's `ReachableBiasConfig` threshold.
 For VM and Graph operators the eligible set is the operator's applicable set
 — the backend's nodes filtered by the operator's applicability predicate
 (T13.F03) — so both biases apply within the modules that carry a suitable
-site. For Topology, and for InputRef `Add`/`Remove`/`Swap`, the eligible set
-is unchanged.
+site. For Topology and for InputRef `Add` the eligible set is unchanged;
+InputRef `Swap` and `Prune` filter per entry (a node with a swappable entry, a
+node with an unreferenced entry) before the draw, so neither can select a
+node and then find no site.
 
 Executed layer (`TargetSelector::select`), applied in all four domains:
 1. An empty eligible set selects nothing.
@@ -657,7 +671,10 @@ node, evaluated before selection: it names the sites the operator will draw
 from, and application draws only from those sites (T13.F03). The predicate is
 the single source of truth for an operator's sites on a node — a new or
 extended operator adds its sites to the predicate rather than failing after
-the draw.
+the draw. InputRef `Swap` and `Prune` carry the same kind of predicate over
+the node's `input_refs` entries: a swappable entry (another member of its
+kind exists) and an unreferenced entry (no edge or `ReadInput` addresses it)
+respectively (T11.F22).
 
 If no node is applicable, the event is skipped with `NoApplicableTarget` and
 records no target.

@@ -702,7 +702,7 @@ pub(crate) fn graph_operator_key(op: GraphOperator) -> MutationOperator {
 pub(crate) fn input_ref_operator_key(op: InputRefOperator) -> MutationOperator {
     match op {
         InputRefOperator::Add => MutationOperator::InputRefAdd,
-        InputRefOperator::Remove => MutationOperator::InputRefRemove,
+        InputRefOperator::Prune => MutationOperator::InputRefPrune,
         InputRefOperator::Swap => MutationOperator::InputRefSwap,
         InputRefOperator::RawFieldMutation => MutationOperator::InputRefRawFieldMutation,
     }

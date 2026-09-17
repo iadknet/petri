@@ -21,7 +21,11 @@ use v3_core::kernel::occupancy_grid::{occupancy_grid, OCCUPANCY_CELLS_PER_AXIS};
 /// applied birth mutation did while they lived. The score sums are the
 /// composite the observation contract leaves out, the six classification
 /// counters are bucketings of `viability_score` and go with it, and
-/// `final_energy_sum` is zero on every benchmark path.
+/// `final_energy_sum` is zero on every benchmark path. The three value
+/// counters (T11.F22) classify each carrier's outcome so a per-operator
+/// helpful share, helpful / (helpful + detrimental), is readable from the
+/// summary; they are optional so a summary written before them reads as
+/// absent, never as zero.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MutationOutcomeTotals {
@@ -35,6 +39,12 @@ pub struct MutationOutcomeTotals {
     pub blocked_move_total: u64,
     pub invalid_reproduce_total: u64,
     pub invalid_action_total: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub helpful_total: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub neutral_total: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detrimental_total: Option<u64>,
 }
 
 impl From<&v3_core::simulation::stats::MutationValueTotals> for MutationOutcomeTotals {
@@ -50,6 +60,9 @@ impl From<&v3_core::simulation::stats::MutationValueTotals> for MutationOutcomeT
             blocked_move_total: totals.blocked_move_total,
             invalid_reproduce_total: totals.invalid_reproduce_total,
             invalid_action_total: totals.invalid_action_total,
+            helpful_total: Some(totals.helpful_total),
+            neutral_total: Some(totals.neutral_total),
+            detrimental_total: Some(totals.detrimental_total),
         }
     }
 }
