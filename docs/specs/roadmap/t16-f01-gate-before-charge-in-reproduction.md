@@ -21,22 +21,16 @@ same `f32` value as before this feature.
 - The gate condition, the charge formula (T03.F11 replication multiplier,
   age and complexity multipliers), `min_reproduce_energy`, the transfer
   clamp, and the founder's own node-0 reproduce threshold are unchanged.
-- The `failed_action_penalty` that `execute_reproduce` (`tick.rs`) debits
-  after every non-`Spawned` result is untouched; retiring it is T16.F02. This
-  feature's "costs nothing" claim is about the reproduce charge inside
-  `apply_reproduce`, and the tests are written at that boundary.
+- The `failed_action_penalty` debited in `execute_reproduce` (`tick.rs`) is
+  untouched (T16.F02); "costs nothing" means the `apply_reproduce` charge.
 - No new sensor, operator, assay, report field, config field, or panel
   surface. `reproduction_actions_rejected_by_reason` keeps counting energy
   rejections; the `DeathCause::ActionReproduce` and `ParentalTransfer` sinks
   stay even though a rejected attempt can no longer reach them.
 - Closed feature specs (T03.F11) are not edited; the reference documents are.
-- The survey's paired-perturbation probe (track criterion 4) is a recorded
-  deferral, not a non-goal: see the `Deferred:` bullet in Notes for AI Agents.
-  The T11.F14 readings the goal summary already carries are recorded with no
-  predeclared direction.
-- The T12.F04 three-environment pressure-integration rule does not apply:
-  this feature adds no environmental pressure, so the goal-world recipes are
-  untouched.
+- The paired-perturbation probe (track criterion 4) is a recorded deferral
+  (Notes); the T11.F14 readings are recorded with no predeclared direction.
+- The T12.F04 pressure-integration rule does not apply: no pressure is added.
 
 ## Inputs and Invariants
 
@@ -58,11 +52,9 @@ The age gate at Step 4 was already before the charge, pinned by
 `apply_reproduce_age_rejection_does_not_charge_reproduce_cost`
 (`actions/mod.rs`), the precedent the energy tests mirror.
 
-Options considered: (a) gate on `energy - cost` before deducting, then deduct
-in the old order (the review's recommendation; Avida's divide checks validity
-first) — chosen; (b) charge then refund — a spurious `observe_energy`
-crossing; (c) a precheck in `execute_reproduce` — the reproduction spec puts
-authoritative acceptance inside `apply_reproduce`.
+Options: (a) gate on `energy - cost`, then deduct in the old order — chosen;
+(b) charge then refund — a spurious `observe_energy` crossing; (c) a precheck
+in `execute_reproduce` — acceptance is authoritative inside `apply_reproduce`.
 
 Invariants:
 
@@ -100,19 +92,15 @@ Invariants:
       `action_charges.reproduce` change, then the reorder in
       `apply_reproduce`. The reorder is inline; no predicate is extracted,
       so no property test.
-- [x] Update `docs/reference/v3-reproduction-spec.md` Sections 5 and 6
-      (gate evaluated on `energy - cost` and transfer feasibility before any
-      charge; "If the energy gate fails" clause beside the age clause) and the
-      "Charged before the `min_reproduce_energy` and transfer gates" bullet
-      plus the "Reproduction transfer sequencing" list in
-      `docs/reference/v3-runtime-config-spec.md`. Step 5 is the charge
-      computation and Step 8 the payment, so the cited step numbers and the
-      `too_many_lines` reason string in `reproduction.rs` stay accurate.
-- [x] Re-pin any evolved-trajectory test value that moves, with the reason in
-      the test and the old and new values in the readings file; a founder-only
-      pin that moves is a defect, not a re-pin. Moved: the evolved
-      `applied_trajectory` digest and two tests that pinned the old order;
-      no founder-only pin (readings file, "Pins that moved").
+- [x] `docs/reference/v3-reproduction-spec.md` Sections 5–6 and the
+      replication-cost bullet and transfer-sequencing list in
+      `docs/reference/v3-runtime-config-spec.md` state the gate-then-charge
+      order; Step 5 computes the charge and Step 8 pays it, so step numbers
+      and the `too_many_lines` reason string stay accurate.
+- [x] Re-pin moved evolved-trajectory values (reason in the test, old and
+      new values in the readings file); a founder-only pin that moves is a
+      defect. Moved: the evolved `applied_trajectory` digest and two tests
+      that pinned the old order; no founder-only pin.
 
 ## Verification
 
@@ -214,10 +202,10 @@ counter level `ok` against both references, no wall flag, no epoch re-pin.
 The gate is not identical to T11.F22's (largest delta `plasticity_updates`
 −4.572214%; per-seed `final_population`/`births` 1,896/2,968, 1,853/3,043,
 1,874/3,031): the identity predeclaration is a miss, ruled by the spec owner
-on 2026-09-17 as the pre-ruled case. Creatures in the gate profile do fail
-the energy gate — the founder in invariant 6's window and its mutated
-descendants both reach it; the summary does not split them — and the
-charge-first engine taxed those attempts. The accepted path is bitwise the
+on 2026-09-17 as the pre-ruled case. By elimination (no rejection counter is
+reported; config digests and the accepted path are unchanged), creatures in
+the gate profile do fail the energy gate — the founder in invariant 6's
+window and its mutated descendants — and the charge-first engine taxed them. The accepted path is bitwise the
 old order (Step 8 assigns `after_cost`, then `after_cost - transfer`), so
 nothing else moved the trajectory. Not a blocker; the track note is corrected.
 Goal: CLI exit 0, `severe=false`, every level `ok` against both references
@@ -230,8 +218,7 @@ the collapse persists with a slightly lower floor — 1,350 at tick 200 (was
 1,399), minimum 7, plateau 7.988, final 7 (T11.F22: 10 / 10.32 / 10); the
 user's hypothesis that the pre-gate charge drives the collapse is not
 supported at this depth, and no further disposition follows. Canyon country
-and Confluence finals 4,323 and 4,341 (T11.F22: 4,870 and 6,744), no
-predeclared direction; full tables in the readings file.
+and Confluence finals 4,323 and 4,341 (T11.F22: 4,870 and 6,744).
 
 - Summaries: `docs/progress/features/t16-f01-gate-before-charge-in-reproduction.json`
   and `...-goal.json`.
@@ -257,6 +244,10 @@ predeclared direction; full tables in the readings file.
 - Decision: the failed-action penalty on a rejected reproduce stays in place
   until T16.F02; this feature's zero-cost claim is scoped to the
   `apply_reproduce` charge.
+- Deferred: review P3s (0 P1, 0 P2, 4 P3): goal summary `dirty: true` from
+  the uncommitted gate artifacts, not a measurement problem; test helper
+  `reproduce_charge` duplicates the engine's cost formula on purpose (T16.F02
+  inherits two copies).
 - Deferred: track criterion 4's paired-perturbation probe is not taken on this
   feature because it changes no input, sensor, or decision, only the ledger
   after a decision, so there is nothing to perturb; the probe genomes live in
