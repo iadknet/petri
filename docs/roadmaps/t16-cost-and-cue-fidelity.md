@@ -58,8 +58,13 @@ cannot yet avoid or a record they cannot see.
   the T11.F14 battery and the survey's paired-perturbation probe (the survey
   note's Appendix B), not a new instrument.
 - T16.F02 changes production trajectories and closes under the epoch re-pin
-  rule; T16.F01 and T16.F03 are expected to leave the founder gate unchanged
-  (the founder never fails its energy gate in the gate profile, and no founder
-  node reads the identity bank), which the closure report verifies rather than
+  rule. T16.F01 moved the gate profile: creatures there do fail the energy
+  gate (the founder's node-0 threshold is `EnergyCurrent >= 30` while the
+  engine gate is `energy - cost >= 30`, and mutated descendants' thresholds
+  reach it too), so the charge-first engine taxed those attempts and the
+  T16.F01 gate run differs from T11.F22's (largest delta `plasticity_updates`
+  −4.57%, every level ok; recorded as a predeclaration miss in its spec).
+  T16.F03 is expected to leave the founder gate unchanged (no founder node
+  reads the identity bank), which its closure report verifies rather than
   assumes.
 - Priority: not in the order of new starts until the user places it.
