@@ -649,6 +649,36 @@ mod tests {
     }
 
     #[test]
+    fn apply_reproduce_accepts_post_charge_energy_exactly_at_min_reproduce_energy() {
+        // The energy gate is `after_cost < min_reproduce_energy`: landing
+        // exactly on the floor is accepted, as it was before T16.F01. The
+        // floor is pinned to the engine's own f32 `energy - cost` so the
+        // boundary is exact, not approximate.
+        let pos = Position::new(5, 5);
+        let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
+        let energy_before = sim.creatures[parent_id].energy;
+        let cost = reproduce_charge(&sim, parent_id);
+        let after_cost = energy_before - cost;
+        sim.config.energy.lifecycle.min_reproduce_energy = after_cost;
+        let transfer = 20.0_f32;
+        assert!(
+            transfer <= after_cost,
+            "fixture must leave only the min-energy gate in play"
+        );
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(38);
+
+        let result = apply_reproduce(parent_id, &mut sim, Direction::N, transfer, &mut rng);
+
+        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(sim.creatures.len(), 2, "one child should be spawned");
+        assert_eq!(
+            sim.creatures[parent_id].energy.to_bits(),
+            (after_cost - transfer).to_bits()
+        );
+    }
+
+    #[test]
     fn apply_reproduce_birth_pays_cost_then_transfer_as_two_subtractions() {
         // T16.F01 invariant 3: the accepted path pays `cost` then `transfer`
         // as two successive f32 subtractions, so the parent's post-birth

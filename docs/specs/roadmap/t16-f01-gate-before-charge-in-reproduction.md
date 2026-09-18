@@ -112,9 +112,13 @@ Invariants:
       passed, 0 failed (2026-09-17).
 - [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
       exit 0 on the final feature commit (hash in the readings file).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred; the
-      survivor list stays here.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` (2026-09-17): "17 mutants
+      tested in 3m: 1 missed, 15 caught, 1 unviable"; output
+      `~/.local/share/petri-tools/mutants/t16-f01/mutants.out` (fresh).
+      Survivors: `reproduction.rs:182:19: replace < with <= in
+      apply_reproduce` -> killed by
+      `apply_reproduce_accepts_post_charge_energy_exactly_at_min_reproduce_energy`
+      (`actions/mod.rs`; `MUTANTS_ITERATE=1` pass: 1 caught). No timeouts.
 - [x] `make bench PROFILE=gate` and one `PROFILE=goal` run (2026-09-17):
       CLI exits 0, `severe=false`, no wall flag. Readings file "Benchmark".
 - [x] Gate identity check: nonzero `percent_delta` on all six counters vs.
