@@ -140,9 +140,13 @@ Topology connection semantics (T11.F15, T11.F18):
   unreachable node without a bypass, delete its incoming entries. Eligibility
   uses fresh traversal, while selection/classification retain the parent cache.
 - `RewriteNodeId` is retired from the live catalog. `ChangeEntryNode` remains
-  an explicit whole-brain macro with weight 1. Other weights remain unchanged;
-  topology total weight is 22 across 13 operators. Eligibility skips are
-  reported as skips, never counted as applied silent mutations.
+  an explicit whole-brain macro with weight 1. Since 2026-09-18 every other
+  topology weight is scaled by ten (refinement 40, moderate 20, structural
+  10), so the macro is drawn in 1 of 211 topology events rather than 1 of 22:
+  on a chain-shaped founder an entry moved past the action nodes queues
+  nothing, the one topology edit that still reads dead after T11.F15.
+  Eligibility skips are reported as skips, never counted as applied silent
+  mutations.
 - The former `topology_new_node_birth` configuration is removed: inline
   detours have fixed Halt births. Both backend kinds remain available through
   alternate growth. No other supply or pressure setting changes.

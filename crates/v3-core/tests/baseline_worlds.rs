@@ -91,13 +91,12 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
     assert_eq!(points.len(), 6);
 }
 
-/// T11.F22 re-pin: `InputRef.Swap` draws its replacement from the entry's
-/// own kind and `InputRef.Prune` draws among the node's unreferenced entries,
-/// so RNG consumption per input-reference event changes and the hashed
-/// genomes diverge from the first such birth onward, as the T11.F22 spec
-/// predeclares. The hash below was measured on the T11.F22 code after two
-/// runs agreed; the identity the test pins is unchanged (previously re-pinned
-/// at T02.F04, T11.F19, and T11.F21).
+/// 2026-09-18 re-pin: the topology operator weight table was scaled ten-fold
+/// around `ChangeEntryNode` (weight 1 of 211 instead of 1 of 22), so every
+/// topology draw shifts and the hashed genomes diverge from the first
+/// topology event onward. The hash below was measured after two runs agreed;
+/// the identity the test pins is unchanged (previously re-pinned at T02.F04,
+/// T11.F19, T11.F21, and T11.F22).
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -125,7 +124,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 3381210231612339474);
+    assert_eq!(hash.finish(), 9202429689225232841);
 }
 
 use proptest::prelude::*;

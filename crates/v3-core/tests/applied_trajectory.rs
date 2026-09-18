@@ -1,13 +1,13 @@
 //! Pins the sampled trajectory, including stochastic descendants and actions.
 //! Telemetry and wall-clock fields are deliberately excluded.
 //!
-//! T16.F01 re-pin: a reproduce attempt rejected on the energy or transfer
-//! gate no longer pays the reproduce charge, so the parent's energy and
-//! every downstream decision diverge from the first such rejection onward,
-//! as the T16.F01 spec predeclares (invariant 5). The digest below was
-//! measured on the T16.F01 code after two runs agreed (previously re-pinned
-//! at T02.F04, T03.F11, T11.F21, and T11.F22); the pin's purpose — that the
-//! accounting keeps the trajectory reproducible — is unchanged.
+//! 2026-09-18 re-pin: the topology operator weight table was scaled ten-fold
+//! around `ChangeEntryNode` (weight 1 of 211 instead of 1 of 22), so every
+//! topology draw shifts and the trajectories diverge at their first topology
+//! event. The digest below was measured after two runs agreed (previously
+//! re-pinned at T02.F04, T03.F11, T11.F21, T11.F22, and T16.F01); the pin's
+//! purpose — that the accounting keeps the trajectory reproducible — is
+//! unchanged.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -73,6 +73,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "01143817f27e4b493af53cc81d680388ce260baa6bd4f42fd3445b968e8b1f57"
+        "1d649e9fd054d9f26a260249510883f1b4a3e1578a5a0002020b27f2df22c0a9"
     );
 }

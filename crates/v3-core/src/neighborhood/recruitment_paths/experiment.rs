@@ -773,20 +773,23 @@ mod tests {
     /// `Swap`/`Remove`, so every lineage diverges at its first
     /// input-reference event; the selected-inapplicable discard counts stay
     /// exactly zero on both backends (T13.F03's repair, kept by the
-    /// per-entry predicates).
+    /// per-entry predicates). Re-pinned 2026-09-18 when the topology weight
+    /// table was scaled ten-fold around `ChangeEntryNode` (weight 1 of 211):
+    /// every topology draw shifts, so every lineage diverges at its first
+    /// topology event; the discard counts stay zero.
     #[test]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [19, 15, 13, 6], [0, 0]),
+            ("graph_prepared", Policy::Drift, [21, 13, 11, 7], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [20, 20, 20, 19],
+                [22, 22, 22, 22],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [20, 16, 14, 3], [0, 0]),
-            ("vm_prepared", Policy::Selection, [20, 20, 20, 16], [0, 0]),
+            ("vm_prepared", Policy::Drift, [21, 14, 12, 7], [0, 0]),
+            ("vm_prepared", Policy::Selection, [21, 21, 21, 20], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
             let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -892,14 +895,15 @@ mod tests {
     /// T13.F06 reading, re-pinned at T11.F22 (the within-kind swap and the
     /// prune move every lineage at its first input-reference event): under
     /// cost-visible selection the two prepared forms keep every retained
-    /// discovery useful (22/22 and 20/20 against 19/20 and 16/20 under F02
-    /// selection).
+    /// discovery useful (22/22 and 19/19 against 22/22 and 21/20 under F02
+    /// selection; values re-pinned 2026-09-18 with the topology weight
+    /// rescale around `ChangeEntryNode`).
     #[test]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
             ("graph_prepared", [22, 22, 22, 22], 10),
-            ("vm_prepared", [20, 20, 20, 20], 12),
+            ("vm_prepared", [19, 19, 19, 19], 13),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, Policy::CostSelection);

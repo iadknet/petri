@@ -762,16 +762,20 @@ mod tests {
         // T13.F03 re-pin: applicability-first selection changes which
         // operator applies at each node-internal event, so this walk's
         // lineages differ from the pre-repair ones; the dating properties
-        // the test exists for are asserted on the new walk.
-        assert_eq!(reading.cohort.created, 8);
-        assert_eq!(reading.cohort.dispatched(), 2);
-        // Three cohort modules reached dispatch, the median four generations
+        // the test exists for are asserted on the new walk. Re-pinned again
+        // 2026-09-18 when the topology weight table was scaled ten-fold
+        // around `ChangeEntryNode` (weight 1 of 211): every topology draw
+        // shifts, so the walk's lineages diverge at their first topology
+        // event.
+        assert_eq!(reading.cohort.created, 9);
+        assert_eq!(reading.cohort.dispatched(), 3);
+        // Four cohort modules reached dispatch, the median four generations
         // after the birth that created them: later births, or a dispatch date
         // taken only at the closing checkpoint, would both read higher.
         assert_eq!(
             reading.time_to_first(CohortFact::Dispatch),
             &TimeToFirst {
-                reached: 3,
+                reached: 4,
                 median_generations: Some(4),
                 censored_deleted: 0,
                 censored_present: 5,
@@ -779,13 +783,13 @@ mod tests {
         );
         // T11.F22 re-pin: the within-kind `Swap` and consumer-preserving
         // `Prune` draw differently from the old `Swap`/`Remove`, so the walk's
-        // lineages diverge at their first input-reference event; one cohort
-        // module now reaches an internal change, five generations after its
-        // birth.
+        // lineages diverge at their first input-reference event; two cohort
+        // modules now reach an internal change, a median five generations
+        // after birth.
         assert_eq!(
             reading.time_to_first(CohortFact::InternalChange),
             &TimeToFirst {
-                reached: 1,
+                reached: 2,
                 median_generations: Some(5),
                 censored_deleted: 1,
                 censored_present: 6,
