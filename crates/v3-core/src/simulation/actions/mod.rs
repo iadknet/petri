@@ -560,6 +560,139 @@ mod tests {
         );
     }
 
+    /// The reproduce charge in `apply_reproduce`, as the same product
+    /// expression the engine evaluates (T16.F01 invariant 3).
+    fn reproduce_charge(sim: &Simulation, parent_id: CreatureId) -> f32 {
+        let parent = &sim.creatures[parent_id];
+        sim.config.energy.adjusted_action_cost(
+            sim.config.energy.costs.reproduce_cost,
+            parent.cached_complexity,
+            parent.age,
+        ) * reproduction::genome_replication_cost_multiplier(
+            sim.config.energy.lifecycle.genome_replication_cost_per_unit,
+            parent.cached_genome_size,
+        )
+    }
+
+    /// T16.F01 invariant 2: a `RejectedEnergyConstraints` outcome leaves the
+    /// parent and the reproduce/transfer flows untouched while the rejection
+    /// counters still move. Energy is compared bit-exactly on purpose: the
+    /// claim is "unchanged", not "close".
+    fn assert_energy_rejection_is_free(energy: f32, transfer_request: f32, seed: u64) {
+        let pos = Position::new(5, 5);
+        let (mut sim, parent_id) = make_sim_one_creature(pos, energy);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
+        let energy_before = sim.creatures[parent_id].energy;
+        let death_cause_before = sim.creatures[parent_id].pending_death_cause;
+        let charges_before = sim.stats.energy_flows.action_charges.reproduce;
+        let transfer_before = sim.stats.energy_flows.parental_transfer_debit;
+        let rejected_before = sim.stats.reproduction_actions_rejected_total;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+
+        let result = apply_reproduce(
+            parent_id,
+            &mut sim,
+            Direction::N,
+            transfer_request,
+            &mut rng,
+        );
+
+        assert_eq!(result, ReproductionActionResult::RejectedEnergyConstraints);
+        assert_eq!(sim.creatures.len(), 1, "no child should be spawned");
+        assert_eq!(
+            sim.creatures[parent_id].energy.to_bits(),
+            energy_before.to_bits(),
+            "energy-gate rejection must not charge the parent"
+        );
+        assert_eq!(
+            sim.creatures[parent_id].pending_death_cause,
+            death_cause_before
+        );
+        assert!(
+            (sim.stats.energy_flows.action_charges.reproduce - charges_before).abs() < f64::EPSILON,
+            "rejection must not land in action_charges.reproduce"
+        );
+        assert!(
+            (sim.stats.energy_flows.parental_transfer_debit - transfer_before).abs() < f64::EPSILON,
+            "rejection must not land in parental_transfer_debit"
+        );
+        assert_eq!(
+            sim.stats.reproduction_actions_rejected_total,
+            rejected_before + 1
+        );
+        assert_eq!(
+            sim.stats
+                .reproduction_actions_rejected_by_reason
+                .get(&ReproductionActionResult::RejectedEnergyConstraints),
+            Some(&1)
+        );
+    }
+
+    #[test]
+    fn apply_reproduce_min_energy_rejection_does_not_charge_reproduce_cost() {
+        // energy - cost lands below min_reproduce_energy (30.0).
+        assert_energy_rejection_is_free(30.0, 20.0, 34);
+    }
+
+    #[test]
+    fn apply_reproduce_infeasible_transfer_rejection_does_not_charge_reproduce_cost() {
+        // energy - cost clears min_reproduce_energy but cannot cover a
+        // transfer of default_offspring_energy (100.0).
+        assert_energy_rejection_is_free(50.0, 100.0, 35);
+    }
+
+    #[test]
+    fn apply_reproduce_non_positive_transfer_rejection_does_not_charge_reproduce_cost() {
+        assert_energy_rejection_is_free(80.0, 0.0, 36);
+    }
+
+    #[test]
+    fn apply_reproduce_birth_pays_cost_then_transfer_as_two_subtractions() {
+        // T16.F01 invariant 3: the accepted path pays `cost` then `transfer`
+        // as two successive f32 subtractions, so the parent's post-birth
+        // energy is bit-identical to the pre-feature engine's. Bit-exact
+        // comparison is the point of this test.
+        let pos = Position::new(5, 5);
+        let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
+        let energy_before = sim.creatures[parent_id].energy;
+        let cost = reproduce_charge(&sim, parent_id);
+        let transfer = 20.0_f32;
+        let after_cost = energy_before - cost;
+        let expected_energy = after_cost - transfer;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(37);
+
+        let result = apply_reproduce(parent_id, &mut sim, Direction::N, transfer, &mut rng);
+
+        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(
+            sim.creatures[parent_id].energy.to_bits(),
+            expected_energy.to_bits(),
+            "parent must pay cost then transfer as two f32 subtractions"
+        );
+        assert!(
+            (sim.stats.energy_flows.action_charges.reproduce
+                - applied_debit(energy_before, after_cost))
+            .abs()
+                < f64::EPSILON,
+            "action_charges.reproduce must carry exactly the reproduce charge"
+        );
+        assert!(
+            (sim.stats.energy_flows.parental_transfer_debit
+                - applied_debit(after_cost, expected_energy))
+            .abs()
+                < f64::EPSILON,
+            "parental_transfer_debit must carry exactly the transfer"
+        );
+        let child = sim
+            .creatures
+            .iter()
+            .find(|(id, _)| *id != parent_id)
+            .map(|(_, c)| c.energy)
+            .expect("one child should be spawned");
+        assert_eq!(child.to_bits(), transfer.to_bits());
+    }
+
     #[test]
     fn apply_reproduce_succeeds_when_parent_meets_min_reproduce_age() {
         let pos = Position::new(5, 5);
@@ -1621,11 +1754,6 @@ mod tests {
         ] {
             let (mut sim, id) = make_sim_one_creature(Position::new(5, 5), energy);
             sim.creatures[id].age = 20;
-            let cost = sim.config.energy.adjusted_action_cost(
-                sim.config.energy.costs.reproduce_cost,
-                sim.creatures[id].cached_complexity,
-                20,
-            );
             assert_eq!(
                 apply_reproduce(
                     id,
@@ -1636,11 +1764,10 @@ mod tests {
                 ),
                 ReproductionActionResult::RejectedEnergyConstraints
             );
-            assert!((sim.creatures[id].energy - (energy - cost)).abs() < 1e-6);
-            assert_eq!(
-                sim.stats.energy_flows.action_charges.reproduce,
-                f64::from(energy) - f64::from(energy - cost)
-            );
+            // T16.F01: the energy gates reject before the charge, so a
+            // rejected attempt is free (bit-exact "unchanged" comparison).
+            assert_eq!(sim.creatures[id].energy.to_bits(), energy.to_bits());
+            assert_eq!(sim.stats.energy_flows.action_charges.reproduce, 0.0);
             assert_eq!(sim.stats.energy_flows.parental_transfer_debit, 0.0);
             assert_eq!(sim.stats.energy_flows.offspring_energy_credit, 0.0);
             assert_eq!(sim.creatures.len(), 1);
