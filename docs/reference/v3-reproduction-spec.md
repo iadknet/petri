@@ -177,11 +177,15 @@ Constraints:
 Reproduction action semantics:
 - After target validity succeeds, parent must satisfy minimum reproduction age
   before any reproduce action cost is charged.
-- After age succeeds, parent pays reproduction action cost according to
-  energy config.
-- Requested child transfer is clamped by configured offspring transfer cap.
-- If parent cannot satisfy required transfer constraints, reproduction fails and
-  no child is spawned.
+- After age succeeds, the reproduce action cost is computed according to energy
+  config, and the minimum reproduction energy gate is evaluated on the parent's
+  energy minus that cost. Nothing is charged yet.
+- Requested child transfer is clamped by configured offspring transfer cap and
+  must be coverable from the parent's energy minus the cost.
+- If parent cannot satisfy the energy gate or the transfer constraints,
+  reproduction fails, no child is spawned, and the parent pays nothing.
+- Only after both gates pass does the parent pay the reproduce action cost and
+  then the transfer.
 - Energy/lifecycle config values are continuous scalar units (`f32`) as defined
   in `v3-runtime-config-spec.md`.
 
@@ -204,18 +208,20 @@ runtime config contract: `v3-runtime-config-spec.md`.
      -> reached : [reject RejectedPopulationCap; return]
   4. enforce minimum parent age
      -> below threshold : [reject RejectedAgeConstraints; return]
-  5. pay energy.costs.reproduce_cost from parent, scaled by the complexity and
+  5. compute cost = energy.costs.reproduce_cost scaled by the complexity and
      age multipliers and by the genome replication cost factor
      (1 + energy.lifecycle.genome_replication_cost_per_unit
-        * max(genome_size() - 111, 0)); the extra energy is burned, not
-     transferred
-  6. enforce energy.lifecycle.min_reproduce_energy gate on parent
+        * max(genome_size() - 111, 0)), and after_cost = parent energy - cost;
+     nothing is deducted yet
+  6. enforce energy.lifecycle.min_reproduce_energy gate on after_cost
      -> below threshold : [reject RejectedEnergyConstraints; return]
   7. compute transfer = min(clamp_non_negative_finite(requested_energy),
                            energy.lifecycle.default_offspring_energy)
-     -> reject if transfer <= 0.0 or parent cannot cover transfer
+     -> reject if transfer <= 0.0 or after_cost cannot cover transfer
      -> [reject RejectedEnergyConstraints; return]
-  8. deduct transfer from parent; build OffspringDraft with initial_energy = transfer
+  8. pay cost from parent, then deduct transfer from parent, as two successive
+     subtractions; the extra cost energy is burned, not transferred; build
+     OffspringDraft with initial_energy = transfer
   9. call MutationEngine unconditionally on child genome -> MutationSummary
      (MutationEngine internally draws the requested event count;
       see v3-mutation-spec.md Section 4.1)
@@ -257,6 +263,13 @@ If target validation fails:
 If minimum-age validation fails:
 - Reproduce is rejected as `RejectedAgeConstraints`.
 - No reproduce action cost is charged for that attempt.
+
+If the energy gate fails (step 6 on `energy - cost`, or step 7 on transfer
+feasibility):
+- Reproduce is rejected as `RejectedEnergyConstraints`.
+- No reproduce action cost and no transfer is charged for that attempt; the
+  parent's energy is unchanged and `energy_flows.action_charges.reproduce`
+  does not move.
 
 ### Ownership boundary
 

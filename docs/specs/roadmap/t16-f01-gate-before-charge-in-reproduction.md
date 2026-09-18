@@ -112,12 +112,15 @@ Invariants:
       compared against itself would be tautological), so no property
       test. A pure gate predicate, if extracted, gets a
       property test for invariants 1 and 3.
-- [ ] Update `docs/reference/v3-reproduction-spec.md` Sections 5 and 6
+- [x] Update `docs/reference/v3-reproduction-spec.md` Sections 5 and 6
       (gate evaluated on `energy - cost` and transfer feasibility before any
       charge; "If the energy gate fails" clause beside the age clause) and the
       "Charged before the `min_reproduce_energy` and transfer gates" bullet
-      in `docs/reference/v3-runtime-config-spec.md`; the `too_many_lines`
-      reason string in `reproduction.rs` still names the spec's gate order.
+      plus the "Reproduction transfer sequencing" list in
+      `docs/reference/v3-runtime-config-spec.md`. Step 5 stays the charge
+      computation and step 8 the payment, so the step numbers the config
+      spec cites and the `too_many_lines` reason string in `reproduction.rs`
+      remain accurate.
 - [x] Re-pin any evolved-trajectory test value that moves, with the reason in
       the test and the old and new values in the readings file; a founder-only
       pin that moves is a defect, not a re-pin. The `applied_trajectory`
@@ -131,11 +134,11 @@ Invariants:
       (names in the readings file): both rejection branches free, the
       accepted path bitwise equal to the pre-feature values, the reason
       counter still incremented; `cargo test -p v3-core` -> exit 0.
-      Build pass (uncommitted worktree, 2026-09-17): `cargo test -p v3-core
-      --test viability` first -> 26 passed; `cargo test -p v3-core` -> 1560
-      lib + 89 integration passed, 0 failed, 3 ignored; `cargo check
-      --workspace --all-targets` clean; `cargo clippy -p v3-core
-      --all-targets -- -D warnings` clean; `cargo fmt -p v3-core -- --check`
+      Self-review pass (uncommitted worktree, 2026-09-17): `cargo test -p
+      v3-core --test viability` first -> 26 passed; `cargo test -p v3-core`
+      -> 1560 lib + 89 integration passed, 0 failed, 3 ignored; `cargo check
+      --workspace --all-targets` clean; `cargo clippy --workspace
+      --all-targets -- -D warnings` clean; `cargo fmt --all -- --check`
       clean.
 - [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
       exit 0 on the final feature commit (hash in the readings file).
@@ -154,7 +157,9 @@ Invariants:
       per-seed pairs go in the readings file (predeclaration below).
 - [ ] Orchards trajectory reading (before/after table, predeclaration below)
       recorded in the readings file.
-- [ ] `make roadmap-check` and `make check-docs` on the document edits.
+- [x] `make roadmap-check` on the document edits -> "validation passed",
+      exit 0 (2026-09-17, after the Task 2 reference-document edits).
+- [ ] `make check-docs` on the document edits.
 
 Readings file: `docs/progress/readings/t16-f01.md`.
 
