@@ -28,10 +28,8 @@ same `f32` value as before this feature.
 - No new sensor, operator, assay, report field, config field, or panel
   surface. `reproduction_actions_rejected_by_reason` keeps counting energy
   rejections; the `DeathCause::ActionReproduce` and `ParentalTransfer` sinks
-  stay as accounting sinks even though a valid config can no longer reach
-  them through a rejected attempt.
-- Closed feature specs (T03.F11) are history and are not edited; the living
-  reference documents are.
+  stay even though a rejected attempt can no longer reach them.
+- Closed feature specs (T03.F11) are not edited; the reference documents are.
 - The survey's paired-perturbation probe (track criterion 4) is a recorded
   deferral, not a non-goal: see the `Deferred:` bullet in Notes for AI Agents.
   The T11.F14 readings the goal summary already carries are recorded with no
@@ -52,26 +50,19 @@ cost half the median creature's energy); `apply_reproduce` Steps 1–8;
 `docs/reference/v3-runtime-config-spec.md` "Genome replication cost", both of
 which currently document the charge-before-gate order.
 
-Current order (Steps 5–8): charge `cost = adjusted_action_cost(reproduce_cost,
+Pre-feature order (Steps 5–8): charge `cost = adjusted_action_cost(reproduce_cost,
 cached_complexity, age) × genome_replication_cost_multiplier(rate,
-cached_genome_size)` and record it through `observe_energy` into
-`action_charges.reproduce`; reject if `energy < min_reproduce_energy`;
-compute `transfer = min(clamp_non_negative_finite(request),
-default_offspring_energy)` and reject if `transfer <= 0.0 || energy <
-transfer`; deduct `transfer` into `parental_transfer_debit`. Both rejections
-return after the charge landed. The age gate at Step 4 is already ordered
-before the charge and pinned by
+cached_genome_size)`, then reject on `energy < min_reproduce_energy` or an
+infeasible `transfer`, so both rejections returned after the charge landed.
+The age gate at Step 4 was already before the charge, pinned by
 `apply_reproduce_age_rejection_does_not_charge_reproduce_cost`
-(`actions/mod.rs`); that test is the local precedent to mirror.
+(`actions/mod.rs`), the precedent the energy tests mirror.
 
-Options considered (research proportional to a bug-sized change): (a)
-evaluate both gates on `energy - cost` before deducting, then deduct cost and
-transfer in today's order — the review's recommendation and Avida's divide
-(validity first, a failed divide spends nothing); (b) charge then refund on
-rejection — leaves a spurious `observe_energy` crossing and flow noise; (c)
-an advisory precheck in `execute_reproduce` — the reproduction spec's
-ownership boundary says authoritative acceptance is emitted at action
-application, so the gate must stay inside `apply_reproduce`. (a) is chosen.
+Options considered: (a) gate on `energy - cost` before deducting, then deduct
+in the old order (the review's recommendation; Avida's divide checks validity
+first) — chosen; (b) charge then refund — a spurious `observe_energy`
+crossing; (c) a precheck in `execute_reproduce` — the reproduction spec puts
+authoritative acceptance inside `apply_reproduce`.
 
 Invariants:
 
@@ -107,39 +98,30 @@ Invariants:
       (below `min_reproduce_energy`; transfer infeasible or non-positive)
       asserting zero parent energy change and zero
       `action_charges.reproduce` change, then the reorder in
-      `apply_reproduce`. The reorder is inline (no predicate extracted:
-      the gate reads config plus three creature fields, and a predicate
-      compared against itself would be tautological), so no property
-      test. A pure gate predicate, if extracted, gets a
-      property test for invariants 1 and 3.
+      `apply_reproduce`. The reorder is inline; no predicate is extracted,
+      so no property test.
 - [x] Update `docs/reference/v3-reproduction-spec.md` Sections 5 and 6
       (gate evaluated on `energy - cost` and transfer feasibility before any
       charge; "If the energy gate fails" clause beside the age clause) and the
       "Charged before the `min_reproduce_energy` and transfer gates" bullet
       plus the "Reproduction transfer sequencing" list in
-      `docs/reference/v3-runtime-config-spec.md`. Step 5 stays the charge
-      computation and step 8 the payment, so the step numbers the config
-      spec cites and the `too_many_lines` reason string in `reproduction.rs`
-      remain accurate.
+      `docs/reference/v3-runtime-config-spec.md`. Step 5 is the charge
+      computation and Step 8 the payment, so the cited step numbers and the
+      `too_many_lines` reason string in `reproduction.rs` stay accurate.
 - [x] Re-pin any evolved-trajectory test value that moves, with the reason in
       the test and the old and new values in the readings file; a founder-only
-      pin that moves is a defect, not a re-pin. The `applied_trajectory`
-      digest moved (evolved, re-pinned); two tests that pinned the
-      charge-before-gate order itself were updated to the free-rejection
-      contract; no founder-only pin moved (readings file, "Pins that moved").
+      pin that moves is a defect, not a re-pin. Moved: the evolved
+      `applied_trajectory` digest and two tests that pinned the old order;
+      no founder-only pin (readings file, "Pins that moved").
 
 ## Verification
 
 - [x] Focused tests in `actions/mod.rs` and `actions/reproduction.rs`
       (names in the readings file): both rejection branches free, the
       accepted path bitwise equal to the pre-feature values, the reason
-      counter still incremented; `cargo test -p v3-core` -> exit 0.
-      Self-review pass (uncommitted worktree, 2026-09-17): `cargo test -p
-      v3-core --test viability` first -> 26 passed; `cargo test -p v3-core`
-      -> 1560 lib + 89 integration passed, 0 failed, 3 ignored; `cargo check
-      --workspace --all-targets` clean; `cargo clippy --workspace
-      --all-targets -- -D warnings` clean; `cargo fmt --all -- --check`
-      clean.
+      counter still incremented; `cargo test -p v3-core --test viability`
+      -> 26 passed, `cargo test -p v3-core` -> 1560 lib + 89 integration
+      passed, 0 failed (2026-09-17).
 - [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
       exit 0 on the final feature commit (hash in the readings file).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
@@ -147,12 +129,9 @@ Invariants:
       survivor list stays here.
 - [x] `make bench PROFILE=gate` and one `PROFILE=goal` run (2026-09-17):
       CLI exits 0, `severe=false`, no wall flag. Readings file "Benchmark".
-- [x] Gate identity check: measured, not predeclared — nonzero
-      `percent_delta` on all six counters vs. T11.F22 and mismatched
-      per-seed values. Per the spec's reading rule this is a predeclaration
-      miss, not a threshold failure (`severe=false`, `ok`), consistent with
-      invariant 6. Numbers in readings file "(a)". Routed to the
-      orchestrator, not remediated here.
+- [x] Gate identity check: nonzero `percent_delta` on all six counters vs.
+      T11.F22 and mismatched per-seed values — a predeclaration miss, ruled
+      in the measured verdict below; numbers in readings file "(a)".
 - [x] Orchards trajectory recorded in readings file "(b)" (2026-09-17):
       floor slightly lower than T11.F22 (final 7 vs. 10).
 - [x] `make roadmap-check` on the document edits -> "validation passed",
@@ -229,13 +208,30 @@ closure.
 | Goal: `failed_action_penalty` flow | unchanged mechanism; moves only with the trajectory |
 | Drift depth, lineage diversity, sensor census, recruitment, T11.F14 readings | no predeclared direction, recorded |
 
-**Measured verdict.** Gate and goal both `severe=false`, no wall flag
-(goal wall 438.637 ms vs. 180,000 ms cap). Gate identity: predeclaration
-miss (nonzero deltas, mismatched per-seed values vs. T11.F22, invariant 6),
-read `ok`/not severe. `action_charges.reproduce / births` fell in all
-three worlds as predeclared. Orchards: collapse persists, floor slightly
-lower than T11.F22 — a reading, not a gate. No severe result, no
-extinction. Full numbers: readings file.
+**Measured verdict.** Gate: CLI exit 0 (v3-cli status on artifact-pair
+completion; outer-process exit in the readings file), `severe=false`, every
+counter level `ok` against both references, no wall flag, no epoch re-pin.
+The gate is not identical to T11.F22's (largest delta `plasticity_updates`
+−4.572214%; per-seed `final_population`/`births` 1,896/2,968, 1,853/3,043,
+1,874/3,031): the identity predeclaration is a miss, ruled by the spec owner
+on 2026-09-17 as the pre-ruled case. Creatures in the gate profile do fail
+the energy gate — the founder in invariant 6's window and its mutated
+descendants both reach it; the summary does not split them — and the
+charge-first engine taxed those attempts. The accepted path is bitwise the
+old order (Step 8 assigns `after_cost`, then `after_cost - transfer`), so
+nothing else moved the trajectory. Not a blocker; the track note is corrected.
+Goal: CLI exit 0, `severe=false`, every level `ok` against both references
+(largest: `plasticity_updates` −17.623209% against T11.F22, a decrease), no
+wall flag (438.637 ms against the 180,000 ms cap), no extinction, no epoch
+re-pin. `action_charges.reproduce / births` falls in every world as
+predeclared: 0.2063 → 0.1390 (Orchards), 1.2119 → 0.4653 (Canyon country),
+0.7281 → 0.2788 (Confluence). Orchards reading, recorded and not a gate:
+the collapse persists with a slightly lower floor — 1,350 at tick 200 (was
+1,399), minimum 7, plateau 7.988, final 7 (T11.F22: 10 / 10.32 / 10); the
+user's hypothesis that the pre-gate charge drives the collapse is not
+supported at this depth, and no further disposition follows. Canyon country
+and Confluence finals 4,323 and 4,341 (T11.F22: 4,870 and 6,744), no
+predeclared direction; full tables in the readings file.
 
 - Summaries: `docs/progress/features/t16-f01-gate-before-charge-in-reproduction.json`
   and `...-goal.json`.
