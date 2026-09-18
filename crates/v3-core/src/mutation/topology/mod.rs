@@ -51,23 +51,27 @@ impl TopologyOperator {
     ];
 
     /// Per-operator weight reflecting impact tier.
-    /// 4 = refinement, 2 = moderate, 1 = structural.
+    /// 40 = refinement, 20 = moderate, 10 = structural; `ChangeEntryNode`
+    /// stays at 1 so the whole-brain macro is a rare event (1 in 211) rather
+    /// than 1 in 22: on a chain-shaped founder an entry moved past the
+    /// action nodes queues nothing, the one topology edit that still reads
+    /// dead after T11.F15.
     #[must_use]
     pub const fn weight(self) -> u8 {
         match self {
-            Self::AddNode => 1,
-            Self::RemoveNode => 1,
-            Self::RetargetNodeTarget => 2,
-            Self::AddRouteTarget => 2,
-            Self::RemoveRouteTarget => 2,
+            Self::AddNode => 10,
+            Self::RemoveNode => 10,
+            Self::RetargetNodeTarget => 20,
+            Self::AddRouteTarget => 20,
+            Self::RemoveRouteTarget => 20,
             Self::ChangeEntryNode => 1,
-            Self::SwapNodeBackend => 1,
-            Self::CopyNode => 1,
-            Self::CopyMeshBackwardSlice => 1,
-            Self::CopyMeshForwardSlice => 1,
-            Self::SpliceNode => 1,
-            Self::SwapRouteTargets => 4,
-            Self::MutateGateBias => 4,
+            Self::SwapNodeBackend => 10,
+            Self::CopyNode => 10,
+            Self::CopyMeshBackwardSlice => 10,
+            Self::CopyMeshForwardSlice => 10,
+            Self::SpliceNode => 10,
+            Self::SwapRouteTargets => 40,
+            Self::MutateGateBias => 40,
         }
     }
 

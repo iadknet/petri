@@ -873,6 +873,25 @@ fn topology_weighted_random_favors_refinement() {
 }
 
 #[test]
+fn change_entry_node_is_a_rare_topology_draw() {
+    // The whole-brain macro stays in the catalog at weight 1 while every
+    // other weight is scaled, so it is drawn in well under 1% of topology
+    // events (1 of TOPOLOGY_TOTAL_WEIGHT) instead of 1 in 22.
+    assert_eq!(TopologyOperator::ChangeEntryNode.weight(), 1);
+    assert_eq!(TopologyOperator::TOTAL_WEIGHT, 211);
+    let mut rng = SmallRng::seed_from_u64(0xC0DE);
+    let draws = 200_000u32;
+    let entry_draws = (0..draws)
+        .filter(|_| TopologyOperator::random(&mut rng) == TopologyOperator::ChangeEntryNode)
+        .count();
+    let share = entry_draws as f64 / f64::from(draws);
+    assert!(
+        share < 0.01,
+        "ChangeEntryNode drawn {entry_draws} of {draws} ({share:.4}); expected under 1%"
+    );
+}
+
+#[test]
 fn topology_operator_weights_are_positive() {
     let all = TopologyOperator::ALL;
     assert_eq!(

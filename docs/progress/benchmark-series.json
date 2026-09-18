@@ -43,7 +43,8 @@
       "docs/progress/features/t14-f07-surviving-clade-behavioral-profile.json",
       "docs/progress/features/t11-f21-per-direction-motor-output.json",
       "docs/progress/features/t11-f22-meaning-stable-input-references.json",
-      "docs/progress/features/t16-f01-gate-before-charge-in-reproduction.json"
+      "docs/progress/features/t16-f01-gate-before-charge-in-reproduction.json",
+      "docs/progress/features/topology-weight-rescale.json"
     ]
   },
   "goal": {
