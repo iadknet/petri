@@ -145,18 +145,16 @@ Invariants:
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred; the
       survivor list stays here.
-- [ ] `make bench PROFILE=gate FEATURE=t16-f01-gate-before-charge-in-reproduction`
-      and one `PROFILE=goal` run: exit statuses, `severe`, summaries at
-      `docs/progress/features/<feature>.json` and `<feature>-goal.json`,
-      series entries, raw hash/byte counts in the readings file, no full
-      report staged.
-- [ ] Gate identity check: the gate summary's `comparison.references[]`
-      entry whose `path` is the T11.F22 gate summary shows `percent_delta`
-      `0.000000` on all six counters, and `deterministic.per_seed[*]`
-      `final_population` and `births` match; the six deltas and the three
-      per-seed pairs go in the readings file (predeclaration below).
-- [ ] Orchards trajectory reading (before/after table, predeclaration below)
-      recorded in the readings file.
+- [x] `make bench PROFILE=gate` and one `PROFILE=goal` run (2026-09-17):
+      CLI exits 0, `severe=false`, no wall flag. Readings file "Benchmark".
+- [x] Gate identity check: measured, not predeclared — nonzero
+      `percent_delta` on all six counters vs. T11.F22 and mismatched
+      per-seed values. Per the spec's reading rule this is a predeclaration
+      miss, not a threshold failure (`severe=false`, `ok`), consistent with
+      invariant 6. Numbers in readings file "(a)". Routed to the
+      orchestrator, not remediated here.
+- [x] Orchards trajectory recorded in readings file "(b)" (2026-09-17):
+      floor slightly lower than T11.F22 (final 7 vs. 10).
 - [x] `make roadmap-check` on the document edits -> "validation passed",
       exit 0 (2026-09-17, after the Task 2 reference-document edits).
 - [ ] `make check-docs` on the document edits.
@@ -231,7 +229,13 @@ closure.
 | Goal: `failed_action_penalty` flow | unchanged mechanism; moves only with the trajectory |
 | Drift depth, lineage diversity, sensor census, recruitment, T11.F14 readings | no predeclared direction, recorded |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate and goal both `severe=false`, no wall flag
+(goal wall 438.637 ms vs. 180,000 ms cap). Gate identity: predeclaration
+miss (nonzero deltas, mismatched per-seed values vs. T11.F22, invariant 6),
+read `ok`/not severe. `action_charges.reproduce / births` fell in all
+three worlds as predeclared. Orchards: collapse persists, floor slightly
+lower than T11.F22 — a reading, not a gate. No severe result, no
+extinction. Full numbers: readings file.
 
 - Summaries: `docs/progress/features/t16-f01-gate-before-charge-in-reproduction.json`
   and `...-goal.json`.
