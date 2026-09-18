@@ -163,10 +163,11 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedAgeConstraints;
     }
 
-    // Step 5: Deduct reproduce_cost from parent (scaled by genome complexity,
-    // age, and the genome replication cost on units above the founder's size).
-    let before = sim.creatures[parent_id].energy;
-    sim.creatures[parent_id].energy -= sim.config.energy.adjusted_action_cost(
+    // Step 5: Compute reproduce_cost (scaled by genome complexity, age, and
+    // the genome replication cost on units above the founder's size) and the
+    // parent's energy after it. Nothing is deducted until both gates pass
+    // (T16.F01): a rejected attempt leaves the parent untouched.
+    let cost = sim.config.energy.adjusted_action_cost(
         sim.config.energy.costs.reproduce_cost,
         sim.creatures[parent_id].cached_complexity,
         sim.creatures[parent_id].age,
@@ -174,13 +175,11 @@ pub fn apply_reproduce(
         sim.config.energy.lifecycle.genome_replication_cost_per_unit,
         sim.creatures[parent_id].cached_genome_size,
     );
-    sim.stats.energy_flows.action_charges.reproduce += sim.creatures[parent_id].observe_energy(
-        before,
-        crate::simulation::energy_accounting::DeathCause::ActionReproduce,
-    );
+    let energy_before_cost = sim.creatures[parent_id].energy;
+    let after_cost = energy_before_cost - cost;
 
-    // Step 6: Check parent has sufficient energy after cost deduction.
-    if sim.creatures[parent_id].energy < sim.config.energy.lifecycle.min_reproduce_energy {
+    // Step 6: Check parent would have sufficient energy after the charge.
+    if after_cost < sim.config.energy.lifecycle.min_reproduce_energy {
         sim.stats.reproduction_actions_rejected_total += 1;
         *sim.stats
             .reproduction_actions_rejected_by_reason
@@ -189,7 +188,8 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedEnergyConstraints;
     }
 
-    // Step 7: Compute energy transfer (clamped to [0, default_offspring_energy]).
+    // Step 7: Compute energy transfer (clamped to [0, default_offspring_energy])
+    // and check it is feasible from the post-charge energy.
     let max_transfer = sim.config.energy.lifecycle.default_offspring_energy;
     let transfer = if energy_transfer_request.is_finite() && energy_transfer_request > 0.0 {
         energy_transfer_request.min(max_transfer)
@@ -197,7 +197,7 @@ pub fn apply_reproduce(
         0.0
     };
 
-    if transfer <= 0.0 || sim.creatures[parent_id].energy < transfer {
+    if transfer <= 0.0 || after_cost < transfer {
         sim.stats.reproduction_actions_rejected_total += 1;
         *sim.stats
             .reproduction_actions_rejected_by_reason
@@ -206,11 +206,18 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedEnergyConstraints;
     }
 
-    // Step 8: Deduct transfer from parent.
-    let before = sim.creatures[parent_id].energy;
+    // Step 8: Both gates passed; deduct cost, then transfer, as two
+    // successive f32 subtractions so the parent lands on the same value the
+    // charge-first order produced.
+    sim.creatures[parent_id].energy = after_cost;
+    sim.stats.energy_flows.action_charges.reproduce += sim.creatures[parent_id].observe_energy(
+        energy_before_cost,
+        crate::simulation::energy_accounting::DeathCause::ActionReproduce,
+    );
+    let before_transfer = sim.creatures[parent_id].energy;
     sim.creatures[parent_id].energy -= transfer;
     sim.stats.energy_flows.parental_transfer_debit += sim.creatures[parent_id].observe_energy(
-        before,
+        before_transfer,
         crate::simulation::energy_accounting::DeathCause::ParentalTransfer,
     );
 
@@ -551,6 +558,43 @@ mod tests {
     #[test]
     fn fast_path_newborns_cache_the_parents_genome_size() {
         assert_every_creature_caches_its_own_genome_size(0.0);
+    }
+
+    /// T16.F01 invariant 4: `action_charges.reproduce` accumulates only over
+    /// births. With the energy gate above `max_energy`, every attempt is an
+    /// energy rejection and the flow stays at zero across the tick loop.
+    #[test]
+    fn energy_rejected_attempts_leave_the_reproduce_flow_at_zero() {
+        use crate::config::SimulationConfig;
+        use crate::simulation::{run_tick, seed_simulation};
+
+        let mut cfg = SimulationConfig::default();
+        cfg.world.width = 48;
+        cfg.world.height = 48;
+        cfg.population.initial_creatures = 200;
+        cfg.energy.lifecycle.min_reproduce_energy = cfg.energy.lifecycle.max_energy + 1.0;
+        let mut sim = seed_simulation(cfg, 2026);
+        for _ in 0..40 {
+            run_tick(&mut sim, &mut None);
+        }
+
+        let energy_rejections = sim
+            .stats
+            .reproduction_actions_rejected_by_reason
+            .get(&ReproductionActionResult::RejectedEnergyConstraints)
+            .copied()
+            .unwrap_or(0);
+        assert!(
+            energy_rejections > 0,
+            "the fixture must actually reject attempts on energy"
+        );
+        assert_eq!(sim.stats.reproduction_actions_spawned_total, 0);
+        // Exact zero is the claim: no observe_energy crossing was recorded.
+        assert!(
+            sim.stats.energy_flows.action_charges.reproduce.abs() < f64::EPSILON,
+            "rejected attempts must not contribute to action_charges.reproduce, got {}",
+            sim.stats.energy_flows.action_charges.reproduce
+        );
     }
 
     #[test]

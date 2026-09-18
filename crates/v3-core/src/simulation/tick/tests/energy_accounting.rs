@@ -53,6 +53,10 @@ fn noop_counts_each_applied_attempt() {
     }
 }
 
+/// Reproduce is absent: since T16.F01 the reproduce charge lands only after
+/// the energy gates pass (`energy - cost >= transfer > 0`), so it can never
+/// cross zero; `reproduce_below_cost_rejects_free_and_records_no_crossing`
+/// pins that instead.
 #[test]
 fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
     for (action, cause) in [
@@ -62,13 +66,6 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
             DeathCause::ActionEat,
         ),
         (WorldAction::Move(Direction::N), DeathCause::ActionMove),
-        (
-            WorldAction::Reproduce {
-                direction: Direction::N,
-                energy_transfer: 1.0,
-            },
-            DeathCause::ActionReproduce,
-        ),
         (
             WorldAction::StealEnergy {
                 direction: Direction::N,
@@ -94,7 +91,6 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
             DeathCause::ActionNoop => charges.noop,
             DeathCause::ActionEat => charges.eat,
             DeathCause::ActionMove => charges.r#move,
-            DeathCause::ActionReproduce => charges.reproduce,
             DeathCause::ActionStealEnergy => charges.steal_energy,
             _ => unreachable!(),
         };
@@ -104,6 +100,28 @@ fn every_base_action_crossing_keeps_its_cause_through_the_action_floor() {
             2.0
         );
     }
+}
+
+#[test]
+fn reproduce_below_cost_rejects_free_and_records_no_crossing() {
+    let (mut sim, id) = make_sim_with_one_creature(1.0);
+    sim.config.energy.complexity_cost.enabled = false;
+    sim.config.energy.costs.reproduce_cost = 2.0;
+    sim.config.energy.costs.failed_action_penalty = 0.0;
+    sim.config.energy.lifecycle.min_reproduce_age = 0;
+    execute(
+        &mut sim,
+        id,
+        WorldAction::Reproduce {
+            direction: Direction::N,
+            energy_transfer: 1.0,
+        },
+    );
+    assert_eq!(sim.stats.mortality.count(DeathCause::ActionReproduce), 0);
+    assert_eq!(sim.stats.energy_flows.action_charges.reproduce, 0.0);
+    assert_eq!(sim.stats.energy_flows.zero_floor_credit, 0.0);
+    assert_eq!(sim.creatures[id].energy, 1.0);
+    assert!(sim.creatures[id].pending_death_cause.is_none());
 }
 
 #[test]
@@ -156,7 +174,11 @@ fn parental_transfer_counts_only_a_successful_birth_and_newborn_starts_clear() {
                 energy_transfer: 4.0,
             },
         );
-        assert_eq!(sim.stats.energy_flows.action_charges.reproduce, 1.0);
+        // T16.F01: the charge lands only on a birth; a rejected attempt is free.
+        assert_eq!(
+            sim.stats.energy_flows.action_charges.reproduce,
+            if spawned { 1.0 } else { 0.0 }
+        );
         assert_eq!(
             sim.stats.energy_flows.parental_transfer_debit,
             if spawned { 4.0 } else { 0.0 }

@@ -103,11 +103,14 @@ Invariants:
 
 ## Implementation Tasks
 
-- [ ] TDD first: failing tests on both `RejectedEnergyConstraints` branches
+- [x] TDD first: failing tests on both `RejectedEnergyConstraints` branches
       (below `min_reproduce_energy`; transfer infeasible or non-positive)
       asserting zero parent energy change and zero
       `action_charges.reproduce` change, then the reorder in
-      `apply_reproduce`. A pure gate predicate, if extracted, gets a
+      `apply_reproduce`. The reorder is inline (no predicate extracted:
+      the gate reads config plus three creature fields, and a predicate
+      compared against itself would be tautological), so no property
+      test. A pure gate predicate, if extracted, gets a
       property test for invariants 1 and 3.
 - [ ] Update `docs/reference/v3-reproduction-spec.md` Sections 5 and 6
       (gate evaluated on `energy - cost` and transfer feasibility before any
@@ -115,16 +118,25 @@ Invariants:
       "Charged before the `min_reproduce_energy` and transfer gates" bullet
       in `docs/reference/v3-runtime-config-spec.md`; the `too_many_lines`
       reason string in `reproduction.rs` still names the spec's gate order.
-- [ ] Re-pin any evolved-trajectory test value that moves, with the reason in
+- [x] Re-pin any evolved-trajectory test value that moves, with the reason in
       the test and the old and new values in the readings file; a founder-only
-      pin that moves is a defect, not a re-pin.
+      pin that moves is a defect, not a re-pin. The `applied_trajectory`
+      digest moved (evolved, re-pinned); two tests that pinned the
+      charge-before-gate order itself were updated to the free-rejection
+      contract; no founder-only pin moved (readings file, "Pins that moved").
 
 ## Verification
 
-- [ ] Focused tests in `actions/mod.rs` and `actions/reproduction.rs`
+- [x] Focused tests in `actions/mod.rs` and `actions/reproduction.rs`
       (names in the readings file): both rejection branches free, the
       accepted path bitwise equal to the pre-feature values, the reason
       counter still incremented; `cargo test -p v3-core` -> exit 0.
+      Build pass (uncommitted worktree, 2026-09-17): `cargo test -p v3-core
+      --test viability` first -> 26 passed; `cargo test -p v3-core` -> 1560
+      lib + 89 integration passed, 0 failed, 3 ignored; `cargo check
+      --workspace --all-targets` clean; `cargo clippy -p v3-core
+      --all-targets -- -D warnings` clean; `cargo fmt -p v3-core -- --check`
+      clean.
 - [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
       exit 0 on the final feature commit (hash in the readings file).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,

@@ -1,15 +1,13 @@
 //! Pins the sampled trajectory, including stochastic descendants and actions.
 //! Telemetry and wall-clock fields are deliberately excluded.
 //!
-//! T11.F22 re-pin: `InputRef.Swap` draws its replacement from the entry's
-//! own kind (`swap_alternatives`) instead of the whole reference pool, and
-//! `InputRef.Prune` draws among the node's unreferenced entries instead of
-//! every entry, so RNG consumption per input-reference event changes and the
-//! sampled trajectory moves from the first such event onward, as the T11.F22
-//! spec predeclares ("Measured, not preserved"). The digest below was
-//! measured on the T11.F22 code after two runs agreed (previously re-pinned
-//! at T02.F04, T03.F11, and T11.F21); the pin's purpose — that the accounting
-//! keeps the trajectory reproducible — is unchanged.
+//! T16.F01 re-pin: a reproduce attempt rejected on the energy or transfer
+//! gate no longer pays the reproduce charge, so the parent's energy and
+//! every downstream decision diverge from the first such rejection onward,
+//! as the T16.F01 spec predeclares (invariant 5). The digest below was
+//! measured on the T16.F01 code after two runs agreed (previously re-pinned
+//! at T02.F04, T03.F11, T11.F21, and T11.F22); the pin's purpose — that the
+//! accounting keeps the trajectory reproducible — is unchanged.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -75,6 +73,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "35d2928667a5086b224a35089a66ddc1c669108b729a8ae2ae519f3bc89d954e"
+        "01143817f27e4b493af53cc81d680388ce260baa6bd4f42fd3445b968e8b1f57"
     );
 }
