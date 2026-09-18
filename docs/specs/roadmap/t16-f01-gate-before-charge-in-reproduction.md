@@ -1,6 +1,6 @@
 # T16.F01 — Gate Before Charge in Reproduction
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-17
 **Feature**: T16.F01
 **Track**: [T16 — Cost and Cue Fidelity](../../roadmaps/t16-cost-and-cue-fidelity.md)
@@ -111,8 +111,8 @@ Invariants:
       counter still incremented; `cargo test -p v3-core --test viability`
       -> 26 passed, `cargo test -p v3-core` -> 1560 lib + 89 integration
       passed, 0 failed (2026-09-17).
-- [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
-      exit 0 on the final feature commit (hash in the readings file).
+- [x] `cargo test -p v3-core --test viability` first (26 passed), then
+      `make check` -> exit 0 on the final feature commit `c0839ab0`.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` (2026-09-17): "17 mutants
       tested in 3m: 1 missed, 15 caught, 1 unviable"; output
       `~/.local/share/petri-tools/mutants/t16-f01/mutants.out` (fresh).
@@ -129,7 +129,7 @@ Invariants:
       floor slightly lower than T11.F22 (final 7 vs. 10).
 - [x] `make roadmap-check` on the document edits -> "validation passed",
       exit 0 (2026-09-17, after the Task 2 reference-document edits).
-- [ ] `make check-docs` on the document edits.
+- [x] `make check-docs` on the closure edits -> exit 0.
 
 Readings file: `docs/progress/readings/t16-f01.md`.
 
@@ -231,14 +231,14 @@ and Confluence finals 4,323 and 4,341 (T11.F22: 4,870 and 6,744).
 
 ## Success Criteria
 
-- [ ] A reproduce attempt rejected at the energy gate or the transfer check
+- [x] A reproduce attempt rejected at the energy gate or the transfer check
       leaves the parent's energy and `action_charges.reproduce` unchanged,
       proven by tests on both branches.
-- [ ] A successful birth costs the parent bit for bit what it cost before
+- [x] A successful birth costs the parent bit for bit what it cost before
       this feature; the T03.F11 pins and the founder's charge are unchanged.
-- [ ] The reference documents state the new order; the code comment and
+- [x] The reference documents state the new order; the code comment and
       spec agree.
-- [ ] The gate identity check and the Orchards before/after reading are
+- [x] The gate identity check and the Orchards before/after reading are
       recorded in the readings file, whatever they show.
 
 ## Notes for AI Agents

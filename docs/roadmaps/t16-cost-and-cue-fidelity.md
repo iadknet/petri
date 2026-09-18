@@ -34,7 +34,7 @@ cannot yet avoid or a record they cannot see.
 
 ## Executable Features
 
-- [ ] **T16.F01 — Gate Before Charge in Reproduction** — Depends on: None
+- [x] **T16.F01 — Gate Before Charge in Reproduction** — Depends on: None
   - Goal: An animal that cannot afford a litter does not conceive. The reproduce energy gate (`energy - cost >= min_reproduce_energy`) and the transfer feasibility check are evaluated before any charge is taken, so a rejected attempt costs the parent nothing and a successful birth costs what it costs today; a TDD test on the `RejectedEnergyConstraints` path asserts zero energy change. Evidence: [antipattern review](../strategy/antipattern-review-2026-09-16.md) Section 3 (109 rejections at -10.8 each against 315 births in the sampled logs).
 - [ ] **T16.F02 — Effort-Priced Failed Actions** — Depends on: T16.F01
   - Goal: Bumping into a wall costs the step, not more. A blocked move, an eat on an empty cell, and a reproduce into an occupied or barrier cell charge only the action's own cost; `failed_action_penalty`, its ramp, and their config, panel, and spec surface are retired. Predeclared: the failed-action share of action energy in the goal reports falls to the effort cost, the gate and goal trajectories move (an epoch re-pin is expected and recorded), and the blocked-move fraction is read before and after so a later reading of T11.F21's avoidance fraction is attributable. Evidence: review Section 2 (7,196 of 23,460 action energy on penalized failures with 0 of 12,501 avoidances).
