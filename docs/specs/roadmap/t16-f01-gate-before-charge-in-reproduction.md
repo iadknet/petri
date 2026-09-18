@@ -32,11 +32,13 @@ same `f32` value as before this feature.
   them through a rejected attempt.
 - Closed feature specs (T03.F11) are history and are not edited; the living
   reference documents are.
-- The survey's paired-perturbation probe (track criterion 4) is not run here:
-  this feature changes no input, sensor, or decision, only the ledger after a
-  decision, so there is nothing to perturb. The T11.F14 readings the goal
-  summary already carries are recorded with no predeclared direction. The
-  probe is T16.F02's and T16.F03's instrument.
+- The survey's paired-perturbation probe (track criterion 4) is a recorded
+  deferral, not a non-goal: see the `Deferred:` bullet in Notes for AI Agents.
+  The T11.F14 readings the goal summary already carries are recorded with no
+  predeclared direction.
+- The T12.F04 three-environment pressure-integration rule does not apply:
+  this feature adds no environmental pressure, so the goal-world recipes are
+  untouched.
 
 ## Inputs and Invariants
 
@@ -238,3 +240,9 @@ closure.
 - Decision: the failed-action penalty on a rejected reproduce stays in place
   until T16.F02; this feature's zero-cost claim is scoped to the
   `apply_reproduce` charge.
+- Deferred: track criterion 4's paired-perturbation probe is not taken on this
+  feature because it changes no input, sensor, or decision, only the ledger
+  after a decision, so there is nothing to perturb; the probe genomes live in
+  session scratchpads, not the repo, and the probe is taken at T16.F02/F03 on
+  the substrate this feature produces. Surfaced to the user as a recorded
+  deferral by the orchestrator.
