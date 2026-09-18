@@ -99,8 +99,9 @@ Invariants:
       and the `too_many_lines` reason string stay accurate.
 - [x] Re-pin moved evolved-trajectory values (reason in the test, old and
       new values in the readings file); a founder-only pin that moves is a
-      defect. Moved: the evolved `applied_trajectory` digest and two tests
-      that pinned the old order; no founder-only pin.
+      defect. Moved: the evolved `applied_trajectory` digest, two tests
+      that pinned the old order, and the v3-cli occupancy-grid test's seed
+      (18 -> 1); no founder-only pin.
 
 ## Verification
 
