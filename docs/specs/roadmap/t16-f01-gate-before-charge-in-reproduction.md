@@ -44,13 +44,12 @@ cost half the median creature's energy); `apply_reproduce` Steps 1–8;
 `docs/reference/v3-runtime-config-spec.md` "Genome replication cost", both of
 which currently document the charge-before-gate order.
 
-Pre-feature order (Steps 5–8): charge `cost = adjusted_action_cost(reproduce_cost,
-cached_complexity, age) × genome_replication_cost_multiplier(rate,
-cached_genome_size)`, then reject on `energy < min_reproduce_energy` or an
-infeasible `transfer`, so both rejections returned after the charge landed.
-The age gate at Step 4 was already before the charge, pinned by
-`apply_reproduce_age_rejection_does_not_charge_reproduce_cost`
-(`actions/mod.rs`), the precedent the energy tests mirror.
+Pre-feature order (Steps 5–8): charge `cost = adjusted_action_cost(...) ×
+genome_replication_cost_multiplier(...)`, then reject on
+`energy < min_reproduce_energy` or an infeasible `transfer`. The Step 4 age
+gate was already before the charge
+(`apply_reproduce_age_rejection_does_not_charge_reproduce_cost`), the
+precedent the energy tests mirror.
 
 Options: (a) gate on `energy - cost`, then deduct in the old order — chosen;
 (b) charge then refund — a spurious `observe_energy` crossing; (c) a precheck
@@ -115,7 +114,9 @@ Invariants:
       `make check` -> exit 0 on the final feature commit `c0839ab0`.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` (2026-09-17): "17 mutants
       tested in 3m: 1 missed, 15 caught, 1 unviable"; output
-      `~/.local/share/petri-tools/mutants/t16-f01/mutants.out` (fresh).
+      `~/.local/share/petri-tools/mutants/t16-f01/mutants.out.old` (fresh
+      run at `11eafd65`; the iterate pass rotated it there). Later commits
+      are test-only, so no second fresh run.
       Survivors: `reproduction.rs:182:19: replace < with <= in
       apply_reproduce` -> killed by
       `apply_reproduce_accepts_post_charge_energy_exactly_at_min_reproduce_energy`
@@ -253,9 +254,10 @@ and Confluence finals 4,323 and 4,341 (T11.F22: 4,870 and 6,744).
   the uncommitted gate artifacts, not a measurement problem; test helper
   `reproduce_charge` duplicates the engine's cost formula on purpose (T16.F02
   inherits two copies).
-- Deferred: track criterion 4's paired-perturbation probe is not taken on this
-  feature because it changes no input, sensor, or decision, only the ledger
-  after a decision, so there is nothing to perturb; the probe genomes live in
-  session scratchpads, not the repo, and the probe is taken at T16.F02/F03 on
-  the substrate this feature produces. Surfaced to the user as a recorded
-  deferral by the orchestrator.
+- Deferred: track criterion 4's paired-perturbation probe is not taken here:
+  the feature changes no input, sensor, or decision, only the ledger after a
+  decision; the probe genomes live in session scratchpads, not the repo; it
+  is taken at T16.F02/F03 on this substrate. Surfaced to the user.
+- Cost: `/usage` totals at closure pending from the user; implementer advisor
+  consults 2 + 2 + 2 over three passes (build, self-review, test re-pin);
+  spec-owner resumes after Plan 2; reviewer findings 0 P1, 0 P2, 4 P3.
