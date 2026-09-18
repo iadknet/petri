@@ -1,7 +1,7 @@
 # T16 — Cost and Cue Fidelity
 
-**Status**: Planned
-**Last updated**: 2026-09-16
+**Status**: In Progress
+**Last updated**: 2026-09-17
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
