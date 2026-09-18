@@ -266,10 +266,13 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
 
 #[test]
 fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
-    // Re-pinned by T11.F21: one more VM opcode and one more graph edge surface
-    // remap every seeded mutation draw, and seed 13's 32x32 population now
-    // ends the horizon on a single cell; seed 18 keeps a spread population.
-    const SEED: u64 = 18;
+    // Evolved-trajectory pin. T16.F01 stops charging a rejected reproduce
+    // attempt, so every trajectory moves from its first energy-gate
+    // rejection: seed 18's 32x32 population now busts to a single survivor
+    // by tick 200, while seed 1 keeps 5 creatures over 5 cells at the
+    // horizon (the lowest seed that does; 7 of seeds 0..=25 go extinct and
+    // 4 end on one cell). T11.F21 had moved this pin from seed 13 to 18.
+    const SEED: u64 = 1;
     const HORIZON: u64 = 250;
     let config = build_config(&ProfileParams {
         recipe: None,
