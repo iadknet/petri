@@ -214,12 +214,13 @@ Genome replication cost:
   the pre-feature engine; it is non-decreasing in genome size.
 - Composes multiplicatively with the complexity and age action multipliers
   (`energy.complexity_cost`, `energy.age_cost`), which are untouched.
-- Charged before the `min_reproduce_energy` and transfer gates (steps 6 and
-  7), so an attempt those gates reject still burns the multiplied charge; the
-  whole charge lands in `energy_flows.action_charges.reproduce` and none of it
-  reaches the offspring, whose transfer is unchanged.
+- Computed at step 5 but charged only after the `min_reproduce_energy` and
+  transfer gates (steps 6 and 7) pass, both of which read the parent's energy
+  minus the charge; an attempt those gates reject burns nothing. On a birth
+  the whole charge lands in `energy_flows.action_charges.reproduce` and none
+  of it reaches the offspring, whose transfer is unchanged.
 - At the default rate a 386-unit genome (275 above the founder) pays 28.5x the
-  base charge per charged attempt.
+  base charge per birth.
 
 Complexity energy cost:
 - When enabled, all action energy costs (noop, eat, move, reproduce, steal, and
@@ -268,15 +269,18 @@ Reproduction transfer sequencing:
 This sequencing is evaluated only after spawn target validity succeeds, as
 defined in `v3-reproduction-spec.md`.
 1. Enforce `energy.lifecycle.min_reproduce_age` gate on parent age.
-2. Pay `energy.costs.reproduce_cost`, scaled by the complexity and age
-   multipliers and by the genome replication cost factor
-   `1 + energy.lifecycle.genome_replication_cost_per_unit * max(genome_size() - 111, 0)`.
-3. Enforce `energy.lifecycle.min_reproduce_energy` gate.
+2. Compute `cost = energy.costs.reproduce_cost`, scaled by the complexity and
+   age multipliers and by the genome replication cost factor
+   `1 + energy.lifecycle.genome_replication_cost_per_unit * max(genome_size() - 111, 0)`,
+   and `after_cost = parent energy - cost`. Nothing is charged yet.
+3. Enforce `energy.lifecycle.min_reproduce_energy` gate on `after_cost`.
 4. Compute
    `requested_energy_sanitized = clamp_non_negative_finite(requested_energy)`,
    then
    `transfer = min(requested_energy_sanitized, energy.lifecycle.default_offspring_energy)`.
-5. Reject reproduction when `transfer <= 0.0` or parent cannot cover transfer.
+5. Reject reproduction when `transfer <= 0.0` or `after_cost` cannot cover
+   transfer. A rejection at step 3 or step 5 charges nothing.
+6. Pay `cost`, then `transfer`, from the parent.
 
 Outcome mapping:
 - Age-gate failures in this sequencing map to

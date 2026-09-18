@@ -608,12 +608,14 @@ mod tests {
             sim.creatures[parent_id].pending_death_cause,
             death_cause_before
         );
-        assert!(
-            (sim.stats.energy_flows.action_charges.reproduce - charges_before).abs() < f64::EPSILON,
+        // The flows are compared exactly, not within a tolerance: the claim is
+        // "unchanged, bit for bit", and nothing was added to them.
+        assert_eq!(
+            sim.stats.energy_flows.action_charges.reproduce, charges_before,
             "rejection must not land in action_charges.reproduce"
         );
-        assert!(
-            (sim.stats.energy_flows.parental_transfer_debit - transfer_before).abs() < f64::EPSILON,
+        assert_eq!(
+            sim.stats.energy_flows.parental_transfer_debit, transfer_before,
             "rejection must not land in parental_transfer_debit"
         );
         assert_eq!(
@@ -670,18 +672,14 @@ mod tests {
             expected_energy.to_bits(),
             "parent must pay cost then transfer as two f32 subtractions"
         );
-        assert!(
-            (sim.stats.energy_flows.action_charges.reproduce
-                - applied_debit(energy_before, after_cost))
-            .abs()
-                < f64::EPSILON,
+        assert_eq!(
+            sim.stats.energy_flows.action_charges.reproduce,
+            applied_debit(energy_before, after_cost),
             "action_charges.reproduce must carry exactly the reproduce charge"
         );
-        assert!(
-            (sim.stats.energy_flows.parental_transfer_debit
-                - applied_debit(after_cost, expected_energy))
-            .abs()
-                < f64::EPSILON,
+        assert_eq!(
+            sim.stats.energy_flows.parental_transfer_debit,
+            applied_debit(after_cost, expected_energy),
             "parental_transfer_debit must carry exactly the transfer"
         );
         let child = sim

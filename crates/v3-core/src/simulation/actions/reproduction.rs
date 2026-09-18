@@ -214,10 +214,9 @@ pub fn apply_reproduce(
         energy_before_cost,
         crate::simulation::energy_accounting::DeathCause::ActionReproduce,
     );
-    let before_transfer = sim.creatures[parent_id].energy;
-    sim.creatures[parent_id].energy -= transfer;
+    sim.creatures[parent_id].energy = after_cost - transfer;
     sim.stats.energy_flows.parental_transfer_debit += sim.creatures[parent_id].observe_energy(
-        before_transfer,
+        after_cost,
         crate::simulation::energy_accounting::DeathCause::ParentalTransfer,
     );
 
@@ -590,10 +589,9 @@ mod tests {
         );
         assert_eq!(sim.stats.reproduction_actions_spawned_total, 0);
         // Exact zero is the claim: no observe_energy crossing was recorded.
-        assert!(
-            sim.stats.energy_flows.action_charges.reproduce.abs() < f64::EPSILON,
-            "rejected attempts must not contribute to action_charges.reproduce, got {}",
-            sim.stats.energy_flows.action_charges.reproduce
+        assert_eq!(
+            sim.stats.energy_flows.action_charges.reproduce, 0.0,
+            "rejected attempts must not contribute to action_charges.reproduce"
         );
     }
 
