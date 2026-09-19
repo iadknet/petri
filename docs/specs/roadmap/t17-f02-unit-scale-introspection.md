@@ -263,3 +263,4 @@ serialized `age_reference_ticks` moved the config digests).
       constraint.
 
 ## Notes for AI Agents
+- Decision: 2026-09-19, the user accepted the severe goal `plasticity_updates` (+78.9%, `severe=true`, `cli_exit` 3) as this feature's predeclared cost; the goal-worlds epoch is re-pinned to `t17-f02-unit-scale-introspection-goal.json` in the closing commit.
