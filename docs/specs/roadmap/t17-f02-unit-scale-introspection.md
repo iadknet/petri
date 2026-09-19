@@ -182,10 +182,11 @@ Invariants:
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t17-f02-unit-scale-introspection.json` and
-      `-goal.json`, local raw hash/byte count and verification time checked,
-      series entries point to the summaries, no new full report staged.
+      `-goal.json`; local raw sha256/bytes re-checked (`verified_local`);
+      series entries point to the summaries; no full report staged; goal
+      run once (2026-09-05 decision); details in the readings file.
 
 ## Performance and Goal Impact
 
@@ -229,7 +230,20 @@ not in the repository (T16.F01 deferral) and is not taken here.
 | Goal: sensor census count of `Generation` references | 0 by construction |
 | Goal work counters | no direction; standard thresholds; severe is a user decision |
 
-**Measured verdict.** Pending.
+**Measured verdict** (benchmark specialist, 2026-09-18, `ae5eef80`, each
+profile once). Gate: `make` exit 0, `cli_exit` 0, `severe`
+**false**, every counter and wall `ok`. Goal: `make` exit **2**, `cli_exit`
+**3**, `severe` **true**: `plasticity_updates` 0.049588 → 0.088735 per
+creature-tick, **+78.944503%** (per world in the readings file);
+the other five counters and wall `ok`; no extinction; evolved neighborhood
+1.503 s of the 180 s cap, founder 0.225 s of 10 s. The severe counter is a
+user decision under the blocker rule; the epoch is not re-pinned here. Predeclared readings, before → after: gate `births`
+0.026042 → 0.025998; gate founder changed/dead 0.395238/0 → 0.414286/0;
+goal founder changed of 210 (Orchards/Canyon/Confluence) 91/83/91 →
+96/87/96; goal evolved changed 0.2709/0.2696/0.3320 → 0.3947/0.3086/0.3570,
+dead 0.0431/0.0006/0 → 0.0228/0.0163/0; `Generation` string count 0 in the
+raw goal report. Every goal case reports `inputs_changed: true` (the
+serialized `age_reference_ticks` moved the config digests).
 
 - Summaries: [gate](../../progress/features/t17-f02-unit-scale-introspection.json),
   [goal](../../progress/features/t17-f02-unit-scale-introspection-goal.json).
