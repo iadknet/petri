@@ -996,8 +996,10 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 /// exceeds 10,000. T11.F22 keeps `InputRef.Swap` within a kind, so the
 /// unprepared forms open with `InputRef.Add` of the ring beside the copied
 /// `FoodHere` and move each consumer onto it: `graph_unprepared` still
-/// qualifies in six, `vm_unprepared` needs a seventh event for the read's
-/// `ref_idx` nudge and is a recorded growth gap.
+/// qualifies in six. T11.F23's scale-relative constant step cannot walk the
+/// zeroed direction constant to east in two events, so `vm_unprepared`
+/// replaces the constant's load with a doubling of the cue register in one
+/// `VmInstructionMutation` and qualifies in six.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1066,11 +1068,10 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     (VmInstructionRawFieldMutation, 94),
                     (VmInstructionRawFieldMutation, 72),
                     (VmInstructionRawFieldMutation, 223),
-                    (VmConstantMutation, 13),
-                    (VmConstantMutation, 13),
+                    (VmInstructionMutation, 205_178),
                     swap,
                 ],
-                Some(7),
+                None,
             ),
             (
                 "graph_detour",
@@ -1110,6 +1111,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             "graph_split",
             "vm_copy",
             "graph_unprepared",
+            "vm_unprepared",
             "graph_detour",
             "vm_detour"
         ]

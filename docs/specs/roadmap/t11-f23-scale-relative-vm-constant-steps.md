@@ -98,50 +98,50 @@ Invariants:
 6. Determinism: same seed, same config, same trajectory. Every trajectory
    moves from the first `VmConstantMutation` event; each pinned trajectory
    test is re-pinned and listed in the readings file with old and new values.
-7. T13.F05 replay stays truthful. `vm_unprepared_plan`'s `direction_half`
-   step (constants[1] ≥ 0.5 in one event from 0.0) and `direction_east`
-   ([1.5, 2.5) on the next) are unreachable under the rule (from 0.0 the
-   maximal draw is 0.1 per event until |c| ≥ 1, then ×1.1: at least 15
-   maximal draws to reach 1.5), and `qualify` panics on a pinned seed that is
-   no longer accepted. The implementer re-derives the route from the same
-   starting form with the existing operators — a shorter plan through another
-   operator if one exists, otherwise a longer constant walk — pins its seeds
-   by the module's own search, and records the gap (`GrowthGap.length`,
-   `lengthening_step`) from the route actually replayed. Predicates of other
-   steps and forms, `MAX_PATH_EVENTS` (6), `SEARCH_RANGE`, and
-   `qualified_paths().len() == 9` are unchanged; a step is never accepted by
-   weakening its predicate, and if no route can be pinned within
-   `SEARCH_RANGE` the implementer escalates to the spec owner instead of
-   changing the record's structure. The record's growth-gap comment ("a
-   constant mutation moves at most one") is rewritten to the new bound.
+7. T13.F05 replay stays truthful. A constant walk from 0.0 to [1.5, 2.5)
+   needs at least 15 maximal draws under the rule (0.1 per event until
+   |c| ≥ 1, then ×1.1), so `vm_unprepared_plan` reaches east through the
+   existing operators instead: one `VmInstructionMutation` replace
+   (`direction_doubled`, seed 205,178) turns the direction constant's
+   `LoadConst { dst: 3, const_idx: 1 }` at program index 4 into
+   `Add { dst: 3, a: 0, b: 0 }`, the cue register doubled into the direction
+   register as `vm_blank`'s `double_to_east` computes it. The plan is six
+   events, `vm_unprepared` qualifies, and its `GrowthGap` is gone (qualified
+   forms 7 of 9). The step's predicate is structural and exact (same length,
+   same program before and after index 4, that instruction equal); every
+   other step, form, seed, predicate, `MAX_PATH_EVENTS` (6), `SEARCH_RANGE`,
+   and `qualified_paths().len() == 9` are unchanged; the seed is the module's
+   own first-accepted search; the readings file lists old and new seeds.
 8. Documentation: the `VmConstantMutation` entry in
    `docs/reference/v3-mutation-spec.md` states the step rule.
 
 ## Implementation Tasks
 
-- [ ] Step rule in `apply_constant_mutation` (invariants 1–4), TDD: focused
+- [x] Step rule in `apply_constant_mutation` (invariants 1–4), TDD: focused
       tests and the proptest for invariant 3.
-- [ ] Transfer-slot probe (invariant 5): seed sweep before and after, table in
+- [x] Transfer-slot probe (invariant 5): seed sweep before and after, table in
       `docs/progress/readings/t11-f23.md`.
-- [ ] T13.F05 `vm_unprepared` route re-derived and pinned (invariant 7);
+- [x] T13.F05 `vm_unprepared` route re-derived and pinned (invariant 7);
       `tests/recruitment_paths.rs` green.
-- [ ] Pinned trajectories re-pinned and listed (invariant 6).
-- [ ] `docs/reference/v3-mutation-spec.md` entry (invariant 8).
+- [x] Pinned trajectories re-pinned and listed (invariant 6).
+- [x] `docs/reference/v3-mutation-spec.md` entry (invariant 8).
 - [ ] Gate and goal baseline runs recorded; goal-worlds epoch re-pinned in the
       closing commit (Performance).
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-core mutation::vm` (step bound, unit-scale
+- [x] Focused tests: `cargo test -p v3-core mutation::vm` (step bound, unit-scale
       equality with the graph step, empty-pool draw, RNG draw count) and
       `cargo test -p v3-core --test recruitment_paths` -> results and test
       names in `docs/progress/readings/t11-f23.md`.
-- [ ] Property test for invariant 3 (proptest; `proptest-regressions/`
+- [x] Property test for invariant 3 (proptest; `proptest-regressions/`
       committed if produced) -> test name in the readings file.
-- [ ] Transfer-slot seed sweep before/after and founder battery
+- [x] Transfer-slot seed sweep before/after and founder battery
       `operator_rows[VmConstantMutation]` before/after -> tables in the
-      readings file (invariant 5).
-- [ ] `cargo test -p v3-core --test viability` first, then `make check` -> exit 0.
+      readings file (invariant 5); the after battery row is a local
+      `evaluate_genome` reading until the gate summary is recorded.
+- [x] `cargo test -p v3-core --test viability` first (27 passed), then
+      `make check` -> exit 0.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
@@ -210,7 +210,7 @@ world (before = the T17.F01 goal summary; gate founder births before
       `VmConstantMutation` read 0 after (0.167 / 0.333 before), tabled in the
       readings file with the founder battery operator row before and after.
 - [ ] T13.F05's replay is green with a truthfully re-derived `vm_unprepared`
-      route and gap record; no predicate weakened.
+      route (six events, qualified); no predicate weakened.
 - [ ] Pinned trajectories re-pinned and listed; `make check` and the mutation
       gate pass with every survivor resolved.
 - [ ] Gate and goal summaries stored, goal births per creature-tick read before
@@ -221,6 +221,12 @@ world (before = the T17.F01 goal summary; gate founder births before
 - Decision: the user chose the scale-relative step over rescaling the transfer
   slot back to an integer scale and over per-slot step sizes (track note
   "Constant steps, 2026-09-18"); graph parameter steps stay ±0.1.
+- Decision: spec-owner ruling 2026-09-18 — the T13.F05 `vm_unprepared` form
+  qualifies through the `direction_doubled` instruction replace (invariant 7);
+  the earlier "no six-event route exists with the existing operators" record
+  was a constant-walk reading only, since the same replace was available
+  under the ±1 operator. Later readers (T13.F06, T11.F13) cite 7 qualified
+  forms of 9 from this closure, not the 7-event growth gap.
 - Cost: Opus substitution for all roles (spec owner, implementer without
   advisor, benchmark specialist, reviewer, mutation specialist); /usage totals
   pending.

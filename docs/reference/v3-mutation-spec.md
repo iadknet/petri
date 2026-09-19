@@ -160,7 +160,12 @@ Topology connection semantics (T11.F15, T11.F18):
   `action_type` in `0..=4`, the range
   `decode_world_action` admits (T13.F05); existing values above 4 stay in
   the genome and the raw-field unit step is unchanged
-- `VmConstantMutation`
+- `VmConstantMutation` — one constant `c` of the pool, drawn uniformly, moves
+  by `u × max(|c|, 1)` with `u` uniform in [−0.1, 0.1] (the graph parameter
+  step; T11.F23): a unit-scale constant moves as a graph parameter does, a
+  raw-scale constant by at most a tenth of its magnitude; the step may cross
+  zero and is not clamped. An empty pool gains one constant drawn from
+  [−1, 1]
 - `VmRegisterCountMutation`
 - `VmInstructionRawFieldMutation` (raw representable-field mutation for
   tolerant runtime decoders, including fields such as `action_type` and

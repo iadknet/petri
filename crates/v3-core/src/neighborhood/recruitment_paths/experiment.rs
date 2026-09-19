@@ -776,7 +776,10 @@ mod tests {
     /// per-entry predicates). Re-pinned 2026-09-18 when the topology weight
     /// table was scaled ten-fold around `ChangeEntryNode` (weight 1 of 211):
     /// every topology draw shifts, so every lineage diverges at its first
-    /// topology event; the discard counts stay zero.
+    /// topology event; the discard counts stay zero. Re-pinned by T11.F23
+    /// (scale-relative constant steps): the VM drift row's retained-useful
+    /// count moved 7 -> 8 with the applied constant values; the other three
+    /// rows are unchanged.
     #[test]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
@@ -788,7 +791,7 @@ mod tests {
                 [22, 22, 22, 22],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [21, 14, 12, 7], [0, 0]),
+            ("vm_prepared", Policy::Drift, [21, 14, 12, 8], [0, 0]),
             ("vm_prepared", Policy::Selection, [21, 21, 21, 20], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
