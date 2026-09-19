@@ -54,7 +54,7 @@ fn probe_cases() -> [ProbeCase; 4] {
                     neighbor_food: [0.9, 0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4],
                     neighbor_barrier: [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
                     neighbor_occupied: [0.0; 8],
-                    generation: 2.0,
+                    max_energy: 200.0,
                     age_ticks: 5.0,
                 },
                 typed_local_food: TypedFoodLocalSnapshot {
@@ -72,7 +72,7 @@ fn probe_cases() -> [ProbeCase; 4] {
                     neighbor_food: [1.0, 0.0, 0.8, 0.0, 0.6, 0.0, 0.4, 0.0],
                     neighbor_barrier: [0.0; 8],
                     neighbor_occupied: [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
-                    generation: 8.0,
+                    max_energy: 200.0,
                     age_ticks: 40.0,
                 },
                 typed_local_food: TypedFoodLocalSnapshot {
@@ -90,7 +90,7 @@ fn probe_cases() -> [ProbeCase; 4] {
                     neighbor_food: [0.0, 0.4, 0.0, 0.6, 0.0, 0.8, 0.0, 1.0],
                     neighbor_barrier: [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
                     neighbor_occupied: [0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
-                    generation: 1.0,
+                    max_energy: 200.0,
                     age_ticks: 120.0,
                 },
                 typed_local_food: TypedFoodLocalSnapshot {
@@ -108,7 +108,7 @@ fn probe_cases() -> [ProbeCase; 4] {
                     neighbor_food: [0.0; 8],
                     neighbor_barrier: [0.0; 8],
                     neighbor_occupied: [0.0; 8],
-                    generation: 0.0,
+                    max_energy: 200.0,
                     age_ticks: 0.0,
                 },
                 typed_local_food: TypedFoodLocalSnapshot::zeroed(1),

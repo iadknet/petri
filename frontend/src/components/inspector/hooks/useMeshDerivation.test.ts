@@ -84,7 +84,7 @@ function makeGenome(): CreatureGenome {
 			},
 			{
 				node_id: 9,
-				input_refs: [{ StaticIntrospection: "Generation" }],
+				input_refs: [{ StaticIntrospection: "AgeTicks" }],
 				targets: [],
 				backend_def: { Vm: { register_count: 1, constants: [], program: ["Halt"] } },
 			},

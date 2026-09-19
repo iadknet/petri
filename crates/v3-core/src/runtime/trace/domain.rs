@@ -58,7 +58,6 @@ pub struct StaticInputsSnapshot {
     pub neighbor_food: [f32; 8],
     pub neighbor_barrier: [f32; 8],
     pub neighbor_occupied: [f32; 8],
-    pub generation: f32,
     pub age_ticks: f32,
 }
 
@@ -69,7 +68,6 @@ impl From<&StaticInputs> for StaticInputsSnapshot {
             neighbor_food: si.neighbor_food,
             neighbor_barrier: si.neighbor_barrier,
             neighbor_occupied: si.neighbor_occupied,
-            generation: si.generation,
             age_ticks: si.age_ticks,
         }
     }
@@ -269,15 +267,14 @@ mod tests {
             neighbor_food: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
             neighbor_barrier: [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
             neighbor_occupied: [0.0; 8],
-            generation: 5.0,
-            age_ticks: 42.0,
+            max_energy: 200.0,
+            age_ticks: 0.084,
         };
         let snapshot = StaticInputsSnapshot::from(&si);
         assert_eq!(snapshot.food_here, 0.75);
         assert_eq!(snapshot.neighbor_food, si.neighbor_food);
         assert_eq!(snapshot.neighbor_barrier, si.neighbor_barrier);
-        assert_eq!(snapshot.generation, 5.0);
-        assert_eq!(snapshot.age_ticks, 42.0);
+        assert_eq!(snapshot.age_ticks, 0.084);
     }
 
     #[test]

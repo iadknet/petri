@@ -6,7 +6,7 @@ use slotmap::{SecondaryMap, SlotMap};
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, InputReference, Position, WorldInputKey};
 use crate::creature::action_log::ActionLog;
-use crate::creature::founder::founder_genome_with_min_reproduce_age;
+use crate::creature::founder::founder_genome_with_age_gate;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
@@ -87,9 +87,9 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     let log_capacity = config.action_log.capacity;
 
     for (founder_index, &pos) in positions.iter().take(spawn_count).enumerate() {
-        let genome = founder_genome_with_min_reproduce_age(
+        let genome = founder_genome_with_age_gate(
             config.population.founder_profile,
-            config.energy.lifecycle.min_reproduce_age,
+            &config.energy.lifecycle,
         );
         let energy = config.energy.lifecycle.initial_energy;
         let identity = CreatureIdentityState::founder(founder_index, seed);
@@ -378,10 +378,13 @@ mod tests {
         );
     }
 
+    /// The founder's age gate is `(min_reproduce_age - 0.5) /
+    /// age_reference_ticks`, both from the seeded config (T17.F02 invariant 5).
     #[test]
-    fn seeding_threads_min_reproduce_age_into_founder_gate() {
+    fn seeding_threads_min_reproduce_age_and_reference_span_into_founder_gate() {
         let mut cfg = small_config();
         cfg.energy.lifecycle.min_reproduce_age = 25;
+        cfg.energy.lifecycle.age_reference_ticks = 1_000;
         let sim = seed_simulation(cfg, 42);
         let founder = sim.creatures.values().next().expect("seeded founder");
         let BackendDef::Graph(graph) = &founder.genome.nodes[0].backend_def else {
@@ -389,7 +392,7 @@ mod tests {
         };
         assert_eq!(
             graph.compute_nodes[1].kind,
-            crate::creature::genome::cgp::ComputeNodeKind::Threshold(24.5)
+            crate::creature::genome::cgp::ComputeNodeKind::Threshold(24.5 / 1_000.0)
         );
     }
 }

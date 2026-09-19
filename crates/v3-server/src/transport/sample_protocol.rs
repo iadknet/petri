@@ -44,7 +44,6 @@ pub struct StaticInputsSnapshotPayload {
     pub neighbor_food: [f32; 8],
     pub neighbor_barrier: [f32; 8],
     pub neighbor_occupied: [f32; 8],
-    pub generation: f32,
     pub age_ticks: f32,
 }
 

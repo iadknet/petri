@@ -132,10 +132,10 @@ fn swap_alternatives_follow_the_kind_table() {
             ))),
         ]
     );
-    // The four introspection scalars form one kind.
+    // The three introspection scalars form one kind.
     let energy = InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent);
     let others = swap_alternatives(&energy, &config, 1);
-    assert_eq!(others.len(), 3);
+    assert_eq!(others.len(), 2);
     assert!(!others.contains(&energy));
     assert!(others
         .iter()

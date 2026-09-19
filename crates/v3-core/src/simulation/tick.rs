@@ -224,7 +224,7 @@ fn assemble_sensor_inputs(
         .filter(|&&id| sim.creatures.contains_key(id))
         .map(|&id| {
             let creature = &sim.creatures[id];
-            let local = assemble_static_inputs(&sim.world, creature);
+            let local = assemble_static_inputs(&sim.world, creature, &sim.config.energy.lifecycle);
             let typed_local_food = if genome_uses_typed_local_food(&creature.genome) {
                 assemble_typed_food_local_snapshot(&sim.world, creature.position)
             } else {

@@ -1067,3 +1067,61 @@ fn ordinary_food_alone_replenishes_energy_and_reproduces() {
     assert!(sim.creature_count() > 0);
     assert!(sim.stats.reproduction_actions_spawned_total > 0);
 }
+
+/// T17.F02 invariant 6: with mutation off, the unit-scale introspection
+/// re-expression of the founder gates leaves a founder-only world on exactly
+/// the trajectory it ran before. The digest covers every creature's position,
+/// energy bits, age and generation plus the primary food grid after 2,000
+/// ticks, sampled every tick; births and final population are asserted
+/// alongside. The digest was
+/// measured on the pre-feature code and must not move.
+#[test]
+fn founder_only_trajectory_digest_is_pinned() {
+    use sha2::{Digest, Sha256};
+    use slotmap::Key;
+
+    let mut cfg = viability_config();
+    cfg.mutation.per_unit_supply_enabled = false;
+    cfg.mutation.mutation_probability = 0.0;
+    let mut sim = seed_simulation(cfg, 2026);
+    let mut hash = Sha256::new();
+    for _ in 0..2_000 {
+        run_tick(&mut sim, &mut None);
+        for (id, creature) in &sim.creatures {
+            hash.update(id.data().as_ffi().to_le_bytes());
+            hash.update(creature.position.x.to_le_bytes());
+            hash.update(creature.position.y.to_le_bytes());
+            hash.update(creature.energy.to_bits().to_le_bytes());
+            hash.update(creature.age.to_le_bytes());
+            hash.update(creature.generation.to_le_bytes());
+        }
+    }
+    for y in 0..32 {
+        for x in 0..32 {
+            hash.update(
+                sim.world
+                    .food_at_type(
+                        Position::new(x, y),
+                        v3_core::config::OrdinaryFoodTypeId::default(),
+                    )
+                    .to_bits()
+                    .to_le_bytes(),
+            );
+        }
+    }
+    let digest = hex::encode(hash.finalize());
+
+    assert_eq!(sim.stats.mutation_events_applied_total, 0);
+    assert_eq!(
+        (
+            sim.stats.reproduction_actions_spawned_total,
+            sim.creatures.len(),
+            digest.as_str()
+        ),
+        (
+            177,
+            0,
+            "5ad9e8e1484792ab566c8ecac7466fffac3bb2b92bb4dd72e9ce7cb49ade36a9"
+        )
+    );
+}

@@ -62,7 +62,6 @@ const sample: ExecutionSample = {
 				neighbor_food: [0, 0, 0, 0],
 				neighbor_barrier: [0, 0, 0, 0],
 				neighbor_occupied: [0, 0, 0, 0],
-				generation: 2,
 				age_ticks: 8,
 			},
 			hops: [

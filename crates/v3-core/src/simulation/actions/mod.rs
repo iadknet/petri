@@ -1818,10 +1818,11 @@ mod tests {
         ) {
             let policy = founder_reproduce_policy(profile);
             let max_energy = SimulationConfig::default().energy.lifecycle.max_energy;
-            // Strictly above the gate: the smallest f32 above the threshold
-            // when `unit` draws 0.0, `max_energy` when it draws 1.0.
-            let energy = (policy.energy_threshold + unit * (max_energy - policy.energy_threshold))
-                .max(policy.energy_threshold.next_up());
+            // The gate is a fraction of `max_energy` (T17.F02); strictly
+            // above it: the smallest f32 above the raw threshold when `unit`
+            // draws 0.0, `max_energy` when it draws 1.0.
+            let threshold = policy.energy_threshold * max_energy;
+            let energy = (threshold + unit * (max_energy - threshold)).max(threshold.next_up());
             let (mut sim, id) = make_sim_one_founder(founder_genome(profile), Position::new(5, 5), energy);
             proptest::prop_assert!(age >= sim.config.energy.lifecycle.min_reproduce_age);
             sim.creatures[id].age = age;

@@ -779,19 +779,22 @@ mod tests {
     /// topology event; the discard counts stay zero. Re-pinned by T11.F23
     /// (scale-relative constant steps): the VM drift row's retained-useful
     /// count moved 7 -> 8 with the applied constant values; the other three
-    /// rows are unchanged.
+    /// rows are unchanged. Re-pinned by T17.F02 (unit-scale introspection,
+    /// `Generation` removed from the catalog): every input-reference draw
+    /// shifts, and the two drift rows' retained-useful counts moved 7 -> 6
+    /// (graph) and 8 -> 7 (VM); the selection rows are unchanged.
     #[test]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [21, 13, 11, 7], [0, 0]),
+            ("graph_prepared", Policy::Drift, [21, 13, 11, 6], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
                 [22, 22, 22, 22],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [21, 14, 12, 8], [0, 0]),
+            ("vm_prepared", Policy::Drift, [21, 14, 12, 7], [0, 0]),
             ("vm_prepared", Policy::Selection, [21, 21, 21, 20], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {

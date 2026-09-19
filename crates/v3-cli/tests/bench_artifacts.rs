@@ -175,19 +175,20 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
     v3_cli::inspect::resolve_baseline_world(recipe, path.to_str().unwrap()).unwrap()
 }
 
-/// T02.F04 re-pin: the resolved config now serializes the `grazing` block the
-/// byte-identical recipes inherit from the production default, so every
-/// digest moved once. Measured on the T02.F04 code.
+/// T17.F02 re-pin: the resolved config now serializes the lifecycle
+/// `age_reference_ticks` field the byte-identical recipes inherit from the
+/// production default, so every digest moved once (previously re-pinned at
+/// T02.F04 for the `grazing` block). Measured on the T17.F02 code.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     for (name, expected) in GOAL_RECIPE_NAMES.into_iter().zip([
-        "sha256:81450ac8a7d4ed087d7f888fa992c486ecc2257d3db85fa17715619a8f1bbe80",
-        "sha256:c8d2ab9402e2eb74a2bf7ffbdfa3b071a989680d47e39b7d5cf2ec8cb3b81b2a",
-        "sha256:a8b84ed7b3a4f2319bea8f76870a452dc5ae83582192a0110727cde872ae072d",
+        "sha256:b065b220220dd57d6d7beec27adea65f5fce005f7b34c38684ff99a1771f2f6a",
+        "sha256:bd3fa7878befa9c07d3c180786a6c6603b6701a97e1f9f0ae552c2e13b1d4e32",
+        "sha256:289a95bd906e0548f5ec815daf1c0d08e6aac0a4184f8d4603e08fc8fb185239",
     ]) {
         let digest = v3_core::config::config_digest(&resolve_checked_in_recipe(name));
         println!("{name}: {digest}");
-        assert_eq!(digest, expected);
+        assert_eq!(digest, expected, "{name}");
     }
 }
 

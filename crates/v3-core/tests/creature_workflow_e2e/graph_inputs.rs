@@ -217,21 +217,19 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
         }), // ref 1 (compound, sub_idx=N=0)
         InputReference::World(WorldInputKey::NeighborBarrierRing), // ref 2 (compound, sub_idx=E=2)
         InputReference::World(WorldInputKey::NeighborOccupiedRing), // ref 3 (compound, sub_idx=W=6)
-        InputReference::StaticIntrospection(StaticIntrospectionKey::Generation), // ref 4
-        InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks), // ref 5
-        InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent), // ref 6
-        InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick), // ref 7
-        InputReference::UpstreamSlot(3), // ref 8
+        InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks), // ref 4
+        InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent), // ref 5
+        InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick), // ref 6
+        InputReference::UpstreamSlot(3), // ref 7
     ];
 
     // sub_idx per input ref: compound ring inputs use the direction index,
     // scalar inputs use 0.
-    let sub_indices: [u16; 9] = [
+    let sub_indices: [u16; 8] = [
         0,                              // FoodHere: scalar
         Direction::N.to_index() as u16, // NeighborFoodRing → N=0
         Direction::E.to_index() as u16, // NeighborBarrierRing → E=2
         Direction::W.to_index() as u16, // NeighborOccupiedRing → W=6
-        0,                              // Generation: scalar
         0,                              // AgeTicks: scalar
         0,                              // EnergyCurrent: scalar
         0,                              // EnergyConsumedThisTick: scalar
@@ -315,18 +313,21 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
     assert!((out[1] - 0.25).abs() < 1e-6, "NeighborFoodRing[N]");
     assert!((out[2] - 1.0).abs() < 1e-6, "NeighborBarrierRing[E]");
     assert!((out[3] - 1.0).abs() < 1e-6, "NeighborOccupiedRing[W]");
-    assert!((out[4] - 7.0).abs() < 1e-6, "Generation");
     assert!(
-        (out[5] - 4.0).abs() < 1e-6,
-        "AgeTicks after Phase 0 increment"
+        (out[4] - 4.0 / 500.0).abs() < 1e-6,
+        "AgeTicks after Phase 0 increment, on the default age_reference_ticks"
     );
-    assert!(out[6] > 0.0, "EnergyCurrent should be positive");
+    assert!(out[5] > 0.0, "EnergyCurrent should be positive");
     assert!(
-        (out[7] - 0.0).abs() < 1e-6,
+        out[5] <= 120.0 / 200.0,
+        "EnergyCurrent is a fraction of max_energy"
+    );
+    assert!(
+        (out[6] - 0.0).abs() < 1e-6,
         "EnergyConsumedThisTick first hop"
     );
     assert!(
-        (out[8] - 0.0).abs() < 1e-6,
+        (out[7] - 0.0).abs() < 1e-6,
         "UpstreamSlot on entry should be zero"
     );
 }

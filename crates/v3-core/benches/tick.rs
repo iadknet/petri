@@ -81,7 +81,11 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                 let config = sim.config.runtime.clone();
                 let ids: Vec<_> = sim.creatures.keys().collect();
                 for id in ids {
-                    let local = assemble_static_inputs(&sim.world, &sim.creatures[id]);
+                    let local = assemble_static_inputs(
+                        &sim.world,
+                        &sim.creatures[id],
+                        &sim.config.energy.lifecycle,
+                    );
                     let typed_local_food =
                         assemble_typed_food_local_snapshot(&sim.world, sim.creatures[id].position);
                     let ss = SensorSnapshot {

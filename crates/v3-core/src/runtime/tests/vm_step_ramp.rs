@@ -373,8 +373,9 @@ fn a_mid_dispatch_consumption_read_includes_what_the_dispatch_owes() {
         run_vm_with_config(program, 1, vec![], &refs, zeroed_upstream(), 50.0, cfg);
 
     // Noop owes 1.05 and the ReadInput step itself 2.12, against a tick
-    // consumption of 0.0 before the dispatch.
-    let seen = result.output_slots[0];
+    // consumption of 0.0 before the dispatch; the brain reads the 3.17 as a
+    // fraction of max_energy (200).
+    let seen = result.output_slots[0] * 200.0;
     assert!(
         (seen - 3.17).abs() < 0.01,
         "the brain read {seen} consumed, expected about 3.17",
@@ -489,8 +490,9 @@ fn a_mid_dispatch_energy_read_sees_the_effective_energy() {
     let (result, _energy, _side) =
         run_vm_with_config(program, 1, vec![], &refs, zeroed_upstream(), 50.0, cfg);
 
-    // Step 1 (Noop) owes 1.05, step 2 (ReadInput) owes 2.12: 50 - 3.17.
-    let seen = result.output_slots[0];
+    // Step 1 (Noop) owes 1.05, step 2 (ReadInput) owes 2.12: 50 - 3.17, read
+    // as a fraction of max_energy (200).
+    let seen = result.output_slots[0] * 200.0;
     assert!(
         (seen - 46.83).abs() < 0.05,
         "the brain read {seen} energy, expected about 46.83",

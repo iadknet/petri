@@ -396,6 +396,11 @@ pub struct EnergyLifecycleConfig {
     pub min_reproduce_energy: f32,
     #[serde(default = "default_min_reproduce_age")]
     pub min_reproduce_age: u64,
+    /// Span over which a creature's `AgeTicks` input rises from 0 to 1:
+    /// the brain reads `min(age / age_reference_ticks, 1)`. `0` normalizes to
+    /// the default.
+    #[serde(default = "default_age_reference_ticks")]
+    pub age_reference_ticks: u64,
     pub default_offspring_energy: f32,
     /// Per-tick maintenance charge on every unit of `genome_size()`, settled in
     /// Phase 0 beside `energy_decay_per_tick`. `0.0` disables the charge.
@@ -411,6 +416,10 @@ pub struct EnergyLifecycleConfig {
 
 fn default_min_reproduce_age() -> u64 {
     20
+}
+
+fn default_age_reference_ticks() -> u64 {
+    500
 }
 
 fn default_genome_carry_cost_per_unit() -> f32 {
@@ -429,6 +438,7 @@ impl Default for EnergyLifecycleConfig {
             energy_decay_per_tick: 0.5,
             min_reproduce_energy: 30.0,
             min_reproduce_age: default_min_reproduce_age(),
+            age_reference_ticks: default_age_reference_ticks(),
             default_offspring_energy: 100.0,
             genome_carry_cost_per_unit: default_genome_carry_cost_per_unit(),
             genome_replication_cost_per_unit: default_genome_replication_cost_per_unit(),
@@ -1012,6 +1022,9 @@ impl SimulationConfig {
         el.max_energy = normalize_f32_finite_min(el.max_energy, 1.0, 200.0);
         el.energy_decay_per_tick = normalize_f32_finite_nonneg(el.energy_decay_per_tick, 0.5);
         el.min_reproduce_energy = normalize_f32_finite_nonneg(el.min_reproduce_energy, 30.0);
+        if el.age_reference_ticks == 0 {
+            el.age_reference_ticks = default_age_reference_ticks();
+        }
         el.default_offspring_energy =
             normalize_f32_finite_nonneg(el.default_offspring_energy, 100.0);
         el.genome_carry_cost_per_unit = normalize_f32_finite_nonneg(
@@ -1690,6 +1703,22 @@ mod tests {
     }
 
     #[test]
+    fn normalize_zero_age_reference_ticks_falls_back_to_default() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.age_reference_ticks = 0;
+        cfg.normalize();
+        assert_eq!(cfg.energy.lifecycle.age_reference_ticks, 500);
+    }
+
+    #[test]
+    fn normalize_age_reference_ticks_keeps_configured_value() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.age_reference_ticks = 1_000;
+        cfg.normalize();
+        assert_eq!(cfg.energy.lifecycle.age_reference_ticks, 1_000);
+    }
+
+    #[test]
     fn normalize_zero_max_mesh_hops_falls_back() {
         let mut cfg = SimulationConfig::default();
         cfg.runtime.max_mesh_hops = 0;
@@ -2114,6 +2143,7 @@ mod tests {
         let json = r#"{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":30.0,"default_offspring_energy":100.0}"#;
         let lifecycle: EnergyLifecycleConfig = serde_json::from_str(json).unwrap();
         assert_eq!(lifecycle.min_reproduce_age, 20);
+        assert_eq!(lifecycle.age_reference_ticks, 500);
     }
 
     #[test]

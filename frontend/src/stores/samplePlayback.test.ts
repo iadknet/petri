@@ -15,7 +15,6 @@ function makeSample(): ExecutionSample {
 					neighbor_food: [],
 					neighbor_barrier: [],
 					neighbor_occupied: [],
-					generation: 0,
 					age_ticks: 0,
 				},
 				hops: [
@@ -112,7 +111,6 @@ function makeSample(): ExecutionSample {
 					neighbor_food: [],
 					neighbor_barrier: [],
 					neighbor_occupied: [],
-					generation: 0,
 					age_ticks: 1,
 				},
 				hops: [

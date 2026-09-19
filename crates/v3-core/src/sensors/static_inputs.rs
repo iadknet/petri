@@ -1,4 +1,4 @@
-use crate::config::OrdinaryFoodTypeId;
+use crate::config::{EnergyLifecycleConfig, OrdinaryFoodTypeId};
 use crate::contracts::{Direction, StaticIntrospectionKey, WorldInputKey};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
@@ -6,9 +6,11 @@ use crate::kernel::WorldState;
 /// Snapshot of world and static-introspection sensor values for one creature's turn.
 ///
 /// Assembled once at turn start; dynamic introspection (energy, consumed) is
-/// resolved live during mesh evaluation.
+/// resolved live during mesh evaluation as a fraction of `max_energy`, which
+/// the snapshot carries from the lifecycle config for that purpose.
 ///
-/// All food values are normalized to [0.0, 1.0] by clamping raw food density.
+/// All food values are normalized to [0.0, 1.0] by clamping raw food density;
+/// introspection is on the unit scale (T17.F02).
 #[derive(Debug, Clone, PartialEq)]
 pub struct StaticInputs {
     /// Food density at the creature's current cell, normalized to [0.0, 1.0].
@@ -22,10 +24,28 @@ pub struct StaticInputs {
     /// Whether each neighboring cell is occupied by a creature (1.0) or not (0.0).
     /// 0.0 for out-of-bounds neighbors.
     pub neighbor_occupied: [f32; 8],
-    /// Creature's generation number cast to f32. Unbounded.
-    pub generation: f32,
-    /// Creature's age in ticks cast to f32. Unbounded.
+    /// Creature's age as a saturating fraction of
+    /// `EnergyLifecycleConfig::age_reference_ticks`, in [0.0, 1.0].
     pub age_ticks: f32,
+    /// `EnergyLifecycleConfig::max_energy`: the denominator for the live
+    /// energy introspection reads.
+    pub max_energy: f32,
+}
+
+/// `value / max` clamped to [0, 1]: the unit-scale read of an energy quantity
+/// (`EnergyCurrent`, `EnergyConsumedThisTick`). A negative `value` (the VM's
+/// mid-dispatch `effective` energy can be) reads 0.
+#[inline]
+#[must_use]
+pub fn energy_fraction(value: f32, max_energy: f32) -> f32 {
+    (value / max_energy).clamp(0.0, 1.0)
+}
+
+/// `min(age / reference, 1)` as f32 division: the unit-scale `AgeTicks` read.
+#[inline]
+#[must_use]
+pub fn age_fraction(age: u64, age_reference_ticks: u64) -> f32 {
+    (age as f32 / age_reference_ticks as f32).min(1.0)
 }
 
 impl StaticInputs {
@@ -47,7 +67,6 @@ impl StaticInputs {
     /// Look up a resolved f32 value by StaticIntrospectionKey.
     pub fn resolve_static(&self, key: &StaticIntrospectionKey) -> f32 {
         match key {
-            StaticIntrospectionKey::Generation => self.generation,
             StaticIntrospectionKey::AgeTicks => self.age_ticks,
         }
     }
@@ -61,7 +80,11 @@ impl StaticInputs {
 /// - `WorldEdgeMode::Bounded`: a neighbor that falls outside the grid bounds resolves
 ///   to `None`. All sensor slots for such out-of-bounds neighbors are set to 0.0
 ///   (no food, no barrier signal, not occupied).
-pub fn assemble_static_inputs(world: &WorldState, creature: &CreatureState) -> StaticInputs {
+pub fn assemble_static_inputs(
+    world: &WorldState,
+    creature: &CreatureState,
+    lifecycle: &EnergyLifecycleConfig,
+) -> StaticInputs {
     let pos = creature.position;
     let food_here = world.food_at(pos).clamp(0.0, 1.0);
 
@@ -92,8 +115,8 @@ pub fn assemble_static_inputs(world: &WorldState, creature: &CreatureState) -> S
         neighbor_food,
         neighbor_barrier,
         neighbor_occupied,
-        generation: creature.generation as f32,
-        age_ticks: creature.age as f32,
+        age_ticks: age_fraction(creature.age, lifecycle.age_reference_ticks),
+        max_energy: lifecycle.max_energy,
     }
 }
 
@@ -108,6 +131,7 @@ mod tests {
     use crate::creature::identity::CreatureIdentityState;
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
+    use proptest::prelude::*;
     use slotmap::SlotMap;
 
     fn make_world(w: u16, h: u16) -> WorldState {
@@ -152,7 +176,7 @@ mod tests {
         let world = make_world(4, 4);
         let id = get_id();
         let creature = make_creature(id, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature);
+        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
         assert_eq!(si.food_here, 0.0);
     }
 
@@ -171,7 +195,7 @@ mod tests {
         world.seed_food(&mut rng);
         let id = get_id();
         let creature = make_creature(id, Position::new(1, 1));
-        let si = assemble_static_inputs(&world, &creature);
+        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
         assert!((si.food_here - 1.0).abs() < 1e-6);
     }
 
@@ -190,7 +214,7 @@ mod tests {
         world.seed_food(&mut rng);
         let id = get_id();
         let creature = make_creature(id, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature);
+        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
         for i in 0..8 {
             assert!(
                 (si.neighbor_food[i] - 1.0).abs() < 1e-6,
@@ -205,7 +229,7 @@ mod tests {
         world.set_barrier(Position::new(2, 1), true);
         let id = get_id();
         let creature = make_creature(id, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature);
+        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
         assert_eq!(si.neighbor_barrier[Direction::N.to_index()], 1.0);
         assert_eq!(si.neighbor_barrier[Direction::S.to_index()], 0.0);
     }
@@ -218,13 +242,13 @@ mod tests {
         let mut world = make_world(5, 5);
         world.place_creature(Position::new(3, 2), id2);
         let creature = make_creature(id1, Position::new(2, 2));
-        let si = assemble_static_inputs(&world, &creature);
+        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
         assert_eq!(si.neighbor_occupied[Direction::E.to_index()], 1.0);
         assert_eq!(si.neighbor_occupied[Direction::W.to_index()], 0.0);
     }
 
     #[test]
-    fn static_introspection_generation_and_age() {
+    fn static_introspection_age_is_a_fraction_of_the_reference_span() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
         let world = make_world(4, 4);
@@ -254,9 +278,65 @@ mod tests {
             [0.0; 16],
         );
         creature.age = 42;
-        let si = assemble_static_inputs(&world, &creature);
-        assert!((si.generation - 5.0).abs() < 1e-6);
-        assert!((si.age_ticks - 42.0).abs() < 1e-6);
+        let lifecycle = EnergyLifecycleConfig {
+            max_energy: 150.0,
+            age_reference_ticks: 400,
+            ..EnergyLifecycleConfig::default()
+        };
+        let si = assemble_static_inputs(&world, &creature, &lifecycle);
+        assert!((si.age_ticks - 0.105).abs() < 1e-6);
+        assert_eq!(si.max_energy, 150.0);
+        assert_eq!(
+            si.resolve_static(&StaticIntrospectionKey::AgeTicks),
+            si.age_ticks
+        );
+    }
+
+    #[test]
+    fn age_fraction_saturates_at_the_reference_span() {
+        assert_eq!(age_fraction(0, 500), 0.0);
+        assert_eq!(age_fraction(500, 500), 1.0);
+        assert_eq!(age_fraction(10_000, 500), 1.0);
+        assert!((age_fraction(20, 500) - 0.04).abs() < 1e-7);
+    }
+
+    #[test]
+    fn energy_fraction_clamps_negative_and_overfull_reads() {
+        assert_eq!(energy_fraction(-5.0, 200.0), 0.0);
+        assert_eq!(energy_fraction(0.0, 200.0), 0.0);
+        assert_eq!(energy_fraction(200.0, 200.0), 1.0);
+        assert_eq!(energy_fraction(260.0, 200.0), 1.0);
+        assert!((energy_fraction(32.0, 200.0) - 0.16).abs() < 1e-7);
+    }
+
+    proptest! {
+        /// T17.F02 invariant 8: every unit-scale read lies in [0, 1] and is
+        /// non-decreasing in its numerator.
+        #[test]
+        fn energy_fraction_is_bounded_and_monotone(
+            lo in -1.0e6f32..1.0e6,
+            step in 0.0f32..1.0e6,
+            max_energy in 1.0f32..1.0e6,
+        ) {
+            let a = energy_fraction(lo, max_energy);
+            let b = energy_fraction(lo + step, max_energy);
+            prop_assert!((0.0..=1.0).contains(&a), "{a}");
+            prop_assert!((0.0..=1.0).contains(&b), "{b}");
+            prop_assert!(a <= b, "{lo} -> {a}, {} -> {b}", lo + step);
+        }
+
+        #[test]
+        fn age_fraction_is_bounded_and_monotone(
+            age in 0u64..1_000_000,
+            step in 0u64..1_000_000,
+            reference in 1u64..1_000_000,
+        ) {
+            let a = age_fraction(age, reference);
+            let b = age_fraction(age + step, reference);
+            prop_assert!((0.0..=1.0).contains(&a), "{a}");
+            prop_assert!((0.0..=1.0).contains(&b), "{b}");
+            prop_assert!(a <= b);
+        }
     }
 
     #[test]
@@ -264,7 +344,7 @@ mod tests {
         let world = make_world(4, 4);
         let id = get_id();
         let creature = make_creature(id, Position::new(1, 1));
-        let si = assemble_static_inputs(&world, &creature);
+        let si = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
         let result = si.resolve_world(&WorldInputKey::FoodHere {
             type_idx: OrdinaryFoodTypeId::default(),
         });

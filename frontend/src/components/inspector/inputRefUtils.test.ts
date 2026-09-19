@@ -55,8 +55,8 @@ describe("formatInputRef", () => {
 	});
 
 	it("formats StaticIntrospection variant", () => {
-		const ref: InputReference = { StaticIntrospection: "Generation" };
-		expect(formatInputRef(ref)).toBe("Generation");
+		const ref: InputReference = { StaticIntrospection: "AgeTicks" };
+		expect(formatInputRef(ref)).toBe("AgeTicks");
 	});
 
 	it("formats UpstreamSlot variant", () => {
