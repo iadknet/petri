@@ -1,0 +1,270 @@
+{
+  "action_log": {
+    "capacity": 500
+  },
+  "energy": {
+    "age_cost": {
+      "age_cap": 150,
+      "enabled": true,
+      "max_multiplier": 20.0
+    },
+    "complexity_cost": {
+      "enabled": false,
+      "scaling_factor": 0.0020000000949949026,
+      "threshold": 50
+    },
+    "costs": {
+      "eat_cost": 0.0,
+      "eat_reward_per_food": 5.0,
+      "failed_action_penalty": 0.0,
+      "move_cost": 0.10000000149011612,
+      "noop_cost": 0.05000000074505806,
+      "reproduce_cost": 1.0
+    },
+    "lifecycle": {
+      "default_offspring_energy": 100.0,
+      "energy_decay_per_tick": 0.019999999552965164,
+      "genome_carry_cost_per_unit": 0.00009999999747378752,
+      "genome_replication_cost_per_unit": 0.010000001639127731,
+      "initial_energy": 20.0,
+      "max_energy": 200.0,
+      "min_reproduce_age": 20,
+      "min_reproduce_energy": 30.0
+    }
+  },
+  "mutation": {
+    "action_queue_cap": 4,
+    "executed_bias": 0.9,
+    "executed_window_ticks": 100,
+    "genome_size_cap": 1200,
+    "genome_size_pressure_enabled": false,
+    "mesh_layer_probability": 0.2,
+    "mutation_probability": 0.44,
+    "per_birth_mutation_event_continuation_probability": 0.2,
+    "per_birth_mutation_events_max": 10,
+    "per_birth_mutation_events_min": 1,
+    "per_unit_rate": 0.005,
+    "per_unit_supply_enabled": true,
+    "phenotype": {
+      "channel_change_chance": 0.0010000000474974513,
+      "channel_step": 1,
+      "polarity_flip_chance": 0.00019999999494757503
+    },
+    "reachable_bias": {
+      "graph": 0.0,
+      "input_ref": 0.0,
+      "topology": 0.0,
+      "vm": 0.0
+    }
+  },
+  "population": {
+    "founder_profile": "v3_alpha1",
+    "initial_creatures": 10000,
+    "max_creatures": 1000000
+  },
+  "predation": {
+    "kill_complexity_bonus_multiplier": 0.0,
+    "steal_cost_rate": 0.05000000074505806
+  },
+  "runtime": {
+    "graph_convergence_epsilon": 0.0010000000474974513,
+    "graph_convergence_stable_passes": 2,
+    "graph_node_base_cost": 0.000009999999747378752,
+    "max_actions_per_turn": 10,
+    "max_graph_relax_iters": 15,
+    "max_mesh_hops": 1024,
+    "max_vm_steps": 10000,
+    "perception": {
+      "vision_radius": 5
+    },
+    "plasticity_update_cost": 0.0,
+    "reward_learning_cost": 0.0,
+    "vm": {
+      "opcode_cost_multiplier": 9.999999974752427E-7,
+      "step_ramp_allowance": 100,
+      "step_ramp_cost": 9.999999974752427E-7
+    }
+  },
+  "shared_memory": {
+    "decay_rate": 0.0
+  },
+  "startup": {
+    "ramps": {
+      "failed_action_penalty": {
+        "enabled": false,
+        "end": 0.0,
+        "start": 0.0,
+        "target_tick": 62680
+      }
+    }
+  },
+  "world": {
+    "edge_mode": "Wrap",
+    "food": {
+      "annealing": {
+        "enabled": false,
+        "initial_max_fertility": 1.5,
+        "initial_min_fertility": 0.30000001192092896,
+        "ramp_ticks": 5000
+      },
+      "fertility": {
+        "enabled": true,
+        "layers": [
+          {
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 90,
+                "falloff": 0.6000000238418579,
+                "max_radius": 100.0,
+                "min_radius": 15.0,
+                "seed": null
+              }
+            },
+            "target": {
+              "SingleType": {
+                "type_idx": 0
+              }
+            },
+            "weight": 1.0
+          },
+          {
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 5000,
+                "falloff": 0.5,
+                "max_radius": 5.0,
+                "min_radius": 1.0,
+                "seed": null
+              }
+            },
+            "target": {
+              "SingleType": {
+                "type_idx": 1
+              }
+            },
+            "weight": 1.0
+          }
+        ],
+        "max_fertility": 2.0,
+        "min_fertility": 0.0
+      },
+      "shared": {
+        "annealing": {
+          "enabled": false,
+          "initial_max_fertility": 1.5,
+          "initial_min_fertility": 0.30000001192092896,
+          "ramp_ticks": 5000
+        },
+        "fertility": {
+          "enabled": true,
+          "layers": [
+            {
+              "algorithm": {
+                "PoissonBlobs": {
+                  "blob_count": 90,
+                  "falloff": 0.6000000238418579,
+                  "max_radius": 100.0,
+                  "min_radius": 15.0,
+                  "seed": null
+                }
+              },
+              "target": {
+                "SingleType": {
+                  "type_idx": 0
+                }
+              },
+              "weight": 1.0
+            },
+            {
+              "algorithm": {
+                "PoissonBlobs": {
+                  "blob_count": 5000,
+                  "falloff": 0.5,
+                  "max_radius": 5.0,
+                  "min_radius": 1.0,
+                  "seed": null
+                }
+              },
+              "target": {
+                "SingleType": {
+                  "type_idx": 1
+                }
+              },
+              "weight": 1.0
+            }
+          ],
+          "max_fertility": 2.0,
+          "min_fertility": 0.0
+        },
+        "grazing": {
+          "enabled": true,
+          "factor": 0.5,
+          "floor": 0.10000000894069672,
+          "recovery_ticks": 1000
+        },
+        "growth_rate": 0.09000000357627869,
+        "initial_coverage": 0.5400000214576721,
+        "initial_density": 1.0,
+        "max_density": 1.0,
+        "occupancy_depletion": {
+          "deposit_per_occupied_tick": 0.07999999821186066,
+          "enabled": true
+        },
+        "recovery_floor_ratio": 1.0,
+        "recovery_spawn_rate": 0.0005000000237487257,
+        "spread_density_ratio": 0.25,
+        "spread_threshold_ratio": 0.800000011920929
+      },
+      "types": [
+        {
+          "color": "#22c55e",
+          "energy_per_unit": null,
+          "growth_inhibitor": 0.20000000298023224,
+          "growth_rate": null,
+          "initial_coverage": 0.5400000214576721,
+          "initial_density": 1.0,
+          "initial_fertility_only": true,
+          "name": "Primary Food",
+          "recovery_spawn_rate": null
+        },
+        {
+          "color": "#38bdf8",
+          "energy_per_unit": 50.0,
+          "growth_inhibitor": 0.0,
+          "growth_rate": 0.029999999329447746,
+          "initial_coverage": 0.5400000214576721,
+          "initial_density": 0.33000001311302185,
+          "initial_fertility_only": true,
+          "name": "Fruit",
+          "recovery_spawn_rate": 1.0
+        }
+      ]
+    },
+    "height": 1600,
+    "terrain": [
+      {
+        "bounds": null,
+        "params": {
+          "frequency": 0.004999999888241291,
+          "lacunarity": 2.0,
+          "octaves": 4,
+          "pattern_type": "FbmThreshold",
+          "persistence": 0.5,
+          "threshold": 0.019999999552965164
+        },
+        "seed": null
+      },
+      {
+        "bounds": null,
+        "params": {
+          "cluster_size": 2,
+          "density": 0.029999999329447746,
+          "pattern_type": "Noise"
+        },
+        "seed": null
+      }
+    ],
+    "width": 1600,
+    "world_seed": 5786586509898421
+  }
+}
