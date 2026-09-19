@@ -1,6 +1,6 @@
 # T17.F01 — Offspring Investment as a Fraction of Parent Energy
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-18
 **Feature**: T17.F01
 **Track**: [T17 — Brain Boundary Evolvability](../../roadmaps/t17-brain-boundary-evolvability.md)
@@ -158,7 +158,8 @@ step is a T11 question for the user.
       `viability::founders_only_run_has_no_energy_rejected_reproduce_attempts`
       (10 founders, mutation off, 2,000 ticks): no `RejectedEnergyConstraints`
       entry, `reproduction_actions_spawned_total > 0`.
-- [x] `cargo test --workspace` and `make check` -> pass; re-pinned tests and
+- [x] `cargo test --workspace` and `make check` -> exit 0 at tested commit
+      `9a7d13ca`; `make check-docs` -> exit 0 on the closure edits; re-pinned tests and
       old/new values in
       [`docs/progress/readings/t17-f01.md`](../../progress/readings/t17-f01.md).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` at 669b2c9e:
@@ -241,7 +242,8 @@ not taken here.
   Canyon); the likeliest cause — a battery scenario between energy 30 and 32
   no longer reaching the reproduce branch — is a hypothesis, not a
   measurement. Evolved dead per mutated birth rose in every world (Confluence
-  0 → 0.0273), no direction predeclared. Re-pin pending the user's decision.
+  0 → 0.0273), no direction predeclared. User decision 2026-09-18: severe accepted; goal-worlds epoch
+  re-pinned to this feature's goal summary in `benchmark-series.json`.
 
 | World | `plasticity_updates` per creature-tick, T16.F01 → T17.F01 | `final_population` | `plateau_population` |
 | --- | --- | --- | --- |
@@ -260,16 +262,16 @@ not taken here.
 
 ## Success Criteria
 
-- [ ] `meta[1]` decodes to a fraction in [0, 1] and the child's starting energy
+- [x] `meta[1]` decodes to a fraction in [0, 1] and the child's starting energy
       is `min(fraction × after_cost, default_offspring_energy)`.
-- [ ] A litter under `initial_energy` is rejected before any charge; the
+- [x] A litter under `initial_energy` is rejected before any charge; the
       parent's energy and every reproduce flow are unchanged by the rejection.
-- [ ] Every founder profile's attempt is accepted at every energy above its
+- [x] Every founder profile's attempt is accepted at every energy above its
       threshold and eligible age (property test and founders-only run), and
       the viability test passes.
 - [x] Reference docs and the frontend trace type describe the fraction; no
       surface still calls it an energy amount.
-- [ ] Gate and goal summaries stored with the before/after readings above in
+- [x] Gate and goal summaries stored with the before/after readings above in
       the readings file; goal-worlds epoch re-pinned in the closing commit.
 
 ## Notes for AI Agents
@@ -284,5 +286,7 @@ not taken here.
   `VmConstantMutation` step size on a [0, 1] fraction is surfaced to the user
   as a T11 question.
 - Cost: Opus-only substitution (spec owner, implementer, benchmark, reviewer,
-  mutation all Opus 5; implementer without advisor); `/usage` totals and
-  pass counts recorded at closure.
+  mutation all Opus 5; implementer without advisor). Implementer passes 3
+  (build, self-review, post-review remediation), advisor consults 0/0/0;
+  spec-owner resumes after Plan 2; reviewer findings P1 0, P2 2, P3 1;
+  `/usage` totals await the user.
