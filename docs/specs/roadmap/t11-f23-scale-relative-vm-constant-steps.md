@@ -138,18 +138,26 @@ Invariants:
       committed if produced) -> test name in the readings file.
 - [x] Transfer-slot seed sweep before/after and founder battery
       `operator_rows[VmConstantMutation]` before/after -> tables in the
-      readings file (invariant 5); the after battery row is a local
-      `evaluate_genome` reading until the gate summary is recorded.
+      readings file (invariant 5); the authoritative after battery row is the
+      gate summary's `operator_rows[VmConstantMutation]` (changed 6, silent
+      44, dead 0 of 50; before 13/37/0), which matches the earlier local
+      `evaluate_genome` reading.
 - [x] `cargo test -p v3-core --test viability` first (27 passed), then
       `make check` -> exit 0.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t11-f23-scale-relative-vm-constant-steps.json`
-      (gate) and `...-goal.json` (goal), local raw hash/byte count and
-      verification time checked, series entries point to the summaries, no new
-      full report staged.
+      (gate, 97,683 bytes) and `...-goal.json` (goal, 6,870,431 bytes); local
+      raw at the main checkout's `.bench-artifacts/t11-f23-scale-relative-vm-constant-steps/`
+      (`gate.json` 94,841 bytes sha256 `2c41167b…ada980`, `goal.json`
+      534,930,639 bytes sha256 `cdeaeac3…d5146`), `verified_local` at
+      2026-09-19T04:23:31Z / 04:32:31Z and re-checked with `shasum -a 256`;
+      `make` exit 0 and CLI exit 0 on both profiles; series entries
+      (`gate-v1`, `goal-worlds-v1`) point to the summaries; no full report
+      staged. Full hashes and the per-profile tables in the readings file's
+      Benchmark section.
 
 ## Performance and Goal Impact
 
@@ -195,7 +203,32 @@ world (before = the T17.F01 goal summary; gate founder births before
 | Goal: `energy_flows.offspring_energy_credit / births` (mean litter), per world | no direction; recorded (a slot-5 line now varies its litter within ±15% per event instead of dying or halving) |
 | Goal: evolved changed/dead, `neighborhood_read_*`, drift depth, lineage diversity, recruitment paths | no direction; recorded |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Measured 2026-09-18 at `ea498567` (benchmark
+specialist; commands, exit statuses, sizes and tables in the readings file).
+Gate: `make` exit 0, CLI exit 0, `severe=false` against both
+`remove-complementary-nutrition.json` and
+`t17-f01-offspring-investment-fraction.json`; every work counter `ok`
+(largest move `plasticity_updates` +9.435938% vs the latest closure,
+−25.145466% vs the epoch); wall `ok` (−1.569492% / +1.704988%). Goal:
+`make` exit 0, CLI exit 0, `severe=false` against
+`t17-f01-offspring-investment-fraction-goal.json` (epoch and latest
+closure); every work counter `ok` (`plasticity_updates` −32.885797%,
+`vm_steps` +0.400436%); wall `ok` (+16.476621%, under the 25% flag). No
+extinction in any goal world (`extinction_tick` null; final populations
+Orchards 7,208, Canyon 5,683, Confluence 4,648). Caps:
+`neighborhood_evolved_wall_clock_ms_total` 695.156 ms of 180,000;
+`neighborhood_founder_wall_clock_ms` 115.480 ms (goal) and 46.371 ms (gate)
+of 10,000. Founder battery `operator_rows[VmConstantMutation]` in the gate
+summary: changed 6, silent 44, dead 0 of 50 (before 13/37/0), the same in
+every goal world. `founder_changed_per_all_births` fell in the gate
+(0.400000 → 0.395238; gate source
+`mutational_neighborhood.founder.births.any_events.changed_fraction`, 83/210,
+as the gate summary has no `case_readings`) and every goal world (0.438095 → 0.433333, 0.4 →
+0.395238, 0.438095 → 0.433333); `founder_dead_per_all_births` 0 everywhere.
+Gate `births` per creature-tick 0.026042 (before 0.026268). No indicator
+missed its predeclared direction; no severe flag; no user decision raised
+by the measurements. The goal-worlds epoch re-pin to this feature's goal
+summary is the closing commit's step, not this record's.
 
 - Summaries: [gate](../../progress/features/t11-f23-scale-relative-vm-constant-steps.json),
   [goal](../../progress/features/t11-f23-scale-relative-vm-constant-steps-goal.json).
