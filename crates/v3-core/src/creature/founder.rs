@@ -331,6 +331,7 @@ fn node1_vm_decision(forage_first: bool, reproduce_transfer_fraction: f32) -> No
 
 #[cfg(test)]
 mod tests {
+    use super::super::cgp_founder::age_gate_threshold;
     use super::*;
     use crate::config::RuntimeConfig;
     use crate::contracts::{Direction, WorldAction};
@@ -342,25 +343,26 @@ mod tests {
     use proptest::prelude::*;
 
     /// The T17.F01 profile table on the unit scale (T17.F02): (profile,
-    /// strict energy threshold as a fraction of `max_energy`, transfer
+    /// strict energy threshold as a fraction of `max_energy`, the T17.F01 raw
+    /// threshold it re-expresses at the default `max_energy` (200), transfer
     /// fraction). Pinned here independently of `founder_reproduce_policy`
     /// so a change in either shows up.
-    const PROFILES: [(FounderProfile, f32, f32); 5] = [
-        (FounderProfile::V3Alpha1, 0.16, 2.0 / 3.0),
-        (FounderProfile::ForageFirstSparse, 0.16, 2.0 / 3.0),
-        (FounderProfile::ForageFirstSparseConservative, 0.30, 0.35),
-        (FounderProfile::ForageFirstSparseRichOffspring, 0.20, 0.60),
-        (FounderProfile::ForageFirstSparseBalanced, 0.25, 0.45),
-    ];
-
-    /// The T17.F01 raw thresholds each unit threshold re-expresses at the
-    /// default `max_energy` (200).
-    const RAW_THRESHOLDS: [(FounderProfile, f32); 5] = [
-        (FounderProfile::V3Alpha1, 32.0),
-        (FounderProfile::ForageFirstSparse, 32.0),
-        (FounderProfile::ForageFirstSparseConservative, 60.0),
-        (FounderProfile::ForageFirstSparseRichOffspring, 40.0),
-        (FounderProfile::ForageFirstSparseBalanced, 50.0),
+    const PROFILES: [(FounderProfile, f32, f32, f32); 5] = [
+        (FounderProfile::V3Alpha1, 0.16, 32.0, 2.0 / 3.0),
+        (FounderProfile::ForageFirstSparse, 0.16, 32.0, 2.0 / 3.0),
+        (
+            FounderProfile::ForageFirstSparseConservative,
+            0.30,
+            60.0,
+            0.35,
+        ),
+        (
+            FounderProfile::ForageFirstSparseRichOffspring,
+            0.20,
+            40.0,
+            0.60,
+        ),
+        (FounderProfile::ForageFirstSparseBalanced, 0.25, 50.0, 0.45),
     ];
 
     /// T17.F02 invariant 6, energy half: on the unit scale the founder makes
@@ -370,8 +372,7 @@ mod tests {
     #[test]
     fn founder_energy_gates_scan_identically_on_the_unit_scale() {
         let max_energy = EnergyLifecycleConfig::default().max_energy;
-        for (profile, raw) in RAW_THRESHOLDS {
-            let unit = founder_reproduce_policy(profile).energy_threshold;
+        for (profile, unit, raw, _) in PROFILES {
             assert_eq!(unit, raw / max_energy, "{profile:?}");
             let mut mismatches = Vec::new();
             let mut energy = raw - 1.0;
@@ -397,7 +398,7 @@ mod tests {
     fn founder_age_gate_is_exact_at_every_integer_age() {
         for reference in [500_u64, 1_000, 1_024, 2_000, 2_048, 4_096] {
             for min_age in [0_u64, 1, 19, 20, 25, 100] {
-                let threshold = super::super::cgp_founder::age_gate_threshold(min_age, reference);
+                let threshold = age_gate_threshold(min_age, reference);
                 for age in 0..=(reference + 10) {
                     let raw_pass = age >= min_age;
                     let unit_pass = age_fraction(age, reference) > threshold;
@@ -412,7 +413,7 @@ mod tests {
 
     #[test]
     fn founder_reproduce_policy_matches_the_profile_table() {
-        for (profile, threshold, fraction) in PROFILES {
+        for (profile, threshold, _, fraction) in PROFILES {
             assert_eq!(
                 founder_reproduce_policy(profile),
                 FounderReproducePolicy {
@@ -477,16 +478,11 @@ mod tests {
         .actions
     }
 
-    /// The raw energy a unit threshold sits at under the default lifecycle;
-    /// the `actions` helper takes raw energy.
-    fn raw_threshold(unit_threshold: f32) -> f32 {
-        unit_threshold * EnergyLifecycleConfig::default().max_energy
-    }
-
     #[test]
     fn founder_profiles_execute_energy_age_boundaries_and_priorities() {
-        for (profile, unit_threshold, transfer) in PROFILES {
-            let threshold = raw_threshold(unit_threshold);
+        // The `actions` helper takes raw energy, so the boundaries sit on the
+        // raw threshold.
+        for (profile, _, threshold, transfer) in PROFILES {
             let reproduction = vec![WorldAction::Reproduce {
                 direction: Direction::W,
                 energy_transfer_fraction: transfer,
@@ -538,8 +534,7 @@ mod tests {
     }
 
     fn assert_directions(cardinal: [f32; 4]) {
-        for (profile, unit_threshold, _) in PROFILES {
-            let threshold = raw_threshold(unit_threshold);
+        for (profile, _, threshold, _) in PROFILES {
             for (food, energy, age) in [(1.0, 20.0, 0), (0.0, 20.0, 0), (0.0, threshold + 1.0, 20)]
             {
                 let output = actions(profile, food, energy, age, 20, cardinal, 10);
@@ -585,7 +580,7 @@ mod tests {
             v3alpha1_founder_genome(),
             founder_genome(FounderProfile::V3Alpha1)
         );
-        for (profile, _, _) in PROFILES {
+        for (profile, ..) in PROFILES {
             let genome = founder_genome(profile);
             assert_eq!(genome.nodes.len(), 2);
             assert_eq!(genome.nodes[0].input_refs.len(), 5);

@@ -166,12 +166,19 @@ Invariants:
       Conservative); `founder_age_gate_is_exact_at_every_integer_age`;
       property tests `energy_fraction_is_bounded_and_monotone` and
       `age_fraction_is_bounded_and_monotone`; all named in the readings file.
-- [x] `cargo test -p v3-core` -> 1579 lib tests passed (2 ignored), every
-      integration binary ok; `cargo test --workspace --no-fail-fast` ok after
-      the `bench_artifacts` re-pin; `cargo check --workspace --all-targets`
-      clean; `make check` -> exit 0 (rustfmt, clippy, workspace tests,
-      frontend lint/typecheck/tests/build, roadmap-check). Re-pinned tests
-      and fixtures tabled in the readings file with old and new values.
+- [x] `cargo test --workspace --no-fail-fast` -> ok on the self-reviewed
+      tree: v3-core 1579 lib tests passed (2 ignored), viability 28, every
+      integration binary ok, v3-cli and v3-server ok; `cargo check --workspace
+      --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`,
+      and `cargo fmt --all --check` clean; `make roadmap-check` passed;
+      `make check` -> exit 0 on the build commit (rustfmt, clippy, workspace
+      tests, frontend lint/typecheck/tests/build, roadmap-check). Re-pinned
+      tests and fixtures tabled in the readings file with old and new values.
+- [x] Simplification pass (test code only, no pinned value moved): the
+      founder profile table in `creature/founder.rs` carries the raw T17.F01
+      threshold beside the unit one (one table, no `raw_threshold` helper);
+      `tests/temporal_fixtures.rs` derives its age constants through
+      `age_fraction` and `EnergyLifecycleConfig::default()`.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.

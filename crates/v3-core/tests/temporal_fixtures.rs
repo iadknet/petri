@@ -36,7 +36,7 @@ use common::{graph_hop, insert_creature, run_one_traced_tick, test_config};
 
 use proptest::prelude::*;
 use slotmap::SlotMap;
-use v3_core::config::{MutationConfig, OrdinaryFoodTypeId, SimulationConfig};
+use v3_core::config::{EnergyLifecycleConfig, MutationConfig, OrdinaryFoodTypeId};
 use v3_core::contracts::{
     CreatureId, Direction, InputReference, NodeId, Position, RouteTarget, StaticIntrospectionKey,
     WorldAction, WorldInputKey,
@@ -53,7 +53,7 @@ use v3_core::creature::state::{CreatureState, GraphRuntimeState};
 use v3_core::kernel::WorldState;
 use v3_core::runtime::mesh::execute_creature_mesh;
 use v3_core::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
-use v3_core::sensors::static_inputs::StaticInputs;
+use v3_core::sensors::static_inputs::{age_fraction, StaticInputs};
 use v3_core::sensors::typed_food::TypedFoodLocalSnapshot;
 use v3_core::simulation::Simulation;
 
@@ -75,18 +75,11 @@ fn age_ticks_ref() -> InputReference {
 /// on integer ages, so their targets and half-tick tolerance sit on that
 /// scale.
 fn age_target(age: u64) -> f32 {
-    age as f32
-        / SimulationConfig::default()
-            .energy
-            .lifecycle
-            .age_reference_ticks as f32
+    age_fraction(age, EnergyLifecycleConfig::default().age_reference_ticks)
 }
 
 fn age_eps() -> f32 {
-    0.5 / SimulationConfig::default()
-        .energy
-        .lifecycle
-        .age_reference_ticks as f32
+    0.5 / EnergyLifecycleConfig::default().age_reference_ticks as f32
 }
 
 /// A1's genome, also used as B1's matched reactive control: read `FoodHere`
