@@ -1,6 +1,6 @@
 # T11.F23 — Scale-Relative VM Constant Steps
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-18
 **Feature**: T11.F23
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -126,7 +126,7 @@ Invariants:
       `tests/recruitment_paths.rs` green.
 - [x] Pinned trajectories re-pinned and listed (invariant 6).
 - [x] `docs/reference/v3-mutation-spec.md` entry (invariant 8).
-- [ ] Gate and goal baseline runs recorded; goal-worlds epoch re-pinned in the
+- [x] Gate and goal baseline runs recorded; goal-worlds epoch re-pinned in the
       closing commit (Performance).
 
 ## Verification
@@ -237,8 +237,7 @@ as the gate summary has no `case_readings`) and every goal world (0.438095 → 0
 0.395238, 0.438095 → 0.433333); `founder_dead_per_all_births` 0 everywhere.
 Gate `births` per creature-tick 0.026042 (before 0.026268). No indicator
 missed its predeclared direction; no severe flag; no user decision raised
-by the measurements. The goal-worlds epoch re-pin to this feature's goal
-summary is the closing commit's step, not this record's.
+by the measurements. The goal-worlds epoch now points at this feature's goal summary.
 
 - Summaries: [gate](../../progress/features/t11-f23-scale-relative-vm-constant-steps.json),
   [goal](../../progress/features/t11-f23-scale-relative-vm-constant-steps-goal.json).
@@ -246,17 +245,17 @@ summary is the closing commit's step, not this record's.
 
 ## Success Criteria
 
-- [ ] `apply_constant_mutation` applies `c += u × max(|c|, 1)`, `u` uniform in
+- [x] `apply_constant_mutation` applies `c += u × max(|c|, 1)`, `u` uniform in
       [−0.1, 0.1], with the empty-pool draw and RNG draw order unchanged
       (invariants 1–4, tests and proptest green).
-- [ ] The founder's transfer-slot sterile and semelparous shares under one
+- [x] The founder's transfer-slot sterile and semelparous shares under one
       `VmConstantMutation` read 0 after (0.167 / 0.333 before), tabled in the
       readings file with the founder battery operator row before and after.
-- [ ] T13.F05's replay is green with a truthfully re-derived `vm_unprepared`
+- [x] T13.F05's replay is green with a truthfully re-derived `vm_unprepared`
       route (six events, qualified); no predicate weakened.
-- [ ] Pinned trajectories re-pinned and listed; `make check` and the mutation
+- [x] Pinned trajectories re-pinned and listed; `make check` and the mutation
       gate pass with every survivor resolved.
-- [ ] Gate and goal summaries stored, goal births per creature-tick read before
+- [x] Gate and goal summaries stored, goal births per creature-tick read before
       and after per world, goal-worlds epoch re-pinned in the closing commit.
 
 ## Notes for AI Agents
@@ -266,10 +265,10 @@ summary is the closing commit's step, not this record's.
   "Constant steps, 2026-09-18"); graph parameter steps stay ±0.1.
 - Decision: spec-owner ruling 2026-09-18 — the T13.F05 `vm_unprepared` form
   qualifies through the `direction_doubled` instruction replace (invariant 7);
-  the earlier "no six-event route exists with the existing operators" record
-  was a constant-walk reading only, since the same replace was available
-  under the ±1 operator. Later readers (T13.F06, T11.F13) cite 7 qualified
-  forms of 9 from this closure, not the 7-event growth gap.
-- Cost: Opus substitution for all roles (spec owner, implementer without
-  advisor, benchmark specialist, reviewer, mutation specialist); /usage totals
-  pending.
+  the earlier "no six-event route" record was a constant-walk reading only
+  (the replace existed under ±1). Later readers (T13.F06, T11.F13) cite 7
+  qualified forms of 9, not the 7-event growth gap.
+- Cost: Opus for every role (user-directed 2026-09-18; no advisor). Tested
+  commit e6a8f19c; 3 implementer passes, 0 advisor consults; 1 spec-owner
+  resume; review P1/P2/P3 0/0/3; 1 fresh mutation run, 1 survivor killed;
+  /usage pending.
