@@ -46,7 +46,8 @@
       "docs/progress/features/t16-f01-gate-before-charge-in-reproduction.json",
       "docs/progress/features/topology-weight-rescale.json",
       "docs/progress/features/t17-f01-offspring-investment-fraction.json",
-      "docs/progress/features/t11-f23-scale-relative-vm-constant-steps.json"
+      "docs/progress/features/t11-f23-scale-relative-vm-constant-steps.json",
+      "docs/progress/features/t17-f02-unit-scale-introspection.json"
     ]
   },
   "goal": {
@@ -112,7 +113,8 @@
       "docs/progress/features/t11-f22-meaning-stable-input-references-goal.json",
       "docs/progress/features/t16-f01-gate-before-charge-in-reproduction-goal.json",
       "docs/progress/features/t17-f01-offspring-investment-fraction-goal.json",
-      "docs/progress/features/t11-f23-scale-relative-vm-constant-steps-goal.json"
+      "docs/progress/features/t11-f23-scale-relative-vm-constant-steps-goal.json",
+      "docs/progress/features/t17-f02-unit-scale-introspection-goal.json"
     ]
   }
 }
