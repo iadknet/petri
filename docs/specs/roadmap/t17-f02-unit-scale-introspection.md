@@ -1,6 +1,6 @@
 # T17.F02 — Unit-Scale Introspection
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-19
 **Feature**: T17.F02
 **Track**: [T17 — Brain Boundary Evolvability](../../roadmaps/t17-brain-boundary-evolvability.md)
@@ -13,9 +13,8 @@ A creature feels how full, how tired, and how old it is as a share of itself.
 age_reference_ticks, 1)` on a new lifecycle config field; `Generation` leaves
 the input key set. Every founder profile's energy gate is re-expressed on the
 unit scale and its age gate on the configured span, so a founder-only world
-runs the same trajectory as before. A `Threshold` or `Constant` drawn in
-[−1, 1], a ±0.1 parameter step, and the Covariance rule now act on these
-inputs at the scale they were designed for.
+runs the same trajectory as before. Thresholds, constants, ±0.1 steps, and the
+Covariance rule now act on these inputs at their designed scale.
 
 ## Non-Goals
 
@@ -29,8 +28,8 @@ inputs at the scale they were designed for.
 - No load-time validation that a non-default lifecycle keeps a founder's unit
   gate inside physiology's acceptance region (`SimulationConfig` has no
   error-returning validation path; the constraint is documented, invariant 7).
-- No compatibility shim: a serialized genome that names `Generation` no
-  longer loads (the repository holds none).
+- No compatibility shim for serialized genomes naming `Generation` (the
+  repository holds none).
 
 ## Inputs and Invariants
 
@@ -154,7 +153,7 @@ Invariants:
       the mutation-off pin unchanged.
 - [x] Reference docs per invariant 10 (`v3-mutation-spec.md` never named
       `Generation`, unchanged); frontend fixtures updated.
-- [x] `make check` -> pass.
+- [x] `make check` -> exit 0 at d2929582 (tested commit).
 - [x] Invariant 5 constraint: config-spec text beside `age_reference_ticks`
       and one `min_reproduce_age > age_reference_ticks` case in
       `founder_age_gate_is_exact_at_every_integer_age` asserting no attempt.
@@ -258,16 +257,18 @@ serialized `age_reference_ticks` moved the config digests).
 
 ## Success Criteria
 
-- [ ] `EnergyCurrent`, `EnergyConsumedThisTick`, and `AgeTicks` resolve in
+- [x] `EnergyCurrent`, `EnergyConsumedThisTick`, and `AgeTicks` resolve in
       [0, 1] on both read paths from the configured denominators;
       `Generation` no longer exists as a key.
-- [ ] Every founder profile carries the tabled unit threshold and the
+- [x] Every founder profile carries the tabled unit threshold and the
       config-derived age threshold; the founder-only digest is unchanged and
       the gate-scan mismatch sets match the table.
-- [ ] The gate and goal summaries are stored, the before/after readings are
+- [x] The gate and goal summaries are stored, the before/after readings are
       tabled, and the goal-worlds epoch is re-pinned in the closing commit.
-- [ ] Reference docs describe the unit-scale boundary and the hazard
+- [x] Reference docs describe the unit-scale boundary and the hazard
       constraint.
 
 ## Notes for AI Agents
-- Decision: 2026-09-19, the user accepted the severe goal `plasticity_updates` (+78.9%, `severe=true`, `cli_exit` 3) as this feature's predeclared cost; the goal-worlds epoch is re-pinned to `t17-f02-unit-scale-introspection-goal.json` in the closing commit.
+- Decision: 2026-09-19, the user accepted the severe goal `plasticity_updates` (+78.9%) as the predeclared cost; goal-worlds epoch re-pinned to this feature's goal summary.
+- Cost: Opus every role, no advisor. 3 implementer passes, 0 consults;
+  1 spec-owner resume; review 0/1/6; 1 mutation run; /usage pending.
