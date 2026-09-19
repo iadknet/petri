@@ -783,19 +783,21 @@ mod tests {
     /// `Generation` removed from the catalog): every input-reference draw
     /// shifts, and the two drift rows' retained-useful counts moved 7 -> 6
     /// (graph) and 8 -> 7 (VM); the selection rows are unchanged.
+    /// Re-pinned 2026-09-19 for the 25% large-copy weight default: topology
+    /// draws and subsequent RNG histories change; applicability stays intact.
     #[test]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [21, 13, 11, 6], [0, 0]),
+            ("graph_prepared", Policy::Drift, [19, 15, 13, 7], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [22, 22, 22, 22],
+                [20, 20, 20, 20],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [21, 14, 12, 7], [0, 0]),
-            ("vm_prepared", Policy::Selection, [21, 21, 21, 20], [0, 0]),
+            ("vm_prepared", Policy::Drift, [19, 16, 15, 9], [0, 0]),
+            ("vm_prepared", Policy::Selection, [19, 19, 19, 18], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
             let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -904,12 +906,14 @@ mod tests {
     /// discovery useful (22/22 and 19/19 against 22/22 and 21/20 under F02
     /// selection; values re-pinned 2026-09-18 with the topology weight
     /// rescale around `ChangeEntryNode`).
+    /// Re-pinned 2026-09-19 for the 25% large-copy weight default: 21/21
+    /// graph and 20/20 VM retained discoveries remain useful.
     #[test]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
-            ("graph_prepared", [22, 22, 22, 22], 10),
-            ("vm_prepared", [19, 19, 19, 19], 13),
+            ("graph_prepared", [21, 21, 21, 21], 11),
+            ("vm_prepared", [20, 20, 20, 20], 12),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, Policy::CostSelection);

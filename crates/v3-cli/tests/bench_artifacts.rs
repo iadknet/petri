@@ -179,17 +179,19 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
 /// `age_reference_ticks` field the byte-identical recipes inherit from the
 /// production default, so every digest moved once (previously re-pinned at
 /// T02.F04 for the `grazing` block). Measured on the T17.F02 code.
+/// Re-pinned 2026-09-19: resolved recipes now include the 25% large-copy weight.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
-    for (name, expected) in GOAL_RECIPE_NAMES.into_iter().zip([
-        "sha256:b065b220220dd57d6d7beec27adea65f5fce005f7b34c38684ff99a1771f2f6a",
-        "sha256:bd3fa7878befa9c07d3c180786a6c6603b6701a97e1f9f0ae552c2e13b1d4e32",
-        "sha256:289a95bd906e0548f5ec815daf1c0d08e6aac0a4184f8d4603e08fc8fb185239",
-    ]) {
-        let digest = v3_core::config::config_digest(&resolve_checked_in_recipe(name));
-        println!("{name}: {digest}");
-        assert_eq!(digest, expected, "{name}");
-    }
+    let actual = GOAL_RECIPE_NAMES
+        .map(|name| v3_core::config::config_digest(&resolve_checked_in_recipe(name)));
+    assert_eq!(
+        actual,
+        [
+            "sha256:998a2733f9ce5e5156db679a3c5e9552873b2cbcf538a237edeb612d5043b2d8",
+            "sha256:80fc4f40ba769fe32ac11d8f884bc1d25a362b82ddc4428207a5590af7a8ba01",
+            "sha256:c9584d3f0604ae829a90c694e8a4e546b5b2e14e17b12b5a5ddba647775df97b",
+        ]
+    );
 }
 
 /// Every checked-in goal world carries grazing at the production defaults

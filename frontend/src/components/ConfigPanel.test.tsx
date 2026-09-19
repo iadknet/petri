@@ -86,6 +86,14 @@ describe("ConfigPanel", () => {
 		expect(mutation?.per_unit_rate).toBe(0.01);
 	});
 
+	it("edits the relative large-copy weight in the runtime draft", () => {
+		render(<ConfigPanel />);
+		const weight = screen.getByTestId("config-field-mutation-large-copy-weight-percent");
+		expect(weight).toHaveValue(25);
+		fireEvent.change(weight, { target: { value: "0" } });
+		expect(useConfigStore.getState().localDraft?.mutation.large_copy_weight_percent).toBe(0);
+	});
+
 	it("edits the executed-target bias and window in the runtime draft", () => {
 		render(<ConfigPanel />);
 		const bias = screen.getByTestId("config-field-mutation-executed-bias");

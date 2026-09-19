@@ -8,6 +8,7 @@
 //! T02.F04, T03.F11, T11.F21, T11.F22, T16.F01, the 2026-09-18
 //! `ChangeEntryNode` rescale, T17.F01, and T11.F23); the pin's purpose — that
 //! the accounting keeps the trajectory reproducible — is unchanged.
+//! Re-pinned 2026-09-19 for the 25% large-copy weight default.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -73,6 +74,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "1d1878c9c15b5f1527e21a10af92db75faf079630e3246d21baf4895997a8709"
+        "1b616e569682439ffe4edb3c02bb45b2c809e44c70abc9418efae3bb64726cca"
     );
 }

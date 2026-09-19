@@ -814,6 +814,11 @@ pub struct MutationConfig {
     /// Probability of selecting the mesh (Topology) layer per mutation event.
     /// Complement (1 - this) selects the node-internal layer (VM/Graph/InputRef).
     pub mesh_layer_probability: f64,
+    /// Relative weight of node and mesh-slice copying, as a percentage of
+    /// their base weights. 25 quarters copying; 100 restores base weights;
+    /// 0 disables these operators. Other operators retain their relative weights.
+    #[serde(default = "default_large_copy_weight_percent")]
+    pub large_copy_weight_percent: u8,
     /// Total genome size above which pressure escalates against structural growth.
     #[serde(alias = "complexity_cap")]
     pub genome_size_cap: u32,
@@ -865,6 +870,10 @@ fn default_executed_bias() -> f64 {
     0.9
 }
 
+fn default_large_copy_weight_percent() -> u8 {
+    25
+}
+
 fn default_executed_window_ticks() -> u64 {
     100
 }
@@ -880,6 +889,7 @@ impl Default for MutationConfig {
             per_birth_mutation_event_continuation_probability:
                 default_mutation_event_continuation_probability(),
             mesh_layer_probability: 0.2,
+            large_copy_weight_percent: default_large_copy_weight_percent(),
             genome_size_cap: 1200,
             genome_size_pressure_enabled: false,
             action_queue_cap: 4,
@@ -1093,6 +1103,7 @@ impl SimulationConfig {
         // per_unit_supply_enabled: bool, no normalization needed.
         m.mutation_probability = m.mutation_probability.clamp(0.0, 1.0);
         m.mesh_layer_probability = m.mesh_layer_probability.clamp(0.0, 1.0);
+        m.large_copy_weight_percent = m.large_copy_weight_percent.min(100);
         let continuation = m.per_birth_mutation_event_continuation_probability;
         m.per_birth_mutation_event_continuation_probability = if continuation.is_finite() {
             continuation.clamp(0.0, 1.0)
@@ -2420,6 +2431,32 @@ mod tests {
         let cfg = SimulationConfig::default();
         assert!((cfg.mutation.executed_bias - 0.9).abs() < 1e-9);
         assert_eq!(cfg.mutation.executed_window_ticks, 100);
+    }
+
+    #[test]
+    fn large_copy_tuning_defaults_and_recipe_roundtrip() {
+        let mut value = serde_json::to_value(MutationConfig::default()).unwrap();
+        assert_eq!(value["large_copy_weight_percent"], 25);
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("large_copy_weight_percent");
+        let config: MutationConfig = serde_json::from_value(value).unwrap();
+        assert_eq!(config.large_copy_weight_percent, 25);
+        assert!(!config.genome_size_pressure_enabled);
+    }
+
+    proptest! {
+        #[test]
+        fn large_copy_tuning_normalizes(percent in any::<u8>()) {
+            let mut config = SimulationConfig::default();
+            config.mutation.large_copy_weight_percent = percent;
+            config.normalize();
+            prop_assert_eq!(config.mutation.large_copy_weight_percent, percent.min(100));
+            let roundtrip: SimulationConfig = serde_json::from_str(
+                &serde_json::to_string(&config).unwrap()).unwrap();
+            prop_assert_eq!(roundtrip.mutation.large_copy_weight_percent, percent.min(100));
+        }
     }
 
     #[test]
