@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc f70a57f9661f6bb5cc3106c841233f0c3e70f9ca53058fb983e8b3b6d8400d6b # shrinks to forced_slot = 11, extra = [(3, 3), (15, 1), (11, 0), (3, 2), (6, 2), (14, 0), (5, 1), (15, 3), (3, 2), (2, 1), (14, 2)], seed = 9271024164662436681
+cc e848977f31d070a28a70254006b3bdafc97a7e1d1f53e81106be81877941c897 # shrinks to c = 0.0, seed = 695102326708072050

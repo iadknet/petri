@@ -8,6 +8,14 @@ use crate::creature::genome::{BackendDef, CreatureGenome, VmBackendDef, VmInstru
 use crate::mutation::types::MutationSkipReason;
 use crate::runtime::action_decode::{DIRECTION_BANK_SLOTS, MAX_DECODED_ACTION_TYPE};
 
+/// Nudge one constant of the node's VM pool by a share of its scale.
+///
+/// T11.F23: the constant `c` moves by `u * max(|c|, 1)` with `u` drawn
+/// uniformly from `[-0.1, 0.1]`, the graph parameter step. A unit-scale
+/// constant moves as a graph parameter does, a raw-scale constant moves by
+/// at most a tenth of its magnitude; the step may cross zero and is never
+/// clamped. The index draw then the `u` draw are the operator's only draws.
+/// An empty pool gains one constant drawn from `[-1, 1]`.
 pub(super) fn apply_constant_mutation(
     genome: &mut CreatureGenome,
     node_idx: usize,
@@ -16,12 +24,11 @@ pub(super) fn apply_constant_mutation(
     let node = &mut genome.nodes[node_idx];
     if let BackendDef::Vm(ref mut vm) = node.backend_def {
         if vm.constants.is_empty() {
-            // If pool is empty, add one random constant.
             vm.constants.push(rng.gen_range(-1.0f32..=1.0));
         } else {
             let idx = rng.gen_range(0..vm.constants.len());
-            let scale = 1.0f32;
-            vm.constants[idx] += rng.gen_range(-1.0f32..=1.0) * scale;
+            let constant = &mut vm.constants[idx];
+            *constant += rng.gen_range(-0.1f32..=0.1) * constant.abs().max(1.0);
         }
     }
     Ok(())

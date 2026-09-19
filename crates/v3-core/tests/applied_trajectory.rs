@@ -1,13 +1,12 @@
 //! Pins the sampled trajectory, including stochastic descendants and actions.
 //! Telemetry and wall-clock fields are deliberately excluded.
 //!
-//! T17.F01 re-pin: the founder now emits a transfer fraction (2/3 of
-//! post-cost energy behind a strict gate of 32) instead of a 20-energy
-//! ration behind 30, so every trajectory moves from its first birth. The
-//! digest below was measured after two runs agreed (previously re-pinned at
-//! T02.F04, T03.F11, T11.F21, T11.F22, T16.F01, and the 2026-09-18
-//! `ChangeEntryNode` rescale); the pin's purpose — that the accounting keeps
-//! the trajectory reproducible — is unchanged.
+//! T11.F23 re-pin: `VmConstantMutation` moves a constant by a share of its
+//! scale instead of ±1, so every trajectory moves from its first constant
+//! event. The digest below was measured after two runs agreed (previously
+//! re-pinned at T02.F04, T03.F11, T11.F21, T11.F22, T16.F01, the 2026-09-18
+//! `ChangeEntryNode` rescale, and T17.F01); the pin's purpose — that the
+//! accounting keeps the trajectory reproducible — is unchanged.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -73,6 +72,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "c17ab70b66dcf9de7c216d9cfc5e8c768aca4811047b0a140cff33be35ee5c93"
+        "112d9b4e0106fece34f47a87246bf658f838b56376ddad58e42530bda393266f"
     );
 }

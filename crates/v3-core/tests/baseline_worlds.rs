@@ -91,12 +91,11 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
     assert_eq!(points.len(), 6);
 }
 
-/// T17.F01 re-pin: the founder now emits a transfer fraction (2/3 of
-/// post-cost energy behind a strict gate of 32) instead of a 20-energy
-/// ration behind 30, so energies and positions move from the first birth.
-/// The hash below was measured after two runs agreed; the identity the test
-/// pins is unchanged (previously re-pinned at T02.F04, T11.F19, T11.F21,
-/// T11.F22, and the 2026-09-18 `ChangeEntryNode` rescale).
+/// T11.F23 re-pin: `VmConstantMutation` moves a constant by a share of its
+/// scale instead of ±1, so every trajectory moves from its first constant
+/// event. The hash below was measured after two runs agreed; the identity
+/// the test pins is unchanged (previously re-pinned at T02.F04, T11.F19,
+/// T11.F21, T11.F22, the 2026-09-18 `ChangeEntryNode` rescale, and T17.F01).
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -124,7 +123,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 16537473422018603259);
+    assert_eq!(hash.finish(), 17387818010249764947);
 }
 
 use proptest::prelude::*;

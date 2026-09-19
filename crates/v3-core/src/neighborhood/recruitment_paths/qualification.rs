@@ -448,8 +448,14 @@ fn graph_copy_plan(cue_sources: Vec<GraphSource>) -> Vec<StepSpec> {
 
 /// The Task A-correct copy: the ring added to the table, the read's
 /// reference then its sub-index moved one raw-field nudge at a time, the
-/// direction constant moved twice, activation: seven events, a recorded
-/// growth gap (no six-event route exists with the existing operators).
+/// zeroed direction constant's load replaced by a doubling of the cue
+/// register (the east code 2, as the blank program computes it),
+/// activation: six events.
+///
+/// T11.F23: a constant mutation moves a constant by at most a tenth of
+/// `max(|c|, 1)`, so walking the zeroed direction constant to `[1.5, 2.5)`
+/// takes at least fifteen events; the one-event `VmInstructionMutation`
+/// replace is the route through the existing operators.
 fn vm_unprepared_plan() -> Vec<StepSpec> {
     let read = |ref_idx: u16, sub_idx: u16| VmInstruction::ReadInput {
         dst: 0,
@@ -462,11 +468,11 @@ fn vm_unprepared_plan() -> Vec<StepSpec> {
             && vm(after).program[1..] == vm(before).program[1..]
             && vm(after).constants == vm(before).constants
     };
-    let constant_moved = |before: &CreatureGenome, after: &CreatureGenome| {
-        only_scaffold_backend_changed(before, after)
-            && vm(after).program == vm(before).program
-            && vm(after).constants[0] == vm(before).constants[0]
-    };
+    /// The direction load: `LoadConst { dst: 3, const_idx: 1 }` at this
+    /// position of the copied incumbent program.
+    const DIRECTION_LOAD: usize = 4;
+    /// The cue register doubled into the direction register.
+    const DOUBLE_INTO_DIRECTION: VmInstruction = VmInstruction::Add { dst: 3, a: 0, b: 0 };
     vec![
         ring_added(),
         step(
@@ -488,17 +494,18 @@ fn vm_unprepared_plan() -> Vec<StepSpec> {
             move |before, after| read_moved(before, after, read(1, 2)),
         ),
         step(
-            "direction_half",
-            "VmConstantMutation on the direction constant: at least 0.5 of the way to east",
-            ProductionEvent::Vm(VmOperator::VmConstantMutation),
-            move |before, after| constant_moved(before, after) && vm(after).constants[1] >= 0.5,
-        ),
-        step(
-            "direction_east",
-            "VmConstantMutation on the direction constant: lands in [1.5, 2.5)",
-            ProductionEvent::Vm(VmOperator::VmConstantMutation),
-            move |before, after| {
-                constant_moved(before, after) && decodes_east(vm(after).constants[1])
+            "direction_doubled",
+            "VmInstructionMutation replace: the direction constant's LoadConst becomes Add doubling the cue register into the direction register (east code 2)",
+            ProductionEvent::Vm(VmOperator::VmInstructionMutation),
+            |before, after| {
+                let (b, a) = (vm(before), vm(after));
+                only_scaffold_backend_changed(before, after)
+                    && a.constants == b.constants
+                    && a.register_count == b.register_count
+                    && a.program.len() == b.program.len()
+                    && a.program[..DIRECTION_LOAD] == b.program[..DIRECTION_LOAD]
+                    && a.program[DIRECTION_LOAD] == DOUBLE_INTO_DIRECTION
+                    && a.program[DIRECTION_LOAD + 1..] == b.program[DIRECTION_LOAD + 1..]
             },
         ),
         swap_activation(),
@@ -876,16 +883,6 @@ fn detour_start(backend: ModuleBackend, base: &CreatureGenome) -> ConstructionSt
     )
 }
 
-/// The unprepared VM copy's read moves one raw field per event: the table
-/// entry, then the sub-index twice. Seven events with the existing
-/// operators (`nudge_u16` moves one, a constant mutation moves at most one).
-fn vm_unprepared_growth_gap() -> GrowthGap {
-    GrowthGap {
-        length: 7,
-        lengthening_step: "read_ref_idx_1: the ring added beside the copied FoodHere, the read's ref_idx nudged onto it, its sub_idx nudged twice to east, the direction constant moved twice, then the route swap".into(),
-    }
-}
-
 /// Undispatched blank tissue needs every event a dispatched detour needs
 /// plus the route swap that dispatches it.
 fn blank_growth_gap(backend: ModuleBackend) -> GrowthGap {
@@ -932,6 +929,12 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 // unprepared forms open with `InputRef.Add` of the ring (a different draw
 // from the retired cross-kind swap) and the VM read gains a `ref_idx` nudge;
 // every later seed on both forms is unchanged.
+//
+// Re-pinned by T11.F23: the scale-relative constant step cannot walk the
+// zeroed direction constant to east in two events, so `vm_unprepared`
+// replaces the constant's load with a doubling of the cue register in one
+// `VmInstructionMutation` (a fresh-instruction replace draw, hence the
+// larger seed); every other seed is unchanged.
 
 const SWAP: u64 = 0;
 const GRAPH_BLANK_SEEDS: &[u64] = &[1, 25, 1020, 1650, 2300, 596, SWAP];
@@ -940,8 +943,8 @@ const GRAPH_COPY_SEEDS: &[u64] = &[1202, SWAP];
 const GRAPH_SPLIT_SEEDS: &[u64] = &[3518, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
 const GRAPH_UNPREPARED_SEEDS: &[u64] = &[68, 32, 64, 6718, 4, SWAP];
-/// Ring, ref_idx, sub_idx, sub_idx, half, east, swap.
-const VM_UNPREPARED_SEEDS: &[u64] = &[68, 94, 72, 223, 13, 13, SWAP];
+/// Ring, ref_idx, sub_idx, sub_idx, doubled, swap.
+const VM_UNPREPARED_SEEDS: &[u64] = &[68, 94, 72, 223, 205_178, SWAP];
 /// Reading order: cue, read, jump, double, write, push, swap.
 const VM_BLANK_SEEDS: &[u64] = &[1, 1869, 5608, 800, 9361, 4126, SWAP];
 /// Neutral-first order: cue, read, double, write, jump, push.
@@ -983,11 +986,7 @@ fn form_plans() -> Vec<FormPlan> {
                 )
             }
             "graph_unprepared" => (graph_unprepared_plan(), GRAPH_UNPREPARED_SEEDS, None),
-            "vm_unprepared" => (
-                vm_unprepared_plan(),
-                VM_UNPREPARED_SEEDS,
-                Some(vm_unprepared_growth_gap()),
-            ),
+            "vm_unprepared" => (vm_unprepared_plan(), VM_UNPREPARED_SEEDS, None),
             // F02's prepared controls already dispatch: no path to qualify.
             "graph_prepared" | "vm_prepared" => continue,
             _ => unreachable!("unplanned form {name}"),

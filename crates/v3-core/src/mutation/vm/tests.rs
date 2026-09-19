@@ -75,6 +75,172 @@ fn vm_constant_mutation_on_node_with_empty_constants_adds_constant() {
     }
 }
 
+/// One `VmConstantMutation` on the founder's VM node with its pool set to `[c]`.
+fn constant_step(c: f32, seed: u64) -> f32 {
+    let mut genome = v3alpha1_founder_genome();
+    let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def else {
+        panic!("expected VM backend on node 1")
+    };
+    vm.constants = vec![c];
+    VmMutator::apply_to_node(
+        &mut genome,
+        VmOperator::VmConstantMutation,
+        1,
+        &mut rng(seed),
+        &MutationConfig::default(),
+    )
+    .unwrap();
+    let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def else {
+        panic!()
+    };
+    vm.constants[0]
+}
+
+/// T11.F23 invariant 3: `|c' - c| <= 0.1 * max(|c|, 1)` up to one f32 ulp of
+/// the larger operand (the sum rounds once).
+fn within_scale_relative_bound(c: f32, after: f32) -> bool {
+    let scale = f64::from(c.abs().max(1.0));
+    let slack = f64::from(f32::EPSILON) * f64::from(c.abs().max(after.abs()));
+    (f64::from(after) - f64::from(c)).abs() <= 0.1 * scale + slack
+}
+
+/// T11.F23 invariant 1: on the unit scale the constant step is the graph
+/// parameter step, `c += gen_range(-0.1..=0.1)`, drawn after the index.
+#[test]
+fn vm_constant_mutation_unit_scale_step_equals_the_graph_parameter_step() {
+    for seed in 0u64..256 {
+        for c in [0.0f32, 0.25, -0.5, 1.0, -1.0] {
+            let after = constant_step(c, seed);
+            let mut r = rng(seed);
+            let _index = r.gen_range(0..1usize);
+            let u: f32 = r.gen_range(-0.1f32..=0.1);
+            assert_eq!(after, c + u, "seed {seed} c {c}");
+            assert!((after - c).abs() <= 0.1 + f32::EPSILON);
+        }
+    }
+}
+
+/// T11.F23 invariant 4: a raw-scale constant moves by a tenth of its
+/// magnitude at most, may cross zero, and is never clamped.
+#[test]
+fn vm_constant_mutation_raw_scale_step_is_a_tenth_of_the_magnitude() {
+    let mut crossed_zero = false;
+    let mut moved_past_the_unit_step = false;
+    for seed in 0u64..512 {
+        let after = constant_step(20.0, seed);
+        assert!(
+            within_scale_relative_bound(20.0, after),
+            "seed {seed}: {after}"
+        );
+        moved_past_the_unit_step |= (after - 20.0).abs() > 0.1;
+        let small = constant_step(0.05, seed);
+        assert!(within_scale_relative_bound(0.05, small));
+        crossed_zero |= small < 0.0;
+    }
+    assert!(
+        moved_past_the_unit_step,
+        "20.0 must move by more than the unit step"
+    );
+    assert!(
+        crossed_zero,
+        "a constant near zero must be able to cross it"
+    );
+}
+
+/// T11.F23 invariant 1: the operator draws the index and then `u` — two
+/// draws — so the RNG stream after the event is unchanged from the ±1 rule.
+#[test]
+fn vm_constant_mutation_consumes_exactly_two_draws() {
+    let mut r = rng(7);
+    let mut genome = v3alpha1_founder_genome();
+    VmMutator::apply_to_node(
+        &mut genome,
+        VmOperator::VmConstantMutation,
+        1,
+        &mut r,
+        &MutationConfig::default(),
+    )
+    .unwrap();
+    let next: u64 = r.gen();
+    let mut reference = rng(7);
+    let _index = reference.gen_range(0..6usize);
+    let _u: f32 = reference.gen_range(-0.1f32..=0.1);
+    assert_eq!(next, reference.gen::<u64>());
+}
+
+/// T11.F23 invariant 5: a slot-5 hit on the founder's reproduce transfer
+/// fraction (2/3) lands in [0.5667, 0.7667]; the sterile (<= 0) and
+/// semelparous (>= 1) shares are zero. The tally is the readings-file probe.
+#[test]
+fn vm_constant_mutation_never_sterilizes_the_founder_transfer_fraction() {
+    const SEEDS: u64 = 20_000;
+    let founder = v3alpha1_founder_genome();
+    let BackendDef::Vm(ref vm) = founder.nodes[1].backend_def else {
+        panic!()
+    };
+    let fraction = vm.constants[5];
+    let (mut hits, mut sterile, mut semelparous, mut in_band) = (0u32, 0u32, 0u32, 0u32);
+    let (mut min, mut max) = (f32::INFINITY, f32::NEG_INFINITY);
+    for seed in 0..SEEDS {
+        let mut g = founder.clone();
+        VmMutator::apply(
+            &mut g,
+            VmOperator::VmConstantMutation,
+            &mut TargetSelector::reachable_only(&[], 0.0),
+            &mut rng(seed),
+            &MutationConfig::default(),
+        )
+        .unwrap();
+        let BackendDef::Vm(ref vm) = g.nodes[1].backend_def else {
+            panic!()
+        };
+        let after = vm.constants[5];
+        if after == fraction {
+            continue;
+        }
+        hits += 1;
+        min = min.min(after);
+        max = max.max(after);
+        sterile += u32::from(after <= 0.0);
+        semelparous += u32::from(after >= 1.0);
+        in_band += u32::from((0.5667..=0.7667).contains(&after));
+    }
+    eprintln!(
+        "transfer-slot sweep: seeds {SEEDS} slot-5 hits {hits} in-band {in_band} sterile {sterile} semelparous {semelparous} min {min} max {max}"
+    );
+    assert!(hits > 0);
+    assert_eq!((sterile, semelparous), (0, 0));
+    assert_eq!(in_band, hits);
+}
+
+proptest! {
+    /// T11.F23 invariant 3: for every finite `c` in the range whose step
+    /// stays finite, `|c' - c| <= 0.1 * max(|c|, 1)` and `c'` is finite.
+    #[test]
+    fn vm_constant_mutation_step_is_bounded_by_the_constant_scale(
+        c in prop_oneof![
+            -1.0f32..=1.0,
+            -16.0f32..=16.0,
+            -(f32::MAX / 1.1)..=(f32::MAX / 1.1),
+        ],
+        seed in any::<u64>(),
+    ) {
+        let after = constant_step(c, seed);
+        prop_assert!(after.is_finite(), "c {c} -> {after}");
+        prop_assert!(within_scale_relative_bound(c, after), "c {c} -> {after}");
+    }
+
+    /// The same bound on the unit scale, where the step is the graph step.
+    #[test]
+    fn vm_constant_mutation_unit_scale_step_is_within_a_tenth(
+        c in -1.0f32..=1.0,
+        seed in any::<u64>(),
+    ) {
+        let after = constant_step(c, seed);
+        prop_assert!((f64::from(after) - f64::from(c)).abs() <= 0.1 + f64::from(f32::EPSILON), "c {c} -> {after}");
+    }
+}
+
 #[test]
 fn vm_instruction_mutation_changes_program() {
     let mut genome = v3alpha1_founder_genome();
