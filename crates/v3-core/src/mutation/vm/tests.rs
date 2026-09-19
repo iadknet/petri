@@ -75,6 +75,43 @@ fn vm_constant_mutation_on_node_with_empty_constants_adds_constant() {
     }
 }
 
+/// T11.F23: an empty pool gains exactly the operator's one draw from
+/// `[-1, 1]`; the seeds cover both signs, so the range is not one-sided.
+#[test]
+fn vm_constant_mutation_on_empty_pool_draws_the_constant_from_the_signed_unit_range() {
+    let mut saw_negative = false;
+    for seed in 0u64..256 {
+        // Arrange
+        let mut genome = v3alpha1_founder_genome();
+        founder_vm_constants(&mut genome).clear();
+        let expected: f32 = rng(seed).gen_range(-1.0f32..=1.0);
+
+        // Act
+        VmMutator::apply_to_node(
+            &mut genome,
+            VmOperator::VmConstantMutation,
+            1,
+            &mut rng(seed),
+            &MutationConfig::default(),
+        )
+        .unwrap();
+
+        // Assert
+        let added = founder_vm_constants(&mut genome).clone();
+        assert_eq!(added, vec![expected], "seed {seed}");
+        assert!(
+            (-1.0..=1.0).contains(&added[0]),
+            "seed {seed}: {}",
+            added[0]
+        );
+        saw_negative |= added[0] < 0.0;
+    }
+    assert!(
+        saw_negative,
+        "the empty-pool draw must reach negative values"
+    );
+}
+
 /// The constant pool of the founder's VM node (node 1).
 fn founder_vm_constants(genome: &mut CreatureGenome) -> &mut Vec<f32> {
     let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def else {

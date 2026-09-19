@@ -145,9 +145,18 @@ Invariants:
       `evaluate_genome` reading.
 - [x] `cargo test -p v3-core --test viability` first (27 passed), then
       `make check` -> exit 0.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here; `docs/workflow.md` requires it in the spec.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` (mode `fresh`) at
+      `~/.local/share/petri-tools/mutants/t11-f23/`: `13 mutants tested in
+      5m: 1 missed, 10 caught, 2 unviable`, no timeouts. Survivors:
+      1. `crates/v3-core/src/mutation/vm/operators.rs:27:45: delete - in
+         apply_constant_mutation` (empty-pool draw becomes `1.0..=1.0`) ->
+         killed by
+         `vm_constant_mutation_on_empty_pool_draws_the_constant_from_the_signed_unit_range`
+         (`mutation/vm/tests.rs`; pins the draw over 256 seeds, some
+         negative); `MUTANTS_ITERATE=1` pass: `1 mutant tested in 2m: 1
+         caught` (`mutants.out/caught.txt`; fresh `missed.txt`/`timeout.txt`
+         under `mutants.out.old/`; `run-mode.txt` now `incremental`).
+         Test-only remediation; no second fresh run.
 - [x] Benchmark summaries stored at
       `docs/progress/features/t11-f23-scale-relative-vm-constant-steps.json`
       (gate, 97,683 bytes) and `...-goal.json` (goal, 6,870,431 bytes); local
