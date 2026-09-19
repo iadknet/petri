@@ -1,3 +1,4 @@
+import { randomSeed } from "../../../stores/startupConfig.ts";
 import type {
 	FertilityAlgorithm,
 	FertilityLayer,
@@ -5,6 +6,7 @@ import type {
 } from "../../../types/config.ts";
 import { FieldGroup } from "../shared/FieldGroup.tsx";
 import { FieldRow } from "../shared/FieldRow.tsx";
+import { RandomSeedButton } from "../shared/RandomSeedButton.tsx";
 import { ToggleRow } from "../shared/ToggleRow.tsx";
 import { Tooltip } from "../shared/Tooltip.tsx";
 import { getByPath } from "../shared/pathUtils.ts";
@@ -179,9 +181,20 @@ interface LayerFieldProps {
 	min?: number;
 	max?: number;
 	step?: number;
+	onRandomize?: () => void;
 }
 
-function LayerField({ label, testId, value, onChange, tooltip, min, max, step }: LayerFieldProps) {
+function LayerField({
+	label,
+	testId,
+	value,
+	onChange,
+	tooltip,
+	min,
+	max,
+	step,
+	onRandomize,
+}: LayerFieldProps) {
 	return (
 		<div className="flex items-center justify-between gap-2 py-0.5 pl-2">
 			<label
@@ -195,17 +208,22 @@ function LayerField({ label, testId, value, onChange, tooltip, min, max, step }:
 					</Tooltip>
 				)}
 			</label>
-			<input
-				id={`${testId}-input`}
-				data-testid={testId}
-				type="number"
-				value={value}
-				min={min}
-				max={max}
-				step={step}
-				onChange={(e) => onChange(Number(e.target.value))}
-				className="w-28 px-1.5 py-0.5 text-xs font-mono text-right bg-slate-800 border border-slate-700 rounded text-slate-200"
-			/>
+			<div className="flex items-center gap-1">
+				<input
+					id={`${testId}-input`}
+					data-testid={testId}
+					type="number"
+					value={value}
+					min={min}
+					max={max}
+					step={step}
+					onChange={(e) => onChange(Number(e.target.value))}
+					className="w-28 px-1.5 py-0.5 text-xs font-mono text-right bg-slate-800 border border-slate-700 rounded text-slate-200"
+				/>
+				{onRandomize && (
+					<RandomSeedButton label={label} testId={`${testId}-randomize`} onClick={onRandomize} />
+				)}
+			</div>
 		</div>
 	);
 }
@@ -531,6 +549,12 @@ export function FertilitySection({
 															},
 														}))
 													}
+													onRandomize={() =>
+														updateLayer(index, () => ({
+															...layer,
+															algorithm: { Fbm: { ...fbm, seed: randomSeed() } },
+														}))
+													}
 												/>
 											)}
 										</>
@@ -671,6 +695,12 @@ export function FertilitySection({
 																	seed: Math.max(0, Math.round(value)),
 																},
 															},
+														}))
+													}
+													onRandomize={() =>
+														updateLayer(index, () => ({
+															...layer,
+															algorithm: { PoissonBlobs: { ...poisson, seed: randomSeed() } },
 														}))
 													}
 												/>

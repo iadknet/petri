@@ -394,6 +394,32 @@ describe("ConfigPanel", () => {
 		});
 	});
 
+	it("randomizes FBM and Poisson fertility seeds with the seed buttons", () => {
+		const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
+		try {
+			render(<ConfigPanel />);
+			fireEvent.click(screen.getByTestId("startup-field-fertility-enabled"));
+			fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-algorithm"), {
+				target: { value: "Fbm" },
+			});
+			fireEvent.click(screen.getByTestId("startup-field-fertility-layer-0-fbm-seed-enabled"));
+			fireEvent.click(screen.getByTestId("startup-field-fertility-layer-0-fbm-seed-randomize"));
+			const fbm = useStartupConfigStore.getState().preset.world.food.fertility.layers[0]?.algorithm;
+			expect(fbm).toMatchObject({ Fbm: { seed: 2147483648 } });
+
+			fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-algorithm"), {
+				target: { value: "PoissonBlobs" },
+			});
+			fireEvent.click(screen.getByTestId("startup-field-fertility-layer-0-poisson-seed-enabled"));
+			fireEvent.click(screen.getByTestId("startup-field-fertility-layer-0-poisson-seed-randomize"));
+			const poisson =
+				useStartupConfigStore.getState().preset.world.food.fertility.layers[0]?.algorithm;
+			expect(poisson).toMatchObject({ PoissonBlobs: { seed: 2147483648 } });
+		} finally {
+			random.mockRestore();
+		}
+	});
+
 	it("shows ELI5 tooltips for FBM fertility controls", () => {
 		render(<ConfigPanel />);
 		fireEvent.click(screen.getByTestId("startup-field-fertility-enabled"));

@@ -59,7 +59,7 @@ export interface StartupConfigState {
 	reset: () => void;
 }
 
-function randomSeed(): number {
+export function randomSeed(): number {
 	return Math.floor(Math.random() * 2 ** 32);
 }
 

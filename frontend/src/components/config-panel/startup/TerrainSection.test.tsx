@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { buildStartupRequest, useStartupConfigStore } from "../../../stores/startupConfig.ts";
 import { TerrainSection } from "./TerrainSection.tsx";
 
@@ -45,4 +45,18 @@ it("switches through all pattern editors and keeps surviving layer order", () =>
 	fireEvent.change(screen.getByLabelText("Layer 2 seed"), { target: { value: "789" } });
 	fireEvent.click(screen.getByRole("button", { name: "Remove terrain layer 1" }));
 	expect(useStartupConfigStore.getState().preset.world.terrain[0]?.seed).toBe(789);
+});
+
+it("randomizes map and layer seeds with the seed buttons", () => {
+	const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
+	try {
+		render(<Harness />);
+		fireEvent.click(screen.getByRole("button", { name: "Add terrain layer" }));
+		fireEvent.click(screen.getByTestId("startup-map-seed-randomize"));
+		expect(useStartupConfigStore.getState().preset.world.world_seed).toBe(2147483648);
+		fireEvent.click(screen.getByTestId("startup-terrain-layer-0-seed-randomize"));
+		expect(useStartupConfigStore.getState().preset.world.terrain[0]?.seed).toBe(2147483648);
+	} finally {
+		random.mockRestore();
+	}
 });
