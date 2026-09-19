@@ -137,7 +137,7 @@ export type WorldAction =
 	| "Eat"
 	| { Eat: { type_idx: number } }
 	| { Move: string }
-	| { Reproduce: { direction: string; energy_transfer: number } }
+	| { Reproduce: { direction: string; energy_transfer_fraction: number } }
 	| { StealEnergy: { direction: string; amount: number } };
 
 export interface TickTrace {

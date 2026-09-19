@@ -866,7 +866,7 @@ fn execute_reproduce(
     sim: &mut Simulation,
     ctx: &ActionContext,
     direction: Direction,
-    energy_transfer: f32,
+    energy_transfer_fraction: f32,
     outcome_acc: &mut OutcomeAccumulator,
     reproduce_rng: &mut SmallRng,
     successful_spawn_targets: &mut HashSet<Position>,
@@ -881,7 +881,13 @@ fn execute_reproduce(
             .entry(barrier.reader_state)
             .or_insert(0) += 1;
     }
-    let result = apply_reproduce(ctx.id, sim, direction, energy_transfer, reproduce_rng);
+    let result = apply_reproduce(
+        ctx.id,
+        sim,
+        direction,
+        energy_transfer_fraction,
+        reproduce_rng,
+    );
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
         creature.record_action_attempt(ActionType::Reproduce);
     }
@@ -939,7 +945,7 @@ fn execute_reproduce(
         ActionType::Reproduce,
         action_result,
         direction.to_index() as u8,
-        energy_transfer,
+        energy_transfer_fraction,
         None,
     );
 }
@@ -1043,12 +1049,12 @@ fn run_phase_2(
                 WorldAction::Move(dir) => execute_move(sim, &ctx, dir, outcome_acc),
                 WorldAction::Reproduce {
                     direction,
-                    energy_transfer,
+                    energy_transfer_fraction,
                 } => execute_reproduce(
                     sim,
                     &ctx,
                     direction,
-                    energy_transfer,
+                    energy_transfer_fraction,
                     outcome_acc,
                     reproduce_rng,
                     &mut successful_spawn_targets,
@@ -1317,7 +1323,7 @@ mod final_action_observation_tests {
             } else {
                 Direction::N
             },
-            energy_transfer: value,
+            energy_transfer_fraction: value,
         }]
     }
 
@@ -1359,7 +1365,7 @@ mod final_action_observation_tests {
             observation.intact,
             vec![WorldAction::Reproduce {
                 direction: Direction::NE,
-                energy_transfer: 1.0,
+                energy_transfer_fraction: 1.0,
             }]
         );
         assert_ne!(observation.intact, observation.zeroed);

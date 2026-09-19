@@ -34,7 +34,7 @@ pub fn decode_world_action(
         2 => WorldAction::Move(select_direction(meta[0], bank)),
         3 => WorldAction::Reproduce {
             direction: select_direction(meta[0], bank),
-            energy_transfer: clamp_non_negative_finite(meta[1]),
+            energy_transfer_fraction: clamp_unit_interval(meta[1]),
         },
         4 => WorldAction::StealEnergy {
             direction: select_direction(meta[0], bank),
@@ -97,6 +97,20 @@ fn decode_direction(raw: f32) -> Direction {
         raw.round().clamp(0.0, 7.0)
     };
     Direction::ALL[clamped as usize]
+}
+
+/// Clamp to the unit interval (T17.F01): NaN, ±∞, and negatives become 0.0;
+/// values above 1.0 become 1.0. The reproduce action carries `meta[1]` as
+/// a fraction of the parent's post-cost energy, so this is the only shape
+/// `apply_reproduce` accepts.
+#[inline]
+#[must_use]
+pub(crate) fn clamp_unit_interval(v: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 /// Clamp to non-negative finite: NaN/Inf/negative → 0.0.
@@ -317,15 +331,15 @@ mod tests {
     fn action_type_3_is_reproduce() {
         let mut meta = zero_meta();
         meta[0] = 4.0; // S = index 4
-        meta[1] = 15.0;
+        meta[1] = 0.75;
         let action = decode_world_action(3, &meta, None);
         if let WorldAction::Reproduce {
             direction,
-            energy_transfer,
+            energy_transfer_fraction,
         } = action
         {
             assert_eq!(direction, Direction::S);
-            assert!((energy_transfer - 15.0).abs() < 1e-6);
+            assert!((energy_transfer_fraction - 0.75).abs() < 1e-6);
         } else {
             panic!("expected Reproduce, got {action:?}");
         }
@@ -447,45 +461,52 @@ mod tests {
         }
     }
 
+    /// T17.F01 invariant 1: `meta[1]` leaves decode as a fraction in [0, 1].
     #[test]
-    fn reproduce_energy_negative_becomes_zero() {
-        let mut meta = zero_meta();
-        meta[1] = -5.0;
-        if let WorldAction::Reproduce {
-            energy_transfer, ..
-        } = decode_world_action(3, &meta, None)
-        {
-            assert_eq!(energy_transfer, 0.0);
-        } else {
-            panic!("expected Reproduce");
+    fn reproduce_fraction_is_sanitized_to_unit_interval() {
+        for (raw, expected) in [
+            (f32::NAN, 0.0_f32),
+            (f32::INFINITY, 0.0),
+            (f32::NEG_INFINITY, 0.0),
+            (-0.5, 0.0),
+            (0.0, 0.0),
+            (0.42, 0.42),
+            (1.0, 1.0),
+            (7.0, 1.0),
+        ] {
+            let mut meta = zero_meta();
+            meta[1] = raw;
+            let WorldAction::Reproduce {
+                energy_transfer_fraction,
+                ..
+            } = decode_world_action(3, &meta, None)
+            else {
+                panic!("expected Reproduce");
+            };
+            assert_eq!(
+                energy_transfer_fraction.to_bits(),
+                expected.to_bits(),
+                "meta[1] = {raw} should decode to {expected}"
+            );
         }
     }
 
-    #[test]
-    fn reproduce_energy_nan_becomes_zero() {
-        let mut meta = zero_meta();
-        meta[1] = f32::NAN;
-        if let WorldAction::Reproduce {
-            energy_transfer, ..
-        } = decode_world_action(3, &meta, None)
-        {
-            assert_eq!(energy_transfer, 0.0);
-        } else {
-            panic!("expected Reproduce");
-        }
-    }
-
-    #[test]
-    fn reproduce_energy_inf_becomes_zero() {
-        let mut meta = zero_meta();
-        meta[1] = f32::INFINITY;
-        if let WorldAction::Reproduce {
-            energy_transfer, ..
-        } = decode_world_action(3, &meta, None)
-        {
-            assert_eq!(energy_transfer, 0.0);
-        } else {
-            panic!("expected Reproduce");
+    proptest! {
+        #[test]
+        fn reproduce_fraction_always_lands_in_unit_interval(raw in prop::num::f32::ANY) {
+            let mut meta = zero_meta();
+            meta[1] = raw;
+            let WorldAction::Reproduce {
+                energy_transfer_fraction,
+                ..
+            } = decode_world_action(3, &meta, None)
+            else {
+                panic!("expected Reproduce");
+            };
+            prop_assert!((0.0..=1.0).contains(&energy_transfer_fraction));
+            if raw.is_finite() {
+                prop_assert_eq!(energy_transfer_fraction, raw.clamp(0.0, 1.0));
+            }
         }
     }
 }

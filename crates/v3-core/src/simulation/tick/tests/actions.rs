@@ -869,21 +869,26 @@ fn oversized_vm_genome() -> CreatureGenome {
     vm_program_genome(vec![VmInstruction::Noop; 300])
 }
 
+/// The litter a 1000-energy parent hands over at a fraction of 1.0: the
+/// `default_offspring_energy` cap, independent of the charge (T17.F01).
+const CAPPED_TRANSFER: f32 = 100.0;
+
 /// One direct `apply_reproduce` on a fresh 1000-energy parent at reproduce
-/// age; returns the parent's energy after the birth, the child's energy, and
-/// the recorded `action_charges.reproduce`.
-fn charged_reproduction(
-    genome: CreatureGenome,
-    rate: f32,
-    transfer_request: f32,
-) -> (f32, f32, f32) {
+/// age, at a transfer fraction of 1.0 (so the child gets `CAPPED_TRANSFER`);
+/// returns the parent's energy after the birth, the child's energy, and the
+/// recorded `action_charges.reproduce`.
+fn charged_reproduction(genome: CreatureGenome, rate: f32) -> (f32, f32, f32) {
     let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
     sim.config.energy.lifecycle.genome_replication_cost_per_unit = rate;
     sim.config.mutation.per_unit_supply_enabled = false;
     sim.config.mutation.mutation_probability = 0.0;
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-    let result = apply_reproduce(parent, &mut sim, Direction::N, transfer_request, &mut rng);
+    assert_eq!(
+        sim.config.energy.lifecycle.default_offspring_energy,
+        CAPPED_TRANSFER
+    );
+    let result = apply_reproduce(parent, &mut sim, Direction::N, 1.0, &mut rng);
     assert_eq!(result, ReproductionActionResult::Spawned);
     let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
     (
@@ -915,9 +920,9 @@ fn parent_above_the_founder_anchor_pays_the_replication_factor_and_child_gets_th
     let factor = 1.0 + rate * (size - FOUNDER_GENOME_SIZE_UNITS) as f32;
     let base = base_reproduce_charge(&genome);
     assert!(base > 0.0);
-    let transfer = 20.0;
+    let transfer = CAPPED_TRANSFER;
 
-    let (parent_after, child_energy, charged) = charged_reproduction(genome, rate, transfer);
+    let (parent_after, child_energy, charged) = charged_reproduction(genome, rate);
 
     assert!(
         (charged - base * factor).abs() < 1e-4,
@@ -938,28 +943,31 @@ fn parent_above_the_founder_anchor_pays_the_replication_factor_and_child_gets_th
 fn rate_zero_charges_an_oversized_parent_exactly_the_base_charge() {
     let genome = oversized_vm_genome();
     let base = base_reproduce_charge(&genome);
-    let (parent_after, child_energy, charged) = charged_reproduction(genome, 0.0, 20.0);
+    let (parent_after, child_energy, charged) = charged_reproduction(genome, 0.0);
     // `1.0 * base` is bit-exact, so the parent lands exactly where the
-    // pre-feature engine left it.
-    assert_eq!(parent_after.to_bits(), (1000.0f32 - base - 20.0).to_bits());
+    // rate-free engine leaves it.
+    assert_eq!(
+        parent_after.to_bits(),
+        (1000.0f32 - base - CAPPED_TRANSFER).to_bits()
+    );
     assert!(
         (charged - base).abs() < 1e-5,
         "charge {charged} vs base {base}"
     );
-    assert_eq!(child_energy, 20.0);
+    assert_eq!(child_energy, CAPPED_TRANSFER);
 }
 
 #[test]
 fn founder_reproduce_charge_is_bit_identical_with_and_without_the_replication_rate() {
     let (parent_default, child_default, charged_default) =
-        charged_reproduction(v3alpha1_founder_genome(), 0.1, 20.0);
+        charged_reproduction(v3alpha1_founder_genome(), 0.1);
     let (parent_zero, child_zero, charged_zero) =
-        charged_reproduction(v3alpha1_founder_genome(), 0.0, 20.0);
+        charged_reproduction(v3alpha1_founder_genome(), 0.0);
     let base = base_reproduce_charge(&v3alpha1_founder_genome());
     assert_eq!(parent_default.to_bits(), parent_zero.to_bits());
     assert_eq!(
         parent_default.to_bits(),
-        (1000.0f32 - base - 20.0).to_bits()
+        (1000.0f32 - base - CAPPED_TRANSFER).to_bits()
     );
     assert_eq!(charged_default.to_bits(), charged_zero.to_bits());
     assert_eq!(child_default, child_zero);

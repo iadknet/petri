@@ -64,7 +64,7 @@ This document does not define:
   if age validation fails:
     reject RejectedAgeConstraints
     return
-  charges reproduce action cost, then validates energy + transfer
+  validates energy gate + litter, then charges cost and transfer
   if energy validation fails:
     reject RejectedEnergyConstraints
     return
@@ -94,7 +94,8 @@ outcomes per all births when interpreting this supply.
 `OffspringDraft` minimum fields:
 
 - `position` (target spawn position)
-- `initial_energy` (post-transfer child energy, scalar `f32`)
+- `initial_energy` (post-transfer child energy, scalar `f32`: the
+  transfer of step 7, at least `energy.lifecycle.initial_energy`)
 - `generation` (`parent.generation + 1`)
 - `identity` (`CreatureIdentityState` derived during reproduction flow)
 - `phenotype` (inherited or mutated per `v3-phenotype-spec.md` trigger rules)
@@ -180,9 +181,11 @@ Reproduction action semantics:
 - After age succeeds, the reproduce action cost is computed according to energy
   config, and the minimum reproduction energy gate is evaluated on the parent's
   energy minus that cost. Nothing is charged yet.
-- Requested child transfer is clamped by configured offspring transfer cap and
-  must be coverable from the parent's energy minus the cost.
-- If parent cannot satisfy the energy gate or the transfer constraints,
+- The child transfer is the action's `energy_transfer_fraction` (a value in
+  [0, 1] after decode) times the parent's energy minus the cost, clamped by
+  the configured offspring transfer cap; a litter under
+  `energy.lifecycle.initial_energy` is not conceived.
+- If parent cannot satisfy the energy gate or the litter floor,
   reproduction fails, no child is spawned, and the parent pays nothing.
 - Only after both gates pass does the parent pay the reproduce action cost and
   then the transfer.
@@ -215,9 +218,11 @@ runtime config contract: `v3-runtime-config-spec.md`.
      nothing is deducted yet
   6. enforce energy.lifecycle.min_reproduce_energy gate on after_cost
      -> below threshold : [reject RejectedEnergyConstraints; return]
-  7. compute transfer = min(clamp_non_negative_finite(requested_energy),
+  7. compute transfer = min(energy_transfer_fraction * after_cost,
                            energy.lifecycle.default_offspring_energy)
-     -> reject if transfer <= 0.0 or after_cost cannot cover transfer
+     (energy_transfer_fraction is in [0, 1], so after_cost >= transfer)
+     -> reject if transfer <= 0.0
+        or transfer < energy.lifecycle.initial_energy
      -> [reject RejectedEnergyConstraints; return]
   8. pay cost from parent, then deduct transfer from parent, as two successive
      subtractions; the extra cost energy is burned, not transferred; build
@@ -264,8 +269,8 @@ If minimum-age validation fails:
 - Reproduce is rejected as `RejectedAgeConstraints`.
 - No reproduce action cost is charged for that attempt.
 
-If the energy gate fails (step 6 on `energy - cost`, or step 7 on transfer
-feasibility):
+If the energy gate fails (step 6 on `energy - cost`, or step 7 on the
+litter floor):
 - Reproduce is rejected as `RejectedEnergyConstraints`.
 - No reproduce action cost and no transfer is charged for that attempt; the
   parent's energy is unchanged and `energy_flows.action_charges.reproduce`

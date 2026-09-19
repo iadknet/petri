@@ -191,16 +191,21 @@ PushAction, and ExecuteActionQueue; registers 16–19 remain unreferenced.
 
 `population.founder_profile` selects one row below by wire name. A profile
 changes only the strict energy threshold in Node 0 and the priority and
-transfer constant in Node 1; the 2-node mesh, its input references, compute
-nodes, and output wiring are shared by every profile.
+transfer fraction (VM constant index 5, written to `meta[1]` of the reproduce
+action as the share of the parent's post-cost energy the child starts with)
+in Node 1; the 2-node mesh, its input references, compute nodes, and output
+wiring are shared by every profile. Every threshold sits at least 2.0 above
+`min_reproduce_energy` and every fraction clears the `initial_energy` litter
+floor at its own threshold after the age-1.0 reproduce cost, so a founder
+attempt at or above its gate is never refused on energy.
 
-| Profile | Wire name | Strict energy threshold | Transfer | Priority |
+| Profile | Wire name | Strict energy threshold | Transfer fraction | Priority |
 | --- | --- | ---: | ---: | --- |
-| V3Alpha1 | `v3_alpha1` | 30 | 20 | Reproduce, local forage, Move fallback |
-| ForageFirstSparse | `forage_first_sparse` | 30 | 10 | Local forage, Reproduce, forage fallback |
-| ForageFirstSparseConservative | `forage_first_sparse_conservative` | 60 | 10 | Local forage, Reproduce, forage fallback |
-| ForageFirstSparseRichOffspring | `forage_first_sparse_rich_offspring` | 40 | 20 | Local forage, Reproduce, forage fallback |
-| ForageFirstSparseBalanced | `forage_first_sparse_balanced` | 50 | 15 | Local forage, Reproduce, forage fallback |
+| V3Alpha1 | `v3_alpha1` | 32 | 2/3 | Reproduce, local forage, Move fallback |
+| ForageFirstSparse | `forage_first_sparse` | 32 | 2/3 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseConservative | `forage_first_sparse_conservative` | 60 | 0.35 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseRichOffspring | `forage_first_sparse_rich_offspring` | 40 | 0.60 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseBalanced | `forage_first_sparse_balanced` | 50 | 0.45 | Local forage, Reproduce, forage fallback |
 
 Local forage requires positive primary food and queues Eat(type 0), then Move.
 Forage-first fallback also queues Eat then Move on an empty cell, retaining

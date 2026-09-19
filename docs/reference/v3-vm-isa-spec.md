@@ -357,7 +357,7 @@ mapping below:
 | `0` | `NoOp` | none |
 | `1` | `Eat` | `meta[0]` = food type index |
 | `2` | `Move` | `meta[0]` = direction index, or the direction bank when written |
-| `3` | `Reproduce` | `meta[0]` = direction index (or the bank), `meta[1]` = offspring transfer energy (scalar `f32`) |
+| `3` | `Reproduce` | `meta[0]` = direction index (or the bank), `meta[1]` = offspring transfer fraction of the parent's post-cost energy (scalar `f32` in [0, 1]) |
 | `4` | `StealEnergy` | `meta[0]` = direction index (or the bank), `meta[1]` = steal amount |
 | other | `NoOp` | none |
 
@@ -368,8 +368,11 @@ encode different actions.
 Metadata decode rules:
 - direction index uses `meta[0].round().clamp(0.0, 7.0)` and maps to
   `Direction::ALL` (`0=N,1=NE,2=E,3=SE,4=S,5=SW,6=W,7=NW`)
-- reproduce energy amount uses non-negative scalar
-  `clamp_non_negative_finite(meta[1])` (no integer rounding)
+- reproduce transfer fraction uses `clamp_unit_interval(meta[1])`: NaN,
+  ±∞, and negatives become 0.0, values above 1.0 become 1.0 (no integer
+  rounding)
+- steal amount uses non-negative scalar `clamp_non_negative_finite(meta[1])`
+  (no integer rounding)
 - unspecified metadata slots are reserved and ignored by current runtime action
   decoding
 - `WriteWorldActionMeta` to `slot_idx >= 8` is ignored

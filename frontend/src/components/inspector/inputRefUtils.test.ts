@@ -15,7 +15,7 @@ import {
 describe("formatAction", () => {
 	it("formats current server world action variants", () => {
 		const move: WorldAction = { Move: "E" };
-		const reproduce: WorldAction = { Reproduce: { direction: "N", energy_transfer: 12 } };
+		const reproduce: WorldAction = { Reproduce: { direction: "N", energy_transfer_fraction: 0.5 } };
 		const steal: WorldAction = { StealEnergy: { direction: "W", amount: 3 } };
 
 		expect(formatAction(move)).toBe("Move(E)");

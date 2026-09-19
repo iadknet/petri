@@ -1,13 +1,13 @@
 //! Pins the sampled trajectory, including stochastic descendants and actions.
 //! Telemetry and wall-clock fields are deliberately excluded.
 //!
-//! 2026-09-18 re-pin: the topology operator weight table was scaled ten-fold
-//! around `ChangeEntryNode` (weight 1 of 211 instead of 1 of 22), so every
-//! topology draw shifts and the trajectories diverge at their first topology
-//! event. The digest below was measured after two runs agreed (previously
-//! re-pinned at T02.F04, T03.F11, T11.F21, T11.F22, and T16.F01); the pin's
-//! purpose — that the accounting keeps the trajectory reproducible — is
-//! unchanged.
+//! T17.F01 re-pin: the founder now emits a transfer fraction (2/3 of
+//! post-cost energy behind a strict gate of 32) instead of a 20-energy
+//! ration behind 30, so every trajectory moves from its first birth. The
+//! digest below was measured after two runs agreed (previously re-pinned at
+//! T02.F04, T03.F11, T11.F21, T11.F22, T16.F01, and the 2026-09-18
+//! `ChangeEntryNode` rescale); the pin's purpose — that the accounting keeps
+//! the trajectory reproducible — is unchanged.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -73,6 +73,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "1d649e9fd054d9f26a260249510883f1b4a3e1578a5a0002020b27f2df22c0a9"
+        "c17ab70b66dcf9de7c216d9cfc5e8c768aca4811047b0a140cff33be35ee5c93"
     );
 }

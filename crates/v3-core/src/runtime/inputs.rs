@@ -280,7 +280,7 @@ mod tests {
         let mut aq = ActionQueue::new(4);
         aq.push(WorldAction::Reproduce {
             direction: Direction::N,
-            energy_transfer: 0.42,
+            energy_transfer_fraction: 0.42,
         });
         let ctx = ResolveCtx {
             sensors: &ss,
@@ -289,11 +289,11 @@ mod tests {
             energy_consumed: 0.0,
             action_queue: &aq,
         };
-        // sub_idx=2 → slot 0, field 2 = param1 = energy_transfer = 0.42
+        // sub_idx=2 → slot 0, field 2 = param1 = energy_transfer_fraction = 0.42
         let v = resolve_input(&InputReference::ActionQueue, 2, &ctx);
         assert!(
             (v - 0.42).abs() < f32::EPSILON,
-            "Reproduce param1 = energy_transfer = 0.42, got {v}"
+            "Reproduce param1 = energy_transfer_fraction = 0.42, got {v}"
         );
     }
 

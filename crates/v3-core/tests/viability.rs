@@ -29,11 +29,17 @@ use v3_core::creature::action_log::{ActionResult, ActionType};
 use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::MutationEngine;
+use v3_core::simulation::actions::ReproductionActionResult;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
 const FOUNDER_CHANNELS: [u8; 6] = [0, 0, 92, 92, 138, 138];
 const FOUNDER_ACTIVE_CHANNEL: usize = 0;
 const FOUNDER_POLARITY: [bool; 6] = [true; 6];
+/// Starting energy for hand-placed founders in single-creature scenarios:
+/// above the default founder gate (32) so the founder reproduces when the
+/// scenario allows it. Set on the creature, not through `initial_energy`,
+/// because `initial_energy` is also the litter floor (T17.F01).
+const FOUNDER_SCENARIO_ENERGY: f32 = 80.0;
 
 /// Return a compact config suitable for fast, behavior-focused viability tests.
 ///
@@ -245,6 +251,37 @@ fn canonical_founder_consumes_primary_food_and_reproduces() {
     );
 }
 
+/// T17.F01 invariant 5 at tick level: a founders-only population on the
+/// default profile never has a reproduce attempt refused on energy. The
+/// founder's gate (`EnergyCurrent > 32`) sits above what physiology accepts
+/// (`after_cost >= 30`, litter `>= initial_energy`), and the cognition cost
+/// paid between the gate read (Phase 1a) and `apply_reproduce` (Phase 2) is
+/// under the margin.
+#[test]
+fn founders_only_run_has_no_energy_rejected_reproduce_attempts() {
+    let mut cfg = viability_config();
+    cfg.mutation.per_unit_supply_enabled = false;
+    cfg.mutation.mutation_probability = 0.0;
+    let mut sim = seed_simulation(cfg, 2026);
+
+    for _ in 0..2_000 {
+        run_tick(&mut sim, &mut None);
+    }
+
+    assert!(sim.stats.reproduction_actions_spawned_total > 0);
+    assert_eq!(sim.stats.mutation_events_applied_total, 0);
+    assert_eq!(
+        sim.stats
+            .reproduction_actions_rejected_by_reason
+            .get(&ReproductionActionResult::RejectedEnergyConstraints)
+            .copied()
+            .unwrap_or(0),
+        0,
+        "founder attempts are gated above what physiology accepts; rejections by reason: {:?}",
+        sim.stats.reproduction_actions_rejected_by_reason
+    );
+}
+
 /// The total food count after 1 tick should differ from the initial seeded food
 /// (either consumed by creatures or grown by the food-growth pass).
 #[test]
@@ -413,9 +450,7 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
     cfg.world.food.initial_coverage = 0.0;
     cfg.world.food.growth_rate = 0.0;
     cfg.runtime.graph_node_base_cost = 0.1;
-    cfg.energy.lifecycle.initial_energy = 80.0;
     cfg.energy.lifecycle.max_energy = 120.0;
-    cfg.energy.lifecycle.default_offspring_energy = 12.0;
     cfg.energy.costs.reproduce_cost = 1.0;
 
     let pos = Position::new(5, 5);
@@ -426,7 +461,7 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
             id,
             v3alpha1_founder_genome(),
             pos,
-            cfg.energy.lifecycle.initial_energy,
+            FOUNDER_SCENARIO_ENERGY,
             0,
             FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
@@ -472,9 +507,7 @@ fn founder_does_not_attempt_reproduce_when_below_min_reproduce_age() {
     cfg.world.food.initial_coverage = 0.0;
     cfg.world.food.growth_rate = 0.0;
     cfg.runtime.graph_node_base_cost = 0.1;
-    cfg.energy.lifecycle.initial_energy = 80.0;
     cfg.energy.lifecycle.max_energy = 120.0;
-    cfg.energy.lifecycle.default_offspring_energy = 12.0;
     cfg.energy.costs.reproduce_cost = 1.0;
     cfg.energy.lifecycle.min_reproduce_age = 20;
 
@@ -486,7 +519,7 @@ fn founder_does_not_attempt_reproduce_when_below_min_reproduce_age() {
             id,
             v3alpha1_founder_genome(),
             start,
-            cfg.energy.lifecycle.initial_energy,
+            FOUNDER_SCENARIO_ENERGY,
             0,
             FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
@@ -704,9 +737,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
     cfg.world.height = 10;
     cfg.mutation.per_unit_supply_enabled = false;
     cfg.mutation.mutation_probability = 0.0;
-    cfg.energy.lifecycle.initial_energy = 80.0;
     cfg.energy.lifecycle.max_energy = 120.0;
-    cfg.energy.lifecycle.default_offspring_energy = 12.0;
     cfg.energy.costs.reproduce_cost = 1.0;
     cfg.runtime.graph_node_base_cost = 0.1;
 
@@ -718,7 +749,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
             id,
             v3alpha1_founder_genome(),
             pos,
-            cfg.energy.lifecycle.initial_energy,
+            FOUNDER_SCENARIO_ENERGY,
             0,
             FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
@@ -759,9 +790,7 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
     cfg.world.height = 10;
     cfg.mutation.per_unit_supply_enabled = false;
     cfg.mutation.mutation_probability = 0.0;
-    cfg.energy.lifecycle.initial_energy = 80.0;
     cfg.energy.lifecycle.max_energy = 120.0;
-    cfg.energy.lifecycle.default_offspring_energy = 12.0;
     cfg.energy.costs.reproduce_cost = 1.0;
     cfg.runtime.graph_node_base_cost = 0.1;
 
@@ -774,7 +803,7 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
             id,
             v3alpha1_founder_genome(),
             pos,
-            cfg.energy.lifecycle.initial_energy,
+            FOUNDER_SCENARIO_ENERGY,
             0,
             FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
@@ -992,14 +1021,16 @@ fn mutation_skip_reason_tracking_accumulates_correctly() {
     cfg.world.food.initial_coverage = 0.8;
     cfg.world.food.initial_density = 1.0;
     cfg.world.food.growth_rate = 0.5;
-    cfg.energy.lifecycle.initial_energy = 150.0;
-    cfg.energy.lifecycle.default_offspring_energy = 4.0;
     cfg.energy.costs.reproduce_cost = 1.0;
     let mut sim = seed_simulation(cfg, 42);
     for _ in 0..50 {
         run_tick(&mut sim, &mut None);
     }
     let stats = &sim.stats;
+    assert!(
+        stats.mutation_events_attempted_total > 0,
+        "the run must carry births for the skip-reason accounting to be exercised"
+    );
     // If any skips occurred, all keys must be valid skip reasons.
     for reason in stats.mutation_events_skipped_by_reason.keys() {
         let is_valid = matches!(
