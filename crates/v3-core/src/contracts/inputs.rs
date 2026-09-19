@@ -99,9 +99,7 @@ impl WorldInputKey {
 /// Static introspection values assembled at tick start (snapshot).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum StaticIntrospectionKey {
-    /// Number of generations from the founder.
-    Generation,
-    /// Age in ticks.
+    /// Age as a saturating fraction of `age_reference_ticks`, in [0, 1].
     AgeTicks,
 }
 
@@ -176,7 +174,7 @@ mod tests {
             }),
             InputReference::World(WorldInputKey::NeighborBarrierRing),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
-            InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::UpstreamSlot(0),
             InputReference::ActionQueue,

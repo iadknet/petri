@@ -11,18 +11,26 @@ use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
 };
 
-fn age_gate_threshold(min_reproduce_age_ticks: f32) -> f32 {
-    // Threshold uses strict `>` semantics; offset by 0.5 so integer age ticks
-    // satisfy `age >= min_reproduce_age_ticks`.
-    (min_reproduce_age_ticks - 0.5).max(-0.5)
+/// The founder's age gate on the unit scale the brain reads `AgeTicks` on:
+/// `(min_reproduce_age - 0.5) / age_reference_ticks`. Threshold uses strict
+/// `>` semantics; the 0.5 offset makes every integer age at or above
+/// `min_reproduce_age_ticks` pass and every one below fail, and the same
+/// f32 division on both sides keeps the comparison exact (T17.F02).
+pub(crate) fn age_gate_threshold(min_reproduce_age_ticks: u64, age_reference_ticks: u64) -> f32 {
+    (min_reproduce_age_ticks as f32 - 0.5).max(-0.5) / age_reference_ticks as f32
 }
 
 /// Build the founder sensor graph from primary food, energy, age, and occupancy.
+///
+/// `reproduce_energy_threshold` is a fraction of `max_energy` (the scale
+/// `EnergyCurrent` reads on); the age gate is derived from the two tick
+/// counts by `age_gate_threshold`.
 #[must_use]
 pub(crate) fn build_cgp_founder_graph_with_thresholds(
     config: &MutationConfig,
     reproduce_energy_threshold: f32,
-    min_reproduce_age_ticks: f32,
+    min_reproduce_age_ticks: u64,
+    age_reference_ticks: u64,
 ) -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs(config);
 
@@ -41,7 +49,10 @@ pub(crate) fn build_cgp_founder_graph_with_thresholds(
 
     // CN1: age threshold gate.
     def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Threshold(age_gate_threshold(min_reproduce_age_ticks)),
+        kind: ComputeNodeKind::Threshold(age_gate_threshold(
+            min_reproduce_age_ticks,
+            age_reference_ticks,
+        )),
         inputs: vec![GraphEdge {
             source: GraphSource::InputLeaf {
                 ref_idx: 2, // AgeTicks

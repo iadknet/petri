@@ -14,13 +14,13 @@
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
-use crate::config::RuntimeConfig;
+use crate::config::{EnergyLifecycleConfig, RuntimeConfig};
 use crate::contracts::WorldAction;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, UntracedMeshExecution};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
-use crate::sensors::static_inputs::StaticInputs;
+use crate::sensors::static_inputs::{age_fraction, StaticInputs};
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 use crate::simulation::advance_shared_memory;
 
@@ -35,7 +35,9 @@ pub const SNAPSHOT_SEED: u64 = 7;
 /// Fixed seed for the sequence scenarios.
 pub const SEQUENCE_SEED: u64 = 8;
 
-const AGE_CHOICES: [f32; 6] = [0.0, 5.0, 19.0, 20.0, 50.0, 200.0];
+/// Ages in ticks; the snapshot carries each as the unit-scale `AgeTicks`
+/// read on the default `age_reference_ticks` (T17.F02).
+const AGE_CHOICES: [u64; 6] = [0, 5, 19, 20, 50, 200];
 const ENERGY_CHOICES: [f32; 6] = [5.0, 15.0, 25.0, 31.0, 45.0, 80.0];
 
 /// One battery scenario, drawn once at battery generation and immutable
@@ -73,14 +75,15 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
 
     let food_here = food_here_by_type.first().copied().unwrap_or(0.0);
     let neighbor_food = neighbor_food_by_type.first().copied().unwrap_or([0.0; 8]);
+    let lifecycle = EnergyLifecycleConfig::default();
     let sensors = SensorSnapshot {
         local: StaticInputs {
             food_here,
             neighbor_food,
             neighbor_barrier: [0.0; 8],
             neighbor_occupied,
-            generation: 0.0,
-            age_ticks: age,
+            age_ticks: age_fraction(age, lifecycle.age_reference_ticks),
+            max_energy: lifecycle.max_energy,
         },
         typed_local_food: TypedFoodLocalSnapshot {
             food_here_by_type,

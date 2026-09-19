@@ -131,34 +131,46 @@ Invariants:
 
 ## Implementation Tasks
 
-- [ ] Viability baseline run first; pin a founder-only (mutation-off)
+- [x] Viability baseline run first; pin a founder-only (mutation-off)
       trajectory digest on the current code before any production change
       (TDD: the pin is the identity check of invariant 6).
-- [ ] `age_reference_ticks` on `EnergyLifecycleConfig` with default,
+- [x] `age_reference_ticks` on `EnergyLifecycleConfig` with default,
       normalization, and config-spec row (invariants 2, 7).
-- [ ] Unit-scale resolution of the three introspective values on both the
-      graph and VM read paths (invariants 1–2).
-- [ ] Delete `Generation`; update the sampling catalog, key sets, census and
+- [x] Unit-scale resolution of the three introspective values on both the
+      graph and VM read paths (invariants 1–2): `StaticInputs` carries
+      `max_energy` and the age fraction from the tick loop's lifecycle config;
+      `resolve_input` divides both energy reads by it.
+- [x] Delete `Generation`; update the sampling catalog, key sets, census and
       analysis code, and test sources that named it (invariant 3).
-- [ ] Founder profiles on the unit scale (invariants 4–5); F01's acceptance
+- [x] Founder profiles on the unit scale (invariants 4–5); F01's acceptance
       proptest and the profile-table pin updated to the unit thresholds.
-- [ ] Gate-scan test per profile and the range/monotonicity property tests
-      (invariants 6, 8); `proptest-regressions/` files committed if they
-      appear.
-- [ ] Re-pinned mutation-on tests and fixtures listed in the readings file;
+- [x] Gate-scan test per profile and the range/monotonicity property tests
+      (invariants 6, 8); the one `proptest-regressions/` file a red run
+      created (`simulation/actions/mod.txt`) is kept.
+- [x] Re-pinned mutation-on tests and fixtures listed in the readings file;
       the mutation-off pin unchanged.
-- [ ] Reference docs per invariant 10; frontend fixtures naming `Generation`
-      updated where a test fails.
-- [ ] `make check` -> pass.
+- [x] Reference docs per invariant 10 (`v3-mutation-spec.md` never named
+      `Generation`; its kind-table text already reads correctly and is
+      unchanged); frontend fixtures naming `Generation` updated.
+- [x] `make check` -> pass.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> before and after counts.
-- [ ] Founder-only digest pin: test name, digest before, digest after
-      (identical), in `docs/progress/readings/t17-f02.md`.
-- [ ] Gate-scan test: per-profile mismatch set as tabled above; property tests
-      for invariant 8; all named in the readings file.
-- [ ] `cargo test -p v3-core` and `make check` -> pass; the re-pinned tests
+- [x] `cargo test -p v3-core --test viability` -> 27 passed before the
+      change; 28 passed after (the founder-only digest pin added).
+- [x] Founder-only digest pin: `viability.rs::founder_only_trajectory_digest_is_pinned`,
+      digest `5ad9e8e1…de36a9` (177 births, final population 0) before and
+      after, identical; tabled in `docs/progress/readings/t17-f02.md`.
+- [x] Gate-scan test: `founder_energy_gates_scan_identically_on_the_unit_scale`
+      finds the mismatch sets tabled above (empty ×4, `[60.000004]` for
+      Conservative); `founder_age_gate_is_exact_at_every_integer_age`;
+      property tests `energy_fraction_is_bounded_and_monotone` and
+      `age_fraction_is_bounded_and_monotone`; all named in the readings file.
+- [x] `cargo test -p v3-core` -> 1579 lib tests passed (2 ignored), every
+      integration binary ok; `cargo test --workspace --no-fail-fast` ok after
+      the `bench_artifacts` re-pin; `cargo check --workspace --all-targets`
+      clean; `make check` -> exit 0 (rustfmt, clippy, workspace tests,
+      frontend lint/typecheck/tests/build, roadmap-check). Re-pinned tests
       and fixtures tabled in the readings file with old and new values.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full

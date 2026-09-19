@@ -138,12 +138,16 @@ Resolved once per acting-creature turn from current creature state:
 
 ```rust
 pub enum StaticIntrospectionKey {
-    Generation,
     AgeTicks,
 }
 ```
 
-Resolved values are raw integer casts to `f32`.
+Resolved value (T17.F02):
+- `AgeTicks = min(age / energy.lifecycle.age_reference_ticks, 1)`, computed
+  as `f32` division by the configured span; `0.0` at birth, saturating at
+  `1.0` from `age_reference_ticks` on.
+
+There is no generation input: a body cannot sense its ancestor count.
 
 ### 3.3 Dynamic Introspection
 
@@ -156,9 +160,16 @@ pub enum DynamicIntrospectionKey {
 }
 ```
 
-Resolved values:
-- `EnergyCurrent`: raw current energy, bounded by lifecycle config
-- `EnergyConsumedThisTick`: raw energy consumed since turn start
+Resolved values (T17.F02), both fractions of
+`energy.lifecycle.max_energy` clamped to `[0.0, 1.0]`:
+- `EnergyCurrent = clamp(energy / max_energy, 0, 1)`: the live energy. The VM
+  reads its `effective` energy mid-dispatch (what it has left after the
+  charges it already owes); a negative `effective` reads `0.0`.
+- `EnergyConsumedThisTick = clamp(consumed / max_energy, 0, 1)`: energy
+  consumed since turn start, including the VM's owed dispatch debt.
+
+The denominator travels on the sensor snapshot (`StaticInputs::max_energy`)
+from the tick loop's lifecycle config; no runtime copy of the default exists.
 
 ### 3.4 Upstream Output
 

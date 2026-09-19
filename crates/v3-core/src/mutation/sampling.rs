@@ -6,11 +6,11 @@ use crate::contracts::{
 };
 use crate::runtime::OUTPUT_SLOT_COUNT;
 
-/// Generate a random input reference from the full set of 24 possible values.
+/// Generate a random input reference from the full set of 23 possible values.
 ///
-/// Distribution: FoodHere (1) + Ring sensors (3) + StaticIntrospection (2) +
-/// DynamicIntrospection (3) + ActionQueue (1) + Area summaries (3) +
-/// Nearby creature (3) + UpstreamSlot (8 weighted slots) = 24 total.
+/// Distribution: FoodHere (1) + Ring sensors (3) + StaticIntrospection (1) +
+/// DynamicIntrospection (2) + ActionQueue (1) + Area summaries (3) +
+/// Nearby creature (3) + UpstreamSlot (8 weighted slots) = 23 total.
 pub(crate) fn random_input_reference(rng: &mut impl Rng) -> InputReference {
     random_input_reference_for_food_types(rng, 1)
 }
@@ -23,7 +23,7 @@ pub(crate) fn random_input_reference_for_food_types(
     rng: &mut impl Rng,
     food_type_count: usize,
 ) -> InputReference {
-    let idx = rng.gen_range(0u8..23);
+    let idx = rng.gen_range(0u8..22);
     match idx {
         0 => InputReference::World(WorldInputKey::FoodHere {
             type_idx: sample_food_type_id(food_type_count, rng),
@@ -33,19 +33,18 @@ pub(crate) fn random_input_reference_for_food_types(
         }),
         2 => InputReference::World(WorldInputKey::NeighborBarrierRing),
         3 => InputReference::World(WorldInputKey::NeighborOccupiedRing),
-        4 => InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
-        5 => InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
-        6 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
-        7 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
-        8 => InputReference::ActionQueue,
-        9 => InputReference::World(WorldInputKey::AreaFoodSummary {
+        4 => InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
+        5 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+        6 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
+        7 => InputReference::ActionQueue,
+        8 => InputReference::World(WorldInputKey::AreaFoodSummary {
             type_idx: sample_food_type_id(food_type_count, rng),
         }),
-        10 => InputReference::World(WorldInputKey::AreaBarrierSummary),
-        11 => InputReference::World(WorldInputKey::NearbyCreatureCore),
-        12 => InputReference::World(WorldInputKey::NearbyCreatureVitals),
-        13 => InputReference::World(WorldInputKey::NearbyCreatureIdentity),
-        14 => InputReference::World(WorldInputKey::AreaOccupancySummary),
+        9 => InputReference::World(WorldInputKey::AreaBarrierSummary),
+        10 => InputReference::World(WorldInputKey::NearbyCreatureCore),
+        11 => InputReference::World(WorldInputKey::NearbyCreatureVitals),
+        12 => InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+        13 => InputReference::World(WorldInputKey::AreaOccupancySummary),
         _ => InputReference::UpstreamSlot(rng.gen_range(0..OUTPUT_SLOT_COUNT)),
     }
 }
@@ -124,12 +123,12 @@ mod tests {
     #[test]
     fn typed_sampler_retains_both_energy_introspection_keys() {
         for (index, key) in [
-            (6_u64, DynamicIntrospectionKey::EnergyCurrent),
-            (7, DynamicIntrospectionKey::EnergyConsumedThisTick),
+            (5_u64, DynamicIntrospectionKey::EnergyCurrent),
+            (6, DynamicIntrospectionKey::EnergyConsumedThisTick),
         ] {
             // The midpoint of this u32 bucket selects the exact catalog index
             // under rand's multiply-high uniform sampler, with no rejection.
-            let draw = ((index << 32) + (1_u64 << 31)) / 23;
+            let draw = ((index << 32) + (1_u64 << 31)) / 22;
             let mut rng = rand::rngs::mock::StepRng::new(draw, 0);
             assert_eq!(
                 random_input_reference_for_food_types(&mut rng, 1),

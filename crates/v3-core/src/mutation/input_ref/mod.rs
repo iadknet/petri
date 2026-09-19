@@ -47,7 +47,6 @@ fn input_reference_universe(food_type_count: usize) -> Vec<InputReference> {
         .into_iter()
         .map(InputReference::World)
         .chain([
-            InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
             InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),

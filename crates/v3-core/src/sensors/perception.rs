@@ -334,7 +334,7 @@ mod tests {
             neighbor_food: [0.0; 8],
             neighbor_barrier: [0.0; 8],
             neighbor_occupied: [0.0; 8],
-            generation: 0.0,
+            max_energy: 200.0,
             age_ticks: 0.0,
         };
         assert_eq!(

@@ -91,11 +91,12 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
     assert_eq!(points.len(), 6);
 }
 
-/// T11.F23 re-pin: `VmConstantMutation` moves a constant by a share of its
-/// scale instead of ±1, so every trajectory moves from its first constant
-/// event. The hash below was measured after two runs agreed; the identity
-/// the test pins is unchanged (previously re-pinned at T02.F04, T11.F19,
-/// T11.F21, T11.F22, the 2026-09-18 `ChangeEntryNode` rescale, and T17.F01).
+/// T17.F02 re-pin: introspection reads on the unit scale and `Generation`
+/// leaves the input-reference catalog, so every trajectory moves from its
+/// first birth that draws an introspective reference or parameter. The hash
+/// below was measured after two runs agreed; the identity the test pins is
+/// unchanged (previously re-pinned at T02.F04, T11.F19, T11.F21, T11.F22,
+/// the 2026-09-18 `ChangeEntryNode` rescale, T17.F01, and T11.F23).
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -123,7 +124,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 17387818010249764947);
+    assert_eq!(hash.finish(), 17519359726252727600);
 }
 
 use proptest::prelude::*;

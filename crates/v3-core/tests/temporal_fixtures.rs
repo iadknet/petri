@@ -36,7 +36,7 @@ use common::{graph_hop, insert_creature, run_one_traced_tick, test_config};
 
 use proptest::prelude::*;
 use slotmap::SlotMap;
-use v3_core::config::{MutationConfig, OrdinaryFoodTypeId};
+use v3_core::config::{MutationConfig, OrdinaryFoodTypeId, SimulationConfig};
 use v3_core::contracts::{
     CreatureId, Direction, InputReference, NodeId, Position, RouteTarget, StaticIntrospectionKey,
     WorldAction, WorldInputKey,
@@ -69,6 +69,24 @@ fn food_here_ref() -> InputReference {
 
 fn age_ticks_ref() -> InputReference {
     InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks)
+}
+
+/// `AgeTicks` reads `age / age_reference_ticks` (T17.F02); the fixtures gate
+/// on integer ages, so their targets and half-tick tolerance sit on that
+/// scale.
+fn age_target(age: u64) -> f32 {
+    age as f32
+        / SimulationConfig::default()
+            .energy
+            .lifecycle
+            .age_reference_ticks as f32
+}
+
+fn age_eps() -> f32 {
+    0.5 / SimulationConfig::default()
+        .energy
+        .lifecycle
+        .age_reference_ticks as f32
 }
 
 /// A1's genome, also used as B1's matched reactive control: read `FoodHere`
@@ -198,11 +216,11 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
         VmInstruction::LoadConst {
             dst: 1,
             const_idx: 0,
-        }, // idx1: r1 = 1.0 (age target 1)
+        }, // idx1: r1 = age target 1
         VmInstruction::LoadConst {
             dst: 2,
             const_idx: 2,
-        }, // idx2: r2 = eps 0.5
+        }, // idx2: r2 = eps, half a tick
         VmInstruction::CmpEq {
             dst: 3,
             a: 0,
@@ -221,7 +239,7 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
         VmInstruction::LoadConst {
             dst: 5,
             const_idx: 1,
-        }, // idx7: r5 = 2.0 (age target 2)
+        }, // idx7: r5 = age target 2
         VmInstruction::CmpEq {
             dst: 6,
             a: 0,
@@ -242,8 +260,8 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
         VmInstruction::JumpIfZero { cond: 9, offset: 4 }, // idx14: -> idx19 if prev_slot0 <= 0
         VmInstruction::LoadConst {
             dst: 10,
-            const_idx: 1,
-        }, // idx15: r10 = 2.0 (DIR_E)
+            const_idx: 4,
+        }, // idx15: r10 = DIR_E
         VmInstruction::WriteWorldActionMeta {
             slot_idx: 0,
             src: 10,
@@ -264,7 +282,7 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
             input_refs: vec![age_ticks_ref()],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 11,
-                constants: vec![1.0, 2.0, 0.5, 0.0],
+                constants: vec![age_target(1), age_target(2), age_eps(), 0.0, DIR_E],
                 program,
             }),
             targets: vec![],
@@ -285,11 +303,11 @@ fn slot_write_once_vm_genome(slot: u8, value: f32) -> CreatureGenome {
         VmInstruction::LoadConst {
             dst: 1,
             const_idx: 0,
-        }, // idx1: r1 = 1.0
+        }, // idx1: r1 = age target 1
         VmInstruction::LoadConst {
             dst: 2,
             const_idx: 1,
-        }, // idx2: r2 = eps 0.5
+        }, // idx2: r2 = eps, half a tick
         VmInstruction::CmpEq {
             dst: 3,
             a: 0,
@@ -317,7 +335,7 @@ fn slot_write_once_vm_genome(slot: u8, value: f32) -> CreatureGenome {
             input_refs: vec![age_ticks_ref()],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 5,
-                constants: vec![1.0, 0.5, value],
+                constants: vec![age_target(1), age_eps(), value],
                 program,
             }),
             targets: vec![],
@@ -735,7 +753,6 @@ fn b1_shared_memory_delayed_cue() {
             assert_eq!(cue.neighbor_food, no_cue.neighbor_food);
             assert_eq!(cue.neighbor_barrier, no_cue.neighbor_barrier);
             assert_eq!(cue.neighbor_occupied, no_cue.neighbor_occupied);
-            assert_eq!(cue.generation, no_cue.generation);
             assert_eq!(
                 cue.age_ticks, no_cue.age_ticks,
                 "delay {delay}, reactive_control {is_reactive_control}: static_inputs at the \
@@ -1150,7 +1167,7 @@ fn empty_sensor_snapshot() -> SensorSnapshot {
             neighbor_food: [0.0; 8],
             neighbor_barrier: [0.0; 8],
             neighbor_occupied: [0.0; 8],
-            generation: 0.0,
+            max_energy: 200.0,
             age_ticks: 0.0,
         },
         typed_local_food: TypedFoodLocalSnapshot::zeroed(1),

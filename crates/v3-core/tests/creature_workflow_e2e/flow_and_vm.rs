@@ -233,11 +233,10 @@ fn vm_reads_all_inputs_e2e() {
     // ref 1: NeighborFoodRing (compound, 8 sub-values)
     // ref 2: NeighborBarrierRing (compound, 8 sub-values)
     // ref 3: NeighborOccupiedRing (compound, 8 sub-values)
-    // ref 4: Generation
-    // ref 5: AgeTicks
-    // ref 6: EnergyCurrent
-    // ref 7: EnergyConsumedThisTick
-    // ref 8: UpstreamSlot(11)
+    // ref 4: AgeTicks
+    // ref 5: EnergyCurrent
+    // ref 6: EnergyConsumedThisTick
+    // ref 7: UpstreamSlot(11)
     let input_refs = vec![
         InputReference::World(WorldInputKey::FoodHere {
             type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
@@ -247,7 +246,6 @@ fn vm_reads_all_inputs_e2e() {
         }),
         InputReference::World(WorldInputKey::NeighborBarrierRing),
         InputReference::World(WorldInputKey::NeighborOccupiedRing),
-        InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
         InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
         InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
         InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
@@ -256,7 +254,7 @@ fn vm_reads_all_inputs_e2e() {
 
     // Build a program that reads every sub-value of every input ref.
     // For compound ring sensors (refs 1-3), read sub_idx 0..7.
-    // For scalar refs (0, 4-8), read sub_idx 0.
+    // For scalar refs (0, 4-7), read sub_idx 0.
     let mut program = Vec::new();
     // Track (ref_idx, sub_idx) order so we can match observed values later.
     let mut read_schedule: Vec<(u16, u16)> = Vec::new();
@@ -369,26 +367,27 @@ fn vm_reads_all_inputs_e2e() {
         );
     }
 
-    // ref 4: Generation, ref 5: AgeTicks
-    assert!((observed[&(4, 0)] - 9.0).abs() < 1e-6, "Generation");
-    assert!((observed[&(5, 0)] - 3.0).abs() < 1e-6, "AgeTicks");
+    // ref 4: AgeTicks as a fraction of the default age_reference_ticks (500)
+    assert!((observed[&(4, 0)] - 3.0 / 500.0).abs() < 1e-6, "AgeTicks");
 
-    let energy_current = observed[&(6, 0)];
+    // ref 5: EnergyCurrent as a fraction of max_energy (200)
+    let energy_current = observed[&(5, 0)];
     assert!(energy_current > 0.0, "EnergyCurrent should stay positive");
     assert!(
-        energy_current < 150.0,
-        "EnergyCurrent should stay below starting energy"
+        energy_current < 150.0 / 200.0,
+        "EnergyCurrent should stay below the starting fraction"
     );
 
-    // ref 7: EnergyConsumedThisTick
-    let energy_consumed = observed[&(7, 0)];
+    // ref 6: EnergyConsumedThisTick
+    let energy_consumed = observed[&(6, 0)];
     assert!(
         energy_consumed > 0.0,
         "EnergyConsumedThisTick should include graph hop costs"
     );
+    assert!(energy_consumed <= 1.0);
 
-    // ref 8: UpstreamSlot(11)
-    assert!((observed[&(8, 0)] - 0.73).abs() < 1e-6, "UpstreamSlot(11)");
+    // ref 7: UpstreamSlot(11)
+    assert!((observed[&(7, 0)] - 0.73).abs() < 1e-6, "UpstreamSlot(11)");
 }
 
 #[test]

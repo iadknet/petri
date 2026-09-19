@@ -1,4 +1,5 @@
 use super::*;
+use crate::config::EnergyLifecycleConfig;
 use crate::contracts::WorldAction;
 use crate::creature::identity::CreatureIdentityState;
 
@@ -590,7 +591,7 @@ fn vm_eats_when_food_here() {
         [0.0; 16],
     );
 
-    let local = assemble_static_inputs(&world, &creature);
+    let local = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
     // food_here should be > 0.0
     assert!(local.food_here > 0.0);
     let ss = SensorSnapshot {
@@ -693,7 +694,7 @@ fn vm_noop_when_no_food() {
         CreatureIdentityState::default(),
         [0.0; 16],
     );
-    let local = assemble_static_inputs(&world, &creature);
+    let local = assemble_static_inputs(&world, &creature, &EnergyLifecycleConfig::default());
     assert_eq!(local.food_here, 0.0);
     let ss = SensorSnapshot {
         local,

@@ -1,6 +1,7 @@
 use crate::contracts::{ActionQueue, DynamicIntrospectionKey, InputReference};
 use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::SensorSnapshot;
+use crate::sensors::static_inputs::energy_fraction;
 
 /// Shared resolution context for input references.
 ///
@@ -22,7 +23,8 @@ pub struct ResolveCtx<'a> {
 ///   world keys). Scalar inputs ignore sub_idx. Compound inputs wrap via
 ///   `compound_width()`.
 /// - World and static introspection keys are read from the pre-assembled snapshot.
-/// - Dynamic introspection is resolved live from `ctx.energy` and `ctx.energy_consumed`.
+/// - Dynamic introspection is resolved live from `ctx.energy` and `ctx.energy_consumed`
+///   as fractions of the snapshot's `max_energy`, clamped to [0, 1].
 /// - UpstreamSlot: reads `upstream_slots[idx]`; idx >= `OUTPUT_SLOT_COUNT` yields 0.0.
 /// - Missing or out-of-range index: 0.0 (soft default).
 #[inline]
@@ -46,8 +48,12 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
         InputReference::World(key) => ctx.sensors.resolve_world(key),
         InputReference::StaticIntrospection(key) => ctx.sensors.local.resolve_static(key),
         InputReference::DynamicIntrospection(key) => match key {
-            DynamicIntrospectionKey::EnergyCurrent => ctx.energy,
-            DynamicIntrospectionKey::EnergyConsumedThisTick => ctx.energy_consumed,
+            DynamicIntrospectionKey::EnergyCurrent => {
+                energy_fraction(ctx.energy, ctx.sensors.local.max_energy)
+            }
+            DynamicIntrospectionKey::EnergyConsumedThisTick => {
+                energy_fraction(ctx.energy_consumed, ctx.sensors.local.max_energy)
+            }
         },
         InputReference::UpstreamSlot(idx) => {
             if *idx < OUTPUT_SLOT_COUNT {
@@ -78,8 +84,8 @@ mod tests {
                 neighbor_food: [0.5; 8],
                 neighbor_barrier: [0.0; 8],
                 neighbor_occupied: [0.0; 8],
-                generation: 3.0,
-                age_ticks: 10.0,
+                max_energy: 200.0,
+                age_ticks: 0.02,
             },
             typed_local_food: TypedFoodLocalSnapshot {
                 food_here_by_type: vec![food_here],
@@ -138,19 +144,6 @@ mod tests {
     }
 
     #[test]
-    fn static_introspection_generation() {
-        let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
-        let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
-        let v = resolve_input(
-            &InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
-            0,
-            &ctx,
-        );
-        assert!((v - 3.0).abs() < 1e-6);
-    }
-
-    #[test]
     fn static_introspection_age_ticks() {
         let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
@@ -160,33 +153,35 @@ mod tests {
             0,
             &ctx,
         );
-        assert!((v - 10.0).abs() < 1e-6);
+        assert!((v - 0.02).abs() < 1e-6);
+    }
+
+    /// `EnergyCurrent` is the live energy as a fraction of the snapshot's
+    /// `max_energy`; a negative mid-dispatch `effective` energy reads 0 and
+    /// an overfull one reads 1.
+    #[test]
+    fn dynamic_energy_current_is_a_fraction_of_max_energy() {
+        let ss = make_sensor_snapshot(0.0);
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
+        let key = InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent);
+        for (energy, expected) in [(42.5, 0.2125), (-3.0, 0.0), (250.0, 1.0), (200.0, 1.0)] {
+            let ctx = make_ctx(&ss, &upstream, energy, 0.0);
+            let v = resolve_input(&key, 0, &ctx);
+            assert!((v - expected).abs() < 1e-6, "energy={energy} read {v}");
+        }
     }
 
     #[test]
-    fn dynamic_energy_current_live() {
+    fn dynamic_energy_consumed_this_tick_is_a_fraction_of_max_energy() {
         let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
-        let ctx = make_ctx(&ss, &upstream, 42.5, 0.0);
-        let v = resolve_input(
-            &InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
-            0,
-            &ctx,
-        );
-        assert!((v - 42.5).abs() < 1e-6);
-    }
-
-    #[test]
-    fn dynamic_energy_consumed_this_tick() {
-        let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
-        let ctx = make_ctx(&ss, &upstream, 20.0, 5.5);
-        let v = resolve_input(
-            &InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
-            0,
-            &ctx,
-        );
-        assert!((v - 5.5).abs() < 1e-6);
+        let key =
+            InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick);
+        for (consumed, expected) in [(5.5, 0.0275), (0.0, 0.0), (400.0, 1.0)] {
+            let ctx = make_ctx(&ss, &upstream, 20.0, consumed);
+            let v = resolve_input(&key, 0, &ctx);
+            assert!((v - expected).abs() < 1e-6, "consumed={consumed} read {v}");
+        }
     }
 
     #[test]
@@ -324,7 +319,7 @@ mod tests {
 
         let refs = vec![
             InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
-            InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::UpstreamSlot(0),
         ];

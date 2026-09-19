@@ -41,7 +41,6 @@ fn assemble_tick(tick: core_trace::TickTrace) -> Result<TickTracePayload, serde_
             neighbor_food: tick.static_inputs.neighbor_food,
             neighbor_barrier: tick.static_inputs.neighbor_barrier,
             neighbor_occupied: tick.static_inputs.neighbor_occupied,
-            generation: tick.static_inputs.generation,
             age_ticks: tick.static_inputs.age_ticks,
         },
         debug_perception: tick
@@ -229,7 +228,6 @@ mod tests {
                     neighbor_food: [0.0; 8],
                     neighbor_barrier: [0.0; 8],
                     neighbor_occupied: [0.0; 8],
-                    generation: 1.0,
                     age_ticks: 2.0,
                 },
                 debug_perception: None,
@@ -303,7 +301,6 @@ mod tests {
                     neighbor_food: [0.0; 8],
                     neighbor_barrier: [0.0; 8],
                     neighbor_occupied: [0.0; 8],
-                    generation: 1.0,
                     age_ticks: 1.0,
                 },
                 debug_perception: None,

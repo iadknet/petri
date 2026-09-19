@@ -179,8 +179,11 @@ CreatureGenome {
 
 The five input references are primary FoodHere, live EnergyCurrent, AgeTicks,
 primary NeighborFoodRing, and NeighborOccupiedRing. Three compute nodes apply
-strict energy `Threshold`, age `Threshold(max(min_reproduce_age_ticks - 0.5,
--0.5))`, and Multiply of those gates. Six custom outputs carry food here,
+strict energy `Threshold` (a fraction of `max_energy`, the scale
+`EnergyCurrent` reads on), age `Threshold(max(min_reproduce_age - 0.5, -0.5)
+/ age_reference_ticks)` (the scale `AgeTicks` reads on, both values from the
+lifecycle config at seeding, exact at every integer age), and Multiply of
+those gates. Six custom outputs carry food here,
 can-reproduce, and N/E/S/W primary food. Other output sinks, action bank, and
 execute gate remain unwired. The graph routes to node 1 in slot 0.
 
@@ -194,18 +197,22 @@ changes only the strict energy threshold in Node 0 and the priority and
 transfer fraction (VM constant index 5, written to `meta[1]` of the reproduce
 action as the share of the parent's post-cost energy the child starts with)
 in Node 1; the 2-node mesh, its input references, compute nodes, and output
-wiring are shared by every profile. Every threshold sits at least 2.0 above
-`min_reproduce_energy` and every fraction clears the `initial_energy` litter
+wiring are shared by every profile. The energy threshold is the founder's own
+constant on the unit scale (it gates on fullness and is not recomputed from
+`max_energy`); at the default `max_energy` (200) each sits at least 2.0 above
+`min_reproduce_energy`, and every fraction clears the `initial_energy` litter
 floor at its own threshold after the age-1.0 reproduce cost, so a founder
-attempt at or above its gate is never refused on energy.
+attempt at or above its gate is never refused on energy. A lifecycle where
+`threshold * max_energy - 1.0 < min_reproduce_energy` pins the founder at its
+gate (`v3-runtime-config-spec.md` Section 4).
 
-| Profile | Wire name | Strict energy threshold | Transfer fraction | Priority |
-| --- | --- | ---: | ---: | --- |
-| V3Alpha1 | `v3_alpha1` | 32 | 2/3 | Reproduce, local forage, Move fallback |
-| ForageFirstSparse | `forage_first_sparse` | 32 | 2/3 | Local forage, Reproduce, forage fallback |
-| ForageFirstSparseConservative | `forage_first_sparse_conservative` | 60 | 0.35 | Local forage, Reproduce, forage fallback |
-| ForageFirstSparseRichOffspring | `forage_first_sparse_rich_offspring` | 40 | 0.60 | Local forage, Reproduce, forage fallback |
-| ForageFirstSparseBalanced | `forage_first_sparse_balanced` | 50 | 0.45 | Local forage, Reproduce, forage fallback |
+| Profile | Wire name | Strict energy threshold (fraction of `max_energy`) | Energy at default `max_energy` | Transfer fraction | Priority |
+| --- | --- | ---: | ---: | ---: | --- |
+| V3Alpha1 | `v3_alpha1` | 0.16 | 32 | 2/3 | Reproduce, local forage, Move fallback |
+| ForageFirstSparse | `forage_first_sparse` | 0.16 | 32 | 2/3 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseConservative | `forage_first_sparse_conservative` | 0.30 | 60 | 0.35 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseRichOffspring | `forage_first_sparse_rich_offspring` | 0.20 | 40 | 0.60 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseBalanced | `forage_first_sparse_balanced` | 0.25 | 50 | 0.45 | Local forage, Reproduce, forage fallback |
 
 Local forage requires positive primary food and queues Eat(type 0), then Move.
 Forage-first fallback also queues Eat then Move on an empty cell, retaining

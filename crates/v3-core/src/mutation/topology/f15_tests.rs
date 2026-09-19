@@ -846,7 +846,7 @@ fn sensors(input: f32) -> crate::sensors::perception::SensorSnapshot {
             neighbor_barrier: [0.0; 8],
             neighbor_occupied: [0.0; 8],
             age_ticks: 0.0,
-            generation: 0.0,
+            max_energy: 200.0,
         },
         typed_local_food: TypedFoodLocalSnapshot {
             food_here_by_type: vec![input],

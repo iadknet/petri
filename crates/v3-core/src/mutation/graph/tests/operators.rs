@@ -42,7 +42,7 @@ pub(super) fn scenarios() -> Vec<SensorSnapshot> {
             neighbor_food,
             neighbor_barrier: [0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0],
             neighbor_occupied: [0.0; 8],
-            generation: 0.0,
+            max_energy: 200.0,
             age_ticks: age,
         },
         typed_local_food: TypedFoodLocalSnapshot::zeroed(1),

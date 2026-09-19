@@ -21,7 +21,7 @@ fn sensors() -> SensorSnapshot {
             neighbor_food: [0.0; 8],
             neighbor_barrier: [0.0; 8],
             neighbor_occupied: [0.0; 8],
-            generation: 0.0,
+            max_energy: 200.0,
             age_ticks: 0.0,
         },
         typed_local_food: TypedFoodLocalSnapshot::zeroed(1),
@@ -200,7 +200,8 @@ fn activity_uses_evaluation_energy_before_pure_hebbian_cost() {
     let side = visit(&def, &mut state, 0.0, &mut energy, &runtime);
     assert_eq!(energy, 6.0);
     assert_eq!(side.work_counters.plasticity_updates, 1);
-    assert_eq!(state.eligibility_traces[0][0][0], 8.0);
+    // The read is the evaluation energy (8.0) as a fraction of max_energy.
+    assert_eq!(state.eligibility_traces[0][0][0], 8.0 / 200.0);
 }
 
 #[test]

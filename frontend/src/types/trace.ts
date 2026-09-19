@@ -7,7 +7,6 @@ export interface StaticInputsSnapshot {
 	neighbor_food: number[];
 	neighbor_barrier: number[];
 	neighbor_occupied: number[];
-	generation: number;
 	age_ticks: number;
 }
 

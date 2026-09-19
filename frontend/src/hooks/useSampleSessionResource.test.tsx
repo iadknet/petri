@@ -33,7 +33,6 @@ function buildSample(creatureId: number): ExecutionSample {
 					neighbor_food: [0, 0, 0, 0],
 					neighbor_barrier: [0, 0, 0, 0],
 					neighbor_occupied: [0, 0, 0, 0],
-					generation: 1,
 					age_ticks: 5,
 				},
 				hops: [],

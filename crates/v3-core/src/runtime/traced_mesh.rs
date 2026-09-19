@@ -195,7 +195,7 @@ mod tests {
                 neighbor_food: [0.0; 8],
                 neighbor_barrier: [0.0; 8],
                 neighbor_occupied: [0.0; 8],
-                generation: 0.0,
+                max_energy: 200.0,
                 age_ticks: 0.0,
             },
             typed_local_food: TypedFoodLocalSnapshot::zeroed(1),
@@ -998,7 +998,8 @@ mod tests {
         );
 
         assert_eq!(output_a.actions, output_b.actions);
-        assert!((memory_a[0] - 100.0).abs() < 0.01);
+        // The live read is the energy as a fraction of max_energy (200).
+        assert!((memory_a[0] - 0.5).abs() < 0.01);
         assert_eq!(memory_a, memory_b);
     }
 
