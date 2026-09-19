@@ -1,36 +1,52 @@
+import { randomSeed } from "../../../stores/startupConfig.ts";
 import type { TerrainLayer } from "../../../types/config.ts";
 import { DEFAULT_PATTERN_PARAMS, type PatternType } from "../../../types/pattern.ts";
 import { PatternParamsPanel } from "../../pattern-params/PatternParamsPanel.tsx";
 import { FieldGroup } from "../shared/FieldGroup.tsx";
+import { RandomSeedButton } from "../shared/RandomSeedButton.tsx";
 import type { StartupSectionProps } from "../shared/types.ts";
 
 const inputClass =
 	"min-w-0 w-full px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded text-slate-200";
 function OptionalSeed({
 	label,
+	testId,
 	value,
 	onChange,
-}: { label: string; value: number | null | undefined; onChange: (value: number | null) => void }) {
+}: {
+	label: string;
+	testId: string;
+	value: number | null | undefined;
+	onChange: (value: number | null) => void;
+}) {
 	return (
-		<label className="flex flex-col gap-1 text-xs text-slate-300">
-			{label}
-			<input
-				aria-label={label}
-				type="number"
-				min={0}
-				max={Number.MAX_SAFE_INTEGER}
-				step={1}
-				value={value ?? ""}
-				placeholder="Use derived seed"
-				className={inputClass}
-				onChange={(event) => {
-					const raw = event.target.value;
-					const seed = Number(raw);
-					if (raw === "") onChange(null);
-					else if (Number.isSafeInteger(seed) && seed >= 0) onChange(seed);
-				}}
-			/>
-		</label>
+		<div className="flex flex-col gap-1 text-xs text-slate-300">
+			<label htmlFor={`${testId}-input`}>{label}</label>
+			<div className="flex items-center gap-1">
+				<input
+					id={`${testId}-input`}
+					aria-label={label}
+					type="number"
+					min={0}
+					max={Number.MAX_SAFE_INTEGER}
+					step={1}
+					value={value ?? ""}
+					placeholder="Use derived seed"
+					className={inputClass}
+					onChange={(event) => {
+						const raw = event.target.value;
+						const seed = Number(raw);
+						if (raw === "") onChange(null);
+						else if (Number.isSafeInteger(seed) && seed >= 0) onChange(seed);
+					}}
+				/>
+				<RandomSeedButton
+					label={label}
+					testId={`${testId}-randomize`}
+					onClick={() => onChange(randomSeed())}
+				/>
+			</div>
+		</div>
 	);
 }
 export function TerrainSection({ startupPreset, updateStartupPreset }: StartupSectionProps) {
@@ -47,6 +63,7 @@ export function TerrainSection({ startupPreset, updateStartupPreset }: StartupSe
 			</p>
 			<OptionalSeed
 				label="Map seed"
+				testId="startup-map-seed"
 				value={startupPreset.world.world_seed}
 				onChange={(seed) => updateStartupPreset("world.world_seed", seed)}
 			/>
@@ -81,6 +98,7 @@ export function TerrainSection({ startupPreset, updateStartupPreset }: StartupSe
 					/>
 					<OptionalSeed
 						label={`Layer ${index + 1} seed`}
+						testId={`startup-terrain-layer-${index}-seed`}
 						value={layer.seed}
 						onChange={(seed) => updateLayer(index, { seed })}
 					/>
