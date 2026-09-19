@@ -10,10 +10,12 @@ pub enum WorldAction {
     Eat { type_idx: OrdinaryFoodTypeId },
     /// Move one step in the given direction.
     Move(Direction),
-    /// Attempt to spawn an offspring in the given direction, transferring energy.
+    /// Attempt to spawn an offspring in the given direction. The child starts
+    /// with `energy_transfer_fraction` (in [0, 1]) of the parent's post-cost
+    /// energy, capped at `default_offspring_energy` (T17.F01).
     Reproduce {
         direction: Direction,
-        energy_transfer: f32,
+        energy_transfer_fraction: f32,
     },
     /// Attempt to steal energy from a neighbor in the given direction.
     StealEnergy { direction: Direction, amount: f32 },
@@ -56,8 +58,9 @@ impl WorldAction {
     }
 
     /// Read back a parameter slot, mirroring the meta buffer layout used during encoding.
-    /// Slot 0 = direction index (as f32), slot 1 = amount/energy_transfer. Returns 0.0 for
-    /// unknown slots or variants without that parameter.
+    /// Slot 0 = direction index (as f32), slot 1 = amount (StealEnergy) or
+    /// energy_transfer_fraction (Reproduce). Returns 0.0 for unknown slots or
+    /// variants without that parameter.
     #[inline]
     pub fn param(&self, slot: usize) -> f32 {
         match (self, slot) {
@@ -66,10 +69,11 @@ impl WorldAction {
             (WorldAction::Reproduce { direction, .. }, 0) => direction.to_index() as f32,
             (
                 WorldAction::Reproduce {
-                    energy_transfer, ..
+                    energy_transfer_fraction,
+                    ..
                 },
                 1,
-            ) => *energy_transfer,
+            ) => *energy_transfer_fraction,
             (WorldAction::StealEnergy { direction, .. }, 0) => direction.to_index() as f32,
             (WorldAction::StealEnergy { amount, .. }, 1) => *amount,
             _ => 0.0,
@@ -96,7 +100,7 @@ mod tests {
         assert!(!WorldAction::Move(Direction::N).is_noop());
         assert!(!WorldAction::Reproduce {
             direction: Direction::S,
-            energy_transfer: 5.0
+            energy_transfer_fraction: 5.0
         }
         .is_noop());
         assert!(!WorldAction::StealEnergy {
@@ -115,7 +119,7 @@ mod tests {
         assert_eq!(
             WorldAction::Reproduce {
                 direction: Direction::SE,
-                energy_transfer: 1.0
+                energy_transfer_fraction: 1.0
             }
             .direction(),
             Some(Direction::SE)
@@ -142,15 +146,15 @@ mod tests {
     fn reproduce_fields_accessible() {
         let action = WorldAction::Reproduce {
             direction: Direction::SE,
-            energy_transfer: 10.0,
+            energy_transfer_fraction: 10.0,
         };
         if let WorldAction::Reproduce {
             direction,
-            energy_transfer,
+            energy_transfer_fraction,
         } = action
         {
             assert_eq!(direction, Direction::SE);
-            assert!((energy_transfer - 10.0).abs() < f32::EPSILON);
+            assert!((energy_transfer_fraction - 10.0).abs() < f32::EPSILON);
         } else {
             panic!("expected Reproduce variant");
         }
@@ -180,7 +184,7 @@ mod tests {
             WorldAction::Move(Direction::W),
             WorldAction::Reproduce {
                 direction: Direction::NE,
-                energy_transfer: 15.5,
+                energy_transfer_fraction: 15.5,
             },
             WorldAction::StealEnergy {
                 direction: Direction::S,

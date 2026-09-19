@@ -161,12 +161,12 @@ Queue-shape coupling invariant:
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `energy.lifecycle.initial_energy` | `f32` | `20.0` | Must be finite and `>= 0.0`; invalid values fall back to `20.0`. |
+| `energy.lifecycle.initial_energy` | `f32` | `20.0` | Must be finite and `>= 0.0`; invalid values fall back to `20.0`. Also the litter floor: a reproduce attempt whose child would start under it is rejected. |
 | `energy.lifecycle.max_energy` | `f32` | `200.0` | Must be finite and `>= 1.0`; invalid values fall back to `200.0`. |
 | `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.5` | Must be finite and `>= 0.0`; invalid values fall back to `0.5`. |
 | `energy.lifecycle.min_reproduce_energy` | `f32` | `30.0` | Must be finite and `>= 0.0`; invalid values fall back to `30.0`. |
 | `energy.lifecycle.min_reproduce_age` | `u64` | `20` | Minimum parent age (ticks) required before reproduce can be accepted. No normalization fallback; value is consumed as configured. |
-| `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. |
+| `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. Cap on the child's starting energy (`transfer = min(fraction * after_cost, cap)`); it clamps, never rejects. A cap under `initial_energy` puts every litter under the floor, so such a config refuses every birth (free, counted as `RejectedEnergyConstraints`) and is not rejected or normalized at load. |
 | `energy.lifecycle.genome_carry_cost_per_unit` | `f32` | `1e-4` | Must be finite and `>= 0.0`; invalid values fall back to `1e-4`. A missing field defaults to `1e-4`. `0.0` is allowed and disables the charge. Energy charged per tick per unit of total genome size. |
 | `energy.lifecycle.genome_replication_cost_per_unit` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. A missing field defaults to `0.1`. `0.0` is allowed and disables the surcharge. Per-birth multiplier on the parent's reproduce charge per unit of total genome size above the founder's 111. |
 | `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
@@ -275,11 +275,12 @@ defined in `v3-reproduction-spec.md`.
    and `after_cost = parent energy - cost`. Nothing is charged yet.
 3. Enforce `energy.lifecycle.min_reproduce_energy` gate on `after_cost`.
 4. Compute
-   `requested_energy_sanitized = clamp_non_negative_finite(requested_energy)`,
-   then
-   `transfer = min(requested_energy_sanitized, energy.lifecycle.default_offspring_energy)`.
-5. Reject reproduction when `transfer <= 0.0` or `after_cost` cannot cover
-   transfer. A rejection at step 3 or step 5 charges nothing.
+   `transfer = min(energy_transfer_fraction * after_cost, energy.lifecycle.default_offspring_energy)`,
+   where `energy_transfer_fraction` is the action's `meta[1]` sanitized to
+   [0, 1] at decode (so `after_cost >= transfer`).
+5. Reject reproduction when `transfer <= 0.0` or
+   `transfer < energy.lifecycle.initial_energy`. A rejection at step 3 or
+   step 5 charges nothing.
 6. Pay `cost`, then `transfer`, from the parent.
 
 Outcome mapping:

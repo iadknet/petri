@@ -91,12 +91,12 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
     assert_eq!(points.len(), 6);
 }
 
-/// 2026-09-18 re-pin: the topology operator weight table was scaled ten-fold
-/// around `ChangeEntryNode` (weight 1 of 211 instead of 1 of 22), so every
-/// topology draw shifts and the hashed genomes diverge from the first
-/// topology event onward. The hash below was measured after two runs agreed;
-/// the identity the test pins is unchanged (previously re-pinned at T02.F04,
-/// T11.F19, T11.F21, and T11.F22).
+/// T17.F01 re-pin: the founder now emits a transfer fraction (2/3 of
+/// post-cost energy behind a strict gate of 32) instead of a 20-energy
+/// ration behind 30, so energies and positions move from the first birth.
+/// The hash below was measured after two runs agreed; the identity the test
+/// pins is unchanged (previously re-pinned at T02.F04, T11.F19, T11.F21,
+/// T11.F22, and the 2026-09-18 `ChangeEntryNode` rescale).
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -124,7 +124,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 9202429689225232841);
+    assert_eq!(hash.finish(), 16537473422018603259);
 }
 
 use proptest::prelude::*;

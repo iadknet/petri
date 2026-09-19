@@ -31,12 +31,36 @@ pub fn v3alpha1_founder_genome() -> CreatureGenome {
 pub fn v3alpha1_founder_genome_with_min_reproduce_age(
     min_reproduce_age_ticks: u64,
 ) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
-            node0_graph_sensor(min_reproduce_age_ticks),
-            node1_vm_decision(false, 20.0),
-        ],
+    founder_genome_with_min_reproduce_age(FounderProfile::V3Alpha1, min_reproduce_age_ticks)
+}
+
+/// The energy gate and offspring investment a founder profile emits
+/// (T17.F01, v3-startup-seeding-spec.md Section 5.1).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FounderReproducePolicy {
+    /// The founder attempts to reproduce only while `EnergyCurrent` is
+    /// strictly above this (a `Threshold` compute node in node 0).
+    pub energy_threshold: f32,
+    /// VM constant index 5: the fraction of the parent's post-cost energy
+    /// the child starts with, written to `meta[1]` of the reproduce action.
+    pub transfer_fraction: f32,
+}
+
+/// Each threshold sits at least 2.0 above `min_reproduce_energy` (30) and
+/// each fraction clears the `initial_energy` (20) litter floor at its own
+/// threshold after the age-1.0 reproduce cost, so a founder attempt at or
+/// above its gate is never refused on energy (T17.F01 invariant 5).
+#[must_use]
+pub const fn founder_reproduce_policy(profile: FounderProfile) -> FounderReproducePolicy {
+    let (energy_threshold, transfer_fraction) = match profile {
+        FounderProfile::V3Alpha1 | FounderProfile::ForageFirstSparse => (32.0, 2.0 / 3.0),
+        FounderProfile::ForageFirstSparseConservative => (60.0, 0.35),
+        FounderProfile::ForageFirstSparseRichOffspring => (40.0, 0.60),
+        FounderProfile::ForageFirstSparseBalanced => (50.0, 0.45),
+    };
+    FounderReproducePolicy {
+        energy_threshold,
+        transfer_fraction,
     }
 }
 
@@ -53,51 +77,18 @@ pub fn founder_genome_with_min_reproduce_age(
     profile: FounderProfile,
     min_reproduce_age_ticks: u64,
 ) -> CreatureGenome {
-    match profile {
-        FounderProfile::V3Alpha1 => CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
-                node0_graph_sensor(min_reproduce_age_ticks),
-                node1_vm_decision(false, 20.0),
-            ],
-        },
-        FounderProfile::ForageFirstSparse => {
-            forage_first_founder_genome(30.0, 10.0, min_reproduce_age_ticks)
-        }
-        FounderProfile::ForageFirstSparseConservative => {
-            forage_first_founder_genome(60.0, 10.0, min_reproduce_age_ticks)
-        }
-        FounderProfile::ForageFirstSparseRichOffspring => {
-            forage_first_founder_genome(40.0, 20.0, min_reproduce_age_ticks)
-        }
-        FounderProfile::ForageFirstSparseBalanced => {
-            forage_first_founder_genome(50.0, 15.0, min_reproduce_age_ticks)
-        }
-    }
-}
-
-fn forage_first_founder_genome(
-    reproduce_energy_threshold: f32,
-    reproduce_transfer_energy: f32,
-    min_reproduce_age_ticks: u64,
-) -> CreatureGenome {
+    let forage_first = profile != FounderProfile::V3Alpha1;
+    let policy = founder_reproduce_policy(profile);
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
-            node0_graph_sensor_with_threshold(reproduce_energy_threshold, min_reproduce_age_ticks),
-            node1_vm_decision(true, reproduce_transfer_energy),
+            node0_graph_sensor(policy.energy_threshold, min_reproduce_age_ticks),
+            node1_vm_decision(forage_first, policy.transfer_fraction),
         ],
     }
 }
 
-fn node0_graph_sensor(min_reproduce_age_ticks: u64) -> NodeGenome {
-    node0_graph_sensor_with_threshold(30.0, min_reproduce_age_ticks)
-}
-
-fn node0_graph_sensor_with_threshold(
-    reproduce_energy_threshold: f32,
-    min_reproduce_age_ticks: u64,
-) -> NodeGenome {
+fn node0_graph_sensor(reproduce_energy_threshold: f32, min_reproduce_age_ticks: u64) -> NodeGenome {
     NodeGenome {
         node_id: NodeId::new(0),
         input_refs: vec![
@@ -283,7 +274,7 @@ fn append_founder_reproduce(builder: &mut FounderVmBuilder, fallback: usize) {
     builder.push(VmInstruction::ExecuteActionQueue);
 }
 
-fn node1_vm_decision(forage_first: bool, reproduce_transfer_energy: f32) -> NodeGenome {
+fn node1_vm_decision(forage_first: bool, reproduce_transfer_fraction: f32) -> NodeGenome {
     let input_refs = (0..6).map(InputReference::UpstreamSlot).collect();
     let mut builder = FounderVmBuilder::new();
     for register in 0..6u8 {
@@ -326,7 +317,7 @@ fn node1_vm_decision(forage_first: bool, reproduce_transfer_energy: f32) -> Node
         input_refs,
         backend_def: BackendDef::Vm(VmBackendDef {
             register_count: 20,
-            constants: vec![0.0, 1.0, 2.0, 4.0, 6.0, reproduce_transfer_energy],
+            constants: vec![0.0, 1.0, 2.0, 4.0, 6.0, reproduce_transfer_fraction],
             program: builder.finish(),
         }),
         targets: vec![],
@@ -345,13 +336,30 @@ mod tests {
     use crate::sensors::typed_food::TypedFoodLocalSnapshot;
     use proptest::prelude::*;
 
+    /// The T17.F01 profile table: (profile, strict energy threshold,
+    /// transfer fraction). Pinned here independently of
+    /// `founder_reproduce_policy` so a change in either shows up.
     const PROFILES: [(FounderProfile, f32, f32); 5] = [
-        (FounderProfile::V3Alpha1, 30.0, 20.0),
-        (FounderProfile::ForageFirstSparse, 30.0, 10.0),
-        (FounderProfile::ForageFirstSparseConservative, 60.0, 10.0),
-        (FounderProfile::ForageFirstSparseRichOffspring, 40.0, 20.0),
-        (FounderProfile::ForageFirstSparseBalanced, 50.0, 15.0),
+        (FounderProfile::V3Alpha1, 32.0, 2.0 / 3.0),
+        (FounderProfile::ForageFirstSparse, 32.0, 2.0 / 3.0),
+        (FounderProfile::ForageFirstSparseConservative, 60.0, 0.35),
+        (FounderProfile::ForageFirstSparseRichOffspring, 40.0, 0.60),
+        (FounderProfile::ForageFirstSparseBalanced, 50.0, 0.45),
     ];
+
+    #[test]
+    fn founder_reproduce_policy_matches_the_profile_table() {
+        for (profile, threshold, fraction) in PROFILES {
+            assert_eq!(
+                founder_reproduce_policy(profile),
+                FounderReproducePolicy {
+                    energy_threshold: threshold,
+                    transfer_fraction: fraction,
+                },
+                "{profile:?}"
+            );
+        }
+    }
 
     #[allow(clippy::too_many_arguments)]
     fn actions(
@@ -407,7 +415,7 @@ mod tests {
         for (profile, threshold, transfer) in PROFILES {
             let reproduction = vec![WorldAction::Reproduce {
                 direction: Direction::W,
-                energy_transfer: transfer,
+                energy_transfer_fraction: transfer,
             }];
             let forage = vec![
                 WorldAction::eat(OrdinaryFoodTypeId::default()),

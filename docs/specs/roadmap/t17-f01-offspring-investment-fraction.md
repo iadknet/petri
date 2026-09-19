@@ -96,8 +96,11 @@ Invariants:
 6. Determinism: same seed, same config, same trajectory. Every trajectory
    moves from the first birth; pinned-trajectory tests are re-pinned and
    listed in the readings file with old and new values.
-7. The cap binds only when `fraction × after_cost > 100`; it clamps, never
-   rejects.
+7. The cap clamps; only the floor rejects. A config with
+   `default_offspring_energy < initial_energy` refuses every birth, free, and
+   is neither rejected nor normalized at load (lifecycle validation is
+   unchanged, Non-Goals); the refusal is visible in the rejection counters
+   where the old engine bore a child that starved.
 
 | Profile | Threshold (was) | Fraction (was transfer) | Child at threshold, cost 1.0 |
 | --- | ---: | ---: | ---: |
@@ -122,46 +125,55 @@ rescaling the VM constant step is a T11 question for the user.
 
 ## Implementation Tasks
 
-- [ ] Run `cargo test -p v3-core --test viability` first and record the
-      baseline pass.
-- [ ] Decode: sanitize `meta[1]` to [0, 1] and rename the contract field;
-      update `frontend/src/types/trace.ts`, its test, and the `inputs.rs`
-      comment.
-- [ ] `apply_reproduce` Step 7 per invariant 2; rewrite
-      `apply_reproduce_default_cap_allows_twenty_energy_transfer` and add the
-      litter-floor and fraction tests; keep the rejection-free tests green.
-- [ ] Founder: constants and thresholds per the table; re-pin `PROFILES` and
-      the founder scenario tests; add the acceptance property test of
-      invariant 5 (proptest over energy and age; `proptest-regressions/`
-      committed if produced).
-- [ ] Re-pin trajectory-dependent tests; list each in the readings file.
-- [ ] Reference docs: `v3-reproduction-spec.md` Steps 7–8 and the
-      `initial_energy` line, `v3-runtime-config-spec.md` transfer sequencing
-      and the `default_offspring_energy` row, `v3-vm-isa-spec.md` action
-      table row 3, `v3-startup-seeding-spec.md` Section 5.1 profile table.
-- [ ] `make check` (frontend deps present in this worktree).
+- [x] Viability baseline run first (26 passed).
+- [x] Decode: `clamp_unit_interval(meta[1])`;
+      `WorldAction::Reproduce { energy_transfer_fraction }`; frontend trace
+      type and test renamed.
+- [x] `apply_reproduce` Step 7 per invariant 2 (the fraction is clamped again
+      there so `after_cost >= transfer` holds for every caller).
+- [x] Founder: `founder_reproduce_policy(profile)` in `founder.rs` is the
+      one (threshold, fraction) table every profile is built from;
+      `proptest-regressions/runtime/action_decode.txt` added.
+- [x] Re-pinned tests and fixtures listed in the readings file (two digests,
+      five contract pins, eight fixtures whose cap sat under their
+      `initial_energy`).
+- [x] Reference docs: `v3-reproduction-spec.md`, `v3-runtime-config-spec.md`,
+      `v3-vm-isa-spec.md`, `v3-startup-seeding-spec.md` describe the fraction,
+      the floor, and the profile table.
+- [x] `v3-runtime-config-spec.md` `default_offspring_energy` row states that
+      a cap under `initial_energy` refuses every birth (invariant 7).
+- [x] `make check` -> pass.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> pass, before and after.
-- [ ] Decode tests (`runtime/action_decode.rs`): NaN, ±∞, −0.5, 0.0, 0.42,
-      1.0, 7.0 → 0.0, 0.0, 0.0, 0.0, 0.42, 1.0, 1.0 -> test names in the
-      readings file.
-- [ ] `apply_reproduce` tests (`simulation/actions/mod.rs` or
-      `reproduction.rs`): fraction × after_cost child energy; cap at 100;
-      litter-floor rejection with unchanged parent energy and flows; a
-      fraction of 1.0 leaves the parent at exactly 0.0 -> test names in the
-      readings file.
-- [ ] Founder acceptance property test (invariant 5) over all five profiles
-      -> test name; `founder_profiles_execute_energy_age_boundaries_and_priorities`
-      re-pinned to the table.
-- [ ] Tick-level acceptance: a founders-only run (default profile, mutation
-      off, at least 2,000 ticks, one seed) ends with
-      `reproduction_actions_rejected_by_reason[RejectedEnergyConstraints]`
-      equal to 0 and `reproduction_actions_spawned_total > 0` -> test name
-      (viability or a focused tick test).
-- [ ] `make check` -> pass; the re-pinned trajectory tests and their old/new
-      values listed in [`docs/progress/readings/t17-f01.md`](../../progress/readings/t17-f01.md).
+- [x] `cargo test -p v3-core --test viability` -> 26 before, 27 after.
+- [x] Decode tests (`runtime/action_decode.rs`):
+      `reproduce_fraction_is_sanitized_to_unit_interval` (the seven spec
+      inputs, bit-exact) and the proptest
+      `reproduce_fraction_always_lands_in_unit_interval`.
+- [x] `apply_reproduce` tests (`simulation/actions/mod.rs`, bit-exact
+      energies through the `birth_split` fixture):
+      `apply_reproduce_child_starts_at_fraction_of_post_cost_energy`,
+      `apply_reproduce_caps_child_at_default_offspring_energy`,
+      `apply_reproduce_litter_floor_rejection_is_free`,
+      `apply_reproduce_accepts_litter_exactly_at_initial_energy`,
+      `apply_reproduce_full_fraction_leaves_parent_at_exactly_zero`.
+- [x] Founder acceptance property test (invariant 5):
+      `founder_profiles_are_accepted_at_every_energy_above_their_gate`
+      (`simulation/actions/mod.rs`, all five profiles, energy in
+      (threshold, 200], age in [20, 10 000]);
+      `founder_profiles_execute_energy_age_boundaries_and_priorities` and
+      `founder_reproduce_policy_matches_the_profile_table` pin the table.
+- [x] Tick-level acceptance:
+      `viability::founders_only_run_has_no_energy_rejected_reproduce_attempts`
+      (32×32, 10 founders, mutation off, seed 2026, 2,000 ticks) ends with
+      no `RejectedEnergyConstraints` entry and
+      `reproduction_actions_spawned_total > 0`.
+- [x] `cargo test --workspace` -> all binaries ok; re-pinned tests and
+      old/new values in
+      [`docs/progress/readings/t17-f01.md`](../../progress/readings/t17-f01.md).
+- [x] `cargo check --workspace --all-targets`, `cargo fmt --all --check`,
+      `make roadmap-check`, `make check` -> pass after the simplify pass.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.
@@ -250,6 +262,10 @@ crossed, and the re-pin.
 
 - Decision: the founder fractions and thresholds are the table in Inputs and
   Invariants; T17.F02 re-expresses those thresholds, not the pre-F01 values.
+- Deferred: `v3-server/tests/server.rs`'s mutation-counter frame test can
+  finish its 20-tick horizon without a birth, so its reconciliation
+  assertions can be vacuous; pre-existing and outside this contract, not
+  fixed here.
 - Deferred: the track's paired-perturbation probe is not taken (probe genomes
   live in session scratchpads, not the repo; T16.F01 deferral stands); the
   `VmConstantMutation` step size on a [0, 1] fraction is surfaced to the user

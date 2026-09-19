@@ -113,7 +113,7 @@ fn a_rejected_reproduce_counts_in_the_reproduce_slot() {
         id,
         vec![WorldAction::Reproduce {
             direction: Direction::N,
-            energy_transfer: 1.0,
+            energy_transfer_fraction: 1.0,
         }],
     );
     assert_eq!(by_type(&sim, id), slot(ActionType::Reproduce));
@@ -155,7 +155,7 @@ fn a_mixed_sequence_keeps_the_by_type_sum_equal_to_the_attempt_count() {
             WorldAction::Move(Direction::S),
             WorldAction::Reproduce {
                 direction: Direction::N,
-                energy_transfer: 1.0,
+                energy_transfer_fraction: 1.0,
             },
             WorldAction::StealEnergy {
                 direction: Direction::E,

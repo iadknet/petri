@@ -114,7 +114,7 @@ fn reproduce_below_cost_rejects_free_and_records_no_crossing() {
         id,
         WorldAction::Reproduce {
             direction: Direction::N,
-            energy_transfer: 1.0,
+            energy_transfer_fraction: 1.0,
         },
     );
     assert_eq!(sim.stats.mortality.count(DeathCause::ActionReproduce), 0);
@@ -131,7 +131,7 @@ fn failed_penalty_is_a_separate_exhausting_debit_on_every_rejected_action() {
         WorldAction::Move(Direction::N),
         WorldAction::Reproduce {
             direction: Direction::N,
-            energy_transfer: 1.0,
+            energy_transfer_fraction: 1.0,
         },
         WorldAction::StealEnergy {
             direction: Direction::N,
@@ -166,12 +166,16 @@ fn parental_transfer_counts_only_a_successful_birth_and_newborn_starts_clear() {
         sim.config.energy.costs.failed_action_penalty = 0.0;
         sim.config.energy.lifecycle.min_reproduce_age = 0;
         sim.config.energy.lifecycle.min_reproduce_energy = 0.0;
+        // T17.F01: the whole post-cost energy goes to the child; the litter
+        // floor (4.0) accepts the 5.0 start (4.0 after the charge) and
+        // refuses the 3.0 start (2.0 after the charge).
+        sim.config.energy.lifecycle.initial_energy = 4.0;
         execute(
             &mut sim,
             id,
             WorldAction::Reproduce {
                 direction: Direction::N,
-                energy_transfer: 4.0,
+                energy_transfer_fraction: 1.0,
             },
         );
         // T16.F01: the charge lands only on a birth; a rejected attempt is free.

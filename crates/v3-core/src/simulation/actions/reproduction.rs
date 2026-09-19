@@ -10,6 +10,7 @@ use crate::creature::state::CreatureState;
 use crate::mutation::phenotype::mutate_phenotype;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
+use crate::runtime::action_decode::clamp_unit_interval;
 use crate::simulation::simulation::Simulation;
 
 /// Capture birth-local values before any structural mutation.
@@ -99,6 +100,10 @@ impl ReproductionInvalidTargetCause {
 
 /// Apply a Reproduce action per v3-reproduction-spec.md Section 6 unified sequence.
 ///
+/// `energy_transfer_fraction` is the share of the parent's post-cost energy
+/// the child starts with, in [0, 1] (T17.F01); the litter is capped at
+/// `default_offspring_energy` and refused under `initial_energy`.
+///
 /// Returns the outcome indicating whether offspring was spawned or why it was rejected.
 #[must_use]
 #[allow(
@@ -111,7 +116,7 @@ pub fn apply_reproduce(
     parent_id: CreatureId,
     sim: &mut Simulation,
     dir: Direction,
-    energy_transfer_request: f32,
+    energy_transfer_fraction: f32,
     rng: &mut impl Rng,
 ) -> ReproductionActionResult {
     // Stats: always count attempt and per-tick reproduce regardless of outcome.
@@ -188,16 +193,16 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedEnergyConstraints;
     }
 
-    // Step 7: Compute energy transfer (clamped to [0, default_offspring_energy])
-    // and check it is feasible from the post-charge energy.
-    let max_transfer = sim.config.energy.lifecycle.default_offspring_energy;
-    let transfer = if energy_transfer_request.is_finite() && energy_transfer_request > 0.0 {
-        energy_transfer_request.min(max_transfer)
-    } else {
-        0.0
-    };
+    // Step 7 (T17.F01): the litter is a fraction of the parent's post-cost
+    // energy, capped at `default_offspring_energy`. Decode already sanitizes
+    // the fraction to [0, 1]; the clamp here keeps `after_cost >= transfer`
+    // true for every caller. A litter under `initial_energy` is not
+    // conceived, and the refusal is free.
+    let fraction = clamp_unit_interval(energy_transfer_fraction);
+    let transfer =
+        (fraction * after_cost).min(sim.config.energy.lifecycle.default_offspring_energy);
 
-    if transfer <= 0.0 || after_cost < transfer {
+    if transfer <= 0.0 || transfer < sim.config.energy.lifecycle.initial_energy {
         sim.stats.reproduction_actions_rejected_total += 1;
         *sim.stats
             .reproduction_actions_rejected_by_reason

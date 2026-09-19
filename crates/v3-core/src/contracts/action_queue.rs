@@ -156,7 +156,7 @@ mod tests {
         let mut q = ActionQueue::new(10);
         q.push(WorldAction::Reproduce {
             direction: Direction::S,
-            energy_transfer: 15.0,
+            energy_transfer_fraction: 15.0,
         });
         assert!((q.param_at(0, 1) - 15.0).abs() < f32::EPSILON);
     }

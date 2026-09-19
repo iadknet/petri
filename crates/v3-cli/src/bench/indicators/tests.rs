@@ -460,15 +460,15 @@ fn memory_sensitivity_counts_full_action_differences_and_union_once() {
     let ids: Vec<_> = sim.creatures.keys().collect();
     let intact = vec![WorldAction::Reproduce {
         direction: Direction::N,
-        energy_transfer: 1.0,
+        energy_transfer_fraction: 1.0,
     }];
     let payload_changed = vec![WorldAction::Reproduce {
         direction: Direction::N,
-        energy_transfer: 2.0,
+        energy_transfer_fraction: 0.5,
     }];
     let direction_changed = vec![WorldAction::Reproduce {
         direction: Direction::E,
-        energy_transfer: 1.0,
+        energy_transfer_fraction: 1.0,
     }];
     let readings = vec![
         FinalActionObservation {
