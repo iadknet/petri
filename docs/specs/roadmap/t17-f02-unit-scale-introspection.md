@@ -178,9 +178,18 @@ Invariants:
 - [x] Simplification pass (test code only, no pinned value moved): one
       profile table in `creature/founder.rs` carries raw and unit
       thresholds; `tests/temporal_fixtures.rs` derives its age constants.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` at 3200e3d6 (run mode
+      `fresh`, diff against ace7657f); no survivors, so no test change and no
+      second run (production content unchanged by triage):
+
+      ```text
+      57 mutants tested in 15m: 42 caught, 15 unviable
+      rust-mutants: no survivors
+      output: ~/.local/share/petri-tools/mutants/t17-f02/mutants.out
+      missed.txt: empty    timeout.txt: empty
+      unviable (15): all `-> Default::default()` replacements on types
+      without a Default impl (compile failures, not survivors)
+      ```
 - [x] Benchmark summaries stored at
       `docs/progress/features/t17-f02-unit-scale-introspection.json` and
       `-goal.json`; local raw sha256/bytes re-checked (`verified_local`);
