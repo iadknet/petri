@@ -20,7 +20,7 @@ const ACTION_PARAM_NAMES: readonly (readonly string[])[] = [
 	[], // 0: NoOp — no params
 	["food"], // 1: Eat — food type index
 	["dir"], // 2: Move — direction
-	["dir", "energy"], // 3: Reproduce — direction + energy transfer
+	["dir", "frac"], // 3: Reproduce — direction + transfer fraction of parent energy
 	["dir", "amt"], // 4: StealEnergy — direction + amount
 ];
 

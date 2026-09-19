@@ -98,7 +98,7 @@ pub struct ActionLogEntry {
     pub energy_before: f32,
     /// Creature energy AFTER this action was applied (includes costs and penalties).
     pub energy_after: f32,
-    /// Action-specific amount (food consumed, energy transferred/stolen, 0.0 for Move/NoOp).
+    /// Action-specific amount (food consumed, energy stolen, transfer fraction in [0, 1] for Reproduce, 0.0 for Move/NoOp).
     pub amount: f32,
     /// Food type selected by an Eat action; `None` for all other action types.
     pub food_type: Option<OrdinaryFoodTypeId>,
