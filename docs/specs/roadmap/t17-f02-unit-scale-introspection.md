@@ -1,7 +1,7 @@
 # T17.F02 — Unit-Scale Introspection
 
 **Status**: In Progress
-**Last updated**: 2026-09-18
+**Last updated**: 2026-09-19
 **Feature**: T17.F02
 **Track**: [T17 — Brain Boundary Evolvability](../../roadmaps/t17-brain-boundary-evolvability.md)
 
@@ -21,16 +21,16 @@ inputs at the scale they were designed for.
 
 - No change to the reproduce transfer, its floor, or the profile fractions
   (T17.F01); no change to the steal amount (T17.F03).
-- No change to any mutation operator, draw range, or step; no new sensor,
-  operator, assay, founder layout (T18), or environmental pressure.
+- No change to any mutation operator, parameter draw range, or step (the
+  input catalog only loses its `Generation` bucket, invariant 3); no new
+  sensor, operator, assay, founder layout (T18), or environmental pressure.
 - No age reference other than a config field: T03.F07's lifespan replaces it
   later. No coupling to `age_cost.age_cap`, which is the cost ramp's own knob.
 - No load-time validation that a non-default lifecycle keeps a founder's unit
   gate inside physiology's acceptance region (`SimulationConfig` has no
   error-returning validation path; the constraint is documented, invariant 7).
 - No compatibility shim: a serialized genome that names `Generation` no
-  longer loads (the repository holds none; test sources that build one are
-  rewritten).
+  longer loads (the repository holds none).
 
 ## Inputs and Invariants
 
@@ -38,13 +38,10 @@ Sources of truth: the T17.F02 row and the track's "Order" and "Hazard" notes;
 the [reproduction-collapse research note](../../strategy/reproduction-collapse-research-2026-09-18.md)
 Section 8 (the boundary audit); T17.F01's profile table and invariant 5
 (thresholds 32/32/60/40/50 since F01, so the row's "30 → 0.15" reads
-"32 → 0.16"); `runtime/inputs.rs::resolve_input` (`ResolveCtx.energy` and
-`.energy_consumed` are raw; the VM path passes `effective` energy, which can
-be negative, and `energy_consumed + debt`); `sensors/static_inputs.rs`
-(`generation` and `age_ticks` cast raw); `creature/cgp_founder.rs` (CN0
-`Threshold(energy)`, CN1 `Threshold(min_reproduce_age − 0.5)`);
-`mutation/sampling.rs` (catalog index 4 is `Generation`, range `0..23`);
-`config/simulation.rs::EnergyLifecycleConfig` and `normalize`.
+"32 → 0.16"); `runtime/inputs.rs::resolve_input` (the VM path passes
+`effective` energy, which can be negative, and `energy_consumed + debt`);
+`sensors/static_inputs.rs`; `creature/cgp_founder.rs`;
+`mutation/sampling.rs`; `config/simulation.rs::EnergyLifecycleConfig`.
 
 Options for `Generation`, decided here: removal. It has no natural analog (a
 body cannot sense its ancestor count), it is constant over a life so as an
@@ -52,10 +49,9 @@ input it can only be a constant gate — the audit's 14-of-59 lesion class —
 and a saturating fraction would need a reference with no physical meaning.
 Options for the age span: a new `age_reference_ticks` field (chosen; the
 row's "configured reference span"), or reuse of `age_cost.age_cap` (rejected,
-Non-Goals). Default 500 ticks: the physiology's own senescence horizon
-(`age_cost.age_cap` 500) and above the surviving clades' mean ages (36–57
-ticks in the T17.F01 goal summary) so a threshold drawn in [0, 1] spans real
-lifetimes.
+Non-Goals). Default 500 ticks: the physiology's senescence horizon
+(`age_cost.age_cap` 500), above the surviving clades' mean ages (36–57 ticks
+in the T17.F01 goal summary).
 
 Founder re-expression is exact under f32 division, checked by scanning every
 f32 energy in [t − 1, t + 1] for each profile: `e > t` and `e / 200 > t / 200`
@@ -87,14 +83,22 @@ Invariants:
    V3Alpha1/ForageFirstSparse 0.16, Conservative 0.30, RichOffspring 0.20,
    Balanced 0.25 — as the founder's own constant (the founder gates on
    fullness; it is not recomputed from `max_energy` at seeding). Each
-   literal is the f32 nearest the quotient, the value the scan used; outside
-   the scanned window division is monotone, so the window covers the range.
+   literal is the f32 nearest the quotient the scan used; division is
+   monotone, so the scanned window covers the range.
 5. Founder age gate: CN1 becomes `Threshold((min_reproduce_age − 0.5) /
    age_reference_ticks)` with both values from config at seeding, so the
    gate is exact for every integer age (evidence above) and the existing
-   `min_reproduce_age` threading is unchanged. Unlike the energy gate this
-   one is config-derived because physiology refuses an attempt below
+   `min_reproduce_age` threading is unchanged. It is config-derived, unlike
+   the energy gate, because physiology refuses an attempt below
    `min_reproduce_age` and a refused attempt costs the founder its tick.
+   Constraint, same class as invariant 7: `min_reproduce_age ≤
+   age_reference_ticks`. Above it the threshold exceeds the saturated 1.0
+   and the founder never attempts a birth; `v3-runtime-config-spec.md`
+   states this beside `age_reference_ticks`, and the span is not normalized
+   up (a span shorter than the breeding age is a sterile life history the
+   T03.F07 lifespan must be able to express). The exactness claim holds
+   within the constraint; the exactness test carries one case above it
+   asserting no attempt.
 6. Founder-only identity: with mutation disabled and default lifecycle, every
    founder profile makes the same gate decision at every f32 energy in
    [0, `max_energy`] and every integer age as before, except Conservative at
@@ -131,9 +135,8 @@ Invariants:
 
 ## Implementation Tasks
 
-- [x] Viability baseline run first; pin a founder-only (mutation-off)
-      trajectory digest on the current code before any production change
-      (TDD: the pin is the identity check of invariant 6).
+- [x] Viability baseline run first; founder-only (mutation-off) digest
+      pinned before any production change (invariant 6).
 - [x] `age_reference_ticks` on `EnergyLifecycleConfig` with default,
       normalization, and config-spec row (invariants 2, 7).
 - [x] Unit-scale resolution of the three introspective values on both the
@@ -150,9 +153,11 @@ Invariants:
 - [x] Re-pinned mutation-on tests and fixtures listed in the readings file;
       the mutation-off pin unchanged.
 - [x] Reference docs per invariant 10 (`v3-mutation-spec.md` never named
-      `Generation`; its kind-table text already reads correctly and is
-      unchanged); frontend fixtures naming `Generation` updated.
+      `Generation`, unchanged); frontend fixtures updated.
 - [x] `make check` -> pass.
+- [ ] Invariant 5 constraint: config-spec text beside `age_reference_ticks`
+      and one `min_reproduce_age > age_reference_ticks` case in
+      `founder_age_gate_is_exact_at_every_integer_age` asserting no attempt.
 
 ## Verification
 
@@ -166,16 +171,13 @@ Invariants:
       Conservative); `founder_age_gate_is_exact_at_every_integer_age`;
       property tests `energy_fraction_is_bounded_and_monotone` and
       `age_fraction_is_bounded_and_monotone`; all named in the readings file.
-- [x] `cargo test --workspace --no-fail-fast` -> ok on the self-reviewed
-      tree (v3-core 1579 lib tests passed, 2 ignored; viability 28; every
-      integration binary, v3-cli and v3-server ok); check, clippy `-D
-      warnings`, fmt, and `make roadmap-check` clean; `make check` -> exit 0
-      on the build commit. Re-pinned tests and fixtures tabled in the
-      readings file with old and new values.
+- [x] `cargo test --workspace --no-fail-fast` -> ok (v3-core 1579 lib
+      tests, 2 ignored; viability 28); `make check` -> exit 0 on the build
+      commit. Re-pinned tests and fixtures tabled in the readings file with
+      old and new values.
 - [x] Simplification pass (test code only, no pinned value moved): one
-      founder profile table in `creature/founder.rs` carries raw and unit
-      thresholds; `tests/temporal_fixtures.rs` derives its age constants
-      through `age_fraction` and `EnergyLifecycleConfig::default()`.
+      profile table in `creature/founder.rs` carries raw and unit
+      thresholds; `tests/temporal_fixtures.rs` derives its age constants.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here.
@@ -232,9 +234,8 @@ profile once). Gate: `make` exit 0, `cli_exit` 0, `severe`
 **false**, every counter and wall `ok`. Goal: `make` exit **2**, `cli_exit`
 **3**, `severe` **true**: `plasticity_updates` 0.049588 → 0.088735 per
 creature-tick, **+78.944503%** (per world in the readings file);
-the other five counters and wall `ok`; no extinction; evolved neighborhood
-1.503 s of the 180 s cap, founder 0.225 s of 10 s. The severe counter is a
-user decision under the blocker rule; the epoch is not re-pinned here. Predeclared readings, before → after: gate `births`
+the other five counters and wall `ok`; no extinction; neighborhood caps met
+(1.503 s of 180 s, 0.225 s of 10 s). Predeclared readings, before → after: gate `births`
 0.026042 → 0.025998; gate founder changed/dead 0.395238/0 → 0.414286/0;
 goal founder changed of 210 (Orchards/Canyon/Confluence) 91/83/91 →
 96/87/96; goal evolved changed 0.2709/0.2696/0.3320 → 0.3947/0.3086/0.3570,
