@@ -78,7 +78,8 @@ Invariants:
    unchanged and every trajectory difference is the applied value.
 2. Empty pool: unchanged — one constant drawn from [−1, 1] is pushed.
 3. Bound (pure invariant, property-tested): for every finite `c` and every
-   seed, `|c' − c| ≤ 0.1 × max(|c|, 1)`; for `|c| ≤ 1` the step is the
+   seed, `|c' − c| ≤ 0.1 × max(|c|, 1)` up to one f32 rounding of the larger
+   operand (the committed regression `c = 0.0` needs it); for `|c| ≤ 1` the step is the
    ±0.1 graph parameter step; `c'` is finite for every `|c| ≤ f32::MAX / 1.1`.
    A non-finite `c` stays non-finite (it did before); nothing is sanitized.
 4. No clamp: a constant may cross zero and grow without bound, as a graph
