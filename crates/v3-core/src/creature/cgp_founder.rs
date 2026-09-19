@@ -17,7 +17,7 @@ use crate::creature::genome::cgp::{
 /// `min_reproduce_age_ticks` pass and every one below fail, and the same
 /// f32 division on both sides keeps the comparison exact (T17.F02).
 pub(crate) fn age_gate_threshold(min_reproduce_age_ticks: u64, age_reference_ticks: u64) -> f32 {
-    (min_reproduce_age_ticks as f32 - 0.5).max(-0.5) / age_reference_ticks as f32
+    (min_reproduce_age_ticks as f32 - 0.5) / age_reference_ticks as f32
 }
 
 /// Build the founder sensor graph from primary food, energy, age, and occupancy.

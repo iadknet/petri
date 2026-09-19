@@ -409,6 +409,18 @@ mod tests {
                 }
             }
         }
+        // Outside the documented constraint (`min_reproduce_age >
+        // age_reference_ticks`) the threshold exceeds the saturated 1.0 read,
+        // so the founder never attempts a birth at any age.
+        let reference = 500_u64;
+        let threshold = age_gate_threshold(501, reference);
+        assert!(threshold > 1.0);
+        for age in [0_u64, 500, 501, 10_000, u64::MAX] {
+            assert!(
+                age_fraction(age, reference) <= threshold,
+                "age={age} passed a gate above the saturated read"
+            );
+        }
     }
 
     #[test]

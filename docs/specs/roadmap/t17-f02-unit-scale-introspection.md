@@ -155,7 +155,7 @@ Invariants:
 - [x] Reference docs per invariant 10 (`v3-mutation-spec.md` never named
       `Generation`, unchanged); frontend fixtures updated.
 - [x] `make check` -> pass.
-- [ ] Invariant 5 constraint: config-spec text beside `age_reference_ticks`
+- [x] Invariant 5 constraint: config-spec text beside `age_reference_ticks`
       and one `min_reproduce_age > age_reference_ticks` case in
       `founder_age_gate_is_exact_at_every_integer_age` asserting no attempt.
 
