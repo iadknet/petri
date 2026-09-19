@@ -75,6 +75,19 @@ impl TopologyOperator {
         }
     }
 
+    /// Integer weights in hundredths keep small weights exact, including at 1%.
+    /// The base total is 211, so the tuned total never exceeds 21,100.
+    #[must_use]
+    pub fn tuned_weight(self, large_copy_weight_percent: u8) -> u16 {
+        let factor = match self {
+            Self::CopyNode | Self::CopyMeshBackwardSlice | Self::CopyMeshForwardSlice => {
+                u16::from(large_copy_weight_percent.min(100))
+            }
+            _ => 100,
+        };
+        u16::from(self.weight()) * factor
+    }
+
     const TOTAL_WEIGHT: u16 = {
         // Compile-time guard: if a variant is added to the enum but not to ALL,
         // weight() will still compile (exhaustive match), but ALL will be incomplete.

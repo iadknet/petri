@@ -97,6 +97,7 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// below was measured after two runs agreed; the identity the test pins is
 /// unchanged (previously re-pinned at T02.F04, T11.F19, T11.F21, T11.F22,
 /// the 2026-09-18 `ChangeEntryNode` rescale, T17.F01, and T11.F23).
+/// Re-pinned 2026-09-19 for the 25% large-copy weight default.
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -124,7 +125,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 17519359726252727600);
+    assert_eq!(hash.finish(), 15111577783754586301);
 }
 
 use proptest::prelude::*;

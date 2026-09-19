@@ -27,6 +27,24 @@ fn forced_topology_config() -> crate::config::MutationConfig {
     config
 }
 
+proptest::proptest! {
+    #[test]
+    fn zero_large_copy_weight_excludes_copy_attempts(seed in proptest::prelude::any::<u64>()) {
+        let mut config = forced_topology_config();
+        config.large_copy_weight_percent = 0;
+        let mut genome = v3alpha1_founder_genome();
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut rng(seed));
+        for operator in [MutationOperator::TopologyCopyNode,
+            MutationOperator::TopologyCopyMeshBackwardSlice,
+            MutationOperator::TopologyCopyMeshForwardSlice] {
+            proptest::prop_assert!(!summary.operator_funnel_by_operator.contains_key(&operator));
+            proptest::prop_assert!(!summary.attempted_by_operator.contains_key(&operator));
+        }
+        proptest::prop_assert_eq!(summary.attempted_events, 1);
+        proptest::prop_assert_eq!(summary.applied_events + summary.skipped_events, 1);
+    }
+}
+
 fn classify_expected_added_input_classes(
     input_refs: &[InputReference],
 ) -> Vec<MutationAddedNodeInputClass> {

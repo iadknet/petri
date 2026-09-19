@@ -143,12 +143,17 @@ impl MutationEngine {
                     .iter()
                     .copied()
                     .filter(|op| !restricted || op.complexity_effect().is_decreasing())
+                    .filter(|op| op.tuned_weight(config.large_copy_weight_percent) > 0)
                     .collect();
                 let selected = loop {
                     if available.is_empty() {
                         break None;
                     }
-                    let idx = select_weighted_index(&available, |op| op.weight() as u16, rng);
+                    let idx = select_weighted_index(
+                        &available,
+                        |op| op.tuned_weight(config.large_copy_weight_percent),
+                        rng,
+                    );
                     let op = available[idx];
                     let operator = topology_operator_key(op);
                     let tracked_before = if operator_requires_added_node_input_tracking(operator) {

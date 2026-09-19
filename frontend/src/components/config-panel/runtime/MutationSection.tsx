@@ -62,7 +62,18 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 0.01,
 		testId: "config-field-mutation-mesh-layer-probability",
 		defaultValue: 0.2,
-		tooltip: "Probability of adding a mesh layer during genome mutation",
+		tooltip: "Probability of selecting a topology mutation instead of a node-internal mutation",
+	},
+	{
+		path: "mutation.large_copy_weight_percent",
+		label: "Large Copy Weight %",
+		min: 0,
+		max: 100,
+		step: 1,
+		testId: "config-field-mutation-large-copy-weight-percent",
+		defaultValue: 25,
+		tooltip:
+			"Relative weight of copying a node or mesh slice: 25 quarters the base weight, 100 restores it, and 0 disables copying. This is not a per-birth probability; other mutation weights stay unchanged.",
 	},
 	{
 		path: "mutation.genome_size_cap",

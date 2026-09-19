@@ -8,6 +8,21 @@ use crate::creature::parseability::ParseabilityGate;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
+proptest::proptest! {
+    #[test]
+    fn large_copy_tuning_preserves_other_operator_weights(percent in 0u8..=100) {
+        for op in TopologyOperator::ALL {
+            let factor = match op {
+                TopologyOperator::CopyNode
+                | TopologyOperator::CopyMeshBackwardSlice
+                | TopologyOperator::CopyMeshForwardSlice => u16::from(percent),
+                _ => 100,
+            };
+            proptest::prop_assert_eq!(op.tuned_weight(percent), u16::from(op.weight()) * factor);
+        }
+    }
+}
+
 fn wrap_targets(ids: Vec<NodeId>) -> Vec<RouteTarget> {
     ids.into_iter()
         .enumerate()
