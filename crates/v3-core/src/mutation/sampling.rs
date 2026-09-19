@@ -6,11 +6,11 @@ use crate::contracts::{
 };
 use crate::runtime::OUTPUT_SLOT_COUNT;
 
-/// Generate a random input reference from the full set of 23 possible values.
+/// Generate a random input reference from the full set of 22 possible values.
 ///
 /// Distribution: FoodHere (1) + Ring sensors (3) + StaticIntrospection (1) +
 /// DynamicIntrospection (2) + ActionQueue (1) + Area summaries (3) +
-/// Nearby creature (3) + UpstreamSlot (8 weighted slots) = 23 total.
+/// Nearby creature (3) + UpstreamSlot (8 weighted slots) = 22 total.
 pub(crate) fn random_input_reference(rng: &mut impl Rng) -> InputReference {
     random_input_reference_for_food_types(rng, 1)
 }

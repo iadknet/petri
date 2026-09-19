@@ -228,7 +228,7 @@ mod tests {
                     neighbor_food: [0.0; 8],
                     neighbor_barrier: [0.0; 8],
                     neighbor_occupied: [0.0; 8],
-                    age_ticks: 2.0,
+                    age_ticks: 0.004,
                 },
                 debug_perception: None,
                 hops: vec![MeshHopTrace {
@@ -301,7 +301,7 @@ mod tests {
                     neighbor_food: [0.0; 8],
                     neighbor_barrier: [0.0; 8],
                     neighbor_occupied: [0.0; 8],
-                    age_ticks: 1.0,
+                    age_ticks: 0.002,
                 },
                 debug_perception: None,
                 hops: vec![MeshHopTrace {

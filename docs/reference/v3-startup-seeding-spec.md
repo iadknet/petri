@@ -180,9 +180,10 @@ CreatureGenome {
 The five input references are primary FoodHere, live EnergyCurrent, AgeTicks,
 primary NeighborFoodRing, and NeighborOccupiedRing. Three compute nodes apply
 strict energy `Threshold` (a fraction of `max_energy`, the scale
-`EnergyCurrent` reads on), age `Threshold(max(min_reproduce_age - 0.5, -0.5)
-/ age_reference_ticks)` (the scale `AgeTicks` reads on, both values from the
-lifecycle config at seeding, exact at every integer age), and Multiply of
+`EnergyCurrent` reads on), age `Threshold((min_reproduce_age - 0.5) / age_reference_ticks)` (the scale
+`AgeTicks` reads on, both values from the lifecycle config at seeding, exact at
+every integer age while `min_reproduce_age <= age_reference_ticks`), and
+Multiply of
 those gates. Six custom outputs carry food here,
 can-reproduce, and N/E/S/W primary food. Other output sinks, action bank, and
 execute gate remain unwired. The graph routes to node 1 in slot 0.
