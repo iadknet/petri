@@ -161,9 +161,12 @@ step is a T11 question for the user.
 - [x] `cargo test --workspace` and `make check` -> pass; re-pinned tests and
       old/new values in
       [`docs/progress/readings/t17-f01.md`](../../progress/readings/t17-f01.md).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` at 669b2c9e:
+      `26 mutants tested in 6m: 20 caught, 6 unviable`, no survivors.
+
+| Run mode | Output path | Survivors |
+| --- | --- | --- |
+| fresh (`run-mode.txt`) | `~/.local/share/petri-tools/mutants/t17-f01/mutants.out` | none (0 missed, 0 timed out) |
 - [x] Benchmark summaries stored at
       `docs/progress/features/t17-f01-offspring-investment-fraction.json` and
       `...-goal.json`, local raw hash/byte count and verification time
