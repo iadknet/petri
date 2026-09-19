@@ -90,7 +90,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t11-f19-per-unit-mutation-supply-goal.json",
+    "epoch_baseline": "docs/progress/features/t17-f01-offspring-investment-fraction-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
