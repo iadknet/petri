@@ -750,7 +750,7 @@ Field definitions:
 | `direction` | u8 | Direction parameter (0-7 cardinal+diagonal, 255 = N/A). |
 | `energy_before` | f32 | Creature energy before the action. |
 | `energy_after` | f32 | Creature energy after the action (includes costs). |
-| `amount` | f32 | Action-specific amount (food consumed, energy transferred, 0 otherwise). |
+| `amount` | f32 | Action-specific amount (food consumed, energy stolen, transfer fraction in [0, 1] for Reproduce, 0 otherwise). |
 | `food_type` | u16 or null | Selected ordinary-food type for Eat; `null` for non-Eat actions. |
 | `priority_bid` | f32 | Priority bid value for that tick. |
 

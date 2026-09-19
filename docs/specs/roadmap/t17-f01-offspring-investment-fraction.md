@@ -264,7 +264,7 @@ not taken here.
 - [ ] Every founder profile's attempt is accepted at every energy above its
       threshold and eligible age (property test and founders-only run), and
       the viability test passes.
-- [ ] Reference docs and the frontend trace type describe the fraction; no
+- [x] Reference docs and the frontend trace type describe the fraction; no
       surface still calls it an energy amount.
 - [ ] Gate and goal summaries stored with the before/after readings above in
       the readings file; goal-worlds epoch re-pinned in the closing commit.

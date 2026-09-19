@@ -191,6 +191,10 @@ export const VitalsBanner = memo(function VitalsBanner({
 								const failed = entry.result !== ActionResult.Success;
 								const energyDelta = entry.energy_after - entry.energy_before;
 								const dir = DIRECTION_LABELS[entry.direction];
+								// Reproduce logs its transfer fraction in [0, 1]; other types log energy or food.
+								const isFraction = entry.action_type === "Reproduce";
+								const amountLabel = isFraction ? "Transfer fraction" : "Amount";
+								const amountDigits = isFraction ? 2 : 1;
 								// Position tooltip above the dot, clamped to not overflow left
 								const left = Math.max(0, hoveredIdx * COL_W - 40);
 								return (
@@ -215,7 +219,11 @@ export const VitalsBanner = memo(function VitalsBanner({
 												{energyDelta.toFixed(1)})
 											</span>
 										</div>
-										{entry.amount > 0 && <div>Amount: {entry.amount.toFixed(1)}</div>}
+										{entry.amount > 0 && (
+											<div>
+												{amountLabel}: {entry.amount.toFixed(amountDigits)}
+											</div>
+										)}
 										<div className="text-slate-500">Bid: {entry.priority_bid.toFixed(2)}</div>
 									</div>
 								);

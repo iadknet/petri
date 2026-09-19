@@ -100,7 +100,7 @@ export function actionSlotSubtitle(behavior: ActionSlotBehavior): string {
 			case "Eat":
 				return "gate · food type";
 			case "Reproduce":
-				return "gate · direction · energy";
+				return "gate · direction · fraction";
 			case "StealEnergy":
 				return "gate · direction · amount";
 			case "NoOp":
