@@ -45,7 +45,8 @@
       "docs/progress/features/t11-f22-meaning-stable-input-references.json",
       "docs/progress/features/t16-f01-gate-before-charge-in-reproduction.json",
       "docs/progress/features/topology-weight-rescale.json",
-      "docs/progress/features/t17-f01-offspring-investment-fraction.json"
+      "docs/progress/features/t17-f01-offspring-investment-fraction.json",
+      "docs/progress/features/t11-f23-scale-relative-vm-constant-steps.json"
     ]
   },
   "goal": {
@@ -110,7 +111,8 @@
       "docs/progress/features/t11-f21-per-direction-motor-output-goal.json",
       "docs/progress/features/t11-f22-meaning-stable-input-references-goal.json",
       "docs/progress/features/t16-f01-gate-before-charge-in-reproduction-goal.json",
-      "docs/progress/features/t17-f01-offspring-investment-fraction-goal.json"
+      "docs/progress/features/t17-f01-offspring-investment-fraction-goal.json",
+      "docs/progress/features/t11-f23-scale-relative-vm-constant-steps-goal.json"
     ]
   }
 }
