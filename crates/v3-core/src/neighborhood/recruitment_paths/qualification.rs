@@ -499,13 +499,12 @@ fn vm_unprepared_plan() -> Vec<StepSpec> {
             ProductionEvent::Vm(VmOperator::VmInstructionMutation),
             |before, after| {
                 let (b, a) = (vm(before), vm(after));
+                let mut expected = b.program.clone();
+                expected[DIRECTION_LOAD] = DOUBLE_INTO_DIRECTION;
                 only_scaffold_backend_changed(before, after)
                     && a.constants == b.constants
                     && a.register_count == b.register_count
-                    && a.program.len() == b.program.len()
-                    && a.program[..DIRECTION_LOAD] == b.program[..DIRECTION_LOAD]
-                    && a.program[DIRECTION_LOAD] == DOUBLE_INTO_DIRECTION
-                    && a.program[DIRECTION_LOAD + 1..] == b.program[DIRECTION_LOAD + 1..]
+                    && a.program == expected
             },
         ),
         swap_activation(),

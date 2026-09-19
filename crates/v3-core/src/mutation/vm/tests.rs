@@ -75,13 +75,18 @@ fn vm_constant_mutation_on_node_with_empty_constants_adds_constant() {
     }
 }
 
-/// One `VmConstantMutation` on the founder's VM node with its pool set to `[c]`.
-fn constant_step(c: f32, seed: u64) -> f32 {
-    let mut genome = v3alpha1_founder_genome();
+/// The constant pool of the founder's VM node (node 1).
+fn founder_vm_constants(genome: &mut CreatureGenome) -> &mut Vec<f32> {
     let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def else {
         panic!("expected VM backend on node 1")
     };
-    vm.constants = vec![c];
+    &mut vm.constants
+}
+
+/// One `VmConstantMutation` on the founder's VM node with its pool set to `[c]`.
+fn constant_step(c: f32, seed: u64) -> f32 {
+    let mut genome = v3alpha1_founder_genome();
+    *founder_vm_constants(&mut genome) = vec![c];
     VmMutator::apply_to_node(
         &mut genome,
         VmOperator::VmConstantMutation,
@@ -90,10 +95,7 @@ fn constant_step(c: f32, seed: u64) -> f32 {
         &MutationConfig::default(),
     )
     .unwrap();
-    let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def else {
-        panic!()
-    };
-    vm.constants[0]
+    founder_vm_constants(&mut genome)[0]
 }
 
 /// T11.F23 invariant 3: `|c' - c| <= 0.1 * max(|c|, 1)` up to one f32 ulp of
@@ -115,7 +117,6 @@ fn vm_constant_mutation_unit_scale_step_equals_the_graph_parameter_step() {
             let _index = r.gen_range(0..1usize);
             let u: f32 = r.gen_range(-0.1f32..=0.1);
             assert_eq!(after, c + u, "seed {seed} c {c}");
-            assert!((after - c).abs() <= 0.1 + f32::EPSILON);
         }
     }
 }
@@ -174,11 +175,8 @@ fn vm_constant_mutation_consumes_exactly_two_draws() {
 #[test]
 fn vm_constant_mutation_never_sterilizes_the_founder_transfer_fraction() {
     const SEEDS: u64 = 20_000;
-    let founder = v3alpha1_founder_genome();
-    let BackendDef::Vm(ref vm) = founder.nodes[1].backend_def else {
-        panic!()
-    };
-    let fraction = vm.constants[5];
+    let mut founder = v3alpha1_founder_genome();
+    let fraction = founder_vm_constants(&mut founder)[5];
     let (mut hits, mut sterile, mut semelparous, mut in_band) = (0u32, 0u32, 0u32, 0u32);
     let (mut min, mut max) = (f32::INFINITY, f32::NEG_INFINITY);
     for seed in 0..SEEDS {
@@ -191,10 +189,7 @@ fn vm_constant_mutation_never_sterilizes_the_founder_transfer_fraction() {
             &MutationConfig::default(),
         )
         .unwrap();
-        let BackendDef::Vm(ref vm) = g.nodes[1].backend_def else {
-            panic!()
-        };
-        let after = vm.constants[5];
+        let after = founder_vm_constants(&mut g)[5];
         if after == fraction {
             continue;
         }
@@ -228,16 +223,6 @@ proptest! {
         let after = constant_step(c, seed);
         prop_assert!(after.is_finite(), "c {c} -> {after}");
         prop_assert!(within_scale_relative_bound(c, after), "c {c} -> {after}");
-    }
-
-    /// The same bound on the unit scale, where the step is the graph step.
-    #[test]
-    fn vm_constant_mutation_unit_scale_step_is_within_a_tenth(
-        c in -1.0f32..=1.0,
-        seed in any::<u64>(),
-    ) {
-        let after = constant_step(c, seed);
-        prop_assert!((f64::from(after) - f64::from(c)).abs() <= 0.1 + f64::from(f32::EPSILON), "c {c} -> {after}");
     }
 }
 
