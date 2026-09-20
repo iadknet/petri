@@ -20,7 +20,12 @@ pub struct MeshExecutionReading {
     pub reachable_node_count: usize,
     pub executed_node_count: usize,
     pub knockout_count: usize,
+    /// Some node applied two different target positions across the snapshots.
     pub route_varies_with_input: bool,
+    /// Some node applied routes to two different nodes across the snapshots
+    /// (T13.F07): position variation between targets naming the same node
+    /// does not count.
+    pub route_destination_varies: bool,
     pub hop_cap_hits: usize,
 }
 
@@ -49,19 +54,25 @@ pub struct MeshBackendCounts {
     pub vm: BackendNodeCounts,
 }
 
-type Routes = BTreeMap<NodeId, BTreeSet<usize>>;
+type Routes<T = usize> = BTreeMap<NodeId, BTreeSet<T>>;
 
-fn snapshot_routes(observation: &MeshObservation) -> Routes {
-    let mut routes = Routes::new();
-    for &(node, position) in &observation.hops {
-        if let Some(position) = position {
-            routes.entry(node).or_default().insert(position);
+/// Per node, the applied route positions and the applied destinations of one
+/// snapshot.
+fn snapshot_routes(observation: &MeshObservation) -> (Routes, Routes<NodeId>) {
+    let mut positions = Routes::new();
+    let mut destinations = Routes::new();
+    for &(node, route) in &observation.hops {
+        if let Some((position, destination)) = route {
+            positions.entry(node).or_default().insert(position);
+            destinations.entry(node).or_default().insert(destination);
         }
     }
-    routes
+    (positions, destinations)
 }
 
-fn route_varies_with_input(snapshots: &[Routes]) -> bool {
+/// Whether some node applied two different non-empty route sets across the
+/// snapshots (T11.F14 for positions, T13.F07 for destinations).
+pub fn route_varies_with_input<T: Ord>(snapshots: &[Routes<T>]) -> bool {
     let mut prior = BTreeMap::new();
     for routes in snapshots {
         for (&node, positions) in routes {
@@ -102,11 +113,28 @@ pub(crate) fn static_successor_bypass(genome: &CreatureGenome, removed: NodeId) 
     bypass
 }
 
+/// Replace only the chosen node's payload: id, input references, targets and
+/// position stay, `backend_def` becomes `payload` (T13.F07's ancestral
+/// counterfactual, read against [`static_successor_bypass`]).
+#[must_use]
+pub fn ancestral_payload_replacement(
+    genome: &CreatureGenome,
+    node: NodeId,
+    payload: &BackendDef,
+) -> CreatureGenome {
+    let mut replaced = genome.clone();
+    if let Some(slot) = replaced.nodes.iter_mut().find(|slot| slot.node_id == node) {
+        slot.backend_def = payload.clone();
+    }
+    replaced
+}
+
 /// Everything one observed battery pass yields about a genome's execution.
 struct BatteryObservation {
     executed: BTreeSet<NodeId>,
     hop_cap_hits: usize,
     routes: Vec<Routes>,
+    destinations: Vec<Routes<NodeId>>,
     baseline: Signature,
 }
 
@@ -132,10 +160,10 @@ impl Battery {
     ) -> BatteryObservation {
         let (snapshots, sequences) =
             self.execute_with_mode(genome, runtime, decay_rate, ObservedMeshExecution::default);
-        let routes: Vec<_> = snapshots
+        let (routes, destinations): (Vec<_>, Vec<_>) = snapshots
             .iter()
             .map(|(_, observation)| snapshot_routes(observation))
-            .collect();
+            .unzip();
         let mut executed = BTreeSet::new();
         let mut hop_cap_hits = 0;
         for (_, observation) in snapshots.iter().chain(sequences.iter().flatten()) {
@@ -166,6 +194,7 @@ impl Battery {
             executed,
             hop_cap_hits,
             routes,
+            destinations,
             baseline,
         }
     }
@@ -221,6 +250,7 @@ impl Battery {
             executed,
             hop_cap_hits,
             routes,
+            destinations,
             baseline,
         } = self.observe(genome, runtime, decay_rate);
         let mut backends = MeshBackendCounts::default();
@@ -255,6 +285,7 @@ impl Battery {
                 executed_node_count: executed.len(),
                 knockout_count,
                 route_varies_with_input: route_varies_with_input(&routes),
+                route_destination_varies: route_varies_with_input(&destinations),
                 hop_cap_hits,
             },
             executed,
@@ -561,17 +592,45 @@ mod tests {
             ];
         }
         let mut g = genome(vec![router, node(1, &[], true), node(2, &[], false)]);
-        assert!(reading(&g).route_varies_with_input);
+        // Two positions naming the same node: the position reading varies,
+        // the destination reading (T13.F07) does not.
+        let same = reading(&g);
+        assert!(same.route_varies_with_input);
+        assert!(!same.route_destination_varies);
         g.nodes[0].targets[1].target_id = NodeId::new(2);
         let r = reading(&g);
         assert!(r.route_varies_with_input);
+        assert!(r.route_destination_varies);
         assert_eq!(r.knockout_count, 1); // the silent losing terminal only
                                          // Scores on a terminal backend do not establish applied variation.
         if let BackendDef::Vm(vm) = &mut g.nodes[0].backend_def {
             vm.program.push(VmInstruction::ExecuteActionQueue);
             vm.program.remove(2);
         }
-        assert!(!reading(&g).route_varies_with_input);
+        let terminal = reading(&g);
+        assert!(!terminal.route_varies_with_input);
+        assert!(!terminal.route_destination_varies);
+    }
+
+    /// The ancestral counterfactual touches one node's payload and nothing
+    /// else; replacing a payload with itself is the identity, and a missing
+    /// node leaves the genome unchanged.
+    #[test]
+    fn ancestral_payload_replacement_swaps_only_the_named_payload() {
+        let g = genome(vec![node(0, &[1], false), node(1, &[], true)]);
+        let halt = node(7, &[], false).backend_def;
+        let replaced = ancestral_payload_replacement(&g, NodeId::new(1), &halt);
+        assert_eq!(replaced.entry_node_id, g.entry_node_id);
+        assert_eq!(replaced.nodes[0], g.nodes[0]);
+        assert_eq!(replaced.nodes[1].node_id, g.nodes[1].node_id);
+        assert_eq!(replaced.nodes[1].targets, g.nodes[1].targets);
+        assert_eq!(replaced.nodes[1].input_refs, g.nodes[1].input_refs);
+        assert_eq!(replaced.nodes[1].backend_def, halt);
+        assert_eq!(
+            ancestral_payload_replacement(&g, NodeId::new(1), &g.nodes[1].backend_def),
+            g
+        );
+        assert_eq!(ancestral_payload_replacement(&g, NodeId::new(9), &halt), g);
     }
 
     #[test]
@@ -764,6 +823,9 @@ mod tests {
             prop_assert!(executed.is_subset(&reachable));
             prop_assert_eq!(executed.len(), r.executed_node_count);
 
+            for original in &g.nodes {
+                prop_assert_eq!(ancestral_payload_replacement(&g, original.node_id, &original.backend_def), g.clone());
+            }
             let bypass = static_successor_bypass(&g, NodeId::new(removed));
             prop_assert!(!bypass.nodes.iter().any(|n| n.node_id == NodeId::new(removed)));
             for original in &g.nodes {

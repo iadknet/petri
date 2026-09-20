@@ -1,15 +1,19 @@
-use super::super::mesh_execution::{indices_for_node_ids, static_successor_bypass};
+use super::super::mesh_execution::{
+    ancestral_payload_replacement, indices_for_node_ids, static_successor_bypass,
+};
 use super::super::recruitment::{
-    BirthObservation, ModuleBackend, Opportunities, RecruitmentTracker,
+    BirthObservation, CohortFact, ModuleBackend, Opportunities, RecruitmentTracker,
 };
 use super::super::{Battery, Signature};
 use super::*;
+use crate::contracts::NodeId;
 use crate::creature::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::{MutationDomain, MutationEngine, MutationSummary};
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 
 pub fn proposal_seed(batch: u32, lineage: u32, generation: u32, sibling: u8) -> u64 {
     13_020_000
@@ -19,13 +23,13 @@ pub fn proposal_seed(batch: u32, lineage: u32, generation: u32, sibling: u8) -> 
         + u64::from(sibling)
 }
 
-fn fingerprint(value: &impl Serialize) -> String {
+pub(super) fn fingerprint(value: &impl Serialize) -> String {
     hex::encode(Sha256::digest(
         serde_json::to_vec(value).expect("observation values serialize"),
     ))
 }
 
-fn initial_tracker(start: &Start) -> RecruitmentTracker {
+pub(super) fn initial_tracker(start: &Start) -> RecruitmentTracker {
     let mut tracker = RecruitmentTracker::new(1);
     tracker.seed_founder(0, &start.creation_base.nodes);
     for (index, stage) in start.history.iter().enumerate() {
@@ -51,17 +55,28 @@ fn initial_tracker(start: &Start) -> RecruitmentTracker {
             summary: &summary,
         });
     }
+    // Authored preparation is construction, not mutation: the form's
+    // starting payloads are the birth payloads the ancestral test restores.
+    tracker.rebase_birth_payloads(0, &start.genome.nodes);
     tracker
 }
 
-fn uses(
+/// Every present cohort module's task use, with the bypass and (when the
+/// bypass loses) ancestral counterfactuals.
+pub(super) fn uses(
     genome: &CreatureGenome,
     reading: &TaskReading,
     task: Task,
+    baseline: &TaskReading,
     tracker: &RecruitmentTracker,
     config: &crate::config::SimulationConfig,
 ) -> Vec<ModuleUse> {
     let dispatched = reading.dispatched();
+    let live = reading.live();
+    let score = reading.correct(task);
+    let score_gain = score > baseline.correct(task);
+    let incumbents_preserved = reading.preserves_correct_scenes(baseline, task);
+    let current_ending_energy_sum = reading.summary().ending_energy_sum;
     tracker
         .modules()
         .filter(|module| module.is_present() && module.provenance.is_cohort())
@@ -71,6 +86,9 @@ fn uses(
                 .iter()
                 .find(|node| node.node_id == module.node)
                 .expect("present tracker node");
+            let birth_payload = tracker
+                .birth_payload(module)
+                .expect("present tracker module keeps its birth payload");
             let dispatched = dispatched.contains(&module.node);
             let mut result = ModuleUse {
                 node: module.node,
@@ -83,12 +101,23 @@ fn uses(
                 memory_effect: None,
                 output_effect: false,
                 routing_effect: false,
+                payload_changed: node.backend_def != *birth_payload,
+                ancestral_loss: None,
+                current_ending_energy_sum,
+                ancestral_ending_energy_sum: None,
+                destination_kind: DestinationKind::of(&node.backend_def),
+                specialization: Specialization {
+                    task_live: live,
+                    score_gain,
+                    bypass_loss: false,
+                    ancestral_loss: false,
+                    incumbents_preserved,
+                },
             };
             if dispatched {
                 let bypass =
                     evaluate_with_config(&static_successor_bypass(genome, module.node), config);
-                result.score_loss =
-                    i16::from(reading.correct(task)) - i16::from(bypass.correct(task));
+                result.score_loss = i16::from(score) - i16::from(bypass.correct(task));
                 result.memory_effect = reading.memory_effect(&bypass);
                 for (before, after) in reading.scenes.iter().zip(&bypass.scenes) {
                     result.queue_effect |= before.actions != after.actions;
@@ -98,6 +127,26 @@ fn uses(
                         .filter(|(id, _)| *id != module.node)
                         .ne(after.output_slots.iter());
                     result.routing_effect |= before.routing != after.routing;
+                }
+                result.specialization.bypass_loss = result.score_loss >= 1;
+                if result.specialization.bypass_loss {
+                    // A verbatim payload replaced by itself is the identity:
+                    // it reads zero without a second evaluation.
+                    let (loss, energy) = if result.payload_changed {
+                        let replaced = evaluate_with_config(
+                            &ancestral_payload_replacement(genome, module.node, birth_payload),
+                            config,
+                        );
+                        (
+                            i16::from(score) - i16::from(replaced.correct(task)),
+                            replaced.summary().ending_energy_sum,
+                        )
+                    } else {
+                        (0, current_ending_energy_sum)
+                    };
+                    result.ancestral_loss = Some(loss);
+                    result.ancestral_ending_energy_sum = Some(energy);
+                    result.specialization.ancestral_loss = loss >= 1;
                 }
             }
             result
@@ -124,15 +173,41 @@ fn checkpoint(
         &sets.executed,
         Some(&sets.contributing),
     );
+    let cohort = tracker.checkpoint(u64::from(generation));
+    let task_use = uses(
+        genome,
+        reading,
+        start.task,
+        &start.task_reading,
+        tracker,
+        config,
+    );
+    let mut destination_kinds = DestinationKindCounts::default();
+    for module in &task_use {
+        destination_kinds.record(module.destination_kind);
+    }
+    let row = cohort.lineage_rows[0];
     Checkpoint {
         generation,
         genome: genome.clone(),
         task: reading.clone(),
         battery_class: format!("{:?}", super::super::classify(baseline, &signature).class),
         battery: signature,
-        cohort: tracker.checkpoint(u64::from(generation)),
-        modules: tracker.modules().cloned().collect(),
-        task_use: uses(genome, reading, start.task, tracker, config),
+        modules: tracker
+            .modules()
+            .map(|module| ModuleRecord {
+                birth_payload: module
+                    .first(CohortFact::Dispatch)
+                    .and_then(|_| tracker.birth_payload(module).cloned()),
+                module: module.clone(),
+            })
+            .collect(),
+        task_use,
+        route_position_varies: reading.route_position_varies(),
+        route_destination_varies: reading.route_destination_varies(),
+        destination_kinds,
+        eligible_site_fraction: estimate(row.applicable as u32, row.created as u32),
+        cohort,
     }
 }
 
@@ -150,28 +225,47 @@ struct ProposalPosition {
     generation: u32,
 }
 
-/// The mutation config every proposal runs: the default config on the legacy
-/// per-birth supply rule, the fixed-count control the recorded baselines were
-/// taken on, like the drift walk (T11.F19).
+/// Node ids of the genome's statically reachable nodes.
+fn reachable_ids(genome: &CreatureGenome, reachable: &[usize]) -> BTreeSet<NodeId> {
+    reachable
+        .iter()
+        .map(|&index| genome.nodes[index].node_id)
+        .collect()
+}
+
+/// The mutation config the legacy panel's proposals run: the default config
+/// on the legacy per-birth supply rule, the fixed-count control the recorded
+/// baselines were taken on, like the drift walk (T11.F19).
+#[cfg(test)]
 pub(super) fn proposal_mutation_config() -> crate::config::MutationConfig {
-    crate::config::MutationConfig::default().with_legacy_supply()
+    Supply::Legacy.mutation_config()
+}
+
+/// One arm's context: its start, policy, and the panel it runs under.
+struct ArmContext<'a> {
+    start: &'a Start,
+    policy: Policy,
+    panel: Panel,
+    mutation: &'a crate::config::MutationConfig,
+    battery: &'a Battery,
+    config: &'a crate::config::SimulationConfig,
 }
 
 fn propose_siblings(
-    start: &Start,
+    arm: &ArmContext<'_>,
     genome: &CreatureGenome,
     task: &TaskReading,
     tracker: &RecruitmentTracker,
     position: ProposalPosition,
     viable_path: bool,
-    config: &crate::config::SimulationConfig,
 ) -> Vec<Sibling> {
     let ProposalPosition {
         batch,
         lineage,
         generation,
     } = position;
-    let mutation = proposal_mutation_config();
+    let start = arm.start;
+    let config = arm.config;
     let starting_score = start.task_reading.correct(start.task);
     let reachable = mesh_reachable_nodes(genome);
     let executed = indices_for_node_ids(genome, &task.dispatched());
@@ -185,7 +279,7 @@ fn propose_siblings(
         let mut child = genome.clone();
         let summary = MutationEngine::apply_mutations_with_food_type_count(
             &mut child,
-            &mutation,
+            arm.mutation,
             &reachable,
             ParentExecuted::Indices(&executed),
             &mut rng,
@@ -201,7 +295,17 @@ fn propose_siblings(
             summary: &summary,
         });
         let child_task = evaluate_with_config(&child, config);
-        let module_uses = uses(&child, &child_task, start.task, &child_tracker, config);
+        let module_uses = uses(
+            &child,
+            &child_task,
+            start.task,
+            &start.task_reading,
+            &child_tracker,
+            config,
+        );
+        let specialized = module_uses
+            .iter()
+            .any(|module| module.specialization.holds());
         let useful_modules: Vec<_> = module_uses
             .into_iter()
             .filter(|module| child_task.live() && module.dispatched && module.score_loss >= 1)
@@ -261,6 +365,7 @@ fn propose_siblings(
             events,
             useful_modules,
             discovery,
+            specialized,
             viable_path: viable_path
                 && parent_live
                 && child_task.live()
@@ -277,22 +382,167 @@ fn propose_siblings(
     children
 }
 
-fn lineage(
+/// The specialized recruit's current reading on the retained chain.
+fn recruit_reading(
+    genome: &CreatureGenome,
+    task: &TaskReading,
     start: &Start,
-    policy: Policy,
-    sizes: Sizes,
-    batch: u32,
-    lineage: u32,
-    battery: &Battery,
+    tracker: &RecruitmentTracker,
+    discovery: &Discovery,
     config: &crate::config::SimulationConfig,
-) -> Lineage {
+) -> Option<ModuleUse> {
+    uses(
+        genome,
+        task,
+        start.task,
+        &start.task_reading,
+        tracker,
+        config,
+    )
+    .into_iter()
+    .find(|module| {
+        module.node == discovery.module.node
+            && module.created_depth == discovery.module.created_depth
+    })
+}
+
+/// One lineage and, in generation order, the whole-birth delta of every
+/// chosen child (the compact record keeps these; the legacy report does not).
+/// The first retained F06 discovery and the first retained T13.F07
+/// specialized recruit, within the discovery horizon.
+fn note_retained_discoveries(result: &mut Lineage, record: &Proposal, viable_path: bool) {
+    if result.retained_discovery.is_none() && record.discovery {
+        result.retained_discovery = Some(Discovery {
+            generation: record.generation,
+            sibling: record.sibling,
+            module: record.useful_modules[0].clone(),
+        });
+        result.viable_retained_discovery = viable_path;
+    }
+    if result.specialized_discovery.is_none() && record.specialized {
+        let module = record
+            .useful_modules
+            .iter()
+            .find(|module| module.specialization.holds())
+            .expect("a specialized proposal carries a specialized useful module")
+            .clone();
+        result.specialized_discovery = Some(Discovery {
+            generation: record.generation,
+            sibling: record.sibling,
+            module,
+        });
+        result.ladder.specialized = true;
+    }
+}
+
+/// The retained chain at one generation.
+struct Chain<'a> {
+    generation: u32,
+    genome: &'a CreatureGenome,
+    task: &'a TaskReading,
+    tracker: &'a RecruitmentTracker,
+}
+
+/// The T13.F06 retention reading at retained discovery + follow-up.
+fn legacy_retention(result: &mut Lineage, arm: &ArmContext<'_>, chain: &Chain<'_>) {
+    let Some(discovery) = &result.retained_discovery else {
+        return;
+    };
+    if chain.generation != discovery.generation + arm.panel.sizes.followup {
+        return;
+    }
+    let task = arm.start.task;
+    let present = chain.tracker.modules().any(|module| {
+        module.node == discovery.module.node
+            && module.created_depth == discovery.module.created_depth
+            && module.is_present()
+    });
+    let score_loss = present.then(|| {
+        let bypass = evaluate_with_config(
+            &static_successor_bypass(chain.genome, discovery.module.node),
+            arm.config,
+        );
+        i16::from(chain.task.correct(task)) - i16::from(bypass.correct(task))
+    });
+    result.retention = Some(Retention {
+        discovery: discovery.clone(),
+        at_generation: chain.generation,
+        outcome: classify_retention(chain.task.live(), score_loss),
+        score: chain.task.correct(task),
+        score_loss,
+    });
+}
+
+/// The T13.F07 discovery checkpoint and the recruit's readings at each
+/// [`HORIZONS`] offset after the specialized retained discovery.
+fn specialized_horizons(
+    result: &mut Lineage,
+    arm: &ArmContext<'_>,
+    chain: &Chain<'_>,
+    baseline: &Signature,
+) {
+    let Some(discovery) = result.specialized_discovery.clone() else {
+        return;
+    };
+    if chain.generation == discovery.generation {
+        // Read a clone: the panel's fixed checkpoints keep their cohort
+        // retention baselines.
+        result.discovery_checkpoint = Some(checkpoint(
+            chain.generation,
+            chain.genome,
+            chain.task,
+            arm.start,
+            &mut chain.tracker.clone(),
+            (arm.battery, baseline),
+            arm.config,
+        ));
+    }
+    for offset in HORIZONS {
+        if chain.generation != discovery.generation + offset {
+            continue;
+        }
+        let module = recruit_reading(
+            chain.genome,
+            chain.task,
+            arm.start,
+            chain.tracker,
+            &discovery,
+            arm.config,
+        );
+        let outcome = HorizonOutcome::of(chain.task.live(), module.as_ref());
+        if offset == PRIMARY_HORIZON {
+            result.ladder.at_primary_horizon = Some(outcome);
+        }
+        result.horizons.push(Horizon {
+            offset,
+            at_generation: chain.generation,
+            outcome,
+            live: chain.task.live(),
+            score: chain.task.correct(arm.start.task),
+            module,
+        });
+    }
+}
+
+fn lineage(arm: &ArmContext<'_>, batch: u32, lineage: u32) -> (Lineage, Vec<GenomeDelta>) {
+    let ArmContext {
+        start,
+        policy,
+        panel,
+        battery,
+        config,
+        ..
+    } = *arm;
+    let sizes = panel.sizes;
     let mut genome = start.genome.clone();
     let mut task = start.task_reading.clone();
     let mut tracker = initial_tracker(start);
+    tracker.record_scene_dispatch(0, &task.scenes_dispatched());
     let baseline = battery.signature(&genome, &config.runtime, config.shared_memory.decay_rate);
     let mut result = Lineage {
         batch,
         lineage,
+        task: start.task,
         proposals: Vec::new(),
         checkpoints: vec![checkpoint(
             0,
@@ -308,12 +558,21 @@ fn lineage(
         viable_retained_discovery: false,
         retention: None,
         first_successful_path: Vec::new(),
+        specialized_discovery: None,
+        discovery_checkpoint: None,
+        horizons: Vec::new(),
+        ladder: Ladder::default(),
+        classification: LineageClass::NoEligibility,
     };
+    let mut reachable_cohort = reachable_cohort(&genome, &tracker);
+    result.ladder.eligibility = !reachable_cohort.is_empty();
+    result.ladder.expression = expressed(&tracker);
     let mut viable_path = task.live();
     let mut history = Vec::new();
+    let mut chosen_deltas = Vec::new();
     for generation in 1..=sizes.discovery + sizes.followup {
         let mut children = propose_siblings(
-            start,
+            arm,
             &genome,
             &task,
             &tracker,
@@ -323,7 +582,6 @@ fn lineage(
                 generation,
             },
             viable_path,
-            config,
         );
         let winner = choose(
             policy,
@@ -336,41 +594,29 @@ fn lineage(
         if let Some(index) = winner {
             children[index].record.chosen = true;
         }
-        if generation <= sizes.discovery && result.proposal_discovery.is_none() {
-            if let Some(child) = children.iter().find(|child| child.record.discovery) {
-                result.proposal_discovery = Some(Discovery {
-                    generation,
-                    sibling: child.record.sibling,
-                    module: child.record.useful_modules[0].clone(),
-                });
-                result.first_successful_path = history.clone();
-                result.first_successful_path.push(ReplayStep {
-                    generation,
-                    sibling: Some(child.record.sibling),
-                    seed: Some(child.record.seed),
-                    retained: child.record.chosen,
-                    events: child.record.events.clone(),
-                    delta: child.delta.clone(),
-                    outcome: child.task.clone(),
-                });
-            }
+        if generation <= sizes.discovery {
+            note_proposal_discovery(&mut result, &children, &history);
         }
         for child in &children {
             result.proposals.push(child.record.clone());
         }
         if let Some(index) = winner {
             let child = children.swap_remove(index);
+            chosen_deltas.push(child.delta.clone());
             viable_path = child.record.viable_path;
-            if generation <= sizes.discovery
-                && result.retained_discovery.is_none()
-                && child.record.discovery
-            {
-                result.retained_discovery = Some(Discovery {
-                    generation,
-                    sibling: child.record.sibling,
-                    module: child.record.useful_modules[0].clone(),
-                });
-                result.viable_retained_discovery = viable_path;
+            result.ladder.local_edit |= child.record.events.iter().any(|event| {
+                event.outcome.starts_with("Applied")
+                    && event
+                        .target
+                        .is_some_and(|target| reachable_cohort.contains(&target))
+            });
+            result.ladder.bypass_only |= child
+                .record
+                .useful_modules
+                .iter()
+                .any(|module| module.ancestral_loss == Some(0));
+            if generation <= sizes.discovery {
+                note_retained_discoveries(&mut result, &child.record, viable_path);
             }
             if result.proposal_discovery.is_none() {
                 history.push(ReplayStep {
@@ -398,30 +644,18 @@ fn lineage(
             });
         }
         tracker.record_reading(0, u64::from(generation), &task.dispatched(), None);
-        if let Some(discovery) = &result.retained_discovery {
-            if generation == discovery.generation + sizes.followup {
-                let present = tracker.modules().any(|module| {
-                    module.node == discovery.module.node
-                        && module.created_depth == discovery.module.created_depth
-                        && module.is_present()
-                });
-                let score_loss = present.then(|| {
-                    let bypass = evaluate_with_config(
-                        &static_successor_bypass(&genome, discovery.module.node),
-                        config,
-                    );
-                    i16::from(task.correct(start.task)) - i16::from(bypass.correct(start.task))
-                });
-                let outcome = classify_retention(task.live(), score_loss);
-                result.retention = Some(Retention {
-                    discovery: discovery.clone(),
-                    at_generation: generation,
-                    outcome,
-                    score: task.correct(start.task),
-                    score_loss,
-                });
-            }
-        }
+        tracker.record_scene_dispatch(0, &task.scenes_dispatched());
+        reachable_cohort = self::reachable_cohort(&genome, &tracker);
+        result.ladder.eligibility |= !reachable_cohort.is_empty();
+        result.ladder.expression |= expressed(&tracker);
+        let chain = Chain {
+            generation,
+            genome: &genome,
+            task: &task,
+            tracker: &tracker,
+        };
+        legacy_retention(&mut result, arm, &chain);
+        specialized_horizons(&mut result, arm, &chain, &baseline);
         if generation == sizes.discovery || generation == sizes.discovery + sizes.followup {
             result.checkpoints.push(checkpoint(
                 generation,
@@ -434,22 +668,74 @@ fn lineage(
             ));
         }
     }
-    // Each tracker uses local index zero; expose the actual batch/lineage
-    // identity on its F01 module/cohort records at the report boundary.
-    for checkpoint in &mut result.checkpoints {
-        for module in &mut checkpoint.modules {
-            module.lineage = batch * sizes.lineages + lineage;
-        }
-        for row in &mut checkpoint.cohort.lineage_rows {
-            row.lineage = batch * sizes.lineages + lineage;
+    result.classification = LineageClass::of(result.ladder);
+    expose_identity(&mut result, batch * sizes.lineages + lineage);
+    (result, chosen_deltas)
+}
+
+/// Present cohort modules statically reachable from the entry node.
+fn reachable_cohort(genome: &CreatureGenome, tracker: &RecruitmentTracker) -> BTreeSet<NodeId> {
+    let reachable = reachable_ids(genome, &mesh_reachable_nodes(genome));
+    tracker
+        .modules()
+        .filter(|module| module.is_present() && module.provenance.is_cohort())
+        .map(|module| module.node)
+        .filter(|node| reachable.contains(node))
+        .collect()
+}
+
+/// Some cohort module dispatched in at least one scene of the latest reading.
+fn expressed(tracker: &RecruitmentTracker) -> bool {
+    tracker
+        .modules()
+        .any(|module| module.provenance.is_cohort() && module.scenes_dispatched >= 1)
+}
+
+/// The first F06 discovery among either sibling, with the replay path that
+/// reached it, and the proposal-level specialization flag.
+fn note_proposal_discovery(result: &mut Lineage, children: &[Sibling], history: &[ReplayStep]) {
+    if result.proposal_discovery.is_none() {
+        if let Some(child) = children.iter().find(|child| child.record.discovery) {
+            result.proposal_discovery = Some(Discovery {
+                generation: child.record.generation,
+                sibling: child.record.sibling,
+                module: child.record.useful_modules[0].clone(),
+            });
+            result.first_successful_path = history.to_vec();
+            result.first_successful_path.push(ReplayStep {
+                generation: child.record.generation,
+                sibling: Some(child.record.sibling),
+                seed: Some(child.record.seed),
+                retained: child.record.chosen,
+                events: child.record.events.clone(),
+                delta: child.delta.clone(),
+                outcome: child.task.clone(),
+            });
         }
     }
-    result
+    result.ladder.proposal_specialized |= children.iter().any(|child| child.record.specialized);
+}
+
+/// Each tracker uses local index zero; expose the actual batch/lineage
+/// identity on its F01 module/cohort records at the report boundary.
+fn expose_identity(result: &mut Lineage, identity: u32) {
+    for checkpoint in result
+        .checkpoints
+        .iter_mut()
+        .chain(result.discovery_checkpoint.iter_mut())
+    {
+        for module in &mut checkpoint.modules {
+            module.module.lineage = identity;
+        }
+        for row in &mut checkpoint.cohort.lineage_rows {
+            row.lineage = identity;
+        }
+    }
 }
 
 /// Retained-parent cost at each checkpoint generation, spread over lineages.
 /// Every lineage checkpoints at the same generations.
-fn checkpoint_cost(lineages: &[&Lineage]) -> Vec<CheckpointCost> {
+fn checkpoint_cost(lineages: &[LineageFacts]) -> Vec<CheckpointCost> {
     let Some(first) = lineages.first() else {
         return Vec::new();
     };
@@ -466,64 +752,85 @@ fn checkpoint_cost(lineages: &[&Lineage]) -> Vec<CheckpointCost> {
                     checkpoint
                 })
                 .collect();
-            let spread = |value: fn(&Checkpoint) -> f64| {
+            let spread = |value: fn(&CheckpointScalars) -> f64| {
                 Spread::of(at.iter().map(|checkpoint| value(checkpoint)).collect())
             };
             Some(CheckpointCost {
                 generation: reference.generation,
-                genome_size: spread(|checkpoint| f64::from(checkpoint.genome.genome_size()))?,
-                modules: spread(|checkpoint| checkpoint.genome.nodes.len() as f64)?,
-                carrying_sum: spread(|checkpoint| checkpoint.task.summary().carrying_sum)?,
-                ending_energy_sum: spread(|checkpoint| {
-                    checkpoint.task.summary().ending_energy_sum
-                })?,
+                genome_size: spread(|checkpoint| checkpoint.genome_size)?,
+                modules: spread(|checkpoint| checkpoint.modules)?,
+                carrying_sum: spread(|checkpoint| checkpoint.carrying_sum)?,
+                ending_energy_sum: spread(|checkpoint| checkpoint.ending_energy_sum)?,
             })
         })
         .collect()
 }
 
-fn summary(task: Task, lineages: &[&Lineage]) -> Summary {
+fn transitions(lineages: &[LineageFacts]) -> Transitions {
+    let mut out = Transitions {
+        lineages: lineages.len() as u32,
+        ..Transitions::default()
+    };
+    let mut applicable = (0u64, 0u64);
+    for lineage in lineages {
+        let ladder = lineage.ladder;
+        out.eligibility += u32::from(ladder.eligibility);
+        out.local_edit += u32::from(ladder.local_edit);
+        out.expression += u32::from(ladder.expression);
+        out.specialized += u32::from(ladder.specialized);
+        out.proposal_specialized_lineages += u32::from(ladder.proposal_specialized);
+        out.specialized_proposals += lineage.specialized_proposals;
+        out.bypass_only += u32::from(ladder.bypass_only);
+        for &(offset, outcome) in &lineage.horizons {
+            *out.retained_at.entry(offset).or_default() +=
+                u32::from(outcome == HorizonOutcome::Retained);
+        }
+        *out.classes
+            .entry(class_key(lineage.classification))
+            .or_default() += 1;
+        applicable.0 += lineage.final_applicable.0;
+        applicable.1 += lineage.final_applicable.1;
+        out.destination_kinds.merge(lineage.destination_kinds);
+    }
+    out.eligible_site_fraction = estimate(applicable.0 as u32, applicable.1 as u32);
+    out
+}
+
+/// One arm's summary over its lineages' facts.
+#[must_use]
+pub fn summary(lineages: &[LineageFacts]) -> Summary {
     let count = lineages.len() as u32;
     let discoveries: Vec<_> = lineages
         .iter()
-        .filter_map(|lineage| lineage.retained_discovery.as_ref())
+        .filter_map(|lineage| lineage.retained_discovery)
         .collect();
     let mut retention_outcomes = RetentionOutcomes::default();
-    for retention in lineages
-        .iter()
-        .filter_map(|lineage| lineage.retention.as_ref())
-    {
-        retention_outcomes.record(retention.outcome);
+    for outcome in lineages.iter().filter_map(|lineage| lineage.retention) {
+        retention_outcomes.record(outcome);
     }
     let useful = retention_outcomes.useful;
-    let (proposals, task_dead, task_live_loss) = lineages
-        .iter()
-        .flat_map(|lineage| &lineage.proposals)
-        .fold((0, 0, 0), |(total, dead, loss), proposal| {
-            let outcome = &proposal.outcome;
-            (
-                total + 1,
-                dead + u32::from(!outcome.live()),
-                loss + u32::from(outcome.live() && outcome.correct(task) < proposal.parent_score),
-            )
-        });
+    let (proposals, task_dead, task_live_loss) =
+        lineages.iter().flat_map(|lineage| &lineage.proposals).fold(
+            (0, 0, 0),
+            |(total, dead, loss), &(live, score, parent_score)| {
+                (
+                    total + 1,
+                    dead + u32::from(!live),
+                    loss + u32::from(live && score < parent_score),
+                )
+            },
+        );
     let damage = Damage {
         task_dead: estimate(task_dead, proposals),
         task_live_loss: estimate(task_live_loss, proposals - task_dead),
     };
     Summary {
-        time_to_first_retained: TimeToFirst::of(lineages.iter().map(|lineage| {
-            lineage
-                .retained_discovery
-                .as_ref()
-                .map(|discovery| discovery.generation)
-        })),
-        time_to_first_proposal: TimeToFirst::of(lineages.iter().map(|lineage| {
-            lineage
-                .proposal_discovery
-                .as_ref()
-                .map(|discovery| discovery.generation)
-        })),
+        time_to_first_retained: TimeToFirst::of(
+            lineages.iter().map(|lineage| lineage.retained_discovery),
+        ),
+        time_to_first_proposal: TimeToFirst::of(
+            lineages.iter().map(|lineage| lineage.proposal_discovery),
+        ),
         retention_outcomes,
         damage,
         checkpoint_cost: checkpoint_cost(lineages),
@@ -546,16 +853,28 @@ fn summary(task: Task, lineages: &[&Lineage]) -> Summary {
         retention_among_discoverers: estimate(useful, discoveries.len() as u32),
         discovery_depth_range: discoveries
             .iter()
-            .map(|discovery| discovery.generation)
             .min()
-            .zip(
-                discoveries
-                    .iter()
-                    .map(|discovery| discovery.generation)
-                    .max(),
-            )
-            .map(|(min, max)| [min, max]),
+            .zip(discoveries.iter().max())
+            .map(|(&min, &max)| [min, max]),
+        transitions: transitions(lineages),
     }
+}
+
+/// An arm summary and its per-batch summaries.
+#[must_use]
+pub fn summaries(facts: &[LineageFacts], batches: u32) -> (Summary, Vec<Summary>) {
+    let arm = summary(facts);
+    let per_batch = (0..batches)
+        .map(|batch| {
+            let of_batch: Vec<_> = facts
+                .iter()
+                .filter(|lineage| lineage.batch == batch)
+                .cloned()
+                .collect();
+            summary(&of_batch)
+        })
+        .collect();
+    (arm, per_batch)
 }
 
 fn pair(left: &Arm, right: &Arm, left_arm: usize, right_arm: usize) -> Pair {
@@ -603,47 +922,190 @@ fn pair(left: &Arm, right: &Arm, left_arm: usize, right_arm: usize) -> Pair {
     }
 }
 
-/// One report-level observation; it has no ecological world input or RNG.
+/// The fingerprint comparison of one replayed lineage.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
+pub struct ReplayCheck {
+    pub proposals: u64,
+    pub matched: u64,
+    /// The first `(generation, sibling)` whose fingerprint differed.
+    pub first_mismatch: Option<(u32, u8)>,
+}
+
+impl ReplayCheck {
+    pub fn merge(&mut self, other: Self) {
+        self.proposals += other.proposals;
+        self.matched += other.matched;
+        if self.first_mismatch.is_none() {
+            self.first_mismatch = other.first_mismatch;
+        }
+    }
+}
+
+/// The fixed arms of one panel: the nine starting forms under Drift,
+/// Selection and CostSelection, in the order the legacy report records them
+/// (`arms/0` is `graph_blank` under Drift; the nine cost arms follow).
+pub struct Assay {
+    panel: Panel,
+    mutation: crate::config::MutationConfig,
+    config: crate::config::SimulationConfig,
+    battery: Battery,
+    constructed: Vec<ConstructedPath>,
+    starts: Vec<Start>,
+    arms: Vec<(usize, Policy)>,
+}
+
+impl Assay {
+    #[must_use]
+    pub fn new(panel: Panel) -> Self {
+        let config = task_config();
+        let battery = Battery::generate(config.world.food.types.len());
+        let constructed = constructed_paths();
+        let starts = fixtures::starts_from_paths(&constructed);
+        let f02 = (0..starts.len()).flat_map(|start| Policy::F02.map(|policy| (start, policy)));
+        let cost = (0..starts.len()).map(|start| (start, Policy::CostSelection));
+        let arms: Vec<_> = f02.chain(cost).collect();
+        debug_assert_eq!(arms.len(), ARMS);
+        Self {
+            panel,
+            mutation: panel.supply.mutation_config(),
+            config,
+            battery,
+            constructed,
+            starts,
+            arms,
+        }
+    }
+
+    #[must_use]
+    pub const fn panel(&self) -> Panel {
+        self.panel
+    }
+
+    #[must_use]
+    pub fn starts(&self) -> &[Start] {
+        &self.starts
+    }
+
+    #[must_use]
+    pub fn arm_count(&self) -> usize {
+        self.arms.len()
+    }
+
+    /// The start and policy of arm `arm`.
+    #[must_use]
+    pub fn arm(&self, arm: usize) -> (&Start, Policy) {
+        let (start, policy) = self.arms[arm];
+        (&self.starts[start], policy)
+    }
+
+    fn context(&self, arm: usize) -> ArmContext<'_> {
+        let (start, policy) = self.arm(arm);
+        ArmContext {
+            start,
+            policy,
+            panel: self.panel,
+            mutation: &self.mutation,
+            battery: &self.battery,
+            config: &self.config,
+        }
+    }
+
+    /// Run one lineage of one arm; deterministic in `(arm, batch, lineage)`.
+    #[must_use]
+    pub fn lineage(&self, arm: usize, batch: u32, lineage: u32) -> Lineage {
+        self::lineage(&self.context(arm), batch, lineage).0
+    }
+
+    /// Run one lineage and keep its compact record: the full record's
+    /// proposal rows reduced to seeds, choices and outcomes, plus the chosen
+    /// children's deltas.
+    #[must_use]
+    pub fn compact_lineage(&self, arm: usize, batch: u32, lineage: u32) -> CompactLineage {
+        let (start, policy) = self.arm(arm);
+        let (full, deltas) = self::lineage(&self.context(arm), batch, lineage);
+        let mut compact = CompactLineage::of(arm, &start.name, policy, &full);
+        let mut deltas = deltas.into_iter();
+        for proposal in compact.proposals.iter_mut().filter(|p| p.chosen) {
+            proposal.delta = deltas.next();
+        }
+        debug_assert!(deltas.next().is_none());
+        compact
+    }
+
+    /// Re-run one seed's mutation on `parent` into `child`, returning the
+    /// post-call RNG draw and the summary.
+    fn mutate(
+        &self,
+        parent: &CreatureGenome,
+        seed: u64,
+        child: &mut CreatureGenome,
+    ) -> (u64, MutationSummary) {
+        let task = evaluate_with_config(parent, &self.config);
+        let reachable = mesh_reachable_nodes(parent);
+        let executed = indices_for_node_ids(parent, &task.dispatched());
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let summary = MutationEngine::apply_mutations_with_food_type_count(
+            child,
+            &self.mutation,
+            &reachable,
+            ParentExecuted::Indices(&executed),
+            &mut rng,
+            self.config.world.food.types.len(),
+        );
+        (rng.clone().next_u64(), summary)
+    }
+
+    /// Reconstruct every proposal of a compact lineage from the initial
+    /// genome, the chosen chain and the seeds, and compare fingerprints.
+    #[must_use]
+    pub fn replay(&self, record: &CompactLineage) -> ReplayCheck {
+        let (start, _) = self.arm(record.arm);
+        let mut check = ReplayCheck::default();
+        let mut parent = start.genome.clone();
+        for pair in record.proposals.chunks_exact(2) {
+            let mut retained = None;
+            for proposal in pair {
+                let mut child = parent.clone();
+                let (rng_after, summary) = self.mutate(&parent, proposal.seed, &mut child);
+                let delta = GenomeDelta::between(&parent, &child);
+                let events: Vec<_> = summary.events.iter().map(Event::from).collect();
+                let replayed = fingerprint(&(&delta, &events, rng_after));
+                check.proposals += 1;
+                if replayed == proposal.mutation_fingerprint {
+                    check.matched += 1;
+                } else if check.first_mismatch.is_none() {
+                    check.first_mismatch = Some((proposal.generation, proposal.sibling));
+                }
+                if proposal.chosen {
+                    retained = Some(child);
+                }
+            }
+            if let Some(child) = retained {
+                parent = child;
+            }
+        }
+        check
+    }
+}
+
+/// One report-level observation of the legacy panel; it has no ecological
+/// world input or RNG.
 #[must_use]
 pub fn observe(sizes: Sizes) -> Report {
-    assert!(sizes.batches > 0 && sizes.batches <= 4 && sizes.lineages > 0 && sizes.lineages <= 8);
-    assert!(
-        sizes.discovery > 0 && sizes.discovery <= 32 && sizes.followup > 0 && sizes.followup <= 16
-    );
-    let config = task_config();
-    let battery = Battery::generate(config.world.food.types.len());
-    let constructed = constructed_paths();
-    let starts = fixtures::starts_from_paths(&constructed);
+    let assay = Assay::new(Panel::legacy(sizes));
+    let config = &assay.config;
     let mut arms = Vec::with_capacity(ARMS);
     let mut opportunities = Opportunities::default();
-    // The eighteen T13.F02 arms keep their order and indices (`arms/0` is
-    // `graph_blank` under drift); the nine T13.F06 cost arms are appended.
-    let f02 = starts
-        .iter()
-        .flat_map(|start| Policy::F02.map(|policy| (start, policy)));
-    let cost = starts.iter().map(|start| (start, Policy::CostSelection));
-    for (start, policy) in f02.chain(cost) {
+    for arm in 0..assay.arm_count() {
+        let (start, policy) = assay.arm(arm);
         let mut lineages = Vec::new();
         for batch in 0..sizes.batches {
             for index in 0..sizes.lineages {
-                lineages.push(lineage(
-                    start, policy, sizes, batch, index, &battery, &config,
-                ));
+                lineages.push(assay.lineage(arm, batch, index));
             }
         }
-        let all: Vec<_> = lineages.iter().collect();
-        let summary = summary(start.task, &all);
-        let batches = (0..sizes.batches)
-            .map(|batch| {
-                self::summary(
-                    start.task,
-                    &all.iter()
-                        .copied()
-                        .filter(|lineage| lineage.batch == batch)
-                        .collect::<Vec<_>>(),
-                )
-            })
-            .collect();
+        let facts: Vec<_> = lineages.iter().map(LineageFacts::of).collect();
+        let (summary, batches) = summaries(&facts, sizes.batches);
         let mut supply = Opportunities::default();
         for lineage in &lineages {
             for proposal in &lineage.proposals {
@@ -671,17 +1133,18 @@ pub fn observe(sizes: Sizes) -> Report {
             }
         }
     }
-    Report { version: VERSION.into(), config_digest: crate::config::config_digest(&config), config, sizes,
+    Report { version: VERSION.into(), config_digest: crate::config::config_digest(config), config: config.clone(), sizes,
+        supply: Supply::Legacy, supply_rule: Supply::Legacy.rule().into(),
         task_definition: "Eight fresh 12x12 one-tick scenes; energy 50; zero learned state; here/east/north food 0/1. A: FoodHere(0)>0; B: NeighborFood(E,0)>0. Exact [Move(E)] plus east displacement or [NoOp] plus no displacement. Score=correct/8; practical margin=1/8.".into(),
         mutation_context: "Default MutationConfig on the legacy per-birth supply rule (per_unit_supply_enabled forced false); SmallRng seed=13020000+batch*1000000+lineage*10000+generation_zero_based*2+sibling. Reachability and ParentExecuted indices from all eight task ticks recomputed before each sibling pair; observations consume no mutation RNG.".into(),
         construction_resolution: "Constructed authored fixtures and controlled helper seeds; genomes frozen before discovery. Construction-only tracker opportunities are excluded from proposal totals; creation registration precedes preparation.".into(),
-        observation_resolution: "Both siblings every generation; first discovery by discovery horizon; retention on same (lineage,node,creation-depth) after followup generations including held parents. Full 80-execution battery/cohort checkpoints at 0/discovery/end; first-fact dates are observation-censored. Replay deltas are complete whole-birth transitions with ordered events, not per-event field causation. Selected-inapplicable backend comes from Graph/VM domain or the target's before/after node; transient deleted targets without backend evidence remain explicitly unresolved.".into(),
+        observation_resolution: "Both siblings every generation; first discovery by discovery horizon; retention on same (lineage,node,creation-depth) after followup generations including held parents. Full 80-execution battery/cohort checkpoints at 0/discovery/end; first-fact dates are observation-censored. Replay deltas are complete whole-birth transitions with ordered events, not per-event field causation. Selected-inapplicable backend comes from Graph/VM domain or the target's before/after node; transient deleted targets without backend evidence remain explicitly unresolved. T13.F07: specialization is task-live, score >= start+1, bypass loss >= 1, ancestral-payload loss >= 1 and every generation-0 correct scene preserved; the ladder and classification read the retained chain; the +64 horizon is censored on this panel.".into(),
         rng_control: "NotApplicable: no added-draw or constructor intervention; observation never advances mutation RNG. Equal seeds need not produce equal transitions after genotype/site divergence; paired fingerprints include complete deltas, ordered events and a draw from a clone of the post-call RNG.".into(),
         limitations: vec!["Task-live is eight-tick survival, not lifetime/ecological viability; drift after task death is genotype drift, not reproduction.".into(),
             "Authored starting forms have matched behavior, unequal size/cost/sites; dormant preparation was constructed, not discovered.".into(),
             "Four batches and eight lineages per batch are replicates; siblings and cross-arm reused seeds are dependent; no positive-discovery floor or pooled-proposal superiority claim.".into(),
             "Target-applicability gaps belong to T13.F03; zero-compute direct Graph effect activation to T13.F04; function-preserving module preparation/recruitment paths to T13.F05. This observation repairs none.".into()],
-        total_proposals: opportunities.births, opportunities, constructed, starts, arms, pairs }
+        total_proposals: opportunities.births, opportunities, constructed: assay.constructed.clone(), starts: assay.starts.clone(), arms, pairs }
 }
 
 #[cfg(test)]
@@ -690,16 +1153,21 @@ mod tests {
 
     fn production_lineages(start: &Start, policy: Policy) -> Vec<Lineage> {
         let sizes = Sizes::PRODUCTION;
-        let config = task_config();
-        let battery = Battery::generate(config.world.food.types.len());
-        (0..sizes.batches)
-            .flat_map(|batch| {
-                let config = &config;
-                let battery = &battery;
-                (0..sizes.lineages)
-                    .map(move |index| lineage(start, policy, sizes, batch, index, battery, config))
+        let assay = Assay::new(Panel::legacy(sizes));
+        let arm = (0..assay.arm_count())
+            .find(|&arm| {
+                let (candidate, candidate_policy) = assay.arm(arm);
+                candidate.name == start.name && candidate_policy == policy
             })
+            .expect("every start and policy is an arm");
+        (0..sizes.batches)
+            .flat_map(|batch| (0..sizes.lineages).map(move |index| (batch, index)))
+            .map(|(batch, index)| assay.lineage(arm, batch, index))
             .collect()
+    }
+
+    fn facts(lineages: &[Lineage]) -> Vec<LineageFacts> {
+        lineages.iter().map(LineageFacts::of).collect()
     }
 
     #[test]
@@ -726,7 +1194,14 @@ mod tests {
 
         let mut unchanged = bypass.clone();
         unchanged.scenes[0].dispatched.push(module);
-        let unchanged_use = uses(&start.genome, &unchanged, start.task, &tracker, &config);
+        let unchanged_use = uses(
+            &start.genome,
+            &unchanged,
+            start.task,
+            &start.task_reading,
+            &tracker,
+            &config,
+        );
         assert_eq!(unchanged_use.len(), 1);
         assert!(unchanged_use[0].dispatched);
         assert_eq!(
@@ -754,12 +1229,20 @@ mod tests {
         changed.scenes[1].shared_memory = Some([1.0; 16]);
         changed.scenes[1].routing.push((
             crate::contracts::NodeId::new(98),
+            0,
             crate::contracts::NodeId::new(99),
         ));
         changed.scenes[1]
             .output_slots
             .push((crate::contracts::NodeId::new(99), [1.0; 24]));
-        let changed_use = uses(&start.genome, &changed, start.task, &tracker, &config);
+        let changed_use = uses(
+            &start.genome,
+            &changed,
+            start.task,
+            &start.task_reading,
+            &tracker,
+            &config,
+        );
         assert_eq!(changed_use.len(), 1);
         assert!(changed_use[0].score_loss > 0);
         assert!(changed_use[0].queue_effect);
@@ -802,8 +1285,7 @@ mod tests {
         for (name, policy, expected, expected_discards) in cases {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, policy);
-            let refs: Vec<_> = lineages.iter().collect();
-            let aggregate = summary(start.task, &refs);
+            let aggregate = summary(&facts(&lineages));
             assert_eq!(
                 [
                     aggregate.proposal_discovery.numerator,
@@ -823,7 +1305,7 @@ mod tests {
                 assert!(lineage.checkpoints.iter().all(|checkpoint| checkpoint
                     .modules
                     .iter()
-                    .all(|module| module.lineage == expected_identity)));
+                    .all(|module| module.module.lineage == expected_identity)));
                 assert!(lineage.checkpoints.iter().all(|checkpoint| checkpoint
                     .cohort
                     .lineage_rows
@@ -917,8 +1399,7 @@ mod tests {
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, Policy::CostSelection);
-            let refs: Vec<_> = lineages.iter().collect();
-            let aggregate = summary(start.task, &refs);
+            let aggregate = summary(&facts(&lineages));
             assert_eq!(
                 [
                     aggregate.proposal_discovery.numerator,
@@ -961,17 +1442,14 @@ mod tests {
             .unwrap();
         let left_lineages = production_lineages(&start, Policy::Drift);
         let right_lineages = production_lineages(&start, Policy::Selection);
-        let make_arm = |policy, lineages: Vec<Lineage>| {
-            let refs: Vec<_> = lineages.iter().collect();
-            Arm {
-                start: start.name.clone(),
-                task: start.task,
-                policy,
-                summary: summary(start.task, &refs),
-                batches: vec![],
-                opportunities: Opportunities::default(),
-                lineages,
-            }
+        let make_arm = |policy, lineages: Vec<Lineage>| Arm {
+            start: start.name.clone(),
+            task: start.task,
+            policy,
+            summary: summary(&facts(&lineages)),
+            batches: vec![],
+            opportunities: Opportunities::default(),
+            lineages,
         };
         let left = make_arm(Policy::Drift, left_lineages);
         let right = make_arm(Policy::Selection, right_lineages);
@@ -1050,6 +1528,7 @@ mod tests {
             events: Vec::new(),
             useful_modules: Vec::new(),
             discovery: false,
+            specialized: false,
             viable_path: true,
             mutation_fingerprint: String::new(),
             parent_fingerprint: String::new(),
@@ -1089,6 +1568,7 @@ mod tests {
         let lineage = Lineage {
             batch: 0,
             lineage: 0,
+            task: Task::A,
             proposals,
             checkpoints: Vec::new(),
             proposal_discovery: None,
@@ -1096,10 +1576,15 @@ mod tests {
             viable_retained_discovery: false,
             retention: None,
             first_successful_path: Vec::new(),
+            specialized_discovery: None,
+            discovery_checkpoint: None,
+            horizons: Vec::new(),
+            ladder: Ladder::default(),
+            classification: LineageClass::NoEligibility,
         };
 
         // Act
-        let aggregate = summary(Task::A, &[&lineage]);
+        let aggregate = summary(&[LineageFacts::of(&lineage)]);
 
         // Assert
         assert_eq!(aggregate.damage.task_dead, estimate(3, 6));

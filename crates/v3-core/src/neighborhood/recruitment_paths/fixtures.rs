@@ -213,7 +213,7 @@ fn reactive(backend: ModuleBackend, live: bool) -> NodeGenome {
     }
 }
 
-fn base(backend: ModuleBackend, live: bool) -> CreatureGenome {
+pub(super) fn base(backend: ModuleBackend, live: bool) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![

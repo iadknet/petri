@@ -88,8 +88,8 @@ fn visited_top_choice_falls_through_and_visits_reset_each_tick() {
         assert_eq!(
             result.hops,
             vec![
-                (NodeId::new(0), Some(0)),
-                (NodeId::new(1), Some(1)),
+                (NodeId::new(0), Some((0, NodeId::new(1)))),
+                (NodeId::new(1), Some((1, NodeId::new(2)))),
                 (NodeId::new(2), None)
             ]
         );
@@ -123,7 +123,10 @@ fn missing_winner_soft_terminates_without_fallback() {
         nodes: vec![node(0, &[99, 1]), node(1, &[])],
     };
     let result = observe(&g, 10);
-    assert_eq!(result.hops, vec![(NodeId::new(0), Some(0))]);
+    assert_eq!(
+        result.hops,
+        vec![(NodeId::new(0), Some((0, NodeId::new(99))))]
+    );
     assert!(matches!(
         result.termination_reason,
         TerminationReason::MissingNode
@@ -203,8 +206,10 @@ fn all_three_modes_match_cycle_fallback_energy_memory_priority_and_cost() {
                         .collect::<Vec<_>>()
                 );
                 for (hop, (_, route)) in hops.iter().zip(&observation.hops) {
-                    if let Some(route) = route {
-                        assert_eq!(hop.route.as_ref().unwrap().selected_target_idx, *route);
+                    if let Some((position, destination)) = route {
+                        let decision = hop.route.as_ref().unwrap();
+                        assert_eq!(decision.selected_target_idx, *position);
+                        assert_eq!(decision.selected_target_id, *destination);
                     }
                 }
             }

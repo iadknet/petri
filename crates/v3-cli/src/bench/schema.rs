@@ -703,6 +703,10 @@ pub struct MeshExecution {
     pub executed_node_count: u64,
     pub knockout_count: u64,
     pub route_varies_with_input: bool,
+    /// Some node applied routes to two different nodes (T13.F07); absent
+    /// from summaries measured before it was read.
+    #[serde(default)]
+    pub route_destination_varies: bool,
     pub hop_cap_hits: u64,
 }
 

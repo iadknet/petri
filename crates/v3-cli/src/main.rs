@@ -21,6 +21,41 @@ enum Commands {
     BenchSummarize(SummarizeArgs),
     /// Saved-world tooling.
     World(WorldArgs),
+    /// The T13.F07 S0 recruitment panel under production supply: a compact
+    /// raw record under the artifact root and a summary under
+    /// docs/progress/features. Exit status 3 when a cap stopped the run and
+    /// the record is marked incomplete.
+    Recruitment(RecruitmentArgs),
+}
+
+#[derive(clap::Args)]
+struct RecruitmentArgs {
+    #[arg(long)]
+    feature: String,
+    /// Batch 0, lineages 0-1, every arm: the feasibility pilot whose
+    /// lineages are a prefix of the panel.
+    #[arg(long)]
+    pilot: bool,
+    /// Private rayon pool of this many threads (>= 1); arms and lineages run
+    /// in parallel. Omit it to use the rayon global pool.
+    #[arg(long)]
+    threads: Option<usize>,
+    /// Stop between lineages once this many seconds have elapsed.
+    #[arg(long, default_value_t = v3_cli::recruitment::DEFAULT_WALL_CAP_SECS)]
+    wall_cap_secs: u64,
+    /// Stop between lineages once the raw record reaches this many bytes.
+    #[arg(long, default_value_t = v3_cli::recruitment::DEFAULT_BYTE_CAP)]
+    byte_cap: u64,
+    /// Rebuild every proposal from the written record and compare
+    /// fingerprints; the result goes into the summary.
+    #[arg(long)]
+    replay_check: bool,
+    /// Raw record destination; the summary path is unaffected.
+    #[arg(long)]
+    out: Option<std::path::PathBuf>,
+    /// Summary destination; the raw path is unaffected.
+    #[arg(long)]
+    summary_out: Option<std::path::PathBuf>,
 }
 
 #[derive(clap::Args)]
@@ -185,6 +220,7 @@ fn main() {
                 }
             }
         }
+        Commands::Recruitment(args) => run_recruitment(args),
         Commands::World(args) => match args.command {
             WorldCommands::Inspect(args) => {
                 if let Err(message) = run_world_inspect(&args, &mut std::io::stdout()) {
@@ -373,6 +409,57 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
     }
 }
 
+fn run_recruitment(args: RecruitmentArgs) {
+    let cwd = match std::env::current_dir() {
+        Ok(cwd) => cwd,
+        Err(e) => {
+            eprintln!("error: cannot identify the working directory: {e}");
+            std::process::exit(1);
+        }
+    };
+    if args.threads == Some(0) {
+        eprintln!("error: --threads must be >= 1");
+        std::process::exit(1);
+    }
+    let options = v3_cli::recruitment::Options {
+        pilot: args.pilot,
+        threads: args.threads,
+        wall_cap: std::time::Duration::from_secs(args.wall_cap_secs),
+        byte_cap: args.byte_cap,
+        replay_check: args.replay_check,
+        raw: args.out,
+        summary: args.summary_out,
+        source_revision: bench::detect_git_revision(),
+        ..v3_cli::recruitment::Options::new(&args.feature, cwd)
+    };
+    match v3_cli::recruitment::run(&options) {
+        Ok(outcome) => {
+            println!(
+                "wrote {} ({} bytes, {} lineages, {} proposals) and {}",
+                outcome.raw.display(),
+                outcome.bytes,
+                outcome.lineage_count,
+                outcome.proposal_count,
+                outcome.summary.display()
+            );
+            if let Some(check) = outcome.replay_check {
+                println!(
+                    "replay check: {}/{} proposals matched",
+                    check.matched, check.proposals
+                );
+            }
+            if outcome.incomplete {
+                eprintln!("incomplete: a cap stopped the run between lineages");
+                std::process::exit(3);
+            }
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
 fn run_bench(args: BenchArgs) {
     if let Err(e) = run_bench_result(args) {
         eprintln!("error: {e}");
@@ -523,10 +610,61 @@ mod tests {
             .command
         {
             Commands::Bench(args) => args,
-            Commands::Run(_) | Commands::World(_) | Commands::BenchSummarize(_) => {
+            Commands::Run(_)
+            | Commands::World(_)
+            | Commands::BenchSummarize(_)
+            | Commands::Recruitment(_) => {
                 panic!("expected the bench subcommand")
             }
         }
+    }
+
+    #[test]
+    fn recruitment_arguments_parse_with_their_defaults_and_flags() {
+        let Commands::Recruitment(args) = Cli::try_parse_from([
+            "v3-cli",
+            "recruitment",
+            "--feature",
+            "t13-f07-current-policy-recruitment-transitions",
+        ])
+        .expect("arguments must parse")
+        .command
+        else {
+            panic!("expected the recruitment subcommand");
+        };
+        assert!(!args.pilot);
+        assert_eq!(args.threads, None);
+        assert_eq!(
+            args.wall_cap_secs,
+            v3_cli::recruitment::DEFAULT_WALL_CAP_SECS
+        );
+        assert_eq!(args.byte_cap, v3_cli::recruitment::DEFAULT_BYTE_CAP);
+        assert!(!args.replay_check);
+        let Commands::Recruitment(args) = Cli::try_parse_from([
+            "v3-cli",
+            "recruitment",
+            "--feature",
+            "x",
+            "--pilot",
+            "--threads",
+            "4",
+            "--wall-cap-secs",
+            "10",
+            "--byte-cap",
+            "1000",
+            "--replay-check",
+        ])
+        .expect("arguments must parse")
+        .command
+        else {
+            panic!("expected the recruitment subcommand");
+        };
+        assert!(args.pilot && args.replay_check);
+        assert_eq!(
+            (args.threads, args.wall_cap_secs, args.byte_cap),
+            (Some(4), 10, 1000)
+        );
+        assert!(Cli::try_parse_from(["v3-cli", "recruitment"]).is_err());
     }
 
     #[test]

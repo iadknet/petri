@@ -441,7 +441,7 @@ mod drift_characterization {
                         );
                         for (id, route) in observation.hops {
                             executed.insert(id);
-                            if let Some(position) = route {
+                            if let Some((position, _)) = route {
                                 routes.entry(id).or_default().insert(position);
                             }
                         }

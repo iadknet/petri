@@ -10,6 +10,7 @@ mod comparison;
 mod indicators;
 mod profiles;
 mod run;
+pub use run::detect_git_revision;
 mod schema;
 #[cfg(test)]
 mod tests;

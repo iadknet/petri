@@ -158,6 +158,8 @@ fn mesh_summary(source: &Value) -> Value {
             }
         }
         *out.entry("routeVaries").or_default() += u64::from(row["route_varies_with_input"] == true);
+        *out.entry("routeDestinationVaries").or_default() +=
+            u64::from(row["route_destination_varies"] == true);
     }
     if out.is_empty() {
         Value::Null
@@ -273,6 +275,8 @@ fn recruitment_summary(source: &Value, report: &recruitment::Report) -> Value {
             "config",
             "config_digest",
             "sizes",
+            "supply",
+            "supply_rule",
             "task_definition",
             "mutation_context",
             "construction_resolution",
@@ -323,7 +327,11 @@ fn recruitment_summary(source: &Value, report: &recruitment::Report) -> Value {
             }
             json!({"batch":lineage.batch,"lineage":lineage.lineage,"proposal_count":lineage.proposals.len(),
                 "proposal_discovery":lineage.proposal_discovery,"retained_discovery":lineage.retained_discovery,
-                "viable_retained_discovery":lineage.viable_retained_discovery,"retention":lineage.retention})
+                "viable_retained_discovery":lineage.viable_retained_discovery,"retention":lineage.retention,
+                "specialized_discovery":lineage.specialized_discovery,
+                "horizons":lineage.horizons.iter().map(|horizon| json!({"offset":horizon.offset,
+                    "at_generation":horizon.at_generation,"outcome":horizon.outcome,"score":horizon.score})).collect::<Vec<_>>(),
+                "ladder":lineage.ladder,"classification":lineage.classification})
         }).collect::<Vec<_>>();
         json!({"start":arm.start,"task":arm.task,"policy":arm.policy,"summary":arm.summary,
             "batches":arm.batches,"opportunities":arm.opportunities,"proposal_count":total,
@@ -639,6 +647,24 @@ pub fn output_paths(
     raw: Option<&Path>,
     summary: Option<&Path>,
 ) -> Result<OutputPaths, String> {
+    let suffix = if profile == "gate" {
+        String::new()
+    } else {
+        format!("-{profile}")
+    };
+    output_paths_with_suffix(cwd, profile, &suffix, feature, raw, summary)
+}
+
+/// [`output_paths`] with the summary file's suffix chosen by the caller:
+/// the raw file is `<profile>.json`, the summary `<feature><suffix>.json`.
+pub fn output_paths_with_suffix(
+    cwd: &Path,
+    profile: &str,
+    suffix: &str,
+    feature: Option<&str>,
+    raw: Option<&Path>,
+    summary: Option<&Path>,
+) -> Result<OutputPaths, String> {
     if let Some(feature) = feature {
         if feature.is_empty()
             || !feature
@@ -689,11 +715,6 @@ pub fn output_paths(
         raw_path.with_file_name(format!("{stem}.summary.json"))
     } else {
         let checkout = git_output(cwd, &["rev-parse", "--show-toplevel"])?;
-        let suffix = if profile == "gate" {
-            String::new()
-        } else {
-            format!("-{profile}")
-        };
         Path::new(checkout.trim_end())
             .join("docs/progress/features")
             .join(format!(
@@ -779,7 +800,8 @@ mod tests {
                 "knockout_count": 7,
                 "hop_cap_hits": 11,
                 "executions_per_genome": 13,
-                "route_varies_with_input": true
+                "route_varies_with_input": true,
+                "route_destination_varies": false
             }},
             {"mesh_execution": {
                 "total_node_count": 17,
@@ -788,7 +810,8 @@ mod tests {
                 "knockout_count": 29,
                 "hop_cap_hits": 31,
                 "executions_per_genome": 37,
-                "route_varies_with_input": false
+                "route_varies_with_input": false,
+                "route_destination_varies": true
             }},
             {"unmeasured": true}
         ]);
@@ -803,7 +826,8 @@ mod tests {
                 "knockout": 36,
                 "capHits": 42,
                 "execs": 50,
-                "routeVaries": 1
+                "routeVaries": 1,
+                "routeDestinationVaries": 1
             })
         );
     }
@@ -854,7 +878,8 @@ mod tests {
                         "knockout": 7,
                         "capHits": 11,
                         "execs": 13,
-                        "routeVaries": 1
+                        "routeVaries": 1,
+                        "routeDestinationVaries": 0
                     }
                 }]}
             })

@@ -479,8 +479,13 @@ fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names()
     );
     let mut historical = serde_json::to_value(mesh).unwrap();
     historical.as_object_mut().unwrap().remove("backends");
+    historical
+        .as_object_mut()
+        .unwrap()
+        .remove("route_destination_varies");
     let historical: MeshExecution = serde_json::from_value(historical).unwrap();
     assert_eq!(historical.backends, None);
+    assert!(!historical.route_destination_varies);
     assert_eq!(historical.total_node_count, mesh.total_node_count);
     assert_eq!(mesh.version, "mesh-execution-v1");
     assert_eq!(mesh.executions_per_genome, 80);

@@ -166,16 +166,19 @@ impl MeshExecutionMode for UntracedMeshExecution {
     }
 }
 
+/// One applied route: the winning target position and the node it named.
+pub(crate) type AppliedRoute = (usize, NodeId);
+
 /// Compact observations of actual dispatches and applied routing, without backend traces.
 #[derive(Debug, Clone)]
 pub(crate) struct MeshObservation {
-    pub hops: Vec<(NodeId, Option<usize>)>,
+    pub hops: Vec<(NodeId, Option<AppliedRoute>)>,
     pub termination_reason: TerminationReason,
 }
 
 #[derive(Default)]
 pub(crate) struct ObservedMeshExecution {
-    hops: Vec<(NodeId, Option<usize>)>,
+    hops: Vec<(NodeId, Option<AppliedRoute>)>,
 }
 
 impl MeshExecutionMode for ObservedMeshExecution {
@@ -229,7 +232,7 @@ impl MeshExecutionMode for ObservedMeshExecution {
         let route = if result.terminal || result.energy_exhausted {
             None
         } else {
-            route_result.map(|(position, _)| position)
+            route_result
         };
         self.hops.push((node.node_id, route));
     }
