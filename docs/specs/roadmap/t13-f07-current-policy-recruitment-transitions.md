@@ -1,6 +1,6 @@
 # T13.F07 — Current-Policy Recruitment Transitions
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-20
 **Feature**: T13.F07
 **Track**: [T13 — Neutral Module Recruitment](../../roadmaps/t13-neutral-module-recruitment.md)
@@ -175,7 +175,7 @@ the S0 command stops between lineages when `--wall-cap-secs` (7,200) or
 - [x] S0 panel: same command without `--pilot` -> summary at
       `docs/progress/features/<id>-s0.json`, raw hash/bytes/wall/thread count
       in the readings file, `incomplete` false.
-- [x] `make check` -> passes.
+- [x] `make check` -> exit 0 on tested commit `b6f8b455` (24 test binaries ok).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
 
@@ -281,47 +281,47 @@ window, no F08 gate reached, paths in the readings file; the predeclaration's
 
 ## Success Criteria
 
-- [ ] Every S0 and legacy-panel lineage carries exactly one ladder outcome
+- [x] Every S0 and legacy-panel lineage carries exactly one ladder outcome
       (retained or one null class) with its stage facts, exposure counts,
       ancestry and route readings; counts reconcile (proposals = 1,769,472
       and 82,944; lineages × arms = classifications).
-- [ ] Observation consumes no mutation RNG and moves no production counter;
+- [x] Observation consumes no mutation RNG and moves no production counter;
       the pinned short-run identity hash is unchanged.
-- [ ] Verbatim-copy controls read 0 `ancestral_loss`; the constructed diverged
+- [x] Verbatim-copy controls read 0 `ancestral_loss`; the constructed diverged
       paths read ≥ 1 with incumbent scenes preserved; prepared fixtures
       express as expected.
-- [ ] Pilot replay check 100%, projection inside the caps, S0 run complete
+- [x] Pilot replay check 100%, projection inside the caps, S0 run complete
       within 2 host-hours and 2 GiB, raw provenance recorded; or the cap
       breach is reported as incomplete and escalated, never trimmed.
-- [ ] Gate and goal summaries stored with the attribution recorded; the
+- [x] Gate and goal summaries stored with the attribution recorded; the
       readings file separates historical F06 numbers from current-source
       remeasurement.
 
 ## Notes for AI Agents
 
-- Decision: for this run only, every role (spec owner, reviewer, benchmark
-  specialist) runs on Opus 5 in place of its Fable/Sonnet frontmatter and the
-  `/advisor` step is skipped, at the user's direction on 2026-09-19; not a
-  precedent, nothing under `.claude/` changes.
+- Decision: this run only, at the user's direction (2026-09-19): every role
+  ran on Opus 5 instead of its Fable/Sonnet frontmatter and `/advisor` was
+  skipped; not a precedent, nothing under `.claude/` changes.
 - Decision: S1 base-world qualification and the matched long legacy arm are
   outside this feature; the feasibility pilot is inside it and runs before the
   S0 panel. A projection over either cap stops for a user decision.
-- Decision: exposure surface = the selecting operator (`EditSurface::of`:
-  split for route-target/gate/entry/splice, payload for Vm/Graph/SwapNodeBackend,
-  other for InputRef/add/remove/copy); a new route entry naming the module is
-  one applied split exposure per birth. `eligible_site_fraction` = cohort
-  modules that reached `ApplicableSelection` ÷ cohort modules created.
+- Decision: exposure surfaces and `eligible_site_fraction` are as the
+  "Target-local exposure" row defines them (`EditSurface::of`).
 - Decision: authored history is construction, not mutation: birth payloads
   are re-based on the start genome; preparation is never an ancestral loss.
 - Decision: a specialized proposal never retained is `loss/not_selected`;
   `bypass_only` reads the retained chain; `ancestral_loss` is evaluated only
   past the bypass gate (`Some(0)` by identity when unchanged).
 - Deferred: the goal drift walk reads identically for Orchards and
-  Confluence at every checkpoint (its seed formula does not vary by world;
-  already so at T17.F02); for the drift walk's owner, T11.F20, not this feature.
+  Confluence (seed formula does not vary by world; already so at T17.F02);
+  for the walk's owner, T11.F20.
 - Decision: the S0 raw is single-line JSON streamed per lineage; `--byte-cap`
   sits beside `--wall-cap-secs`; an incomplete run exits 3 after writing both
   artifacts. `MeshObservation` (observation-only) carries the destination.
 - Deferred: the final review's record-only findings (six-site chain facts,
   P3 cleanups, exit 3 untested, byte-cap overshoot, UTC dates) are in the
   readings file's "Deferred" section.
+- Cost: `/usage` totals at closure not yet supplied (user command);
+  implementer briefs 3 (advisor consults 2 / 2 / 2); spec-owner resumes after
+  Plan 3; review 0 P1 / 6 P2 / 9 P3; one fresh mutation run, 72 killed,
+  2 equivalent.
