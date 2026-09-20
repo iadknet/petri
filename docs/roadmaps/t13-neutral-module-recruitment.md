@@ -38,7 +38,7 @@ selection can be distinguished before changing the substrate.
   - Goal: Gene duplication and circuit growth: new Graph and VM tissue can extend working computation through short viable mutation paths and then diverge into a useful contribution.
 - [x] **T13.F06 — Recruitment and Retention Qualification** — Depends on: T13.F05, T03.F08
   - Goal: Measure whether newly recruited tissue is discovered and retained because it helps a creature, including the cost of carrying it and its response to a changed task.
-- [ ] **T13.F07 — Current-Policy Recruitment Transitions** — Depends on: T13.F06, T11.F21
+- [x] **T13.F07 — Current-Policy Recruitment Transitions** — Depends on: T13.F06, T11.F21
   - Goal: Observe where newly created brain tissue stops progressing from mutation opportunity to expression, useful specialization and retention under the current mutation policy.
 - [ ] **T13.F08 — Restricted Contextual Recruitment** — Depends on: T13.F07, T18.F01
   - Goal: Gene duplication and specialization: qualify whether existing operators or restricted contextual copies let new tissue acquire a useful behavior while preserving the creature's incumbent abilities under real costs.
