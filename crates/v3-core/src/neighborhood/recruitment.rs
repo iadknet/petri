@@ -92,6 +92,110 @@ impl Provenance {
     }
 }
 
+/// The pre-birth module a copy was read from (T13.F07): the first pre-birth
+/// node whose `backend_def` matched, `ambiguous` when several matched.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CopySource {
+    pub node: NodeId,
+    pub created_depth: u64,
+    pub ambiguous: bool,
+}
+
+/// Which part of a module a mutation event reached (T13.F07's target-local
+/// exposure): its route entries (`Split`), its `backend_def` (`Payload`), or
+/// neither (`Other`: input references, creation, deletion and copy sources).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum EditSurface {
+    Split,
+    Payload,
+    Other,
+}
+
+impl EditSurface {
+    /// The surface an operator edits on the node it selected.
+    #[must_use]
+    pub const fn of(operator: MutationOperator) -> Self {
+        match operator {
+            MutationOperator::TopologyRetargetNodeTarget
+            | MutationOperator::TopologyAddRouteTarget
+            | MutationOperator::TopologyRemoveRouteTarget
+            | MutationOperator::TopologySwapRouteTargets
+            | MutationOperator::TopologyMutateGateBias
+            | MutationOperator::TopologySpliceNode
+            | MutationOperator::TopologyChangeEntryNode => Self::Split,
+            MutationOperator::TopologySwapNodeBackend => Self::Payload,
+            MutationOperator::TopologyAddNode
+            | MutationOperator::TopologyRemoveNode
+            | MutationOperator::TopologyCopyNode
+            | MutationOperator::TopologyCopyMeshBackwardSlice
+            | MutationOperator::TopologyCopyMeshForwardSlice
+            | MutationOperator::InputRefAdd
+            | MutationOperator::InputRefPrune
+            | MutationOperator::InputRefSwap
+            | MutationOperator::InputRefRawFieldMutation => Self::Other,
+            _ => match operator.domain() {
+                MutationDomain::Vm | MutationDomain::Graph => Self::Payload,
+                MutationDomain::Topology | MutationDomain::InputRef => Self::Other,
+            },
+        }
+    }
+}
+
+/// Counts of the events that selected one module on one surface, and the
+/// depth of the first of each kind.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SurfaceExposure {
+    pub applied: u64,
+    pub discarded: u64,
+    pub first_applied: Option<u64>,
+    pub first_discarded: Option<u64>,
+}
+
+impl SurfaceExposure {
+    fn record(&mut self, applied: bool, depth: u64) {
+        let (count, first) = if applied {
+            (&mut self.applied, &mut self.first_applied)
+        } else {
+            (&mut self.discarded, &mut self.first_discarded)
+        };
+        *count += 1;
+        first.get_or_insert(depth);
+    }
+}
+
+/// Target-local exposure of one module (T13.F07): every event that selected
+/// it, applied or discarded, by the surface the operator edits. A new route
+/// entry on another node naming this module counts as one applied split
+/// exposure per birth.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Exposure {
+    pub split: SurfaceExposure,
+    pub payload: SurfaceExposure,
+    pub other: SurfaceExposure,
+}
+
+impl Exposure {
+    fn surface(&mut self, surface: EditSurface) -> &mut SurfaceExposure {
+        match surface {
+            EditSurface::Split => &mut self.split,
+            EditSurface::Payload => &mut self.payload,
+            EditSurface::Other => &mut self.other,
+        }
+    }
+
+    /// Applied events over every surface.
+    #[must_use]
+    pub const fn applied(&self) -> u64 {
+        self.split.applied + self.payload.applied + self.other.applied
+    }
+
+    /// Discarded events over every surface.
+    #[must_use]
+    pub const fn discarded(&self) -> u64 {
+        self.split.discarded + self.payload.discarded + self.other.discarded
+    }
+}
+
 /// One module and the depth at which it first reached each cohort fact.
 ///
 /// The facts are separate and never merged: a selection is not an applicable
@@ -105,6 +209,23 @@ pub struct Module {
     pub backend: ModuleBackend,
     pub provenance: Provenance,
     pub deleted_depth: Option<u64>,
+    /// Which pre-birth module a `Copy` was read from; `None` for `New` and
+    /// founder modules.
+    #[serde(default)]
+    pub copy_source: Option<CopySource>,
+    /// SHA-256 of the `backend_def` this module was created with; the payload
+    /// itself is read through [`RecruitmentTracker::birth_payload`].
+    #[serde(default)]
+    pub birth_payload_hash: String,
+    /// Copies later read from this module.
+    #[serde(default)]
+    pub later_copies: u64,
+    #[serde(default)]
+    pub exposure: Exposure,
+    /// Scenes of the latest task reading that dispatched this module (0..=8);
+    /// contextual when 1..=7, unconditional when 8.
+    #[serde(default)]
+    pub scenes_dispatched: u8,
     /// The depth at which this module first reached each [`CohortFact`],
     /// indexed by `fact as usize`; read it through [`Module::first`].
     first: [Option<u64>; CohortFact::COUNT],
@@ -112,21 +233,35 @@ pub struct Module {
     contributing_now: bool,
 }
 
+/// SHA-256 hex of a payload's JSON form.
+#[must_use]
+pub fn payload_hash(payload: &BackendDef) -> String {
+    use sha2::Digest;
+    hex::encode(sha2::Sha256::digest(
+        serde_json::to_vec(payload).expect("backend definitions serialize"),
+    ))
+}
+
 impl Module {
     fn new(
         lineage: u32,
-        node: NodeId,
+        node: &NodeGenome,
         created_depth: u64,
-        backend: ModuleBackend,
         provenance: Provenance,
+        copy_source: Option<CopySource>,
     ) -> Self {
         Self {
             lineage,
-            node,
+            node: node.node_id,
             created_depth,
-            backend,
+            backend: ModuleBackend::from(&node.backend_def),
             provenance,
             deleted_depth: None,
+            copy_source,
+            birth_payload_hash: payload_hash(&node.backend_def),
+            later_copies: 0,
+            exposure: Exposure::default(),
+            scenes_dispatched: 0,
             first: [None; CohortFact::COUNT],
             dispatched_now: false,
             contributing_now: false,
@@ -450,6 +585,11 @@ pub struct LineageRow {
     pub present: u64,
     pub dispatched: u64,
     pub contributing: u64,
+    /// Cohort modules that reached `ApplicableSelection` (at least one
+    /// applied event found a site on them); over `created`, this is
+    /// T13.F07's `eligible_site_fraction`.
+    #[serde(default)]
+    pub applicable: u64,
 }
 
 /// Everything the recruitment observation reports at one checkpoint.
@@ -478,6 +618,8 @@ struct LineageState {
     opportunities: Opportunities,
     live: BTreeMap<NodeId, usize>,
     modules: Vec<Module>,
+    /// Each module's `backend_def` at creation, aligned with `modules`.
+    payloads: Vec<BackendDef>,
     /// The nodes this lineage carried before the next birth, retained so a
     /// generation is diffed in place. Only the nodes a birth changed or added
     /// are cloned into it, so a birth that changed nothing clones nothing.
@@ -521,13 +663,7 @@ impl RecruitmentTracker {
     /// snapshot every later birth is diffed against.
     pub fn seed_founder(&mut self, lineage: u32, nodes: &[NodeGenome]) {
         for node in nodes {
-            self.create(
-                lineage,
-                node.node_id,
-                0,
-                ModuleBackend::from(&node.backend_def),
-                Provenance::Founder,
-            );
+            self.create(lineage, node, 0, Provenance::Founder, None);
         }
         let state = &mut self.lineages[lineage as usize];
         state.previous = nodes
@@ -541,20 +677,52 @@ impl RecruitmentTracker {
         self.lineages.iter().flat_map(|state| state.modules.iter())
     }
 
+    /// Re-base every live module's birth payload on `nodes`: a constructed
+    /// starting form's history is authored construction, not lineage
+    /// mutation, so the payload a form starts with is its birth payload.
+    pub fn rebase_birth_payloads(&mut self, lineage: u32, nodes: &[NodeGenome]) {
+        let state = &mut self.lineages[lineage as usize];
+        for node in nodes {
+            if let Some(&index) = state.live.get(&node.node_id) {
+                state.payloads[index].clone_from(&node.backend_def);
+                state.modules[index].birth_payload_hash = payload_hash(&node.backend_def);
+            }
+        }
+    }
+
+    /// The `backend_def` a module was created with.
+    #[must_use]
+    pub fn birth_payload(&self, module: &Module) -> Option<&BackendDef> {
+        let state = self.lineages.get(module.lineage as usize)?;
+        state
+            .modules
+            .iter()
+            .position(|candidate| {
+                candidate.node == module.node && candidate.created_depth == module.created_depth
+            })
+            .map(|index| &state.payloads[index])
+    }
+
     fn create(
         &mut self,
         lineage: u32,
-        node: NodeId,
+        node: &NodeGenome,
         depth: u64,
-        backend: ModuleBackend,
         provenance: Provenance,
+        copy_source: Option<CopySource>,
     ) {
         let state = &mut self.lineages[lineage as usize];
         let index = state.modules.len();
+        if let Some(source) = copy_source {
+            if let Some(&source_index) = state.live.get(&source.node) {
+                state.modules[source_index].later_copies += 1;
+            }
+        }
         state
             .modules
-            .push(Module::new(lineage, node, depth, backend, provenance));
-        state.live.insert(node, index);
+            .push(Module::new(lineage, node, depth, provenance, copy_source));
+        state.payloads.push(node.backend_def.clone());
+        state.live.insert(node.node_id, index);
     }
 
     /// Pool one birth's opportunities and fold its genome diff into the
@@ -576,27 +744,50 @@ impl RecruitmentTracker {
         state.opportunities.record(summary);
         let mut previous = std::mem::take(&mut state.previous);
         let mut changed: Vec<usize> = Vec::new();
-        let mut created: Vec<(usize, Provenance)> = Vec::new();
+        let mut created: Vec<(usize, Provenance, Option<CopySource>)> = Vec::new();
+        // Route entries this birth added, by the module they name (T13.F07
+        // split-gate exposure); at most once per module per birth.
+        let mut named: BTreeSet<NodeId> = BTreeSet::new();
         // Classify against the untouched snapshot: provenance asks whether
         // some *pre-birth* node carried this content, so nothing is written
         // back until the whole birth has been read.
         for (index, node) in after.iter().enumerate() {
             match previous.get(&node.node_id) {
                 Some(slot) if slot == node => {}
-                Some(_) => changed.push(index),
+                Some(slot) => {
+                    named.extend(
+                        node.targets
+                            .iter()
+                            .map(|target| target.target_id)
+                            .filter(|id| !slot.targets.iter().any(|old| old.target_id == *id)),
+                    );
+                    changed.push(index);
+                }
                 None => {
-                    let copied = copy_applied
-                        && previous
-                            .values()
-                            .any(|existing| existing.backend_def == node.backend_def);
-                    created.push((
-                        index,
-                        if copied {
-                            Provenance::Copy
-                        } else {
-                            Provenance::New
-                        },
-                    ));
+                    named.extend(node.targets.iter().map(|target| target.target_id));
+                    let mut matches = previous
+                        .values()
+                        .filter(|existing| existing.backend_def == node.backend_def);
+                    let source = copy_applied.then(|| matches.next()).flatten();
+                    let (provenance, copy_source) = match source {
+                        Some(existing) => {
+                            let ambiguous = matches.next().is_some();
+                            let created_depth = state
+                                .live
+                                .get(&existing.node_id)
+                                .map_or(0, |&index| state.modules[index].created_depth);
+                            (
+                                Provenance::Copy,
+                                Some(CopySource {
+                                    node: existing.node_id,
+                                    created_depth,
+                                    ambiguous,
+                                }),
+                            )
+                        }
+                        None => (Provenance::New, None),
+                    };
+                    created.push((index, provenance, copy_source));
                 }
             }
         }
@@ -605,7 +796,7 @@ impl RecruitmentTracker {
                 slot.clone_from(&after[index]);
             }
         }
-        for &(index, _) in &created {
+        for &(index, _, _) in &created {
             previous.insert(after[index].node_id, after[index].clone());
         }
         // Every id of `after` is now in the snapshot, so a longer snapshot is
@@ -625,6 +816,9 @@ impl RecruitmentTracker {
         self.lineages[lineage as usize].previous = previous;
 
         self.record_selections(lineage, depth, &summary.events);
+        for node in named {
+            self.expose(lineage, node, EditSurface::Split, true, depth);
+        }
         for node in deleted {
             self.delete(lineage, node, depth);
         }
@@ -632,15 +826,8 @@ impl RecruitmentTracker {
             let node = after[index].node_id;
             self.fact_reached(lineage, node, CohortFact::InternalChange, depth);
         }
-        for (index, provenance) in created {
-            let node = &after[index];
-            self.create(
-                lineage,
-                node.node_id,
-                depth,
-                ModuleBackend::from(&node.backend_def),
-                provenance,
-            );
+        for (index, provenance, copy_source) in created {
+            self.create(lineage, &after[index], depth, provenance, copy_source);
         }
     }
 
@@ -648,8 +835,13 @@ impl RecruitmentTracker {
         for event in events {
             // A discarded operator's pick is a selection too: the module was
             // named and carried no applicable site.
-            for target in event.discarded.iter().filter_map(|&(_, pick)| pick) {
+            for (operator, target) in event
+                .discarded
+                .iter()
+                .filter_map(|&(operator, pick)| pick.map(|pick| (operator, pick)))
+            {
                 self.fact_reached(lineage, target, CohortFact::Selection, depth);
+                self.expose(lineage, target, EditSurface::of(operator), false, depth);
             }
             let Some(target) = event.target else {
                 continue;
@@ -658,6 +850,41 @@ impl RecruitmentTracker {
             if event.outcome.is_applied() {
                 self.fact_reached(lineage, target, CohortFact::ApplicableSelection, depth);
             }
+            if let Some(operator) = event.operator {
+                self.expose(
+                    lineage,
+                    target,
+                    EditSurface::of(operator),
+                    event.outcome.is_applied(),
+                    depth,
+                );
+            }
+        }
+    }
+
+    fn expose(
+        &mut self,
+        lineage: u32,
+        node: NodeId,
+        surface: EditSurface,
+        applied: bool,
+        depth: u64,
+    ) {
+        let state = &mut self.lineages[lineage as usize];
+        if let Some(&index) = state.live.get(&node) {
+            state.modules[index]
+                .exposure
+                .surface(surface)
+                .record(applied, depth);
+        }
+    }
+
+    /// Fold one task reading's per-scene dispatch counts in (T13.F07): each
+    /// live module's `scenes_dispatched` becomes its count, zero when absent.
+    pub fn record_scene_dispatch(&mut self, lineage: u32, scenes: &BTreeMap<NodeId, u8>) {
+        let state = &mut self.lineages[lineage as usize];
+        for (&node, &index) in &state.live {
+            state.modules[index].scenes_dispatched = scenes.get(&node).copied().unwrap_or(0);
         }
     }
 
@@ -668,6 +895,7 @@ impl RecruitmentTracker {
             module.deleted_depth = Some(depth);
             module.dispatched_now = false;
             module.contributing_now = false;
+            module.scenes_dispatched = 0;
         }
     }
 
@@ -763,6 +991,8 @@ impl RecruitmentTracker {
                     ModuleBackend::Vm => reading.vm.record(module),
                 }
                 row.created += 1;
+                row.applicable +=
+                    u64::from(module.first(CohortFact::ApplicableSelection).is_some());
                 if module.is_present() {
                     row.present += 1;
                     row.dispatched += u64::from(module.dispatched_now);

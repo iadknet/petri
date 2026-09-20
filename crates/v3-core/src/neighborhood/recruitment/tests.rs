@@ -816,3 +816,347 @@ proptest! {
         }
     }
 }
+
+// ── T13.F07 ancestry, exposure and scene dispatch ───────────────────────────
+
+fn module(tracker: &RecruitmentTracker, id: u32, depth: u64) -> &Module {
+    tracker
+        .modules()
+        .find(|module| module.node == NodeId::new(id) && module.created_depth == depth)
+        .expect("module recorded")
+}
+
+#[test]
+fn a_copy_names_its_first_matching_source_and_flags_ambiguity() {
+    // Arrange: two identical founders; a copy of either is ambiguous, a copy
+    // of the odd one out is not.
+    let before = vec![vm_node(0, 3), vm_node(1, 3), vm_node(2, 5)];
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &before);
+
+    // Act
+    birth(
+        &mut tracker,
+        1,
+        &[vm_node(0, 3), vm_node(1, 3), vm_node(2, 5), vm_node(3, 3)],
+        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 1)]),
+    );
+    birth(
+        &mut tracker,
+        2,
+        &[
+            vm_node(0, 3),
+            vm_node(1, 3),
+            vm_node(2, 5),
+            vm_node(3, 3),
+            vm_node(4, 5),
+        ],
+        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 2)]),
+    );
+
+    // Assert
+    assert_eq!(
+        module(&tracker, 3, 1).copy_source,
+        Some(CopySource {
+            node: NodeId::new(0),
+            created_depth: 0,
+            ambiguous: true
+        })
+    );
+    assert_eq!(
+        module(&tracker, 4, 2).copy_source,
+        Some(CopySource {
+            node: NodeId::new(2),
+            created_depth: 0,
+            ambiguous: false
+        })
+    );
+    assert_eq!(module(&tracker, 0, 0).later_copies, 1);
+    assert_eq!(module(&tracker, 1, 0).later_copies, 0);
+    assert_eq!(module(&tracker, 2, 0).later_copies, 1);
+    assert_eq!(module(&tracker, 3, 1).later_copies, 0);
+    assert_eq!(module(&tracker, 2, 0).copy_source, None);
+    assert_eq!(
+        module(&tracker, 3, 1).birth_payload_hash,
+        payload_hash(&vm_node(3, 3).backend_def)
+    );
+    assert_eq!(
+        tracker.birth_payload(module(&tracker, 4, 2)),
+        Some(&vm_node(4, 5).backend_def)
+    );
+}
+
+#[test]
+fn the_birth_payload_is_the_creation_content_not_the_current_one() {
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &[vm_node(0, 3)]);
+    birth(
+        &mut tracker,
+        1,
+        &[vm_node(0, 3), vm_node(1, 2)],
+        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+    );
+    birth(
+        &mut tracker,
+        2,
+        &[vm_node(0, 3), vm_node(1, 9)],
+        &summary_with(vec![applied(MutationOperator::VmRegisterCountMutation, 1)]),
+    );
+    let created = module(&tracker, 1, 1);
+    assert_eq!(
+        tracker.birth_payload(created),
+        Some(&vm_node(1, 2).backend_def)
+    );
+    assert_eq!(
+        created.birth_payload_hash,
+        payload_hash(&vm_node(1, 2).backend_def)
+    );
+    assert_ne!(
+        created.birth_payload_hash,
+        payload_hash(&vm_node(1, 9).backend_def)
+    );
+    let mut foreign = created.clone();
+    foreign.lineage = 4;
+    assert_eq!(tracker.birth_payload(&foreign), None);
+}
+
+#[test]
+fn rebasing_birth_payloads_moves_the_live_modules_only() {
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &[vm_node(0, 3), vm_node(1, 1)]);
+    birth(
+        &mut tracker,
+        1,
+        &[vm_node(0, 3)],
+        &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 1)]),
+    );
+    tracker.rebase_birth_payloads(0, &[vm_node(0, 9), vm_node(1, 9)]);
+    let live = module(&tracker, 0, 0);
+    assert_eq!(
+        tracker.birth_payload(live),
+        Some(&vm_node(0, 9).backend_def)
+    );
+    assert_eq!(
+        live.birth_payload_hash,
+        payload_hash(&vm_node(0, 9).backend_def)
+    );
+    let gone = module(&tracker, 1, 0);
+    assert_eq!(
+        tracker.birth_payload(gone),
+        Some(&vm_node(1, 1).backend_def)
+    );
+    assert_eq!(
+        gone.birth_payload_hash,
+        payload_hash(&vm_node(1, 1).backend_def)
+    );
+}
+
+#[test]
+fn exposure_counts_every_selection_by_surface_and_outcome() {
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &[vm_node(0, 3)]);
+    birth(
+        &mut tracker,
+        1,
+        &[vm_node(0, 3), vm_node(1, 3)],
+        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 0)]),
+    );
+    // Two applied payload edits, one applied split edit, one discarded
+    // payload pick, one discarded split pick, and an input-ref edit.
+    birth(
+        &mut tracker,
+        2,
+        &[vm_node(0, 3), vm_node(1, 4)],
+        &summary_with(vec![
+            applied(MutationOperator::VmRegisterCountMutation, 1),
+            applied_after_discard(
+                MutationOperator::VmConstantMutation,
+                1,
+                MutationOperator::VmDeleteInstruction,
+                Some(1),
+            ),
+            applied_after_discard(
+                MutationOperator::TopologyMutateGateBias,
+                1,
+                MutationOperator::TopologyRemoveRouteTarget,
+                Some(1),
+            ),
+            applied(MutationOperator::InputRefAdd, 1),
+        ]),
+    );
+    birth(
+        &mut tracker,
+        5,
+        &[vm_node(0, 3), vm_node(1, 4)],
+        &summary_with(vec![selected_inapplicable(
+            MutationOperator::GraphAddGraphEdge,
+            1,
+        )]),
+    );
+    let exposure = module(&tracker, 1, 1).exposure;
+    assert_eq!(
+        exposure.payload,
+        SurfaceExposure {
+            applied: 2,
+            discarded: 2,
+            first_applied: Some(2),
+            first_discarded: Some(2),
+        }
+    );
+    assert_eq!(
+        exposure.split,
+        SurfaceExposure {
+            applied: 1,
+            discarded: 1,
+            first_applied: Some(2),
+            first_discarded: Some(2),
+        }
+    );
+    assert_eq!(
+        exposure.other,
+        SurfaceExposure {
+            applied: 1,
+            discarded: 0,
+            first_applied: Some(2),
+            first_discarded: None,
+        }
+    );
+    assert_eq!((exposure.applied(), exposure.discarded()), (4, 3));
+    // The founder was never selected after the copy.
+    assert_eq!(module(&tracker, 0, 0).exposure.applied(), 1);
+    assert_eq!(module(&tracker, 0, 0).exposure.other.applied, 1);
+}
+
+#[test]
+fn a_new_route_entry_naming_a_module_is_one_split_exposure_per_birth() {
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &[vm_node(0, 3), vm_node(1, 3)]);
+    let mut router = vm_node(0, 3);
+    router.targets = vec![
+        RouteTarget {
+            target_id: NodeId::new(1),
+            slot: 0,
+            gate_bias: 0.0,
+        },
+        RouteTarget {
+            target_id: NodeId::new(1),
+            slot: 1,
+            gate_bias: 0.0,
+        },
+    ];
+    birth(
+        &mut tracker,
+        1,
+        &[router.clone(), vm_node(1, 3)],
+        &summary_with(vec![applied(MutationOperator::TopologyAddRouteTarget, 0)]),
+    );
+    assert_eq!(
+        module(&tracker, 1, 0).exposure.split,
+        SurfaceExposure {
+            applied: 1,
+            discarded: 0,
+            first_applied: Some(1),
+            first_discarded: None,
+        }
+    );
+    // The router's own targets changed: its own split exposure comes from
+    // the event, not from naming.
+    assert_eq!(module(&tracker, 0, 0).exposure.split.applied, 1);
+    // A gate-bias change on an existing entry names nothing new.
+    router.targets[0].gate_bias = 1.0;
+    birth(
+        &mut tracker,
+        2,
+        &[router.clone(), vm_node(1, 3)],
+        &summary_with(vec![applied(MutationOperator::TopologyMutateGateBias, 0)]),
+    );
+    assert_eq!(module(&tracker, 1, 0).exposure.split.applied, 1);
+    // A created node whose targets name the module counts too.
+    let mut added = vm_node(2, 1);
+    added.targets = vec![RouteTarget {
+        target_id: NodeId::new(1),
+        slot: 0,
+        gate_bias: 0.0,
+    }];
+    birth(
+        &mut tracker,
+        3,
+        &[router, vm_node(1, 3), added],
+        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+    );
+    assert_eq!(module(&tracker, 1, 0).exposure.split.applied, 2);
+}
+
+#[test]
+fn scene_dispatch_counts_follow_the_latest_reading_and_clear_on_deletion() {
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &[vm_node(0, 3), vm_node(1, 3)]);
+    tracker.record_scene_dispatch(
+        0,
+        &BTreeMap::from([(NodeId::new(0), 8), (NodeId::new(1), 3)]),
+    );
+    assert_eq!(module(&tracker, 0, 0).scenes_dispatched, 8);
+    assert_eq!(module(&tracker, 1, 0).scenes_dispatched, 3);
+    tracker.record_scene_dispatch(0, &BTreeMap::from([(NodeId::new(0), 8)]));
+    assert_eq!(module(&tracker, 1, 0).scenes_dispatched, 0);
+    tracker.record_scene_dispatch(0, &BTreeMap::from([(NodeId::new(1), 5)]));
+    birth(
+        &mut tracker,
+        1,
+        &[vm_node(0, 3)],
+        &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 1)]),
+    );
+    assert_eq!(module(&tracker, 1, 0).scenes_dispatched, 0);
+    assert_eq!(module(&tracker, 1, 0).deleted_depth, Some(1));
+}
+
+#[test]
+fn the_lineage_row_counts_cohort_modules_with_an_applied_site() {
+    let mut tracker = RecruitmentTracker::new(1);
+    tracker.seed_founder(0, &[vm_node(0, 3)]);
+    birth(
+        &mut tracker,
+        1,
+        &[vm_node(0, 3), vm_node(1, 1), vm_node(2, 2)],
+        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+    );
+    birth(
+        &mut tracker,
+        2,
+        &[vm_node(0, 3), vm_node(1, 4), vm_node(2, 2)],
+        &summary_with(vec![
+            applied(MutationOperator::VmRegisterCountMutation, 1),
+            selected_inapplicable(MutationOperator::VmDeleteInstruction, 2),
+        ]),
+    );
+    let reading = tracker.checkpoint(2);
+    assert_eq!(reading.lineage_rows[0].created, 2);
+    assert_eq!(reading.lineage_rows[0].applicable, 1);
+}
+
+#[test]
+fn every_operator_has_exactly_one_edit_surface() {
+    use MutationOperator as Op;
+    assert_eq!(
+        EditSurface::of(Op::TopologyRetargetNodeTarget),
+        EditSurface::Split
+    );
+    assert_eq!(
+        EditSurface::of(Op::TopologyChangeEntryNode),
+        EditSurface::Split
+    );
+    assert_eq!(
+        EditSurface::of(Op::TopologySwapNodeBackend),
+        EditSurface::Payload
+    );
+    assert_eq!(
+        EditSurface::of(Op::VmInsertReadBidMotif),
+        EditSurface::Payload
+    );
+    assert_eq!(
+        EditSurface::of(Op::GraphMutateTraceDecay),
+        EditSurface::Payload
+    );
+    assert_eq!(EditSurface::of(Op::TopologyCopyNode), EditSurface::Other);
+    assert_eq!(EditSurface::of(Op::InputRefSwap), EditSurface::Other);
+}

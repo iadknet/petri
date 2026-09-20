@@ -129,8 +129,64 @@ pub struct QualifiedPath {
     pub task: Task,
     pub backend: ModuleBackend,
     pub start: ConstructionStage,
+    /// The scaffold's `backend_def` at its creation stage (T13.F07).
+    pub birth_payload: BackendDef,
     pub steps: Vec<PathStep>,
     pub gap: Option<GrowthGap>,
+}
+
+/// The scaffold's T13.F07 counterfactual readings at one path step.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StepReading {
+    pub step: String,
+    pub score: u8,
+    pub payload_changed: bool,
+    pub bypass_loss: i16,
+    /// score(step) − score(birth payload on the same route).
+    pub ancestral_loss: i16,
+    pub specialization: Specialization,
+}
+
+/// Read the scaffold of `genome` against `baseline` on `task`: the bypass and
+/// birth-payload counterfactuals and the five specialization components.
+#[must_use]
+pub fn payload_reading(
+    step: &str,
+    genome: &CreatureGenome,
+    birth_payload: &BackendDef,
+    baseline: &TaskReading,
+    task: Task,
+) -> StepReading {
+    use super::super::mesh_execution::{ancestral_payload_replacement, static_successor_bypass};
+    let reading = evaluate(genome);
+    let score = reading.correct(task);
+    let bypass = evaluate(&static_successor_bypass(genome, SCAFFOLD));
+    let payload_changed = node(genome, SCAFFOLD).backend_def != *birth_payload;
+    let replaced = if payload_changed {
+        evaluate(&ancestral_payload_replacement(
+            genome,
+            SCAFFOLD,
+            birth_payload,
+        ))
+    } else {
+        reading.clone()
+    };
+    let bypass_loss = i16::from(score) - i16::from(bypass.correct(task));
+    let ancestral_loss = i16::from(score) - i16::from(replaced.correct(task));
+    StepReading {
+        step: step.into(),
+        score,
+        payload_changed,
+        bypass_loss,
+        ancestral_loss,
+        specialization: Specialization {
+            task_live: reading.live(),
+            score_gain: score > baseline.correct(task),
+            bypass_loss: bypass_loss >= 1,
+            ancestral_loss: ancestral_loss >= 1,
+            incumbents_preserved: reading.preserves_correct_scenes(baseline, task),
+        },
+    }
 }
 
 impl QualifiedPath {
@@ -138,6 +194,24 @@ impl QualifiedPath {
     #[must_use]
     pub fn qualified(&self) -> bool {
         self.gap.is_none() && self.steps.len() <= MAX_PATH_EVENTS
+    }
+
+    /// T13.F07: the scaffold's counterfactual readings at every step,
+    /// against the path's start.
+    #[must_use]
+    pub fn payload_readings(&self) -> Vec<StepReading> {
+        self.steps
+            .iter()
+            .map(|step| {
+                payload_reading(
+                    &step.stage.name,
+                    &step.stage.genome,
+                    &self.birth_payload,
+                    &self.start.task,
+                    self.task,
+                )
+            })
+            .collect()
     }
 
     /// T13.F06: each step judged by `Policy::CostSelection` against its
@@ -252,6 +326,7 @@ struct FormPlan {
     task: Task,
     backend: ModuleBackend,
     start: ConstructionStage,
+    birth_payload: BackendDef,
     specs: Vec<StepSpec>,
     seeds: &'static [u64],
     gap: Option<GrowthGap>,
@@ -267,6 +342,7 @@ fn qualify(plan: FormPlan) -> QualifiedPath {
         task,
         backend,
         start,
+        birth_payload,
         specs,
         seeds,
         gap,
@@ -298,6 +374,7 @@ fn qualify(plan: FormPlan) -> QualifiedPath {
         form,
         task,
         backend,
+        birth_payload,
         start,
         steps,
         gap,
@@ -997,6 +1074,9 @@ fn form_plans() -> Vec<FormPlan> {
             form: name.into(),
             task: start.task,
             backend: start.backend,
+            // Authored history is construction, not mutation: the form's
+            // starting payload is the scaffold's birth payload.
+            birth_payload: node(&last.genome, SCAFFOLD).backend_def.clone(),
             start: last,
             specs,
             seeds,
@@ -1008,11 +1088,13 @@ fn form_plans() -> Vec<FormPlan> {
             ModuleBackend::Graph => (graph_blank_plan(true), GRAPH_DETOUR_SEEDS),
             ModuleBackend::Vm => (vm_blank_plan(true), VM_DETOUR_SEEDS),
         };
+        let start = detour_start(backend, &base);
         plans.push(FormPlan {
             form: format!("{}_detour", backend.as_key()),
             task: Task::A,
             backend,
-            start: detour_start(backend, &base),
+            birth_payload: node(&start.genome, SCAFFOLD).backend_def.clone(),
+            start,
             specs,
             seeds,
             gap: None,

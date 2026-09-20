@@ -396,17 +396,30 @@ fn recruitment_paths_every_observed_sibling_replays_the_unmodified_engine() {
             let mut retained = parent.clone();
             for record in pair {
                 let mut child = parent.clone();
+                let mut rng = SmallRng::seed_from_u64(record.seed);
                 let summary = MutationEngine::apply_mutations_with_food_type_count(
                     &mut child,
                     &super::experiment::proposal_mutation_config(),
                     &reachable,
                     ParentExecuted::Indices(&executed),
-                    &mut SmallRng::seed_from_u64(record.seed),
+                    &mut rng,
                     1,
                 );
+                let events: Vec<_> = summary.events.iter().map(Event::from).collect();
+                assert_eq!(events, record.events);
+                // T13.F07: the bare engine, with no readings taken at all,
+                // leaves the RNG and the fingerprint exactly where the
+                // observed proposal recorded them, so the bypass, ancestral
+                // and route readings consumed no mutation RNG.
+                let rng_after = rand::RngCore::next_u64(&mut rng.clone());
+                assert_eq!(rng_after, record.rng_after);
                 assert_eq!(
-                    summary.events.iter().map(Event::from).collect::<Vec<_>>(),
-                    record.events
+                    super::experiment::fingerprint(&(
+                        &GenomeDelta::between(&parent, &child),
+                        &events,
+                        rng_after
+                    )),
+                    record.mutation_fingerprint
                 );
                 assert_eq!(evaluate(&child).summary(), record.outcome);
                 assert_eq!(
@@ -1380,5 +1393,629 @@ proptest! {
             }
         );
         prop_assert_eq!(recorded.total() as usize, outcomes.len());
+    }
+}
+
+// ── T13.F07 transitions ─────────────────────────────────────────────────────
+
+fn ladder_strategy() -> impl Strategy<Value = Ladder> {
+    (
+        any::<bool>(),
+        any::<bool>(),
+        any::<bool>(),
+        any::<bool>(),
+        any::<bool>(),
+        any::<bool>(),
+        prop::option::of(prop::sample::select(vec![
+            HorizonOutcome::Retained,
+            HorizonOutcome::TaskDead,
+            HorizonOutcome::Deleted,
+            HorizonOutcome::NoLongerUseful,
+            HorizonOutcome::Despecialized,
+        ])),
+    )
+        .prop_map(
+            |(
+                eligibility,
+                local_edit,
+                expression,
+                specialized,
+                proposal_specialized,
+                bypass_only,
+                at_primary_horizon,
+            )| Ladder {
+                eligibility,
+                local_edit,
+                expression,
+                specialized,
+                proposal_specialized,
+                bypass_only,
+                at_primary_horizon,
+            },
+        )
+}
+
+proptest! {
+    /// Every ladder classifies to exactly one class, and that class names
+    /// the first stage that failed (exclusive and total).
+    #[test]
+    fn recruitment_paths_classification_names_the_first_failing_stage(ladder in ladder_strategy()) {
+        let class = LineageClass::of(ladder);
+        let stages = [ladder.eligibility, ladder.local_edit, ladder.expression, ladder.specialized];
+        let first_failure = stages.iter().position(|reached| !reached);
+        match first_failure {
+            Some(0) => prop_assert_eq!(class, LineageClass::NoEligibility),
+            Some(1) => prop_assert_eq!(class, LineageClass::NoEdit),
+            Some(2) => prop_assert_eq!(class, LineageClass::NoExpression),
+            Some(_) => {
+                if ladder.proposal_specialized {
+                    prop_assert_eq!(class, LineageClass::Loss(LossKind::NotSelected));
+                } else {
+                    prop_assert_eq!(class, LineageClass::NoBenefit);
+                }
+            }
+            None => match ladder.at_primary_horizon {
+                None => prop_assert_eq!(class, LineageClass::CensoredAt64),
+                Some(HorizonOutcome::Retained) => prop_assert_eq!(class, LineageClass::Retained),
+                Some(outcome) => {
+                    let LineageClass::Loss(kind) = class else {
+                        return Err(TestCaseError::fail(format!("a lost recruit classifies as a loss: {class:?}")));
+                    };
+                    prop_assert_ne!(kind, LossKind::NotSelected);
+                    prop_assert_eq!(format!("{kind:?}"), format!("{outcome:?}"));
+                }
+            },
+        }
+        // Retained never coexists with a failed stage.
+        prop_assert_eq!(class == LineageClass::Retained, stages.iter().all(|reached| *reached)
+            && ladder.at_primary_horizon == Some(HorizonOutcome::Retained));
+        prop_assert!(!class_key(class).is_empty());
+    }
+
+    /// The horizon reading is total over liveness and presence and ranks
+    /// task death before absence before the bypass before the components.
+    #[test]
+    fn recruitment_paths_horizon_outcome_ranks_death_absence_bypass_then_components(
+        live in any::<bool>(), present in any::<bool>(), score_loss in -8i16..=8, holds in any::<bool>()
+    ) {
+        let module = present.then(|| {
+            let mut module = synthetic_module_use(score_loss);
+            module.specialization = Specialization {
+                task_live: holds, score_gain: holds, bypass_loss: holds, ancestral_loss: holds, incumbents_preserved: holds,
+            };
+            module
+        });
+        let outcome = HorizonOutcome::of(live, module.as_ref());
+        let expected = if !live { HorizonOutcome::TaskDead }
+            else if !present { HorizonOutcome::Deleted }
+            else if score_loss < 1 { HorizonOutcome::NoLongerUseful }
+            else if !holds { HorizonOutcome::Despecialized }
+            else { HorizonOutcome::Retained };
+        prop_assert_eq!(outcome, expected);
+    }
+}
+
+fn synthetic_module_use(score_loss: i16) -> ModuleUse {
+    ModuleUse {
+        node: NodeId::new(2),
+        created_depth: 0,
+        created_backend: ModuleBackend::Vm,
+        current_backend: ModuleBackend::Vm,
+        dispatched: true,
+        score_loss,
+        queue_effect: false,
+        memory_effect: None,
+        output_effect: false,
+        routing_effect: false,
+        payload_changed: false,
+        ancestral_loss: None,
+        current_ending_energy_sum: 0.0,
+        ancestral_ending_energy_sum: None,
+        destination_kind: DestinationKind::Vm,
+        specialization: Specialization::default(),
+    }
+}
+
+#[test]
+fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
+    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, GraphSource};
+    let starts = starting_forms();
+    let scaffold = |name: &str| {
+        let start = starts.iter().find(|start| start.name == name).unwrap();
+        start
+            .genome
+            .nodes
+            .iter()
+            .find(|node| node.node_id == start.scaffold)
+            .unwrap()
+            .backend_def
+            .clone()
+    };
+    // The canonical blank Graph start is pure with no wired effect surface;
+    // the copied and prepared Graph forms carry a wired action slot.
+    assert_eq!(
+        DestinationKind::of(&scaffold("graph_blank")),
+        DestinationKind::GraphPureNoEffect
+    );
+    assert_eq!(
+        DestinationKind::of(&scaffold("graph_copy")),
+        DestinationKind::GraphPureWithEffect
+    );
+    assert_eq!(
+        DestinationKind::of(&scaffold("graph_prepared")),
+        DestinationKind::GraphPureWithEffect
+    );
+    for name in ["vm_blank", "vm_copy", "vm_prepared"] {
+        assert_eq!(DestinationKind::of(&scaffold(name)), DestinationKind::Vm);
+    }
+    // Statefulness: a stateful kind, a self reference, a forward reference,
+    // a previous-tick memory read, or plasticity.
+    let BackendDef::Graph(pure) = scaffold("graph_prepared") else {
+        unreachable!()
+    };
+    let edge = |source| GraphEdge {
+        source,
+        weight: 1.0,
+    };
+    let mut stateful_kind = pure.clone();
+    stateful_kind.compute_nodes[1].kind = ComputeNodeKind::Momentum(0.5);
+    assert_eq!(
+        DestinationKind::of(&BackendDef::Graph(stateful_kind)),
+        DestinationKind::GraphStateful
+    );
+    let mut self_reference = pure.clone();
+    self_reference.compute_nodes[0]
+        .inputs
+        .push(edge(GraphSource::ComputeNode(0)));
+    assert_eq!(
+        DestinationKind::of(&BackendDef::Graph(self_reference)),
+        DestinationKind::GraphStateful
+    );
+    let mut forward = pure.clone();
+    forward.compute_nodes[0]
+        .inputs
+        .push(edge(GraphSource::ComputeNode(1)));
+    assert_eq!(
+        DestinationKind::of(&BackendDef::Graph(forward)),
+        DestinationKind::GraphStateful
+    );
+    let mut backward = pure.clone();
+    backward.compute_nodes.push(ComputeNode {
+        kind: ComputeNodeKind::Relu,
+        inputs: vec![edge(GraphSource::ComputeNode(0))],
+        plasticity: None,
+    });
+    assert_eq!(
+        DestinationKind::of(&BackendDef::Graph(backward)),
+        DestinationKind::GraphPureWithEffect
+    );
+    let mut previous = pure.clone();
+    previous
+        .execute_gate
+        .inputs
+        .push(edge(GraphSource::SharedMemory {
+            slot: 0,
+            previous: true,
+        }));
+    assert_eq!(
+        DestinationKind::of(&BackendDef::Graph(previous)),
+        DestinationKind::GraphStateful
+    );
+    let mut current_memory = pure.clone();
+    current_memory
+        .execute_gate
+        .inputs
+        .push(edge(GraphSource::SharedMemory {
+            slot: 0,
+            previous: false,
+        }));
+    assert_eq!(
+        DestinationKind::of(&BackendDef::Graph(current_memory)),
+        DestinationKind::GraphPureWithEffect
+    );
+    let mut plastic = pure;
+    plastic.compute_nodes[0].plasticity = Some(crate::creature::genome::PlasticityConfig {
+        rule: crate::creature::genome::HebbianRule::Classic,
+        learning_rate: 0.1,
+        weight_clamp: 1.0,
+        lamarckian: false,
+        modulation: None,
+    });
+    assert_eq!(
+        DestinationKind::of(&BackendDef::Graph(plastic)),
+        DestinationKind::GraphStateful
+    );
+}
+
+#[test]
+fn recruitment_paths_destination_kind_counts_total_every_module() {
+    let mut counts = DestinationKindCounts::default();
+    for kind in [
+        DestinationKind::Vm,
+        DestinationKind::GraphStateful,
+        DestinationKind::GraphStateful,
+        DestinationKind::GraphPureNoEffect,
+        DestinationKind::GraphPureWithEffect,
+    ] {
+        counts.record(kind);
+    }
+    let mut pooled = counts;
+    pooled.merge(counts);
+    assert_eq!((counts.total(), pooled.total()), (5, 10));
+    assert_eq!(pooled.graph_stateful, 4);
+}
+
+/// A verbatim copy of the correct incumbent, routed in front of it, is
+/// useful by bypass on both backends but reads an ancestral loss of zero:
+/// copied computation alone never scores as specialization.
+#[test]
+fn recruitment_paths_verbatim_copy_reads_zero_ancestral_loss_on_each_backend() {
+    use crate::mutation::topology::TopologyOperator;
+    use crate::neighborhood::recruitment::{BirthObservation, RecruitmentTracker};
+    for backend in [ModuleBackend::Graph, ModuleBackend::Vm] {
+        let base = fixtures::base(backend, true);
+        let baseline = evaluate(&base);
+        assert_eq!(baseline.correct(Task::A), 8);
+        let mut copied = base.clone();
+        let copy = fixtures::topology(&mut copied, TopologyOperator::CopyNode, 7);
+        let birth = copied.nodes[2].backend_def.clone();
+        assert_eq!(birth, base.nodes[1].backend_def);
+        let mut activated = copied.clone();
+        activated.entry_node_id = NodeId::new(2);
+        let reading = payload_reading("verbatim", &activated, &birth, &baseline, Task::A);
+        assert!(reading.specialization.task_live, "{backend:?}");
+        assert!(!reading.payload_changed, "{backend:?}");
+        assert_eq!(reading.score, 8, "{backend:?}");
+        assert!(reading.bypass_loss >= 1, "{backend:?}: {reading:?}");
+        assert!(reading.specialization.bypass_loss);
+        assert_eq!(reading.ancestral_loss, 0, "{backend:?}");
+        assert!(!reading.specialization.ancestral_loss);
+        assert!(!reading.specialization.holds());
+        // The same payload read through the tracker path is the same zero,
+        // with the current energy standing in for the unevaluated replacement.
+        let mut tracker = RecruitmentTracker::new(1);
+        tracker.seed_founder(0, &base.nodes);
+        tracker.record_birth(BirthObservation {
+            lineage: 0,
+            depth: 1,
+            after: &copied.nodes,
+            summary: &copy,
+        });
+        tracker.record_birth(BirthObservation {
+            lineage: 0,
+            depth: 2,
+            after: &activated.nodes,
+            summary: &crate::mutation::MutationSummary::zero(),
+        });
+        let uses = super::experiment::uses(
+            &activated,
+            &evaluate(&activated),
+            Task::A,
+            &baseline,
+            &tracker,
+            &task_config(),
+        );
+        assert_eq!(uses.len(), 1);
+        assert!(uses[0].dispatched);
+        assert!(!uses[0].payload_changed);
+        assert_eq!(uses[0].ancestral_loss, Some(0));
+        assert_eq!(
+            uses[0].ancestral_ending_energy_sum,
+            Some(uses[0].current_ending_energy_sum)
+        );
+        assert!(!uses[0].specialization.holds());
+    }
+}
+
+/// The qualified copy paths on each backend end in a step whose payload
+/// diverged from birth and loses at least one scene when restored, with the
+/// generation-0 correct scenes preserved: the ancestral test scores real
+/// specialization.
+#[test]
+fn recruitment_paths_qualified_copy_paths_specialize_by_the_ancestral_reading() {
+    let mut seen = Vec::new();
+    for path in paths().iter().filter(|path| path.qualified()) {
+        let readings = path.payload_readings();
+        assert_eq!(readings.len(), path.steps.len());
+        for (reading, step) in readings.iter().zip(&path.steps) {
+            assert_eq!(reading.step, step.stage.name);
+            assert_eq!(reading.score, step.stage.task.correct(path.task));
+            assert_eq!(reading.specialization.bypass_loss, reading.bypass_loss >= 1);
+            assert_eq!(
+                reading.specialization.ancestral_loss,
+                reading.ancestral_loss >= 1
+            );
+            if !reading.payload_changed {
+                assert_eq!(reading.ancestral_loss, 0, "{} {}", path.form, reading.step);
+            }
+        }
+        let last = readings.last().unwrap();
+        if last.specialization.holds() {
+            seen.push((path.backend, path.form.clone()));
+        }
+    }
+    assert!(
+        seen.iter()
+            .any(|(backend, _)| *backend == ModuleBackend::Graph),
+        "{seen:?}"
+    );
+    assert!(
+        seen.iter()
+            .any(|(backend, _)| *backend == ModuleBackend::Vm),
+        "{seen:?}"
+    );
+    for form in ["graph_copy", "vm_copy"] {
+        let path = paths().iter().find(|path| path.form == form).unwrap();
+        let last = path.payload_readings().pop().unwrap();
+        assert!(last.payload_changed, "{form}");
+        assert!(last.ancestral_loss >= 1, "{form}: {last:?}");
+        assert!(last.specialization.incumbents_preserved, "{form}");
+        assert!(last.specialization.holds(), "{form}: {last:?}");
+    }
+}
+
+#[test]
+fn recruitment_paths_task_reading_route_variation_separates_position_from_destination() {
+    let scene = |routing: Vec<(NodeId, usize, NodeId)>| Scene {
+        food: [false; 3],
+        correct_a: true,
+        correct_b: false,
+        survived: true,
+        energy: Some(1.0),
+        maintenance: 0.0,
+        carrying: 0.0,
+        work: Work::default(),
+        actions: vec![],
+        position: None,
+        dispatched: routing.iter().map(|route| route.0).collect(),
+        routing,
+        output_slots: vec![],
+        shared_memory: None,
+    };
+    let router = NodeId::new(0);
+    let same_destination = TaskReading {
+        scenes: vec![
+            scene(vec![(router, 0, NodeId::new(1))]),
+            scene(vec![(router, 1, NodeId::new(1))]),
+        ],
+    };
+    assert!(same_destination.route_position_varies());
+    assert!(!same_destination.route_destination_varies());
+    let different = TaskReading {
+        scenes: vec![
+            scene(vec![(router, 0, NodeId::new(1))]),
+            scene(vec![(router, 0, NodeId::new(2))]),
+        ],
+    };
+    assert!(!different.route_position_varies());
+    assert!(different.route_destination_varies());
+    let fixed = TaskReading {
+        scenes: vec![
+            scene(vec![(router, 0, NodeId::new(1))]),
+            scene(vec![]),
+            scene(vec![(router, 0, NodeId::new(1))]),
+        ],
+    };
+    assert!(!fixed.route_position_varies());
+    assert!(!fixed.route_destination_varies());
+    assert_eq!(fixed.scenes_dispatched(), BTreeMap::from([(router, 2)]));
+}
+
+/// Every transition reading of the reduced legacy run is consistent with
+/// its lineage's ladder, discoveries and horizons, and the +64 horizon is
+/// censored on this panel.
+#[test]
+fn recruitment_paths_reduced_run_transitions_are_consistent() {
+    use crate::neighborhood::recruitment::{payload_hash, CohortFact};
+    let report = observe(Sizes::TEST);
+    assert_eq!(report.supply, Supply::Legacy);
+    assert_eq!(report.supply_rule, Supply::Legacy.rule());
+    for arm in &report.arms {
+        let transitions = &arm.summary.transitions;
+        assert_eq!(transitions.lineages, arm.lineages.len() as u32);
+        assert_eq!(
+            transitions.classes.values().sum::<u32>(),
+            transitions.lineages
+        );
+        assert!(!transitions.retained_at.contains_key(&PRIMARY_HORIZON));
+        assert_eq!(
+            transitions.eligibility,
+            arm.lineages
+                .iter()
+                .filter(|lineage| lineage.ladder.eligibility)
+                .count() as u32
+        );
+        for lineage in &arm.lineages {
+            let ladder = lineage.ladder;
+            assert_eq!(lineage.classification, LineageClass::of(ladder));
+            assert_eq!(lineage.task, arm.task);
+            assert_eq!(ladder.specialized, lineage.specialized_discovery.is_some());
+            assert_eq!(
+                lineage.discovery_checkpoint.as_ref().map(|c| c.generation),
+                lineage.specialized_discovery.as_ref().map(|d| d.generation)
+            );
+            assert!(ladder.eligibility || !ladder.local_edit);
+            assert!(ladder.proposal_specialized || !ladder.specialized);
+            assert_eq!(ladder.at_primary_horizon, None);
+            for horizon in &lineage.horizons {
+                let discovery = lineage.specialized_discovery.as_ref().unwrap();
+                assert!(HORIZONS.contains(&horizon.offset));
+                assert_eq!(horizon.at_generation, discovery.generation + horizon.offset);
+                assert_eq!(
+                    horizon.outcome,
+                    HorizonOutcome::of(horizon.live, horizon.module.as_ref())
+                );
+            }
+            for proposal in &lineage.proposals {
+                assert!(!proposal.specialized || proposal.discovery);
+                for module in &proposal.useful_modules {
+                    assert!(module.dispatched && module.specialization.bypass_loss);
+                    assert!(module.ancestral_loss.is_some());
+                    if !module.payload_changed {
+                        assert_eq!(module.ancestral_loss, Some(0));
+                    }
+                }
+            }
+            // Generation 0: every starting payload is its own birth payload,
+            // so authored preparation can never read as an ancestral loss.
+            let first = &lineage.checkpoints[0];
+            assert!(first.task_use.iter().all(|module| !module.payload_changed));
+            for module in &first.modules {
+                let node = first
+                    .genome
+                    .nodes
+                    .iter()
+                    .find(|node| node.node_id == module.module.node);
+                if let Some(node) = node.filter(|_| module.module.is_present()) {
+                    assert_eq!(
+                        module.module.birth_payload_hash,
+                        payload_hash(&node.backend_def),
+                        "{} {:?}",
+                        arm.start,
+                        module.module.node
+                    );
+                }
+            }
+            for checkpoint in lineage
+                .checkpoints
+                .iter()
+                .chain(&lineage.discovery_checkpoint)
+            {
+                assert_eq!(
+                    checkpoint.destination_kinds.total(),
+                    checkpoint.task_use.len() as u64
+                );
+                assert_eq!(
+                    u64::from(checkpoint.eligible_site_fraction.denominator),
+                    checkpoint.cohort.lineage_rows[0].created
+                );
+                assert_eq!(
+                    checkpoint.route_position_varies,
+                    checkpoint.task.route_position_varies()
+                );
+                assert_eq!(
+                    checkpoint.route_destination_varies,
+                    checkpoint.task.route_destination_varies()
+                );
+                for module in &checkpoint.modules {
+                    assert_eq!(
+                        module.birth_payload.is_some(),
+                        module.module.first(CohortFact::Dispatch).is_some()
+                    );
+                    if let Some(payload) = &module.birth_payload {
+                        assert_eq!(payload_hash(payload), module.module.birth_payload_hash);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Two observations at the same sizes are byte-identical: the assay has no
+/// hidden state.
+#[test]
+fn recruitment_paths_legacy_panel_observation_is_deterministic() {
+    let first = serde_json::to_vec(&observe(Sizes::TEST)).unwrap();
+    let second = serde_json::to_vec(&observe(Sizes::TEST)).unwrap();
+    assert_eq!(first, second);
+}
+
+#[test]
+fn recruitment_paths_panels_enforce_their_size_caps() {
+    assert_eq!(Panel::legacy(Sizes::PRODUCTION).supply, Supply::Legacy);
+    assert_eq!(Panel::s0(Sizes::S0).supply, Supply::Production);
+    assert_eq!(Panel::s0(Sizes::S0_PILOT).version(), S0_VERSION);
+    assert_eq!(Panel::legacy(Sizes::TEST).version(), VERSION);
+    assert_eq!(Sizes::S0.proposals(), 1_769_472);
+    assert_eq!(Sizes::S0_PILOT.proposals(), 55_296);
+    assert!(!Sizes::S0.fits(Sizes::PRODUCTION));
+    assert!(Sizes::S0_PILOT.fits(Sizes::S0));
+    for sizes in [
+        Sizes {
+            lineages: 17,
+            ..Sizes::S0
+        },
+        Sizes {
+            discovery: 257,
+            ..Sizes::S0
+        },
+        Sizes {
+            followup: 0,
+            ..Sizes::S0
+        },
+        Sizes {
+            batches: 5,
+            ..Sizes::S0
+        },
+    ] {
+        assert!(std::panic::catch_unwind(move || Panel::s0(sizes)).is_err());
+    }
+    assert!(std::panic::catch_unwind(|| Panel::legacy(Sizes::S0)).is_err());
+    assert!(Supply::Production.mutation_config().per_unit_supply_enabled);
+    assert!(!Supply::Legacy.mutation_config().per_unit_supply_enabled);
+}
+
+/// The S0 panel path: the compact record replays to identical fingerprints
+/// from the initial genome, the chosen chain and the seeds; the chosen deltas
+/// rebuild the final checkpoint genome; a pilot-sized panel's lineage is
+/// byte-identical to the same lineage inside a larger panel.
+#[test]
+fn recruitment_paths_s0_compact_records_replay_and_prefix_the_panel() {
+    let tiny = Sizes {
+        batches: 1,
+        lineages: 1,
+        discovery: 2,
+        followup: 1,
+    };
+    let assay = Assay::new(Panel::s0(tiny));
+    assert_eq!(assay.arm_count(), ARMS);
+    assert_eq!(assay.arm(0).0.name, "graph_blank");
+    assert_eq!(assay.arm(0).1, Policy::Drift);
+    let wider = Assay::new(Panel::s0(Sizes {
+        lineages: 2,
+        batches: 2,
+        ..tiny
+    }));
+    for arm in [0, 13, ARMS - 1] {
+        let record = assay.compact_lineage(arm, 0, 0);
+        assert_eq!(record.arm, arm);
+        assert_eq!(record.proposals.len(), 6);
+        assert_eq!(
+            record
+                .proposals
+                .iter()
+                .filter(|p| p.delta.is_some())
+                .count(),
+            record.proposals.iter().filter(|p| p.chosen).count()
+        );
+        let check = assay.replay(&record);
+        assert_eq!(check.proposals, 6);
+        assert_eq!(check.matched, 6, "{check:?}");
+        assert_eq!(check.first_mismatch, None);
+        let start = assay.arm(arm).0;
+        let mut genome = start.genome.clone();
+        for proposal in record.proposals.iter().filter(|p| p.chosen) {
+            genome = proposal.delta.as_ref().unwrap().apply(&genome).unwrap();
+        }
+        assert_eq!(genome, record.checkpoints.last().unwrap().genome);
+        let inside = wider.compact_lineage(arm, 0, 0);
+        assert_eq!(
+            serde_json::to_vec(&record).unwrap(),
+            serde_json::to_vec(&inside).unwrap()
+        );
+        // A different lineage index draws different seeds.
+        let other = wider.compact_lineage(arm, 1, 1);
+        assert_ne!(other.proposals[0].seed, record.proposals[0].seed);
+        // A corrupted fingerprint is caught by the replay.
+        let mut corrupted = record.clone();
+        corrupted.proposals[3].mutation_fingerprint.clear();
+        let check = assay.replay(&corrupted);
+        assert_eq!((check.matched, check.first_mismatch), (5, Some((2, 1))));
+        let facts = LineageFacts::of_compact(&record);
+        let full = assay.lineage(arm, 0, 0);
+        assert_eq!(facts, LineageFacts::of(&full));
+        let (arm_summary, batches) = summaries(&[facts], 1);
+        assert_eq!(arm_summary.transitions.lineages, 1);
+        assert_eq!(batches.len(), 1);
     }
 }

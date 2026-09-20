@@ -5,11 +5,11 @@ mod fixtures;
 mod qualification;
 mod records;
 
-pub use experiment::observe;
+pub use experiment::{observe, summaries, summary, Assay, ReplayCheck};
 pub use fixtures::{constructed_paths, starting_forms, ConstructedPath, ConstructionStage, Start};
 pub use qualification::{
-    qualified_paths, search_seeds, CostVerdict, GrowthGap, PathStep, ProductionEvent,
-    QualifiedPath, SeedSearch, MAX_PATH_EVENTS, SEARCH_RANGE,
+    payload_reading, qualified_paths, search_seeds, CostVerdict, GrowthGap, PathStep,
+    ProductionEvent, QualifiedPath, SeedSearch, StepReading, MAX_PATH_EVENTS, SEARCH_RANGE,
 };
 pub use records::*;
 
@@ -114,9 +114,13 @@ fn evaluate_with_config(genome: &CreatureGenome, config: &SimulationConfig) -> T
                 tick.hops
                     .iter()
                     .filter_map(|hop| {
-                        hop.route
-                            .as_ref()
-                            .map(|route| (hop.node_id, route.selected_target_id))
+                        hop.route.as_ref().map(|route| {
+                            (
+                                hop.node_id,
+                                route.selected_target_idx,
+                                route.selected_target_id,
+                            )
+                        })
                     })
                     .collect()
             }),

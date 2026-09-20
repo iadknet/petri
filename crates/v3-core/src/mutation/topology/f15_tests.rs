@@ -494,7 +494,10 @@ fn one_production_addition_is_conditional_silent_and_can_diverge_on_both_backend
             assert_eq!(old.0.actions, new.0.actions);
             assert_eq!(old.0.priority_bid, new.0.priority_bid);
             assert_eq!(old.2, new.2);
-            assert_eq!(new.1.hops[0].1, Some(usize::from(input > 0.0)));
+            assert_eq!(
+                new.1.hops[0].1.map(|(position, _)| position),
+                Some(usize::from(input > 0.0))
+            );
             if !graph || input > 0.0 {
                 assert!(
                     new.0.cost_report.vm_cost + new.0.cost_report.graph_cost
@@ -560,7 +563,10 @@ fn dormant_alternative_cannot_win_even_when_other_routes_have_dynamic_bids() {
             assert_eq!(before.0.actions, after.0.actions);
             assert_eq!(before.2, after.2);
             assert_eq!(before.1.hops, after.1.hops);
-            assert_eq!(after.1.hops[0].1, Some(usize::from(input > 0.0)));
+            assert_eq!(
+                after.1.hops[0].1.map(|(position, _)| position),
+                Some(usize::from(input > 0.0))
+            );
         }
     }
 }

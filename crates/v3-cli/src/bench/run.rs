@@ -558,7 +558,7 @@ fn detect_host() -> Host {
     }
 }
 
-fn detect_git_revision() -> String {
+pub fn detect_git_revision() -> String {
     std::process::Command::new("git")
         .args(["rev-parse", "HEAD"])
         .output()

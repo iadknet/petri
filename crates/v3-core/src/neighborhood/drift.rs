@@ -307,7 +307,7 @@ mod tests {
                 MeshExecutionReading { backends: super::super::mesh_execution::MeshBackendCounts {
                     graph: super::super::mesh_execution::BackendNodeCounts {total: (total / 2) as u64, executed: (exec / 2) as u64, contributing: ((exec-knockout.min(exec))/2) as u64},
                     vm: super::super::mesh_execution::BackendNodeCounts {total: (total-total/2) as u64, executed: (exec-exec/2) as u64, contributing: ((exec-knockout.min(exec))-(exec-knockout.min(exec))/2) as u64},
-                }, total_node_count: total, reachable_node_count: reach, executed_node_count: exec, knockout_count: knockout.min(exec), route_varies_with_input: varies, hop_cap_hits: cap }
+                }, total_node_count: total, reachable_node_count: reach, executed_node_count: exec, knockout_count: knockout.min(exec), route_varies_with_input: varies, route_destination_varies: varies, hop_cap_hits: cap }
             }).collect();
             let mut pooled = MeshTotals::default();
             for &reading in &readings { pooled.record(reading); }

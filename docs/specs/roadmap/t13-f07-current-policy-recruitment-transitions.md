@@ -31,10 +31,9 @@ changes.
   arm (a later prospective amendment), no new benchmark service or campaign
   runner.
 - No positive recruitment floor: a trustworthy null closes the feature; an
-  invalid observation (false specialization, applied-ledger mismatch, RNG
-  consumption by observation, cap breach) cannot.
-- No change to T13.F06's committed summaries or readings; historical exact
-  records stay at their recorded source.
+  invalid observation (false specialization, ledger mismatch, RNG consumption
+  by observation, cap breach) cannot.
+- No change to T13.F06's committed summaries or readings.
 
 ## Inputs and Invariants
 
@@ -70,14 +69,12 @@ changes.
   structural copy weight 25%) and `3806dc91` (age-cost grace 100 ticks, cap
   200, max 10). Both move mutation draws and world trajectories before this
   feature touches anything; T11.F20 is open, so `with_legacy_supply` exists.
-- Options weighed for the long panel's entry point: (1) a fourth `make bench`
-  profile — rejected, it carries world-profile parameters the assay does not
-  use; (2) a probe patch and shell script as the per-unit-supply sweep used —
-  rejected, not replayable from the repository; (3) one `v3-cli` subcommand
-  over the extended `observe`, writing under the existing artifact root —
-  chosen. For the record density, per-proposal full genomes (F06) are
-  replaced by seeds, choices and deltas, which reconstruct every proposal
-  deterministically; this is the report's compact-record rule.
+- Entry point options: a fourth `make bench` profile (rejected: world-profile
+  parameters the assay does not use), a probe patch plus shell script as the
+  per-unit-supply sweep used (rejected: not replayable from the repository),
+  or one `v3-cli` subcommand over the extended `observe` writing under the
+  existing artifact root (chosen). Record density: seeds, choices and deltas
+  replace F06's per-proposal genomes, the report's compact-record rule.
 
 **Panels (fixed before measurement).**
 
@@ -91,17 +88,17 @@ Both panels use the nine F06 starting forms × Drift / Selection /
 CostSelection (27 arms), the `proposal_seed` formula (no collisions up to
 lineage 15, generation 511), reachability and `ParentExecuted` recomputed
 before each sibling pair, and the same battery/task config. The pilot's
-lineages are a prefix of the panel and must reproduce byte-identically inside
-it. Seeds shared across panels and arms are dependent, not paired evidence.
-`--threads` may parallelize arms; determinism is per lineage and the thread
-count is recorded.
+lineages are a prefix of the panel and reproduce byte-identically inside it.
+Seeds shared across panels and arms are dependent, not paired evidence.
+`--threads` parallelizes arms; determinism is per lineage; thread count is
+recorded.
 
 **Per-module facts added to the tracker and the assay.**
 
 | Fact | Definition |
 | --- | --- |
-| Ancestry | `copy_source: Option<(NodeId, created_depth)>` (first pre-birth node whose `backend_def` matches, `ambiguous` flag when several match), `birth_payload` (the `backend_def` at creation; stored whole only for modules that reach Dispatch, as a hash otherwise), `later_copies`, `deleted_depth`. |
-| Target-local exposure | Per module, counts (not first depth) of events that selected it: applied / discarded, split gate (route entries naming it or its own `targets`) / payload (`backend_def`), plus the depth of the first of each; per lineage, `eligible_site_fraction` = modules with ≥ 1 applicable site ÷ cohort modules. |
+| Ancestry | `copy_source: Option<(NodeId, created_depth)>` (first pre-birth node whose `backend_def` matches, `ambiguous` flag when several match), `birth_payload` (the `backend_def` at creation; for a constructed start, its generation-0 payload — authored history is construction, not mutation; stored whole only for modules that reach Dispatch, as a hash otherwise), `later_copies`, `deleted_depth`. |
+| Target-local exposure | Per module, counts (not first depth) of events that selected it: applied / discarded, by surface of the selecting operator — split (route target/gate/entry/splice; a new route entry naming the module from the birth diff is one applied split), payload (Vm/Graph/SwapNodeBackend), other (InputRef/add/remove/copy) — plus the depth of the first of each; per lineage, `eligible_site_fraction` = cohort modules that reached `ApplicableSelection` ÷ cohort modules created (selection is the only observed applicability, so it under-reads; stated in the readings). |
 | Expression | `scenes_dispatched` 0–8 per scene reading; contextual when 1–7, unconditional when 8. |
 | Route variation | `route_destination_varies` beside the existing position reading, from `selected_target_id`; both in the assay checkpoints and in `mesh_execution` for the founder and evolved genomes. |
 | Ancestral-payload counterfactual | `ancestral_payload_replacement(genome, module)`: the node keeps id, targets and position; only `backend_def` becomes `birth_payload`. `ancestral_loss` = score(current) − score(replaced) on the arm's task; `ending_energy_sum` of both reported beside it. |
@@ -116,15 +113,15 @@ counts reported beside it).**
 | Local edit | ≥ 1 applied event targeted a reachable cohort module. |
 | Expression | A cohort module dispatched in ≥ 1 scene. |
 | Specialized | Task-live; score ≥ starting score + 1; bypass loss ≥ 1; `ancestral_loss` ≥ 1; every scene correct at generation 0 is still correct. Each component is stored, so a reader sees which failed. |
-| Retained | Specialized recruit present and still specialized at retained discovery + 64 (primary); +16 and +256 reported. |
+| Retained | Specialized recruit present and still specialized at the first retained specialized discovery + 64 (primary); +16 and +256 reported; the legacy panel's F02 retention at bypass discovery + 16 is a separate, unchanged reading. |
 | Null classes | Exclusive, first failing stage: `no_eligibility`, `no_edit`, `no_expression`, `no_benefit` (with sub-count `bypass_only`: bypass loss ≥ 1 but `ancestral_loss` 0), `loss` (sub-kinds `not_selected`, `deleted`, `despecialized`, `task_dead`, `no_longer_useful`). Legacy panel: +64 unobservable → `censored_at_64`, its +16 reading unchanged. |
 
 **Compact raw record (S0 and pilot).** Per start: the initial genome once.
 Per lineage: per proposal `generation, sibling, seed, chosen, live, score,
 discovery, specialized, applied event list (operator, target, outcome)`;
 per chosen child additionally the `GenomeDelta`; full genome, tracker module
-table, battery signature and cohort at checkpoints 0 / 256 / 512 and at
-retained discovery; no other full genome. `mutation_fingerprint` per proposal
+table, battery signature and cohort at checkpoints 0 / 256 / 512 and at the
+first retained specialized discovery (tracker clone); no other full genome. `mutation_fingerprint` per proposal
 stays. A proposal is reconstructible from the initial genome, the chosen
 chain and its seed; the replay check re-derives fingerprints from that alone.
 
@@ -137,61 +134,62 @@ equal; no production file changes, so the pinned short-run identity hash
 `14387572686062595774` (`baseline_worlds.rs`) stays; the S0 panel is
 versioned `recruitment-transitions-s0-v1` with `supply_rule` and
 `source_revision` strings; a verbatim copy always reads `ancestral_loss` 0;
-the S0 command stops between lineages when `--wall-cap-secs` (7,200) or the
-byte cap (2 GiB on disk) is reached and writes what it has as
-`incomplete: true`, never dropping completed records.
+the S0 command stops between lineages when `--wall-cap-secs` (7,200) or
+`--byte-cap` (2 GiB on disk) is reached, writes what it has as
+`incomplete: true` and exits 3, never dropping completed records.
 
 ## Implementation Tasks
 
-- [ ] Tracker: ancestry, exposure counts, `scenes_dispatched`, birth payload;
+- [x] Tracker: ancestry, exposure counts, `scenes_dispatched`, birth payload;
       `ancestral_payload_replacement` beside `static_successor_bypass`;
       `route_destination_varies` in `mesh_execution` and the assay.
-- [ ] Assay: parameterize `observe` by supply and sizes (lift the caps to
+- [x] Assay: parameterize `observe` by supply and sizes (lift the caps to
       16 / 256 / 256), multi-horizon retention (+16 / +64 / +256),
       specialization components, ladder classification, destination kind,
       per-arm and per-batch classification summaries; legacy panel
       unchanged in estimates.
-- [ ] Fixture readings: per qualified path and step, `ancestral_loss` and the
+- [x] Fixture readings: per qualified path and step, `ancestral_loss` and the
       specialization components; a verbatim-copy negative control per backend
       reading 0; at least one Graph and one VM constructed path whose useful
       step diverges its payload reading ≥ 1 with incumbent scenes preserved
       (from F05's qualified paths where one exists, else a fixture-only path).
-- [ ] CLI: `v3-cli recruitment --feature <id> [--pilot] [--threads N]
-      [--wall-cap-secs 7200]`, raw to `.bench-artifacts/<feature>/recruitment-s0.json`
+- [x] CLI: `v3-cli recruitment --feature <id> [--pilot] [--threads N]
+      [--wall-cap-secs 7200] [--byte-cap] [--replay-check]`, raw to `.bench-artifacts/<feature>/recruitment-s0.json`
       (`-pilot.json`), compact summary to
       `docs/progress/features/<feature>-s0.json` (`-s0-pilot.json`), a
       replay-check flag that reconstructs every pilot proposal from the record
       and compares fingerprints; one row in `docs/benchmark-artifacts.md`.
-- [ ] Goal summary: the legacy panel's ladder/classification block and the
+- [x] Goal summary: the legacy panel's ladder/classification block and the
       founder/evolved `route_destination_varies` reach the committed summary
       through `bench/artifacts.rs`.
 - [ ] Readings file `docs/progress/readings/t13-f07-current-policy-recruitment-transitions.md`:
-      pilot projection, S0 tables, legacy-panel comparison with F06's recorded
-      numbers labelled "current-source remeasurement".
+      pilot projection, S0 tables, the per-path/per-step table from
+      `QualifiedPath::payload_readings()`, legacy-panel comparison with F06's
+      recorded numbers labelled "current-source remeasurement".
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first (config shape is
-      unchanged; run because the assay's config defaults moved at `3806dc91`).
-- [ ] Focused tests: `cargo test -p v3-core recruitment` -> ancestry,
+- [x] `cargo test -p v3-core --test viability` first: 28 passed;
+      `baseline_worlds` 19 passed, identity hash unchanged.
+- [x] Focused tests: `cargo test -p v3-core recruitment` -> ancestry,
       exposure, `scenes_dispatched`, ancestral replacement (verbatim copy 0,
       diverged path ≥ 1), ladder classification of authored lineages, the
       destination kind on canonical and prepared forms, RNG non-consumption
       with readings on/off, destination-versus-position route variation, and
       proptest invariants (classification exclusive and total; ancestral
       replacement of an unchanged payload is the identity).
-- [ ] `cargo test -p v3-cli` -> the subcommand's outputs, pilot prefix
-      identity, cap stop marks `incomplete`, replay check.
+- [x] `cargo test -p v3-cli` -> subcommand outputs, pilot prefix identity,
+      cap stop marks `incomplete`, replay check, two-thread parity.
 - [ ] Pilot: `scripts/bench-wait cargo run --release -p v3-cli -- recruitment
-      --feature t13-f07-current-policy-recruitment-transitions --pilot` ->
-      wall seconds and bytes per arm, replay check 100%, projection to 64
+      --feature t13-f07-current-policy-recruitment-transitions --pilot
+      --replay-check` -> wall seconds and bytes per arm, replay check 100%, projection to 64
       lineages recorded in the readings file; launch only if mean-based
       projection ≤ 1.6 h and ≤ 1.6 GiB (max-based bound reported beside it).
 - [ ] S0 panel: same command without `--pilot` -> summary at
       `docs/progress/features/t13-f07-current-policy-recruitment-transitions-s0.json`,
       raw hash/bytes/wall/thread count in the readings file, `incomplete`
       false.
-- [ ] `make check` -> passes.
+- [x] `make check` -> passes.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Benchmark summaries stored at
@@ -269,3 +267,16 @@ panel over its cap).
 - Decision: S1 base-world qualification and the matched long legacy arm are
   outside this feature; the feasibility pilot is inside it and runs before the
   S0 panel. A projection over either cap stops for a user decision.
+- Decision: exposure surface = the selecting operator (`EditSurface::of`:
+  split for route-target/gate/entry/splice, payload for Vm/Graph/SwapNodeBackend,
+  other for InputRef/add/remove/copy); a new route entry naming the module is
+  one applied split exposure per birth. `eligible_site_fraction` = cohort
+  modules that reached `ApplicableSelection` ÷ cohort modules created.
+- Decision: authored history is construction, not mutation: birth payloads
+  are re-based on the start genome; preparation is never an ancestral loss.
+- Decision: a specialized proposal never retained is `loss/not_selected`;
+  `bypass_only` reads the retained chain; `ancestral_loss` is evaluated only
+  past the bypass gate (`Some(0)` by identity when unchanged).
+- Decision: the S0 raw is single-line JSON streamed per lineage; `--byte-cap`
+  sits beside `--wall-cap-secs`; an incomplete run exits 3 after writing both
+  artifacts. `MeshObservation` (observation-only) carries the destination.

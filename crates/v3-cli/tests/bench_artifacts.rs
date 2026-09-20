@@ -1038,7 +1038,33 @@ fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloa
             projected["lineages"][0]["retention"],
             serde_json::to_value(&arm.lineages[0].retention).unwrap()
         );
+        // T13.F07: the ladder and classification block rides the summary,
+        // and each lineage row keeps its class, ladder and horizon outcomes.
+        assert_eq!(
+            projected["summary"]["transitions"],
+            serde_json::to_value(&arm.summary.transitions).unwrap()
+        );
+        assert_eq!(
+            projected["summary"]["transitions"]["lineages"],
+            arm.lineages.len()
+        );
+        assert_eq!(
+            projected["lineages"][0]["classification"],
+            serde_json::to_value(arm.lineages[0].classification).unwrap()
+        );
+        assert_eq!(
+            projected["lineages"][0]["ladder"],
+            serde_json::to_value(arm.lineages[0].ladder).unwrap()
+        );
+        assert_eq!(
+            projected["lineages"][0]["horizons"]
+                .as_array()
+                .unwrap()
+                .len(),
+            arm.lineages[0].horizons.len()
+        );
     }
+    assert_eq!(compact["supply"], "legacy");
     assert_eq!(total as u64, experiment.total_proposals);
     let compact_bytes = serde_json::to_vec(compact).unwrap();
     let text = String::from_utf8(compact_bytes).unwrap();

@@ -1,10 +1,11 @@
 use super::super::recruitment::{Module, ModuleBackend, Opportunities, RecruitmentCheckpoint};
 use super::super::Signature;
 use crate::contracts::{NodeId, Position, WorldAction};
-use crate::creature::genome::{CreatureGenome, NodeGenome};
+use crate::creature::genome::cgp::{GraphSource, NodeClass};
+use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::{MutationDomain, MutationEventRecord, MutationOperator};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Task {
@@ -46,6 +47,22 @@ impl Sizes {
         discovery: 32,
         followup: 16,
     };
+    /// The T13.F07 S0 panel: 1,769,472 proposals under production supply.
+    pub const S0: Self = Self {
+        batches: 4,
+        lineages: 16,
+        discovery: 256,
+        followup: 256,
+    };
+    /// The S0 feasibility pilot: batch 0, lineages 0–1, every arm; its
+    /// lineages are a prefix of [`Sizes::S0`] and reproduce byte-identically
+    /// inside it.
+    pub const S0_PILOT: Self = Self {
+        batches: 1,
+        lineages: 2,
+        discovery: 256,
+        followup: 256,
+    };
     pub const TEST: Self = Self {
         batches: 1,
         lineages: 1,
@@ -58,6 +75,196 @@ impl Sizes {
             * u64::from(self.discovery + self.followup)
             * 2
             * ARMS as u64
+    }
+    /// Whether every dimension fits within `cap`.
+    #[must_use]
+    pub fn fits(self, cap: Self) -> bool {
+        self.batches > 0
+            && self.lineages > 0
+            && self.discovery > 0
+            && self.followup > 0
+            && self.batches <= cap.batches
+            && self.lineages <= cap.lineages
+            && self.discovery <= cap.discovery
+            && self.followup <= cap.followup
+    }
+}
+
+/// Which mutation supply rule the proposals draw under.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Supply {
+    /// `MutationConfig::default().with_legacy_supply()`: the fixed per-birth
+    /// count the recorded T13.F02/F06 baselines were taken on.
+    Legacy,
+    /// `MutationConfig::default()`: the per-unit draw on the child's own
+    /// `genome_size()` production runs.
+    Production,
+}
+
+impl Supply {
+    #[must_use]
+    pub fn mutation_config(self) -> crate::config::MutationConfig {
+        let config = crate::config::MutationConfig::default();
+        match self {
+            Self::Legacy => config.with_legacy_supply(),
+            Self::Production => config,
+        }
+    }
+
+    /// The `supply_rule` string a record carries.
+    #[must_use]
+    pub const fn rule(self) -> &'static str {
+        match self {
+            Self::Legacy => "legacy per-birth supply (per_unit_supply_enabled forced false)",
+            Self::Production => "production per-unit supply on the child's own genome_size()",
+        }
+    }
+}
+
+/// One observation panel: its supply rule and sizes, checked against the
+/// panel's fixed cap at construction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Panel {
+    pub supply: Supply,
+    pub sizes: Sizes,
+}
+
+impl Panel {
+    /// The fixed legacy panel (T13.F06's 82,944 proposals at production
+    /// sizes); the sizes may not exceed [`Sizes::PRODUCTION`].
+    ///
+    /// # Panics
+    /// When `sizes` has a zero dimension or exceeds the legacy cap.
+    #[must_use]
+    pub fn legacy(sizes: Sizes) -> Self {
+        assert!(
+            sizes.fits(Sizes::PRODUCTION),
+            "legacy panel sizes exceed {:?}: {sizes:?}",
+            Sizes::PRODUCTION
+        );
+        Self {
+            supply: Supply::Legacy,
+            sizes,
+        }
+    }
+
+    /// The S0 panel under production supply; the sizes may not exceed
+    /// [`Sizes::S0`].
+    ///
+    /// # Panics
+    /// When `sizes` has a zero dimension or exceeds the S0 cap.
+    #[must_use]
+    pub fn s0(sizes: Sizes) -> Self {
+        assert!(
+            sizes.fits(Sizes::S0),
+            "S0 panel sizes exceed {:?}: {sizes:?}",
+            Sizes::S0
+        );
+        Self {
+            supply: Supply::Production,
+            sizes,
+        }
+    }
+
+    /// The record version this panel writes.
+    #[must_use]
+    pub const fn version(self) -> &'static str {
+        match self.supply {
+            Supply::Legacy => super::VERSION,
+            Supply::Production => S0_VERSION,
+        }
+    }
+}
+
+/// Version of the S0 panel's compact record.
+pub const S0_VERSION: &str = "recruitment-transitions-s0-v1";
+
+/// Which retention horizons (generations after the specialized retained
+/// discovery) the assay reads; the primary is 64.
+pub const HORIZONS: [u32; 3] = [16, 64, 256];
+pub const PRIMARY_HORIZON: u32 = 64;
+
+/// What one module's payload reads as under T13.F08's lens, read only: VM,
+/// or a graph that is stateful (a stateful compute kind, a self/forward
+/// compute reference, a previous-tick memory read, or plasticity), pure
+/// without any wired effect surface, or pure with one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DestinationKind {
+    Vm,
+    GraphStateful,
+    GraphPureNoEffect,
+    GraphPureWithEffect,
+}
+
+impl DestinationKind {
+    #[must_use]
+    pub fn of(payload: &BackendDef) -> Self {
+        let BackendDef::Graph(graph) = payload else {
+            return Self::Vm;
+        };
+        let previous_memory = |source: &GraphSource| {
+            matches!(source, GraphSource::SharedMemory { previous: true, .. })
+        };
+        let stateful = graph.compute_nodes.iter().enumerate().any(|(index, node)| {
+            node.kind.class() == NodeClass::Stateful
+                || node.plasticity.is_some()
+                || node.inputs.iter().any(|edge| match edge.source {
+                    GraphSource::ComputeNode(source) => usize::from(source) >= index,
+                    ref source => previous_memory(source),
+                })
+        }) || graph
+            .output_sinks
+            .iter()
+            .flat_map(|sink| &sink.inputs)
+            .chain(graph.action_bank.iter().flat_map(|slot| slot.edges()))
+            .chain(&graph.execute_gate.inputs)
+            .any(|edge| previous_memory(&edge.source));
+        if stateful {
+            return Self::GraphStateful;
+        }
+        let effect = graph.action_bank.iter().any(|slot| slot.is_wired())
+            || !graph.execute_gate.inputs.is_empty()
+            || graph
+                .output_sinks
+                .iter()
+                .any(|sink| !sink.inputs.is_empty());
+        if effect {
+            Self::GraphPureWithEffect
+        } else {
+            Self::GraphPureNoEffect
+        }
+    }
+}
+
+/// Cohort modules by destination kind at one checkpoint.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DestinationKindCounts {
+    pub vm: u64,
+    pub graph_stateful: u64,
+    pub graph_pure_no_effect: u64,
+    pub graph_pure_with_effect: u64,
+}
+
+impl DestinationKindCounts {
+    pub fn record(&mut self, kind: DestinationKind) {
+        match kind {
+            DestinationKind::Vm => self.vm += 1,
+            DestinationKind::GraphStateful => self.graph_stateful += 1,
+            DestinationKind::GraphPureNoEffect => self.graph_pure_no_effect += 1,
+            DestinationKind::GraphPureWithEffect => self.graph_pure_with_effect += 1,
+        }
+    }
+    pub fn merge(&mut self, other: Self) {
+        self.vm += other.vm;
+        self.graph_stateful += other.graph_stateful;
+        self.graph_pure_no_effect += other.graph_pure_no_effect;
+        self.graph_pure_with_effect += other.graph_pure_with_effect;
+    }
+    #[must_use]
+    pub const fn total(self) -> u64 {
+        self.vm + self.graph_stateful + self.graph_pure_no_effect + self.graph_pure_with_effect
     }
 }
 
@@ -83,7 +290,9 @@ pub struct Scene {
     pub actions: Vec<WorldAction>,
     pub position: Option<Position>,
     pub dispatched: Vec<NodeId>,
-    pub routing: Vec<(NodeId, NodeId)>,
+    /// Applied routes: the routing node, the winning target position and the
+    /// node it named.
+    pub routing: Vec<(NodeId, usize, NodeId)>,
     pub output_slots: Vec<(NodeId, [f32; 24])>,
     /// Observed zero is distinct from state unavailable after subject removal.
     pub shared_memory: Option<[f32; 16]>,
@@ -125,6 +334,55 @@ impl TaskReading {
             .iter()
             .flat_map(|scene| scene.dispatched.iter().copied())
             .collect()
+    }
+    /// How many scenes dispatched each node (0..=8).
+    pub fn scenes_dispatched(&self) -> BTreeMap<NodeId, u8> {
+        let mut counts = BTreeMap::new();
+        for scene in &self.scenes {
+            let once: BTreeSet<_> = scene.dispatched.iter().copied().collect();
+            for node in once {
+                *counts.entry(node).or_insert(0u8) += 1;
+            }
+        }
+        counts
+    }
+    /// Whether some node applied two different target positions across the
+    /// eight scenes (the T11.F14 reading on the task scenes).
+    pub fn route_position_varies(&self) -> bool {
+        self.route_varies(|&(_, position, _)| position)
+    }
+    /// Whether some node applied routes to two different nodes across the
+    /// eight scenes (T13.F07).
+    pub fn route_destination_varies(&self) -> bool {
+        self.route_varies(|&(_, _, destination)| destination)
+    }
+    fn route_varies<T: Ord>(&self, key: impl Fn(&(NodeId, usize, NodeId)) -> T) -> bool {
+        let snapshots: Vec<BTreeMap<NodeId, BTreeSet<T>>> = self
+            .scenes
+            .iter()
+            .map(|scene| {
+                let mut routes: BTreeMap<NodeId, BTreeSet<T>> = BTreeMap::new();
+                for route in &scene.routing {
+                    routes.entry(route.0).or_default().insert(key(route));
+                }
+                routes
+            })
+            .collect();
+        super::super::mesh_execution::route_varies_with_input(&snapshots)
+    }
+    /// Whether every scene `baseline` got right on `task` is still right here.
+    pub fn preserves_correct_scenes(&self, baseline: &Self, task: Task) -> bool {
+        baseline
+            .scenes
+            .iter()
+            .zip(&self.scenes)
+            .all(|(before, after)| {
+                let correct = |scene: &Scene| match task {
+                    Task::A => scene.correct_a,
+                    Task::B => scene.correct_b,
+                };
+                !correct(before) || correct(after)
+            })
     }
     pub fn summary(&self) -> TaskSummary {
         let mut work = Work::default();
@@ -282,7 +540,34 @@ impl From<&MutationEventRecord> for Event {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// The five specialization components (T13.F07), stored separately so a
+/// reader sees which failed. `holds` is their conjunction.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Specialization {
+    pub task_live: bool,
+    /// Score at least the starting score plus one.
+    pub score_gain: bool,
+    /// Static-successor bypass loses at least one scene.
+    pub bypass_loss: bool,
+    /// Replacing the payload with its birth payload on the same route loses
+    /// at least one scene; copied or prepared computation alone never scores.
+    pub ancestral_loss: bool,
+    /// Every scene correct at generation 0 is still correct.
+    pub incumbents_preserved: bool,
+}
+
+impl Specialization {
+    #[must_use]
+    pub const fn holds(self) -> bool {
+        self.task_live
+            && self.score_gain
+            && self.bypass_loss
+            && self.ancestral_loss
+            && self.incumbents_preserved
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModuleUse {
     pub node: NodeId,
     pub created_depth: u64,
@@ -295,6 +580,16 @@ pub struct ModuleUse {
     pub memory_effect: Option<bool>,
     pub output_effect: bool,
     pub routing_effect: bool,
+    /// Whether the current payload differs from the birth payload.
+    pub payload_changed: bool,
+    /// score(current) − score(birth payload on the same route); `Some(0)`
+    /// without evaluation for an unchanged payload, `None` when the module
+    /// was not dispatched or its bypass loss is below one.
+    pub ancestral_loss: Option<i16>,
+    pub current_ending_energy_sum: f64,
+    pub ancestral_ending_energy_sum: Option<f64>,
+    pub destination_kind: DestinationKind,
+    pub specialization: Specialization,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -314,6 +609,8 @@ pub struct Proposal {
     pub events: Vec<Event>,
     pub useful_modules: Vec<ModuleUse>,
     pub discovery: bool,
+    /// Some cohort module meets every specialization component (T13.F07).
+    pub specialized: bool,
     pub viable_path: bool,
     pub mutation_fingerprint: String,
     pub parent_fingerprint: String,
@@ -325,11 +622,169 @@ pub struct Proposal {
     pub selected_inapplicable_backend_unresolved: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Discovery {
     pub generation: u32,
     pub sibling: u8,
     pub module: ModuleUse,
+}
+
+/// What became of the specialized recruit at one retention horizon.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HorizonOutcome {
+    Retained,
+    TaskDead,
+    Deleted,
+    NoLongerUseful,
+    Despecialized,
+}
+
+impl HorizonOutcome {
+    /// Read the recruit at a horizon: task death first, then absence, then
+    /// the bypass loss, then the remaining components.
+    #[must_use]
+    pub fn of(live: bool, module: Option<&ModuleUse>) -> Self {
+        match module {
+            _ if !live => Self::TaskDead,
+            None => Self::Deleted,
+            Some(module) if module.score_loss < 1 => Self::NoLongerUseful,
+            Some(module) if !module.specialization.holds() => Self::Despecialized,
+            Some(_) => Self::Retained,
+        }
+    }
+}
+
+/// The specialized recruit re-read `offset` generations after its retained
+/// discovery.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Horizon {
+    pub offset: u32,
+    pub at_generation: u32,
+    pub outcome: HorizonOutcome,
+    pub live: bool,
+    pub score: u8,
+    pub module: Option<ModuleUse>,
+}
+
+/// The ladder stages one lineage reached on its retained chain.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Ladder {
+    /// Some cohort module was statically reachable from the entry node.
+    pub eligibility: bool,
+    /// Some applied event targeted a reachable cohort module.
+    pub local_edit: bool,
+    /// Some cohort module dispatched in at least one scene.
+    pub expression: bool,
+    /// A specialized recruit was retained within the discovery horizon.
+    pub specialized: bool,
+    /// Some proposal (retained or not) carried a specialized recruit.
+    pub proposal_specialized: bool,
+    /// Some retained proposal had a bypass loss of one or more with an
+    /// ancestral loss of zero.
+    pub bypass_only: bool,
+    /// The recruit's reading at the primary horizon, when observable.
+    pub at_primary_horizon: Option<HorizonOutcome>,
+}
+
+/// Why a lineage produced no retained specialized recruit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LossKind {
+    /// A specialized proposal existed but none was retained.
+    NotSelected,
+    Deleted,
+    Despecialized,
+    TaskDead,
+    NoLongerUseful,
+}
+
+/// One lineage's exclusive classification: retained, the first failing
+/// ladder stage, or the loss kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "class", content = "loss", rename_all = "snake_case")]
+pub enum LineageClass {
+    Retained,
+    NoEligibility,
+    NoEdit,
+    NoExpression,
+    NoBenefit,
+    Loss(LossKind),
+    /// The primary horizon lies beyond the run (the legacy panel).
+    CensoredAt64,
+}
+
+impl LineageClass {
+    /// The first failing stage of the ladder, in order.
+    #[must_use]
+    pub fn of(ladder: Ladder) -> Self {
+        if !ladder.eligibility {
+            Self::NoEligibility
+        } else if !ladder.local_edit {
+            Self::NoEdit
+        } else if !ladder.expression {
+            Self::NoExpression
+        } else if !ladder.specialized {
+            if ladder.proposal_specialized {
+                Self::Loss(LossKind::NotSelected)
+            } else {
+                Self::NoBenefit
+            }
+        } else {
+            match ladder.at_primary_horizon {
+                None => Self::CensoredAt64,
+                Some(HorizonOutcome::Retained) => Self::Retained,
+                Some(HorizonOutcome::TaskDead) => Self::Loss(LossKind::TaskDead),
+                Some(HorizonOutcome::Deleted) => Self::Loss(LossKind::Deleted),
+                Some(HorizonOutcome::NoLongerUseful) => Self::Loss(LossKind::NoLongerUseful),
+                Some(HorizonOutcome::Despecialized) => Self::Loss(LossKind::Despecialized),
+            }
+        }
+    }
+}
+
+/// Per-arm ladder and classification counts (T13.F07).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Transitions {
+    pub lineages: u32,
+    pub eligibility: u32,
+    pub local_edit: u32,
+    pub expression: u32,
+    pub specialized: u32,
+    pub proposal_specialized_lineages: u32,
+    /// Proposals (both siblings, every generation) carrying a specialized
+    /// recruit.
+    pub specialized_proposals: u64,
+    pub retained_at: BTreeMap<u32, u32>,
+    pub classes: BTreeMap<String, u32>,
+    pub bypass_only: u32,
+    /// Cohort modules with an applied site over cohort modules, pooled at
+    /// the final checkpoint.
+    pub eligible_site_fraction: Estimate,
+    pub destination_kinds: DestinationKindCounts,
+}
+
+/// The key a class is counted under.
+#[must_use]
+pub fn class_key(class: LineageClass) -> String {
+    match class {
+        LineageClass::Retained => "retained".into(),
+        LineageClass::NoEligibility => "no_eligibility".into(),
+        LineageClass::NoEdit => "no_edit".into(),
+        LineageClass::NoExpression => "no_expression".into(),
+        LineageClass::NoBenefit => "no_benefit".into(),
+        LineageClass::Loss(kind) => format!(
+            "loss_{}",
+            match kind {
+                LossKind::NotSelected => "not_selected",
+                LossKind::Deleted => "deleted",
+                LossKind::Despecialized => "despecialized",
+                LossKind::TaskDead => "task_dead",
+                LossKind::NoLongerUseful => "no_longer_useful",
+            }
+        ),
+        LineageClass::CensoredAt64 => "censored_at_64".into(),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -369,6 +824,14 @@ pub struct ReplayStep {
     pub outcome: TaskReading,
 }
 
+/// One tracker module with its birth payload, stored whole only for modules
+/// that reached `Dispatch`; every module carries the payload hash.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModuleRecord {
+    pub module: Module,
+    pub birth_payload: Option<BackendDef>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Checkpoint {
     pub generation: u32,
@@ -377,14 +840,44 @@ pub struct Checkpoint {
     pub battery: Signature,
     pub battery_class: String,
     pub cohort: RecruitmentCheckpoint,
-    pub modules: Vec<Module>,
+    pub modules: Vec<ModuleRecord>,
     pub task_use: Vec<ModuleUse>,
+    pub route_position_varies: bool,
+    pub route_destination_varies: bool,
+    pub destination_kinds: DestinationKindCounts,
+    pub eligible_site_fraction: Estimate,
+}
+
+impl Checkpoint {
+    /// The retained-parent cost scalars the arm summary spreads.
+    #[must_use]
+    pub fn cost(&self) -> CheckpointScalars {
+        let summary = self.task.summary();
+        CheckpointScalars {
+            generation: self.generation,
+            genome_size: f64::from(self.genome.genome_size()),
+            modules: self.genome.nodes.len() as f64,
+            carrying_sum: summary.carrying_sum,
+            ending_energy_sum: summary.ending_energy_sum,
+        }
+    }
+}
+
+/// The scalars of one checkpoint an arm summary needs.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct CheckpointScalars {
+    pub generation: u32,
+    pub genome_size: f64,
+    pub modules: f64,
+    pub carrying_sum: f64,
+    pub ending_energy_sum: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Lineage {
     pub batch: u32,
     pub lineage: u32,
+    pub task: Task,
     pub proposals: Vec<Proposal>,
     pub checkpoints: Vec<Checkpoint>,
     pub proposal_discovery: Option<Discovery>,
@@ -392,9 +885,226 @@ pub struct Lineage {
     pub viable_retained_discovery: bool,
     pub retention: Option<Retention>,
     pub first_successful_path: Vec<ReplayStep>,
+    /// First retained proposal within the discovery horizon carrying a
+    /// specialized recruit (T13.F07).
+    pub specialized_discovery: Option<Discovery>,
+    /// The retained chain at the specialized discovery generation.
+    pub discovery_checkpoint: Option<Checkpoint>,
+    /// The recruit re-read at each observable [`HORIZONS`] offset.
+    pub horizons: Vec<Horizon>,
+    pub ladder: Ladder,
+    pub classification: LineageClass,
 }
 
+/// One proposal as the compact S0 record keeps it: enough to reconstruct the
+/// child from the initial genome, the chosen chain and the seed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CompactProposal {
+    pub generation: u32,
+    pub sibling: u8,
+    pub seed: u64,
+    pub chosen: bool,
+    pub live: bool,
+    pub score: u8,
+    pub parent_score: u8,
+    pub discovery: bool,
+    pub specialized: bool,
+    /// Applied events only: operator, target, outcome.
+    pub events: Vec<(MutationOperator, Option<NodeId>, String)>,
+    pub mutation_fingerprint: String,
+    /// The chosen child's whole-birth delta; absent for the sibling not taken.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delta: Option<GenomeDelta>,
+}
+
+/// One lineage of the compact S0 record.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompactLineage {
+    pub arm: usize,
+    pub start: String,
+    pub policy: Policy,
+    pub batch: u32,
+    pub lineage: u32,
+    pub proposals: Vec<CompactProposal>,
+    pub checkpoints: Vec<Checkpoint>,
+    pub discovery_checkpoint: Option<Checkpoint>,
+    pub proposal_discovery: Option<Discovery>,
+    pub retained_discovery: Option<Discovery>,
+    pub viable_retained_discovery: bool,
+    pub specialized_discovery: Option<Discovery>,
+    pub retention: Option<Retention>,
+    pub horizons: Vec<Horizon>,
+    pub ladder: Ladder,
+    pub classification: LineageClass,
+    /// Opportunities pooled over the lineage's proposals.
+    pub opportunities: Opportunities,
+}
+
+impl CompactLineage {
+    #[must_use]
+    pub fn of(arm: usize, start: &str, policy: Policy, lineage: &Lineage) -> Self {
+        let mut opportunities = Opportunities::default();
+        let proposals = lineage
+            .proposals
+            .iter()
+            .map(|proposal| {
+                opportunities.merge(&proposal.opportunities);
+                CompactProposal {
+                    generation: proposal.generation,
+                    sibling: proposal.sibling,
+                    seed: proposal.seed,
+                    chosen: proposal.chosen,
+                    live: proposal.outcome.live(),
+                    score: proposal.outcome.correct(lineage.task),
+                    parent_score: proposal.parent_score,
+                    discovery: proposal.discovery,
+                    specialized: proposal.specialized,
+                    events: proposal
+                        .events
+                        .iter()
+                        .filter_map(|event| {
+                            event
+                                .operator
+                                .filter(|_| event.outcome.starts_with("Applied"))
+                                .map(|operator| (operator, event.target, event.outcome.clone()))
+                        })
+                        .collect(),
+                    mutation_fingerprint: proposal.mutation_fingerprint.clone(),
+                    delta: None,
+                }
+            })
+            .collect();
+        Self {
+            arm,
+            start: start.into(),
+            policy,
+            batch: lineage.batch,
+            lineage: lineage.lineage,
+            proposals,
+            checkpoints: lineage.checkpoints.clone(),
+            discovery_checkpoint: lineage.discovery_checkpoint.clone(),
+            proposal_discovery: lineage.proposal_discovery.clone(),
+            retained_discovery: lineage.retained_discovery.clone(),
+            viable_retained_discovery: lineage.viable_retained_discovery,
+            specialized_discovery: lineage.specialized_discovery.clone(),
+            retention: lineage.retention.clone(),
+            horizons: lineage.horizons.clone(),
+            ladder: lineage.ladder,
+            classification: lineage.classification,
+            opportunities,
+        }
+    }
+}
+
+/// The per-lineage facts an arm summary folds; built from a full or a
+/// compact lineage so both panels summarize through one path.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineageFacts {
+    pub batch: u32,
+    pub lineage: u32,
+    /// `(live, score, parent_score)` per proposal.
+    pub proposals: Vec<(bool, u8, u8)>,
+    pub specialized_proposals: u64,
+    pub checkpoints: Vec<CheckpointScalars>,
+    pub proposal_discovery: Option<u32>,
+    pub retained_discovery: Option<u32>,
+    pub specialized_discovery: Option<u32>,
+    pub viable_retained_discovery: bool,
+    pub retention: Option<RetentionOutcome>,
+    pub horizons: Vec<(u32, HorizonOutcome)>,
+    pub ladder: Ladder,
+    pub classification: LineageClass,
+    pub final_applicable: (u64, u64),
+    pub destination_kinds: DestinationKindCounts,
+}
+
+impl LineageFacts {
+    #[must_use]
+    pub fn of(lineage: &Lineage) -> Self {
+        let last = lineage.checkpoints.last();
+        Self {
+            batch: lineage.batch,
+            lineage: lineage.lineage,
+            proposals: lineage
+                .proposals
+                .iter()
+                .map(|proposal| {
+                    (
+                        proposal.outcome.live(),
+                        proposal.outcome.correct(lineage.task),
+                        proposal.parent_score,
+                    )
+                })
+                .collect(),
+            specialized_proposals: lineage
+                .proposals
+                .iter()
+                .filter(|proposal| proposal.specialized)
+                .count() as u64,
+            checkpoints: lineage.checkpoints.iter().map(Checkpoint::cost).collect(),
+            proposal_discovery: lineage.proposal_discovery.as_ref().map(|d| d.generation),
+            retained_discovery: lineage.retained_discovery.as_ref().map(|d| d.generation),
+            specialized_discovery: lineage.specialized_discovery.as_ref().map(|d| d.generation),
+            viable_retained_discovery: lineage.viable_retained_discovery,
+            retention: lineage.retention.as_ref().map(|r| r.outcome),
+            horizons: lineage
+                .horizons
+                .iter()
+                .map(|horizon| (horizon.offset, horizon.outcome))
+                .collect(),
+            ladder: lineage.ladder,
+            classification: lineage.classification,
+            final_applicable: last.map_or((0, 0), |checkpoint| {
+                (
+                    checkpoint.eligible_site_fraction.numerator.into(),
+                    checkpoint.eligible_site_fraction.denominator.into(),
+                )
+            }),
+            destination_kinds: last.map_or_else(Default::default, |c| c.destination_kinds),
+        }
+    }
+
+    #[must_use]
+    pub fn of_compact(lineage: &CompactLineage) -> Self {
+        let last = lineage.checkpoints.last();
+        Self {
+            batch: lineage.batch,
+            lineage: lineage.lineage,
+            proposals: lineage
+                .proposals
+                .iter()
+                .map(|proposal| (proposal.live, proposal.score, proposal.parent_score))
+                .collect(),
+            specialized_proposals: lineage
+                .proposals
+                .iter()
+                .filter(|proposal| proposal.specialized)
+                .count() as u64,
+            checkpoints: lineage.checkpoints.iter().map(Checkpoint::cost).collect(),
+            proposal_discovery: lineage.proposal_discovery.as_ref().map(|d| d.generation),
+            retained_discovery: lineage.retained_discovery.as_ref().map(|d| d.generation),
+            specialized_discovery: lineage.specialized_discovery.as_ref().map(|d| d.generation),
+            viable_retained_discovery: lineage.viable_retained_discovery,
+            retention: lineage.retention.as_ref().map(|r| r.outcome),
+            horizons: lineage
+                .horizons
+                .iter()
+                .map(|horizon| (horizon.offset, horizon.outcome))
+                .collect(),
+            ladder: lineage.ladder,
+            classification: lineage.classification,
+            final_applicable: last.map_or((0, 0), |checkpoint| {
+                (
+                    checkpoint.eligible_site_fraction.numerator.into(),
+                    checkpoint.eligible_site_fraction.denominator.into(),
+                )
+            }),
+            destination_kinds: last.map_or_else(Default::default, |c| c.destination_kinds),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Estimate {
     pub numerator: u32,
     pub denominator: u32,
@@ -538,6 +1248,7 @@ pub struct Summary {
     pub retention_outcomes: RetentionOutcomes,
     pub damage: Damage,
     pub checkpoint_cost: Vec<CheckpointCost>,
+    pub transitions: Transitions,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -577,6 +1288,8 @@ pub struct Report {
     pub config: crate::config::SimulationConfig,
     pub config_digest: String,
     pub sizes: Sizes,
+    pub supply: Supply,
+    pub supply_rule: String,
     pub task_definition: String,
     pub mutation_context: String,
     pub construction_resolution: String,

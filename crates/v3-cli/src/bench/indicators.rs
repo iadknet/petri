@@ -328,6 +328,7 @@ pub(super) fn mesh_execution_and_steering(
         executed_node_count: reading.executed_node_count as u64,
         knockout_count: reading.knockout_count as u64,
         route_varies_with_input: reading.route_varies_with_input,
+        route_destination_varies: reading.route_destination_varies,
         hop_cap_hits: reading.hop_cap_hits as u64,
     };
     let steering = Steering {
