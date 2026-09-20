@@ -8,9 +8,9 @@
 //! and the optional replay check that rebuilds every proposal from the record.
 
 use std::io::{BufWriter, Write};
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
@@ -36,7 +36,7 @@ pub struct Options {
     pub feature: String,
     pub pilot: bool,
     /// Private rayon pool size; `None` uses the global pool.
-    pub threads: Option<usize>,
+    pub threads: Option<NonZeroUsize>,
     pub wall_cap: Duration,
     pub byte_cap: u64,
     pub replay_check: bool,
@@ -268,7 +268,7 @@ pub fn run(options: &Options) -> Result<Outcome, String> {
         .threads
         .map(|threads| {
             rayon::ThreadPoolBuilder::new()
-                .num_threads(threads.max(1))
+                .num_threads(threads.get())
                 .build()
                 .map_err(|e| format!("cannot build a {threads}-thread pool: {e}"))
         })
@@ -299,16 +299,17 @@ pub fn run(options: &Options) -> Result<Outcome, String> {
     let stream = open_stream(&paths.raw, &header)?;
     let started = Instant::now();
     let Execution {
-        facts,
+        stream,
+        records,
         stop_reason,
         incomplete,
     } = execute(options, &assay, pool.as_ref(), stream, started)?;
     let wall_secs = started.elapsed().as_secs_f64();
-    let stream = facts.stream;
+    let lineage_count = records.len() as u64;
     let footer = serde_json::json!({
         "incomplete": incomplete,
         "stop_reason": stop_reason,
-        "lineage_count": facts.records.len(),
+        "lineage_count": lineage_count,
         "wall_secs": wall_secs,
     });
     let (bytes, sha256) = close_stream(&paths.raw, stream, &footer)?;
@@ -316,8 +317,7 @@ pub fn run(options: &Options) -> Result<Outcome, String> {
         .replay_check
         .then(|| replay(&paths.raw, &assay, pool.as_ref()))
         .transpose()?;
-    let (arms, opportunities) = summarize_arms(&assay, &facts.records);
-    let lineage_count = facts.records.len() as u64;
+    let (arms, opportunities) = summarize_arms(&assay, records);
     let summary = RunSummary {
         kind: SUMMARY_KIND.into(),
         version: S0_VERSION.into(),
@@ -411,17 +411,13 @@ fn close_stream(
     Ok((bytes, format!("{:x}", hasher.finalize())))
 }
 
-/// What the parallel loop leaves behind: the stream with its per-lineage
-/// facts, and whether a cap stopped it.
+/// What the parallel loop leaves behind: the stream, the completed
+/// lineages' facts, and whether a cap stopped it.
 struct Execution {
-    facts: Completed,
-    stop_reason: Option<String>,
-    incomplete: bool,
-}
-
-struct Completed {
     stream: Stream,
     records: Vec<(usize, LineageFacts, Opportunities)>,
+    stop_reason: Option<String>,
+    incomplete: bool,
 }
 
 /// Run every `(arm, batch, lineage)` task on the pool, streaming each
@@ -442,28 +438,21 @@ fn execute(
         })
         .collect();
     let stream = Mutex::new(stream);
-    let stop = AtomicBool::new(false);
-    let stop_reason = Mutex::new(None::<String>);
-    let halt = |reason: &str| {
-        stop.store(true, Ordering::SeqCst);
-        stop_reason
-            .lock()
-            .expect("stop reason lock")
-            .get_or_insert_with(|| reason.into());
-    };
+    // The first cap to trip names the stop reason; a set lock is the flag.
+    let stop = OnceLock::<String>::new();
     let work = || {
         tasks.par_iter().for_each(|&(arm, batch, lineage)| {
-            if stop.load(Ordering::SeqCst) {
+            if stop.get().is_some() {
                 return;
             }
             if started.elapsed() >= options.wall_cap {
-                halt("wall_cap");
+                let _ = stop.set("wall_cap".into());
                 return;
             }
             let record = assay.compact_lineage(arm, batch, lineage);
             let bytes = stream.lock().expect("stream lock").append(arm, &record);
             if bytes >= options.byte_cap {
-                halt("byte_cap");
+                let _ = stop.set("byte_cap".into());
             }
         });
     };
@@ -478,30 +467,33 @@ fn execute(
     let records = std::mem::take(&mut stream.facts);
     let incomplete = records.len() < tasks.len();
     Ok(Execution {
-        facts: Completed { stream, records },
-        stop_reason: stop_reason.into_inner().expect("stop reason lock"),
+        stream,
+        records,
+        stop_reason: stop.into_inner(),
         incomplete,
     })
 }
 
-/// Per-arm summaries over the completed lineages, and the pooled
-/// opportunities (whose `births` count the proposals observed).
+/// Per-arm summaries over the completed lineages (every arm, empty or not),
+/// and the pooled opportunities (whose `births` count the proposals
+/// observed).
 fn summarize_arms(
     assay: &Assay,
-    records: &[(usize, LineageFacts, Opportunities)],
+    mut records: Vec<(usize, LineageFacts, Opportunities)>,
 ) -> (Vec<ArmSummary>, Opportunities) {
     let batches = assay.panel().sizes.batches;
+    // Completion order depends on the thread count; the summary does not.
+    records.sort_by_key(|(arm, facts, _)| (*arm, facts.batch, facts.lineage));
+    let mut records = records.into_iter().peekable();
     let mut arms = Vec::with_capacity(assay.arm_count());
     let mut opportunities = Opportunities::default();
     for arm in 0..assay.arm_count() {
         let mut arm_facts = Vec::new();
         let mut pooled = Opportunities::default();
-        for (_, facts, lineage) in records.iter().filter(|(index, _, _)| *index == arm) {
-            arm_facts.push(facts.clone());
-            pooled.merge(lineage);
+        while let Some((_, facts, lineage)) = records.next_if(|(index, _, _)| *index == arm) {
+            arm_facts.push(facts);
+            pooled.merge(&lineage);
         }
-        // Completion order depends on the thread count; the summary does not.
-        arm_facts.sort_by_key(|facts| (facts.batch, facts.lineage));
         opportunities.merge(&pooled);
         let (summary, per_batch) = summaries(&arm_facts, batches);
         let (start, policy) = assay.arm(arm);
@@ -558,7 +550,7 @@ fn replay(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     static NEXT: AtomicUsize = AtomicUsize::new(0);
 
@@ -592,7 +584,7 @@ mod tests {
             sizes: Some(sizes),
             raw: Some(dir.0.join(format!("{name}-raw.json"))),
             summary: Some(dir.0.join(format!("{name}-summary.json"))),
-            threads: Some(1),
+            threads: NonZeroUsize::new(1),
             source_revision: "test-revision".into(),
             ..Options::new("t13-f07-test", dir.0.clone())
         }
@@ -720,7 +712,7 @@ mod tests {
         };
         let single = run(&options(&dir, "one", sizes)).unwrap();
         let mut parallel = options(&dir, "two", sizes);
-        parallel.threads = Some(2);
+        parallel.threads = NonZeroUsize::new(2);
         let parallel = run(&parallel).unwrap();
 
         assert!(!parallel.incomplete);
@@ -754,7 +746,7 @@ mod tests {
             );
         }
         let mut capped = options(&dir, "capped-two", sizes);
-        capped.threads = Some(2);
+        capped.threads = NonZeroUsize::new(2);
         capped.byte_cap = 1;
         let capped = run(&capped).unwrap();
         assert!(capped.incomplete);

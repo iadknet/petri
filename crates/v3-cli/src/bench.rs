@@ -10,7 +10,6 @@ mod comparison;
 mod indicators;
 mod profiles;
 mod run;
-pub use run::detect_git_revision;
 mod schema;
 #[cfg(test)]
 mod tests;
@@ -29,8 +28,8 @@ pub use profiles::{
     ProfileParams, Recipe, COUNTER_NAMES, GOAL_WORLD_SET, SAMPLE_EVERY_TICKS, SCHEMA_VERSION,
 };
 pub use run::{
-    build_report, build_report_with_threads, deterministic_block_json, report_json_pretty,
-    rfc3339_now, run_deterministic, throughput_rates, RunTimings,
+    build_report, build_report_with_threads, detect_git_revision, deterministic_block_json,
+    report_json_pretty, rfc3339_now, run_deterministic, throughput_rates, RunTimings,
 };
 pub use schema::{
     ByReaderState, CaseComparison, CaseReadingComparison, CohortLadder, CohortLineageRow,
