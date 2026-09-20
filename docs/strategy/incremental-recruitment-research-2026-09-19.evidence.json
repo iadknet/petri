@@ -1,0 +1,1066 @@
+{
+  "kind": "petri-existing-evidence-audit",
+  "date": "2026-09-19",
+  "source_revision": "45c8063722fa3aa509a32d523f5e477e9fcd3853",
+  "source_note": "Includes pre-existing uncommitted aging implementation; source was only read by this task. No new runtime experiments.",
+  "existing_implementation_diff_sha256": "917566f42c8c6c75b2be0cadf5cfc4e18b5ed79d3c1e60a1ec61264142afe937",
+  "status_at_audit": [
+    " M crates/v3-cli/tests/bench_artifacts.rs",
+    " M crates/v3-core/src/config/simulation.rs",
+    " M crates/v3-core/src/simulation/tick/tests/actions.rs",
+    " M crates/v3-core/tests/applied_trajectory.rs",
+    " M crates/v3-core/tests/baseline_worlds.rs",
+    " M crates/v3-core/tests/viability.rs",
+    " M docs/reference/v3-runtime-config-spec.md",
+    " M frontend/src/components/ControlBar.test.tsx",
+    " M frontend/src/components/config-panel/runtime/AgeEnergyCostSection.tsx",
+    " M frontend/src/test/fixtures.ts",
+    " M frontend/src/types/config.ts",
+    "?? docs/strategy/adaptive-base-mutation-rate-pilot-2026-09-19.md",
+    "?? docs/strategy/adaptive-base-mutation-rate-pilot-2026-09-19.results.json",
+    "?? docs/strategy/incremental-recruitment-research-2026-09-19.md",
+    "?? docs/strategy/population-decline-mechanisms-research-2026-09-19.md",
+    "?? docs/strategy/population-decline-mechanisms-research-2026-09-19.results.json",
+    "?? world-recipe-extended-age-drain-age10-baseline.json",
+    "?? world-recipe-extended-age-drain-age10-mutation-half.json",
+    "?? world-recipe-extended-age-drain-age10-mutation-quarter.json"
+  ],
+  "inspected_source_sha256": {
+    "crates/v3-core/src/runtime/routing.rs": "4366ac124995afcb8a74a3480096faa7dad58f4061df2a9e0bba2232443e0b0e",
+    "crates/v3-core/src/runtime/mesh.rs": "0d4bac690cfede924e15708233e206d6ea3f02ff1a7d5950fe4ddc8ba308e1ea",
+    "crates/v3-core/src/runtime/cgp/execute.rs": "ca89b222550f107c26af9927d9d40d619cd8aae3ac3a3074f57845b96a9f0ebd",
+    "crates/v3-core/src/runtime/cgp/effects.rs": "283baee8f97f6132e2a31614e2b88579fb9066cc090f2138d7de1b8aeeb8d832",
+    "crates/v3-core/src/runtime/cgp/sources.rs": "727b28d7f3e7a773e44199805ee8ddc32403dc7e722583ada09277c414124619",
+    "crates/v3-core/src/mutation/engine/mod.rs": "dc4a677bed81e319ddf436adb4eb41179e237358705e7dd934adda417e480f4b",
+    "crates/v3-core/src/mutation/reachability.rs": "949105ab41b30944da3c5847ab4f5706db9912122d1be75a3f81b1259b5404dc",
+    "crates/v3-core/src/mutation/topology/routing.rs": "d91165e46a40c425d3ccd33e82ff3e9dfdbfbb937c6dd14e61aef07c53fa3602",
+    "crates/v3-core/src/mutation/topology/structural.rs": "78ee667d06107be931deb655354191af5234b4c5ffd3fe80d0e187c766a8a3c0",
+    "crates/v3-core/src/mutation/vm/operators.rs": "d68d4fbfe4b6ad263e93e5469e09ae67200ddad1c452581b86fa1489828c473b",
+    "crates/v3-core/src/creature/founder.rs": "d58cfeac4b76d9a9e8fe2135ba1a4e5d80aaef1a6278e28bd5f3297941bae4e3",
+    "crates/v3-core/src/creature/cgp_founder.rs": "0c14458a2ea9dceba33b678974ced530b22a6c93b37bf202e0953afd7184b8a1",
+    "crates/v3-core/src/creature/genome/mod.rs": "87a767e187acd37b3386584b5bd84b49f84bb01d280df13f893f47b36342b382",
+    "crates/v3-core/src/creature/genome/analysis.rs": "3f50fae4c6824f11977696431bf1341b02fe1610562fd51372eb5f3f60bb89bc",
+    "crates/v3-core/src/config/simulation.rs": "92a84274bbf58184cef2a1f080c261820957a804d649f53316d73b78787d64af",
+    "crates/v3-core/src/simulation/tick.rs": "daf9676651c6a2983a01bca4180e68f41232d661f2fc3502b32d8339772aa291",
+    "crates/v3-core/src/simulation/actions/reproduction.rs": "21c00885ffcfb9f6f4236c9b72ded73a3c4173fc4961b846a877b29fe67aeb58",
+    "crates/v3-core/src/neighborhood/mesh_execution.rs": "e66f4c5ab1311e9f03cbb7c4e21186dcdad687a71818c3e7afabdf34355ede6c",
+    "crates/v3-core/src/neighborhood/recruitment_paths/experiment.rs": "5d3ea77ac4a53809b2d30aae154c4ce3675d1b94f3ae69f1906344ed3c7316e3"
+  },
+  "f06": {
+    "summary_path": "docs/progress/features/t13-f06-recruitment-and-retention-qualification-goal.json",
+    "summary_sha256": "eda0024e83b6c46bc98c5e8bc46f1bea7d70dc9d691a1c27d478742be1b5cc7c",
+    "raw_path": "/Users/istefanek/projects/petri/.bench-artifacts/t13-f06-recruitment-and-retention-qualification/goal.json",
+    "raw_bytes": 511723596,
+    "raw_sha256": "e33e5d25bdb982b731cf7c4fccd314ba08ae3d4e3a076ccd349c346ff578897b",
+    "raw_hash_matches_recorded_reading": true,
+    "arms": [
+      {
+        "start": "graph_blank",
+        "policy": "Drift",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_blank",
+        "policy": "Selection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_copy",
+        "policy": "Drift",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_copy",
+        "policy": "Selection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_split",
+        "policy": "Drift",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_split",
+        "policy": "Selection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "vm_blank",
+        "policy": "Drift",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "vm_blank",
+        "policy": "Selection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "vm_copy",
+        "policy": "Drift",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "vm_copy",
+        "policy": "Selection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_unprepared",
+        "policy": "Drift",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_unprepared",
+        "policy": "Selection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_prepared",
+        "policy": "Drift",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.53125,
+          "numerator": 17,
+          "wilson_95": [
+            0.36449517118974645,
+            0.6913061289193116
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.40625,
+          "numerator": 13,
+          "wilson_95": [
+            0.25519634842665434,
+            0.5773997512461713
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0625,
+          "numerator": 2,
+          "wilson_95": [
+            0.017310567031640967,
+            0.2014712314415458
+          ]
+        }
+      },
+      {
+        "start": "graph_prepared",
+        "policy": "Selection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.53125,
+          "numerator": 17,
+          "wilson_95": [
+            0.36449517118974645,
+            0.6913061289193116
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.53125,
+          "numerator": 17,
+          "wilson_95": [
+            0.36449517118974645,
+            0.6913061289193116
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.5,
+          "numerator": 16,
+          "wilson_95": [
+            0.33630882869327483,
+            0.6636911713067252
+          ]
+        }
+      },
+      {
+        "start": "vm_unprepared",
+        "policy": "Drift",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "vm_unprepared",
+        "policy": "Selection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "vm_prepared",
+        "policy": "Drift",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.5625,
+          "numerator": 18,
+          "wilson_95": [
+            0.3932559113685198,
+            0.7183466888495963
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.4375,
+          "numerator": 14,
+          "wilson_95": [
+            0.2816533111504036,
+            0.6067440886314801
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.03125,
+          "numerator": 1,
+          "wilson_95": [
+            0.005537860164003122,
+            0.15744263820012558
+          ]
+        }
+      },
+      {
+        "start": "vm_prepared",
+        "policy": "Selection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.5625,
+          "numerator": 18,
+          "wilson_95": [
+            0.3932559113685198,
+            0.7183466888495963
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.5625,
+          "numerator": 18,
+          "wilson_95": [
+            0.3932559113685198,
+            0.7183466888495963
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.46875,
+          "numerator": 15,
+          "wilson_95": [
+            0.3086938710806884,
+            0.6355048288102536
+          ]
+        }
+      },
+      {
+        "start": "graph_blank",
+        "policy": "CostSelection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_copy",
+        "policy": "CostSelection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_split",
+        "policy": "CostSelection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "vm_blank",
+        "policy": "CostSelection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "vm_copy",
+        "policy": "CostSelection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_unprepared",
+        "policy": "CostSelection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "graph_prepared",
+        "policy": "CostSelection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.53125,
+          "numerator": 17,
+          "wilson_95": [
+            0.36449517118974645,
+            0.6913061289193116
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.53125,
+          "numerator": 17,
+          "wilson_95": [
+            0.36449517118974645,
+            0.6913061289193116
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.53125,
+          "numerator": 17,
+          "wilson_95": [
+            0.36449517118974645,
+            0.6913061289193116
+          ]
+        }
+      },
+      {
+        "start": "vm_unprepared",
+        "policy": "CostSelection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.0,
+          "numerator": 0,
+          "wilson_95": [
+            0.0,
+            0.1071791982550706
+          ]
+        }
+      },
+      {
+        "start": "vm_prepared",
+        "policy": "CostSelection",
+        "proposals": 3072,
+        "proposal_discovery": {
+          "denominator": 32,
+          "fraction": 0.53125,
+          "numerator": 17,
+          "wilson_95": [
+            0.36449517118974645,
+            0.6913061289193116
+          ]
+        },
+        "retained_discovery": {
+          "denominator": 32,
+          "fraction": 0.53125,
+          "numerator": 17,
+          "wilson_95": [
+            0.36449517118974645,
+            0.6913061289193116
+          ]
+        },
+        "retained_useful": {
+          "denominator": 32,
+          "fraction": 0.53125,
+          "numerator": 17,
+          "wilson_95": [
+            0.36449517118974645,
+            0.6913061289193116
+          ]
+        }
+      }
+    ],
+    "total_proposals": 82944,
+    "zero_discovery_arms": 21
+  },
+  "mutation_pilot": [
+    {
+      "arm": "source_age305",
+      "path": "/Users/istefanek/projects/petri/.bench-artifacts/mutation-rate-2026-09-19/results/source-age305-s11.ndjson",
+      "sha256": "64ce17ab2c4428d0fa183dcd2f9515f9bd008f6cd33482b54ec7af90ef460b16",
+      "samples": 61,
+      "last_tick": 6000,
+      "population": 4361,
+      "births": 286661,
+      "all_sample_population_ledgers_balance": true
+    },
+    {
+      "arm": "age10_baseline",
+      "path": "/Users/istefanek/projects/petri/.bench-artifacts/mutation-rate-2026-09-19/results/base-s11.ndjson",
+      "sha256": "a255c8557ae64bf7520ff8afa0e4a6160f9acebc037ed2261931f48411f32bcc",
+      "samples": 61,
+      "last_tick": 6000,
+      "population": 23040,
+      "births": 578186,
+      "all_sample_population_ledgers_balance": true
+    },
+    {
+      "arm": "age10_half",
+      "path": "/Users/istefanek/projects/petri/.bench-artifacts/mutation-rate-2026-09-19/results/half-s11.ndjson",
+      "sha256": "fcb162f5d1ce4d472dd43c482730b8391eb9631f47d28aeddf7a40e5dcdd9d56",
+      "samples": 61,
+      "last_tick": 6000,
+      "population": 20719,
+      "births": 581703,
+      "all_sample_population_ledgers_balance": true
+    },
+    {
+      "arm": "age10_quarter",
+      "path": "/Users/istefanek/projects/petri/.bench-artifacts/mutation-rate-2026-09-19/results/quarter-s11.ndjson",
+      "sha256": "ea3c3feaabec806912eda723aa29ab6dcf7cb02eadeebf825e28e954b3cfeae1",
+      "samples": 61,
+      "last_tick": 6000,
+      "population": 21434,
+      "births": 590158,
+      "all_sample_population_ledgers_balance": true
+    }
+  ],
+  "recipes": {
+    "world-recipe-extended-age-drain-age10-baseline.json": {
+      "sha256": "e3dcc41e8dd959fadc59128cf7e1c2cd612c443e10276ac44fb3ee9a09a6f51c",
+      "age_cost": {
+        "age_cap": 600,
+        "enabled": true,
+        "max_multiplier": 10.0
+      },
+      "mutation": {
+        "per_unit_rate": 0.005,
+        "per_unit_supply_enabled": true,
+        "executed_bias": 0.0,
+        "large_copy_weight_percent": 25
+      }
+    },
+    "world-recipe-extended-age-drain-age10-mutation-half.json": {
+      "sha256": "c5b7d2effc32573ed9dafec2f109253e35498b387d3a8bc5e57f0b94421225e6",
+      "age_cost": {
+        "age_cap": 600,
+        "enabled": true,
+        "max_multiplier": 10.0
+      },
+      "mutation": {
+        "per_unit_rate": 0.0025,
+        "per_unit_supply_enabled": true,
+        "executed_bias": 0.0,
+        "large_copy_weight_percent": 25
+      }
+    },
+    "world-recipe-extended-age-drain-age10-mutation-quarter.json": {
+      "sha256": "6133e1222567168019a878b30c67719a414e57c7e78293e9b13fa1838b7294c5",
+      "age_cost": {
+        "age_cap": 600,
+        "enabled": true,
+        "max_multiplier": 10.0
+      },
+      "mutation": {
+        "per_unit_rate": 0.00125,
+        "per_unit_supply_enabled": true,
+        "executed_bias": 0.0,
+        "large_copy_weight_percent": 25
+      }
+    },
+    "world-recipe-extended-age-drain-reduced-copy-growth.json": {
+      "sha256": "989649fe3182bdddfa5fb349b8127cdb229b782fd4ef5fd7139e69fef5f34ec9",
+      "age_cost": {
+        "age_cap": 600,
+        "enabled": true,
+        "max_multiplier": 305.0
+      },
+      "mutation": {
+        "per_unit_rate": 0.005,
+        "per_unit_supply_enabled": true,
+        "executed_bias": 0.0,
+        "large_copy_weight_percent": 25
+      }
+    },
+    "world-recipe-extended-age-drain-relaxed-genome-costs.json": {
+      "sha256": "aba68c713beb52e6168e6dedd61033a36acc1e790e261e6f1e51f8588db13905",
+      "age_cost": {
+        "age_cap": 600,
+        "enabled": true,
+        "max_multiplier": 305.0
+      },
+      "mutation": {
+        "per_unit_rate": 0.005,
+        "per_unit_supply_enabled": true,
+        "executed_bias": 0.0,
+        "large_copy_weight_percent": null
+      }
+    },
+    "world-recipe-extended-age-drain.json": {
+      "sha256": "c72f75e9b87af0ee0c0c89120374f0bdeacca4bd3fc2eccc6fb411914e64a197",
+      "age_cost": {
+        "age_cap": 600,
+        "enabled": true,
+        "max_multiplier": 305.0
+      },
+      "mutation": {
+        "per_unit_rate": 0.005,
+        "per_unit_supply_enabled": true,
+        "executed_bias": 0.9,
+        "large_copy_weight_percent": null
+      }
+    }
+  },
+  "named_main_recipe_equals_checkout": true,
+  "derived_probability_bounds": {
+    "zero_of_32_one_sided_95_upper": 0.0893681989862648,
+    "zero_of_64_one_sided_95_upper": 0.045729702330762456,
+    "zero_event_probability_111_units_rate_005": 0.5732736268885888,
+    "zero_event_probability_600_units_rate_005": 0.04941382211003858
+  },
+  "limitations": [
+    "Live September 16 survey raw genomes not regenerated; table and embedded probe source inspected.",
+    "Source task history is ephemeral and unavailable; five prior accessible tasks read.",
+    "Historical raw content has not been rerun on current source.",
+    "Historical recipes omit grace_ticks and resolve differently under pre-existing dirty source."
+  ]
+}
