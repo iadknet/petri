@@ -594,6 +594,39 @@ mod tests {
         serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
     }
 
+    /// A throwaway Git checkout with one commit, so default output paths
+    /// resolve without depending on the process working directory being a
+    /// repository (cargo-mutants runs tests from a plain copy of the tree).
+    fn git_checkout(dir: &Temp) -> &Path {
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(&dir.0)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&["init", "--quiet"]);
+        git(&[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            "fixture",
+        ]);
+        &dir.0
+    }
+
     /// A tiny complete run writes a readable raw record and a summary whose
     /// counts, identities and replay check agree with the record.
     #[test]
@@ -800,9 +833,77 @@ mod tests {
     }
 
     #[test]
+    fn default_caps_are_two_hours_and_two_gibibytes() {
+        assert_eq!(DEFAULT_WALL_CAP_SECS, 7_200);
+        assert_eq!(DEFAULT_BYTE_CAP, 2_147_483_648);
+    }
+
+    /// The hashing writer forwards flushes, so a cap stop leaves the streamed
+    /// records on disk rather than in a buffer.
+    #[test]
+    fn hashing_writer_forwards_flush_to_its_inner_writer() {
+        struct Counting {
+            flushes: usize,
+        }
+        impl Write for Counting {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                Ok(buf.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                self.flushes += 1;
+                Ok(())
+            }
+        }
+        let mut writer = HashingWriter {
+            inner: Counting { flushes: 0 },
+            hasher: Sha256::new(),
+            bytes: 0,
+        };
+        writer.write_all(b"abc").unwrap();
+        assert_eq!(writer.inner.flushes, 0);
+
+        writer.flush().unwrap();
+
+        assert_eq!((writer.inner.flushes, writer.bytes), (1, 3));
+    }
+
+    /// A raw path that is a directory cannot be created as a file: the error
+    /// names the path.
+    #[test]
+    fn an_unwritable_raw_path_is_named_in_the_error() {
+        let dir = Temp::new();
+        let mut options = options(&dir, "unwritable", TINY);
+        options.raw = Some(dir.0.clone());
+
+        let error = run(&options).unwrap_err();
+
+        let canonical = dir.0.canonicalize().unwrap();
+        assert!(
+            error.starts_with(&format!("failed to write {}: ", canonical.display())),
+            "{error}"
+        );
+    }
+
+    /// Missing parent directories of the raw path are created.
+    #[test]
+    fn a_raw_path_in_a_missing_directory_is_created() {
+        let dir = Temp::new();
+        let mut options = options(&dir, "nested", TINY);
+        options.raw = Some(dir.0.join("nested").join("deeper").join("raw.json"));
+        options.wall_cap = Duration::ZERO;
+
+        let outcome = run(&options).unwrap();
+
+        assert!(outcome.raw.is_file());
+        assert!(read_raw(&outcome.raw).unwrap().lineages.is_empty());
+    }
+
+    #[test]
     fn default_paths_follow_the_feature_and_pilot_naming() {
+        let dir = Temp::new();
+        let checkout = git_checkout(&dir);
         let root = crate::bench::artifacts::output_paths_with_suffix(
-            Path::new("."),
+            checkout,
             "recruitment-s0-pilot",
             "-s0-pilot",
             Some("t13-f07-x"),
@@ -817,7 +918,7 @@ mod tests {
             .summary
             .ends_with("docs/progress/features/t13-f07-x-s0-pilot.json"));
         let panel = crate::bench::artifacts::output_paths_with_suffix(
-            Path::new("."),
+            checkout,
             "recruitment-s0",
             "-s0",
             Some("t13-f07-x"),

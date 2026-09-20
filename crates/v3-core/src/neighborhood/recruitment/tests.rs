@@ -1028,6 +1028,22 @@ fn exposure_counts_every_selection_by_surface_and_outcome() {
 }
 
 #[test]
+fn exposure_totals_sum_every_surface() {
+    let surface = |applied, discarded| SurfaceExposure {
+        applied,
+        discarded,
+        first_applied: None,
+        first_discarded: None,
+    };
+    let exposure = Exposure {
+        split: surface(1, 2),
+        payload: surface(3, 5),
+        other: surface(7, 11),
+    };
+    assert_eq!((exposure.applied(), exposure.discarded()), (11, 18));
+}
+
+#[test]
 fn a_new_route_entry_naming_a_module_is_one_split_exposure_per_birth() {
     let mut tracker = RecruitmentTracker::new(1);
     tracker.seed_founder(0, &[vm_node(0, 3), vm_node(1, 3)]);

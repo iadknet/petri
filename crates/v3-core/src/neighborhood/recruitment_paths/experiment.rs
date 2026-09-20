@@ -1590,4 +1590,77 @@ mod tests {
         assert!(aggregate.checkpoint_cost.is_empty());
         assert_eq!(aggregate.retained_discovery, estimate(0, 1));
     }
+
+    /// Every fixed start's authored module 2 is reachable and undispatched
+    /// at generation 0: eligibility is raised before the first proposal and
+    /// expression is not.
+    #[test]
+    fn every_start_reaches_but_does_not_express_its_cohort_module_at_generation_zero() {
+        for start in starting_forms() {
+            let tracker = initial_tracker(&start);
+            assert_eq!(
+                reachable_cohort(&start.genome, &tracker),
+                BTreeSet::from([NodeId::new(2)]),
+                "{}",
+                start.name
+            );
+            assert!(!expressed(&tracker), "{}", start.name);
+        }
+    }
+
+    /// Two cohort modules born at the same depth are told apart by node: the
+    /// recruit reading is the discovered module's, not its earlier sibling's.
+    #[test]
+    fn recruit_reading_finds_the_discovered_module_among_same_depth_siblings() {
+        use crate::mutation::topology::TopologyOperator;
+        let start = starting_forms()
+            .into_iter()
+            .find(|start| start.name == "graph_copy")
+            .unwrap();
+        let base = fixtures::base(ModuleBackend::Graph, true);
+        let mut copied = base.clone();
+        fixtures::topology(&mut copied, TopologyOperator::CopyNode, 7);
+        let second = fixtures::topology(&mut copied, TopologyOperator::CopyNode, 11);
+        assert_eq!(
+            copied
+                .nodes
+                .iter()
+                .map(|node| node.node_id.0)
+                .collect::<Vec<_>>(),
+            [0, 1, 2, 3]
+        );
+        let mut tracker = RecruitmentTracker::new(1);
+        tracker.seed_founder(0, &base.nodes);
+        tracker.record_birth(BirthObservation {
+            lineage: 0,
+            depth: 1,
+            after: &copied.nodes,
+            summary: &second,
+        });
+        let config = task_config();
+        let reading = evaluate_with_config(&copied, &config);
+        let all = uses(
+            &copied,
+            &reading,
+            start.task,
+            &start.task_reading,
+            &tracker,
+            &config,
+        );
+        assert_eq!(
+            all.iter()
+                .map(|module| (module.node, module.created_depth))
+                .collect::<Vec<_>>(),
+            [(NodeId::new(2), 1), (NodeId::new(3), 1)]
+        );
+        let discovery = Discovery {
+            generation: 1,
+            sibling: 0,
+            module: all[1].clone(),
+        };
+
+        let found = recruit_reading(&copied, &reading, &start, &tracker, &discovery, &config);
+
+        assert_eq!(found.map(|module| module.node), Some(NodeId::new(3)));
+    }
 }
