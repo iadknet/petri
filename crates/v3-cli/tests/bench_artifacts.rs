@@ -175,11 +175,8 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
     v3_cli::inspect::resolve_baseline_world(recipe, path.to_str().unwrap()).unwrap()
 }
 
-/// T17.F02 re-pin: the resolved config now serializes the lifecycle
-/// `age_reference_ticks` field the byte-identical recipes inherit from the
-/// production default, so every digest moved once (previously re-pinned at
-/// T02.F04 for the `grazing` block). Measured on the T17.F02 code.
-/// Re-pinned 2026-09-19: resolved recipes now include the 25% large-copy weight.
+/// These digests pin the fully resolved checked-in recipes. Intentional changes
+/// to inherited production defaults must update them after repeated resolution.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let actual = GOAL_RECIPE_NAMES
@@ -187,9 +184,9 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
-            "sha256:998a2733f9ce5e5156db679a3c5e9552873b2cbcf538a237edeb612d5043b2d8",
-            "sha256:80fc4f40ba769fe32ac11d8f884bc1d25a362b82ddc4428207a5590af7a8ba01",
-            "sha256:c9584d3f0604ae829a90c694e8a4e546b5b2e14e17b12b5a5ddba647775df97b",
+            "sha256:d4b8c057ebbf7b1e83380b91a942f7da777b6c4ed12a9d3a522a258b06878a34",
+            "sha256:3c42bd6c569e9bfe01edbd5b2250d022b4d87e0f0ec38cf9fb9478819f722f6d",
+            "sha256:aa5b67350af94d814eead058803ad772a01e4cce1611c755acd105f278f72b8c",
         ]
     );
 }

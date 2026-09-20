@@ -2,14 +2,25 @@ import type { BooleanFieldDef, FieldDef } from "../shared/types.ts";
 
 export const AGE_COST_FIELDS: FieldDef[] = [
 	{
+		path: "energy.age_cost.grace_ticks",
+		label: "Grace Ticks",
+		min: 0,
+		max: 5000,
+		step: 10,
+		testId: "config-field-age-cost-grace-ticks",
+		defaultValue: 100,
+		tooltip: "Age through which creatures pay normal action energy costs",
+	},
+	{
 		path: "energy.age_cost.age_cap",
 		label: "Age Cap",
 		min: 1,
 		max: 5000,
 		step: 10,
 		testId: "config-field-age-cost-age-cap",
-		defaultValue: 500,
-		tooltip: "Age in ticks at which the maximum cost multiplier applies",
+		defaultValue: 200,
+		tooltip:
+			"Age in ticks at which the maximum cost multiplier applies; set above grace ticks for a gradual ramp",
 	},
 	{
 		path: "energy.age_cost.max_multiplier",
@@ -29,7 +40,7 @@ export const AGE_COST_TOGGLES: BooleanFieldDef[] = [
 		label: "Age Cost",
 		testId: "config-field-age-cost-enabled",
 		defaultValue: true,
-		tooltip: "When enabled, older creatures pay higher energy costs for all actions",
+		tooltip: "When enabled, creatures past the grace age pay higher energy costs for all actions",
 	},
 ];
 

@@ -161,6 +161,7 @@ export interface ComplexityEnergyCostConfig {
 
 export interface AgeEnergyCostConfig {
 	enabled: boolean;
+	grace_ticks: number;
 	age_cap: number;
 	max_multiplier: number;
 }
