@@ -78,7 +78,8 @@ export const MOCK_CONFIG: SimulationConfig = {
 		},
 		age_cost: {
 			enabled: true,
-			age_cap: 500,
+			grace_ticks: 100,
+			age_cap: 200,
 			max_multiplier: 10.0,
 		},
 	},

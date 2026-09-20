@@ -518,6 +518,9 @@ impl ComplexityEnergyCostConfig {
 pub struct AgeEnergyCostConfig {
     /// Whether the age energy cost multiplier is active.
     pub enabled: bool,
+    /// Age (in ticks) through which no age-based multiplier applies.
+    #[serde(default = "default_age_cost_grace_ticks")]
+    pub grace_ticks: u64,
     /// Age (in ticks) at which the maximum multiplier applies.
     pub age_cap: u64,
     /// Maximum energy cost multiplier at or beyond age_cap.
@@ -528,24 +531,37 @@ impl Default for AgeEnergyCostConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            age_cap: 500,
+            grace_ticks: default_age_cost_grace_ticks(),
+            age_cap: 200,
             max_multiplier: 10.0,
         }
     }
 }
 
+fn default_age_cost_grace_ticks() -> u64 {
+    100
+}
+
 impl AgeEnergyCostConfig {
     /// Returns the energy cost multiplier for a creature of the given age.
     ///
-    /// Formula: `1.0 + (max_multiplier - 1.0) * min(1.0, age / age_cap)^2`
-    /// Returns 1.0 (no penalty) when disabled or age_cap is 0.
+    /// Formula after the grace period:
+    /// `1.0 + (max_multiplier - 1.0) * min(1.0, (age - grace_ticks) / (age_cap - grace_ticks))^2`.
+    ///
+    /// Returns 1.0 when disabled, `age_cap` is 0, or age is within the grace period. If
+    /// `age_cap` is not later than the grace period, the maximum applies immediately after grace.
     #[inline]
     #[must_use]
     pub fn multiplier(&self, age: u64) -> f32 {
-        if !self.enabled || self.age_cap == 0 {
+        if !self.enabled || self.age_cap == 0 || age <= self.grace_ticks {
             return 1.0;
         }
-        let ratio = (age as f32 / self.age_cap as f32).min(1.0);
+        let ramp_ticks = self.age_cap.saturating_sub(self.grace_ticks);
+        if ramp_ticks == 0 {
+            return self.max_multiplier;
+        }
+        let elapsed_ticks = age.saturating_sub(self.grace_ticks);
+        let ratio = (elapsed_ticks as f64 / ramp_ticks as f64).min(1.0) as f32;
         1.0 + (self.max_multiplier - 1.0) * ratio * ratio
     }
 }
@@ -1542,7 +1558,8 @@ mod tests {
         assert!((cfg.energy.complexity_cost.scaling_factor - 0.002).abs() < 1e-6);
         // Age energy cost
         assert!(cfg.energy.age_cost.enabled);
-        assert_eq!(cfg.energy.age_cost.age_cap, 500);
+        assert_eq!(cfg.energy.age_cost.grace_ticks, 100);
+        assert_eq!(cfg.energy.age_cost.age_cap, 200);
         assert!((cfg.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
         // Energy costs
         assert!((cfg.energy.costs.move_cost - 0.2).abs() < 1e-6);
@@ -2087,7 +2104,8 @@ mod tests {
     fn age_cost_config_default_values() {
         let ac = AgeEnergyCostConfig::default();
         assert!(ac.enabled);
-        assert_eq!(ac.age_cap, 500);
+        assert_eq!(ac.grace_ticks, 100);
+        assert_eq!(ac.age_cap, 200);
         assert!((ac.max_multiplier - 10.0).abs() < 1e-6);
     }
 
@@ -2095,7 +2113,8 @@ mod tests {
     fn energy_config_has_age_cost_field() {
         let cfg = SimulationConfig::default();
         assert!(cfg.energy.age_cost.enabled);
-        assert_eq!(cfg.energy.age_cost.age_cap, 500);
+        assert_eq!(cfg.energy.age_cost.grace_ticks, 100);
+        assert_eq!(cfg.energy.age_cost.age_cap, 200);
         assert!((cfg.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
     }
 
@@ -2136,8 +2155,17 @@ mod tests {
         let cfg = SimulationConfig::default();
         let json = serde_json::to_string(&cfg).unwrap();
         let cfg2: SimulationConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(cfg2.energy.age_cost.age_cap, 500);
+        assert_eq!(cfg2.energy.age_cost.grace_ticks, 100);
+        assert_eq!(cfg2.energy.age_cost.age_cap, 200);
         assert!((cfg2.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn age_cost_config_serde_defaults_grace_ticks_when_missing() {
+        let json = r#"{"enabled":true,"age_cap":600,"max_multiplier":10.0}"#;
+        let ac: AgeEnergyCostConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(ac.grace_ticks, 100);
+        assert_eq!(ac.age_cap, 600);
     }
 
     #[test]
@@ -2146,7 +2174,8 @@ mod tests {
         let json = r#"{"lifecycle":{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":1.0,"default_offspring_energy":100.0},"costs":{"move_cost":1.0,"eat_cost":0.0,"eat_reward_per_food":5.0,"noop_cost":0.05,"reproduce_cost":0.1,"failed_action_penalty":5.0},"complexity_cost":{"enabled":true,"threshold":50,"scaling_factor":0.002}}"#;
         let ec: EnergyConfig = serde_json::from_str(json).unwrap();
         assert!(ec.age_cost.enabled);
-        assert_eq!(ec.age_cost.age_cap, 500);
+        assert_eq!(ec.age_cost.grace_ticks, 100);
+        assert_eq!(ec.age_cost.age_cap, 200);
     }
 
     #[test]
@@ -2259,29 +2288,36 @@ mod tests {
     }
 
     #[test]
-    fn age_multiplier_mid_range_quadratic() {
-        let ac = AgeEnergyCostConfig::default(); // age_cap=500, max_multiplier=10.0
-                                                 // age=250: ratio=0.5, 1.0 + 9.0 * 0.25 = 3.25
-        assert!((ac.multiplier(250) - 3.25).abs() < 1e-4);
+    fn age_multiplier_stays_one_through_grace_period() {
+        let ac = AgeEnergyCostConfig::default();
+        assert!((ac.multiplier(100) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn age_multiplier_ramps_quadratically_between_grace_and_cap() {
+        let ac = AgeEnergyCostConfig::default();
+        // age=150: progress=(150-100)/(200-100)=0.5; 1.0 + 9.0 * 0.25 = 3.25
+        assert!((ac.multiplier(150) - 3.25).abs() < 1e-4);
     }
 
     #[test]
     fn age_multiplier_at_cap_returns_max() {
         let ac = AgeEnergyCostConfig::default();
-        assert!((ac.multiplier(500) - 10.0).abs() < 1e-4);
+        assert!((ac.multiplier(200) - 10.0).abs() < 1e-4);
     }
 
     #[test]
     fn age_multiplier_above_cap_clamped() {
         let ac = AgeEnergyCostConfig::default();
-        assert!((ac.multiplier(1000) - 10.0).abs() < 1e-4);
+        assert!((ac.multiplier(500) - 10.0).abs() < 1e-4);
     }
 
     #[test]
     fn age_multiplier_disabled_returns_one() {
         let ac = AgeEnergyCostConfig {
             enabled: false,
-            age_cap: 500,
+            grace_ticks: 100,
+            age_cap: 200,
             max_multiplier: 10.0,
         };
         assert!((ac.multiplier(400) - 1.0).abs() < f32::EPSILON);
@@ -2291,10 +2327,49 @@ mod tests {
     fn age_multiplier_zero_cap_returns_one() {
         let ac = AgeEnergyCostConfig {
             enabled: true,
+            grace_ticks: 100,
             age_cap: 0,
             max_multiplier: 10.0,
         };
         assert!((ac.multiplier(100) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn age_multiplier_reaches_max_after_grace_when_cap_is_not_later() {
+        let ac = AgeEnergyCostConfig {
+            enabled: true,
+            grace_ticks: 100,
+            age_cap: 50,
+            max_multiplier: 10.0,
+        };
+        assert!((ac.multiplier(100) - 1.0).abs() < f32::EPSILON);
+        assert!((ac.multiplier(101) - 10.0).abs() < f32::EPSILON);
+    }
+
+    proptest! {
+        #[test]
+        fn age_multiplier_is_bounded_and_monotonic(
+            grace_ticks in 0u64..1_000,
+            ramp_ticks in 1u64..1_000,
+            first_age in 0u64..3_000,
+            second_age in 0u64..3_000,
+            max_multiplier in 1.0f32..1_000.0,
+        ) {
+            let ac = AgeEnergyCostConfig {
+                enabled: true,
+                grace_ticks,
+                age_cap: grace_ticks + ramp_ticks,
+                max_multiplier,
+            };
+            let younger = first_age.min(second_age);
+            let older = first_age.max(second_age);
+            let younger_multiplier = ac.multiplier(younger);
+            let older_multiplier = ac.multiplier(older);
+
+            prop_assert!(younger_multiplier >= 1.0);
+            prop_assert!(older_multiplier <= max_multiplier);
+            prop_assert!(younger_multiplier <= older_multiplier);
+        }
     }
 
     // ── EnergyConfig::action_cost_multiplier tests ────────────────────────
@@ -2303,11 +2378,11 @@ mod tests {
     fn action_cost_multiplier_composes_complexity_and_age() {
         let mut ec = EnergyConfig::default();
         ec.complexity_cost.enabled = true;
-        // complexity=200, age=250
+        // complexity=200, age=150
         // complexity_mult = 1.0 + (200-50)*0.002 = 1.3
         // age_mult = 1.0 + 9.0 * 0.25 = 3.25
         // combined = 1.3 * 3.25 = 4.225
-        let mult = ec.action_cost_multiplier(200, 250);
+        let mult = ec.action_cost_multiplier(200, 150);
         assert!((mult - 4.225).abs() < 1e-3);
     }
 

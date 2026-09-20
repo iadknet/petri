@@ -91,13 +91,9 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
     assert_eq!(points.len(), 6);
 }
 
-/// T17.F02 re-pin: introspection reads on the unit scale and `Generation`
-/// leaves the input-reference catalog, so every trajectory moves from its
-/// first birth that draws an introspective reference or parameter. The hash
-/// below was measured after two runs agreed; the identity the test pins is
-/// unchanged (previously re-pinned at T02.F04, T11.F19, T11.F21, T11.F22,
-/// the 2026-09-18 `ChangeEntryNode` rescale, T17.F01, and T11.F23).
-/// Re-pinned 2026-09-19 for the 25% large-copy weight default.
+/// The hash below pins the short production-default trajectory after two runs
+/// agree. Intentional changes to production defaults must update it only after
+/// the new trajectory has been reproduced.
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -125,7 +121,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 15111577783754586301);
+    assert_eq!(hash.finish(), 14387572686062595774);
 }
 
 use proptest::prelude::*;

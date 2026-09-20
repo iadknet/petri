@@ -180,7 +180,8 @@ Queue-shape coupling invariant:
 | `energy.complexity_cost.threshold` | `u32` | `50` | Complexity at or below this value incurs no extra cost (multiplier = 1.0). |
 | `energy.complexity_cost.scaling_factor` | `f32` | `0.002` | Must be finite and `>= 0.0`; invalid values fall back to `0.002`. Linear scaling: multiplier = `1.0 + max(0, complexity - threshold) * scaling_factor`. |
 | `energy.age_cost.enabled` | `bool` | `true` | When `true`, creature age scales action energy costs via a quadratic multiplier. |
-| `energy.age_cost.age_cap` | `u64` | `500` | Age (in ticks) at which the maximum multiplier applies. Ages beyond this are clamped. `0` disables the multiplier (returns 1.0). |
+| `energy.age_cost.grace_ticks` | `u64` | `100` | Age through which the multiplier remains 1.0. A missing field defaults to `100`. |
+| `energy.age_cost.age_cap` | `u64` | `200` | Age (in ticks) at which the maximum multiplier applies. Ages beyond this are clamped. `0` disables the multiplier (returns 1.0). If the cap is at or before the grace age, the maximum applies on the first tick after grace. |
 | `energy.age_cost.max_multiplier` | `f32` | `10.0` | Must be finite and `>= 1.0`; invalid values fall back to `10.0`. Maximum multiplier reached at or beyond `age_cap`. |
 
 Genome carrying cost:
@@ -238,13 +239,15 @@ Complexity energy cost:
 
 Age energy cost:
 - When enabled, creature age adds a quadratic multiplier to action energy costs.
-- Formula: `1.0 + (max_multiplier - 1.0) * min(1.0, age / age_cap)^2`.
-- Returns 1.0 (no penalty) when disabled or `age_cap` is 0.
+- Through `grace_ticks`, the multiplier remains 1.0. After grace, the formula is
+  `1.0 + (max_multiplier - 1.0) * min(1.0, (age - grace_ticks) / (age_cap - grace_ticks))^2`.
+- Returns 1.0 when disabled or `age_cap` is 0. If `age_cap <= grace_ticks`,
+  the maximum multiplier applies on the first tick after grace.
 - Does NOT apply to `energy_decay_per_tick` (world-level phase 0 cost) or
   shared Eat energy rewards (applied by the action owner).
-- At default settings (age_cap=500, max_multiplier=10.0): age 0 pays 1.0x;
-  age 100 pays 1.36x; age 250 pays 3.25x; age 400 pays 6.76x; age 500+ pays
-  10.0x (clamped).
+- At default settings (`grace_ticks=100`, `age_cap=200`,
+  `max_multiplier=10.0`): ages 0 through 100 pay 1.0x; age 150 pays 3.25x;
+  and age 200+ pays 10.0x (clamped).
 
 Action cost multiplier composition:
 - All action energy costs are scaled by a combined multiplier computed as:

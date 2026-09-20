@@ -1068,13 +1068,11 @@ fn ordinary_food_alone_replenishes_energy_and_reproduces() {
     assert!(sim.stats.reproduction_actions_spawned_total > 0);
 }
 
-/// T17.F02 invariant 6: with mutation off, the unit-scale introspection
-/// re-expression of the founder gates leaves a founder-only world on exactly
-/// the trajectory it ran before. The digest covers every creature's position,
-/// energy bits, age and generation plus the primary food grid after 2,000
-/// ticks, sampled every tick; births and final population are asserted
-/// alongside. The digest was
-/// measured on the pre-feature code and must not move.
+/// With mutation off, the digest covers every creature's position, energy
+/// bits, age and generation plus the primary food grid after 2,000 ticks,
+/// sampled every tick; births and final population are asserted alongside.
+/// Intentional changes to production defaults must update this pin only after
+/// the new trajectory has been reproduced.
 #[test]
 fn founder_only_trajectory_digest_is_pinned() {
     use sha2::{Digest, Sha256};
@@ -1119,9 +1117,9 @@ fn founder_only_trajectory_digest_is_pinned() {
             digest.as_str()
         ),
         (
-            177,
+            185,
             0,
-            "5ad9e8e1484792ab566c8ecac7466fffac3bb2b92bb4dd72e9ce7cb49ade36a9"
+            "63498f8d36346079f8827c382e2978510357b374ca37759af857afa263f2d0be"
         )
     );
 }

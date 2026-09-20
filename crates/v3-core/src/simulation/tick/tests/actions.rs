@@ -950,8 +950,10 @@ fn rate_zero_charges_an_oversized_parent_exactly_the_base_charge() {
         parent_after.to_bits(),
         (1000.0f32 - base - CAPPED_TRANSFER).to_bits()
     );
+    // The flow ledger records the realized f32 debit at the parent's energy
+    // scale, so allow one rounding step around the nominal base charge.
     assert!(
-        (charged - base).abs() < 1e-5,
+        (charged - base).abs() < 1e-4,
         "charge {charged} vs base {base}"
     );
     assert_eq!(child_energy, CAPPED_TRANSFER);

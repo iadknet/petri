@@ -1,14 +1,9 @@
 //! Pins the sampled trajectory, including stochastic descendants and actions.
 //! Telemetry and wall-clock fields are deliberately excluded.
 //!
-//! T17.F02 re-pin: introspection reads on the unit scale and `Generation`
-//! leaves the input-reference catalog, so every trajectory moves from its
-//! first birth that draws an introspective reference or parameter. The
-//! digest below was measured after two runs agreed (previously re-pinned at
-//! T02.F04, T03.F11, T11.F21, T11.F22, T16.F01, the 2026-09-18
-//! `ChangeEntryNode` rescale, T17.F01, and T11.F23); the pin's purpose — that
-//! the accounting keeps the trajectory reproducible — is unchanged.
-//! Re-pinned 2026-09-19 for the 25% large-copy weight default.
+//! The digest below pins the current production-default trajectory after two
+//! runs agree. Intentional changes to production defaults must update it only
+//! after the new trajectory has been reproduced.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -74,6 +69,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "1b616e569682439ffe4edb3c02bb45b2c809e44c70abc9418efae3bb64726cca"
+        "c82547de36d3cfed37a1f1db8bc61ecc4b7184a31c8e42de163681bd6daae235"
     );
 }
