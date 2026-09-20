@@ -2019,3 +2019,98 @@ fn recruitment_paths_s0_compact_records_replay_and_prefix_the_panel() {
         assert_eq!(batches.len(), 1);
     }
 }
+
+/// The S0 panel's arm 22 (`vm_copy` / CostSelection) batch 1 lineage 13
+/// first specializes at generation 192 (`docs/progress/features/…-s0.json`).
+/// Seeds depend on `(batch, lineage, generation, sibling)` only, so the same
+/// chain replays at sizes that just reach the +64 primary horizon, and the
+/// lineage classifies `Retained` through `specialized_horizons` →
+/// `at_primary_horizon`, not through a ladder default.
+#[test]
+fn recruitment_paths_known_specializing_lineage_classifies_retained_at_the_primary_horizon() {
+    let sizes = Sizes {
+        batches: 2,
+        lineages: 14,
+        discovery: 192,
+        followup: PRIMARY_HORIZON,
+    };
+    let assay = Assay::new(Panel::s0(sizes));
+    let (start, policy) = assay.arm(22);
+    assert_eq!(
+        (start.name.as_str(), policy),
+        ("vm_copy", Policy::CostSelection)
+    );
+
+    let lineage = assay.lineage(22, 1, 13);
+
+    let discovery = lineage.specialized_discovery.as_ref().unwrap();
+    assert_eq!(discovery.generation, 192);
+    assert!(discovery.module.specialization.holds());
+    assert_eq!(
+        lineage.discovery_checkpoint.as_ref().map(|c| c.generation),
+        Some(192)
+    );
+    let horizons: Vec<_> = lineage
+        .horizons
+        .iter()
+        .map(|h| (h.offset, h.at_generation, h.outcome))
+        .collect();
+    assert_eq!(
+        horizons,
+        [
+            (16, 208, HorizonOutcome::Retained),
+            (PRIMARY_HORIZON, 256, HorizonOutcome::Retained)
+        ]
+    );
+    assert!(lineage.ladder.specialized);
+    assert_eq!(
+        lineage.ladder.at_primary_horizon,
+        Some(HorizonOutcome::Retained)
+    );
+    assert_eq!(lineage.classification, LineageClass::Retained);
+}
+
+/// Prints the readings-file table of `QualifiedPath::payload_readings()`:
+/// one row per qualified path and step, then the two verbatim-copy controls.
+/// Run with `cargo test -p v3-core recruitment_paths_print_payload_readings_table
+/// -- --ignored --nocapture`.
+#[test]
+#[ignore = "prints the T13.F07 readings table; not an assertion"]
+fn recruitment_paths_print_payload_readings_table() {
+    use crate::mutation::topology::TopologyOperator;
+    let row = |form: &str, backend: ModuleBackend, task: Task, reading: &StepReading| {
+        let s = reading.specialization;
+        println!(
+            "| {form} | {backend:?} | {task:?} | {} | {} | {} | {} | {} | {} / {} / {} / {} / {} | {} |",
+            reading.step,
+            reading.score,
+            reading.payload_changed,
+            reading.bypass_loss,
+            reading.ancestral_loss,
+            s.task_live,
+            s.score_gain,
+            s.bypass_loss,
+            s.ancestral_loss,
+            s.incumbents_preserved,
+            s.holds()
+        );
+    };
+    println!(
+        "| Form | Backend | Task | Step | Score | payload_changed | bypass_loss | ancestral_loss | task_live / score_gain / bypass_loss / ancestral_loss / incumbents_preserved | holds |"
+    );
+    println!("| --- | --- | --- | --- | ---: | --- | ---: | ---: | --- | --- |");
+    for path in paths().iter().filter(|path| path.qualified()) {
+        for reading in path.payload_readings() {
+            row(&path.form, path.backend, path.task, &reading);
+        }
+    }
+    for backend in [ModuleBackend::Graph, ModuleBackend::Vm] {
+        let base = fixtures::base(backend, true);
+        let mut copied = base.clone();
+        fixtures::topology(&mut copied, TopologyOperator::CopyNode, 7);
+        let birth = copied.nodes[2].backend_def.clone();
+        copied.entry_node_id = NodeId::new(2);
+        let reading = payload_reading("verbatim", &copied, &birth, &evaluate(&base), Task::A);
+        row("verbatim_copy (control)", backend, Task::A, &reading);
+    }
+}

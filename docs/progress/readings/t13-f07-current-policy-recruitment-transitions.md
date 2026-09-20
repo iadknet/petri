@@ -138,43 +138,55 @@ InputRef 131,121; `skipped_by_operator_reason` {}; `selected_inapplicable_by_dom
 
 ### S0 ladder per arm
 
-| Arm | Start | Policy | Task | Lineages | eligibility | local_edit | expression | specialized | proposal_specialized (lineages) | specialized_proposals | bypass_only | Classes | eligible_site_fraction |
-| ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
-| 0 | graph_blank | Drift | A | 64 | 64 | 61 | 61 | 0 | 0 | 0 | 0 | no_benefit 60, no_edit 3, no_expression 1 | 348/498 = 0.6988 |
-| 1 | graph_blank | Selection | A | 64 | 64 | 61 | 61 | 0 | 0 | 0 | 0 | no_benefit 60, no_edit 3, no_expression 1 | 348/498 = 0.6988 |
-| 2 | graph_copy | Drift | A | 64 | 64 | 62 | 63 | 0 | 0 | 0 | 0 | no_benefit 61, no_edit 2, no_expression 1 | 583/856 = 0.6811 |
-| 3 | graph_copy | Selection | A | 64 | 64 | 62 | 63 | 0 | 0 | 0 | 0 | no_benefit 61, no_edit 2, no_expression 1 | 581/856 = 0.6787 |
-| 4 | graph_split | Drift | A | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 0 | no_benefit 64 | 755/1107 = 0.6820 |
-| 5 | graph_split | Selection | A | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 0 | no_benefit 64 | 738/1066 = 0.6923 |
-| 6 | vm_blank | Drift | A | 64 | 64 | 63 | 64 | 0 | 0 | 0 | 0 | no_benefit 63, no_edit 1 | 542/737 = 0.7354 |
-| 7 | vm_blank | Selection | A | 64 | 64 | 63 | 64 | 0 | 0 | 0 | 0 | no_benefit 63, no_edit 1 | 556/770 = 0.7221 |
-| 8 | vm_copy | Drift | A | 64 | 64 | 64 | 63 | 0 | 1 | 2 | 0 | loss_not_selected 1, no_benefit 62, no_expression 1 | 840/1178 = 0.7131 |
-| 9 | vm_copy | Selection | A | 64 | 64 | 64 | 63 | 1 | 1 | 1056 | 1 | no_benefit 62, no_expression 1, retained 1 | 834/1193 = 0.6991 |
-| 10 | graph_unprepared | Drift | B | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 2 | no_benefit 64 | 691/1017 = 0.6794 |
-| 11 | graph_unprepared | Selection | B | 64 | 64 | 62 | 62 | 0 | 0 | 0 | 1 | no_benefit 61, no_edit 2, no_expression 1 | 741/1093 = 0.6780 |
-| 12 | graph_prepared | Drift | B | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 33 | no_benefit 64 | 718/1038 = 0.6917 |
-| 13 | graph_prepared | Selection | B | 64 | 64 | 64 | 64 | 0 | 0 | 2 | 44 | no_benefit 64 | 640/958 = 0.6681 |
-| 14 | vm_unprepared | Drift | B | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 3 | no_benefit 64 | 775/1076 = 0.7203 |
-| 15 | vm_unprepared | Selection | B | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 0 | no_benefit 64 | 802/1187 = 0.6757 |
-| 16 | vm_prepared | Drift | B | 64 | 64 | 64 | 64 | 0 | 0 | 13 | 40 | no_benefit 64 | 767/1061 = 0.7229 |
-| 17 | vm_prepared | Selection | B | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 50 | no_benefit 64 | 837/1193 = 0.7016 |
-| 18 | graph_blank | CostSelection | A | 64 | 64 | 20 | 43 | 0 | 0 | 0 | 0 | no_benefit 19, no_edit 44, no_expression 1 | 34/64 = 0.5312 |
-| 19 | graph_copy | CostSelection | A | 64 | 64 | 33 | 32 | 0 | 0 | 0 | 0 | no_benefit 26, no_edit 31, no_expression 7 | 62/65 = 0.9538 |
-| 20 | graph_split | CostSelection | A | 64 | 64 | 15 | 1 | 0 | 0 | 0 | 0 | no_edit 49, no_expression 15 | 61/65 = 0.9385 |
-| 21 | vm_blank | CostSelection | A | 64 | 64 | 13 | 34 | 0 | 0 | 0 | 0 | no_benefit 13, no_edit 51 | 49/64 = 0.7656 |
-| 22 | vm_copy | CostSelection | A | 64 | 64 | 35 | 39 | 1 | 1 | 1095 | 0 | no_benefit 32, no_edit 29, no_expression 2, retained 1 | 63/64 = 0.9844 |
-| 23 | graph_unprepared | CostSelection | B | 64 | 64 | 13 | 2 | 0 | 0 | 0 | 0 | no_benefit 2, no_edit 51, no_expression 11 | 56/64 = 0.8750 |
-| 24 | graph_prepared | CostSelection | B | 64 | 64 | 43 | 43 | 0 | 0 | 0 | 42 | no_benefit 43, no_edit 21 | 64/67 = 0.9552 |
-| 25 | vm_unprepared | CostSelection | B | 64 | 64 | 9 | 4 | 0 | 0 | 0 | 0 | no_benefit 3, no_edit 55, no_expression 6 | 59/66 = 0.8939 |
-| 26 | vm_prepared | CostSelection | B | 64 | 64 | 45 | 45 | 0 | 0 | 0 | 44 | no_benefit 43, no_edit 19, no_expression 2 | 62/64 = 0.9688 |
+| Arm | Start | Policy | Task | Lineages | eligibility | local_edit | expression | specialized | proposal_specialized (lineages) | specialized_proposals | specialized_after_window | bypass_only | Classes | eligible_site_fraction |
+| ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| 0 | graph_blank | Drift | A | 64 | 64 | 61 | 61 | 0 | 0 | 0 | 0 | 0 | no_benefit 60, no_edit 3, no_expression 1 | 348/498 = 0.6988 |
+| 1 | graph_blank | Selection | A | 64 | 64 | 61 | 61 | 0 | 0 | 0 | 0 | 0 | no_benefit 60, no_edit 3, no_expression 1 | 348/498 = 0.6988 |
+| 2 | graph_copy | Drift | A | 64 | 64 | 62 | 63 | 0 | 0 | 0 | 0 | 0 | no_benefit 61, no_edit 2, no_expression 1 | 583/856 = 0.6811 |
+| 3 | graph_copy | Selection | A | 64 | 64 | 62 | 63 | 0 | 0 | 0 | 0 | 0 | no_benefit 61, no_edit 2, no_expression 1 | 581/856 = 0.6787 |
+| 4 | graph_split | Drift | A | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 0 | 0 | no_benefit 64 | 755/1107 = 0.6820 |
+| 5 | graph_split | Selection | A | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 0 | 0 | no_benefit 64 | 738/1066 = 0.6923 |
+| 6 | vm_blank | Drift | A | 64 | 64 | 63 | 64 | 0 | 0 | 0 | 0 | 0 | no_benefit 63, no_edit 1 | 542/737 = 0.7354 |
+| 7 | vm_blank | Selection | A | 64 | 64 | 63 | 64 | 0 | 0 | 0 | 0 | 0 | no_benefit 63, no_edit 1 | 556/770 = 0.7221 |
+| 8 | vm_copy | Drift | A | 64 | 64 | 64 | 63 | 0 | 1 | 2 | 1 | 0 | loss_not_selected 1, no_benefit 62, no_expression 1 | 840/1178 = 0.7131 |
+| 9 | vm_copy | Selection | A | 64 | 64 | 64 | 63 | 1 | 1 | 1056 | 1 | 1 | no_benefit 62, no_expression 1, retained 1 | 834/1193 = 0.6991 |
+| 10 | graph_unprepared | Drift | B | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 0 | 2 | no_benefit 64 | 691/1017 = 0.6794 |
+| 11 | graph_unprepared | Selection | B | 64 | 64 | 62 | 62 | 0 | 0 | 0 | 0 | 1 | no_benefit 61, no_edit 2, no_expression 1 | 741/1093 = 0.6780 |
+| 12 | graph_prepared | Drift | B | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 0 | 33 | no_benefit 64 | 718/1038 = 0.6917 |
+| 13 | graph_prepared | Selection | B | 64 | 64 | 64 | 64 | 0 | 0 | 2 | 1 | 44 | no_benefit 64 | 640/958 = 0.6681 |
+| 14 | vm_unprepared | Drift | B | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 0 | 3 | no_benefit 64 | 775/1076 = 0.7203 |
+| 15 | vm_unprepared | Selection | B | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 0 | 0 | no_benefit 64 | 802/1187 = 0.6757 |
+| 16 | vm_prepared | Drift | B | 64 | 64 | 64 | 64 | 0 | 0 | 13 | 1 | 40 | no_benefit 64 | 767/1061 = 0.7229 |
+| 17 | vm_prepared | Selection | B | 64 | 64 | 64 | 64 | 0 | 0 | 0 | 0 | 50 | no_benefit 64 | 837/1193 = 0.7016 |
+| 18 | graph_blank | CostSelection | A | 64 | 64 | 20 | 43 | 0 | 0 | 0 | 0 | 0 | no_benefit 19, no_edit 44, no_expression 1 | 34/64 = 0.5312 |
+| 19 | graph_copy | CostSelection | A | 64 | 64 | 33 | 32 | 0 | 0 | 0 | 0 | 0 | no_benefit 26, no_edit 31, no_expression 7 | 62/65 = 0.9538 |
+| 20 | graph_split | CostSelection | A | 64 | 64 | 15 | 1 | 0 | 0 | 0 | 0 | 0 | no_edit 49, no_expression 15 | 61/65 = 0.9385 |
+| 21 | vm_blank | CostSelection | A | 64 | 64 | 13 | 34 | 0 | 0 | 0 | 0 | 0 | no_benefit 13, no_edit 51 | 49/64 = 0.7656 |
+| 22 | vm_copy | CostSelection | A | 64 | 64 | 35 | 39 | 1 | 1 | 1095 | 1 | 0 | no_benefit 32, no_edit 29, no_expression 2, retained 1 | 63/64 = 0.9844 |
+| 23 | graph_unprepared | CostSelection | B | 64 | 64 | 13 | 2 | 0 | 0 | 0 | 0 | 0 | no_benefit 2, no_edit 51, no_expression 11 | 56/64 = 0.8750 |
+| 24 | graph_prepared | CostSelection | B | 64 | 64 | 43 | 43 | 0 | 0 | 0 | 0 | 42 | no_benefit 43, no_edit 21 | 64/67 = 0.9552 |
+| 25 | vm_unprepared | CostSelection | B | 64 | 64 | 9 | 4 | 0 | 0 | 0 | 0 | 0 | no_benefit 3, no_edit 55, no_expression 6 | 59/66 = 0.8939 |
+| 26 | vm_prepared | CostSelection | B | 64 | 64 | 45 | 45 | 0 | 0 | 0 | 0 | 44 | no_benefit 43, no_edit 19, no_expression 2 | 62/64 = 0.9688 |
 
-Unprepared arms (18 of 27: 0–11, 14, 15, 18–23, 25): `specialized` 0
-except arm 9 (`vm_copy`/Selection, 1 lineage retained at horizons 16, 64
-and 256, `specialized_proposals` 1,056) and arm 22 (`vm_copy`/CostSelection,
-1 lineage retained at 16/64/256, `specialized_proposals` 1,095); arm 8
-(`vm_copy`/Drift) has one `loss_not_selected` lineage (2 specialized
-proposals, never retained). Prepared arms (12, 13, 16, 17, 24, 26):
-`specialized` 0, `bypass_only` 33 / 44 / 40 / 50 / 42 / 44.
+Unprepared arms (21 of 27 = 7 forms × 3 selectors: 0–11, 14, 15, 18–23,
+25): `specialized` 0 in 19 of the 21, except arm 9 (`vm_copy`/Selection, 1
+lineage retained at horizons 16, 64 and 256, `specialized_proposals` 1,056)
+and arm 22 (`vm_copy`/CostSelection, 1 lineage retained at 16/64/256,
+`specialized_proposals` 1,095); arm 8 (`vm_copy`/Drift) has one
+`loss_not_selected` lineage (1 specialized proposal in the window, never
+retained). Prepared arms (12, 13, 16, 17, 24, 26): `specialized` 0,
+`bypass_only` 33 / 44 / 40 / 50 / 42 / 44; expression 64/64 under Drift and
+Selection (12, 13, 16, 17), 43/64 and 45/64 under CostSelection (24, 26).
+
+`specialized_after_window` counts lineages with `specialized_proposals` > 0
+whose `proposal_specialized` is false: specialization first appeared after
+the 256-generation discovery window, so the lineage keeps its null class
+(the F02/report convention, spec Inputs and Invariants). Derived from the S0
+summary's per-lineage rows: five lineages in five arms, 0 in the other 22 —
+arm 8 b3/l0 (1 proposal), arm 9 b3/l0 (460), arm 13 b0/l7 (2), arm 16 b3/l9
+(13), arm 22 b2/l15 (461); the in-window rows are arm 8 b1/l15 (1 proposal,
+`loss_not_selected`), arm 9 b1/l15 (596, discovery at generation 214,
+retained) and arm 22 b1/l13 (634, discovery at 192, retained).
 
 ### S0 discovery, retention and destination kinds per arm
 
@@ -547,6 +559,57 @@ parent or RNG divergence and 742 a nonzero `proposal_discovery_difference`
 (paired arms diverge after genotype/site divergence by the `rng_control`
 note; no added-draw intervention).
 
+## Qualified-path payload readings (`QualifiedPath::payload_readings()`)
+
+One row per step of each qualified construction path (seven of the nine
+fixed forms; `graph_blank` and `vm_blank` carry a growth gap and are not
+qualified), read against the path's start
+on its task, then the two verbatim-copy negative controls (a `CopyNode` of
+the founder's module, activated as entry, on each backend). Produced by
+`cargo test -p v3-core recruitment_paths_print_payload_readings_table --
+--ignored --nocapture` at the committed source (the test prints; it asserts
+nothing). `ancestral_loss` = score(step) − score(birth payload on the same
+route); a step whose payload equals birth reads 0 by identity. Every path's
+useful last step diverges its payload with `ancestral_loss` ≥ 4 and
+incumbents preserved; every earlier step reads 0; both verbatim copies read
+`bypass_loss` 4 but `ancestral_loss` 0, so the ancestral test — not the
+bypass test — is what separates copied computation from specialization.
+
+| Form | Backend | Task | Step | Score | payload_changed | bypass_loss | ancestral_loss | task_live / score_gain / bypass_loss / ancestral_loss / incumbents_preserved | holds |
+| --- | --- | --- | --- | ---: | --- | ---: | ---: | --- | --- |
+| graph_copy | Graph | A | gate_edge_added | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| graph_copy | Graph | A | activated | 8 | true | 4 | 4 | true / true / true / true / true | true |
+| graph_split | Graph | A | gate_edge_added | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| graph_split | Graph | A | activated | 8 | true | 4 | 4 | true / true / true / true / true | true |
+| vm_copy | Vm | A | leading_halt_removed | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| vm_copy | Vm | A | activated | 8 | true | 4 | 4 | true / true / true / true / true | true |
+| graph_unprepared | Graph | B | ring_added | 4 | false | 0 | 0 | true / false / false / false / true | false |
+| graph_unprepared | Graph | B | cue_edge_retargeted | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| graph_unprepared | Graph | B | direction_node | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| graph_unprepared | Graph | B | direction_doubled | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| graph_unprepared | Graph | B | direction_read | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| graph_unprepared | Graph | B | activated | 8 | true | 4 | 6 | true / true / true / true / true | true |
+| vm_unprepared | Vm | B | ring_added | 4 | false | 0 | 0 | true / false / false / false / true | false |
+| vm_unprepared | Vm | B | read_ref_idx_1 | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| vm_unprepared | Vm | B | read_sub_idx_1 | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| vm_unprepared | Vm | B | read_sub_idx_2 | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| vm_unprepared | Vm | B | direction_doubled | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| vm_unprepared | Vm | B | activated | 8 | true | 4 | 6 | true / true / true / true / true | true |
+| graph_detour | Graph | A | cue_added | 4 | false | 0 | 0 | true / false / false / false / true | false |
+| graph_detour | Graph | A | slot_emits_move | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| graph_detour | Graph | A | direction_node | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| graph_detour | Graph | A | direction_doubled | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| graph_detour | Graph | A | direction_read | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| graph_detour | Graph | A | gate_edge_added | 8 | true | 4 | 4 | true / true / true / true / true | true |
+| vm_detour | Vm | A | cue_added | 4 | false | 0 | 0 | true / false / false / false / true | false |
+| vm_detour | Vm | A | read_cue | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| vm_detour | Vm | A | double_to_east | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| vm_detour | Vm | A | write_direction | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| vm_detour | Vm | A | skip_when_zero | 4 | true | 0 | 0 | true / false / false / false / true | false |
+| vm_detour | Vm | A | push_move | 8 | true | 4 | 4 | true / true / true / true / true | true |
+| verbatim_copy (control) | Graph | A | verbatim | 8 | false | 4 | 0 | true / false / true / false / true | false |
+| verbatim_copy (control) | Vm | A | verbatim | 8 | false | 4 | 0 | true / false / true / false / true | false |
+
 ## Predeclaration table against the measurements (verdict only)
 
 | Indicator | Predeclared | Measured | Verdict |
@@ -554,12 +617,43 @@ note; no added-draw intervention).
 | Six normalized counters, both profiles | differ from T17.F02 by the two default changes only; pinned identity hash unchanged | gate: all six `ok` vs both references, `severe` false; goal: all six `ok`, `severe` false, largest `plasticity_updates` −46.011157% (flag level, under the 50% severe line); identity-hash check is the reviewer's (`baseline_worlds` unchanged per the Verification item, not re-measured here) | recorded, no severe flag |
 | Founder neighborhood, drift walk, evolved trajectories, diversity and cognition | same attribution; no floor | founder rows equal T17.F02 in every world and the gate; evolved rows, drift (2,000: 0.001 / 0.0005 / 0.001 vs 0.005, no gate), lineage entropy and clade counts moved (tables above) | recorded |
 | Founder and evolved `mesh_execution` | existing keys unchanged; `route_destination_varies` never true where position false; founder readings equal | founder false/false in gate and all three worlds; raw goal tally 0 destination-true-with-position-false out of 39 blocks; existing keys present with the T17.F02 shapes | met |
-| Legacy panel, unprepared arms | 0/32 proposal and retained discovery | 18 unprepared arms all 0/32 / 0/32 | met |
+| Legacy panel, unprepared arms | 0/32 proposal and retained discovery | 21 unprepared arms (7 forms × 3 selectors) all 0/32 / 0/32 | met |
 | Legacy panel, prepared arms | discovery near F06's 17–18/32; every discovery `ancestral_loss` 0, `bypass_only` | 19–21/32 proposal discovery (arms 12, 13, 16, 17, 24, 26); 229 discovery readings all `ancestral_loss` 0; `specialized` 0, `bypass_only` 15/20/16/20/21/21 | recorded (discovery above the F06 range; no floor) |
-| S0 unprepared arms (18 of 27) | no floor; ladder counts and `eligible_site_fraction` are the result; exposure reported | 16 arms `specialized` 0; arm 9 (`vm_copy`/Selection) and arm 22 (`vm_copy`/CostSelection) each carry 1 `retained` lineage (at 16/64/256); arm 8 one `loss_not_selected`; `eligible_site_fraction` 0.53–0.98; requested per birth 0.055–0.466 (tables above) | recorded |
-| S0 prepared arms | expression as F06; specialization 0 unless a payload edit diverges | expression 64/64 in all six; `specialized` 0; discovery 42–50/64; `bypass_only` 33–50 | recorded |
+| S0 unprepared arms (predeclared as 18 of 27; 21 = 7 forms × 3 selectors) | no floor; ladder counts and `eligible_site_fraction` are the result; exposure reported | 19 of 21 arms `specialized` 0; arm 9 (`vm_copy`/Selection) and arm 22 (`vm_copy`/CostSelection) each carry 1 `retained` lineage (at 16/64/256); arm 8 one `loss_not_selected`; `specialized_after_window` 1 in arms 8, 9 and 22; `eligible_site_fraction` 0.53–0.98; requested per birth 0.055–0.466 (tables above) | recorded |
+| S0 prepared arms | expression as F06; specialization 0 unless a payload edit diverges | expression 64/64 in the Drift/Selection arms (12, 13, 16, 17), 43/64 and 45/64 under CostSelection (24, 26); `specialized` 0; `specialized_after_window` 1 in arms 13 and 16; discovery 42–50/64; `bypass_only` 33–50 | recorded |
 | S0 Drift arms | genome size may grow; p50/p90 reported; pilot projection is the cap check | gen-512 p50 52.5–187, p90 128–478 (max 4,658 in arm 17); projection inside the launch margin; run complete, 1.342 GiB, 162.5 s | met |
-| Negative controls | verbatim copies 0 `ancestral_loss` | fixtures are test-covered (Verification); panel: 0 nonzero `ancestral_loss` among 229 discoveries | recorded |
+| Negative controls | verbatim copies 0 `ancestral_loss` | both verbatim-copy controls read `ancestral_loss` 0 (`bypass_loss` 4), every qualified path's useful last step reads ≥ 4 with incumbents preserved (per-step table above); panel: 0 nonzero `ancestral_loss` among 229 discoveries | recorded |
 | Wall per creature-tick, both profiles | no direction | gate −3.35% / −17.68% `ok`; goal −6.68% `ok` | recorded |
 | Committed goal summary bytes | grows by the new keys; S0 summary under 4 MB, per-lineage rows | goal summary 7,632,294 (T17.F02 6,873,055, +759,239); S0 summary 2,405,314 with 1,728 lineage rows and no proposal rows | met |
 | Caps | goal experiment < 120 s; goal profile < 15 min; S0 < 2 h and 2 GiB; pilot < 10 min | recruitment 11.5 s; goal 460.4 s CLI / 494 s outer; S0 162.5 s and 1.342 GiB; pilot 6.8 s CLI (140 s outer with the build) | met |
+
+## Deferred (final review, 2026-09-20; spec-owner rulings)
+
+Code findings the review ruled record-only for this feature; the spec's
+Notes for AI Agents point here. Each is a cleanup for the feature that next
+touches the site (F08–F10 extend the chain facts), not a behavior defect.
+
+- Deferred: chain facts (retained discovery, horizons, ladder, classification)
+  are restated at six sites — `records.rs` `Lineage`, `CompactLineage`,
+  `ChainFacts`, `LineageFacts::assemble`, `v3-cli/src/recruitment.rs`
+  `LineageRow::of`, `v3-cli/src/bench/artifacts.rs` projection; refactor to
+  one owned chain-facts struct before F08–F10 extend them.
+- Deferred: `EditSurface::of` (`recruitment.rs` ~136) matches a wildcard
+  and falls back on `operator.domain()`; match the topology operators
+  exhaustively so a new operator is a compile error, not a silent `Other`.
+- Deferred: `class_key` (`records.rs` ~769) hand-rolls the snake_case that
+  `LineageClass`'s serde derive already produces.
+- Deferred: `event.outcome.starts_with("Applied")` is a string pattern on
+  an outcome that is an enum upstream (`experiment.rs` ~605, `records.rs`
+  ~968); carry the enum or a boolean instead.
+- Deferred: the streamed S0 JSON is built by popping braces from serialized
+  text (`v3-cli/src/recruitment.rs` ~384 head, ~402 footer); a
+  `serde_json::Serializer` sequence or an explicit envelope struct removes
+  the text surgery.
+- Deferred: exit status 3 on an incomplete run is asserted by no
+  spawned-binary test (the in-process test checks `incomplete` only).
+- Deferred: the raw file may exceed `--byte-cap` by up to `threads − 1`
+  lineage records (cap checked after each append; recorded in
+  `docs/benchmark-artifacts.md`).
+- Deferred: spec dates are UTC (the 2026-09-20 run dates fall on the
+  2026-09-19 local evening).
