@@ -233,13 +233,20 @@ pub struct Module {
     contributing_now: bool,
 }
 
+/// SHA-256 hex of a value's JSON form: payload hashes and proposal
+/// fingerprints alike.
+#[must_use]
+pub fn json_sha256(value: &impl serde::Serialize) -> String {
+    use sha2::Digest;
+    hex::encode(sha2::Sha256::digest(
+        serde_json::to_vec(value).expect("observation values serialize"),
+    ))
+}
+
 /// SHA-256 hex of a payload's JSON form.
 #[must_use]
 pub fn payload_hash(payload: &BackendDef) -> String {
-    use sha2::Digest;
-    hex::encode(sha2::Sha256::digest(
-        serde_json::to_vec(payload).expect("backend definitions serialize"),
-    ))
+    json_sha256(payload)
 }
 
 impl Module {

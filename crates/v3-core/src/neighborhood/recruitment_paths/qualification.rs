@@ -162,17 +162,18 @@ pub fn payload_reading(
     let score = reading.correct(task);
     let bypass = evaluate(&static_successor_bypass(genome, SCAFFOLD));
     let payload_changed = node(genome, SCAFFOLD).backend_def != *birth_payload;
-    let replaced = if payload_changed {
-        evaluate(&ancestral_payload_replacement(
+    // A verbatim payload replaced by itself is the identity: loss zero.
+    let ancestral_loss = if payload_changed {
+        let replaced = evaluate(&ancestral_payload_replacement(
             genome,
             SCAFFOLD,
             birth_payload,
-        ))
+        ));
+        i16::from(score) - i16::from(replaced.correct(task))
     } else {
-        reading.clone()
+        0
     };
     let bypass_loss = i16::from(score) - i16::from(bypass.correct(task));
-    let ancestral_loss = i16::from(score) - i16::from(replaced.correct(task));
     StepReading {
         step: step.into(),
         score,

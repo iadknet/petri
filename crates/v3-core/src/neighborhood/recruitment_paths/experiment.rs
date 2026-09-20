@@ -12,7 +12,6 @@ use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::{MutationDomain, MutationEngine, MutationSummary};
 use rand::{rngs::SmallRng, RngCore, SeedableRng};
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 pub fn proposal_seed(batch: u32, lineage: u32, generation: u32, sibling: u8) -> u64 {
@@ -24,9 +23,7 @@ pub fn proposal_seed(batch: u32, lineage: u32, generation: u32, sibling: u8) -> 
 }
 
 pub(super) fn fingerprint(value: &impl Serialize) -> String {
-    hex::encode(Sha256::digest(
-        serde_json::to_vec(value).expect("observation values serialize"),
-    ))
+    super::super::recruitment::json_sha256(value)
 }
 
 pub(super) fn initial_tracker(start: &Start) -> RecruitmentTracker {

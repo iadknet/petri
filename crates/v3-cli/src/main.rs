@@ -39,7 +39,7 @@ struct RecruitmentArgs {
     /// Private rayon pool of this many threads (>= 1); arms and lineages run
     /// in parallel. Omit it to use the rayon global pool.
     #[arg(long)]
-    threads: Option<usize>,
+    threads: Option<NonZeroUsize>,
     /// Stop between lineages once this many seconds have elapsed.
     #[arg(long, default_value_t = v3_cli::recruitment::DEFAULT_WALL_CAP_SECS)]
     wall_cap_secs: u64,
@@ -417,10 +417,6 @@ fn run_recruitment(args: RecruitmentArgs) {
             std::process::exit(1);
         }
     };
-    if args.threads == Some(0) {
-        eprintln!("error: --threads must be >= 1");
-        std::process::exit(1);
-    }
     let options = v3_cli::recruitment::Options {
         pilot: args.pilot,
         threads: args.threads,
@@ -662,9 +658,13 @@ mod tests {
         assert!(args.pilot && args.replay_check);
         assert_eq!(
             (args.threads, args.wall_cap_secs, args.byte_cap),
-            (Some(4), 10, 1000)
+            (NonZeroUsize::new(4), 10, 1000)
         );
         assert!(Cli::try_parse_from(["v3-cli", "recruitment"]).is_err());
+        assert!(
+            Cli::try_parse_from(["v3-cli", "recruitment", "--feature", "x", "--threads", "0"])
+                .is_err()
+        );
     }
 
     #[test]

@@ -1018,81 +1018,120 @@ pub struct LineageFacts {
     pub destination_kinds: DestinationKindCounts,
 }
 
+/// The retained-chain fields a full and a compact lineage share, borrowed
+/// so both fold into [`LineageFacts`] through one path.
+struct ChainFacts<'a> {
+    batch: u32,
+    lineage: u32,
+    checkpoints: &'a [Checkpoint],
+    proposal_discovery: Option<&'a Discovery>,
+    retained_discovery: Option<&'a Discovery>,
+    specialized_discovery: Option<&'a Discovery>,
+    viable_retained_discovery: bool,
+    retention: Option<&'a Retention>,
+    horizons: &'a [Horizon],
+    ladder: Ladder,
+    classification: LineageClass,
+}
+
+impl Lineage {
+    fn chain(&self) -> ChainFacts<'_> {
+        ChainFacts {
+            batch: self.batch,
+            lineage: self.lineage,
+            checkpoints: &self.checkpoints,
+            proposal_discovery: self.proposal_discovery.as_ref(),
+            retained_discovery: self.retained_discovery.as_ref(),
+            specialized_discovery: self.specialized_discovery.as_ref(),
+            viable_retained_discovery: self.viable_retained_discovery,
+            retention: self.retention.as_ref(),
+            horizons: &self.horizons,
+            ladder: self.ladder,
+            classification: self.classification,
+        }
+    }
+}
+
+impl CompactLineage {
+    fn chain(&self) -> ChainFacts<'_> {
+        ChainFacts {
+            batch: self.batch,
+            lineage: self.lineage,
+            checkpoints: &self.checkpoints,
+            proposal_discovery: self.proposal_discovery.as_ref(),
+            retained_discovery: self.retained_discovery.as_ref(),
+            specialized_discovery: self.specialized_discovery.as_ref(),
+            viable_retained_discovery: self.viable_retained_discovery,
+            retention: self.retention.as_ref(),
+            horizons: &self.horizons,
+            ladder: self.ladder,
+            classification: self.classification,
+        }
+    }
+}
+
 impl LineageFacts {
     #[must_use]
     pub fn of(lineage: &Lineage) -> Self {
-        let last = lineage.checkpoints.last();
-        Self {
-            batch: lineage.batch,
-            lineage: lineage.lineage,
-            proposals: lineage
-                .proposals
-                .iter()
-                .map(|proposal| {
-                    (
-                        proposal.outcome.live(),
-                        proposal.outcome.correct(lineage.task),
-                        proposal.parent_score,
-                    )
-                })
-                .collect(),
-            specialized_proposals: lineage
-                .proposals
-                .iter()
-                .filter(|proposal| proposal.specialized)
-                .count() as u64,
-            checkpoints: lineage.checkpoints.iter().map(Checkpoint::cost).collect(),
-            proposal_discovery: lineage.proposal_discovery.as_ref().map(|d| d.generation),
-            retained_discovery: lineage.retained_discovery.as_ref().map(|d| d.generation),
-            specialized_discovery: lineage.specialized_discovery.as_ref().map(|d| d.generation),
-            viable_retained_discovery: lineage.viable_retained_discovery,
-            retention: lineage.retention.as_ref().map(|r| r.outcome),
-            horizons: lineage
-                .horizons
-                .iter()
-                .map(|horizon| (horizon.offset, horizon.outcome))
-                .collect(),
-            ladder: lineage.ladder,
-            classification: lineage.classification,
-            final_applicable: last.map_or((0, 0), |checkpoint| {
+        Self::assemble(
+            lineage.chain(),
+            lineage.proposals.iter().map(|proposal| {
                 (
-                    checkpoint.eligible_site_fraction.numerator.into(),
-                    checkpoint.eligible_site_fraction.denominator.into(),
+                    proposal.outcome.live(),
+                    proposal.outcome.correct(lineage.task),
+                    proposal.parent_score,
+                    proposal.specialized,
                 )
             }),
-            destination_kinds: last.map_or_else(Default::default, |c| c.destination_kinds),
-        }
+        )
     }
 
     #[must_use]
     pub fn of_compact(lineage: &CompactLineage) -> Self {
-        let last = lineage.checkpoints.last();
+        Self::assemble(
+            lineage.chain(),
+            lineage.proposals.iter().map(|proposal| {
+                (
+                    proposal.live,
+                    proposal.score,
+                    proposal.parent_score,
+                    proposal.specialized,
+                )
+            }),
+        )
+    }
+
+    /// `proposals` yields `(live, score, parent_score, specialized)`.
+    fn assemble(
+        chain: ChainFacts<'_>,
+        proposals: impl Iterator<Item = (bool, u8, u8, bool)>,
+    ) -> Self {
+        let mut specialized_proposals = 0;
+        let proposals = proposals
+            .map(|(live, score, parent_score, specialized)| {
+                specialized_proposals += u64::from(specialized);
+                (live, score, parent_score)
+            })
+            .collect();
+        let last = chain.checkpoints.last();
         Self {
-            batch: lineage.batch,
-            lineage: lineage.lineage,
-            proposals: lineage
-                .proposals
-                .iter()
-                .map(|proposal| (proposal.live, proposal.score, proposal.parent_score))
-                .collect(),
-            specialized_proposals: lineage
-                .proposals
-                .iter()
-                .filter(|proposal| proposal.specialized)
-                .count() as u64,
-            checkpoints: lineage.checkpoints.iter().map(Checkpoint::cost).collect(),
-            proposal_discovery: lineage.proposal_discovery.as_ref().map(|d| d.generation),
-            retained_discovery: lineage.retained_discovery.as_ref().map(|d| d.generation),
-            specialized_discovery: lineage.specialized_discovery.as_ref().map(|d| d.generation),
-            viable_retained_discovery: lineage.viable_retained_discovery,
-            retention: lineage.retention.as_ref().map(|r| r.outcome),
-            horizons: lineage
+            batch: chain.batch,
+            lineage: chain.lineage,
+            proposals,
+            specialized_proposals,
+            checkpoints: chain.checkpoints.iter().map(Checkpoint::cost).collect(),
+            proposal_discovery: chain.proposal_discovery.map(|d| d.generation),
+            retained_discovery: chain.retained_discovery.map(|d| d.generation),
+            specialized_discovery: chain.specialized_discovery.map(|d| d.generation),
+            viable_retained_discovery: chain.viable_retained_discovery,
+            retention: chain.retention.map(|r| r.outcome),
+            horizons: chain
                 .horizons
                 .iter()
                 .map(|horizon| (horizon.offset, horizon.outcome))
                 .collect(),
-            ladder: lineage.ladder,
-            classification: lineage.classification,
+            ladder: chain.ladder,
+            classification: chain.classification,
             final_applicable: last.map_or((0, 0), |checkpoint| {
                 (
                     checkpoint.eligible_site_fraction.numerator.into(),
