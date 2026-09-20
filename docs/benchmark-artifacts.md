@@ -10,7 +10,7 @@ remain valid comparison inputs; historical migration belongs to T15.F02.
 | Gate | `.bench-artifacts/<feature>/gate.json` | `docs/progress/features/<feature>.json` |
 | Goal | `.bench-artifacts/<feature>/goal.json` | `docs/progress/features/<feature>-goal.json` |
 | Sweep | `.bench-artifacts/<feature>/sweep.json` | `docs/progress/features/<feature>-sweep.json` |
-| Recruitment S0 (`v3-cli recruitment`, `--pilot` adds `-pilot`) | `.bench-artifacts/<feature>/recruitment-s0.json` (`recruitment-s0-pilot.json`): compact per-lineage records streamed as they complete, `incomplete: true` when a cap stopped the run; exit status 3 | `docs/progress/features/<feature>-s0.json` (`-s0-pilot.json`): `petri-recruitment-s0-summary`, per-arm estimates, ladder and classification counts, raw bytes/sha256, thread count, optional replay check |
+| Recruitment S0 (`v3-cli recruitment`, `--pilot` adds `-pilot`) | `.bench-artifacts/<feature>/recruitment-s0.json` (`recruitment-s0-pilot.json`): compact per-lineage records streamed as they complete, `incomplete: true` when a cap stopped the run; exit status 3. The byte cap is checked after each record lands, so lineages already in flight on other threads still append: the raw file may exceed `--byte-cap` by up to `threads − 1` lineage records. | `docs/progress/features/<feature>-s0.json` (`-s0-pilot.json`): `petri-recruitment-s0-summary`, per-arm estimates, ladder and classification counts, raw bytes/sha256, thread count, optional replay check |
 
 The first entry from `git worktree list --porcelain -z` identifies the main
 checkout, including when called from a linked worktree or a path containing

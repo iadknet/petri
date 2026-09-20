@@ -61,10 +61,9 @@ nothing reaches creatures, no production trajectory changes.
   structural copy weight 25%) and `3806dc91` (age-cost grace 100, cap 200,
   max 10); both move draws and trajectories before this feature. T11.F20 is
   open, so `with_legacy_supply` exists.
-- Entry point: one `v3-cli` subcommand over the extended `observe` (chosen)
-  over a fourth bench profile (world parameters the assay lacks) or a probe
-  patch plus script (not replayable). Seeds, choices and deltas replace
-  F06's per-proposal genomes.
+- Entry point: one `v3-cli` subcommand over the extended `observe`, chosen
+  over a fourth bench profile (unused world parameters) or a probe patch
+  plus script (not replayable).
 
 **Panels (fixed before measurement).**
 
@@ -86,7 +85,7 @@ evidence. `--threads` parallelizes arms; determinism is per lineage.
 | Fact | Definition |
 | --- | --- |
 | Ancestry | `copy_source: Option<(NodeId, created_depth)>` (first pre-birth node whose `backend_def` matches, `ambiguous` flag when several match), `birth_payload` (the `backend_def` at creation; for a constructed start, its generation-0 payload — authored history is construction, not mutation; stored whole only for modules that reach Dispatch, as a hash otherwise), `later_copies`, `deleted_depth`. |
-| Target-local exposure | Per module, counts (not first depth) of events that selected it: applied / discarded, by surface of the selecting operator — split (route target/gate/entry/splice; a new route entry naming the module from the birth diff is one applied split), payload (Vm/Graph/SwapNodeBackend), other (InputRef/add/remove/copy) — plus the depth of the first of each; per lineage, `eligible_site_fraction` = cohort modules that reached `ApplicableSelection` ÷ cohort modules created (selection is the only observed applicability, so it under-reads; stated in the readings). |
+| Target-local exposure | Per module, counts (not first depth) of events that selected it: applied / discarded, by surface of the selecting operator — split (route target/gate/entry/splice; a new route entry naming an existing module from the birth diff is one applied split; wiring created in the module's own birth is provenance, not exposure), payload (Vm/Graph/SwapNodeBackend), other (InputRef/add/remove/copy) — plus the depth of the first of each; per lineage, `eligible_site_fraction` = cohort modules that reached `ApplicableSelection` ÷ cohort modules created (selection is the only observed applicability, so it under-reads; stated in the readings). |
 | Expression | `scenes_dispatched` 0–8 per scene reading; contextual when 1–7, unconditional when 8. |
 | Route variation | `route_destination_varies` beside the existing position reading, from `selected_target_id`; both in the assay checkpoints and in `mesh_execution` for the founder and evolved genomes. |
 | Ancestral-payload counterfactual | `ancestral_payload_replacement(genome, module)`: the node keeps id, targets and position; only `backend_def` becomes `birth_payload`. `ancestral_loss` = score(current) − score(replaced) on the arm's task; `ending_energy_sum` of both reported beside it. |
@@ -100,25 +99,24 @@ counts reported beside it).**
 | Eligibility | A cohort (New/Copy) module is statically reachable from the entry node. |
 | Local edit | ≥ 1 applied event targeted a reachable cohort module. |
 | Expression | A cohort module dispatched in ≥ 1 scene. |
-| Specialized | Task-live; score ≥ starting score + 1; bypass loss ≥ 1; `ancestral_loss` ≥ 1; every scene correct at generation 0 is still correct. Each component is stored, so a reader sees which failed. |
+| Specialized | Task-live; score ≥ starting score + 1; bypass loss ≥ 1; `ancestral_loss` ≥ 1; every scene correct at generation 0 is still correct. Each component is stored, so a reader sees which failed. Counts toward discovery only within the discovery horizon (256; legacy 32), the F02/report convention; a lineage that first specializes later keeps its null class and is counted `specialized_after_window` in the readings. |
 | Retained | Specialized recruit present and still specialized at the first retained specialized discovery + 64 (primary); +16 and +256 reported; the legacy panel's F02 retention at bypass discovery + 16 is a separate, unchanged reading. |
 | Null classes | Exclusive, first failing stage: `no_eligibility`, `no_edit`, `no_expression`, `no_benefit` (with sub-count `bypass_only`: bypass loss ≥ 1 but `ancestral_loss` 0), `loss` (sub-kinds `not_selected`, `deleted`, `despecialized`, `task_dead`, `no_longer_useful`). Legacy panel: +64 unobservable → `censored_at_64`, its +16 reading unchanged. |
 
 **Compact raw record (S0 and pilot).** Per start, the initial genome once;
-per proposal `generation, sibling, seed, chosen, live, score,
-discovery, specialized, applied event list (operator, target, outcome)`;
-per chosen child additionally the `GenomeDelta`; full genome, tracker module
-table, battery signature and cohort at checkpoints 0 / 256 / 512 and at the
-first retained specialized discovery (tracker clone); no other full genome. `mutation_fingerprint` per proposal
-stays. A proposal is reconstructible from the initial genome, the chosen
-chain and its seed; the replay check re-derives fingerprints from that alone.
+per proposal `generation, sibling, seed, chosen, live, score, discovery,
+specialized, applied events (operator, target, outcome)`, `mutation_fingerprint`;
+per chosen child the `GenomeDelta`; full genome, module table, battery
+signature and cohort at checkpoints 0 / 256 / 512 and at the first retained
+specialized discovery (tracker clone); no other full genome. The replay check
+re-derives fingerprints from the initial genome, chosen chain and seeds.
 
 **Invariants.** Mutation, runtime and simulation never depend on observation
 types; every reading is computed from clones and consumes no mutation RNG
 (fingerprints identical with the new readings on and off); the legacy panel
 keeps its arm order, `arms/0` = `graph_blank`/Drift, `Sizes::proposals` =
 82,944 = `total_proposals`, and two `observe` calls at `Sizes::TEST` are
-equal; no production file changes, so the pinned short-run identity hash
+equal; no production behavior change, so the pinned short-run identity hash
 `14387572686062595774` (`baseline_worlds.rs`) stays; the S0 panel is
 versioned `recruitment-transitions-s0-v1` with `supply_rule` and
 `source_revision` strings; a verbatim copy always reads `ancestral_loss` 0;
@@ -140,20 +138,20 @@ the S0 command stops between lineages when `--wall-cap-secs` (7,200) or
       specialization components; a verbatim-copy negative control per backend
       reading 0; at least one Graph and one VM constructed path whose useful
       step diverges its payload reading ≥ 1 with incumbent scenes preserved
-      (from F05's qualified paths where one exists, else a fixture-only path).
+      (F05's qualified paths where one exists, else a fixture-only path).
 - [x] CLI: `v3-cli recruitment --feature <id> [--pilot] [--threads N]
-      [--wall-cap-secs 7200] [--byte-cap] [--replay-check]`, raw to `.bench-artifacts/<feature>/recruitment-s0.json`
-      (`-pilot.json`), compact summary to
-      `docs/progress/features/<feature>-s0.json` (`-s0-pilot.json`), a
-      replay-check flag that reconstructs every pilot proposal from the record
-      and compares fingerprints; one row in `docs/benchmark-artifacts.md`.
+      [--wall-cap-secs 7200] [--byte-cap] [--replay-check]`, raw to
+      `.bench-artifacts/<id>/recruitment-s0.json` (`-pilot.json`), compact
+      summary to `docs/progress/features/<id>-s0.json` (`-s0-pilot.json`);
+      `--replay-check` reconstructs every pilot proposal from the record and
+      compares fingerprints; one row in `docs/benchmark-artifacts.md`.
 - [x] Goal summary: the legacy panel's ladder/classification block and the
       founder/evolved `route_destination_varies` reach the committed summary
       through `bench/artifacts.rs`.
-- [ ] Readings file `docs/progress/readings/t13-f07-current-policy-recruitment-transitions.md`:
-      pilot projection, S0 tables, the per-path/per-step table from
-      `QualifiedPath::payload_readings()`, legacy-panel comparison with F06's
-      recorded numbers labelled "current-source remeasurement".
+- [x] Readings file `docs/progress/readings/<id>.md`: pilot projection, S0
+      tables, the per-path/per-step `QualifiedPath::payload_readings()`
+      table, legacy-panel comparison with F06's recorded numbers labelled
+      "current-source remeasurement".
 
 ## Verification
 
@@ -161,30 +159,28 @@ the S0 command stops between lineages when `--wall-cap-secs` (7,200) or
       `baseline_worlds` 19 passed, identity hash unchanged.
 - [x] Focused tests: `cargo test -p v3-core recruitment` -> ancestry,
       exposure, `scenes_dispatched`, ancestral replacement (verbatim copy 0,
-      diverged path ≥ 1), ladder classification of authored lineages, the
-      destination kind on canonical and prepared forms, RNG non-consumption
-      with readings on/off, destination-versus-position route variation, and
-      proptest invariants (classification exclusive and total; ancestral
-      replacement of an unchanged payload is the identity).
+      diverged path ≥ 1), `recruitment_paths_known_specializing_lineage_classifies_retained_at_the_primary_horizon`
+      (S0 arm 22 b1/l13 at 192 + 64), destination kind on canonical and
+      prepared forms, RNG non-consumption with readings on/off,
+      destination-versus-position route variation, and proptest invariants
+      (classification exclusive and total; ancestral replacement of an
+      unchanged payload is the identity).
 - [x] `cargo test -p v3-cli` -> subcommand outputs, pilot prefix identity,
-      cap stop marks `incomplete`, replay check, two-thread parity.
+      cap stop marks `incomplete`, replay check, 2-thread parity.
 - [x] Pilot: `scripts/bench-wait cargo run --release -p v3-cli -- recruitment
-      --feature t13-f07-current-policy-recruitment-transitions --pilot
-      --replay-check` -> wall seconds and bytes per arm, replay check 100%,
-      projection to 64 lineages in the readings file, pilot summary committed
-      at `docs/progress/features/<id>-s0-pilot.json`; launch only if mean-based
-      projection ≤ 1.6 h and ≤ 1.6 GiB (max-based bound reported beside it).
+      --feature <id> --pilot --replay-check` -> per-arm wall and bytes,
+      replay 100%, projection to 64 lineages in the readings file, summary at
+      `docs/progress/features/<id>-s0-pilot.json`; launch only if the mean
+      projection ≤ 1.6 h and 1.6 GiB (max-based bound beside it).
 - [x] S0 panel: same command without `--pilot` -> summary at
-      `docs/progress/features/t13-f07-current-policy-recruitment-transitions-s0.json`,
-      raw hash/bytes/wall/thread count in the readings file, `incomplete`
-      false.
+      `docs/progress/features/<id>-s0.json`, raw hash/bytes/wall/thread count
+      in the readings file, `incomplete` false.
 - [x] `make check` -> passes.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
-- [x] Benchmark summaries stored at
-      `docs/progress/features/t13-f07-current-policy-recruitment-transitions.json`
-      and `-goal.json`, local raw hash/byte count and verification time
-      checked, series entries point to the summaries, no full report staged.
+- [x] Benchmark summaries stored at `docs/progress/features/<id>.json` and
+      `-goal.json`, local raw hash/byte count and verification time checked,
+      series entries point to the summaries, no full report staged.
 
 ## Performance and Goal Impact
 
@@ -223,21 +219,24 @@ panel over its cap).
 | Committed goal summary bytes | Grows by the new keys on 27 arms and their lineage rows; recorded, no cap; shrinking stays with T15 summary-v2. S0 summary under 4 MB, per-lineage rows and no per-proposal rows. |
 
 **Measured verdict.** Spec-owner rulings, 2026-09-20: (1) the goal deltas
-(`plasticity_updates` −46.01% flag, Orchards minimum 149→30, no extinction)
+(`plasticity_updates` −46.01%, stored level `ok`; Orchards minimum 149→30;
+no extinction)
 are the predeclared `8263a8ee`/`3806dc91` divergence under an unchanged
 identity hash — recorded, not severe, no re-pin required; (2) legacy
 prepared discovery 19–21/32 against F06's 17–18/32 is current-source
 remeasurement under the remapped draw, not a deviation; (3) the two
 `vm_copy` retained specialized lineages (arms 9 and 22, Task A, held at
 +16/+64/+256) are an honest positive under the no-floor predeclaration,
-1/64 per arm, no F08 gate reached, paths in the readings file. Tables:
+1/64 retained per arm plus one lineage each specialized after the discovery
+window, no F08 gate reached, paths in the readings file; the predeclaration's
+"18 of 27" unprepared arms miscounted: 21 (7 forms × 3). Tables:
 
 | Run (2026-09-20, `cdc4674b`, 8 threads, run once each, sequential, host idle) | Exit: observed outer / recorded CLI | `severe` | Verdict | Summary bytes | Raw bytes, sha256 (main `.bench-artifacts/`, local) |
 | --- | --- | --- | --- | ---: | --- |
 | Pilot `recruitment --pilot --replay-check` (no `--threads`) | 0 / n/a (CLI exits 3 incomplete, 1 error; neither) | n/a | replay 55,296/55,296 = 100%; `wall_secs` 6.784; mean projection 0.0603 h, 1.5045 GiB (inside 1.6 h / 1.6 GiB, launched); max-based 4.9428 GiB, wall not computable | 467,195 (`-s0-pilot.json`, by-product) | 50,483,845, `de977a6f…ffa9e3` |
 | S0 `recruitment` (no `--pilot`) | 0 / n/a | n/a | `incomplete` false, 1,728 lineages, 1,769,472 proposals, `wall_secs` 162.537, 1.342 GiB of 2 GiB, summary < 4 MB | 2,405,314 | 1,441,006,562, `977ddfcc…be2e302` |
 | Gate `make bench PROFILE=gate` | 0 / `{"code":0,"source":"v3-cli status on successful artifact-pair completion; output errors instead exit 1"}`, `outer_exit` null, `dirty` true (untracked summaries only) | false | all six `ok` vs epoch `remove-complementary-nutrition.json` and `t17-f02-unit-scale-introspection.json`; wall −3.35% / −17.68% `ok`; founder 42 ms of 10 s | 97,724 | 94,864, `763def13…b7244`, `verified_local` 2026-09-20T03:34:06Z |
-| Goal `make bench PROFILE=goal` | 0 / same `cli_exit`, `outer_exit` null, `dirty` true | false | all six `ok` vs `t17-f02-unit-scale-introspection-goal.json` (goal-worlds epoch = latest closure; one comparison printed); `plasticity_updates` −46.01% flag-level; wall −6.68% `ok`; `wall_clock_ms_total` 460,424 of 900 s; evolved 572 ms of 180 s; founder 99 ms; recruitment 11.5 s of 120 s; no extinction | 7,632,294 | 591,945,210, `9e5c9180…f43f6`, `verified_local` 2026-09-20T03:42:22Z |
+| Goal `make bench PROFILE=goal` | 0 / same `cli_exit`, `outer_exit` null, `dirty` true | false | all six `ok` vs `t17-f02-unit-scale-introspection-goal.json` (goal-worlds epoch = latest closure; one comparison printed); `plasticity_updates` −46.01%, stored level `ok`; wall −6.68% `ok`; `wall_clock_ms_total` 460,424 of 900 s; evolved 572 ms of 180 s; founder 99 ms; recruitment 11.5 s of 120 s; no extinction | 7,632,294 | 591,945,210, `9e5c9180…f43f6`, `verified_local` 2026-09-20T03:42:22Z |
 
 | Goal world (T17.F02 → F07) | `final_population` | `minimum_population` | `plateau_population` | `births` | `extinction_tick` | `drift_changed_per_all_births_at_2000` |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -249,8 +248,8 @@ remeasurement under the remapped draw, not a deviation; (3) the two
 | --- | --- |
 | Six counters | no severe flag in either profile; founder T11.F14 rows equal T17.F02 (87/123/0 gate; 96/114/0, 87/123/0, 96/114/0 goal) |
 | `mesh_execution` | founder false/false everywhere; 0 of 39 raw goal blocks read destination true with position false |
-| Legacy unprepared / prepared | 18 arms 0/32; prepared 19–21/32 discovery (above F06's 17–18/32), 229 discovery readings all `ancestral_loss` 0, `specialized` 0, `bypass_only` 15–21 |
-| S0 unprepared / prepared / Drift | 16 of 18 unprepared arms `specialized` 0; arms 9 and 22 (`vm_copy` Selection / CostSelection) 1 `retained` each, arm 8 1 `loss_not_selected`; prepared `specialized` 0, expression 64/64; gen-512 p90 128–478 |
+| Legacy unprepared / prepared | 21 unprepared arms 0/32; prepared 19–21/32 discovery (above F06's 17–18/32), 229 discovery readings all `ancestral_loss` 0, `specialized` 0, `bypass_only` 15–21 |
+| S0 unprepared / prepared / Drift | 19 of 21 unprepared arms `specialized` 0; arms 9 and 22 (`vm_copy` Selection / CostSelection) 1 `retained` each plus 1 `specialized_after_window`, arm 8 1 `loss_not_selected`; `specialized_after_window` 1 in arms 8, 9, 13, 16, 22 (0 elsewhere); prepared `specialized` 0, expression 64/64 under Drift/Selection, 43/64 and 45/64 under CostSelection (arms 24, 26); gen-512 p90 128–478 |
 | Summary bytes | goal +759,239 vs T17.F02; S0 1,728 lineage rows, no proposal rows |
 
 - Summaries: [gate](../../progress/features/t13-f07-current-policy-recruitment-transitions.json),
@@ -301,3 +300,6 @@ remeasurement under the remapped draw, not a deviation; (3) the two
 - Decision: the S0 raw is single-line JSON streamed per lineage; `--byte-cap`
   sits beside `--wall-cap-secs`; an incomplete run exits 3 after writing both
   artifacts. `MeshObservation` (observation-only) carries the destination.
+- Deferred: the final review's record-only findings (six-site chain facts,
+  P3 cleanups, exit 3 untested, byte-cap overshoot, UTC dates) are in the
+  readings file's "Deferred" section.
