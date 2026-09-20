@@ -176,8 +176,30 @@ the S0 command stops between lineages when `--wall-cap-secs` (7,200) or
       `docs/progress/features/<id>-s0.json`, raw hash/bytes/wall/thread count
       in the readings file, `incomplete` false.
 - [x] `make check` -> passes.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
+
+      ```text
+      387 mutants tested in 55m: 74 missed, 251 caught, 62 unviable
+      run mode: fresh (diff against 3806dc91, at 922445d1 + the attempt-1 test fix)
+      output: ~/.local/share/petri-tools/mutants/t13-f07/mutants.out
+      missed.txt: 74 lines    timeout.txt: empty
+      attempt 1 (no evidence): cargo mutants exit 4, baseline failed on
+        v3-cli default_paths_follow_the_feature_and_pilot_naming (test read
+        default paths from a cwd that is not a Git checkout under
+        cargo-mutants); test-only fix, then the one fresh run above
+      survivors: 72 killed (tests only), 2 equivalent
+        (EditSurface::of deleted arm -> the wildcard maps the same operators
+        to Other; lineage eligibility |= is_empty() -> every fixed start is
+        eligible at generation 0), 0 deferred; full 74-row table with each
+        test name in docs/progress/readings/t13-f07-current-policy-recruitment-transitions.md
+        "Mutation gate"
+      incremental passes 1-2 (MUTANTS_OUT=…/t13-f07-triage, MUTANTS_ITERATE=1,
+        not closure evidence): 74 tested, 3 missed -> 3 tested, 2 missed (the
+        two equivalents); see the readings "Mutation gate" run table
+      no production, test-selection or tool-configuration change during
+        triage, so no second fresh run
+      ```
 - [x] Benchmark summaries stored at `docs/progress/features/<id>.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
       series entries point to the summaries, no full report staged.

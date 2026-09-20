@@ -657,3 +657,101 @@ touches the site (F08–F10 extend the chain facts), not a behavior defect.
   `docs/benchmark-artifacts.md`).
 - Deferred: spec dates are UTC (the 2026-09-20 run dates fall on the
   2026-09-19 local evening).
+
+## Mutation gate (roadmap-mutation-specialist, 2026-09-20)
+
+| Run | Command | Result |
+| --- | --- | --- |
+| Attempt 1 (no gate evidence) | `MUTANTS_ITERATE=0 make rust-mutants` at 922445d1 | `cargo mutants` exit 4: the unmutated baseline failed on `recruitment::tests::default_paths_follow_the_feature_and_pilot_naming` (`v3-cli`), which resolved default output paths from the process working directory; cargo-mutants tests a plain copy of the tree that is not a Git checkout. Zero mutants tested. Test-only fix: the test now builds its own throwaway Git checkout (`git_checkout` fixture in `crates/v3-cli/src/recruitment.rs`). |
+| Fresh run | `MUTANTS_ITERATE=0 make rust-mutants`, diff against 3806dc91 | `387 mutants tested in 55m: 74 missed, 251 caught, 62 unviable`; `run-mode.txt` = `fresh`; output `~/.local/share/petri-tools/mutants/t13-f07/mutants.out` (`missed.txt` 74 lines, `timeout.txt` empty); the measured diff includes the attempt-1 test fix. |
+| Incremental pass 1 (not closure evidence) | `MUTANTS_OUT=~/.local/share/petri-tools/mutants/t13-f07-triage MUTANTS_ITERATE=1 make rust-mutants` (a copy of the fresh output so the recorded path stays untouched) | `74 mutants tested in 13m: 3 missed, 71 caught`: the two equivalents (rows 15, 30) and `records.rs:229` (row 65, precedence). |
+| Incremental pass 2 (not closure evidence) | same, after the gate-only/sink-only fixtures | `3 mutants tested in 2m: 2 missed, 1 caught`: the two equivalents remain; `timeout.txt` empty. |
+| Verification after triage | `cargo test -p v3-core recruitment` (92 + 3 passed, 1 ignored), `cargo test -p v3-cli` (all binaries), `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all -- --check`, `make roadmap-check` | all exit 0; `missed.txt` (74) and `timeout.txt` (empty) at the recorded path unchanged since the fresh run. |
+
+Survivor triage. Production code, test selection and tool configuration are
+unchanged; every kill is a new or strengthened test, so no second fresh run
+is required. Tests live in `crates/v3-core/src/neighborhood/recruitment_paths/tests.rs`
+(`rp::`), the inline `experiment::tests` module (`ex::`),
+`crates/v3-core/src/neighborhood/recruitment/tests.rs` (`rec::`),
+`crates/v3-cli/src/recruitment.rs` tests (`cli::`) and
+`crates/v3-cli/tests/cli.rs` (`bin::`).
+
+| # | Survivor (`missed.txt`) | Resolution | Test |
+| --- | --- | --- | --- |
+| 1 | `v3-cli/src/main.rs:413:5: replace run_recruitment with ()` | killed | `bin::recruitment_cli_passes_every_option_into_the_written_summary` (spawned binary; exit 3, both artifacts) |
+| 2 | `main.rs:421:9: delete field pilot from Options in run_recruitment` | killed | same (`summary.pilot`) |
+| 3 | `main.rs:422:9: delete field threads` | killed | same (`summary.threads == 1`) |
+| 4 | `main.rs:423:9: delete field wall_cap` | killed | same (`--wall-cap-secs 0` stops with `wall_cap`, 0 lineages) |
+| 5 | `main.rs:424:9: delete field byte_cap` | killed | same (`--byte-cap 1` stops with `byte_cap`, 1 lineage) |
+| 6 | `main.rs:425:9: delete field replay_check` | killed | same (`replay_check` object present) |
+| 7 | `main.rs:426:9: delete field raw` | killed | same (`--out` path written and recorded) |
+| 8 | `main.rs:427:9: delete field summary` | killed | same (`--summary-out` path written) |
+| 9 | `main.rs:428:9: delete field source_revision` | killed | same (`source_revision == git rev-parse HEAD` of the fixture checkout) |
+| 10 | `v3-cli/src/recruitment.rs:32:37: replace * with +` (`DEFAULT_BYTE_CAP`) | killed | `cli::default_caps_are_two_hours_and_two_gibibytes` |
+| 11 | `recruitment.rs:204:9: replace HashingWriter::flush with Ok(())` | killed | `cli::hashing_writer_forwards_flush_to_its_inner_writer` |
+| 12 | `recruitment.rs:244:5: replace io_error with String::new()` | killed | `cli::an_unwritable_raw_path_is_named_in_the_error` |
+| 13 | `recruitment.rs:244:5: replace io_error with "xyzzy".into()` | killed | same |
+| 14 | `recruitment.rs:361:51: delete ! in open_stream` | killed | `cli::a_raw_path_in_a_missing_directory_is_created` |
+| 15 | `v3-core/src/neighborhood/recruitment.rs:127:13: delete match arm TopologyAddNode … InputRefRawFieldMutation in EditSurface::of` | equivalent | Every operator in the deleted arm reports `MutationDomain::Topology` or `MutationDomain::InputRef` (`mutation/types/mod.rs` `domain`), which the wildcard arm maps to `EditSurface::Other` as well. |
+| 16 | `recruitment.rs:195:55: replace + with - in Exposure::discarded` | killed | `rec::exposure_totals_sum_every_surface` |
+| 17 | `experiment.rs:74:28: replace > with >= in uses` (`score_gain`) | killed | `rp::recruitment_paths_reduced_run_ladders_agree_with_their_records` (generation 0 reads no score gain against itself) |
+| 18 | `experiment.rs:138:46: replace - with + in uses` (`ancestral_loss`) | killed | `rp::recruitment_paths_known_specializing_lineage_classifies_retained_at_the_primary_horizon` (`ancestral_loss == Some(4)`, `score_loss == 4`) |
+| 19 | `experiment.rs:138:46: replace - with / in uses` | killed | same |
+| 20 | `experiment.rs:402:13: replace && with \|\| in recruit_reading` | killed | `ex::recruit_reading_finds_the_discovered_module_among_same_depth_siblings` |
+| 21 | `experiment.rs:455:13: replace && with \|\| in legacy_retention` (`is_present`) | killed | `rp::recruitment_paths_known_deleting_lineage_reads_deleted_retention` |
+| 22 | `experiment.rs:454:13: replace && with \|\| in legacy_retention` (`created_depth`) | killed | same |
+| 23 | `experiment.rs:453:21: replace == with != in legacy_retention` (`node`) | killed | same |
+| 24 | `experiment.rs:510:19: replace == with != in specialized_horizons` | killed | `rp::recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_horizon` |
+| 25 | `experiment.rs:565:33: delete ! in lineage` (`eligibility = is_empty()` at generation 0) | killed | `rp::recruitment_paths_known_lineage_keeps_generation_zero_eligibility_once_its_cohort_goes_unreachable` |
+| 26 | `experiment.rs:606:21: replace && with \|\| in lineage` (`local_edit`) | killed | `rp::recruitment_paths_reduced_run_ladders_agree_with_their_records` (a local edit names a cohort module) |
+| 27 | `experiment.rs:610:39: replace \|= with &= in lineage` (`bypass_only`) | killed | same (`bypass_only` equals the retained zero-ancestral-loss reading) |
+| 28 | `experiment.rs:614:53: replace == with != in lineage` (`ancestral_loss == Some(0)`) | killed | same |
+| 29 | `experiment.rs:646:35: replace \|= with &= in lineage` (`eligibility` per generation) | killed | `rp::recruitment_paths_known_lineage_keeps_generation_zero_eligibility_once_its_cohort_goes_unreachable` |
+| 30 | `experiment.rs:646:38: delete ! in lineage` (`eligibility \|= is_empty()`) | equivalent | Every fixed start has its authored module 2 reachable at generation 0 (`ex::every_start_reaches_but_does_not_express_its_cohort_module_at_generation_zero`), so `eligibility` is already true before the per-generation update, which can only raise it. |
+| 31 | `experiment.rs:678:46: replace && with \|\| in reachable_cohort` | killed | `rp::recruitment_paths_reduced_run_ladders_agree_with_their_records` (founder-node edits do not count as local edits) |
+| 32 | `experiment.rs:686:5: replace expressed with true` | killed | `ex::every_start_reaches_but_does_not_express_its_cohort_module_at_generation_zero`; `rp::…ladders_agree…` (`expression` equals a dispatched cohort module) |
+| 33 | `experiment.rs:688:53: replace && with \|\| in expressed` | killed | same |
+| 34 | `experiment.rs:688:81: replace >= with < in expressed` | killed | same |
+| 35 | `experiment.rs:713:40: replace \|= with &= in note_proposal_discovery` | killed | `rp::…known_specializing_lineage_classifies_retained…` (`proposal_specialized`) |
+| 36 | `experiment.rs:775:24: replace += with *= in transitions` (`local_edit`) | killed | `rp::recruitment_paths_transitions_count_every_ladder_flag_across_lineages` |
+| 37 | `experiment.rs:776:24: replace += with *= in transitions` (`expression`) | killed | same |
+| 38 | `experiment.rs:777:25: replace += with -= in transitions` (`specialized`) | killed | same |
+| 39 | `experiment.rs:777:25: replace += with *= in transitions` | killed | same |
+| 40 | `experiment.rs:778:43: replace += with -= in transitions` (`proposal_specialized_lineages`) | killed | same |
+| 41 | `experiment.rs:778:43: replace += with *= in transitions` | killed | same |
+| 42 | `experiment.rs:779:35: replace += with -= in transitions` (`specialized_proposals`) | killed | same |
+| 43 | `experiment.rs:779:35: replace += with *= in transitions` | killed | same |
+| 44 | `experiment.rs:780:25: replace += with *= in transitions` (`bypass_only`) | killed | same |
+| 45 | `experiment.rs:782:57: replace += with -= in transitions` (`retained_at`) | killed | same |
+| 46 | `experiment.rs:782:57: replace += with *= in transitions` | killed | same |
+| 47 | `experiment.rs:783:35: replace == with != in transitions` (`Retained`) | killed | same |
+| 48 | `experiment.rs:788:22: replace += with *= in transitions` (`applicable.0`) | killed | same (`eligible_site_fraction == estimate(3, 6)`) |
+| 49 | `experiment.rs:933:9: replace ReplayCheck::merge with ()` | killed | `rp::recruitment_paths_replay_check_merge_sums_counts_and_keeps_the_first_mismatch` |
+| 50 | `experiment.rs:933:24: replace += with -= in ReplayCheck::merge` | killed | same |
+| 51 | `experiment.rs:933:24: replace += with *= in ReplayCheck::merge` | killed | same |
+| 52 | `experiment.rs:934:22: replace += with -= in ReplayCheck::merge` | killed | same |
+| 53 | `experiment.rs:934:22: replace += with *= in ReplayCheck::merge` | killed | same |
+| 54 | `experiment.rs:983:9: replace Assay::starts with Vec::leak(Vec::new())` | killed | `rp::recruitment_paths_assay_exposes_the_nine_starts_in_order` |
+| 55 | `qualification.rs:172:26: replace - with + in payload_reading` (`ancestral_loss`) | killed | `rp::recruitment_paths_qualified_payload_readings_match_the_recorded_table` |
+| 56 | `qualification.rs:172:26: replace - with / in payload_reading` | killed | same |
+| 57 | `qualification.rs:176:40: replace - with + in payload_reading` (`bypass_loss`) | killed | same |
+| 58 | `qualification.rs:176:40: replace - with / in payload_reading` | killed | same |
+| 59 | `qualification.rs:185:31: replace > with >= in payload_reading` (`score_gain`) | killed | same |
+| 60 | `records.rs:82:22: replace > with >= in Sizes::fits` (`batches`) | killed | `rp::recruitment_paths_sizes_reject_every_zero_dimension_and_name_the_supply_rules` |
+| 61 | `records.rs:83:30: replace > with >= in Sizes::fits` (`lineages`) | killed | same |
+| 62 | `records.rs:84:31: replace > with >= in Sizes::fits` (`discovery`) | killed | same |
+| 63 | `records.rs:118:9: replace Supply::rule with ""` | killed | same |
+| 64 | `records.rs:118:9: replace Supply::rule with "xyzzy"` | killed | same |
+| 65 | `records.rs:229:13: replace \|\| with && in DestinationKind::of` (`wired \|\| (gate && sinks)` by precedence) | killed | `rp::recruitment_paths_destination_kind_reads_a_wired_action_slot_alone_as_an_effect` (gate-only and sink-only fixtures; survived incremental pass 1 with the bank-only fixture, killed in pass 2) |
+| 66 | `records.rs:228:13: replace \|\| with && in DestinationKind::of` | killed | same |
+| 67 | `records.rs:261:29: replace += with *= in DestinationKindCounts::merge` | killed | `rp::recruitment_paths_destination_kind_counts_merge_asymmetric_pools` |
+| 68 | `records.rs:375:9: replace TaskReading::preserves_correct_scenes with true` | killed | `rp::recruitment_paths_incumbents_are_preserved_only_when_no_correct_scene_is_lost` |
+| 69 | `records.rs:384:17: delete ! in TaskReading::preserves_correct_scenes` | killed | same |
+| 70 | `records.rs:564:13: replace && with \|\| in Specialization::holds` | killed | `rp::recruitment_paths_specialization_holds_only_with_every_component` |
+| 71 | `records.rs:565:13: replace && with \|\| in Specialization::holds` | killed | same |
+| 72 | `records.rs:770:5: replace class_key with "xyzzy".into()` | killed | `rp::recruitment_paths_class_keys_name_every_class` |
+| 73 | `records.rs:1112:39: replace += with -= in LineageFacts::assemble` (`specialized_proposals`) | killed | `rp::…known_specializing_lineage_classifies_retained…` (`specialized_proposals == 128`) |
+| 74 | `records.rs:1112:39: replace += with *= in LineageFacts::assemble` | killed | same |
+
+The spawned-binary test in row 1 also covers the review's deferred
+"exit status 3 asserted by no spawned-binary test" bullet above.

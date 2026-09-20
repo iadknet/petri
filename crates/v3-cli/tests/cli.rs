@@ -293,3 +293,98 @@ fn recipe_cli_save_reload_and_failures() {
     }
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+/// The `recruitment` subcommand passes every option through: the pilot
+/// panel, thread count, both caps, the replay check, the explicit output
+/// paths and the checkout revision all reach the summary, and a cap stop
+/// exits 3 after writing both artifacts.
+#[test]
+fn recruitment_cli_passes_every_option_into_the_written_summary() {
+    let dir = std::env::temp_dir().join(format!("petri-recruitment-cli-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    // Output paths are recorded canonically.
+    let dir = dir.canonicalize().unwrap();
+    let git = |args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .current_dir(&dir)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    git(&["init", "--quiet"]);
+    git(&[
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "commit",
+        "--quiet",
+        "--allow-empty",
+        "-m",
+        "fixture",
+    ]);
+    let revision = git(&["rev-parse", "HEAD"]);
+    let run = |name: &str, wall_cap_secs: &str, byte_cap: &str| {
+        let raw = dir.join(format!("{name}-raw.json"));
+        let summary = dir.join(format!("{name}-summary.json"));
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+            .current_dir(&dir)
+            .args([
+                "recruitment",
+                "--feature",
+                "t13-f07-cli-test",
+                "--pilot",
+                "--threads",
+                "1",
+                "--wall-cap-secs",
+                wall_cap_secs,
+                "--byte-cap",
+                byte_cap,
+                "--replay-check",
+                "--out",
+            ])
+            .arg(&raw)
+            .arg("--summary-out")
+            .arg(&summary)
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(3),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(raw.is_file(), "{name}: raw record written");
+        let summary: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&summary).unwrap()).unwrap();
+        assert_eq!(summary["kind"], "petri-recruitment-s0-summary");
+        assert_eq!(summary["feature"], "t13-f07-cli-test");
+        assert_eq!(summary["pilot"], true);
+        assert_eq!(summary["threads"], 1);
+        assert_eq!(summary["source_revision"], revision);
+        assert_eq!(summary["incomplete"], true);
+        assert_eq!(summary["raw"]["path"], raw.display().to_string());
+        assert!(summary["replay_check"].is_object(), "{name}: replay check");
+        summary
+    };
+    // A zero wall cap stops before any lineage; a one-byte cap after the
+    // first lineage crosses it.
+    let wall = run("wall", "0", "0");
+    assert_eq!(wall["stop_reason"], "wall_cap");
+    assert_eq!(wall["lineage_count"], 0);
+    let byte = run("byte", "20", "1");
+    assert_eq!(byte["stop_reason"], "byte_cap");
+    assert_eq!(byte["lineage_count"], 1);
+    assert_eq!(byte["replay_check"]["proposals"], 1024);
+    assert_eq!(byte["replay_check"]["matched"], 1024);
+    std::fs::remove_dir_all(dir).unwrap();
+}
