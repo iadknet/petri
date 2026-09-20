@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-19",
+  "commit": "45c8063722fa3aa509a32d523f5e477e9fcd3853",
+  "world_seed": 5786586509898421,
+  "simulation_seed": 11,
+  "horizon_ticks": 6000,
+  "decision": {
+    "selected_recipe": "world-recipe-extended-age-drain-age10-baseline.json",
+    "selected_age_max_multiplier": 10,
+    "selected_per_unit_mutation_rate": 0.005,
+    "conclusion": "Correcting age pressure produced the clear resilience gain. Halving or quartering mutation reduced genome growth but did not improve final population or founder-lineage retention in this seed."
+  },
+  "arms": [
+    {
+      "id": "source_age305",
+      "recipe": "world-recipe-extended-age-drain-reduced-copy-growth.json",
+      "age_max_multiplier": 305,
+      "per_unit_rate": 0.005,
+      "population": 4361,
+      "births": 286661,
+      "deaths": 292300,
+      "mean_genome_size": 186.43751433157533,
+      "mean_generation": 130.3428112818161,
+      "mutation_events": 212265,
+      "events_per_birth": 0.7404739396011316,
+      "surviving_founder_lineages": 39,
+      "dominant_lineage_fraction": 0.4930061912405412,
+      "fruit_energy": 150.00000381469727,
+      "primary_energy": 12059040.861922257,
+      "sha256": "64ce17ab2c4428d0fa183dcd2f9515f9bd008f6cd33482b54ec7af90ef460b16"
+    },
+    {
+      "id": "age10_baseline",
+      "recipe": "world-recipe-extended-age-drain-age10-baseline.json",
+      "age_max_multiplier": 10,
+      "per_unit_rate": 0.005,
+      "population": 23040,
+      "births": 578186,
+      "deaths": 565146,
+      "mean_genome_size": 160.51111111111112,
+      "mean_generation": 55.31336805555556,
+      "mutation_events": 402572,
+      "events_per_birth": 0.6962672911485231,
+      "surviving_founder_lineages": 132,
+      "dominant_lineage_fraction": 0.06315104166666667,
+      "fruit_energy": 99.99999809265137,
+      "primary_energy": 19368442.648974817,
+      "sha256": "a255c8557ae64bf7520ff8afa0e4a6160f9acebc037ed2261931f48411f32bcc"
+    },
+    {
+      "id": "age10_half",
+      "recipe": "world-recipe-extended-age-drain-age10-mutation-half.json",
+      "age_max_multiplier": 10,
+      "per_unit_rate": 0.0025,
+      "population": 20719,
+      "births": 581703,
+      "deaths": 570984,
+      "mean_genome_size": 146.37704522419037,
+      "mean_generation": 60.49177083836093,
+      "mutation_events": 187973,
+      "events_per_birth": 0.323142565879839,
+      "surviving_founder_lineages": 97,
+      "dominant_lineage_fraction": 0.06105507022539698,
+      "fruit_energy": 1251.9522311389446,
+      "primary_energy": 18215223.406409446,
+      "sha256": "fcb162f5d1ce4d472dd43c482730b8391eb9631f47d28aeddf7a40e5dcdd9d56"
+    },
+    {
+      "id": "age10_quarter",
+      "recipe": "world-recipe-extended-age-drain-age10-mutation-quarter.json",
+      "age_max_multiplier": 10,
+      "per_unit_rate": 0.00125,
+      "population": 21434,
+      "births": 590158,
+      "deaths": 578724,
+      "mean_genome_size": 127.56708967061678,
+      "mean_generation": 61.6380983484184,
+      "mutation_events": 88008,
+      "events_per_birth": 0.1491261662131158,
+      "surviving_founder_lineages": 84,
+      "dominant_lineage_fraction": 0.06377717644863301,
+      "fruit_energy": 926.655969619751,
+      "primary_energy": 17520181.665689893,
+      "sha256": "ea3c3feaabec806912eda723aa29ab6dcf7cb02eadeebf825e28e954b3cfeae1"
+    }
+  ],
+  "recipe_sha256": {
+    "source": "989649fe3182bdddfa5fb349b8127cdb229b782fd4ef5fd7139e69fef5f34ec9",
+    "age10_baseline": "e3dcc41e8dd959fadc59128cf7e1c2cd612c443e10276ac44fb3ee9a09a6f51c",
+    "age10_half": "c5b7d2effc32573ed9dafec2f109253e35498b387d3a8bc5e57f0b94421225e6",
+    "age10_quarter": "6133e1222567168019a878b30c67719a414e57c7e78293e9b13fa1838b7294c5"
+  },
+  "artifacts": {
+    "raw_directory": ".bench-artifacts/mutation-rate-2026-09-19/results",
+    "trajectory_plot": ".bench-artifacts/mutation-rate-2026-09-19/trajectory.svg"
+  }
+}
