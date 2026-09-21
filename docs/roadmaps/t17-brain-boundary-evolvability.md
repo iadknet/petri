@@ -1,7 +1,7 @@
 # T17 — Brain Boundary Evolvability
 
 **Status**: In Progress
-**Last updated**: 2026-09-18
+**Last updated**: 2026-09-21
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -39,9 +39,9 @@ new compute node can actually tune.
   - Goal: A parent gives its young a share of what it has, not a fixed ration. The reproduce action's energy-transfer meta becomes a fraction in [0, 1] of the parent's post-cost energy (Polyworld's `MateEnergyFraction`, a heritable share of current energy the world bounds to [0.2, 0.8]; capital breeders provision litters from their reserves), so a sensor routed into that slot is a condition-dependent investment rule. Physiology keeps the parent's `min_reproduce_energy` gate (T16.F01) and adds a minimum litter (a child born with less than `initial_energy` is not conceived, rejected before charge). The founder emits a constant fraction and its brain gate is set so every attempt it makes is accepted: the founder's reproduce branch ends with the terminal `ExecuteActionQueue`, so a refused attempt is a tick without eating, and a founder whose gate sits below what physiology accepts pins itself at its threshold (measured: 0 births in 2,000 ticks, with and without `failed_action_penalty`). Predeclared: births-based indicators and the goal trajectories move (epoch re-pin recorded); the founder's births per creature-tick on the gate profile are read before and after.
 - [x] **T17.F02 — Unit-Scale Introspection** — Depends on: None
   - Goal: A creature feels how full, how tired, and how old it is as a share of itself, not in joules or ticks. `EnergyCurrent` and `EnergyConsumedThisTick` reach the brain as fractions of `max_energy`; `AgeTicks` as a saturating fraction of a configured reference span (T03.F07's lifespan is its later denominator); `Generation` is removed from the input key set or saturates the same way. The founder's gates are re-expressed exactly (32 → 0.16 of 200 since T17.F01; the age gate on the same span) so its behavior is identical by construction. Evidence: a new `Threshold` drawn in [−1, 1] against raw energy is always on; the founder's 30 needs ~700 ±0.1 steps to reach 100; Covariance with `pre` = 20–200 drives the weight to its clamp in one tick, which is the six Orchards Hebbian carriers; 14 of the 59 Orchards survivors had `Generation` (1–6) swapped in for energy or age as a constant gate. Predeclared: the T11.F14 changed/silent/dead readings and the goal trajectories move (epoch re-pin recorded); founder gate behavior unchanged.
-- [ ] **T17.F03 — Steal Amount as a Fraction** — Depends on: T17.F01
+- [ ] **T17.F03 — Steal Amount as a Fraction** — Depends on: T17.F01, T19.F04
   - Goal: A bite takes a share of the prey, not a fixed calorie count. The steal action's amount meta becomes a fraction in [0, 1] of the victim's current energy, capped by the existing config limit (Polyworld's attack depletion scales with the attacker's state and is capped). Predeclared: predation transfer per event in the goal reports is read before and after.
-- [ ] **T17.F04 — Per-Type Eat Bank** — Depends on: T11.F21
+- [ ] **T17.F04 — Per-Type Eat Bank** — Depends on: T11.F21, T19.F04
   - Goal: Which food to bite is a bid per food type, as direction became a bid per direction in T11.F21. Today the eat action's type index is a rounded scalar, which a [0, 1] sensor drives correctly for exactly two food types and not for three. Trigger: a baseline world or T02/T12 feature with a third ordinary food type; until then unscheduled.
 
 ## Notes for AI Agents
@@ -73,3 +73,4 @@ new compute node can actually tune.
 - These are mechanism features under the natural-analog rule; each goal
   line names its analog. None adds a sensor, an operator, or an assay.
 - Priority: not in the order of new starts until the user places it.
+- T19, 2026-09-21: the mesh action-selection refactor ([T19](t19-mesh-action-selection-and-live-state.md)) replaces the action meta slots with per-kind parameter surfaces and the per-kind action bank with vote sinks (`Eat[t]` per food type), which are the surfaces T17.F03 and T17.F04 are written on, so both now depend on T19.F04 and are re-read against the note's Section 2.1 when placed.
