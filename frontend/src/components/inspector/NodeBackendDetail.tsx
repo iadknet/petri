@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { BackendDef, InputReference } from "../../types/genome.ts";
 import type { VmTrace } from "../../types/trace.ts";
-import { buildActionContext, formatReadableInstruction } from "./vmInstructionFormat.ts";
+import { formatReadableInstruction } from "./vmInstructionFormat.ts";
 
 interface NodeBackendDetailProps {
 	backendDef: BackendDef;
@@ -40,7 +40,6 @@ export function NodeBackendDetail({
 	if ("Vm" in backendDef) {
 		const vm = backendDef.Vm;
 		const liveSet = new Set(liveInstructionIndices);
-		const actionCtx = buildActionContext(vm.program);
 
 		return (
 			<div className="px-3 py-2">
@@ -49,13 +48,7 @@ export function NodeBackendDetail({
 				</div>
 				<div className="space-y-px overflow-y-auto">
 					{vm.program.map((instruction, index) => {
-						const readable = formatReadableInstruction(
-							instruction,
-							inputRefs,
-							vm.constants,
-							index,
-							actionCtx,
-						);
+						const readable = formatReadableInstruction(instruction, inputRefs, vm.constants, index);
 						const isLive = liveSet.has(index);
 
 						// Execution state overlay

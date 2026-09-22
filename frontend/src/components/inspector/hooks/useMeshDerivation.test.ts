@@ -50,8 +50,6 @@ function makeGenome(): CreatureGenome {
 						output_sinks: [
 							{ kind: { RouterGate: 0 }, inputs: [{ source: { ComputeNode: 1 }, weight: 1 }] },
 						],
-						action_bank: [],
-						execute_gate: { inputs: [] },
 					},
 				},
 			},
@@ -77,8 +75,6 @@ function makeGenome(): CreatureGenome {
 						output_sinks: [
 							{ kind: { CustomOutput: 1 }, inputs: [{ source: { ComputeNode: 0 }, weight: 1 }] },
 						],
-						action_bank: [],
-						execute_gate: { inputs: [] },
 					},
 				},
 			},

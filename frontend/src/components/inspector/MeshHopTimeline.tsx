@@ -88,7 +88,7 @@ export const MeshHopTimeline = memo(function MeshHopTimeline({
 				<div className="flex items-center gap-1 flex-shrink-0">
 					{hops.length > 0 && <span className="text-slate-600 text-xs">→</span>}
 					<span className="text-[10px] font-mono text-slate-500 px-1">
-						{terminationReason === "ActionEmitted" ? finalAction : terminationReason}
+						{finalAction ? `${finalAction} · ${terminationReason}` : terminationReason}
 					</span>
 				</div>
 			</div>

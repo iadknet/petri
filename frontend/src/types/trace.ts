@@ -39,7 +39,6 @@ export interface VmTrace {
 	steps: VmStepTrace[];
 	final_registers: number[];
 	final_payload: number[];
-	final_meta: number[];
 	slot_writes: SlotWriteTrace[];
 }
 
@@ -68,23 +67,6 @@ export interface GraphOutputSinkTrace {
 	applied_value: number;
 }
 
-export interface GraphActionSlotTrace {
-	wired: boolean;
-	gate_weighted_sum: number;
-	fired: boolean;
-	param_values: [number, number];
-	queue_len_before: number;
-	queue_len_after: number;
-	emitted_action: WorldAction | null;
-}
-
-export interface GraphExecuteGateTrace {
-	wired: boolean;
-	weighted_sum: number;
-	queue_non_empty: boolean;
-	fired: boolean;
-}
-
 export interface GraphTrace {
 	temporal_committed: boolean;
 	passes: GraphPassTrace[];
@@ -92,8 +74,6 @@ export interface GraphTrace {
 	stable_passes_count: number;
 	final_outputs: number[];
 	output_sinks: GraphOutputSinkTrace[];
-	action_slots: GraphActionSlotTrace[];
-	execute_gate: GraphExecuteGateTrace;
 }
 
 export type BackendTrace = { Vm: VmTrace } | { Graph: GraphTrace };
@@ -113,7 +93,10 @@ export interface TraceRouteDecision {
 }
 
 export interface MeshHopTrace {
+	/** Tick-wide hop index. */
 	hop_index: number;
+	/** The pass this hop belongs to. */
+	pass_index: number;
 	node_id: number;
 	input_refs: InputReference[];
 	upstream_slots: number[];
@@ -121,17 +104,25 @@ export interface MeshHopTrace {
 	energy_after: number;
 	output_slots: number[];
 	route: TraceRouteDecision | null;
-	/** The vote contribution this hop committed (T19.F03); zeros when it did not. */
+	/** The vote contribution this hop committed; zeros when it did not. */
 	vote_contribution: readonly number[];
 	backend_trace: BackendTrace;
 }
 
+/** Why the tick's pass loop ended. */
 export type TerminationReason =
-	| "ActionEmitted"
-	| "EnergyExhausted"
-	| "MaxHopsReached"
+	| "NoDecision"
+	| "TerminateVoted"
+	| "ActionCapReached"
+	| "EnergyExhausted";
+
+/** Why one pass ended. */
+export type PassEndReason =
+	| "Decided"
+	| "PassCapReached"
 	| "NoTargets"
-	| "MissingNode";
+	| "MissingNode"
+	| "EnergyExhausted";
 
 export type WorldAction =
 	| "NoOp"
@@ -155,6 +146,17 @@ export const ZERO_VOTES: readonly number[] = Object.freeze(
 	Array.from({ length: VOTE_SINK_COUNT }, () => 0),
 );
 
+/** One pass of a tick: its vote vector, the effective vote per kind against
+ * the bars it started with, and the action it committed, if any. */
+export interface MeshPassTrace {
+	pass_index: number;
+	end_reason: PassEndReason;
+	votes: readonly number[];
+	effective_votes: readonly number[];
+	committed: WorldAction | null;
+	hops: number;
+}
+
 export interface TickTrace {
 	tick_number: number;
 	energy_before: number;
@@ -162,12 +164,12 @@ export interface TickTrace {
 	static_inputs: StaticInputsSnapshot;
 	debug_perception: PerceptionDebugSnapshot | null;
 	hops: MeshHopTrace[];
+	/** One record per pass, in order. */
+	passes: MeshPassTrace[];
 	final_actions: WorldAction[];
 	termination_reason: TerminationReason;
 	priority_bid: number;
-	/** Inert vote surface (T19.F03), in catalog index order. Nothing reads it. */
-	votes: readonly number[];
-	/** Per-kind vote commit counters (T19.F03). */
+	/** Final per-kind bars: commits of each kind this tick, in `VOTE_KINDS` order. */
 	commit_counts: readonly number[];
 }
 

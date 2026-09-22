@@ -37,7 +37,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		step: 0.001,
 		defaultValue: 0.1,
 		tooltip:
-			"Per-birth multiplier on the parent's reproduce charge: 1 + rate \u00d7 units of genome_size() above the founder's 111",
+			"Per-birth multiplier on the parent's reproduce charge: 1 + rate \u00d7 units of genome_size() above the founder's 97",
 	},
 	{
 		path: "energy.lifecycle.min_reproduce_energy",

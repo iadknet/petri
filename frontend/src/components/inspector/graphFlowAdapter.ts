@@ -55,11 +55,6 @@ export function buildGraphFlowScene(input: {
 				weightedSum: trace?.weightedSum ?? null,
 				appliedValue: trace?.appliedValue ?? null,
 				applied: trace?.applied ?? null,
-				fired: trace?.fired ?? null,
-				emittedAction: trace?.emittedAction ?? null,
-				queueDelta: trace?.queueDelta ?? null,
-				gateFired: trace?.gateFired ?? null,
-				queueNonEmpty: trace?.queueNonEmpty ?? null,
 			},
 		});
 	}

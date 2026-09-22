@@ -31,6 +31,7 @@ function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 		hops: [
 			{
 				hop_index: 0,
+				pass_index: 0,
 				vote_contribution: ZERO_VOTES,
 				node_id: 1,
 				input_refs: [],
@@ -61,13 +62,13 @@ function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 						],
 						final_registers: [0, 0, 0, 0],
 						final_payload: [],
-						final_meta: [],
 						slot_writes: [],
 					},
 				},
 			},
 			{
 				hop_index: 1,
+				pass_index: 0,
 				vote_contribution: ZERO_VOTES,
 				node_id: 2,
 				input_refs: [],
@@ -92,22 +93,15 @@ function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 						stable_passes_count: 0,
 						final_outputs: [],
 						output_sinks: [],
-						action_slots: [],
-						execute_gate: {
-							wired: false,
-							weighted_sum: 0,
-							queue_non_empty: false,
-							fired: false,
-						},
 					},
 				},
 			},
 		],
+		passes: [],
 		final_actions: ["NoOp" as const],
-		termination_reason: "NoTargets" as const,
+		termination_reason: "NoDecision" as const,
 		debug_perception: null,
 		priority_bid: 0,
-		votes: ZERO_VOTES,
 		commit_counts: [0, 0, 0, 0],
 	}));
 

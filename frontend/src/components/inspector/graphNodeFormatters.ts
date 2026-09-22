@@ -1,5 +1,4 @@
 import type {
-	ActionSlotBehavior,
 	ComputeNodeKind,
 	GraphSource,
 	InputReference,
@@ -67,7 +66,7 @@ export function formatGraphSource(source: GraphSource, inputRefs: InputReference
 /** Directions each directed vote sink covers — the `Direction::ALL` index range. */
 const VOTE_DIRECTION_COUNT = 8;
 
-/** The vote sink at a catalog index (T19.F03); null at or above the catalog count. */
+/** The vote sink at a catalog index; null at or above the catalog count. */
 function voteSinkFromIndex(index: number): VoteSink | null {
 	if (index === 0) return "Eat";
 	if (index < 1 + VOTE_DIRECTION_COUNT) return { Move: index - 1 };
@@ -82,13 +81,13 @@ function voteSinkFromIndex(index: number): VoteSink | null {
 	return null;
 }
 
-/** Label the vote sink at a catalog index (T19.F03); out of range reads as invalid. */
+/** Label the vote sink at a catalog index; out of range reads as invalid. */
 export function voteSinkLabel(index: number): string {
 	const sink = voteSinkFromIndex(index);
 	return sink === null ? `invalid(${index})` : formatVoteSink(sink);
 }
 
-/** Format one vote sink of the T19.F03 catalog. */
+/** Format one vote sink of the catalog. */
 export function formatVoteSink(sink: VoteSink): string {
 	if (typeof sink === "string") return sink;
 	if ("Move" in sink) return `Move[${sink.Move}]`;
@@ -117,38 +116,7 @@ export function outputSinkSubtitle(kind: OutputSinkKind): string | undefined {
 	if ("RouterGate" in kind) return "route score";
 	if ("WriteSlot" in kind) return "shared memory";
 	if ("ClearSlot" in kind) return "shared memory";
-	if ("ActionVote" in kind) return "action vote (not yet read)";
-	if ("ActionParam" in kind) return "action parameter (not yet read)";
+	if ("ActionVote" in kind) return "action vote";
+	if ("ActionParam" in kind) return "action parameter";
 	return undefined;
-}
-
-/** Format an ActionSlotBehavior as a human-readable label. */
-export function formatActionSlotBehavior(behavior: ActionSlotBehavior): string {
-	if (typeof behavior === "string") return behavior;
-	if ("Emit" in behavior) return behavior.Emit;
-	return "?";
-}
-
-/** Human-readable subtitle explaining what an action slot's inputs control. */
-export function actionSlotSubtitle(behavior: ActionSlotBehavior): string {
-	if (typeof behavior === "string") {
-		return behavior === "Pop" ? "removes last queued action" : behavior;
-	}
-	if ("Emit" in behavior) {
-		switch (behavior.Emit) {
-			case "Move":
-				return "gate · direction";
-			case "Eat":
-				return "gate · food type";
-			case "Reproduce":
-				return "gate · direction · fraction";
-			case "StealEnergy":
-				return "gate · direction · amount";
-			case "NoOp":
-				return "gate only";
-			default:
-				return "gate";
-		}
-	}
-	return "";
 }

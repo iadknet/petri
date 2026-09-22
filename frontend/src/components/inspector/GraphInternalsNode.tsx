@@ -22,13 +22,6 @@ export interface GraphInternalsNodeData extends Record<string, unknown> {
 	weightedSum: number | null;
 	appliedValue: number | null;
 	applied: boolean | null;
-	// Action slot trace
-	fired: boolean | null;
-	emittedAction: string | null;
-	queueDelta: string | null;
-	// Execute gate trace
-	gateFired: boolean | null;
-	queueNonEmpty: boolean | null;
 }
 
 const CATEGORY_COLORS: Record<
@@ -43,7 +36,6 @@ const CATEGORY_COLORS: Record<
 	constant: { r: 100, g: 116, b: 139, bgAlpha: 0.12, borderAlpha: 0.35, text: "#94a3b8" },
 	output_value: { r: 251, g: 191, b: 36, bgAlpha: 0.15, borderAlpha: 0.4, text: "#fcd34d" },
 	output_action: { r: 249, g: 115, b: 22, bgAlpha: 0.15, borderAlpha: 0.4, text: "#fdba74" },
-	output_gate: { r: 239, g: 68, b: 68, bgAlpha: 0.15, borderAlpha: 0.4, text: "#fca5a5" },
 };
 
 export const GraphInternalsNode = memo(function GraphInternalsNode(props: NodeProps) {
@@ -134,22 +126,6 @@ export const GraphInternalsNode = memo(function GraphInternalsNode(props: NodePr
 				{data.weightedSum !== null ? (
 					<span className="shrink-0 text-[8px] text-cyan-300">
 						{"\u03A3"}={data.weightedSum.toFixed(2)}
-					</span>
-				) : null}
-				{/* Action slot trace */}
-				{data.fired !== null ? (
-					<span
-						className={`shrink-0 text-[8px] ${data.fired ? "text-orange-300" : "text-slate-600"}`}
-					>
-						{data.fired ? (data.emittedAction ?? "fired") : "\u2014"}
-					</span>
-				) : null}
-				{/* Execute gate trace */}
-				{data.gateFired !== null ? (
-					<span
-						className={`shrink-0 text-[8px] ${data.gateFired ? "text-red-300" : "text-slate-600"}`}
-					>
-						{data.gateFired ? "fired" : "\u2014"}
 					</span>
 				) : null}
 			</div>

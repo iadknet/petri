@@ -9,8 +9,7 @@ export type NodeCategory =
 	| "stateful"
 	| "constant"
 	| "output_value"
-	| "output_action"
-	| "output_gate";
+	| "output_action";
 
 const STATEFUL = new Set(["DecayIntegrator", "Momentum", "Oscillator", "AdaptiveGain"]);
 const ACTIVATION = new Set(["Sigmoid", "Tanh", "Relu", "Clamp01", "Threshold"]);
