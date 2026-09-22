@@ -212,7 +212,8 @@ fn tick_sample_reports_the_founder_structure_means_before_any_birth() {
     let events = run_and_collect(1, 1);
     let sample = first_tick_sample(&events);
     assert_eq!(sample["population"].as_u64().unwrap(), 10);
-    assert_eq!(sample["mean_genome_size"].as_f64().unwrap(), 111.0);
+    // The T19.F04 vote founder is 97 genome units.
+    assert_eq!(sample["mean_genome_size"].as_f64().unwrap(), 97.0);
     assert_eq!(sample["mean_mesh_nodes"].as_f64().unwrap(), 2.0);
     assert_eq!(sample["mean_generation"].as_f64().unwrap(), 0.0);
 }

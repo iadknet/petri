@@ -69,7 +69,10 @@ pub(crate) fn build_cgp_child_plasticity_weights(def: &mut CgpGraphBackendDef) -
 mod tests {
     use super::*;
     use crate::config::MutationConfig;
-    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, GraphSource};
+    use crate::creature::genome::cgp::{
+        ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, FIRST_ACTION_VOTE_SINK,
+        FIXED_SINK_COUNT,
+    };
     use crate::creature::genome::{HebbianRule, PlasticityConfig};
 
     #[test]
@@ -96,8 +99,7 @@ mod tests {
     }
 
     fn simple_cgp_def() -> CgpGraphBackendDef {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         // CN0: no plasticity
         def.compute_nodes.push(ComputeNode {
@@ -178,8 +180,7 @@ mod tests {
 
     #[test]
     fn empty_graph_produces_empty_weights() {
-        let config = MutationConfig::default();
-        let def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let def = CgpGraphBackendDef::new_with_fixed_outputs();
         let parent_weights: Vec<Box<[f32]>> = Vec::new();
 
         let child = build_cgp_child_plasticity_weights(&def, &parent_weights);
@@ -188,8 +189,7 @@ mod tests {
 
     #[test]
     fn darwinian_always_resets() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Add,
@@ -391,8 +391,8 @@ mod tests {
                 match field {
                     0 => changed.compute_nodes[0].kind = ComputeNodeKind::Constant(value),
                     1 => changed.output_sinks[0].inputs.push(edge),
-                    2 => changed.action_bank[0].gate_inputs.push(edge),
-                    _ => changed.execute_gate.inputs.push(edge),
+                    2 => changed.output_sinks[FIRST_ACTION_VOTE_SINK].inputs.push(edge),
+                    _ => changed.output_sinks[FIXED_SINK_COUNT - 1].inputs.push(edge),
                 }
                 proptest::prop_assert_ne!(&original, &changed);
                 proptest::prop_assert_ne!(&changed, &original);
@@ -453,7 +453,6 @@ mod tests {
         }
         let mut def = tracked_def();
         def.output_sinks.clear();
-        def.action_bank.clear();
         for seed in 0..12 {
             add_edge(
                 &mut def,

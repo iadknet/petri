@@ -33,8 +33,7 @@ fn sort_by_priority_bid_orders_descending() {
         priority_bid: bid,
         work_counters: Default::default(),
         energy_observation: Default::default(),
-        termination_reason: TerminationReason::ActionEmitted,
-        votes: Default::default(),
+        termination_reason: TerminationReason::NoDecision,
         commit_counts: Default::default(),
     };
 
@@ -67,8 +66,7 @@ fn sort_by_priority_bid_stable_for_equal_bids() {
         priority_bid: bid,
         work_counters: Default::default(),
         energy_observation: Default::default(),
-        termination_reason: TerminationReason::ActionEmitted,
-        votes: Default::default(),
+        termination_reason: TerminationReason::NoDecision,
         commit_counts: Default::default(),
     };
 

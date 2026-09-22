@@ -1,5 +1,5 @@
 //! Battery `steering-v1` (T11.F21): does a genome's movement follow food and
-//! avoid barriers, and does its executed mesh write a direction bank?
+//! avoid barriers, and does its executed mesh vote on a `Move` sink?
 //!
 //! Separate from `neighborhood-v1`, which is not edited. Six base scenarios
 //! (seed 9) are drawn by the same generator; every reading executes one tick
@@ -13,8 +13,8 @@
 //! (b) avoidance: for each (a) scenario leading with `Move(c)`, the same
 //!     scenario with `barrier[c] = 1`; avoided when the lead is no longer
 //!     `Move(c)`;
-//! (c) `bank_written`: a node in the T11.F14 executed set structurally writes
-//!     a bank.
+//! (c) `move_voted`: a node in the T11.F14 executed set contributes to a
+//!     `Move` sink (T19.F04).
 //!
 //! Observation only, never a fitness signal.
 
@@ -23,7 +23,8 @@ use std::collections::BTreeSet;
 use super::battery::{draw_scenarios, execute_scenario_tick, Scenario};
 use crate::config::RuntimeConfig;
 use crate::contracts::{Direction, NodeId, WorldAction};
-use crate::creature::genome::cgp::ActionSlotBehavior;
+use crate::creature::genome::cgp::OutputSinkKind;
+use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::runtime::mesh::UntracedMeshExecution;
 
@@ -60,8 +61,8 @@ pub struct SteeringReading {
     pub avoidance_trials: u64,
     /// (b) scenarios whose lead is no longer the barred move.
     pub avoided: u64,
-    /// Whether a node the battery executes structurally writes a bank.
-    pub bank_written: bool,
+    /// Whether a node the battery executes contributes to a `Move` sink.
+    pub move_voted: bool,
 }
 
 /// The sums of [`SteeringReading`]s over a sample of genomes.
@@ -74,8 +75,8 @@ pub struct SteeringPooled {
     pub within_45: u64,
     pub avoidance_trials: u64,
     pub avoided: u64,
-    /// Genomes whose `bank_written` is true.
-    pub bank_written: u64,
+    /// Genomes whose `move_voted` is true.
+    pub move_voted: u64,
 }
 
 impl SteeringPooled {
@@ -90,28 +91,29 @@ impl SteeringPooled {
             within_45: self.within_45 + reading.within_45,
             avoidance_trials: self.avoidance_trials + reading.avoidance_trials,
             avoided: self.avoided + reading.avoided,
-            bank_written: self.bank_written + u64::from(reading.bank_written),
+            move_voted: self.move_voted + u64::from(reading.move_voted),
         }
     }
 }
 
-/// Whether a node in `executed` structurally writes a direction bank: a VM
-/// program containing `WriteDirectionBid`, or a graph slot with a movement
-/// `Emit` behavior and a non-empty bank.
+/// Whether a node in `executed` structurally contributes to a `Move` sink
+/// (T19.F04): a VM program with an `AddVote` naming a `Move` sink, or a graph
+/// with a wired `ActionVote(Move(_))` sink.
 #[must_use]
-pub fn writes_bank(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool {
+pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool {
+    let is_move = |sink: Option<VoteSink>| matches!(sink, Some(VoteSink::Move(_)));
     genome
         .nodes
         .iter()
         .filter(|node| executed.contains(&node.node_id))
         .any(|node| match &node.backend_def {
-            BackendDef::Vm(vm) => vm
-                .program
-                .iter()
-                .any(|instruction| matches!(instruction, VmInstruction::WriteDirectionBid { .. })),
-            BackendDef::Graph(graph) => graph.action_bank.iter().any(|slot| {
-                matches!(slot.behavior, ActionSlotBehavior::Emit(kind) if kind.is_movement())
-                    && !slot.direction_bids.is_empty()
+            BackendDef::Vm(vm) => vm.program.iter().any(|instruction| {
+                matches!(instruction, VmInstruction::AddVote { sink, .. }
+                    if is_move(VoteSink::from_index(usize::from(*sink))))
+            }),
+            BackendDef::Graph(graph) => graph.output_sinks.iter().any(|sink| {
+                !sink.inputs.is_empty()
+                    && matches!(sink.kind, OutputSinkKind::ActionVote(VoteSink::Move(_)))
             }),
         })
 }
@@ -174,7 +176,7 @@ impl SteeringBattery {
         executed: &BTreeSet<NodeId>,
     ) -> SteeringReading {
         let mut reading = SteeringReading {
-            bank_written: writes_bank(genome, executed),
+            move_voted: votes_move(genome, executed),
             ..SteeringReading::default()
         };
         for base in &self.bases {
@@ -206,8 +208,7 @@ mod tests {
     use crate::contracts::{InputReference, WorldInputKey};
     use crate::creature::founder::founder_genome;
     use crate::creature::genome::cgp::{
-        ActionSlot, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, DirectionBidEdge,
-        ExecuteGate, GraphEdge, GraphSource, WorldActionKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
     use crate::creature::genome::NodeGenome;
     use crate::neighborhood::Battery;
@@ -265,7 +266,7 @@ mod tests {
     }
 
     #[test]
-    fn founder_reading_is_deterministic_and_writes_no_bank() {
+    fn founder_reading_is_deterministic_and_votes_move() {
         let config = config();
         let genome = founder();
         let battery = SteeringBattery::generate(config.world.food.types.len());
@@ -273,7 +274,7 @@ mod tests {
         let reading = battery.read(&genome, &config.runtime, &executed);
         assert_eq!(reading, battery.read(&genome, &config.runtime, &executed));
         assert_eq!(reading.scenarios, 48);
-        assert!(!reading.bank_written);
+        assert!(reading.move_voted);
         assert!(reading.exact_hits <= reading.within_45);
         assert!(reading.within_45 <= reading.moves);
         assert!(reading.moves <= reading.scenarios);
@@ -290,10 +291,10 @@ mod tests {
             within_45: 5,
             avoidance_trials: 10,
             avoided: 1,
-            bank_written: true,
+            move_voted: true,
         };
         let b = SteeringReading {
-            bank_written: false,
+            move_voted: false,
             ..a
         };
         let pooled = SteeringPooled::default().merge(a).merge(b);
@@ -307,103 +308,105 @@ mod tests {
                 within_45: 10,
                 avoidance_trials: 20,
                 avoided: 2,
-                bank_written: 1,
+                move_voted: 1,
             }
         );
     }
 
-    // ── One-edge fixtures (T11.F21 contract) ────────────────────────────────
+    // ── One-edge fixtures (T11.F21 contract, re-expressed on votes) ─────────
 
     const FOOD_RING: InputReference = InputReference::World(WorldInputKey::NeighborFoodRing {
         type_idx: OrdinaryFoodTypeId::new(0),
     });
     const BARRIER_RING: InputReference = InputReference::World(WorldInputKey::NeighborBarrierRing);
 
-    /// A one-node graph genome that always emits `Move(scalar)`: the graph
-    /// backend's founder-equivalent for the one-edge fixtures.
-    fn graph_mover(scalar: usize) -> CreatureGenome {
-        let constant = |value: f32| ComputeNode {
-            kind: ComputeNodeKind::Constant(value),
+    fn vote_edge(source: GraphSource, weight: f32) -> GraphEdge {
+        GraphEdge { source, weight }
+    }
+
+    /// A one-node graph genome that votes `Move(scalar)` 0.5 from a constant,
+    /// so it commits `Move(scalar)` once: the graph backend's
+    /// founder-equivalent for the one-edge fixtures.
+    fn graph_mover(scalar: u8) -> CreatureGenome {
+        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
+        graph.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::Constant(1.0),
             inputs: Vec::new(),
             plasticity: None,
-        };
-        let edge = |idx: u16| GraphEdge {
-            source: GraphSource::ComputeNode(idx),
-            weight: 1.0,
-        };
-        let mut slot = ActionSlot::inert(ActionSlotBehavior::Emit(WorldActionKind::Move));
-        slot.gate_inputs = vec![edge(0)];
-        slot.param_inputs = vec![edge(1)];
+        });
+        wire(
+            &mut graph,
+            VoteSink::Move(scalar),
+            vote_edge(GraphSource::ComputeNode(0), 0.5),
+        );
         CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![FOOD_RING, BARRIER_RING],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    birth_weights: None,
-                    compute_nodes: vec![constant(1.0), constant(scalar as f32)],
-                    output_sinks: Vec::new(),
-                    action_bank: vec![slot],
-                    execute_gate: ExecuteGate {
-                        inputs: vec![edge(0)],
-                    },
-                }),
+                backend_def: BackendDef::Graph(graph),
                 targets: Vec::new(),
             }],
         }
     }
 
-    /// `graph_mover` with one bank edge `ring[d] * weight -> bid d`.
-    fn graph_mover_with_bid(scalar: usize, ring: u16, d: u8, weight: f32) -> CreatureGenome {
+    fn wire(graph: &mut CgpGraphBackendDef, sink: VoteSink, edge: GraphEdge) {
+        graph
+            .output_sinks
+            .iter_mut()
+            .find(|candidate| candidate.kind == OutputSinkKind::ActionVote(sink))
+            .expect("catalog sink")
+            .inputs
+            .push(edge);
+    }
+
+    /// `graph_mover` with one edge `ring[d] * weight -> Move(d)`.
+    fn graph_mover_with_edge(scalar: u8, ring: u16, d: u8, weight: f32) -> CreatureGenome {
         let mut genome = graph_mover(scalar);
         let BackendDef::Graph(graph) = &mut genome.nodes[0].backend_def else {
             unreachable!()
         };
-        graph.action_bank[0].direction_bids.push(DirectionBidEdge {
-            edge: GraphEdge {
-                source: GraphSource::InputLeaf {
+        wire(
+            graph,
+            VoteSink::Move(d),
+            vote_edge(
+                GraphSource::InputLeaf {
                     ref_idx: ring,
                     sub_idx: u16::from(d),
                 },
                 weight,
-            },
-            direction: d,
-        });
+            ),
+        );
         genome
     }
 
-    /// The founder with `ring[d] -> bid d` (negated when `negative`) written
-    /// at the start of its VM decision node: prepending keeps every relative
-    /// jump valid, and the bank persists to whichever push the dispatch
-    /// reaches.
-    fn vm_founder_with_bid(ring: InputReference, d: u8, negative: bool) -> CreatureGenome {
+    /// The founder with one edge `ring[d] * weight -> Move(d)` on its vote
+    /// node, reading `ring` through a new input reference.
+    fn founder_with_edge(ring: InputReference, d: u8, weight: f32) -> CreatureGenome {
         let mut genome = founder();
         let node = &mut genome.nodes[1];
         let ref_idx = node.input_refs.len() as u16;
         node.input_refs.push(ring);
-        let BackendDef::Vm(vm) = &mut node.backend_def else {
+        let BackendDef::Graph(graph) = &mut node.backend_def else {
             unreachable!()
         };
-        let mut prefix = vec![VmInstruction::ReadInput {
-            dst: 12,
-            ref_idx,
-            sub_idx: u16::from(d),
-        }];
-        if negative {
-            prefix.push(VmInstruction::Neg { dst: 12, src: 12 });
-        }
-        prefix.push(VmInstruction::WriteDirectionBid {
-            direction: d,
-            src: 12,
-        });
-        prefix.append(&mut vm.program);
-        vm.program = prefix;
+        wire(
+            graph,
+            VoteSink::Move(d),
+            vote_edge(
+                GraphSource::InputLeaf {
+                    ref_idx,
+                    sub_idx: u16::from(d),
+                },
+                weight,
+            ),
+        );
         genome
     }
 
     /// On the `neighborhood-v1` snapshots, `with` differs from `without` only
-    /// where the base's `ring[d]` is nonzero, and there only by moving every
-    /// movement action to `d`.
+    /// where the base's `ring[d]` is nonzero, and there every move of the
+    /// steered queue is `Move(d)`.
     fn assert_only_ring_scenarios_differ(
         with: &CreatureGenome,
         without: &CreatureGenome,
@@ -427,20 +430,24 @@ mod tests {
                 assert_eq!(a, b, "a zero cue must leave the queue unchanged");
                 continue;
             }
-            assert_eq!(a.len(), b.len());
-            for (x, y) in a.iter().zip(b) {
-                assert_eq!(x.action_type(), y.action_type());
-                if let Some(direction) = x.direction() {
-                    assert_eq!(direction.to_index(), d);
-                }
-                if x != y {
-                    differed += 1;
-                }
+            if a != b {
+                differed += 1;
+                let moves: Vec<usize> = a
+                    .iter()
+                    .filter_map(|action| match action {
+                        WorldAction::Move(direction) => Some(direction.to_index()),
+                        _ => None,
+                    })
+                    .collect();
+                assert!(
+                    !moves.is_empty() && moves.iter().all(|&c| c == d),
+                    "a steered queue moves only to {d}: {a:?}"
+                );
             }
         }
         assert!(
             differed > 0 || !expect_difference,
-            "some snapshot must exercise the bank"
+            "some snapshot must exercise the edge"
         );
     }
 
@@ -468,42 +475,43 @@ mod tests {
     }
 
     #[test]
-    fn writes_bank_needs_an_executed_movement_emit_with_a_non_empty_bank() {
+    fn votes_move_needs_an_executed_node_contributing_to_a_move_sink() {
         let node0: BTreeSet<NodeId> = [NodeId::new(0)].into_iter().collect();
-        // A movement slot with an empty bank writes nothing.
-        assert!(!writes_bank(&graph_mover(2), &node0));
-        // A movement slot with a bank edge writes, but only when executed.
-        let with_bid = graph_mover_with_bid(2, 0, 3, 1.0);
-        assert!(writes_bank(&with_bid, &node0));
-        assert!(!writes_bank(&with_bid, &BTreeSet::new()));
-        // A bank on a non-movement slot never writes.
-        let mut eater = with_bid;
+        assert!(votes_move(&graph_mover(2), &node0));
+        assert!(!votes_move(&graph_mover(2), &BTreeSet::new()));
+        // A graph voting only `Eat` does not.
+        let mut eater = graph_mover(2);
         let BackendDef::Graph(graph) = &mut eater.nodes[0].backend_def else {
             unreachable!()
         };
-        graph.action_bank[0].behavior = ActionSlotBehavior::Emit(WorldActionKind::Eat);
-        assert!(!writes_bank(&eater, &node0));
-    }
-
-    #[test]
-    fn graph_out_of_range_bid_direction_is_summed_nowhere() {
-        let config = config();
-        let battery = SteeringBattery::generate(config.world.food.types.len());
-        let scalar = 2;
-        let plain = battery.read(&graph_mover(scalar), &config.runtime, &BTreeSet::new());
-        let mut genome = graph_mover(scalar);
-        let BackendDef::Graph(graph) = &mut genome.nodes[0].backend_def else {
-            unreachable!()
+        let edges = std::mem::take(
+            &mut graph
+                .output_sinks
+                .iter_mut()
+                .find(|sink| sink.kind == OutputSinkKind::ActionVote(VoteSink::Move(2)))
+                .unwrap()
+                .inputs,
+        );
+        wire(graph, VoteSink::Eat, edges[0]);
+        assert!(!votes_move(&eater, &node0));
+        // A VM `AddVote` on a `Move` sink does; one on `Eat` or past the
+        // catalog does not.
+        let vm = |sink: u8| CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::AddVote { sink, src: 0 }],
+                }),
+                targets: vec![],
+            }],
         };
-        graph.action_bank[0].direction_bids.push(DirectionBidEdge {
-            edge: GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            },
-            direction: 8,
-        });
-        let reading = battery.read(&genome, &config.runtime, &BTreeSet::new());
-        assert_eq!(reading, plain, "a direction-8 edge must not write the bank");
+        assert!(votes_move(&vm(VoteSink::Move(7).index() as u8), &node0));
+        assert!(!votes_move(&vm(VoteSink::Eat.index() as u8), &node0));
+        assert!(!votes_move(&vm(200), &node0));
     }
 
     #[test]
@@ -513,22 +521,22 @@ mod tests {
         let scalar = 2;
         let plain = battery.read(&graph_mover(scalar), &config.runtime, &BTreeSet::new());
         assert_eq!(plain.moves, 48);
-        assert_eq!(plain.exact_hits, 6, "the scalar mover hits only food at E");
+        assert_eq!(plain.exact_hits, 6, "the fixed mover hits only food at E");
         assert_eq!(plain.within_45, 18);
-        assert!(!plain.bank_written);
+        assert!(!plain.move_voted, "nothing was executed");
         for d in 0..8u8 {
-            let genome = graph_mover_with_bid(scalar, 0, d, 1.0);
+            let genome = graph_mover_with_edge(scalar, 0, d, 1.0);
             let executed = executed(&genome, &config);
             let reading = battery.read(&genome, &config.runtime, &executed);
-            assert!(reading.bank_written, "d={d}");
+            assert!(reading.move_voted, "d={d}");
             assert_eq!(reading.moves, 48, "d={d}");
             assert_eq!(
                 moves_on_food_at(&battery, &genome, &config, usize::from(d)),
                 (6, 6),
                 "d={d}: food at d is an exact hit on every base"
             );
-            // Elsewhere the bid is 0, the bank all-ties, and the scalar wins.
-            let steered = u64::from(usize::from(d) != scalar) * 6;
+            // Elsewhere the edge reads 0 and the fixed vote wins.
+            let steered = u64::from(d != scalar) * 6;
             assert_eq!(reading.exact_hits, plain.exact_hits + steered, "d={d}");
         }
     }
@@ -536,13 +544,13 @@ mod tests {
     #[test]
     fn graph_one_positive_food_edge_changes_nothing_else() {
         let config = config();
-        for d in 0..8usize {
+        for d in 0..8u8 {
             assert_only_ring_scenarios_differ(
-                &graph_mover_with_bid(2, 0, d as u8, 1.0),
+                &graph_mover_with_edge(2, 0, d, 1.0),
                 &graph_mover(2),
                 &config,
                 |scenario| scenario.sensors.local.neighbor_food,
-                d,
+                usize::from(d),
                 d != 2,
             );
         }
@@ -556,7 +564,7 @@ mod tests {
         let plain = battery.read(&graph_mover(scalar), &config.runtime, &BTreeSet::new());
         assert_eq!(plain.avoided, 0);
         for d in 0..8u8 {
-            let genome = graph_mover_with_bid(scalar, 1, d, -1.0);
+            let genome = graph_mover_with_edge(scalar, 1, d, -1.0);
             let reading = battery.read(&genome, &config.runtime, &executed(&genome, &config));
             assert_eq!(
                 (reading.moves, reading.exact_hits, reading.within_45),
@@ -564,7 +572,7 @@ mod tests {
                 "d={d}: no barrier, no change"
             );
             assert_eq!(reading.avoidance_trials, plain.avoidance_trials);
-            let expected = if usize::from(d) == scalar {
+            let expected = if d == scalar {
                 plain.avoidance_trials
             } else {
                 0
@@ -577,7 +585,7 @@ mod tests {
         let decay = config.shared_memory.decay_rate;
         assert_eq!(
             neighborhood.signature(
-                &graph_mover_with_bid(scalar, 1, scalar as u8, -1.0),
+                &graph_mover_with_edge(scalar, 1, scalar, -1.0),
                 &config.runtime,
                 decay
             ),
@@ -586,15 +594,15 @@ mod tests {
     }
 
     #[test]
-    fn vm_one_positive_food_edge_hits_every_direction_and_changes_nothing_else() {
+    fn founder_one_positive_food_edge_hits_every_direction_and_changes_nothing_else() {
         let config = config();
         let battery = SteeringBattery::generate(config.world.food.types.len());
         let founder = founder();
         let plain = battery.read(&founder, &config.runtime, &executed(&founder, &config));
         for d in 0..8u8 {
-            let genome = vm_founder_with_bid(FOOD_RING, d, false);
+            let genome = founder_with_edge(FOOD_RING, d, 1.0);
             let reading = battery.read(&genome, &config.runtime, &executed(&genome, &config));
-            assert!(reading.bank_written, "d={d}");
+            assert!(reading.move_voted, "d={d}");
             assert_eq!(reading.moves, plain.moves, "d={d}");
             let (moves, hits) = moves_on_food_at(&battery, &genome, &config, usize::from(d));
             assert_eq!(
@@ -612,13 +620,13 @@ mod tests {
                 &config,
                 |scenario| scenario.sensors.local.neighbor_food,
                 usize::from(d),
-                true,
+                !matches!(d, 0 | 2 | 4 | 6),
             );
         }
     }
 
     #[test]
-    fn vm_one_negative_barrier_edge_avoids_where_the_founder_led_and_changes_nothing_else() {
+    fn founder_one_negative_barrier_edge_avoids_where_the_founder_led_and_changes_nothing_else() {
         let config = config();
         let battery = SteeringBattery::generate(config.world.food.types.len());
         let founder = founder();
@@ -629,7 +637,7 @@ mod tests {
         let founder_signature = neighborhood.signature(&founder, &config.runtime, decay);
         let mut avoided_total = 0;
         for d in 0..8u8 {
-            let genome = vm_founder_with_bid(BARRIER_RING, d, true);
+            let genome = founder_with_edge(BARRIER_RING, d, -1.0);
             let reading = battery.read(&genome, &config.runtime, &executed(&genome, &config));
             assert_eq!(
                 (
@@ -644,7 +652,7 @@ mod tests {
                     plain.within_45,
                     plain.avoidance_trials
                 ),
-                "d={d}: an all-zero bank leaves the scalar decode in force"
+                "d={d}: with no barrier the edge reads 0"
             );
             let led_with_d = leads_with_direction(&battery, &founder, &config, usize::from(d));
             assert_eq!(reading.avoided, led_with_d, "d={d}");

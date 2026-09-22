@@ -56,11 +56,11 @@ fn founder_neighborhood_is_identical_across_thread_counts() {
     );
 }
 
-/// The audit's headline structural facts: two operators are reliably silent
-/// on the founder because of how they are constructed, not because of any
-/// repair. `VmCopyConstantBlock` only appends to the (unread by control
-/// flow) constant pool; `CopySubgraph` lands its copy disconnected. Neither
-/// fact depends on any T11 repair, so this assertion is not a floor.
+/// The audit's headline structural facts, as they stand on the T19.F04
+/// all-Graph founder: `CopySubgraph` lands its copy disconnected, so it is
+/// reliably silent by construction, not because of any repair; and
+/// `VmCopyConstantBlock` (append-only, silent at 100% in the audit) finds no
+/// VM node to act on, so every trial is a skip.
 #[test]
 fn specific_operators_are_fully_silent_on_the_founder_as_the_audit_recorded() {
     let evaluation = founder_evaluation(1);
@@ -75,12 +75,8 @@ fn specific_operators_are_fully_silent_on_the_founder_as_the_audit_recorded() {
     let copy_constant_block = row("VmCopyConstantBlock");
     assert_eq!(
         copy_constant_block.tally.applied(),
-        REDUCED_OPERATOR_TRIALS,
-        "VmCopyConstantBlock always applies on the founder"
-    );
-    assert_eq!(
-        copy_constant_block.tally.silent, REDUCED_OPERATOR_TRIALS,
-        "VmCopyConstantBlock is append-only, so every trial is silent (audit: 100%)"
+        0,
+        "the vote founder carries no VM node, so VmCopyConstantBlock never applies"
     );
 
     let copy_subgraph = row("CopySubgraph");

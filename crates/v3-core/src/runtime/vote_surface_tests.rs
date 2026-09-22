@@ -1,15 +1,14 @@
-//! T19.F03 vote surface: accumulation, commit boundaries, and inertness.
-//!
-//! The surface is wired everywhere a genome and a trace are represented while
-//! nothing reads it, so every assertion here is about what is recorded, never
-//! about a decision the recorded values caused.
+//! The vote surface (T19.F03, read by T19.F04): accumulation within a pass,
+//! the dispatch commit boundary, sanitizing, and the parameter surface. The
+//! pass-loop decisions the votes cause are asserted in `pass_loop_tests`.
 
 use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, RouteTarget};
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
-    OutputSink, OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+    OutputSinkKind,
 };
+use crate::creature::genome::vote::VoteVector;
 use crate::creature::genome::vote::{VoteKind, VoteSink, VOTE_SINK_COUNT};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
@@ -99,14 +98,27 @@ fn voting_graph_node(
                     }],
                 })
                 .collect(),
-            action_bank: vec![],
-            execute_gate: ExecuteGate { inputs: vec![] },
         }),
         targets: targets(target_ids),
     }
 }
 
-fn run(genome: &CreatureGenome, energy: f32, cap: u32) -> MeshOutput {
+/// A tick's output beside its first pass's final vote vector.
+struct Run {
+    output: MeshOutput,
+    votes: VoteVector,
+    first_pass_hops: u32,
+}
+
+impl std::ops::Deref for Run {
+    type Target = MeshOutput;
+
+    fn deref(&self) -> &MeshOutput {
+        &self.output
+    }
+}
+
+fn run(genome: &CreatureGenome, energy: f32, cap: u32) -> Run {
     run_with(
         genome,
         energy,
@@ -134,12 +146,12 @@ fn costly_config() -> RuntimeConfig {
     }
 }
 
-fn run_with(genome: &CreatureGenome, energy: f32, config: RuntimeConfig) -> MeshOutput {
+fn run_with(genome: &CreatureGenome, energy: f32, config: RuntimeConfig) -> Run {
     let mut energy = energy;
     let mut memory = [0.0; 16];
     let mut state = GraphRuntimeState::new();
     state.begin_tick(&genome.nodes, 0);
-    execute_creature_mesh_impl(
+    let (output, _, passes) = execute_creature_mesh_traced(
         genome,
         &sensors(),
         &mut energy,
@@ -147,8 +159,12 @@ fn run_with(genome: &CreatureGenome, energy: f32, config: RuntimeConfig) -> Mesh
         &[0.0; 16],
         &mut state,
         &config,
-        crate::runtime::mesh::UntracedMeshExecution,
-    )
+    );
+    Run {
+        output,
+        votes: passes[0].votes,
+        first_pass_hops: passes[0].hops,
+    }
 }
 
 #[test]
@@ -183,7 +199,8 @@ fn a_vm_dispatch_sums_its_own_votes_and_commits_them() {
     let output = run(&genome, 100.0, 4);
     assert_eq!(output.votes[VoteSink::Move(2).index()], 3.0);
     assert_eq!(output.votes.iter().filter(|v| **v != 0.0).count(), 1);
-    assert_eq!(output.commit_counts, [0; 4]);
+    // A vote of 3.0 commits three moves.
+    assert_eq!(output.commit_counts, [0, 3, 0, 0]);
 }
 
 #[test]
@@ -193,7 +210,7 @@ fn a_revisit_replaces_that_node_s_contribution_rather_than_adding_one() {
         entry_node_id: NodeId::new(0),
         nodes: vec![
             voting_vm_node(0, 1.0, VoteSink::Eat.index() as u8, &[1]),
-            voting_vm_node(1, 4.0, VoteSink::Decide.index() as u8, &[0]),
+            voting_vm_node(1, 4.0, VoteSink::Terminate.index() as u8, &[0]),
         ],
     };
     let one_pass = run(&genome, 1000.0, 1);
@@ -202,9 +219,9 @@ fn a_revisit_replaces_that_node_s_contribution_rather_than_adding_one() {
     // Three hops: node 0, node 1, node 0 again. The revisit replaces node 0's
     // contribution with the same value instead of doubling it.
     let revisited = run(&genome, 1000.0, 3);
-    assert_eq!(revisited.work_counters.mesh_hops, 3);
+    assert_eq!(revisited.first_pass_hops, 3);
     assert_eq!(revisited.votes[VoteSink::Eat.index()], 1.0);
-    assert_eq!(revisited.votes[VoteSink::Decide.index()], 4.0);
+    assert_eq!(revisited.votes[VoteSink::Terminate.index()], 4.0);
 }
 
 #[test]
@@ -363,9 +380,9 @@ fn a_graph_visit_commits_its_wired_sinks_and_writes_the_parameter_surface() {
     };
     let output = run(&genome, 100.0, 4);
     assert_eq!(output.votes[VoteSink::StealEnergy(5).index()], 2.0);
-    // The parameter surface is not carried on `MeshOutput`: nothing reads it.
-    // Its write is asserted through the effects pass below.
-    assert_eq!(output.commit_counts, [0; 4]);
+    // A vote of 2.0 commits two steals; the parameter surface is read at
+    // each commit (asserted in `pass_loop_tests`).
+    assert_eq!(output.commit_counts, [0, 0, 0, 2]);
 }
 
 #[test]
@@ -492,7 +509,7 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
                 &config,
                 ObservedMeshExecution::default(),
             );
-            let (traced, hops, _) = execute_creature_mesh_traced(
+            let (traced, hops, passes) = execute_creature_mesh_traced(
                 &genome,
                 &sensors(),
                 &mut energies[2],
@@ -502,28 +519,29 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
                 &config,
             );
             for output in [&observed, &traced] {
-                assert_eq!(plain.votes, output.votes, "cap {cap} start {start}");
                 assert_eq!(plain.commit_counts, output.commit_counts);
                 assert_eq!(plain.work_counters, output.work_counters);
                 assert_eq!(plain.actions, output.actions);
             }
             assert_eq!(energies, [energies[0]; 3]);
-            // The traced hops carry each hop's committed contribution, and the
-            // last commit of every node sums to the evaluation's vote vector.
-            let mut latest: Vec<(NodeId, [f32; VOTE_SINK_COUNT])> = Vec::new();
-            for hop in &hops {
-                match latest.iter_mut().find(|(id, _)| *id == hop.node_id) {
-                    Some((_, entry)) => *entry = hop.vote_contribution,
-                    None => latest.push((hop.node_id, hop.vote_contribution)),
+            // Within each pass, the latest commit of every node sums to that
+            // pass's vote vector.
+            for pass in &passes {
+                let mut latest: Vec<(NodeId, [f32; VOTE_SINK_COUNT])> = Vec::new();
+                for hop in hops.iter().filter(|hop| hop.pass_index == pass.pass_index) {
+                    match latest.iter_mut().find(|(id, _)| *id == hop.node_id) {
+                        Some((_, entry)) => *entry = hop.vote_contribution,
+                        None => latest.push((hop.node_id, hop.vote_contribution)),
+                    }
                 }
-            }
-            let mut summed = [0.0f32; VOTE_SINK_COUNT];
-            for (_, entry) in &latest {
-                for (sum, value) in summed.iter_mut().zip(entry) {
-                    *sum += *value;
+                let mut summed = [0.0f32; VOTE_SINK_COUNT];
+                for (_, entry) in &latest {
+                    for (sum, value) in summed.iter_mut().zip(entry) {
+                        *sum += *value;
+                    }
                 }
+                assert_eq!(summed, pass.votes, "cap {cap} start {start}");
             }
-            assert_eq!(summed, traced.votes, "cap {cap} start {start}");
         }
     }
 }
@@ -539,16 +557,18 @@ mod sum_rule_property {
 
     const NO_VOTES: VoteVector = [0.0; VOTE_SINK_COUNT];
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     enum Step {
         Stage(VoteVector),
         Commit(usize),
+        BeginPass,
     }
 
     fn step_strategy() -> impl Strategy<Value = Step> {
         prop_oneof![
-            prop::array::uniform(any::<f32>()).prop_map(Step::Stage),
-            (0usize..6).prop_map(Step::Commit),
+            4 => prop::array::uniform(any::<f32>()).prop_map(Step::Stage),
+            4 => (0usize..6).prop_map(Step::Commit),
+            1 => Just(Step::BeginPass),
         ]
     }
 
@@ -579,7 +599,7 @@ mod sum_rule_property {
 
     proptest! {
         #[test]
-        fn votes_are_the_sanitized_sum_of_each_node_s_latest_contribution(
+        fn votes_are_the_sanitized_sum_of_each_node_s_latest_contribution_this_pass(
             steps in prop::collection::vec(step_strategy(), 0..32),
         ) {
             let mut side_outputs = MeshSideOutputs::new(4);
@@ -591,6 +611,11 @@ mod sum_rule_property {
                     Step::Stage(contribution) => {
                         side_outputs.stage_vote_contribution(&contribution);
                         staged = Some(contribution.map(sanitize_f32));
+                    }
+                    Step::BeginPass => {
+                        side_outputs.begin_pass();
+                        model = Model::default();
+                        staged = None;
                     }
                     Step::Commit(node_idx) => {
                         let expected = staged.take();

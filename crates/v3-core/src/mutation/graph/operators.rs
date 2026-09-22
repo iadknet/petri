@@ -1,22 +1,19 @@
 //! CGP-style graph mutation operators.
 //!
 //! Topology mutations operate on `compute_nodes` only. Edge mutations work
-//! across all 6 edge-bearing surfaces: compute inputs, sink inputs, action
-//! gate edges, action param edges, action direction-bank edges, and execute
-//! gate inputs.
+//! across both edge-bearing surfaces: compute inputs and sink inputs, the
+//! action-vote and parameter sinks included (T19.F04).
 
 use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference};
 use crate::creature::genome::cgp::{
-    ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, DirectionBidEdge,
-    GraphEdge, GraphSource, WorldActionKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::types::MutationSkipReason;
-use crate::runtime::action_decode::DIRECTION_BANK_SLOTS;
 
 #[inline]
 fn graph_def_mut(
@@ -76,15 +73,6 @@ pub(super) fn mutate_operator_param(
 ) -> Result<(), MutationSkipReason> {
     let def = graph_def_mut(genome, node_idx)?;
     mutate_compute_param(def, rng)
-}
-
-pub(super) fn mutate_action_slot_behavior(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    let def = graph_def_mut(genome, node_idx)?;
-    mutate_action_slot_behavior_in_def(def, rng)
 }
 
 pub(super) fn add_internal_node(
@@ -230,36 +218,6 @@ pub(crate) fn random_compute_node_kind(rng: &mut impl Rng) -> ComputeNodeKind {
     }
 }
 
-fn random_action_slot_behavior_excluding(
-    current: ActionSlotBehavior,
-    rng: &mut impl Rng,
-) -> ActionSlotBehavior {
-    match current {
-        ActionSlotBehavior::Pop => ActionSlotBehavior::Emit(random_world_action_kind(rng)),
-        ActionSlotBehavior::Emit(current_kind) => {
-            if rng.gen_bool(0.5) {
-                ActionSlotBehavior::Pop
-            } else {
-                let mut next_kind = random_world_action_kind(rng);
-                while next_kind == current_kind {
-                    next_kind = random_world_action_kind(rng);
-                }
-                ActionSlotBehavior::Emit(next_kind)
-            }
-        }
-    }
-}
-
-fn random_world_action_kind(rng: &mut impl Rng) -> WorldActionKind {
-    match rng.gen_range(0u8..5) {
-        0 => WorldActionKind::Eat,
-        1 => WorldActionKind::Move,
-        2 => WorldActionKind::Reproduce,
-        3 => WorldActionKind::StealEnergy,
-        _ => WorldActionKind::NoOp,
-    }
-}
-
 // ─── Edge surface helpers ───────────────────────────────────────────────────
 
 /// Identifies which edge-bearing surface an edge belongs to.
@@ -267,17 +225,10 @@ fn random_world_action_kind(rng: &mut impl Rng) -> WorldActionKind {
 pub(crate) enum EdgeSurface {
     ComputeInput(usize),
     SinkInput(usize),
-    ActionGate(usize),
-    ActionParam(usize),
-    /// A slot's direction bank (T11.F21): edges carry a `direction` beside
-    /// the `GraphEdge`.
-    ActionBid(usize),
-    ExecuteGate,
 }
 
 /// Every edge site on the def, defining the canonical surface order:
-/// compute inputs, sink inputs, per action slot gate, param, then bank
-/// inputs, execute gate. The single enumeration [`total_edge_count`],
+/// compute inputs, then sink inputs. The single enumeration [`total_edge_count`],
 /// [`pick_random_edge`], the edge-site applicability predicates and the
 /// operators that draw from filtered edge sets all read.
 fn edge_sites(def: &CgpGraphBackendDef) -> impl Iterator<Item = (EdgeSurface, usize)> + '_ {
@@ -287,18 +238,7 @@ fn edge_sites(def: &CgpGraphBackendDef) -> impl Iterator<Item = (EdgeSurface, us
     let sinks = def.output_sinks.iter().enumerate().flat_map(|(i, sink)| {
         (0..sink.inputs.len()).map(move |edge| (EdgeSurface::SinkInput(i), edge))
     });
-    let actions = def.action_bank.iter().enumerate().flat_map(|(i, slot)| {
-        (0..slot.gate_inputs.len())
-            .map(move |edge| (EdgeSurface::ActionGate(i), edge))
-            .chain(
-                (0..slot.param_inputs.len()).map(move |edge| (EdgeSurface::ActionParam(i), edge)),
-            )
-            .chain(
-                (0..slot.direction_bids.len()).map(move |edge| (EdgeSurface::ActionBid(i), edge)),
-            )
-    });
-    let gate = (0..def.execute_gate.inputs.len()).map(|edge| (EdgeSurface::ExecuteGate, edge));
-    compute.chain(sinks).chain(actions).chain(gate)
+    compute.chain(sinks)
 }
 
 /// The edge at `idx` on `surface`; read-only twin of [`edge_at_mut`].
@@ -306,26 +246,10 @@ fn edge_at(def: &CgpGraphBackendDef, surface: EdgeSurface, idx: usize) -> &Graph
     match surface {
         EdgeSurface::ComputeInput(i) => &def.compute_nodes[i].inputs[idx],
         EdgeSurface::SinkInput(i) => &def.output_sinks[i].inputs[idx],
-        EdgeSurface::ActionGate(i) => &def.action_bank[i].gate_inputs[idx],
-        EdgeSurface::ActionParam(i) => &def.action_bank[i].param_inputs[idx],
-        EdgeSurface::ActionBid(i) => &def.action_bank[i].direction_bids[idx].edge,
-        EdgeSurface::ExecuteGate => &def.execute_gate.inputs[idx],
     }
 }
 
-/// The `direction` field of a bank edge; `None` on every other surface.
-fn bid_direction_mut(
-    def: &mut CgpGraphBackendDef,
-    surface: EdgeSurface,
-    idx: usize,
-) -> Option<&mut u8> {
-    match surface {
-        EdgeSurface::ActionBid(i) => Some(&mut def.action_bank[i].direction_bids[idx].direction),
-        _ => None,
-    }
-}
-
-/// Count total edges across all 6 surfaces: the length of [`edge_sites`].
+/// Count total edges across both surfaces: the length of [`edge_sites`].
 fn total_edge_count(def: &CgpGraphBackendDef) -> usize {
     edge_sites(def).count()
 }
@@ -340,42 +264,24 @@ fn pick_random_edge(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Option<(Edg
     edge_sites(def).nth(rng.gen_range(0..total))
 }
 
-/// Pick a random edge container (surface) to add an edge to.
-/// Uniform across all surfaces (compute inputs, sink inputs, action
-/// gate/param/bank, execute gate).
+/// Pick a random edge container (surface) to add an edge to, uniform over
+/// every compute node and every catalog sink, the action-vote and parameter
+/// sinks included (T19.F04).
 pub(crate) fn pick_random_surface(
     def: &CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Option<EdgeSurface> {
-    // Build list of all available surfaces
-    let mut surfaces = Vec::with_capacity(
-        def.compute_nodes.len() + def.output_sinks.len() + def.action_bank.len() * 3 + 1,
-    );
-
-    for i in 0..def.compute_nodes.len() {
-        surfaces.push(EdgeSurface::ComputeInput(i));
-    }
-    // The vote and parameter sinks (T19.F03) are excluded by kind, so the
-    // surface list, its length, and every draw are what they were before the
-    // catalog grew. T19.F04 lifts the exclusion without renumbering.
-    for (i, sink) in def.output_sinks.iter().enumerate() {
-        if sink.kind.is_vote_surface() {
-            continue;
-        }
-        surfaces.push(EdgeSurface::SinkInput(i));
-    }
-    for i in 0..def.action_bank.len() {
-        surfaces.push(EdgeSurface::ActionGate(i));
-        surfaces.push(EdgeSurface::ActionParam(i));
-        surfaces.push(EdgeSurface::ActionBid(i));
-    }
-    surfaces.push(EdgeSurface::ExecuteGate);
-
-    if surfaces.is_empty() {
+    let compute = def.compute_nodes.len();
+    let total = compute + def.output_sinks.len();
+    if total == 0 {
         return None;
     }
-
-    Some(surfaces[rng.gen_range(0..surfaces.len())])
+    let pick = rng.gen_range(0..total);
+    Some(if pick < compute {
+        EdgeSurface::ComputeInput(pick)
+    } else {
+        EdgeSurface::SinkInput(pick - compute)
+    })
 }
 
 /// Mutable access to the edge at `idx` on `surface`.
@@ -387,31 +293,14 @@ pub(crate) fn edge_at_mut(
     match surface {
         EdgeSurface::ComputeInput(i) => &mut def.compute_nodes[i].inputs[idx],
         EdgeSurface::SinkInput(i) => &mut def.output_sinks[i].inputs[idx],
-        EdgeSurface::ActionGate(i) => &mut def.action_bank[i].gate_inputs[idx],
-        EdgeSurface::ActionParam(i) => &mut def.action_bank[i].param_inputs[idx],
-        EdgeSurface::ActionBid(i) => &mut def.action_bank[i].direction_bids[idx].edge,
-        EdgeSurface::ExecuteGate => &mut def.execute_gate.inputs[idx],
     }
 }
 
-/// Append `edge` to `surface`; a bank edge draws its `direction` uniformly
-/// over the eight bank slots.
-fn push_edge(
-    def: &mut CgpGraphBackendDef,
-    surface: EdgeSurface,
-    edge: GraphEdge,
-    rng: &mut impl Rng,
-) {
+/// Append `edge` to `surface`.
+fn push_edge(def: &mut CgpGraphBackendDef, surface: EdgeSurface, edge: GraphEdge) {
     match surface {
         EdgeSurface::ComputeInput(i) => def.compute_nodes[i].inputs.push(edge),
         EdgeSurface::SinkInput(i) => def.output_sinks[i].inputs.push(edge),
-        EdgeSurface::ActionGate(i) => def.action_bank[i].gate_inputs.push(edge),
-        EdgeSurface::ActionParam(i) => def.action_bank[i].param_inputs.push(edge),
-        EdgeSurface::ActionBid(i) => def.action_bank[i].direction_bids.push(DirectionBidEdge {
-            edge,
-            direction: rng.gen_range(0..DIRECTION_BANK_SLOTS as u8),
-        }),
-        EdgeSurface::ExecuteGate => def.execute_gate.inputs.push(edge),
     }
 }
 
@@ -423,18 +312,6 @@ fn remove_edge_at(def: &mut CgpGraphBackendDef, surface: EdgeSurface, idx: usize
         }
         EdgeSurface::SinkInput(i) => {
             def.output_sinks[i].inputs.remove(idx);
-        }
-        EdgeSurface::ActionGate(i) => {
-            def.action_bank[i].gate_inputs.remove(idx);
-        }
-        EdgeSurface::ActionParam(i) => {
-            def.action_bank[i].param_inputs.remove(idx);
-        }
-        EdgeSurface::ActionBid(i) => {
-            def.action_bank[i].direction_bids.remove(idx);
-        }
-        EdgeSurface::ExecuteGate => {
-            def.execute_gate.inputs.remove(idx);
         }
     }
 }
@@ -771,7 +648,7 @@ pub(crate) fn add_edge(
     let compute_count = def.compute_nodes.len() as u16;
     let source = random_graph_source(compute_count, input_refs, config, rng);
     let weight = rng.gen_range(-1.0f32..=1.0);
-    push_edge(def, surface, GraphEdge { source, weight }, rng);
+    push_edge(def, surface, GraphEdge { source, weight });
     if let (Some(weights), EdgeSurface::ComputeInput(node)) = (&mut def.birth_weights, surface) {
         weights[node].push(None);
     }
@@ -920,20 +797,6 @@ pub(crate) fn mutate_compute_param(
     Ok(())
 }
 
-/// Mutate one action slot's behavior (Pop vs Emit(kind)).
-pub(crate) fn mutate_action_slot_behavior_in_def(
-    def: &mut CgpGraphBackendDef,
-    rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    if def.action_bank.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let slot_idx = rng.gen_range(0..def.action_bank.len());
-    let current = def.action_bank[slot_idx].behavior;
-    def.action_bank[slot_idx].behavior = random_action_slot_behavior_excluding(current, rng);
-    Ok(())
-}
-
 // ─── Raw field mutation ─────────────────────────────────────────────────────
 
 /// One field-level move available on a picked edge's `GraphSource`. Each
@@ -946,13 +809,9 @@ enum EdgeFieldMove {
     SubIdx(i32),
     SharedSlot(i32),
     FlipPrevious,
-    /// A bank edge's `direction` slot (T11.F21); bank surfaces only.
-    Direction(i32),
 }
 
-/// Every field-level move valid for the edge at `edge_idx` on `surface`:
-/// the source moves of [`valid_edge_field_moves`] plus, on a direction bank,
-/// the `direction` moves of [`valid_direction_moves`].
+/// Every field-level move valid for the edge at `edge_idx` on `surface`.
 fn valid_edge_moves(
     def: &CgpGraphBackendDef,
     surface: EdgeSurface,
@@ -960,34 +819,12 @@ fn valid_edge_moves(
     input_refs: &[InputReference],
     config: &MutationConfig,
 ) -> Vec<EdgeFieldMove> {
-    let compute_count = def.compute_nodes.len() as u16;
-    let mut moves = valid_edge_field_moves(
+    valid_edge_field_moves(
         edge_at(def, surface, edge_idx).source,
-        compute_count,
+        def.compute_nodes.len() as u16,
         input_refs,
         config,
-    );
-    if let EdgeSurface::ActionBid(slot) = surface {
-        moves.extend(valid_direction_moves(
-            def.action_bank[slot].direction_bids[edge_idx].direction,
-        ));
-    }
-    moves
-}
-
-/// The one-unit `direction` moves of a bank edge (T11.F21): bounded like a
-/// `ComputeNode` index, no wrap, and none for an out-of-range direction.
-fn valid_direction_moves(direction: u8) -> Vec<EdgeFieldMove> {
-    let mut moves = Vec::new();
-    if (direction as usize) < DIRECTION_BANK_SLOTS {
-        if direction > 0 {
-            moves.push(EdgeFieldMove::Direction(-1));
-        }
-        if (direction as usize) + 1 < DIRECTION_BANK_SLOTS {
-            moves.push(EdgeFieldMove::Direction(1));
-        }
-    }
-    moves
+    )
 }
 
 /// Enumerate every field-level move that is a valid single-step change for
@@ -1125,12 +962,6 @@ pub(crate) fn raw_field_mutation(
     let (surface, edge_idx) = edges[pick - param_count];
     let moves = valid_edge_moves(def, surface, edge_idx, input_refs, config);
     let chosen = moves[rng.gen_range(0..moves.len())];
-    if let EdgeFieldMove::Direction(delta) = chosen {
-        let direction = bid_direction_mut(def, surface, edge_idx)
-            .expect("direction moves are offered on bank edges only");
-        *direction = (i32::from(*direction) + delta) as u8;
-        return Ok(());
-    }
     let source = edge_at(def, surface, edge_idx).source;
     apply_edge_field_move(&mut edge_at_mut(def, surface, edge_idx).source, chosen);
     if edge_at(def, surface, edge_idx).source != source {
@@ -1166,11 +997,6 @@ pub(super) fn has_parameterized_compute_node(def: &CgpGraphBackendDef) -> bool {
     def.compute_nodes
         .iter()
         .any(|node| is_compute_parameterized(&node.kind))
-}
-
-/// `MutateActionSlotBehavior`: any action slot.
-pub(super) fn has_action_slot(def: &CgpGraphBackendDef) -> bool {
-    !def.action_bank.is_empty()
 }
 
 /// `CopyInternalNode`: a compute node to copy, with room for the copy.
@@ -1213,10 +1039,11 @@ pub(super) const fn can_add_compute_node(_def: &CgpGraphBackendDef) -> bool {
     true
 }
 
-/// `AddGraphEdge`: the execute gate is always an available surface, so
-/// every Graph node is a target.
-pub(super) const fn can_add_edge(_def: &CgpGraphBackendDef) -> bool {
-    true
+/// `AddGraphEdge`: any compute node or catalog sink is a surface, the set
+/// `pick_random_surface` draws from. Every graph built on the fixed catalog
+/// qualifies.
+pub(super) fn can_add_edge(def: &CgpGraphBackendDef) -> bool {
+    !def.compute_nodes.is_empty() || !def.output_sinks.is_empty()
 }
 
 #[cfg(test)]
@@ -1224,9 +1051,8 @@ mod tests {
     use super::*;
     use crate::config::{MutationConfig, OrdinaryFoodTypeId};
     use crate::contracts::{InputReference, WorldInputKey};
-    use crate::creature::genome::cgp::{
-        ActionSlot, ActionSlotBehavior, ExecuteGate, OutputSink, OutputSinkKind, WorldActionKind,
-    };
+    use crate::creature::genome::cgp::{OutputSink, OutputSinkKind};
+    use crate::creature::genome::vote::VoteSink;
     use rand::SeedableRng;
 
     fn test_rng() -> rand::rngs::SmallRng {
@@ -1251,23 +1077,22 @@ mod tests {
                     plasticity: None,
                 },
             ],
-            output_sinks: vec![OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-            }],
-            action_bank: vec![ActionSlot {
-                behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
-                gate_inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-                param_inputs: Vec::new(),
-                direction_bids: Vec::new(),
-            }],
-            execute_gate: ExecuteGate { inputs: Vec::new() },
+            output_sinks: vec![
+                OutputSink {
+                    kind: OutputSinkKind::CustomOutput(0),
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 1.0,
+                    }],
+                },
+                OutputSink {
+                    kind: OutputSinkKind::ActionVote(VoteSink::Eat),
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 1.0,
+                    }],
+                },
+            ],
         }
     }
 
@@ -1356,8 +1181,6 @@ mod tests {
                 plasticity: None,
             }],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let mut rng = test_rng();
         assert_eq!(
@@ -1382,8 +1205,6 @@ mod tests {
                     weight: 1.0,
                 }],
             }],
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let mut rng = test_rng();
         assert_eq!(
@@ -1416,14 +1237,13 @@ mod tests {
                     plasticity: None,
                 },
             ],
-            output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate {
+            output_sinks: vec![OutputSink {
+                kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
                 inputs: vec![GraphEdge {
                     source: GraphSource::ComputeNode(1),
                     weight: 1.0,
                 }],
-            },
+            }],
         };
         // Force selection of the only edge (ComputeInput(1), edge 0).
         let mut rng = test_rng();
@@ -1446,10 +1266,10 @@ mod tests {
             GraphSource::ComputeNode(1)
         );
         assert_eq!(def.compute_nodes[2].inputs[0].weight, 0.75);
-        // The execute gate's unrelated reference to the shifted Sigmoid is
+        // The vote sink's unrelated reference to the shifted Sigmoid is
         // remapped too.
         assert_eq!(
-            def.execute_gate.inputs[0].source,
+            def.output_sinks[0].inputs[0].source,
             GraphSource::ComputeNode(2)
         );
     }
@@ -1470,8 +1290,6 @@ mod tests {
                 plasticity: None,
             }],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let mut rng = test_rng();
         split_existing_edge(&mut def, &[], &mut rng).unwrap();
@@ -1508,8 +1326,6 @@ mod tests {
                     weight: 2.0,
                 }],
             }],
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let mut rng = test_rng();
         split_existing_edge(&mut def, &[], &mut rng).unwrap();
@@ -1543,8 +1359,6 @@ mod tests {
             birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let mut rng = test_rng();
         assert!(remove_compute_node(&mut def, &mut rng).is_err());
@@ -1597,8 +1411,6 @@ mod tests {
                 plasticity: None,
             }],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let mut rng = test_rng();
         assert!(copy_cgp_subgraph(&mut def, &mut rng).is_err());
@@ -1639,8 +1451,6 @@ mod tests {
                 plasticity: None,
             }],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let original = def.compute_nodes[0].inputs[0].source;
         let input_refs = sample_input_refs();
@@ -1671,8 +1481,6 @@ mod tests {
                 plasticity: None,
             }],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let original_weight = 1.0f32;
         let mut rng = test_rng();
@@ -1734,8 +1542,6 @@ mod tests {
                 plasticity: None,
             }],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let mut rng = test_rng();
         assert!(mutate_compute_param(&mut def, &mut rng).is_err());
@@ -1818,25 +1624,29 @@ mod tests {
     // ── Full fixed output tests ─────────────────────────────────────────────
 
     #[test]
-    fn add_edge_to_execute_gate() {
+    fn add_edge_reaches_the_vote_and_parameter_sinks() {
         let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Constant(1.0),
             inputs: Vec::new(),
             plasticity: None,
         });
 
-        // Try many times to hit execute gate surface
         let mut rng = test_rng();
-        for _ in 0..100 {
+        for _ in 0..200 {
             let _ = add_edge(&mut def, &[], &config, &mut rng);
         }
-        // Execute gate should have gotten at least one edge
-        assert!(
-            !def.execute_gate.inputs.is_empty(),
-            "execute gate should have received edges"
-        );
+        let wired = |pick: fn(OutputSinkKind) -> bool| {
+            def.output_sinks
+                .iter()
+                .any(|sink| pick(sink.kind) && !sink.inputs.is_empty())
+        };
+        assert!(wired(|kind| matches!(kind, OutputSinkKind::ActionVote(_))));
+        assert!(wired(|kind| matches!(
+            kind,
+            OutputSinkKind::ActionParam(_, _)
+        )));
     }
 
     // ── Raw-field mutation tests ────────────────────────────────────────────
@@ -1869,8 +1679,6 @@ mod tests {
                 },
             ],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let config = MutationConfig::default();
         for seed in 0u64..64 {
@@ -1900,8 +1708,6 @@ mod tests {
                 plasticity: None,
             }],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let config = MutationConfig::default();
         for seed in 0u64..64 {
@@ -1964,8 +1770,6 @@ mod tests {
                 },
             ],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let config = MutationConfig::default();
         for seed in 0u64..500 {
@@ -2008,8 +1812,6 @@ mod tests {
                 plasticity: None,
             }],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let config = MutationConfig::default();
         let mut rng = test_rng();
@@ -2083,7 +1885,7 @@ mod tests {
     }
 
     /// `add_compute_node`'s three-way dispatch must reach every form. The
-    /// fixture's only edge lives on the execute gate (not a compute-node
+    /// fixture's only edge lives on a vote sink (not a compute-node
     /// consumer), so `split_existing_edge` always appends its new node and
     /// retargets that one edge — giving each form an exact, non-overlapping
     /// structural fingerprint (kills both match-arm-deletion mutants).
@@ -2097,14 +1899,13 @@ mod tests {
                     inputs: Vec::new(),
                     plasticity: None,
                 }],
-                output_sinks: Vec::new(),
-                action_bank: Vec::new(),
-                execute_gate: ExecuteGate {
+                output_sinks: vec![OutputSink {
+                    kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
                     inputs: vec![GraphEdge {
                         source: GraphSource::ComputeNode(0),
                         weight: 0.5,
                     }],
-                },
+                }],
             }
         }
 
@@ -2123,12 +1924,12 @@ mod tests {
                 "every form appends exactly one node"
             );
             let new_node = &def.compute_nodes[1];
-            let gate_source = def.execute_gate.inputs[0].source;
+            let gate_source = def.output_sinks[0].inputs[0].source;
             if gate_source == GraphSource::ComputeNode(1) {
                 // Split: the pre-existing edge now sources the new identity
                 // node, which reproduces the old source exactly.
                 assert_eq!(
-                    def.execute_gate.inputs[0].weight, 0.5,
+                    def.output_sinks[0].inputs[0].weight, 0.5,
                     "split preserves the old weight"
                 );
                 assert_eq!(new_node.kind, ComputeNodeKind::Add);
@@ -2434,8 +2235,6 @@ mod tests {
                 plasticity: None,
             }],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         assert_eq!(total_edge_count(&params_only), 0);
         assert!(has_parameterized_compute_node(&params_only));
@@ -2466,8 +2265,6 @@ mod tests {
                 },
             ],
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         assert!(!has_parameterized_compute_node(&edges_only));
         assert!(raw_field_edge_sites(&edges_only, &input_refs, &config)
@@ -2480,188 +2277,44 @@ mod tests {
         assert!(raw_field_mutation(&mut edges_only, &input_refs, &config, &mut test_rng()).is_ok());
     }
 
-    // ── Direction bank surface (T11.F21) ────────────────────────────────────
-
-    /// A def whose only edge-bearing surfaces are one slot's bank and the
-    /// compute node it reads, so every edge draw lands on the bank.
-    fn bank_only_def(direction: u8) -> CgpGraphBackendDef {
-        let mut def = CgpGraphBackendDef {
-            birth_weights: None,
-            compute_nodes: vec![ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: Vec::new(),
-                plasticity: None,
-            }],
-            output_sinks: Vec::new(),
-            action_bank: vec![ActionSlot::inert(ActionSlotBehavior::Emit(
-                WorldActionKind::Move,
-            ))],
-            execute_gate: ExecuteGate { inputs: Vec::new() },
-        };
-        def.action_bank[0].direction_bids.push(DirectionBidEdge {
-            edge: GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            },
-            direction,
-        });
-        def
-    }
-
-    #[test]
-    fn add_edge_lands_on_the_bank_surface_with_a_direction_in_range() {
-        let input_refs = sample_input_refs();
-        let config = MutationConfig::default();
-        let mut landed = false;
-        for seed in 0..64u64 {
-            let mut def = minimal_def();
-            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            let surface = pick_random_surface(&def, &mut rng).unwrap();
-            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            add_edge(&mut def, &input_refs, &config, &mut rng).unwrap();
-            if let EdgeSurface::ActionBid(slot) = surface {
-                landed = true;
-                let bids = &def.action_bank[slot].direction_bids;
-                assert_eq!(bids.len(), 1);
-                assert!((bids[0].direction as usize) < DIRECTION_BANK_SLOTS);
-            }
-        }
-        assert!(landed, "no seed in 0..64 drew the bank surface");
-    }
-
-    #[test]
-    fn edge_operators_act_on_a_bank_edge() {
-        let input_refs = sample_input_refs();
-        let config = MutationConfig::default();
-
-        let mut def = bank_only_def(3);
-        remove_edge(&mut def, &mut test_rng()).unwrap();
-        assert!(def.action_bank[0].direction_bids.is_empty());
-
-        let mut def = bank_only_def(3);
-        let mut retargeted = false;
-        for seed in 0..32u64 {
-            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            retarget_edge(&mut def, &input_refs, &config, &mut rng).unwrap();
-            if def.action_bank[0].direction_bids[0].edge.source != GraphSource::ComputeNode(0) {
-                retargeted = true;
-                break;
-            }
-        }
-        assert!(retargeted);
-        assert_eq!(def.action_bank[0].direction_bids[0].direction, 3);
-
-        let mut def = bank_only_def(3);
-        let mut rng = test_rng();
-        for _ in 0..10 {
-            alter_edge_weight_in_def(&mut def, &mut rng).unwrap();
-        }
-        assert!((def.action_bank[0].direction_bids[0].edge.weight - 1.0).abs() > f32::EPSILON);
-
-        let mut def = bank_only_def(3);
-        split_existing_edge(&mut def, &input_refs, &mut test_rng()).unwrap();
-        assert_eq!(def.compute_nodes.len(), 2);
-        assert_eq!(
-            def.action_bank[0].direction_bids[0].edge.source,
-            GraphSource::ComputeNode(1)
-        );
-    }
-
-    #[test]
-    fn raw_field_mutation_moves_a_bank_direction_by_one_unit() {
-        let input_refs = sample_input_refs();
-        let config = MutationConfig::default();
-        // A single unparameterized compute node offers no source move and no
-        // parameter, so the direction is the only raw field on the def.
-        let def = bank_only_def(3);
-        assert_eq!(
-            valid_edge_moves(&def, EdgeSurface::ActionBid(0), 0, &input_refs, &config),
-            vec![EdgeFieldMove::Direction(-1), EdgeFieldMove::Direction(1)]
-        );
-        let mut seen = std::collections::BTreeSet::new();
-        for seed in 0..16u64 {
-            let mut def = bank_only_def(3);
-            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            raw_field_mutation(&mut def, &input_refs, &config, &mut rng).unwrap();
-            seen.insert(def.action_bank[0].direction_bids[0].direction);
-        }
-        assert_eq!(seen.into_iter().collect::<Vec<_>>(), vec![2, 4]);
-        // At either bound only one move is offered, so the delta's sign is
-        // observable regardless of the draw.
-        for (start, expected) in [(0u8, 1u8), (7, 6)] {
-            let mut def = bank_only_def(start);
-            raw_field_mutation(&mut def, &input_refs, &config, &mut test_rng()).unwrap();
-            assert_eq!(def.action_bank[0].direction_bids[0].direction, expected);
-        }
-    }
-
-    #[test]
-    fn direction_moves_are_bounded_and_absent_out_of_range() {
-        assert_eq!(valid_direction_moves(0), vec![EdgeFieldMove::Direction(1)]);
-        assert_eq!(valid_direction_moves(7), vec![EdgeFieldMove::Direction(-1)]);
-        assert!(valid_direction_moves(8).is_empty());
-        assert!(!has_raw_field_site(
-            &bank_only_def(8),
-            &sample_input_refs(),
-            &MutationConfig::default()
-        ));
-    }
-
-    /// The founder graph's surface draws, recorded on `07086ed0` before the
-    /// T19.F03 vote surface existed. `pick_random_surface` skips the vote and
-    /// parameter sinks, so the surface list, its length, and every draw stay
-    /// exactly what they were when the catalog held 64 sinks.
-    const FOUNDER_SURFACE_DRAWS_BEFORE_VOTE_SINKS: [&str; 8] = [
-        "SinkInput(54)",
-        "SinkInput(57)",
-        "SinkInput(63)",
-        "SinkInput(48)",
-        "SinkInput(55)",
-        "ActionParam(3)",
-        "ActionParam(3)",
-        "SinkInput(33)",
-    ];
+    // ── The edge-surface draw (T19.F04) ─────────────────────────────────────
 
     fn founder_graph_def() -> CgpGraphBackendDef {
-        crate::creature::cgp_founder::build_cgp_founder_graph_with_thresholds(
-            &MutationConfig::default(),
-            0.5,
-            100,
-            500,
-        )
+        crate::creature::cgp_founder::build_cgp_founder_graph_with_thresholds(0.5, 100, 500)
     }
 
+    /// The draw is uniform over every compute node, then every catalog sink
+    /// in order, the vote and parameter sinks included: one `gen_range` over
+    /// the concatenated list.
     #[test]
-    fn pick_random_surface_never_returns_a_vote_or_parameter_sink() {
+    fn pick_random_surface_draws_uniformly_over_compute_nodes_and_every_sink() {
         let def = founder_graph_def();
-        let votes_or_params: Vec<usize> = def
-            .output_sinks
-            .iter()
-            .enumerate()
-            .filter(|(_, sink)| sink.kind.is_vote_surface())
-            .map(|(i, _)| i)
+        let reference: Vec<EdgeSurface> = (0..def.compute_nodes.len())
+            .map(EdgeSurface::ComputeInput)
+            .chain((0..def.output_sinks.len()).map(EdgeSurface::SinkInput))
             .collect();
-        assert_eq!(votes_or_params.len(), 35);
-        for seed in 0u64..4096 {
+        let mut drew_vote_surface = false;
+        for seed in 0u64..512 {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let surface = pick_random_surface(&def, &mut rng).expect("founder graph has surfaces");
+            let mut replay = rand::rngs::SmallRng::seed_from_u64(seed);
+            assert_eq!(surface, reference[replay.gen_range(0..reference.len())]);
             if let EdgeSurface::SinkInput(i) = surface {
-                assert!(!votes_or_params.contains(&i), "seed {seed} drew sink {i}");
+                drew_vote_surface |= matches!(
+                    def.output_sinks[i].kind,
+                    OutputSinkKind::ActionVote(_) | OutputSinkKind::ActionParam(_, _)
+                );
             }
         }
-    }
-
-    #[test]
-    fn pick_random_surface_on_the_founder_graph_matches_the_pre_feature_record() {
-        let def = founder_graph_def();
-        let drawn: Vec<String> = (1u64..=8)
-            .map(|seed| {
-                let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-                let surface =
-                    pick_random_surface(&def, &mut rng).expect("founder graph has surfaces");
-                format!("{surface:?}")
-            })
-            .collect();
-        assert_eq!(drawn, FOUNDER_SURFACE_DRAWS_BEFORE_VOTE_SINKS);
+        assert!(drew_vote_surface);
+        assert!(pick_random_surface(
+            &CgpGraphBackendDef {
+                birth_weights: None,
+                compute_nodes: Vec::new(),
+                output_sinks: Vec::new(),
+            },
+            &mut test_rng()
+        )
+        .is_none());
     }
 }

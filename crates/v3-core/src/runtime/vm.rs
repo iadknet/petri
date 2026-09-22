@@ -1,8 +1,7 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, MAX_GATE_SLOTS};
-use crate::creature::genome::vote::{VoteSink, VoteVector, VOTE_SINK_COUNT};
+use crate::creature::genome::vote::{VoteSink, VoteVector, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
-use crate::runtime::action_decode::{decode_world_action, DirectionBank, DIRECTION_BANK_SLOTS};
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{
@@ -29,7 +28,7 @@ use crate::simulation::energy_accounting::{applied_debit, observe_energy_change,
 /// - `side_outputs`: mesh-scoped side outputs (action queue, priority bid) that persist across hops
 ///
 /// # Returns
-/// `NodeResult` — the mesh executor checks `terminal` and `energy_exhausted` to decide routing.
+/// `NodeResult` — the mesh executor checks `energy_exhausted` and routes on the gates.
 #[allow(clippy::too_many_arguments)]
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn execute_vm_node(
@@ -96,7 +95,6 @@ pub(crate) trait VmTraceSink {
         def: &VmBackendDef,
         registers: &[f32],
         payload: [f32; OUTPUT_SLOT_COUNT],
-        meta: [f32; 8],
     ) -> Self::Output;
 }
 
@@ -109,20 +107,13 @@ impl VmTraceSink for NoopVmTraceSink {
     fn finish_empty(self, _def: &VmBackendDef, _upstream_slots: &[f32; OUTPUT_SLOT_COUNT]) {}
 
     #[inline]
-    fn finish(
-        self,
-        _def: &VmBackendDef,
-        _registers: &[f32],
-        _payload: [f32; OUTPUT_SLOT_COUNT],
-        _meta: [f32; 8],
-    ) {
-    }
+    fn finish(self, _def: &VmBackendDef, _registers: &[f32], _payload: [f32; OUTPUT_SLOT_COUNT]) {}
 }
 
 #[allow(clippy::too_many_arguments)]
 #[allow(
     clippy::too_many_lines,
-    reason = "the opcode dispatch match covers all 42 VM instructions; keeping \
+    reason = "the opcode dispatch match covers all 39 VM instructions; keeping \
               them in one interpreter loop keeps the stack and trace sink local"
 )]
 pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
@@ -161,11 +152,6 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
     const MAX_REGS: usize = 256;
     let mut regs = [0.0f32; MAX_REGS];
     let mut payload: [f32; OUTPUT_SLOT_COUNT] = *upstream_slots;
-    let mut meta: [f32; 8] = [0.0; 8];
-    // Direction bank for movement pushes (T11.F21): `None` until a
-    // `WriteDirectionBid` lands, then persists between pushes within this
-    // dispatch and resets with `meta` at node end.
-    let mut bank: Option<DirectionBank> = None;
     // This dispatch's vote contribution (T19.F03): starts at zeros, sums the
     // dispatch's own `AddVote`s, and is staged wherever the dispatch commits.
     let mut vote_contribution: VoteVector = [0.0; VOTE_SINK_COUNT];
@@ -419,37 +405,28 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 // invalid slot: write ignored
             }
 
-            VmInstruction::WriteWorldActionMeta { slot_idx, src } => {
-                if (*slot_idx as usize) < 8 {
-                    meta[*slot_idx as usize] = regs[nr(*src, reg_count)];
+            VmInstruction::WriteActionParam { slot_idx, src } => {
+                // The parameter surface (T19.F04): `slot_idx` addresses
+                // `params[slot_idx / 2][slot_idx % 2]`, overwriting. An
+                // invalid slot is ignored.
+                let per_kind = usize::from(VOTE_PARAM_SLOTS);
+                let slot = usize::from(*slot_idx);
+                if let Some(param) = side_outputs
+                    .action_params
+                    .get_mut(slot / per_kind)
+                    .map(|params| &mut params[slot % per_kind])
+                {
+                    *param = regs[nr(*src, reg_count)];
                 }
-                // invalid slot: write ignored
-            }
-
-            VmInstruction::WriteDirectionBid { direction, src } => {
-                if (*direction as usize) < DIRECTION_BANK_SLOTS {
-                    bank.get_or_insert([0.0; DIRECTION_BANK_SLOTS])[*direction as usize] =
-                        regs[nr(*src, reg_count)];
-                }
-                // invalid slot: write ignored, bank stays unwritten
             }
 
             VmInstruction::AddVote { sink, src } => {
-                // Inert (T19.F03): the contribution is accumulated, committed
-                // at the dispatch boundary, and read by nothing. An invalid
-                // sink writes nothing and still costs.
+                // The contribution is accumulated and committed at the
+                // dispatch boundary; the pass end reads the summed votes
+                // (T19.F04). An invalid sink writes nothing and still costs.
                 if let Some(vote_sink) = VoteSink::from_index(*sink as usize) {
                     vote_contribution[vote_sink.index()] += regs[nr(*src, reg_count)];
                 }
-            }
-
-            VmInstruction::PushAction { action_type } => {
-                let action = decode_world_action(*action_type, &meta, bank.as_ref());
-                side_outputs.action_queue.push(action);
-            }
-
-            VmInstruction::PopAction => {
-                side_outputs.action_queue.pop();
             }
 
             VmInstruction::ReadActionQueueLength { dst } => {
@@ -482,18 +459,6 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 } else {
                     0.0
                 };
-            }
-
-            VmInstruction::ExecuteActionQueue => {
-                commit_slots!();
-                trace_sink.after_instruction(
-                    pc,
-                    instr,
-                    step_energy_cost,
-                    effective_energy!() as f32,
-                    &regs[..reg_count],
-                );
-                break NodeResult::terminal(payload, route_gates);
             }
 
             VmInstruction::WriteRouteGate { slot, src } => {
@@ -585,7 +550,7 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
         f64::from(*energy),
         DeathCause::VmCompute,
     );
-    let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
+    let trace = trace_sink.finish(def, &regs[..reg_count], payload);
     (result, trace)
 }
 
@@ -656,16 +621,12 @@ pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -
         VmInstruction::Jump { .. } => 0.10,
         VmInstruction::ReadInput { .. } => 0.12,
         VmInstruction::WriteInternalPayload { .. } => 0.14,
-        VmInstruction::WriteWorldActionMeta { .. } => 0.14,
-        VmInstruction::WriteDirectionBid { .. } => 0.14,
+        VmInstruction::WriteActionParam { .. } => 0.14,
         VmInstruction::AddVote { .. } => 0.14,
-        VmInstruction::PushAction { .. } => 0.24,
-        VmInstruction::PopAction => 0.10,
         VmInstruction::ReadActionQueueLength { .. } => 0.08,
         VmInstruction::ReadActionQueueType { .. } => 0.12,
         VmInstruction::ReadActionQueueParam { .. } => 0.12,
         VmInstruction::SetPriorityBid { .. } => 0.20,
-        VmInstruction::ExecuteActionQueue => 0.24,
         VmInstruction::WriteRouteGate { .. } => 0.10,
         VmInstruction::Halt => 0.05,
         VmInstruction::LoadSlot { .. } => 0.12,

@@ -77,8 +77,8 @@ fn assert_equivalent(
     );
     assert_eq!(memory_a, memory_b, "{label}: memory mismatch");
     assert_eq!(
-        aq_a.action_queue.into_actions(),
-        aq_b.action_queue.into_actions(),
+        aq_a.dispatch_effects(),
+        aq_b.dispatch_effects(),
         "{label}: action queue mismatch"
     );
     assert_eq!(
@@ -100,8 +100,8 @@ fn result_equivalence_emit_eat() {
                 const_idx: 0,
             },
             VmInstruction::ToBool { dst: 1, src: 0 },
-            VmInstruction::PushAction { action_type: 1 },
-            VmInstruction::ExecuteActionQueue,
+            VmInstruction::AddVote { sink: 0, src: 0 },
+            VmInstruction::Halt,
         ],
     };
     let input_refs: Vec<InputReference> = vec![];
@@ -931,7 +931,7 @@ fn result_equivalence_all_41_opcodes() {
             zero_mem,
         ),
         (
-            "WriteWorldActionMeta",
+            "WriteActionParam",
             VmBackendDef {
                 register_count: 1,
                 constants: vec![2.0],
@@ -940,12 +940,12 @@ fn result_equivalence_all_41_opcodes() {
                         dst: 0,
                         const_idx: 0,
                     },
-                    VmInstruction::WriteWorldActionMeta {
+                    VmInstruction::WriteActionParam {
                         slot_idx: 0,
                         src: 0,
                     },
-                    VmInstruction::PushAction { action_type: 2 },
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::AddVote { sink: 1, src: 0 },
+                    VmInstruction::Halt,
                 ],
             },
             vec![],
@@ -962,12 +962,12 @@ fn result_equivalence_all_41_opcodes() {
                         dst: 0,
                         const_idx: 0,
                     },
-                    VmInstruction::WriteDirectionBid {
-                        direction: 5,
+                    VmInstruction::WriteActionParam {
+                        slot_idx: 5,
                         src: 0,
                     },
-                    VmInstruction::PushAction { action_type: 2 },
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::AddVote { sink: 1, src: 0 },
+                    VmInstruction::Halt,
                 ],
             },
             vec![],
@@ -980,8 +980,8 @@ fn result_equivalence_all_41_opcodes() {
                 register_count: 1,
                 constants: vec![],
                 program: vec![
-                    VmInstruction::PushAction { action_type: 1 },
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::AddVote { sink: 0, src: 0 },
+                    VmInstruction::Halt,
                 ],
             },
             vec![],
@@ -994,8 +994,8 @@ fn result_equivalence_all_41_opcodes() {
                 register_count: 1,
                 constants: vec![],
                 program: vec![
-                    VmInstruction::PushAction { action_type: 0 },
-                    VmInstruction::PopAction,
+                    VmInstruction::Noop,
+                    VmInstruction::Noop,
                     VmInstruction::Halt,
                 ],
             },
@@ -1071,7 +1071,7 @@ fn result_equivalence_all_41_opcodes() {
             VmBackendDef {
                 register_count: 1,
                 constants: vec![],
-                program: vec![VmInstruction::ExecuteActionQueue],
+                program: vec![VmInstruction::Halt],
             },
             vec![],
             zero_upstream,

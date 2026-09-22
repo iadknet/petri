@@ -25,22 +25,45 @@ pub struct TickTracePayload {
     pub static_inputs: StaticInputsSnapshotPayload,
     pub debug_perception: Option<PerceptionDebugSnapshotPayload>,
     pub hops: Vec<MeshHopTracePayload>,
+    /// One record per pass of the tick (T19.F04).
+    pub passes: Vec<MeshPassTracePayload>,
     pub final_actions: Vec<WorldActionPayload>,
     pub termination_reason: TerminationReasonPayload,
     pub priority_bid: f32,
-    /// Inert vote surface (T19.F03), in `VoteSink` index order.
-    pub votes: [f32; VOTE_SINK_COUNT],
-    /// Per-kind vote commit counters (T19.F03).
+    /// Final per-kind bars: commits of each kind this tick (T19.F04).
     pub commit_counts: [u32; VOTE_KIND_COUNT],
 }
 
+/// Why the tick's pass loop ended (T19.F04).
 #[derive(Debug, Clone, Serialize)]
 pub enum TerminationReasonPayload {
-    ActionEmitted,
+    NoDecision,
+    TerminateVoted,
+    ActionCapReached,
     EnergyExhausted,
-    MaxHopsReached,
+}
+
+/// Why one pass ended (T19.F04).
+#[derive(Debug, Clone, Serialize)]
+pub enum PassEndReasonPayload {
+    Decided,
+    PassCapReached,
     NoTargets,
     MissingNode,
+    EnergyExhausted,
+}
+
+/// One pass of a tick (T19.F04).
+#[derive(Debug, Clone, Serialize)]
+pub struct MeshPassTracePayload {
+    pub pass_index: u32,
+    pub end_reason: PassEndReasonPayload,
+    /// The pass's final vote vector, in `VoteSink` index order.
+    pub votes: [f32; VOTE_SINK_COUNT],
+    /// Effective vote per kind against the bars the pass started with.
+    pub effective_votes: [f32; VOTE_KIND_COUNT],
+    pub committed: Option<WorldActionPayload>,
+    pub hops: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -65,6 +88,8 @@ pub struct PerceptionDebugSnapshotPayload {
 #[derive(Debug, Clone, Serialize)]
 pub struct MeshHopTracePayload {
     pub hop_index: usize,
+    /// The pass this hop belongs to (T19.F04).
+    pub pass_index: u32,
     pub node_id: u64,
     pub input_refs: Vec<InputReferencePayload>,
     pub upstream_slots: [f32; OUTPUT_SLOT_COUNT],
@@ -106,7 +131,6 @@ pub struct VmTracePayload {
     pub steps: Vec<VmStepTracePayload>,
     pub final_registers: Vec<f32>,
     pub final_payload: [f32; OUTPUT_SLOT_COUNT],
-    pub final_meta: [f32; 8],
     pub slot_writes: Vec<SlotWritePayload>,
 }
 
@@ -133,8 +157,6 @@ pub struct GraphTracePayload {
     pub stable_passes_count: u32,
     pub final_outputs: Vec<f32>,
     pub output_sinks: Vec<GraphOutputSinkTracePayload>,
-    pub action_slots: Vec<GraphActionSlotTracePayload>,
-    pub execute_gate: GraphExecuteGateTracePayload,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -143,25 +165,6 @@ pub struct GraphOutputSinkTracePayload {
     pub weighted_sum: f32,
     pub applied: bool,
     pub applied_value: f32,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct GraphActionSlotTracePayload {
-    pub wired: bool,
-    pub gate_weighted_sum: f32,
-    pub fired: bool,
-    pub param_values: [f32; 2],
-    pub queue_len_before: usize,
-    pub queue_len_after: usize,
-    pub emitted_action: Option<WorldActionPayload>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct GraphExecuteGateTracePayload {
-    pub wired: bool,
-    pub weighted_sum: f32,
-    pub queue_non_empty: bool,
-    pub fired: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

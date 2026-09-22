@@ -171,7 +171,6 @@ pub enum MutationOperator {
     GraphAlterGraphEdgeWeight,
     GraphSwapGraphOperator,
     GraphMutateGraphOperatorParam,
-    GraphMutateActionSlotBehavior,
     GraphAddInternalGraphNode,
     GraphRemoveInternalGraphNode,
     GraphAddGraphEdge,
@@ -232,7 +231,6 @@ impl MutationOperator {
             Self::GraphAlterGraphEdgeWeight => "Graph.AlterGraphEdgeWeight",
             Self::GraphSwapGraphOperator => "Graph.SwapGraphOperator",
             Self::GraphMutateGraphOperatorParam => "Graph.MutateGraphOperatorParam",
-            Self::GraphMutateActionSlotBehavior => "Graph.MutateActionSlotBehavior",
             Self::GraphAddInternalGraphNode => "Graph.AddInternalGraphNode",
             Self::GraphRemoveInternalGraphNode => "Graph.RemoveInternalGraphNode",
             Self::GraphAddGraphEdge => "Graph.AddGraphEdge",
@@ -292,7 +290,6 @@ impl MutationOperator {
             Self::GraphAlterGraphEdgeWeight
             | Self::GraphSwapGraphOperator
             | Self::GraphMutateGraphOperatorParam
-            | Self::GraphMutateActionSlotBehavior
             | Self::GraphAddInternalGraphNode
             | Self::GraphRemoveInternalGraphNode
             | Self::GraphAddGraphEdge
@@ -372,7 +369,6 @@ impl MutationOperator {
             Self::GraphAlterGraphEdgeWeight
             | Self::GraphSwapGraphOperator
             | Self::GraphMutateGraphOperatorParam
-            | Self::GraphMutateActionSlotBehavior
             | Self::GraphRetargetGraphEdge
             | Self::GraphRawFieldMutation
             | Self::GraphMutateHebbianRule
@@ -388,7 +384,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 54] {
+    pub const fn all() -> [Self; 53] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -421,7 +417,6 @@ impl MutationOperator {
             Self::GraphAlterGraphEdgeWeight,
             Self::GraphSwapGraphOperator,
             Self::GraphMutateGraphOperatorParam,
-            Self::GraphMutateActionSlotBehavior,
             Self::GraphAddInternalGraphNode,
             Self::GraphRemoveInternalGraphNode,
             Self::GraphAddGraphEdge,

@@ -63,6 +63,8 @@ fn per_creature_tick_value(pct: &PerCreatureTick, name: &str) -> Option<f64> {
         "actions_applied" => &pct.actions_applied,
         "births" => &pct.births,
         "pass_cap_hits" => &pct.pass_cap_hits,
+        "passes" => &pct.passes,
+        "decided_passes" => &pct.decided_passes,
         _ => unreachable!("unknown counter name: {name}"),
     };
     raw.as_deref().and_then(|s| s.parse::<f64>().ok())
@@ -247,6 +249,8 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
         |row| row.actions_applied,
         |row| row.births,
         |row| row.pass_cap_hits,
+        |row| row.passes,
+        |row| row.decided_passes,
     ];
     for (name, count) in COUNTER_NAMES.iter().zip(counts) {
         readings.push((

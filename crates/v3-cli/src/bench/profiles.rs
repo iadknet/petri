@@ -8,10 +8,11 @@ use v3_core::neighborhood;
 
 pub const SCHEMA_VERSION: u32 = 1;
 
-/// The deterministic work counters normalized by creature-tick. The seventh,
-/// `pass_cap_hits` (T19.F02), is additive: a stored report without it reads
-/// as unmeasured (`level: "new"`) in comparisons and zero in its totals.
-pub const COUNTER_NAMES: [&str; 7] = [
+/// The deterministic work counters normalized by creature-tick. The last
+/// three, `pass_cap_hits` (T19.F02), `passes`, and `decided_passes`
+/// (T19.F04), are additive: a stored report without one reads as unmeasured
+/// (`level: "new"`) in comparisons and zero in its totals.
+pub const COUNTER_NAMES: [&str; 9] = [
     "mesh_hops",
     "vm_steps",
     "graph_relax_iters",
@@ -19,12 +20,14 @@ pub const COUNTER_NAMES: [&str; 7] = [
     "actions_applied",
     "births",
     "pass_cap_hits",
+    "passes",
+    "decided_passes",
 ];
 
 /// Counters added after the first stored summaries: absent from an older
 /// summary and read as zero when such a summary is the current side of an
 /// offline comparison (as a reference, absence stays `level: "new"`).
-pub const ADDITIVE_COUNTER_NAMES: [&str; 1] = ["pass_cap_hits"];
+pub const ADDITIVE_COUNTER_NAMES: [&str; 3] = ["pass_cap_hits", "passes", "decided_passes"];
 
 /// Persistence sampling cadence (T01.F11): every executed tick that is a
 /// multiple of this constant is sampled, plus the last executed tick.

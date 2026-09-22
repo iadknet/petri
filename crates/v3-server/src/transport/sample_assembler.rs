@@ -3,9 +3,9 @@
 use v3_core::runtime::trace::domain as core_trace;
 
 use crate::transport::sample_protocol::{
-    BackendTracePayload, ExecutionSamplePayload, GateScorePayload, GraphActionSlotTracePayload,
-    GraphExecuteGateTracePayload, GraphNodeEvalTracePayload, GraphOutputSinkTracePayload,
-    GraphPassTracePayload, GraphTracePayload, MeshHopTracePayload, PerceptionDebugSnapshotPayload,
+    BackendTracePayload, ExecutionSamplePayload, GateScorePayload, GraphNodeEvalTracePayload,
+    GraphOutputSinkTracePayload, GraphPassTracePayload, GraphTracePayload, MeshHopTracePayload,
+    MeshPassTracePayload, PassEndReasonPayload, PerceptionDebugSnapshotPayload,
     RouteDecisionPayload, SlotWritePayload, StaticInputsSnapshotPayload, TerminationReasonPayload,
     TickTracePayload, VmStepTracePayload, VmTracePayload,
 };
@@ -58,25 +58,50 @@ fn assemble_tick(tick: core_trace::TickTrace) -> Result<TickTracePayload, serde_
             .into_iter()
             .map(assemble_hop)
             .collect::<Result<Vec<_>, _>>()?,
+        passes: tick
+            .passes
+            .into_iter()
+            .map(assemble_pass)
+            .collect::<Result<Vec<_>, _>>()?,
         final_actions: tick
             .final_actions
             .into_iter()
             .map(serialize_core_shape)
             .collect::<Result<Vec<_>, _>>()?,
         termination_reason: match tick.termination_reason {
-            core_trace::TerminationReason::ActionEmitted => TerminationReasonPayload::ActionEmitted,
+            core_trace::TerminationReason::NoDecision => TerminationReasonPayload::NoDecision,
+            core_trace::TerminationReason::TerminateVoted => {
+                TerminationReasonPayload::TerminateVoted
+            }
+            core_trace::TerminationReason::ActionCapReached => {
+                TerminationReasonPayload::ActionCapReached
+            }
             core_trace::TerminationReason::EnergyExhausted => {
                 TerminationReasonPayload::EnergyExhausted
             }
-            core_trace::TerminationReason::MaxHopsReached => {
-                TerminationReasonPayload::MaxHopsReached
-            }
-            core_trace::TerminationReason::NoTargets => TerminationReasonPayload::NoTargets,
-            core_trace::TerminationReason::MissingNode => TerminationReasonPayload::MissingNode,
         },
         priority_bid: tick.priority_bid,
-        votes: tick.votes,
         commit_counts: tick.commit_counts,
+    })
+}
+
+#[inline]
+fn assemble_pass(
+    pass: core_trace::MeshPassTrace,
+) -> Result<MeshPassTracePayload, serde_json::Error> {
+    Ok(MeshPassTracePayload {
+        pass_index: pass.pass_index,
+        end_reason: match pass.end_reason {
+            core_trace::PassEndReason::Decided => PassEndReasonPayload::Decided,
+            core_trace::PassEndReason::PassCapReached => PassEndReasonPayload::PassCapReached,
+            core_trace::PassEndReason::NoTargets => PassEndReasonPayload::NoTargets,
+            core_trace::PassEndReason::MissingNode => PassEndReasonPayload::MissingNode,
+            core_trace::PassEndReason::EnergyExhausted => PassEndReasonPayload::EnergyExhausted,
+        },
+        votes: pass.votes,
+        effective_votes: pass.effective_votes,
+        committed: pass.committed.map(serialize_core_shape).transpose()?,
+        hops: pass.hops,
     })
 }
 
@@ -84,6 +109,7 @@ fn assemble_tick(tick: core_trace::TickTrace) -> Result<TickTracePayload, serde_
 fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, serde_json::Error> {
     Ok(MeshHopTracePayload {
         hop_index: hop.hop_index,
+        pass_index: hop.pass_index,
         node_id: hop.node_id.0 as u64,
         input_refs: hop
             .input_refs
@@ -129,7 +155,6 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
                     .collect::<Result<Vec<_>, _>>()?,
                 final_registers: vm.final_registers,
                 final_payload: vm.final_payload,
-                final_meta: vm.final_meta,
                 slot_writes: vm
                     .slot_writes
                     .into_iter()
@@ -178,30 +203,6 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
                             applied_value: s.applied_value,
                         })
                         .collect(),
-                    action_slots: graph
-                        .action_slots
-                        .into_iter()
-                        .map(|slot| {
-                            Ok(GraphActionSlotTracePayload {
-                                wired: slot.wired,
-                                gate_weighted_sum: slot.gate_weighted_sum,
-                                fired: slot.fired,
-                                param_values: slot.param_values,
-                                queue_len_before: slot.queue_len_before,
-                                queue_len_after: slot.queue_len_after,
-                                emitted_action: slot
-                                    .emitted_action
-                                    .map(serialize_core_shape)
-                                    .transpose()?,
-                            })
-                        })
-                        .collect::<Result<Vec<_>, _>>()?,
-                    execute_gate: GraphExecuteGateTracePayload {
-                        wired: graph.execute_gate.wired,
-                        weighted_sum: graph.execute_gate.weighted_sum,
-                        queue_non_empty: graph.execute_gate.queue_non_empty,
-                        fired: graph.execute_gate.fired,
-                    },
                 })
             }
         },
@@ -213,9 +214,8 @@ mod tests {
     use super::*;
     use v3_core::creature::genome::vote::{VOTE_KIND_COUNT, VOTE_SINK_COUNT};
     use v3_core::runtime::trace::domain::{
-        BackendTrace, ExecutionSample, GraphActionSlotTrace, GraphExecuteGateTrace,
-        GraphOutputSinkTrace, GraphTrace, MeshHopTrace, TickTrace, TraceGateScore,
-        TraceRouteDecision, VmTrace,
+        BackendTrace, ExecutionSample, GraphOutputSinkTrace, GraphTrace, MeshHopTrace,
+        MeshPassTrace, PassEndReason, TickTrace, TraceGateScore, TraceRouteDecision, VmTrace,
     };
     use v3_core::runtime::OUTPUT_SLOT_COUNT;
 
@@ -237,6 +237,7 @@ mod tests {
                 debug_perception: None,
                 hops: vec![MeshHopTrace {
                     hop_index: 0,
+                    pass_index: 0,
                     node_id: v3_core::contracts::NodeId::new(1),
                     input_refs: vec![],
                     upstream_slots: [0.0; OUTPUT_SLOT_COUNT],
@@ -270,14 +271,13 @@ mod tests {
                         steps: vec![],
                         final_registers: vec![0.0],
                         final_payload: [0.0; OUTPUT_SLOT_COUNT],
-                        final_meta: [0.0; 8],
                         slot_writes: vec![],
                     }),
                 }],
+                passes: vec![],
                 final_actions: vec![],
-                termination_reason: core_trace::TerminationReason::NoTargets,
+                termination_reason: core_trace::TerminationReason::NoDecision,
                 priority_bid: 0.0,
-                votes: [0.0; VOTE_SINK_COUNT],
                 commit_counts: [0; VOTE_KIND_COUNT],
             }],
         };
@@ -296,7 +296,7 @@ mod tests {
     }
 
     #[test]
-    fn assembler_maps_graph_effect_phase_trace_fields() {
+    fn assembler_maps_graph_effect_phase_and_pass_records() {
         let sample = ExecutionSample {
             creature_id: 7,
             ticks: vec![TickTrace {
@@ -313,6 +313,7 @@ mod tests {
                 debug_perception: None,
                 hops: vec![MeshHopTrace {
                     hop_index: 0,
+                    pass_index: 0,
                     node_id: v3_core::contracts::NodeId::new(2),
                     input_refs: vec![],
                     upstream_slots: [0.0; OUTPUT_SLOT_COUNT],
@@ -343,34 +344,34 @@ mod tests {
                             applied: true,
                             applied_value: 1.0,
                         }],
-                        action_slots: vec![GraphActionSlotTrace {
-                            wired: true,
-                            gate_weighted_sum: 1.0,
-                            fired: true,
-                            param_values: [0.0, 0.0],
-                            queue_len_before: 0,
-                            queue_len_after: 1,
-                            emitted_action: Some(v3_core::contracts::WorldAction::Eat {
-                                type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
-                            }),
-                            direction_bids: None,
-                            chosen_direction: None,
-                        }],
-                        execute_gate: GraphExecuteGateTrace {
-                            wired: true,
-                            weighted_sum: 1.0,
-                            queue_non_empty: true,
-                            fired: true,
-                        },
                     }),
                 }],
+                passes: vec![
+                    MeshPassTrace {
+                        pass_index: 0,
+                        end_reason: PassEndReason::Decided,
+                        votes: [1.0; VOTE_SINK_COUNT],
+                        effective_votes: [1.0; VOTE_KIND_COUNT],
+                        committed: Some(v3_core::contracts::WorldAction::Eat {
+                            type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+                        }),
+                        hops: 1,
+                    },
+                    MeshPassTrace {
+                        pass_index: 1,
+                        end_reason: PassEndReason::PassCapReached,
+                        votes: [0.0; VOTE_SINK_COUNT],
+                        effective_votes: [-1.0, 0.0, 0.0, 0.0],
+                        committed: None,
+                        hops: 64,
+                    },
+                ],
                 final_actions: vec![v3_core::contracts::WorldAction::Eat {
                     type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
                 }],
-                termination_reason: core_trace::TerminationReason::ActionEmitted,
+                termination_reason: core_trace::TerminationReason::NoDecision,
                 priority_bid: 0.0,
-                votes: [0.0; VOTE_SINK_COUNT],
-                commit_counts: [0; VOTE_KIND_COUNT],
+                commit_counts: [1, 0, 0, 0],
             }],
         };
 
@@ -384,10 +385,21 @@ mod tests {
         assert_eq!(graph.output_sinks.len(), 1);
         assert!(graph.output_sinks[0].wired);
         assert!(graph.output_sinks[0].applied);
-        assert_eq!(graph.action_slots.len(), 1);
-        assert!(graph.action_slots[0].fired);
-        assert!(graph.action_slots[0].emitted_action.is_some());
-        assert!(graph.execute_gate.fired);
-        assert!(graph.execute_gate.queue_non_empty);
+        let tick = &assembled.ticks[0];
+        assert_eq!(tick.passes.len(), 2);
+        assert!(matches!(
+            tick.passes[0].end_reason,
+            PassEndReasonPayload::Decided
+        ));
+        assert!(tick.passes[0].committed.is_some());
+        assert!(matches!(
+            tick.passes[1].end_reason,
+            PassEndReasonPayload::PassCapReached
+        ));
+        assert!(tick.passes[1].committed.is_none());
+        assert_eq!(tick.commit_counts, [1, 0, 0, 0]);
+        let json = serde_json::to_value(tick).expect("pass records serialize");
+        assert_eq!(json["passes"][0]["end_reason"], "Decided");
+        assert_eq!(json["termination_reason"], "NoDecision");
     }
 }

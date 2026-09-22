@@ -156,8 +156,7 @@ mod tests {
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::genome::analysis::mesh_reachable_nodes;
     use crate::creature::genome::cgp::{
-        ActionSlot, ActionSlotBehavior, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge,
-        OutputSink, OutputSinkKind, WorldActionKind,
+        ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
     };
     use crate::creature::genome::{
         HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef, VmInstruction,
@@ -200,8 +199,6 @@ mod tests {
             birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         }
     }
 
@@ -502,15 +499,18 @@ mod tests {
     }
 
     #[test]
-    fn world_inputs_reach_action_slot_and_execute_gate_edges() {
+    fn world_inputs_reach_vote_and_terminate_sink_edges() {
+        use crate::creature::genome::cgp::{OutputSink, OutputSinkKind};
+        use crate::creature::genome::vote::VoteSink;
         let mut graph = empty_graph();
-        graph.action_bank.push(ActionSlot {
-            behavior: ActionSlotBehavior::Emit(WorldActionKind::Move),
-            gate_inputs: vec![leaf(0)],
-            param_inputs: vec![],
-            direction_bids: Vec::new(),
+        graph.output_sinks.push(OutputSink {
+            kind: OutputSinkKind::ActionVote(VoteSink::Move(0)),
+            inputs: vec![leaf(0)],
         });
-        graph.execute_gate.inputs.push(leaf(1));
+        graph.output_sinks.push(OutputSink {
+            kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
+            inputs: vec![leaf(1)],
+        });
         let census = census_of(&graph_node(
             graph,
             vec![

@@ -1,8 +1,8 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::NodeId;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
-    OutputSink, OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+    OutputSinkKind,
 };
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
@@ -65,7 +65,7 @@ fn run_both(
         &mut state,
         config,
     );
-    let (traced, hops, reason) = super::traced_mesh::execute_creature_mesh_traced(
+    let (traced, hops, _) = super::traced_mesh::execute_creature_mesh_traced(
         genome,
         &sensors(),
         &mut energy_traced,
@@ -76,7 +76,7 @@ fn run_both(
     );
     assert_eq!(output.work_counters, traced.work_counters);
     assert_eq!(output.actions, traced.actions);
-    assert_eq!(output.termination_reason, reason);
+    assert_eq!(output.termination_reason, traced.termination_reason);
     assert_eq!(energy_plain, energy_traced);
     assert_eq!(memory, traced_memory);
     assert_eq!(state.plasticity_weights, traced_state.plasticity_weights);
@@ -151,8 +151,6 @@ fn graph_writes(values: &[f32], clear: bool) -> CreatureGenome {
             plasticity: None,
         }],
         output_sinks,
-        action_bank: vec![],
-        execute_gate: ExecuteGate { inputs: vec![] },
     }))
 }
 

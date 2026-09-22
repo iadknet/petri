@@ -351,7 +351,7 @@ pub(crate) fn mutate_trace_decay_in_def(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::creature::genome::cgp::{ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource};
+    use crate::creature::genome::cgp::{ComputeNodeKind, GraphEdge, GraphSource};
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
 
@@ -364,8 +364,6 @@ mod tests {
             birth_weights: None,
             compute_nodes: nodes,
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         }
     }
 

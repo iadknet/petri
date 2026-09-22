@@ -80,7 +80,7 @@ fn recruitment_paths_qualified_paths_replay_through_the_production_operators() {
             assert_eq!(path.steps.last().unwrap().stage.task.correct(path.task), 8);
         }
     }
-    // T11.F23: vm_unprepared qualifies in six through a VmInstructionMutation
-    // replace; the blank forms stay recorded growth gaps.
-    assert_eq!(qualified, 7);
+    // T19.F04: a blank module reaches a `Move(E)` vote in one edge or one
+    // instruction, so the two blank forms qualify beside the other seven.
+    assert_eq!(qualified, 9);
 }

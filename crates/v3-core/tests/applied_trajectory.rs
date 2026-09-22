@@ -69,15 +69,14 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "09b9e53c23451057957fdebd135ea8dc12a49b71e8493e4a155424b527e5ff4b"
+        "dcf75b04b54fd748385b13087fa8073f00ea9cc662fbdc57961a4f7d2e64e1e8"
     );
 }
 
-/// Applied-behavior guard for the T19.F03 inert vote surface: a mutation-on
-/// short run digested over positions, energy bits, and ages only, with no
-/// genome bytes. Adding an unread sink catalog, opcode, or vote vector must
-/// leave this value untouched; a moved value means a draw or a read leaked
-/// into applied behavior.
+/// Applied-behavior guard: a mutation-on short run digested over positions,
+/// energy bits, and ages only, with no genome bytes. T19.F03 held it through
+/// the inert vote surface; T19.F04 moves it by construction (the founder's
+/// actions now come from votes) and re-pins it after two agreeing runs.
 #[test]
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     let mut hash = Sha256::new();
@@ -111,6 +110,6 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "99ef9a142a40178c4952fe73a29978e69fa0030d9475e92ca22f106d19608273"
+        "5e094be34106a2d4f6cce8d854f2c698bb958f8b5dbf4b5b008ce281472f4a68"
     );
 }

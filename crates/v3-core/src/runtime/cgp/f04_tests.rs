@@ -1,18 +1,18 @@
 //! T13.F04 — direct graph effect activation.
 //!
-//! A Graph module whose sink, router gate, memory sink, action slot or execute
-//! gate carries an edge from an input leaf or shared memory applies that effect
+//! A Graph module whose sink, router gate, memory sink, vote sink or parameter
+//! sink carries an edge from an input leaf or shared memory applies that effect
 //! even with no compute node, under the nonzero-compute ordering, charge and
 //! exhaustion rules. A zero-compute graph with no wired surface stays inert.
 
-use crate::config::{MutationConfig, RuntimeConfig};
+use crate::config::{OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::{
     Direction, InputReference, NodeId, RouteTarget, StaticIntrospectionKey, WorldAction,
 };
 use crate::creature::genome::cgp::{
-    ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
-    OutputSinkKind, WorldActionKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
+use crate::creature::genome::vote::{VoteKind, VoteSink};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute::execute_graph_node;
@@ -59,7 +59,7 @@ fn config() -> RuntimeConfig {
 
 /// A T11.F18 blank Graph detour: the full fixed output catalog, all unwired.
 fn blank() -> CgpGraphBackendDef {
-    CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default())
+    CgpGraphBackendDef::new_with_fixed_outputs()
 }
 
 fn leaf(weight: f32) -> GraphEdge {
@@ -183,7 +183,6 @@ fn input_leaf_writes_custom_output_slot_and_pays_one_node_equivalent() {
 
     assert_eq!(visited.result.output_slots[2], 2.0 * LEAF_VALUE);
     assert_eq!(visited.result.output_slots[5], 7.0);
-    assert!(!visited.result.terminal);
     assert_eq!(visited.energy, 100.0 - BASE_COST);
     assert_eq!(
         visited.side.energy_observation.graph_compute,
@@ -239,38 +238,53 @@ fn shared_memory_router_gate_steers_a_two_target_route() {
 }
 
 #[test]
-fn memory_gate_and_leaf_param_emit_move_through_a_wired_execute_gate() {
+fn memory_vote_and_leaf_parameter_commit_an_eat_of_the_leaf_type() {
     let mut def = blank();
-    def.action_bank[0].behavior = ActionSlotBehavior::Emit(WorldActionKind::Move);
-    def.action_bank[0].gate_inputs.push(memory(0, 1.0));
-    def.action_bank[0].param_inputs.push(leaf(1.0));
-    def.execute_gate.inputs.push(memory(0, 1.0));
+    wire(
+        &mut def,
+        OutputSinkKind::ActionVote(VoteSink::Eat),
+        memory(0, 1.0),
+    );
+    wire(
+        &mut def,
+        OutputSinkKind::ActionParam(VoteKind::Eat, 0),
+        leaf(1.0),
+    );
     let mut memory_in = [0.0; 16];
     memory_in[0] = 1.0;
+    let mut energy = 100.0;
 
-    let visited = visit_with(&def, memory_in, 100.0, [0.0; OUTPUT_SLOT_COUNT]);
-
-    assert!(visited.result.terminal);
-    assert_eq!(
-        visited.side.action_queue.into_actions_or_noop(),
-        vec![WorldAction::Move(Direction::ALL[LEAF_VALUE as usize])]
+    let output = run_mesh(
+        vec![graph_node(0, def, &[])],
+        &mut memory_in,
+        &mut energy,
+        &config(),
     );
-    assert_eq!(visited.energy, 100.0 - BASE_COST);
+
+    assert_eq!(
+        output.actions,
+        vec![WorldAction::eat(OrdinaryFoodTypeId::new(LEAF_VALUE as u16))]
+    );
+    // Two passes, one visit each.
+    assert_eq!(energy, 100.0 - 2.0 * BASE_COST);
 }
 
-/// Either action-slot edge list alone activates the slot's surface: a gate edge
-/// with no param edge, and a param edge with no gate edge, each enter the visit
-/// and pay its one node-equivalent charge.
+/// A vote edge alone and a parameter edge alone each enter the visit and pay
+/// its one node-equivalent charge.
 #[test]
-fn action_slot_enters_a_visit_on_a_gate_edge_or_a_param_edge_alone() {
-    for (label, gate_only) in [("gate edge only", true), ("param edge only", false)] {
+fn a_vote_or_parameter_edge_alone_enters_a_visit() {
+    for (label, kind) in [
+        (
+            "vote edge only",
+            OutputSinkKind::ActionVote(VoteSink::Move(3)),
+        ),
+        (
+            "parameter edge only",
+            OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+        ),
+    ] {
         let mut def = blank();
-        def.action_bank[0].behavior = ActionSlotBehavior::Emit(WorldActionKind::Move);
-        if gate_only {
-            def.action_bank[0].gate_inputs.push(leaf(1.0));
-        } else {
-            def.action_bank[0].param_inputs.push(leaf(1.0));
-        }
+        wire(&mut def, kind, leaf(1.0));
         assert!(def.enters_visit(), "{label}");
 
         let visited = visit_with(&def, [0.0; 16], 100.0, [0.0; OUTPUT_SLOT_COUNT]);
@@ -290,10 +304,12 @@ fn wired_blank_detour_forwards_its_bus_and_executes_its_successor() {
     let mut detour = blank();
     wire(&mut detour, OutputSinkKind::CustomOutput(0), leaf(1.0));
     let mut successor = blank();
-    successor.action_bank[0].behavior = ActionSlotBehavior::Emit(WorldActionKind::Move);
-    successor.action_bank[0].gate_inputs.push(leaf(1.0));
-    successor.action_bank[0].param_inputs.push(leaf(1.0));
-    successor.execute_gate.inputs.push(leaf(1.0));
+    // 0.75 of the leaf: one commit.
+    wire(
+        &mut successor,
+        OutputSinkKind::ActionVote(VoteSink::Move(3)),
+        leaf(0.25),
+    );
 
     let mut memory_in = [0.0; 16];
     let mut energy = 100.0;
@@ -307,14 +323,11 @@ fn wired_blank_detour_forwards_its_bus_and_executes_its_successor() {
         &config(),
     );
 
-    assert_eq!(
-        output.actions,
-        vec![WorldAction::Move(Direction::ALL[LEAF_VALUE as usize])]
-    );
-    assert_eq!(output.termination_reason, TerminationReason::ActionEmitted);
-    assert_eq!(output.work_counters.mesh_hops, 2);
-    assert_eq!(output.work_counters.graph_relax_iters, 2);
-    assert_eq!(energy, 100.0 - 2.0 * BASE_COST);
+    assert_eq!(output.actions, vec![WorldAction::Move(Direction::ALL[3])]);
+    assert_eq!(output.termination_reason, TerminationReason::NoDecision);
+    assert_eq!(output.work_counters.mesh_hops, 4);
+    assert_eq!(output.work_counters.graph_relax_iters, 4);
+    assert_eq!(energy, 100.0 - 4.0 * BASE_COST);
 }
 
 #[test]
@@ -328,7 +341,6 @@ fn unwired_blank_visit_is_free_and_passes_its_bus_through() {
 
     assert_eq!(visited.result.output_slots, upstream);
     assert_eq!(visited.result.route_gates.scores, [0.0; 8]);
-    assert!(!visited.result.terminal);
     assert_eq!(visited.memory, memory_in);
     assert_eq!(visited.energy, 100.0);
     assert_eq!(visited.side.work_counters.graph_relax_iters, 0);
@@ -402,10 +414,14 @@ fn stateful_module_and_blank_neighbor_each_step_once_per_visit() {
 }
 
 #[test]
-fn traced_zero_compute_visit_reports_its_wired_sink_and_gate() {
+fn traced_zero_compute_visit_reports_its_wired_sinks() {
     let mut def = blank();
     wire(&mut def, OutputSinkKind::WriteSlot(4), leaf(1.0));
-    def.execute_gate.inputs.push(leaf(1.0));
+    wire(
+        &mut def,
+        OutputSinkKind::ActionVote(VoteSink::Terminate),
+        leaf(1.0),
+    );
 
     let mut memory_in = [0.0; 16];
     let mut energy = 100.0;
@@ -428,7 +444,7 @@ fn traced_zero_compute_visit_reports_its_wired_sink_and_gate() {
     );
 
     assert_eq!(memory_in[4], LEAF_VALUE);
-    assert!(!result.terminal, "the action queue is empty");
+    assert!(!result.energy_exhausted);
     assert!(trace.temporal_committed);
     assert!(trace.final_outputs.is_empty());
     assert_eq!(trace.passes.len(), 1);
@@ -439,12 +455,11 @@ fn traced_zero_compute_visit_reports_its_wired_sink_and_gate() {
         .iter()
         .filter(|sink| sink.wired)
         .collect();
-    assert_eq!(wired.len(), 1);
-    assert_eq!(wired[0].weighted_sum, LEAF_VALUE);
-    assert!(wired[0].applied);
-    assert!(trace.execute_gate.wired);
-    assert_eq!(trace.execute_gate.weighted_sum, LEAF_VALUE);
-    assert!(!trace.execute_gate.fired);
+    assert_eq!(wired.len(), 2);
+    for sink in wired {
+        assert_eq!(sink.weighted_sum, LEAF_VALUE);
+        assert!(sink.applied);
+    }
 }
 
 #[test]
@@ -465,7 +480,8 @@ fn wired_detour_chain_terminates_on_the_hop_budget() {
     let mut energy = 100.0;
     let output = run_mesh(chain, &mut memory_in, &mut energy, &runtime);
 
-    assert_eq!(output.termination_reason, TerminationReason::MaxHopsReached);
+    assert_eq!(output.termination_reason, TerminationReason::NoDecision);
+    assert_eq!(output.work_counters.pass_cap_hits, 1);
     assert_eq!(output.work_counters.mesh_hops, 2);
     assert_eq!(output.work_counters.graph_relax_iters, 2);
     assert_eq!(energy, 100.0 - 2.0 * BASE_COST);
@@ -500,17 +516,21 @@ fn wired_def(surface: u8, source: u8, slot: u8, weight: f32) -> CgpGraphBackendD
         1 => wire(&mut def, OutputSinkKind::RouterGate(slot % 8), edge),
         2 => wire(&mut def, OutputSinkKind::WriteSlot(slot % 16), edge),
         3 => wire(&mut def, OutputSinkKind::ClearSlot(slot % 16), edge),
-        4 => {
-            def.action_bank[0].behavior = ActionSlotBehavior::Emit(WorldActionKind::Move);
-            def.action_bank[0].gate_inputs.push(edge);
-            def.action_bank[0].param_inputs.push(leaf(1.0));
-        }
-        5 => {
-            def.action_bank[0].behavior = ActionSlotBehavior::Emit(WorldActionKind::Eat);
-            def.action_bank[0].param_inputs.push(edge);
-            def.action_bank[0].gate_inputs.push(leaf(1.0));
-        }
-        _ => def.execute_gate.inputs.push(edge),
+        4 => wire(
+            &mut def,
+            OutputSinkKind::ActionVote(VoteSink::Move(slot % 8)),
+            edge,
+        ),
+        5 => wire(
+            &mut def,
+            OutputSinkKind::ActionParam(VoteKind::Eat, slot % 2),
+            edge,
+        ),
+        _ => wire(
+            &mut def,
+            OutputSinkKind::ActionVote(VoteSink::Terminate),
+            edge,
+        ),
     }
     def
 }
@@ -535,19 +555,19 @@ proptest! {
         memory_in[(slot % 16) as usize] = memory_value;
         let upstream = [1.0; OUTPUT_SLOT_COUNT];
 
-        let plain = visit_with(&def, memory_in, energy, upstream);
-        let dummied = visit_with(&with_dummy, memory_in, energy, upstream);
+        let mut plain = visit_with(&def, memory_in, energy, upstream);
+        let mut dummied = visit_with(&with_dummy, memory_in, energy, upstream);
 
         prop_assert_eq!(plain.result.output_slots, dummied.result.output_slots);
         prop_assert_eq!(plain.result.route_gates, dummied.result.route_gates);
-        prop_assert_eq!(plain.result.terminal, dummied.result.terminal);
         prop_assert_eq!(plain.result.energy_exhausted, dummied.result.energy_exhausted);
         prop_assert_eq!(plain.memory, dummied.memory);
         prop_assert_eq!(plain.energy, dummied.energy);
         prop_assert_eq!(
-            plain.side.action_queue.into_actions_or_noop(),
-            dummied.side.action_queue.into_actions_or_noop()
+            plain.side.commit_vote_contribution(0),
+            dummied.side.commit_vote_contribution(0)
         );
+        prop_assert_eq!(plain.side.action_params, dummied.side.action_params);
         prop_assert_eq!(plain.side.work_counters, dummied.side.work_counters);
         prop_assert_eq!(
             plain.side.energy_observation.graph_compute,
@@ -567,12 +587,11 @@ proptest! {
 
         prop_assert_eq!(visited.result.output_slots, upstream);
         prop_assert_eq!(visited.result.route_gates.scores, [0.0; 8]);
-        prop_assert!(!visited.result.terminal);
         prop_assert_eq!(visited.memory, memory_in);
         prop_assert_eq!(visited.energy, energy);
         prop_assert_eq!(visited.side.work_counters.graph_relax_iters, 0);
         prop_assert_eq!(visited.side.energy_observation.graph_compute, 0.0);
-        prop_assert!(visited.side.action_queue.is_empty());
+        prop_assert_eq!(visited.side.action_params, [[0.0; 2]; 4]);
     }
 
     /// Exhaustion: energy at most the entry charge exhausts before any effect.
@@ -585,11 +604,12 @@ proptest! {
         let mut memory_in = [0.0; 16];
         memory_in[(slot % 16) as usize] = 2.0;
 
-        let visited = visit_with(&def, memory_in, energy, [0.0; OUTPUT_SLOT_COUNT]);
+        let mut visited = visit_with(&def, memory_in, energy, [0.0; OUTPUT_SLOT_COUNT]);
 
         prop_assert!(visited.result.energy_exhausted);
         prop_assert_eq!(visited.memory, memory_in);
-        prop_assert!(visited.side.action_queue.is_empty());
+        prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; 27]);
+        prop_assert_eq!(visited.side.action_params, [[0.0; 2]; 4]);
         prop_assert_eq!(visited.energy, energy - BASE_COST);
         prop_assert_eq!(visited.side.work_counters.graph_relax_iters, 1);
         prop_assert_eq!(

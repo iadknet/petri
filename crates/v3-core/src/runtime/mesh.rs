@@ -1,20 +1,26 @@
-//! Mesh chain executor — evaluates a creature's genome mesh each tick.
+//! Mesh pass executor — evaluates a creature's genome mesh each tick.
 //!
-//! The mesh executor walks a chain of [`NodeGenome`] nodes starting from
-//! `genome.entry_node_id`, dispatching each node to its backend (VM or Graph),
-//! and routing to the next node via the returned internal routing decision until
-//! a terminal condition or soft-default termination condition fires.
+//! A tick is a sequence of passes (T19.F04). Each pass walks the chain from
+//! `genome.entry_node_id` with the vote vector cleared, dispatching each node
+//! to its backend (VM or Graph) and routing by the returned gate scores, until
+//! the genome's guarded `Decide` vote, the chain's end, the per-pass hop cap,
+//! or energy exhaustion ends it. The pass end commits one action of the kind
+//! with the largest positive effective vote and raises that kind's bar; the
+//! tick ends when nothing is positive, when `Terminate` wins against a
+//! non-empty queue, when the queue is full, or on exhaustion.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{NodeId, WorldAction};
-use crate::creature::genome::vote::VoteVector;
+use crate::contracts::NodeId;
+use crate::creature::genome::vote::{VoteKind, VoteSink, VoteVector};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
+use crate::runtime::action_decode::decode_commit;
 use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::routing::resolve_gated_route;
-use crate::runtime::trace::domain::TerminationReason;
+use crate::runtime::trace::domain::{MeshPassTrace, PassEndReason, TerminationReason};
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node;
+use crate::runtime::vote_select::select;
 use crate::sensors::perception::SensorSnapshot;
 use crate::simulation::energy_accounting::{applied_debit, observe_energy_change, DeathCause};
 
@@ -23,32 +29,29 @@ use crate::simulation::energy_accounting::{applied_debit, observe_energy_change,
 /// index. Over `n` hops the ramp totals `cost * m * (m + 1) / 2` with
 /// `m = max(0, n - allowance)`.
 ///
-/// The index never resets within a tick and starts at 1 at every tick, which is
-/// what separates this charge from the VM's per-dispatch step ramp (T03.F10).
+/// The index never resets within a tick, across passes included, and starts
+/// at 1 at every tick, which is what separates this charge from the VM's
+/// per-dispatch step ramp (T03.F10).
 #[inline]
 #[must_use]
 fn hop_charge(k: u32, allowance: u32, cost: f32) -> f32 {
     cost * k.saturating_sub(allowance) as f32
 }
 
-/// Execute the creature's mesh chain within the current tick, returning a [`MeshOutput`]
-/// containing the queued actions, a [`ComputeCostReport`], and the priority bid.
+/// Execute the creature's mesh for the current tick, returning a [`MeshOutput`]
+/// containing the committed actions, a [`ComputeCostReport`], and the paid
+/// priority bid.
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
 /// `graph_runtime.begin_tick(&genome.nodes, age)`, which decays eligibility
 /// once per world tick. A node may be dispatched any number of times within
 /// the tick on its live state (T19.F02); the per-pass cap `max_mesh_hops`
-/// bounds the dispatches and the per-tick hop ramp prices them.
+/// bounds the routed hops of one pass and the per-tick hop ramp prices every
+/// dispatch across passes.
 ///
-/// The function walks the genome's node chain starting at `entry_node_id`,
-/// dispatching each node to its VM or Graph backend, routing to subsequent
-/// nodes by resolving each internal node result's route-gate scores, and terminating
-/// when a terminal instruction is reached, the cap is hit, or a soft-default
-/// condition fires. The recorded priority bid is settled once at the end.
-///
-/// Soft-default and cap terminations keep the accumulated queue (or return
-/// `vec![WorldAction::NoOp]` when it is empty). Energy exhaustion, including
-/// an all-in bid, discards the queue and returns `vec![WorldAction::NoOp]`.
+/// Every exit keeps the committed queue (or returns `vec![WorldAction::NoOp]`
+/// when nothing was committed), exhaustion included. The recorded priority
+/// bid settles once at the end (T19.F04 invariant 6).
 ///
 /// # Arguments
 /// - `genome`: the creature's node graph
@@ -57,7 +60,7 @@ fn hop_charge(k: u32, allowance: u32, cost: f32) -> f32 {
 /// - `shared_memory`: creature's shared f32 memory slots
 /// - `prev_shared_memory`: snapshot of shared memory from previous tick
 /// - `graph_runtime`: per-node persistent runtime state for Graph backends
-/// - `config`: runtime limits (max_mesh_hops, max_vm_steps, etc.)
+/// - `config`: runtime limits (max_mesh_hops, max_actions_per_turn, etc.)
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh(
     genome: &CreatureGenome,
@@ -85,6 +88,8 @@ pub(crate) trait MeshExecutionMode {
     type BackendTrace;
     type Output;
 
+    /// Whether the mode records hops and passes; the loop builds the pass
+    /// record and resolves diagnostic routes only when it does.
     const RECORDS_HOPS: bool;
 
     #[allow(clippy::too_many_arguments)]
@@ -108,6 +113,7 @@ pub(crate) trait MeshExecutionMode {
     fn record_hop(
         &mut self,
         _hop_index: usize,
+        _pass_index: u32,
         _node: &NodeGenome,
         _upstream_slots: [f32; OUTPUT_SLOT_COUNT],
         _energy_before: f32,
@@ -118,6 +124,10 @@ pub(crate) trait MeshExecutionMode {
         _backend_trace: Self::BackendTrace,
     ) {
     }
+
+    /// Record one finished pass; called only when `RECORDS_HOPS`.
+    #[inline]
+    fn record_pass(&mut self, _pass: MeshPassTrace) {}
 
     /// Consume the finished evaluation. The termination reason travels on
     /// [`MeshOutput::termination_reason`], so every mode reads the same value.
@@ -191,19 +201,38 @@ pub(crate) type AppliedRoute = (usize, NodeId);
 /// Compact observations of actual dispatches and applied routing, without backend traces.
 #[derive(Debug, Clone)]
 pub(crate) struct MeshObservation {
+    /// Every dispatch of the tick, across passes, with its applied route.
     pub hops: Vec<(NodeId, Option<AppliedRoute>)>,
+    /// The index in `hops` where each pass that dispatched begins.
+    pub pass_starts: Vec<usize>,
     pub termination_reason: TerminationReason,
+}
+
+impl MeshObservation {
+    /// The hops of each pass that dispatched, in pass order.
+    pub(crate) fn passes(&self) -> impl Iterator<Item = &[(NodeId, Option<AppliedRoute>)]> {
+        self.pass_starts.iter().enumerate().map(|(i, &start)| {
+            let end = self
+                .pass_starts
+                .get(i + 1)
+                .copied()
+                .unwrap_or(self.hops.len());
+            &self.hops[start..end]
+        })
+    }
 }
 
 #[derive(Default)]
 pub(crate) struct ObservedMeshExecution {
     hops: Vec<(NodeId, Option<AppliedRoute>)>,
+    pass_starts: Vec<usize>,
+    last_pass: Option<u32>,
 }
 
 impl MeshExecutionMode for ObservedMeshExecution {
     type BackendTrace = ();
     type Output = (MeshOutput, MeshObservation);
-    // Diagnostic route winners on terminal/exhausted nodes are not applied routes.
+    // Diagnostic route winners on exhausted or deciding nodes are not applied routes.
     const RECORDS_HOPS: bool = false;
 
     #[inline]
@@ -240,21 +269,23 @@ impl MeshExecutionMode for ObservedMeshExecution {
     fn record_hop(
         &mut self,
         _hop_index: usize,
+        pass_index: u32,
         node: &NodeGenome,
         _upstream_slots: [f32; OUTPUT_SLOT_COUNT],
         _energy_before: f32,
         _energy_after: f32,
-        result: &crate::runtime::types::NodeResult,
+        _result: &crate::runtime::types::NodeResult,
         route_result: Option<(usize, NodeId)>,
         _vote_contribution: VoteVector,
         _backend_trace: (),
     ) {
-        let route = if result.terminal || result.energy_exhausted {
-            None
-        } else {
-            route_result
-        };
-        self.hops.push((node.node_id, route));
+        if self.last_pass != Some(pass_index) {
+            self.last_pass = Some(pass_index);
+            self.pass_starts.push(self.hops.len());
+        }
+        // Without `RECORDS_HOPS` the loop resolves a route only when it
+        // applies one.
+        self.hops.push((node.node_id, route_result));
     }
 
     fn finish(self, output: MeshOutput) -> Self::Output {
@@ -263,6 +294,7 @@ impl MeshExecutionMode for ObservedMeshExecution {
             output,
             MeshObservation {
                 hops: self.hops,
+                pass_starts: self.pass_starts,
                 termination_reason,
             },
         )
@@ -270,6 +302,12 @@ impl MeshExecutionMode for ObservedMeshExecution {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "the pass loop and the hop loop share one borrow set (energy, \
+              memory, runtime state, side outputs, and the mode); the pure \
+              commit rule lives in `vote_select`"
+)]
 pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
     genome: &CreatureGenome,
     sensors: &SensorSnapshot,
@@ -280,157 +318,222 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
     config: &RuntimeConfig,
     mut mode: M,
 ) -> M::Output {
+    // The bus: zeroed at tick start, carried from the last dispatched node of
+    // one pass to the entry of the next (T19.F04 invariant 7).
     let mut upstream_slots = [0.0f32; OUTPUT_SLOT_COUNT];
-    let mut hops: usize = 0;
     let max_hops = config.max_mesh_hops.max(1) as usize;
     let start_energy = *energy;
     let mut report = ComputeCostReport::default();
     let mut side_outputs = MeshSideOutputs::new(config.max_actions_per_turn);
+    let entry_idx = find_node_index(&genome.nodes, genome.entry_node_id);
+    let mut previous_kind: Option<VoteKind> = None;
+    let mut hop_index: usize = 0;
 
-    // Soft default: entry_node_id missing from node set → NoOp immediately.
-    let termination_reason = match find_node_index(&genome.nodes, genome.entry_node_id) {
-        None => TerminationReason::MissingNode,
-        Some(mut current_idx) => loop {
-            // Per-pass cap (T19.F02): a pass dispatches at most `max_hops`
-            // nodes; reaching the cap ends the evaluation with the queue kept.
-            if hops >= max_hops {
-                side_outputs.work_counters.pass_cap_hits += 1;
-                break TerminationReason::MaxHopsReached;
-            }
+    let termination_reason = loop {
+        side_outputs.begin_pass();
+        let pass_index = side_outputs.work_counters.passes;
+        side_outputs.work_counters.passes += 1;
+        let mut pass_hops: u32 = 0;
+        let mut routed_hops: usize = 0;
 
-            let node = &genome.nodes[current_idx];
+        // One pass: walk the chain from the entry. A missing entry node is a
+        // pass with zero votes ending `MissingNode`.
+        let pass_end = match entry_idx {
+            None => PassEndReason::MissingNode,
+            Some(mut current_idx) => loop {
+                // Per-pass cap (T19.F02): a pass routes at most `max_hops`
+                // times; reaching the cap ends the pass with votes and queue kept.
+                if routed_hops >= max_hops {
+                    side_outputs.work_counters.pass_cap_hits += 1;
+                    break PassEndReason::PassCapReached;
+                }
 
-            // One mesh hop is one node dispatch, counted regardless of outcome.
-            side_outputs.work_counters.mesh_hops += 1;
-            // Same event, recorded for the offspring's mutation targeting (T11.F17).
-            // Written from the shared loop, so every execution mode agrees.
-            graph_runtime.dispatch_record.record_dispatch(current_idx);
+                let node = &genome.nodes[current_idx];
 
-            // Per-tick hop ramp (T19.F01): sustained neural activity costs
-            // metabolism. Charged before the dispatch, so an unaffordable hop is
-            // counted and recorded but never executed.
-            let ramp_charge = hop_charge(
-                side_outputs.work_counters.mesh_hops,
-                config.hop_ramp_allowance,
-                config.hop_ramp_cost,
-            );
-            if ramp_charge > 0.0 {
-                let before = *energy;
-                *energy -= ramp_charge;
-                side_outputs.energy_observation.mesh_ramp += applied_debit(before, *energy);
-                report.mesh_ramp_cost += (before - *energy).max(0.0);
-                observe_energy_change(
-                    &mut side_outputs.energy_observation.pending_cause,
-                    f64::from(before),
-                    f64::from(*energy),
-                    DeathCause::MeshRamp,
+                // One mesh hop is one node dispatch, counted regardless of outcome.
+                side_outputs.work_counters.mesh_hops += 1;
+                pass_hops += 1;
+                // Same event, recorded for the offspring's mutation targeting (T11.F17).
+                // Written from the shared loop, so every execution mode agrees.
+                graph_runtime.dispatch_record.record_dispatch(current_idx);
+
+                // Per-tick hop ramp (T19.F01): sustained neural activity costs
+                // metabolism. Charged before the dispatch, so an unaffordable hop is
+                // counted and recorded but never executed.
+                let ramp_charge = hop_charge(
+                    side_outputs.work_counters.mesh_hops,
+                    config.hop_ramp_allowance,
+                    config.hop_ramp_cost,
                 );
-                if *energy <= 0.0 {
-                    break TerminationReason::EnergyExhausted;
+                if ramp_charge > 0.0 {
+                    let before = *energy;
+                    *energy -= ramp_charge;
+                    side_outputs.energy_observation.mesh_ramp += applied_debit(before, *energy);
+                    report.mesh_ramp_cost += (before - *energy).max(0.0);
+                    observe_energy_change(
+                        &mut side_outputs.energy_observation.pending_cause,
+                        f64::from(before),
+                        f64::from(*energy),
+                        DeathCause::MeshRamp,
+                    );
+                    if *energy <= 0.0 {
+                        break PassEndReason::EnergyExhausted;
+                    }
                 }
-            }
 
-            let energy_consumed = (start_energy - *energy).max(0.0);
+                let energy_consumed = (start_energy - *energy).max(0.0);
 
-            // Snapshot energy before node dispatch to attribute cost to the correct backend.
-            let node_energy_before = *energy;
-            let (result, backend_trace) = mode.execute_node(
-                node,
-                current_idx,
-                &upstream_slots,
-                energy,
-                energy_consumed,
-                shared_memory,
-                prev_shared_memory,
-                graph_runtime,
-                sensors,
-                config,
-                &mut side_outputs,
-            );
+                // Snapshot energy before node dispatch to attribute cost to the correct backend.
+                let node_energy_before = *energy;
+                let (result, backend_trace) = mode.execute_node(
+                    node,
+                    current_idx,
+                    &upstream_slots,
+                    energy,
+                    energy_consumed,
+                    shared_memory,
+                    prev_shared_memory,
+                    graph_runtime,
+                    sensors,
+                    config,
+                    &mut side_outputs,
+                );
 
-            // Take the dispatch's vote contribution as this node's latest
-            // (T19.F03). A dispatch that ended exhausted staged nothing, so
-            // the node keeps whatever it last committed and the hop reports
-            // zeros.
-            let vote_contribution = side_outputs.commit_vote_contribution(current_idx);
+                // Take the dispatch's vote contribution as this node's latest
+                // this pass (T19.F03). A dispatch that ended exhausted staged
+                // nothing, so the hop reports zeros.
+                let vote_contribution = side_outputs.commit_vote_contribution(current_idx);
 
-            // Attribute energy delta to the correct backend.
-            let node_cost = (node_energy_before - *energy).max(0.0);
-            match &node.backend_def {
-                BackendDef::Vm(_) => report.vm_cost += node_cost,
-                BackendDef::Graph(_) => report.graph_cost += node_cost,
-            }
-
-            // Every existing target is eligible (T19.F02): a node may route to
-            // itself or to any node this tick already dispatched.
-            let route_result = if M::RECORDS_HOPS || (!result.energy_exhausted && !result.terminal)
-            {
-                resolve_gated_route(&node.targets, &result.route_gates)
-            } else {
-                None
-            };
-
-            mode.record_hop(
-                hops,
-                node,
-                upstream_slots,
-                node_energy_before,
-                *energy,
-                &result,
-                route_result,
-                vote_contribution,
-                backend_trace,
-            );
-
-            // Check exhaustion first: NodeResult::exhausted() discards the action queue.
-            if result.energy_exhausted {
-                break TerminationReason::EnergyExhausted;
-            }
-
-            if result.terminal {
-                break TerminationReason::ActionEmitted;
-            }
-
-            // Routing via per-target gate scoring.
-            match route_result.map(|(_, id)| find_node_index(&genome.nodes, id)) {
-                Some(Some(next_idx)) => {
-                    upstream_slots = result.output_slots;
-                    current_idx = next_idx;
-                    hops += 1;
+                // Attribute energy delta to the correct backend.
+                let node_cost = (node_energy_before - *energy).max(0.0);
+                match &node.backend_def {
+                    BackendDef::Vm(_) => report.vm_cost += node_cost,
+                    BackendDef::Graph(_) => report.graph_cost += node_cost,
                 }
-                Some(None) => break TerminationReason::MissingNode,
-                None => break TerminationReason::NoTargets,
-            }
-        },
-    };
 
-    // Single bid settlement (T19.F02): the recorded bid is paid once, on every
-    // exit that is not already an exhaustion; a bid the creature cannot cover
-    // is an all-in that ends the evaluation exhausted. A creature that
-    // exhausts on compute pays no bid.
-    let (termination_reason, priority_bid) =
-        if termination_reason == TerminationReason::EnergyExhausted {
-            (termination_reason, 0.0)
+                // The `Decide` guard (T19.F04 invariant 2): a committed dispatch
+                // ends the pass when `Decide` is positive and some kind's
+                // effective vote is positive.
+                let decided = !result.energy_exhausted
+                    && side_outputs.votes[VoteSink::Decide.index()] > 0.0
+                    && select(
+                        &side_outputs.votes,
+                        &side_outputs.commit_counts,
+                        previous_kind,
+                    )
+                    .winner
+                    .is_some();
+
+                // Every existing target is eligible (T19.F02): a node may route to
+                // itself or to any node this tick already dispatched.
+                let route_result = if M::RECORDS_HOPS || (!result.energy_exhausted && !decided) {
+                    resolve_gated_route(&node.targets, &result.route_gates)
+                } else {
+                    None
+                };
+
+                mode.record_hop(
+                    hop_index,
+                    pass_index,
+                    node,
+                    upstream_slots,
+                    node_energy_before,
+                    *energy,
+                    &result,
+                    route_result,
+                    vote_contribution,
+                    backend_trace,
+                );
+                hop_index += 1;
+
+                if result.energy_exhausted {
+                    break PassEndReason::EnergyExhausted;
+                }
+
+                // The bus carries this dispatch's output to the next node,
+                // this pass or the next.
+                upstream_slots = result.output_slots;
+
+                if decided {
+                    side_outputs.work_counters.decided_passes += 1;
+                    break PassEndReason::Decided;
+                }
+
+                match route_result.map(|(_, id)| find_node_index(&genome.nodes, id)) {
+                    Some(Some(next_idx)) => {
+                        current_idx = next_idx;
+                        routed_hops += 1;
+                    }
+                    Some(None) => break PassEndReason::MissingNode,
+                    None => break PassEndReason::NoTargets,
+                }
+            },
+        };
+
+        // Pass end (T19.F04 invariant 1).
+        let selection = select(
+            &side_outputs.votes,
+            &side_outputs.commit_counts,
+            previous_kind,
+        );
+        let mut committed = None;
+        let tick_end = if pass_end == PassEndReason::EnergyExhausted {
+            Some(TerminationReason::EnergyExhausted)
         } else {
-            match settle_priority_bid(side_outputs.priority_bid, energy, &mut side_outputs) {
-                Some(paid) => (termination_reason, paid),
-                None => (TerminationReason::EnergyExhausted, 0.0),
+            match selection.committed() {
+                None => Some(TerminationReason::NoDecision),
+                Some((_, effective))
+                    if !side_outputs.action_queue.is_empty()
+                        && side_outputs.votes[VoteSink::Terminate.index()] >= effective =>
+                {
+                    Some(TerminationReason::TerminateVoted)
+                }
+                Some((sink, _)) => {
+                    let kind = sink.kind().expect("a committed sink has a kind");
+                    let action = decode_commit(sink, &side_outputs.action_params[kind.index()]);
+                    side_outputs.action_queue.push(action);
+                    side_outputs.commit_counts[kind.index()] += 1;
+                    previous_kind = Some(kind);
+                    committed = Some(action);
+                    (side_outputs.action_queue.len() >= config.max_actions_per_turn)
+                        .then_some(TerminationReason::ActionCapReached)
+                }
             }
         };
-    // Exhaustion discards the queue; every other exit keeps it (a missing
-    // entry node has an empty queue, so it reads `NoOp` as before).
-    let actions = if termination_reason == TerminationReason::EnergyExhausted {
-        vec![WorldAction::NoOp]
+
+        if M::RECORDS_HOPS {
+            mode.record_pass(MeshPassTrace {
+                pass_index,
+                end_reason: pass_end,
+                votes: side_outputs.votes,
+                effective_votes: selection.effective,
+                committed,
+                hops: pass_hops,
+            });
+        }
+
+        if let Some(reason) = tick_end {
+            break reason;
+        }
+    };
+
+    // Single bid settlement (T19.F04 invariant 6): the recorded bid is paid
+    // once on every exit; nothing is paid when energy is already gone, and a
+    // bid the creature cannot cover is an all-in that ends the tick exhausted.
+    // Every exit keeps the committed queue.
+    let (priority_bid, all_in) =
+        settle_priority_bid(side_outputs.priority_bid, energy, &mut side_outputs);
+    let termination_reason = if all_in {
+        TerminationReason::EnergyExhausted
     } else {
-        side_outputs.action_queue.into_actions_or_noop()
+        termination_reason
     };
 
     let output = MeshOutput {
-        actions,
+        actions: side_outputs.action_queue.into_actions_or_noop(),
         cost_report: report,
         priority_bid,
         work_counters: side_outputs.work_counters,
-        votes: side_outputs.votes,
         commit_counts: side_outputs.commit_counts,
         energy_observation: side_outputs.energy_observation,
         termination_reason,
@@ -439,19 +542,20 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
 }
 
 /// Pay the recorded `bid` against `energy` exactly once: `paid = min(bid,
-/// energy)`. A bid at or above the creature's energy is an all-in that pins
-/// energy to `0.0` and returns `None`; otherwise the paid amount is returned.
-/// A zero bid pays nothing and never exhausts.
+/// energy)`, nothing when energy is already gone. Returns the paid amount and
+/// whether the bid was an all-in, which pins energy to `0.0`. A zero bid pays
+/// nothing and never exhausts.
 fn settle_priority_bid(
     bid: f32,
     energy: &mut f32,
     side_outputs: &mut MeshSideOutputs,
-) -> Option<f32> {
-    if bid <= 0.0 {
-        return Some(0.0);
+) -> (f32, bool) {
+    if bid <= 0.0 || *energy <= 0.0 {
+        return (0.0, false);
     }
     let before = *energy;
     let all_in = bid >= before;
+    let paid = bid.min(before);
     *energy = if all_in { 0.0 } else { before - bid };
     side_outputs.energy_observation.priority_bid += applied_debit(before, *energy);
     observe_energy_change(
@@ -460,7 +564,7 @@ fn settle_priority_bid(
         f64::from(*energy),
         DeathCause::PriorityBid,
     );
-    (!all_in).then_some(bid)
+    (paid, all_in)
 }
 
 /// Find the index of a node by its `NodeId` via linear scan.
@@ -520,36 +624,41 @@ mod tests {
             )
         };
         // A self-loop is legal (T19.F02): both capped dispatches applied
-        // the self route, and the cap is the real termination.
-        let (_, observed) = observe(&genome, 100.0);
+        // the self route; the capped pass votes nothing, so the tick ends
+        // `NoDecision` after one pass.
+        let (output, observed) = observe(&genome, 100.0);
         assert_eq!(
             observed.hops,
             vec![(id, Some((0, id))), (id, Some((0, id)))]
         );
-        assert!(matches!(
-            observed.termination_reason,
-            TerminationReason::MaxHopsReached
-        ));
+        assert_eq!(observed.termination_reason, TerminationReason::NoDecision);
+        assert_eq!(output.work_counters.pass_cap_hits, 1);
         genome.nodes[0] = vm_halt_with_route(id, 1.0, vec![]);
         let (_, observed) = observe(&genome, 100.0);
         assert_eq!(observed.hops, vec![(id, None)]);
-        assert!(matches!(
-            observed.termination_reason,
-            TerminationReason::NoTargets
-        ));
-        genome.nodes[0] = vm_emit_node(id, 0, vec![id]);
-        let (_, observed) = observe(&genome, 100.0);
-        assert_eq!(observed.hops, vec![(id, None)]);
-        assert!(matches!(
-            observed.termination_reason,
-            TerminationReason::ActionEmitted
-        ));
+        assert_eq!(observed.termination_reason, TerminationReason::NoDecision);
+        // A deciding dispatch applies no route; the next pass, where the
+        // guard fails, routes to the cap.
+        genome.nodes[0] = crate::runtime::vote_test_support::vm_voter(
+            0,
+            &[
+                (crate::creature::genome::vote::VoteSink::Eat, 1.0),
+                (crate::creature::genome::vote::VoteSink::Decide, 1.0),
+            ],
+            &[0],
+        );
+        let (output, observed) = observe(&genome, 100.0);
+        assert_eq!(
+            observed.hops,
+            vec![(id, None), (id, Some((0, id))), (id, Some((0, id)))]
+        );
+        assert_eq!(output.work_counters.decided_passes, 1);
         let (_, observed) = observe(&genome, 0.0);
         assert_eq!(observed.hops, vec![(id, None)]);
-        assert!(matches!(
+        assert_eq!(
             observed.termination_reason,
             TerminationReason::EnergyExhausted
-        ));
+        );
     }
 
     #[test]
@@ -561,34 +670,34 @@ mod tests {
             ..default_config()
         };
         let cases = [
-            (vec![], 100.0, TerminationReason::MissingNode),
+            (vec![], 100.0, TerminationReason::NoDecision),
             (
                 vec![vm_halt_with_route(id, 1.0, vec![])],
                 100.0,
-                TerminationReason::NoTargets,
+                TerminationReason::NoDecision,
             ),
             (
-                vec![vm_emit_node(id, 0, vec![])],
+                vec![vm_emit_node(id, 1, vec![])],
                 100.0,
-                TerminationReason::ActionEmitted,
+                TerminationReason::NoDecision,
             ),
             (
-                vec![vm_emit_node(id, 0, vec![])],
+                vec![vm_emit_node(id, 1, vec![])],
                 0.0,
                 TerminationReason::EnergyExhausted,
             ),
             (
                 vec![vm_halt_with_route(id, 1.0, vec![next])],
                 100.0,
-                TerminationReason::MissingNode,
+                TerminationReason::NoDecision,
             ),
             (
                 vec![
                     vm_halt_with_route(id, 1.0, vec![next]),
-                    vm_emit_node(next, 0, vec![]),
+                    vm_emit_node(next, 1, vec![]),
                 ],
                 100.0,
-                TerminationReason::MaxHopsReached,
+                TerminationReason::NoDecision,
             ),
         ];
         for (nodes, start, expected) in cases {
@@ -640,8 +749,7 @@ mod tests {
         use crate::creature::genome::cgp::{
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
-        let mut graph =
-            CgpGraphBackendDef::new_with_fixed_outputs(&crate::config::MutationConfig::default());
+        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::DecayIntegrator(0.5),
             inputs: vec![GraphEdge {
@@ -672,7 +780,10 @@ mod tests {
                         src: 0,
                     },
                     VmInstruction::SetPriorityBid { src: 0 },
-                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::AddVote {
+                        sink: crate::creature::genome::vote::VoteSink::Eat.index() as u8,
+                        src: 0,
+                    },
                 ],
             );
         }
@@ -817,19 +928,37 @@ mod tests {
         }
     }
 
-    /// Build a minimal VM node that pushes an action and executes the queue.
-    /// The node has `register_count=1` so the VM will run.
+    /// Build a minimal VM node that votes 1.0 for the action of
+    /// `action_type` (1 Eat, 2 to 4 the directed kinds toward N; 0 votes
+    /// nothing), so a tick commits that action once.
     fn vm_emit_node(node_id: NodeId, action_type: u8, targets: Vec<NodeId>) -> NodeGenome {
+        use crate::creature::genome::vote::VoteSink;
+        let sink = match action_type {
+            1 => Some(VoteSink::Eat),
+            2 => Some(VoteSink::Move(0)),
+            3 => Some(VoteSink::Reproduce(0)),
+            4 => Some(VoteSink::StealEnergy(0)),
+            _ => None,
+        };
+        let mut program = Vec::new();
+        if let Some(sink) = sink {
+            program.push(VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            });
+            program.push(VmInstruction::AddVote {
+                sink: sink.index() as u8,
+                src: 0,
+            });
+        }
+        program.push(VmInstruction::Halt);
         NodeGenome {
             node_id,
             input_refs: vec![],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 1,
-                constants: vec![],
-                program: vec![
-                    VmInstruction::PushAction { action_type },
-                    VmInstruction::ExecuteActionQueue,
-                ],
+                constants: vec![1.0],
+                program,
             }),
             targets: wrap_targets(targets),
         }
@@ -885,102 +1014,23 @@ mod tests {
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
 
-    // ── Cycle fixtures (T19.F02) ─────────────────────────────────────────────
+    // ── Runners ──────────────────────────────────────────────────────────────
 
     fn run(genome: &CreatureGenome, config: &RuntimeConfig, energy: &mut f32) -> MeshOutput {
-        let mut memory = [0.0f32; 16];
-        run_with_memory(genome, config, energy, &mut memory)
-    }
-
-    fn run_with_memory(
-        genome: &CreatureGenome,
-        config: &RuntimeConfig,
-        energy: &mut f32,
-        memory: &mut [f32; 16],
-    ) -> MeshOutput {
         execute_creature_mesh(
             genome,
             &empty_sensor_snapshot(),
             energy,
-            memory,
+            &mut [0.0; 16],
             &[0.0; 16],
             &mut GraphRuntimeState::new(),
             config,
         )
     }
 
-    /// W11: a Halt-only self-loop is legal and runs to the per-pass cap, 64
-    /// hops at the defaults, paying the T19.F01 ramp
-    /// (`1e-4 * 32 * 33 / 2 = 0.0528`) and counting one capped pass.
-    #[test]
-    fn w11_halt_only_self_loop_runs_to_the_pass_cap() {
-        let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![VmInstruction::Halt],
-                }),
-                targets: wrap_targets(vec![id0]),
-            }],
-        };
-        let config = default_config();
-        assert_eq!(config.max_mesh_hops, 64);
-        let mut energy = 10.0f32;
-        let output = run(&genome, &config, &mut energy);
-        assert_eq!(output.actions, vec![WorldAction::NoOp]);
-        assert_eq!(output.termination_reason, TerminationReason::MaxHopsReached);
-        assert_eq!(output.work_counters.mesh_hops, 64);
-        assert_eq!(output.work_counters.pass_cap_hits, 1);
-        assert!(
-            (output.cost_report.mesh_ramp_cost - 0.0528).abs() < 1e-5,
-            "ramp {}",
-            output.cost_report.mesh_ramp_cost
-        );
-        assert!(energy > 0.0, "one capped pass is survivable");
-    }
-
-    /// W12: a self-looping non-terminal push node fills the queue to
-    /// `max_actions_per_turn` and the cap keeps it there; the capped pass
-    /// still returns the queue.
-    #[test]
-    fn w12_self_looping_push_node_fills_the_queue_and_keeps_it_at_the_cap() {
-        let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![
-                        VmInstruction::PushAction { action_type: 1 },
-                        VmInstruction::Halt,
-                    ],
-                }),
-                targets: wrap_targets(vec![id0]),
-            }],
-        };
-        let config = default_config();
-        let output = run(&genome, &config, &mut 10.0);
-        assert_eq!(output.termination_reason, TerminationReason::MaxHopsReached);
-        assert_eq!(output.work_counters.mesh_hops, 64);
-        assert_eq!(output.work_counters.pass_cap_hits, 1);
-        assert_eq!(output.actions.len(), config.max_actions_per_turn);
-        assert!(output
-            .actions
-            .iter()
-            .all(|action| matches!(action, WorldAction::Eat { .. })));
-    }
-
-    /// The W14 entry node: count visits in shared slot 0, push one action per
-    /// visit, and route back to itself while the count is below `limit`
-    /// (gate 1.0 on slot 0 against a constant 0.5 on the exit's slot 1).
+    /// The entry node: count visits in shared slot 0, bid the count, and
+    /// route back to itself while the count is below `limit` (gate on slot 0
+    /// against a constant 0.5 on the exit's slot 1).
     fn counted_cycle_node(limit: f32, exit: NodeId) -> NodeGenome {
         let id0 = NodeId::new(0);
         NodeGenome {
@@ -1003,7 +1053,7 @@ mod tests {
                         slot_idx: 0,
                         src: 0,
                     },
-                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::SetPriorityBid { src: 0 },
                     VmInstruction::LoadConst {
                         dst: 1,
                         const_idx: 1,
@@ -1020,41 +1070,6 @@ mod tests {
             }),
             targets: wrap_targets(vec![id0, exit]),
         }
-    }
-
-    /// W14: a two-target cycle gated on a memory counter exits after the
-    /// counted visits (three dispatches of the entry, then the terminal exit)
-    /// and keeps the actions every visit pushed.
-    #[test]
-    fn w14_counted_cycle_exits_on_its_gate_and_keeps_its_actions() {
-        let exit = NodeId::new(1);
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
-                counted_cycle_node(3.0, exit),
-                NodeGenome {
-                    node_id: exit,
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
-                        register_count: 1,
-                        constants: vec![],
-                        program: vec![VmInstruction::ExecuteActionQueue],
-                    }),
-                    targets: vec![],
-                },
-            ],
-        };
-        let config = default_config();
-        let mut memory = [0.0f32; 16];
-        let output = run_with_memory(&genome, &config, &mut 10.0, &mut memory);
-        assert_eq!(output.termination_reason, TerminationReason::ActionEmitted);
-        assert_eq!(output.work_counters.mesh_hops, 4);
-        assert_eq!(output.work_counters.pass_cap_hits, 0);
-        assert_eq!(output.actions.len(), 3);
-        assert_eq!(
-            memory[0], 3.0,
-            "each visit read the previous visit's commit"
-        );
     }
 
     // ── Test 3: empty_targets_returns_noop ───────────────────────────────────
@@ -1304,15 +1319,22 @@ mod tests {
                 input_refs: vec![],
                 backend_def: BackendDef::Vm(VmBackendDef {
                     register_count: 1,
-                    constants: vec![3.0],
+                    constants: vec![3.0, 1.0],
                     program: vec![
                         VmInstruction::LoadConst {
                             dst: 0,
                             const_idx: 0,
                         },
                         VmInstruction::SetPriorityBid { src: 0 },
-                        VmInstruction::PushAction { action_type: 1 },
-                        VmInstruction::ExecuteActionQueue,
+                        VmInstruction::LoadConst {
+                            dst: 0,
+                            const_idx: 1,
+                        },
+                        VmInstruction::AddVote {
+                            sink: crate::creature::genome::vote::VoteSink::Eat.index() as u8,
+                            src: 0,
+                        },
+                        VmInstruction::Halt,
                     ],
                 }),
                 targets: vec![],
@@ -1348,7 +1370,23 @@ mod tests {
         assert!((output.energy_observation.priority_bid - 3.0).abs() < 1e-3);
     }
 
-    /// A VM node that bids `bid` (from constant 0) and then runs `tail`.
+    /// The tail that votes `Eat` once from constant 1.
+    fn vote_eat_tail() -> Vec<VmInstruction> {
+        vec![
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 1,
+            },
+            VmInstruction::AddVote {
+                sink: crate::creature::genome::vote::VoteSink::Eat.index() as u8,
+                src: 0,
+            },
+            VmInstruction::Halt,
+        ]
+    }
+
+    /// A VM node that bids `bid` (from constant 0) and then runs `tail`;
+    /// constant 1 is 1.0.
     fn bidding_node(
         node_id: NodeId,
         bid: f32,
@@ -1368,40 +1406,38 @@ mod tests {
             input_refs: vec![],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 1,
-                constants: vec![bid],
+                constants: vec![bid, 1.0],
                 program,
             }),
             targets: wrap_targets(targets),
         }
     }
 
-    /// A bid at or above the creature's energy is an all-in (T19.F02): energy
-    /// lands on exactly `0.0`, the evaluation ends `EnergyExhausted` with
-    /// `NoOp`, and the pending death cause is the bid.
+    /// A bid at or above the creature's energy is an all-in: energy lands on
+    /// exactly `0.0`, the tick ends `EnergyExhausted` with the committed queue
+    /// kept and the energy paid as its bid, and the pending death cause is
+    /// the bid (T19.F04 invariant 6).
     #[test]
-    fn priority_bid_all_in_exhausts_at_settlement() {
+    fn priority_bid_all_in_exhausts_at_settlement_and_keeps_the_queue() {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![bidding_node(
-                id0,
-                5.0,
-                vec![
-                    VmInstruction::PushAction { action_type: 1 },
-                    VmInstruction::ExecuteActionQueue,
-                ],
-                vec![],
-            )],
+            nodes: vec![bidding_node(id0, 5.0, vote_eat_tail(), vec![])],
         };
         let mut energy = 2.0f32;
         let output = run(&genome, &default_config(), &mut energy);
         assert_eq!(energy, 0.0);
-        assert_eq!(output.actions, vec![WorldAction::NoOp]);
+        assert_eq!(
+            output.actions,
+            vec![WorldAction::Eat {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            }]
+        );
         assert_eq!(
             output.termination_reason,
             TerminationReason::EnergyExhausted
         );
-        assert_eq!(output.priority_bid, 0.0);
+        assert!((output.priority_bid - 2.0).abs() < 1e-5);
         assert_eq!(
             output.energy_observation.pending_cause,
             Some(DeathCause::PriorityBid)
@@ -1409,8 +1445,8 @@ mod tests {
         assert!((output.energy_observation.priority_bid - 2.0).abs() < 1e-5);
     }
 
-    /// A creature that exhausts on compute pays no bid: the recorded bid is
-    /// dropped with the queue and energy is untouched by it.
+    /// A creature that exhausts on compute pays no bid: energy is already
+    /// gone when the bid settles.
     #[test]
     fn priority_bid_is_unpaid_when_compute_exhausts_the_creature() {
         let id0 = NodeId::new(0);
@@ -1419,7 +1455,7 @@ mod tests {
             nodes: vec![bidding_node(
                 id0,
                 0.5,
-                vec![VmInstruction::PushAction { action_type: 1 }; 10_000],
+                vec![VmInstruction::Noop; 10_000],
                 vec![],
             )],
         };
@@ -1444,38 +1480,21 @@ mod tests {
         );
     }
 
-    /// Across a revisit the last write wins and the bid is settled once:
-    /// three visits bidding 1, 2, and 3 pay 3, not 6.
+    /// Across revisits and passes the last write wins and the bid is settled
+    /// once: pass 1 visits the entry three times (bids 1, 2, 3), pass 2 once
+    /// more (bid 4), and the tick pays 4.
     #[test]
-    fn priority_bid_last_write_wins_across_a_revisit_and_settles_once() {
+    fn priority_bid_last_write_wins_across_revisits_and_settles_once() {
         let exit = NodeId::new(1);
-        let mut entry = counted_cycle_node(3.0, exit);
-        if let BackendDef::Vm(def) = &mut entry.backend_def {
-            // After the counter store, bid the visit count held in r0.
-            def.program
-                .insert(4, VmInstruction::SetPriorityBid { src: 0 });
-        }
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![
-                entry,
-                NodeGenome {
-                    node_id: exit,
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
-                        register_count: 1,
-                        constants: vec![],
-                        program: vec![VmInstruction::ExecuteActionQueue],
-                    }),
-                    targets: vec![],
-                },
-            ],
+            nodes: vec![counted_cycle_node(3.0, exit), vm_emit_node(exit, 1, vec![])],
         };
         let mut energy = 10.0f32;
         let output = run(&genome, &default_config(), &mut energy);
-        assert_eq!(output.termination_reason, TerminationReason::ActionEmitted);
-        assert_eq!(output.priority_bid, 3.0);
-        assert!((energy - 7.0).abs() < 1e-3, "energy {energy}");
+        assert_eq!(output.termination_reason, TerminationReason::NoDecision);
+        assert_eq!(output.priority_bid, 4.0);
+        assert!((energy - 6.0).abs() < 1e-3, "energy {energy}");
     }
 
     /// Non-finite and negative reads record no bid.
@@ -1485,20 +1504,12 @@ mod tests {
             let id0 = NodeId::new(0);
             let genome = CreatureGenome {
                 entry_node_id: id0,
-                nodes: vec![bidding_node(
-                    id0,
-                    raw,
-                    vec![
-                        VmInstruction::PushAction { action_type: 1 },
-                        VmInstruction::ExecuteActionQueue,
-                    ],
-                    vec![],
-                )],
+                nodes: vec![bidding_node(id0, raw, vote_eat_tail(), vec![])],
             };
             let mut energy = 10.0f32;
             let output = run(&genome, &default_config(), &mut energy);
             assert_eq!(output.priority_bid, 0.0);
-            assert_eq!(output.termination_reason, TerminationReason::ActionEmitted);
+            assert_eq!(output.termination_reason, TerminationReason::NoDecision);
             assert!((energy - 10.0).abs() < 1e-3);
         }
     }
@@ -1541,8 +1552,11 @@ mod tests {
                         const_idx: 0,
                     },
                     VmInstruction::SetPriorityBid { src: 0 },
-                    VmInstruction::PushAction { action_type: 1 },
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::AddVote {
+                        sink: crate::creature::genome::vote::VoteSink::Eat.index() as u8,
+                        src: 0,
+                    },
+                    VmInstruction::Halt,
                 ],
             }),
             targets: vec![],
@@ -1578,8 +1592,8 @@ mod tests {
 
     #[test]
     fn single_hop_vm_node_reports_known_mesh_hops_and_vm_steps() {
-        // A single VM node (PushAction, ExecuteActionQueue = 2 opcodes) with
-        // no routing: exactly one mesh hop and two VM steps.
+        // A single VM node (LoadConst, AddVote, Halt = 3 opcodes) with no
+        // routing, run for two passes: two mesh hops and six VM steps.
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
@@ -1601,8 +1615,9 @@ mod tests {
             &mut gr,
             &config,
         );
-        assert_eq!(output.work_counters.mesh_hops, 1);
-        assert_eq!(output.work_counters.vm_steps, 2);
+        assert_eq!(output.work_counters.mesh_hops, 2);
+        assert_eq!(output.work_counters.vm_steps, 6);
+        assert_eq!(output.work_counters.passes, 2);
         assert_eq!(output.work_counters.graph_relax_iters, 0);
         assert_eq!(output.work_counters.plasticity_updates, 0);
     }
@@ -1610,8 +1625,8 @@ mod tests {
     #[test]
     fn two_hop_chain_sums_vm_steps_across_both_nodes() {
         // node0: LoadConst, SetPriorityBid, Halt = 3 opcodes, routes to node1.
-        // node1: LoadConst, SetPriorityBid, PushAction, ExecuteActionQueue = 4 opcodes.
-        // Two mesh hops (one dispatch per node), seven VM steps total.
+        // node1: LoadConst, SetPriorityBid, Halt = 3 opcodes; nothing votes,
+        // so one pass: two mesh hops, six VM steps total.
         let id0 = NodeId::new(0);
         let id1 = NodeId::new(1);
 
@@ -1645,8 +1660,7 @@ mod tests {
                         const_idx: 0,
                     },
                     VmInstruction::SetPriorityBid { src: 0 },
-                    VmInstruction::PushAction { action_type: 1 },
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::Halt,
                 ],
             }),
             targets: vec![],
@@ -1673,13 +1687,13 @@ mod tests {
             &config,
         );
         assert_eq!(output.work_counters.mesh_hops, 2);
-        assert_eq!(output.work_counters.vm_steps, 7);
+        assert_eq!(output.work_counters.vm_steps, 6);
     }
 
     #[test]
     fn missing_entry_node_reports_zero_work() {
-        // A genome with no reachable entry node performs no mesh, VM, or
-        // graph work at all.
+        // A genome with no reachable entry node runs one empty pass and
+        // performs no mesh, VM, or graph work.
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(99),
             nodes: vec![],
@@ -1702,7 +1716,10 @@ mod tests {
         );
         assert_eq!(
             output.work_counters,
-            crate::runtime::types::WorkCounters::default()
+            crate::runtime::types::WorkCounters {
+                passes: 1,
+                ..Default::default()
+            }
         );
     }
 
@@ -1746,11 +1763,11 @@ mod tests {
             ..default_config()
         };
         let capped = run_chain(&halting_chain(3), &config, &mut 100.0);
-        assert_eq!(capped.termination_reason, TerminationReason::MaxHopsReached);
+        assert_eq!(capped.termination_reason, TerminationReason::NoDecision);
         assert_eq!(capped.work_counters.pass_cap_hits, 1);
         assert_eq!(capped.work_counters.mesh_hops, 2);
         let uncapped = run_chain(&halting_chain(2), &config, &mut 100.0);
-        assert_eq!(uncapped.termination_reason, TerminationReason::NoTargets);
+        assert_eq!(uncapped.termination_reason, TerminationReason::NoDecision);
         assert_eq!(uncapped.work_counters.pass_cap_hits, 0);
     }
 
@@ -1812,8 +1829,8 @@ mod tests {
         }
     }
 
-    /// The production defaults leave the founder cost-free: it runs two hops,
-    /// far inside the 32-hop allowance.
+    /// The production defaults leave the founder cost-free: its two or three
+    /// passes of two hops stay far inside the 32-hop allowance.
     #[test]
     fn founder_pays_no_hop_ramp_at_the_production_defaults() {
         let genome = crate::creature::founder::v3alpha1_founder_genome();
@@ -1822,8 +1839,8 @@ mod tests {
         let mut energy = 100.0f32;
         let output = run_chain(&genome, &config, &mut energy);
         assert_eq!(
-            output.work_counters.mesh_hops, 2,
-            "the founder chain runs exactly two hops, far inside the allowance",
+            output.work_counters.mesh_hops, 4,
+            "two passes of the two-node founder chain, far inside the allowance",
         );
         assert_eq!(output.energy_observation.mesh_ramp, 0.0);
         assert_eq!(output.cost_report.mesh_ramp_cost, 0.0);

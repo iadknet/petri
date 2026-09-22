@@ -4,9 +4,9 @@ use std::ops::Range;
 use crate::config::MutationConfig;
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
+use crate::creature::genome::vote::VOTE_SINK_COUNT;
 use crate::creature::genome::{BackendDef, CreatureGenome, VmBackendDef, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
-use crate::runtime::action_decode::{DIRECTION_BANK_SLOTS, MAX_DECODED_ACTION_TYPE};
 
 /// Nudge one constant of the node's VM pool by a share of its scale.
 ///
@@ -100,7 +100,7 @@ pub(super) fn apply_register_count_mutation(
 /// index 0 (safe — the VM treats out-of-range as a soft default).
 #[allow(
     clippy::too_many_lines,
-    reason = "one match arm per opcode in the 42-entry catalog; the uniform draw \
+    reason = "one match arm per opcode in the 39-entry catalog; the uniform draw \
               over the catalog is the whole function"
 )]
 pub(crate) fn random_vm_instruction(
@@ -114,7 +114,7 @@ pub(crate) fn random_vm_instruction(
     let cl = constants_len.clamp(1, 255) as u8;
     let il = input_refs_len.clamp(1, 255) as u8;
 
-    match rng.gen_range(0u8..42) {
+    match rng.gen_range(0u8..39) {
         0 => VmInstruction::Noop,
         1 => VmInstruction::LoadConst {
             dst: rng.gen_range(0..rc),
@@ -224,7 +224,7 @@ pub(crate) fn random_vm_instruction(
             slot_idx: rng.gen_range(0u8..8),
             src: rng.gen_range(0..rc),
         },
-        25 => VmInstruction::WriteWorldActionMeta {
+        25 => VmInstruction::WriteActionParam {
             slot_idx: rng.gen_range(0u8..8),
             src: rng.gen_range(0..rc),
         },
@@ -232,55 +232,51 @@ pub(crate) fn random_vm_instruction(
             slot: rng.gen_range(0..MAX_GATE_SLOTS as u8),
             src: rng.gen_range(0..rc),
         },
-        27 => VmInstruction::PushAction {
-            action_type: rng.gen_range(0..=MAX_DECODED_ACTION_TYPE),
-        },
-        28 => VmInstruction::PopAction,
-        29 => VmInstruction::ReadActionQueueLength {
+        27 => VmInstruction::ReadActionQueueLength {
             dst: rng.gen_range(0..rc),
         },
-        30 => VmInstruction::ReadActionQueueType {
+        28 => VmInstruction::ReadActionQueueType {
             index_src: rng.gen_range(0..rc),
             dst: rng.gen_range(0..rc),
         },
-        31 => VmInstruction::ReadActionQueueParam {
+        29 => VmInstruction::ReadActionQueueParam {
             index_src: rng.gen_range(0..rc),
             param_slot: rng.gen_range(0..8),
             dst: rng.gen_range(0..rc),
         },
-        32 => VmInstruction::ExecuteActionQueue,
-        33 => VmInstruction::Halt,
-        34 => VmInstruction::LoadSlot {
+        30 => VmInstruction::Halt,
+        31 => VmInstruction::LoadSlot {
             dst: rng.gen_range(0..rc),
             slot_reg: rng.gen_range(0..rc),
         },
-        35 => VmInstruction::StoreSlot {
+        32 => VmInstruction::StoreSlot {
             slot_reg: rng.gen_range(0..rc),
             src: rng.gen_range(0..rc),
         },
-        36 => VmInstruction::LoadSlotImm {
+        33 => VmInstruction::LoadSlotImm {
             dst: rng.gen_range(0..rc),
             slot_idx: rng.gen_range(0..16),
         },
-        37 => VmInstruction::StoreSlotImm {
+        34 => VmInstruction::StoreSlotImm {
             slot_idx: rng.gen_range(0..16),
             src: rng.gen_range(0..rc),
         },
-        38 => VmInstruction::SetPriorityBid {
+        35 => VmInstruction::SetPriorityBid {
             src: rng.gen_range(0..rc),
         },
-        39 => VmInstruction::LoadSlotPrev {
+        36 => VmInstruction::LoadSlotPrev {
             dst: rng.gen_range(0..rc),
             slot_idx: rng.gen_range(0..16),
         },
-        40 => VmInstruction::ClearSlot {
+        37 => VmInstruction::ClearSlot {
             slot_idx: rng.gen_range(0..16),
         },
-        41 => VmInstruction::WriteDirectionBid {
-            direction: rng.gen_range(0u8..DIRECTION_BANK_SLOTS as u8),
+        // The vote catalog (T19.F04): every sink is drawable.
+        38 => VmInstruction::AddVote {
+            sink: rng.gen_range(0..VOTE_SINK_COUNT as u8),
             src: rng.gen_range(0..rc),
         },
-        _ => unreachable!("gen_range(0..42) cannot produce values >= 42"),
+        _ => unreachable!("gen_range(0..39) cannot produce values >= 39"),
     }
 }
 
@@ -321,10 +317,7 @@ pub(crate) fn mutate_one_instruction_field(
     rng: &mut impl Rng,
 ) -> bool {
     match instruction {
-        VmInstruction::Noop
-        | VmInstruction::Halt
-        | VmInstruction::ExecuteActionQueue
-        | VmInstruction::PopAction => false,
+        VmInstruction::Noop | VmInstruction::Halt => false,
         VmInstruction::LoadConst { dst, const_idx } => {
             nudge_one_u8(&mut [dst, const_idx], rng);
             true
@@ -386,13 +379,7 @@ pub(crate) fn mutate_one_instruction_field(
             true
         }
         VmInstruction::WriteInternalPayload { slot_idx, src }
-        | VmInstruction::WriteWorldActionMeta { slot_idx, src }
-        | VmInstruction::WriteDirectionBid {
-            direction: slot_idx,
-            src,
-        }
-        // Unreachable until T19.F04: `random_vm_instruction` never yields
-        // `AddVote`, so no program carries one to nudge (T19.F03).
+        | VmInstruction::WriteActionParam { slot_idx, src }
         | VmInstruction::AddVote {
             sink: slot_idx,
             src,
@@ -404,8 +391,7 @@ pub(crate) fn mutate_one_instruction_field(
             nudge_one_u8(&mut [slot, src], rng);
             true
         }
-        VmInstruction::PushAction { action_type }
-        | VmInstruction::SetPriorityBid { src: action_type }
+        VmInstruction::SetPriorityBid { src: action_type }
         | VmInstruction::ReadActionQueueLength { dst: action_type }
         | VmInstruction::ClearSlot {
             slot_idx: action_type,
@@ -572,13 +558,7 @@ pub(super) fn apply_instruction_raw_field_mutation(
 /// set `apply_instruction_raw_field_mutation` draws from and the
 /// `VmInstructionRawFieldMutation` applicability predicate share it.
 pub(super) fn has_mutable_field(instruction: &VmInstruction) -> bool {
-    !matches!(
-        instruction,
-        VmInstruction::Noop
-            | VmInstruction::Halt
-            | VmInstruction::ExecuteActionQueue
-            | VmInstruction::PopAction
-    )
+    !matches!(instruction, VmInstruction::Noop | VmInstruction::Halt)
 }
 
 /// Remap all register-typed fields: `(reg + offset) % register_count`.
@@ -633,16 +613,12 @@ fn for_each_register_ref(instruction: &mut VmInstruction, callback: &mut impl Fn
         }
         VmInstruction::JumpIfZero { cond, .. } => callback(cond),
         VmInstruction::WriteInternalPayload { src, .. }
-        | VmInstruction::WriteWorldActionMeta { src, .. }
-        | VmInstruction::WriteDirectionBid { src, .. }
+        | VmInstruction::WriteActionParam { src, .. }
         | VmInstruction::AddVote { src, .. }
         | VmInstruction::WriteRouteGate { src, .. }
         | VmInstruction::SetPriorityBid { src }
         | VmInstruction::StoreSlotImm { src, .. } => callback(src),
-        VmInstruction::PushAction { .. }
-        | VmInstruction::PopAction
-        | VmInstruction::ExecuteActionQueue
-        | VmInstruction::ClearSlot { .. } => {}
+        VmInstruction::ClearSlot { .. } => {}
         VmInstruction::ReadActionQueueType { index_src, dst }
         | VmInstruction::ReadActionQueueParam { index_src, dst, .. } => {
             callback(index_src);
@@ -770,12 +746,9 @@ pub(crate) fn splice_program_with_reference_repair(
 
 // ── VM Copy Operators ──
 
-/// The instructions that end a dispatch when control flow reaches them.
+/// The instruction that ends a dispatch when control flow reaches it.
 pub(crate) fn is_terminal_instruction(instruction: &VmInstruction) -> bool {
-    matches!(
-        instruction,
-        VmInstruction::ExecuteActionQueue | VmInstruction::Halt
-    )
+    matches!(instruction, VmInstruction::Halt)
 }
 
 /// Splice a copy of `source_indices` into a dormant span at the program tail

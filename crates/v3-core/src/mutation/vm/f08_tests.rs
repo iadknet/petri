@@ -10,7 +10,7 @@
 use super::operators::mutate_one_instruction_field;
 use super::{VmMutator, VmOperator};
 use crate::config::{MutationConfig, RuntimeConfig};
-use crate::contracts::{NodeId, WorldAction};
+use crate::contracts::NodeId;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -104,7 +104,8 @@ fn empty_sensor_snapshot() -> SensorSnapshot {
 /// neutrality precondition needs.
 struct Run {
     result: NodeResult,
-    actions: Vec<WorldAction>,
+    /// The dispatch's committed vote contribution and parameter surface.
+    actions: (crate::creature::genome::vote::VoteVector, [[f32; 2]; 4]),
     memory: [f32; 16],
     steps: u32,
 }
@@ -134,7 +135,10 @@ fn run(program: &[VmInstruction], config: &RuntimeConfig) -> Run {
     let steps = side_outputs.work_counters.vm_steps;
     Run {
         result,
-        actions: side_outputs.action_queue.into_actions(),
+        actions: (
+            side_outputs.commit_vote_contribution(0),
+            side_outputs.action_params,
+        ),
         memory,
         steps,
     }
@@ -172,8 +176,8 @@ fn generated_program(seed: u64, len: usize, wild_offsets: bool) -> Vec<VmInstruc
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(96))]
 
-    /// The dormant tail copy leaves the dispatch's `NodeResult`, action
-    /// queue, output slots, and shared memory untouched whenever the
+    /// The dormant tail copy leaves the dispatch's `NodeResult`, votes,
+    /// parameters, output slots, and shared memory untouched whenever the
     /// original run neither exhausts energy nor reaches the step cap.
     #[test]
     fn tail_copy_is_neutral_under_ample_budget(
@@ -249,10 +253,10 @@ fn tail_copy_preserves_the_program_prefix_and_guards_a_non_terminal_program() {
 #[test]
 fn tail_copy_authors_no_guard_when_the_program_already_ends_in_a_terminal() {
     for (label, terminal) in [
-        ("execute", VmInstruction::ExecuteActionQueue),
+        ("execute", VmInstruction::Halt),
         ("halt", VmInstruction::Halt),
     ] {
-        let original = vec![VmInstruction::PushAction { action_type: 3 }, terminal];
+        let original = vec![VmInstruction::AddVote { sink: 9, src: 0 }, terminal];
         for seed in 0u64..24 {
             let mut genome = vm_genome(original.clone());
             if apply(&mut genome, VmOperator::VmCopyInstructionBlock, seed).is_err() {
@@ -273,7 +277,7 @@ fn tail_copy_authors_no_guard_when_the_program_already_ends_in_a_terminal() {
 fn the_guard_stops_fall_through_into_the_copied_span() {
     // Without the guard, fall-through past the original's last instruction
     // would run the copy and push the action a second time.
-    let original = vec![VmInstruction::PushAction { action_type: 3 }];
+    let original = vec![VmInstruction::AddVote { sink: 9, src: 0 }];
     let config = RuntimeConfig::default();
     let before = run(&original, &config);
     let mut genome = vm_genome(original.clone());
@@ -282,9 +286,9 @@ fn the_guard_stops_fall_through_into_the_copied_span() {
     assert_eq!(
         copied,
         vec![
-            VmInstruction::PushAction { action_type: 3 },
+            VmInstruction::AddVote { sink: 9, src: 0 },
             VmInstruction::Halt,
-            VmInstruction::PushAction { action_type: 3 },
+            VmInstruction::AddVote { sink: 9, src: 0 },
         ]
     );
     let after = run(&copied, &config);
@@ -294,15 +298,20 @@ fn the_guard_stops_fall_through_into_the_copied_span() {
 
 // ── Copy, silent divergence, activation ────────────────────────────────────
 
-/// Copy the whole two-instruction program to the dormant tail, diverge the
-/// dormant copy with the production single-field step, then activate the span
-/// with a newly authored `Jump` at pc 0: the exact copy reproduces the
-/// original's behavior in its place and the diverged one does not.
+/// Copy the whole three-instruction program (load 0.5, vote it into
+/// `Reproduce(N)`, halt) to the dormant tail, diverge the dormant copy's load
+/// with the production single-field step, then activate the span with a newly
+/// authored `Jump` at pc 0: the exact copy reproduces the original's behavior
+/// in its place and the diverged one does not.
 #[test]
 fn vm_copy_diverge_and_activate_trajectory() {
     let original = vec![
-        VmInstruction::PushAction { action_type: 3 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::AddVote { sink: 9, src: 0 },
+        VmInstruction::Halt,
     ];
     let base = vm_genome(original.clone());
     let base_signature = signature(&base);
@@ -326,7 +335,7 @@ fn vm_copy_diverge_and_activate_trajectory() {
     let mut rng = SmallRng::seed_from_u64(3);
     assert!(
         mutate_one_instruction_field(&mut program[span_start], &mut rng),
-        "the copied PushAction carries a mutable field"
+        "the copied LoadConst carries a mutable field"
     );
     assert_ne!(
         program[span_start], original[0],

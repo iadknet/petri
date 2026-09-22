@@ -218,18 +218,14 @@ impl DestinationKind {
             .output_sinks
             .iter()
             .flat_map(|sink| &sink.inputs)
-            .chain(graph.action_bank.iter().flat_map(|slot| slot.edges()))
-            .chain(&graph.execute_gate.inputs)
             .any(|edge| previous_memory(&edge.source));
         if stateful {
             return Self::GraphStateful;
         }
-        let effect = graph.action_bank.iter().any(|slot| slot.is_wired())
-            || !graph.execute_gate.inputs.is_empty()
-            || graph
-                .output_sinks
-                .iter()
-                .any(|sink| !sink.inputs.is_empty());
+        let effect = graph
+            .output_sinks
+            .iter()
+            .any(|sink| !sink.inputs.is_empty());
         if effect {
             Self::GraphPureWithEffect
         } else {

@@ -444,9 +444,7 @@ mod tests {
         use crate::contracts::NodeId;
         use crate::creature::genome::NodeGenome;
 
-        let config = MutationConfig::default();
-        let mut def =
-            crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs();
         def.compute_nodes = compute_nodes;
 
         CreatureGenome {
@@ -504,7 +502,7 @@ mod tests {
 
     #[test]
     fn replication_multiplier_is_exactly_one_below_the_founder_anchor() {
-        for size in [0, 1, 7, 110] {
+        for size in [0, 1, 7, 96] {
             assert_eq!(genome_replication_cost_multiplier(0.1, size), 1.0);
         }
     }
@@ -517,10 +515,11 @@ mod tests {
     }
 
     #[test]
-    fn replication_multiplier_charges_the_reference_genome_28_5_times() {
-        // The T03.F08 cost arm's 386-unit genome: 275 units above the founder.
+    fn replication_multiplier_charges_the_reference_genome_29_9_times() {
+        // The T03.F08 cost arm's 386-unit genome: 289 units above the 97-unit
+        // founder (T19.F04).
         let factor = genome_replication_cost_multiplier(0.1, 386);
-        assert!((factor - 28.5).abs() < 1e-4, "factor {factor}");
+        assert!((factor - 29.9).abs() < 1e-4, "factor {factor}");
     }
 
     proptest::proptest! {

@@ -2,22 +2,22 @@ use super::super::run_tick;
 use super::support::*;
 use crate::contracts::NodeId;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
 };
 use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmInstruction,
 };
 
-/// A single creature running a known 3-opcode program (Noop, PushAction,
-/// ExecuteActionQueue) for one tick exercises exactly one mesh hop, three VM
-/// steps, no graph work, one creature-tick, and one applied action.
+/// A single creature running a known 3-opcode program (Noop, Noop, Halt)
+/// that votes nothing: one pass, one mesh hop, three VM steps, no graph work,
+/// one creature-tick, and one applied `NoOp`.
 #[test]
 fn run_tick_accumulates_known_vm_work_counters_for_one_creature() {
-    let genome = vm_program_genome(vec![
+    let genome = vm_raw_program_genome(vec![
         VmInstruction::Noop,
-        VmInstruction::PushAction { action_type: 0 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::Noop,
+        VmInstruction::Halt,
     ]);
     let (mut sim, _id) = make_sim_with_custom_genome(100.0, genome);
 
@@ -35,10 +35,10 @@ fn run_tick_accumulates_known_vm_work_counters_for_one_creature() {
 /// Work counters accumulate cumulatively across ticks rather than resetting.
 #[test]
 fn run_tick_work_counters_accumulate_across_ticks() {
-    let genome = vm_program_genome(vec![
+    let genome = vm_raw_program_genome(vec![
         VmInstruction::Noop,
-        VmInstruction::PushAction { action_type: 0 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::Noop,
+        VmInstruction::Halt,
     ]);
     let (mut sim, _id) = make_sim_with_custom_genome(1000.0, genome);
 
@@ -115,8 +115,6 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
                     }),
                 }],
                 output_sinks: vec![],
-                action_bank: vec![],
-                execute_gate: ExecuteGate { inputs: vec![] },
             }),
             targets: vec![],
         }],
@@ -142,10 +140,10 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
 /// counts that termination and no other.
 #[test]
 fn run_tick_counts_only_dispatches_that_ran_out_of_energy() {
-    let genome = vm_program_genome(vec![
+    let genome = vm_raw_program_genome(vec![
         VmInstruction::Noop,
-        VmInstruction::PushAction { action_type: 0 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::Noop,
+        VmInstruction::Halt,
     ]);
     let (mut sim, id) = make_sim_with_custom_genome(100.0, genome);
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
@@ -255,8 +253,6 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
                         inputs: vec![edge],
                     },
                 ],
-                action_bank: vec![],
-                execute_gate: ExecuteGate { inputs: vec![] },
             }),
         }],
     }

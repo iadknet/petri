@@ -93,7 +93,8 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 
 /// The hash below pins the short production-default trajectory after two runs
 /// agree. Intentional changes to production defaults must update it only after
-/// the new trajectory has been reproduced.
+/// the new trajectory has been reproduced. Re-pinned by T19.F04 (the vote
+/// founder's genome and actions).
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -121,7 +122,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 5811834416729882562);
+    assert_eq!(hash.finish(), 14378788429370811441);
 }
 
 use proptest::prelude::*;

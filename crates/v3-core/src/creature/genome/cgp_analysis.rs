@@ -1,13 +1,13 @@
 //! CGP graph backend analysis: backward/forward slicing and functional complexity.
 //!
-//! Backward slicing anchors on all wired behavioral surfaces:
-//! output_sinks + action_bank gate/param/direction-bank edges + execute_gate inputs.
+//! Backward slicing anchors on every wired output sink, the action-vote and
+//! parameter sinks included.
 //! Slicing traverses `GraphSource::ComputeNode` references, stopping at
 //! `InputLeaf` and `SharedMemory` (implicit sources, not nodes).
 
 use std::collections::{HashSet, VecDeque};
 
-use super::cgp::{ActionSlot, CgpGraphBackendDef, GraphEdge, GraphSource};
+use super::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource};
 
 // ── Backward slicing ────────────────────────────────────────────────────────
 
@@ -32,8 +32,7 @@ fn enqueue_compute_sources<'a>(
 
 /// Backward-slice from all wired behavioral surfaces in the CGP graph.
 ///
-/// Anchors: wired output_sinks, wired action_bank (gate + param), wired execute_gate.
-/// An item is "wired" if it has at least one edge.
+/// Anchors: wired output sinks. A sink is "wired" if it has at least one edge.
 /// Traverses `GraphSource::ComputeNode` references recursively.
 /// Returns compute node indices that are backward-reachable from any wired surface.
 #[must_use]
@@ -52,16 +51,6 @@ pub(crate) fn cgp_live_compute_indices(def: &CgpGraphBackendDef) -> Vec<usize> {
         }
     }
 
-    // Anchor: wired action bank (gate, param, and direction-bank edges)
-    for slot in &def.action_bank {
-        enqueue_compute_sources(slot.edges(), n, &mut visited, &mut queue);
-    }
-
-    // Anchor: wired execute gate
-    if !def.execute_gate.inputs.is_empty() {
-        enqueue_compute_sources(&def.execute_gate.inputs, n, &mut visited, &mut queue);
-    }
-
     // BFS through compute node inputs
     while let Some(idx) = queue.pop_front() {
         enqueue_compute_sources(&def.compute_nodes[idx].inputs, n, &mut visited, &mut queue);
@@ -76,11 +65,10 @@ pub(crate) fn cgp_live_compute_indices(def: &CgpGraphBackendDef) -> Vec<usize> {
 }
 
 /// Every edge on the graph's wired surface: the inputs of the given live
-/// compute nodes, then all output sinks, action-bank gate and param inputs,
-/// and the execute gate.
+/// compute nodes, then all output sinks.
 ///
-/// `live` is a `cgp_live_compute_indices` result. An unwired sink, slot or
-/// execute gate carries no edge, so no wiredness test is needed here. Edges
+/// `live` is a `cgp_live_compute_indices` result. An unwired sink carries no
+/// edge, so no wiredness test is needed here. Edges
 /// are yielded once each, in traversal order; every caller reduces them into
 /// an order-independent result, and each keeps its own filtering — the census
 /// in `sensor_census` deliberately reads `SharedMemory` on the whole surface
@@ -92,8 +80,6 @@ pub(crate) fn wired_surface_edges<'a>(
     live.iter()
         .flat_map(|&idx| &def.compute_nodes[idx].inputs)
         .chain(def.output_sinks.iter().flat_map(|sink| &sink.inputs))
-        .chain(def.action_bank.iter().flat_map(ActionSlot::edges))
-        .chain(&def.execute_gate.inputs)
 }
 
 // ── Functional complexity ───────────────────────────────────────────────────
@@ -113,13 +99,11 @@ fn collect_consumed_input_refs(def: &CgpGraphBackendDef, live: &[usize]) -> Hash
 ///
 /// Scoring (per the three-tier liveness model):
 /// - +1 per wired output sink (has at least one edge)
-/// - +1 per wired action slot (gate or param has at least one edge)
-/// - +1 if execute gate is wired
 /// - +1 per live compute node (backward-reachable from wired surfaces)
 /// - +edge_count per live compute node
 /// - +1 per consumed InputLeaf ref_idx (across all live edges)
 ///
-/// Dormant (unwired) sinks, slots, and execute gate are NOT counted.
+/// Dormant (unwired) sinks are NOT counted.
 #[must_use]
 pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
     let mut score: u32 = 0;
@@ -129,18 +113,6 @@ pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
         if !sink.inputs.is_empty() {
             score += 1;
         }
-    }
-
-    // Count wired action slots
-    for slot in &def.action_bank {
-        if slot.is_wired() {
-            score += 1;
-        }
-    }
-
-    // Count wired execute gate
-    if !def.execute_gate.inputs.is_empty() {
-        score += 1;
     }
 
     // Live compute nodes (backward-reachable from wired surfaces)
@@ -161,19 +133,14 @@ pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::MutationConfig;
-    use crate::creature::genome::cgp::{
-        ActionSlot, ActionSlotBehavior, ComputeNode, ComputeNodeKind, ExecuteGate, OutputSink,
-        OutputSinkKind, WorldActionKind,
-    };
+    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind, OutputSink, OutputSinkKind};
+    use crate::creature::genome::vote::VoteSink;
 
     fn empty_def() -> CgpGraphBackendDef {
         CgpGraphBackendDef {
             birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         }
     }
 
@@ -181,8 +148,8 @@ mod tests {
         // CN0: Add, inputs from CN1 + InputLeaf(0,0)
         // CN1: Constant(1.0), no inputs
         // Sink(CustomOutput(0)) wired to CN0
-        // ActionSlot gate wired to CN1
-        // ExecuteGate wired to CN0
+        // Sink(ActionVote(Eat)) wired to CN1
+        // Sink(ActionVote(Terminate)) wired to CN0
         CgpGraphBackendDef {
             birth_weights: None,
             compute_nodes: vec![
@@ -214,28 +181,29 @@ mod tests {
                     plasticity: None,
                 },
             ],
-            output_sinks: vec![OutputSink {
-                kind: OutputSinkKind::CustomOutput(0),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-            }],
-            action_bank: vec![ActionSlot {
-                behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
-                gate_inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(1),
-                    weight: 1.0,
-                }],
-                param_inputs: Vec::new(),
-                direction_bids: Vec::new(),
-            }],
-            execute_gate: ExecuteGate {
-                inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
-                }],
-            },
+            output_sinks: vec![
+                OutputSink {
+                    kind: OutputSinkKind::CustomOutput(0),
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 1.0,
+                    }],
+                },
+                OutputSink {
+                    kind: OutputSinkKind::ActionVote(VoteSink::Eat),
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(1),
+                        weight: 1.0,
+                    }],
+                },
+                OutputSink {
+                    kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 1.0,
+                    }],
+                },
+            ],
         }
     }
 
@@ -259,8 +227,7 @@ mod tests {
 
     #[test]
     fn live_indices_unwired_sinks_dont_anchor() {
-        let config = MutationConfig::default();
-        let def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let def = CgpGraphBackendDef::new_with_fixed_outputs();
         // All sinks are empty → no live compute nodes
         assert!(cgp_live_compute_indices(&def).is_empty());
     }
@@ -275,8 +242,7 @@ mod tests {
 
     #[test]
     fn complexity_unwired_fixed_outputs_is_zero() {
-        let config = MutationConfig::default();
-        let def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let def = CgpGraphBackendDef::new_with_fixed_outputs();
         assert_eq!(cgp_functional_complexity(&def), 0);
     }
 
@@ -286,12 +252,10 @@ mod tests {
         let score = cgp_functional_complexity(&def);
 
         // Expected:
-        // Wired sinks: 1 (CustomOutput(0))
-        // Wired action slots: 1 (slot 0 gate wired)
-        // Wired execute gate: 1
+        // Wired sinks: 3 (CustomOutput(0), ActionVote(Eat), ActionVote(Terminate))
         // Live compute nodes: CN0 (2 edges) + CN1 (0 edges) = 2 nodes + 2 edges
         // Consumed refs: InputLeaf(ref_idx=0) = 1
-        // Total: 1 + 1 + 1 + 2 + 2 + 1 = 8
+        // Total: 3 + 2 + 2 + 1 = 8
         assert_eq!(score, 8);
     }
 }

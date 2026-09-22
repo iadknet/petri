@@ -75,7 +75,7 @@ impl VoteSink {
     /// built with an out-of-range direction indexes past the catalog and is
     /// never constructed by the catalog itself.
     #[must_use]
-    pub fn index(self) -> usize {
+    pub const fn index(self) -> usize {
         let directions = VOTE_DIRECTION_COUNT as usize;
         match self {
             Self::Eat => 0,

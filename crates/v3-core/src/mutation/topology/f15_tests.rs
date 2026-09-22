@@ -124,8 +124,7 @@ fn branch_failure_is_atomic_and_orphan_writes_are_preserved() {
                 }
             }
             _ => {
-                let mut graph =
-                    CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+                let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
                 graph
                     .output_sinks
                     .retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
@@ -312,7 +311,7 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
         type_idx: Default::default(),
     })];
     if graph {
-        let mut backend = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        let mut backend = CgpGraphBackendDef::new_with_fixed_outputs();
         backend
             .compute_nodes
             .push(crate::creature::genome::cgp::ComputeNode {
@@ -343,7 +342,7 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
     } else {
         g.nodes[0].backend_def = BackendDef::Vm(VmBackendDef {
             register_count: 1,
-            constants: vec![3.0],
+            constants: vec![3.0, 1.0],
             program: vec![
                 VmInstruction::LoadConst {
                     dst: 0,
@@ -358,7 +357,12 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
                     src: 0,
                 },
                 VmInstruction::SetPriorityBid { src: 0 },
-                VmInstruction::PushAction { action_type: 1 },
+                VmInstruction::LoadConst {
+                    dst: 0,
+                    const_idx: 1,
+                },
+                // One `Eat` vote.
+                VmInstruction::AddVote { sink: 0, src: 0 },
                 VmInstruction::ReadInput {
                     dst: 0,
                     ref_idx: 0,
@@ -368,22 +372,28 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
             ],
         });
     }
+    // Node 1 carries the bus value (3.0) into the `Move` parameter slot and
+    // votes one `Move(SE)`.
     g.nodes[1].input_refs = vec![InputReference::UpstreamSlot(0)];
     g.nodes[1].backend_def = BackendDef::Vm(VmBackendDef {
         register_count: 1,
-        constants: vec![],
+        constants: vec![1.0],
         program: vec![
             VmInstruction::ReadInput {
                 dst: 0,
                 ref_idx: 0,
                 sub_idx: 0,
             },
-            VmInstruction::WriteWorldActionMeta {
-                slot_idx: 0,
+            VmInstruction::WriteActionParam {
+                slot_idx: 3,
                 src: 0,
             },
-            VmInstruction::PushAction { action_type: 2 },
-            VmInstruction::ExecuteActionQueue,
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            },
+            VmInstruction::AddVote { sink: 4, src: 0 },
+            VmInstruction::Halt,
         ],
     });
     g
@@ -440,13 +450,17 @@ fn added_work_retains_default_behavior_but_can_exhaust_at_the_boundary() {
         let after = execute_with_config(&grown, input, 80.0, &config);
         assert_eq!(before.0.actions, after.0.actions);
         assert_eq!(before.2, after.2);
+        // Every pass pays the added work (T19.F04): one gate-write step, plus
+        // one hop and its `Halt` when the input routes to the added node.
+        let passes = before.0.work_counters.passes;
+        assert_eq!(after.0.work_counters.passes, passes);
         assert_eq!(
             after.0.work_counters.vm_steps,
-            before.0.work_counters.vm_steps + 1 + u32::from(input > 0.0)
+            before.0.work_counters.vm_steps + passes * (1 + u32::from(input > 0.0))
         );
         assert_eq!(
             after.0.work_counters.mesh_hops,
-            before.0.work_counters.mesh_hops + u32::from(input > 0.0)
+            before.0.work_counters.mesh_hops + passes * u32::from(input > 0.0)
         );
     }
     // The fixture's 3.0 bid is settled after the chain (T19.F02), outside
@@ -457,14 +471,22 @@ fn added_work_retains_default_behavior_but_can_exhaust_at_the_boundary() {
     let after = execute(&grown, 1.0, budget);
     assert!(matches!(
         before.1.termination_reason,
-        crate::runtime::trace::domain::TerminationReason::ActionEmitted
+        crate::runtime::trace::domain::TerminationReason::NoDecision
     ));
     assert!(matches!(
         after.1.termination_reason,
         crate::runtime::trace::domain::TerminationReason::EnergyExhausted
     ));
-    assert_ne!(before.0.actions, after.0.actions);
-    assert_eq!(after.0.actions, vec![crate::contracts::WorldAction::NoOp]);
+    // Exhaustion keeps what the earlier passes committed (T19.F04): the
+    // grown genome's queue is a prefix of the base genome's.
+    let kept: Vec<_> = after
+        .0
+        .actions
+        .iter()
+        .copied()
+        .filter(|action| *action != crate::contracts::WorldAction::NoOp)
+        .collect();
+    assert!(before.0.actions.starts_with(&kept));
 }
 
 #[test]
@@ -576,9 +598,7 @@ fn dormant_alternative_cannot_win_even_when_other_routes_have_dynamic_bids() {
 #[test]
 fn graph_alternative_can_grow_a_vm_without_erasing_original() {
     let mut g = genome(vec![node(0, &[1]), node(1, &[])]);
-    g.nodes[1].backend_def = BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs(
-        &MutationConfig::default(),
-    ));
+    g.nodes[1].backend_def = BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs());
     let old = g.nodes[1].clone();
     apply(&mut g, TopologyOperator::SwapNodeBackend, 7).unwrap();
     assert_eq!(g.nodes[1], old);
@@ -629,7 +649,7 @@ fn paired_graph_gates_reach_all_sensor_subvalues_without_resampling() {
 
 #[test]
 fn vm_gate_can_append_without_terminal_and_preserve_shifted_jump_target() {
-    for terminal in [VmInstruction::Halt, VmInstruction::ExecuteActionQueue] {
+    for terminal in [VmInstruction::Halt, VmInstruction::Halt] {
         let mut g = genome(vec![node(0, &[1]), node(1, &[])]);
         let BackendDef::Vm(vm) = &mut g.nodes[0].backend_def else {
             panic!()
@@ -678,9 +698,12 @@ fn inline_growth_preserves_bus_queue_priority_memory_and_exposes_real_energy_cos
             assert_eq!(before.0.actions, after.0.actions);
             assert_eq!(before.0.priority_bid, after.0.priority_bid);
             assert_eq!(before.2, after.2);
+            // One added hop per pass.
+            let passes = before.0.work_counters.passes;
+            assert_eq!(after.0.work_counters.passes, passes);
             assert_eq!(
                 after.0.work_counters.mesh_hops,
-                before.0.work_counters.mesh_hops + 1
+                before.0.work_counters.mesh_hops + passes
             );
         }
     }

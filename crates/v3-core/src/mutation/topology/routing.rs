@@ -111,7 +111,7 @@ pub(super) fn apply_add_route_target(
             let at = vm
                 .program
                 .iter()
-                .position(|i| matches!(i, VmInstruction::Halt | VmInstruction::ExecuteActionQueue))
+                .position(|i| matches!(i, VmInstruction::Halt))
                 .unwrap_or(vm.program.len());
             let instruction = VmInstruction::WriteRouteGate {
                 slot,
@@ -145,9 +145,7 @@ pub(super) fn apply_add_route_target(
         slot,
         gate_bias: old.gate_bias,
     });
-    genome
-        .nodes
-        .push(birth::detour(new_id, old.target_id, config, rng));
+    genome.nodes.push(birth::detour(new_id, old.target_id, rng));
     Ok(reachability)
 }
 

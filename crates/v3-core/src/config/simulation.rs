@@ -884,8 +884,8 @@ fn default_per_unit_supply_enabled() -> bool {
     true
 }
 
-/// Sized so the 111-unit V3Alpha1 founder keeps about 0.55 requested events
-/// per birth; the founder pin test holds the two together.
+/// Per genome unit: the 97-unit V3Alpha1 founder (T19.F04) requests about
+/// 0.485 events per birth; the founder pin test holds the two together.
 fn default_per_unit_rate() -> f64 {
     0.005
 }
@@ -1484,15 +1484,16 @@ mod tests {
         }
     }
 
-    /// The default rate is pinned to the founder's genome size, so the founder
-    /// keeps about 0.55 requested events per birth (T11.F19); the size itself
-    /// is pinned by the creature state test, not repeated here.
+    /// The default rate times the founder's genome size: the founder requests
+    /// `0.005 × 97 = 0.485` events per birth (T19.F04; the T11.F19 0.55 was
+    /// the 111-unit VM founder's). The size itself is pinned by the creature
+    /// state test, not repeated here.
     #[test]
     fn default_per_unit_rate_keeps_the_founder_near_the_legacy_supply() {
         let founder = crate::creature::founder::v3alpha1_founder_genome();
         let expected = MutationConfig::default().per_unit_rate * f64::from(founder.genome_size());
         assert!(
-            (expected - 0.55).abs() <= 0.55 * 0.01,
+            (expected - 0.485).abs() <= 0.485 * 0.01,
             "founder expects {expected} requested events per birth"
         );
     }

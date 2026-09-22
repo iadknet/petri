@@ -25,8 +25,6 @@ fn graph_node(id: u32) -> NodeGenome {
             birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: crate::creature::genome::cgp::ExecuteGate { inputs: Vec::new() },
         }),
         targets: vec![RouteTarget {
             target_id: NodeId::new(0),

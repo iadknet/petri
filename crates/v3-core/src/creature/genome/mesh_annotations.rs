@@ -105,11 +105,7 @@ fn derive_node_annotation(node: &NodeGenome, reachable: bool) -> MeshNodeAnnotat
                     super::VmInstruction::WriteInternalPayload { .. } => {
                         write_classes.insert(MeshWriteClass::Payload);
                     }
-                    super::VmInstruction::WriteWorldActionMeta { .. }
-                    | super::VmInstruction::WriteDirectionBid { .. }
-                    | super::VmInstruction::PushAction { .. }
-                    | super::VmInstruction::PopAction
-                    | super::VmInstruction::ExecuteActionQueue
+                    super::VmInstruction::WriteActionParam { .. }
                     | super::VmInstruction::SetPriorityBid { .. }
                     | super::VmInstruction::AddVote { .. } => {
                         write_classes.insert(MeshWriteClass::Action);
@@ -189,8 +185,8 @@ mod tests {
     use crate::contracts::{DynamicIntrospectionKey, InputReference, RouteTarget};
     use crate::creature::genome::analysis::mesh_reachable_nodes;
     use crate::creature::genome::cgp::{
-        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
-        OutputSink, OutputSinkKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+        OutputSinkKind,
     };
     use crate::creature::genome::{CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 
@@ -293,8 +289,6 @@ mod tests {
                         weight: 1.0,
                     }],
                 }],
-                action_bank: vec![],
-                execute_gate: ExecuteGate { inputs: vec![] },
             }),
         };
 

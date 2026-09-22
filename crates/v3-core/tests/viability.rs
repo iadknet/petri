@@ -1072,7 +1072,9 @@ fn ordinary_food_alone_replenishes_energy_and_reproduces() {
 /// bits, age and generation plus the primary food grid after 2,000 ticks,
 /// sampled every tick; births and final population are asserted alongside.
 /// Intentional changes to production defaults must update this pin only after
-/// the new trajectory has been reproduced.
+/// the new trajectory has been reproduced. Re-pinned by T19.F04 (the vote
+/// founder, 97 genome units): 185 births became 323; before/after in
+/// `docs/progress/readings/t19-f04.md`.
 #[test]
 fn founder_only_trajectory_digest_is_pinned() {
     use sha2::{Digest, Sha256};
@@ -1117,9 +1119,9 @@ fn founder_only_trajectory_digest_is_pinned() {
             digest.as_str()
         ),
         (
-            185,
+            323,
             0,
-            "63498f8d36346079f8827c382e2978510357b374ca37759af857afa263f2d0be"
+            "54db30adef8c1c9e047f3eeb1e988e2581c6e43b28183d01c5ea23b7800e529c"
         )
     );
 }

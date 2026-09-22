@@ -1,7 +1,7 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId};
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
 };
 use crate::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
@@ -82,8 +82,6 @@ fn graph(rule: HebbianRule, eta: f32, lambda: f32) -> CgpGraphBackendDef {
             plasticity: Some(config(rule, eta, lambda)),
         }],
         output_sinks: vec![],
-        action_bank: vec![],
-        execute_gate: ExecuteGate { inputs: vec![] },
     }
 }
 
@@ -343,17 +341,15 @@ fn clock_does_not_initialize_unvisited_modules_or_charge_reward_work() {
 #[test]
 fn first_tick_repeated_visits_have_zero_base_and_ordinary_traced_parity() {
     let mut def = graph(HebbianRule::Oja, 0.4, 0.7);
-    def.action_bank
-        .push(crate::creature::genome::cgp::ActionSlot {
-            behavior: crate::creature::genome::cgp::ActionSlotBehavior::Emit(
-                crate::creature::genome::cgp::WorldActionKind::Eat,
+    def.output_sinks
+        .push(crate::creature::genome::cgp::OutputSink {
+            kind: crate::creature::genome::cgp::OutputSinkKind::ActionVote(
+                crate::creature::genome::vote::VoteSink::Eat,
             ),
-            gate_inputs: vec![GraphEdge {
+            inputs: vec![GraphEdge {
                 source: GraphSource::ComputeNode(0),
                 weight: 1.0,
             }],
-            param_inputs: vec![],
-            direction_bids: Vec::new(),
         });
     let runtime = RuntimeConfig::default();
     let mut ordinary = GraphRuntimeState::new();
@@ -390,10 +386,7 @@ fn first_tick_repeated_visits_have_zero_base_and_ordinary_traced_parity() {
             assert_eq!(ordinary.node_outputs, traced.node_outputs);
             assert_eq!(energy, traced_energy);
             assert_eq!(side.work_counters, traced_side.work_counters);
-            assert_eq!(
-                side.action_queue.into_actions(),
-                traced_side.action_queue.into_actions()
-            );
+            assert_eq!(side.dispatch_effects(), traced_side.dispatch_effects());
         }
         assert_eq!(
             reward(&def, &mut ordinary, 0.5),
@@ -463,7 +456,6 @@ proptest! {
 #[test]
 fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
     use crate::contracts::WorldAction;
-    use crate::creature::genome::cgp::{ActionSlot, ActionSlotBehavior, WorldActionKind};
     use crate::runtime::mesh::execute_creature_mesh;
     let started = std::time::Instant::now();
     let mut def = graph(HebbianRule::Classic, 0.5, 0.0);
@@ -482,21 +474,14 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
         source: GraphSource::ComputeNode(index),
         weight,
     };
-    def.action_bank = vec![
-        ActionSlot {
-            behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
-            gate_inputs: vec![edge(1, 1.0)],
-            param_inputs: vec![],
-            direction_bids: Vec::new(),
-        },
-        ActionSlot {
-            behavior: ActionSlotBehavior::Emit(WorldActionKind::NoOp),
-            gate_inputs: vec![edge(0, 1.0), edge(1, -1.0)],
-            param_inputs: vec![],
-            direction_bids: Vec::new(),
-        },
-    ];
-    def.execute_gate.inputs = vec![edge(0, 1.0)];
+    // Eat when the learned gate fires; otherwise nothing is voted and the
+    // tick is `NoOp`.
+    def.output_sinks = vec![crate::creature::genome::cgp::OutputSink {
+        kind: crate::creature::genome::cgp::OutputSinkKind::ActionVote(
+            crate::creature::genome::vote::VoteSink::Eat,
+        ),
+        inputs: vec![edge(1, 1.0)],
+    }];
     let genome = genome(&def);
     let run = |state: &mut GraphRuntimeState, acquisition: bool, frozen: bool| {
         let mut correct = Vec::new();

@@ -150,7 +150,8 @@ fn mesh_summary(source: &Value) -> Value {
             ("reachable", "reachable_node_count"),
             ("executed", "executed_node_count"),
             ("knockout", "knockout_count"),
-            ("capHits", "hop_cap_hits"),
+            ("capHits", "pass_cap_hits"),
+            ("passes", "passes"),
             ("execs", "executions_per_genome"),
         ] {
             if let Some(count) = row[key].as_u64() {
@@ -798,7 +799,8 @@ mod tests {
                 "reachable_node_count": 3,
                 "executed_node_count": 5,
                 "knockout_count": 7,
-                "hop_cap_hits": 11,
+                "pass_cap_hits": 11,
+                "passes": 41,
                 "executions_per_genome": 13,
                 "route_varies_with_input": true,
                 "route_destination_varies": false
@@ -808,7 +810,8 @@ mod tests {
                 "reachable_node_count": 19,
                 "executed_node_count": 23,
                 "knockout_count": 29,
-                "hop_cap_hits": 31,
+                "pass_cap_hits": 31,
+                "passes": 43,
                 "executions_per_genome": 37,
                 "route_varies_with_input": false,
                 "route_destination_varies": true
@@ -825,6 +828,7 @@ mod tests {
                 "executed": 28,
                 "knockout": 36,
                 "capHits": 42,
+                "passes": 84,
                 "execs": 50,
                 "routeVaries": 1,
                 "routeDestinationVaries": 1
@@ -850,7 +854,8 @@ mod tests {
                     "reachable_node_count": 3,
                     "executed_node_count": 5,
                     "knockout_count": 7,
-                    "hop_cap_hits": 11,
+                    "pass_cap_hits": 11,
+                    "passes": 41,
                     "executions_per_genome": 13,
                     "route_varies_with_input": true
                 }}],
@@ -877,6 +882,7 @@ mod tests {
                         "executed": 5,
                         "knockout": 7,
                         "capHits": 11,
+                        "passes": 41,
                         "execs": 13,
                         "routeVaries": 1,
                         "routeDestinationVaries": 0

@@ -717,17 +717,17 @@ mod tests {
     }
 
     /// The carrying charge's founder sizing is read from this number: the spec's
-    /// 96 is stale (it predates the founder's current program), so the founder
-    /// pays `111 * genome_carry_cost_per_unit` per tick. The replication cost's
+    /// The founder's decision node is a vote graph (T19.F04), so the founder
+    /// pays `97 * genome_carry_cost_per_unit` per tick. The replication cost's
     /// anchor `FOUNDER_GENOME_SIZE_UNITS` is pinned to the same measurement, so
     /// the founder's multiplier is exactly 1.0.
     #[test]
-    fn the_canonical_founder_genome_is_one_hundred_eleven_units() {
+    fn the_canonical_founder_genome_is_ninety_seven_units() {
         use crate::config::FounderProfile;
         use crate::creature::founder::{founder_genome, FOUNDER_GENOME_SIZE_UNITS};
 
         let genome = founder_genome(FounderProfile::V3Alpha1);
-        assert_eq!(genome.genome_size(), 111);
+        assert_eq!(genome.genome_size(), 97);
         assert_eq!(genome.genome_size(), FOUNDER_GENOME_SIZE_UNITS);
     }
 

@@ -26,7 +26,7 @@ fn genome_for(class: CognitiveClass) -> CreatureGenome {
             }]);
         }
         CognitiveClass::Stateful | CognitiveClass::Plasticity => {
-            let mut graph = CgpGraphBackendDef::new_with_fixed_outputs(&Default::default());
+            let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
             graph.compute_nodes.push(ComputeNode {
                 kind: ComputeNodeKind::DecayIntegrator(0.5),
                 inputs: vec![GraphEdge {

@@ -1,199 +1,111 @@
 use super::*;
 use crate::config::EnergyLifecycleConfig;
-use crate::contracts::WorldAction;
+use crate::creature::genome::vote::{VoteSink, VOTE_SINK_COUNT};
 use crate::creature::identity::CreatureIdentityState;
 
-// ── PushAction + ExecuteActionQueue ────────────────────────────────────────
+// ── AddVote and WriteActionParam (T19.F04) ─────────────────────────────────
 
 #[test]
-fn emit_noop_action_type_0() {
-    let (_r, _, aq) = run_vm(
+fn add_vote_sums_into_the_staged_contribution_and_never_touches_the_queue() {
+    let (_, _, mut side) = run_vm(
         vec![
-            VmInstruction::PushAction { action_type: 0 },
-            VmInstruction::ExecuteActionQueue,
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            },
+            VmInstruction::AddVote {
+                sink: VoteSink::Eat.index() as u8,
+                src: 0,
+            },
+            VmInstruction::AddVote {
+                sink: VoteSink::Eat.index() as u8,
+                src: 0,
+            },
+            // Past the catalog: writes nothing.
+            VmInstruction::AddVote {
+                sink: VOTE_SINK_COUNT as u8,
+                src: 0,
+            },
+            VmInstruction::Halt,
         ],
         1,
-        vec![],
+        vec![1.5],
         &[],
         zeroed_upstream(),
         100.0,
     );
-    let actions = aq.action_queue.into_actions();
-    assert_eq!(actions.len(), 1);
-    assert_eq!(actions[0], crate::contracts::WorldAction::NoOp);
+    assert!(side.action_queue.is_empty());
+    let committed = side.commit_vote_contribution(0);
+    assert_eq!(committed[VoteSink::Eat.index()], 3.0);
+    assert_eq!(committed.iter().filter(|v| **v != 0.0).count(), 1);
 }
 
 #[test]
-fn emit_eat_action_type_1() {
-    let (_r, _, aq) = run_vm(
+fn write_action_param_addresses_the_surface_kind_major() {
+    for slot in 0u8..8 {
+        let (_, _, side) = run_vm(
+            vec![
+                VmInstruction::LoadConst {
+                    dst: 0,
+                    const_idx: 0,
+                },
+                VmInstruction::WriteActionParam {
+                    slot_idx: slot,
+                    src: 0,
+                },
+                VmInstruction::Halt,
+            ],
+            1,
+            vec![7.0],
+            &[],
+            zeroed_upstream(),
+            100.0,
+        );
+        let mut expected = [[0.0f32; 2]; 4];
+        expected[usize::from(slot / 2)][usize::from(slot % 2)] = 7.0;
+        assert_eq!(side.action_params, expected, "slot {slot}");
+    }
+}
+
+#[test]
+fn write_action_param_overwrites_and_ignores_an_invalid_slot() {
+    let (_, _, side) = run_vm(
         vec![
-            VmInstruction::PushAction { action_type: 1 },
-            VmInstruction::ExecuteActionQueue,
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            },
+            VmInstruction::WriteActionParam {
+                slot_idx: 3,
+                src: 0,
+            },
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 1,
+            },
+            VmInstruction::WriteActionParam {
+                slot_idx: 3,
+                src: 0,
+            },
+            VmInstruction::WriteActionParam {
+                slot_idx: 8,
+                src: 0,
+            },
+            VmInstruction::WriteActionParam {
+                slot_idx: 255,
+                src: 0,
+            },
+            VmInstruction::Halt,
         ],
         1,
-        vec![],
+        vec![7.0, -2.0],
         &[],
         zeroed_upstream(),
         100.0,
     );
-    let actions = aq.action_queue.into_actions();
-    assert_eq!(actions.len(), 1);
-    assert_eq!(
-        actions[0],
-        crate::contracts::WorldAction::Eat {
-            type_idx: crate::config::OrdinaryFoodTypeId::default()
-        }
-    );
-}
-
-#[test]
-fn emit_unknown_action_type_255_defaults_to_noop() {
-    let (_r, _, aq) = run_vm(
-        vec![
-            VmInstruction::PushAction { action_type: 255 },
-            VmInstruction::ExecuteActionQueue,
-        ],
-        1,
-        vec![],
-        &[],
-        zeroed_upstream(),
-        100.0,
-    );
-    let actions = aq.action_queue.into_actions();
-    assert_eq!(actions.len(), 1);
-    assert_eq!(actions[0], crate::contracts::WorldAction::NoOp);
-}
-
-#[test]
-fn emit_move_with_meta() {
-    // Set meta[0] = 2.0 (East), then emit Move
-    let program = vec![
-        VmInstruction::LoadConst {
-            dst: 0,
-            const_idx: 0,
-        }, // r0 = 2.0
-        VmInstruction::WriteWorldActionMeta {
-            slot_idx: 0,
-            src: 0,
-        },
-        VmInstruction::PushAction { action_type: 2 },
-        VmInstruction::ExecuteActionQueue,
-    ];
-    let (_r, _, aq) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
-    let actions = aq.action_queue.into_actions();
-    assert_eq!(actions.len(), 1);
-    assert_eq!(
-        actions[0],
-        crate::contracts::WorldAction::Move(Direction::E)
-    );
-}
-
-// ── WriteDirectionBid opcode (T11.F21) ─────────────────────────────────────
-
-/// One program, three pushes: meta says East, one bank bid at slot 5 (SW)
-/// wins the first push; the bank persists for the second push; an
-/// out-of-range write and an `Eat` push never consult it.
-#[test]
-fn write_direction_bid_selects_the_winning_slot_and_persists_within_a_dispatch() {
-    let program = vec![
-        VmInstruction::LoadConst {
-            dst: 0,
-            const_idx: 0,
-        }, // r0 = 2.0 (East)
-        VmInstruction::LoadConst {
-            dst: 1,
-            const_idx: 1,
-        }, // r1 = 0.5
-        VmInstruction::WriteWorldActionMeta {
-            slot_idx: 0,
-            src: 0,
-        },
-        VmInstruction::WriteDirectionBid {
-            direction: 5,
-            src: 1,
-        },
-        VmInstruction::PushAction { action_type: 2 },
-        VmInstruction::PushAction { action_type: 3 },
-        VmInstruction::PushAction { action_type: 1 },
-        VmInstruction::ExecuteActionQueue,
-    ];
-    let (_r, _, aq) = run_vm(program, 2, vec![2.0, 0.5], &[], zeroed_upstream(), 100.0);
-    let actions = aq.action_queue.into_actions();
-    assert_eq!(actions.len(), 3);
-    assert_eq!(actions[0], WorldAction::Move(Direction::SW));
-    assert!(matches!(
-        actions[1],
-        WorldAction::Reproduce {
-            direction: Direction::SW,
-            ..
-        }
-    ));
-    assert_eq!(
-        actions[2].param(0),
-        2.0,
-        "Eat reads meta slot 0, not the bank"
-    );
-}
-
-#[test]
-fn write_direction_bid_out_of_range_leaves_the_bank_unwritten() {
-    let program = vec![
-        VmInstruction::LoadConst {
-            dst: 0,
-            const_idx: 0,
-        }, // r0 = 2.0 (East)
-        VmInstruction::WriteWorldActionMeta {
-            slot_idx: 0,
-            src: 0,
-        },
-        VmInstruction::WriteDirectionBid {
-            direction: 8,
-            src: 0,
-        },
-        VmInstruction::PushAction { action_type: 2 },
-        VmInstruction::ExecuteActionQueue,
-    ];
-    let (_r, _, aq) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
-    let actions = aq.action_queue.into_actions();
-    assert_eq!(actions, vec![WorldAction::Move(Direction::E)]);
-}
-
-#[test]
-fn write_direction_bid_resets_between_dispatches() {
-    // The bank is per-dispatch state like `meta`: a second run of a program
-    // that only pushes decodes from the scalar again.
-    let program = vec![
-        VmInstruction::LoadConst {
-            dst: 0,
-            const_idx: 0,
-        },
-        VmInstruction::WriteDirectionBid {
-            direction: 7,
-            src: 0,
-        },
-        VmInstruction::PushAction { action_type: 2 },
-        VmInstruction::ExecuteActionQueue,
-    ];
-    let (_r, _, aq) = run_vm(program, 1, vec![1.0], &[], zeroed_upstream(), 100.0);
-    assert_eq!(
-        aq.action_queue.into_actions(),
-        vec![WorldAction::Move(Direction::NW)]
-    );
-    let (_r, _, aq) = run_vm(
-        vec![
-            VmInstruction::PushAction { action_type: 2 },
-            VmInstruction::ExecuteActionQueue,
-        ],
-        1,
-        vec![],
-        &[],
-        zeroed_upstream(),
-        100.0,
-    );
-    assert_eq!(
-        aq.action_queue.into_actions(),
-        vec![WorldAction::Move(Direction::N)]
-    );
+    let mut expected = [[0.0f32; 2]; 4];
+    expected[1][1] = -2.0;
+    assert_eq!(side.action_params, expected);
 }
 
 // ── ReadInput opcode ──────────────────────────────────────────────────────
@@ -569,10 +481,10 @@ fn vm_eats_when_food_here() {
                     // r1 is 0.0; compare r0 > r1
                     VmInstruction::CmpGt { dst: 0, a: 0, b: 1 }, // r0 = (food > 0)?
                     VmInstruction::JumpIfZero { cond: 0, offset: 2 }, // skip Eat if no food
-                    VmInstruction::PushAction { action_type: 1 }, // Eat
-                    VmInstruction::ExecuteActionQueue,
-                    VmInstruction::PushAction { action_type: 0 }, // NoOp fallback
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::AddVote { sink: 0, src: 0 },  // Eat
+                    VmInstruction::Halt,
+                    VmInstruction::Noop, // NoOp fallback
+                    VmInstruction::Halt,
                 ],
             }),
             targets: vec![],
@@ -600,31 +512,18 @@ fn vm_eats_when_food_here() {
         perception: PerceptionSnapshot::zeroed(1),
     };
 
-    let def = if let BackendDef::Vm(ref v) = creature.genome.nodes[0].backend_def {
-        v
-    } else {
-        panic!("expected VM backend");
-    };
-
-    let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
+    // One tick of the pass loop: a vote of 1.0 commits once.
     let mut energy = creature.energy;
-    let mut mem = [0.0f32; 16];
-    let prev_mem = [0.0f32; 16];
-    let cfg = config();
-    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
-    let _result = execute_vm_node(
-        def,
-        &creature.genome.nodes[0].input_refs,
-        &upstream,
-        &mut energy,
-        0.0,
-        &mut mem,
-        &prev_mem,
+    let actions = crate::runtime::mesh::execute_creature_mesh(
+        &creature.genome,
         &ss,
-        &cfg,
-        &mut side_outputs,
-    );
-    let actions = side_outputs.action_queue.into_actions();
+        &mut energy,
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
+        &mut crate::creature::state::GraphRuntimeState::new(),
+        &config(),
+    )
+    .actions;
     assert_eq!(
         actions.first(),
         Some(&crate::contracts::WorldAction::Eat {
@@ -673,10 +572,10 @@ fn vm_noop_when_no_food() {
                     }, // r0 = food_here = 0
                     VmInstruction::CmpGt { dst: 0, a: 0, b: 1 }, // r0 = (0 > 0) = 0
                     VmInstruction::JumpIfZero { cond: 0, offset: 2 }, // fires → skip Eat
-                    VmInstruction::PushAction { action_type: 1 }, // Eat (skipped)
-                    VmInstruction::ExecuteActionQueue,
-                    VmInstruction::PushAction { action_type: 0 }, // NoOp fallback
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::AddVote { sink: 0, src: 0 },  // Eat (skipped)
+                    VmInstruction::Halt,
+                    VmInstruction::Noop, // NoOp fallback
+                    VmInstruction::Halt,
                 ],
             }),
             targets: vec![],
@@ -702,31 +601,18 @@ fn vm_noop_when_no_food() {
         perception: PerceptionSnapshot::zeroed(1),
     };
 
-    let def = if let BackendDef::Vm(ref v) = creature.genome.nodes[0].backend_def {
-        v
-    } else {
-        panic!()
-    };
-
-    let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
+    // One tick of the pass loop: a vote of 1.0 commits once.
     let mut energy = 30.0;
-    let mut mem = [0.0f32; 16];
-    let prev_mem = [0.0f32; 16];
-    let cfg = config();
-    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
-    let _result = execute_vm_node(
-        def,
-        &creature.genome.nodes[0].input_refs,
-        &upstream,
-        &mut energy,
-        0.0,
-        &mut mem,
-        &prev_mem,
+    let actions = crate::runtime::mesh::execute_creature_mesh(
+        &creature.genome,
         &ss,
-        &cfg,
-        &mut side_outputs,
-    );
-    let actions = side_outputs.action_queue.into_actions();
+        &mut energy,
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
+        &mut crate::creature::state::GraphRuntimeState::new(),
+        &config(),
+    )
+    .actions;
     assert_eq!(
         actions.first(),
         Some(&crate::contracts::WorldAction::NoOp),

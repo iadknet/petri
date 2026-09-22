@@ -61,12 +61,8 @@ pub fn vm_register_write(instr: &VmInstruction) -> Option<u8> {
         | VmInstruction::Jump { .. }
         | VmInstruction::JumpIfZero { .. }
         | VmInstruction::WriteInternalPayload { .. }
-        | VmInstruction::WriteWorldActionMeta { .. }
-        | VmInstruction::WriteDirectionBid { .. }
+        | VmInstruction::WriteActionParam { .. }
         | VmInstruction::AddVote { .. }
-        | VmInstruction::PushAction { .. }
-        | VmInstruction::PopAction
-        | VmInstruction::ExecuteActionQueue
         | VmInstruction::WriteRouteGate { .. }
         | VmInstruction::SetPriorityBid { .. }
         | VmInstruction::StoreSlot { .. }
@@ -90,17 +86,12 @@ pub fn vm_reg_bit(reg: u8) -> u32 {
 /// Bit `i` set means register `i` is read.
 pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
     match instr {
-        VmInstruction::Noop
-        | VmInstruction::Halt
-        | VmInstruction::Jump { .. }
-        | VmInstruction::PopAction
-        | VmInstruction::ExecuteActionQueue => 0,
+        VmInstruction::Noop | VmInstruction::Halt | VmInstruction::Jump { .. } => 0,
         VmInstruction::LoadConst { .. }
         | VmInstruction::LoadSlotImm { .. }
         | VmInstruction::LoadSlotPrev { .. }
         | VmInstruction::ClearSlot { .. }
         | VmInstruction::ReadActionQueueLength { .. } => 0,
-        VmInstruction::PushAction { .. } => 0,
         VmInstruction::Move { src, .. }
         | VmInstruction::Abs { src, .. }
         | VmInstruction::Neg { src, .. }
@@ -125,8 +116,7 @@ pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
         }
         VmInstruction::JumpIfZero { cond, .. } => vm_reg_bit(*cond),
         VmInstruction::WriteInternalPayload { src, .. }
-        | VmInstruction::WriteWorldActionMeta { src, .. }
-        | VmInstruction::WriteDirectionBid { src, .. }
+        | VmInstruction::WriteActionParam { src, .. }
         | VmInstruction::AddVote { src, .. }
         | VmInstruction::WriteRouteGate { src, .. }
         | VmInstruction::SetPriorityBid { src }
@@ -143,12 +133,8 @@ pub fn vm_is_output_instruction(instr: &VmInstruction) -> bool {
     matches!(
         instr,
         VmInstruction::WriteInternalPayload { .. }
-            | VmInstruction::WriteWorldActionMeta { .. }
-            | VmInstruction::WriteDirectionBid { .. }
+            | VmInstruction::WriteActionParam { .. }
             | VmInstruction::AddVote { .. }
-            | VmInstruction::PushAction { .. }
-            | VmInstruction::PopAction
-            | VmInstruction::ExecuteActionQueue
             | VmInstruction::WriteRouteGate { .. }
             | VmInstruction::SetPriorityBid { .. }
             | VmInstruction::StoreSlot { .. }

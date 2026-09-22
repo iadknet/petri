@@ -785,7 +785,7 @@ fn severe_completed_sweep_retains_both_artifacts_and_status() {
     assert!(sweep(&dir.0, &["--out", "reference.json"]).status.success());
     let mut reference: Value =
         serde_json::from_slice(&std::fs::read(dir.0.join("reference.json")).unwrap()).unwrap();
-    reference["deterministic"]["per_creature_tick"]["vm_steps"] = json!("0.000000");
+    reference["deterministic"]["per_creature_tick"]["mesh_hops"] = json!("0.000000");
     std::fs::write(
         dir.0.join("reference.json"),
         serde_json::to_vec(&reference).unwrap(),

@@ -74,7 +74,7 @@ fn charge_for_capped_jump_loop(energy: f32, cfg: &RuntimeConfig) -> f32 {
         energy,
         cfg.clone(),
     );
-    assert!(!result.terminal && !result.energy_exhausted);
+    assert!(!result.energy_exhausted);
     assert_eq!(side_outputs.work_counters.vm_steps, cfg.max_vm_steps);
     energy - remaining
 }

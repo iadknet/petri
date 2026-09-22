@@ -3,7 +3,7 @@ use crate::config::SimulationConfig;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ExecuteGate, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
+    CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::{
@@ -72,8 +72,6 @@ fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureG
                     kind: OutputSinkKind::CustomOutput(0),
                     inputs: Vec::new(),
                 }],
-                action_bank: Vec::new(),
-                execute_gate: ExecuteGate { inputs: Vec::new() },
             }),
             targets: Vec::new(),
         }],
@@ -211,8 +209,6 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                         kind: OutputSinkKind::CustomOutput(0),
                         inputs: Vec::new(),
                     }],
-                    action_bank: Vec::new(),
-                    execute_gate: ExecuteGate { inputs: Vec::new() },
                 }),
                 targets: vec![RouteTarget {
                     target_id: NodeId::new(1),
@@ -230,8 +226,6 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                         kind: OutputSinkKind::CustomOutput(0),
                         inputs: Vec::new(),
                     }],
-                    action_bank: Vec::new(),
-                    execute_gate: ExecuteGate { inputs: Vec::new() },
                 }),
                 targets: vec![],
             },
@@ -407,7 +401,7 @@ fn diversity_test_mutated_clones_differ_from_original() {
     config.per_birth_mutation_events_min = 1;
     config.per_birth_mutation_events_max = 3;
 
-    let original = v3alpha1_founder_genome();
+    let original = crate::creature::founder::vm_decision_founder_genome();
     let mut differ_count = 0;
     for seed in 0u64..100 {
         let mut genome = original.clone();
@@ -522,7 +516,7 @@ fn engine_attempted_counters_cover_all_domains_and_hit_each_domain_operator_surf
     let mut operator_hits = std::collections::HashMap::<MutationOperator, u64>::new();
 
     for seed in 0u64..20_000 {
-        let mut genome = v3alpha1_founder_genome();
+        let mut genome = crate::creature::founder::vm_decision_founder_genome();
         let mut r = rng(seed);
         let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
         for (domain, count) in summary.attempted_by_domain {
@@ -692,7 +686,7 @@ fn apply_topology_event_adds_pass_through_detour() {
         ),
         BackendDef::Graph(graph) => assert_eq!(
             graph,
-            &crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(&config)
+            &crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()
         ),
     }
     assert!(newborn.input_refs.is_empty());
@@ -776,7 +770,7 @@ fn engine_restricted_vm_mutations_can_apply() {
     let mut vm_attempted: u64 = 0;
     let mut vm_applied: u64 = 0;
     for seed in 0u64..3000 {
-        let mut genome = v3alpha1_founder_genome();
+        let mut genome = crate::creature::founder::vm_decision_founder_genome();
         let mut r = rng(seed);
         let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
         vm_attempted += summary
@@ -1141,8 +1135,8 @@ fn per_unit_config(rate: f64) -> MutationConfig {
     }
 }
 
-/// The default rule on the founder: about 0.555 requested events per birth
-/// (0.005 per unit over 111 units), with a Binomial's spread.
+/// The default rule on the founder: about 0.485 requested events per birth
+/// (0.005 per unit over 97 units), with a Binomial's spread.
 #[test]
 fn per_unit_supply_founder_mean_matches_rate_times_genome_size() {
     let config = MutationConfig::default();

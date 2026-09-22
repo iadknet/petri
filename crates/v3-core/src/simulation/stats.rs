@@ -313,6 +313,10 @@ pub struct SimStats {
     /// Passes that reached the per-pass hop cap (`max_mesh_hops`), summed in
     /// queue order after the parallel mesh phase (T19.F02).
     pub pass_cap_hits_total: u64,
+    /// Mesh passes run, summed in queue order (T19.F04).
+    pub passes_total: u64,
+    /// Passes that ended `Decided`, summed in queue order (T19.F04).
+    pub decided_passes_total: u64,
     /// Every action the action phase executed (move, eat, noop, reproduce, steal).
     pub actions_applied_total: u64,
 
