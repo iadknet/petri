@@ -159,30 +159,12 @@ resets per dispatch; the hop index is per tick.
       `cargo test -p v3-core --test viability`, 28 passed, 0 failed.
 - [ ] Whole-repo gate (Rust, frontend, docs): `make check`, run by the
       orchestrator.
-- [x] Charge shape, invariants 1–5, in `crates/v3-core/src/runtime/mesh.rs`:
-      the charge is zero inside the allowance and linear past it
-      (`hop_charge_is_zero_inside_the_allowance_and_linear_past_it`) and a tick
-      of `n` hops totals the closed form
-      (`hop_ramp_total_over_a_tick_is_the_closed_form`), both proptests; a chain
-      at the allowance pays nothing (`hop_ramp_charges_only_past_the_allowance`);
-      the founder pays zero at the production defaults
-      (`founder_pays_no_hop_ramp_at_the_production_defaults`); an unaffordable
-      charge ends the tick as `NoOp`/`EnergyExhausted` with the hop counted and
-      the node never dispatched
-      (`hop_ramp_exhaustion_ends_the_tick_as_noop_before_dispatch`); production,
-      observed, and traced execution agree on energy, counters, observation, and
-      `mesh_ramp_cost` (`hop_ramp_agrees_across_execution_modes`).
-- [x] Accounting surfaces (invariant 5): the `mesh_ramp` cause key, its schema
-      slot, and flow accumulation in
-      `crates/v3-core/src/simulation/energy_accounting.rs`; the stored JSON key
-      in `crates/v3-cli/src/bench/tracking/tests.rs`; flow totals still summed in
-      dispatch order in
-      `dispatch_float_totals_follow_priority_queue_order_without_preaggregation`
-      (`crates/v3-core/src/simulation/tick/tests/energy_accounting.rs`).
-- [x] Config contract — defaults, serde defaults when the fields are absent, the
-      normalization fallback for an invalid cost, and a valid zero cost and zero
-      allowance preserved: the four hop-ramp tests in
-      `crates/v3-core/src/config/simulation.rs`.
+- [x] Focused tests for invariants 1–5 and the config contract: the six
+      `hop_ramp` tests in `crates/v3-core/src/runtime/mesh.rs` (two proptests),
+      the `mesh_ramp` accounting tests in `crates/v3-core/src/simulation/` and
+      `crates/v3-cli/src/bench/tracking/tests.rs`, and the four hop-ramp config
+      tests in `crates/v3-core/src/config/simulation.rs`; names and claims in
+      [`docs/progress/readings/t19-f01.md`](../../progress/readings/t19-f01.md).
 - [x] Founder trajectory unchanged: `founder_only_trajectory_digest_is_pinned`
       on `5ad9e8e1484792ab566c8ecac7466fffac3bb2b92bb4dd72e9ce7cb49ade36a9`.
 - [x] Suites and lints: `cargo test -p v3-core` 1635 + 91 passed, 0 failed;
@@ -227,9 +209,20 @@ A reading that contradicts the neutrality rows means a live genome dispatched
 more than 32 hops in a tick or the charge landed where it should not; either
 is a spec-owner escalation, not an accepted cost.
 
-**Measured verdict.** Not severe; every row met at `1f64e7c3`. One
-pre-existing non-counter schema deviation vs T13.F07 in
-`mutational_neighborhood`/`recruitment_paths`. No re-pin.
+**Measured verdict.** Gate and goal at `1f64e7c3`: CLI exit 0,
+`severe=false` against the epoch and T13.F07, no threshold crossed, no
+re-pin. All six counters 0.000000% on both profiles; `mesh_ramp` 0.000000 and
+0 deaths in every world. The `deterministic` rows are met on the two
+committed summaries: an order-insensitive diff of their `deterministic`
+blocks lists exactly 15 differences, all predeclared in kind — seven
+`config_digest` values (three cases, three profile cases, and
+`recruitment_paths.config_digest`, whose echoed `config.runtime` block also
+carries the two new fields) and six `mesh_ramp` keys at zero. A shape
+difference reported during the run (`sampled_genomes` against
+`mesh_summary`, `proposals` against `proposal_count`) is the T15.F01 summary
+projection in `crates/v3-cli/src/bench/artifacts.rs` seen from the
+unprojected raw block; both committed summaries carry the projected keys, so
+it is not a deviation.
 
 - Summaries: [gate](../../progress/features/t19-f01-per-tick-hop-ramp.json),
   [goal](../../progress/features/t19-f01-per-tick-hop-ramp-goal.json).
