@@ -260,26 +260,31 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved as killed, equivalent, or deferred (a long gate
       is budgeted: the deleted surface touches every hub file).
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t19-f04-vote-based-action-selection.json` and
       `-goal.json`, local raw hash, byte count, and verification time checked,
       series entries point to the summaries, no full report staged. Gate
-      summary stored and series entry added; goal summary not yet stored.
-      The goal read-back failure (`docs/progress/readings/t19-f04.md`, "Goal —
-      failed, not stored") is fixed: `Indicator<T>` reads without untagged
-      buffering, so `Transitions.retained_at` integer keys parse (tests
-      `goal_reader_*` in `crates/v3-cli/tests/bench_artifacts.rs`); in-memory
-      `artifacts::summarize` over the existing raw goal report succeeds (27
-      arms). The goal run is to be repeated.
+      summary stored and series entry added. Goal summary now stored: the
+      read-back fix (`e1a6919d`) let `bench-summarize` convert the existing
+      raw goal report (`docs/benchmark-artifacts.md`, "Convert an existing
+      full report") byte-for-byte in place of a repeat `make bench` run — raw
+      bytes and sha256 unchanged since the original `94ea0af9` measurement,
+      only the reader changed; the goal-profile-runs-once rule is honored, not
+      bypassed. Summary 7,688,756 bytes, `comparison.severe = true`, series
+      entry added under `goal_worlds.closed` (epoch not re-pinned). Full
+      details, including two predeclaration mismatches found and escalated
+      (Orchards `passes`/creature-tick ceiling and Orchards final-population
+      investigation trigger), in `docs/progress/readings/t19-f04.md`, "Goal —
+      converted from the existing raw report, stored".
 - [x] Readings file, founder half: the one-edge census and the founder
       per-tick compute cost before and after.
-- [ ] Readings file, run half: births probe with the new classes, drift walk
+- [x] Readings file, run half: births probe with the new classes, drift walk
       against T19.F03, the T11.F14 and steering evolved halves, Orchards seed
       12 to 2,000 ticks (`v3 run`: command, final and minimum population, tick
       reasons), passes and `Decided` against capped passes, cognition wall per
-      creature-tick. Orchards seed 12 obtained directly. Every other item
-      depends on the failed goal report and is recorded "not measured" with
-      its reason in the readings file.
+      creature-tick. Orchards seed 12 obtained directly; every other item now
+      filled from the converted goal summary (readings file, "Run-half
+      readings — now obtained from the converted goal summary").
 
 ## Performance and Goal Impact
 
@@ -321,9 +326,12 @@ that re-pin, which is the predeclared severe, not a waived check.
 
 **Measured verdict.** Gate `severe = true`, matching the predeclaration
 (commands, exit statuses, deltas, and match/mismatch notes in the readings
-file). The goal profile's report read-back failed before a summary could be
-written; nothing goal-dependent below is measured. Orchards seed 12 was run
-independently of the goal profile.
+file). The goal profile's raw report was converted with `bench-summarize`
+(read-back fix `e1a6919d`; same raw bytes as the original `94ea0af9` run, no
+repeat measurement) and is now stored, `severe = true`, matching the gate's
+direction. Two predeclaration mismatches surfaced in the goal report and are
+escalated, not remediated here (see readings file for both). Orchards seed 12
+was run independently of the goal profile.
 
 | Reading | Verdict |
 | --- | --- |
@@ -332,12 +340,17 @@ independently of the goal profile.
 | Gate `plasticity_updates` | Severe, +268.05%, as predeclared |
 | Gate `pass_cap_hits` | Tool level `severe` (zero reference); within its own 10% ceiling (0.075%) |
 | Gate `passes`, `decided_passes` | Level `new`; 2.351203 ≤ 4, as predeclared |
-| Goal profile | Failed: `invalid full report` deserializing an `Indicator` field; no summary written; escalated |
+| Goal `mesh_hops`, `graph_relax_iters`, `plasticity_updates`, `actions_applied` | Severe (pooled), up, as predeclared; `mesh_hops` per world within the ≤5× T19.F03 ceiling in all three worlds |
+| Goal `vm_steps` | -95.54% pooled, tool level `ok` (same mismatch as gate: predeclared severe, no floor) |
+| Goal `passes`/creature-tick | Orchards 4.106617 **breaches** the ≤4 ceiling; Canyon 3.236254 and Confluence 3.104272 meet it — mismatch, escalated |
+| Goal `pass_cap_hits` | ≤0.13% of creature-ticks, ≤0.04% of passes in every world — within the ≤10% ceiling |
+| Goal final population, Orchards | 1,331, below half of the T19.F02 reference (5,111 → 2,555.5) — triggers the predeclared investigation clause, escalated |
+| Goal cognition wall/creature-tick | 0.0017513–0.0019828 ms; ceiling not evaluated (host mismatch, `wall_clock: null`) |
 | Orchards seed 12, 2,000 ticks | Final population 4,828; minimum 34 (tick 308); tick reasons not obtainable from `v3 run` |
-| All other run-half readings | Not measured (goal report dependency); see readings file |
+| All other run-half readings | Measured from the converted goal summary; see readings file |
 
 - Summaries: [gate](../../progress/features/t19-f04-vote-based-action-selection.json);
-  goal not produced.
+  [goal](../../progress/features/t19-f04-vote-based-action-selection-goal.json).
 - Full readings: [`docs/progress/readings/t19-f04.md`](../../progress/readings/t19-f04.md).
 
 ## Success Criteria
