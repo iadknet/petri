@@ -49,7 +49,8 @@
       "docs/progress/features/t11-f23-scale-relative-vm-constant-steps.json",
       "docs/progress/features/t17-f02-unit-scale-introspection.json",
       "docs/progress/features/t13-f07-current-policy-recruitment-transitions.json",
-      "docs/progress/features/t19-f01-per-tick-hop-ramp.json"
+      "docs/progress/features/t19-f01-per-tick-hop-ramp.json",
+      "docs/progress/features/t19-f02-live-internal-state-and-legal-cycles.json"
     ]
   },
   "goal": {
@@ -71,7 +72,8 @@
       "docs/progress/features/t11-f17-executed-biased-mutation-targeting-goal.json",
       "docs/progress/features/t03-f10-activity-ramped-compute-cost-goal.json",
       "docs/progress/features/t03-f08-genome-size-maintenance-cost-goal.json",
-      "docs/progress/features/t11-f18-backend-neutral-mesh-node-growth-goal.json"
+      "docs/progress/features/t11-f18-backend-neutral-mesh-node-growth-goal.json",
+      "docs/progress/features/t19-f02-live-internal-state-and-legal-cycles-goal.json"
     ]
   },
   "report_omissions": [
