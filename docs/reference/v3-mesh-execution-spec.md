@@ -71,7 +71,8 @@ pass:
   of the previous pass; state, memory, weights, traces live)
     after each committed dispatch: that node's contribution replaces its
     earlier one this pass; V = sanitized sum over nodes visited this pass
-    if V[Decide] > 0 and max_K E[K] > 0: end the pass (Decided)
+    if V[Decide] > 0 and (max_K E[K] > 0 or (queue non-empty and V[Terminate] > 0)):
+      end the pass (Decided)
   the pass also ends at NoTargets, MissingNode, PassCapReached (hops_this_pass
   reaches max_mesh_hops), or EnergyExhausted; all keep V and the queue
   pass end:
@@ -97,9 +98,11 @@ The parameter surface is zeroed at tick start, overwritten per visit, and
 read at commit.
 
 Guards and ties:
-- `Decide` ends a pass only when some kind's effective vote is positive;
-  with every `E <= 0` the pass end is `NoDecision` whatever `Terminate`
-  holds (W18).
+- `Decide` ends a pass only when the pass end would act: some kind's
+  effective vote is positive, or the queue is non-empty and `Terminate` is
+  positive (W17b), so a stray `Decide` is harmless (W18) and a cycle leaves by
+  one `Terminate` edge instead of a capped pass. With every `E <= 0` the pass
+  end is `NoDecision` whatever `Terminate` holds (W17, W17b).
 - `Terminate` never commits, has no bar, wins its ties, and cannot end an
   empty tick (W15).
 - A revisited node replaces its own contribution, so a cycle re-judges
@@ -158,7 +161,7 @@ Each pass ends with a `PassEndReason`:
 
 | Pass end | Condition |
 | --- | --- |
-| `Decided` | After a committed dispatch, `V[Decide] > 0` and some `E[K] > 0` |
+| `Decided` | After a committed dispatch, `V[Decide] > 0` and either some `E[K] > 0` or a non-empty queue with `V[Terminate] > 0` |
 | `PassCapReached` | `hops_this_pass` reaches `max_mesh_hops` before a dispatch |
 | `NoTargets` | The dispatched node has no route target |
 | `MissingNode` | The routed (or entry) node id is missing from the node set |

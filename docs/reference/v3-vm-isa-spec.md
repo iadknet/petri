@@ -365,7 +365,7 @@ best sink. The committed action reads its kind's parameter row:
 | `Reproduce` | 9 to 16 | `action_params[Reproduce][1]` = offspring transfer fraction, `clamp_unit_interval` |
 | `StealEnergy` | 17 to 24 | `action_params[StealEnergy][1]` = amount, `clamp_non_negative_finite` |
 | `Terminate` | 25 | never commits; ends a non-empty tick when it holds the best effective vote |
-| `Decide` | 26 | never commits; ends the pass early when some kind's effective vote is positive |
+| `Decide` | 26 | never commits; ends the pass early when some kind's effective vote is positive, or the queue is non-empty and `Terminate` is positive |
 
 `WriteActionParam` slot indexes: `0` `Eat[0]`, `1` `Eat[1]`, `2` `Move[0]`,
 `3` `Move[1]`, `4` `Reproduce[0]`, `5` `Reproduce[1]`, `6`
