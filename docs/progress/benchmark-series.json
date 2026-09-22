@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t19-f02-live-internal-state-and-legal-cycles.json",
+    "epoch_baseline": "docs/progress/features/t19-f04-vote-based-action-selection.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -96,7 +96,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t19-f02-live-internal-state-and-legal-cycles-goal.json",
+    "epoch_baseline": "docs/progress/features/t19-f04-vote-based-action-selection-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
