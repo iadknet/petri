@@ -191,8 +191,30 @@ controllers integrate several steps per sensorimotor step (7.2).
 - [x] Recipe digest pins moved (`d9a4dc8c…`, `d1aff3f5…`, `b24c1225…`) and
       `cargo test -p v3-cli` green.
 - [ ] Whole-repo gate: `make check` exit 0 on the tested commit.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred, listed here.
+- [x] Mutation gate: 4 survivors killed test-only, 2 equivalent, none deferred:
+
+      ```
+      $ MUTANTS_ITERATE=0 make rust-mutants
+      rust-mutants: fresh run; no prior mutant results reused
+      rust-mutants: diff against bd43b914965e09247ecade7f7b325ae1255e1514, output in /Users/istefanek/.local/share/petri-tools/mutants/t19-f02/mutants.out
+      140 mutants tested in 21m: 6 missed, 117 caught, 17 unviable
+      run-mode.txt: fresh; timeout.txt: empty
+
+      rust-mutants: survivors: missed by every test (/Users/istefanek/.local/share/petri-tools/mutants/t19-f02/mutants.out/missed.txt):
+      crates/v3-cli/src/bench/comparison.rs:522:21: replace match guard ADDITIVE_COUNTER_NAMES.contains(&name) with true in compare_inputs
+        killed: a_current_report_missing_a_non_additive_counter_panics (crates/v3-cli/src/bench/comparison/tests.rs)
+      crates/v3-core/src/config/simulation.rs:1100:29: replace < with <= in SimulationConfig::normalize
+        killed: normalize_zero_max_mesh_hops_falls_back now pins max_mesh_hops = 1 as kept
+      crates/v3-core/src/runtime/mesh.rs:352:59: replace += with -= in execute_creature_mesh_impl
+      crates/v3-core/src/runtime/mesh.rs:352:59: replace += with *= in execute_creature_mesh_impl
+        killed: backend_costs_accumulate_every_dispatch_and_close_the_energy_account (crates/v3-core/src/runtime/cycle_tests.rs)
+      crates/v3-core/src/runtime/mesh.rs:357:80: replace && with || in execute_creature_mesh_impl
+        equivalent: the mutant additionally resolves a route when the result is terminal or exhausted; resolve_gated_route is pure, the loop breaks on both before route_result is read, and the non-tracing record_hop maps it to None.
+      crates/v3-core/src/runtime/vm.rs:462:71: replace > with >= in execute_vm_node_impl
+        equivalent: the mutant only differs on a read of +0.0 or -0.0, recording that value instead of 0.0; the record's sole reader settle_priority_bid maps every bid <= 0.0 to a paid +0.0, so no output changes.
+      MUTANTS_ITERATE=1 feedback after the test edits: 4 mutants tested in 2m: 2 missed (the two equivalent), 2 caught
+      (the iterate passes rewrote the live mutants.out: missed.txt now lists the two equivalents, run-mode.txt reads incremental; the fresh figures above are the closure record)
+      ```
 - [x] Before and after loop-productivity readings (invariant 10):
       [`docs/progress/readings/t19-f02.md`](../../progress/readings/t19-f02.md);
       one ceiling exceeded (Canyon `cycle_carrying` dead-per-birth), below.

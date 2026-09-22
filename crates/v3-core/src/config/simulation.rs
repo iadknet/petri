@@ -1757,6 +1757,10 @@ mod tests {
         cfg.runtime.max_mesh_hops = 0;
         cfg.normalize();
         assert_eq!(cfg.runtime.max_mesh_hops, 64);
+        // One is the smallest legal per-pass cap and is kept as written.
+        cfg.runtime.max_mesh_hops = 1;
+        cfg.normalize();
+        assert_eq!(cfg.runtime.max_mesh_hops, 1);
     }
 
     #[test]

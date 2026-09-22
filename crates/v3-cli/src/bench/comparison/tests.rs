@@ -139,6 +139,18 @@ fn world_set_comparison_labels_changed_inputs_and_records_absent_cases() {
     );
 }
 
+/// Only the additive counters may be absent from a current report; a
+/// missing non-additive counter is a report-construction bug, not a zero.
+#[test]
+#[should_panic(expected = "populates the mesh_hops counter")]
+fn a_current_report_missing_a_non_additive_counter_panics() {
+    let report = small_world_set_report();
+    let reference: ComparisonInputs = (&report).into();
+    let mut current = reference.clone();
+    current.per_creature_tick.mesh_hops = None;
+    compare_inputs(&current, std::path::Path::new("reference.json"), &reference);
+}
+
 /// A profile difference that is not the per-case block is still a hard
 /// error, and a single-config profile records no cases at all.
 #[test]
