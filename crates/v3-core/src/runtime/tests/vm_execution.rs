@@ -9,8 +9,8 @@ fn register_count_zero_halts_immediately() {
         register_count: 0,
         constants: vec![],
         program: vec![
-            VmInstruction::PushAction { action_type: 1 },
-            VmInstruction::ExecuteActionQueue,
+            VmInstruction::AddVote { sink: 0, src: 0 },
+            VmInstruction::Halt,
         ],
     };
     let ss = empty_sensor_snapshot();
@@ -31,14 +31,12 @@ fn register_count_zero_halts_immediately() {
         &cfg,
         &mut side_outputs,
     );
-    assert!(!r.terminal);
     assert!(!r.energy_exhausted);
 }
 
 #[test]
 fn empty_program_halts_immediately() {
-    let (r, _, _) = run_vm(vec![], 1, vec![], &[], zeroed_upstream(), 100.0);
-    assert!(!r.terminal);
+    let (_, _, _) = run_vm(vec![], 1, vec![], &[], zeroed_upstream(), 100.0);
 }
 
 #[test]
@@ -51,7 +49,6 @@ fn halt_returns_no_action() {
         zeroed_upstream(),
         100.0,
     );
-    assert!(!r.terminal);
     assert!(!r.energy_exhausted);
 }
 
@@ -84,7 +81,6 @@ fn program_counter_past_program_len_soft_halts() {
         &cfg,
         &mut side_outputs,
     );
-    assert!(!r.terminal);
     assert!(!r.energy_exhausted);
     // Noop base cost = 0.05, multiplier = 1.0 → energy = 99.95
     assert!(e < 100.0);
@@ -155,8 +151,7 @@ fn jump_target_wraps_via_rem_euclid() {
     // Program of 2 instructions: Jump(offset=2), Halt
     // provisional_pc = 0 + 1 + 2 = 3; 3 % 2 = 1 (Halt)
     let program = vec![VmInstruction::Jump { offset: 2 }, VmInstruction::Halt];
-    let (r, _, _) = run_vm(program, 1, vec![], &[], zeroed_upstream(), 100.0);
-    assert!(!r.terminal);
+    let (_, _, _) = run_vm(program, 1, vec![], &[], zeroed_upstream(), 100.0);
 }
 
 // ── Energy metering ───────────────────────────────────────────────────────
@@ -296,7 +291,6 @@ fn max_vm_steps_enforced() {
         &cfg,
         &mut side_outputs,
     );
-    assert!(!r.terminal);
     assert!(!r.energy_exhausted);
 }
 
@@ -460,8 +454,8 @@ fn inserted_noop_preserves_outputs_with_ample_budget_but_charges_its_cost() {
 
     assert_eq!(inserted_result, original_result);
     assert_eq!(
-        inserted_side_outputs.action_queue.into_actions(),
-        original_side_outputs.action_queue.into_actions()
+        inserted_side_outputs.dispatch_effects(),
+        original_side_outputs.dispatch_effects()
     );
     assert!(
         inserted_energy < original_energy,
@@ -477,8 +471,8 @@ fn copied_unreachable_middle_span_preserves_outputs_with_ample_budget() {
     // unreachable because repair follows the original output instruction.
     let original = vec![
         VmInstruction::Jump { offset: 3 },
-        VmInstruction::PushAction { action_type: 9 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::AddVote { sink: 9, src: 0 },
+        VmInstruction::Halt,
         VmInstruction::Noop,
         VmInstruction::LoadConst {
             dst: 0,
@@ -507,8 +501,8 @@ fn copied_unreachable_middle_span_preserves_outputs_with_ample_budget() {
 
     assert_eq!(copied_result, original_result);
     assert_eq!(
-        copied_side_outputs.action_queue.into_actions(),
-        original_side_outputs.action_queue.into_actions()
+        copied_side_outputs.dispatch_effects(),
+        original_side_outputs.dispatch_effects()
     );
 }
 
@@ -557,8 +551,8 @@ proptest! {
 
             prop_assert_eq!(inserted_result, original_result);
             prop_assert_eq!(
-                inserted_outputs.action_queue.into_actions(),
-                original_outputs.action_queue.into_actions()
+                inserted_outputs.dispatch_effects(),
+                original_outputs.dispatch_effects()
             );
             if matches!(insert_at, 0 | 3 | 4) {
                 prop_assert!(inserted_energy < original_energy);
@@ -571,12 +565,12 @@ proptest! {
     #[test]
     fn copied_unreachable_suffix_preserves_behavior_under_ample_budget(
         value in -1000.0f32..1000.0,
-        action_type in any::<u8>(),
+        sink in any::<u8>(),
     ) {
         let original = vec![
             VmInstruction::Jump { offset: 3 },
-            VmInstruction::PushAction { action_type },
-            VmInstruction::ExecuteActionQueue,
+            VmInstruction::AddVote { sink, src: 0 },
+            VmInstruction::Halt,
             VmInstruction::Noop,
             VmInstruction::LoadConst { dst: 0, const_idx: 0 },
             VmInstruction::WriteInternalPayload { slot_idx: 0, src: 0 },
@@ -604,8 +598,8 @@ proptest! {
 
         prop_assert_eq!(copied_result, original_result);
         prop_assert_eq!(
-            copied_outputs.action_queue.into_actions(),
-            original_outputs.action_queue.into_actions()
+            copied_outputs.dispatch_effects(),
+            original_outputs.dispatch_effects()
         );
     }
 }
@@ -613,8 +607,8 @@ proptest! {
 #[test]
 fn noop_insertion_can_change_step_cap_without_being_an_energy_exhaustion() {
     let original = vec![
-        VmInstruction::PushAction { action_type: 3 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::AddVote { sink: 9, src: 0 },
+        VmInstruction::Halt,
     ];
     let mut inserted = original.clone();
     crate::mutation::vm::insert_new_instruction_with_reference_repair(
@@ -639,11 +633,9 @@ fn noop_insertion_can_change_step_cap_without_being_an_energy_exhaustion() {
     let (inserted_result, _, _) =
         run_vm_with_config(inserted, 1, vec![], &[], zeroed_upstream(), 100.0, cfg);
 
-    assert!(original_result.terminal);
-    assert!(
-        !inserted_result.terminal,
-        "the added step reaches the cap first"
-    );
+    // Both stop without exhausting: the original at its `Halt`, the copy at
+    // the step cap the added step reaches first.
+    assert!(!original_result.energy_exhausted);
     assert!(!inserted_result.energy_exhausted);
 }
 

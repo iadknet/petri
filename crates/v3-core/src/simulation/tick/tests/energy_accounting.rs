@@ -16,8 +16,7 @@ fn decision(actions: Vec<WorldAction>) -> MeshOutput {
         priority_bid: 0.0,
         work_counters: Default::default(),
         energy_observation: Default::default(),
-        termination_reason: TerminationReason::ActionEmitted,
-        votes: Default::default(),
+        termination_reason: TerminationReason::NoDecision,
         commit_counts: Default::default(),
     }
 }
@@ -246,8 +245,8 @@ fn cognition_cause_is_visible_before_victim_reduction_and_its_flows_still_commit
     use crate::runtime::trace::recording::ActiveTrace;
     for traced in [false, true] {
         let (mut sim, attacker, victim) = make_sim_two_creatures(100.0, 0.01);
-        sim.creatures[attacker].genome = vm_program_genome(vec![]);
-        sim.creatures[victim].genome = vm_program_genome(vec![VmInstruction::Noop]);
+        sim.creatures[attacker].genome = vm_raw_program_genome(vec![]);
+        sim.creatures[victim].genome = vm_raw_program_genome(vec![VmInstruction::Noop]);
         sim.config.runtime.vm.opcode_cost_multiplier = 1.0;
         sim.config.runtime.vm.step_ramp_cost = 0.0;
         sim.config.predation.steal_cost_rate = 0.0;
@@ -349,10 +348,18 @@ fn zero_carrying_rate_keeps_exposure_and_food_lower_floor_is_observed() {
 #[test]
 fn rounded_compute_exhaustion_preserves_the_queued_eat_recovery() {
     use crate::creature::genome::VmInstruction;
+    // `LoadConst`, `AddVote`, `Halt` at 0.1x cost 0.027 in `f64`, whose `f32`
+    // rounds up to exactly the starting energy: the settled energy is 0.0
+    // with a positive effective remainder. One action per tick, so the
+    // committed `Eat` ends the tick before a second pass could charge.
     let (mut sim, id) = make_sim_with_custom_genome(
-        0.024,
-        vm_program_genome(vec![VmInstruction::PushAction { action_type: 1 }]),
+        0.027,
+        vm_program_genome(vec![
+            VmInstruction::AddVote { sink: 0, src: 0 },
+            VmInstruction::Halt,
+        ]),
     );
+    sim.config.runtime.max_actions_per_turn = 1;
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
     sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.0;
     sim.config.runtime.vm.opcode_cost_multiplier = 0.1;
@@ -368,7 +375,7 @@ fn rounded_compute_exhaustion_preserves_the_queued_eat_recovery() {
     assert_eq!(sim.creatures[id].energy, 2.0);
     assert_eq!(sim.creatures[id].pending_death_cause, None);
     assert_eq!(sim.stats.mortality.deaths_total, 0);
-    assert_eq!(sim.stats.energy_flows.vm_compute, f64::from(0.024f32));
+    assert_eq!(sim.stats.energy_flows.vm_compute, f64::from(0.027f32));
     assert_eq!(sim.stats.energy_flows.food_intake_by_type, vec![2.0]);
 }
 
@@ -456,7 +463,7 @@ fn food_credit_is_observed_before_cap_and_can_recover_an_exhausted_creature() {
 fn reward_learning_exhaustion_is_retained_until_the_next_phase_zero() {
     use crate::contracts::NodeId;
     use crate::creature::genome::cgp::{
-        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
     use crate::creature::genome::{
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
@@ -491,8 +498,6 @@ fn reward_learning_exhaustion_is_retained_until_the_next_phase_zero() {
                     }),
                 }],
                 output_sinks: vec![],
-                action_bank: vec![],
-                execute_gate: ExecuteGate { inputs: vec![] },
             }),
         }],
     };

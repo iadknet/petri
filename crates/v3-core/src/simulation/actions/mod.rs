@@ -1120,7 +1120,13 @@ mod tests {
     #[test]
     fn reproduce_updates_domain_and_operator_mutation_stats() {
         let pos = Position::new(5, 5);
-        let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        // A parent with a node in every mutation domain, so each attempted
+        // event draws an operator.
+        let (mut sim, parent_id) = make_sim_one_founder(
+            crate::creature::founder::vm_decision_founder_genome(),
+            pos,
+            80.0,
+        );
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         sim.config.mutation.per_unit_supply_enabled = false;
         sim.config.mutation.mutation_probability = 1.0;
@@ -1337,10 +1343,11 @@ mod tests {
             BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
         };
 
-        // Each PushAction is an output instruction → counts as live for functional complexity.
-        // Node itself = 1, each PushAction = 1 live instruction.
+        // Each AddVote is an output instruction → counts as live for functional complexity.
+        // Node itself = 1, each AddVote = 1 live instruction. Sink 25 is
+        // `Terminate`, which commits nothing.
         let instruction_count = (min_complexity.saturating_sub(1)) as usize;
-        let program = vec![VmInstruction::PushAction { action_type: 0 }; instruction_count];
+        let program = vec![VmInstruction::AddVote { sink: 25, src: 0 }; instruction_count];
         CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {

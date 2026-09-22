@@ -1265,19 +1265,23 @@ mod tests {
     /// (graph) and 8 -> 7 (VM); the selection rows are unchanged.
     /// Re-pinned 2026-09-19 for the 25% large-copy weight default: topology
     /// draws and subsequent RNG histories change; applicability stays intact.
+    /// Re-pinned by T19.F04 (vote sinks replace the action bank, remapping
+    /// every VM instruction and Graph edge draw and shrinking the modules;
+    /// before/after in `docs/progress/readings/t19-f04.md`); the discard
+    /// counts stay zero.
     #[test]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [19, 15, 13, 7], [0, 0]),
+            ("graph_prepared", Policy::Drift, [18, 13, 13, 1], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [20, 20, 20, 20],
+                [18, 18, 18, 17],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [19, 16, 15, 9], [0, 0]),
-            ("vm_prepared", Policy::Selection, [19, 19, 19, 18], [0, 0]),
+            ("vm_prepared", Policy::Drift, [19, 16, 16, 8], [0, 0]),
+            ("vm_prepared", Policy::Selection, [19, 19, 19, 19], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
             let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -1387,12 +1391,14 @@ mod tests {
     /// rescale around `ChangeEntryNode`).
     /// Re-pinned 2026-09-19 for the 25% large-copy weight default: 21/21
     /// graph and 20/20 VM retained discoveries remain useful.
+    /// Re-pinned by T19.F04 (vote sinks): 16/16 graph and 21/21 VM retained
+    /// discoveries remain useful.
     #[test]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
-            ("graph_prepared", [21, 21, 21, 21], 11),
-            ("vm_prepared", [20, 20, 20, 20], 12),
+            ("graph_prepared", [16, 16, 16, 16], 16),
+            ("vm_prepared", [21, 21, 21, 21], 11),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, Policy::CostSelection);

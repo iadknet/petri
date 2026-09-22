@@ -9,6 +9,7 @@ pub mod traced_mesh;
 pub mod traced_vm;
 pub mod types;
 pub mod vm;
+pub mod vote_select;
 pub use mesh::execute_creature_mesh;
 pub use types::{sanitize_f32, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 
@@ -17,6 +18,12 @@ mod cycle_tests;
 
 #[cfg(test)]
 mod vote_surface_tests;
+
+#[cfg(test)]
+pub(crate) mod vote_test_support;
+
+#[cfg(test)]
+mod pass_loop_tests;
 
 #[cfg(test)]
 mod cognition_tests;

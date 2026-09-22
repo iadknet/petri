@@ -95,7 +95,7 @@ pub fn structural_companions(genome: &CreatureGenome) -> StructuralCompanions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::MutationConfig;
+
     use crate::contracts::NodeId;
     use crate::creature::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge,
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn a_graph_genome_with_no_stateful_structure_reports_nothing() {
-        let graph = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        let graph = CgpGraphBackendDef::new_with_fixed_outputs();
         let genome = graph_genome(graph);
         let companions = structural_companions(&genome);
         assert!(!companions.reads_shared_memory);
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn a_stateful_compute_node_kind_is_reported() {
-        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::DecayIntegrator(0.5),
             inputs: vec![],
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn a_plastic_compute_node_is_reported() {
-        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Add,
             inputs: vec![],
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn a_shared_memory_input_edge_reads_shared_memory() {
-        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Add,
             inputs: vec![GraphEdge {
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn a_wired_write_slot_sink_writes_shared_memory_but_an_unwired_one_does_not() {
-        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Add,
             inputs: vec![],
@@ -318,9 +318,7 @@ mod tests {
         let genome = graph_genome(graph);
         assert!(structural_companions(&genome).writes_shared_memory);
 
-        let unwired = graph_genome(CgpGraphBackendDef::new_with_fixed_outputs(
-            &MutationConfig::default(),
-        ));
+        let unwired = graph_genome(CgpGraphBackendDef::new_with_fixed_outputs());
         assert!(!structural_companions(&unwired).writes_shared_memory);
     }
 }

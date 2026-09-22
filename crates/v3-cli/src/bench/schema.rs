@@ -68,6 +68,13 @@ pub struct PerSeed {
     /// without the key reads as zero.
     #[serde(default)]
     pub pass_cap_hits: u64,
+    /// Mesh passes run (T19.F04); a stored report without the key reads as
+    /// zero.
+    #[serde(default)]
+    pub passes: u64,
+    /// Passes that ended `Decided` (T19.F04); absent reads as zero.
+    #[serde(default)]
+    pub decided_passes: u64,
     pub final_population: u64,
     pub extinction_tick: Option<u64>,
 }
@@ -84,6 +91,10 @@ pub struct Totals {
     pub births: u64,
     #[serde(default)]
     pub pass_cap_hits: u64,
+    #[serde(default)]
+    pub passes: u64,
+    #[serde(default)]
+    pub decided_passes: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -102,6 +113,10 @@ pub struct PerCreatureTick {
     pub births: Option<String>,
     #[serde(default)]
     pub pass_cap_hits: Option<String>,
+    #[serde(default)]
+    pub passes: Option<String>,
+    #[serde(default)]
+    pub decided_passes: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -442,13 +457,22 @@ pub struct DriftDepthCheckpoint {
     pub mean_knockout_nodes: String,
     pub route_varying_lineages: u32,
     pub route_varying_fraction: String,
-    pub hop_cap_hits: u64,
     pub battery_executions: u64,
-    pub hop_cap_fraction: String,
     /// Capped passes summed over the lineages' battery executions (T19.F02);
     /// absent from reports measured before it was read.
     #[serde(default)]
     pub pass_cap_hits: u64,
+    /// Battery executions by the reason their tick ended (T19.F04).
+    #[serde(default)]
+    pub tick_reasons: neighborhood::mesh_execution::TickReasonCounts,
+    /// Passes and `Decided` passes over the battery executions (T19.F04).
+    #[serde(default)]
+    pub passes: u64,
+    #[serde(default)]
+    pub decided_passes: u64,
+    /// Capped passes over passes (T19.F04).
+    #[serde(default)]
+    pub pass_cap_fraction: String,
     /// The T19.F02 per-lineage cycle classes; absent from earlier reports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cycle_classes: Option<CycleClasses>,
@@ -734,10 +758,17 @@ pub struct MeshExecution {
     /// from summaries measured before it was read.
     #[serde(default)]
     pub route_destination_varies: bool,
-    pub hop_cap_hits: u64,
     /// Capped passes summed over the battery (T19.F02); absent from earlier reports.
     #[serde(default)]
     pub pass_cap_hits: u64,
+    /// Battery executions by the reason their tick ended (T19.F04).
+    #[serde(default)]
+    pub tick_reasons: neighborhood::mesh_execution::TickReasonCounts,
+    /// Passes and `Decided` passes over the battery (T19.F04).
+    #[serde(default)]
+    pub passes: u64,
+    #[serde(default)]
+    pub decided_passes: u64,
     /// The reachable mesh contains a cycle, self-targets included (T19.F02).
     #[serde(default)]
     pub cycle_carrying: bool,
@@ -794,7 +825,7 @@ pub struct SteeringPooled {
     pub exact_hit_fraction: String,
     pub within_45_fraction: String,
     pub avoidance_fraction: String,
-    pub bank_written_fraction: String,
+    pub move_voted_fraction: String,
     pub chance: SteeringChance,
 }
 

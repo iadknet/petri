@@ -15,21 +15,24 @@
 //! 96-by-96 world, 150 founders, full initial food coverage and density, and
 //! `mutation_probability = 1.0`, 4 to 10 mutation events per birth, and
 //! `mesh_layer_probability = 0.5`, so the corrected operators are reached
-//! within the unchanged 250-tick horizon. Every founder
-//! genome gets four paired slot groups appended to its first VM program, which
-//! is what makes a `Vm.MutatePairedSlotAddress` candidate list exist at all
-//! (the v3alpha1 founder program has no slot instructions), so that operator is
-//! exercised from the first birth onward.
+//! within the unchanged 250-tick horizon. The T19.F04 founder is all Graph,
+//! so every founder genome gets a VM node routed after its decision node
+//! whose program holds four paired slot groups, which is what makes a
+//! `Vm.MutatePairedSlotAddress` candidate list exist at all; that operator is
+//! exercised from the first birth onward. The node votes nothing, so it adds
+//! hops and compute cost but never changes a committed action.
 
 use v3_core::config::SimulationConfig;
-use v3_core::contracts::Position;
-use v3_core::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
+use v3_core::contracts::{NodeId, Position, RouteTarget};
+use v3_core::creature::genome::{
+    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+};
 use v3_core::mutation::MutationOperator;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
 const SEED: u64 = 20_260_904;
 const TICKS: u64 = 250;
-/// Slots that get a load and a store appended to every founder VM program, so
+/// Slots that get a load and a store in the injected VM node's program, so
 /// `Vm.MutatePairedSlotAddress` has four candidates to pick from at birth.
 const INJECTED_PAIRED_SLOTS: [u8; 4] = [2, 5, 9, 13];
 
@@ -48,26 +51,40 @@ fn reproducibility_config() -> SimulationConfig {
     cfg
 }
 
-/// Seed a simulation and inject the paired slot groups.
+/// Seed a simulation and route every founder's decision node into a VM node
+/// that holds the paired slot groups.
 fn seeded_fixture(seed: u64) -> Simulation {
     let mut sim = seed_simulation(reproducibility_config(), seed);
     for (_, creature) in sim.creatures.iter_mut() {
-        let vm = creature
-            .genome
-            .nodes
-            .iter_mut()
-            .find_map(|n| match n.backend_def {
-                BackendDef::Vm(ref mut vm) => Some(vm),
-                BackendDef::Graph(_) => None,
-            })
-            .expect("every founder genome has a VM node");
-        vm.program
-            .extend(INJECTED_PAIRED_SLOTS.into_iter().flat_map(|slot_idx| {
+        let genome = &mut creature.genome;
+        let vm_id = NodeId::new(genome.nodes.len() as u32);
+        let last = genome.nodes.last_mut().expect("founder genomes have nodes");
+        assert!(last.targets.is_empty(), "the decision node ends the chain");
+        last.targets.push(RouteTarget {
+            target_id: vm_id,
+            slot: 0,
+            gate_bias: 0.0,
+        });
+        let mut program: Vec<_> = INJECTED_PAIRED_SLOTS
+            .into_iter()
+            .flat_map(|slot_idx| {
                 [
                     VmInstruction::LoadSlotImm { dst: 0, slot_idx },
                     VmInstruction::StoreSlotImm { slot_idx, src: 0 },
                 ]
-            }));
+            })
+            .collect();
+        program.push(VmInstruction::Halt);
+        genome.nodes.push(NodeGenome {
+            node_id: vm_id,
+            input_refs: vec![],
+            targets: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program,
+            }),
+        });
     }
     sim
 }
@@ -94,7 +111,7 @@ fn population_fingerprint(sim: &Simulation) -> Vec<CreatureFingerprint<'_>> {
 
 /// The deterministic work counters a report carries: the six compute counters
 /// the benchmark harness compares, plus terminal cognition and exhaustion totals.
-fn work_counters(sim: &Simulation) -> [(&'static str, u64); 13] {
+fn work_counters(sim: &Simulation) -> [(&'static str, u64); 16] {
     [
         ("mesh_hops", sim.stats.mesh_hops_total),
         ("vm_steps", sim.stats.vm_steps_total),
@@ -121,6 +138,9 @@ fn work_counters(sim: &Simulation) -> [(&'static str, u64); 13] {
             "mesh_dispatches_energy_exhausted",
             sim.stats.mesh_dispatches_energy_exhausted_total,
         ),
+        ("pass_cap_hits", sim.stats.pass_cap_hits_total),
+        ("passes", sim.stats.passes_total),
+        ("decided_passes", sim.stats.decided_passes_total),
     ]
 }
 

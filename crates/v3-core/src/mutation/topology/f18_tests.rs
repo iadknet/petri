@@ -12,7 +12,7 @@ const GROWTH: [TopologyOperator; 3] = [
 
 fn blank(graph: bool) -> BackendDef {
     if graph {
-        birth::blank_graph_backend(&MutationConfig::default())
+        birth::blank_graph_backend()
     } else {
         birth::minimal_vm_backend()
     }
@@ -107,7 +107,7 @@ fn stateful_fixture(source_graph: bool) -> CreatureGenome {
     let mut base = conditional_fixture(source_graph);
     // Keep a stateful surviving graph downstream of the attachment.
     let mut temporal = node(9, &[1]);
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.compute_nodes.push(ComputeNode {
         kind: ComputeNodeKind::DecayIntegrator(0.5),
         inputs: vec![GraphEdge {
@@ -146,11 +146,11 @@ fn stateful_fixture(source_graph: bool) -> CreatureGenome {
                 slot_idx: 0,
                 src: 0,
             },
-            VmInstruction::WriteWorldActionMeta {
+            VmInstruction::WriteActionParam {
                 slot_idx: 0,
                 src: 0,
             },
-            VmInstruction::PushAction { action_type: 1 },
+            VmInstruction::AddVote { sink: 0, src: 0 },
             VmInstruction::SetPriorityBid { src: 0 },
             VmInstruction::Halt,
         ],
@@ -194,16 +194,15 @@ fn both_detours_preserve_nonzero_bus_queue_local_metadata_and_temporal_state() {
                     assert_eq!(before.priority_bid, after.priority_bid);
                     assert_eq!(memory[0], memory[1]);
                     for old in old_hops {
-                        let new = new_hops.iter().find(|n| n.node_id == old.node_id).unwrap();
+                        let new = new_hops
+                            .iter()
+                            .find(|n| n.node_id == old.node_id && n.pass_index == old.pass_index)
+                            .unwrap();
                         assert_eq!(old.upstream_slots, new.upstream_slots);
                         assert_eq!(old.output_slots, new.output_slots);
                         if let (BackendTrace::Vm(a), BackendTrace::Vm(b)) =
                             (&old.backend_trace, &new.backend_trace)
                         {
-                            assert_eq!(a.final_meta, b.final_meta);
-                            if old.node_id == NodeId::new(1) || old.node_id == NodeId::new(8) {
-                                assert_eq!(a.final_meta[0], 3.0);
-                            }
                             assert_eq!(a.final_payload, b.final_payload);
                         }
                     }
@@ -243,9 +242,12 @@ fn both_detours_preserve_nonzero_bus_queue_local_metadata_and_temporal_state() {
                             usize::from(input > 0.0)
                         );
                     }
+                    // Every pass pays the growth (T19.F04).
+                    let passes = before.work_counters.passes;
+                    assert_eq!(after.work_counters.passes, passes);
                     assert_eq!(
                         after.work_counters.mesh_hops,
-                        before.work_counters.mesh_hops + u32::from(visited)
+                        before.work_counters.mesh_hops + passes * u32::from(visited)
                     );
                     assert_eq!(
                         after.work_counters.graph_relax_iters,
@@ -254,8 +256,10 @@ fn both_detours_preserve_nonzero_bus_queue_local_metadata_and_temporal_state() {
                     assert_eq!(
                         after.work_counters.vm_steps,
                         before.work_counters.vm_steps
-                            + u32::from(op == TopologyOperator::AddRouteTarget && !source_graph)
-                            + u32::from(visited && !graph)
+                            + passes
+                                * (u32::from(
+                                    op == TopologyOperator::AddRouteTarget && !source_graph
+                                ) + u32::from(visited && !graph))
                     );
                     if let Some(detour) = new_hops
                         .iter()
@@ -300,10 +304,7 @@ fn extra_hop_exhausts_budget_for_both_backends() {
         let before = execute_with_config(&base, 1.0, 1000.0, &config);
         let after = execute_with_config(&grown, 1.0, 1000.0, &config);
         assert_ne!(before.0.actions, after.0.actions);
-        assert!(matches!(
-            after.1.termination_reason,
-            crate::runtime::trace::domain::TerminationReason::MaxHopsReached
-        ));
+        assert!(after.0.work_counters.pass_cap_hits > 0);
     }
 }
 
@@ -415,7 +416,7 @@ fn both_backend_choices_keep_skips_atomic_and_branch_energy_boundary_real() {
         let after = execute(&grown, 1.0, cost + 0.025);
         assert!(matches!(
             before.1.termination_reason,
-            crate::runtime::trace::domain::TerminationReason::ActionEmitted
+            crate::runtime::trace::domain::TerminationReason::NoDecision
         ));
         assert!(matches!(
             after.1.termination_reason,

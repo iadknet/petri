@@ -381,7 +381,7 @@
       any = true; out.genomes += 1;
       out.total += num(me.total_node_count) || 0; out.reachable += num(me.reachable_node_count) || 0;
       out.executed += num(me.executed_node_count) || 0; out.knockout += num(me.knockout_count) || 0;
-      out.routeVaries += me.route_varies_with_input ? 1 : 0; out.capHits += num(me.hop_cap_hits) || 0;
+      out.routeVaries += me.route_varies_with_input ? 1 : 0; out.capHits += num(me.pass_cap_hits ?? me.hop_cap_hits) || 0;
       out.execs += num(me.executions_per_genome) || 0;
       });
     });
@@ -1533,7 +1533,7 @@
         });
       });
       const c = card('Mesh execution in sampled evolved genomes', 'Sums over the sampled evolved genomes, per closure and world (mesh-execution-v1, T11.F14). Route varies: genomes whose chosen targets differ across the 48 snapshots.');
-      c.card.appendChild(table(['Closure', 'World', 'Genomes', 'Total nodes', 'Reachable', 'Executed', 'Knockouts', 'Route varies', 'Hop-cap hits', 'Executions'], rows, (i) => (rows[i][1] === 'default world, seeds pooled' ? 'hist' : null)));
+      c.card.appendChild(table(['Closure', 'World', 'Genomes', 'Total nodes', 'Reachable', 'Executed', 'Knockouts', 'Route varies', 'Capped passes', 'Executions'], rows, (i) => (rows[i][1] === 'default world, seeds pooled' ? 'hist' : null)));
       q.cards.appendChild(c.card);
     }
     app.appendChild(q.section);

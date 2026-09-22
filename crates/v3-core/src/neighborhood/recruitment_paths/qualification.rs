@@ -1,15 +1,13 @@
 //! T13.F05: seed-selected production-operator paths from each fixed starting
 //! form to a useful, bypass-sensitive contribution. Observation only.
 
-use super::fixtures::{cue, stage_for};
+use super::fixtures::{cue, move_sink, stage_for, EAST};
 use super::*;
 use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
-use crate::creature::genome::cgp::{
-    ActionSlotBehavior, CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource,
-    WorldActionKind,
-};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
+use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::engine::{
     graph_operator_key, input_ref_operator_key, topology_operator_key, vm_operator_key,
@@ -21,7 +19,6 @@ use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::vm::{VmMutator, VmOperator};
 use crate::mutation::{MutationOperator, MutationSkipReason, TargetReachability};
 use crate::neighborhood::recruitment::ModuleBackend;
-use crate::runtime::vm::jump_target;
 use rand::{rngs::SmallRng, SeedableRng};
 
 /// Every pinned step seed is the first in `0..SEARCH_RANGE` whose applied
@@ -459,20 +456,6 @@ fn cue_leaf(task: Task) -> GraphSource {
     }
 }
 
-/// Weight the edges of one surface contribute when the cue reads 1.0.
-fn cue_weight(edges: &[GraphEdge], sources: &[GraphSource]) -> f32 {
-    edges
-        .iter()
-        .filter(|edge| sources.contains(&edge.source))
-        .map(|edge| edge.weight)
-        .sum()
-}
-
-/// A Move parameter of `[1.5, 2.5)` decodes to east.
-fn decodes_east(weight: f32) -> bool {
-    (1.5..2.5).contains(&weight)
-}
-
 fn appended<'a>(before: &[GraphEdge], after: &'a [GraphEdge]) -> Option<&'a GraphEdge> {
     (after.len() == before.len() + 1 && after[..before.len()] == *before)
         .then(|| &after[before.len()])
@@ -504,36 +487,36 @@ fn vm_copy_plan() -> Vec<StepSpec> {
     ]
 }
 
-/// Graph copy and split: one gate edge from a cue-valued compute node.
+/// Graph copy and split: one vote edge from a cue-valued source (T19.F04).
 fn graph_copy_plan(cue_sources: Vec<GraphSource>) -> Vec<StepSpec> {
-    vec![
-        step(
-            "gate_edge_added",
-            "Graph.AddGraphEdge onto action slot 0's gate from a cue-valued source, positive weight",
-            ProductionEvent::Graph(GraphOperator::AddGraphEdge),
-            move |before, after| {
-                only_scaffold_backend_changed(before, after)
-                    && appended(
-                        &graph(before).action_bank[0].gate_inputs,
-                        &graph(after).action_bank[0].gate_inputs,
-                    )
-                    .is_some_and(|edge| cue_sources.contains(&edge.source) && edge.weight > 0.0)
-            },
-        ),
-        swap_activation(),
-    ]
+    vec![east_vote_edge_added(cue_sources), swap_activation()]
 }
 
-/// The Task A-correct copy: the ring added to the table, the read's
+/// `Graph.AddGraphEdge` onto the `Move(E)` vote sink from one of `sources`
+/// with a positive weight, nothing else on the scaffold changed: the
+/// activation of a Graph module is one edge into a vote sink (T19.F04).
+fn east_vote_edge_added(sources: Vec<GraphSource>) -> StepSpec {
+    step(
+        "vote_edge_added",
+        "Graph.AddGraphEdge onto the Move(E) vote sink from a cue-valued source, positive weight",
+        ProductionEvent::Graph(GraphOperator::AddGraphEdge),
+        move |before, after| {
+            let (b, a) = (graph(before), graph(after));
+            only_scaffold_backend_changed(before, after)
+                && a.compute_nodes == b.compute_nodes
+                && a.output_sinks.iter().zip(&b.output_sinks).all(|(x, y)| {
+                    x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST)) || x == y
+                })
+                && appended(&move_sink(b, EAST).inputs, &move_sink(a, EAST).inputs)
+                    .is_some_and(|edge| sources.contains(&edge.source) && edge.weight > 0.0)
+        },
+    )
+}
+
+/// The Task B-correct VM copy: the ring added to the table, the read's
 /// reference then its sub-index moved one raw-field nudge at a time, the
-/// zeroed direction constant's load replaced by a doubling of the cue
-/// register (the east code 2, as the blank program computes it),
-/// activation: six events.
-///
-/// T11.F23: a constant mutation moves a constant by at most a tenth of
-/// `max(|c|, 1)`, so walking the zeroed direction constant to `[1.5, 2.5)`
-/// takes at least fifteen events; the one-event `VmInstructionMutation`
-/// replace is the route through the existing operators.
+/// vote's `Move(N)` sink replaced by `Move(E)` in one
+/// `VmInstructionMutation`, activation: six events.
 fn vm_unprepared_plan() -> Vec<StepSpec> {
     let read = |ref_idx: u16, sub_idx: u16| VmInstruction::ReadInput {
         dst: 0,
@@ -546,11 +529,9 @@ fn vm_unprepared_plan() -> Vec<StepSpec> {
             && vm(after).program[1..] == vm(before).program[1..]
             && vm(after).constants == vm(before).constants
     };
-    /// The direction load: `LoadConst { dst: 3, const_idx: 1 }` at this
-    /// position of the copied incumbent program.
-    const DIRECTION_LOAD: usize = 4;
-    /// The cue register doubled into the direction register.
-    const DOUBLE_INTO_DIRECTION: VmInstruction = VmInstruction::Add { dst: 3, a: 0, b: 0 };
+    /// The vote: `AddVote { sink: Move(N), src: 2 }` at this position of the
+    /// copied incumbent program.
+    const VOTE: usize = 3;
     vec![
         ring_added(),
         step(
@@ -572,13 +553,13 @@ fn vm_unprepared_plan() -> Vec<StepSpec> {
             move |before, after| read_moved(before, after, read(1, 2)),
         ),
         step(
-            "direction_doubled",
-            "VmInstructionMutation replace: the direction constant's LoadConst becomes Add doubling the cue register into the direction register (east code 2)",
+            "vote_to_east",
+            "VmInstructionMutation replace: the Move(N) vote becomes a Move(E) vote of the comparison",
             ProductionEvent::Vm(VmOperator::VmInstructionMutation),
             |before, after| {
                 let (b, a) = (vm(before), vm(after));
                 let mut expected = b.program.clone();
-                expected[DIRECTION_LOAD] = DOUBLE_INTO_DIRECTION;
+                expected[VOTE] = VOTE_EAST;
                 only_scaffold_backend_changed(before, after)
                     && a.constants == b.constants
                     && a.register_count == b.register_count
@@ -589,64 +570,6 @@ fn vm_unprepared_plan() -> Vec<StepSpec> {
     ]
 }
 
-/// Compute kinds whose single- or two-input output is the weighted sum of
-/// a non-negative cue, so a node of that kind can carry the east code.
-fn sums_inputs(kind: &ComputeNodeKind) -> bool {
-    matches!(
-        kind,
-        ComputeNodeKind::Add | ComputeNodeKind::WeightedSum | ComputeNodeKind::Relu
-    )
-}
-
-/// The Move direction is `param_inputs[0]` alone (positional, not summed)
-/// and an edge weight is drawn in `[-1, 1]`, so east (2) needs a compute
-/// node reading the cue twice: a bootstrap node with one cue edge, a second
-/// cue edge onto it, then the parameter edge that reads the node. `at` is
-/// the index the new node takes; `param_step` supplies the third event.
-fn direction_node_steps(
-    cue_sources: Vec<GraphSource>,
-    at: usize,
-    param_step: StepSpec,
-) -> Vec<StepSpec> {
-    let sources = cue_sources.clone();
-    let bootstrap = step(
-        "direction_node",
-        "Graph.AddInternalGraphNode bootstrap form: a summing node reading the cue at weight at least 0.9",
-        ProductionEvent::Graph(GraphOperator::AddInternalGraphNode),
-        move |before, after| {
-            let (b, a) = (graph(before), graph(after));
-            only_scaffold_backend_changed(before, after)
-                && a.compute_nodes.len() == b.compute_nodes.len() + 1
-                && a.compute_nodes[..at] == b.compute_nodes[..at]
-                && a.action_bank == b.action_bank
-                && a.output_sinks == b.output_sinks
-                && a.execute_gate == b.execute_gate
-                && sums_inputs(&a.compute_nodes[at].kind)
-                && a.compute_nodes[at].plasticity.is_none()
-                && matches!(
-                    a.compute_nodes[at].inputs.as_slice(),
-                    [edge] if sources.contains(&edge.source) && edge.weight >= 0.9
-                )
-        },
-    );
-    let sources = cue_sources;
-    let second_edge = step(
-        "direction_doubled",
-        "Graph.AddGraphEdge onto the direction node from the cue: cue-weighted sum at least 1.7",
-        ProductionEvent::Graph(GraphOperator::AddGraphEdge),
-        move |before, after| {
-            only_scaffold_backend_changed(before, after)
-                && appended(
-                    &graph(before).compute_nodes[at].inputs,
-                    &graph(after).compute_nodes[at].inputs,
-                )
-                .is_some_and(|edge| sources.contains(&edge.source))
-                && cue_weight(&graph(after).compute_nodes[at].inputs, &sources) >= 1.7
-        },
-    );
-    vec![bootstrap, second_edge, param_step]
-}
-
 /// The ring cue's leaf on the unprepared copy: the table entry `Add`
 /// appended after the copied `FoodHere`, at the east sub-index.
 const RING_EAST: GraphSource = GraphSource::InputLeaf {
@@ -654,29 +577,27 @@ const RING_EAST: GraphSource = GraphSource::InputLeaf {
     sub_idx: 2,
 };
 
-/// The Task A-correct copy: the ring added to the table, the sensing edge to
-/// its east sub-index, a direction node in place of the zeroed constant,
-/// activation. The copied `FoodHere` entry stays, unread.
+/// The Task B-correct Graph copy: the ring added to the table, the sensing
+/// edge to its east sub-index, the `Move(N)` vote edge removed and a
+/// `Move(E)` vote edge added, activation: five events. The copied
+/// `FoodHere` entry stays, unread.
 fn graph_unprepared_plan() -> Vec<StepSpec> {
-    let sources = vec![GraphSource::ComputeNode(0), RING_EAST];
-    let retarget_param = step(
-        "direction_read",
-        "Graph.RetargetGraphEdge: the Move parameter edge reads the direction node instead of the zeroed constant",
-        ProductionEvent::Graph(GraphOperator::RetargetGraphEdge),
+    let north_removed = step(
+        "north_vote_removed",
+        "Graph.RemoveGraphEdge: the Move(N) vote edge",
+        ProductionEvent::Graph(GraphOperator::RemoveGraphEdge),
         |before, after| {
             let (b, a) = (graph(before), graph(after));
             only_scaffold_backend_changed(before, after)
                 && a.compute_nodes == b.compute_nodes
-                && a.output_sinks == b.output_sinks
-                && a.execute_gate == b.execute_gate
-                && a.action_bank[1..] == b.action_bank[1..]
-                && a.action_bank[0].gate_inputs == b.action_bank[0].gate_inputs
-                && a.action_bank[0].param_inputs.len() == 1
-                && a.action_bank[0].param_inputs[0].source == GraphSource::ComputeNode(2)
-                && a.action_bank[0].param_inputs[0].weight == b.action_bank[0].param_inputs[0].weight
+                && move_sink(a, 0).inputs.is_empty()
+                && a.output_sinks
+                    .iter()
+                    .zip(&b.output_sinks)
+                    .all(|(x, y)| x.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)) || x == y)
         },
     );
-    let mut plan = vec![
+    vec![
         ring_added(),
         step(
             "cue_edge_retargeted",
@@ -689,105 +610,24 @@ fn graph_unprepared_plan() -> Vec<StepSpec> {
                     && a.compute_nodes[0].inputs[0].source == RING_EAST
                     && a.compute_nodes[0].inputs[0].weight == b.compute_nodes[0].inputs[0].weight
                     && a.compute_nodes[1..] == b.compute_nodes[1..]
-                    && a.action_bank == b.action_bank
-                    && a.execute_gate == b.execute_gate
                     && a.output_sinks == b.output_sinks
             },
         ),
-    ];
-    plan.extend(direction_node_steps(sources, 2, retarget_param));
-    plan.push(swap_activation());
-    plan
+        north_removed,
+        east_vote_edge_added(vec![GraphSource::ComputeNode(0), RING_EAST]),
+        swap_activation(),
+    ]
 }
 
-/// Blank Graph tissue: sensor, Move behavior, the three-event direction
-/// node, then the gate edge. A dispatched detour is exposed by the gate edge
-/// (six events); undispatched blank tissue also needs the route swap (seven,
-/// a recorded growth gap).
+/// Blank Graph tissue: the sensor, then one vote edge from the cue into
+/// `Move(E)`. A dispatched detour is exposed by the edge (two events);
+/// undispatched blank tissue also needs the route swap (three).
 fn graph_blank_plan(dispatched: bool) -> Vec<StepSpec> {
-    let leaf = cue_leaf(Task::A);
-    let param_edge = step(
-        "direction_read",
-        "Graph.AddGraphEdge onto action slot 0's parameter from the direction node: product in [1.5, 2.5)",
-        ProductionEvent::Graph(GraphOperator::AddGraphEdge),
-        move |before, after| {
-            only_scaffold_backend_changed(before, after)
-                && appended(
-                    &graph(before).action_bank[0].param_inputs,
-                    &graph(after).action_bank[0].param_inputs,
-                )
-                .is_some_and(|edge| {
-                    edge.source == GraphSource::ComputeNode(0)
-                        && decodes_east(
-                            edge.weight * cue_weight(&graph(after).compute_nodes[0].inputs, &[leaf]),
-                        )
-                })
-        },
-    );
-    let mut plan = vec![
-        cue_added(),
-        step(
-            "slot_emits_move",
-            "Graph.MutateActionSlotBehavior: action slot 0 NoOp to Emit(Move)",
-            ProductionEvent::Graph(GraphOperator::MutateActionSlotBehavior),
-            |before, after| {
-                let (b, a) = (graph(before), graph(after));
-                only_scaffold_backend_changed(before, after)
-                    && a.action_bank[0].behavior == ActionSlotBehavior::Emit(WorldActionKind::Move)
-                    && a.action_bank[1..] == b.action_bank[1..]
-            },
-        ),
-    ];
-    plan.extend(direction_node_steps(vec![leaf], 0, param_edge));
-    plan.push(step(
-        "gate_edge_added",
-        "Graph.AddGraphEdge onto action slot 0's gate from the cue, positive weight",
-        ProductionEvent::Graph(GraphOperator::AddGraphEdge),
-        move |before, after| {
-            only_scaffold_backend_changed(before, after)
-                && appended(
-                    &graph(before).action_bank[0].gate_inputs,
-                    &graph(after).action_bank[0].gate_inputs,
-                )
-                .is_some_and(|edge| {
-                    (edge.source == leaf || edge.source == GraphSource::ComputeNode(0))
-                        && edge.weight > 0.0
-                })
-        },
-    ));
+    let mut plan = vec![cue_added(), east_vote_edge_added(vec![cue_leaf(Task::A)])];
     if !dispatched {
         plan.push(swap_activation());
     }
     plan
-}
-
-/// One expected instruction of a VM program under construction.
-#[derive(Clone)]
-enum Expect {
-    Exact(VmInstruction),
-    /// A `JumpIfZero` on register 0 that resolves to the program's closing
-    /// Halt. The drawn offset is any of the `-16..=16` values landing there
-    /// modulo the length; every later insert before the Halt goes through
-    /// `splice_program_with_reference_repair`, which rewrites the offset so
-    /// the jump keeps that target.
-    JumpToHalt,
-}
-
-fn program_matches(program: &[VmInstruction], expected: &[Expect]) -> bool {
-    let len = program.len();
-    len == expected.len()
-        && program
-            .iter()
-            .enumerate()
-            .zip(expected)
-            .all(|((pc, actual), expected)| match expected {
-                Expect::Exact(instruction) => actual == instruction,
-                Expect::JumpToHalt => matches!(
-                    actual,
-                    VmInstruction::JumpIfZero { cond: 0, offset }
-                        if jump_target(pc, *offset, len) + 1 == len
-                ),
-            })
 }
 
 const READ_CUE: VmInstruction = VmInstruction::ReadInput {
@@ -795,12 +635,12 @@ const READ_CUE: VmInstruction = VmInstruction::ReadInput {
     ref_idx: 0,
     sub_idx: 0,
 };
-const DOUBLE: VmInstruction = VmInstruction::Add { dst: 0, a: 0, b: 0 };
-const WRITE_DIRECTION: VmInstruction = VmInstruction::WriteWorldActionMeta {
-    slot_idx: 0,
-    src: 0,
-};
-const PUSH_MOVE: VmInstruction = VmInstruction::PushAction { action_type: 2 };
+/// The blank program's vote: the cue register into `Move(E)`.
+const VOTE_CUE_EAST: VmInstruction = VmInstruction::AddVote { sink: 3, src: 0 };
+/// The reactive program's vote retargeted east: the comparison register into
+/// `Move(E)`.
+const VOTE_EAST: VmInstruction = VmInstruction::AddVote { sink: 3, src: 2 };
+const _: () = assert!(VoteSink::Move(EAST).index() == 3);
 
 /// `InputRef.Add` on the scaffold, accepted when the table becomes exactly
 /// `expected` and nothing else on the node changes: the entry is wired into
@@ -843,7 +683,7 @@ fn ring_added() -> StepSpec {
     )
 }
 
-fn insert_step(name: &'static str, edits: &'static str, expected: Vec<Expect>) -> StepSpec {
+fn insert_step(name: &'static str, edits: &'static str, expected: Vec<VmInstruction>) -> StepSpec {
     step(
         name,
         edits,
@@ -852,70 +692,31 @@ fn insert_step(name: &'static str, edits: &'static str, expected: Vec<Expect>) -
             only_scaffold_backend_changed(before, after)
                 && vm(after).constants == vm(before).constants
                 && vm(after).register_count == vm(before).register_count
-                && program_matches(&vm(after).program, &expected)
+                && vm(after).program == expected
         },
     )
 }
 
-/// The one-register Task A program: read the cue, skip to the Halt when it
-/// is zero, double it to the east direction code, write the Move parameter,
-/// push the Move. Five instructions, each one `VmInstructionMutation` insert.
+/// The one-register Task A program: read the cue, vote it into `Move(E)`.
+/// Two instructions, each one `VmInstructionMutation` insert before the
+/// blank program's `Halt`.
 ///
-/// Blank tissue is not dispatched, so the program is built in reading order
-/// and the route swap exposes it: seven events, a recorded growth gap. A
-/// dispatched detour builds the neutral instructions first, adds the jump
-/// to the Halt (a zero cue then does nothing at length five), and exposes
-/// the module by inserting the push last: six events.
+/// Blank tissue is not dispatched, so the route swap exposes it: four
+/// events. A dispatched detour is exposed by the vote insert: three.
 fn vm_blank_plan(dispatched: bool) -> Vec<StepSpec> {
-    use Expect::{Exact, JumpToHalt};
-    /// The finished program in position order: each instruction's insert
-    /// step name and edit note.
-    const PROGRAM: [(&str, &str); 5] = [
-        (
+    let mut plan = vec![
+        cue_added(),
+        insert_step(
             "read_cue",
             "VmInstructionMutation insert: ReadInput of the cue into register 0",
+            vec![READ_CUE, VmInstruction::Halt],
         ),
-        (
-            "skip_when_zero",
-            "VmInstructionMutation insert: JumpIfZero on the cue, landing on the Halt",
-        ),
-        (
-            "double_to_east",
-            "VmInstructionMutation insert: Add doubling the cue to the east code 2",
-        ),
-        (
-            "write_direction",
-            "VmInstructionMutation insert: WriteWorldActionMeta slot 0 from register 0",
-        ),
-        (
-            "push_move",
-            "VmInstructionMutation insert: PushAction(Move); the module now emits",
+        insert_step(
+            "vote_east",
+            "VmInstructionMutation insert: AddVote of the cue into Move(E); the module now votes",
+            vec![READ_CUE, VOTE_CUE_EAST, VmInstruction::Halt],
         ),
     ];
-    let expects = [
-        Exact(READ_CUE),
-        JumpToHalt,
-        Exact(DOUBLE),
-        Exact(WRITE_DIRECTION),
-        Exact(PUSH_MOVE),
-    ];
-    // Program positions in insertion order.
-    let order: [usize; 5] = if dispatched {
-        [0, 2, 3, 1, 4]
-    } else {
-        [0, 1, 2, 3, 4]
-    };
-    let mut plan = vec![cue_added()];
-    for inserted in 1..=order.len() {
-        let present = &order[..inserted];
-        let (name, edits) = PROGRAM[present[inserted - 1]];
-        let expected = (0..expects.len())
-            .filter(|position| present.contains(position))
-            .map(|position| expects[position].clone())
-            .chain([Exact(VmInstruction::Halt)])
-            .collect();
-        plan.push(insert_step(name, edits, expected));
-    }
     if !dispatched {
         plan.push(swap_activation());
     }
@@ -960,19 +761,6 @@ fn detour_start(backend: ModuleBackend, base: &CreatureGenome) -> ConstructionSt
     )
 }
 
-/// Undispatched blank tissue needs every event a dispatched detour needs
-/// plus the route swap that dispatches it.
-fn blank_growth_gap(backend: ModuleBackend) -> GrowthGap {
-    GrowthGap {
-        length: 7,
-        lengthening_step: match backend {
-            ModuleBackend::Graph => "activation: the sensor, the Move behavior, the three-event direction node (a positional Move parameter reads one edge of weight at most 1, so east needs a node summing two cue edges), the gate edge, then the route swap",
-            ModuleBackend::Vm => "activation: the sensor, the five-instruction program (one VmInstructionMutation insert each; the motif pairs carry none of the jump, meta write or push), then the route swap",
-        }
-        .into(),
-    }
-}
-
 /// Split-form cue sources: any compute node that reads the cue leaf at weight
 /// 1.0 and forwards it unchanged (the sensing WeightedSum or the identity Add
 /// the split inserted before it).
@@ -998,34 +786,25 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 
 // ── Pinned seeds: the first accepted in `0..SEARCH_RANGE` per step ──────────
 //
-// Re-pinned by T11.F21: one more VM opcode in the fresh-instruction draw and
-// one more graph edge surface (`ActionBid`) remap every seeded draw of the
-// VM insertion-class operators and `AddGraphEdge`, as the spec predeclares.
-//
-// Re-pinned by T11.F22: `InputRef.Swap` stays within a kind, so the
-// unprepared forms open with `InputRef.Add` of the ring (a different draw
-// from the retired cross-kind swap) and the VM read gains a `ref_idx` nudge;
-// every later seed on both forms is unchanged.
-//
-// Re-pinned by T11.F23: the scale-relative constant step cannot walk the
-// zeroed direction constant to east in two events, so `vm_unprepared`
-// replaces the constant's load with a doubling of the cue register in one
-// `VmInstructionMutation` (a fresh-instruction replace draw, hence the
-// larger seed); every other seed is unchanged.
+// Re-pinned by T19.F04: the plans are re-expressed on votes (a Graph module
+// activates with one edge into the `Move(E)` vote sink, a VM module with one
+// `AddVote`), the fresh-instruction draw lost four opcodes and gained
+// `AddVote`, and the edge-surface draw covers the vote and parameter sinks.
 
 const SWAP: u64 = 0;
-const GRAPH_BLANK_SEEDS: &[u64] = &[1, 25, 1020, 1650, 2300, 596, SWAP];
-const GRAPH_DETOUR_SEEDS: &[u64] = &[1, 25, 1020, 1650, 2300, 596];
-const GRAPH_COPY_SEEDS: &[u64] = &[1202, SWAP];
-const GRAPH_SPLIT_SEEDS: &[u64] = &[3518, SWAP];
+const GRAPH_BLANK_SEEDS: &[u64] = &[1, 57, SWAP];
+const GRAPH_DETOUR_SEEDS: &[u64] = &[1, 57];
+const GRAPH_COPY_SEEDS: &[u64] = &[103, SWAP];
+const GRAPH_SPLIT_SEEDS: &[u64] = &[103, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
-const GRAPH_UNPREPARED_SEEDS: &[u64] = &[68, 32, 64, 6718, 4, SWAP];
-/// Ring, ref_idx, sub_idx, sub_idx, doubled, swap.
-const VM_UNPREPARED_SEEDS: &[u64] = &[68, 94, 72, 223, 205_178, SWAP];
-/// Reading order: cue, read, jump, double, write, push, swap.
-const VM_BLANK_SEEDS: &[u64] = &[1, 1869, 5608, 800, 9361, 4126, SWAP];
-/// Neutral-first order: cue, read, double, write, jump, push.
-const VM_DETOUR_SEEDS: &[u64] = &[1, 1869, 800, 31_060, 521, 4126];
+/// Ring, retarget, remove north, add east, swap.
+const GRAPH_UNPREPARED_SEEDS: &[u64] = &[68, 32, 5, 103, SWAP];
+/// Ring, ref_idx, sub_idx, sub_idx, vote to east, swap.
+const VM_UNPREPARED_SEEDS: &[u64] = &[68, 18, 25, 25, 66_421, SWAP];
+/// Cue, read, vote, swap.
+const VM_BLANK_SEEDS: &[u64] = &[1, 1279, 2189, SWAP];
+/// Cue, read, vote.
+const VM_DETOUR_SEEDS: &[u64] = &[1, 1279, 2189];
 
 /// Every starting form's plan with its pinned seeds, in the fixed family
 /// order.
@@ -1036,16 +815,8 @@ fn form_plans() -> Vec<FormPlan> {
         let name = start.name.as_str();
         let last = start.history.last().expect("history").clone();
         let (specs, seeds, gap) = match name {
-            "graph_blank" => (
-                graph_blank_plan(false),
-                GRAPH_BLANK_SEEDS,
-                Some(blank_growth_gap(start.backend)),
-            ),
-            "vm_blank" => (
-                vm_blank_plan(false),
-                VM_BLANK_SEEDS,
-                Some(blank_growth_gap(start.backend)),
-            ),
+            "graph_blank" => (graph_blank_plan(false), GRAPH_BLANK_SEEDS, None),
+            "vm_blank" => (vm_blank_plan(false), VM_BLANK_SEEDS, None),
             "graph_copy" => (
                 graph_copy_plan(vec![GraphSource::ComputeNode(0), cue_leaf(Task::A)]),
                 GRAPH_COPY_SEEDS,

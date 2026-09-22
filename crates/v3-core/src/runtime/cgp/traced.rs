@@ -5,8 +5,7 @@ use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::effects::CgpEffectsTrace;
 use crate::runtime::cgp::execute::{execute_graph_impl, GraphTracer};
 use crate::runtime::trace::domain::{
-    kind_label, GraphActionSlotTrace, GraphExecuteGateTrace, GraphNodeEvalTrace,
-    GraphOutputSinkTrace, GraphPassTrace, GraphTrace,
+    kind_label, GraphNodeEvalTrace, GraphOutputSinkTrace, GraphPassTrace, GraphTrace,
 };
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
@@ -19,8 +18,6 @@ pub(crate) struct RecordingTracer {
     final_outputs: Vec<f32>,
     temporal_committed: bool,
     output_sinks: Vec<GraphOutputSinkTrace>,
-    action_slots: Vec<GraphActionSlotTrace>,
-    execute_gate: GraphExecuteGateTrace,
 }
 
 impl RecordingTracer {
@@ -33,13 +30,6 @@ impl RecordingTracer {
             final_outputs: Vec::new(),
             temporal_committed: false,
             output_sinks: Vec::new(),
-            action_slots: Vec::new(),
-            execute_gate: GraphExecuteGateTrace {
-                wired: false,
-                weighted_sum: 0.0,
-                queue_non_empty: false,
-                fired: false,
-            },
         }
     }
 
@@ -51,8 +41,6 @@ impl RecordingTracer {
             stable_passes_count: 0,
             final_outputs: self.final_outputs,
             output_sinks: self.output_sinks,
-            action_slots: self.action_slots,
-            execute_gate: self.execute_gate,
         }
     }
 }
@@ -102,8 +90,6 @@ impl GraphTracer for RecordingTracer {
 
     fn on_effects(&mut self, effects: CgpEffectsTrace) {
         self.output_sinks = effects.output_sinks;
-        self.action_slots = effects.action_slots;
-        self.execute_gate = effects.execute_gate;
     }
 }
 
@@ -133,13 +119,6 @@ pub(crate) fn execute_graph_node_traced(
             stable_passes_count: 0,
             final_outputs: Vec::new(),
             output_sinks: Vec::new(),
-            action_slots: Vec::new(),
-            execute_gate: GraphExecuteGateTrace {
-                wired: false,
-                weighted_sum: 0.0,
-                queue_non_empty: false,
-                fired: false,
-            },
         };
         return (
             NodeResult::halted(

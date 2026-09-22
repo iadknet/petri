@@ -48,8 +48,8 @@ pub(in crate::mutation) struct ModuleSize {
     compute_nodes: usize,
     edges_per_node: usize,
     sinks: usize,
-    action_slots: usize,
-    gate_edges: usize,
+    vote_sinks: usize,
+    vote_edges: usize,
     input_refs: usize,
     instructions: usize,
     constants: usize,
@@ -71,8 +71,8 @@ pub(in crate::mutation) fn module_size() -> impl Strategy<Value = ModuleSize> {
                 compute_nodes,
                 edges_per_node,
                 sinks,
-                action_slots,
-                gate_edges,
+                vote_sinks,
+                vote_edges,
                 input_refs,
                 instructions,
                 constants,
@@ -81,8 +81,8 @@ pub(in crate::mutation) fn module_size() -> impl Strategy<Value = ModuleSize> {
                     compute_nodes,
                     edges_per_node,
                     sinks,
-                    action_slots,
-                    gate_edges,
+                    vote_sinks,
+                    vote_edges,
                     input_refs,
                     instructions,
                     constants,
@@ -117,9 +117,17 @@ fn graph_def(
     refs: &[InputReference],
     config: &MutationConfig,
 ) -> CgpGraphBackendDef {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(config);
-    def.output_sinks.truncate(size.sinks);
-    def.action_bank.truncate(size.action_slots);
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    // The first `sinks` value sinks and the first `vote_sinks` vote sinks.
+    let first_vote = crate::creature::genome::cgp::FIRST_ACTION_VOTE_SINK;
+    let catalog = std::mem::take(&mut def.output_sinks);
+    def.output_sinks = catalog
+        .into_iter()
+        .enumerate()
+        .filter(|&(i, _)| i < size.sinks || (first_vote..first_vote + size.vote_sinks).contains(&i))
+        .map(|(_, sink)| sink)
+        .collect();
+    let vote_start = def.output_sinks.len() - size.vote_sinks;
     for _ in 0..size.compute_nodes {
         def.compute_nodes.push(ComputeNode {
             kind: random_compute_node_kind(rng),
@@ -140,21 +148,17 @@ fn graph_def(
             def.compute_nodes[i].inputs.push(e);
         }
     }
-    for i in 0..def.output_sinks.len() {
+    for i in 0..vote_start {
         for _ in 0..size.edges_per_node {
             let e = edge(rng);
             def.output_sinks[i].inputs.push(e);
         }
     }
-    for i in 0..def.action_bank.len() {
-        for _ in 0..size.edges_per_node {
+    for i in vote_start..def.output_sinks.len() {
+        for _ in 0..size.vote_edges {
             let e = edge(rng);
-            def.action_bank[i].gate_inputs.push(e);
+            def.output_sinks[i].inputs.push(e);
         }
-    }
-    for _ in 0..size.gate_edges {
-        let e = edge(rng);
-        def.execute_gate.inputs.push(e);
     }
     def
 }
@@ -206,11 +210,11 @@ pub(in crate::mutation) fn genome(
 }
 
 /// The blank Graph module the mesh birth operators create.
-fn blank_graph_node(id: u32, config: &MutationConfig) -> NodeGenome {
+fn blank_graph_node(id: u32) -> NodeGenome {
     NodeGenome {
         node_id: NodeId::new(id),
         input_refs: Vec::new(),
-        backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs(config)),
+        backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
         targets: Vec::new(),
     }
 }
@@ -477,7 +481,7 @@ proptest! {
         for i in 0..padding {
             let id = (base.nodes.len() + i) as u32;
             padded.nodes.push(if i % 2 == 0 {
-                blank_graph_node(id, &config)
+                blank_graph_node(id)
             } else {
                 blank_vm_node(id)
             });
@@ -542,7 +546,7 @@ fn growth_operators_reach_a_blank_graph_module() {
     let config = MutationConfig::default();
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![blank_graph_node(0, &config)],
+        nodes: vec![blank_graph_node(0)],
     };
     for op in [
         GraphOperator::AddInternalGraphNode,

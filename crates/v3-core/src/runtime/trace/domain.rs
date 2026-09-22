@@ -36,25 +36,60 @@ pub struct TickTrace {
     /// `null` when the sample request did not set `include_perception_debug = true`.
     pub debug_perception: Option<PerceptionDebugSnapshot>,
     pub hops: Vec<MeshHopTrace>,
+    /// One record per pass, in pass order (T19.F04).
+    pub passes: Vec<MeshPassTrace>,
     pub final_actions: Vec<WorldAction>,
     pub termination_reason: TerminationReason,
     /// Energy bid for turn-order priority (0.0 if none).
     pub priority_bid: f32,
-    /// The tick's accumulated vote vector (T19.F03), in `VoteSink` index
-    /// order. Reported only; nothing reads it.
-    pub votes: VoteVector,
-    /// Per-kind vote commit counters (T19.F03), zero until T19.F04.
+    /// Final per-kind bars: commits of each kind this tick, in `VoteKind`
+    /// index order.
     pub commit_counts: [u32; VOTE_KIND_COUNT],
 }
 
-/// Why the mesh chain terminated for this tick.
+/// Why a tick's pass loop ended (T19.F04).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum TerminationReason {
-    ActionEmitted,
+    /// A pass ended with no positive effective vote.
+    NoDecision,
+    /// `Terminate` met the best effective vote against a non-empty queue.
+    TerminateVoted,
+    /// A commit filled the queue (`max_actions_per_turn`).
+    ActionCapReached,
+    /// Energy ran out in a dispatch, the hop ramp, or an all-in bid; the
+    /// committed queue is kept.
     EnergyExhausted,
-    MaxHopsReached,
+}
+
+/// Why one pass of the mesh ended (T19.F04).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum PassEndReason {
+    /// A committed dispatch left `Decide` positive while some kind's
+    /// effective vote was positive.
+    Decided,
+    /// The pass reached `max_mesh_hops` routed hops.
+    PassCapReached,
+    /// The last node selected no target.
     NoTargets,
+    /// The entry node or the routed target is absent from the genome.
     MissingNode,
+    /// A dispatch or the hop ramp exhausted the creature.
+    EnergyExhausted,
+}
+
+/// One pass of a tick's mesh evaluation (T19.F04).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MeshPassTrace {
+    pub pass_index: u32,
+    pub end_reason: PassEndReason,
+    /// The pass's final vote vector, in `VoteSink` index order.
+    pub votes: VoteVector,
+    /// Effective vote per kind against the bars the pass started with.
+    pub effective_votes: [f32; VOTE_KIND_COUNT],
+    /// The action the pass end committed, if any.
+    pub committed: Option<WorldAction>,
+    /// Dispatches this pass.
+    pub hops: u32,
 }
 
 /// Serializable mirror of [`StaticInputs`].
@@ -114,7 +149,10 @@ pub struct TraceRouteDecision {
 /// Trace data for a single hop in the mesh chain.
 #[derive(Debug, Clone, Serialize)]
 pub struct MeshHopTrace {
+    /// Tick-wide dispatch index.
     pub hop_index: usize,
+    /// The pass this hop belongs to (T19.F04).
+    pub pass_index: u32,
     pub node_id: NodeId,
     pub input_refs: Vec<InputReference>,
     pub upstream_slots: [f32; OUTPUT_SLOT_COUNT],
@@ -143,7 +181,6 @@ pub struct VmTrace {
     pub steps: Vec<VmStepTrace>,
     pub final_registers: Vec<f32>,
     pub final_payload: [f32; OUTPUT_SLOT_COUNT],
-    pub final_meta: [f32; 8],
     pub slot_writes: Vec<SlotWrite>,
 }
 
@@ -176,8 +213,6 @@ pub struct GraphTrace {
     pub stable_passes_count: u32,
     pub final_outputs: Vec<f32>,
     pub output_sinks: Vec<GraphOutputSinkTrace>,
-    pub action_slots: Vec<GraphActionSlotTrace>,
-    pub execute_gate: GraphExecuteGateTrace,
 }
 
 /// Effect-phase trace for a single output sink (indexed 1:1 with `output_sinks`).
@@ -187,34 +222,6 @@ pub struct GraphOutputSinkTrace {
     pub weighted_sum: f32,
     pub applied: bool,
     pub applied_value: f32,
-}
-
-/// Effect-phase trace for a single action slot (indexed 1:1 with `action_bank`).
-#[derive(Debug, Clone, Serialize)]
-pub struct GraphActionSlotTrace {
-    pub wired: bool,
-    pub gate_weighted_sum: f32,
-    pub fired: bool,
-    pub param_values: [f32; 2],
-    pub queue_len_before: usize,
-    pub queue_len_after: usize,
-    pub emitted_action: Option<WorldAction>,
-    /// The eight direction bids, `Some` only when the slot fired a movement
-    /// action with a written bank (T11.F21).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub direction_bids: Option<[f32; 8]>,
-    /// `Direction::ALL` index the bank committed, paired with `direction_bids`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub chosen_direction: Option<u8>,
-}
-
-/// Effect-phase trace for the execute gate.
-#[derive(Debug, Clone, Serialize)]
-pub struct GraphExecuteGateTrace {
-    pub wired: bool,
-    pub weighted_sum: f32,
-    pub queue_non_empty: bool,
-    pub fired: bool,
 }
 
 /// One entered evaluation; node records are candidates when temporal_committed is false.

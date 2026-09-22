@@ -4,8 +4,8 @@ use crate::contracts::{
     WorldInputKey,
 };
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
-    OutputSink, OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+    OutputSinkKind,
 };
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef};
 use rand::SeedableRng;
@@ -21,7 +21,7 @@ fn register_write_returns_dst_for_alu() {
 
 #[test]
 fn register_write_returns_none_for_output() {
-    let instr = VmInstruction::PushAction { action_type: 0 };
+    let instr = VmInstruction::AddVote { sink: 25, src: 0 };
     assert_eq!(vm_register_write(&instr), None);
 }
 
@@ -62,9 +62,16 @@ fn read_mask_write_route_gate() {
 
 #[test]
 fn is_output_matches_side_effecting_writes() {
-    assert!(vm_is_output_instruction(&VmInstruction::PushAction {
-        action_type: 0
+    assert!(vm_is_output_instruction(&VmInstruction::AddVote {
+        sink: 25,
+        src: 0
     }));
+    assert!(vm_is_output_instruction(&VmInstruction::WriteActionParam {
+        slot_idx: 0,
+        src: 0
+    }));
+    assert!(!vm_is_output_instruction(&VmInstruction::Noop));
+    assert!(!vm_is_output_instruction(&VmInstruction::Halt));
     assert!(vm_is_output_instruction(&VmInstruction::WriteRouteGate {
         slot: 0,
         src: 0
@@ -139,7 +146,7 @@ fn backward_slice_returns_none_for_out_of_bounds() {
 #[test]
 fn backward_slice_anchor_only_when_no_deps() {
     // PushAction reads no registers
-    let program = vec![VmInstruction::PushAction { action_type: 1 }];
+    let program = vec![VmInstruction::AddVote { sink: 0, src: 0 }];
     let gene = vm_backward_slice(&program, 0).unwrap();
     assert_eq!(gene.indices, vec![0]);
 }
@@ -190,7 +197,7 @@ fn forward_slice_skips_unrelated() {
 
 #[test]
 fn forward_slice_returns_none_for_non_writer() {
-    let program = vec![VmInstruction::PushAction { action_type: 0 }];
+    let program = vec![VmInstruction::Noop];
     assert_eq!(vm_forward_slice(&program, 0), None);
 }
 
@@ -599,8 +606,11 @@ fn functional_complexity_excludes_unreachable_nodes() {
                     register_count: 4,
                     constants: vec![],
                     program: vec![
-                        VmInstruction::PushAction { action_type: 0 },
-                        VmInstruction::ExecuteActionQueue,
+                        VmInstruction::AddVote { sink: 25, src: 0 },
+                        VmInstruction::WriteActionParam {
+                            slot_idx: 0,
+                            src: 0,
+                        },
                     ],
                 }),
                 targets: vec![RouteTarget {
@@ -616,8 +626,11 @@ fn functional_complexity_excludes_unreachable_nodes() {
                     register_count: 4,
                     constants: vec![],
                     program: vec![
-                        VmInstruction::PushAction { action_type: 0 },
-                        VmInstruction::ExecuteActionQueue,
+                        VmInstruction::AddVote { sink: 25, src: 0 },
+                        VmInstruction::WriteActionParam {
+                            slot_idx: 0,
+                            src: 0,
+                        },
                     ],
                 }),
                 targets: vec![],
@@ -629,8 +642,8 @@ fn functional_complexity_excludes_unreachable_nodes() {
                     register_count: 4,
                     constants: vec![],
                     program: vec![
-                        VmInstruction::PushAction { action_type: 1 },
-                        VmInstruction::ExecuteActionQueue,
+                        VmInstruction::AddVote { sink: 0, src: 0 },
+                        VmInstruction::Halt,
                     ],
                 }),
                 targets: vec![],
@@ -713,8 +726,6 @@ fn functional_complexity_excludes_dead_graph_nodes() {
                         weight: 1.0,
                     }],
                 }],
-                action_bank: vec![],
-                execute_gate: ExecuteGate { inputs: vec![] },
             }),
             targets: vec![],
         }],

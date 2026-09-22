@@ -30,18 +30,58 @@ pub struct MeshExecutionReading {
     /// (T13.F07): position variation between targets naming the same node
     /// does not count.
     pub route_destination_varies: bool,
-    /// Executions that ended `MaxHopsReached`.
-    pub hop_cap_hits: usize,
+    /// Battery executions by tick reason (T19.F04).
+    pub tick_reasons: TickReasonCounts,
+    /// Passes run, summed over the battery (T19.F04).
+    pub passes: usize,
+    /// Passes the genome ended with a guarded `Decide` vote (T19.F04).
+    pub decided_passes: usize,
     /// Passes that reached the per-pass hop cap, summed over the battery
-    /// (T19.F02). Equals `hop_cap_hits` while a tick is one pass.
+    /// (T19.F02); the capped fraction is this over `passes`.
     pub pass_cap_hits: usize,
     /// The reachable mesh contains a cycle, self-targets included (T19.F02).
     pub cycle_carrying: bool,
-    /// Some battery execution dispatched a node more than once (T19.F02).
+    /// Some battery execution dispatched a node more than once within one
+    /// pass (T19.F02; per pass since T19.F04).
     pub revisiting: bool,
     /// Some execution dispatched a node that lies on a cycle and returned an
     /// action list other than `[NoOp]` (T19.F02).
     pub productive_cycle: bool,
+}
+
+/// Battery executions counted by the reason their tick ended (T19.F04).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TickReasonCounts {
+    pub no_decision: usize,
+    pub terminate_voted: usize,
+    pub action_cap_reached: usize,
+    pub energy_exhausted: usize,
+}
+
+impl TickReasonCounts {
+    /// Count one execution that ended for `reason`.
+    pub fn record(&mut self, reason: TerminationReason) {
+        *match reason {
+            TerminationReason::NoDecision => &mut self.no_decision,
+            TerminationReason::TerminateVoted => &mut self.terminate_voted,
+            TerminationReason::ActionCapReached => &mut self.action_cap_reached,
+            TerminationReason::EnergyExhausted => &mut self.energy_exhausted,
+        } += 1;
+    }
+
+    /// Add `other`'s counts to these.
+    pub fn add(&mut self, other: &Self) {
+        self.no_decision += other.no_decision;
+        self.terminate_voted += other.terminate_voted;
+        self.action_cap_reached += other.action_cap_reached;
+        self.energy_exhausted += other.energy_exhausted;
+    }
+
+    /// Executions counted.
+    #[must_use]
+    pub fn total(&self) -> usize {
+        self.no_decision + self.terminate_voted + self.action_cap_reached + self.energy_exhausted
+    }
 }
 
 /// A [`MeshExecutionReading`] with the node ids behind two of its counts.
@@ -147,7 +187,9 @@ pub fn ancestral_payload_replacement(
 /// Everything one observed battery pass yields about a genome's execution.
 struct BatteryObservation {
     executed: BTreeSet<NodeId>,
-    hop_cap_hits: usize,
+    tick_reasons: TickReasonCounts,
+    passes: usize,
+    decided_passes: usize,
     pass_cap_hits: usize,
     cycle_carrying: bool,
     revisiting: bool,
@@ -185,20 +227,27 @@ impl Battery {
             .unzip();
         let cycle_nodes = mesh_cycle_nodes(genome);
         let mut executed = BTreeSet::new();
-        let mut hop_cap_hits = 0;
+        let mut tick_reasons = TickReasonCounts::default();
+        let mut passes = 0;
+        let mut decided_passes = 0;
         let mut pass_cap_hits = 0;
         let mut revisiting = false;
         let mut productive_cycle = false;
         for (output, observation) in snapshots.iter().chain(sequences.iter().flatten()) {
-            if matches!(
-                observation.termination_reason,
-                TerminationReason::MaxHopsReached
-            ) {
-                hop_cap_hits += 1;
-            }
+            tick_reasons.record(observation.termination_reason);
+            passes += output.work_counters.passes as usize;
+            decided_passes += output.work_counters.decided_passes as usize;
             pass_cap_hits += output.work_counters.pass_cap_hits as usize;
             let dispatched: BTreeSet<NodeId> = observation.hops.iter().map(|(id, _)| *id).collect();
-            revisiting |= dispatched.len() < observation.hops.len();
+            // A revisit is a node dispatched twice within one pass: every
+            // pass after the first re-runs the chain from the entry (T19.F04).
+            revisiting |= observation.passes().any(|pass| {
+                pass.iter()
+                    .map(|(id, _)| *id)
+                    .collect::<BTreeSet<_>>()
+                    .len()
+                    < pass.len()
+            });
             productive_cycle |= !dispatched.is_disjoint(&cycle_nodes)
                 && output
                     .actions
@@ -223,7 +272,9 @@ impl Battery {
         };
         BatteryObservation {
             executed,
-            hop_cap_hits,
+            tick_reasons,
+            passes,
+            decided_passes,
             pass_cap_hits,
             cycle_carrying: !cycle_nodes.is_empty(),
             revisiting,
@@ -283,7 +334,9 @@ impl Battery {
     ) -> MeshExecutionSets {
         let BatteryObservation {
             executed,
-            hop_cap_hits,
+            tick_reasons,
+            passes,
+            decided_passes,
             pass_cap_hits,
             cycle_carrying,
             revisiting,
@@ -325,7 +378,9 @@ impl Battery {
                 knockout_count,
                 route_varies_with_input: route_varies_with_input(&routes),
                 route_destination_varies: route_varies_with_input(&destinations),
-                hop_cap_hits,
+                tick_reasons,
+                passes,
+                decided_passes,
                 pass_cap_hits,
                 cycle_carrying,
                 revisiting,
@@ -348,17 +403,31 @@ mod tests {
     use crate::neighborhood::Battery;
     use proptest::prelude::*;
 
+    /// A halting node; with `action`, it votes `Eat` 1.0 and `Decide` 1.0,
+    /// so the pass that commits the `Eat` ends at it.
     fn node(id: u32, targets: &[u32], action: bool) -> NodeGenome {
+        use crate::creature::genome::vote::VoteSink;
         NodeGenome {
             node_id: NodeId::new(id),
             input_refs: vec![],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 1,
-                constants: vec![],
+                constants: vec![1.0],
                 program: if action {
                     vec![
-                        VmInstruction::PushAction { action_type: 1 },
-                        VmInstruction::ExecuteActionQueue,
+                        VmInstruction::LoadConst {
+                            dst: 0,
+                            const_idx: 0,
+                        },
+                        VmInstruction::AddVote {
+                            sink: VoteSink::Eat.index() as u8,
+                            src: 0,
+                        },
+                        VmInstruction::AddVote {
+                            sink: VoteSink::Decide.index() as u8,
+                            src: 0,
+                        },
+                        VmInstruction::Halt,
                     ]
                 } else {
                     vec![VmInstruction::Halt]
@@ -392,9 +461,7 @@ mod tests {
             let mut unreachable = node(2, &[], false);
             if graph {
                 let blank =
-                    crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(
-                        &crate::config::MutationConfig::default(),
-                    );
+                    crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs();
                 silent.backend_def = BackendDef::Graph(blank.clone());
                 unreachable.backend_def = BackendDef::Graph(blank);
             }
@@ -419,8 +486,7 @@ mod tests {
         producer.input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
             type_idx: Default::default(),
         })];
-        let mut graph =
-            CgpGraphBackendDef::new_with_fixed_outputs(&crate::config::MutationConfig::default());
+        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::WeightedSum,
             inputs: vec![GraphEdge {
@@ -452,12 +518,12 @@ mod tests {
                     ref_idx: 0,
                     sub_idx: 0,
                 },
-                VmInstruction::WriteWorldActionMeta {
+                VmInstruction::WriteActionParam {
                     slot_idx: 0,
                     src: 0,
                 },
-                VmInstruction::PushAction { action_type: 1 },
-                VmInstruction::ExecuteActionQueue,
+                VmInstruction::AddVote { sink: 0, src: 0 },
+                VmInstruction::Halt,
             ];
         }
         let g = genome(vec![producer, consumer]);
@@ -494,7 +560,7 @@ mod tests {
             (4, 3, 2, 1)
         );
         assert!(!r.route_varies_with_input);
-        assert_eq!(r.hop_cap_hits, 0);
+        assert_eq!(r.pass_cap_hits, 0);
         assert_eq!(g, before);
     }
 
@@ -613,26 +679,26 @@ mod tests {
                 .cycle_carrying
         );
 
+        // The deciding node ends the committing pass; the next pass, with
+        // nothing left to decide, routes back toward the entry and the cap
+        // ends it before the revisit.
         let productive = genome(vec![node(0, &[1], false), node(1, &[0], true)]);
         let r = battery.mesh_execution(&productive, &config, 0.0);
         assert!(r.cycle_carrying);
-        assert!(
-            !r.revisiting,
-            "the terminal node ends the pass before any revisit"
-        );
+        assert!(!r.revisiting);
         assert!(r.productive_cycle);
-        assert_eq!(r.pass_cap_hits, 0);
-
-        // A self-looping push node revisits and is productive: the capped
-        // pass keeps its queue.
-        let looping_push = genome(vec![node(0, &[0], true)]);
-        let mut looping_push_halts = looping_push.clone();
-        if let BackendDef::Vm(def) = &mut looping_push_halts.nodes[0].backend_def {
-            def.program[1] = VmInstruction::Halt;
-        }
-        let r = battery.mesh_execution(&looping_push_halts, &config, 0.0);
-        assert!(r.cycle_carrying && r.revisiting && r.productive_cycle);
+        assert_eq!(r.decided_passes, 80);
         assert_eq!(r.pass_cap_hits, 80);
+
+        // A self-looping voter without `Decide` revisits and is productive:
+        // both of its passes cap, and the capped pass keeps its votes.
+        let mut looping_voter = genome(vec![node(0, &[0], true)]);
+        if let BackendDef::Vm(def) = &mut looping_voter.nodes[0].backend_def {
+            def.program[2] = VmInstruction::Halt;
+        }
+        let r = battery.mesh_execution(&looping_voter, &config, 0.0);
+        assert!(r.cycle_carrying && r.revisiting && r.productive_cycle);
+        assert_eq!(r.pass_cap_hits, 160);
 
         let capped = genome(vec![
             node(0, &[1], false),
@@ -642,15 +708,15 @@ mod tests {
         let r = battery.mesh_execution(&capped, &config, 0.0);
         assert!(!r.cycle_carrying);
         assert!(!r.productive_cycle);
-        assert_eq!(r.pass_cap_hits, r.hop_cap_hits);
         assert_eq!(r.pass_cap_hits, 80);
+        assert_eq!(r.passes, 80);
     }
 
     #[test]
     fn missing_nodes_and_cap_termination_are_not_inferred_from_visits() {
         assert_eq!(reading(&genome(vec![])).executed_node_count, 0);
         assert_eq!(
-            reading(&genome(vec![node(0, &[99], false)])).hop_cap_hits,
+            reading(&genome(vec![node(0, &[99], false)])).pass_cap_hits,
             0
         );
         let battery = Battery::generate(2);
@@ -663,7 +729,7 @@ mod tests {
         let looping = genome(vec![node(0, &[0], false)]);
         let r = battery.mesh_execution(&looping, &config, 0.0);
         assert_eq!(r.executed_node_count, 1);
-        assert_eq!(r.hop_cap_hits, 80);
+        assert_eq!(r.tick_reasons.no_decision, 80);
         assert_eq!(r.pass_cap_hits, 80);
         assert!(r.cycle_carrying);
         assert!(r.revisiting);
@@ -674,13 +740,15 @@ mod tests {
             node(2, &[], false),
         ]);
         assert_eq!(
-            battery.mesh_execution(&chain, &config, 0.0).hop_cap_hits,
+            battery.mesh_execution(&chain, &config, 0.0).pass_cap_hits,
             80
         );
         let terminal = genome(vec![node(0, &[1], false), node(1, &[0], true)]);
         assert_eq!(
-            battery.mesh_execution(&terminal, &config, 0.0).hop_cap_hits,
-            0
+            battery
+                .mesh_execution(&terminal, &config, 0.0)
+                .decided_passes,
+            80
         );
     }
 
@@ -713,14 +781,6 @@ mod tests {
         assert!(r.route_varies_with_input);
         assert!(r.route_destination_varies);
         assert_eq!(r.knockout_count, 1); // the silent losing terminal only
-                                         // Scores on a terminal backend do not establish applied variation.
-        if let BackendDef::Vm(vm) = &mut g.nodes[0].backend_def {
-            vm.program.push(VmInstruction::ExecuteActionQueue);
-            vm.program.remove(2);
-        }
-        let terminal = reading(&g);
-        assert!(!terminal.route_varies_with_input);
-        assert!(!terminal.route_destination_varies);
     }
 
     /// The ancestral counterfactual touches one node's payload and nothing
@@ -777,11 +837,11 @@ mod tests {
                     dst: 0,
                     slot_idx: 0,
                 },
-                VmInstruction::WriteWorldActionMeta {
+                VmInstruction::WriteActionParam {
                     slot_idx: 0,
                     src: 0,
                 },
-                VmInstruction::PushAction { action_type: 1 },
+                VmInstruction::AddVote { sink: 0, src: 0 },
                 VmInstruction::Halt,
             ];
         }
@@ -809,8 +869,7 @@ mod tests {
         assert_ne!(baseline.sequences, bypass.sequences);
         assert_eq!(reading(&g).knockout_count, 0);
         assert_eq!(reading(&g).backends.vm.contributing, 2);
-        let mut graph =
-            CgpGraphBackendDef::new_with_fixed_outputs(&crate::config::MutationConfig::default());
+        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::WeightedSum,
             inputs: vec![],
@@ -873,26 +932,31 @@ mod tests {
         if let BackendDef::Vm(vm) = &mut middle.backend_def {
             vm.constants[0] = 5.0;
         }
-        let mut consumer = node(2, &[], true);
-        if let BackendDef::Vm(vm) = &mut consumer.backend_def {
-            vm.program[0] = VmInstruction::PushAction { action_type: 2 };
-        }
+        // The consumer steals the bus value: it writes upstream slot 0 into
+        // the `StealEnergy` amount (parameter slot 7) and votes one steal.
+        let mut consumer = node(2, &[], false);
         consumer.input_refs = vec![InputReference::UpstreamSlot(0)];
         if let BackendDef::Vm(vm) = &mut consumer.backend_def {
-            vm.program.splice(
-                0..0,
-                [
-                    VmInstruction::ReadInput {
-                        dst: 0,
-                        ref_idx: 0,
-                        sub_idx: 0,
-                    },
-                    VmInstruction::WriteWorldActionMeta {
-                        slot_idx: 0,
-                        src: 0,
-                    },
-                ],
-            );
+            vm.program = vec![
+                VmInstruction::ReadInput {
+                    dst: 0,
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                VmInstruction::WriteActionParam {
+                    slot_idx: 7,
+                    src: 0,
+                },
+                VmInstruction::LoadConst {
+                    dst: 0,
+                    const_idx: 0,
+                },
+                VmInstruction::AddVote {
+                    sink: crate::creature::genome::vote::VoteSink::StealEnergy(0).index() as u8,
+                    src: 0,
+                },
+                VmInstruction::Halt,
+            ];
         }
         let g = genome(vec![producer, middle, consumer]);
         let battery = Battery::generate(2);
@@ -903,9 +967,17 @@ mod tests {
         assert_ne!(baseline, actual);
         assert_eq!(
             actual.snapshots[0],
-            vec![crate::contracts::WorldAction::Move(
-                crate::contracts::Direction::SE
-            )]
+            vec![crate::contracts::WorldAction::StealEnergy {
+                direction: crate::contracts::Direction::N,
+                amount: 3.0,
+            }]
+        );
+        assert_eq!(
+            baseline.snapshots[0],
+            vec![crate::contracts::WorldAction::StealEnergy {
+                direction: crate::contracts::Direction::N,
+                amount: 5.0,
+            }]
         );
         assert_eq!(reading(&g).knockout_count, 1); // overwritten producer is silent
     }
@@ -916,7 +988,7 @@ mod tests {
             for graph_parity in [0, 1] {
             let g = genome(targets.iter().enumerate().map(|(i,t)| {
                 let mut n = node(i as u32,t,false);
-                if i % 2 == graph_parity { n.backend_def = BackendDef::Graph(crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(&crate::config::MutationConfig::default())); }
+                if i % 2 == graph_parity { n.backend_def = BackendDef::Graph(crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()); }
                 n
             }).collect());
             let before = g.clone();

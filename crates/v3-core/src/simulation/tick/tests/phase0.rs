@@ -190,12 +190,12 @@ fn phase_0_charges_the_founder_its_carrying_cost_beside_decay() {
     let decay = sim.config.energy.lifecycle.energy_decay_per_tick;
     let rate = sim.config.energy.lifecycle.genome_carry_cost_per_unit;
     assert_eq!(rate, 1e-4);
-    // The canonical founder carries 111 genome units at this revision.
-    assert_eq!(sim.creatures[id].cached_genome_size, 111);
+    // The canonical founder carries 97 genome units at this revision.
+    assert_eq!(sim.creatures[id].cached_genome_size, 97);
 
     run_phase_0(&mut sim);
 
-    let expected = initial - (decay + 111.0 * rate);
+    let expected = initial - (decay + 97.0 * rate);
     assert_eq!(sim.creatures[id].energy, expected);
     // The carrying charge is visible: decay alone would leave more energy.
     assert!(sim.creatures[id].energy < initial - decay);

@@ -1,6 +1,5 @@
 use rand::Rng;
 
-use crate::config::MutationConfig;
 use crate::contracts::{NodeId, RouteTarget};
 use crate::creature::genome::cgp::CgpGraphBackendDef;
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
@@ -13,22 +12,17 @@ pub(super) fn minimal_vm_backend() -> BackendDef {
     })
 }
 
-pub(super) fn blank_graph_backend(config: &MutationConfig) -> BackendDef {
-    BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs(config))
+pub(super) fn blank_graph_backend() -> BackendDef {
+    BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs())
 }
 
 /// Either blank backend preserves the incoming bus and mesh side outputs.
-pub(super) fn detour(
-    node_id: NodeId,
-    successor: NodeId,
-    config: &MutationConfig,
-    rng: &mut impl Rng,
-) -> NodeGenome {
+pub(super) fn detour(node_id: NodeId, successor: NodeId, rng: &mut impl Rng) -> NodeGenome {
     NodeGenome {
         node_id,
         input_refs: vec![],
         backend_def: if rng.gen_bool(0.5) {
-            blank_graph_backend(config)
+            blank_graph_backend()
         } else {
             minimal_vm_backend()
         },

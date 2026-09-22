@@ -3,9 +3,10 @@ use crate::config::{MutationConfig, OrdinaryFoodTypeId, RuntimeConfig};
 use crate::contracts::{NodeId, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{
-    ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate,
-    GraphEdge, GraphSource, OutputSink, OutputSinkKind, WorldActionKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+    OutputSinkKind,
 };
+use crate::creature::genome::vote::{VoteKind, VoteSink};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -254,9 +255,9 @@ fn prune_applies_to_founder_node_zero_only_and_is_silent() {
 #[test]
 fn prune_on_the_founder_vm_node_is_silent() {
     let config = default_config();
-    let mut genome = v3alpha1_founder_genome();
+    let mut genome = crate::creature::founder::vm_decision_founder_genome();
     genome.nodes[1].input_refs.push(InputReference::ActionQueue);
-    assert_eq!(prunable_indices(&genome.nodes[1]), vec![6]);
+    assert_eq!(prunable_indices(&genome.nodes[1]), vec![7]);
     let base = battery_signature(&genome);
 
     let mut pruned = genome.clone();
@@ -265,7 +266,7 @@ fn prune_on_the_founder_vm_node_is_silent() {
         .unwrap();
     assert_eq!(
         pruned.nodes[1].input_refs,
-        v3alpha1_founder_genome().nodes[1].input_refs
+        crate::creature::founder::vm_decision_founder_genome().nodes[1].input_refs
     );
     assert_eq!(pruned.nodes[1].backend_def, genome.nodes[1].backend_def);
     assert_eq!(battery_signature(&pruned), base);
@@ -361,19 +362,24 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
             inputs: vec![leaf(3), leaf(0)],
             plasticity: None,
         }],
-        output_sinks: vec![OutputSink {
-            kind: OutputSinkKind::CustomOutput(0),
-            inputs: vec![leaf(2)],
-        }],
-        action_bank: vec![ActionSlot {
-            behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
-            gate_inputs: vec![leaf(4)],
-            param_inputs: vec![leaf(0)],
-            direction_bids: Vec::new(),
-        }],
-        execute_gate: ExecuteGate {
-            inputs: vec![leaf(7)],
-        },
+        output_sinks: vec![
+            OutputSink {
+                kind: OutputSinkKind::CustomOutput(0),
+                inputs: vec![leaf(2)],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionVote(VoteSink::Eat),
+                inputs: vec![leaf(4)],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionParam(VoteKind::Eat, 0),
+                inputs: vec![leaf(0)],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
+                inputs: vec![leaf(7)],
+            },
+        ],
     };
     let base_genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -695,17 +701,16 @@ fn graph_node_genome_zero_refs() -> CreatureGenome {
                     inputs: vec![],
                     plasticity: None,
                 }],
-                output_sinks: vec![OutputSink {
-                    kind: OutputSinkKind::CustomOutput(0),
-                    inputs: vec![],
-                }],
-                action_bank: vec![ActionSlot {
-                    behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
-                    gate_inputs: vec![],
-                    param_inputs: vec![],
-                    direction_bids: Vec::new(),
-                }],
-                execute_gate: ExecuteGate { inputs: vec![] },
+                output_sinks: vec![
+                    OutputSink {
+                        kind: OutputSinkKind::CustomOutput(0),
+                        inputs: vec![],
+                    },
+                    OutputSink {
+                        kind: OutputSinkKind::ActionVote(VoteSink::Eat),
+                        inputs: vec![],
+                    },
+                ],
             }),
             targets: vec![],
         }],
@@ -735,28 +740,6 @@ fn count_input_leaf_edges_for_ref(genome: &CreatureGenome, node_idx: usize, ref_
             )
             .count();
     }
-    for slot in &def.action_bank {
-        count += slot
-            .gate_inputs
-            .iter()
-            .filter(
-                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx),
-            )
-            .count();
-        count += slot
-            .param_inputs
-            .iter()
-            .filter(
-                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx),
-            )
-            .count();
-    }
-    count += def
-        .execute_gate
-        .inputs
-        .iter()
-        .filter(|e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx))
-        .count();
     count
 }
 

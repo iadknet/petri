@@ -69,7 +69,6 @@ impl VmTraceSink for RecordingVmTraceSink {
             steps: self.steps,
             final_registers: Vec::new(),
             final_payload: *upstream_slots,
-            final_meta: [0.0; 8],
             slot_writes: self.slot_writes,
         }
     }
@@ -121,7 +120,6 @@ impl VmTraceSink for RecordingVmTraceSink {
         def: &VmBackendDef,
         registers: &[f32],
         payload: [f32; OUTPUT_SLOT_COUNT],
-        meta: [f32; 8],
     ) -> VmTrace {
         VmTrace {
             register_count: def.register_count,
@@ -129,7 +127,6 @@ impl VmTraceSink for RecordingVmTraceSink {
             steps: self.steps,
             final_registers: registers.to_vec(),
             final_payload: payload,
-            final_meta: meta,
             slot_writes: self.slot_writes,
         }
     }

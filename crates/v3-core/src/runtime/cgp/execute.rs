@@ -393,8 +393,7 @@ mod work_counter_tests {
     use crate::config::RuntimeConfig;
     use crate::contracts::NodeId;
     use crate::creature::genome::cgp::{
-        ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind,
-        ExecuteGate, GraphEdge, GraphSource, WorldActionKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
     use crate::creature::genome::{
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig,
@@ -437,8 +436,6 @@ mod work_counter_tests {
                         plasticity: None,
                     }],
                     output_sinks: vec![],
-                    action_bank: vec![],
-                    execute_gate: ExecuteGate { inputs: vec![] },
                 }),
                 targets: vec![],
             }],
@@ -496,22 +493,15 @@ mod work_counter_tests {
                             modulation: None,
                         }),
                     }],
-                    output_sinks: vec![],
-                    action_bank: vec![ActionSlot {
-                        behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
-                        gate_inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: 1.0,
-                        }],
-                        param_inputs: vec![],
-                        direction_bids: Vec::new(),
-                    }],
-                    execute_gate: ExecuteGate {
+                    output_sinks: vec![crate::creature::genome::cgp::OutputSink {
+                        kind: crate::creature::genome::cgp::OutputSinkKind::ActionVote(
+                            crate::creature::genome::vote::VoteSink::Terminate,
+                        ),
                         inputs: vec![GraphEdge {
                             source: GraphSource::ComputeNode(0),
                             weight: 1.0,
                         }],
-                    },
+                    }],
                 }),
                 targets: vec![],
             }],
@@ -579,8 +569,6 @@ mod clock_tests {
                     weight: 1.0,
                 }],
             }],
-            action_bank: vec![],
-            execute_gate: crate::creature::genome::cgp::ExecuteGate { inputs: vec![] },
         }
     }
 

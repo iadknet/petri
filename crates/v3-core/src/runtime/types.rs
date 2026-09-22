@@ -20,20 +20,18 @@ pub(crate) struct NodeResult {
     pub output_slots: [f32; OUTPUT_SLOT_COUNT],
     /// Per-target gate scores for routing decisions.
     pub route_gates: RouteGateMap,
-    /// True when execution should stop (ExecuteActionQueue or Halt).
-    pub terminal: bool,
-    /// True when the node was halted due to energy exhaustion.
-    /// When true, the mesh executor MUST discard the action queue and return `[NoOp]`.
+    /// True when the node was halted due to energy exhaustion, which ends
+    /// the pass and the tick with the committed queue kept (T19.F04).
     pub energy_exhausted: bool,
 }
 
 impl NodeResult {
-    /// Create a non-terminal result (halt or step cap reached — node finished but mesh continues).
+    /// A dispatch that finished (halt, program end, or step cap); the mesh
+    /// routes on its gates.
     pub fn halted(output_slots: [f32; OUTPUT_SLOT_COUNT], route_gates: RouteGateMap) -> Self {
         Self {
             output_slots,
             route_gates,
-            terminal: false,
             energy_exhausted: false,
         }
     }
@@ -43,18 +41,7 @@ impl NodeResult {
         Self {
             output_slots: [0.0; OUTPUT_SLOT_COUNT],
             route_gates: RouteGateMap::default(),
-            terminal: true,
             energy_exhausted: true,
-        }
-    }
-
-    /// Create a terminal result (action emitted or ExecuteActionQueue).
-    pub fn terminal(output_slots: [f32; OUTPUT_SLOT_COUNT], route_gates: RouteGateMap) -> Self {
-        Self {
-            output_slots,
-            route_gates,
-            terminal: true,
-            energy_exhausted: false,
         }
     }
 }
@@ -77,7 +64,8 @@ pub struct ComputeCostReport {
 /// Passed as `&mut` through the mesh hop chain; consumed by the mesh executor on return.
 #[derive(Debug)]
 pub struct MeshSideOutputs {
-    /// Action queue that persists across mesh hops.
+    /// Committed actions, one per pass that committed (T19.F04). Nodes read
+    /// it through the queue inputs; only the pass end writes it.
     pub action_queue: ActionQueue,
     /// Energy bid for turn-order priority. 0.0 = no bid (default).
     pub priority_bid: f32,
@@ -85,17 +73,19 @@ pub struct MeshSideOutputs {
     pub work_counters: WorkCounters,
     /// Applied cognition debits and exhausting sink; never used to control execution.
     pub energy_observation: crate::simulation::energy_accounting::CognitionEnergyObservation,
-    /// Inert vote surface (T19.F03): the sanitized sum of the latest committed
-    /// contribution of every node visited this evaluation. Nothing reads it.
+    /// The current pass's vote vector: the sanitized sum of the latest
+    /// committed contribution of every node visited this pass. Cleared at
+    /// every pass start.
     pub votes: VoteVector,
-    /// Per-kind commit counters (T19.F03). Zero throughout: nothing commits a
-    /// vote to a world action until T19.F04.
+    /// Per-kind bars (T19.F04): commits of each kind this tick. Zeroed at
+    /// tick start, raised by one per commit.
     pub commit_counts: [u32; VOTE_KIND_COUNT],
-    /// Inert parameter surface (T19.F03): a wired `ActionParam(kind, i)` sink
-    /// overwrites `action_params[kind][i]`, last visit wins. Nothing reads it.
+    /// Parameter surface: a wired `ActionParam(kind, i)` sink or a
+    /// `WriteActionParam` overwrites `action_params[kind][i]`, last write
+    /// wins. Zeroed at tick start and read at every commit.
     pub action_params: [[f32; VOTE_PARAM_SLOTS as usize]; VOTE_KIND_COUNT],
-    /// Latest committed contribution per genome node index, in first-commit
-    /// order. A revisit replaces the node's entry rather than adding one.
+    /// Latest committed contribution per genome node index this pass, in
+    /// first-commit order. A revisit replaces the node's entry.
     node_contributions: Vec<(usize, VoteVector)>,
     /// Contribution staged by the dispatch in flight, taken by the mesh loop
     /// once the dispatch returns. `None` when the dispatch did not commit.
@@ -118,6 +108,14 @@ impl MeshSideOutputs {
         }
     }
 
+    /// Start a pass: the vote vector and the per-node contributions clear;
+    /// the queue, bars, parameter surface, and bid are tick-scoped.
+    pub(crate) fn begin_pass(&mut self) {
+        self.votes = [0.0; VOTE_SINK_COUNT];
+        self.node_contributions.clear();
+        self.staged_contribution = None;
+    }
+
     /// Stage this dispatch's vote contribution (T19.F03). Called at the
     /// boundary where a dispatch commits its effects, which is every exit
     /// except energy exhaustion; entries are sanitized here.
@@ -125,9 +123,24 @@ impl MeshSideOutputs {
         self.staged_contribution = Some(contribution.map(sanitize_f32));
     }
 
+    /// A dispatch's observable action effects for tests: its staged vote
+    /// contribution (zeros when it staged none) and the parameter surface.
+    #[cfg(test)]
+    pub(crate) fn dispatch_effects(
+        &self,
+    ) -> (
+        VoteVector,
+        [[f32; VOTE_PARAM_SLOTS as usize]; VOTE_KIND_COUNT],
+    ) {
+        (
+            self.staged_contribution.unwrap_or([0.0; VOTE_SINK_COUNT]),
+            self.action_params,
+        )
+    }
+
     /// Take the staged contribution as `node_idx`'s latest, replacing that
-    /// node's previous one, and re-sum the mesh vote vector. Returns what the
-    /// hop committed: zeros when the dispatch staged nothing.
+    /// node's previous one this pass, and re-sum the pass vote vector.
+    /// Returns what the hop committed: zeros when the dispatch staged nothing.
     pub(crate) fn commit_vote_contribution(&mut self, node_idx: usize) -> VoteVector {
         let Some(contribution) = self.staged_contribution.take() else {
             return [0.0; VOTE_SINK_COUNT];
@@ -175,9 +188,12 @@ pub struct WorkCounters {
     /// Includes VM writes executed before a later exhaustion discards its copy.
     pub shared_memory_writes_changed: u32,
     /// Passes that reached the per-pass hop cap (`max_mesh_hops`) and ended
-    /// with their queue kept (T19.F02). Equals the `MaxHopsReached`
-    /// termination count while a tick is one pass.
+    /// with their votes and queue kept (T19.F02).
     pub pass_cap_hits: u32,
+    /// Passes run this tick (T19.F04), at most `max_actions_per_turn`.
+    pub passes: u32,
+    /// Passes the genome ended with a guarded `Decide` vote (T19.F04).
+    pub decided_passes: u32,
 }
 
 /// Complete output of one creature's mesh evaluation for a single tick.
@@ -194,14 +210,12 @@ pub struct MeshOutput {
     pub work_counters: WorkCounters,
     /// Dispatch-local applied energy observations, committed sequentially by Phase 2.
     pub energy_observation: crate::simulation::energy_accounting::CognitionEnergyObservation,
-    /// Why the mesh chain stopped. Carried on every execution mode's output so
-    /// the untraced production path can count terminations without a trace.
+    /// Why the tick's pass loop stopped. Carried on every execution mode's
+    /// output so the untraced production path can count reasons without a
+    /// trace.
     pub termination_reason: TerminationReason,
-    /// The evaluation's accumulated vote vector (T19.F03), carried for the
-    /// trace. Nothing else reads it.
-    pub votes: VoteVector,
-    /// Per-kind commit counters (T19.F03), carried for the trace. Zero until
-    /// T19.F04 commits a vote.
+    /// Final per-kind bars (T19.F04): commits of each kind this tick. The
+    /// pass count is `work_counters.passes`.
     pub commit_counts: [u32; VOTE_KIND_COUNT],
 }
 
@@ -267,9 +281,8 @@ mod tests {
     }
 
     #[test]
-    fn node_result_halted_is_not_terminal() {
+    fn node_result_halted_is_not_exhausted() {
         let r = NodeResult::halted([0.0; OUTPUT_SLOT_COUNT], RouteGateMap::default());
-        assert!(!r.terminal);
         assert!(!r.energy_exhausted);
     }
 
@@ -277,15 +290,7 @@ mod tests {
     fn node_result_exhausted_has_flag() {
         let r = NodeResult::exhausted();
         assert!(r.energy_exhausted);
-        assert!(r.terminal);
         assert_eq!(r.route_gates, RouteGateMap::default());
-    }
-
-    #[test]
-    fn node_result_terminal_is_terminal() {
-        let r = NodeResult::terminal([0.0; OUTPUT_SLOT_COUNT], RouteGateMap::default());
-        assert!(r.terminal);
-        assert!(!r.energy_exhausted);
     }
 
     #[test]

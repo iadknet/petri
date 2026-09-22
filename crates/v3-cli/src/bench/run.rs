@@ -232,6 +232,8 @@ pub(super) fn run_one_seed(
         actions_applied: sim.stats.actions_applied_total,
         births: sim.stats.reproduction_actions_spawned_total,
         pass_cap_hits: sim.stats.pass_cap_hits_total,
+        passes: sim.stats.passes_total,
+        decided_passes: sim.stats.decided_passes_total,
         final_population: persistence.final_population,
         extinction_tick: persistence.extinction_tick,
     };
@@ -310,6 +312,8 @@ fn accumulate_totals(per_seed: &[PerSeed]) -> Totals {
         totals.actions_applied += row.actions_applied;
         totals.births += row.births;
         totals.pass_cap_hits += row.pass_cap_hits;
+        totals.passes += row.passes;
+        totals.decided_passes += row.decided_passes;
         totals
     })
 }
@@ -323,6 +327,8 @@ fn normalized_totals(totals: &Totals) -> PerCreatureTick {
         actions_applied: Some(ratio(totals.actions_applied, totals.creature_ticks)),
         births: Some(ratio(totals.births, totals.creature_ticks)),
         pass_cap_hits: Some(ratio(totals.pass_cap_hits, totals.creature_ticks)),
+        passes: Some(ratio(totals.passes, totals.creature_ticks)),
+        decided_passes: Some(ratio(totals.decided_passes, totals.creature_ticks)),
     }
 }
 

@@ -498,7 +498,7 @@ fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names()
     assert_eq!(steering.seed, 9);
     assert_eq!(steering.base_count, 6);
     assert_eq!(steering.reading.scenarios, 48);
-    assert!(!steering.reading.bank_written, "the founder writes no bank");
+    assert!(steering.reading.move_voted, "the vote founder votes Move");
     assert!(
         matches!(gate_neighborhood.evolved, Indicator::Undefined(_)),
         "the evolved half never runs in the gate profile"
@@ -614,39 +614,47 @@ proptest! {
     #[test]
     fn profile_totals_are_the_field_wise_sum_of_every_case_row(
         rows in proptest::collection::vec(
-            (0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000),
+            (
+                (0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000),
+                (0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000),
+            ),
             0..6usize,
         )
     ) {
         let per_seed: Vec<PerSeed> = rows
             .iter()
             .enumerate()
-            .map(|(index, row)| PerSeed {
+            .map(|(index, (a, b))| PerSeed {
                 tick_zero_connectivity: None,
                 seed: index as u64,
-                ticks: row.0,
-                creature_ticks: row.1,
-                mesh_hops: row.2,
-                vm_steps: row.3,
-                graph_relax_iters: row.4,
-                plasticity_updates: row.5,
-                actions_applied: row.6,
-                births: row.7,
-                pass_cap_hits: row.8,
+                ticks: a.0,
+                creature_ticks: a.1,
+                mesh_hops: a.2,
+                vm_steps: a.3,
+                graph_relax_iters: a.4,
+                plasticity_updates: a.5,
+                actions_applied: b.0,
+                births: b.1,
+                pass_cap_hits: b.2,
+                passes: b.3,
+                decided_passes: b.4,
                 final_population: 0,
                 extinction_tick: None,
             })
             .collect();
         let totals = accumulate_totals(&per_seed);
-        prop_assert_eq!(totals.ticks, rows.iter().map(|r| r.0).sum::<u64>());
-        prop_assert_eq!(totals.creature_ticks, rows.iter().map(|r| r.1).sum::<u64>());
-        prop_assert_eq!(totals.mesh_hops, rows.iter().map(|r| r.2).sum::<u64>());
-        prop_assert_eq!(totals.vm_steps, rows.iter().map(|r| r.3).sum::<u64>());
-        prop_assert_eq!(totals.graph_relax_iters, rows.iter().map(|r| r.4).sum::<u64>());
-        prop_assert_eq!(totals.plasticity_updates, rows.iter().map(|r| r.5).sum::<u64>());
-        prop_assert_eq!(totals.actions_applied, rows.iter().map(|r| r.6).sum::<u64>());
-        prop_assert_eq!(totals.births, rows.iter().map(|r| r.7).sum::<u64>());
-        prop_assert_eq!(totals.pass_cap_hits, rows.iter().map(|r| r.8).sum::<u64>());
+        let sum = |field: fn(&PerSeed) -> u64| per_seed.iter().map(field).sum::<u64>();
+        prop_assert_eq!(totals.ticks, rows.iter().map(|(a, _)| a.0).sum::<u64>());
+        prop_assert_eq!(totals.creature_ticks, sum(|r| r.creature_ticks));
+        prop_assert_eq!(totals.mesh_hops, sum(|r| r.mesh_hops));
+        prop_assert_eq!(totals.vm_steps, sum(|r| r.vm_steps));
+        prop_assert_eq!(totals.graph_relax_iters, sum(|r| r.graph_relax_iters));
+        prop_assert_eq!(totals.plasticity_updates, sum(|r| r.plasticity_updates));
+        prop_assert_eq!(totals.actions_applied, sum(|r| r.actions_applied));
+        prop_assert_eq!(totals.births, sum(|r| r.births));
+        prop_assert_eq!(totals.pass_cap_hits, sum(|r| r.pass_cap_hits));
+        prop_assert_eq!(totals.passes, sum(|r| r.passes));
+        prop_assert_eq!(totals.decided_passes, sum(|r| r.decided_passes));
     }
 }
 

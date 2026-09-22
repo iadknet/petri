@@ -1,23 +1,23 @@
-use crate::config::{EnergyLifecycleConfig, FounderProfile, MutationConfig, OrdinaryFoodTypeId};
+use crate::config::{EnergyLifecycleConfig, FounderProfile, OrdinaryFoodTypeId};
 use crate::contracts::{
     DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, StaticIntrospectionKey,
     WorldInputKey,
 };
-use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
+use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 
-use super::cgp_founder::build_cgp_founder_graph_with_thresholds;
+use super::cgp_founder::{
+    build_cgp_founder_decision_graph, build_cgp_founder_graph_with_thresholds,
+};
 
 /// `genome_size()` of the canonical V3Alpha1 founder. The genome replication
 /// cost (T03.F11) charges only the units above this anchor, so the founder's
 /// reproduce charge is unchanged; `creature::state` tests pin the founder's
 /// measured size to this constant.
-pub const FOUNDER_GENOME_SIZE_UNITS: u32 = 111;
+pub const FOUNDER_GENOME_SIZE_UNITS: u32 = 97;
 
 /// Return the canonical v3alpha1 founder genome.
 ///
-/// 2-node mesh: Node 0 (Graph sensor aggregator) -> Node 1 (VM decision emitter).
+/// 2-node mesh: Node 0 (Graph sensor aggregator) -> Node 1 (Graph vote decision).
 /// Spec: v3-startup-seeding-spec.md Section 5.1.
 pub fn v3alpha1_founder_genome() -> CreatureGenome {
     founder_genome(FounderProfile::V3Alpha1)
@@ -32,8 +32,8 @@ pub struct FounderReproducePolicy {
     /// `Threshold` compute node in node 0). The founder gates on fullness:
     /// the fraction is its own constant, not recomputed from `max_energy`.
     pub energy_threshold: f32,
-    /// VM constant index 5: the fraction of the parent's post-cost energy
-    /// the child starts with, written to `meta[1]` of the reproduce action.
+    /// The fraction of the parent's post-cost energy the child starts with:
+    /// node 1's constant on `ActionParam(Reproduce, 1)` (T19.F04).
     pub transfer_fraction: f32,
 }
 
@@ -83,7 +83,7 @@ pub fn founder_genome_with_age_gate(
                 lifecycle.min_reproduce_age,
                 lifecycle.age_reference_ticks,
             ),
-            node1_vm_decision(forage_first, policy.transfer_fraction),
+            node1_graph_decision(forage_first, policy.transfer_fraction),
         ],
     }
 }
@@ -105,7 +105,6 @@ fn node0_graph_sensor(
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
         ],
         backend_def: BackendDef::Graph(build_cgp_founder_graph_with_thresholds(
-            &MutationConfig::default(),
             reproduce_energy_threshold,
             min_reproduce_age_ticks,
             age_reference_ticks,
@@ -118,215 +117,134 @@ fn node0_graph_sensor(
     }
 }
 
-struct FounderVmBuilder {
-    instructions: Vec<VmInstruction>,
-    labels: Vec<Option<usize>>,
-    jumps: Vec<(usize, usize)>,
-}
-
-impl FounderVmBuilder {
-    fn new() -> Self {
-        Self {
-            instructions: Vec::new(),
-            labels: Vec::new(),
-            jumps: Vec::new(),
-        }
-    }
-
-    fn label(&mut self) -> usize {
-        let label = self.labels.len();
-        self.labels.push(None);
-        label
-    }
-
-    fn mark(&mut self, label: usize) {
-        self.labels[label] = Some(self.instructions.len());
-    }
-
-    fn push(&mut self, instruction: VmInstruction) {
-        self.instructions.push(instruction);
-    }
-
-    fn jump_if_zero(&mut self, cond: u8, target: usize) {
-        let index = self.instructions.len();
-        self.instructions
-            .push(VmInstruction::JumpIfZero { cond, offset: 0 });
-        self.jumps.push((index, target));
-    }
-
-    fn jump(&mut self, target: usize) {
-        let index = self.instructions.len();
-        self.instructions.push(VmInstruction::Jump { offset: 0 });
-        self.jumps.push((index, target));
-    }
-
-    fn finish(mut self) -> Vec<VmInstruction> {
-        for (index, label) in self.jumps {
-            let target = self.labels[label].expect("founder VM label must be marked");
-            let offset = target as i32 - index as i32 - 1;
-            match &mut self.instructions[index] {
-                VmInstruction::JumpIfZero { offset: value, .. }
-                | VmInstruction::Jump { offset: value } => *value = offset,
-                _ => unreachable!("founder VM jump table points to non-jump"),
-            }
-        }
-        self.instructions
-    }
-}
-
-fn set_founder_direction(builder: &mut FounderVmBuilder, direction: usize) {
-    if direction == 0 {
-        builder.push(VmInstruction::Sub { dst: 0, a: 0, b: 0 });
-    } else {
-        builder.push(VmInstruction::LoadConst {
-            dst: 0,
-            const_idx: direction as u8 + 1,
-        });
-    }
-}
-
-fn append_founder_direction(builder: &mut FounderVmBuilder, neighbors: [u8; 4]) {
-    let choose_north = builder.label();
-    let choose_east = builder.label();
-    let choose_south = builder.label();
-    let emit = builder.label();
-
-    // First compute the maximum over the complete cardinal ring.  Comparing
-    // each candidate against that value avoids the adjacent-pair trap where
-    // an early local winner can hide a larger value in the remaining ring.
-    builder.push(VmInstruction::Max {
-        dst: 14,
-        a: neighbors[0],
-        b: neighbors[1],
-    });
-    builder.push(VmInstruction::Max {
-        dst: 14,
-        a: 14,
-        b: neighbors[2],
-    });
-    builder.push(VmInstruction::Max {
-        dst: 14,
-        a: 14,
-        b: neighbors[3],
-    });
-
-    // Check in N/E/S/W order so ties have a stable, documented preference for
-    // the first direction in the ring.
-    for (candidate, target) in [
-        (neighbors[0], choose_north),
-        (neighbors[1], choose_east),
-        (neighbors[2], choose_south),
-    ] {
-        builder.push(VmInstruction::CmpGt {
-            dst: 13,
-            a: 14,
-            b: candidate,
-        });
-        builder.jump_if_zero(13, target);
-    }
-    set_founder_direction(builder, 3);
-    builder.jump(emit);
-
-    builder.mark(choose_north);
-    set_founder_direction(builder, 0);
-    builder.jump(emit);
-
-    builder.mark(choose_east);
-    set_founder_direction(builder, 1);
-    builder.jump(emit);
-
-    builder.mark(choose_south);
-    set_founder_direction(builder, 2);
-
-    builder.mark(emit);
-    builder.push(VmInstruction::WriteWorldActionMeta {
-        slot_idx: 0,
-        src: 0,
-    });
-}
-
-fn append_founder_eat(builder: &mut FounderVmBuilder) {
-    builder.push(VmInstruction::WriteWorldActionMeta {
-        slot_idx: 0,
-        src: 15,
-    });
-    builder.push(VmInstruction::PushAction { action_type: 1 });
-}
-
-fn append_founder_move(builder: &mut FounderVmBuilder) {
-    append_founder_direction(builder, [2, 3, 4, 5]);
-    builder.push(VmInstruction::PushAction { action_type: 2 });
-    builder.push(VmInstruction::ExecuteActionQueue);
-}
-
-fn append_founder_reproduce(builder: &mut FounderVmBuilder, fallback: usize) {
-    builder.push(VmInstruction::CmpGt {
-        dst: 13,
-        a: 1,
-        b: 15,
-    });
-    builder.jump_if_zero(13, fallback);
-    append_founder_direction(builder, [2, 3, 4, 5]);
-    builder.push(VmInstruction::LoadConst {
-        dst: 14,
-        const_idx: 5,
-    });
-    builder.push(VmInstruction::WriteWorldActionMeta {
-        slot_idx: 1,
-        src: 14,
-    });
-    builder.push(VmInstruction::PushAction { action_type: 3 });
-    builder.push(VmInstruction::ExecuteActionQueue);
-}
-
-fn node1_vm_decision(forage_first: bool, reproduce_transfer_fraction: f32) -> NodeGenome {
-    let input_refs = (0..6).map(InputReference::UpstreamSlot).collect();
-    let mut builder = FounderVmBuilder::new();
-    for register in 0..6u8 {
-        builder.push(VmInstruction::ReadInput {
-            dst: register,
-            ref_idx: u16::from(register),
-            sub_idx: 0,
-        });
-    }
-    // Keep a dedicated zero register: direction selection overwrites its scratch registers.
-    builder.push(VmInstruction::Sub {
-        dst: 15,
-        a: 15,
-        b: 15,
-    });
-    let forage = builder.label();
-    let fallback = builder.label();
-    if !forage_first {
-        append_founder_reproduce(&mut builder, forage);
-    }
-    builder.mark(forage);
-    builder.push(VmInstruction::CmpGt {
-        dst: 13,
-        a: 0,
-        b: 15,
-    });
-    builder.jump_if_zero(13, fallback);
-    append_founder_eat(&mut builder);
-    append_founder_move(&mut builder);
-    builder.mark(fallback);
-    if forage_first {
-        let explore = builder.label();
-        append_founder_reproduce(&mut builder, explore);
-        builder.mark(explore);
-        append_founder_eat(&mut builder);
-    }
-    append_founder_move(&mut builder);
+/// Node 1 reads node 0's six slots and the `ActionQueue` compound input
+/// (`FOUNDER_QUEUE_REF`) and votes the founder's decision (T19.F04).
+fn node1_graph_decision(forage_first: bool, reproduce_transfer_fraction: f32) -> NodeGenome {
+    let mut input_refs: Vec<InputReference> = (0..6).map(InputReference::UpstreamSlot).collect();
+    input_refs.push(InputReference::ActionQueue);
+    debug_assert_eq!(
+        input_refs.len(),
+        usize::from(super::cgp_founder::FOUNDER_QUEUE_REF) + 1
+    );
     NodeGenome {
         node_id: NodeId::new(1),
         input_refs,
-        backend_def: BackendDef::Vm(VmBackendDef {
-            register_count: 20,
-            constants: vec![0.0, 1.0, 2.0, 4.0, 6.0, reproduce_transfer_fraction],
-            program: builder.finish(),
-        }),
+        backend_def: BackendDef::Graph(build_cgp_founder_decision_graph(
+            forage_first,
+            reproduce_transfer_fraction,
+        )),
         targets: vec![],
     }
+}
+
+/// The V3Alpha1 founder with its decision node as a VM program voting the
+/// same formulas as [`build_cgp_founder_decision_graph`]: a test fixture for
+/// the VM mutation operators, which need a VM node carrying the founder's
+/// program shape (reads, a constant pool with the transfer fraction at index
+/// 5, votes, and a parameter write).
+#[cfg(test)]
+pub(crate) fn vm_decision_founder_genome() -> CreatureGenome {
+    use crate::creature::genome::vote::VoteSink;
+    use crate::creature::genome::{VmBackendDef, VmInstruction};
+    let fraction = founder_reproduce_policy(FounderProfile::V3Alpha1).transfer_fraction;
+    let mut program: Vec<VmInstruction> = (0..7u8)
+        .map(|register| VmInstruction::ReadInput {
+            dst: register,
+            ref_idx: u16::from(register),
+            sub_idx: 0,
+        })
+        .collect();
+    let vote = |sink: VoteSink, src: u8| VmInstruction::AddVote {
+        sink: sink.index() as u8,
+        src,
+    };
+    let load = |dst: u8, const_idx: u8| VmInstruction::LoadConst { dst, const_idx };
+    program.extend([
+        // r7 = 0, r9 = f = [food > 0].
+        load(7, 0),
+        VmInstruction::CmpGt { dst: 9, a: 0, b: 7 },
+        // r11 = q = [type > 2.5] - [type > 3.5].
+        load(10, 2),
+        VmInstruction::CmpGt {
+            dst: 11,
+            a: 6,
+            b: 10,
+        },
+        load(10, 3),
+        VmInstruction::CmpGt {
+            dst: 12,
+            a: 6,
+            b: 10,
+        },
+        VmInstruction::Sub {
+            dst: 11,
+            a: 11,
+            b: 12,
+        },
+        vote(VoteSink::Terminate, 11),
+        // r12 = 2 (g + q) with g = can (r1); Eat = f - r12.
+        VmInstruction::Add {
+            dst: 12,
+            a: 1,
+            b: 11,
+        },
+        VmInstruction::Add {
+            dst: 12,
+            a: 12,
+            b: 12,
+        },
+        VmInstruction::Sub {
+            dst: 13,
+            a: 9,
+            b: 12,
+        },
+        vote(VoteSink::Eat, 13),
+        load(14, 4),
+        load(16, 6),
+    ]);
+    for (ring, d) in [(2u8, 0u8), (3, 2), (4, 4), (5, 6)] {
+        program.extend([
+            // r15 = 0.4 ring + 0.5.
+            VmInstruction::Mul {
+                dst: 15,
+                a: ring,
+                b: 14,
+            },
+            VmInstruction::Add {
+                dst: 15,
+                a: 15,
+                b: 16,
+            },
+            VmInstruction::Sub {
+                dst: 17,
+                a: 15,
+                b: 12,
+            },
+            vote(VoteSink::Move(d), 17),
+            VmInstruction::Mul {
+                dst: 18,
+                a: 15,
+                b: 1,
+            },
+            vote(VoteSink::Reproduce(d), 18),
+        ]);
+    }
+    program.extend([
+        load(19, 5),
+        // params[Reproduce][1].
+        VmInstruction::WriteActionParam {
+            slot_idx: 5,
+            src: 19,
+        },
+        VmInstruction::Halt,
+    ]);
+    let mut genome = v3alpha1_founder_genome();
+    genome.nodes[1].backend_def = BackendDef::Vm(VmBackendDef {
+        register_count: 20,
+        constants: vec![0.0, 1.0, 2.5, 3.5, 0.4, fraction, 0.5],
+        program,
+    });
+    genome
 }
 
 #[cfg(test)]
@@ -452,6 +370,37 @@ mod tests {
             ..EnergyLifecycleConfig::default()
         };
         let genome = founder_genome_with_age_gate(profile, &lifecycle);
+        run_founder(&genome, &lifecycle, food, energy, age, cardinal, limit)
+    }
+
+    /// One tick of `genome` at the default lifecycle and action limit.
+    fn actions_of(
+        genome: &CreatureGenome,
+        food: f32,
+        energy: f32,
+        age: u64,
+        cardinal: [f32; 4],
+    ) -> Vec<WorldAction> {
+        run_founder(
+            genome,
+            &EnergyLifecycleConfig::default(),
+            food,
+            energy,
+            age,
+            cardinal,
+            10,
+        )
+    }
+
+    fn run_founder(
+        genome: &CreatureGenome,
+        lifecycle: &EnergyLifecycleConfig,
+        food: f32,
+        energy: f32,
+        age: u64,
+        cardinal: [f32; 4],
+        limit: usize,
+    ) -> Vec<WorldAction> {
         let mut energy = energy;
         let mut ring = [0.0; 8];
         for (i, value) in cardinal.into_iter().enumerate() {
@@ -479,7 +428,7 @@ mod tests {
             ..RuntimeConfig::default()
         };
         execute_creature_mesh(
-            &genome,
+            genome,
             &sensors,
             &mut energy,
             &mut [0.0; 16],
@@ -586,8 +535,51 @@ mod tests {
         fn founder_cardinal_selection_matches_first_argmax(cardinal in prop::array::uniform4(0.0f32..1.0)) { assert_directions(cardinal); }
     }
 
+    /// T19.F04 invariant 9: the truth table the vote founder reproduces,
+    /// every profile, with `d` the first cardinal argmax.
     #[test]
-    fn founder_structure_keeps_only_primary_inputs_and_four_spare_registers() {
+    fn founder_vote_truth_table() {
+        let cardinal = [0.2, 0.9, 0.1, 0.4];
+        let d = Direction::E;
+        for (profile, _, threshold, transfer) in PROFILES {
+            let reproduce = vec![WorldAction::Reproduce {
+                direction: d,
+                energy_transfer_fraction: transfer,
+            }];
+            let forage = vec![
+                WorldAction::eat(OrdinaryFoodTypeId::default()),
+                WorldAction::Move(d),
+            ];
+            let can_energy = threshold + 1.0;
+            for (can, food) in [(true, 1.0), (true, 0.0), (false, 1.0), (false, 0.0)] {
+                let energy = if can { can_energy } else { 20.0 };
+                let queue = actions(profile, food, energy, 20, 20, cardinal, 10);
+                let expected = match (profile == FounderProfile::V3Alpha1, can, food > 0.0) {
+                    (true, true, _) | (false, true, false) => reproduce.clone(),
+                    (true, false, true) | (false, _, true) | (false, false, false) => {
+                        forage.clone()
+                    }
+                    (true, false, false) => vec![WorldAction::Move(d)],
+                };
+                assert_eq!(queue, expected, "{profile:?} can={can} food={food}");
+            }
+        }
+    }
+
+    /// 2,000 rings from a fixed stream: the committed direction is the first
+    /// cardinal argmax on every profile and branch.
+    #[test]
+    fn founder_two_thousand_ring_direction_check() {
+        use rand::{Rng, SeedableRng};
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(0x7419_f004);
+        for _ in 0..2_000 {
+            let cardinal: [f32; 4] = std::array::from_fn(|_| rng.gen_range(0.0f32..1.0));
+            assert_directions(cardinal);
+        }
+    }
+
+    #[test]
+    fn founder_structure_is_a_sensor_graph_feeding_a_vote_graph() {
         assert_eq!(
             v3alpha1_founder_genome(),
             founder_genome(FounderProfile::V3Alpha1)
@@ -596,16 +588,12 @@ mod tests {
             let genome = founder_genome(profile);
             assert_eq!(genome.nodes.len(), 2);
             assert_eq!(genome.nodes[0].input_refs.len(), 5);
-            assert_eq!(genome.nodes[1].input_refs.len(), 6);
+            assert_eq!(genome.nodes[1].input_refs.len(), 7);
+            assert_eq!(genome.nodes[1].input_refs[6], InputReference::ActionQueue);
             let BackendDef::Graph(graph) = &genome.nodes[0].backend_def else {
                 panic!("graph")
             };
             assert_eq!(graph.compute_nodes.len(), 3);
-            assert!(graph.execute_gate.inputs.is_empty());
-            assert!(graph
-                .action_bank
-                .iter()
-                .all(|slot| slot.gate_inputs.is_empty() && slot.param_inputs.is_empty()));
             assert_eq!(
                 graph
                     .output_sinks
@@ -614,18 +602,37 @@ mod tests {
                     .count(),
                 6
             );
-            let BackendDef::Vm(vm) = &genome.nodes[1].backend_def else {
-                panic!("vm")
+            let BackendDef::Graph(decision) = &genome.nodes[1].backend_def else {
+                panic!("graph")
             };
-            assert_eq!(vm.register_count, 20);
-            for instruction in &vm.program {
-                assert!(
-                    crate::creature::genome::analysis::vm_register_write(instruction)
-                        .is_none_or(|register| register < 16)
-                );
+            // Eat, four Move, four Reproduce, Terminate, and one parameter.
+            assert_eq!(
+                decision
+                    .output_sinks
+                    .iter()
+                    .filter(|sink| !sink.inputs.is_empty())
+                    .count(),
+                11
+            );
+            assert!(genome.nodes[1].targets.is_empty());
+        }
+    }
+
+    /// The VM fixture votes the founder's formulas, so it commits exactly
+    /// the vote founder's queue on every truth-table state and ring.
+    #[test]
+    fn the_vm_decision_fixture_acts_as_the_vote_founder() {
+        use rand::{Rng, SeedableRng};
+        let graph = v3alpha1_founder_genome();
+        let vm = vm_decision_founder_genome();
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(19);
+        for _ in 0..200 {
+            let cardinal: [f32; 4] = std::array::from_fn(|_| rng.gen_range(0.0f32..1.0));
+            for (food, energy) in [(1.0, 20.0), (0.0, 20.0), (1.0, 40.0), (0.0, 40.0)] {
                 assert_eq!(
-                    crate::creature::genome::analysis::vm_register_read_mask(instruction) & !0xffff,
-                    0
+                    actions_of(&graph, food, energy, 20, cardinal),
+                    actions_of(&vm, food, energy, 20, cardinal),
+                    "{cardinal:?} food={food} energy={energy}"
                 );
             }
         }

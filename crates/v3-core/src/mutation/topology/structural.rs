@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use rand::Rng;
 
-use crate::config::MutationConfig;
 use crate::contracts::{NodeId, RouteTarget};
 use crate::creature::genome::analysis::{mesh_backward_slice, mesh_forward_slice};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
@@ -144,7 +143,7 @@ fn copy_attached(
     genome: &mut CreatureGenome,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
-    alternate: Option<&MutationConfig>,
+    swap_backend: bool,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<_> = (0..genome.nodes.len())
         .filter(|&i| !safe_predecessors(genome, i).is_empty())
@@ -163,9 +162,9 @@ fn copy_attached(
             target.target_id = new_id;
         }
     }
-    if let Some(config) = alternate {
+    if swap_backend {
         clone.backend_def = match clone.backend_def {
-            BackendDef::Vm(_) => birth::blank_graph_backend(config),
+            BackendDef::Vm(_) => birth::blank_graph_backend(),
             BackendDef::Graph(_) => birth::minimal_vm_backend(),
         };
     }
@@ -182,9 +181,8 @@ pub(super) fn apply_swap_node_backend(
     genome: &mut CreatureGenome,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
-    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    copy_attached(genome, targets, rng, Some(config))
+    copy_attached(genome, targets, rng, true)
 }
 
 pub(super) fn apply_copy_node(
@@ -192,7 +190,7 @@ pub(super) fn apply_copy_node(
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    copy_attached(genome, targets, rng, None)
+    copy_attached(genome, targets, rng, false)
 }
 
 /// Maximum number of nodes in a mesh slice for copy operators.
@@ -316,7 +314,6 @@ pub(super) fn apply_splice_node(
     genome: &mut CreatureGenome,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
-    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let valid_targets = |idx: usize| -> Vec<usize> {
         genome.nodes[idx]
@@ -337,9 +334,7 @@ pub(super) fn apply_splice_node(
     let position = targets[rng.gen_range(0..targets.len())];
     let successor = genome.nodes[idx].targets[position].target_id;
     let new_id = next_node_id(genome);
-    genome
-        .nodes
-        .push(birth::detour(new_id, successor, config, rng));
+    genome.nodes.push(birth::detour(new_id, successor, rng));
     genome.nodes[idx].targets[position].target_id = new_id;
     Ok(reachability)
 }

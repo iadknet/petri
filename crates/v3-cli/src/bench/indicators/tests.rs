@@ -53,8 +53,6 @@ fn companion_population() -> [v3_core::creature::genome::CreatureGenome; 3] {
         }],
         birth_weights: None,
         output_sinks: vec![],
-        action_bank: vec![],
-        execute_gate: v3_core::creature::genome::cgp::ExecuteGate { inputs: vec![] },
     }));
     let mut inert = make(BackendDef::Vm(VmBackendDef {
         register_count: 1,
@@ -319,7 +317,13 @@ fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
             executed_nodes: 7,
             knockout_nodes: 3,
             route_varying_lineages: 1,
-            hop_cap_hits: 8,
+            tick_reasons: neighborhood::mesh_execution::TickReasonCounts {
+                no_decision: 300,
+                terminate_voted: 20,
+                ..Default::default()
+            },
+            passes: 640,
+            decided_passes: 320,
             pass_cap_hits: 8,
             cycle_carrying_lineages: 3,
             revisiting_lineages: 2,
@@ -368,8 +372,10 @@ fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
     assert_eq!(report.mean_knockout_nodes, "0.750000");
     assert_eq!(report.route_varying_fraction, "0.250000");
     assert_eq!(report.battery_executions, 320);
-    assert_eq!(report.hop_cap_fraction, "0.025000");
+    assert_eq!(report.pass_cap_fraction, "0.012500");
     assert_eq!(report.pass_cap_hits, 8);
+    assert_eq!(report.tick_reasons.total(), 320);
+    assert_eq!((report.passes, report.decided_passes), (640, 320));
     let cycles = report
         .cycle_classes
         .clone()
@@ -393,7 +399,7 @@ fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
         &empty_recruitment(0),
     );
     assert_eq!(empty.mean_total_nodes, UNDEFINED);
-    assert_eq!(empty.hop_cap_fraction, UNDEFINED);
+    assert_eq!(empty.pass_cap_fraction, UNDEFINED);
     assert_eq!(empty.changed_per_all_births, UNDEFINED);
 }
 
@@ -419,8 +425,7 @@ fn lineage_diversity_handles_empty_one_balanced_and_unequal_populations() {
 fn temporal_report_keeps_substrate_counts_separate() {
     use v3_core::contracts::NodeId;
     use v3_core::creature::genome::cgp::{
-        ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind,
-        ExecuteGate, GraphEdge, GraphSource, WorldActionKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
     use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
     let mut config = SimulationConfig::default();
@@ -447,14 +452,12 @@ fn temporal_report_keeps_substrate_counts_separate() {
                     inputs: vec![],
                     plasticity: None,
                 }],
-                output_sinks: vec![],
-                action_bank: vec![ActionSlot {
-                    behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
-                    gate_inputs: vec![edge],
-                    param_inputs: vec![],
-                    direction_bids: Vec::new(),
+                output_sinks: vec![v3_core::creature::genome::cgp::OutputSink {
+                    kind: v3_core::creature::genome::cgp::OutputSinkKind::ActionVote(
+                        v3_core::creature::genome::vote::VoteSink::Eat,
+                    ),
+                    inputs: vec![edge],
                 }],
-                execute_gate: ExecuteGate { inputs: vec![edge] },
             }),
         }],
     };

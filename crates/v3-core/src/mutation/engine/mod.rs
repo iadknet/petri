@@ -682,7 +682,6 @@ pub(crate) fn graph_operator_key(op: GraphOperator) -> MutationOperator {
         GraphOperator::AlterGraphEdgeWeight => MutationOperator::GraphAlterGraphEdgeWeight,
         GraphOperator::SwapGraphOperator => MutationOperator::GraphSwapGraphOperator,
         GraphOperator::MutateGraphOperatorParam => MutationOperator::GraphMutateGraphOperatorParam,
-        GraphOperator::MutateActionSlotBehavior => MutationOperator::GraphMutateActionSlotBehavior,
         GraphOperator::AddInternalGraphNode => MutationOperator::GraphAddInternalGraphNode,
         GraphOperator::RemoveInternalGraphNode => MutationOperator::GraphRemoveInternalGraphNode,
         GraphOperator::AddGraphEdge => MutationOperator::GraphAddGraphEdge,

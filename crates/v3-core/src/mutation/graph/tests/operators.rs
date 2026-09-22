@@ -13,9 +13,10 @@ use rand::SeedableRng;
 use crate::config::{MutationConfig, RuntimeConfig};
 use crate::contracts::{InputReference, WorldAction, WorldInputKey};
 use crate::creature::genome::cgp::{
-    ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate,
-    GraphEdge, GraphSource, OutputSink, OutputSinkKind, WorldActionKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+    OutputSinkKind,
 };
+use crate::creature::genome::vote::{VoteKind, VoteSink};
 use crate::creature::state::GraphRuntimeState;
 use crate::mutation::graph::operators::{
     add_bootstrap_node, add_disconnected_node, copy_cgp_subgraph, copy_compute_node,
@@ -126,10 +127,6 @@ pub(super) fn assert_neutral(
             "{label}: scenario {i} route gates differ"
         );
         assert_eq!(
-            b_result.terminal, a_result.terminal,
-            "{label}: scenario {i} terminal differs"
-        );
-        assert_eq!(
             b_result.energy_exhausted, a_result.energy_exhausted,
             "{label}: scenario {i} energy_exhausted differs"
         );
@@ -181,31 +178,36 @@ pub(super) fn base_def() -> CgpGraphBackendDef {
                 plasticity: None,
             },
         ],
-        output_sinks: vec![OutputSink {
-            kind: OutputSinkKind::CustomOutput(0),
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            }],
-        }],
-        action_bank: vec![ActionSlot {
-            behavior: ActionSlotBehavior::Emit(WorldActionKind::Move),
-            gate_inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            }],
-            param_inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(2),
-                weight: 1.0,
-            }],
-            direction_bids: Vec::new(),
-        }],
-        execute_gate: ExecuteGate {
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            }],
-        },
+        output_sinks: vec![
+            OutputSink {
+                kind: OutputSinkKind::CustomOutput(0),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(1),
+                    weight: 1.0,
+                }],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionVote(VoteSink::Move(2)),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(0),
+                    weight: 1.0,
+                }],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(2),
+                    weight: 1.0,
+                }],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(1),
+                    weight: 1.0,
+                }],
+            },
+        ],
     }
 }
 
@@ -218,12 +220,12 @@ pub(super) fn base_input_refs() -> Vec<InputReference> {
 
 /// A second fixture carrying a Hebbian-plasticity compute node and a
 /// `DynamicIntrospection(EnergyCurrent)` input reference wired directly onto
-/// a non-compute surface (the action slot's param input), on top of the
+/// a non-compute surface (a parameter sink), on top of the
 /// same forward/backward/self-loop shape as `base_def`. Exercises the
 /// growth-neutrality properties against plasticity's post-convergence
 /// energy deduction and against the introspection reference kind, neither
 /// of which `base_def` carries. T11.F08's split exclusion keeps the split
-/// operator away from this fixture's action-param edge, which reads a live
+/// operator away from this fixture's parameter-sink edge, which reads a live
 /// introspection reference directly on a non-compute surface.
 pub(super) fn plasticity_def() -> CgpGraphBackendDef {
     CgpGraphBackendDef {
@@ -255,37 +257,43 @@ pub(super) fn plasticity_def() -> CgpGraphBackendDef {
                 plasticity: None,
             },
         ],
-        output_sinks: vec![OutputSink {
-            kind: OutputSinkKind::CustomOutput(0),
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            }],
-        }],
-        action_bank: vec![ActionSlot {
-            behavior: ActionSlotBehavior::Emit(WorldActionKind::Move),
-            gate_inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            }],
-            param_inputs: vec![GraphEdge {
-                // Directly on a non-compute surface: T11.F08's split
-                // exclusion skips this edge instead of caching its value in
-                // an identity node ahead of the plasticity-cost deduction.
-                source: GraphSource::InputLeaf {
-                    ref_idx: 2,
-                    sub_idx: 0,
-                },
-                weight: 1.0,
-            }],
-            direction_bids: Vec::new(),
-        }],
-        execute_gate: ExecuteGate {
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            }],
-        },
+        output_sinks: vec![
+            OutputSink {
+                kind: OutputSinkKind::CustomOutput(0),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(1),
+                    weight: 1.0,
+                }],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionVote(VoteSink::Move(2)),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(1),
+                    weight: 1.0,
+                }],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+                inputs: vec![GraphEdge {
+                    // Directly on a non-compute surface: T11.F08's split
+                    // exclusion skips this edge instead of caching its value
+                    // in an identity node ahead of the plasticity-cost
+                    // deduction.
+                    source: GraphSource::InputLeaf {
+                        ref_idx: 2,
+                        sub_idx: 0,
+                    },
+                    weight: 1.0,
+                }],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(1),
+                    weight: 1.0,
+                }],
+            },
+        ],
     }
 }
 
@@ -489,11 +497,10 @@ fn unwired_input_ref_add_is_neutral_on_vm_node() {
         );
 
         assert_eq!(result_before.output_slots, result_after.output_slots);
-        assert_eq!(result_before.terminal, result_after.terminal);
         assert_eq!(mem_before, mem_after);
         assert_eq!(
-            side_before.action_queue.len(),
-            side_after.action_queue.len()
+            side_before.dispatch_effects(),
+            side_after.dispatch_effects()
         );
     }
 }

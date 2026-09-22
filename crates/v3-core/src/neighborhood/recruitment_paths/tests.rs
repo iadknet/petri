@@ -369,9 +369,15 @@ fn recruitment_paths_stationary_wrong_actions_do_not_count_as_noop() {
     let BackendDef::Vm(vm) = &mut genome.nodes[0].backend_def else {
         unreachable!()
     };
+    // The entry votes one `Eat` in every scene: a stationary wrong action.
+    vm.constants = vec![1.0];
     vm.program = vec![
-        VmInstruction::PushAction { action_type: 1 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::AddVote { sink: 0, src: 0 },
+        VmInstruction::Halt,
     ];
     let task = evaluate(&genome);
     assert!(task.live());
@@ -749,15 +755,18 @@ fn recruitment_paths_delta_rejects_each_mismatched_precondition() {
 fn recruitment_paths_fixture_sites_and_preparation_are_exact() {
     let starts = starting_forms();
     let expected = [
-        ("graph_blank", [1, 2, 1, 0, 2, 3, 8], 14),
-        ("graph_copy", [2, 2, 1, 0, 4, 6, 8], 22),
-        ("graph_split", [2, 2, 1, 0, 5, 7, 8], 24),
-        ("graph_unprepared", [2, 2, 1, 1, 4, 8, 8], 25),
-        ("graph_prepared", [2, 2, 1, 1, 4, 8, 8], 25),
-        ("vm_blank", [1, 2, 13, 2, 0, 0, 0], 21),
-        ("vm_copy", [2, 2, 23, 4, 0, 0, 0], 34),
-        ("vm_unprepared", [2, 2, 21, 5, 0, 0, 0], 33),
-        ("vm_prepared", [2, 2, 21, 5, 0, 0, 0], 33),
+        // The T19.F04 vote-based modules: one vote edge replaces the old
+        // action-slot and execute-gate wiring (Graph), and one `AddVote`
+        // replaces the push-and-execute tail (VM).
+        ("graph_blank", [1, 2, 1, 0, 1, 1], 9),
+        ("graph_copy", [2, 2, 1, 0, 2, 2], 12),
+        ("graph_split", [2, 2, 1, 0, 3, 3], 14),
+        ("graph_unprepared", [2, 2, 1, 1, 2, 4], 17),
+        ("graph_prepared", [2, 2, 1, 1, 2, 4], 17),
+        ("vm_blank", [1, 2, 7, 1, 0, 0], 14),
+        ("vm_copy", [2, 2, 11, 2, 0, 0], 20),
+        ("vm_unprepared", [2, 2, 9, 3, 0, 0], 19),
+        ("vm_prepared", [2, 2, 9, 3, 0, 0], 19),
     ];
     for (name, sites, genome_size) in expected {
         let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -769,7 +778,6 @@ fn recruitment_paths_fixture_sites_and_preparation_are_exact() {
                 start.mutable_sites.vm_constants,
                 start.mutable_sites.graph_compute_nodes,
                 start.mutable_sites.graph_edges,
-                start.mutable_sites.graph_action_slots,
             ],
             sites
         );
@@ -1003,16 +1011,15 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 }
 
 /// The VM insert and `AddGraphEdge` seeds are the ones the one-off search
-/// found after T11.F21 added `WriteDirectionBid` to the fresh-instruction draw
-/// and the `ActionBid` edge surface (both remap every seeded draw, as the
-/// T11.F21 spec predeclares); only the `vm_detour` `write_direction` seed
-/// exceeds 10,000. T11.F22 keeps `InputRef.Swap` within a kind, so the
+/// found after T19.F04 replaced the action bank with vote sinks (the
+/// fresh-instruction draw gains `AddVote` and the edge surface the 27 vote
+/// sinks, which remaps every seeded draw). A blank module now reaches a
+/// `Move(E)` vote in one edge or one instruction, so both blank forms
+/// qualify beside the copied, split, unprepared, and detour forms. The
 /// unprepared forms open with `InputRef.Add` of the ring beside the copied
-/// `FoodHere` and move each consumer onto it: `graph_unprepared` still
-/// qualifies in six. T11.F23's scale-relative constant step cannot walk the
-/// zeroed direction constant to east in two events, so `vm_unprepared`
-/// replaces the constant's load with a doubling of the cue register in one
-/// `VmInstructionMutation` and qualifies in six.
+/// `FoodHere` and move each consumer onto it; `vm_unprepared` replaces the
+/// zeroed direction vote with the `Move(E)` vote in one
+/// `VmInstructionMutation`.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1035,31 +1042,20 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
         [
             (
                 "graph_blank",
-                vec![
-                    (InputRefAdd, 1),
-                    (GraphMutateActionSlotBehavior, 25),
-                    (GraphAddInternalGraphNode, 1020),
-                    (GraphAddGraphEdge, 1650),
-                    (GraphAddGraphEdge, 2300),
-                    (GraphAddGraphEdge, 596),
-                    swap,
-                ],
-                Some(7),
+                vec![(InputRefAdd, 1), (GraphAddGraphEdge, 57), swap],
+                None,
             ),
-            ("graph_copy", vec![(GraphAddGraphEdge, 1202), swap], None),
-            ("graph_split", vec![(GraphAddGraphEdge, 3518), swap], None),
+            ("graph_copy", vec![(GraphAddGraphEdge, 103), swap], None),
+            ("graph_split", vec![(GraphAddGraphEdge, 103), swap], None),
             (
                 "vm_blank",
                 vec![
                     (InputRefAdd, 1),
-                    (VmInstructionMutation, 1869),
-                    (VmInstructionMutation, 5608),
-                    (VmInstructionMutation, 800),
-                    (VmInstructionMutation, 9361),
-                    (VmInstructionMutation, 4126),
+                    (VmInstructionMutation, 1279),
+                    (VmInstructionMutation, 2189),
                     swap,
                 ],
-                Some(7),
+                None,
             ),
             ("vm_copy", vec![(VmDeleteInstruction, 1), swap], None),
             (
@@ -1067,9 +1063,8 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                 vec![
                     (InputRefAdd, 68),
                     (GraphRetargetGraphEdge, 32),
-                    (GraphAddInternalGraphNode, 64),
-                    (GraphAddGraphEdge, 6718),
-                    (GraphRetargetGraphEdge, 4),
+                    (GraphRemoveGraphEdge, 5),
+                    (GraphAddGraphEdge, 103),
                     swap,
                 ],
                 None,
@@ -1078,35 +1073,25 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                 "vm_unprepared",
                 vec![
                     (InputRefAdd, 68),
-                    (VmInstructionRawFieldMutation, 94),
-                    (VmInstructionRawFieldMutation, 72),
-                    (VmInstructionRawFieldMutation, 223),
-                    (VmInstructionMutation, 205_178),
+                    (VmInstructionRawFieldMutation, 18),
+                    (VmInstructionRawFieldMutation, 25),
+                    (VmInstructionRawFieldMutation, 25),
+                    (VmInstructionMutation, 66_421),
                     swap,
                 ],
                 None,
             ),
             (
                 "graph_detour",
-                vec![
-                    (InputRefAdd, 1),
-                    (GraphMutateActionSlotBehavior, 25),
-                    (GraphAddInternalGraphNode, 1020),
-                    (GraphAddGraphEdge, 1650),
-                    (GraphAddGraphEdge, 2300),
-                    (GraphAddGraphEdge, 596),
-                ],
+                vec![(InputRefAdd, 1), (GraphAddGraphEdge, 57)],
                 None,
             ),
             (
                 "vm_detour",
                 vec![
                     (InputRefAdd, 1),
-                    (VmInstructionMutation, 1869),
-                    (VmInstructionMutation, 800),
-                    (VmInstructionMutation, 31_060),
-                    (VmInstructionMutation, 521),
-                    (VmInstructionMutation, 4126),
+                    (VmInstructionMutation, 1279),
+                    (VmInstructionMutation, 2189),
                 ],
                 None,
             ),
@@ -1120,8 +1105,10 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     assert_eq!(
         qualified,
         [
+            "graph_blank",
             "graph_copy",
             "graph_split",
+            "vm_blank",
             "vm_copy",
             "graph_unprepared",
             "vm_unprepared",
@@ -1170,8 +1157,8 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
                 };
                 assert_eq!(a.compute_nodes, b.compute_nodes);
                 assert_eq!(
-                    a.action_bank[0].gate_inputs.len(),
-                    b.action_bank[0].gate_inputs.len() + 1
+                    fixtures::move_sink(a, fixtures::EAST).inputs.len(),
+                    fixtures::move_sink(b, fixtures::EAST).inputs.len() + 1
                 );
             }
             MutationOperator::VmInstructionMutation => {
@@ -1183,17 +1170,12 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
                     panic!()
                 };
                 assert_eq!(a.constants, b.constants);
+                // The exposing insert is the `Move(E)` vote before the Halt.
                 assert_eq!(a.program.len(), b.program.len() + 1);
-                assert_eq!(a.program[4], VmInstruction::PushAction { action_type: 2 });
-                assert_eq!(a.program[0], b.program[0]);
-                assert_eq!(a.program[2..4], b.program[2..4]);
-                assert_eq!(a.program[5..], b.program[4..]);
-                // The insert's reference repair keeps the jump on the Halt: the
-                // drawn offset 12 wraps onto the Halt of the five-instruction
-                // program (1 + 1 + 12 = 14, 14 mod 5 = 4) and is rewritten to
-                // the direct offset 3 once the push sits before the Halt.
-                let jump = |offset| VmInstruction::JumpIfZero { cond: 0, offset };
-                assert_eq!((&b.program[1], &a.program[1]), (&jump(12), &jump(3)));
+                assert_eq!(
+                    a.program[a.program.len() - 2],
+                    VmInstruction::AddVote { sink: 3, src: 0 }
+                );
             }
             other => panic!("{}: unexpected exposing operator {other:?}", path.form),
         }
@@ -1531,15 +1513,16 @@ fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
             .backend_def
             .clone()
     };
-    // The canonical blank Graph start is pure with no wired effect surface;
-    // the copied and prepared Graph forms carry a wired action slot.
+    // The canonical blank Graph start and the dormant copy (its sensing
+    // node wired into nothing) are pure with no wired effect surface; the
+    // prepared Graph form carries its `Move(E)` vote edge.
     assert_eq!(
         DestinationKind::of(&scaffold("graph_blank")),
         DestinationKind::GraphPureNoEffect
     );
     assert_eq!(
         DestinationKind::of(&scaffold("graph_copy")),
-        DestinationKind::GraphPureWithEffect
+        DestinationKind::GraphPureNoEffect
     );
     assert_eq!(
         DestinationKind::of(&scaffold("graph_prepared")),
@@ -1558,7 +1541,7 @@ fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
         weight: 1.0,
     };
     let mut stateful_kind = pure.clone();
-    stateful_kind.compute_nodes[1].kind = ComputeNodeKind::Momentum(0.5);
+    stateful_kind.compute_nodes[0].kind = ComputeNodeKind::Momentum(0.5);
     assert_eq!(
         DestinationKind::of(&BackendDef::Graph(stateful_kind)),
         DestinationKind::GraphStateful
@@ -1590,8 +1573,7 @@ fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
         DestinationKind::GraphPureWithEffect
     );
     let mut previous = pure.clone();
-    previous
-        .execute_gate
+    previous.output_sinks[0]
         .inputs
         .push(edge(GraphSource::SharedMemory {
             slot: 0,
@@ -1602,8 +1584,7 @@ fn recruitment_paths_destination_kind_reads_canonical_and_prepared_forms() {
         DestinationKind::GraphStateful
     );
     let mut current_memory = pure.clone();
-    current_memory
-        .execute_gate
+    current_memory.output_sinks[0]
         .inputs
         .push(edge(GraphSource::SharedMemory {
             slot: 0,
@@ -2020,8 +2001,9 @@ fn recruitment_paths_s0_compact_records_replay_and_prefix_the_panel() {
     }
 }
 
-/// The S0 panel's arm 22 (`vm_copy` / CostSelection) batch 1 lineage 13
-/// first specializes at generation 192 (`docs/progress/features/…-s0.json`).
+/// The S0 panel's arm 22 (`vm_copy` / CostSelection) batch 0 lineage 3
+/// first specializes at generation 106 on the T19.F04 vote founder
+/// (`docs/progress/readings/t19-f04.md`).
 /// Seeds depend on `(batch, lineage, generation, sibling)` only, so the same
 /// chain replays at sizes that just reach the +64 primary horizon, and the
 /// lineage classifies `Retained` through `specialized_horizons` →
@@ -2031,7 +2013,7 @@ fn recruitment_paths_known_specializing_lineage_classifies_retained_at_the_prima
     let sizes = Sizes {
         batches: 2,
         lineages: 14,
-        discovery: 192,
+        discovery: 106,
         followup: PRIMARY_HORIZON,
     };
     let assay = Assay::new(Panel::s0(sizes));
@@ -2041,14 +2023,14 @@ fn recruitment_paths_known_specializing_lineage_classifies_retained_at_the_prima
         ("vm_copy", Policy::CostSelection)
     );
 
-    let lineage = assay.lineage(22, 1, 13);
+    let lineage = assay.lineage(22, 0, 3);
 
     let discovery = lineage.specialized_discovery.as_ref().unwrap();
-    assert_eq!(discovery.generation, 192);
+    assert_eq!(discovery.generation, 106);
     assert!(discovery.module.specialization.holds());
     assert_eq!(
         lineage.discovery_checkpoint.as_ref().map(|c| c.generation),
-        Some(192)
+        Some(106)
     );
     let horizons: Vec<_> = lineage
         .horizons
@@ -2058,8 +2040,8 @@ fn recruitment_paths_known_specializing_lineage_classifies_retained_at_the_prima
     assert_eq!(
         horizons,
         [
-            (16, 208, HorizonOutcome::Retained),
-            (PRIMARY_HORIZON, 256, HorizonOutcome::Retained)
+            (16, 122, HorizonOutcome::Retained),
+            (PRIMARY_HORIZON, 170, HorizonOutcome::Retained)
         ]
     );
     assert!(lineage.ladder.specialized);
@@ -2081,7 +2063,7 @@ fn recruitment_paths_known_specializing_lineage_classifies_retained_at_the_prima
             retention.outcome,
             retention.score_loss
         ),
-        (256, RetentionOutcome::Useful, Some(4))
+        (170, RetentionOutcome::Useful, Some(4))
     );
     // Every specialized proposal is counted once in the lineage facts.
     let specialized = lineage
@@ -2089,7 +2071,7 @@ fn recruitment_paths_known_specializing_lineage_classifies_retained_at_the_prima
         .iter()
         .filter(|proposal| proposal.specialized)
         .count() as u64;
-    assert_eq!(specialized, 128);
+    assert_eq!(specialized, 129);
     assert_eq!(
         LineageFacts::of(&lineage).specialized_proposals,
         specialized
@@ -2533,10 +2515,9 @@ fn recruitment_paths_incumbents_are_preserved_only_when_no_correct_scene_is_lost
     assert!(reading([false, false]).preserves_correct_scenes(&empty, Task::A));
 }
 
-/// A wired action slot alone is an effect surface: the gate and sink inputs
-/// are not required for `GraphPureWithEffect`.
+/// A wired vote sink alone is an effect surface (T19.F04).
 #[test]
-fn recruitment_paths_destination_kind_reads_a_wired_action_slot_alone_as_an_effect() {
+fn recruitment_paths_destination_kind_reads_a_wired_vote_sink_alone_as_an_effect() {
     let starts = starting_forms();
     let start = starts
         .iter()
@@ -2553,14 +2534,10 @@ fn recruitment_paths_destination_kind_reads_a_wired_action_slot_alone_as_an_effe
     else {
         unreachable!()
     };
-    assert!(prepared.action_bank.iter().any(|slot| slot.is_wired()));
-    // Strip every effect surface, then restore exactly one at a time: each
-    // alone is an effect, none is `GraphPureNoEffect`.
+    assert!(!fixtures::move_sink(&prepared, fixtures::EAST)
+        .inputs
+        .is_empty());
     let mut inert = prepared.clone();
-    for slot in &mut inert.action_bank {
-        *slot = crate::creature::genome::cgp::ActionSlot::inert(slot.behavior);
-    }
-    inert.execute_gate.inputs.clear();
     for sink in &mut inert.output_sinks {
         sink.inputs.clear();
     }
@@ -2568,34 +2545,26 @@ fn recruitment_paths_destination_kind_reads_a_wired_action_slot_alone_as_an_effe
         DestinationKind::of(&BackendDef::Graph(inert.clone())),
         DestinationKind::GraphPureNoEffect
     );
-    let mut bank_only = inert.clone();
-    bank_only.action_bank = prepared.action_bank.clone();
-    let mut gate_only = inert.clone();
-    gate_only
-        .execute_gate
+    let mut vote_only = inert;
+    vote_only
+        .output_sinks
+        .iter_mut()
+        .find(|sink| {
+            sink.kind
+                == crate::creature::genome::cgp::OutputSinkKind::ActionVote(
+                    crate::creature::genome::vote::VoteSink::Terminate,
+                )
+        })
+        .unwrap()
         .inputs
         .push(crate::creature::genome::cgp::GraphEdge {
             source: crate::creature::genome::cgp::GraphSource::ComputeNode(0),
             weight: 1.0,
         });
-    let mut sinks_only = inert;
-    sinks_only.output_sinks[0]
-        .inputs
-        .push(crate::creature::genome::cgp::GraphEdge {
-            source: crate::creature::genome::cgp::GraphSource::ComputeNode(0),
-            weight: 1.0,
-        });
-    for (name, graph) in [
-        ("bank", bank_only),
-        ("gate", gate_only),
-        ("sinks", sinks_only),
-    ] {
-        assert_eq!(
-            DestinationKind::of(&BackendDef::Graph(graph)),
-            DestinationKind::GraphPureWithEffect,
-            "{name}"
-        );
-    }
+    assert_eq!(
+        DestinationKind::of(&BackendDef::Graph(vote_only)),
+        DestinationKind::GraphPureWithEffect
+    );
 }
 
 /// The readings-file table of `QualifiedPath::payload_readings()`, pinned:
@@ -2652,7 +2621,7 @@ fn recruitment_paths_qualified_payload_readings_match_the_recorded_table() {
             path.form
         );
     }
-    assert_eq!(forms, 7);
+    assert_eq!(forms, 9);
 }
 
 /// The same arm 22 lineage replayed to a +16 follow-up only: its +16 horizon
@@ -2663,16 +2632,16 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
     let sizes = Sizes {
         batches: 2,
         lineages: 14,
-        discovery: 192,
+        discovery: 106,
         followup: 16,
     };
     let assay = Assay::new(Panel::s0(sizes));
 
-    let lineage = assay.lineage(22, 1, 13);
+    let lineage = assay.lineage(22, 0, 3);
 
     assert_eq!(
         lineage.specialized_discovery.as_ref().map(|d| d.generation),
-        Some(192)
+        Some(106)
     );
     assert_eq!(
         lineage
@@ -2680,24 +2649,24 @@ fn recruitment_paths_known_specializing_lineage_is_censored_before_the_primary_h
             .iter()
             .map(|h| (h.offset, h.at_generation, h.outcome))
             .collect::<Vec<_>>(),
-        [(16, 208, HorizonOutcome::Retained)]
+        [(16, 122, HorizonOutcome::Retained)]
     );
     assert!(lineage.ladder.specialized);
     assert_eq!(lineage.ladder.at_primary_horizon, None);
     assert_eq!(lineage.classification, LineageClass::CensoredAt64);
 }
 
-/// S0 arm 12 (`graph_prepared` / Drift) batch 0 lineage 2 retains its F06
-/// discovery (module 2) at generation 5 and deletes that module at depth 94
-/// (`docs/progress/features/…-s0.json` raw), so the T13.F06 retention
-/// reading at +256 is `Deleted` with no score loss even though the founder
-/// modules at the same creation depth are still present.
+/// S0 arm 12 (`graph_prepared` / Drift) batch 2 lineage 2 retains its F06
+/// discovery (module 2) at generation 9 and deletes that module at depth 51
+/// on the T19.F04 vote founder (`docs/progress/readings/t19-f04.md`), so the
+/// T13.F06 retention reading at +256 is `Deleted` with no score loss even
+/// though the founder modules at the same creation depth are still present.
 #[test]
 fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
     let sizes = Sizes {
-        batches: 1,
+        batches: 3,
         lineages: 3,
-        discovery: 5,
+        discovery: 9,
         followup: 256,
     };
     let assay = Assay::new(Panel::s0(sizes));
@@ -2707,12 +2676,12 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
         ("graph_prepared", Policy::Drift)
     );
 
-    let lineage = assay.lineage(12, 0, 2);
+    let lineage = assay.lineage(12, 2, 2);
 
     let retention = lineage.retention.as_ref().unwrap();
-    assert_eq!(retention.discovery.generation, 5);
+    assert_eq!(retention.discovery.generation, 9);
     assert_eq!(retention.discovery.module.node, NodeId::new(2));
-    assert_eq!(retention.at_generation, 261);
+    assert_eq!(retention.at_generation, 265);
     assert_eq!(
         (retention.outcome, retention.score_loss),
         (RetentionOutcome::Deleted, None)
@@ -2723,7 +2692,7 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
         .iter()
         .find(|module| module.module.node == NodeId::new(2))
         .unwrap();
-    assert_eq!(module.module.deleted_depth, Some(94));
+    assert_eq!(module.module.deleted_depth, Some(51));
     assert!(!module.module.is_present());
     assert!(last
         .modules
@@ -2731,7 +2700,7 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
         .any(|module| module.module.created_depth == 0 && module.module.is_present()));
 }
 
-/// S0 arm 25 (`vm_unprepared` / CostSelection) batch 1 lineage 11 leaves its
+/// S0 arm 25 (`vm_unprepared` / CostSelection) batch 3 lineage 8 leaves its
 /// only cohort module unreachable after each of its first three generations,
 /// so eligibility rests on the generation-0 reading alone and the lineage
 /// classifies `NoEdit`, never `NoEligibility`.
@@ -2739,8 +2708,8 @@ fn recruitment_paths_known_deleting_lineage_reads_deleted_retention() {
 fn recruitment_paths_known_lineage_keeps_generation_zero_eligibility_once_its_cohort_goes_unreachable(
 ) {
     let sizes = Sizes {
-        batches: 2,
-        lineages: 12,
+        batches: 4,
+        lineages: 9,
         discovery: 2,
         followup: 1,
     };
@@ -2751,7 +2720,7 @@ fn recruitment_paths_known_lineage_keeps_generation_zero_eligibility_once_its_co
         ("vm_unprepared", Policy::CostSelection)
     );
 
-    let record = assay.compact_lineage(25, 1, 11);
+    let record = assay.compact_lineage(25, 3, 8);
 
     let mut genome = start.genome.clone();
     let chosen: Vec<_> = record.proposals.iter().filter(|p| p.chosen).collect();

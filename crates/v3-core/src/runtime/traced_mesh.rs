@@ -8,13 +8,14 @@ use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode};
 use crate::runtime::trace::domain::{
-    BackendTrace, MeshHopTrace, TerminationReason, TraceGateScore, TraceRouteDecision,
+    BackendTrace, MeshHopTrace, MeshPassTrace, TraceGateScore, TraceRouteDecision,
 };
 use crate::runtime::traced_vm::execute_vm_node_traced;
 use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
-/// Execute the creature's mesh chain with trace recording.
+/// Execute the creature's mesh with trace recording: the output, every hop
+/// of the tick across passes, and one record per pass (T19.F04).
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
 /// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Nodes may be
@@ -28,7 +29,7 @@ pub fn execute_creature_mesh_traced(
     prev_shared_memory: &[f32; 16],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
-) -> (MeshOutput, Vec<MeshHopTrace>, TerminationReason) {
+) -> (MeshOutput, Vec<MeshHopTrace>, Vec<MeshPassTrace>) {
     execute_creature_mesh_impl(
         genome,
         sensors,
@@ -43,19 +44,21 @@ pub fn execute_creature_mesh_traced(
 
 struct RecordingMeshExecution {
     hops: Vec<MeshHopTrace>,
+    passes: Vec<MeshPassTrace>,
 }
 
 impl RecordingMeshExecution {
     fn new(max_hops: usize) -> Self {
         Self {
             hops: Vec::with_capacity(max_hops),
+            passes: Vec::new(),
         }
     }
 }
 
 impl MeshExecutionMode for RecordingMeshExecution {
     type BackendTrace = BackendTrace;
-    type Output = (MeshOutput, Vec<MeshHopTrace>, TerminationReason);
+    type Output = (MeshOutput, Vec<MeshHopTrace>, Vec<MeshPassTrace>);
 
     const RECORDS_HOPS: bool = true;
 
@@ -114,6 +117,7 @@ impl MeshExecutionMode for RecordingMeshExecution {
     fn record_hop(
         &mut self,
         hop_index: usize,
+        pass_index: u32,
         node: &NodeGenome,
         upstream_slots: [f32; OUTPUT_SLOT_COUNT],
         energy_before: f32,
@@ -147,6 +151,7 @@ impl MeshExecutionMode for RecordingMeshExecution {
 
         self.hops.push(MeshHopTrace {
             hop_index,
+            pass_index,
             node_id: node.node_id,
             input_refs: node.input_refs.clone(),
             upstream_slots,
@@ -159,9 +164,12 @@ impl MeshExecutionMode for RecordingMeshExecution {
         });
     }
 
+    fn record_pass(&mut self, pass: MeshPassTrace) {
+        self.passes.push(pass);
+    }
+
     fn finish(self, output: MeshOutput) -> Self::Output {
-        let termination_reason = output.termination_reason;
-        (output, self.hops, termination_reason)
+        (output, self.hops, self.passes)
     }
 }
 
@@ -173,16 +181,17 @@ mod tests {
         DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, WorldAction,
     };
     use crate::creature::genome::cgp::{
-        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
-        OutputSink, OutputSinkKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+        OutputSinkKind,
     };
+    use crate::creature::genome::vote::{VoteKind, VoteSink};
     use crate::creature::genome::{
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef,
         VmInstruction,
     };
     use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
-    use crate::runtime::trace::domain::BackendTrace;
+    use crate::runtime::trace::domain::{BackendTrace, TerminationReason};
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
     use crate::sensors::typed_food::TypedFoodLocalSnapshot;
@@ -217,16 +226,24 @@ mod tests {
             .collect()
     }
 
-    fn vm_emit_node(node_id: NodeId, action_type: u8, targets: Vec<NodeId>) -> NodeGenome {
+    /// A VM node voting 1.0 for `Eat`, so a tick commits one `Eat`.
+    fn vm_emit_node(node_id: NodeId, targets: Vec<NodeId>) -> NodeGenome {
         NodeGenome {
             node_id,
             input_refs: vec![],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 1,
-                constants: vec![],
+                constants: vec![1.0],
                 program: vec![
-                    VmInstruction::PushAction { action_type },
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::AddVote {
+                        sink: VoteSink::Eat.index() as u8,
+                        src: 0,
+                    },
+                    VmInstruction::Halt,
                 ],
             }),
             targets: wrap_targets(targets),
@@ -257,13 +274,11 @@ mod tests {
                         weight: 1.0,
                     }],
                 }],
-                action_bank: vec![],
-                execute_gate: ExecuteGate { inputs: vec![] },
             }),
             targets: wrap_targets(vec![id_vm]),
         };
 
-        let vm_node = vm_emit_node(id_vm, 1, vec![]);
+        let vm_node = vm_emit_node(id_vm, vec![]);
 
         let genome = CreatureGenome {
             entry_node_id: id_graph,
@@ -292,7 +307,7 @@ mod tests {
         let mut smem_b = [0.0f32; 16];
         let prev_b = [0.0f32; 16];
         let mut gr_b = GraphRuntimeState::new();
-        let (output_b, hops, reason) = execute_creature_mesh_traced(
+        let (output_b, hops, passes) = execute_creature_mesh_traced(
             &genome,
             &ss,
             &mut energy_b,
@@ -316,13 +331,15 @@ mod tests {
         assert!((output_a.cost_report.vm_cost - output_b.cost_report.vm_cost).abs() < 1e-6);
         assert!((output_a.cost_report.graph_cost - output_b.cost_report.graph_cost).abs() < 1e-6);
 
-        // 2 hops: Graph(hop 0) → VM(hop 1)
-        assert_eq!(hops.len(), 2);
+        // Two passes of two hops: Graph (hop 0) → VM (hop 1), then again.
+        assert_eq!(hops.len(), 4);
+        assert_eq!(passes.len(), 2);
         assert_eq!(hops[0].node_id, id_graph);
         assert!(matches!(hops[0].backend_trace, BackendTrace::Graph(_)));
         assert_eq!(hops[1].node_id, id_vm);
         assert!(matches!(hops[1].backend_trace, BackendTrace::Vm(_)));
-        assert!(matches!(reason, TerminationReason::ActionEmitted));
+        assert_eq!(hops[2].pass_index, 1);
+        assert_eq!(output_b.termination_reason, TerminationReason::NoDecision);
     }
 
     /// Upstream slots correctly propagated between hops in trace.
@@ -355,8 +372,6 @@ mod tests {
                         inputs: vec![], // unwired = default route
                     },
                 ],
-                action_bank: vec![],
-                execute_gate: ExecuteGate { inputs: vec![] },
             }),
             targets: wrap_targets(vec![id_vm]),
         };
@@ -374,8 +389,13 @@ mod tests {
                         ref_idx: 0,
                         sub_idx: 0,
                     },
-                    VmInstruction::PushAction { action_type: 1 },
-                    VmInstruction::ExecuteActionQueue,
+                    // 9.0 / 9.0: a vote of 1.0 commits once.
+                    VmInstruction::Div { dst: 0, a: 0, b: 0 },
+                    VmInstruction::AddVote {
+                        sink: VoteSink::Eat.index() as u8,
+                        src: 0,
+                    },
+                    VmInstruction::Halt,
                 ],
             }),
             targets: vec![],
@@ -413,7 +433,7 @@ mod tests {
     }
 
     #[test]
-    fn graph_effect_trace_captures_sinks_action_bank_and_execute_gate() {
+    fn graph_effect_trace_captures_value_vote_and_parameter_sinks() {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
@@ -439,35 +459,28 @@ mod tests {
                             kind: OutputSinkKind::RouterGate(0),
                             inputs: vec![],
                         },
-                    ],
-                    action_bank: vec![
-                        crate::creature::genome::cgp::ActionSlot {
-                            behavior: crate::creature::genome::cgp::ActionSlotBehavior::Emit(
-                                crate::creature::genome::cgp::WorldActionKind::Eat,
-                            ),
-                            gate_inputs: vec![GraphEdge {
+                        OutputSink {
+                            kind: OutputSinkKind::ActionVote(VoteSink::Eat),
+                            inputs: vec![GraphEdge {
                                 source: GraphSource::ComputeNode(0),
                                 weight: 1.0,
                             }],
-                            param_inputs: vec![],
-                            direction_bids: Vec::new(),
                         },
-                        crate::creature::genome::cgp::ActionSlot {
-                            behavior: crate::creature::genome::cgp::ActionSlotBehavior::Pop,
-                            gate_inputs: vec![GraphEdge {
+                        OutputSink {
+                            kind: OutputSinkKind::ActionParam(VoteKind::Eat, 0),
+                            inputs: vec![GraphEdge {
                                 source: GraphSource::ComputeNode(0),
-                                weight: 1.0,
+                                weight: f32::INFINITY,
                             }],
-                            param_inputs: vec![],
-                            direction_bids: Vec::new(),
+                        },
+                        OutputSink {
+                            kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
+                            inputs: vec![GraphEdge {
+                                source: GraphSource::ComputeNode(0),
+                                weight: f32::NAN,
+                            }],
                         },
                     ],
-                    execute_gate: ExecuteGate {
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: 1.0,
-                        }],
-                    },
                 }),
                 targets: vec![],
             }],
@@ -480,7 +493,7 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (output, hops, reason) = execute_creature_mesh_traced(
+        let (output, hops, passes) = execute_creature_mesh_traced(
             &genome,
             &ss,
             &mut energy,
@@ -490,204 +503,29 @@ mod tests {
             &config,
         );
 
-        assert_eq!(hops.len(), 1);
-        assert!(matches!(reason, TerminationReason::NoTargets));
-        assert_eq!(output.actions, vec![WorldAction::NoOp]);
-
-        let BackendTrace::Graph(graph) = &hops[0].backend_trace else {
-            panic!("expected graph backend trace");
-        };
-
-        assert_eq!(graph.output_sinks.len(), 2);
-        assert!(graph.output_sinks[0].wired);
-        assert!(graph.output_sinks[0].applied);
-        assert!((graph.output_sinks[0].applied_value - 1.0).abs() < 1e-6);
-        assert!(!graph.output_sinks[1].wired);
-        assert!(!graph.output_sinks[1].applied);
-
-        assert_eq!(graph.action_slots.len(), 2);
-        assert!(graph.action_slots[0].wired);
-        assert!(graph.action_slots[0].fired);
-        assert_eq!(graph.action_slots[0].queue_len_before, 0);
-        assert_eq!(graph.action_slots[0].queue_len_after, 1);
-        assert_eq!(
-            graph.action_slots[0].emitted_action,
-            Some(WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::default()
-            })
-        );
-        assert!(graph.action_slots[1].wired);
-        assert!(graph.action_slots[1].fired);
-        assert_eq!(graph.action_slots[1].queue_len_before, 1);
-        assert_eq!(graph.action_slots[1].queue_len_after, 0);
-        assert!(graph.action_slots[1].emitted_action.is_none());
-
-        assert!(graph.execute_gate.wired);
-        assert!(!graph.execute_gate.queue_non_empty);
-        assert!(!graph.execute_gate.fired);
-    }
-
-    #[test]
-    fn graph_effect_trace_execute_gate_fires_only_with_non_empty_queue() {
-        let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    birth_weights: None,
-                    compute_nodes: vec![ComputeNode {
-                        kind: ComputeNodeKind::Constant(1.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    }],
-                    output_sinks: vec![],
-                    action_bank: vec![crate::creature::genome::cgp::ActionSlot {
-                        behavior: crate::creature::genome::cgp::ActionSlotBehavior::Emit(
-                            crate::creature::genome::cgp::WorldActionKind::Eat,
-                        ),
-                        gate_inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: 1.0,
-                        }],
-                        param_inputs: vec![],
-                        direction_bids: Vec::new(),
-                    }],
-                    execute_gate: ExecuteGate {
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: 1.0,
-                        }],
-                    },
-                }),
-                targets: vec![],
-            }],
-        };
-
-        let ss = empty_ss();
-        let mut energy = 100.0f32;
-        let mut smem = [0.0f32; 16];
-        let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
-        let config = default_config();
-
-        let (output, hops, reason) = execute_creature_mesh_traced(
-            &genome,
-            &ss,
-            &mut energy,
-            &mut smem,
-            &prev_smem,
-            &mut gr,
-            &config,
-        );
-
-        assert_eq!(hops.len(), 1);
-        assert!(matches!(reason, TerminationReason::ActionEmitted));
+        // The infinite food-type parameter sanitizes to 1e9 and decodes to
+        // the largest type index.
         assert_eq!(
             output.actions,
             vec![WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::default()
+                type_idx: crate::config::OrdinaryFoodTypeId::new(u16::MAX)
             }]
         );
+        assert_eq!(hops.len(), 2);
+        assert_eq!(passes[0].committed, output.actions.first().copied());
 
         let BackendTrace::Graph(graph) = &hops[0].backend_trace else {
             panic!("expected graph backend trace");
         };
-
-        assert_eq!(graph.output_sinks.len(), 0);
-        assert_eq!(graph.action_slots.len(), 1);
-        assert!(graph.action_slots[0].fired);
-        assert_eq!(graph.action_slots[0].queue_len_before, 0);
-        assert_eq!(graph.action_slots[0].queue_len_after, 1);
-        assert_eq!(
-            graph.action_slots[0].emitted_action,
-            Some(WorldAction::Eat {
-                type_idx: crate::config::OrdinaryFoodTypeId::default()
-            })
-        );
-        assert!(graph.execute_gate.wired);
-        assert!(graph.execute_gate.queue_non_empty);
-        assert!(graph.execute_gate.fired);
-    }
-
-    #[test]
-    fn graph_effect_trace_sanitizes_non_finite_values() {
-        let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                    birth_weights: None,
-                    compute_nodes: vec![ComputeNode {
-                        kind: ComputeNodeKind::Constant(1.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    }],
-                    output_sinks: vec![OutputSink {
-                        kind: OutputSinkKind::CustomOutput(0),
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: f32::NAN,
-                        }],
-                    }],
-                    action_bank: vec![crate::creature::genome::cgp::ActionSlot {
-                        behavior: crate::creature::genome::cgp::ActionSlotBehavior::Emit(
-                            crate::creature::genome::cgp::WorldActionKind::Move,
-                        ),
-                        gate_inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: 1.0,
-                        }],
-                        param_inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: f32::INFINITY,
-                        }],
-                        direction_bids: Vec::new(),
-                    }],
-                    execute_gate: ExecuteGate {
-                        inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: f32::NAN,
-                        }],
-                    },
-                }),
-                targets: vec![],
-            }],
-        };
-
-        let ss = empty_ss();
-        let mut energy = 100.0f32;
-        let mut smem = [0.0f32; 16];
-        let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
-        let config = default_config();
-
-        let (_output, hops, _reason) = execute_creature_mesh_traced(
-            &genome,
-            &ss,
-            &mut energy,
-            &mut smem,
-            &prev_smem,
-            &mut gr,
-            &config,
-        );
-
-        let BackendTrace::Graph(graph) = &hops[0].backend_trace else {
-            panic!("expected graph backend trace");
-        };
-
-        assert_eq!(graph.output_sinks.len(), 1);
-        assert_eq!(graph.output_sinks[0].weighted_sum, 0.0);
-        assert_eq!(graph.output_sinks[0].applied_value, 0.0);
-
-        assert_eq!(graph.action_slots.len(), 1);
-        assert_eq!(graph.action_slots[0].param_values[0], 1_000_000_000.0);
-        assert!(graph.action_slots[0].gate_weighted_sum.is_finite());
-
-        assert!(graph.execute_gate.weighted_sum.is_finite());
+        assert_eq!(graph.output_sinks.len(), 5);
+        assert!(graph.output_sinks[0].applied);
+        assert!((graph.output_sinks[0].applied_value - 1.0).abs() < 1e-6);
+        assert!(!graph.output_sinks[1].wired);
+        assert!(graph.output_sinks[2].applied);
+        assert_eq!(graph.output_sinks[3].applied_value, 1_000_000_000.0);
+        assert_eq!(graph.output_sinks[4].weighted_sum, 0.0);
+        assert_eq!(hops[0].vote_contribution[VoteSink::Eat.index()], 1.0);
+        assert_eq!(passes[0].votes[VoteSink::Terminate.index()], 0.0);
     }
 
     /// Energy exhaustion captured with correct termination reason.
@@ -716,7 +554,7 @@ mod tests {
         let prev_smem = [0.0f32; 16];
         let mut gr = GraphRuntimeState::new();
 
-        let (output, hops, reason) = execute_creature_mesh_traced(
+        let (output, hops, _) = execute_creature_mesh_traced(
             &genome,
             &ss,
             &mut energy,
@@ -727,10 +565,9 @@ mod tests {
         );
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
-        assert!(
-            matches!(reason, TerminationReason::EnergyExhausted),
-            "expected EnergyExhausted, got {:?}",
-            reason
+        assert_eq!(
+            output.termination_reason,
+            TerminationReason::EnergyExhausted
         );
         assert_eq!(hops.len(), 1);
     }
@@ -751,8 +588,6 @@ mod tests {
                         plasticity: None,
                     }],
                     output_sinks: vec![],
-                    action_bank: vec![],
-                    execute_gate: ExecuteGate { inputs: vec![] },
                 }),
                 targets: vec![],
             }],
@@ -766,7 +601,7 @@ mod tests {
         let prev_smem = [0.0f32; 16];
         let mut gr = GraphRuntimeState::new();
 
-        let (output, hops, reason) = execute_creature_mesh_traced(
+        let (output, hops, _) = execute_creature_mesh_traced(
             &genome,
             &ss,
             &mut energy,
@@ -777,7 +612,10 @@ mod tests {
         );
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
-        assert!(matches!(reason, TerminationReason::EnergyExhausted));
+        assert_eq!(
+            output.termination_reason,
+            TerminationReason::EnergyExhausted
+        );
         assert_eq!(hops.len(), 1);
         // No targets on this node, so route is None.
         assert!(hops[0].route.is_none());
@@ -810,24 +648,13 @@ mod tests {
                             modulation: None,
                         }),
                     }],
-                    output_sinks: vec![],
-                    action_bank: vec![crate::creature::genome::cgp::ActionSlot {
-                        behavior: crate::creature::genome::cgp::ActionSlotBehavior::Emit(
-                            crate::creature::genome::cgp::WorldActionKind::Eat,
-                        ),
-                        gate_inputs: vec![GraphEdge {
-                            source: GraphSource::ComputeNode(0),
-                            weight: 1.0,
-                        }],
-                        param_inputs: vec![],
-                        direction_bids: Vec::new(),
-                    }],
-                    execute_gate: ExecuteGate {
+                    output_sinks: vec![OutputSink {
+                        kind: OutputSinkKind::ActionVote(VoteSink::Eat),
                         inputs: vec![GraphEdge {
                             source: GraphSource::ComputeNode(0),
                             weight: 1.0,
                         }],
-                    },
+                    }],
                 }),
                 targets: vec![],
             }],
@@ -842,7 +669,7 @@ mod tests {
         let prev_smem = [0.0f32; 16];
         let mut gr = GraphRuntimeState::new();
 
-        let (output, hops, reason) = execute_creature_mesh_traced(
+        let (output, hops, passes) = execute_creature_mesh_traced(
             &genome,
             &ss,
             &mut energy,
@@ -853,7 +680,12 @@ mod tests {
         );
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
-        assert!(matches!(reason, TerminationReason::EnergyExhausted));
+        assert_eq!(
+            output.termination_reason,
+            TerminationReason::EnergyExhausted
+        );
+        // The exhausted visit committed no vote.
+        assert_eq!(passes[0].votes[VoteSink::Eat.index()], 0.0);
         assert_eq!(hops.len(), 1);
         // No targets on this node, so route is None.
         assert!(hops[0].route.is_none());
@@ -880,8 +712,12 @@ mod tests {
                             const_idx: 0,
                         },
                         VmInstruction::SetPriorityBid { src: 0 },
-                        VmInstruction::PushAction { action_type: 1 },
-                        VmInstruction::ExecuteActionQueue,
+                        VmInstruction::Div { dst: 0, a: 0, b: 0 },
+                        VmInstruction::AddVote {
+                            sink: VoteSink::Eat.index() as u8,
+                            src: 0,
+                        },
+                        VmInstruction::Halt,
                     ],
                 }),
                 targets: vec![],
@@ -966,8 +802,7 @@ mod tests {
                             slot_idx: 0,
                             src: 0,
                         },
-                        VmInstruction::PushAction { action_type: 0 },
-                        VmInstruction::ExecuteActionQueue,
+                        VmInstruction::Halt,
                     ],
                 }),
                 targets: vec![],
@@ -1032,7 +867,7 @@ mod tests {
         let mut energy_b = starting_energy;
         let mut memory_b = [0.0; 16];
         let mut runtime_b = GraphRuntimeState::new();
-        let (output_b, _, reason) = execute_creature_mesh_traced(
+        let (output_b, _, _) = execute_creature_mesh_traced(
             genome,
             &sensors,
             &mut energy_b,
@@ -1042,6 +877,8 @@ mod tests {
             config,
         );
 
+        let reason = output_b.termination_reason;
+        assert_eq!(output_a.termination_reason, reason, "{label}: reason");
         assert!(expected_reason(&reason), "{label}: unexpected {reason:?}");
         assert_eq!(output_a.actions, output_b.actions, "{label}: actions");
         assert_eq!(output_a.priority_bid, output_b.priority_bid, "{label}: bid");
@@ -1081,7 +918,7 @@ mod tests {
             },
             &config,
             100.0,
-            |reason| matches!(reason, TerminationReason::MissingNode),
+            |reason| matches!(reason, TerminationReason::NoDecision),
         );
         assert_mesh_equivalent_for_termination(
             "no targets",
@@ -1091,7 +928,7 @@ mod tests {
             },
             &config,
             100.0,
-            |reason| matches!(reason, TerminationReason::NoTargets),
+            |reason| matches!(reason, TerminationReason::NoDecision),
         );
         assert_mesh_equivalent_for_termination(
             "missing routed node",
@@ -1101,7 +938,7 @@ mod tests {
             },
             &config,
             100.0,
-            |reason| matches!(reason, TerminationReason::MissingNode),
+            |reason| matches!(reason, TerminationReason::NoDecision),
         );
 
         let mut max_hops_config = default_config();
@@ -1112,23 +949,35 @@ mod tests {
                 entry_node_id: id,
                 nodes: vec![
                     halt_node(wrap_targets(vec![missing])),
-                    vm_emit_node(missing, 1, vec![]),
+                    vm_emit_node(missing, vec![]),
                 ],
             },
             &max_hops_config,
             100.0,
-            |reason| matches!(reason, TerminationReason::MaxHopsReached),
+            |reason| matches!(reason, TerminationReason::NoDecision),
         );
 
         assert_mesh_equivalent_for_termination(
-            "action emitted",
+            "action committed",
             &CreatureGenome {
                 entry_node_id: id,
-                nodes: vec![vm_emit_node(id, 1, vec![])],
+                nodes: vec![vm_emit_node(id, vec![])],
             },
             &config,
             100.0,
-            |reason| matches!(reason, TerminationReason::ActionEmitted),
+            |reason| matches!(reason, TerminationReason::NoDecision),
+        );
+        let mut cap_config = default_config();
+        cap_config.max_actions_per_turn = 1;
+        assert_mesh_equivalent_for_termination(
+            "action cap",
+            &CreatureGenome {
+                entry_node_id: id,
+                nodes: vec![vm_emit_node(id, vec![])],
+            },
+            &cap_config,
+            100.0,
+            |reason| matches!(reason, TerminationReason::ActionCapReached),
         );
         let mut exhaustion_config = default_config();
         exhaustion_config.vm.opcode_cost_multiplier = 1.0;

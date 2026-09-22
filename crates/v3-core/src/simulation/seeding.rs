@@ -168,7 +168,7 @@ pub fn seed_simulation_with_perception_mix(
 mod tests {
     use super::*;
     use crate::config::{FounderProfile, SimulationConfig};
-    use crate::creature::genome::{BackendDef, VmInstruction};
+    use crate::creature::genome::BackendDef;
     use crate::sensors::perception::genome_uses_extended_perception;
     use std::collections::HashSet;
 
@@ -355,26 +355,17 @@ mod tests {
     fn seeding_uses_configured_founder_profile() {
         let mut cfg = small_config();
         cfg.population.founder_profile = FounderProfile::ForageFirstSparse;
+        let expected = crate::creature::founder::founder_genome_with_age_gate(
+            FounderProfile::ForageFirstSparse,
+            &cfg.energy.lifecycle,
+        );
         let sim = seed_simulation(cfg, 42);
         let founder = sim.creatures.values().next().expect("seeded founder");
-        let BackendDef::Vm(vm) = &founder.genome.nodes[1].backend_def else {
-            panic!("node 1 should be VM backend");
-        };
-
-        let first_eat = vm
-            .program
-            .iter()
-            .position(|instr| matches!(instr, VmInstruction::PushAction { action_type: 1 }))
-            .expect("eat action should exist");
-        let first_reproduce = vm
-            .program
-            .iter()
-            .position(|instr| matches!(instr, VmInstruction::PushAction { action_type: 3 }))
-            .expect("reproduce action should exist");
-
-        assert!(
-            first_eat < first_reproduce,
-            "forage-first founder should prioritize eat before reproduce"
+        assert_eq!(founder.genome, expected);
+        assert_ne!(
+            founder.genome,
+            crate::creature::founder::v3alpha1_founder_genome(),
+            "the forage-first decision graph differs from V3Alpha1's"
         );
     }
 

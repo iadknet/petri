@@ -402,7 +402,7 @@ mod drift_characterization {
     use crate::mutation::engine::MutationEngine;
     use crate::mutation::reachability::ParentExecuted;
     use crate::runtime::mesh::ObservedMeshExecution;
-    use crate::runtime::trace::domain::TerminationReason;
+
     use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
@@ -433,7 +433,7 @@ mod drift_characterization {
                         BTreeMap::new();
                     let mut cap = false;
                     for scenario in &battery.snapshots {
-                        let (_, observation) = battery.execute_single_tick_with_mode(
+                        let (output, observation) = battery.execute_single_tick_with_mode(
                             &genome,
                             scenario,
                             &config.runtime,
@@ -445,10 +445,7 @@ mod drift_characterization {
                                 routes.entry(id).or_default().insert(position);
                             }
                         }
-                        cap |= matches!(
-                            observation.termination_reason,
-                            TerminationReason::MaxHopsReached
-                        );
+                        cap |= output.work_counters.pass_cap_hits > 0;
                     }
                     let row = &mut totals[index];
                     row[0] += genome.nodes.len();

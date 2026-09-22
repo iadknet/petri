@@ -1,9 +1,9 @@
 //! End-to-end VM opcode coverage test.
 //!
-//! Uses one sample VM program containing all 43 opcodes. The program's final
-//! branch reads `FoodHere`: with food it executes `PushAction` + `ExecuteActionQueue`,
-//! without food it executes `Halt`. Running both scenarios yields full opcode coverage
-//! through the simulation tick path.
+//! Uses one sample VM program containing all 39 opcodes. The program's final
+//! branch reads `FoodHere`: with food it executes the `Eat` vote and `Halt`,
+//! without food it jumps to the trailing `Noop` and `Halt`. Running both
+//! scenarios yields full opcode coverage through the simulation tick path.
 
 use std::collections::HashSet;
 use std::mem::{discriminant, Discriminant};
@@ -118,22 +118,22 @@ fn sample_vm_program() -> Vec<VmInstruction> {
             slot_idx: 0,
             src: 10,
         },
-        VmInstruction::WriteWorldActionMeta {
+        VmInstruction::WriteActionParam {
             slot_idx: 0,
             src: 15,
         },
-        VmInstruction::WriteDirectionBid {
-            direction: 0,
+        VmInstruction::WriteActionParam {
+            slot_idx: 0,
             src: 15,
         },
-        // Inert vote surface (T19.F03): executed and costed, read by nothing.
+        // A vote from r15 (T19.F04); the food branch below adds the `Eat` vote.
         VmInstruction::AddVote { sink: 0, src: 15 },
         VmInstruction::WriteRouteGate { slot: 0, src: 0 },
         // ── Priority bid ────────────────────────────────────────────────────
         VmInstruction::SetPriorityBid { src: 13 }, // r13 = 0.0, so no energy deducted
         // ── Action queue introspection opcodes ──────────────────────────────
-        VmInstruction::PushAction { action_type: 0 }, // push test NoOp action
-        VmInstruction::ReadActionQueueLength { dst: 14 }, // r14 = 1.0
+        VmInstruction::Noop,
+        VmInstruction::ReadActionQueueLength { dst: 14 }, // r14 = committed actions
         VmInstruction::ReadActionQueueType {
             index_src: 14,
             dst: 14,
@@ -143,7 +143,7 @@ fn sample_vm_program() -> Vec<VmInstruction> {
             param_slot: 0,
             dst: 14,
         },
-        VmInstruction::PopAction, // remove the test action
+        VmInstruction::Noop,
         // ── Branch to terminal opcode based on FoodHere ─────────────────────
         VmInstruction::ReadInput {
             dst: 15,
@@ -155,8 +155,8 @@ fn sample_vm_program() -> Vec<VmInstruction> {
             cond: 15,
             offset: 2,
         }, // jump to Halt when no food
-        VmInstruction::PushAction { action_type: 1 }, // Eat when food exists
-        VmInstruction::ExecuteActionQueue,            // terminal: return queue
+        VmInstruction::AddVote { sink: 0, src: 0 }, // Eat when food exists
+        VmInstruction::Halt,                        // end the node
         VmInstruction::Noop,
         VmInstruction::Halt,
     ]
@@ -222,17 +222,17 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
             slot_idx: 0,
             src: 0,
         },
-        VmInstruction::WriteWorldActionMeta {
+        VmInstruction::WriteActionParam {
             slot_idx: 0,
             src: 0,
         },
-        VmInstruction::WriteDirectionBid {
-            direction: 0,
+        VmInstruction::WriteActionParam {
+            slot_idx: 0,
             src: 0,
         },
         VmInstruction::WriteRouteGate { slot: 0, src: 0 },
-        VmInstruction::PushAction { action_type: 0 },
-        VmInstruction::PopAction,
+        VmInstruction::Noop,
+        VmInstruction::Noop,
         VmInstruction::ReadActionQueueLength { dst: 0 },
         VmInstruction::ReadActionQueueType {
             index_src: 0,
@@ -244,7 +244,7 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
             dst: 0,
         },
         VmInstruction::SetPriorityBid { src: 0 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::Halt,
         VmInstruction::Halt,
         VmInstruction::LoadSlot {
             dst: 0,
@@ -271,7 +271,7 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
     ];
 
     let set: HashSet<Discriminant<VmInstruction>> = instructions.iter().map(discriminant).collect();
-    assert_eq!(set.len(), 43, "expected 43 unique VM opcode discriminants");
+    assert_eq!(set.len(), 39, "expected 39 unique VM opcode discriminants");
     set
 }
 
@@ -312,8 +312,8 @@ fn build_simulation(food_here: f32) -> (Simulation, CreatureId, Position) {
 fn collect_vm_discriminants(tick: &TickTrace) -> HashSet<Discriminant<VmInstruction>> {
     assert_eq!(
         tick.hops.len(),
-        1,
-        "single-node sample genome should execute exactly one hop"
+        tick.passes.len(),
+        "single-node sample genome should execute exactly one hop per pass"
     );
     let vm_trace = vm_trace(tick);
     vm_trace
@@ -352,7 +352,7 @@ where
 fn sample_program_exercises_all_vm_opcodes_e2e() {
     let expected = expected_all_opcode_discriminants();
 
-    // Scenario A: food present -> PushAction+ExecuteActionQueue path (Eat).
+    // Scenario A: food present -> the `Eat` vote commits.
     let (mut sim_emit, emit_id, emit_pos) = build_simulation(1.0);
     let mut emit_trace = Some(ActiveTrace::new(emit_id, 1));
     run_tick(&mut sim_emit, &mut emit_trace);
@@ -395,7 +395,7 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
         emit_seen.union(&halt_seen).copied().collect();
     assert_eq!(
         observed, expected,
-        "sample VM program should cover all 43 opcodes across emit/halt runs"
+        "sample VM program should cover all 39 opcodes across emit/halt runs"
     );
 
     // Verify unconditional Jump was actually taken (pc + 2 because offset=1).
@@ -431,23 +431,29 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
     assert_eq!(
         after_jiz_halt,
         jiz_pc_halt + 3,
-        "JumpIfZero should jump over PushAction + ExecuteActionQueue on zero FoodHere (halt path)"
+        "JumpIfZero should jump over the Eat vote and its Halt on zero FoodHere (halt path)"
     );
 
-    assert!(
-        emit_seen.contains(&discriminant(&VmInstruction::ExecuteActionQueue)),
-        "emit scenario must execute ExecuteActionQueue"
+    let instruction_at = |trace: &VmTrace, pc: usize| {
+        trace
+            .steps
+            .iter()
+            .find(|step| step.pc == pc)
+            .map(|step| step.instruction.clone())
+    };
+    assert_eq!(
+        instruction_at(emit_vm_trace, after_jiz_emit),
+        Some(VmInstruction::AddVote { sink: 0, src: 0 }),
+        "emit scenario must execute the Eat vote after the branch"
+    );
+    assert_eq!(
+        instruction_at(halt_vm_trace, after_jiz_halt),
+        Some(VmInstruction::Noop),
+        "halt scenario should skip the Eat vote via JumpIfZero"
     );
     assert!(
-        !emit_seen.contains(&discriminant(&VmInstruction::Halt)),
-        "emit scenario should terminate at ExecuteActionQueue before Halt"
-    );
-    assert!(
-        halt_seen.contains(&discriminant(&VmInstruction::Halt)),
-        "halt scenario must execute Halt"
-    );
-    assert!(
-        !halt_seen.contains(&discriminant(&VmInstruction::ExecuteActionQueue)),
-        "halt scenario should skip ExecuteActionQueue via JumpIfZero"
+        emit_seen.contains(&discriminant(&VmInstruction::Halt))
+            && halt_seen.contains(&discriminant(&VmInstruction::Halt)),
+        "both scenarios end the node at Halt"
     );
 }

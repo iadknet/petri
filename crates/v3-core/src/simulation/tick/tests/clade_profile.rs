@@ -20,8 +20,7 @@ fn execute(
         priority_bid: 0.0,
         work_counters: Default::default(),
         energy_observation: Default::default(),
-        termination_reason: TerminationReason::ActionEmitted,
-        votes: Default::default(),
+        termination_reason: TerminationReason::NoDecision,
         commit_counts: Default::default(),
     };
     super::super::run_phase_2(

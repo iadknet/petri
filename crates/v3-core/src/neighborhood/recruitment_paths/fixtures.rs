@@ -3,9 +3,10 @@ use crate::config::MutationConfig;
 use crate::contracts::{InputReference, NodeId, OrdinaryFoodTypeId, RouteTarget, WorldInputKey};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::cgp::{
-    ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
-    WorldActionKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+    OutputSinkKind,
 };
+use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 use crate::mutation::graph::operators::split_existing_edge;
 use crate::mutation::reachability::TargetSets;
@@ -64,7 +65,6 @@ pub struct MutableSites {
     pub vm_constants: usize,
     pub graph_compute_nodes: usize,
     pub graph_edges: usize,
-    pub graph_action_slots: usize,
 }
 
 fn sites(genome: &CreatureGenome) -> MutableSites {
@@ -75,7 +75,6 @@ fn sites(genome: &CreatureGenome) -> MutableSites {
         vm_constants: 0,
         graph_compute_nodes: 0,
         graph_edges: 0,
-        graph_action_slots: 0,
     };
     for node in &genome.nodes {
         sites.input_refs += node.input_refs.len();
@@ -87,23 +86,7 @@ fn sites(genome: &CreatureGenome) -> MutableSites {
             }
             BackendDef::Graph(graph) => {
                 sites.graph_compute_nodes += graph.compute_nodes.len();
-                sites.graph_action_slots += graph.action_bank.len();
-                sites.graph_edges += graph
-                    .compute_nodes
-                    .iter()
-                    .map(|node| node.inputs.len())
-                    .sum::<usize>()
-                    + graph
-                        .output_sinks
-                        .iter()
-                        .map(|sink| sink.inputs.len())
-                        .sum::<usize>()
-                    + graph
-                        .action_bank
-                        .iter()
-                        .map(|slot| slot.gate_inputs.len() + slot.param_inputs.len())
-                        .sum::<usize>()
-                    + graph.execute_gate.inputs.len();
+                sites.graph_edges += graph.edges().count();
             }
         }
     }
@@ -127,9 +110,7 @@ fn edge(source: GraphSource, weight: f32) -> GraphEdge {
 
 fn blank(backend: ModuleBackend) -> BackendDef {
     match backend {
-        ModuleBackend::Graph => BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs(
-            &MutationConfig::default(),
-        )),
+        ModuleBackend::Graph => BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
         // Identical to topology::birth::minimal_vm_backend's constructor.
         ModuleBackend::Vm => BackendDef::Vm(VmBackendDef {
             register_count: 1,
@@ -139,6 +120,14 @@ fn blank(backend: ModuleBackend) -> BackendDef {
     }
 }
 
+/// The `Move` sink the reactive module votes on: east, the task's target.
+pub(super) const EAST: u8 = 2;
+
+/// The reactive module (T19.F04): vote `Move(EAST)` with the cue when the
+/// cue is positive. VM: read the cue, compare it with the zero constant, and
+/// vote the comparison; a dormant copy leads with `Halt`. Graph: a summing
+/// node reads the cue and, when live, one edge carries it into the
+/// `ActionVote(Move(EAST))` sink.
 fn reactive(backend: ModuleBackend, live: bool) -> NodeGenome {
     let backend_def = match backend {
         ModuleBackend::Vm => {
@@ -153,55 +142,38 @@ fn reactive(backend: ModuleBackend, live: bool) -> NodeGenome {
                     const_idx: 0,
                 },
                 VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
-                VmInstruction::JumpIfZero { cond: 2, offset: 4 },
-                VmInstruction::LoadConst {
-                    dst: 3,
-                    const_idx: 1,
+                VmInstruction::AddVote {
+                    sink: VoteSink::Move(EAST).index() as u8,
+                    src: 2,
                 },
-                VmInstruction::WriteWorldActionMeta {
-                    slot_idx: 0,
-                    src: 3,
-                },
-                VmInstruction::PushAction { action_type: 2 },
-                VmInstruction::ExecuteActionQueue,
-                VmInstruction::PushAction { action_type: 0 },
-                VmInstruction::ExecuteActionQueue,
             ];
             if !live {
                 program.insert(0, VmInstruction::Halt);
             }
             BackendDef::Vm(VmBackendDef {
                 register_count: 4,
-                constants: vec![0.0, 2.0],
+                constants: vec![0.0],
                 program,
             })
         }
         ModuleBackend::Graph => {
-            let mut graph = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
-            graph.compute_nodes = vec![
-                ComputeNode {
-                    kind: ComputeNodeKind::WeightedSum,
-                    inputs: vec![edge(
-                        GraphSource::InputLeaf {
-                            ref_idx: 0,
-                            sub_idx: 0,
-                        },
-                        1.0,
-                    )],
-                    plasticity: None,
-                },
-                ComputeNode {
-                    kind: ComputeNodeKind::Constant(2.0),
-                    inputs: vec![],
-                    plasticity: None,
-                },
-            ];
-            graph.action_bank[0].behavior = ActionSlotBehavior::Emit(WorldActionKind::Move);
-            graph.action_bank[0].param_inputs = vec![edge(GraphSource::ComputeNode(1), 1.0)];
+            let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
+            graph.compute_nodes = vec![ComputeNode {
+                kind: ComputeNodeKind::WeightedSum,
+                inputs: vec![edge(
+                    GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    1.0,
+                )],
+                plasticity: None,
+            }];
             if live {
-                graph.action_bank[0].gate_inputs = vec![edge(GraphSource::ComputeNode(0), 1.0)];
+                move_sink_mut(&mut graph, EAST)
+                    .inputs
+                    .push(edge(GraphSource::ComputeNode(0), 1.0));
             }
-            graph.execute_gate.inputs = vec![edge(GraphSource::ComputeNode(1), 1.0)];
             BackendDef::Graph(graph)
         }
     };
@@ -211,6 +183,23 @@ fn reactive(backend: ModuleBackend, live: bool) -> NodeGenome {
         backend_def,
         targets: vec![],
     }
+}
+
+/// The catalog's `ActionVote(Move(d))` sink.
+pub(super) fn move_sink(graph: &CgpGraphBackendDef, d: u8) -> &OutputSink {
+    graph
+        .output_sinks
+        .iter()
+        .find(|sink| sink.kind == OutputSinkKind::ActionVote(VoteSink::Move(d)))
+        .expect("the fixed catalog holds every Move sink")
+}
+
+fn move_sink_mut(graph: &mut CgpGraphBackendDef, d: u8) -> &mut OutputSink {
+    graph
+        .output_sinks
+        .iter_mut()
+        .find(|sink| sink.kind == OutputSinkKind::ActionVote(VoteSink::Move(d)))
+        .expect("the fixed catalog holds every Move sink")
 }
 
 pub(super) fn base(backend: ModuleBackend, live: bool) -> CreatureGenome {
@@ -333,7 +322,7 @@ pub fn constructed_paths() -> Vec<ConstructedPath> {
         let copy_stage = stage("dormant_copy", "constructed Topology.CopyNode; exact backend/input/slot copy", Some(7), &base, copied.clone());
         let mut prepared = copied.clone();
         prepared.nodes[2].backend_def = reactive(backend, true).backend_def;
-        let prepare_copy = stage("prepared_copy", "authored activation of dormant internal material: Graph.AddGraphEdge to action gate, or VM leading Halt removal (VmDeleteInstruction)", None, &copied, prepared);
+        let prepare_copy = stage("prepared_copy", "authored activation of dormant internal material: Graph.AddGraphEdge into the Move(E) vote sink, or VM leading Halt removal (VmDeleteInstruction)", None, &copied, prepared);
         let copy_activation = activate(&prepare_copy.genome);
         let split_stage = if backend == ModuleBackend::Graph {
             let mut split = copied.clone();
@@ -350,7 +339,7 @@ pub fn constructed_paths() -> Vec<ConstructedPath> {
         scaffold.nodes[2].input_refs = vec![cue(Task::A)];
         let sensor = stage("sensor_preparation", "authored InputRef.AddInputRef: FoodHere(type 0)", None, &blank_genome, scaffold.clone());
         scaffold.nodes[2].backend_def = reactive(backend, true).backend_def;
-        let prepared_stage = stage("dormant_preparation", "authored VM instruction/constants insertion (A1 fixture) or Graph compute/edge/action-field preparation; complete before/after fields recorded", None, &sensor.genome, scaffold);
+        let prepared_stage = stage("dormant_preparation", "authored VM instruction/constants insertion (A1 fixture) or Graph compute node and Move(E) vote edge; complete before/after fields recorded", None, &sensor.genome, scaffold);
         let activated = activate(&prepared_stage.genome);
         ConstructedPath { backend, base, stages: vec![blank_stage, sensor, prepared_stage, activated],
             copy_stages: vec![copy_stage, prepare_copy, copy_activation], split_stage }
@@ -433,10 +422,16 @@ pub(super) fn starts_from_paths(paths: &[ConstructedPath]) -> Vec<Start> {
             &base,
             copied.clone(),
         );
-        // The common history makes the copied action point north, still dormant.
+        // The common history makes the copied vote point north, still dormant.
         let mut common = copied.clone();
-        direction(&mut common.nodes[2], 0.0);
-        let common_stage = stage("common_history_before_fork", "authored dormant direction constant E=2 to N=0; VM constant or Graph.MutateGraphOperatorParam", None, &copied, common.clone());
+        direction(&mut common.nodes[2], 0);
+        let common_stage = stage(
+            "common_history_before_fork",
+            "authored dormant vote sink Move(E) to Move(N); VM AddVote sink or the Graph vote edge",
+            None,
+            &copied,
+            common.clone(),
+        );
         let mut prepared = common.clone();
         prepared.nodes[2].input_refs[0] = cue(Task::B);
         match &mut prepared.nodes[2].backend_def {
@@ -454,8 +449,8 @@ pub(super) fn starts_from_paths(paths: &[ConstructedPath]) -> Vec<Start> {
                 };
             }
         }
-        direction(&mut prepared.nodes[2], 2.0);
-        let preparation = stage("silent_preparation", "authored InputRef field Here to NeighborFoodRing; VM ReadInput/Graph input sub-index 0 to E=2; action direction N=0 to E=2", None, &common, prepared.clone());
+        direction(&mut prepared.nodes[2], EAST);
+        let preparation = stage("silent_preparation", "authored InputRef field Here to NeighborFoodRing; VM ReadInput/Graph input sub-index 0 to E=2; vote sink Move(N) to Move(E)", None, &common, prepared.clone());
         for (label, before, mut history) in [
             (
                 "unprepared",
@@ -498,9 +493,26 @@ pub(super) fn starts_from_paths(paths: &[ConstructedPath]) -> Vec<Start> {
     starts
 }
 
-fn direction(node: &mut NodeGenome, value: f32) {
+/// Point the module's `Move` vote at direction `d`: the VM's `AddVote` sink,
+/// or the Graph's vote edges moved onto `Move(d)`.
+fn direction(node: &mut NodeGenome, d: u8) {
+    let target = VoteSink::Move(d);
     match &mut node.backend_def {
-        BackendDef::Vm(vm) => vm.constants[1] = value,
-        BackendDef::Graph(graph) => graph.compute_nodes[1].kind = ComputeNodeKind::Constant(value),
+        BackendDef::Vm(vm) => {
+            for instruction in &mut vm.program {
+                if let VmInstruction::AddVote { sink, .. } = instruction {
+                    *sink = target.index() as u8;
+                }
+            }
+        }
+        BackendDef::Graph(graph) => {
+            let edges: Vec<GraphEdge> = graph
+                .output_sinks
+                .iter_mut()
+                .filter(|sink| matches!(sink.kind, OutputSinkKind::ActionVote(VoteSink::Move(_))))
+                .flat_map(|sink| std::mem::take(&mut sink.inputs))
+                .collect();
+            move_sink_mut(graph, d).inputs = edges;
+        }
     }
 }

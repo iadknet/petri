@@ -4,14 +4,14 @@ use super::operators::{
 };
 use super::*;
 use crate::contracts::NodeId;
-use crate::creature::founder::v3alpha1_founder_genome;
+use crate::creature::founder::vm_decision_founder_genome as v3alpha1_founder_genome;
 use crate::creature::genome::analysis::vm_forward_slice;
+use crate::creature::genome::vote::VOTE_SINK_COUNT;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::types::MutationSkipReason;
-use crate::runtime::action_decode::MAX_DECODED_ACTION_TYPE;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -201,7 +201,8 @@ fn vm_constant_mutation_consumes_exactly_two_draws() {
     .unwrap();
     let next: u64 = r.gen();
     let mut reference = rng(7);
-    let _index = reference.gen_range(0..6usize);
+    // The fixture's pool holds seven constants.
+    let _index = reference.gen_range(0..7usize);
     let _u: f32 = reference.gen_range(-0.1f32..=0.1);
     assert_eq!(next, reference.gen::<u64>());
 }
@@ -311,7 +312,7 @@ fn vm_instruction_mutation_changes_program() {
 fn vm_instruction_mutation_reaches_insert_replace_and_delete() {
     let genome = slot_program_genome(vec![
         VmInstruction::Noop,
-        VmInstruction::PushAction { action_type: 1 },
+        VmInstruction::AddVote { sink: 0, src: 0 },
         VmInstruction::Halt,
     ]);
     let original = match &genome.nodes[0].backend_def {
@@ -353,7 +354,7 @@ fn vm_delete_instruction_removes_one_instruction() {
         vm.program = vec![
             VmInstruction::Noop,
             VmInstruction::Halt,
-            VmInstruction::PushAction { action_type: 1 },
+            VmInstruction::AddVote { sink: 0, src: 0 },
         ];
     }
 
@@ -406,9 +407,7 @@ fn vm_mutator_on_graph_only_genome_returns_no_applicable_target() {
         node_id: NodeId::new(0),
         input_refs: vec![],
         backend_def: BackendDef::Graph(
-            crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(
-                &MutationConfig::default(),
-            ),
+            crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(),
         ),
         targets: vec![],
     }];
@@ -522,25 +521,6 @@ fn vm_replace_produces_non_noop() {
     );
 }
 
-/// T19.F03: `AddVote` exists in the ISA and is not drawable. The draw must
-/// still reach every one of the 42 older opcodes, so the instruction supply is
-/// unchanged and the vote surface stays inert until T19.F04.
-#[test]
-fn random_vm_instruction_never_yields_add_vote_and_still_reaches_all_42_drawable() {
-    use std::collections::HashSet;
-    let mut discriminants: HashSet<std::mem::Discriminant<VmInstruction>> = HashSet::new();
-    for seed in 0u64..4096 {
-        let mut r = rng(seed);
-        let instr = random_vm_instruction(&mut r, 4, 4, 4);
-        assert!(
-            !matches!(instr, VmInstruction::AddVote { .. }),
-            "seed {seed} drew AddVote"
-        );
-        discriminants.insert(std::mem::discriminant(&instr));
-    }
-    assert_eq!(discriminants.len(), 42);
-}
-
 #[test]
 fn random_vm_instruction_covers_all_families() {
     use std::collections::HashSet;
@@ -552,37 +532,35 @@ fn random_vm_instruction_covers_all_families() {
     }
     assert_eq!(
         discriminants.len(),
-        42,
-        "all 42 VmInstruction variants must be reachable; got {}",
+        39,
+        "all 39 VmInstruction variants must be reachable; got {}",
         discriminants.len()
     );
 }
 
-/// Re-pinned by T13.F05: the draw used to cover the full `u8` (the old test
-/// only asked for a value above 3); it now covers exactly the action types
-/// `decode_world_action` admits, so every one of 0..=4 must be reachable.
+/// T19.F04: `AddVote` is drawable, and its sink is drawn over the catalog, so
+/// every vote sink is reachable.
 #[test]
-fn random_vm_instruction_reaches_every_decodable_action_type() {
-    let mut reached = [false; 5];
-    for seed in 0u64..4096 {
-        if let VmInstruction::PushAction { action_type } =
-            random_vm_instruction(&mut rng(seed), 4, 4, 4)
+fn random_vm_instruction_reaches_every_vote_sink() {
+    let mut reached = [false; VOTE_SINK_COUNT];
+    for seed in 0u64..16_384 {
+        if let VmInstruction::AddVote { sink, .. } = random_vm_instruction(&mut rng(seed), 4, 4, 4)
         {
-            reached[usize::from(action_type)] = true;
+            reached[usize::from(sink)] = true;
         }
     }
-    assert_eq!(reached, [true; 5]);
+    assert_eq!(reached, [true; VOTE_SINK_COUNT]);
 }
 
 proptest! {
-    /// T13.F05: `PushAction.action_type` is drawn over the decodable range
-    /// only; anything above 4 is a soft `NoOp` at runtime.
+    /// T19.F04: a drawn `AddVote` names a catalog sink, never a soft
+    /// out-of-range one.
     #[test]
-    fn random_vm_instruction_never_draws_an_undecodable_action_type(seed in any::<u64>()) {
+    fn random_vm_instruction_never_draws_an_out_of_catalog_sink(seed in any::<u64>()) {
         let mut r = rng(seed);
         for _ in 0..64 {
-            if let VmInstruction::PushAction { action_type } = random_vm_instruction(&mut r, 4, 4, 4) {
-                prop_assert!(action_type <= MAX_DECODED_ACTION_TYPE, "action_type {action_type}");
+            if let VmInstruction::AddVote { sink, .. } = random_vm_instruction(&mut r, 4, 4, 4) {
+                prop_assert!(usize::from(sink) < VOTE_SINK_COUNT, "sink {sink}");
             }
         }
     }
@@ -613,10 +591,10 @@ fn random_vm_instruction_generates_slot_opcodes() {
 }
 
 #[test]
-fn raw_field_mutation_nudges_action_type_by_one() {
+fn raw_field_mutation_nudges_a_single_u8_field_at_zero_up_by_one() {
     let mut genome = v3alpha1_founder_genome();
     if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
-        vm.program = vec![VmInstruction::PushAction { action_type: 0 }];
+        vm.program = vec![VmInstruction::ClearSlot { slot_idx: 0 }];
     }
 
     for seed in 0u64..512 {
@@ -633,7 +611,7 @@ fn raw_field_mutation_nudges_action_type_by_one() {
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
             assert!(matches!(
                 vm.program[0],
-                VmInstruction::PushAction { action_type: 1 }
+                VmInstruction::ClearSlot { slot_idx: 1 }
             ));
         }
     }
@@ -1007,10 +985,10 @@ fn copy_instruction_block_remapped_cyclically_shifts_every_register_field() {
 
 #[test]
 fn copy_instruction_block_remapped_preserves_non_register_fields() {
-    // Non-register fields (const_idx, action_type, etc.) must not change.
+    // Non-register fields (const_idx, sink, etc.) must not change.
     let mut genome = v3alpha1_founder_genome();
     if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
-        vm.program = vec![VmInstruction::PushAction { action_type: 42 }];
+        vm.program = vec![VmInstruction::AddVote { sink: 42, src: 0 }];
         vm.register_count = 4;
     }
     let mut r = rng(0);
@@ -1026,8 +1004,8 @@ fn copy_instruction_block_remapped_preserves_non_register_fields() {
         assert!(
             vm.program
                 .iter()
-                .any(|i| matches!(i, VmInstruction::PushAction { action_type: 42 })),
-            "PushAction with action_type 42 must be preserved"
+                .any(|i| matches!(i, VmInstruction::AddVote { sink: 42, .. })),
+            "AddVote with sink 42 must be preserved"
         );
     }
 }
@@ -1336,7 +1314,7 @@ fn copy_gene_forward_slice_no_dst_returns_no_applicable_target() {
     if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
         vm.program = vec![
             VmInstruction::Noop,
-            VmInstruction::PushAction { action_type: 0 },
+            VmInstruction::Noop,
             VmInstruction::Halt,
         ];
     }
@@ -1553,7 +1531,7 @@ fn vm_insert_read_bid_motif_inserts_read_input_and_priority_bid_pair() {
         {
             if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
                 for w in vm.program.windows(3) {
-                    if let [VmInstruction::ReadInput { dst, .. }, VmInstruction::SetPriorityBid { src }, VmInstruction::ExecuteActionQueue] =
+                    if let [VmInstruction::ReadInput { dst, .. }, VmInstruction::SetPriorityBid { src }, VmInstruction::Halt] =
                         w
                     {
                         if dst == src {
@@ -2186,16 +2164,16 @@ fn operand_bearing_instructions() -> Vec<VmInstruction> {
             slot_idx: 4,
             src: 8,
         },
-        VmInstruction::WriteWorldActionMeta {
+        VmInstruction::WriteActionParam {
             slot_idx: 4,
             src: 8,
         },
-        VmInstruction::WriteDirectionBid {
-            direction: 4,
+        VmInstruction::WriteActionParam {
+            slot_idx: 4,
             src: 8,
         },
         VmInstruction::WriteRouteGate { slot: 4, src: 8 },
-        VmInstruction::PushAction { action_type: 4 },
+        VmInstruction::AddVote { sink: 17, src: 0 },
         VmInstruction::ReadActionQueueLength { dst: 4 },
         VmInstruction::ReadActionQueueType {
             index_src: 4,
@@ -2233,10 +2211,7 @@ fn operand_bearing_instructions() -> Vec<VmInstruction> {
 
 fn encoded_fields(instruction: &VmInstruction) -> Vec<i64> {
     match instruction {
-        VmInstruction::Noop
-        | VmInstruction::Halt
-        | VmInstruction::ExecuteActionQueue
-        | VmInstruction::PopAction => vec![],
+        VmInstruction::Noop | VmInstruction::Halt => vec![],
         VmInstruction::LoadConst { dst, const_idx } => vec![i64::from(*dst), i64::from(*const_idx)],
         VmInstruction::Move { dst, src }
         | VmInstruction::Abs { dst, src }
@@ -2282,11 +2257,7 @@ fn encoded_fields(instruction: &VmInstruction) -> Vec<i64> {
             vec![i64::from(*dst), i64::from(*ref_idx), i64::from(*sub_idx)]
         }
         VmInstruction::WriteInternalPayload { slot_idx, src }
-        | VmInstruction::WriteWorldActionMeta { slot_idx, src }
-        | VmInstruction::WriteDirectionBid {
-            direction: slot_idx,
-            src,
-        }
+        | VmInstruction::WriteActionParam { slot_idx, src }
         | VmInstruction::AddVote {
             sink: slot_idx,
             src,
@@ -2294,8 +2265,7 @@ fn encoded_fields(instruction: &VmInstruction) -> Vec<i64> {
             vec![i64::from(*slot_idx), i64::from(*src)]
         }
         VmInstruction::WriteRouteGate { slot, src } => vec![i64::from(*slot), i64::from(*src)],
-        VmInstruction::PushAction { action_type }
-        | VmInstruction::SetPriorityBid { src: action_type }
+        VmInstruction::SetPriorityBid { src: action_type }
         | VmInstruction::ReadActionQueueLength { dst: action_type }
         | VmInstruction::ClearSlot {
             slot_idx: action_type,
@@ -2410,29 +2380,27 @@ fn raw_field_mutation_nudges_numeric_boundaries_inward() {
 fn raw_field_mutation_exercises_bounded_numeric_directions() {
     let mut u8_directions = Vec::new();
     for seed in 0..128 {
-        let mut instruction = VmInstruction::PushAction { action_type: 127 };
+        let mut instruction = VmInstruction::ClearSlot { slot_idx: 127 };
         assert!(mutate_one_instruction_field(
             &mut instruction,
             &mut rng(seed)
         ));
-        let VmInstruction::PushAction { action_type } = instruction else {
+        let VmInstruction::ClearSlot { slot_idx } = instruction else {
             unreachable!();
         };
-        u8_directions.push(action_type);
+        u8_directions.push(slot_idx);
     }
     assert!(u8_directions.contains(&126));
     assert!(u8_directions.contains(&128));
     for seed in 0..128 {
-        let mut instruction = VmInstruction::PushAction {
-            action_type: u8::MAX,
-        };
+        let mut instruction = VmInstruction::ClearSlot { slot_idx: u8::MAX };
         assert!(mutate_one_instruction_field(
             &mut instruction,
             &mut rng(seed)
         ));
         assert!(matches!(
             instruction,
-            VmInstruction::PushAction { action_type: 254 }
+            VmInstruction::ClearSlot { slot_idx: 254 }
         ));
     }
 
@@ -2552,8 +2520,8 @@ fn raw_field_mutation_skips_programs_without_operands() {
     let mut genome = slot_program_genome(vec![
         VmInstruction::Noop,
         VmInstruction::Halt,
-        VmInstruction::ExecuteActionQueue,
-        VmInstruction::PopAction,
+        VmInstruction::Halt,
+        VmInstruction::Noop,
     ]);
     let before = genome.clone();
     let mut r = rng(9);
@@ -2682,12 +2650,12 @@ fn register_bearing_instructions(raw: u8) -> Vec<VmInstruction> {
             slot_idx: 0,
             src: raw,
         },
-        VmInstruction::WriteWorldActionMeta {
+        VmInstruction::WriteActionParam {
             slot_idx: 0,
             src: raw,
         },
-        VmInstruction::WriteDirectionBid {
-            direction: 0,
+        VmInstruction::WriteActionParam {
+            slot_idx: 0,
             src: raw,
         },
         VmInstruction::WriteRouteGate { slot: 0, src: raw },
@@ -2729,10 +2697,7 @@ fn register_fields(instruction: &VmInstruction) -> Vec<u8> {
     match instruction {
         VmInstruction::Noop
         | VmInstruction::Halt
-        | VmInstruction::ExecuteActionQueue
-        | VmInstruction::PopAction
         | VmInstruction::Jump { .. }
-        | VmInstruction::PushAction { .. }
         | VmInstruction::ClearSlot { .. } => vec![],
         VmInstruction::LoadConst { dst, .. }
         | VmInstruction::ReadInput { dst, .. }
@@ -2767,8 +2732,7 @@ fn register_fields(instruction: &VmInstruction) -> Vec<u8> {
             vec![*cond]
         }
         VmInstruction::WriteInternalPayload { src, .. }
-        | VmInstruction::WriteWorldActionMeta { src, .. }
-        | VmInstruction::WriteDirectionBid { src, .. }
+        | VmInstruction::WriteActionParam { src, .. }
         | VmInstruction::AddVote { src, .. }
         | VmInstruction::WriteRouteGate { src, .. }
         | VmInstruction::StoreSlotImm { src, .. } => vec![*src],
@@ -2965,8 +2929,8 @@ fn motif_insertion_keeps_old_jump_target_identity() {
         let mut genome = slot_program_genome(vec![
             VmInstruction::Jump { offset: 1 },
             VmInstruction::Noop,
-            VmInstruction::PushAction { action_type: 37 },
-            VmInstruction::ExecuteActionQueue,
+            VmInstruction::AddVote { sink: 37, src: 0 },
+            VmInstruction::Halt,
         ]);
         let mut r = rng(seed);
 
@@ -2996,7 +2960,7 @@ fn motif_insertion_keeps_old_jump_target_identity() {
         let target = crate::runtime::vm::jump_target(jump_pc, offset, vm.program.len());
         assert!(matches!(
             vm.program[target],
-            VmInstruction::PushAction { action_type: 37 }
+            VmInstruction::AddVote { sink: 37, src: 0 }
         ));
     }
 }
@@ -3009,8 +2973,8 @@ proptest! {
     ) {
         let mut program = vec![
             VmInstruction::Jump { offset },
-            VmInstruction::PushAction { action_type: 1 },
-            VmInstruction::PushAction { action_type: 2 },
+            VmInstruction::AddVote { sink: 0, src: 0 },
+            VmInstruction::AddVote { sink: 1, src: 0 },
             VmInstruction::Halt,
         ];
         let old_target = crate::runtime::vm::jump_target(0, offset, program.len());
@@ -3040,9 +3004,9 @@ proptest! {
     ) {
         let mut program = vec![
             VmInstruction::Jump { offset },
-            VmInstruction::PushAction { action_type: 1 },
-            VmInstruction::PushAction { action_type: 2 },
-            VmInstruction::PushAction { action_type: 3 },
+            VmInstruction::AddVote { sink: 0, src: 0 },
+            VmInstruction::AddVote { sink: 1, src: 0 },
+            VmInstruction::AddVote { sink: 9, src: 0 },
             VmInstruction::Halt,
         ];
         let old_target = crate::runtime::vm::jump_target(0, offset, program.len());
@@ -3074,8 +3038,8 @@ proptest! {
         let mut program = vec![
             VmInstruction::Jump { offset: old_offset },
             VmInstruction::Jump { offset: 0 },
-            VmInstruction::PushAction { action_type: 1 },
-            VmInstruction::PushAction { action_type: 2 },
+            VmInstruction::AddVote { sink: 0, src: 0 },
+            VmInstruction::AddVote { sink: 1, src: 0 },
             VmInstruction::Halt,
         ];
         let old_target = crate::runtime::vm::jump_target(0, old_offset, program.len());
@@ -3204,8 +3168,8 @@ proptest! {
 fn splice_repair_handles_deleted_and_replaced_targets() {
     let mut middle_delete = vec![
         VmInstruction::Jump { offset: 0 },
-        VmInstruction::PushAction { action_type: 1 },
-        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::AddVote { sink: 0, src: 0 },
+        VmInstruction::AddVote { sink: 1, src: 0 },
     ];
     splice_program_with_reference_repair(&mut middle_delete, 1..2, vec![]).unwrap();
     let VmInstruction::Jump { offset } = middle_delete[0] else {
@@ -3218,13 +3182,13 @@ fn splice_repair_handles_deleted_and_replaced_targets() {
     );
     assert!(matches!(
         middle_delete[1],
-        VmInstruction::PushAction { action_type: 2 }
+        VmInstruction::AddVote { sink: 1, src: 0 }
     ));
 
     let mut tail_delete = vec![
         VmInstruction::Jump { offset: 1 },
         VmInstruction::Noop,
-        VmInstruction::PushAction { action_type: 3 },
+        VmInstruction::AddVote { sink: 9, src: 0 },
     ];
     splice_program_with_reference_repair(&mut tail_delete, 2..3, vec![]).unwrap();
     let VmInstruction::Jump { offset } = tail_delete[0] else {
@@ -3267,9 +3231,9 @@ fn copy_repair_uses_selected_copies_only_for_copied_jumps() {
     let mut program = vec![
         VmInstruction::Jump { offset: 1 },
         VmInstruction::Jump { offset: 0 },
-        VmInstruction::PushAction { action_type: 1 },
+        VmInstruction::AddVote { sink: 0, src: 0 },
         VmInstruction::Jump { offset: 0 },
-        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::AddVote { sink: 1, src: 0 },
         VmInstruction::Halt,
     ];
     let copies = [1, 2, 3]

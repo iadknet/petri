@@ -214,7 +214,6 @@ fn operator_domain_mapping_is_consistent() {
             MutationOperator::GraphAlterGraphEdgeWeight
             | MutationOperator::GraphSwapGraphOperator
             | MutationOperator::GraphMutateGraphOperatorParam
-            | MutationOperator::GraphMutateActionSlotBehavior
             | MutationOperator::GraphAddInternalGraphNode
             | MutationOperator::GraphRemoveInternalGraphNode
             | MutationOperator::GraphAddGraphEdge
@@ -316,9 +315,6 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             GraphOperator::SwapGraphOperator => MutationOperator::GraphSwapGraphOperator,
             GraphOperator::MutateGraphOperatorParam => {
                 MutationOperator::GraphMutateGraphOperatorParam
-            }
-            GraphOperator::MutateActionSlotBehavior => {
-                MutationOperator::GraphMutateActionSlotBehavior
             }
             GraphOperator::AddInternalGraphNode => MutationOperator::GraphAddInternalGraphNode,
             GraphOperator::RemoveInternalGraphNode => {

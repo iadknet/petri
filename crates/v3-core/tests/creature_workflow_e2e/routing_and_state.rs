@@ -1,5 +1,5 @@
 use slotmap::SlotMap;
-use v3_core::config::{MutationConfig, OrdinaryFoodTypeId};
+use v3_core::config::OrdinaryFoodTypeId;
 use v3_core::contracts::{CreatureId, NodeId, Position, RouteTarget, WorldAction};
 use v3_core::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
@@ -32,8 +32,7 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
 
     // CGP graph: Constant(-1.0) → RouterGate(0) sink
     let entry_def = {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Constant(-1.0),
             inputs: Vec::new(),
@@ -75,10 +74,7 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
         backend_def: BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![],
-            program: vec![
-                VmInstruction::PushAction { action_type: 0 },
-                VmInstruction::ExecuteActionQueue,
-            ],
+            program: vec![VmInstruction::Noop, VmInstruction::Halt],
         }),
         targets: vec![],
     };
@@ -87,10 +83,14 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
         input_refs: vec![],
         backend_def: BackendDef::Vm(VmBackendDef {
             register_count: 1,
-            constants: vec![],
+            constants: vec![1.0],
             program: vec![
-                VmInstruction::PushAction { action_type: 1 },
-                VmInstruction::ExecuteActionQueue,
+                VmInstruction::LoadConst {
+                    dst: 0,
+                    const_idx: 0,
+                },
+                VmInstruction::AddVote { sink: 0, src: 0 },
+                VmInstruction::Halt,
             ],
         }),
         targets: vec![],
@@ -106,7 +106,11 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
 
     let tick = run_one_traced_tick(&mut sim, target);
 
-    assert_eq!(tick.hops.len(), 2);
+    // Pass 0 commits the `Eat` vote; pass 1 repeats the route and its vote
+    // no longer clears the raised bar, so the tick ends `NoDecision`.
+    assert_eq!(tick.hops.len(), 4);
+    assert_eq!(tick.passes.len(), 2);
+    assert_eq!(tick.passes[0].hops, 2);
     // Gate routing: slot 1 (effective 0.0) beats slot 0 (effective -1.0)
     assert_eq!(
         tick.final_actions[0],
@@ -142,8 +146,7 @@ fn graph_state_persists_across_ticks_e2e() {
 
     // CGP graph: Constant(1.0) → DecayIntegrator(0.5) → CustomOutput(0)
     let state_def = {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         // CN0: Constant(1.0)
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Constant(1.0),

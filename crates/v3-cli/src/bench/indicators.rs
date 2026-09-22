@@ -209,10 +209,12 @@ fn drift_checkpoint(
             u64::from(mesh.route_varying_lineages),
             denominator,
         ),
-        hop_cap_hits: mesh.hop_cap_hits,
         battery_executions,
-        hop_cap_fraction: fraction_or_undefined(mesh.hop_cap_hits, battery_executions),
         pass_cap_hits: mesh.pass_cap_hits,
+        tick_reasons: mesh.tick_reasons,
+        passes: mesh.passes,
+        decided_passes: mesh.decided_passes,
+        pass_cap_fraction: fraction_or_undefined(mesh.pass_cap_hits, mesh.passes),
         cycle_classes: Some(CycleClasses {
             cycle_carrying_lineages: mesh.cycle_carrying_lineages,
             cycle_carrying_fraction: fraction_or_undefined(
@@ -325,7 +327,7 @@ pub(super) fn generation_distribution(
 
 /// One genome's `mesh_execution` block and its `steering-v1` reading from a
 /// single observed battery pass: the T11.F14 executed set feeds the
-/// steering `bank_written` flag, so the knockout pass runs once.
+/// steering `move_voted` flag, so the knockout pass runs once.
 pub(super) fn mesh_execution_and_steering(
     battery: &Battery,
     steering_battery: &SteeringBattery,
@@ -348,8 +350,10 @@ pub(super) fn mesh_execution_and_steering(
         knockout_count: reading.knockout_count as u64,
         route_varies_with_input: reading.route_varies_with_input,
         route_destination_varies: reading.route_destination_varies,
-        hop_cap_hits: reading.hop_cap_hits as u64,
         pass_cap_hits: reading.pass_cap_hits as u64,
+        tick_reasons: reading.tick_reasons,
+        passes: reading.passes as u64,
+        decided_passes: reading.decided_passes as u64,
         cycle_carrying: reading.cycle_carrying,
         revisiting: reading.revisiting,
         productive_cycle: reading.productive_cycle,
@@ -371,7 +375,7 @@ pub(super) fn steering_pooled(pooled: steering::SteeringPooled) -> Indicator<Ste
         exact_hit_fraction: fraction_or_undefined(pooled.exact_hits, pooled.moves),
         within_45_fraction: fraction_or_undefined(pooled.within_45, pooled.moves),
         avoidance_fraction: fraction_or_undefined(pooled.avoided, pooled.avoidance_trials),
-        bank_written_fraction: fraction_or_undefined(pooled.bank_written, pooled.genomes),
+        move_voted_fraction: fraction_or_undefined(pooled.move_voted, pooled.genomes),
         chance: SteeringChance {
             exact: steering::CHANCE_EXACT,
             within_45: steering::CHANCE_WITHIN_45,

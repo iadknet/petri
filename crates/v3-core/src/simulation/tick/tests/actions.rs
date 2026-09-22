@@ -21,8 +21,8 @@ fn move_north_with_barrier_reader_genome() -> CreatureGenome {
             node_id: NodeId::new(0),
             input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
             backend_def: BackendDef::Vm(VmBackendDef {
-                register_count: 1,
-                constants: vec![],
+                register_count: 2,
+                constants: vec![1.0],
                 program: vec![
                     VmInstruction::ReadInput {
                         dst: 0,
@@ -30,8 +30,12 @@ fn move_north_with_barrier_reader_genome() -> CreatureGenome {
                         sub_idx: 0,
                     },
                     VmInstruction::WriteRouteGate { slot: 0, src: 0 },
-                    VmInstruction::PushAction { action_type: 2 },
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::LoadConst {
+                        dst: 1,
+                        const_idx: 0,
+                    },
+                    VmInstruction::AddVote { sink: 1, src: 1 },
+                    VmInstruction::Halt,
                 ],
             }),
             targets: vec![],
@@ -46,8 +50,8 @@ fn reproduce_north_with_barrier_reader_genome() -> CreatureGenome {
             node_id: NodeId::new(0),
             input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
             backend_def: BackendDef::Vm(VmBackendDef {
-                register_count: 1,
-                constants: vec![],
+                register_count: 2,
+                constants: vec![1.0],
                 program: vec![
                     VmInstruction::ReadInput {
                         dst: 0,
@@ -55,8 +59,12 @@ fn reproduce_north_with_barrier_reader_genome() -> CreatureGenome {
                         sub_idx: 0,
                     },
                     VmInstruction::WriteRouteGate { slot: 0, src: 0 },
-                    VmInstruction::PushAction { action_type: 3 },
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::LoadConst {
+                        dst: 1,
+                        const_idx: 0,
+                    },
+                    VmInstruction::AddVote { sink: 9, src: 1 },
+                    VmInstruction::Halt,
                 ],
             }),
             targets: vec![],
@@ -66,10 +74,11 @@ fn reproduce_north_with_barrier_reader_genome() -> CreatureGenome {
 
 #[test]
 fn queued_actions_stop_once_action_exhausts_creature_energy() {
+    // Eat and Move N tie at one unit: pass 1 commits Eat, pass 2 Move.
     let genome = vm_program_genome(vec![
-        crate::creature::genome::VmInstruction::PushAction { action_type: 1 }, // Eat
-        crate::creature::genome::VmInstruction::PushAction { action_type: 0 }, // NoOp
-        crate::creature::genome::VmInstruction::ExecuteActionQueue,
+        crate::creature::genome::VmInstruction::AddVote { sink: 0, src: 0 }, // Eat
+        crate::creature::genome::VmInstruction::AddVote { sink: 1, src: 0 }, // Move N
+        crate::creature::genome::VmInstruction::Halt,
     ]);
     let (mut sim, id) = make_sim_with_custom_genome(1.0, genome);
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
@@ -91,7 +100,7 @@ fn queued_actions_stop_once_action_exhausts_creature_energy() {
 
     assert_eq!(sim.stats.last_tick_eat, 1, "first queued Eat should run");
     assert_eq!(
-        sim.stats.last_tick_noop, 0,
+        sim.stats.last_tick_move, 0,
         "remaining queued actions should stop after fatal exhaustion"
     );
     assert!(
@@ -107,8 +116,8 @@ fn queued_actions_stop_once_action_exhausts_creature_energy() {
 #[test]
 fn zero_transfer_reproduction_records_energy_constraint_in_action_log() {
     let genome = vm_program_genome(vec![
-        VmInstruction::PushAction { action_type: 3 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::AddVote { sink: 9, src: 0 },
+        VmInstruction::Halt,
     ]);
     let (mut sim, id) = make_sim_with_custom_genome(80.0, genome);
     sim.config.energy.lifecycle.min_reproduce_age = 0;
@@ -145,12 +154,12 @@ fn tick_action_log_records_applied_food_type_amount_and_result() {
                         dst: 0,
                         const_idx: 0,
                     },
-                    VmInstruction::WriteWorldActionMeta {
+                    VmInstruction::WriteActionParam {
                         slot_idx: 0,
                         src: 0,
                     },
-                    VmInstruction::PushAction { action_type: 1 },
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::AddVote { sink: 0, src: 0 },
+                    VmInstruction::Halt,
                 ],
             }),
             targets: vec![],
@@ -333,8 +342,8 @@ fn failed_action_penalty_increases_with_age() {
 #[test]
 fn failed_action_penalty_ramp_uses_effective_tick_value() {
     let genome = vm_program_genome(vec![
-        crate::creature::genome::VmInstruction::PushAction { action_type: 2 },
-        crate::creature::genome::VmInstruction::ExecuteActionQueue,
+        crate::creature::genome::VmInstruction::AddVote { sink: 1, src: 0 },
+        crate::creature::genome::VmInstruction::Halt,
     ]);
     let (mut sim, id) = make_sim_with_custom_genome(100.0, genome);
     sim.world.set_barrier(Position::new(5, 4), true);
@@ -376,8 +385,8 @@ fn failed_action_penalty_ramp_uses_effective_tick_value() {
 #[test]
 fn failed_move_records_blocked_barrier_cause_in_tick() {
     let genome = vm_program_genome(vec![
-        crate::creature::genome::VmInstruction::PushAction { action_type: 2 },
-        crate::creature::genome::VmInstruction::ExecuteActionQueue,
+        crate::creature::genome::VmInstruction::AddVote { sink: 1, src: 0 },
+        crate::creature::genome::VmInstruction::Halt,
     ]);
     let (mut sim, _id) = make_sim_with_custom_genome(100.0, genome);
     sim.world.set_barrier(Position::new(5, 4), true);
@@ -397,8 +406,8 @@ fn failed_move_records_blocked_barrier_cause_in_tick() {
 #[test]
 fn reproduce_invalid_target_records_barrier_cause_in_tick() {
     let genome = vm_program_genome(vec![
-        crate::creature::genome::VmInstruction::PushAction { action_type: 3 },
-        crate::creature::genome::VmInstruction::ExecuteActionQueue,
+        crate::creature::genome::VmInstruction::AddVote { sink: 9, src: 0 },
+        crate::creature::genome::VmInstruction::Halt,
     ]);
     let (mut sim, _id) = make_sim_with_custom_genome(100.0, genome);
     sim.world.set_barrier(Position::new(5, 4), true);
@@ -418,8 +427,8 @@ fn reproduce_invalid_target_records_barrier_cause_in_tick() {
 #[test]
 fn move_barrier_neighbor_counters_split_by_barrier_reader_state() {
     let no_reader_genome = vm_program_genome(vec![
-        VmInstruction::PushAction { action_type: 2 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::AddVote { sink: 1, src: 0 },
+        VmInstruction::Halt,
     ]);
     let (mut no_reader_sim, _) = make_sim_with_custom_genome(100.0, no_reader_genome);
     no_reader_sim.world.set_barrier(Position::new(5, 4), true);
@@ -470,8 +479,8 @@ fn move_barrier_neighbor_counters_split_by_barrier_reader_state() {
 #[test]
 fn reproduction_barrier_neighbor_counters_split_by_barrier_reader_state() {
     let no_reader_genome = vm_program_genome(vec![
-        VmInstruction::PushAction { action_type: 3 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::AddVote { sink: 9, src: 0 },
+        VmInstruction::Halt,
     ]);
     let (mut no_reader_sim, _) = make_sim_with_custom_genome(100.0, no_reader_genome);
     no_reader_sim.world.set_barrier(Position::new(5, 4), true);
@@ -522,8 +531,8 @@ fn reproduction_barrier_neighbor_counters_split_by_barrier_reader_state() {
 #[test]
 fn move_blocked_avoidable_counters_track_alternative_targets_by_reader_state() {
     let no_reader_genome = vm_program_genome(vec![
-        VmInstruction::PushAction { action_type: 2 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::AddVote { sink: 1, src: 0 },
+        VmInstruction::Halt,
     ]);
     let (mut no_reader_sim, _) = make_sim_with_custom_genome(100.0, no_reader_genome);
     no_reader_sim.world.set_barrier(Position::new(5, 4), true);
@@ -541,8 +550,8 @@ fn move_blocked_avoidable_counters_track_alternative_targets_by_reader_state() {
     let (mut no_reader_unavoidable_sim, _) = make_sim_with_custom_genome(
         100.0,
         vm_program_genome(vec![
-            VmInstruction::PushAction { action_type: 2 },
-            VmInstruction::ExecuteActionQueue,
+            VmInstruction::AddVote { sink: 1, src: 0 },
+            VmInstruction::Halt,
         ]),
     );
     let center = Position::new(5, 5);
@@ -583,8 +592,8 @@ fn move_blocked_avoidable_counters_track_alternative_targets_by_reader_state() {
 #[test]
 fn reproduction_invalid_target_avoidable_counters_track_alternative_targets_by_reader_state() {
     let no_reader_genome = vm_program_genome(vec![
-        VmInstruction::PushAction { action_type: 3 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::AddVote { sink: 9, src: 0 },
+        VmInstruction::Halt,
     ]);
     let (mut no_reader_sim, _) = make_sim_with_custom_genome(100.0, no_reader_genome);
     no_reader_sim.world.set_barrier(Position::new(5, 4), true);
@@ -602,8 +611,8 @@ fn reproduction_invalid_target_avoidable_counters_track_alternative_targets_by_r
     let (mut no_reader_unavoidable_sim, _) = make_sim_with_custom_genome(
         100.0,
         vm_program_genome(vec![
-            VmInstruction::PushAction { action_type: 3 },
-            VmInstruction::ExecuteActionQueue,
+            VmInstruction::AddVote { sink: 9, src: 0 },
+            VmInstruction::Halt,
         ]),
     );
     let center = Position::new(5, 5);
@@ -761,9 +770,9 @@ fn energy_floor_at_zero_after_action_execution() {
     // runs — confirming the floor + death check works correctly.
     let genome = vm_program_genome(vec![
         // Queue two Move(N) actions. Both will fail against the barrier.
-        crate::creature::genome::VmInstruction::PushAction { action_type: 2 },
-        crate::creature::genome::VmInstruction::PushAction { action_type: 2 },
-        crate::creature::genome::VmInstruction::ExecuteActionQueue,
+        crate::creature::genome::VmInstruction::AddVote { sink: 1, src: 0 },
+        crate::creature::genome::VmInstruction::AddVote { sink: 1, src: 0 },
+        crate::creature::genome::VmInstruction::Halt,
     ]);
     let (mut sim, id) = make_sim_with_custom_genome(3.0, genome);
 
@@ -808,8 +817,7 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
         HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
     };
     for lamarckian in [false, true] {
-        let mut def =
-            CgpGraphBackendDef::new_with_fixed_outputs(&crate::config::MutationConfig::default());
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Constant(1.0),
             inputs: vec![GraphEdge {
@@ -971,8 +979,8 @@ fn founder_reproduce_charge_is_bit_identical_with_and_without_the_replication_ra
     assert_eq!(child_default, child_zero);
 }
 
-/// A one-node VM genome that eats the named food type: load the type index
-/// into the world-action meta slot the Eat decoder reads, then push and run.
+/// A one-node VM genome that eats the named food type: write the type index
+/// to the `Eat` parameter slot the commit decodes, then vote one `Eat`.
 fn eat_type_genome(type_idx: u16) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -981,18 +989,22 @@ fn eat_type_genome(type_idx: u16) -> CreatureGenome {
             input_refs: vec![],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 2,
-                constants: vec![f32::from(type_idx)],
+                constants: vec![f32::from(type_idx), 1.0],
                 program: vec![
                     VmInstruction::LoadConst {
                         dst: 0,
                         const_idx: 0,
                     },
-                    VmInstruction::WriteWorldActionMeta {
+                    VmInstruction::WriteActionParam {
                         slot_idx: 0,
                         src: 0,
                     },
-                    VmInstruction::PushAction { action_type: 1 },
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::LoadConst {
+                        dst: 1,
+                        const_idx: 1,
+                    },
+                    VmInstruction::AddVote { sink: 0, src: 1 },
+                    VmInstruction::Halt,
                 ],
             }),
             targets: vec![],
@@ -1106,8 +1118,8 @@ fn failed_typed_eat_counters_rise_only_for_the_type_the_action_named() {
 #[test]
 fn move_attempts_count_blocked_and_successful_moves_alike() {
     let genome = vm_program_genome(vec![
-        VmInstruction::PushAction { action_type: 2 },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::AddVote { sink: 1, src: 0 },
+        VmInstruction::Halt,
     ]);
     let (mut sim, _id) = make_sim_with_custom_genome(1000.0, genome);
     sim.world.set_barrier(Position::new(5, 4), true);

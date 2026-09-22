@@ -24,7 +24,7 @@
 //!
 //! Settings held at production values throughout (`RuntimeConfig::default()`
 //! and `shared_memory.decay_rate == 0.0`), per the spec's Inputs and
-//! Invariants section. The only three permitted deviations, each labeled at
+//! Invariants section. The only four permitted deviations, each labeled at
 //! its use site:
 //! 1. `test_config()` (shared with `creature_workflow_e2e`): tiny 12x12
 //!    world, zero food coverage/growth, zero energy decay, zero mutation
@@ -35,6 +35,9 @@
 //! 3. The proptest seeds `GraphRuntimeState::node_state` directly and begins
 //!    the graph tick explicitly; D1–D3 assert the per-visit clock through the
 //!    production tick path. Historical readings remain in the spec.
+//! 4. E1 and E2 set `runtime.max_actions_per_turn = 1` so their voting node
+//!    is visited once per tick: under T19.F04 the pass after a commit would
+//!    dispatch it again.
 
 mod common;
 
@@ -42,15 +45,15 @@ use common::{graph_hop, insert_creature, run_one_traced_tick, test_config};
 
 use proptest::prelude::*;
 use slotmap::SlotMap;
-use v3_core::config::{EnergyLifecycleConfig, MutationConfig, OrdinaryFoodTypeId};
+use v3_core::config::{EnergyLifecycleConfig, OrdinaryFoodTypeId};
 use v3_core::contracts::{
     CreatureId, Direction, InputReference, NodeId, Position, RouteTarget, StaticIntrospectionKey,
     WorldAction, WorldInputKey,
 };
 use v3_core::creature::genome::cgp::{
-    ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
-    OutputSinkKind, WorldActionKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
+use v3_core::creature::genome::vote::VoteSink;
 use v3_core::creature::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, OutcomeChannel, PlasticityConfig,
     RewardModulationConfig, VmBackendDef, VmInstruction,
@@ -63,9 +66,10 @@ use v3_core::sensors::static_inputs::{age_fraction, StaticInputs};
 use v3_core::sensors::typed_food::TypedFoodLocalSnapshot;
 use v3_core::simulation::Simulation;
 
-const DIR_E: f32 = 2.0; // Direction::ALL[2] == Direction::E
-const ACTION_NOOP: u8 = 0;
-const ACTION_MOVE: u8 = 2;
+/// The vote a reactive fixture casts on `Move(E)`: one unit, one commit.
+const MOVE_VOTE: f32 = 1.0;
+/// `VoteSink::Move(E)`'s catalog index (`Direction::ALL[2] == Direction::E`).
+const MOVE_E_SINK: u8 = 3;
 
 fn food_here_ref() -> InputReference {
     InputReference::World(WorldInputKey::FoodHere {
@@ -106,19 +110,15 @@ fn reactive_control_vm_genome() -> CreatureGenome {
         VmInstruction::LoadConst {
             dst: 3,
             const_idx: 1,
-        }, // r3 = DIR_E
-        VmInstruction::WriteWorldActionMeta {
-            slot_idx: 0,
+        }, // r3 = MOVE_VOTE
+        VmInstruction::AddVote {
+            sink: MOVE_E_SINK,
             src: 3,
         },
-        VmInstruction::PushAction {
-            action_type: ACTION_MOVE,
-        },
-        VmInstruction::ExecuteActionQueue,
-        VmInstruction::PushAction {
-            action_type: ACTION_NOOP,
-        },
-        VmInstruction::ExecuteActionQueue,
+        VmInstruction::Noop,
+        VmInstruction::Halt,
+        VmInstruction::Noop,
+        VmInstruction::Halt,
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -127,7 +127,7 @@ fn reactive_control_vm_genome() -> CreatureGenome {
             input_refs: vec![food_here_ref()],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 4,
-                constants: vec![0.0, DIR_E],
+                constants: vec![0.0, MOVE_VOTE],
                 program,
             }),
             targets: vec![],
@@ -172,19 +172,15 @@ fn delayed_cue_vm_genome() -> CreatureGenome {
         VmInstruction::LoadConst {
             dst: 7,
             const_idx: 2,
-        }, // idx10: r7 = DIR_E
-        VmInstruction::WriteWorldActionMeta {
-            slot_idx: 0,
+        }, // idx10: r7 = MOVE_VOTE
+        VmInstruction::AddVote {
+            sink: MOVE_E_SINK,
             src: 7,
         }, // idx11
-        VmInstruction::PushAction {
-            action_type: ACTION_MOVE,
-        }, // idx12
-        VmInstruction::ExecuteActionQueue,           // idx13
-        VmInstruction::PushAction {
-            action_type: ACTION_NOOP,
-        }, // idx14
-        VmInstruction::ExecuteActionQueue,           // idx15
+        VmInstruction::Noop,                         // idx12
+        VmInstruction::Halt,                         // idx13
+        VmInstruction::Noop,                         // idx14
+        VmInstruction::Halt,                         // idx15
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -193,7 +189,7 @@ fn delayed_cue_vm_genome() -> CreatureGenome {
             input_refs: vec![food_here_ref()],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 8,
-                constants: vec![0.0, 1.0, DIR_E],
+                constants: vec![0.0, 1.0, MOVE_VOTE],
                 program,
             }),
             targets: vec![],
@@ -260,19 +256,15 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
         VmInstruction::LoadConst {
             dst: 10,
             const_idx: 4,
-        }, // idx15: r10 = DIR_E
-        VmInstruction::WriteWorldActionMeta {
-            slot_idx: 0,
+        }, // idx15: r10 = MOVE_VOTE
+        VmInstruction::AddVote {
+            sink: MOVE_E_SINK,
             src: 10,
         }, // idx16
-        VmInstruction::PushAction {
-            action_type: ACTION_MOVE,
-        }, // idx17
-        VmInstruction::ExecuteActionQueue,                // idx18
-        VmInstruction::PushAction {
-            action_type: ACTION_NOOP,
-        }, // idx19
-        VmInstruction::ExecuteActionQueue,                // idx20
+        VmInstruction::Noop,                              // idx17
+        VmInstruction::Halt,                              // idx18
+        VmInstruction::Noop,                              // idx19
+        VmInstruction::Halt,                              // idx20
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -281,7 +273,7 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
             input_refs: vec![age_ticks_ref()],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 11,
-                constants: vec![age_target(1), age_target(2), age_eps(), 0.0, DIR_E],
+                constants: vec![age_target(1), age_target(2), age_eps(), 0.0, MOVE_VOTE],
                 program,
             }),
             targets: vec![],
@@ -322,10 +314,8 @@ fn slot_write_once_vm_genome(slot: u8, value: f32) -> CreatureGenome {
             slot_idx: slot,
             src: 4,
         }, // idx6: slot[slot] = value
-        VmInstruction::PushAction {
-            action_type: ACTION_NOOP,
-        }, // idx7
-        VmInstruction::ExecuteActionQueue,                // idx8
+        VmInstruction::Noop,                              // idx7
+        VmInstruction::Halt,                              // idx8
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -345,7 +335,7 @@ fn slot_write_once_vm_genome(slot: u8, value: f32) -> CreatureGenome {
 /// C3's genome: `Constant(0.6)` wired to `WriteSlot(0)`; a second node reads
 /// `SharedMemory { slot: 0, previous: true }` and is wired to `WriteSlot(1)`.
 fn slot_write_and_previous_read_graph_genome() -> CreatureGenome {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.compute_nodes.push(ComputeNode {
         kind: ComputeNodeKind::Constant(0.6),
         inputs: Vec::new(),
@@ -389,7 +379,7 @@ fn wire_custom_write_slot(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, so
 
 /// D1's genome: `Constant(1.0)` feeding a `DecayIntegrator(0.5)`.
 fn decay_integrator_graph_genome() -> CreatureGenome {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.compute_nodes.push(ComputeNode {
         kind: ComputeNodeKind::Constant(1.0),
         inputs: Vec::new(),
@@ -433,7 +423,7 @@ fn decay_integrator_with_disconnected_oscillator_graph_genome() -> CreatureGenom
 /// (edges from `ComputeNode(0)` and from itself, both weight 1), wired to
 /// `WriteSlot(0)`.
 fn backward_edge_recurrence_graph_genome() -> CreatureGenome {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.compute_nodes.push(ComputeNode {
         kind: ComputeNodeKind::Constant(1.0),
         inputs: Vec::new(),
@@ -490,7 +480,7 @@ fn reward_modulated_node_genome_impl(
     reward_source: OutcomeChannel,
     wire_action: bool,
 ) -> CreatureGenome {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.compute_nodes.push(ComputeNode {
         kind: ComputeNodeKind::Constant(1.0),
         inputs: Vec::new(),
@@ -514,15 +504,15 @@ fn reward_modulated_node_genome_impl(
         }),
     });
     if wire_action {
-        def.action_bank[0].behavior = ActionSlotBehavior::Emit(WorldActionKind::Eat);
-        def.action_bank[0].gate_inputs.push(GraphEdge {
-            source: GraphSource::ComputeNode(1),
-            weight: 1.0,
-        });
-        def.execute_gate.inputs.push(GraphEdge {
-            source: GraphSource::ComputeNode(1),
-            weight: 1.0,
-        });
+        def.output_sinks
+            .iter_mut()
+            .find(|sink| sink.kind == OutputSinkKind::ActionVote(VoteSink::Eat))
+            .expect("catalog Eat vote sink")
+            .inputs
+            .push(GraphEdge {
+                source: GraphSource::ComputeNode(1),
+                weight: 1.0,
+            });
     }
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -561,11 +551,9 @@ fn conditional_route_vm_node(
             const_idx: 1,
         }, // idx4: r3 = 1000.0 (large gate boost)
         VmInstruction::WriteRouteGate { slot: 0, src: 3 }, // idx5: boost graph target's gate
-        VmInstruction::Halt,                         // idx6: non-terminal, routes via targets
-        VmInstruction::PushAction {
-            action_type: ACTION_NOOP,
-        }, // idx7: skip branch
-        VmInstruction::ExecuteActionQueue, // idx8: terminal, mesh ends without visiting the graph node
+        VmInstruction::Halt,                         // idx6: routes via targets
+        VmInstruction::Noop,                         // idx7: skip branch
+        VmInstruction::Halt, // idx8: routes to the alt target, never the graph node
     ];
     NodeGenome {
         node_id,
@@ -597,12 +585,7 @@ fn noop_vm_node(node_id: NodeId) -> NodeGenome {
         backend_def: BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![],
-            program: vec![
-                VmInstruction::PushAction {
-                    action_type: ACTION_NOOP,
-                },
-                VmInstruction::ExecuteActionQueue,
-            ],
+            program: vec![VmInstruction::Noop, VmInstruction::Halt],
         }),
         targets: vec![],
     }
@@ -618,8 +601,18 @@ fn one_creature_sim(
     sim_with_config(genome, pos, energy, test_config())
 }
 
-/// Build a one-creature `Simulation` from an explicit `cfg`, for the one
-/// fixture (C2) that needs a labeled non-default runtime setting.
+/// Build a one-creature `Simulation` whose tick ends at its first commit
+/// (`max_actions_per_turn = 1`, a labeled runtime deviation). A voting node
+/// is otherwise dispatched again in the pass after its commit (T19.F04), and
+/// the E fixtures pin one visit's credit per tick.
+fn one_commit_sim(genome: CreatureGenome, pos: Position, energy: f32) -> (Simulation, CreatureId) {
+    let mut cfg = test_config();
+    cfg.runtime.max_actions_per_turn = 1;
+    sim_with_config(genome, pos, energy, cfg)
+}
+
+/// Build a one-creature `Simulation` from an explicit `cfg`, for the
+/// fixtures that need a labeled non-default runtime setting.
 fn sim_with_config(
     genome: CreatureGenome,
     pos: Position,
@@ -1018,7 +1011,7 @@ fn revisit_exit_node(node_id: NodeId) -> NodeGenome {
             constants: vec![],
             program: vec![
                 VmInstruction::ClearSlot { slot_idx: 1 },
-                VmInstruction::ExecuteActionQueue,
+                VmInstruction::Halt,
             ],
         }),
         targets: vec![],
@@ -1081,7 +1074,7 @@ fn d4_integrator_visited_twice_per_tick_steps_twice() {
 #[test]
 fn e1_exact_one_edge_update_immediate_reward() {
     let pos = Position::new(5, 5);
-    let (mut sim, target) = one_creature_sim(
+    let (mut sim, target) = one_commit_sim(
         reward_modulated_node_genome(OutcomeChannel::ActionSuccess),
         pos,
         100.0,
@@ -1130,7 +1123,7 @@ fn e2_delayed_reward_visited_every_tick() {
     for delay in [1u64, 2, 4] {
         let reward_tick = delay + 1;
         let pos = Position::new(5, 5);
-        let (mut sim, target) = one_creature_sim(
+        let (mut sim, target) = one_commit_sim(
             reward_modulated_node_genome(OutcomeChannel::ActionSuccess),
             pos,
             100.0,
@@ -1237,24 +1230,24 @@ fn e3_skipped_module_visits() {
          got {weight_1}"
     );
 
-    // Ticks 2 and 3: skipped visits (no food; entry VM terminates before
-    // reaching the graph node), but reward learning still fires.
+    // Ticks 2 and 3: skipped visits (no food; the entry VM routes to the
+    // alt node instead of the graph node), but reward learning still fires.
     for skipped_tick in [2u64, 3] {
         sim.world.set_food(pos, 0.0);
         let energy_before = sim.creatures.get(target).expect("alive").energy;
         let tick = run_one_traced_tick(&mut sim, target);
         assert_eq!(
-            tick.hops.len(),
-            1,
-            "skipped tick {skipped_tick} should terminate at the entry VM node, \
-             never reaching the graph node"
+            tick.hops.iter().map(|hop| hop.node_id).collect::<Vec<_>>(),
+            [id_vm, id_alt],
+            "skipped tick {skipped_tick} should route from the entry VM node to the alt \
+             node, never reaching the graph node"
         );
         let energy_after = sim.creatures.get(target).expect("alive").energy;
         let signal = energy_after - energy_before;
         assert!(
             signal.abs() > 1e-3,
-            "skipped tick {skipped_tick} signal should be nonzero (the entry VM's explicit \
-             NoOp noop_cost, about -0.05) so the weight-still-moved claim below is not \
+            "skipped tick {skipped_tick} signal should be nonzero (the soft-default \
+             NoOp's noop_cost, about -0.05) so the weight-still-moved claim below is not \
              vacuous; got {signal}"
         );
 
@@ -1342,7 +1335,7 @@ fn empty_sensor_snapshot() -> SensorSnapshot {
 /// weight 1.0), for use with the fully public `execute_creature_mesh` path
 /// (no `Simulation` needed — this is a pure, in-process mesh invocation).
 fn one_step_stateful_genome(node1_kind: ComputeNodeKind, input: f32) -> CreatureGenome {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.compute_nodes.push(ComputeNode {
         kind: ComputeNodeKind::Constant(input),
         inputs: Vec::new(),

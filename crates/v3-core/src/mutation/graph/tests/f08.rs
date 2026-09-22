@@ -15,9 +15,10 @@ use super::operators::{
 use crate::config::RuntimeConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, WorldAction, WorldInputKey};
 use crate::creature::genome::cgp::{
-    ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate,
-    GraphEdge, GraphSource, OutputSink, OutputSinkKind, WorldActionKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+    OutputSinkKind,
 };
+use crate::creature::genome::vote::{VoteKind, VoteSink};
 use crate::creature::genome::PlasticityConfig;
 use crate::creature::state::GraphRuntimeState;
 use crate::mutation::graph::operators::{
@@ -145,11 +146,6 @@ fn activate_copies(def: &mut CgpGraphBackendDef, sources: &[usize]) {
     for sink in &mut def.output_sinks {
         sink.inputs.iter_mut().for_each(remap);
     }
-    for slot in &mut def.action_bank {
-        slot.gate_inputs.iter_mut().for_each(remap);
-        slot.param_inputs.iter_mut().for_each(remap);
-    }
-    def.execute_gate.inputs.iter_mut().for_each(remap);
 }
 
 /// A graph built around evaluation phase: node 1 reads the higher-index node 2
@@ -203,31 +199,36 @@ pub(super) fn phase_def() -> CgpGraphBackendDef {
                 plasticity: None,
             },
         ],
-        output_sinks: vec![OutputSink {
-            kind: OutputSinkKind::CustomOutput(0),
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(2),
-                weight: 1.0,
-            }],
-        }],
-        action_bank: vec![ActionSlot {
-            behavior: ActionSlotBehavior::Emit(WorldActionKind::Move),
-            gate_inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            }],
-            param_inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(1),
-                weight: 1.0,
-            }],
-            direction_bids: Vec::new(),
-        }],
-        execute_gate: ExecuteGate {
-            inputs: vec![GraphEdge {
-                source: GraphSource::ComputeNode(0),
-                weight: 1.0,
-            }],
-        },
+        output_sinks: vec![
+            OutputSink {
+                kind: OutputSinkKind::CustomOutput(0),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(2),
+                    weight: 1.0,
+                }],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionVote(VoteSink::Move(2)),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(0),
+                    weight: 1.0,
+                }],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(1),
+                    weight: 1.0,
+                }],
+            },
+            OutputSink {
+                kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(0),
+                    weight: 1.0,
+                }],
+            },
+        ],
     }
 }
 
@@ -353,8 +354,6 @@ fn copy_operators_skip_when_the_copy_would_exceed_the_index_space() {
             u16::MAX as usize - 1
         ],
         output_sinks: Vec::new(),
-        action_bank: Vec::new(),
-        execute_gate: ExecuteGate { inputs: Vec::new() },
     };
     assert_eq!(
         copy_compute_node(&mut def, &mut SmallRng::seed_from_u64(1)),
@@ -469,18 +468,14 @@ fn introspection_edge_def(plasticity: bool, on_compute_input: bool) -> CgpGraphB
                 modulation: None,
             }),
         }],
-        output_sinks: Vec::new(),
-        action_bank: vec![ActionSlot {
-            behavior: ActionSlotBehavior::Emit(WorldActionKind::Move),
-            gate_inputs: Vec::new(),
-            param_inputs: if on_compute_input {
+        output_sinks: vec![OutputSink {
+            kind: OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+            inputs: if on_compute_input {
                 Vec::new()
             } else {
                 vec![edge]
             },
-            direction_bids: Vec::new(),
         }],
-        execute_gate: ExecuteGate { inputs: Vec::new() },
     }
 }
 

@@ -204,9 +204,9 @@ fn compare_against_flags_severe_work_counter_regression() {
     let current = tiny_report();
     let mut reference = current.clone();
 
-    // Reference had far fewer vm_steps per creature-tick: current regresses
+    // Reference had far fewer mesh hops per creature-tick: current regresses
     // well past the +50% severe threshold.
-    reference.deterministic.per_creature_tick.vm_steps = Some("1.000000".to_string());
+    reference.deterministic.per_creature_tick.mesh_hops = Some("0.001000".to_string());
 
     let comparison = bench::compare_against(
         &current,
@@ -214,12 +214,12 @@ fn compare_against_flags_severe_work_counter_regression() {
         &reference,
     );
 
-    let vm_steps = comparison
+    let mesh_hops = comparison
         .counters
         .iter()
-        .find(|c| c.name == "vm_steps")
-        .expect("vm_steps counter must be present");
-    assert_eq!(vm_steps.level, bench::ComparisonLevel::Severe);
+        .find(|c| c.name == "mesh_hops")
+        .expect("mesh_hops counter must be present");
+    assert_eq!(mesh_hops.level, bench::ComparisonLevel::Severe);
     assert!(
         comparison.severe,
         "a severe counter must mark the reference comparison severe"

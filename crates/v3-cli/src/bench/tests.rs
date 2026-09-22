@@ -266,13 +266,12 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
 
 #[test]
 fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
-    // Evolved-trajectory pin. T11.F23's scale-relative constant step moves
-    // every trajectory from its first VmConstantMutation event: seed 1's
-    // 32x32 population now ends on a single creature, while seed 3 keeps 4
-    // creatures over 4 cells at the horizon (the lowest seed that does; 5 of
-    // seeds 0..=25 go extinct and 8 end on one cell). T16.F01 had moved
-    // this pin from seed 18 to 1, T11.F21 from 13 to 18.
-    const SEED: u64 = 3;
+    // Evolved-trajectory pin. T19.F04's vote founder moves every
+    // trajectory: seed 3 now goes extinct before the horizon, while seed 1
+    // keeps 2 creatures over 2 cells (the lowest seed that does; 5 of seeds
+    // 0..=25 go extinct and 11 end on one cell). T11.F23 had moved this pin
+    // from seed 1 to 3, T16.F01 from 18 to 1, T11.F21 from 13 to 18.
+    const SEED: u64 = 1;
     const HORIZON: u64 = 250;
     let config = build_config(&ProfileParams {
         recipe: None,
@@ -415,7 +414,8 @@ fn world_set_case_tracking_matches_a_replayed_run() {
         assert_eq!(failed.len(), case.case.food_type_count);
         let flows = case.tracking.energy_flows.as_ref().expect("terminal flows");
         assert_eq!(flows.food_intake_by_type.len(), case.case.food_type_count);
-        assert!(flows.vm_compute.parse::<f64>().unwrap() > 0.0);
+        // The T19.F04 founder is all Graph, so its compute is charged there.
+        assert!(flows.graph_compute.parse::<f64>().unwrap() > 0.0);
         assert!(flows.lifecycle_decay.parse::<f64>().unwrap() > 0.0);
         assert!(flows.genome_size_creature_ticks > 0);
         let deaths = case

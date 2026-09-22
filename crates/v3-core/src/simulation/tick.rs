@@ -468,7 +468,7 @@ fn run_cognition(
             let energy_before = creature.energy;
             let si_snapshot = StaticInputsSnapshot::from(&ss.local);
 
-            let (output, hops, termination_reason) = execute_creature_mesh_traced(
+            let (output, hops, passes) = execute_creature_mesh_traced(
                 &creature.genome,
                 ss,
                 &mut creature.energy,
@@ -493,10 +493,10 @@ fn run_cognition(
                     static_inputs: si_snapshot,
                     debug_perception,
                     hops,
+                    passes,
                     final_actions: output.actions.clone(),
-                    termination_reason,
+                    termination_reason: output.termination_reason,
                     priority_bid: output.priority_bid,
-                    votes: output.votes,
                     commit_counts: output.commit_counts,
                 });
                 active.ticks_remaining = active.ticks_remaining.saturating_sub(1);
@@ -540,6 +540,8 @@ struct TickComputeStats {
     shared_memory_writes_changed: u64,
     energy_exhausted_dispatches: u64,
     pass_cap_hits: u64,
+    passes: u64,
+    decided_passes: u64,
 }
 
 impl Default for TickComputeStats {
@@ -563,6 +565,8 @@ impl Default for TickComputeStats {
             shared_memory_writes_changed: 0,
             energy_exhausted_dispatches: 0,
             pass_cap_hits: 0,
+            passes: 0,
+            decided_passes: 0,
         }
     }
 }
@@ -601,6 +605,8 @@ impl TickComputeStats {
         self.plasticity_changes += u64::from(work.plasticity_changes);
         self.shared_memory_writes_changed += u64::from(work.shared_memory_writes_changed);
         self.pass_cap_hits += u64::from(work.pass_cap_hits);
+        self.passes += u64::from(work.passes);
+        self.decided_passes += u64::from(work.decided_passes);
         if output.termination_reason == TerminationReason::EnergyExhausted {
             self.energy_exhausted_dispatches += 1;
         }
@@ -646,6 +652,8 @@ impl TickComputeStats {
         stats.creature_ticks_total += u64::from(self.creature_count);
         stats.mesh_dispatches_energy_exhausted_total += self.energy_exhausted_dispatches;
         stats.pass_cap_hits_total += self.pass_cap_hits;
+        stats.passes_total += self.passes;
+        stats.decided_passes_total += self.decided_passes;
         stats.actions_applied_total += u64::from(
             stats.last_tick_move
                 + stats.last_tick_eat
@@ -1244,8 +1252,7 @@ mod final_action_observation_tests {
     use crate::config::SimulationConfig;
     use crate::contracts::{Direction, NodeId, OrdinaryFoodTypeId, WorldAction};
     use crate::creature::genome::cgp::{
-        ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind,
-        ExecuteGate, GraphEdge, GraphSource, WorldActionKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
@@ -1262,7 +1269,9 @@ mod final_action_observation_tests {
                 input_refs: vec![],
                 backend_def: BackendDef::Vm(VmBackendDef {
                     register_count: 3,
-                    constants: vec![0.5],
+                    constants: vec![0.5, 1.0],
+                    // Reproduce NE when slot 0 exceeds 0.5, else N, with
+                    // slot 0 as the transfer fraction (params[Reproduce][1]).
                     program: vec![
                         VmInstruction::LoadSlotImm {
                             dst: 0,
@@ -1273,16 +1282,18 @@ mod final_action_observation_tests {
                             const_idx: 0,
                         },
                         VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
-                        VmInstruction::WriteWorldActionMeta {
-                            slot_idx: 0,
-                            src: 2,
-                        },
-                        VmInstruction::WriteWorldActionMeta {
-                            slot_idx: 1,
+                        VmInstruction::WriteActionParam {
+                            slot_idx: 5,
                             src: 0,
                         },
-                        VmInstruction::PushAction { action_type: 3 },
-                        VmInstruction::ExecuteActionQueue,
+                        VmInstruction::AddVote { sink: 10, src: 2 },
+                        VmInstruction::LoadConst {
+                            dst: 1,
+                            const_idx: 1,
+                        },
+                        VmInstruction::Sub { dst: 1, a: 1, b: 2 },
+                        VmInstruction::AddVote { sink: 9, src: 1 },
+                        VmInstruction::Halt,
                     ],
                 }),
                 targets: vec![],
@@ -1307,16 +1318,12 @@ mod final_action_observation_tests {
                         inputs: vec![],
                         plasticity: None,
                     }],
-                    output_sinks: vec![],
-                    action_bank: vec![ActionSlot {
-                        behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
-                        gate_inputs: vec![runtime_output],
-                        param_inputs: vec![],
-                        direction_bids: Vec::new(),
-                    }],
-                    execute_gate: ExecuteGate {
+                    output_sinks: vec![crate::creature::genome::cgp::OutputSink {
+                        kind: crate::creature::genome::cgp::OutputSinkKind::ActionVote(
+                            crate::creature::genome::vote::VoteSink::Eat,
+                        ),
                         inputs: vec![runtime_output],
-                    },
+                    }],
                 }),
                 targets: vec![],
             }],

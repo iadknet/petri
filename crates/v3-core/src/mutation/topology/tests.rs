@@ -246,7 +246,7 @@ fn copy_node_deep_copies_vm_backend() {
     // and verify backend equality.
     let mut found = false;
     for seed in 0u64..100 {
-        let mut genome = v3alpha1_founder_genome();
+        let mut genome = crate::creature::founder::vm_decision_founder_genome();
         let mut r = rng(seed);
         apply(
             &mut genome,
@@ -279,15 +279,14 @@ fn copy_node_deep_copies_vm_backend() {
 #[test]
 fn copy_node_deep_copies_graph_backend() {
     // Swap one founder node to Graph first, then copy.
-    use crate::config::MutationConfig;
+
     use crate::creature::genome::cgp::CgpGraphBackendDef;
     let mut found = false;
     for seed in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
         // Swap node 1 to CGP Graph backend.
-        genome.nodes[1].backend_def = BackendDef::Graph(
-            CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default()),
-        );
+        genome.nodes[1].backend_def =
+            BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs());
         let mut r = rng(seed);
         apply(
             &mut genome,
@@ -742,7 +741,6 @@ fn splice_node_new_node_is_blank() {
     genome.nodes.push(crate::mutation::topology::birth::detour(
         NodeId::new(1),
         NodeId::new(0),
-        &MutationConfig::default(),
         &mut rng(0),
     ));
     let config = MutationConfig::default();
@@ -765,7 +763,7 @@ fn splice_node_new_node_is_blank() {
         assert!(vm.constants.is_empty());
         assert_eq!(vm.program, vec![VmInstruction::Halt]);
     } else {
-        assert_eq!(c.backend_def, super::birth::blank_graph_backend(&config));
+        assert_eq!(c.backend_def, super::birth::blank_graph_backend());
     }
 }
 
@@ -1242,7 +1240,7 @@ fn f15_inline_growth_redirects_existing_edge_through_halt() {
         assert_eq!(new.targets[0].target_id, old.target_id);
         assert!(
             new.backend_def == super::birth::minimal_vm_backend()
-                || new.backend_def == super::birth::blank_graph_backend(&MutationConfig::default())
+                || new.backend_def == super::birth::blank_graph_backend()
         );
     }
 }

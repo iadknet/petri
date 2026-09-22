@@ -11,7 +11,7 @@ pub use vote::{VoteKind, VoteSink, VoteVector, VOTE_KIND_COUNT, VOTE_SINK_COUNT}
 
 use crate::contracts::{InputReference, NodeId, RouteTarget};
 
-/// A single VM instruction. 43 opcodes per v3-vm-isa-spec.md.
+/// A single VM instruction. 39 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum VmInstruction {
     // ── Arithmetic and Data Movement ─────────────────────────────────────────
@@ -75,25 +75,18 @@ pub enum VmInstruction {
     // ── Output and Routing Writes ─────────────────────────────────────────────
     /// Overwrite internal payload slot; invalid slot write ignored.
     WriteInternalPayload { slot_idx: u8, src: u8 },
-    /// Write world-action metadata slot (0..7); invalid slot write ignored.
-    WriteWorldActionMeta { slot_idx: u8, src: u8 },
-    /// Write `regs[src]` into direction-bank slot `direction` (0..7) for the
-    /// next movement `PushAction` (T11.F21); an invalid slot writes nothing
-    /// and leaves the bank unwritten.
-    WriteDirectionBid { direction: u8, src: u8 },
+    /// Overwrite parameter-surface slot `params[slot_idx / 2][slot_idx % 2]`
+    /// (`slot_idx` in `0..8`, T19.F04); an invalid slot write is ignored.
+    WriteActionParam { slot_idx: u8, src: u8 },
     /// Add `regs[src]` to this dispatch's vote for `VoteSink::from_index(sink)`
     /// (T19.F03); a sink at or above the catalog count writes nothing and still
     /// costs. The dispatch commits its vote at every exit but energy
-    /// exhaustion. Inert: nothing reads the vote vector.
+    /// exhaustion; the pass end reads the summed votes (T19.F04).
     AddVote { sink: u8, src: u8 },
     /// Write a route gate score for a specific target slot.
     WriteRouteGate { slot: u8, src: u8 },
 
-    // ── Action Queue ──────────────────────────────────────────────────────────
-    /// Decode meta buffer and push action onto queue. Silent no-op if at cap.
-    PushAction { action_type: u8 },
-    /// Remove last action from queue. No-op if empty.
-    PopAction,
+    // ── Action Queue Reads ────────────────────────────────────────────────────
     /// Write `queue.len() as f32` to register `dst`.
     ReadActionQueueLength { dst: u8 },
     /// Write action type discriminant at `queue[reg[index_src]]` to register `dst`.
@@ -109,11 +102,9 @@ pub enum VmInstruction {
     /// settles the bid once at evaluation end (T19.F02).
     /// Last-write-wins if called multiple times.
     SetPriorityBid { src: u8 },
-    /// Terminal: return accumulated action queue for execution.
-    ExecuteActionQueue,
 
     // ── Halt and Shared Memory Slots ─────────────────────────────────────────
-    /// Stop VM execution without emitting a world action.
+    /// End the dispatch; the mesh routes on the written gates.
     Halt,
     /// `dst = shared_memory[regs[slot_reg] % 16]`
     LoadSlot { dst: u8, slot_reg: u8 },
@@ -291,17 +282,6 @@ impl CreatureGenome {
                             score += 1 + sink.inputs.len() as u32;
                         }
                     }
-                    // Count wired action slots
-                    for slot in &graph.action_bank {
-                        let edges = slot.edge_count();
-                        if edges > 0 {
-                            score += 1 + edges as u32;
-                        }
-                    }
-                    // Count wired execute gate
-                    if !graph.execute_gate.inputs.is_empty() {
-                        score += 1 + graph.execute_gate.inputs.len() as u32;
-                    }
                 }
             }
         }
@@ -369,17 +349,11 @@ mod tests {
                 slot_idx: 0,
                 src: 1,
             },
-            VmInstruction::WriteWorldActionMeta {
+            VmInstruction::WriteActionParam {
                 slot_idx: 0,
                 src: 1,
             },
-            VmInstruction::WriteDirectionBid {
-                direction: 0,
-                src: 1,
-            },
             VmInstruction::WriteRouteGate { slot: 0, src: 0 },
-            VmInstruction::PushAction { action_type: 1 },
-            VmInstruction::PopAction,
             VmInstruction::ReadActionQueueLength { dst: 0 },
             VmInstruction::ReadActionQueueType {
                 index_src: 0,
@@ -391,7 +365,6 @@ mod tests {
                 dst: 0,
             },
             VmInstruction::SetPriorityBid { src: 0 },
-            VmInstruction::ExecuteActionQueue,
             VmInstruction::Halt,
             VmInstruction::LoadSlot {
                 dst: 0,
@@ -416,7 +389,7 @@ mod tests {
             VmInstruction::ClearSlot { slot_idx: 2 },
             VmInstruction::AddVote { sink: 0, src: 1 },
         ];
-        assert_eq!(instructions.len(), 43, "must have exactly 43 opcodes");
+        assert_eq!(instructions.len(), 39, "must have exactly 39 opcodes");
     }
 
     #[test]
@@ -452,7 +425,7 @@ mod tests {
             .boxed()
     }
 
-    /// Every one of the 43 opcodes with arbitrary operands.
+    /// Every one of the 39 opcodes with arbitrary operands.
     fn any_vm_instruction() -> impl Strategy<Value = VmInstruction> {
         use VmInstruction::*;
         Union::new(vec![
@@ -491,12 +464,9 @@ mod tests {
                 })
                 .boxed(),
             binary(|slot_idx, src| WriteInternalPayload { slot_idx, src }),
-            binary(|slot_idx, src| WriteWorldActionMeta { slot_idx, src }),
-            binary(|direction, src| WriteDirectionBid { direction, src }),
+            binary(|slot_idx, src| WriteActionParam { slot_idx, src }),
             binary(|sink, src| AddVote { sink, src }),
             binary(|slot, src| WriteRouteGate { slot, src }),
-            unary(|action_type| PushAction { action_type }),
-            nullary(PopAction),
             unary(|dst| ReadActionQueueLength { dst }),
             binary(|index_src, dst| ReadActionQueueType { index_src, dst }),
             ternary(|index_src, param_slot, dst| ReadActionQueueParam {
@@ -505,7 +475,6 @@ mod tests {
                 dst,
             }),
             unary(|src| SetPriorityBid { src }),
-            nullary(ExecuteActionQueue),
             nullary(Halt),
             binary(|dst, slot_reg| LoadSlot { dst, slot_reg }),
             binary(|slot_reg, src| StoreSlot { slot_reg, src }),
@@ -548,8 +517,8 @@ mod tests {
                         register_count: 1,
                         constants: vec![],
                         program: vec![
-                            VmInstruction::PushAction { action_type: 0 },
-                            VmInstruction::ExecuteActionQueue,
+                            VmInstruction::AddVote { sink: 0, src: 0 },
+                            VmInstruction::Halt,
                         ],
                     }),
                     targets: vec![],
@@ -605,13 +574,12 @@ mod tests {
 
     #[test]
     fn genome_size_single_graph_node() {
-        use crate::config::MutationConfig;
         use crate::creature::genome::cgp::{
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
         // 1 node + 1 input_ref + 0 targets + 2 compute_nodes + (1 + 2) compute edges = 7
         // (unwired sinks, action bank, and execute gate add 0)
-        let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs();
         cgp.compute_nodes = vec![
             ComputeNode {
                 kind: ComputeNodeKind::Add,
@@ -658,12 +626,11 @@ mod tests {
 
     #[test]
     fn genome_size_multi_node_mixed() {
-        use crate::config::MutationConfig;
         use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode, ComputeNodeKind};
         // Node 0 (VM): 1 + 0 inputs + 1 target + 1 program + 0 constants = 3
         // Node 1 (Graph): 1 + 1 input + 0 targets + 1 compute_node + 0 edges = 3
         // Total = 6
-        let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs();
         cgp.compute_nodes = vec![ComputeNode {
             kind: ComputeNodeKind::Constant(1.0),
             inputs: vec![],
@@ -737,8 +704,11 @@ mod tests {
                         register_count: 4,
                         constants: vec![],
                         program: vec![
-                            VmInstruction::PushAction { action_type: 0 },
-                            VmInstruction::ExecuteActionQueue,
+                            VmInstruction::AddVote { sink: 25, src: 0 },
+                            VmInstruction::WriteActionParam {
+                                slot_idx: 0,
+                                src: 0,
+                            },
                         ],
                     }),
                     targets: vec![],
@@ -757,8 +727,11 @@ mod tests {
                                 ref_idx: 0,
                                 sub_idx: 0,
                             },
-                            VmInstruction::PushAction { action_type: 1 },
-                            VmInstruction::ExecuteActionQueue,
+                            VmInstruction::AddVote { sink: 25, src: 0 },
+                            VmInstruction::WriteActionParam {
+                                slot_idx: 0,
+                                src: 0,
+                            },
                         ],
                     }),
                     targets: vec![],
@@ -882,11 +855,11 @@ mod tests {
         // - ref_idx 0 → unchanged
         // - ref_idx 1 → removed (edge dropped)
         // - ref_idx 2 → 1 (decremented)
-        use crate::config::MutationConfig;
+
         use crate::creature::genome::cgp::{
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
-        let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs();
         cgp.compute_nodes = vec![ComputeNode {
             kind: ComputeNodeKind::Add,
             inputs: vec![

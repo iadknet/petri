@@ -239,8 +239,8 @@ fn every_checkpoint_carries_the_population_readings_of_its_own_tick() {
 fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
     use v3_core::contracts::NodeId;
     use v3_core::creature::genome::cgp::{
-        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
-        OutputSink, OutputSinkKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+        OutputSinkKind,
     };
     use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 
@@ -274,8 +274,6 @@ fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
             plasticity: None,
         }],
         output_sinks: vec![sink(GraphSource::ComputeNode(0))],
-        action_bank: vec![],
-        execute_gate: ExecuteGate { inputs: vec![] },
     };
     let mut shared_memory_reader = inert.clone();
     shared_memory_reader.output_sinks = vec![sink(GraphSource::SharedMemory {

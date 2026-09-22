@@ -47,8 +47,8 @@ fn worker_node() -> NodeGenome {
                     slot_idx: 2,
                     src: 0,
                 },
-                VmInstruction::PushAction { action_type: 3 },
-                VmInstruction::ExecuteActionQueue,
+                VmInstruction::AddVote { sink: 9, src: 0 },
+                VmInstruction::Halt,
             ],
         }),
         targets: vec![],
@@ -89,8 +89,8 @@ fn diverge_clone(genome: &mut CreatureGenome, seed: u64) {
     let index = vm
         .program
         .iter()
-        .position(|instruction| matches!(instruction, VmInstruction::PushAction { .. }))
-        .expect("the clone carries the copied PushAction");
+        .position(|instruction| matches!(instruction, VmInstruction::AddVote { .. }))
+        .expect("the clone carries the copied AddVote");
     assert!(mutate_one_instruction_field(
         &mut vm.program[index],
         &mut SmallRng::seed_from_u64(seed)

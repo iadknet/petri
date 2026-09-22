@@ -2,8 +2,8 @@
 //!
 //! Derives read/write classes and stateful flags from the CGP three-layer model:
 //! - Read classes from `GraphSource::InputLeaf` ref_idx in edges
-//! - Write classes from `OutputSinkKind` + `ActionSlotBehavior`
-//! - Terminal class from `ExecuteGate`
+//! - Write classes from `OutputSinkKind`; the vote and parameter sinks are
+//!   class `Action`
 //! - Stateful from `ComputeNodeKind` + plasticity
 
 use std::collections::BTreeSet;
@@ -79,25 +79,11 @@ pub(crate) fn derive_cgp_annotations(
                 has_stateful_behavior = true;
                 write_classes.insert(MeshWriteClass::Memory);
             }
-            // The inert vote surface (T19.F03) writes the action channel. No
-            // genome reaches this arm until T19.F04 lets mutation wire it.
+            // The vote and parameter sinks write the action channel (T19.F04).
             OutputSinkKind::ActionVote(_) | OutputSinkKind::ActionParam(_, _) => {
                 write_classes.insert(MeshWriteClass::Action);
             }
         }
-    }
-
-    // Write classes from wired action bank
-    for slot in &def.action_bank {
-        if !slot.is_wired() {
-            continue;
-        }
-        write_classes.insert(MeshWriteClass::Action);
-    }
-
-    // Write class from wired execute gate (terminal = action)
-    if !def.execute_gate.inputs.is_empty() {
-        write_classes.insert(MeshWriteClass::Action);
     }
 
     (
@@ -141,9 +127,9 @@ mod tests {
     use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::WorldInputKey;
     use crate::creature::genome::cgp::{
-        ActionSlot, ActionSlotBehavior, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge,
-        OutputSink, OutputSinkKind, WorldActionKind,
+        ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
     };
+    use crate::creature::genome::vote::{VoteKind, VoteSink};
 
     #[test]
     fn empty_graph_no_annotations() {
@@ -151,8 +137,6 @@ mod tests {
             birth_weights: None,
             compute_nodes: Vec::new(),
             output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let (reads, writes, stateful, live) = derive_cgp_annotations(&def, &[]);
         assert!(reads.is_empty());
@@ -189,8 +173,6 @@ mod tests {
                     inputs: Vec::new(), // unwired — should not count
                 },
             ],
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
             type_idx: OrdinaryFoodTypeId::default(),
@@ -219,36 +201,35 @@ mod tests {
                     weight: 1.0,
                 }],
             }],
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let (_, _, stateful, _) = derive_cgp_annotations(&def, &[]);
         assert!(stateful);
     }
 
     #[test]
-    fn action_slot_produces_action_write() {
-        let def = CgpGraphBackendDef {
-            birth_weights: None,
-            compute_nodes: vec![ComputeNode {
-                kind: ComputeNodeKind::Constant(1.0),
-                inputs: Vec::new(),
-                plasticity: None,
-            }],
-            output_sinks: Vec::new(),
-            action_bank: vec![ActionSlot {
-                behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
-                gate_inputs: vec![GraphEdge {
-                    source: GraphSource::ComputeNode(0),
-                    weight: 1.0,
+    fn vote_and_parameter_sinks_produce_action_writes() {
+        for kind in [
+            OutputSinkKind::ActionVote(VoteSink::Eat),
+            OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+        ] {
+            let def = CgpGraphBackendDef {
+                birth_weights: None,
+                compute_nodes: vec![ComputeNode {
+                    kind: ComputeNodeKind::Constant(1.0),
+                    inputs: Vec::new(),
+                    plasticity: None,
                 }],
-                param_inputs: Vec::new(),
-                direction_bids: Vec::new(),
-            }],
-            execute_gate: ExecuteGate { inputs: Vec::new() },
-        };
-        let (_, writes, _, _) = derive_cgp_annotations(&def, &[]);
-        assert!(writes.contains(&MeshWriteClass::Action));
+                output_sinks: vec![OutputSink {
+                    kind,
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 1.0,
+                    }],
+                }],
+            };
+            let (_, writes, _, _) = derive_cgp_annotations(&def, &[]);
+            assert_eq!(writes, vec![MeshWriteClass::Action], "{kind:?}");
+        }
     }
 
     #[test]
@@ -267,8 +248,6 @@ mod tests {
                     weight: 1.0,
                 }],
             }],
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let (_, writes, stateful, _) = derive_cgp_annotations(&def, &[]);
         assert!(stateful);
@@ -297,40 +276,33 @@ mod tests {
                     weight: 1.0,
                 }],
             }],
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let (_, _, stateful, _) = derive_cgp_annotations(&def, &[]);
         assert!(stateful);
     }
 
     #[test]
-    fn read_class_from_action_slot_and_execute_gate_edges() {
+    fn read_class_from_vote_and_terminate_sink_edges() {
+        let leaf_edge = |ref_idx| GraphEdge {
+            source: GraphSource::InputLeaf {
+                ref_idx,
+                sub_idx: 0,
+            },
+            weight: 1.0,
+        };
         let def = CgpGraphBackendDef {
             birth_weights: None,
             compute_nodes: Vec::new(),
-            output_sinks: Vec::new(),
-            action_bank: vec![ActionSlot {
-                behavior: ActionSlotBehavior::Emit(WorldActionKind::Move),
-                gate_inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
-                        ref_idx: 0,
-                        sub_idx: 0,
-                    },
-                    weight: 1.0,
-                }],
-                param_inputs: Vec::new(),
-                direction_bids: Vec::new(),
-            }],
-            execute_gate: ExecuteGate {
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
-                        ref_idx: 1,
-                        sub_idx: 0,
-                    },
-                    weight: 1.0,
-                }],
-            },
+            output_sinks: vec![
+                OutputSink {
+                    kind: OutputSinkKind::ActionVote(VoteSink::Move(0)),
+                    inputs: vec![leaf_edge(0)],
+                },
+                OutputSink {
+                    kind: OutputSinkKind::ActionVote(VoteSink::Terminate),
+                    inputs: vec![leaf_edge(1)],
+                },
+            ],
         };
         let input_refs = vec![
             InputReference::World(WorldInputKey::FoodHere {

@@ -1,5 +1,4 @@
 use slotmap::SlotMap;
-use v3_core::config::MutationConfig;
 use v3_core::contracts::{
     CreatureId, Direction, DynamicIntrospectionKey, InputReference, NodeId, Position, RouteTarget,
     StaticIntrospectionKey, WorldAction, WorldInputKey,
@@ -22,8 +21,7 @@ use crate::support::{
 /// Build a CGP graph backend with a single Constant compute node whose output
 /// is wired to the specified CustomOutput sink.
 fn cgp_constant_to_custom_output(value: f32, custom_slot: u8) -> CgpGraphBackendDef {
-    let config = MutationConfig::default();
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def.compute_nodes.push(ComputeNode {
         kind: ComputeNodeKind::Constant(value),
         inputs: Vec::new(),
@@ -50,8 +48,7 @@ fn cgp_passthrough_input_to_custom_output(
     sub_idx: u16,
     custom_slot: u8,
 ) -> CgpGraphBackendDef {
-    let config = MutationConfig::default();
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     // CN0: Add with single InputLeaf edge (acts as passthrough)
     def.compute_nodes.push(ComputeNode {
         kind: ComputeNodeKind::Add,
@@ -141,10 +138,10 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
                 },
                 VmInstruction::CmpGt { dst: 2, a: 2, b: 3 },
                 VmInstruction::JumpIfZero { cond: 2, offset: 2 },
-                VmInstruction::PushAction { action_type: 1 }, // Eat
-                VmInstruction::ExecuteActionQueue,
-                VmInstruction::PushAction { action_type: 0 }, // NoOp fallback
-                VmInstruction::ExecuteActionQueue,
+                VmInstruction::AddVote { sink: 0, src: 0 }, // Eat
+                VmInstruction::Halt,
+                VmInstruction::Noop, // NoOp fallback
+                VmInstruction::Halt,
             ],
         }),
         targets: vec![],
@@ -167,7 +164,12 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
             type_idx: v3_core::config::OrdinaryFoodTypeId::default()
         }
     );
-    assert_eq!(tick.hops.len(), 3);
+    // Pass 0 runs the three-node chain and commits `Eat`; pass 1 repeats it
+    // and ends `NoDecision` against the raised bar.
+    assert_eq!(tick.hops.len(), 6);
+    assert_eq!(tick.passes.len(), 2);
+    assert_eq!(tick.passes[0].hops, 3);
+    assert_eq!(tick.passes[1].committed, None);
     assert!(matches!(tick.hops[0].backend_trace, BackendTrace::Graph(_)));
     assert!(matches!(tick.hops[1].backend_trace, BackendTrace::Graph(_)));
     assert!(matches!(tick.hops[2].backend_trace, BackendTrace::Vm(_)));
@@ -276,8 +278,8 @@ fn vm_reads_all_inputs_e2e() {
             read_schedule.push((ref_idx as u16, sub));
         }
     }
-    program.push(VmInstruction::PushAction { action_type: 0 });
-    program.push(VmInstruction::ExecuteActionQueue);
+    program.push(VmInstruction::Noop);
+    program.push(VmInstruction::Halt);
 
     let vm_node = NodeGenome {
         node_id: id_vm,
@@ -434,10 +436,10 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
                     },
                     VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
                     VmInstruction::JumpIfZero { cond: 2, offset: 2 },
-                    VmInstruction::PushAction { action_type: 0 }, // NoOp when barrier present
-                    VmInstruction::ExecuteActionQueue,
-                    VmInstruction::PushAction { action_type: 1 }, // Eat when barrier absent
-                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::Noop, // NoOp when barrier present
+                    VmInstruction::Halt,
+                    VmInstruction::AddVote { sink: 0, src: 1 }, // Eat when barrier absent
+                    VmInstruction::Halt,
                 ],
             }),
             targets: vec![],
@@ -453,7 +455,11 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
         let mut sim = Simulation::new(world, creatures, 0, cfg, 29);
         let tick = run_one_traced_tick(&mut sim, target);
 
-        assert_eq!(tick.hops.len(), 1);
+        // A committed `Eat` is followed by a second pass that no longer
+        // clears the raised bar; the barrier case votes nothing in one pass.
+        let expected_passes = if north_barrier { 1 } else { 2 };
+        assert_eq!(tick.passes.len(), expected_passes);
+        assert_eq!(tick.hops.len(), expected_passes);
         assert_eq!(tick.final_actions[0], expected_action);
 
         let trace = vm_hop(&tick, 0);

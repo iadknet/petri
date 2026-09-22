@@ -1,6 +1,5 @@
 use super::*;
 use crate::config::RuntimeConfig;
-use crate::contracts::Direction;
 use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -106,7 +105,7 @@ fn applied_vm_settlement_observation_survives_every_exit() {
         (vec![VmInstruction::Halt], 0),
         (vec![VmInstruction::Halt], 1),
         (vec![VmInstruction::Noop], 1),
-        (vec![VmInstruction::ExecuteActionQueue], 1),
+        (vec![VmInstruction::Halt], 1),
         (vec![VmInstruction::Jump { offset: -1 }], 1),
     ] {
         let (_, energy, side) = run_vm_with_config(

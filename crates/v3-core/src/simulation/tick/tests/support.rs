@@ -19,7 +19,9 @@ pub(super) fn small_config() -> SimulationConfig {
     cfg
 }
 
-pub(super) fn vm_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
+/// A one-node VM genome running `program` exactly as given, with no
+/// constants and one register.
+pub(super) fn vm_raw_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -29,6 +31,29 @@ pub(super) fn vm_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
                 register_count: 1,
                 constants: vec![],
                 program,
+            }),
+            targets: vec![],
+        }],
+    }
+}
+
+/// A one-node VM genome running `program` after `r0 = 1.0`, so an
+/// `AddVote { src: 0, .. }` votes one unit and commits its action once.
+pub(super) fn vm_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
+    let mut with_unit = vec![VmInstruction::LoadConst {
+        dst: 0,
+        const_idx: 0,
+    }];
+    with_unit.extend(program);
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![1.0],
+                program: with_unit,
             }),
             targets: vec![],
         }],

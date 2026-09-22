@@ -1,10 +1,9 @@
 //! CGP-style graph backend types.
 //!
 //! Three-layer architecture: implicit inputs (GraphSource), mutable compute
-//! nodes (ComputeNodeKind), and fixed structural outputs (OutputSink,
-//! ActionSlot, ExecuteGate).
+//! nodes (ComputeNodeKind), and the fixed output sink catalog (OutputSink),
+//! which includes the action-vote and parameter sinks (T19.F03, T19.F04).
 
-use crate::config::MutationConfig;
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::vote::{
     VoteKind, VoteSink, VOTE_KIND_COUNT, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT,
@@ -121,21 +120,12 @@ pub enum OutputSinkKind {
     WriteSlot(u8),
     /// Clear `shared_memory[slot]` to 0.0. 16 slots, indices 0-15.
     ClearSlot(u8),
-    /// Contribute to `votes[sink.index()]` (T19.F03). 27 sinks. Inert: the
-    /// vote vector is accumulated and traced, and nothing reads it.
+    /// Contribute to the pass vote `votes[sink.index()]` (T19.F03). 27 sinks;
+    /// the pass end commits from them (T19.F04).
     ActionVote(VoteSink),
-    /// Overwrite `action_params[kind][slot]` (T19.F03), `slot` in `0..2`.
-    /// Inert: nothing reads the parameter surface.
+    /// Overwrite `action_params[kind][slot]` (T19.F03), `slot` in `0..2`,
+    /// read when a pass commits `kind` (T19.F04).
     ActionParam(VoteKind, u8),
-}
-
-impl OutputSinkKind {
-    /// Whether this sink belongs to the inert vote surface (T19.F03). Mutation
-    /// skips these sinks until T19.F04 lets a genome wire them.
-    #[must_use]
-    pub fn is_vote_surface(self) -> bool {
-        matches!(self, Self::ActionVote(_) | Self::ActionParam(_, _))
-    }
 }
 
 /// Fixed structural output — one per target slot.
@@ -143,105 +133,6 @@ impl OutputSinkKind {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OutputSink {
     pub kind: OutputSinkKind,
-    pub inputs: Vec<GraphEdge>,
-}
-
-// ── Action bank ─────────────────────────────────────────────────────────────
-
-/// What a slot does when it fires.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum ActionSlotBehavior {
-    /// Queue-program-control: remove last queued action.
-    Pop,
-    /// Emit a world action into the queue.
-    Emit(WorldActionKind),
-}
-
-/// World action kinds — maps 1:1 to WorldAction variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum WorldActionKind {
-    Eat,
-    Move,
-    Reproduce,
-    StealEnergy,
-    NoOp,
-}
-
-impl WorldActionKind {
-    /// Whether the kind commits a direction, so a slot's direction bank
-    /// (T11.F21) applies to it: `Move`, `Reproduce`, and `StealEnergy`.
-    #[must_use]
-    pub fn is_movement(self) -> bool {
-        matches!(self, Self::Move | Self::Reproduce | Self::StealEnergy)
-    }
-}
-
-/// One edge into a slot's direction bank (T11.F21): a weighted source and
-/// the bank slot (`Direction::ALL` index) its value is summed into.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct DirectionBidEdge {
-    pub edge: GraphEdge,
-    /// Bank slot in `0..8`; an out-of-range edge is summed nowhere and does
-    /// not write the bank.
-    pub direction: u8,
-}
-
-/// Action slot in the fixed action bank.
-/// Each slot is fully self-contained: own gate, own params, fixed behavior.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ActionSlot {
-    /// Evolvable via raw field mutation.
-    pub behavior: ActionSlotBehavior,
-    /// Weighted sum > 0.0 means fire.
-    pub gate_inputs: Vec<GraphEdge>,
-    /// Decoded per WorldActionKind (ignored for Pop).
-    pub param_inputs: Vec<GraphEdge>,
-    /// Direction bank for `Move`, `Reproduce`, and `StealEnergy` (T11.F21):
-    /// bid d is the weighted sum of the edges with `direction == d`. Empty on
-    /// every founder and on every genome stored before the bank existed.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub direction_bids: Vec<DirectionBidEdge>,
-}
-
-impl ActionSlot {
-    /// A slot with the given behavior and no edges on any surface.
-    #[must_use]
-    pub fn inert(behavior: ActionSlotBehavior) -> Self {
-        Self {
-            behavior,
-            gate_inputs: Vec::new(),
-            param_inputs: Vec::new(),
-            direction_bids: Vec::new(),
-        }
-    }
-
-    /// Every edge on the slot: gate, then param, then direction-bank edges.
-    pub fn edges(&self) -> impl Iterator<Item = &GraphEdge> {
-        self.gate_inputs
-            .iter()
-            .chain(&self.param_inputs)
-            .chain(self.direction_bids.iter().map(|bid| &bid.edge))
-    }
-
-    /// Number of edges across the slot's three surfaces.
-    #[must_use]
-    pub fn edge_count(&self) -> usize {
-        self.gate_inputs.len() + self.param_inputs.len() + self.direction_bids.len()
-    }
-
-    /// Whether any surface of the slot carries an edge.
-    #[must_use]
-    pub fn is_wired(&self) -> bool {
-        self.edge_count() > 0
-    }
-}
-
-// ── Execute gate ────────────────────────────────────────────────────────────
-
-/// Separate gated output controlling mesh termination.
-/// When gate fires AND queue non-empty, mesh hop terminates.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct ExecuteGate {
     pub inputs: Vec<GraphEdge>,
 }
 
@@ -258,10 +149,6 @@ pub struct CgpGraphBackendDef {
     pub compute_nodes: Vec<ComputeNode>,
     /// Fixed set — structurally immutable. Only edges are evolvable.
     pub output_sinks: Vec<OutputSink>,
-    /// Fixed-length bank (size == config.action_queue_cap at creation time).
-    pub action_bank: Vec<ActionSlot>,
-    /// Separate terminal gate.
-    pub execute_gate: ExecuteGate,
 }
 
 // Keep temporary birth state out of diagnostic genome identity as well as
@@ -271,18 +158,13 @@ impl std::fmt::Debug for CgpGraphBackendDef {
         f.debug_struct("CgpGraphBackendDef")
             .field("compute_nodes", &self.compute_nodes)
             .field("output_sinks", &self.output_sinks)
-            .field("action_bank", &self.action_bank)
-            .field("execute_gate", &self.execute_gate)
             .finish()
     }
 }
 
 impl PartialEq for CgpGraphBackendDef {
     fn eq(&self, other: &Self) -> bool {
-        self.compute_nodes == other.compute_nodes
-            && self.output_sinks == other.output_sinks
-            && self.action_bank == other.action_bank
-            && self.execute_gate == other.execute_gate
+        self.compute_nodes == other.compute_nodes && self.output_sinks == other.output_sinks
     }
 }
 
@@ -307,8 +189,8 @@ const _: () = assert!(FIXED_SINK_COUNT == 99);
 
 impl CgpGraphBackendDef {
     /// Construct a new graph backend with the full fixed output catalog.
-    /// All sinks and action slots start with empty edges (inert).
-    pub fn new_with_fixed_outputs(config: &MutationConfig) -> Self {
+    /// All sinks start with empty edges (inert).
+    pub fn new_with_fixed_outputs() -> Self {
         let mut output_sinks = Vec::with_capacity(FIXED_SINK_COUNT);
 
         // CustomOutput sinks
@@ -361,42 +243,27 @@ impl CgpGraphBackendDef {
             }
         }
 
-        // Action bank sized to config
-        let bank_size = config.action_queue_cap;
-        let mut action_bank = Vec::with_capacity(bank_size);
-        for _ in 0..bank_size {
-            action_bank.push(ActionSlot::inert(ActionSlotBehavior::Emit(
-                WorldActionKind::NoOp,
-            )));
-        }
-
         Self {
             compute_nodes: Vec::new(),
             output_sinks,
             birth_weights: None,
-            action_bank,
-            execute_gate: ExecuteGate { inputs: Vec::new() },
         }
     }
 
     /// Whether a visit to this graph enters evaluation and the effects pass.
     ///
     /// True with at least one compute node, and true for a zero-compute graph
-    /// whose effect surface carries an edge: a wired output sink, an action
-    /// slot with a gate or param edge, or a wired execute gate. A graph with
-    /// neither computes nothing and applies nothing, so its visit is free.
+    /// with a wired output sink. A graph with neither computes nothing and
+    /// applies nothing, so its visit is free.
     /// Derived from the genome on every visit and stored nowhere.
     #[must_use]
     pub fn enters_visit(&self) -> bool {
         !self.compute_nodes.is_empty()
             || self.output_sinks.iter().any(|sink| !sink.inputs.is_empty())
-            || self.action_bank.iter().any(ActionSlot::is_wired)
-            || !self.execute_gate.inputs.is_empty()
     }
 
     /// Remove a compute node at `idx`. Remaps `GraphSource::ComputeNode`
-    /// indices across ALL edge containers: compute inputs, sink inputs,
-    /// action gate/param inputs, and execute gate inputs.
+    /// indices across both edge containers: compute inputs and sink inputs.
     ///
     /// Edges pointing to the removed node get `ComputeNode(u16::MAX)`.
     /// Edges pointing above the removed index are decremented.
@@ -432,7 +299,7 @@ impl CgpGraphBackendDef {
 
     /// Insert `node` at compute index `idx`, the inverse of
     /// [`Self::remove_compute_node_at`]. Every `GraphSource::ComputeNode(i)`
-    /// reference at or above `idx`, across all five edge-bearing surfaces
+    /// reference at or above `idx`, across both edge-bearing surfaces
     /// (including edges belonging to `node` itself, resolved by the caller
     /// before insertion), is incremented by one so every surviving edge keeps
     /// pointing at the same logical node after the shift.
@@ -471,7 +338,7 @@ impl CgpGraphBackendDef {
     /// An edge from one duplicated node to another, including a self-edge,
     /// points at the corresponding copy, so the duplicated set's internal
     /// wiring and per-node state are its own. Every other reference, in the
-    /// copies and across all five edge-bearing surfaces, is remapped to its
+    /// copies and across both edge-bearing surfaces, is remapped to its
     /// shifted index, so no surviving edge changes what it reads.
     ///
     /// `sources` must be strictly ascending and in range; callers must keep
@@ -542,15 +409,12 @@ impl CgpGraphBackendDef {
     }
 
     /// Every edge on every container `retain_edges` walks: all compute
-    /// nodes (live or not), output sinks, action-bank gate, param and
-    /// direction-bid edges, and the execute gate.
+    /// nodes (live or not), then the output sinks.
     pub fn edges(&self) -> impl Iterator<Item = &GraphEdge> {
         self.compute_nodes
             .iter()
             .flat_map(|node| &node.inputs)
             .chain(self.output_sinks.iter().flat_map(|sink| &sink.inputs))
-            .chain(self.action_bank.iter().flat_map(ActionSlot::edges))
-            .chain(&self.execute_gate.inputs)
     }
 
     fn retain_edges(&mut self, mut keep: impl FnMut(&mut GraphEdge) -> bool) {
@@ -576,12 +440,6 @@ impl CgpGraphBackendDef {
         for sink in &mut self.output_sinks {
             sink.inputs.retain_mut(&mut keep);
         }
-        for slot in &mut self.action_bank {
-            slot.gate_inputs.retain_mut(&mut keep);
-            slot.param_inputs.retain_mut(&mut keep);
-            slot.direction_bids.retain_mut(|bid| keep(&mut bid.edge));
-        }
-        self.execute_gate.inputs.retain_mut(keep);
     }
 
     // ── Internal helpers ────────────────────────────────────────────────────
@@ -608,20 +466,6 @@ impl CgpGraphBackendDef {
                 f(edge);
             }
         }
-        for slot in &mut self.action_bank {
-            for edge in &mut slot.gate_inputs {
-                f(edge);
-            }
-            for edge in &mut slot.param_inputs {
-                f(edge);
-            }
-            for bid in &mut slot.direction_bids {
-                f(&mut bid.edge);
-            }
-        }
-        for edge in &mut self.execute_gate.inputs {
-            f(edge);
-        }
     }
 }
 
@@ -629,26 +473,14 @@ impl CgpGraphBackendDef {
 mod tests {
     use super::*;
 
-    #[test]
-    fn is_movement_holds_for_exactly_the_direction_committing_kinds() {
-        assert!(WorldActionKind::Move.is_movement());
-        assert!(WorldActionKind::Reproduce.is_movement());
-        assert!(WorldActionKind::StealEnergy.is_movement());
-        assert!(!WorldActionKind::Eat.is_movement());
-        assert!(!WorldActionKind::NoOp.is_movement());
-    }
-
     // ── Construction tests ──────────────────────────────────────────────────
 
     #[test]
     fn new_with_fixed_outputs_creates_correct_catalog() {
-        let config = MutationConfig::default(); // action_queue_cap = 4
-        let def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         assert_eq!(def.output_sinks.len(), FIXED_SINK_COUNT);
-        assert_eq!(def.action_bank.len(), 4);
         assert!(def.compute_nodes.is_empty());
-        assert!(def.execute_gate.inputs.is_empty());
 
         // Verify sink ordering
         for i in 0..CUSTOM_OUTPUT_COUNT {
@@ -705,26 +537,6 @@ mod tests {
         for sink in &def.output_sinks {
             assert!(sink.inputs.is_empty());
         }
-
-        // All action slots start with empty edges
-        for slot in &def.action_bank {
-            assert!(slot.gate_inputs.is_empty());
-            assert!(slot.param_inputs.is_empty());
-            assert_eq!(
-                slot.behavior,
-                ActionSlotBehavior::Emit(WorldActionKind::NoOp)
-            );
-        }
-    }
-
-    #[test]
-    fn new_with_custom_queue_cap() {
-        let config = MutationConfig {
-            action_queue_cap: 8,
-            ..MutationConfig::default()
-        };
-        let def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
-        assert_eq!(def.action_bank.len(), 8);
     }
 
     // ── Serde roundtrip tests ───────────────────────────────────────────────
@@ -760,73 +572,9 @@ mod tests {
         assert_eq!(kinds, decoded);
     }
 
-    fn any_graph_source() -> impl proptest::strategy::Strategy<Value = GraphSource> {
-        use proptest::prelude::*;
-        prop_oneof![
-            (any::<u16>(), any::<u16>())
-                .prop_map(|(ref_idx, sub_idx)| GraphSource::InputLeaf { ref_idx, sub_idx }),
-            (any::<u8>(), any::<bool>())
-                .prop_map(|(slot, previous)| GraphSource::SharedMemory { slot, previous }),
-            any::<u16>().prop_map(GraphSource::ComputeNode),
-        ]
-    }
-
-    fn any_direction_bid_edge() -> impl proptest::strategy::Strategy<Value = DirectionBidEdge> {
-        use proptest::prelude::*;
-        (any_graph_source(), -10.0f32..10.0, any::<u8>()).prop_map(|(source, weight, direction)| {
-            DirectionBidEdge {
-                edge: GraphEdge { source, weight },
-                direction,
-            }
-        })
-    }
-
-    proptest::proptest! {
-        /// Serde round-trip is the identity for every bank edge and for a slot
-        /// carrying any bank (T11.F21).
-        #[test]
-        fn action_slot_with_a_bank_serde_roundtrip(
-            bids in proptest::collection::vec(any_direction_bid_edge(), 0..6)
-        ) {
-            let mut slot = ActionSlot::inert(ActionSlotBehavior::Emit(WorldActionKind::Move));
-            slot.direction_bids = bids;
-            let json = serde_json::to_string(&slot).unwrap();
-            let decoded: ActionSlot = serde_json::from_str(&json).unwrap();
-            proptest::prop_assert_eq!(decoded, slot);
-        }
-    }
-
-    #[test]
-    fn action_slot_without_direction_bids_deserializes_with_an_empty_bank() {
-        let json = r#"{"behavior":{"Emit":"Move"},"gate_inputs":[],"param_inputs":[]}"#;
-        let slot: ActionSlot = serde_json::from_str(json).unwrap();
-        assert!(slot.direction_bids.is_empty());
-        assert_eq!(
-            serde_json::to_string(&slot).unwrap(),
-            json,
-            "an empty bank is not serialized, so stored genomes keep their bytes"
-        );
-    }
-
-    #[test]
-    fn action_slot_behavior_serde_roundtrip() {
-        let behaviors = vec![
-            ActionSlotBehavior::Pop,
-            ActionSlotBehavior::Emit(WorldActionKind::Eat),
-            ActionSlotBehavior::Emit(WorldActionKind::Move),
-            ActionSlotBehavior::Emit(WorldActionKind::Reproduce),
-            ActionSlotBehavior::Emit(WorldActionKind::StealEnergy),
-            ActionSlotBehavior::Emit(WorldActionKind::NoOp),
-        ];
-        let json = serde_json::to_string(&behaviors).unwrap();
-        let decoded: Vec<ActionSlotBehavior> = serde_json::from_str(&json).unwrap();
-        assert_eq!(behaviors, decoded);
-    }
-
     #[test]
     fn full_backend_def_serde_roundtrip() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         // Add a compute node with edges
         def.compute_nodes.push(ComputeNode {
@@ -877,8 +625,7 @@ mod tests {
 
     #[test]
     fn remove_compute_node_remaps_edges_across_all_containers() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         // Add 3 compute nodes
         for kind in [
@@ -905,23 +652,29 @@ mod tests {
             weight: 0.5,
         });
 
-        // Action slot gate has edge to node 0 (Add)
-        def.action_bank[0].gate_inputs.push(GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        });
+        // Vote sink has edge to node 0 (Add)
+        def.output_sinks[FIRST_ACTION_VOTE_SINK]
+            .inputs
+            .push(GraphEdge {
+                source: GraphSource::ComputeNode(0),
+                weight: 1.0,
+            });
 
-        // Action slot param has edge to node 1 (Sigmoid)
-        def.action_bank[0].param_inputs.push(GraphEdge {
-            source: GraphSource::ComputeNode(1),
-            weight: 1.0,
-        });
+        // Second vote sink has edge to node 1 (Sigmoid)
+        def.output_sinks[FIRST_ACTION_VOTE_SINK + 1]
+            .inputs
+            .push(GraphEdge {
+                source: GraphSource::ComputeNode(1),
+                weight: 1.0,
+            });
 
-        // Execute gate has edge to node 2 (Relu)
-        def.execute_gate.inputs.push(GraphEdge {
-            source: GraphSource::ComputeNode(2),
-            weight: 1.0,
-        });
+        // Parameter sink has edge to node 2 (Relu)
+        def.output_sinks[FIXED_SINK_COUNT - 1]
+            .inputs
+            .push(GraphEdge {
+                source: GraphSource::ComputeNode(2),
+                weight: 1.0,
+            });
 
         // Remove node 0 (Add). Nodes 1,2 become 0,1.
         def.remove_compute_node_at(0);
@@ -944,27 +697,26 @@ mod tests {
 
         // Action gate edge to removed Add: CN(0) -> CN(u16::MAX)
         assert_eq!(
-            def.action_bank[0].gate_inputs[0].source,
+            def.output_sinks[FIRST_ACTION_VOTE_SINK].inputs[0].source,
             GraphSource::ComputeNode(u16::MAX)
         );
 
         // Action param edge to Sigmoid: was CN(1), now CN(0)
         assert_eq!(
-            def.action_bank[0].param_inputs[0].source,
+            def.output_sinks[FIRST_ACTION_VOTE_SINK + 1].inputs[0].source,
             GraphSource::ComputeNode(0)
         );
 
         // Execute gate edge to Relu: was CN(2), now CN(1)
         assert_eq!(
-            def.execute_gate.inputs[0].source,
+            def.output_sinks[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::ComputeNode(1)
         );
     }
 
     #[test]
     fn remove_compute_node_preserves_non_compute_sources() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Add,
@@ -1007,8 +759,7 @@ mod tests {
 
     #[test]
     fn insert_compute_node_at_remaps_edges_across_all_containers() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         // Two compute nodes: 0 (Sigmoid), 1 (Relu), Relu reads Sigmoid.
         def.compute_nodes.push(ComputeNode {
@@ -1028,14 +779,18 @@ mod tests {
             source: GraphSource::ComputeNode(1),
             weight: 0.5,
         });
-        def.action_bank[0].gate_inputs.push(GraphEdge {
-            source: GraphSource::ComputeNode(0),
-            weight: 1.0,
-        });
-        def.execute_gate.inputs.push(GraphEdge {
-            source: GraphSource::ComputeNode(1),
-            weight: 1.0,
-        });
+        def.output_sinks[FIRST_ACTION_VOTE_SINK]
+            .inputs
+            .push(GraphEdge {
+                source: GraphSource::ComputeNode(0),
+                weight: 1.0,
+            });
+        def.output_sinks[FIXED_SINK_COUNT - 1]
+            .inputs
+            .push(GraphEdge {
+                source: GraphSource::ComputeNode(1),
+                weight: 1.0,
+            });
 
         // Insert a new node at index 1 (between Sigmoid and Relu).
         def.insert_compute_node_at(
@@ -1064,20 +819,19 @@ mod tests {
         );
         // Action gate edge to Sigmoid: was CN(0), unaffected.
         assert_eq!(
-            def.action_bank[0].gate_inputs[0].source,
+            def.output_sinks[FIRST_ACTION_VOTE_SINK].inputs[0].source,
             GraphSource::ComputeNode(0)
         );
         // Execute gate edge to Relu: was CN(1), now CN(2).
         assert_eq!(
-            def.execute_gate.inputs[0].source,
+            def.output_sinks[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::ComputeNode(2)
         );
     }
 
     #[test]
     fn insert_compute_node_at_shifts_self_referencing_edge() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::DecayIntegrator(0.5),
             inputs: vec![GraphEdge {
@@ -1106,8 +860,7 @@ mod tests {
 
     #[test]
     fn insert_compute_node_at_and_remove_compute_node_at_are_inverse_on_indices() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         for kind in [ComputeNodeKind::Add, ComputeNodeKind::Sigmoid] {
             def.compute_nodes.push(ComputeNode {
                 kind,
@@ -1134,8 +887,7 @@ mod tests {
 
     #[test]
     fn reindex_input_refs_removes_matching_and_decrements_higher() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Add,
@@ -1207,38 +959,43 @@ mod tests {
     }
 
     #[test]
-    fn reindex_across_action_bank_and_execute_gate() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+    fn reindex_across_vote_and_param_sinks() {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
-        def.action_bank[0].gate_inputs.push(GraphEdge {
-            source: GraphSource::InputLeaf {
-                ref_idx: 2,
-                sub_idx: 0,
-            },
-            weight: 1.0,
-        });
-        def.action_bank[1].param_inputs.push(GraphEdge {
-            source: GraphSource::InputLeaf {
-                ref_idx: 0,
-                sub_idx: 0,
-            },
-            weight: 1.0,
-        });
-        def.execute_gate.inputs.push(GraphEdge {
-            source: GraphSource::InputLeaf {
-                ref_idx: 3,
-                sub_idx: 0,
-            },
-            weight: 1.0,
-        });
+        def.output_sinks[FIRST_ACTION_VOTE_SINK]
+            .inputs
+            .push(GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx: 2,
+                    sub_idx: 0,
+                },
+                weight: 1.0,
+            });
+        def.output_sinks[FIRST_ACTION_VOTE_SINK + 2]
+            .inputs
+            .push(GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                weight: 1.0,
+            });
+        def.output_sinks[FIXED_SINK_COUNT - 1]
+            .inputs
+            .push(GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx: 3,
+                    sub_idx: 0,
+                },
+                weight: 1.0,
+            });
 
         // Remove input_ref at index 1
         def.reindex_input_refs_after_removal(1);
 
         // Gate: ref_idx 2 -> 1
         assert_eq!(
-            def.action_bank[0].gate_inputs[0].source,
+            def.output_sinks[FIRST_ACTION_VOTE_SINK].inputs[0].source,
             GraphSource::InputLeaf {
                 ref_idx: 1,
                 sub_idx: 0,
@@ -1246,7 +1003,7 @@ mod tests {
         );
         // Param: ref_idx 0 unchanged
         assert_eq!(
-            def.action_bank[1].param_inputs[0].source,
+            def.output_sinks[FIRST_ACTION_VOTE_SINK + 2].inputs[0].source,
             GraphSource::InputLeaf {
                 ref_idx: 0,
                 sub_idx: 0,
@@ -1254,7 +1011,7 @@ mod tests {
         );
         // Execute gate: ref_idx 3 -> 2
         assert_eq!(
-            def.execute_gate.inputs[0].source,
+            def.output_sinks[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::InputLeaf {
                 ref_idx: 2,
                 sub_idx: 0,
@@ -1266,8 +1023,7 @@ mod tests {
 
     #[test]
     fn clamp_sub_idx_removes_out_of_range_edges() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Add,
@@ -1321,8 +1077,7 @@ mod tests {
 
     #[test]
     fn clamp_sub_idx_zero_width_removes_all_edges_for_ref() {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Add,
@@ -1377,14 +1132,6 @@ mod tests {
         let kind = OutputSinkKind::CustomOutput(0);
         let _copy = kind;
         let _another = kind;
-
-        let behavior = ActionSlotBehavior::Pop;
-        let _copy = behavior;
-        let _another = behavior;
-
-        let wak = WorldActionKind::Eat;
-        let _copy = wak;
-        let _another = wak;
 
         let cnk = ComputeNodeKind::Add;
         let _copy = cnk;

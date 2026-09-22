@@ -1,5 +1,4 @@
 use slotmap::SlotMap;
-use v3_core::config::MutationConfig;
 use v3_core::contracts::{
     CreatureId, Direction, DynamicIntrospectionKey, InputReference, NodeId, Position,
     StaticIntrospectionKey, WorldAction, WorldInputKey,
@@ -69,8 +68,7 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
     // CN9..=16: NeighborBarrierRing, sub_idx = direction index 0..7
     // CN17..=24: NeighborOccupiedRing, sub_idx = direction index 0..7
     let graph_def = {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         // CN0: FoodHere
         def.compute_nodes.push(ComputeNode {
@@ -237,8 +235,7 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
     // Build CGP graph: one compute node per input ref (Add with InputLeaf edge),
     // each wired to the corresponding CustomOutput sink.
     let graph_def = {
-        let config = MutationConfig::default();
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
 
         for (i, &sub_idx) in sub_indices.iter().enumerate().take(input_refs.len()) {
             // Add compute node reading InputLeaf(ref_idx=i, sub_idx)

@@ -60,7 +60,12 @@ pub struct MeshTotals {
     pub executed_nodes: u64,
     pub knockout_nodes: u64,
     pub route_varying_lineages: u32,
-    pub hop_cap_hits: u64,
+    /// Battery executions by tick reason, summed over lineages (T19.F04).
+    pub tick_reasons: super::mesh_execution::TickReasonCounts,
+    /// Passes summed over lineages (T19.F04).
+    pub passes: u64,
+    /// `Decide`-ended passes summed over lineages (T19.F04).
+    pub decided_passes: u64,
     /// Capped passes summed over lineages (T19.F02).
     pub pass_cap_hits: u64,
     /// Lineages whose reachable mesh contains a cycle (T19.F02).
@@ -86,7 +91,9 @@ impl MeshTotals {
         self.executed_nodes += reading.executed_node_count as u64;
         self.knockout_nodes += reading.knockout_count as u64;
         self.route_varying_lineages += u32::from(reading.route_varies_with_input);
-        self.hop_cap_hits += reading.hop_cap_hits as u64;
+        self.tick_reasons.add(&reading.tick_reasons);
+        self.passes += reading.passes as u64;
+        self.decided_passes += reading.decided_passes as u64;
         self.pass_cap_hits += reading.pass_cap_hits as u64;
         self.cycle_carrying_lineages += u32::from(reading.cycle_carrying);
         self.revisiting_lineages += u32::from(reading.revisiting);
@@ -319,7 +326,7 @@ mod tests {
                 MeshExecutionReading { backends: super::super::mesh_execution::MeshBackendCounts {
                     graph: super::super::mesh_execution::BackendNodeCounts {total: (total / 2) as u64, executed: (exec / 2) as u64, contributing: ((exec-knockout.min(exec))/2) as u64},
                     vm: super::super::mesh_execution::BackendNodeCounts {total: (total-total/2) as u64, executed: (exec-exec/2) as u64, contributing: ((exec-knockout.min(exec))-(exec-knockout.min(exec))/2) as u64},
-                }, total_node_count: total, reachable_node_count: reach, executed_node_count: exec, knockout_count: knockout.min(exec), route_varies_with_input: varies, route_destination_varies: varies, hop_cap_hits: cap, pass_cap_hits: cap, cycle_carrying: cycles[0], revisiting: cycles[1], productive_cycle: cycles[2] }
+                }, total_node_count: total, reachable_node_count: reach, executed_node_count: exec, knockout_count: knockout.min(exec), route_varies_with_input: varies, route_destination_varies: varies, tick_reasons: super::super::mesh_execution::TickReasonCounts { no_decision: cap, ..Default::default() }, passes: 2 * cap, decided_passes: cap, pass_cap_hits: cap, cycle_carrying: cycles[0], revisiting: cycles[1], productive_cycle: cycles[2] }
             }).collect();
             let mut pooled = MeshTotals::default();
             for &reading in &readings { pooled.record(reading); }
@@ -335,10 +342,12 @@ mod tests {
             }
             prop_assert_eq!(pooled.knockout_nodes, readings.iter().map(|r| r.knockout_count as u64).sum::<u64>());
             prop_assert_eq!(pooled.route_varying_lineages as usize, readings.iter().filter(|r| r.route_varies_with_input).count());
-            prop_assert_eq!(pooled.hop_cap_hits, readings.iter().map(|r| r.hop_cap_hits as u64).sum::<u64>());
+            prop_assert_eq!(pooled.tick_reasons.total(), readings.iter().map(|r| r.tick_reasons.total()).sum::<usize>());
+            prop_assert_eq!(pooled.passes, readings.iter().map(|r| r.passes as u64).sum::<u64>());
+            prop_assert_eq!(pooled.decided_passes, readings.iter().map(|r| r.decided_passes as u64).sum::<u64>());
             prop_assert!(pooled.knockout_nodes <= pooled.executed_nodes && pooled.executed_nodes <= pooled.reachable_nodes && pooled.reachable_nodes <= pooled.total_nodes);
             prop_assert!(pooled.route_varying_lineages <= pooled.lineages);
-            prop_assert!(pooled.hop_cap_hits <= u64::from(pooled.lineages) * 80);
+            prop_assert!(pooled.pass_cap_hits <= pooled.passes);
             prop_assert_eq!(pooled.pass_cap_hits, readings.iter().map(|r| r.pass_cap_hits as u64).sum::<u64>());
             prop_assert_eq!(pooled.cycle_carrying_lineages as usize, readings.iter().filter(|r| r.cycle_carrying).count());
             prop_assert_eq!(pooled.revisiting_lineages as usize, readings.iter().filter(|r| r.revisiting).count());
@@ -350,14 +359,24 @@ mod tests {
     #[test]
     fn checkpoint_reads_preserve_lineage_genomes_and_do_not_restart_dead_parents() {
         use crate::contracts::WorldAction;
-        use crate::creature::genome::{BackendDef, VmInstruction};
+        use crate::creature::genome::BackendDef;
         let config = replay_config();
         let context = EvalContext::from_config(&config);
         let battery = Battery::generate(context.food_type_count);
+        // The founder with every vote and parameter edge removed votes
+        // nothing, so every execution is `NoOp`.
         let mut dead = founder_genome(FounderProfile::V3Alpha1);
         for node in &mut dead.nodes {
-            if let BackendDef::Vm(vm) = &mut node.backend_def {
-                vm.program = vec![VmInstruction::Halt];
+            if let BackendDef::Graph(graph) = &mut node.backend_def {
+                for sink in &mut graph.output_sinks {
+                    if matches!(
+                        sink.kind,
+                        crate::creature::genome::cgp::OutputSinkKind::ActionVote(_)
+                            | crate::creature::genome::cgp::OutputSinkKind::ActionParam(_, _)
+                    ) {
+                        sink.inputs.clear();
+                    }
+                }
             }
         }
         let base = battery.signature(&dead, context.runtime, context.shared_memory_decay_rate);
@@ -785,18 +804,21 @@ mod tests {
         // shifts, so the walk's lineages diverge at their first topology
         // event. Re-pinned 2026-09-19 for the 25% large-copy weight default,
         // which again changes topology draws and downstream RNG history.
+        // Re-pinned by T19.F04: the 97-unit vote founder draws fewer events
+        // per birth and its graph decision node changes every
+        // node-internal draw.
         assert_eq!(reading.cohort.created, 12);
-        assert_eq!(reading.cohort.dispatched(), 4);
-        // Six cohort modules reached dispatch, the median four generations
+        assert_eq!(reading.cohort.dispatched(), 5);
+        // Seven cohort modules reached dispatch, the median four generations
         // after the birth that created them: later births, or a dispatch date
         // taken only at the closing checkpoint, would both read higher.
         assert_eq!(
             reading.time_to_first(CohortFact::Dispatch),
             &TimeToFirst {
-                reached: 6,
+                reached: 7,
                 median_generations: Some(4),
                 censored_deleted: 0,
-                censored_present: 6,
+                censored_present: 5,
             },
         );
         // T11.F22 re-pin: the within-kind `Swap` and consumer-preserving
@@ -804,14 +826,15 @@ mod tests {
         // lineages diverge at their first input-reference event; two cohort
         // modules reached an internal change. With the 25% copy default,
         // three reach an internal change, still a median five generations
-        // after birth.
+        // after birth; on the T19.F04 vote founder six do, at the same
+        // median.
         assert_eq!(
             reading.time_to_first(CohortFact::InternalChange),
             &TimeToFirst {
-                reached: 3,
+                reached: 6,
                 median_generations: Some(5),
                 censored_deleted: 1,
-                censored_present: 8,
+                censored_present: 5,
             },
         );
     }
