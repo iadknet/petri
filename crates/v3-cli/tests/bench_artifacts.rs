@@ -937,6 +937,45 @@ fn output_defaults_resolve_main_and_linked_checkouts_with_spaces() {
     .is_ok());
 }
 
+/// Integer-keyed maps (`Transitions::retained_at`) serialize with string keys;
+/// the goal reader must parse them back inside `Indicator::Defined`, which the
+/// buffered `#[serde(untagged)]` derive could not once a lineage retained.
+#[test]
+fn goal_reader_reads_back_recruitment_paths_with_retained_transitions() {
+    use v3_core::neighborhood::recruitment_paths as recruitment;
+    let dir = Temp::new();
+    let raw_path = dir.0.join("raw.json");
+    let mut source = world_source();
+    let mut experiment = recruitment::observe(recruitment::Sizes::TEST);
+    experiment.arms[0].summary.transitions.retained_at = [(16, 2), (64, 1)].into();
+    source["deterministic"]["goal_indicators"]["recruitment_paths"] =
+        serde_json::to_value(&experiment).unwrap();
+    let raw = serde_json::to_vec_pretty(&source).unwrap();
+    std::fs::write(&raw_path, &raw).unwrap();
+
+    artifacts::summarize(&raw, &raw_path, &provenance())
+        .expect("the goal reader accepts the writer's recruitment paths");
+
+    let report: bench::Report = serde_json::from_slice(&raw).unwrap();
+    let read = report
+        .deterministic
+        .goal_indicators
+        .recruitment_paths
+        .defined()
+        .expect("a measured reading stays defined");
+    assert_eq!(
+        read.arms[0].summary.transitions,
+        experiment.arms[0].summary.transitions
+    );
+}
+
+#[test]
+fn goal_reader_keeps_bare_strings_undefined() {
+    let indicator: bench::Indicator<bench::DriftDepth> =
+        serde_json::from_str("\"Undefined\"").unwrap();
+    assert_eq!(indicator, bench::Indicator::Undefined("Undefined".into()));
+}
+
 #[test]
 fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloads() {
     use v3_core::neighborhood::recruitment_paths as recruitment;

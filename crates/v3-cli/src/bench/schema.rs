@@ -205,11 +205,44 @@ pub struct GoalIndicators {
 /// A goal-only indicator is either unavailable for a profile or carries its
 /// versioned per-seed observations. Keeping `Undefined` as the wire value
 /// preserves the established report vocabulary for deferred measurements.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+///
+/// Deserialization is hand-written rather than `#[serde(untagged)]`: the
+/// untagged derive buffers the input, and a buffered JSON object cannot parse
+/// its string keys back into integer map keys (`BTreeMap<u32, _>`), so a
+/// measured reading carrying one failed to read back. Every `T` is a struct,
+/// so a string is `Undefined` and an object is `Defined`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Indicator<T> {
     Undefined(String),
     Defined(T),
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Indicator<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::{value::MapAccessDeserializer, Error, MapAccess, Visitor};
+        use std::marker::PhantomData;
+
+        struct IndicatorVisitor<T>(PhantomData<T>);
+
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for IndicatorVisitor<T> {
+            type Value = Indicator<T>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("an undefined-indicator string or a measured reading object")
+            }
+
+            fn visit_str<E: Error>(self, value: &str) -> Result<Self::Value, E> {
+                Ok(Indicator::Undefined(value.to_owned()))
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
+                T::deserialize(MapAccessDeserializer::new(map)).map(Indicator::Defined)
+            }
+        }
+
+        deserializer.deserialize_any(IndicatorVisitor(PhantomData))
+    }
 }
 
 impl<T> Indicator<T> {
