@@ -264,10 +264,13 @@ exit: settle the bid once; actions = queue, or NoOp when empty
       `docs/progress/features/t19-f04-vote-based-action-selection.json` and
       `-goal.json`, local raw hash, byte count, and verification time checked,
       series entries point to the summaries, no full report staged. Gate
-      summary stored and series entry added; goal summary **could not be
-      generated** — the goal profile's report read-back failed
-      (`docs/progress/readings/t19-f04.md`, "Goal — failed, not stored");
-      escalated, not remediated here.
+      summary stored and series entry added; goal summary not yet stored.
+      The goal read-back failure (`docs/progress/readings/t19-f04.md`, "Goal —
+      failed, not stored") is fixed: `Indicator<T>` reads without untagged
+      buffering, so `Transitions.retained_at` integer keys parse (tests
+      `goal_reader_*` in `crates/v3-cli/tests/bench_artifacts.rs`); in-memory
+      `artifacts::summarize` over the existing raw goal report succeeds (27
+      arms). The goal run is to be repeated.
 - [x] Readings file, founder half: the one-edge census and the founder
       per-tick compute cost before and after.
 - [ ] Readings file, run half: births probe with the new classes, drift walk
