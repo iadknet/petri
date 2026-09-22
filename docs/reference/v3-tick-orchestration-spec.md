@@ -89,10 +89,12 @@ runtime backends or reproduction internals.
   -> [Phase 2: Sequential action execution]
        For each decision in queue order:
          [apply action to current world state]
-  -> [Phase 2.5: Reward-modulated learning pass]
-       For each creature with reward-modulated plasticity nodes:
+  -> [Phase 2.5: Outcome store and reward-modulated learning pass]
+       For each living creature:
          [compute OutcomeSignalBank from Phase 0 snapshot + Phase 2 outcomes]
-         [apply reward-modulated weight updates: dw = lr * outcome * trace]
+         [store it as the creature's previous outcome; newborns store zeros]
+         if it has reward-modulated plasticity nodes:
+           [apply reward-modulated weight updates: dw = lr * outcome * trace]
   -> [tick ends; newborns eligible next tick]
 ```
 
@@ -158,17 +160,23 @@ current world state, and resulting mutations persist before the next action.
 
 This is the canonical first-processed-wins model.
 
-### Phase 2.5: Reward-Modulated Learning Pass
+### Phase 2.5: Outcome Store and Reward-Modulated Learning Pass
 
-After all actions are executed, creatures with reward-modulated plasticity
-nodes receive weight updates based on tick outcomes. For each such creature:
+After all actions are executed, every living creature stores its tick
+outcome, and creatures with reward-modulated plasticity nodes receive weight
+updates based on it. For each creature:
 
 1. Compute `OutcomeSignalBank` from Phase 0 energy snapshot and Phase 2
    action results (energy delta, action success rate, damage received,
-   offspring spawned).
-2. For each reward-modulated edge, apply:
+   offspring spawned), before any reward debit.
+2. Store the bank on the creature (`CreatureState::previous_outcome`,
+   T19.F05). The next tick's sensor assembly reads it into
+   `StaticInputs::previous_outcome` for the `PreviousOutcome` input
+   (`v3-sensor-spec.md` Section 3.7). A creature born this tick has no
+   accumulator entry and stores zeros; nothing is inherited.
+3. For each reward-modulated edge, apply:
    `dw = learning_rate * outcome_signal[channel] * eligibility_trace[edge]`.
-3. Clamp updated weight to `[-weight_clamp, weight_clamp]`.
+4. Clamp updated weight to `[-weight_clamp, weight_clamp]`.
 
 Phase 0 calls `graph_runtime.begin_tick(&genome.nodes, age)` to record the
 dispatch record's age and decay initialized eligibility once; it snapshots
@@ -182,9 +190,9 @@ configured charge and work count. Clock decay initializes no weights and
 adds no charge. See the graph backend reference for the exact four activity
 rules.
 
-Creatures without reward-modulated nodes skip Phase 2.5 entirely.
-Newborns spawned during Phase 2 have no outcome accumulator entry and
-are naturally excluded.
+Creatures without reward-modulated nodes skip the reward steps (3 and 4).
+Newborns spawned during Phase 2 have no outcome accumulator entry and are
+excluded from the reward steps.
 
 ---
 

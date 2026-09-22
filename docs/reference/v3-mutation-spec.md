@@ -446,6 +446,20 @@ execute gate, and `MutateActionSlotBehavior` were deleted by T19.F04.
   becomes addressable only by a later connection operator (`AddGraphEdge` or
   `RetargetGraphEdge` on the graph backend; the VM operators that construct
   `ReadInput` on the VM backend).
+
+  The new reference is one `gen_range(0..27)` key draw (T19.F05):
+
+  | Index | Reference | Extra draw |
+  | --- | --- | --- |
+  | 0, 1 | `FoodHere`, `NeighborFoodRing` | food type, with more than one food type |
+  | 2, 3 | `NeighborBarrierRing`, `NeighborOccupiedRing` | none |
+  | 4 | `StaticIntrospection(AgeTicks)` | none |
+  | 5, 6 | `DynamicIntrospection(EnergyCurrent)`, `(EnergyConsumedThisTick)` | none |
+  | 7 | `ActionQueue` | none |
+  | 8 | `AreaFoodSummary` | food type, with more than one food type |
+  | 9 to 13 | `AreaBarrierSummary`, `NearbyCreatureCore`, `NearbyCreatureVitals`, `NearbyCreatureIdentity`, `AreaOccupancySummary` | none |
+  | 14 to 18 | `ActionVotes`, `PreviousPassVotes`, `CommitCounts`, `DynamicIntrospection(HopsThisTick)`, `PreviousOutcome` | none |
+  | 19 to 26 | `UpstreamSlot` | the slot |
 - `Prune` (T11.F22) — deletes one entry that no consumer addresses: no
   `GraphSource::InputLeaf { ref_idx }` on any edge container and no VM
   `ReadInput { ref_idx }` anywhere in the program, live or not. Higher
@@ -456,12 +470,14 @@ execute gate, and `MutateActionSlotBehavior` were deleted by T19.F04.
 - `Swap` (T11.F22) — replaces one entry with another member of its kind,
   drawn uniformly from the others. The kind is the entry's mesh read class
   (`Food`, `Barrier`, `Occupancy`, `Neighbor`, `Introspection`, `Upstream`,
-  `ActionQueue`) and compound width, so a food ring may become another type's
-  food ring, an energy scalar an age scalar, an upstream slot another slot,
+  `ActionQueue`, `Decision`) and compound width, so a food ring may become
+  another type's food ring, an energy scalar an age or hop-count scalar, an
+  upstream slot another slot, `ActionVotes` `PreviousPassVotes` and back,
   never a scalar for a ring or a barrier ring for a food ring. Rings,
-  summaries, neighbor blocks and the action queue are the only members of
-  their kind and are never swapped; typed food is swappable only with more
-  than one food type. The width never changes, so no edge falls out of range.
+  summaries, neighbor blocks, the action queue, `CommitCounts` (`Decision`,
+  width 4) and `PreviousOutcome` (`Introspection`, width 4) are the only
+  members of their kind and are never swapped; typed food is swappable only
+  with more than one food type. The width never changes, so no edge falls out of range.
   An entry keeps its kind for the node's life and its copies'.
 - `RawFieldMutation` (raw representable-field mutation for tolerant
   `UpstreamSlot(usize)` values)

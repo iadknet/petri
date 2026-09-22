@@ -205,6 +205,14 @@ If the referenced variant is `InputReference::UpstreamSlot(slot)`:
 - value is `upstream_slots[slot]` when `slot < 12`
 - otherwise `0.0`
 
+The decision-state references (T19.F05, `v3-sensor-spec.md` Sections 3.3,
+3.6, 3.7) resolve per instruction: `ActionVotes`, `PreviousPassVotes`, and
+`CommitCounts` read the mesh's vote vectors and bars as they stand at that
+`ReadInput`, `HopsThisTick` the tick's hop count; an `AddVote` earlier in the
+same dispatch is staged, not committed, so a later `ReadInput` of
+`ActionVotes` does not see it. `PreviousOutcome` reads the frozen snapshot.
+A decision compound's `sub_idx` at or past its width yields `0.0`.
+
 Invalid `ref_idx` is a soft default and yields `0.0`.
 
 ### Routing Write Semantics

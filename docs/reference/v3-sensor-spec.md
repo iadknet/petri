@@ -28,10 +28,15 @@ pub enum InputReference {
     DynamicIntrospection(DynamicIntrospectionKey),
     UpstreamSlot(usize),
     ActionQueue,
+    ActionVotes,
+    PreviousPassVotes,
+    CommitCounts,
+    PreviousOutcome,
 }
 ```
 
-All node backends consume the same `input_refs` vector.
+All node backends consume the same `input_refs` vector. The mutation draw
+covers 27 entries (`v3-mutation-spec.md`).
 
 ### Compound vs Scalar Inputs
 
@@ -49,9 +54,14 @@ Compound inputs in v3alpha1:
 - `World(NearbyCreatureCore)` — 16 sub-values
 - `World(NearbyCreatureVitals)` — 8 sub-values
 - `World(NearbyCreatureIdentity)` — 12 sub-values
+- `ActionVotes`, `PreviousPassVotes` — 27 sub-values (Section 3.6)
+- `CommitCounts` — 4 sub-values (Section 3.6)
+- `PreviousOutcome` — 4 sub-values (Section 3.7)
 
 For scalar inputs, `sub_idx` is ignored (the scalar value is returned regardless).
-For compound inputs, `sub_idx` wraps via modular arithmetic (`sub_idx % width`).
+For compound world inputs, `sub_idx` wraps via modular arithmetic
+(`sub_idx % width`); the queue and the four decision-state compounds read
+`0.0` at or past their width.
 
 ---
 
@@ -149,6 +159,9 @@ Resolved value (T17.F02):
 
 There is no generation input: a body cannot sense its ancestor count.
 
+The previous tick's outcome (`PreviousOutcome`, Section 3.7) is the other
+self-read frozen at tick start.
+
 ### 3.3 Dynamic Introspection
 
 Resolved live during mesh evaluation:
@@ -157,6 +170,7 @@ Resolved live during mesh evaluation:
 pub enum DynamicIntrospectionKey {
     EnergyCurrent,
     EnergyConsumedThisTick,
+    HopsThisTick,
 }
 ```
 
@@ -171,6 +185,10 @@ Resolved values (T17.F02), both fractions of
 The denominator travels on the sensor snapshot (`StaticInputs::max_energy`)
 from the tick loop's lifecycle config; no runtime copy of the default exists.
 
+`HopsThisTick` (T19.F05) is the raw count of mesh hops dispatched this tick,
+the dispatch in flight included (the counter rises before the dispatch). It
+ignores `sub_idx` and shares the introspection scalars' `Swap` kind.
+
 ### 3.4 Upstream Output
 
 `UpstreamSlot(slot)` reads routing-parent output slots.
@@ -183,6 +201,35 @@ If `slot >= 12`, value is `0.0`.
 - `sub_idx % 3`: `0` = action_type, `1` = param0, `2` = param1
 
 Total sub-values: `action_queue_cap * 3` (default `12`).
+
+### 3.6 Decision State (Compound, T19.F05)
+
+Corollary discharge: the mesh reads what it has decided so far this tick.
+All three resolve live at every read (read class `decision`); a new tick
+starts from zeros.
+
+| Reference | Width | Sub-value `i` | Value |
+| --- | --- | --- | --- |
+| `ActionVotes` | 27 | `VoteSink::from_index(i)` | The current pass's vote vector: the sanitized sum of every contribution committed so far this pass. A dispatch sees its own earlier contribution this pass, never the one it is staging. |
+| `PreviousPassVotes` | 27 | same | The vote vector at the previous pass's end; zeros in the tick's first pass. |
+| `CommitCounts` | 4 | `VoteKind` index (Eat, Move, Reproduce, StealEnergy) | The per-kind bar as a raw count: commits of that kind this tick. |
+
+### 3.7 Previous Outcome (Compound, T19.F05)
+
+`PreviousOutcome` is perception: the previous tick's outcome signal bank
+(`v3-tick-orchestration-spec.md`, Phase 2.5), assembled into
+`StaticInputs::previous_outcome` at tick start from the creature's store and
+never re-read during the tick. Read class `introspection`, width 4, indexed
+by `OutcomeChannel` discriminant:
+
+| `sub_idx` | Channel | Read |
+| --- | --- | --- |
+| 0 | `EnergyDelta` | `clamp(delta / max_energy, -1, 1)` |
+| 1 | `ActionSuccess` | succeeded / attempted, `0` when none attempted (`NoOp` succeeds) |
+| 2 | `DamageDelta` | `clamp(-damage / max_energy, -1, 0)` |
+| 3 | `OffspringSuccess` | offspring spawned, a raw count |
+
+A newborn reads zeros until its first full tick; nothing is inherited.
 
 ---
 
@@ -393,7 +440,8 @@ Canonical phase order remains in `v3-tick-orchestration-spec.md`.
 
 - Missing `input_refs` index: `0.0`
 - Invalid upstream slot: `0.0`
-- Compound input out-of-bounds `sub_idx`: wraps via `sub_idx % compound_width()`
+- Compound world input out-of-bounds `sub_idx`: wraps via `sub_idx % compound_width()`
+- Queue and decision-state compound at or past its width: `0.0`
 - Scalar input with any `sub_idx`: returns the scalar value (sub_idx is ignored)
 - Unknown/unsupported key variant at runtime boundary: `0.0`
 
@@ -430,8 +478,14 @@ pub struct ResolveCtx<'a> {
     pub energy: f32,
     pub energy_consumed: f32,
     pub action_queue: &'a ActionQueue,
+    pub votes: &'a VoteVector,
+    pub previous_pass_votes: &'a VoteVector,
+    pub commit_counts: &'a [u32; 4],
+    pub mesh_hops: u32,
 }
 ```
 
+The graph backend copies the vote vectors, bars, and hop count once per
+dispatch (nothing commits mid-dispatch); the VM borrows them per read.
 This struct is shared between graph evaluation and VM execution, ensuring
 consistent resolution semantics across backends.
