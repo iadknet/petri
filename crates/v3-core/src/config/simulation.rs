@@ -725,6 +725,14 @@ pub struct RuntimeConfig {
     /// Energy cost per reward-modulated weight update. Default 0.0 (free during initial rollout).
     #[serde(default)]
     pub reward_learning_cost: f32,
+    /// Free mesh hops per world tick before the per-tick hop ramp charges.
+    /// Default 32. Any value is valid; 0 ramps from the first hop.
+    #[serde(default = "default_hop_ramp_allowance")]
+    pub hop_ramp_allowance: u32,
+    /// Extra energy charged per excess hop, per hop past `hop_ramp_allowance`,
+    /// within one world tick. Default 1e-4; 0.0 disables the ramp.
+    #[serde(default = "default_hop_ramp_cost")]
+    pub hop_ramp_cost: f32,
     /// Maximum number of actions a creature can queue per turn.
     #[serde(default = "default_max_actions_per_turn")]
     pub max_actions_per_turn: usize,
@@ -736,6 +744,14 @@ pub struct RuntimeConfig {
 
 fn default_max_actions_per_turn() -> usize {
     10
+}
+
+fn default_hop_ramp_allowance() -> u32 {
+    32
+}
+
+fn default_hop_ramp_cost() -> f32 {
+    1e-4
 }
 
 fn default_action_queue_cap() -> usize {
@@ -753,6 +769,8 @@ impl Default for RuntimeConfig {
             graph_node_base_cost: 1e-5,
             plasticity_update_cost: 0.0,
             reward_learning_cost: 0.0,
+            hop_ramp_allowance: default_hop_ramp_allowance(),
+            hop_ramp_cost: default_hop_ramp_cost(),
             max_actions_per_turn: default_max_actions_per_turn(),
             vm: VmRuntimeConfig::default(),
             perception: PerceptionRuntimeConfig::default(),
@@ -1101,6 +1119,9 @@ impl SimulationConfig {
         rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 1e-5);
         rt.plasticity_update_cost = normalize_f32_finite_nonneg(rt.plasticity_update_cost, 0.0);
         rt.reward_learning_cost = normalize_f32_finite_nonneg(rt.reward_learning_cost, 0.0);
+        // Any allowance is valid (0 ramps from the first hop); only the cost
+        // needs a finite, non-negative guard, like `vm.step_ramp_cost`.
+        rt.hop_ramp_cost = normalize_f32_finite_nonneg(rt.hop_ramp_cost, default_hop_ramp_cost());
         if rt.max_actions_per_turn < 1 {
             rt.max_actions_per_turn = 10;
         }
@@ -1788,6 +1809,51 @@ mod tests {
             serde_json::from_str(r#"{"opcode_cost_multiplier": 0.5}"#).expect("vm config parses");
         assert_eq!(vm.step_ramp_allowance, 100);
         assert!((vm.step_ramp_cost - 1e-6).abs() < 1e-12);
+    }
+
+    #[test]
+    fn hop_ramp_defaults_are_the_documented_calibration() {
+        let cfg = SimulationConfig::default();
+        assert_eq!(cfg.runtime.hop_ramp_allowance, 32);
+        assert!((cfg.runtime.hop_ramp_cost - 1e-4).abs() < 1e-12);
+    }
+
+    #[test]
+    fn hop_ramp_fields_default_when_absent_from_json() {
+        let runtime: RuntimeConfig = serde_json::from_str(
+            r#"{
+                "max_mesh_hops": 1024,
+                "max_vm_steps": 10000,
+                "max_graph_relax_iters": 15,
+                "graph_convergence_epsilon": 0.001,
+                "graph_convergence_stable_passes": 2,
+                "graph_node_base_cost": 0.00001,
+                "vm": {"opcode_cost_multiplier": 0.000001}
+            }"#,
+        )
+        .expect("runtime config parses");
+        assert_eq!(runtime.hop_ramp_allowance, 32);
+        assert!((runtime.hop_ramp_cost - 1e-4).abs() < 1e-12);
+    }
+
+    #[test]
+    fn normalize_invalid_hop_ramp_cost_falls_back() {
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -1.0] {
+            let mut cfg = SimulationConfig::default();
+            cfg.runtime.hop_ramp_cost = invalid;
+            cfg.normalize();
+            assert!((cfg.runtime.hop_ramp_cost - 1e-4).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn normalize_keeps_valid_hop_ramp_settings() {
+        let mut cfg = SimulationConfig::default();
+        cfg.runtime.hop_ramp_cost = 0.0;
+        cfg.runtime.hop_ramp_allowance = 0;
+        cfg.normalize();
+        assert_eq!(cfg.runtime.hop_ramp_cost, 0.0);
+        assert_eq!(cfg.runtime.hop_ramp_allowance, 0);
     }
 
     #[test]

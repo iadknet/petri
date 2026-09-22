@@ -179,6 +179,17 @@ selection pressure rather than strict genome repair.
 
 - VM nodes: energy deducted per opcode from VM cost table.
 - Graph nodes: energy deducted per internal-node-per-visit evaluation.
+- Per-tick hop ramp (T19.F01): the k-th mesh hop of a world tick (k from 1)
+  is charged `runtime.hop_ramp_cost * max(0, k - runtime.hop_ramp_allowance)`
+  before the node is dispatched. Over n hops in a tick the ramp totals
+  `hop_ramp_cost * m * (m + 1) / 2` with `m = max(0, n - hop_ramp_allowance)`.
+  The hop index never resets within a tick and starts at 1 at every tick, so
+  sustained neural activity within one tick costs metabolism. Defaults:
+  allowance `32`, cost `1e-4`. The charge is a direct debit against the
+  creature's energy and is attributed as the `mesh_ramp` energy flow and death
+  cause. If it takes energy to `<= 0.0` the node is not dispatched, the
+  evaluation ends `EnergyExhausted`, the queue is discarded, and the creature
+  acts `NoOp`; the hop is still counted and recorded as a dispatch.
 - If energy is exhausted mid-node, evaluation halts and returns `NoOp`.
   No candidate graph temporal state/output or graph effects from the
   interrupted visit persist, including plasticity-cost exhaustion. Actual

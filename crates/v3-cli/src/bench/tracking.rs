@@ -132,6 +132,9 @@ pub struct EnergyFlowTracking {
     pub vm_compute: String,
     pub priority_bid: String,
     pub graph_compute: String,
+    /// Per-tick hop ramp (T19.F01); absent from reports stored before it.
+    #[serde(default)]
+    pub mesh_ramp: String,
     pub hebbian_learning: String,
     pub reward_learning: String,
     pub lifecycle_decay: String,
@@ -163,6 +166,7 @@ impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTr
             vm_compute: six(flows.vm_compute),
             priority_bid: six(flows.priority_bid),
             graph_compute: six(flows.graph_compute),
+            mesh_ramp: six(flows.mesh_ramp),
             hebbian_learning: six(flows.hebbian_learning),
             reward_learning: six(flows.reward_learning),
             lifecycle_decay: six(flows.lifecycle_decay),

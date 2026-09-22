@@ -33,7 +33,7 @@ cycles, so the gate and goal trajectories are unchanged by construction.
 Sources of truth: the track row and its "Scope, T19.F01", "Decomposition
 rules", and "Epochs" notes; the review note's Sections 1.2 and 2.5
 ([mesh action-selection review](../../strategy/mesh-action-selection-review-2026-09-20.md));
-the executor loop `execute_creature_mesh_where` in
+the executor loop `execute_creature_mesh_impl` in
 `crates/v3-core/src/runtime/mesh.rs`; the VM ramp `step_charge` in
 `crates/v3-core/src/runtime/vm.rs`; `RuntimeConfig` in
 `crates/v3-core/src/config/simulation.rs`; energy accounting in
@@ -80,7 +80,7 @@ resets per dispatch; the hop index is per tick.
    constants are the spec's calibration and T19.F02 re-reads them when it
    chooses the per-pass cap; it does not change them silently.
 3. **Where.** The charge is applied once per dispatch in the shared executor
-   loop (`execute_creature_mesh_where`), in this order: hop-cap check;
+   loop (`execute_creature_mesh_impl`), in this order: hop-cap check;
    `mesh_hops` increment and `record_dispatch` (both unchanged, so an
    unaffordable hop is counted and recorded exactly as a VM node that
    exhausts on its first instruction is today); the ramp debit and its
@@ -90,7 +90,12 @@ resets per dispatch; the hop index is per tick.
    `ComputeCostReport.vm_cost` and `graph_cost` keep their meaning. Every
    execution mode (production, observed, traced) charges identically because
    the loop is shared; in a trace the ramp is the gap between one hop's
-   `energy_after` and the next hop's `energy_before`, not a per-hop field.
+   `energy_after` and the next hop's `energy_before`, not a per-hop field. A
+   hop that exhausts on the ramp never reaches `execute_node`, so it has no
+   entry in the trace's hop list (that list holds executed dispatches); it is
+   identified by the traced output's `EnergyExhausted` termination, the
+   `mesh_ramp` observation, and the `mesh_hops` counter exceeding the hop
+   list by one. No synthetic trace entry is invented for it.
    The charge is a direct `f32` debit against the creature's energy, the same
    accounting as `graph_node_base_cost`: at the defaults every non-zero charge
    is at least `1e-4`, above the ulp of any energy up to `max_energy` 200, so
@@ -110,6 +115,10 @@ resets per dispatch; the hop index is per tick.
    gains `mesh_ramp_cost`, included in the tick's total compute-cost telemetry.
    The `applied-energy-flows-v1` and `applied-mortality-v1` definitions are
    unchanged: a new key is additive and the pinned key list is extended.
+   T14.F03's "exactly the flow fields in the table" describes that closure's
+   report, not a freeze; every existing key keeps its meaning, and a stored
+   report without `mesh_ramp` reads as zero (`#[serde(default)]`), which is
+   true of it because the sink did not exist.
 6. **Founder and trajectory neutrality.** With the allowance above every
    measured chain, the production charge is zero for every creature-tick of
    the gate and goal profiles. The founder-only trajectory digest pinned by
@@ -131,28 +140,54 @@ resets per dispatch; the hop index is per tick.
 
 ## Implementation Tasks
 
-- [ ] `RuntimeConfig` fields, defaults, serde defaults, normalization, and
+- [x] `RuntimeConfig` fields, defaults, serde defaults, normalization, and
       config tests (`crates/v3-core/src/config/simulation.rs`).
-- [ ] Charge in `execute_creature_mesh_where` per invariants 1, 3, and 4;
-      `DeathCause::MeshRamp`; `mesh_ramp` on the observation, flows, tracking,
-      and `ComputeCostReport` (invariant 5).
-- [ ] Tests first (TDD): the k-th hop charge and the closed form as a
-      property test; allowance neutrality (a chain at the allowance pays zero;
-      the founder pays zero); exhaustion on the ramp ends as `NoOp` with cause
-      `mesh_ramp` and no dispatch of the unaffordable node; production,
-      observed, and traced modes agree; flow and mortality keys.
-- [ ] Reference docs and the frontend config type per invariant 8.
+- [x] Charge in the shared executor loop `execute_creature_mesh_impl`
+      (`crates/v3-core/src/runtime/mesh.rs`) per invariants 1, 3, and 4, via the pure
+      `hop_charge(k, allowance, cost)`; `DeathCause::MeshRamp`; `mesh_ramp` on
+      the observation, flows, tracking, and `ComputeCostReport` (invariant 5).
+- [x] Tests first (TDD): the k-th hop charge and the closed form as property tests;
+      allowance neutrality (a chain at the allowance pays zero; the founder
+      pays zero); exhaustion on the ramp ends as `NoOp` with cause `mesh_ramp`
+      and no dispatch of the unaffordable node; production, observed, and
+      traced modes agree; flow and mortality keys.
+- [x] Reference docs and the frontend config type per invariant 8.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first (tick-loop mechanics
-      change), then `make check` -> result recorded here.
-- [ ] Focused tests: the `hop_ramp` tests in `crates/v3-core/src/runtime/`
-      (formula, closed-form property, neutrality, exhaustion, mode agreement)
-      and the energy-accounting tests for `mesh_ramp` -> names and result
-      recorded here.
-- [ ] Founder digest pin `founder_only_trajectory_digest_is_pinned` passes
-      unchanged (`5ad9e8e1484792ab566c8ecac7466fffac3bb2b92bb4dd72e9ce7cb49ade36a9`).
+- [x] Viability — founder survival and tick-loop soundness under the ramp:
+      `cargo test -p v3-core --test viability`, 28 passed, 0 failed.
+- [ ] Whole-repo gate (Rust, frontend, docs): `make check`, run by the
+      orchestrator.
+- [x] Charge shape, invariants 1–5, in `crates/v3-core/src/runtime/mesh.rs`:
+      the charge is zero inside the allowance and linear past it
+      (`hop_charge_is_zero_inside_the_allowance_and_linear_past_it`) and a tick
+      of `n` hops totals the closed form
+      (`hop_ramp_total_over_a_tick_is_the_closed_form`), both proptests; a chain
+      at the allowance pays nothing (`hop_ramp_charges_only_past_the_allowance`);
+      the founder pays zero at the production defaults
+      (`founder_pays_no_hop_ramp_at_the_production_defaults`); an unaffordable
+      charge ends the tick as `NoOp`/`EnergyExhausted` with the hop counted and
+      the node never dispatched
+      (`hop_ramp_exhaustion_ends_the_tick_as_noop_before_dispatch`); production,
+      observed, and traced execution agree on energy, counters, observation, and
+      `mesh_ramp_cost` (`hop_ramp_agrees_across_execution_modes`).
+- [x] Accounting surfaces (invariant 5): the `mesh_ramp` cause key, its schema
+      slot, and flow accumulation in
+      `crates/v3-core/src/simulation/energy_accounting.rs`; the stored JSON key
+      in `crates/v3-cli/src/bench/tracking/tests.rs`; flow totals still summed in
+      dispatch order in
+      `dispatch_float_totals_follow_priority_queue_order_without_preaggregation`
+      (`crates/v3-core/src/simulation/tick/tests/energy_accounting.rs`).
+- [x] Config contract — defaults, serde defaults when the fields are absent, the
+      normalization fallback for an invalid cost, and a valid zero cost and zero
+      allowance preserved: the four hop-ramp tests in
+      `crates/v3-core/src/config/simulation.rs`.
+- [x] Founder trajectory unchanged: `founder_only_trajectory_digest_is_pinned`
+      on `5ad9e8e1484792ab566c8ecac7466fffac3bb2b92bb4dd72e9ce7cb49ade36a9`.
+- [x] Suites and lints: `cargo test -p v3-core` 1635 + 91 passed, 0 failed;
+      `cargo test -p v3-cli --lib` 120 passed, 0 failed; `cargo clippy --workspace --all-targets` and `cargo fmt --all
+      --check` clean.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Benchmark summaries stored at

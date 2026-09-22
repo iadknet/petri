@@ -136,8 +136,9 @@ These were replaced by unified `ReadInput` + `InputReference` dataflow and
   allowance also pay a charge that rises linearly with the step index, so a
   dispatch that runs to `max_vm_steps` costs a lethal share of a creature's
   energy while ordinary programs and short bounded loops stay nearly free. The
-  ramp index resets at every node dispatch; the mesh hop cap and the single-visit
-  rule bound the chain. Formula and constants: Section 6.
+  ramp index resets at every node dispatch; the mesh hop cap, the single-visit
+  rule, and the per-tick hop ramp (`v3-mesh-execution-spec.md` Section 5) bound
+  the chain. Formula and constants: Section 6.
 - A dispatch accumulates its opcode and ramp charges locally and subtracts the
   sum from the creature's energy exactly once, on whichever exit path ends it.
   Mid-dispatch, the creature's effective energy is its energy minus that

@@ -15,6 +15,20 @@ use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::perception::SensorSnapshot;
+use crate::simulation::energy_accounting::{applied_debit, observe_energy_change, DeathCause};
+
+/// Energy charged for the `k`-th mesh hop of a world tick (`k` from 1): zero
+/// while the tick stays within `allowance`, then rising linearly with the hop
+/// index. Over `n` hops the ramp totals `cost * m * (m + 1) / 2` with
+/// `m = max(0, n - allowance)`.
+///
+/// The index never resets within a tick and starts at 1 at every tick, which is
+/// what separates this charge from the VM's per-dispatch step ramp (T03.F10).
+#[inline]
+#[must_use]
+fn hop_charge(k: u32, allowance: u32, cost: f32) -> f32 {
+    cost * k.saturating_sub(allowance) as f32
+}
 
 /// Execute the creature's mesh chain within the current tick, returning a [`MeshOutput`]
 /// containing the queued actions, a [`ComputeCostReport`], and the priority bid.
@@ -301,13 +315,45 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
         let node = &genome.nodes[current_idx];
         visited.insert(node.node_id);
 
-        let energy_consumed = (start_energy - *energy).max(0.0);
-
         // One mesh hop is one node dispatch, counted regardless of outcome.
         side_outputs.work_counters.mesh_hops += 1;
         // Same event, recorded for the offspring's mutation targeting (T11.F17).
         // Written from the shared loop, so every execution mode agrees.
         graph_runtime.dispatch_record.record_dispatch(current_idx);
+
+        // Per-tick hop ramp (T19.F01): sustained neural activity costs
+        // metabolism. Charged before the dispatch, so an unaffordable hop is
+        // counted and recorded but never executed.
+        let ramp_charge = hop_charge(
+            side_outputs.work_counters.mesh_hops,
+            config.hop_ramp_allowance,
+            config.hop_ramp_cost,
+        );
+        if ramp_charge > 0.0 {
+            let before = *energy;
+            *energy -= ramp_charge;
+            side_outputs.energy_observation.mesh_ramp += applied_debit(before, *energy);
+            report.mesh_ramp_cost += (before - *energy).max(0.0);
+            observe_energy_change(
+                &mut side_outputs.energy_observation.pending_cause,
+                f64::from(before),
+                f64::from(*energy),
+                DeathCause::MeshRamp,
+            );
+            if *energy <= 0.0 {
+                let output = MeshOutput {
+                    actions: vec![WorldAction::NoOp],
+                    cost_report: report,
+                    priority_bid: side_outputs.priority_bid,
+                    work_counters: side_outputs.work_counters,
+                    energy_observation: side_outputs.energy_observation,
+                    termination_reason: TerminationReason::EnergyExhausted,
+                };
+                return mode.finish(output);
+            }
+        }
+
+        let energy_consumed = (start_energy - *energy).max(0.0);
 
         // Snapshot energy before node dispatch to attribute cost to the correct backend.
         let node_energy_before = *energy;
@@ -1363,5 +1409,209 @@ mod tests {
             output.work_counters,
             crate::runtime::types::WorkCounters::default()
         );
+    }
+
+    // ── T19.F01: per-tick hop ramp ───────────────────────────────────────────
+
+    /// A forward chain of halting nodes: node `i` routes to node `i + 1`, and
+    /// the last node has no target, so the evaluation runs exactly `len` hops.
+    fn halting_chain(len: usize) -> CreatureGenome {
+        let nodes = (0..len)
+            .map(|i| {
+                let targets = if i + 1 < len {
+                    vec![NodeId::new(i as u32 + 1)]
+                } else {
+                    vec![]
+                };
+                vm_halt_with_route(NodeId::new(i as u32), 1.0, targets)
+            })
+            .collect();
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes,
+        }
+    }
+
+    fn run_chain(genome: &CreatureGenome, config: &RuntimeConfig, energy: &mut f32) -> MeshOutput {
+        execute_creature_mesh(
+            genome,
+            &empty_sensor_snapshot(),
+            energy,
+            &mut [0.0; 16],
+            &[0.0; 16],
+            &mut GraphRuntimeState::new(),
+            config,
+        )
+    }
+
+    proptest::proptest! {
+        /// Hop `k` pays nothing inside the allowance and `cost * (k - allowance)`
+        /// past it, with the saturation at the boundary derived independently.
+        #[test]
+        fn hop_charge_is_zero_inside_the_allowance_and_linear_past_it(
+            k in 1u32..4096,
+            allowance in 0u32..4096,
+            cost in 0.0f32..1.0,
+        ) {
+            let excess = (k.max(allowance) - allowance) as f32;
+            proptest::prop_assert_eq!(hop_charge(k, allowance, cost), cost * excess);
+            if k <= allowance {
+                proptest::prop_assert_eq!(hop_charge(k, allowance, cost), 0.0);
+            }
+            proptest::prop_assert!(hop_charge(k + 1, allowance, cost) >= hop_charge(k, allowance, cost));
+        }
+
+        /// A tick of `n` hops owes the closed form `cost * m * (m + 1) / 2`
+        /// with `m = max(0, n - allowance)`. Asserted at unit cost, where every
+        /// term and the sum are exact in `f32`.
+        #[test]
+        fn hop_ramp_total_over_a_tick_is_the_closed_form(
+            n in 0u32..2048,
+            allowance in 0u32..2048,
+        ) {
+            let summed: f32 = (1..=n).map(|k| hop_charge(k, allowance, 1.0)).sum();
+            let m = f64::from(n.saturating_sub(allowance));
+            proptest::prop_assert_eq!(f64::from(summed), m * (m + 1.0) / 2.0);
+        }
+    }
+
+    /// A chain no longer than the allowance pays nothing, and the charge starts
+    /// on the first hop past it.
+    #[test]
+    fn hop_ramp_charges_only_past_the_allowance() {
+        let genome = halting_chain(4);
+        for (allowance, expected_hops_charged) in [(4u32, 0u32), (3, 1), (2, 3), (0, 10)] {
+            let config = RuntimeConfig {
+                hop_ramp_allowance: allowance,
+                hop_ramp_cost: 0.25,
+                ..default_config()
+            };
+            let mut energy = 100.0f32;
+            let output = run_chain(&genome, &config, &mut energy);
+            assert_eq!(output.work_counters.mesh_hops, 4, "allowance {allowance}");
+            let expected = 0.25 * f64::from(expected_hops_charged);
+            assert_eq!(
+                output.energy_observation.mesh_ramp, expected,
+                "allowance {allowance}"
+            );
+            assert_eq!(
+                f64::from(output.cost_report.mesh_ramp_cost),
+                expected,
+                "allowance {allowance}"
+            );
+        }
+    }
+
+    /// The production defaults leave the founder cost-free: it runs two hops,
+    /// far inside the 32-hop allowance.
+    #[test]
+    fn founder_pays_no_hop_ramp_at_the_production_defaults() {
+        let genome = crate::creature::founder::v3alpha1_founder_genome();
+        let config = default_config();
+        assert_eq!(config.hop_ramp_allowance, 32);
+        let mut energy = 100.0f32;
+        let output = run_chain(&genome, &config, &mut energy);
+        assert!(
+            output.work_counters.mesh_hops <= config.hop_ramp_allowance,
+            "founder hops {} must stay inside the allowance",
+            output.work_counters.mesh_hops
+        );
+        assert_eq!(output.energy_observation.mesh_ramp, 0.0);
+        assert_eq!(output.cost_report.mesh_ramp_cost, 0.0);
+    }
+
+    /// An unaffordable ramp charge ends the tick before the node runs: the hop
+    /// is counted, nothing is dispatched, and the creature acts `NoOp`.
+    #[test]
+    fn hop_ramp_exhaustion_ends_the_tick_as_noop_before_dispatch() {
+        let genome = halting_chain(2);
+        let config = RuntimeConfig {
+            hop_ramp_allowance: 0,
+            hop_ramp_cost: 10.0,
+            ..default_config()
+        };
+        let mut energy = 5.0f32;
+        let mut memory = [0.5f32; 16];
+        let mut state = GraphRuntimeState::new();
+        let output = execute_creature_mesh(
+            &genome,
+            &empty_sensor_snapshot(),
+            &mut energy,
+            &mut memory,
+            &[0.0; 16],
+            &mut state,
+            &config,
+        );
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
+        assert!(matches!(
+            output.termination_reason,
+            TerminationReason::EnergyExhausted
+        ));
+        assert_eq!(
+            output.energy_observation.pending_cause,
+            Some(crate::simulation::energy_accounting::DeathCause::MeshRamp)
+        );
+        assert_eq!(
+            output.work_counters.mesh_hops, 1,
+            "the hop is still counted"
+        );
+        assert_eq!(
+            output.work_counters.vm_steps, 0,
+            "the node never dispatched"
+        );
+        assert_eq!(memory, [0.5f32; 16], "no node ran, so memory is untouched");
+        assert_eq!(energy, -5.0);
+        assert_eq!(output.energy_observation.mesh_ramp, 10.0);
+        assert_eq!(output.cost_report.mesh_ramp_cost, 10.0);
+    }
+
+    /// Production, observed, and traced execution charge the ramp identically,
+    /// because the charge sits in the shared loop.
+    #[test]
+    fn hop_ramp_agrees_across_execution_modes() {
+        let genome = halting_chain(4);
+        let config = RuntimeConfig {
+            hop_ramp_allowance: 1,
+            hop_ramp_cost: 0.5,
+            ..default_config()
+        };
+        for starting_energy in [0.4f32, 1.6, 100.0] {
+            let mut plain_energy = starting_energy;
+            let mut observed_energy = starting_energy;
+            let mut traced_energy = starting_energy;
+            let plain = run_chain(&genome, &config, &mut plain_energy);
+            let (observed, _) = execute_creature_mesh_impl(
+                &genome,
+                &empty_sensor_snapshot(),
+                &mut observed_energy,
+                &mut [0.0; 16],
+                &[0.0; 16],
+                &mut GraphRuntimeState::new(),
+                &config,
+                ObservedMeshExecution::default(),
+            );
+            let (traced, _, _) = crate::runtime::traced_mesh::execute_creature_mesh_traced(
+                &genome,
+                &empty_sensor_snapshot(),
+                &mut traced_energy,
+                &mut [0.0; 16],
+                &[0.0; 16],
+                &mut GraphRuntimeState::new(),
+                &config,
+            );
+            for other in [&observed, &traced] {
+                assert_eq!(plain.actions, other.actions);
+                assert_eq!(plain.work_counters, other.work_counters);
+                assert_eq!(plain.energy_observation, other.energy_observation);
+                assert_eq!(
+                    plain.cost_report.mesh_ramp_cost,
+                    other.cost_report.mesh_ramp_cost
+                );
+                assert_eq!(plain.termination_reason, other.termination_reason);
+            }
+            assert_eq!(plain_energy, observed_energy);
+            assert_eq!(plain_energy, traced_energy);
+            assert!(plain.cost_report.mesh_ramp_cost > 0.0);
+        }
     }
 }

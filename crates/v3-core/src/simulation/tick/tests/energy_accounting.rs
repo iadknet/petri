@@ -385,6 +385,7 @@ fn dispatch_float_totals_follow_priority_queue_order_without_preaggregation() {
         output.priority_bid = bid;
         output.energy_observation.vm_compute = flow;
         output.energy_observation.graph_compute = flow;
+        output.energy_observation.mesh_ramp = flow;
         output.energy_observation.hebbian_learning = flow;
         output.energy_observation.priority_bid = flow;
         decisions.push((ids[index], output));
@@ -400,6 +401,7 @@ fn dispatch_float_totals_follow_priority_queue_order_without_preaggregation() {
     for total in [
         f.vm_compute,
         f.graph_compute,
+        f.mesh_ramp,
         f.hebbian_learning,
         f.priority_bid,
     ] {
