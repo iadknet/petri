@@ -61,7 +61,7 @@ Transport posture note:
 
 | Key | Type | Default | Constraint / normalization | Used by |
 | --- | --- | --- | --- | --- |
-| `runtime.max_mesh_hops` | `u32` | `64` | Must be `>= 1`; invalid values fall back to `64`. Per-pass hop cap (T19.F02): a pass dispatches at most this many mesh nodes, revisits included; reaching it ends the pass `MaxHopsReached` with the queue kept and counts one `pass_cap_hits`. | `v3-mesh-execution-spec.md` |
+| `runtime.max_mesh_hops` | `u32` | `64` | Must be `>= 1`; invalid values fall back to `64`. Per-pass hop cap (T19.F02): a pass dispatches at most this many mesh nodes, revisits included; reaching it ends the pass `PassCapReached` with the votes and queue kept and counts one `pass_cap_hits` (T19.F04 names the pass reason). | `v3-mesh-execution-spec.md` |
 | `runtime.max_actions_per_turn` | `usize` | `10` | Must be `>= 1`; invalid values fall back to `10`. Upper bound on queued actions returned from one mesh evaluation. | `v3-mesh-execution-spec.md`, `v3-graph-backend-spec.md`, `v3-vm-isa-spec.md` |
 | `runtime.max_vm_steps` | `u32` | `10000` | Must be `>= 1`; invalid values fall back to `10000`. | `v3-vm-isa-spec.md` |
 | `runtime.graph_node_base_cost` | `f32` | `1e-5` | Must be `>= 0.0`; invalid values fall back to `1e-5`. | `v3-graph-backend-spec.md` |

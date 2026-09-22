@@ -161,10 +161,11 @@ Founder identity state semantics remain owned by
 
 ### 5.1 Canonical v3alpha1 Founder Genome
 
-The founder genome is a 2-node mesh with both backend types. The graph backend
-uses the CGP-style layered model (see `v3-graph-backend-spec.md`).
-The founder reproduction gate is derived from runtime config
-`energy.lifecycle.min_reproduce_age` (default `20` ticks).
+The founder genome is a 2-node mesh of two Graph nodes (T19.F04; node 1 was a
+VM before), using the CGP-style layered model (see
+`v3-graph-backend-spec.md`). Its `genome_size()` is 97 units
+(`FOUNDER_GENOME_SIZE_UNITS`). The founder reproduction gate is derived from
+runtime config `energy.lifecycle.min_reproduce_age` (default `20` ticks).
 
 **Structural layout:**
 
@@ -185,19 +186,32 @@ strict energy `Threshold` (a fraction of `max_energy`, the scale
 every integer age while `min_reproduce_age <= age_reference_ticks`), and
 Multiply of
 those gates. Six custom outputs carry food here,
-can-reproduce, and N/E/S/W primary food. Other output sinks, action bank, and
-execute gate remain unwired. The graph routes to node 1 in slot 0.
+can-reproduce, and N/E/S/W primary food. Its other output sinks remain
+unwired. The graph routes to node 1 in slot 0.
 
-**Node 1 — VM backend (decision and action emitter)**
+**Node 1 — Graph backend (decision by votes)**
 
-The VM reads those six outputs. It uses the ordinary mutable program, metadata,
-PushAction, and ExecuteActionQueue; registers 16–19 remain unreferenced.
+Node 1 reads node 0's six slots (`UpstreamSlot(0..6)`) and the
+`ActionQueue` compound input (reference 6) and votes; it has no route target,
+so every pass ends at it (`NoTargets`). With `f = [food_here > 0]`, `can`
+the reproduce gate (slot 1), `ring[d]` the cardinal food slots,
+`q = [queue slot 0 holds a Reproduce]` (built as
+`Threshold(2.5) - Threshold(3.5)` on the slot's action type), and the
+profile's reproduce gate `g` (`can` for V3Alpha1; `can · (1 - f)`, built as
+`Threshold(0.5)` over `can - f`, for the ForageFirst profiles):
+
+| Sink | Vote |
+| --- | --- |
+| `Eat` | `f - 2g - 2q` (V3Alpha1) or `1 - 2g - 2q` (ForageFirst) |
+| `Move[d]`, `d` in N, E, S, W | `0.5 + 0.4·ring[d] - 2g - 2q` |
+| `Reproduce[d]`, `d` in N, E, S, W | `g·(0.5 + 0.4·ring[d])` |
+| `Terminate` | `q` |
+| `ActionParam(Reproduce, 1)` | the profile's transfer fraction (a `Constant` node) |
 
 `population.founder_profile` selects one row below by wire name. A profile
 changes only the strict energy threshold in Node 0 and the priority and
-transfer fraction (VM constant index 5, written to `meta[1]` of the reproduce
-action as the share of the parent's post-cost energy the child starts with)
-in Node 1; the 2-node mesh, its input references, compute nodes, and output
+transfer fraction (the `Constant` wired into `ActionParam(Reproduce, 1)`, the
+share of the parent's post-cost energy the child starts with) in Node 1; the 2-node mesh, its input references, compute nodes, and output
 wiring are shared by every profile. The energy threshold is the founder's own
 constant on the unit scale (it gates on fullness and is not recomputed from
 `max_energy`); at the default `max_energy` (200) each sits at least 2.0 above
@@ -215,21 +229,22 @@ gate (`v3-runtime-config-spec.md` Section 4).
 | ForageFirstSparseRichOffspring | `forage_first_sparse_rich_offspring` | 0.20 | 40 | 0.60 | Local forage, Reproduce, forage fallback |
 | ForageFirstSparseBalanced | `forage_first_sparse_balanced` | 0.25 | 50 | 0.45 | Local forage, Reproduce, forage fallback |
 
-Local forage requires positive primary food and queues Eat(type 0), then Move.
-Forage-first fallback also queues Eat then Move on an empty cell, retaining
-normal failed-Eat accounting. Canonical fallback queues Move alone.
-Reproduction requires both graph gates and queues one Reproduce.
-
-Every Move and Reproduce chooses the full primary-food cardinal maximum with
-N/E/S/W tie order and direction metadata 0/2/4/6. This retains the corrected
-selector instead of the historical adjacent-pair heuristic. PushAction captures
-Eat's type 0 before Move overwrites direction metadata. Each branch executes
-its queue once; capacity one retains Eat. No second food type is read.
+The votes act as the truth table under the pass loop
+(`v3-mesh-execution-spec.md` Section 2): with food and no reproduce gate the
+tick commits `Eat` then the best `Move` (pass 3 ends `NoDecision`); without
+food, `Move` alone (V3Alpha1; the ForageFirst profiles still commit `Eat`
+first, retaining normal failed-Eat accounting); with the gate open, one
+`Reproduce`, after which `q` suppresses every other vote and the next pass
+ends the tick. Every `Move` and `Reproduce` takes the full primary-food
+cardinal maximum with N/E/S/W tie order (the lowest-index argmax over sinks
+`0, 2, 4, 6`); `Eat` reads type 0 (its parameter is unwired). With
+`max_actions_per_turn = 1` the first commit ends the tick, so capacity one
+keeps `Eat`. No second food type is read.
 
 **Determinism note:** The founder genome structure above is canonical for
 v3alpha1 seeding. The exact bytewise encoding is an implementation detail, but
 the structural layout (node count, node IDs, input_refs, compute nodes,
-output sink wiring, VM instruction sequence, and constants) must be identical
+output sink wiring, and constants) must be identical
 across implementations for deterministic seeding with the same seed.
 
 ---

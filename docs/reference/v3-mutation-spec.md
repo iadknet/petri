@@ -112,7 +112,7 @@ Topology connection semantics (T11.F15, T11.F18):
   and writes the branch's free gate slot in the same event. Graphs gain one
   weight-1 edge from `random_graph_source` (including full sensor sub-values).
   VMs gain a `WriteRouteGate` from a uniformly sampled existing register before
-  the first Halt/ExecuteActionQueue or at the end, with reference repair.
+  the first `Halt` or at the end, with reference repair.
   Missing gate sinks, zero-register VMs and failed insertion skip atomically.
   Existing orphan gate writes remain. Equal bids retain the old earlier target;
   a varying new bid can immediately select the equivalent detour.
@@ -160,14 +160,10 @@ Topology connection semantics (T11.F15, T11.F18):
 ### VM domain
 
 - `VmInstructionMutation` (insert/delete/replace opcode, mutate operands);
-  the fresh-instruction draw is uniform over the 42 drawable opcodes, which
-  includes `WriteDirectionBid { direction in 0..8, src }` (T11.F21), and the
-  operand nudge moves its `direction` or `src`; the ISA's 43rd opcode
-  `AddVote` (T19.F03) is never drawn, so no evolved program carries one until
-  T19.F04 lifts the exclusion; a new `PushAction` draws
-  `action_type` in `0..=4`, the range
-  `decode_world_action` admits (T13.F05); existing values above 4 stay in
-  the genome and the raw-field unit step is unchanged
+  the fresh-instruction draw is uniform over all 39 opcodes (T19.F04), which
+  include `AddVote { sink in 0..27, src }` (the sink drawn uniformly over the
+  vote catalog) and `WriteActionParam { slot_idx in 0..8, src }`; the operand
+  nudge moves an `AddVote`'s `sink` or `src`
 - `VmConstantMutation` — one constant `c` of the pool, drawn uniformly, moves
   by `u × max(|c|, 1)` with `u` uniform in [−0.1, 0.1] (the graph parameter
   step; T11.F23): a unit-scale constant moves as a graph parameter does, a
@@ -225,13 +221,13 @@ VM structural-edit contract:
   `VmCopyGeneForwardSlice` place their copy in a dormant span at the program
   tail (T11.F08). Every surviving jump keeps its old resolved target through
   the repair above, so nothing outside the span jumps into it; when the
-  program's last instruction is neither `Halt` nor `ExecuteActionQueue`, a
+  program's last instruction is not `Halt`, a
   newly authored `Halt` guard is spliced immediately before the copied span in
   the same event, so fall-through halts exactly where running past the old
   program's end used to halt. A later jump mutation — an offset stepped by one
   unit, or an inserted or replaced jump — is the only way the span becomes
   reachable, short of a mutation removing or replacing the guard or the
-  program's final terminal, and it then runs in its original's place. Neutrality here is
+  program's final `Halt`, and it then runs in its original's place. Neutrality here is
   behavioral and holds under ample budget: executing the guard costs one
   `Halt` step, and the longer program can reach the step cap or exhaust energy
   where the original did not.
@@ -333,23 +329,21 @@ does not extend to energy exhaustion.
 ### Graph domain
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
-(output sinks, action bank, execute gate) are never added/removed/retyped —
-only their edges are evolvable.
+(the 99 output sinks, vote and parameter sinks included) are never
+added/removed/retyped — only their edges are evolvable. The action bank, the
+execute gate, and `MutateActionSlotBehavior` were deleted by T19.F04.
 
-- `AlterGraphEdgeWeight` (all 6 edge-bearing surfaces: compute inputs, sink
-  inputs, action gate, action param, action direction bank (T11.F21), execute
-  gate)
+- `AlterGraphEdgeWeight` (both edge-bearing surfaces: compute inputs and sink
+  inputs)
 - `SwapGraphOperator` (compute nodes only, 17 `ComputeNodeKind` variants)
 - `MutateGraphOperatorParam` (compute params: Constant, Threshold,
   DecayIntegrator, Momentum, Oscillator)
-- `MutateActionSlotBehavior` (mutates `action_bank[i].behavior` between `Pop`
-  and `Emit(WorldActionKind)` variants)
 - `AddComputeNode(kind)` — a growth operator; draws one of three
   function-preserving forms with equal probability: (a) disconnected, a
   random kind appended with no inputs; (b) bootstrap, a random kind appended
   with one input edge from `random_graph_source`, read by no surface; (c)
-  split, a NEAT-style insertion into one existing edge (any of the six
-  surfaces, source any `GraphSource`) with an identity `Add` node whose
+  split, a NEAT-style insertion into one existing edge (either surface,
+  source any `GraphSource`) with an identity `Add` node whose
   single input (weight 1.0) reproduces the split edge's prior source exactly
   in f32 (the new node's output passes through `sanitize_output` like every
   compute node's, so exact reproduction holds for values already within its
@@ -357,10 +351,10 @@ only their edges are evolvable.
   old weight. The split draws from the splittable edges only. When the split
   edge's consumer is a compute node at index `c`,
   the new node is inserted at index `c` and every `ComputeNode(i >= c)`
-  reference is remapped to `i + 1` across all six surfaces
+  reference is remapped to `i + 1` across both surfaces
   (`CgpGraphBackendDef::insert_compute_node_at`, the insert-with-remap
   inverse of `remove_compute_node_at`), preserving Gauss-Seidel pass order; a
-  sink/action/execute-gate consumer appends instead. A split of a backward or
+  sink consumer appends instead. A split of a backward or
   self edge delays that edge's value by one visit. An edge whose source
   is an out-of-range `ComputeNode` (a prior removal's sentinel) is not
   splittable and is excluded from the draw; when the graph has no splittable
@@ -368,7 +362,7 @@ only their edges are evolvable.
   other two forms, both of which apply to any graph.
   **Split exclusion** (T11.F08, replacing T11.F03's documented exception): an
   edge is also unsplittable when the graph carries plasticity, the edge's
-  consumer is a sink, action slot, or execute gate, and its source is an
+  consumer is a sink, and its source is an
   `InputLeaf` resolving to
   `DynamicIntrospection(EnergyCurrent)`. An identity node between them caches
   the value during evaluation, while the direct edge resolves it in the
@@ -382,19 +376,17 @@ only their edges are evolvable.
   split's neutrality property holds unconditionally.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
-- `AddGraphEdge` (all 6 edge-bearing surfaces, `pick_random_surface` uniform
-  over one surface per compute node and per sink whose kind is neither
-  `ActionVote` nor `ActionParam` (T19.F03 excludes both by kind, so the
-  surface list and every draw are what they were with 64 sinks), three per
-  action slot (gate, param, direction bank), and the execute gate; a direction-bank edge draws
-  its `direction` uniformly in `0..8`; source sampled by
+- `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` uniform
+  over one surface per compute node and one per sink, all 99 sinks including
+  the 27 vote and 8 parameter sinks (T19.F04 lifted T19.F03's exclusion);
+  source sampled by
   `random_graph_source`, which draws a compound `InputLeaf` source's
   `sub_idx` uniformly across the reference's full width via
   `mutation::compound::sub_value_count`, so new edges can reach every
   sub-value, not just index 0)
-- `RetargetGraphEdge` (all 6 edge-bearing surfaces; same `sub_idx` sampling
+- `RetargetGraphEdge` (both edge-bearing surfaces; same `sub_idx` sampling
   as `AddGraphEdge`)
-- `RemoveGraphEdge` (all 6 edge-bearing surfaces)
+- `RemoveGraphEdge` (both edge-bearing surfaces)
 - `GraphRawFieldMutation` — selects one parameterized compute node or one
   edge uniformly, then changes exactly one field by one unit and never
   replaces the `GraphSource` variant: a parameter by the existing
@@ -403,9 +395,7 @@ only their edges are evolvable.
   `0..input_refs.len()`, offered only when the current `sub_idx` stays within
   the candidate reference's width; `InputLeaf.sub_idx` by ±1 inward within the
   reference's width; `SharedMemory.slot` by ±1 modulo 16; `SharedMemory.previous`
-  flipped; a direction-bank edge's `direction` by ±1 inward within `0..8`
-  (one more one-unit field beside its source moves; a `direction >= 8` edge
-  offers no direction move). Edges with no valid unit move are excluded from
+  flipped. Edges with no valid unit move are excluded from
   the draw, so the
   operator selects only a module that has a parameterized compute node or a
   movable edge, and never skips after selecting one.
