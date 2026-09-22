@@ -579,3 +579,29 @@ fn predation_retains_exhausted_victim_cause_and_signed_reverse_transfer() {
     sim.remove_creature(attacker);
     assert_eq!(sim.stats.mortality.count(DeathCause::Predation), 1);
 }
+
+/// The per-creature compute total is the plain sum of all three cognition
+/// cost components, including the T19.F01 hop ramp. The three values are
+/// distinct powers of two, so the sum is exact in `f32` and differs from
+/// every pairwise product or difference of the same terms.
+#[test]
+fn tick_compute_total_sums_vm_graph_and_mesh_ramp_costs() {
+    // Arrange
+    let mut output = decision(vec![WorldAction::NoOp]);
+    output.cost_report = ComputeCostReport {
+        vm_cost: 1.0,
+        graph_cost: 2.0,
+        mesh_ramp_cost: 4.0,
+    };
+    let mut compute = super::super::TickComputeStats::default();
+
+    // Act
+    compute.record(&output);
+
+    // Assert
+    assert_eq!(compute.total_sum, 7.0);
+    assert_eq!(compute.total_min, 7.0);
+    assert_eq!(compute.total_max, 7.0);
+    assert_eq!(compute.vm_sum, 1.0);
+    assert_eq!(compute.graph_sum, 2.0);
+}
