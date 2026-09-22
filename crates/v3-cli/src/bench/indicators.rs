@@ -514,6 +514,8 @@ fn to_neighborhood_tally(tally: &Tally) -> NeighborhoodTally {
         changed: tally.changed,
         dead: tally.dead,
         changed_only_in_sequences: tally.changed_only_in_sequences,
+        reordered: tally.reordered,
+        recount: tally.recount,
         silent_fraction: fraction_or_undefined(tally.silent.into(), applied.into()),
         changed_fraction: fraction_or_undefined(tally.changed.into(), applied.into()),
         dead_fraction: fraction_or_undefined(tally.dead.into(), applied.into()),

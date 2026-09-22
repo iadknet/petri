@@ -17,6 +17,7 @@
 
 pub mod battery;
 pub mod births;
+pub mod census;
 pub mod classify;
 pub mod companions;
 pub mod drift;
