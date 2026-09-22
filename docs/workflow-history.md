@@ -181,6 +181,23 @@ mutation specialist) to Opus 5.5 at the same efforts. The agent files already
 select `model: opus`, which resolves to the newest Opus, so only the contract
 text changed.
 
+Also on 2026-09-22, the user asked for Codex to challenge Claude specs
+iteratively and adversarially before they are finalized, and to perform the
+final code review. The Claude spec owner now runs up to three fresh Codex Astra
+`xhigh` challenge rounds, answering each blocking finding with an edit or a
+rebuttal, and the Fable reviewer is replaced by a fresh read-only Codex Astra
+`xhigh` job that uses `.claude/agents/roadmap-reviewer.md` as its checklist.
+The reason is a reviewer from a different model family, so the spec owner's
+blind spots are not shared by its critic. Codex runs through the
+`openai-codex` plugin's companion script as background `task` jobs; its review
+slash commands were not used because they review git diffs with a generic
+attack surface and cannot be model-invoked. Each round is a fresh thread
+because `--resume-last` picks the latest job in the session and carries stale
+context. A smoke test on 2026-09-22 confirmed that a job started with `--cwd`
+on a `.claude/worktrees/` path is scoped to that worktree and that
+`gpt-6-astra` passes through the plugin unchanged. Codex runs keep their single
+readiness review, since their spec owner is already Astra.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the

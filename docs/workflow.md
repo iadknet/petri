@@ -19,12 +19,15 @@ Claude:
 | Implementer | Opus 5.5, effort `medium`, Fable 5.1 advisor | `.claude/agents/roadmap-implementer.md` |
 | Benchmark specialist | Sonnet 5, default effort | `.claude/agents/roadmap-benchmark-specialist.md` |
 | Mutation specialist | Opus 5.5, effort `medium` | `.claude/agents/roadmap-mutation-specialist.md` |
-| Reviewer | Fable 5.1, effort `high`, read-only | `.claude/agents/roadmap-reviewer.md` |
+| Spec challenger | Codex Astra (`gpt-6-astra`), effort `xhigh`, read-only, fresh thread per round | run by the spec owner; see "Codex channel" |
+| Reviewer | Codex Astra (`gpt-6-astra`), effort `xhigh`, read-only, fresh thread | run by the orchestrator; checklist `.claude/agents/roadmap-reviewer.md` |
 
 The orchestrator delegates, verifies, and integrates; the thinking that needs
-the frontier model — writing the spec, judging readiness, and resolving
-requirement questions during implementation — lives in one persistent Fable
-spec owner, resumed by `SendMessage`, and in the fresh Fable reviewer.
+the frontier model — writing the spec and resolving requirement questions
+during implementation — lives in one persistent Fable spec owner, resumed by
+`SendMessage`. Independent judgment comes from a different model family:
+Codex Astra challenges the spec adversarially before it is committed and
+performs the final diff review.
 `.claude/settings.json` sets `advisorModel: fable` and `worktree.baseRef: head`.
 The intended advisor effort is `medium`, but neither Claude Code nor the API
 exposes an advisor effort setting, so that intent is recorded here and not
@@ -43,6 +46,34 @@ registry) on the feature diff; it is deliberately outside `make check` and the
 stop gate, because its output is a survivor list to triage, not a score.
 The benchmark and mutation specialists run sequentially and never alongside
 each other or competing builds, tests, servers, or measurements.
+
+**Codex channel.** Both Codex roles run through the `openai-codex` Claude Code
+plugin's companion script as read-only `task` jobs. The slash commands cannot
+be model-invoked, so call the script directly, resolving its versioned path at
+run time. Write each brief to a file outside the worktree (the session
+scratchpad or `mktemp`) so it never appears in the diff. A job at `xhigh` can
+outlast the 600-second Bash limit, so start it in the background, wait, and
+re-run the wait while the job is still running:
+
+```sh
+CODEX=$(ls -d ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)
+node "$CODEX" task --background --json --fresh --model gpt-6-astra --effort xhigh \
+  --cwd "$WORKTREE" --prompt-file "$BRIEF"            # prints {"jobId": ...}
+node "$CODEX" status "$JOB" --wait --timeout-ms 540000 --cwd "$WORKTREE" --json
+node "$CODEX" result "$JOB" --cwd "$WORKTREE"
+```
+
+Give the Bash tool `timeout: 600000` on the wait call; the job keeps running
+detached when the wait returns early. Report the job's `logFile` path with its
+ID, so another session can read the output if `result` does not show the job.
+Every brief states that the sandbox is read-only and that Codex must not edit
+files or run `cargo`, `make`, or benchmarks. Every round starts a fresh thread
+with `--fresh`; never use `--resume-last`, which picks the latest job in the
+session and carries a stale spec or diff forward. The plugin's optional
+stop-time review gate is independent of this workflow; when enabled it adds a
+Codex review at every orchestrator stop and can block the stop. Route any
+finding it raises on feature code through the implementer or the spec owner as
+this contract requires; the orchestrator still writes no feature code.
 
 ## Run the next feature
 
@@ -87,7 +118,7 @@ completion conditions. Generating either template does not execute it.
 Substitute `<TNN.FNN>` and the lowercase `<tnn-fnn>` worktree name.
 
 ```
-/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec to roadmap-spec-owner, verify it, and commit it there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, the gate and goal baseline runs and their records to roadmap-benchmark-specialist, the final diff review to roadmap-reviewer, and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
+/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, the gate and goal baseline runs and their records to roadmap-benchmark-specialist, and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the final diff review as a fresh read-only Codex Astra xhigh job through the Codex channel; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
 ```
 
 The `/goal` evaluator reads only this conversation and runs no commands, so
@@ -114,6 +145,9 @@ the main checkout — a worktree session cannot merge into the main checkout.
 Load `SendMessage` with `ToolSearch select:SendMessage`; the spec owner is
 resumed through it. If the tool is absent in this build, continue, and apply the
 fallback in "Plan" below.
+Run the Codex channel's `setup --json` and confirm `"ready": true`. If Codex is
+not installed or not logged in, stop and report it; both independent reviews
+depend on it, and there is no Claude fallback.
 
 Then call `EnterWorktree` with the feature name. The session moves to
 `.claude/worktrees/<tnn-fnn>` on branch `worktree-<tnn-fnn>`, branched from
@@ -134,11 +168,42 @@ pre-digest them: the point of the delegation is that the planning inputs never
 enter the orchestrator's context.
 
 The spec owner creates the flat feature spec at
-`docs/specs/roadmap/tnn-fnn-<slug>.md` from the template, runs one readiness
-review, allows one revision, sets the spec to `In Progress`, promotes a
-`Planned` track and a `Planning` master, and runs `make roadmap-check`. Verify
-its report against the files — the spec exists, the statuses moved, the checker
-passed — and commit the plan. Quote the spec owner's agent name or ID in your own
+`docs/specs/roadmap/tnn-fnn-<slug>.md` from the template, runs its own
+readiness review, and then runs the Codex challenge loop below. It then sets
+the spec to `In Progress`, promotes a `Planned` track and a `Planning` master,
+and runs `make roadmap-check`. Verify its report against the files — the spec
+exists, the statuses moved, the checker passed — read the final challenge
+round's output with the Codex channel's `result` command, and commit the plan
+only when that verdict is `ready` or every open blocking finding carries a
+rebuttal that round accepted.
+
+**Codex challenge loop.** The spec owner runs up to three rounds, each a fresh
+Codex Astra `xhigh` job through the Codex channel. Its brief names the spec
+path, the original requirement, the roadmap contract, the feature's track row,
+dependency rows, and matching Notes entries, and asks Codex to break confidence
+that the spec is ready to implement. The attack surface is contradiction with
+the roadmap row or requirement, scope widened or narrowed, acceptance criteria
+that cannot be tested, claims about current code that the code does not
+support, missing invariants and edge cases, determinism, the natural-analog
+rule, an unrealistic Performance predeclaration, and requirements that steer
+toward needless complexity. Each finding is `blocking` or `advisory`, cites
+the spec section and the evidence, and proposes a concrete change. The brief dictates the output format: one line
+per finding starting `blocking:` or `advisory:`, then a final line
+`verdict: ready` or `verdict: not-ready`.
+
+The spec owner answers every blocking finding by editing the spec or writing a
+one-sentence rebuttal grounded in the roadmap row, the requirement, or the
+code. Rounds 2 and 3 carry the previous findings and their dispositions and
+ask Codex to confirm the fixes, accept or reject each rebuttal, and report only
+new blocking findings. The loop ends at a `ready` verdict, or when no blocking
+finding remains that Codex upholds. A blocking finding Codex still upholds
+after round 3, or a new one first raised in round 3, is an unresolved
+requirement: the spec owner reports it, and it
+follows the blocker rule when only the user can settle it. Advisory findings
+are adopted or dropped at the spec owner's judgment. The findings and
+dispositions of every round go in one table in
+`docs/progress/readings/<id>.md`, never in the spec; the spec carries only the
+resulting requirements. Quote the spec owner's agent name or ID in your own
 message after the spawn so the resume address survives context compaction.
 
 **The spec owner stays on the feature.** It is the orchestrator's channel for
@@ -268,12 +333,19 @@ unresolved survivor is a blocker to report, not a number to hide.
 
 ### Review
 
-Delegate the final diff review to `roadmap-reviewer` with the worktree path, the
-feature ID, the spec path, and the spec sections the review needs: Goal, Inputs
-and Invariants, Verification, and Performance and
-Goal Impact when the feature is subject to it. The reviewer reads the feature's
-own track row and the matching track Notes entries, not the whole track, and the
-no-spillover-re-read rule above applies to it as well.
+Run the final diff review as a fresh Codex Astra `xhigh` job through the Codex
+channel. Its brief gives the worktree path, the feature ID, the spec path, and
+the spec sections the review needs: Goal, Inputs and Invariants, Verification,
+and Performance and Goal Impact when the feature is subject to it. It tells
+Codex to read the Review section of this file and
+`.claude/agents/roadmap-reviewer.md` as its checklist, ignoring that file's
+front matter, and to report one finding per line starting `P1:`, `P2:`, or
+`P3:` with file, line, issue, and smallest fix, followed by what it could not
+verify. The reviewer reads the feature's own track row and the
+matching track Notes entries, not the whole track. It never edits, never runs
+builds or tests, and never consults the spec owner. Do not reuse a spec
+challenge thread for this review. Quote the job ID and the findings in your own
+message.
 
 Only a P1 finding blocks progress. P2 and P3 are advisory and are recorded as
 deferred review findings in the spec's "Notes for AI Agents" without expanding
@@ -476,7 +548,8 @@ pushing, opening or updating a pull request, or any other remote mutation.
 After the feature closes, add one line to that feature spec's "Notes for AI
 Agents": the `/usage` totals at closure (ask the user; `/usage` is a user
 command), each implementer brief's self-reported advisor consult count and the
-number of passes, the number of spec-owner resumes after the Plan step, and the
+number of passes, the number of spec-owner resumes after the Plan step, the
+number of Codex challenge rounds with the final verdict, and the Codex
 reviewer's finding counts by severity. Telemetry only, never a success
 criterion.
 

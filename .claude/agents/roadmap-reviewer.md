@@ -1,11 +1,10 @@
 ---
 name: roadmap-reviewer
 description: >-
-  Reviews exactly one implemented roadmap feature (TNN.FNN) diff against its
-  flat feature spec and the roadmap contract, from a fresh context, and reports
-  P1/P2/P3 findings. Read-only. Use for the final diff review after the
-  roadmap-implementer and roadmap-benchmark-specialist report complete. Does
-  not implement, edit, or adjudicate scope.
+  Checklist for the final roadmap diff review, which a fresh read-only Codex
+  Astra xhigh context performs in both Claude and Codex runs (see the Review
+  section of docs/workflow.md). Do not spawn this agent for a roadmap feature;
+  the orchestrator hands this file to Codex as its checklist.
 model: fable
 effort: high
 permissionMode: plan
