@@ -1,6 +1,6 @@
 # T19 — Mesh Action Selection and Live State
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-09-21
 **Master**: [Program Roadmap](../roadmap.md)
 
