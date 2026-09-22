@@ -46,18 +46,15 @@ T13.F07 configuration, the most hops any creature dispatched in one tick was
 The live survey's long-lived world reached a per-creature median chain of 19
 and 22 executed nodes. Tables and method:
 [`docs/progress/readings/t19-f01.md`](../../progress/readings/t19-f01.md).
-The ramp is a body cost, not an environmental pressure: it is in force in all
-three goal worlds through the production default, and the goal run reports
-`mesh_ramp` per world.
+The ramp is a body cost, not an environmental pressure; it is in force in all
+three goal worlds by default and the goal run reports `mesh_ramp` per world.
 
-Options considered for the form: (a) a flat per-hop charge above a cap
-(rejected: T03.F10 found a flat charge either taxes ordinary programs or
-leaves the cap-runner cheap; the review note requires the T03.F10 form); (b)
-raising `graph_node_base_cost` (rejected: it prices graph visits only, and
-the note's Section 1.2 shows a blank detour costs nothing); (c) the T03.F10
-ramp lifted from VM steps to mesh hops (adopted, the note's Section 1.2
-choice; `step_charge` itself cannot be reused because its index resets per
-dispatch).
+Options considered: (a) a flat per-hop charge above a cap (rejected: it
+taxes ordinary programs or leaves the cap-runner cheap, T03.F10's finding);
+(b) raising `graph_node_base_cost` (rejected: graph visits only, and a blank
+detour costs nothing, note Section 1.2); (c) the T03.F10 ramp lifted from VM
+steps to mesh hops (adopted, the note's choice; `step_charge` is not reused
+because its index resets per dispatch).
 
 1. **Formula.** Hop `k` in a tick (`k` from 1, the value of
    `work_counters.mesh_hops` after the dispatch is counted) pays
@@ -93,8 +90,8 @@ dispatch).
    hop that exhausts on the ramp never reaches `execute_node`, so it has no
    entry in the trace's hop list (that list holds executed dispatches); it is
    identified by the traced output's `EnergyExhausted` termination, the
-   `mesh_ramp` observation, and the `mesh_hops` counter exceeding the hop
-   list by one. No synthetic trace entry is invented for it.
+   `mesh_ramp` observation, and `mesh_hops` exceeding the hop list by one;
+   no synthetic trace entry is invented.
    The charge is a direct `f32` debit against the creature's energy, the same
    accounting as `graph_node_base_cost`: at the defaults every non-zero charge
    is at least `1e-4`, above the ulp of any energy up to `max_energy` 200, so
@@ -126,9 +123,8 @@ dispatch).
    the two new zero-valued fields and each goal case's `config_digest`, which
    changes because the two new fields serialize (reported as `inputs_changed`,
    never severe).
-7. **Bounding learning.** Pure Hebbian updates run once per visit; the ramp
-   bounds visits per tick and therefore bounds free within-tick learning once
-   T19.F02 allows revisits. This spec states it so T19.F02 does not discover it.
+7. **Bounding learning.** Pure Hebbian updates run once per visit, so the
+   ramp also bounds free within-tick learning once T19.F02 allows revisits.
 8. **Docs.** `docs/reference/v3-runtime-config-spec.md` Section 2 gains the
    two rows (owner: mesh spec); `docs/reference/v3-mesh-execution-spec.md`
    Section 5 states the formula, the closed form, the exhaustion rule, and the
@@ -169,6 +165,11 @@ dispatch).
 - [x] Suites and lints: `cargo test -p v3-core` 1636 lib + 91 passed, 0 failed;
       `cargo test -p v3-cli --lib` 120 passed, 0 failed; `cargo clippy --workspace --all-targets` and `cargo fmt --all
       --check` clean.
+- [ ] Recipe digest pins: `checked_in_goal_recipe_identities_are_unchanged_by_json_precision`
+      (`crates/v3-cli/tests/bench_artifacts.rs`) moves its three pins to the
+      goal summary's `current_digest` values, the predeclared consequence of
+      the two new `RuntimeConfig` fields serializing (invariant 6); test-only,
+      no trajectory change, epoch unchanged.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
 - [x] Benchmark summaries stored, raw hash/byte count and verification
@@ -215,16 +216,14 @@ is a spec-owner escalation, not an accepted cost.
 
 **Measured verdict.** Gate and goal at `1f64e7c3`: CLI exit 0,
 `severe=false` against the epoch and T13.F07, no threshold crossed, no
-re-pin. All six counters 0.000000% on both profiles; `mesh_ramp` 0.000000 and
-0 deaths in every world. The `deterministic` rows are met on the two
-committed summaries: an order-insensitive diff lists exactly 15 predeclared
-differences — seven `config_digest` values (three cases, three profile
-cases, and `recruitment_paths.config_digest`, whose echoed `config.runtime`
-block also carries the two new fields) and six zero `mesh_ramp` keys. The
-`sampled_genomes`/`mesh_summary` and `proposals`/`proposal_count` shape
-difference is the T15.F01 summary projection
-(`crates/v3-cli/src/bench/artifacts.rs`) seen from the unprojected raw
-block; both summaries carry the projected keys.
+re-pin. All six counters 0.000000% on both profiles; `mesh_ramp` 0.000000
+and 0 deaths in every world. An order-insensitive diff of the two committed
+`deterministic` blocks lists exactly 15 predeclared differences: seven
+`config_digest` values (the cases, the profile cases, and
+`recruitment_paths`, whose echoed config also carries the two fields) and six
+zero `mesh_ramp` keys. A `sampled_genomes`/`proposals` shape difference seen
+during the run was the raw block against the projected summary
+(`bench/artifacts.rs`), not a deviation.
 
 - Summaries: [gate](../../progress/features/t19-f01-per-tick-hop-ramp.json),
   [goal](../../progress/features/t19-f01-per-tick-hop-ramp-goal.json).
