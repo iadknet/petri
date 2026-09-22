@@ -222,7 +222,7 @@ transmitting; the surface reaches creatures through the body, never a sensor.
 | Summary line | `147 mutants tested in 20m: 104 caught, 43 unviable` |
 | Output path | `~/.local/share/petri-tools/mutants/t19-f03/mutants.out` (`run-mode.txt`: `fresh`) |
 | Survivors | None. `missed.txt` and `timeout.txt` are both empty; the target printed `rust-mutants: no survivors` |
-| Inertness mutants | Both `is_vote_surface -> true` and `-> false`, and all five `stage_vote_contribution`/`commit_vote_contribution` mutants (`-> ()`, `-> Default::default()`, `== -> !=`, `+= -> -=`, `+= -> *=`), are in `caught.txt` -> quoted in the readings file |
+| Inertness mutants | Every mutant generated in the two load-bearing functions is caught, none unviable: `is_vote_surface -> true` and `-> false`; `stage_vote_contribution -> ()`; `commit_vote_contribution -> Default::default()`, `== -> !=`, `+= -> -=`, `+= -> *=` -> the failing tests per mutant, read from `mutants.out/log/`, are tabled in the readings file |
 | Skips | No `#[mutants::skip]` and no `exclude_re` added or present in this diff |
 
 ## Performance and Goal Impact
