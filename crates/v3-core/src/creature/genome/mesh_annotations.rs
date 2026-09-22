@@ -372,6 +372,38 @@ mod tests {
     }
 
     #[test]
+    fn classifies_write_internal_payload_as_a_payload_write() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(1),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(1),
+                input_refs: vec![],
+                targets: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![1.0],
+                    program: vec![
+                        VmInstruction::LoadConst {
+                            dst: 0,
+                            const_idx: 0,
+                        },
+                        VmInstruction::WriteInternalPayload {
+                            slot_idx: 0,
+                            src: 0,
+                        },
+                    ],
+                }),
+            }],
+        };
+
+        let annotation = &derive_mesh_annotations(&genome)[0];
+
+        assert_eq!(annotation.write_classes, vec![MeshWriteClass::Payload]);
+        assert!(!annotation.has_stateful_behavior);
+        assert_eq!(annotation.live_instruction_indices, vec![0, 1]);
+    }
+
+    #[test]
     fn helper_matches_wrapper_for_cached_reachable_indices() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(1),
