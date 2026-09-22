@@ -190,11 +190,8 @@ resets per dispatch; the hop index is per tick.
       --check` clean.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
-- [ ] Benchmark summaries stored at
-      `docs/progress/features/t19-f01-per-tick-hop-ramp.json` and
-      `docs/progress/features/t19-f01-per-tick-hop-ramp-goal.json`, local raw
-      hash/byte count and verification time checked, series entries appended,
-      no full report staged.
+- [x] Benchmark summaries stored, raw hash/byte count and verification
+      time checked, series entries appended, no full report staged.
 
 ## Performance and Goal Impact
 
@@ -230,7 +227,9 @@ A reading that contradicts the neutrality rows means a live genome dispatched
 more than 32 hops in a tick or the charge landed where it should not; either
 is a spec-owner escalation, not an accepted cost.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Not severe; every row met at `1f64e7c3`. One
+pre-existing non-counter schema deviation vs T13.F07 in
+`mutational_neighborhood`/`recruitment_paths`. No re-pin.
 
 - Summaries: [gate](../../progress/features/t19-f01-per-tick-hop-ramp.json),
   [goal](../../progress/features/t19-f01-per-tick-hop-ramp-goal.json).
