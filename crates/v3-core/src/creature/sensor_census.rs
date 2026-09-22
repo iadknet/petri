@@ -9,8 +9,8 @@
 //! instead of class resolution: [`collect_live_vm_instruction_indices`] for the
 //! VM backend, and the shared [`wired_surface_edges`] walk for the graph
 //! backend. That walk covers live compute nodes *and* the wired output sinks,
-//! action-bank slots and execute gate, because a founder's world inputs are
-//! wired straight to its output sinks.
+//! vote sinks included, because a founder's world inputs are wired straight
+//! to its output sinks.
 
 use std::collections::BTreeSet;
 
@@ -291,7 +291,7 @@ mod tests {
     fn a_reference_on_an_unreachable_graph_compute_node_is_not_counted() {
         let graph = {
             let mut graph = empty_graph();
-            // CN0 feeds nothing: no sink, action slot or execute gate wires it.
+            // CN0 feeds nothing: no sink wires it.
             graph.compute_nodes.push(ComputeNode {
                 kind: ComputeNodeKind::Add,
                 inputs: vec![leaf(0)],

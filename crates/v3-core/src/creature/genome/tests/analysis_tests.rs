@@ -145,7 +145,7 @@ fn backward_slice_returns_none_for_out_of_bounds() {
 
 #[test]
 fn backward_slice_anchor_only_when_no_deps() {
-    // PushAction reads no registers
+    // A lone instruction has no earlier writer to depend on.
     let program = vec![VmInstruction::AddVote { sink: 0, src: 0 }];
     let gene = vm_backward_slice(&program, 0).unwrap();
     assert_eq!(gene.indices, vec![0]);

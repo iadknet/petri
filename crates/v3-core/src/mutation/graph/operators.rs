@@ -402,8 +402,8 @@ pub(crate) fn add_bootstrap_node(
 /// consumer is a compute node, the new node is inserted at the consumer's
 /// index and every `ComputeNode(i >= consumer)` reference is remapped to
 /// `i + 1` (`CgpGraphBackendDef::insert_compute_node_at`), so Gauss-Seidel
-/// pass order is preserved. When the consumer is a sink, action slot, or
-/// execute gate, the new node is appended instead. The one edge shape a
+/// pass order is preserved. When the consumer is a sink, the new node is
+/// appended instead. The one edge shape a
 /// split cannot preserve is skipped rather than split: see
 /// [`is_excluded_introspection_split`].
 pub(crate) fn split_existing_edge(
@@ -473,8 +473,8 @@ fn splittable_edge_sites<'a>(
 }
 
 /// True for the one edge shape a split cannot preserve (T11.F08, replacing
-/// T11.F03's documented exception): on a graph carrying plasticity, a sink,
-/// action slot, or execute gate reading a
+/// T11.F03's documented exception): on a graph carrying plasticity, a sink
+/// reading a
 /// `DynamicIntrospection(EnergyCurrent)` reference directly. An identity node
 /// between them caches the value during evaluation, while the direct edge
 /// resolves it in the post-convergence effects context after the

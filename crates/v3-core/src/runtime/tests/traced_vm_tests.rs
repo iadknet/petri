@@ -953,7 +953,7 @@ fn result_equivalence_all_41_opcodes() {
             zero_mem,
         ),
         (
-            "WriteDirectionBid",
+            "WriteActionParam_reproduce_fraction",
             VmBackendDef {
                 register_count: 1,
                 constants: vec![2.0],
@@ -975,7 +975,7 @@ fn result_equivalence_all_41_opcodes() {
             zero_mem,
         ),
         (
-            "PushAction",
+            "AddVote",
             VmBackendDef {
                 register_count: 1,
                 constants: vec![],
@@ -989,7 +989,7 @@ fn result_equivalence_all_41_opcodes() {
             zero_mem,
         ),
         (
-            "PopAction",
+            "Noop_twice",
             VmBackendDef {
                 register_count: 1,
                 constants: vec![],
@@ -1067,7 +1067,7 @@ fn result_equivalence_all_41_opcodes() {
             zero_mem,
         ),
         (
-            "ExecuteActionQueue",
+            "Halt_alone",
             VmBackendDef {
                 register_count: 1,
                 constants: vec![],

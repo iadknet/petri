@@ -135,8 +135,8 @@ pub(super) fn assert_neutral(
 }
 
 /// A moderately interesting base graph: forward edges, a backward
-/// self-reference, and every wired surface (sink, action gate and param,
-/// execute gate), so growth operators are exercised against real structure.
+/// self-reference, and both wired surfaces (compute inputs and sinks, vote
+/// sinks included), so growth operators are exercised against real structure.
 pub(super) fn base_def() -> CgpGraphBackendDef {
     CgpGraphBackendDef {
         birth_weights: None,

@@ -707,7 +707,7 @@ mod tests {
             GraphSource::ComputeNode(0)
         );
 
-        // Execute gate edge to Relu: was CN(2), now CN(1)
+        // Last sink (ActionParam(StealEnergy, 1)) edge to Relu: was CN(2), now CN(1)
         assert_eq!(
             def.output_sinks[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::ComputeNode(1)
@@ -822,7 +822,7 @@ mod tests {
             def.output_sinks[FIRST_ACTION_VOTE_SINK].inputs[0].source,
             GraphSource::ComputeNode(0)
         );
-        // Execute gate edge to Relu: was CN(1), now CN(2).
+        // Last sink (ActionParam(StealEnergy, 1)) edge to Relu: was CN(1), now CN(2).
         assert_eq!(
             def.output_sinks[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::ComputeNode(2)
@@ -1009,7 +1009,7 @@ mod tests {
                 sub_idx: 0,
             }
         );
-        // Execute gate: ref_idx 3 -> 2
+        // Last sink (ActionParam(StealEnergy, 1)): ref_idx 3 -> 2
         assert_eq!(
             def.output_sinks[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::InputLeaf {

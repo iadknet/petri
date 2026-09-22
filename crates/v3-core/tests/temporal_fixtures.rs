@@ -464,8 +464,8 @@ fn reward_modulated_node_genome(reward_source: OutcomeChannel) -> CreatureGenome
 }
 
 /// E3's reward-modulated graph node: identical compute nodes to
-/// [`reward_modulated_node_genome`], but with no action bank or execute-gate
-/// wiring and no route targets of its own. With no route target, the mesh
+/// [`reward_modulated_node_genome`], but with no vote wiring and no route
+/// targets of its own. With no route target, the mesh
 /// soft-default terminates the tick with `vec![WorldAction::NoOp]`, and
 /// Phase 2 charges `noop_cost` (0.05, `crates/v3-core/src/config/
 /// simulation.rs:390`) — an order of magnitude larger than the VM/graph
@@ -1087,7 +1087,7 @@ fn e1_exact_one_edge_update_immediate_reward() {
         WorldAction::Eat {
             type_idx: OrdinaryFoodTypeId::default()
         },
-        "the wired action bank should fire Eat every tick"
+        "the wired Eat vote should commit Eat every tick"
     );
 
     let creature = sim.creatures.get(target).expect("creature alive");
