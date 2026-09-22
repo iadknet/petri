@@ -8,7 +8,9 @@ use crate::creature::genome::mesh_annotations::{
     collect_live_vm_instruction_indices, derive_mesh_annotations_with_reachable_indices,
     MeshReadClass,
 };
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
+use crate::creature::genome::{
+    BackendDef, CreatureGenome, NodeGenome, VmInstruction, OUTCOME_CHANNEL_COUNT,
+};
 use crate::creature::identity::CreatureIdentityState;
 use crate::mutation::MutationOperator;
 
@@ -200,6 +202,10 @@ pub struct CreatureState {
     pub lifetime_energy_sum: f64,
     /// Number of lifetime energy samples accumulated.
     pub lifetime_energy_sample_count: u64,
+    /// The outcome signal bank of this creature's last full tick, indexed by
+    /// `OutcomeChannel` discriminant (T19.F05). Written once per tick in
+    /// Phase 2.5; zeros until the first full tick, never inherited.
+    pub previous_outcome: [f32; OUTCOME_CHANNEL_COUNT],
 }
 
 impl CreatureState {
@@ -289,6 +295,7 @@ impl CreatureState {
             lifetime_invalid_reproduce_count: 0,
             lifetime_energy_sum: 0.0,
             lifetime_energy_sample_count: 0,
+            previous_outcome: [0.0; OUTCOME_CHANNEL_COUNT],
         }
     }
 
@@ -346,6 +353,7 @@ impl CreatureState {
             lifetime_invalid_reproduce_count: 0,
             lifetime_energy_sum: 0.0,
             lifetime_energy_sample_count: 0,
+            previous_outcome: [0.0; OUTCOME_CHANNEL_COUNT],
         }
     }
 }

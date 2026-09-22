@@ -23,6 +23,8 @@ mod vote_surface_tests;
 pub(crate) mod vote_test_support;
 
 #[cfg(test)]
+mod decision_input_tests;
+#[cfg(test)]
 mod pass_loop_tests;
 
 #[cfg(test)]

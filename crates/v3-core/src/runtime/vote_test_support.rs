@@ -194,6 +194,7 @@ impl Senses {
                 neighbor_occupied: self.occupied,
                 max_energy: 200.0,
                 age_ticks: self.age,
+                previous_outcome: [0.0; 4],
             },
             typed_local_food: TypedFoodLocalSnapshot {
                 food_here_by_type: vec![self.food_here],
@@ -210,6 +211,8 @@ pub(crate) struct Tick {
     pub(crate) hops: Vec<MeshHopTrace>,
     pub(crate) passes: Vec<MeshPassTrace>,
     pub(crate) energy: f32,
+    /// Shared memory at tick end, the same in every mode.
+    pub(crate) memory: [f32; 16],
 }
 
 impl Tick {
@@ -291,5 +294,6 @@ pub(crate) fn run_tick(
         hops,
         passes,
         energy: energies[0],
+        memory: memories[0],
     }
 }

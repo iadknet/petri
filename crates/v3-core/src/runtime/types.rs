@@ -78,6 +78,9 @@ pub struct MeshSideOutputs {
     /// committed contribution of every node visited this pass. Cleared at
     /// every pass start.
     pub votes: VoteVector,
+    /// The vote vector at the previous pass's end (T19.F05): copied from
+    /// `votes` at every pass start, so it is zeros in the tick's first pass.
+    pub previous_pass_votes: VoteVector,
     /// Per-kind bars (T19.F04): commits of each kind this tick. Zeroed at
     /// tick start, raised by one per commit.
     pub commit_counts: [u32; VOTE_KIND_COUNT],
@@ -102,6 +105,7 @@ impl MeshSideOutputs {
             work_counters: WorkCounters::default(),
             energy_observation: Default::default(),
             votes: [0.0; VOTE_SINK_COUNT],
+            previous_pass_votes: [0.0; VOTE_SINK_COUNT],
             commit_counts: [0; VOTE_KIND_COUNT],
             action_params: [[0.0; VOTE_PARAM_SLOTS as usize]; VOTE_KIND_COUNT],
             node_contributions: Vec::new(),
@@ -109,9 +113,11 @@ impl MeshSideOutputs {
         }
     }
 
-    /// Start a pass: the vote vector and the per-node contributions clear;
+    /// Start a pass: the ending pass's vote vector becomes the previous
+    /// pass's, then the vote vector and the per-node contributions clear;
     /// the queue, bars, parameter surface, and bid are tick-scoped.
     pub(crate) fn begin_pass(&mut self) {
+        self.previous_pass_votes = self.votes;
         self.votes = [0.0; VOTE_SINK_COUNT];
         self.node_contributions.clear();
         self.staged_contribution = None;

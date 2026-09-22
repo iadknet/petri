@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
 use v3_core::creature::sensor_census::{
-    creature_sensor_census, world_input_key_label, world_input_key_universe,
+    creature_sensor_census, world_input_key_label, world_input_key_universe, DecisionInputKey,
 };
 use v3_core::kernel::occupancy_grid::{occupancy_grid, OCCUPANCY_CELLS_PER_AXIS};
 
@@ -725,8 +725,17 @@ pub struct WorldInputCensusRow {
     pub creatures: u64,
 }
 
+/// One decision-state input's row in a checkpoint census (T19.F05).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DecisionInputCensusRow {
+    /// `DecisionInputKey::as_key()`.
+    pub key: String,
+    /// Living creatures holding at least one live reference to this input.
+    pub creatures: u64,
+}
+
 /// The sensor usage census of one checkpoint: living creatures per world input
-/// key, and the three stateful-reach counts.
+/// key and per decision-state input, and the three stateful-reach counts.
 ///
 /// Every key the run's world can present has a row, so a `0` reads as "no
 /// living creature references this" rather than as an absent key. Rows are in
@@ -734,6 +743,10 @@ pub struct WorldInputCensusRow {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SensorCensus {
     pub world_inputs: Vec<WorldInputCensusRow>,
+    /// The five decision-state inputs (T19.F05), always present in catalog
+    /// order. Defaulted so summaries written before T19.F05 still load.
+    #[serde(default)]
+    pub decision_inputs: Vec<DecisionInputCensusRow>,
     /// Living creatures a live reference of which reads a shared-memory slot.
     /// `shared_memory` persists across ticks, so a same-tick read counts.
     pub creatures_reading_shared_memory: u64,
@@ -757,6 +770,7 @@ impl SensorCensus {
         .into_iter()
         .map(|key| (key, 0))
         .collect();
+        let mut decision_inputs = [0u64; DecisionInputKey::ALL.len()];
         let mut creatures_reading_shared_memory = 0;
         let mut creatures_with_stateful_node = 0;
         let mut creatures_with_any_stateful_read = 0;
@@ -766,6 +780,9 @@ impl SensorCensus {
             creatures_reading_shared_memory += u64::from(census.reads_shared_memory);
             creatures_with_stateful_node += u64::from(census.holds_stateful_node);
             creatures_with_any_stateful_read += u64::from(census.reads_any_stateful());
+            for key in census.decision_inputs {
+                decision_inputs[key as usize] += 1;
+            }
             for key in census.world_inputs {
                 // The row set is the same at every checkpoint: mutation draws
                 // food type ids from `config.world.food.types.len()`, clamped
@@ -782,6 +799,14 @@ impl SensorCensus {
                 .into_iter()
                 .map(|(key, creatures)| WorldInputCensusRow {
                     key: world_input_key_label(key),
+                    creatures,
+                })
+                .collect(),
+            decision_inputs: DecisionInputKey::ALL
+                .into_iter()
+                .zip(decision_inputs)
+                .map(|(key, creatures)| DecisionInputCensusRow {
+                    key: key.as_key().to_string(),
                     creatures,
                 })
                 .collect(),

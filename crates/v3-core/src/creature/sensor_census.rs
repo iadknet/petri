@@ -14,21 +14,75 @@
 
 use std::collections::BTreeSet;
 
-use crate::contracts::{InputReference, OrdinaryFoodTypeId, WorldInputKey};
+use crate::contracts::{
+    DynamicIntrospectionKey, InputReference, OrdinaryFoodTypeId, WorldInputKey,
+};
 use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphSource, NodeClass};
 use crate::creature::genome::cgp_analysis::{cgp_live_compute_indices, wired_surface_edges};
 use crate::creature::genome::mesh_annotations::collect_live_vm_instruction_indices;
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 
-/// The structural reach of one creature: the world input keys a live reference
-/// resolves to, and whether it reads shared memory or holds a stateful compute
-/// node.
+/// One decision-state input (T19.F05), in catalog order: the census key of
+/// the four decision references and `DynamicIntrospection(HopsThisTick)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DecisionInputKey {
+    ActionVotes,
+    PreviousPassVotes,
+    CommitCounts,
+    HopsThisTick,
+    PreviousOutcome,
+}
+
+impl DecisionInputKey {
+    /// Every key in catalog order.
+    pub const ALL: [Self; 5] = [
+        Self::ActionVotes,
+        Self::PreviousPassVotes,
+        Self::CommitCounts,
+        Self::HopsThisTick,
+        Self::PreviousOutcome,
+    ];
+
+    /// The key of a decision-state reference; `None` for every other one.
+    #[must_use]
+    pub fn from_input_reference(reference: &InputReference) -> Option<Self> {
+        match reference {
+            InputReference::ActionVotes => Some(Self::ActionVotes),
+            InputReference::PreviousPassVotes => Some(Self::PreviousPassVotes),
+            InputReference::CommitCounts => Some(Self::CommitCounts),
+            InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick) => {
+                Some(Self::HopsThisTick)
+            }
+            InputReference::PreviousOutcome => Some(Self::PreviousOutcome),
+            _ => None,
+        }
+    }
+
+    /// Report label: the variant name.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::ActionVotes => "ActionVotes",
+            Self::PreviousPassVotes => "PreviousPassVotes",
+            Self::CommitCounts => "CommitCounts",
+            Self::HopsThisTick => "HopsThisTick",
+            Self::PreviousOutcome => "PreviousOutcome",
+        }
+    }
+}
+
+/// The structural reach of one creature: the world input keys and
+/// decision-state inputs a live reference resolves to, and whether it reads
+/// shared memory or holds a stateful compute node.
 ///
 /// A key appears at most once however many instructions or edges reference it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CreatureSensorCensus {
     /// World input keys reached by a live reference, in `WorldInputKey` order.
     pub world_inputs: BTreeSet<WorldInputKey>,
+    /// Decision-state inputs reached by a live reference (T19.F05), in
+    /// catalog order.
+    pub decision_inputs: BTreeSet<DecisionInputKey>,
     /// A live, reachable node reads a shared-memory slot. `shared_memory`
     /// persists across ticks, so a current-tick read is a stateful read too.
     pub reads_shared_memory: bool,
@@ -64,10 +118,7 @@ pub fn creature_sensor_census(
                 for instruction_idx in collect_live_vm_instruction_indices(vm) {
                     match vm.program.get(instruction_idx) {
                         Some(VmInstruction::ReadInput { ref_idx, .. }) => {
-                            insert_world_key(
-                                &mut census.world_inputs,
-                                node.input_refs.get(*ref_idx as usize),
-                            );
+                            census.insert_input(node.input_refs.get(*ref_idx as usize));
                         }
                         Some(
                             VmInstruction::LoadSlot { .. }
@@ -96,7 +147,7 @@ fn census_graph(
     for edge in wired_surface_edges(graph, &live) {
         match edge.source {
             GraphSource::InputLeaf { ref_idx, .. } => {
-                insert_world_key(&mut census.world_inputs, input_refs.get(ref_idx as usize));
+                census.insert_input(input_refs.get(ref_idx as usize));
             }
             // Deliberate and spec-mandated: the stateful table counts a
             // shared-memory read on every wired surface, not on live compute
@@ -108,9 +159,18 @@ fn census_graph(
     }
 }
 
-fn insert_world_key(keys: &mut BTreeSet<WorldInputKey>, input_ref: Option<&InputReference>) {
-    if let Some(InputReference::World(key)) = input_ref {
-        keys.insert(*key);
+impl CreatureSensorCensus {
+    /// Record the reference a live read addresses, if it is a world key or
+    /// a decision-state input.
+    fn insert_input(&mut self, input_ref: Option<&InputReference>) {
+        let Some(reference) = input_ref else {
+            return;
+        };
+        if let InputReference::World(key) = reference {
+            self.world_inputs.insert(*key);
+        } else if let Some(key) = DecisionInputKey::from_input_reference(reference) {
+            self.decision_inputs.insert(key);
+        }
     }
 }
 
@@ -528,6 +588,72 @@ mod tests {
         );
     }
 
+    /// T19.F05: every decision-state reference a live read addresses is
+    /// counted once however often it is read; a dead read is not counted.
+    #[test]
+    fn each_decision_state_input_is_counted_once_per_reference() {
+        let refs = vec![
+            InputReference::ActionVotes,
+            InputReference::PreviousPassVotes,
+            InputReference::CommitCounts,
+            InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
+            InputReference::PreviousOutcome,
+            InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+        ];
+        let mut program = Vec::new();
+        for ref_idx in (0..6u16).chain(0..5) {
+            program.push(VmInstruction::ReadInput {
+                ref_idx,
+                sub_idx: ref_idx,
+                dst: 1,
+            });
+            program.push(VmInstruction::WriteInternalPayload {
+                slot_idx: 0,
+                src: 1,
+            });
+        }
+        program.push(VmInstruction::Halt);
+        let census = census_of(&vm_node(program, refs.clone()));
+        assert_eq!(
+            census.decision_inputs,
+            BTreeSet::from(DecisionInputKey::ALL),
+            "{census:?}"
+        );
+        assert!(census.world_inputs.is_empty());
+
+        let mut graph = empty_graph();
+        graph.output_sinks.push(OutputSink {
+            kind: OutputSinkKind::CustomOutput(0),
+            inputs: vec![leaf(2), leaf(2), leaf(4)],
+        });
+        let census = census_of(&graph_node(graph, refs.clone()));
+        assert_eq!(
+            census.decision_inputs,
+            BTreeSet::from([
+                DecisionInputKey::CommitCounts,
+                DecisionInputKey::PreviousOutcome
+            ])
+        );
+
+        // A read into a register no output instruction reads is dead.
+        let dead = census_of(&vm_node(
+            vec![
+                VmInstruction::ReadInput {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                    dst: 2,
+                },
+                VmInstruction::WriteInternalPayload {
+                    slot_idx: 0,
+                    src: 1,
+                },
+                VmInstruction::Halt,
+            ],
+            refs,
+        ));
+        assert!(dead.decision_inputs.is_empty(), "{dead:?}");
+    }
+
     #[test]
     fn a_non_world_reference_is_not_a_world_input() {
         let mut graph = empty_graph();
@@ -602,6 +728,13 @@ mod tests {
                 prop_oneof![
                     world_key_strategy().prop_map(InputReference::World),
                     Just(InputReference::ActionQueue),
+                    Just(InputReference::ActionVotes),
+                    Just(InputReference::PreviousPassVotes),
+                    Just(InputReference::CommitCounts),
+                    Just(InputReference::DynamicIntrospection(
+                        DynamicIntrospectionKey::HopsThisTick,
+                    )),
+                    Just(InputReference::PreviousOutcome),
                 ],
                 0..6usize,
             ),
@@ -615,8 +748,15 @@ mod tests {
                 })
                 .collect();
 
+            let expected_decision: BTreeSet<DecisionInputKey> = indices
+                .iter()
+                .filter_map(|&i| refs.get(i as usize))
+                .filter_map(DecisionInputKey::from_input_reference)
+                .collect();
+
             let census = census_of(&graph_reading_refs(&refs, &indices));
             prop_assert_eq!(&census.world_inputs, &expected);
+            prop_assert_eq!(&census.decision_inputs, &expected_decision);
 
             let doubled: Vec<u16> = indices.iter().chain(indices.iter()).copied().collect();
             let doubled_census = census_of(&graph_reading_refs(&refs, &doubled));

@@ -152,12 +152,23 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     }
 
     let evaluation_energy = *energy;
+    // The tick's decision state, copied once per dispatch (T19.F05): nothing
+    // commits mid-dispatch, so every context below reads the same values,
+    // and the copies let the later contexts coexist with `&mut side_outputs`.
+    let votes = side_outputs.votes;
+    let previous_pass_votes = side_outputs.previous_pass_votes;
+    let commit_counts = side_outputs.commit_counts;
+    let mesh_hops = side_outputs.work_counters.mesh_hops;
     let resolve_ctx = ResolveCtx {
         sensors,
         upstream_slots,
         energy: *energy,
         energy_consumed,
         action_queue: &side_outputs.action_queue,
+        votes: &votes,
+        previous_pass_votes: &previous_pass_votes,
+        commit_counts: &commit_counts,
+        mesh_hops,
     };
 
     for current_idx in 0..node_count {
@@ -233,6 +244,10 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             energy: *energy,
             energy_consumed,
             action_queue: &queue_snapshot,
+            votes: &votes,
+            previous_pass_votes: &previous_pass_votes,
+            commit_counts: &commit_counts,
+            mesh_hops,
         };
         let (plasticity_cost, plasticity_update_count, plasticity_changed_count) =
             hebbian::apply_hebbian_updates(
@@ -296,6 +311,10 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             energy: evaluation_energy,
             energy_consumed,
             action_queue: &queue_snapshot,
+            votes: &votes,
+            previous_pass_votes: &previous_pass_votes,
+            commit_counts: &commit_counts,
+            mesh_hops,
         };
         traces::update_eligibility_traces(
             def,
@@ -318,6 +337,10 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         energy: *energy,
         energy_consumed,
         action_queue: &queue_snapshot,
+        votes: &votes,
+        previous_pass_votes: &previous_pass_votes,
+        commit_counts: &commit_counts,
+        mesh_hops,
     };
     let (result, effects_trace) = apply_cgp_graph_effects(
         def,
@@ -413,6 +436,7 @@ mod work_counter_tests {
                 neighbor_occupied: [0.0; 8],
                 max_energy: 200.0,
                 age_ticks: 0.0,
+                previous_outcome: [0.0; 4],
             },
             typed_local_food: TypedFoodLocalSnapshot::zeroed(1),
             perception: PerceptionSnapshot::zeroed(1),

@@ -6,6 +6,7 @@ mod logging;
 mod ordering;
 mod phase0;
 mod phase_timing;
+mod previous_outcome;
 mod reproductive_success;
 mod support;
 mod trace;
