@@ -110,6 +110,9 @@ pub enum DynamicIntrospectionKey {
     EnergyCurrent,
     /// Total energy consumed by Eat actions this tick so far.
     EnergyConsumedThisTick,
+    /// Mesh hops dispatched this tick, the one in flight included; a raw
+    /// count (T19.F05).
+    HopsThisTick,
 }
 
 /// A reference to a specific input source for a node input slot.
@@ -126,6 +129,18 @@ pub enum InputReference {
     /// Compound: the creature's action queue. sub_idx maps to queue slot values:
     /// `sub_idx / 3` = queue slot index, `sub_idx % 3`: 0 = action_type, 1 = param0, 2 = param1.
     ActionQueue,
+    /// Compound (T19.F05): the current pass's vote vector, one sub-value per
+    /// `VoteSink` index, resolved live.
+    ActionVotes,
+    /// Compound (T19.F05): the vote vector at the previous pass's end; zeros
+    /// in the tick's first pass.
+    PreviousPassVotes,
+    /// Compound (T19.F05): the per-kind bars, one raw commit count per
+    /// `VoteKind` index, resolved live.
+    CommitCounts,
+    /// Compound (T19.F05): the previous tick's outcome channels, one per
+    /// `OutcomeChannel` discriminant, frozen at tick start.
+    PreviousOutcome,
 }
 
 #[cfg(test)]
@@ -176,8 +191,13 @@ mod tests {
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
             InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+            InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
             InputReference::UpstreamSlot(0),
             InputReference::ActionQueue,
+            InputReference::ActionVotes,
+            InputReference::PreviousPassVotes,
+            InputReference::CommitCounts,
+            InputReference::PreviousOutcome,
         ];
         for r in refs {
             let json = serde_json::to_string(&r).unwrap();

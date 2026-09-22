@@ -510,6 +510,7 @@ mod tests {
             MeshReadClass::Introspection,
             MeshReadClass::Upstream,
             MeshReadClass::ActionQueue,
+            MeshReadClass::Decision,
         ];
         let write_classes = [
             MeshWriteClass::Route,
@@ -545,7 +546,7 @@ mod tests {
         // order, so the endpoint bytes stay byte-identical for clients.
         let expected_read = concat!(
             r#""reachable_read_class_counts":{"#,
-            r#""action_queue":7,"barrier":3,"food":1,"introspection":5,"#,
+            r#""action_queue":7,"barrier":3,"decision":8,"food":1,"introspection":5,"#,
             r#""neighbor":2,"occupancy":4,"upstream":6}"#,
         );
         let expected_write = concat!(

@@ -206,6 +206,17 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
             .map(|row| row.key.clone())
             .collect();
         assert_eq!(keys, expected_keys, "tick {}", sample.tick);
+        let decision_keys: Vec<&str> = census
+            .decision_inputs
+            .iter()
+            .map(|row| row.key.as_str())
+            .collect();
+        assert_eq!(
+            decision_keys,
+            v3_core::creature::sensor_census::DecisionInputKey::ALL.map(|key| key.as_key()),
+            "tick {}",
+            sample.tick
+        );
         assert!(
             census.creatures_with_any_stateful_read
                 >= census

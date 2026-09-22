@@ -133,10 +133,14 @@ fn swap_alternatives_follow_the_kind_table() {
             ))),
         ]
     );
-    // The three introspection scalars form one kind.
+    // The four introspection scalars form one kind (T19.F05 adds
+    // `HopsThisTick`).
     let energy = InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent);
     let others = swap_alternatives(&energy, &config, 1);
-    assert_eq!(others.len(), 2);
+    assert_eq!(others.len(), 3);
+    assert!(others.contains(&InputReference::DynamicIntrospection(
+        DynamicIntrospectionKey::HopsThisTick
+    )));
     assert!(!others.contains(&energy));
     assert!(others
         .iter()
@@ -155,6 +159,8 @@ fn swap_alternatives_follow_the_kind_table() {
         InputReference::World(WorldInputKey::NearbyCreatureVitals),
         InputReference::World(WorldInputKey::NearbyCreatureIdentity),
         InputReference::ActionQueue,
+        InputReference::CommitCounts,
+        InputReference::PreviousOutcome,
     ] {
         assert!(
             swap_alternatives(&lone, &config, 4).is_empty(),
@@ -419,6 +425,54 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
     }
 }
 
+/// T19.F05 invariant 5: the two vote vectors swap with each other only;
+/// the decision compounds never share a kind with the introspection ones.
+#[test]
+fn decision_state_kinds_follow_the_swap_table() {
+    let config = default_config();
+    let kind = |reference: &InputReference| input_ref_kind(reference, &config);
+    let hops = InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick);
+    for (reference, class, width) in [
+        (InputReference::ActionVotes, MeshReadClass::Decision, 27),
+        (
+            InputReference::PreviousPassVotes,
+            MeshReadClass::Decision,
+            27,
+        ),
+        (InputReference::CommitCounts, MeshReadClass::Decision, 4),
+        (hops.clone(), MeshReadClass::Introspection, 1),
+        (
+            InputReference::PreviousOutcome,
+            MeshReadClass::Introspection,
+            4,
+        ),
+    ] {
+        assert_eq!(
+            kind(&reference),
+            InputRefKind { class, width },
+            "{reference:?}"
+        );
+    }
+    assert_eq!(
+        swap_alternatives(&InputReference::ActionVotes, &config, 3),
+        vec![InputReference::PreviousPassVotes]
+    );
+    assert_eq!(
+        swap_alternatives(&InputReference::PreviousPassVotes, &config, 3),
+        vec![InputReference::ActionVotes]
+    );
+    let mut hops_partners = swap_alternatives(&hops, &config, 1);
+    hops_partners.sort_by_key(|reference| format!("{reference:?}"));
+    assert_eq!(
+        hops_partners,
+        vec![
+            InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
+            InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
+        ]
+    );
+}
+
 // ─── Invariants 1 and 2 over generated genomes (T11.F22) ────────────────────
 
 proptest! {
@@ -564,14 +618,19 @@ fn random_input_reference_covers_all_categories() {
             InputReference::DynamicIntrospection(_) => "DynamicIntrospection".to_string(),
             InputReference::UpstreamSlot(_) => "UpstreamSlot".to_string(),
             InputReference::ActionQueue => "ActionQueue".to_string(),
+            InputReference::ActionVotes => "ActionVotes".to_string(),
+            InputReference::PreviousPassVotes => "PreviousPassVotes".to_string(),
+            InputReference::CommitCounts => "CommitCounts".to_string(),
+            InputReference::PreviousOutcome => "PreviousOutcome".to_string(),
         };
         categories.insert(cat);
     }
-    // 14 categories: 8 original + 6 extended perception families
+    // 18 categories: 8 original + 6 extended perception families + the four
+    // decision-state compounds (T19.F05; `HopsThisTick` is a dynamic key).
     assert_eq!(
         categories.len(),
-        14,
-        "all 14 input reference categories must be reachable; got {:?}",
+        18,
+        "all 18 input reference categories must be reachable; got {:?}",
         categories
     );
 }

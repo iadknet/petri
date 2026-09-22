@@ -58,6 +58,13 @@ fn census_for(population: u64) -> SensorCensus {
                 creatures: if key == food_here { population } else { 0 },
             })
             .collect(),
+        decision_inputs: DecisionInputKey::ALL
+            .into_iter()
+            .map(|key| DecisionInputCensusRow {
+                key: key.as_key().to_string(),
+                creatures: 0,
+            })
+            .collect(),
         creatures_reading_shared_memory: population / 2,
         creatures_with_stateful_node: population / 4,
         creatures_with_any_stateful_read: population / 2,
@@ -331,6 +338,15 @@ fn the_extinction_checkpoint_reports_absent_means_and_a_zero_clade_count() {
         "every key universe row is a true zero: {census:?}"
     );
     assert!(!census.world_inputs.is_empty());
+    assert_eq!(
+        census
+            .decision_inputs
+            .iter()
+            .map(|row| (row.key.as_str(), row.creatures))
+            .collect::<Vec<_>>(),
+        DecisionInputKey::ALL.map(|key| (key.as_key(), 0)).to_vec(),
+        "the five decision rows are present and zero"
+    );
     assert_eq!(census.creatures_reading_shared_memory, 0);
     assert_eq!(census.creatures_with_stateful_node, 0);
     assert_eq!(census.creatures_with_any_stateful_read, 0);
@@ -1451,4 +1467,91 @@ fn extinction_yields_an_empty_profile_table_not_an_absent_one() {
         value["surviving_clade_profiles"],
         serde_json::json!({ "definition": "surviving-clade-profile-v1", "rows": [] })
     );
+}
+
+/// T19.F05: each decision-state input's row counts the living creatures
+/// with a live reference to it, once per creature, and every row is present.
+#[test]
+fn decision_input_rows_count_each_referencing_creature_once() {
+    use v3_core::contracts::{DynamicIntrospectionKey, InputReference, NodeId};
+    use v3_core::creature::genome::VmInstruction;
+    use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef};
+
+    fn reading(refs: Vec<InputReference>) -> CreatureGenome {
+        let mut program = Vec::new();
+        for ref_idx in 0..refs.len() as u16 {
+            program.push(VmInstruction::ReadInput {
+                dst: 0,
+                ref_idx,
+                sub_idx: 0,
+            });
+            program.push(VmInstruction::WriteInternalPayload {
+                slot_idx: 0,
+                src: 0,
+            });
+        }
+        program.push(VmInstruction::Halt);
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: refs,
+                targets: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program,
+                }),
+            }],
+        }
+    }
+
+    let mut config = SimulationConfig::default();
+    config.population.initial_creatures = 3;
+    let mut sim = seed_simulation(config, 11);
+    let ids: Vec<_> = sim.creatures.keys().collect();
+    let hops = InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick);
+    for (id, refs) in ids.iter().zip([
+        vec![
+            InputReference::ActionVotes,
+            InputReference::ActionVotes,
+            hops,
+        ],
+        vec![InputReference::ActionVotes, InputReference::PreviousOutcome],
+        vec![],
+    ]) {
+        sim.creatures[*id].genome = reading(refs);
+        sim.creatures[*id].cached_reachable_nodes = vec![0].into_boxed_slice();
+    }
+
+    let census = SensorCensus::observe(&sim);
+
+    let rows: Vec<(&str, u64)> = census
+        .decision_inputs
+        .iter()
+        .map(|row| (row.key.as_str(), row.creatures))
+        .collect();
+    assert_eq!(
+        rows,
+        vec![
+            ("ActionVotes", 2),
+            ("PreviousPassVotes", 0),
+            ("CommitCounts", 0),
+            ("HopsThisTick", 1),
+            ("PreviousOutcome", 1),
+        ]
+    );
+}
+
+/// A census written before T19.F05 has no decision rows and still loads.
+#[test]
+fn a_census_without_decision_rows_still_loads() {
+    let mut value = serde_json::to_value(census_for(4)).expect("serializes");
+    value
+        .as_object_mut()
+        .expect("an object")
+        .remove("decision_inputs");
+    let loaded: SensorCensus = serde_json::from_value(value).expect("loads");
+    assert!(loaded.decision_inputs.is_empty());
+    assert_eq!(loaded.world_inputs, census_for(4).world_inputs);
 }

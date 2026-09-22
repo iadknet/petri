@@ -113,9 +113,12 @@ fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
             | WorldInputKey::NearbyCreatureVitals
             | WorldInputKey::NearbyCreatureIdentity => MeshReadClass::Neighbor,
         },
-        InputReference::StaticIntrospection(_) | InputReference::DynamicIntrospection(_) => {
-            MeshReadClass::Introspection
-        }
+        InputReference::StaticIntrospection(_)
+        | InputReference::DynamicIntrospection(_)
+        | InputReference::PreviousOutcome => MeshReadClass::Introspection,
+        InputReference::ActionVotes
+        | InputReference::PreviousPassVotes
+        | InputReference::CommitCounts => MeshReadClass::Decision,
         InputReference::UpstreamSlot(_) => MeshReadClass::Upstream,
         InputReference::ActionQueue => MeshReadClass::ActionQueue,
     }

@@ -336,6 +336,7 @@ mod tests {
             neighbor_occupied: [0.0; 8],
             max_energy: 200.0,
             age_ticks: 0.0,
+            previous_outcome: [0.0; 4],
         };
         assert_eq!(
             WorldInputKey::NeighborFoodRing {

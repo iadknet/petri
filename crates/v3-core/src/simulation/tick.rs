@@ -9,7 +9,7 @@ use rayon::prelude::*;
 use crate::config::{EnergyConfig, OrdinaryFoodTypeId};
 use crate::contracts::{CreatureId, Direction, Position, WorldAction};
 use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType, NO_DIRECTION};
-use crate::creature::genome::BackendDef;
+use crate::creature::genome::{BackendDef, OUTCOME_CHANNEL_COUNT};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::runtime::mesh::execute_creature_mesh;
@@ -1096,10 +1096,14 @@ fn run_phase_2(
     compute
 }
 
-/// Phase 2.5: reward-modulated learning pass.
+/// Phase 2.5: the outcome store and the reward-modulated learning pass.
 ///
-/// For each creature with reward-modulated graph nodes, compute outcome signals
-/// and apply three-factor weight updates using eligibility traces.
+/// Every living creature stores this tick's outcome signal bank as its
+/// `previous_outcome` (T19.F05): energy now minus the post-Phase-0 snapshot,
+/// computed before any reward debit; a creature born this tick has no
+/// record and stores zeros. For each creature with reward-modulated graph
+/// nodes, the same bank then drives three-factor weight updates using
+/// eligibility traces.
 fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
     use super::energy_accounting::{applied_debit, observe_energy_change, DeathCause};
     let reward_cost = sim.config.runtime.reward_learning_cost;
@@ -1107,10 +1111,15 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
     // Collect IDs to avoid borrow conflict (need &mut creature + &sim.config).
     let ids: Vec<CreatureId> = sim.creatures.keys().collect();
     for id in ids {
-        let creature = match sim.creatures.get(id) {
-            Some(c) => c,
-            None => continue,
+        let Some(creature) = sim.creatures.get_mut(id) else {
+            continue;
         };
+
+        // Newborns spawned this tick have no outcome record.
+        let signals = outcome_acc.compute_signal_bank(id, creature.energy);
+        creature.previous_outcome = signals
+            .as_ref()
+            .map_or([0.0; OUTCOME_CHANNEL_COUNT], |bank| bank.signals);
 
         // Check if any mesh node has reward-modulated plasticity.
         let has_reward = creature.genome.nodes.iter().any(|node| {
@@ -1120,22 +1129,11 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
                 false
             }
         });
-        if !has_reward {
+        let Some(signals) = signals.filter(|_| has_reward) else {
             continue;
-        }
-
-        // Compute outcome signal bank for this creature.
-        let energy_after = creature.energy;
-        let signals = match outcome_acc.compute_signal_bank(id, energy_after) {
-            Some(s) => s,
-            None => continue, // Newborn spawned this tick — no outcome record.
         };
 
         // Apply reward-modulated updates per mesh node.
-        let creature = match sim.creatures.get_mut(id) {
-            Some(c) => c,
-            None => continue,
-        };
         for (node_idx, node) in creature.genome.nodes.iter().enumerate() {
             if let BackendDef::Graph(ref def) = node.backend_def {
                 if has_any_reward_modulated(def) {

@@ -1325,6 +1325,7 @@ fn empty_sensor_snapshot() -> SensorSnapshot {
             neighbor_occupied: [0.0; 8],
             max_energy: 200.0,
             age_ticks: 0.0,
+            previous_outcome: [0.0; 4],
         },
         typed_local_food: TypedFoodLocalSnapshot::zeroed(1),
         perception: PerceptionSnapshot::zeroed(1),

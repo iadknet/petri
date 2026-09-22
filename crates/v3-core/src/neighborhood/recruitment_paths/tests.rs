@@ -1019,7 +1019,8 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 /// unprepared forms open with `InputRef.Add` of the ring beside the copied
 /// `FoodHere` and move each consumer onto it; `vm_unprepared` replaces the
 /// zeroed direction vote with the `Move(E)` vote in one
-/// `VmInstructionMutation`.
+/// `VmInstructionMutation`. T19.F05 moved the `InputRef.Add` seeds: the
+/// input-reference draw grows from 22 to 27 entries.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1042,7 +1043,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
         [
             (
                 "graph_blank",
-                vec![(InputRefAdd, 1), (GraphAddGraphEdge, 57), swap],
+                vec![(InputRefAdd, 201), (GraphAddGraphEdge, 57), swap],
                 None,
             ),
             ("graph_copy", vec![(GraphAddGraphEdge, 103), swap], None),
@@ -1050,7 +1051,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             (
                 "vm_blank",
                 vec![
-                    (InputRefAdd, 1),
+                    (InputRefAdd, 201),
                     (VmInstructionMutation, 1279),
                     (VmInstructionMutation, 2189),
                     swap,
@@ -1061,7 +1062,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             (
                 "graph_unprepared",
                 vec![
-                    (InputRefAdd, 68),
+                    (InputRefAdd, 1),
                     (GraphRetargetGraphEdge, 32),
                     (GraphRemoveGraphEdge, 5),
                     (GraphAddGraphEdge, 103),
@@ -1072,7 +1073,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             (
                 "vm_unprepared",
                 vec![
-                    (InputRefAdd, 68),
+                    (InputRefAdd, 1),
                     (VmInstructionRawFieldMutation, 18),
                     (VmInstructionRawFieldMutation, 25),
                     (VmInstructionRawFieldMutation, 25),
@@ -1083,13 +1084,13 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             ),
             (
                 "graph_detour",
-                vec![(InputRefAdd, 1), (GraphAddGraphEdge, 57)],
+                vec![(InputRefAdd, 201), (GraphAddGraphEdge, 57)],
                 None,
             ),
             (
                 "vm_detour",
                 vec![
-                    (InputRefAdd, 1),
+                    (InputRefAdd, 201),
                     (VmInstructionMutation, 1279),
                     (VmInstructionMutation, 2189),
                 ],

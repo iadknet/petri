@@ -806,19 +806,21 @@ mod tests {
         // which again changes topology draws and downstream RNG history.
         // Re-pinned by T19.F04: the 97-unit vote founder draws fewer events
         // per birth and its graph decision node changes every
-        // node-internal draw.
+        // node-internal draw. Re-pinned by T19.F05: the input-reference draw
+        // grows from 22 to 27 entries, so every input-reference event draws
+        // differently.
         assert_eq!(reading.cohort.created, 12);
-        assert_eq!(reading.cohort.dispatched(), 5);
-        // Seven cohort modules reached dispatch, the median four generations
+        assert_eq!(reading.cohort.dispatched(), 4);
+        // Six cohort modules reached dispatch, the median five generations
         // after the birth that created them: later births, or a dispatch date
         // taken only at the closing checkpoint, would both read higher.
         assert_eq!(
             reading.time_to_first(CohortFact::Dispatch),
             &TimeToFirst {
-                reached: 7,
-                median_generations: Some(4),
+                reached: 6,
+                median_generations: Some(5),
                 censored_deleted: 0,
-                censored_present: 5,
+                censored_present: 6,
             },
         );
         // T11.F22 re-pin: the within-kind `Swap` and consumer-preserving

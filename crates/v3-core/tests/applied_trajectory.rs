@@ -69,14 +69,15 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "dcf75b04b54fd748385b13087fa8073f00ea9cc662fbdc57961a4f7d2e64e1e8"
+        "14541daa2c01ba8b8a01ade8ced9efd2176d27f155f77a9c7aa64dc325307226"
     );
 }
 
 /// Applied-behavior guard: a mutation-on short run digested over positions,
 /// energy bits, and ages only, with no genome bytes. T19.F03 held it through
 /// the inert vote surface; T19.F04 moves it by construction (the founder's
-/// actions now come from votes) and re-pins it after two agreeing runs.
+/// actions now come from votes) and re-pins it after two agreeing runs;
+/// T19.F05 re-pins both digests here for the 27-entry input-reference draw.
 #[test]
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     let mut hash = Sha256::new();
@@ -110,6 +111,6 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "5e094be34106a2d4f6cce8d854f2c698bb958f8b5dbf4b5b008ce281472f4a68"
+        "03761998705760977cbe31da198d2afda2da189b3b6ac31c011e557bea9fb431"
     );
 }

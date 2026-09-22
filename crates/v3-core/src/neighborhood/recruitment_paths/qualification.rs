@@ -790,21 +790,23 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 // activates with one edge into the `Move(E)` vote sink, a VM module with one
 // `AddVote`), the fresh-instruction draw lost four opcodes and gained
 // `AddVote`, and the edge-surface draw covers the vote and parameter sinks.
+// Re-pinned by T19.F05: the input-reference draw grows from 22 to 27
+// entries, which moves the cue and ring additions.
 
 const SWAP: u64 = 0;
-const GRAPH_BLANK_SEEDS: &[u64] = &[1, 57, SWAP];
-const GRAPH_DETOUR_SEEDS: &[u64] = &[1, 57];
+const GRAPH_BLANK_SEEDS: &[u64] = &[201, 57, SWAP];
+const GRAPH_DETOUR_SEEDS: &[u64] = &[201, 57];
 const GRAPH_COPY_SEEDS: &[u64] = &[103, SWAP];
 const GRAPH_SPLIT_SEEDS: &[u64] = &[103, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
 /// Ring, retarget, remove north, add east, swap.
-const GRAPH_UNPREPARED_SEEDS: &[u64] = &[68, 32, 5, 103, SWAP];
+const GRAPH_UNPREPARED_SEEDS: &[u64] = &[1, 32, 5, 103, SWAP];
 /// Ring, ref_idx, sub_idx, sub_idx, vote to east, swap.
-const VM_UNPREPARED_SEEDS: &[u64] = &[68, 18, 25, 25, 66_421, SWAP];
+const VM_UNPREPARED_SEEDS: &[u64] = &[1, 18, 25, 25, 66_421, SWAP];
 /// Cue, read, vote, swap.
-const VM_BLANK_SEEDS: &[u64] = &[1, 1279, 2189, SWAP];
+const VM_BLANK_SEEDS: &[u64] = &[201, 1279, 2189, SWAP];
 /// Cue, read, vote.
-const VM_DETOUR_SEEDS: &[u64] = &[1, 1279, 2189];
+const VM_DETOUR_SEEDS: &[u64] = &[201, 1279, 2189];
 
 /// Every starting form's plan with its pinned seeds, in the fixed family
 /// order.

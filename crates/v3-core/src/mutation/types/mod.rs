@@ -71,6 +71,7 @@ pub enum MutationAddedNodeInputClass {
     Introspection,
     Upstream,
     ActionQueue,
+    Decision,
 }
 
 impl MutationAddedNodeInputClass {
@@ -85,6 +86,7 @@ impl MutationAddedNodeInputClass {
             Self::Introspection => "introspection",
             Self::Upstream => "upstream",
             Self::ActionQueue => "action_queue",
+            Self::Decision => "decision",
         }
     }
 }
@@ -106,9 +108,12 @@ impl From<&InputReference> for MutationAddedNodeInputClass {
                 | WorldInputKey::NearbyCreatureVitals
                 | WorldInputKey::NearbyCreatureIdentity => Self::Neighbor,
             },
-            InputReference::StaticIntrospection(_) | InputReference::DynamicIntrospection(_) => {
-                Self::Introspection
-            }
+            InputReference::StaticIntrospection(_)
+            | InputReference::DynamicIntrospection(_)
+            | InputReference::PreviousOutcome => Self::Introspection,
+            InputReference::ActionVotes
+            | InputReference::PreviousPassVotes
+            | InputReference::CommitCounts => Self::Decision,
             InputReference::UpstreamSlot(_) => Self::Upstream,
             InputReference::ActionQueue => Self::ActionQueue,
         }

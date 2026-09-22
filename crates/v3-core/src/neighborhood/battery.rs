@@ -84,6 +84,7 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
             neighbor_occupied,
             age_ticks: age_fraction(age, lifecycle.age_reference_ticks),
             max_energy: lifecycle.max_energy,
+            previous_outcome: [0.0; 4],
         },
         typed_local_food: TypedFoodLocalSnapshot {
             food_here_by_type,

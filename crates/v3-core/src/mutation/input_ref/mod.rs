@@ -51,6 +51,11 @@ fn input_reference_universe(food_type_count: usize) -> Vec<InputReference> {
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
             InputReference::ActionQueue,
+            InputReference::ActionVotes,
+            InputReference::PreviousPassVotes,
+            InputReference::CommitCounts,
+            InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
+            InputReference::PreviousOutcome,
         ])
         .chain((0..OUTPUT_SLOT_COUNT).map(InputReference::UpstreamSlot))
         .collect()
@@ -70,7 +75,8 @@ fn alternatives_in<'a>(
 
 /// The other members of `entry`'s kind: what a `Swap` may replace it with.
 /// Empty when the entry is the only member of its kind at this food type
-/// count (every ring, summary, neighbor and queue reference; typed food at
+/// count (every ring, summary, neighbor and queue reference, `CommitCounts`
+/// and `PreviousOutcome`; typed food at
 /// one food type), so such an entry is not swappable.
 #[must_use]
 pub fn swap_alternatives(

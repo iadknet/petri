@@ -390,6 +390,10 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                         energy: effective as f32,
                         energy_consumed: energy_consumed + debt as f32,
                         action_queue: &side_outputs.action_queue,
+                        votes: &side_outputs.votes,
+                        previous_pass_votes: &side_outputs.previous_pass_votes,
+                        commit_counts: &side_outputs.commit_counts,
+                        mesh_hops: side_outputs.work_counters.mesh_hops,
                     };
                     resolve_input(&input_refs[*ref_idx as usize], *sub_idx, &ctx)
                 } else {

@@ -1,5 +1,6 @@
 use crate::config::{EnergyLifecycleConfig, OrdinaryFoodTypeId};
 use crate::contracts::{Direction, StaticIntrospectionKey, WorldInputKey};
+use crate::creature::genome::{OutcomeChannel, OUTCOME_CHANNEL_COUNT};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 
@@ -30,6 +31,26 @@ pub struct StaticInputs {
     /// `EnergyLifecycleConfig::max_energy`: the denominator for the live
     /// energy introspection reads.
     pub max_energy: f32,
+    /// The previous tick's outcome channels (`PreviousOutcome`, T19.F05),
+    /// indexed by `OutcomeChannel` discriminant: the energy channels as
+    /// fractions of `max_energy`, the other two as stored.
+    pub previous_outcome: [f32; OUTCOME_CHANNEL_COUNT],
+}
+
+/// The `PreviousOutcome` read of a stored outcome bank: `EnergyDelta` over
+/// `max_energy` clamped to [-1, 1], `DamageDelta` over `max_energy` clamped
+/// to [-1, 0], `ActionSuccess` and `OffspringSuccess` as stored.
+#[must_use]
+pub fn previous_outcome_read(
+    stored: &[f32; OUTCOME_CHANNEL_COUNT],
+    max_energy: f32,
+) -> [f32; OUTCOME_CHANNEL_COUNT] {
+    let mut read = *stored;
+    let energy = OutcomeChannel::EnergyDelta as usize;
+    let damage = OutcomeChannel::DamageDelta as usize;
+    read[energy] = (stored[energy] / max_energy).clamp(-1.0, 1.0);
+    read[damage] = (stored[damage] / max_energy).clamp(-1.0, 0.0);
+    read
 }
 
 /// `value / max` clamped to [0, 1]: the unit-scale read of an energy quantity
@@ -117,6 +138,7 @@ pub fn assemble_static_inputs(
         neighbor_occupied,
         age_ticks: age_fraction(creature.age, lifecycle.age_reference_ticks),
         max_energy: lifecycle.max_energy,
+        previous_outcome: previous_outcome_read(&creature.previous_outcome, lifecycle.max_energy),
     }
 }
 
@@ -349,5 +371,40 @@ mod tests {
             type_idx: OrdinaryFoodTypeId::default(),
         });
         assert_eq!(result, 0.0);
+    }
+
+    /// The `PreviousOutcome` read scales the two energy channels by
+    /// `max_energy` into their clamps and passes the other two through.
+    #[test]
+    fn previous_outcome_read_scales_and_clamps_the_energy_channels() {
+        assert_eq!(
+            previous_outcome_read(&[50.0, 0.5, -20.0, 2.0], 200.0),
+            [0.25, 0.5, -0.1, 2.0]
+        );
+        assert_eq!(
+            previous_outcome_read(&[-900.0, 1.0, -900.0, 0.0], 200.0),
+            [-1.0, 1.0, -1.0, 0.0]
+        );
+        assert_eq!(
+            previous_outcome_read(&[900.0, 0.0, 5.0, 0.0], 200.0),
+            [1.0, 0.0, 0.0, 0.0]
+        );
+    }
+
+    #[test]
+    fn assembly_reads_the_creature_outcome_store() {
+        let world = make_world(8, 8);
+        let mut ids: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let mut creature = make_creature(ids.insert(()), Position::new(2, 2));
+        let lifecycle = SimulationConfig::default().energy.lifecycle;
+        assert_eq!(
+            assemble_static_inputs(&world, &creature, &lifecycle).previous_outcome,
+            [0.0; OUTCOME_CHANNEL_COUNT]
+        );
+        creature.previous_outcome = [lifecycle.max_energy / 4.0, 1.0, 0.0, 1.0];
+        assert_eq!(
+            assemble_static_inputs(&world, &creature, &lifecycle).previous_outcome,
+            [0.25, 1.0, 0.0, 1.0]
+        );
     }
 }

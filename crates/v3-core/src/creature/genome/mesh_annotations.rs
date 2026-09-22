@@ -17,6 +17,9 @@ pub enum MeshReadClass {
     Introspection,
     Upstream,
     ActionQueue,
+    /// The in-tick decision state (T19.F05): `ActionVotes`,
+    /// `PreviousPassVotes`, `CommitCounts`.
+    Decision,
 }
 
 #[derive(
@@ -153,9 +156,12 @@ pub(crate) fn collect_live_vm_instruction_indices(vm: &VmBackendDef) -> Vec<usiz
 pub(crate) fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
     match input_ref {
         InputReference::World(key) => classify_world_input(key),
-        InputReference::StaticIntrospection(_) | InputReference::DynamicIntrospection(_) => {
-            MeshReadClass::Introspection
-        }
+        InputReference::StaticIntrospection(_)
+        | InputReference::DynamicIntrospection(_)
+        | InputReference::PreviousOutcome => MeshReadClass::Introspection,
+        InputReference::ActionVotes
+        | InputReference::PreviousPassVotes
+        | InputReference::CommitCounts => MeshReadClass::Decision,
         InputReference::UpstreamSlot(_) => MeshReadClass::Upstream,
         InputReference::ActionQueue => MeshReadClass::ActionQueue,
     }
