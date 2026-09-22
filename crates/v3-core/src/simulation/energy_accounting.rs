@@ -7,6 +7,7 @@ pub enum DeathCause {
     GenomeCarrying,
     VmCompute,
     GraphCompute,
+    MeshRamp,
     HebbianLearning,
     RewardLearning,
     PriorityBid,
@@ -23,11 +24,12 @@ pub enum DeathCause {
 }
 
 impl DeathCause {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::LifecycleDecay,
         Self::GenomeCarrying,
         Self::VmCompute,
         Self::GraphCompute,
+        Self::MeshRamp,
         Self::HebbianLearning,
         Self::RewardLearning,
         Self::PriorityBid,
@@ -50,6 +52,7 @@ impl DeathCause {
             Self::GenomeCarrying => "genome_carrying",
             Self::VmCompute => "vm_compute",
             Self::GraphCompute => "graph_compute",
+            Self::MeshRamp => "mesh_ramp",
             Self::HebbianLearning => "hebbian_learning",
             Self::RewardLearning => "reward_learning",
             Self::PriorityBid => "priority_bid",
@@ -117,6 +120,8 @@ pub(crate) fn decay_partition(before: f32, after: f32, decay: f32) -> (f64, f64)
 pub struct CognitionEnergyObservation {
     pub vm_compute: f64,
     pub graph_compute: f64,
+    /// Per-tick hop ramp charged in the mesh loop before each dispatch (T19.F01).
+    pub mesh_ramp: f64,
     pub hebbian_learning: f64,
     pub priority_bid: f64,
     pub pending_cause: Option<DeathCause>,
@@ -141,6 +146,7 @@ pub struct EnergyFlows {
     pub vm_compute: f64,
     pub priority_bid: f64,
     pub graph_compute: f64,
+    pub mesh_ramp: f64,
     pub hebbian_learning: f64,
     pub reward_learning: f64,
     pub lifecycle_decay: f64,
@@ -161,6 +167,7 @@ impl EnergyFlows {
         self.vm_compute += observation.vm_compute;
         self.priority_bid += observation.priority_bid;
         self.graph_compute += observation.graph_compute;
+        self.mesh_ramp += observation.mesh_ramp;
         self.hebbian_learning += observation.hebbian_learning;
     }
 }
@@ -172,10 +179,10 @@ mod tests {
 
     proptest! {
         #[test]
-        fn cause_keys_follow_the_stable_report_schema(index in 0usize..17) {
+        fn cause_keys_follow_the_stable_report_schema(index in 0usize..DeathCause::ALL.len()) {
             let expected = [
                 "lifecycle_decay", "genome_carrying", "vm_compute", "graph_compute",
-                "hebbian_learning", "reward_learning", "priority_bid", "action_noop",
+                "mesh_ramp", "hebbian_learning", "reward_learning", "priority_bid", "action_noop",
                 "action_eat", "action_move", "action_reproduce", "action_steal_energy",
                 "failed_action_penalty", "parental_transfer", "predation",
                 "external_removal", "unattributed",
@@ -186,7 +193,7 @@ mod tests {
         #[test]
         fn unchanged_energy_preserves_pending_attribution(
             positive in 0.001f64..1.0e6,
-            cause in 0usize..17,
+            cause in 0usize..DeathCause::ALL.len(),
         ) {
             for energy in [-positive, 0.0, positive] {
                 for initial in [None, Some(DeathCause::ALL[cause])] {
@@ -198,7 +205,7 @@ mod tests {
         }
 
         #[test]
-        fn mortality_counts_partition_every_removal(causes in prop::collection::vec(0usize..17, 0..200)) {
+        fn mortality_counts_partition_every_removal(causes in prop::collection::vec(0usize..DeathCause::ALL.len(), 0..200)) {
             let mut totals = MortalityTotals::default();
             for &index in &causes {
                 totals.record(DeathCause::ALL[index]);
@@ -214,8 +221,8 @@ mod tests {
         fn pending_cause_retains_first_crossing_until_positive_recovery(
             positive in 0.001f64..1.0e6,
             overshoot in -1.0e6f64..=0.0,
-            first in 0usize..17,
-            second in 0usize..17,
+            first in 0usize..DeathCause::ALL.len(),
+            second in 0usize..DeathCause::ALL.len(),
         ) {
             let mut pending = None;
             observe_energy_change(&mut pending, positive, overshoot, DeathCause::ALL[first]);

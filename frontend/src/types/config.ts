@@ -223,6 +223,8 @@ export interface RuntimeConfig {
 	graph_node_base_cost: number;
 	plasticity_update_cost: number;
 	reward_learning_cost: number;
+	hop_ramp_allowance: number;
+	hop_ramp_cost: number;
 	max_actions_per_turn: number;
 	vm: VmConfig;
 	perception: PerceptionRuntimeConfig;

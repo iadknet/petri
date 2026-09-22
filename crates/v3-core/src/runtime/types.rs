@@ -66,6 +66,8 @@ pub struct ComputeCostReport {
     pub vm_cost: f32,
     /// Total energy deducted from executing Graph nodes this tick.
     pub graph_cost: f32,
+    /// Total energy deducted by the per-tick hop ramp this tick (T19.F01).
+    pub mesh_ramp_cost: f32,
 }
 
 /// Accumulated side outputs from VM/graph node execution within a single mesh evaluation.

@@ -570,7 +570,8 @@ impl TickComputeStats {
     /// deterministic regardless of the parallel mesh phase's thread scheduling.
     fn record(&mut self, output: &MeshOutput) {
         let compute_cost = &output.cost_report;
-        let total_cost = compute_cost.vm_cost + compute_cost.graph_cost;
+        let total_cost =
+            compute_cost.vm_cost + compute_cost.graph_cost + compute_cost.mesh_ramp_cost;
         self.total_sum += total_cost;
         if total_cost < self.total_min {
             self.total_min = total_cost;
