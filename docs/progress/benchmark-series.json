@@ -50,7 +50,8 @@
       "docs/progress/features/t17-f02-unit-scale-introspection.json",
       "docs/progress/features/t13-f07-current-policy-recruitment-transitions.json",
       "docs/progress/features/t19-f01-per-tick-hop-ramp.json",
-      "docs/progress/features/t19-f02-live-internal-state-and-legal-cycles.json"
+      "docs/progress/features/t19-f02-live-internal-state-and-legal-cycles.json",
+      "docs/progress/features/t19-f04-vote-based-action-selection.json"
     ]
   },
   "goal": {
