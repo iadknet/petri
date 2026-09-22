@@ -122,7 +122,7 @@ resets per dispatch; the hop index is per tick.
 6. **Founder and trajectory neutrality.** With the allowance above every
    measured chain, the production charge is zero for every creature-tick of
    the gate and goal profiles. The founder-only trajectory digest pinned by
-   `founder_only_trajectory_digest_is_pinned` (`5ad9e8e1…`) is unchanged, and
+   `founder_only_trajectory_digest_is_pinned` (`63498f8d…`) is unchanged, and
    both profiles' `deterministic` blocks are identical to T13.F07's except for
    the two new zero-valued fields and each goal case's `config_digest`, which
    changes because the two new fields serialize (reported as `inputs_changed`,
@@ -155,18 +155,18 @@ resets per dispatch; the hop index is per tick.
 
 ## Verification
 
-- [x] Viability — founder survival and tick-loop soundness under the ramp:
-      `cargo test -p v3-core --test viability`, 28 passed, 0 failed.
+- [x] Viability under the ramp: `cargo test -p v3-core --test viability`,
+      28 passed, 0 failed.
 - [ ] Whole-repo gate (Rust, frontend, docs): `make check`, run by the
       orchestrator.
-- [x] Focused tests for invariants 1–5 and the config contract: the six
+- [x] Focused tests for invariants 1–5 and the config contract: the seven
       `hop_ramp` tests in `crates/v3-core/src/runtime/mesh.rs` (two proptests),
       the `mesh_ramp` accounting tests in `crates/v3-core/src/simulation/` and
-      `crates/v3-cli/src/bench/tracking/tests.rs`, and the four hop-ramp config
-      tests in `crates/v3-core/src/config/simulation.rs`; names and claims in
+      `crates/v3-cli/src/bench/tracking/tests.rs`, and the four config tests in
+      `crates/v3-core/src/config/simulation.rs`; claims in
       [`docs/progress/readings/t19-f01.md`](../../progress/readings/t19-f01.md).
 - [x] Founder trajectory unchanged: `founder_only_trajectory_digest_is_pinned`
-      on `5ad9e8e1484792ab566c8ecac7466fffac3bb2b92bb4dd72e9ce7cb49ade36a9`.
+      on `63498f8d36346079f8827c382e2978510357b374ca37759af857afa263f2d0be`.
 - [x] Suites and lints: `cargo test -p v3-core` 1635 + 91 passed, 0 failed;
       `cargo test -p v3-cli --lib` 120 passed, 0 failed; `cargo clippy --workspace --all-targets` and `cargo fmt --all
       --check` clean.
@@ -174,6 +174,11 @@ resets per dispatch; the hop index is per tick.
       and every survivor resolved as killed, equivalent, or deferred.
 - [x] Benchmark summaries stored, raw hash/byte count and verification
       time checked, series entries appended, no full report staged.
+- [x] Review remediation: one P1 (a stale founder digest, corrected here and
+      in invariant 6) and five P3 — two readings corrections, the founder hop
+      assertion tightened to the exact count of 2, a new mesh test pinning
+      invariant 3's debit-before-read ordering, one item deferred below.
+      Rerun clean: mesh tests 23 passed, viability 28 passed, clippy, fmt.
 
 ## Performance and Goal Impact
 
@@ -184,8 +189,8 @@ same accounting as decay, compute, and actions.
 
 Predeclared compute cost: one saturating subtraction, one multiply, one
 subtraction, and one comparison per mesh hop (2.28 hops per creature-tick on
-the goal profile). Wall time is predeclared flat; a wall flag (+25%) is
-accepted as host noise and a wall severe (+100%) is investigated, not accepted.
+the goal profile). Wall time is predeclared flat; a flag (+25%) is accepted
+as host noise, a severe (+100%) is investigated.
 No epoch re-pin is budgeted for either profile and none may be taken: the
 track's Epochs note binds T19.F01 to unchanged applied behavior.
 
@@ -213,16 +218,14 @@ is a spec-owner escalation, not an accepted cost.
 `severe=false` against the epoch and T13.F07, no threshold crossed, no
 re-pin. All six counters 0.000000% on both profiles; `mesh_ramp` 0.000000 and
 0 deaths in every world. The `deterministic` rows are met on the two
-committed summaries: an order-insensitive diff of their `deterministic`
-blocks lists exactly 15 differences, all predeclared in kind — seven
-`config_digest` values (three cases, three profile cases, and
-`recruitment_paths.config_digest`, whose echoed `config.runtime` block also
-carries the two new fields) and six `mesh_ramp` keys at zero. A shape
-difference reported during the run (`sampled_genomes` against
-`mesh_summary`, `proposals` against `proposal_count`) is the T15.F01 summary
-projection in `crates/v3-cli/src/bench/artifacts.rs` seen from the
-unprojected raw block; both committed summaries carry the projected keys, so
-it is not a deviation.
+committed summaries: an order-insensitive diff lists exactly 15 predeclared
+differences — seven `config_digest` values (three cases, three profile
+cases, and `recruitment_paths.config_digest`, whose echoed `config.runtime`
+block also carries the two new fields) and six zero `mesh_ramp` keys. The
+`sampled_genomes`/`mesh_summary` and `proposals`/`proposal_count` shape
+difference is the T15.F01 summary projection
+(`crates/v3-cli/src/bench/artifacts.rs`) seen from the unprojected raw
+block; both summaries carry the projected keys.
 
 - Summaries: [gate](../../progress/features/t19-f01-per-tick-hop-ramp.json),
   [goal](../../progress/features/t19-f01-per-tick-hop-ramp-goal.json).
@@ -243,7 +246,10 @@ it is not a deviation.
 
 ## Notes for AI Agents
 
-- Decision: the orchestrator for this run is Fable 5.1 rather than the Opus 5
-  the workflow's start check names, because the user launched the session
-  with Fable and set the advisor to Fable deliberately; the orchestrator
-  proceeded rather than stall.
+- Decision: the orchestrator for this run is Fable 5.1, not the Opus 5 the
+  workflow's start check names: the user launched the session with Fable and
+  set the advisor to Fable deliberately.
+- Deferred: adding one energy-flow key touches `CognitionEnergyObservation`,
+  `EnergyFlows`, `record_cognition`, the `DeathCause` enum/`ALL`/key,
+  `EnergyFlowTracking` and its `From`, and three test key lists; T19.F02
+  repeats the pattern and may consolidate it.

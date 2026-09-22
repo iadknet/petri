@@ -1511,13 +1511,83 @@ mod tests {
         assert_eq!(config.hop_ramp_allowance, 32);
         let mut energy = 100.0f32;
         let output = run_chain(&genome, &config, &mut energy);
-        assert!(
-            output.work_counters.mesh_hops <= config.hop_ramp_allowance,
-            "founder hops {} must stay inside the allowance",
-            output.work_counters.mesh_hops
+        assert_eq!(
+            output.work_counters.mesh_hops, 2,
+            "the founder chain runs exactly two hops, far inside the allowance",
         );
         assert_eq!(output.energy_observation.mesh_ramp, 0.0);
         assert_eq!(output.cost_report.mesh_ramp_cost, 0.0);
+    }
+
+    /// A node reading `EnergyConsumedThisTick` sees the hop's own ramp charge:
+    /// the debit lands before the dispatch, so the tick's consumption at hop 2
+    /// includes hop 1's charge and hop 2's.
+    ///
+    /// Measured differentially against a zero-cost run of the same genome, so
+    /// node 0's VM cost and the reading dispatch's own in-flight step costs
+    /// (which the read also includes) cancel and only the ramp remains.
+    #[test]
+    fn a_node_reads_its_own_hop_ramp_charge_as_consumed_this_tick() {
+        fn consumption_read(hop_ramp_cost: f32) -> f32 {
+            let genome = CreatureGenome {
+                entry_node_id: NodeId::new(0),
+                nodes: vec![
+                    vm_halt_with_route(NodeId::new(0), 1.0, vec![NodeId::new(1)]),
+                    NodeGenome {
+                        node_id: NodeId::new(1),
+                        input_refs: vec![crate::contracts::InputReference::DynamicIntrospection(
+                            crate::contracts::DynamicIntrospectionKey::EnergyConsumedThisTick,
+                        )],
+                        backend_def: BackendDef::Vm(VmBackendDef {
+                            register_count: 1,
+                            constants: vec![],
+                            program: vec![
+                                VmInstruction::ReadInput {
+                                    dst: 0,
+                                    ref_idx: 0,
+                                    sub_idx: 0,
+                                },
+                                VmInstruction::StoreSlotImm {
+                                    slot_idx: 0,
+                                    src: 0,
+                                },
+                                VmInstruction::Halt,
+                            ],
+                        }),
+                        targets: wrap_targets(vec![]),
+                    },
+                ],
+            };
+            let config = RuntimeConfig {
+                hop_ramp_allowance: 0,
+                hop_ramp_cost,
+                ..default_config()
+            };
+            let mut energy = 100.0f32;
+            let mut shared_mem = [0.0f32; 16];
+            let output = execute_creature_mesh(
+                &genome,
+                &empty_sensor_snapshot(),
+                &mut energy,
+                &mut shared_mem,
+                &[0.0; 16],
+                &mut GraphRuntimeState::new(),
+                &config,
+            );
+            assert_eq!(output.work_counters.mesh_hops, 2);
+            // The read is a fraction of `max_energy`, which is 200.0 here.
+            shared_mem[0] * 200.0
+        }
+
+        let cost = 1.0f32;
+        let seen = consumption_read(cost) - consumption_read(0.0);
+        // Hop 1 owes `cost`, hop 2 owes `2 * cost`, and hop 2's charge is
+        // debited before the node that reads it runs.
+        let expected = 3.0 * cost;
+        assert!(
+            (seen - expected).abs() < 1e-4,
+            "the node read {seen} more consumed under the ramp, expected {expected}",
+        );
     }
 
     /// An unaffordable ramp charge ends the tick before the node runs: the hop
