@@ -14,11 +14,11 @@ Claude:
 
 | Role | Model | Where it is defined |
 | --- | --- | --- |
-| Orchestrator | Opus 5, effort `medium` | the session you paste the goal into |
+| Orchestrator | Opus 5.5, effort `medium` | the session you paste the goal into |
 | Spec owner and advisor | Fable 5.1, effort `high`, persistent | `.claude/agents/roadmap-spec-owner.md` |
-| Implementer | Opus 5, effort `medium`, Fable 5.1 advisor | `.claude/agents/roadmap-implementer.md` |
+| Implementer | Opus 5.5, effort `medium`, Fable 5.1 advisor | `.claude/agents/roadmap-implementer.md` |
 | Benchmark specialist | Sonnet 5, default effort | `.claude/agents/roadmap-benchmark-specialist.md` |
-| Mutation specialist | Opus 5, effort `medium` | `.claude/agents/roadmap-mutation-specialist.md` |
+| Mutation specialist | Opus 5.5, effort `medium` | `.claude/agents/roadmap-mutation-specialist.md` |
 | Reviewer | Fable 5.1, effort `high`, read-only | `.claude/agents/roadmap-reviewer.md` |
 
 The orchestrator delegates, verifies, and integrates; the thinking that needs
@@ -52,7 +52,7 @@ In Codex, use the [Codex launch instructions](workflow-codex.md#launch-and-goal-
    roadmap feature."** It applies the next-feature rule below and returns one
    `/goal` command for Claude, or the Codex goal prompt when requested in Codex.
 2. Open a new session in the **main checkout** (not a worktree), on a clean,
-   current `main`. Select Opus 5, effort `medium`, and auto mode. Keep agent
+   current `main`. Select Opus 5.5, effort `medium`, and auto mode. Keep agent
    teams disabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` unset or `0`).
 3. Confirm the startup notice `Advisor Tool (experimental) is on`. If it is
    missing, run `/advisor fable` once (a Fable advisor bills to usage
@@ -87,7 +87,7 @@ completion conditions. Generating either template does not execute it.
 Substitute `<TNN.FNN>` and the lowercase `<tnn-fnn>` worktree name.
 
 ```
-/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec to roadmap-spec-owner, verify it, and commit it there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, the gate and goal baseline runs and their records to roadmap-benchmark-specialist, the final diff review to roadmap-reviewer, and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
+/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec to roadmap-spec-owner, verify it, and commit it there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, the gate and goal baseline runs and their records to roadmap-benchmark-specialist, the final diff review to roadmap-reviewer, and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
 ```
 
 The `/goal` evaluator reads only this conversation and runs no commands, so
@@ -105,7 +105,7 @@ when running in Codex.
 ### Start
 
 Verify before doing anything else, and stop with the reason if any check fails:
-you are Opus 5 at effort `medium`; `git rev-parse --show-toplevel` is the
+you are Opus 5.5 at effort `medium`; `git rev-parse --show-toplevel` is the
 main checkout, not a
 path under `.claude/worktrees/`; `git status` is clean on `main`; the target
 feature is unchecked and every dependency in its track row is checked. If the
