@@ -48,7 +48,8 @@
       "docs/progress/features/t17-f01-offspring-investment-fraction.json",
       "docs/progress/features/t11-f23-scale-relative-vm-constant-steps.json",
       "docs/progress/features/t17-f02-unit-scale-introspection.json",
-      "docs/progress/features/t13-f07-current-policy-recruitment-transitions.json"
+      "docs/progress/features/t13-f07-current-policy-recruitment-transitions.json",
+      "docs/progress/features/t19-f01-per-tick-hop-ramp.json"
     ]
   },
   "goal": {
@@ -116,7 +117,8 @@
       "docs/progress/features/t17-f01-offspring-investment-fraction-goal.json",
       "docs/progress/features/t11-f23-scale-relative-vm-constant-steps-goal.json",
       "docs/progress/features/t17-f02-unit-scale-introspection-goal.json",
-      "docs/progress/features/t13-f07-current-policy-recruitment-transitions-goal.json"
+      "docs/progress/features/t13-f07-current-policy-recruitment-transitions-goal.json",
+      "docs/progress/features/t19-f01-per-tick-hop-ramp-goal.json"
     ]
   }
 }
