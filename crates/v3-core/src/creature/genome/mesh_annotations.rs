@@ -110,7 +110,8 @@ fn derive_node_annotation(node: &NodeGenome, reachable: bool) -> MeshNodeAnnotat
                     | super::VmInstruction::PushAction { .. }
                     | super::VmInstruction::PopAction
                     | super::VmInstruction::ExecuteActionQueue
-                    | super::VmInstruction::SetPriorityBid { .. } => {
+                    | super::VmInstruction::SetPriorityBid { .. }
+                    | super::VmInstruction::AddVote { .. } => {
                         write_classes.insert(MeshWriteClass::Action);
                     }
                     super::VmInstruction::WriteRouteGate { .. } => {
@@ -342,6 +343,38 @@ mod tests {
             unreachable_annotation.write_classes,
             vec![MeshWriteClass::Action]
         );
+    }
+
+    /// T19.F03: `AddVote` is a world-action write on the VM side, classified
+    /// the same way as the graph side's vote sinks.
+    #[test]
+    fn classifies_add_vote_as_an_action_write() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(1),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(1),
+                input_refs: vec![],
+                targets: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![1.0],
+                    program: vec![
+                        VmInstruction::LoadConst {
+                            dst: 0,
+                            const_idx: 0,
+                        },
+                        VmInstruction::AddVote { sink: 0, src: 0 },
+                    ],
+                }),
+            }],
+        };
+
+        let annotation = &derive_mesh_annotations(&genome)[0];
+
+        assert_eq!(annotation.write_classes, vec![MeshWriteClass::Action]);
+        assert!(annotation.read_classes.is_empty());
+        assert!(!annotation.has_stateful_behavior);
+        assert_eq!(annotation.live_instruction_indices, vec![0, 1]);
     }
 
     #[test]

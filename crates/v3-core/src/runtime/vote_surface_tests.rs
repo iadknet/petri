@@ -527,3 +527,85 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
         }
     }
 }
+
+/// The sum rule as a property: for any sequence of stages and commits, the
+/// mesh vote vector is the sanitized sum, in first-commit order, of every
+/// node's latest sanitized contribution.
+mod sum_rule_property {
+    use super::VOTE_SINK_COUNT;
+    use crate::creature::genome::vote::VoteVector;
+    use crate::runtime::types::{sanitize_f32, MeshSideOutputs};
+    use proptest::prelude::*;
+
+    const NO_VOTES: VoteVector = [0.0; VOTE_SINK_COUNT];
+
+    #[derive(Debug)]
+    enum Step {
+        Stage(VoteVector),
+        Commit(usize),
+    }
+
+    fn step_strategy() -> impl Strategy<Value = Step> {
+        prop_oneof![
+            prop::array::uniform(any::<f32>()).prop_map(Step::Stage),
+            (0usize..6).prop_map(Step::Commit),
+        ]
+    }
+
+    /// The reference model: the same per-node-latest list, in the same
+    /// first-commit order, so its summation order matches the implementation
+    /// and the comparison is bit-exact rather than approximate.
+    #[derive(Default)]
+    struct Model(Vec<(usize, VoteVector)>);
+
+    impl Model {
+        fn record(&mut self, node_idx: usize, contribution: VoteVector) {
+            match self.0.iter_mut().find(|(idx, _)| *idx == node_idx) {
+                Some((_, entry)) => *entry = contribution,
+                None => self.0.push((node_idx, contribution)),
+            }
+        }
+
+        fn votes(&self) -> VoteVector {
+            let mut votes = NO_VOTES;
+            for (_, entry) in &self.0 {
+                for (sum, value) in votes.iter_mut().zip(entry) {
+                    *sum += *value;
+                }
+            }
+            votes.map(sanitize_f32)
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn votes_are_the_sanitized_sum_of_each_node_s_latest_contribution(
+            steps in prop::collection::vec(step_strategy(), 0..32),
+        ) {
+            let mut side_outputs = MeshSideOutputs::new(4);
+            let mut model = Model::default();
+            let mut staged: Option<VoteVector> = None;
+
+            for step in steps {
+                match step {
+                    Step::Stage(contribution) => {
+                        side_outputs.stage_vote_contribution(&contribution);
+                        staged = Some(contribution.map(sanitize_f32));
+                    }
+                    Step::Commit(node_idx) => {
+                        let expected = staged.take();
+                        if let Some(contribution) = expected {
+                            model.record(node_idx, contribution);
+                        }
+                        prop_assert_eq!(
+                            side_outputs.commit_vote_contribution(node_idx),
+                            expected.unwrap_or(NO_VOTES)
+                        );
+                    }
+                }
+                prop_assert_eq!(side_outputs.votes, model.votes());
+                prop_assert!(side_outputs.votes.iter().all(|v| v.is_finite()));
+            }
+        }
+    }
+}
