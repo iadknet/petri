@@ -1,6 +1,6 @@
 # T19.F03 — Vote Surface as Inert Data
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-22
 **Feature**: T19.F03
 **Track**: [T19 — Mesh Action Selection and Live State](../../roadmaps/t19-mesh-action-selection-and-live-state.md)
@@ -271,10 +271,10 @@ within budget, epochs not re-pinned. Table above; full readings in
 - [x] No mutation draws a vote or parameter sink or an `AddVote`, and no
       executor, input, or reading consumes the surface (grep and reviewer
       proof).
-- [ ] Guard digest, founder digest, `FOUNDER_GENOME_SIZE_UNITS` 111, and
+- [x] Guard digest, founder digest, `FOUNDER_GENOME_SIZE_UNITS` 111, and
       every `config_digest` unchanged; gate and goal counters identical to
       T19.F02; the moved Debug fingerprint re-pinned and listed.
-- [ ] Reference docs of invariant 11 rewritten; mutation gate run with every
+- [x] Reference docs of invariant 11 rewritten; mutation gate run with every
       survivor resolved; gate and goal run with no epoch re-pinned.
 
 ## Notes for AI Agents
