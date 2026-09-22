@@ -196,10 +196,14 @@ transmitting; the surface reaches creatures through the body, never a sensor.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed
       here.
-- [ ] Benchmark summaries stored at `docs/progress/features/t19-f03-vote-surface-as-inert-data.json`
-      and `-goal.json`, local raw hash/byte count and verification time
-      checked, series entries point to the summaries, no new full report
-      staged, and no epoch re-pinned.
+- [x] Benchmark summaries stored, raw hash/byte count and verification time
+      checked, no new full report staged, no epoch re-pinned -> table below,
+      full detail in [readings](../../progress/readings/t19-f03.md).
+
+| Profile | Exit | `severe` | Counters vs T19.F02 | Wall delta | Raw (sha256, bytes) |
+| --- | --- | --- | --- | --- | --- |
+| Gate | 0 | false | 7/7 identical | +14.89% (ok) | `324a1ea6…`, 94,762 |
+| Goal (1 run) | 0 | false | 7/7 identical; `goal_indicators` 0 diffs | +3.23% (ok) | `08e9a27d…`, 662,416,918 |
 
 | Command | Result |
 | --- | --- |
@@ -239,9 +243,10 @@ unchanged, and the goal run is one run.
 | Debug-hashed trajectory fingerprint (`legacy_default_short_run_identity`) | Moves by construction (catalog grew); re-pinned, not a behavior change |
 | Wall time, both profiles | Up; if the host matches T19.F02's (`MacBookPro.lan`) the comparison is live (otherwise `null`, as at T19.F02): a flag (≥25%) is the predeclared cost of the wider effects pass and is tolerated; a severe (≥100%) does not fit and is investigated against the per-visit cost before anything is presented |
 
-**Measured verdict.** One line per profile: CLI and observed outer-process
-exit statuses with their sources, the `severe` flag, whether any threshold
-was crossed, and whether the epoch was re-pinned (it must not be).
+**Measured verdict.** Both profiles: CLI and outer exit 0, `severe=false`,
+work counters identical, wall under the 25% flag, neighborhood caps well
+within budget, epochs not re-pinned. Table above; full readings in
+[readings](../../progress/readings/t19-f03.md).
 
 - Summaries: [gate](../../progress/features/t19-f03-vote-surface-as-inert-data.json),
   [goal](../../progress/features/t19-f03-vote-surface-as-inert-data-goal.json).
