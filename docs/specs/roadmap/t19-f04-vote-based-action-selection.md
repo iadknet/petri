@@ -271,7 +271,7 @@ exit: settle the bid once; actions = queue, or NoOp when empty
       bytes and sha256 unchanged since the original `94ea0af9` measurement,
       only the reader changed; the goal-profile-runs-once rule is honored, not
       bypassed. Summary 7,688,756 bytes, `comparison.severe = true`, series
-      entry added under `goal_worlds.closed` (epoch not re-pinned). Full
+      entry added under `goal_worlds.closed` (both epochs re-pinned to the T19.F04 summaries, user-accepted 2026-09-22). Full
       details, including two predeclaration mismatches found and escalated
       (Orchards `passes`/creature-tick ceiling and Orchards final-population
       investigation trigger), in `docs/progress/readings/t19-f04.md`, "Goal —
@@ -385,3 +385,6 @@ investigation"). Orchards seed 12 was run independently of the goal profile.
   equivalence is historical once the size moves.
 - Decision: `reordered`/`recount` hold on every differing execution
   (kinds are `WorldAction` variants); a mix is neither.
+- Exception: user accepted 2026-09-22 the gate and goal severes, the Orchards
+  `passes` 4.107 miss, and re-pinned both epochs to the T19.F04 summaries
+  before the mutation gate, whose baseline needs the gate series test green.
