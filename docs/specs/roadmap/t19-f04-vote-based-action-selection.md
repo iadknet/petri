@@ -329,9 +329,9 @@ that re-pin, which is the predeclared severe, not a waived check.
 file). The goal profile's raw report was converted with `bench-summarize`
 (read-back fix `e1a6919d`; same raw bytes as the original `94ea0af9` run, no
 repeat measurement) and is now stored, `severe = true`, matching the gate's
-direction. Two predeclaration mismatches surfaced in the goal report and are
-escalated, not remediated here (see readings file for both). Orchards seed 12
-was run independently of the goal profile.
+direction. Two predeclaration mismatches surfaced in the goal report; the spec
+owner ruled on both from stored data (rows below; readings file "Orchards
+investigation"). Orchards seed 12 was run independently of the goal profile.
 
 | Reading | Verdict |
 | --- | --- |
@@ -341,10 +341,10 @@ was run independently of the goal profile.
 | Gate `pass_cap_hits` | Tool level `severe` (zero reference); within its own 10% ceiling (0.075%) |
 | Gate `passes`, `decided_passes` | Level `new`; 2.351203 ≤ 4, as predeclared |
 | Goal `mesh_hops`, `graph_relax_iters`, `plasticity_updates`, `actions_applied` | Severe (pooled), up, as predeclared; `mesh_hops` per world within the ≤5× T19.F03 ceiling in all three worlds |
-| Goal `vm_steps` | -95.54% pooled, tool level `ok` (same mismatch as gate: predeclared severe, no floor) |
-| Goal `passes`/creature-tick | Orchards 4.106617 **breaches** the ≤4 ceiling; Canyon 3.236254 and Confluence 3.104272 meet it — mismatch, escalated |
+| Goal `vm_steps` | -95.54% pooled, tool level `ok`; as on the gate, the predeclared direction (down) holds and "severe expected" named a level the comparison never assigns to a decrease — a wording error about the tool, recorded here, the predeclaration left as written |
+| Goal `passes`/creature-tick | Orchards 4.106617 **misses** the ≤4 ceiling by 2.7%; Canyon 3.236254 and Confluence 3.104272 meet it. Ruling: the ceiling stands as predeclared (not weakened after measuring); no code remediation, because the mechanism is within contract (passes ≤ 10, capped passes ≤ 0.04%, `mesh_hops` within its ceiling, wall caps met) and tuning behavior to a cost bound would fit the reading; the miss goes to the user as an exception with the severes and the re-pin |
 | Goal `pass_cap_hits` | ≤0.13% of creature-ticks, ≤0.04% of passes in every world — within the ≤10% ceiling |
-| Goal final population, Orchards | 1,331, below half of the T19.F02 reference (5,111 → 2,555.5) — triggers the predeclared investigation clause, escalated |
+| Goal final population, Orchards | 1,331, below half of the T19.F02 reference (5,111). Investigated from the stored checkpoints (readings "Orchards investigation"): no extinction or sterile decline; the run is a boom-bust cycle (34 at tick 300, 8,354 at 1,200, 1,895 at 1,400, 5,419 at 1,800, 1,331 at 2,000) where T19.F03's was a monotone recovery, and the plateau indicator is up (3,032.9 vs 2,758.5); seed 12 agrees (min 34, final 4,828). The final snapshot is a trough, recorded as a finding with no direction; the clause is satisfied, nothing further is run |
 | Goal cognition wall/creature-tick | 0.0017513–0.0019828 ms; ceiling not evaluated (host mismatch, `wall_clock: null`) |
 | Orchards seed 12, 2,000 ticks | Final population 4,828; minimum 34 (tick 308); tick reasons not obtainable from `v3 run` |
 | All other run-half readings | Measured from the converted goal summary; see readings file |
