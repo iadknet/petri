@@ -40,14 +40,16 @@ contract; W1 to W19 are the acceptance fixtures); T19.F02 invariants 2, 5, 6
 and T19.F03 invariants 1 to 8; the code named in each invariant, from
 `execute_creature_mesh_impl` (`crates/v3-core/src/runtime/mesh.rs`).
 
-Options: settled by the note (Section 7 read the primary texts; the Section
-2.3 table compares six commit rules). Adopted: reset per pass, per-kind
-rising bar, within-kind argmax (the only rule that ports the founder and
-commits a unit edge once). Rejected: action cap only, one global bar,
-per-sink bar, winner-only suppression, unit
-debit, random tie-breaking (the parallel phase is RNG-free), queue discard at
-exhaustion (order of computation would decide survival), a decide register.
-No external research is repeated here.
+Options, settled by the note (Section 7 read the primary texts; no external
+research is repeated here):
+
+| Option | Disposition |
+| --- | --- |
+| Reset per pass, per-kind rising bar, within-kind argmax | Adopted: the only rule in the note's 2.3 table that ports the founder and commits a unit edge once |
+| Action cap only; one global bar; per-sink bar; winner-only suppression; unit debit | Rejected (2.3 table rows) |
+| Random tie-breaking | Rejected: the parallel phase is RNG-free (1.9) |
+| Queue discard at exhaustion | Rejected: order of computation would decide survival (1.8) |
+| A decide-threshold register | Rejected: a threshold is a negative contribution (W19) |
 
 1. **Pass loop.** The shared executor runs this in every execution mode; `V`
    is the vote vector, `C` the per-kind bars, `unit` 1.0, `E` the effective
@@ -84,13 +86,15 @@ exit: settle the bid once; actions = queue, or NoOp when empty
    something: some kind's effective vote is positive, or the queue is
    non-empty and `Terminate` is positive (the note's Section 2.4, both
    clauses; the second lets a genome leave a cycle by one `Terminate` edge
-   instead of a capped pass). W17 votes no `Terminate`, so its second pass
-   runs to the cap (`PassCapReached`, `NoDecision`, queue `Move W`); the
-   row's "six hops" assumed a reset bus and is superseded. W17b adds a static
-   `Terminate` vote and ends pass two at its first `Decide` boundary.
-   `Terminate` never commits, has no bar, wins its ties, and cannot end an
-   empty tick (W15). A revisited node replaces its own contribution (W11 to
-   W14). Comparisons are on sanitized `f32`; no RNG is drawn.
+   instead of a capped pass). `Terminate` never commits, has no bar, wins
+   its ties, and cannot end an empty tick (W15). A revisited node replaces
+   its own contribution (W11 to W14). Comparisons are on sanitized `f32`; no
+   RNG is drawn. Where a fixture departs from the note's row:
+
+| Case | Ruling |
+| --- | --- |
+| W17 (no `Terminate` vote) | Pass two runs to the cap: `PassCapReached`, `NoDecision`, queue `Move W`; the row's "six hops" assumed a reset bus and is superseded |
+| W17b (W17 plus a static `Terminate`) | Pass two ends at its first `Decide` boundary by the second guard clause |
 3. **Commit decode.** The direction is the winning sink; the parameter surface
    `action_params[kind][i]` (T19.F03 invariant 6: zeroed at tick start,
    overwritten per visit, read at commit) supplies the rest through the
@@ -106,26 +110,25 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 | `Reproduce` | `Reproduce(d)` | `energy_transfer_fraction = clamp_unit_interval(params[Reproduce][1])` |
 | `StealEnergy` | `StealEnergy(d)` | `amount = clamp_non_negative_finite(params[StealEnergy][1])` |
 
-4. **Reasons and trace.** `TerminationReason` becomes the tick reasons
-   `NoDecision`, `TerminateVoted`, `ActionCapReached`, `EnergyExhausted`; a
-   new `PassEndReason` carries `Decided`, `PassCapReached`, `NoTargets`,
-   `MissingNode`, `EnergyExhausted`. A missing entry node is a pass ending
-   `MissingNode` with zero votes and a tick ending `NoDecision` (`NoOp`).
-   `TickTrace` carries one record per pass (end reason, final `V`, `E`, the
-   committed action or none, hops) beside the tick reason and final bars;
-   `MeshHopTrace` carries its pass index; `MeshOutput` carries the final bars
-   and the pass count. Every soft-default row keeps its outcome.
+4. **Reasons and trace.** A missing entry node is a pass ending `MissingNode`
+   with zero votes and a tick ending `NoDecision` (`NoOp`); every soft-default
+   row keeps its outcome.
+
+| Level | Reasons | Carried on |
+| --- | --- | --- |
+| Tick (`TerminationReason`) | `NoDecision`, `TerminateVoted`, `ActionCapReached`, `EnergyExhausted` | `TickTrace`, `MeshOutput` (with final bars and pass count) |
+| Pass (`PassEndReason`) | `Decided`, `PassCapReached`, `NoTargets`, `MissingNode`, `EnergyExhausted` | One `TickTrace` record per pass: reason, final `V`, `E`, committed action or none, hops; `MeshHopTrace` carries its pass index |
 5. **Budgets and counters.** `max_mesh_hops` (64) bounds hops per pass and
    resets per pass; `work_counters.mesh_hops` and the T19.F01 ramp index never
    reset within the tick, so cycling every pass pays the ramp across passes
-   (640 hops cost 18.5 energy at the defaults). Passes per tick are at most
-   `max_actions_per_turn` (10). `WorkCounters` gains `passes` and
-   `decided_passes`; both join bench `COUNTER_NAMES` after `pass_cap_hits`
-   (level `new` against a reference without them) and the T11.F14 block,
-   where `hop_cap_hits` is deleted (no tick reason names the cap), the
-   capped fraction is capped passes over passes, and `passes` and
-   `decided_passes` are totals; `MESH_EXECUTION_VERSION` becomes
-   `mesh-execution-v2` because the block's shape and reason names changed.
+   (640 hops cost 18.5 energy). Passes per tick are at most
+   `max_actions_per_turn` (10).
+
+| Counter or block | Rule |
+| --- | --- |
+| `WorkCounters.passes`, `decided_passes` | New totals; join bench `COUNTER_NAMES` after `pass_cap_hits` (level `new` against a reference without them) and the T11.F14 block |
+| T11.F14 block | `hop_cap_hits` deleted (no tick reason names the cap); `pass_cap_fraction` = capped passes / passes; `MESH_EXECUTION_VERSION` = `mesh-execution-v2` (shape and reason names changed) |
+| Drift walk | `EXECUTED_SOURCE` names `mesh-execution-v2`; `VERSION` stays `drift-depth-v3` (the walk's method is unchanged; rows move by the draw remap, as at T19.F02) |
 6. **Exhaustion and bid.** Exhaustion at any point (compute, ramp, bid) keeps
    the actions committed before it. The bid settles once on every exit,
    `paid = min(bid, energy)`, nothing when energy is already gone; an all-in
@@ -186,13 +189,14 @@ exit: settle the bid once; actions = queue, or NoOp when empty
    and could cross the gate. `[Eat]` alone at `max_actions_per_turn` 1;
    thresholds and fractions unchanged. Verified by the founder tests
    (`founder.rs`, the `limit 1` case, the ring proptest), a 2,000-ring check
-   against `expected_direction`, and `tests/viability.rs`.
-   `FOUNDER_GENOME_SIZE_UNITS` is re-pinned to the measured `genome_size()`
-   (97); the per-unit rate stays `0.005`, the `0.55` assertion is re-pinned
-   to `0.005 × 97`, and the T11 track's walk-anchor wording names 97. The
-   founder digest and `legacy_default_short_run_identity` move and are
-   re-pinned after reproduction; a pin on positions, energy, or ages moves
-   only through the founder's changed actions.
+   against `expected_direction`, and `tests/viability.rs`. Pins:
+
+| Pin | Rule |
+| --- | --- |
+| `FOUNDER_GENOME_SIZE_UNITS` | Measured `genome_size()` of the new V3Alpha1: 97 (was 111) |
+| Per-unit mutation rate | Stays `0.005`; the `0.55` assertion becomes `0.005 × 97`; the T11 track's walk-anchor wording names 97 |
+| Founder digest, `legacy_default_short_run_identity` | Move; re-pinned after reproduction |
+| Pins on positions, energy, or ages | Move only through the founder's changed actions and size |
 10. **Compile-coupled consumers, all owned here.**
 
 | Consumer | Change |
@@ -207,14 +211,13 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 11. **Config.** No `RuntimeConfig` or `MutationConfig` field changes; every
     `config_digest` and the v3-cli recipe digest pin (`tests/cli.rs`) are
     unchanged. Adding a field would move those pins and is out of scope.
-12. **Readings.** The births probe adds `reordered` (the same multiset of
-    actions on every differing execution, in another order) and `recount`
-    (the same action kinds, different counts) as tallies inside `Changed`,
-    whose definition is unchanged so the series compares. The one-edge census
-    is a founder reading: every unit-weight edge from an input-leaf sub-value
-    of node 1 into each of the 27 vote sinks, classified on the neighborhood
-    battery, with W4, W5, W6, W7, W10 as exact fixtures. The T11.F14 evolved
-    half reports tick reasons by the new names and passes per execution.
+12. **Readings.**
+
+| Reading | Rule |
+| --- | --- |
+| Births probe | `reordered` (same multiset of actions on every differing execution, another order) and `recount` (same action kinds, different counts) as tallies inside `Changed`, whose definition is unchanged so the series compares |
+| One-edge census | Founder only: every unit-weight edge from an input-leaf sub-value of node 1 into each of the 27 vote sinks, classified on the neighborhood battery; W4, W5, W6, W7, W10 as exact fixtures |
+| T11.F14 evolved half | Tick reasons by the new names; passes and `decided_passes` totals |
 13. **Docs, rewritten for passes, citing the worked cases as fixtures.**
 
 | Reference | Sections |
@@ -294,7 +297,7 @@ that re-pin, which is the predeclared severe, not a waived check.
 | --- | --- |
 | Gate and goal `mesh_hops`, `graph_relax_iters` | Up, severe expected; ceiling: goal mean `mesh_hops` per creature-tick at most 5 times T19.F03's per world; above it the result does not fit and is escalated before anything is presented |
 | Gate and goal `vm_steps` | Down, severe expected (the founder has no VM node); no floor |
-| `plasticity_updates`, `actions_applied`, `births` | No direction; gate `births` are expected up because the graph founder's cognition is cheaper per tick than the VM program's (the founder-only trajectory's births moved 185 to 323); the readings file records the founder's per-tick compute cost before and after so the move is attributed, and a severe is reported to the user with the re-pin |
+| `plasticity_updates`, `actions_applied`, `births` | No direction; gate `births` are expected up because the founder's genome carrying cost fell with its size (111 to 97 units, 1.126e-2 to 9.83e-3 per creature-tick), which outweighs its compute cost rising about nine times (3.28e-5 to 2.93e-4); the founder-only trajectory's births moved 185 to 323, and a founder padded back to 111 units reproduces 185 exactly (readings, founder compute table); a severe is reported to the user with the re-pin |
 | `passes`, `decided_passes` | Level `new`; goal mean passes per creature-tick at most 4 in every world (the founder runs 2 or 3); `Decided` passes reported against capped passes, no direction |
 | `pass_cap_hits` | At most 10% of creature-ticks per goal world (T19.F02's rule); capped passes at most 10% of passes |
 | Births probe (founder half): dead and sterile per mutated birth | Against T19.F03, ceiling twice its value for each; `reordered` and `recount` reported, no direction (first reading) |
