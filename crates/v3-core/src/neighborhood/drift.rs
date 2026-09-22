@@ -14,7 +14,7 @@ use std::collections::BTreeSet;
 
 pub const VERSION: &str = "drift-depth-v3";
 /// How the walk keeps each lineage's executed node set current (T11.F17).
-pub const EXECUTED_SOURCE: &str = "battery hop records (mesh-execution-v1), node ids";
+pub const EXECUTED_SOURCE: &str = "battery hop records (mesh-execution-v2), node ids";
 pub const EXECUTED_REFRESH: &str =
     "walk: depth 0 and every 10 generations; births: derived at each checkpoint";
 /// Generations between executed-set refreshes along the walk.

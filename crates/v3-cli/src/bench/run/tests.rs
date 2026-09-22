@@ -196,11 +196,11 @@ fn drift_is_goal_only_once_and_historical_fields_are_unavailable() {
         "7000000 + 1000 * (lineage_index + 1) + checkpoint + 9000 + trial_index"
     );
     assert_eq!(drift.battery_version, "neighborhood-v1");
-    assert_eq!(drift.mesh_version, "mesh-execution-v1");
+    assert_eq!(drift.mesh_version, "mesh-execution-v2");
     assert_eq!(drift.knockout_method, "static-successor-bypass-v1");
     assert_eq!(
         drift.executed_source,
-        "battery hop records (mesh-execution-v1), node ids"
+        "battery hop records (mesh-execution-v2), node ids"
     );
     assert_eq!(
         drift.executed_refresh,
@@ -487,7 +487,7 @@ fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names()
     assert_eq!(historical.backends, None);
     assert!(!historical.route_destination_varies);
     assert_eq!(historical.total_node_count, mesh.total_node_count);
-    assert_eq!(mesh.version, "mesh-execution-v1");
+    assert_eq!(mesh.version, "mesh-execution-v2");
     assert_eq!(mesh.executions_per_genome, 80);
     assert_eq!(mesh.snapshot_route_probes, 48);
     assert_eq!(mesh.knockout_method, "static-successor-bypass-v1");
