@@ -110,7 +110,7 @@ pub(super) fn apply_change_entry_node(
     Ok(())
 }
 
-/// A tied, unwritten alternative cannot beat the still-unvisited original.
+/// A tied, unwritten alternative loses to the original by position (strict `>`).
 fn safe_predecessors(genome: &CreatureGenome, source: usize) -> Vec<(usize, u8, f32)> {
     let source_id = genome.nodes[source].node_id;
     let mut candidates: Vec<_> = genome

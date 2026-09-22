@@ -420,7 +420,7 @@ impl CgpGraphBackendDef {
     /// after its original so the copy reads every source in the same
     /// evaluation phase its original reads: a source below the original stays
     /// below the copy and is read from this visit, a source at or above it
-    /// stays above and is read from the frozen tick-start outputs
+    /// stays above and is read from the last committed outputs
     /// (`runtime/cgp/sources.rs`, T11.F06). The `i`-th source ends at index
     /// `sources[i] + i` and its copy at `sources[i] + i + 1`.
     ///
