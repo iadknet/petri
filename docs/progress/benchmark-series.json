@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/remove-complementary-nutrition.json",
+    "epoch_baseline": "docs/progress/features/t19-f02-live-internal-state-and-legal-cycles.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -72,8 +72,7 @@
       "docs/progress/features/t11-f17-executed-biased-mutation-targeting-goal.json",
       "docs/progress/features/t03-f10-activity-ramped-compute-cost-goal.json",
       "docs/progress/features/t03-f08-genome-size-maintenance-cost-goal.json",
-      "docs/progress/features/t11-f18-backend-neutral-mesh-node-growth-goal.json",
-      "docs/progress/features/t19-f02-live-internal-state-and-legal-cycles-goal.json"
+      "docs/progress/features/t11-f18-backend-neutral-mesh-node-growth-goal.json"
     ]
   },
   "report_omissions": [
@@ -96,7 +95,7 @@
   ],
   "goal_worlds": {
     "series": "goal-worlds-v1",
-    "epoch_baseline": "docs/progress/features/t17-f02-unit-scale-introspection-goal.json",
+    "epoch_baseline": "docs/progress/features/t19-f02-live-internal-state-and-legal-cycles-goal.json",
     "closed": [
       "docs/progress/features/t12-f04-baseline-world-set-goal.json",
       "docs/progress/features/t13-f01-module-recruitment-observability-goal.json",
@@ -120,7 +119,8 @@
       "docs/progress/features/t11-f23-scale-relative-vm-constant-steps-goal.json",
       "docs/progress/features/t17-f02-unit-scale-introspection-goal.json",
       "docs/progress/features/t13-f07-current-policy-recruitment-transitions-goal.json",
-      "docs/progress/features/t19-f01-per-tick-hop-ramp-goal.json"
+      "docs/progress/features/t19-f01-per-tick-hop-ramp-goal.json",
+      "docs/progress/features/t19-f02-live-internal-state-and-legal-cycles-goal.json"
     ]
   }
 }

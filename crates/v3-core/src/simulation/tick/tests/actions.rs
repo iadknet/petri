@@ -800,7 +800,7 @@ fn energy_floor_at_zero_after_action_execution() {
 }
 
 #[test]
-fn reproduction_resets_reward_credit_including_frozen_tick_base() {
+fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
     use crate::creature::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };

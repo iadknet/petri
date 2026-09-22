@@ -1,7 +1,7 @@
 # T19.F02 — Live Internal State and Legal Cycles
 
 **Status**: In Progress
-**Last updated**: 2026-09-22
+**Last updated**: 2026-09-21
 **Feature**: T19.F02
 **Track**: [T19 — Mesh Action Selection and Live State](../../roadmaps/t19-mesh-action-selection-and-live-state.md)
 
@@ -194,8 +194,8 @@ controllers integrate several steps per sensorimotor step (7.2).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed here.
 - [x] Before and after loop-productivity readings (invariant 10):
-      [`docs/progress/readings/t19-f02.md`](../../progress/readings/t19-f02.md#after-reading-closure-goal-report-t19-f02-live-internal-state-and-legal-cycles-goaljson);
-      one ceiling exceeded (Canyon `cycle_carrying` dead-per-birth), reported below.
+      [`docs/progress/readings/t19-f02.md`](../../progress/readings/t19-f02.md);
+      one ceiling exceeded (Canyon `cycle_carrying` dead-per-birth), below.
 - [x] Benchmark summaries stored, hash/byte count and series entries checked;
       byte/hash figures in Performance below; no raw report staged.
 
@@ -208,15 +208,14 @@ never a sensor. Predeclared compute: no per-hop `HashSet` insert or lookup
 (a small saving per hop), against more hops wherever an evolved genome
 revisits or loops, bounded at 64 per creature-tick.
 
-References: the gate against the gate epoch
-(`remove-complementary-nutrition.json`) and the previous closure
-(`t19-f01-per-tick-hop-ramp.json`); the goal world set against its epoch
-(`t17-f02-unit-scale-introspection-goal.json`) and the previous closure
-(`t19-f01-per-tick-hop-ramp-goal.json`). Thresholds are the standing ones:
-counters flag at 10% and severe at 50%; wall flags at 25% and severe at 100%.
-The goal epoch is re-pinned in the closing commit by construction (track
-"Epochs"); the gate epoch is re-pinned if any gate `deterministic` counter
-differs from T19.F01's, since the gate has births under the relaxed draw.
+References: gate epoch `remove-complementary-nutrition.json` and previous
+closure `t19-f01-per-tick-hop-ramp.json`; goal-worlds epoch
+`t17-f02-unit-scale-introspection-goal.json` and previous closure
+`t19-f01-per-tick-hop-ramp-goal.json`. Standing thresholds: counters flag at
+10%, severe at 50%; wall flags at 25%, severe at 100%. The goal epoch is
+re-pinned in the closing commit by construction (track "Epochs"); the gate
+epoch is re-pinned if any gate `deterministic` counter differs from
+T19.F01's, since the gate has births under the relaxed draw.
 
 | Reading | Predeclaration |
 | --- | --- |
@@ -232,31 +231,28 @@ differs from T19.F01's, since the gate has births under the relaxed draw.
 | Founder digest | Unchanged |
 | Wall time, both profiles | Up with hops; a flag is tolerated, a severe is investigated against the per-hop cost before it is presented |
 
-A severe on a goal work counter is the predeclared consequence of legal
-cycles and goes to the user with the epoch re-pin; it is not accepted here.
-
 **Measured verdict.** Commands and exit statuses in the table below; goal ran once.
 
 | Row | Verdict |
 | --- | --- |
 | `make bench PROFILE=gate FEATURE=t19-f02-live-internal-state-and-legal-cycles` | Exit 0 |
-| `make bench PROFILE=goal FEATURE=t19-f02-live-internal-state-and-legal-cycles` | Outer `make` exit 2; CLI `bench --profile goal` exit 3 (`measurement_evidence.cli_exit`: "successful artifact-pair completion" with a severe comparison); both raw and summary artifacts written |
-| --- | --- |
+| `make bench PROFILE=goal FEATURE=t19-f02-live-internal-state-and-legal-cycles` | Outer `make` exit 2; CLI `bench --profile goal` exit 3 (`measurement_evidence.cli_exit`: "successful artifact-pair completion" with a severe comparison); both raw and summary artifacts written; `measurement_evidence.dirty: true` at `6c0f6c35` because the gate's own summary and its series entries had been written to the worktree minutes earlier, not from a code change |
 | Gate counters vs gate epoch (`remove-complementary-nutrition.json`) | Not severe; all six counters `ok`, `pass_cap_hits` `new` (0.0) |
-| Gate counters vs previous closure (`t19-f01-per-tick-hop-ramp.json`) | Not severe; all counters unchanged (delta% ≤ 0.001%); no gate epoch re-pin needed |
+| Gate counters vs previous closure (`t19-f01-per-tick-hop-ramp.json`) | Not severe, all `ok`; `mesh_hops` 2.040238 vs 2.040249 (−0.000539%) and `graph_relax_iters` 0.999831 vs 0.999842 (−0.001100%) differ (within "unchanged" at the predeclaration's resolution, not 0 under the re-pin rule), the other four are 0.000000% — by the rule above the gate epoch is re-pinned to this feature's gate summary (`epoch_baseline` staged in `benchmark-series.json`) |
 | Goal counters vs goal epoch (`t17-f02-unit-scale-introspection-goal.json`) | Not severe; all `ok` |
 | Goal counters vs previous closure (`t19-f01-per-tick-hop-ramp-goal.json`) | **Severe**: `plasticity_updates` +80.48% (0.047907→0.086461); every other counter `ok`; predeclared consequence of legal cycles, not accepted here — goes to the user with the epoch re-pin |
 | Goal `mesh_hops` per creature-tick ceiling (≤9.1) | 2.203591 — within ceiling |
 | Goal `pass_cap_hits` per world, ceiling 10% of creature-ticks | seed 11: 84/11,791,629 = 0.00071%; seed 22: 211/10,463,518 = 0.00202%; seed 33: 478/16,747,134 = 0.00285%; total 773/39,002,281 = 0.00198% — all within ceiling |
 | T11.F14 evolved-half `hop_cap_fraction`, ceiling ≤0.10 | 0/960 = 0 in all three worlds — within ceiling |
 | `cycle_carrying` dead-per-birth, ceiling twice overall | Orchards/Confluence 0/343 = 0 (within); **Canyon country 1/148 = 0.00676 vs twice-overall 0.003664 — exceeds ceiling**; reported, not remediated |
-| Drift walk dead/changed/silent vs T19.F01 (no floor) | Dead flat or down at every depth except Canyon depth 2,000 (0→1); changed flat/down at deep checkpoints, up at shallow ones; silent no clear direction — see readings file for the full before/after table |
+| Drift walk dead/changed/silent vs T19.F01 (no floor) | Dead flat or down at every depth except Canyon depth 2,000 (0→1); changed flat at depths 0 and 22 in every world and at every Canyon depth, down at Orchards/Confluence 250 (45→43), 1,000 (9→7), and 2,000 (2→0), nothing up — a miss against "flat or up", recorded; silent no clear direction — see readings file for the full before/after table |
 | Loop productivity (`cycle_carrying`, `revisiting`, `productive_cycle`) | `revisiting` no longer 0 (was 0 by construction pre-flip); all three lineage counts reported in the readings table, no direction required |
 | Goal persistence (final population vs half of T19.F01) | seed 11: 5,111 vs 2,924.5; seed 22: 3,349 vs 1,753; seed 33: 8,909 vs 4,542 — all above half; no investigation triggered |
 | Energy flow `mesh_ramp` per goal world | Orchards 4.435176, Canyon 11.140935, Confluence 25.238420 — above 0 in every world |
 | `config_digest` (goal and gate) | Changed in both profiles (`inputs_changed`), as predeclared |
 | Founder digest | Not independently re-checked by this run; Verification section reports it unchanged via `founder_only_trajectory_digest_is_pinned` |
-| Wall time | Evolved-neighborhood total 438.66 ms (cap 180,000 ms); founder-neighborhood 87.61 ms (cap 10,000 ms); goal total wall 415,298.80 ms ≈ 6.92 min (cap 900 s / 15 min) — all within cap, no flag |
+| Wall time | Evolved-neighborhood total 438.66 ms (cap 180,000 ms); founder-neighborhood 87.61 ms (cap 10,000 ms); goal total wall 415,298.80 ms ≈ 6.92 min (cap 900 s / 15 min) — all within cap; all four comparisons (gate and goal, epoch and previous) record `wall_clock: null` (host `MacBookPro.lan` matches none of the references), so no wall flag could be computed |
+| Memory sensitivity (`memory-sensitivity-v1`) | Perturbs committed `node_outputs` and `node_state` from this feature on; the series re-bases here as invariant 10 and the track note promise, no direction predeclared |
 
 | Artifact | Raw bytes | Raw sha256 | Summary bytes |
 | --- | ---: | --- | ---: |
@@ -295,8 +291,12 @@ cycles and goes to the user with the epoch re-pin; it is not accepted here.
   hops per creature-tick are flat (2.20 vs 2.28) and revisits are rare, so it
   is a trajectory shift under the draw remap, as at T11.F19 (+82%) and
   T17.F02 (+78.9%), not per-visit multiplication. The goal-worlds epoch
-  re-pins to this feature's goal summary by the track's Epochs rule; the
-  severe itself needs the user's acceptance, which the spec owner cannot give.
+  re-pins to this feature's goal summary by the track's Epochs rule, and the
+  gate epoch by the gate rule above; both `epoch_baseline` values are staged
+  in `benchmark-series.json`, the severe itself needs the user's acceptance.
+- Deferred: bench counter registration is spread across `profiles.rs`,
+  `comparison.rs`, `run.rs`, and `schema.rs` (`pass_cap_hits` touched all
+  four); not consolidated here, T19.F04 reads all four before adding one.
 - Exception: pending the user at closure. Canyon `cycle_carrying` dead per
   birth 1/148 (0.00676) exceeds twice overall (0.003664) by one death at
   depth 2,000; at the overall rate the chance of at least one death in 148
