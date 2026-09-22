@@ -8,15 +8,13 @@
 ## Goal
 
 A nervous system's dynamics run faster than its behavior and a circuit may
-reverberate. After this feature a mesh node may run any number of times in a
-tick on its live state: no destination is ineligible because it already
-executed, a graph visit starts from the last committed operator state and
-outputs, eligibility credit adds per visit, and no tick-start snapshot of
-internal state exists. A cycle ends at a survivable per-pass hop cap
-(`max_mesh_hops`, now 64) that keeps the queue and is paid through T19.F01's
-ramp; the priority bid is settled once per tick. Founders are byte-identical
-on their tests. The change is read on its own: the goal trajectories move
-where evolved genomes revisit or loop, and loop productivity is measured
+reverberate. A mesh node may run any number of times in a tick on its live
+state: no destination is ineligible because it already executed, a graph
+visit starts from the last committed state and outputs, eligibility credit
+adds per visit, and no tick-start snapshot exists. A cycle ends at a
+survivable per-pass hop cap (`max_mesh_hops` 64) that keeps the queue and is
+paid through T19.F01's ramp; the priority bid is settled once per tick.
+Founders are byte-identical on their tests; loop productivity is measured
 before and after.
 
 ## Non-Goals
@@ -27,9 +25,9 @@ before and after.
 - Whether committed actions survive energy exhaustion (note 1.8, T19.F04);
   here exhaustion still discards the queue.
 - The hop-ramp constants: re-read for the cap choice, not changed.
-- Graph-traversal correctness stays: `RemoveNode`'s distinct-successor
-  bypass, `CopyNode`'s attachment proof, the static visited sets in
-  reachability, the knockout bypass, and the inspector's traversal.
+- Graph-traversal correctness stays: `RemoveNode`'s bypass, `CopyNode`'s
+  attachment proof, reachability's visited sets, the knockout bypass, the
+  inspector's traversal.
 - Removing the legacy trace fields `converged`, `stable_passes_count`, and
   `max_delta` (T19.F06; invariant 3 only changes what `max_delta` measures
   against); T11.F10's protocol on this closure.
@@ -40,20 +38,14 @@ Sources of truth: the track row and its "Scope, T19.F02", "Decomposition
 rules", "Epochs", and "Contract text" notes; the
 [mesh action-selection review](../../strategy/mesh-action-selection-review-2026-09-20.md)
 Sections 0, 1.2, 1.5, 1.7, 2.4 to 2.6, and 5; the T11 track's "T19 and the
-execution contract" note; in `crates/v3-core/src`: `runtime/mesh.rs`,
-`runtime/routing.rs`, `runtime/cgp/execute.rs`, `creature/state.rs`,
-`runtime/plasticity/traces.rs`, `runtime/vm.rs`, `mutation/topology/routing.rs`,
-`config/simulation.rs`, `simulation/tick.rs`, `neighborhood/mesh_execution.rs`;
-`crates/v3-cli/src/bench/indicators.rs`.
+execution contract" note; the code named in each invariant.
 
-Options, settled by the note against R1 and R2: the visited filter or a
-tick-start freeze under any label (rejected, Section 0); a stall detector or
-epsilon convergence as a cycle exit (rejected, 2.4); a cap that discards the
-queue or kills (rejected, 2.5); a queue-keeping per-pass cap priced by the
-ramp (adopted); the bid paid per visit against one settlement (adopted, 1.7);
-convergence fields ignored against deleted (deleted, `AGENTS.md`'s
-no-compatibility default). Analog: recurrent controllers integrate several
-steps per sensorimotor step and the count is part of the controller (7.2).
+Options, settled by the note against R1 and R2: a visited filter or freeze
+under any label (rejected, 0); a stall or epsilon exit (rejected, 2.4); a cap
+that discards or kills (rejected, 2.5); a queue-keeping cap priced by the ramp
+(adopted); one bid settlement over per-visit payment (adopted, 1.7); deleting
+the convergence fields over ignoring them (`AGENTS.md`). Analog: recurrent
+controllers integrate several steps per sensorimotor step (7.2).
 
 1. **Routing.** Every existing target is eligible; the resolver is
    `resolve_gated_route` (earliest argmax of `gate_bias + gate score`), the
@@ -86,10 +78,9 @@ steps per sensorimotor step and the count is part of the controller (7.2).
    that last committed output; a successful visit commits both. The fields
    `tick_start_state`, `tick_start_outputs`, and
    `tick_start_eligibility_traces` are deleted; `begin_tick` keeps only the
-   dispatch record's age and the once-per-world-tick trace decay. Internal
-   time is counted in visits, world time in ticks; unvisited modules hold;
-   disconnected growth adds no visit. The trace's `max_delta` compares the
-   candidate with the last committed outputs.
+   dispatch record's age and the once-per-world-tick trace decay. Unvisited
+   modules hold; disconnected growth adds no visit. The trace's `max_delta`
+   compares the candidate with the last committed outputs.
 4. **Eligibility.** Each successful visit adds: `trace += activity`. Decay
    runs once per world tick in Phase 0 and is never rolled back; a failed
    visit leaves the trace untouched; a module first initialized this tick
@@ -129,13 +120,12 @@ steps per sensorimotor step and the count is part of the controller (7.2).
    which is the predeclared draw remap.
 8. **Config.** `max_graph_relax_iters`, `graph_convergence_epsilon`, and
    `graph_convergence_stable_passes` are deleted from `RuntimeConfig`, its
-   `Default`, `normalize`, the seven tracked recipes, `frontend/src/types/config.ts`,
-   `frontend/src/test/fixtures.ts`, `ControlBar.test.tsx`, the
-   `RuntimeSection.tsx` rows, the two server API examples, and the
-   runtime-config spec. `RuntimeConfig` is `deny_unknown_fields`, so a stored
-   config still carrying them is rejected, not ignored. Every case's
-   `config_digest` changes (`inputs_changed`, never severe), and the v3-cli
-   recipe-digest pins move in the first implementer brief.
+   `Default` and `normalize`, the seven tracked recipes, the frontend type,
+   fixtures, tests, and `RuntimeSection.tsx` rows, the server API examples,
+   and the runtime-config spec. `RuntimeConfig` is `deny_unknown_fields`, so
+   a stored config still carrying them is rejected. Every case's
+   `config_digest` changes (`inputs_changed`, never severe) and the v3-cli
+   recipe-digest pins move.
 9. **Founders.** V3Alpha1 is a two-hop DAG with no bid and no stateful revisit,
    so the founder tests and `founder_only_trajectory_digest_is_pinned`
    (`63498f8d…`) are unchanged.
@@ -165,10 +155,8 @@ steps per sensorimotor step and the count is part of the controller (7.2).
 
 - [x] Instrument first, on the unflipped executor: `pass_cap_hits`, the
       three cycle classes, and the births-probe partition (invariants 2, 10);
-      run the drift walk (the goal profile's `drift_depth` instrument, through
-      an existing entry point or a throwaway harness as T19.F01's readings
-      did) on the three goal worlds and store the before reading in
-      `docs/progress/readings/t19-f02.md`.
+      run the drift walk on the three goal worlds and store the before
+      reading in `docs/progress/readings/t19-f02.md`.
 - [x] `cargo test -p v3-core --test viability` first (tick-loop mechanics
       change), then TDD on the tests below.
 
@@ -205,13 +193,11 @@ steps per sensorimotor step and the count is part of the controller (7.2).
 - [ ] Whole-repo gate: `make check` exit 0 on the tested commit.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed here.
-- [ ] Before and after loop-productivity readings (invariant 10) in the
-      readings file: the drift walk on the unflipped executor (stored)
-      against the closure goal report's `drift_depth` rows and evolved half.
-- [ ] Benchmark summaries stored at
-      `docs/progress/features/t19-f02-live-internal-state-and-legal-cycles.json`
-      and `-goal.json`, local raw hash/byte count and verification time
-      checked, series entries appended, no full report staged.
+- [x] Before and after loop-productivity readings (invariant 10):
+      [`docs/progress/readings/t19-f02.md`](../../progress/readings/t19-f02.md#after-reading-closure-goal-report-t19-f02-live-internal-state-and-legal-cycles-goaljson);
+      one ceiling exceeded (Canyon `cycle_carrying` dead-per-birth), reported below.
+- [x] Benchmark summaries stored, hash/byte count and series entries checked;
+      byte/hash figures in Performance below; no raw report staged.
 
 ## Performance and Goal Impact
 
@@ -249,25 +235,49 @@ differs from T19.F01's, since the gate has births under the relaxed draw.
 A severe on a goal work counter is the predeclared consequence of legal
 cycles and goes to the user with the epoch re-pin; it is not accepted here.
 
-**Measured verdict.** Pending the run.
+**Measured verdict.** Commands and exit statuses in the table below; goal ran once.
+
+| Row | Verdict |
+| --- | --- |
+| `make bench PROFILE=gate FEATURE=t19-f02-live-internal-state-and-legal-cycles` | Exit 0 |
+| `make bench PROFILE=goal FEATURE=t19-f02-live-internal-state-and-legal-cycles` | Outer `make` exit 2; CLI `bench --profile goal` exit 3 (`measurement_evidence.cli_exit`: "successful artifact-pair completion" with a severe comparison); both raw and summary artifacts written |
+| --- | --- |
+| Gate counters vs gate epoch (`remove-complementary-nutrition.json`) | Not severe; all six counters `ok`, `pass_cap_hits` `new` (0.0) |
+| Gate counters vs previous closure (`t19-f01-per-tick-hop-ramp.json`) | Not severe; all counters unchanged (delta% ≤ 0.001%); no gate epoch re-pin needed |
+| Goal counters vs goal epoch (`t17-f02-unit-scale-introspection-goal.json`) | Not severe; all `ok` |
+| Goal counters vs previous closure (`t19-f01-per-tick-hop-ramp-goal.json`) | **Severe**: `plasticity_updates` +80.48% (0.047907→0.086461); every other counter `ok`; predeclared consequence of legal cycles, not accepted here — goes to the user with the epoch re-pin |
+| Goal `mesh_hops` per creature-tick ceiling (≤9.1) | 2.203591 — within ceiling |
+| Goal `pass_cap_hits` per world, ceiling 10% of creature-ticks | seed 11: 84/11,791,629 = 0.00071%; seed 22: 211/10,463,518 = 0.00202%; seed 33: 478/16,747,134 = 0.00285%; total 773/39,002,281 = 0.00198% — all within ceiling |
+| T11.F14 evolved-half `hop_cap_fraction`, ceiling ≤0.10 | 0/960 = 0 in all three worlds — within ceiling |
+| `cycle_carrying` dead-per-birth, ceiling twice overall | Orchards/Confluence 0/343 = 0 (within); **Canyon country 1/148 = 0.00676 vs twice-overall 0.003664 — exceeds ceiling**; reported, not remediated |
+| Drift walk dead/changed/silent vs T19.F01 (no floor) | Dead flat or down at every depth except Canyon depth 2,000 (0→1); changed flat/down at deep checkpoints, up at shallow ones; silent no clear direction — see readings file for the full before/after table |
+| Loop productivity (`cycle_carrying`, `revisiting`, `productive_cycle`) | `revisiting` no longer 0 (was 0 by construction pre-flip); all three lineage counts reported in the readings table, no direction required |
+| Goal persistence (final population vs half of T19.F01) | seed 11: 5,111 vs 2,924.5; seed 22: 3,349 vs 1,753; seed 33: 8,909 vs 4,542 — all above half; no investigation triggered |
+| Energy flow `mesh_ramp` per goal world | Orchards 4.435176, Canyon 11.140935, Confluence 25.238420 — above 0 in every world |
+| `config_digest` (goal and gate) | Changed in both profiles (`inputs_changed`), as predeclared |
+| Founder digest | Not independently re-checked by this run; Verification section reports it unchanged via `founder_only_trajectory_digest_is_pinned` |
+| Wall time | Evolved-neighborhood total 438.66 ms (cap 180,000 ms); founder-neighborhood 87.61 ms (cap 10,000 ms); goal total wall 415,298.80 ms ≈ 6.92 min (cap 900 s / 15 min) — all within cap, no flag |
+
+| Artifact | Raw bytes | Raw sha256 | Summary bytes |
+| --- | ---: | --- | ---: |
+| Gate | 96,081 | `4c5dc42acc85d3e5a50286ba2b7c761226f6dc5afbae207bdccd2b4e41a711ce` | 98,951 |
+| Goal | 592,059,046 | `79d694a42bd21a26ec2289acb34ee3129d0f9501e867dd155f46e82c778ea0b8` | 7,698,308 |
 
 - Summaries: [gate](../../progress/features/t19-f02-live-internal-state-and-legal-cycles.json),
   [goal](../../progress/features/t19-f02-live-internal-state-and-legal-cycles-goal.json).
+  Raw reports stay local under the main checkout's ignored `.bench-artifacts/`.
 - Full readings: [`docs/progress/readings/t19-f02.md`](../../progress/readings/t19-f02.md).
 
 ## Success Criteria
 
-- [ ] No node is ineligible to execute because it already executed, and no
-      `tick_start_*` field exists; a graph visit reads and commits the last
-      committed state and outputs, traces add per visit.
-- [ ] `max_mesh_hops` defaults to 64, ends the chain keeping the queue,
-      counts `pass_cap_hits`, and the seven recipes carry 64.
-- [ ] The priority bid is charged exactly once per tick, at settlement.
-- [ ] `RetargetNodeTarget` and `AddRouteTarget` can produce a self-target.
-- [ ] The three convergence fields are gone everywhere named in invariant 8.
-- [ ] Founders are byte-identical on their tests and the founder digest holds.
-- [ ] The cycle fixtures, inverted tests, and rewritten reference sections
-      exist; before and after loop-productivity readings are stored.
+- [ ] No node is ineligible because it already executed; no `tick_start_*`
+      field exists; visits read and commit committed state; traces add per visit.
+- [ ] `max_mesh_hops` 64 keeps the queue and counts `pass_cap_hits`; the
+      seven recipes carry 64; the bid is charged once per tick.
+- [ ] `RetargetNodeTarget` and `AddRouteTarget` can produce a self-target;
+      the convergence fields are gone everywhere named in invariant 8.
+- [ ] Founders byte-identical and the founder digest holds; cycle fixtures,
+      inverted tests, rewritten references, and both loop readings exist.
 - [ ] Mutation gate run with every survivor resolved; gate and goal run with
       the epoch handling above.
 
@@ -280,3 +290,15 @@ cycles and goes to the user with the epoch re-pin; it is not accepted here.
   unchanged; a later change of either re-reads invariant 2's calibration.
 - Deferred: the legacy graph trace fields `converged`, `stable_passes_count`,
   and `max_delta` are left for T19.F06.
+- Decision: pending the user at closure. Goal `plasticity_updates` +80.48% vs
+  T19.F01 (not severe vs the epoch) is the predeclared "up" with no ceiling;
+  hops per creature-tick are flat (2.20 vs 2.28) and revisits are rare, so it
+  is a trajectory shift under the draw remap, as at T11.F19 (+82%) and
+  T17.F02 (+78.9%), not per-visit multiplication. The goal-worlds epoch
+  re-pins to this feature's goal summary by the track's Epochs rule; the
+  severe itself needs the user's acceptance, which the spec owner cannot give.
+- Exception: pending the user at closure. Canyon `cycle_carrying` dead per
+  birth 1/148 (0.00676) exceeds twice overall (0.003664) by one death at
+  depth 2,000; at the overall rate the chance of at least one death in 148
+  births is 0.24, so the ceiling has no power at this sample. Reported, not
+  remediated; the ceiling is unchanged.
