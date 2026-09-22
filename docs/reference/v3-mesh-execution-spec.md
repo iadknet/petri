@@ -63,10 +63,11 @@ on a pass. `C[K]` is the bar of kind `K` (its commits so far this tick),
 `unit` is 1.0, and `E[K]` is kind `K`'s effective vote.
 
 ```text
-tick start: V = 0, C = 0, queue empty, bus zeroed, parameter surface zeroed,
-            per-node contributions empty; internal state untouched
+tick start: V = 0, V_prev = 0, C = 0, queue empty, bus zeroed, parameter
+            surface zeroed, per-node contributions empty; internal state
+            untouched
 pass:
-  hops_this_pass = 0; V = 0; per-node contributions cleared
+  hops_this_pass = 0; V_prev = V; V = 0; per-node contributions cleared
   run the chain from the entry (bus = the last dispatched node's output slots
   of the previous pass; state, memory, weights, traces live)
     after each committed dispatch: that node's contribution replaces its
@@ -120,6 +121,16 @@ What the rule gives (the worked cases in
 - A plan is a construction: nodes that read the queue or a clock change the
   winning direction or vote `Terminate` from pass to pass (W8 to W10, W19).
 - Every kind inhibited is `NoOp` without a stall (W16).
+
+Decision-state reads (T19.F05, `v3-sensor-spec.md` Section 3.6): a node reads
+`V` (`ActionVotes`), `V_prev` (`PreviousPassVotes`), `C` (`CommitCounts`),
+and the tick's hop count, the dispatch in flight included (`HopsThisTick`),
+live at every read. A dispatch sees `V` as committed so far this pass, never
+its own staged contribution; nothing commits mid-dispatch, so a graph
+dispatch's evaluation, post-plasticity, and effects contexts read the same
+values. The worked cases V1 to V6 are in
+`crates/v3-core/src/runtime/decision_input_tests.rs` and
+`crates/v3-core/src/simulation/tick/tests/previous_outcome.rs`.
 
 Notes:
 - The bus is zeroed at tick start only and carried between passes: pass
@@ -216,6 +227,7 @@ behavior.
 | `ReadInput` `sub_idx` out of range (compound) | Yield `0.0` |
 | Scalar input with `sub_idx > 0` | Yield `0.0` |
 | `UpstreamSlot` slot out of range | Yield `0.0` |
+| Decision-state compound `sub_idx` at or past its width | Yield `0.0` (no wrap) |
 | Node backend does not write an output slot | Preserve incoming `upstream_slots[slot]` |
 | Graph edge source out of bounds | Input contributes `0.0` |
 | Non-finite vote or parameter | Sanitized before summing; no NaN reaches a comparison |

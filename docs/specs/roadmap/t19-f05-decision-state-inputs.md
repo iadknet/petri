@@ -167,11 +167,11 @@ Options settled here, all internal to the codebase:
 
 ## Implementation Tasks
 
-- [ ] Catalog, resolution, `previous_pass_votes`, and the frozen outcome
+- [x] Catalog, resolution, `previous_pass_votes`, and the frozen outcome
       block (invariants 1 to 4), tests first (the worked cases).
-- [ ] Draw, widths, universe, class, census, and the bench rows (5, 8).
-- [ ] Frontend types and minimal rendering; server class fixture (9).
-- [ ] Reference specs (9); re-pin `legacy_default_short_run_identity` (6).
+- [x] Draw, widths, universe, class, census, and the bench rows (5, 8).
+- [x] Frontend types and minimal rendering; server class fixture (9).
+- [x] Reference specs (9); re-pin `legacy_default_short_run_identity` (6).
 - [ ] Readings file: worked-case transcripts, the pin before and after, the
       births probe and drift walk against T19.F04, the census rows from the
       goal summary.
