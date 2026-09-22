@@ -263,14 +263,20 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 - [ ] Benchmark summaries stored at
       `docs/progress/features/t19-f04-vote-based-action-selection.json` and
       `-goal.json`, local raw hash, byte count, and verification time checked,
-      series entries point to the summaries, no full report staged.
+      series entries point to the summaries, no full report staged. Gate
+      summary stored and series entry added; goal summary **could not be
+      generated** — the goal profile's report read-back failed
+      (`docs/progress/readings/t19-f04.md`, "Goal — failed, not stored");
+      escalated, not remediated here.
 - [x] Readings file, founder half: the one-edge census and the founder
       per-tick compute cost before and after.
 - [ ] Readings file, run half: births probe with the new classes, drift walk
       against T19.F03, the T11.F14 and steering evolved halves, Orchards seed
       12 to 2,000 ticks (`v3 run`: command, final and minimum population, tick
       reasons), passes and `Decided` against capped passes, cognition wall per
-      creature-tick.
+      creature-tick. Orchards seed 12 obtained directly. Every other item
+      depends on the failed goal report and is recorded "not measured" with
+      its reason in the readings file.
 
 ## Performance and Goal Impact
 
@@ -310,10 +316,25 @@ that re-pin, which is the predeclared severe, not a waived check.
 | `config_digest`, gate and goal | Unchanged (`inputs_changed` false) |
 | Founder digest, short-run identity, `FOUNDER_GENOME_SIZE_UNITS` | Move by construction; re-pinned and listed |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate `severe = true`, matching the predeclaration
+(commands, exit statuses, deltas, and match/mismatch notes in the readings
+file). The goal profile's report read-back failed before a summary could be
+written; nothing goal-dependent below is measured. Orchards seed 12 was run
+independently of the goal profile.
 
-- Summaries: [gate](../../progress/features/t19-f04-vote-based-action-selection.json),
-  [goal](../../progress/features/t19-f04-vote-based-action-selection-goal.json).
+| Reading | Verdict |
+| --- | --- |
+| Gate `mesh_hops`, `graph_relax_iters` | Severe, up, as predeclared |
+| Gate `vm_steps` | -99.81%, tool level `ok` (predeclared severe; mismatch, reported) |
+| Gate `plasticity_updates` | Severe, +268.05%, as predeclared |
+| Gate `pass_cap_hits` | Tool level `severe` (zero reference); within its own 10% ceiling (0.075%) |
+| Gate `passes`, `decided_passes` | Level `new`; 2.351203 ≤ 4, as predeclared |
+| Goal profile | Failed: `invalid full report` deserializing an `Indicator` field; no summary written; escalated |
+| Orchards seed 12, 2,000 ticks | Final population 4,828; minimum 34 (tick 308); tick reasons not obtainable from `v3 run` |
+| All other run-half readings | Not measured (goal report dependency); see readings file |
+
+- Summaries: [gate](../../progress/features/t19-f04-vote-based-action-selection.json);
+  goal not produced.
 - Full readings: [`docs/progress/readings/t19-f04.md`](../../progress/readings/t19-f04.md).
 
 ## Success Criteria
