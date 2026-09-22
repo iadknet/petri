@@ -9,23 +9,19 @@
 
 Motor programs compete and the winner habituates, as in basal ganglia
 selection and competitive queuing of serial order. A tick is a sequence of
-passes: each runs the mesh from the entry with the vote vector cleared and the
-bus carried, ends at the genome's `Decide` vote or at the chain's end, and
-commits one action of the kind with the largest effective vote (best sink vote
-minus that kind's bar), raising the bar by one unit. The tick ends when no
-effective vote is positive, when `Terminate` beats the best kind against a
-non-empty queue, or at the action cap. The push, pop, execute, and
-direction-bid opcodes, the graph action bank, the execute gate, and
-`MutateActionSlotBehavior` are deleted in the same commit, so one execution
-model exists. Every founder profile is re-expressed in votes and acts
-identically on its tests.
+passes: each runs the mesh from the entry with the votes cleared and the bus
+carried, ends at the genome's `Decide` vote or the chain's end, and commits
+one action of the kind with the largest effective vote (best sink vote minus
+the kind's bar), raising that bar by one. The tick ends at `NoDecision`,
+`TerminateVoted`, or the action cap. The push machinery, the action bank, the
+execute gate, and `MutateActionSlotBehavior` are deleted in the same commit;
+every founder profile is re-expressed in votes and acts identically.
 
 ## Non-Goals
 
 - T19.F05's inputs; T19.F06's retirements (`action_queue_cap`, the inspector
   redesign, historical markings, the `route_varies_with_input` split, the
-  deleted-name grep). This feature ships only the minimal vote rendering that
-  keeps the build green.
+  deleted-name grep). Only the minimal vote rendering ships here.
 - Meanings for the unread parameter slots (T17.F03, T17.F04); the T18
   layouts; the census on goal-sampled genomes and the discovery protocol
   (T11.F10).
@@ -39,17 +35,16 @@ Sources of truth: the track row and its "Decisions recorded", "Two rules",
 "Scope, T19.F04", "Decomposition rules", "Epochs", "Contract text", and
 "Readings that become historical" notes; the
 [mesh action-selection review](../../strategy/mesh-action-selection-review-2026-09-20.md)
-Sections 0, 1.4, 1.7 to 1.9, 2.3 to 2.8, 3, and 5 (Section 2.3 is the
-transition contract; W1 to W19 are this feature's acceptance fixtures);
-T19.F02 invariants 2, 5, 6 and T19.F03 invariants 1 to 8; the code named in
-each invariant, starting from `execute_creature_mesh_impl`
-(`crates/v3-core/src/runtime/mesh.rs`).
+Sections 0, 1.4, 1.7 to 1.9, 2.3 to 2.8, 3, and 5 (2.3 is the transition
+contract; W1 to W19 are the acceptance fixtures); T19.F02 invariants 2, 5, 6
+and T19.F03 invariants 1 to 8; the code named in each invariant, from
+`execute_creature_mesh_impl` (`crates/v3-core/src/runtime/mesh.rs`).
 
-Options: settled by the note, whose Section 7 read the primary texts and
-whose Section 2.3 table compares six commit rules on the rows that separate
-them. Adopted: reset per pass, per-kind rising bar, within-kind argmax (the
-only rule that ports the founder and commits a unit edge once). Rejected:
-action cap only, one global bar, per-sink bar, winner-only suppression, unit
+Options: settled by the note (Section 7 read the primary texts; the Section
+2.3 table compares six commit rules). Adopted: reset per pass, per-kind
+rising bar, within-kind argmax (the only rule that ports the founder and
+commits a unit edge once). Rejected: action cap only, one global bar,
+per-sink bar, winner-only suppression, unit
 debit, random tie-breaking (the parallel phase is RNG-free), queue discard at
 exhaustion (order of computation would decide survival), a decide register.
 No external research is repeated here.
@@ -67,7 +62,8 @@ pass:
   of the previous pass; state, memory, weights, traces live)
     after each committed dispatch: that node's contribution replaces its
     earlier one this pass; V = sanitized sum over nodes visited this pass
-    if V[Decide] > 0 and max_K E[K] > 0: end the pass (Decided)
+    if V[Decide] > 0 and (max_K E[K] > 0 or (queue non-empty and V[Terminate] > 0)):
+      end the pass (Decided)
   the pass also ends at NoTargets, MissingNode, PassCapReached (hops_this_pass
   reaches max_mesh_hops), or EnergyExhausted; all keep V and the queue
   pass end:
@@ -84,9 +80,14 @@ pass:
 exit: settle the bid once; actions = queue, or NoOp when empty
 ```
 
-2. **Guards and ties.** `Decide` ends a pass only when some kind's effective
-   vote is positive (with `E <= 0` the pass end is `NoDecision` whatever
-   `Terminate` holds, so the note's 2.4 second clause is subsumed).
+2. **Guards and ties.** `Decide` ends a pass only when the pass end would do
+   something: some kind's effective vote is positive, or the queue is
+   non-empty and `Terminate` is positive (the note's Section 2.4, both
+   clauses; the second lets a genome leave a cycle by one `Terminate` edge
+   instead of a capped pass). W17 votes no `Terminate`, so its second pass
+   runs to the cap (`PassCapReached`, `NoDecision`, queue `Move W`); the
+   row's "six hops" assumed a reset bus and is superseded. W17b adds a static
+   `Terminate` vote and ends pass two at its first `Decide` boundary.
    `Terminate` never commits, has no bar, wins its ties, and cannot end an
    empty tick (W15). A revisited node replaces its own contribution (W11 to
    W14). Comparisons are on sanitized `f32`; no RNG is drawn.
@@ -121,8 +122,10 @@ exit: settle the bid once; actions = queue, or NoOp when empty
    `max_actions_per_turn` (10). `WorkCounters` gains `passes` and
    `decided_passes`; both join bench `COUNTER_NAMES` after `pass_cap_hits`
    (level `new` against a reference without them) and the T11.F14 block,
-   where `hop_cap_hits` is deleted (no tick reason names the cap) and the
-   capped fraction is capped passes over passes.
+   where `hop_cap_hits` is deleted (no tick reason names the cap), the
+   capped fraction is capped passes over passes, and `passes` and
+   `decided_passes` are totals; `MESH_EXECUTION_VERSION` becomes
+   `mesh-execution-v2` because the block's shape and reason names changed.
 6. **Exhaustion and bid.** Exhaustion at any point (compute, ramp, bid) keeps
    the actions committed before it. The bid settles once on every exit,
    `paid = min(bid, energy)`, nothing when energy is already gone; an all-in
@@ -180,19 +183,16 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 | ForageFirst* | 0 | 0 | `Eat, Move d` |
 
    `q` closes the reproduce branch because live energy falls between passes
-   and could cross the gate. `[Eat]` alone at `max_actions_per_turn` 1. The
-   profile thresholds and fractions are unchanged. Verified by the existing
-   founder tests (`founder.rs`, the `limit 1` case, the ring proptest), a
-   2,000-ring direction check against `expected_direction`, and the founder
-   scenarios in `tests/viability.rs`. `FOUNDER_GENOME_SIZE_UNITS` is
-   re-pinned to the measured `genome_size()` of the new V3Alpha1 (wired vote
-   sinks count by the existing rule); the per-unit rate stays `0.005`, the
-   assertion tying `0.55` to the founder size is re-pinned to `0.005 × the
-   new size`, and the T11 track's "the 111 the state test asserts" wording
-   names the new number. `founder_only_trajectory_digest_is_pinned` and
-   `legacy_default_short_run_identity` move and are re-pinned after
-   reproduction; a pin that hashes positions, energy, or ages moves only
-   through the founder's changed actions.
+   and could cross the gate. `[Eat]` alone at `max_actions_per_turn` 1;
+   thresholds and fractions unchanged. Verified by the founder tests
+   (`founder.rs`, the `limit 1` case, the ring proptest), a 2,000-ring check
+   against `expected_direction`, and `tests/viability.rs`.
+   `FOUNDER_GENOME_SIZE_UNITS` is re-pinned to the measured `genome_size()`
+   (97); the per-unit rate stays `0.005`, the `0.55` assertion is re-pinned
+   to `0.005 × 97`, and the T11 track's walk-anchor wording names 97. The
+   founder digest and `legacy_default_short_run_identity` move and are
+   re-pinned after reproduction; a pin on positions, energy, or ages moves
+   only through the founder's changed actions.
 10. **Compile-coupled consumers, all owned here.**
 
 | Consumer | Change |
@@ -200,7 +200,7 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 | v3-server `sample_protocol.rs`, `sample_assembler.rs` | Pass records, bars, reasons; `PROTOCOL_VERSION` becomes `v3alpha3` (fields are removed; T19.F03's additive reasoning does not cover removal) |
 | Every frontend source and test referencing the bank, the gate, the four opcodes, or `ActionEmitted` (11 sources, 17 tests by grep, 2026-09-22) | Types mirrored; the T19.F03 vote block shown per pass with the committed action and pass reason; nothing more |
 | `tests/vm_all_opcodes_e2e.rs`, the memory-sensitivity and cycle fixtures | Rebuilt on votes |
-| T13 recruitment-path fixtures and qualification | Activation is one edge into a vote sink; stored records become historical at T19.F06 |
+| T13 recruitment-path fixtures and qualification | Activation is one edge into a vote sink, so all nine forms qualify and the recorded `graph_blank` and `vm_blank` growth gaps close by construction (a finding, not a re-pin); stored records become historical at T19.F06 |
 | Steering structural reading | "The executed node contributes to a `Move` sink" |
 | Mesh annotations write classes | `ActionVote` and `ActionParam` are class `Action`; the slot classes go |
 
@@ -255,19 +255,18 @@ exit: settle the bid once; actions = queue, or NoOp when empty
       check pass; the moved pins listed with before and after values in the
       readings file.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      every survivor resolved as killed, equivalent, or deferred. Budget named
-      up front: the deleted surface touches every hub file the gate runs on,
-      so a long gate is expected, not a deviation.
+      every survivor resolved as killed, equivalent, or deferred (a long gate
+      is budgeted: the deleted surface touches every hub file).
 - [ ] Benchmark summaries stored at
       `docs/progress/features/t19-f04-vote-based-action-selection.json` and
       `-goal.json`, local raw hash, byte count, and verification time checked,
       series entries point to the summaries, no full report staged.
-- [ ] Readings in the readings file: births probe with the new classes, the
-      one-edge census table, drift walk against T19.F03, the T11.F14 and
-      steering evolved halves, Orchards seed 12 to 2,000 ticks (`v3 run` on
-      the Orchards recipe: command, final and minimum population, tick-reason
-      counts), passes and `Decided` against capped passes, cognition wall per
-      creature-tick.
+- [ ] Readings file: births probe with the new classes, the one-edge census,
+      drift walk against T19.F03, the T11.F14 and steering evolved halves,
+      Orchards seed 12 to 2,000 ticks (`v3 run`: command, final and minimum
+      population, tick reasons), passes and `Decided` against capped passes,
+      cognition wall per creature-tick, founder per-tick compute cost before
+      and after.
 
 ## Performance and Goal Impact
 
@@ -285,16 +284,16 @@ References: gate epoch and previous closure are
 `t19-f03-vote-surface-as-inert-data.json`; goal-worlds epoch and previous
 closure are their `-goal.json` counterparts. Standing thresholds: counters
 flag at 10%, severe at 50%; wall flags at 25%, severe at 100%. The goal
-profile runs once. **Both epochs re-pin in the closing commit** by the track's
-"Epochs" note (the founder changes; the goal trajectories move by
-construction); the severe flags predeclared below are still reported to the
-user before closure with the re-pin, as at T19.F02, never taken silently.
+profile runs once. **Both epochs re-pin in the closing commit** (track
+"Epochs"); the predeclared severes are still reported to the user with the
+re-pin before closure, as at T19.F02; the gate's series test is red until
+that re-pin, which is the predeclared severe, not a waived check.
 
 | Reading | Predeclaration |
 | --- | --- |
 | Gate and goal `mesh_hops`, `graph_relax_iters` | Up, severe expected; ceiling: goal mean `mesh_hops` per creature-tick at most 5 times T19.F03's per world; above it the result does not fit and is escalated before anything is presented |
 | Gate and goal `vm_steps` | Down, severe expected (the founder has no VM node); no floor |
-| `plasticity_updates`, `actions_applied`, `births` | No direction; a severe on gate `births` is investigated against the founder truth table before it is presented |
+| `plasticity_updates`, `actions_applied`, `births` | No direction; gate `births` are expected up because the graph founder's cognition is cheaper per tick than the VM program's (the founder-only trajectory's births moved 185 to 323); the readings file records the founder's per-tick compute cost before and after so the move is attributed, and a severe is reported to the user with the re-pin |
 | `passes`, `decided_passes` | Level `new`; goal mean passes per creature-tick at most 4 in every world (the founder runs 2 or 3); `Decided` passes reported against capped passes, no direction |
 | `pass_cap_hits` | At most 10% of creature-ticks per goal world (T19.F02's rule); capped passes at most 10% of passes |
 | Births probe (founder half): dead and sterile per mutated birth | Against T19.F03, ceiling twice its value for each; `reordered` and `recount` reported, no direction (first reading) |
@@ -335,8 +334,9 @@ user before closure with the re-pin, as at T19.F02, never taken silently.
 - Decision: the parameter surface index keeps today's `meta[i]` meaning minus
   the direction (`Eat` type at 0, `Reproduce` fraction and `StealEnergy`
   amount at 1); T17.F03 and T17.F04 name the unread slots.
-- Decision: the `Decide` guard is "some kind's effective vote is positive"; a
-  pass with none ends the tick `NoDecision` regardless of `Terminate`.
+- Decision: the `Decide` guard is the note's 2.4 rule, both clauses (a
+  positive effective vote, or a non-empty queue with a positive `Terminate`);
+  the note's W17 row hop count is superseded (invariant 2).
 - Decision: exhaustion of any kind keeps the committed queue; an all-in bid
   keeps the queue with `priority_bid` equal to the energy paid.
 - Decision: the per-unit mutation rate stays `0.005`; the founder's requested
