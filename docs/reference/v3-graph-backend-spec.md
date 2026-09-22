@@ -38,8 +38,9 @@ The graph backend uses a three-layer CGP (Cartesian Genetic Programming) model:
    sources (`GraphSource`), not physical nodes.
 2. **Compute nodes** — mutable computation layer with free topology mutations.
    Supports recurrence through the last committed outputs.
-3. **Fixed structural outputs** — value sinks, action bank, and execute gate.
-   Structurally immutable (always present); only edges TO them are evolvable.
+3. **Fixed structural outputs** — value, routing, memory, vote, and
+   parameter sinks. Structurally immutable (always present); only edges TO
+   them are evolvable.
 
 This separation eliminates the class of bugs where topology mutations corrupt
 structural invariants (sensor nodes, output nodes). Every topology mutation
@@ -53,8 +54,6 @@ produces a structurally valid genome.
 pub struct GraphBackendDef {
     pub compute_nodes: Vec<ComputeNode>,
     pub output_sinks: Vec<OutputSink>,
-    pub action_bank: Vec<ActionSlot>,
-    pub execute_gate: ExecuteGate,
 }
 
 pub struct ComputeNode {
@@ -65,24 +64,6 @@ pub struct ComputeNode {
 
 pub struct OutputSink {
     pub kind: OutputSinkKind,
-    pub inputs: Vec<GraphEdge>,
-}
-
-pub struct ActionSlot {
-    pub behavior: ActionSlotBehavior,
-    pub gate_inputs: Vec<GraphEdge>,
-    pub param_inputs: Vec<GraphEdge>,
-    /// Direction bank (T11.F21); serde-defaulted, empty on founders.
-    pub direction_bids: Vec<DirectionBidEdge>,
-}
-
-pub struct DirectionBidEdge {
-    pub edge: GraphEdge,
-    /// Bank slot in `0..8` (`Direction::ALL` index).
-    pub direction: u8,
-}
-
-pub struct ExecuteGate {
     pub inputs: Vec<GraphEdge>,
 }
 
@@ -175,8 +156,8 @@ pub enum OutputSinkKind {
     RouterGate(u8),          // eight routing gate scores, indices 0-7
     WriteSlot(u8),           // 16 slots, indices 0-15: shared memory write
     ClearSlot(u8),           // 16 slots, indices 0-15: shared memory clear
-    ActionVote(VoteSink),    // 27 vote sinks (T19.F03), inert
-    ActionParam(VoteKind, u8), // two parameter slots per kind (T19.F03), inert
+    ActionVote(VoteSink),    // 27 vote sinks
+    ActionParam(VoteKind, u8), // two parameter slots per kind
 }
 ```
 
@@ -190,10 +171,14 @@ kinds.
 `Direction::ALL` slots, `Terminate` (25), and `Decide` (26). `VoteKind` is
 `Eat`, `Move`, `Reproduce`, `StealEnergy`, in that order.
 
-Both new kinds are inert until T19.F04: a wired `ActionVote` sink contributes
-to the mesh vote vector and a wired `ActionParam` sink overwrites
-`action_params[kind][slot]`, and nothing reads either. `pick_random_surface`
-skips both, so no mutation can wire them yet.
+A wired `ActionVote` sink writes its weighted sum into the visit's vote
+contribution, which replaces the node's earlier contribution in the pass; a
+wired `ActionParam(kind, slot)` sink overwrites `action_params[kind][slot]`
+on the tick's parameter surface. The pass end reads both
+(`v3-mesh-execution-spec.md` Section 2); votes are how the graph acts, so a
+graph with no wired vote sink never commits an action. `pick_random_surface`
+draws uniformly over the compute nodes and then all 99 sinks, vote and
+parameter sinks included (T19.F04).
 
 ### Inert-when-unwired rule
 
@@ -209,73 +194,31 @@ the result.
 
 ---
 
-## 6. ActionSlotBehavior and WorldActionKind
+## 6. Votes and Parameters
 
-```rust
-pub enum ActionSlotBehavior {
-    Pop,
-    Emit(WorldActionKind),
-}
+The action bank, its `ActionSlotBehavior`/`WorldActionKind` catalog, the
+direction bank, and the execute gate were deleted by T19.F04; votes and
+parameters replace them.
 
-pub enum WorldActionKind {
-    Eat,
-    Move,
-    Reproduce,
-    StealEnergy,
-    NoOp,
-}
-```
-
-- `Pop` — queue-program-control: removes the last queued action.
-- `Emit(kind)` — world-action-payload: decodes a world action from `kind` +
-  the slot's `param_inputs` and pushes to the queue.
-
-Behavior is evolvable via raw field mutation (not edge-computed).
-
-### Action parameter decoding
-
-When an `Emit(kind)` slot fires, parameters are decoded from `param_inputs`
-weighted sums:
-
-| `WorldActionKind` | `param[0]` | `param[1]` | Notes |
-|---|---|---|---|
-| `Eat` | — | — | No params |
-| `Move` | direction index (0-7) | — | `round().clamp(0, 7)` |
-| `Reproduce` | direction index (0-7) | offspring energy | Non-negative |
-| `StealEnergy` | direction index (0-7) | steal amount | Non-negative |
-| `NoOp` | — | — | Real action with costs |
-
-Direction decoding matches the VM `PushAction` convention: both backends call
-`runtime::action_decode::decode_world_action`, and
-`meta[0].round().clamp(0.0, 7.0)` maps to `Direction::ALL`.
-
-### Direction bank (T11.F21)
-
-A `Move`, `Reproduce`, or `StealEnergy` slot may carry `direction_bids`: bid
-`d` is the weighted sum of the edges with `direction == d` (unwired `0.0`),
-and the bank is written when at least one edge has `direction < 8`. With a
-written bank the committed direction is the index of the maximum sanitized
-bid; on a tie at the maximum the scalar-decoded `param[0]` direction wins if
-it is among the tied slots, else the lowest tied index. A slot with no bank
-decodes from `param[0]` exactly as above. `Eat`, `NoOp`, and `Pop` slots
-never consult a bank. Founder and blank graphs carry empty banks.
+- A kind's action count is its vote: at the pass end the kind with the
+  highest effective vote (best sink's vote minus the kind's bar, its commits
+  so far this tick) commits once, in its best sink's direction; a vote of
+  `v` therefore commits `ceil(v)` actions over successive passes.
+- Parameters are read at commit from `action_params[kind]`: `Eat` its food
+  type at slot 0, `Reproduce` its transfer fraction and `StealEnergy` its
+  amount at slot 1 (`runtime::action_decode::decode_commit`, shared with the
+  VM's `WriteActionParam`).
+- `Terminate` ends a non-empty tick when its vote is at least the best
+  effective vote; `Decide` ends a pass early when some kind's effective vote
+  is positive. Neither commits.
 
 ---
 
-## 7. ExecuteGate
+## 7. Deleted: ExecuteGate
 
-```rust
-pub struct ExecuteGate {
-    pub inputs: Vec<GraphEdge>,
-}
-```
-
-Separate gated output controlling mesh termination. The gate fires when
-`wsum(inputs) > 0.0` AND the action queue is non-empty. When fired, the mesh
-hop terminates and returns the accumulated action queue for execution.
-
-If inputs are empty, `wsum = 0.0` — gate doesn't fire. Terminal behavior is
-evolvable only through edge mutations on the execute gate.
+A pass ends at the chain's natural end (`NoTargets`, `MissingNode`), at the
+per-pass hop cap, or when a `Decide` vote holds (`v3-mesh-execution-spec.md`
+Section 3). No graph output terminates the tick.
 
 ---
 
@@ -289,8 +232,7 @@ visits and world time in ticks: a module's state advances once per visit,
 however many visits a tick's pass makes, and the per-pass hop cap and the
 per-tick hop ramp bound and price those visits. A visit is entered when the
 graph has at least one compute node or a wired effect surface (an output
-sink, action-slot gate or param list, or execute gate carrying at least one
-edge). An entered visit evaluates all compute nodes once in index order,
+sink carrying at least one edge). An entered visit evaluates all compute nodes once in index order,
 including disconnected nodes; with zero compute nodes that evaluation is
 empty and the effects pass still runs.
 
@@ -313,8 +255,8 @@ fields are deleted (`v3-runtime-config-spec.md`).
 
 ## 9. Post-Evaluation Effects
 
-After the ordered evaluation and its plasticity cost are affordable, a
-three-phase effects pass processes all fixed structural outputs. A zero-compute
+After the ordered evaluation and its plasticity cost are affordable, one
+effects pass processes all fixed structural outputs. A zero-compute
 entered visit runs the same pass with `compute_count = 0`, where a `ComputeNode`
 source resolves to `0.0` as any out-of-range compute source does.
 
@@ -331,28 +273,11 @@ Iterate `output_sinks`. For each sink with non-empty `inputs`:
   - `WriteSlot(slot)`: `shared_memory[slot % 16] = sanitize_f32(wsum)`.
   - `ClearSlot(slot)`: `shared_memory[slot % 16] = 0.0` (wsum is ignored;
     the act of having edges and firing is what clears).
+  - `ActionVote(sink)`: `contribution[sink] = sanitize_f32(wsum)`.
+  - `ActionParam(kind, slot)`: `action_params[kind][slot] = sanitize_f32(wsum)`.
 
-Sinks with empty `inputs` are inert — no write occurs.
-
-### Phase 2: Action bank scan
-
-Iterate `action_bank` in order (index 0 to N-1). For each slot:
-1. Gather `gate_wsum = sum(resolve_source(e.source) * e.weight)` from
-   `gate_inputs`.
-2. If `gate_wsum > 0.0` (slot fires):
-   - If `behavior` is `Pop`: remove last queued item. No-op if queue empty.
-   - If `behavior` is `Emit(kind)`: gather `param_wsum[i]` from
-     `param_inputs` and, for a movement kind, the direction bank from
-     `direction_bids`; decode world action from `kind` + params (+ bank), push
-     to queue.
-3. If `gate_inputs` is empty: `gate_wsum = 0.0`, slot doesn't fire.
-
-### Phase 3: Execute gate
-
-Gather `gate_wsum` from `execute_gate.inputs`. If `gate_wsum > 0.0` AND
-queue is non-empty: mark hop as terminal.
-
-If `execute_gate.inputs` is empty: `gate_wsum = 0.0`, hop doesn't terminate.
+Sinks with empty `inputs` are inert — no write occurs. A visit that reaches
+its effects stages its vote contribution; an exhausted visit stages nothing.
 
 ### Effect-phase trace visibility (Execution Sampler)
 
@@ -360,14 +285,9 @@ Graph sampler traces include post-evaluation structural-layer records in
 addition to the single entered evaluation:
 - `output_sinks: Vec<GraphOutputSinkTrace>` (1:1 with `output_sinks`)
   - fields: `wired`, `weighted_sum`, `applied`, `applied_value`
-- `action_slots: Vec<GraphActionSlotTrace>` (1:1 with `action_bank`)
-  - fields: `wired`, `gate_weighted_sum`, `fired`, `param_values`,
-    `queue_len_before`, `queue_len_after`, `emitted_action`,
-    `direction_bids: Option<[f32; 8]>` and `chosen_direction: Option<u8>`
-    (`Some` only when the slot fired a movement action with a written bank;
-    omitted from the serialized trace otherwise)
-- `execute_gate: GraphExecuteGateTrace`
-  - fields: `wired`, `weighted_sum`, `queue_non_empty`, `fired`
+
+The pass records (votes, effective votes, committed action, end reason) are
+on the tick trace (`v3-server-api-protocol-spec.md`).
 
 These records are always index-aligned with structural catalogs (not sparse
 "only fired" lists), so UI/debug tooling can compare wired-but-inert vs active
@@ -427,7 +347,7 @@ no graph effects. Actual charge and entered work remain recorded; learned
 pure Hebbian weight and reward rollback are outside this temporal transaction.
 Reward-trace activity commits at this same successful boundary.
 
-Note: fixed structural outputs (sinks, action bank, execute gate) are not
+Note: fixed structural outputs (the sinks) are not
 counted in the per-visit energy cost. They are evaluated once post-evaluation.
 
 ---
@@ -529,16 +449,16 @@ Clear terminology to avoid conflating structural presence with functional
 contribution:
 
 - **Structurally present**: exists in the genome by construction. All fixed
-  sinks, all action slots, and the execute gate are always structurally present.
-- **Wired**: has at least one edge. Only wired items write values / fire
-  actions. Only wired items count toward `genome_size()` and
+  sinks are always structurally present.
+- **Wired**: has at least one edge. Only wired items write values or
+  votes. Only wired items count toward `genome_size()` and
   `functional_complexity()`.
 - **Functionally reachable** ("live"): compute nodes backward-reachable from
-  any wired sink, wired action slot gate/param, or wired execute gate inputs.
+  any wired sink, vote and parameter sinks included.
   "Live" is reserved for behaviorally contributing items only — unwired sinks
   are structurally present but NOT live.
 
-Dormant (unwired) sinks and action slots are NOT counted toward
+Dormant (unwired) sinks are NOT counted toward
 `genome_size()` or `functional_complexity()`. This prevents the fixed catalog
 from imposing a constant complexity tax.
 
@@ -546,33 +466,28 @@ from imposing a constant complexity tax.
 
 ## 15. Fixed Output Catalog Construction
 
-`GraphBackendDef::new_with_fixed_outputs(config)` constructs, in this order:
+`GraphBackendDef::new_with_fixed_outputs()` constructs, in this order:
 - 24 `CustomOutput(0..23)` sinks (catalog indices 0..24)
 - 8 `RouterGate(0..7)` sinks (24..32)
 - 16 `WriteSlot(0..15)` sinks (32..48)
 - 16 `ClearSlot(0..15)` sinks (48..64)
 - 27 `ActionVote` sinks in `VoteSink` index order (64..91)
 - 8 `ActionParam` sinks kind-major, two slots per kind (91..99)
-- `action_bank` of `config.action_queue_cap` empty `ActionSlot`s
-- Empty `ExecuteGate`
 
-All sinks and action slots start with empty edge Vecs (inert until evolution
-wires them).
+All sinks start with empty edge Vecs (inert until evolution wires them).
 
 ### Queue-size contract
 
-`action_bank.len()` is derived from `MutationConfig::action_queue_cap`
-(default 4). This gives a single source of truth for queue shape:
-- `action_bank.len() == config.action_queue_cap` at genome creation time.
+`MutationConfig::action_queue_cap` (default 4) sets the width of the queue
+the genome can read:
 - `InputReference::ActionQueue` width = `action_queue_cap * 3`.
 - Invariant: `action_queue_cap <= max_actions_per_turn`.
 - Normalization order: `max_actions_per_turn` is normalized first, then
   `action_queue_cap` is clamped to
   `1..=min(21845, max_actions_per_turn)`.
 
-Config-change policy: frozen at creation. `action_bank.len()` is set when the
-genome is created and never changes. If `action_queue_cap` changes
-mid-simulation, existing creatures keep their original bank size.
+The number of actions a tick commits is bounded by
+`runtime.max_actions_per_turn`, not by the genome.
 
 ---
 
@@ -588,15 +503,10 @@ Two-layer validation: mutation-time (bound values at creation) and runtime
 | `InputLeaf { sub_idx }` where `sub_idx >= sub_value_count` | Resolve to 0.0 |
 | `SharedMemory { slot }` where `slot >= 16` | Bound at mutation time to 0-15; defensive fallback: 0.0 |
 | `CustomOutput(s)` where `s >= 12` | Constructor invariant; defensive fallback: 0.0 |
-| `Pop` on empty queue | Silent no-op |
-| ActionSlot with empty `gate_inputs` | gate wsum = 0.0, slot doesn't fire |
-| ActionSlot with empty `param_inputs` | all params = 0.0 |
-| ActionSlot with empty `direction_bids` | no bank; scalar direction decode |
-| `DirectionBidEdge` with `direction >= 8` | summed nowhere; does not write the bank |
-| ExecuteGate with empty `inputs` | wsum = 0.0, hop doesn't terminate |
+| Unwired `ActionParam` sink | The parameter keeps its last write this tick (zero at tick start) |
+| Graph with no wired vote sink | Votes nothing; the pass commits only what other nodes vote |
 | Edge with NaN/Inf weight | `sanitize_f32()` to 0.0 |
 | Sink with empty `inputs` | Inert — does not write |
-| `Emit(NoOp)` that fires | Enqueues `WorldAction::NoOp` (real action with costs) |
 | Re-entry in one tick (a revisit) | Starts from the previous visit's commit and commits again; bounded by the per-pass hop cap |
 | Missing graph state | Lazily initialized to zeros |
 

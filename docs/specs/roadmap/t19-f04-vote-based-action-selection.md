@@ -228,32 +228,30 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 
 ## Implementation Tasks
 
-- [ ] Fixtures first (TDD): W1 to W19 as executor tests on hand-built vote
+- [x] Fixtures first (TDD): W1 to W19 as executor tests on hand-built vote
       genomes with the three execution modes agreeing, the founder truth
       table, the `limit 1` case, the 2,000-ring check.
-- [ ] Pass loop, reasons, counters, exhaustion and bid rules, bus carry, and
+- [x] Pass loop, reasons, counters, exhaustion and bid rules, bus carry, and
       the per-pass contribution container (invariants 1 to 7).
-- [ ] Deletions, `WriteActionParam`, both draws lifted (invariant 8).
-- [ ] Founder port and pin moves (invariant 9); run
+- [x] Deletions, `WriteActionParam`, both draws lifted (invariant 8).
+- [x] Founder port and pin moves (invariant 9); run
       `cargo test -p v3-core --test viability` first.
-- [ ] Consumers, server protocol, frontend types and rendering (invariant 10).
-- [ ] Births-probe classes, one-edge census, T11.F14 and steering
+- [x] Consumers, server protocol, frontend types and rendering (invariant 10).
+- [x] Births-probe classes, one-edge census, T11.F14 and steering
       re-expression (invariant 12); readings file.
 - [ ] Reference docs (invariant 13); `make check`.
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-core --test viability` -> result;
-      `cargo test -p v3-core` (worked cases, founder tests, three-mode parity,
-      births classes) -> result; `cargo test -p v3-server -p v3-cli` ->
-      result; frontend `npm test` -> result; `make check` -> result.
+- [ ] Focused tests: `cargo test -p v3-core --test viability` -> 28 passed;
+      workspace -> 2,092 passed, 1 failed (gate severe, pre re-pin); `npx vitest run` -> 327 passed; `make check` pending.
       Transcripts in [`docs/progress/readings/t19-f04.md`](../../progress/readings/t19-f04.md).
-- [ ] Grep proof: none of `PushAction`, `PopAction`, `ExecuteActionQueue`,
+- [x] Grep proof: none of `PushAction`, `PopAction`, `ExecuteActionQueue`,
       `WriteDirectionBid`, `ActionSlot`, `ExecuteGate`, `action_bank`,
       `execute_gate`, `MutateActionSlotBehavior`, `ActionEmitted`,
       `DirectionBank` under `crates/` or `frontend/src` (historical specs keep
       theirs) -> result in the readings file.
-- [ ] Founder exactness: truth table, `limit 1`, proptest, and 2,000-ring
+- [x] Founder exactness: truth table, `limit 1`, proptest, and 2,000-ring
       check pass; the moved pins listed with before and after values in the
       readings file.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
@@ -344,3 +342,5 @@ user before closure with the re-pin, as at T19.F02, never taken silently.
 - Decision: the per-unit mutation rate stays `0.005`; the founder's requested
   events per birth become `0.005 × the new founder size`, and the `0.55`
   equivalence is historical once the size moves.
+- Decision: `reordered`/`recount` hold on every differing execution
+  (kinds are `WorldAction` variants); a mix is neither.

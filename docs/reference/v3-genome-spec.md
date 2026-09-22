@@ -61,11 +61,13 @@ pub enum BackendDef {
 `VmBackendDef` is defined in `v3-vm-isa-spec.md`.
 `GraphBackendDef` is defined in `v3-graph-backend-spec.md`. The graph backend
 uses a CGP-style layered model with implicit inputs, mutable compute nodes,
-and fixed structural outputs (value sinks, action bank, execute gate). The
-fixed catalog holds 99 sinks: 24 `CustomOutput`, 8 `RouterGate`, 16
-`WriteSlot`, 16 `ClearSlot`, 27 `ActionVote`, and 8 `ActionParam` (T19.F03;
-the last two groups are inert and unreachable by mutation until T19.F04).
-`genome_size` counts wired sinks only, so the inert groups add nothing to it.
+and fixed structural outputs (the sinks; the action bank and execute gate were
+deleted by T19.F04). The fixed catalog holds 99 sinks: 24 `CustomOutput`, 8
+`RouterGate`, 16 `WriteSlot`, 16 `ClearSlot`, 27 `ActionVote`, and 8
+`ActionParam`; the vote and parameter sinks are how a graph acts
+(`v3-mesh-execution-spec.md` Section 2) and are drawable by mutation.
+`genome_size` counts wired sinks only, so unwired sinks add nothing to it;
+the founder is 97 units.
 Topology examples are documented in `v3-genome-topology-examples.md`.
 
 ---
@@ -111,8 +113,8 @@ misalignment across topology mutations.
 
 Within each mesh node, graph runtime state (node_state, plasticity_weights,
 eligibility_traces, scratch buffers) is indexed by compute node index — only
-compute nodes have state. Fixed structural outputs (sinks, action bank,
-execute gate) do not participate in relaxation and have no runtime state.
+compute nodes have state. Fixed structural outputs (the sinks) do not
+participate in relaxation and have no runtime state.
 
 ---
 

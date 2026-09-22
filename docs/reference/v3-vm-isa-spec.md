@@ -28,9 +28,9 @@ contract are defined in `v3-mutation-spec.md`.
 
 ## 2. Instruction Set
 
-The VM defines **43 opcodes**. Mutation draws over the first 42; opcode 42
-`AddVote` exists in the ISA and the interpreter and is not drawable until
-T19.F04.
+The VM defines **39 opcodes** (T19.F04). The `#` column is the index of the
+fresh-instruction draw (`mutation/vm/operators.rs`), which covers all 39;
+`AddVote` draws its sink uniformly over the 27-sink catalog.
 
 ### Arithmetic and Data Movement
 
@@ -86,53 +86,47 @@ T19.F04.
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 24 | `WriteInternalPayload` | slot_idx, src | overwrites payload slot value (payload buffer starts from incoming `upstream_slots`; invalid slot write ignored) |
-| 25 | `WriteWorldActionMeta` | slot_idx, src | writes world-action metadata slot (`slot_idx` in `0..7`; invalid slot write ignored) |
+| 25 | `WriteActionParam` | slot_idx, src | `action_params[slot_idx / 2][slot_idx % 2] = regs[src]` on the tick's parameter surface (`slot_idx` in `0..8`, kinds in `VoteKind` order `Eat, Move, Reproduce, StealEnergy`; an invalid slot is ignored) |
 | 26 | `WriteRouteGate` | slot, src_reg | write one routing gate score (`f32`) |
 
-### Action Queue
+### Action Queue Reads
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 27 | `PushAction` | action_type | decode meta buffer and push action onto queue; silent no-op if at cap |
-| 28 | `PopAction` | none | remove last action from queue; no-op if empty |
-| 29 | `ReadActionQueueLength` | dst | `dst = queue.len() as f32` |
-| 30 | `ReadActionQueueType` | index_src, dst | `dst = queue[reg[index_src]].action_type()` (OOB yields `0.0`) |
-| 31 | `ReadActionQueueParam` | index_src, param_slot, dst | `dst = queue[reg[index_src]].param(param_slot)` (OOB yields `0.0`) |
-| 32 | `SetPriorityBid` | src | read `regs[src]`, clamp non-negative, record it as the creature's turn-order priority bid (last-write-wins); the mesh settles the bid once at evaluation end (Section 9) |
-| 33 | `ExecuteActionQueue` | none | terminal: return accumulated action queue for execution |
+| 27 | `ReadActionQueueLength` | dst | `dst = queue.len() as f32` (the actions committed by earlier passes this tick) |
+| 28 | `ReadActionQueueType` | index_src, dst | `dst = queue[reg[index_src]].action_type()` (OOB yields `0.0`) |
+| 29 | `ReadActionQueueParam` | index_src, param_slot, dst | `dst = queue[reg[index_src]].param(param_slot)` (OOB yields `0.0`) |
 
-### Halt and Shared Memory Slots
+### Halt, Shared Memory Slots, and Priority Bid
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 34 | `Halt` | none | stop VM execution |
-| 35 | `LoadSlot` | dst, slot_reg | `dst = shared_memory[regs[slot_reg] % 16]` |
-| 36 | `StoreSlot` | slot_reg, src | `shared_memory[regs[slot_reg] % 16] = sanitize(regs[src])` |
-| 37 | `LoadSlotImm` | dst, slot_idx | `dst = shared_memory[slot_idx % 16]` |
-| 38 | `StoreSlotImm` | slot_idx, src | `shared_memory[slot_idx % 16] = sanitize(regs[src])` |
-| 39 | `LoadSlotPrev` | dst, slot_idx | `dst = prev_shared_memory[slot_idx % 16]` |
-| 40 | `ClearSlot` | slot_idx | `shared_memory[slot_idx % 16] = 0.0` |
+| 30 | `Halt` | none | stop VM execution; the dispatch commits its outputs and votes |
+| 31 | `LoadSlot` | dst, slot_reg | `dst = shared_memory[regs[slot_reg] % 16]` |
+| 32 | `StoreSlot` | slot_reg, src | `shared_memory[regs[slot_reg] % 16] = sanitize(regs[src])` |
+| 33 | `LoadSlotImm` | dst, slot_idx | `dst = shared_memory[slot_idx % 16]` |
+| 34 | `StoreSlotImm` | slot_idx, src | `shared_memory[slot_idx % 16] = sanitize(regs[src])` |
+| 35 | `SetPriorityBid` | src | read `regs[src]`, clamp non-negative, record it as the creature's turn-order priority bid (last-write-wins across the tick); the mesh settles the bid once at tick end (Section 9) |
+| 36 | `LoadSlotPrev` | dst, slot_idx | `dst = prev_shared_memory[slot_idx % 16]` |
+| 37 | `ClearSlot` | slot_idx | `shared_memory[slot_idx % 16] = 0.0` |
 
-### Direction Bank (T11.F21)
-
-| # | Opcode | Operands | Semantics |
-|---|---|---|---|
-| 41 | `WriteDirectionBid` | direction, src | `bids[direction] = regs[src]` in the eight-slot direction bank and marks the bank written (`direction` in `0..7`; an invalid slot writes nothing and marks nothing) |
-
-### Action Vote (T19.F03)
+### Action Vote
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 42 | `AddVote` | sink, src | `contribution[sink] += regs[src]` on the dispatch-local vote vector (`sink` in `0..27`, the `VoteSink` catalog order; an invalid sink writes nothing and still costs). The dispatch commits its contribution at every exit but energy exhaustion. Inert: nothing reads the vote vector until T19.F04. |
+| 38 | `AddVote` | sink, src | `contribution[sink] += regs[src]` on the dispatch-local vote vector (`sink` in `0..27`, the `VoteSink` catalog order; an invalid sink writes nothing and still costs). The dispatch's contribution replaces this node's earlier one in the pass at every exit but energy exhaustion; the pass end reads the summed votes (`v3-mesh-execution-spec.md` Section 2). |
 
 Removed from active V3 mesh ISA:
 - `ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`
 - `ReadNeighborCreature`
 - `EmitInternal`
-- `EmitWorldAction` (replaced by `PushAction` + `ExecuteActionQueue`)
+- `EmitWorldAction` (replaced by `PushAction` + `ExecuteActionQueue`, T09)
+- `PushAction`, `PopAction`, `ExecuteActionQueue`, `WriteDirectionBid`
+  (replaced by `AddVote` and the pass loop, T19.F04); `WriteWorldActionMeta`
+  became `WriteActionParam`
 
-These were replaced by unified `ReadInput` + `InputReference` dataflow and
-`output_slots` routing semantics.
+The sensor reads were replaced by unified `ReadInput` + `InputReference`
+dataflow and `output_slots` routing semantics; the action opcodes by votes.
 
 ---
 
@@ -154,8 +148,9 @@ These were replaced by unified `ReadInput` + `InputReference` dataflow and
   `EnergyConsumedThisTick` includes the accumulator, and exhaustion triggers
   when the effective energy reaches zero or below. `SetPriorityBid` records
   its bid without charging it (Section 9).
-- `ExecuteActionQueue` is terminal: halts VM and returns accumulated actions.
-- `Halt` halts VM without returning actions (mesh uses action queue state).
+- No opcode ends the tick or the pass: `Halt` (or running off the program
+  end) ends the dispatch, which commits its payload, route gates, and votes;
+  the mesh then routes (`v3-mesh-execution-spec.md` Section 2).
 - VM runtime enforces a configurable step cap `max_vm_steps` per node
   evaluation (default `1024`; canonical owner:
   `v3-runtime-config-spec.md`).
@@ -188,10 +183,10 @@ All genome-derived indexes are handled without panic:
 - **Register index**: normalized by modulo `register_count`.
 - **Constant index**: if `constants` empty -> `0.0`; else modulo `constants.len()`.
 - **Payload slot index**: valid when `< 12`; otherwise write ignored.
-- **World-action metadata slot index**: valid when `< 8`; otherwise write ignored.
-- **Direction bank slot index**: valid when `< 8`; otherwise write ignored and the bank stays unwritten.
+- **Action parameter slot index**: valid when `< 8`; otherwise write ignored.
+- **Vote sink index**: valid when `< 27`; otherwise the vote is dropped.
 
-If `register_count == 0`, VM halts immediately (no action emission).
+If `register_count == 0`, VM halts immediately (no votes).
 
 Mutation width changes preserve effective register identity: they canonicalize
 operands under the old width and skip a shrink that would remove a referenced
@@ -220,7 +215,7 @@ Invalid `ref_idx` is a soft default and yields `0.0`.
 - Mesh routing selects the maximum bias-plus-score among all targets, the
   node itself included, retaining the earliest target on ties; see
   `v3-mesh-execution-spec.md`.
-- T11.F15 route addition inserts this write before the first terminal using
+- T11.F15 route addition inserts this write before the first `Halt` using
   the existing structural reference repair and a uniformly sampled register.
 
 ---
@@ -235,7 +230,7 @@ authoritative soft-default matrix).
 
 Soft defaults / graceful behavior:
 - invalid register/constant/index operands use normalization rules
-- invalid payload/meta/direction-bank writes are ignored
+- invalid payload and parameter writes, and invalid vote sinks, are ignored
 - out-of-range jump targets wrap into valid program range (when program non-empty)
 - invalid `ReadInput` `ref_idx` or `sub_idx` yields `0.0`
 
@@ -291,17 +286,13 @@ Defined numeric rules:
 | Jump | 0.10 |
 | ReadInput | 0.12 |
 | WriteInternalPayload | 0.14 |
-| WriteWorldActionMeta | 0.14 |
-| WriteDirectionBid | 0.14 |
+| WriteActionParam | 0.14 |
 | AddVote | 0.14 |
-| WriteRouteTarget | 0.10 |
-| PushAction | 0.24 |
-| PopAction | 0.10 |
+| WriteRouteGate | 0.10 |
 | ReadActionQueueLength | 0.08 |
 | ReadActionQueueType | 0.12 |
 | ReadActionQueueParam | 0.12 |
 | SetPriorityBid | 0.20 |
-| ExecuteActionQueue | 0.24 |
 | Halt | 0.05 |
 | LoadSlot | 0.12 |
 | StoreSlot | 0.14 |
@@ -341,75 +332,59 @@ Canonical owner for `runtime.vm.opcode_cost_multiplier`,
 
 VM node evaluation maintains:
 - internal payload buffer (12 slots)
-- world action metadata buffer (8 slots)
-- direction bank (8 bids plus a written flag; T11.F21)
+- a dispatch-local vote contribution (27 entries, `VoteSink` order)
 - eight route gate scores
+
+and writes the tick's parameter surface (`action_params`, 4 kinds by 2
+slots) in place.
 
 Initialization at the start of each VM node evaluation:
 - internal payload buffer is copied from incoming `upstream_slots`
-- world action metadata buffer is zeroed
-- the direction bank is unwritten (no bids)
+- the vote contribution is zeroed
 - all eight route gate scores start at `0.0`
 
-All writes are last-write-wins per slot/register.
-If `WriteInternalPayload` targets an invalid slot (`>= 12`), the write is
-ignored and existing payload slot values are preserved.
+The parameter surface is zeroed at tick start only; a dispatch overwrites the
+slots it writes and the value stands until the next write or the commit that
+reads it.
 
-World-action metadata buffer size is fixed:
-- `WORLD_ACTION_META_SLOTS = 8`
-- non-configurable (to keep VM behavior consistent across configs)
+All writes are last-write-wins per slot/register; votes add within the
+dispatch. If `WriteInternalPayload` targets an invalid slot (`>= 12`), the
+write is ignored and existing payload slot values are preserved.
 
-### Action encoding and metadata mapping
+### Votes, parameters, and the commit
 
-`PushAction(action_type)` decodes using the metadata buffer and the canonical
-mapping below:
+A node's votes say which action and how many; the pass end commits at most
+one (`v3-mesh-execution-spec.md` Section 2): the kind with the highest
+effective vote (its best sink's vote minus its bar), in the direction of its
+best sink. The committed action reads its kind's parameter row:
 
-| `action_type` | Decoded `WorldAction` | Metadata usage |
+| Kind | Sinks (`AddVote` index) | Parameters read at commit |
 |---|---|---|
-| `0` | `NoOp` | none |
-| `1` | `Eat` | `meta[0]` = food type index |
-| `2` | `Move` | `meta[0]` = direction index, or the direction bank when written |
-| `3` | `Reproduce` | `meta[0]` = direction index (or the bank), `meta[1]` = offspring transfer fraction of the parent's post-cost energy (scalar `f32` in [0, 1]) |
-| `4` | `StealEnergy` | `meta[0]` = direction index (or the bank), `meta[1]` = steal amount |
-| other | `NoOp` | none |
+| `Eat` | 0 | `action_params[Eat][0]` = food type index (rounded; non-finite or negative reads 0) |
+| `Move` | 1 to 8 (`Direction::ALL` order `N, NE, E, SE, S, SW, W, NW`) | none |
+| `Reproduce` | 9 to 16 | `action_params[Reproduce][1]` = offspring transfer fraction, `clamp_unit_interval` |
+| `StealEnergy` | 17 to 24 | `action_params[StealEnergy][1]` = amount, `clamp_non_negative_finite` |
+| `Terminate` | 25 | never commits; ends a non-empty tick when it holds the best effective vote |
+| `Decide` | 26 | never commits; ends the pass early when some kind's effective vote is positive |
 
-Each `PushAction` decodes from the *current* metadata buffer state and appends
-to the action queue. The metadata buffer can be overwritten between pushes to
-encode different actions.
-
-Metadata decode rules:
-- direction index uses `meta[0].round().clamp(0.0, 7.0)` and maps to
-  `Direction::ALL` (`0=N,1=NE,2=E,3=SE,4=S,5=SW,6=W,7=NW`)
-- reproduce transfer fraction uses `clamp_unit_interval(meta[1])`: NaN,
-  ±∞, and negatives become 0.0, values above 1.0 become 1.0 (no integer
-  rounding)
-- steal amount uses non-negative scalar `clamp_non_negative_finite(meta[1])`
-  (no integer rounding)
-- unspecified metadata slots are reserved and ignored by current runtime action
-  decoding
-- `WriteWorldActionMeta` to `slot_idx >= 8` is ignored
-- direction bank (T11.F21): when at least one `WriteDirectionBid` landed in
-  `0..8` during this dispatch, `Move`, `Reproduce`, and `StealEnergy` take the
-  index of the maximum bid (non-finite bids read as `0.0`); on a tie at the
-  maximum, the scalar-decoded `meta[0]` direction wins if it is among the tied
-  slots, else the lowest tied index. `Eat`, `NoOp`, and unknown types never
-  consult the bank. The bank persists between pushes within a dispatch.
-- `WriteDirectionBid` to `direction >= 8` is ignored and leaves the bank unwritten
+`WriteActionParam` slot indexes: `0` `Eat[0]`, `1` `Eat[1]`, `2` `Move[0]`,
+`3` `Move[1]`, `4` `Reproduce[0]`, `5` `Reproduce[1]`, `6`
+`StealEnergy[0]`, `7` `StealEnergy[1]`. Slots no commit reads are reserved.
 
 At node end:
-- if `ExecuteActionQueue` was called: `NodeResult.terminal` is true, mesh
-  returns accumulated action queue
-- otherwise internal payload buffer is emitted as `NodeResult.output_slots`
+- the internal payload buffer is emitted as `NodeResult.output_slots`
 - per-slot scores are returned in `NodeResult.route_gates`
-- payload/meta buffers and the direction bank are discarded after node dispatch
+- the vote contribution replaces this node's earlier contribution in the pass
+- payload and gate buffers are discarded after node dispatch
 
-This makes `WriteInternalPayload` the VM path for producing routed output slots.
+This makes `WriteInternalPayload` the VM path for producing routed output slots
+and `AddVote` its path to action.
 
 ### Removed opcodes
 
-`EmitWorldAction` was replaced by the action queue model
-(`PushAction` + `ExecuteActionQueue`). The action queue allows multiple actions
-per VM evaluation, with a configurable cap (`max_actions_per_turn`).
+`EmitWorldAction` was replaced by the action queue model (T09), and the queue
+opcodes by votes (T19.F04): an action is committed by the pass loop, at most
+one per pass, up to `max_actions_per_turn` per tick.
 
 ---
 
@@ -431,19 +406,18 @@ per VM evaluation, with a configurable cap (`max_actions_per_turn`).
 Phase 2 (action resolution). Higher bidders act first, gaining priority access to
 contested resources like food.
 
-Semantics (T19.F02):
+Semantics (T19.F02, T19.F04):
 - Reads `regs[src]`, clamps to non-negative (`max(0.0, value)`; a non-finite
-  read is `0.0`) and records it as the creature's bid for this evaluation.
+  read is `0.0`) and records it as the creature's bid for this tick.
   The opcode pays only its 0.20 opcode cost and the step's ramp charge.
-- Last-write-wins if called multiple times, across nodes and across revisits
-  of the same node within the tick.
-- The mesh settles the recorded bid exactly once, after the chain, on every
-  exit that is not already `EnergyExhausted`: `paid = min(bid, energy)`. If
-  `bid >= energy` the creature goes all-in: energy is `0.0`, the evaluation
-  ends `EnergyExhausted` with `NoOp` and `DeathCause::PriorityBid`;
-  otherwise `energy -= paid` and the paid amount is the turn-order bid. A
-  creature that exhausts on compute or the hop ramp pays no bid; a zero bid
-  pays nothing and never exhausts. The `priority_bid` energy flow and death
+- Last-write-wins if called multiple times, across nodes, revisits, and
+  passes within the tick.
+- The mesh settles the recorded bid exactly once, at tick end, on every
+  exit: `paid = min(bid, energy)`, nothing when energy is already gone. If
+  `bid >= energy` the creature goes all-in: energy is `0.0`, the tick ends
+  `EnergyExhausted` with `DeathCause::PriorityBid`, and the actions already
+  committed are kept; otherwise `energy -= paid` and the paid amount is the
+  turn-order bid. A zero bid pays nothing and never exhausts. The `priority_bid` energy flow and death
   cause keep their keys.
 
 Turn ordering:
@@ -453,6 +427,6 @@ Turn ordering:
 - Creatures that never call `SetPriorityBid` have bid 0.0 (no cost, no priority).
 
 There is no cap on bid amount beyond the energy the creature actually has left
-when the chain ends: a bid at or above that energy is an all-in. Natural
+when the tick's passes end: a bid at or above that energy is an all-in. Natural
 selection handles the economics: overbidding wastes energy and leads to
 extinction.
