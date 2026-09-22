@@ -172,7 +172,7 @@ transmitting; the surface reaches creatures through the body, never a sensor.
 
 - [x] Guard digest test unchanged between `07086ed0` and the feature commit
       -> value and both runs in
-      [`docs/progress/readings/t19-f03.md`](../../progress/readings/t19-f03.md).
+      [readings](../../progress/readings/t19-f03.md).
 - [x] Focused tests: catalog indices and count; `pick_random_surface` over
       4,096 seeds never returns a vote or parameter sink and, on the founder
       graph, returns for eight fixed seeds the surfaces recorded on
@@ -182,17 +182,15 @@ transmitting; the surface reaches creatures through the body, never a sensor.
       nodes; sanitization of a non-finite contribution; an exhausted VM dispatch
       and an exhausted graph visit leave the vector untouched; an invalid
       `AddVote.sink` is a costed no-op; parameter overwrite; three-mode parity
-      (production, observed, traced) on a voting genome -> test names and
+      (production, observed, traced) on a voting genome; `AddVote` classified
+      `Action` on the VM side; the sum rule as a proptest -> test names and
       counts in the readings file.
-- [x] Nothing reads the surface: a grep for `.votes`, `commit_counts`,
-      `action_params`, `vote_contribution`, `ActionVote`, `ActionParam`,
-      `AddVote`, and `is_vote_surface` over `crates/` and `frontend/src` lists
-      only writers, traces, formatters, and tests -> the grep output in the
-      readings file; the reviewer proves it.
-- [x] `cargo test -p v3-core --test viability` -> 28 passed;
-      `founder_only_trajectory_digest_is_pinned` unchanged;
-      `cargo test -p v3-core --test vm_all_opcodes_e2e` updated for 43
-      variants; `make check` exit 0.
+- [x] Nothing reads the surface: a grep for the surface's names over
+      `crates/` and `frontend/src` lists only writers, traces, formatters,
+      and tests -> the terms and output in the readings file; the reviewer
+      proves it.
+- [x] Pins hold, `vm_all_opcodes_e2e` covers 43 variants, and `make check`
+      exits 0 -> the command table below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed
       here.
@@ -215,6 +213,8 @@ transmitting; the surface reaches creatures through the body, never a sensor.
 | `npm run test` (frontend) | 329 passed, 62 files |
 | `make check` | exit 0 |
 | `make roadmap-check` | validation passed |
+| `cargo test -p v3-core --lib mesh_annotations` | 13 passed |
+| `cargo test -p v3-core --lib vote_surface` | 12 passed |
 
 ## Performance and Goal Impact
 
@@ -278,3 +278,5 @@ within budget, epochs not re-pinned. Table above; full readings in
   renumbering, and T19.F05's `ActionVotes` input reads the same index order.
 - Decision: a genome stored with the 64-sink catalog loads and runs with no
   vote sinks; no migration or shim is added.
+- Deferred: the `too_many_lines` allow on `apply_cgp_graph_effects`
+  (`runtime/cgp/effects.rs`); the alternative is a per-sink match helper.
