@@ -1,6 +1,6 @@
 # T19.F04 — Vote-Based Action Selection
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-22
 **Feature**: T19.F04
 **Track**: [T19 — Mesh Action Selection and Live State](../../roadmaps/t19-mesh-action-selection-and-live-state.md)
@@ -242,14 +242,14 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 - [x] Consumers, server protocol, frontend types and rendering (invariant 10).
 - [x] Births-probe classes, one-edge census, T11.F14 and steering
       re-expression (invariant 12); readings file.
-- [ ] Reference docs (invariant 13); `make check`.
+- [x] Reference docs (invariant 13); `make check`.
 
 ## Verification
 
 - [x] Focused tests (W1 to W19, W17b, viability, workspace, clippy, fmt,
       vitest) in [`docs/progress/readings/t19-f04.md`](../../progress/readings/t19-f04.md);
       only the predeclared gate severe fails.
-- [ ] `make check` green after the re-pin.
+- [x] `make check` green after the re-pin (exit 0 at fe22fd30).
 - [x] Grep proof: none of `PushAction`, `PopAction`, `ExecuteActionQueue`,
       `WriteDirectionBid`, `ActionSlot`, `ExecuteGate`, `action_bank`,
       `execute_gate`, `MutateActionSlotBehavior`, `ActionEmitted`,
@@ -359,20 +359,20 @@ investigation"). Orchards seed 12 was run independently of the goal profile.
 
 ## Success Criteria
 
-- [ ] The executor runs the pass loop of invariant 1 in every execution mode;
+- [x] The executor runs the pass loop of invariant 1 in every execution mode;
       W1 to W19 pass as fixtures; tick and pass reasons, bars, passes, and
       committed actions are on the trace, the server payload, and the
       inspector.
-- [ ] The deleted surfaces of invariant 8 are gone from the runtime, the ISA,
+- [x] The deleted surfaces of invariant 8 are gone from the runtime, the ISA,
       the genome, the mutation engine, the server, and the TypeScript types
       (grep proof); both draw exclusions are lifted; `make check` is green.
-- [ ] Every founder profile acts exactly as the truth table on its tests, the
+- [x] Every founder profile acts exactly as the truth table on its tests, the
       `limit 1` case, and the ring checks; the moved pins are re-pinned and
       listed; no config digest moves.
-- [ ] Readings of invariant 12 recorded; docs of invariant 13 rewritten;
+- [x] Readings of invariant 12 recorded; docs of invariant 13 rewritten;
       mutation gate run with every survivor resolved; gate and goal run once
-      with both epochs re-pinned in the closing commit and any severe reported
-      to the user first.
+      with both epochs re-pinned (at bf2ca325, see the Exception) and any
+      severe reported to the user first.
 
 ## Notes for AI Agents
 
@@ -392,3 +392,4 @@ investigation"). Orchards seed 12 was run independently of the goal profile.
 - Exception: user accepted 2026-09-22 the gate and goal severes, the Orchards
   `passes` 4.107 miss, and re-pinned both epochs to the T19.F04 summaries
   before the mutation gate, whose baseline needs the gate series test green.
+- Deferred: five P3 review findings, none blocking (readings, "Final review").

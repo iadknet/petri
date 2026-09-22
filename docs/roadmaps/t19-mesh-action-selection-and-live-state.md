@@ -1,7 +1,7 @@
 # T19 — Mesh Action Selection and Live State
 
 **Status**: In Progress
-**Last updated**: 2026-09-21
+**Last updated**: 2026-09-22
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -70,7 +70,7 @@ of the worked cases in its Section 2.3.
   - Goal: A nervous system's dynamics run faster than its behavior and a circuit may reverberate, so a mesh node may run any number of times in a tick on its live state, a cycle ends at a survivable per-pass hop cap that keeps the queue, and no tick-start snapshot of internal state exists.
 - [x] **T19.F03 — Vote Surface as Inert Data** — Depends on: T19.F02
   - Goal: A motor pool is wired before it is ever driven, like a silent synapse, so the vote sinks (the four kinds, Terminate, and Decide), the `AddVote` opcode, the vote vector, and the per-kind counters exist everywhere a genome and a trace are represented while nothing reads or draws them.
-- [ ] **T19.F04 — Vote-Based Action Selection** — Depends on: T19.F03
+- [x] **T19.F04 — Vote-Based Action Selection** — Depends on: T19.F03
   - Goal: Motor programs compete and the winner habituates, as in basal ganglia selection and competitive queuing of serial order, so a tick becomes a sequence of passes, each ended by the genome's `Decide` vote or by the chain's end, in which the action kind with the largest effective vote commits one action and its bar rises by one unit, with the push, pop, execute, bank, and gate machinery deleted in the same commit and the founders re-expressed exactly.
 - [ ] **T19.F05 — Decision-State Inputs** — Depends on: T19.F04
   - Goal: Corollary discharge, a brain sensing what it just decided and how tired it is, so the current and previous pass's votes, the per-kind commit counts, hops this tick, and the previous tick's outcome channels become drawable inputs.
