@@ -52,6 +52,8 @@ export function classifyVmInstruction(instruction: VmInstruction): RuntimeIoSema
 			flags.readsActionQueue = true;
 			break;
 		case "WriteWorldActionMeta":
+		// The inert vote surface (T19.F03) writes the action channel.
+		case "AddVote":
 		case "PushAction":
 		case "PopAction":
 		case "ExecuteActionQueue":

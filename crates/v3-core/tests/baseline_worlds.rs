@@ -121,7 +121,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 14387572686062595774);
+    assert_eq!(hash.finish(), 5811834416729882562);
 }
 
 use proptest::prelude::*;

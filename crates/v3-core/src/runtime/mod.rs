@@ -16,4 +16,7 @@ pub use types::{sanitize_f32, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 mod cycle_tests;
 
 #[cfg(test)]
+mod vote_surface_tests;
+
+#[cfg(test)]
 mod cognition_tests;

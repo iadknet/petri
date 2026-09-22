@@ -6,6 +6,9 @@
 
 use crate::config::MutationConfig;
 use crate::contracts::MAX_GATE_SLOTS;
+use crate::creature::genome::vote::{
+    VoteKind, VoteSink, VOTE_KIND_COUNT, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT,
+};
 
 // ── Edge addressing ─────────────────────────────────────────────────────────
 
@@ -118,6 +121,12 @@ pub enum OutputSinkKind {
     WriteSlot(u8),
     /// Clear `shared_memory[slot]` to 0.0. 16 slots, indices 0-15.
     ClearSlot(u8),
+    /// Contribute to `votes[sink.index()]` (T19.F03). 27 sinks. Inert: the
+    /// vote vector is accumulated and traced, and nothing reads it.
+    ActionVote(VoteSink),
+    /// Overwrite `action_params[kind][slot]` (T19.F03), `slot` in `0..2`.
+    /// Inert: nothing reads the parameter surface.
+    ActionParam(VoteKind, u8),
 }
 
 /// Fixed structural output — one per target slot.
@@ -272,12 +281,18 @@ impl PartialEq for CgpGraphBackendDef {
 pub const CUSTOM_OUTPUT_COUNT: u8 = 24;
 /// Number of shared memory slots (WriteSlot + ClearSlot each).
 pub const SHARED_MEMORY_SLOTS: u8 = 16;
-/// Total fixed sink count: N CustomOutput + 8 RouterGate + 16 WriteSlot + 16 ClearSlot.
+/// Total fixed sink count: N CustomOutput + 8 RouterGate + 16 WriteSlot +
+/// 16 ClearSlot + 27 ActionVote + 8 ActionParam.
 pub const FIXED_SINK_COUNT: usize = CUSTOM_OUTPUT_COUNT as usize     // 24 CustomOutput slots
     + MAX_GATE_SLOTS                 // 8 RouterGate sinks
     + SHARED_MEMORY_SLOTS as usize   // 16 WriteSlot sinks
-    + SHARED_MEMORY_SLOTS as usize; // 16 ClearSlot sinks
-const _: () = assert!(FIXED_SINK_COUNT == 64);
+    + SHARED_MEMORY_SLOTS as usize   // 16 ClearSlot sinks
+    + VOTE_SINK_COUNT                // 27 ActionVote sinks (T19.F03)
+    + VOTE_KIND_COUNT * VOTE_PARAM_SLOTS as usize; // 8 ActionParam sinks (T19.F03)
+const _: () = assert!(FIXED_SINK_COUNT == 99);
+/// Catalog index of the first `ActionVote` sink; the vote sinks run from here
+/// in `VoteSink` index order, and the `ActionParam` sinks follow kind-major.
+pub const FIRST_ACTION_VOTE_SINK: usize = 64;
 
 impl CgpGraphBackendDef {
     /// Construct a new graph backend with the full fixed output catalog.
@@ -315,6 +330,24 @@ impl CgpGraphBackendDef {
                 kind: OutputSinkKind::ClearSlot(slot),
                 inputs: Vec::new(),
             });
+        }
+
+        // 27 ActionVote sinks in `VoteSink` index order (T19.F03).
+        for sink in VoteSink::all() {
+            output_sinks.push(OutputSink {
+                kind: OutputSinkKind::ActionVote(sink),
+                inputs: Vec::new(),
+            });
+        }
+
+        // 8 ActionParam sinks, kind-major (T19.F03).
+        for kind in VoteKind::ALL {
+            for slot in 0..VOTE_PARAM_SLOTS {
+                output_sinks.push(OutputSink {
+                    kind: OutputSinkKind::ActionParam(kind, slot),
+                    inputs: Vec::new(),
+                });
+            }
         }
 
         // Action bank sized to config
@@ -635,6 +668,27 @@ mod tests {
                 OutputSinkKind::ClearSlot(i)
             );
         }
+        // The vote sinks occupy 64..91 in `VoteSink` index order (T19.F03).
+        assert_eq!(FIRST_ACTION_VOTE_SINK, 64);
+        for (offset, sink) in VoteSink::all().enumerate() {
+            assert_eq!(
+                def.output_sinks[FIRST_ACTION_VOTE_SINK + offset].kind,
+                OutputSinkKind::ActionVote(sink)
+            );
+        }
+        // The parameter sinks occupy 91..99, kind-major.
+        let first_param = FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT;
+        assert_eq!(first_param, 91);
+        for (kind_index, kind) in VoteKind::ALL.into_iter().enumerate() {
+            for slot in 0..VOTE_PARAM_SLOTS {
+                let index = first_param + kind_index * VOTE_PARAM_SLOTS as usize + slot as usize;
+                assert_eq!(
+                    def.output_sinks[index].kind,
+                    OutputSinkKind::ActionParam(kind, slot)
+                );
+            }
+        }
+        assert_eq!(def.output_sinks.len(), 99);
 
         // All sinks start with empty edges
         for sink in &def.output_sinks {

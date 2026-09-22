@@ -4,6 +4,7 @@ use crate::contracts::{InputReference, WorldAction, MAX_GATE_SLOTS};
 use crate::creature::genome::cgp::{
     ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, GraphEdge, OutputSinkKind, WorldActionKind,
 };
+use crate::creature::genome::vote::{VoteVector, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT};
 use crate::runtime::action_decode::{decode_world_action, DirectionBank, DIRECTION_BANK_SLOTS};
 use crate::runtime::cgp::sources::resolve_source_post_convergence;
 use crate::runtime::inputs::ResolveCtx;
@@ -140,6 +141,12 @@ fn decode_action_from_kind(
 /// Apply post-convergence effects from CGP graph evaluation.
 #[inline]
 #[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "three ordered phases over one borrow set (slots, gates, memory, queue, \
+              and the vote buffer); splitting them would thread every buffer through \
+              helpers without changing the order they must run in"
+)]
 pub(crate) fn apply_cgp_graph_effects(
     def: &CgpGraphBackendDef,
     curr_outputs: &[f32],
@@ -156,6 +163,10 @@ pub(crate) fn apply_cgp_graph_effects(
     let mut buf = Vec::with_capacity(8);
     let mut output_sink_traces = Vec::with_capacity(def.output_sinks.len());
     let mut action_slot_traces = Vec::with_capacity(def.action_bank.len());
+    // This visit's vote contribution (T19.F03): the sanitized weighted sum of
+    // each wired `ActionVote` sink, 0 for an unwired one. Staged at the end of
+    // the pass, which only runs when the visit commits.
+    let mut contribution: VoteVector = [0.0; VOTE_SINK_COUNT];
 
     // Phase 1: value outputs
     for sink in &def.output_sinks {
@@ -215,6 +226,24 @@ pub(crate) fn apply_cgp_graph_effects(
                         u32::from(shared_memory_write_changed(shared_memory[s as usize], 0.0));
                     shared_memory[s as usize] = 0.0;
                     applied_value = 0.0;
+                    applied = true;
+                }
+            }
+            // The inert vote surface (T19.F03). Both arms write the visit's
+            // contribution and the parameter surface and count no work; no
+            // executor or reading consumes either until T19.F04.
+            OutputSinkKind::ActionVote(sink) => {
+                let index = sink.index();
+                if index < VOTE_SINK_COUNT {
+                    applied_value = sanitize_f32(wsum);
+                    contribution[index] = applied_value;
+                    applied = true;
+                }
+            }
+            OutputSinkKind::ActionParam(kind, slot) => {
+                if (slot as usize) < VOTE_PARAM_SLOTS as usize {
+                    applied_value = sanitize_f32(wsum);
+                    side_outputs.action_params[kind.index()][slot as usize] = applied_value;
                     applied = true;
                 }
             }
@@ -310,6 +339,10 @@ pub(crate) fn apply_cgp_graph_effects(
     };
     let queue_non_empty = !side_outputs.action_queue.is_empty();
     let terminal = execute_wired && execute_wsum > 0.0 && queue_non_empty;
+
+    // The visit reached its effects, so it commits (T19.F03): an exhausted
+    // visit returns before this pass and stages nothing.
+    side_outputs.stage_vote_contribution(&contribution);
 
     (
         NodeResult {

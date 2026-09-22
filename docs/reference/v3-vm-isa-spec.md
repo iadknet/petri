@@ -28,7 +28,9 @@ contract are defined in `v3-mutation-spec.md`.
 
 ## 2. Instruction Set
 
-The VM defines **42 opcodes**.
+The VM defines **43 opcodes**. Mutation draws over the first 42; opcode 42
+`AddVote` exists in the ISA and the interpreter and is not drawable until
+T19.F04.
 
 ### Arithmetic and Data Movement
 
@@ -116,6 +118,12 @@ The VM defines **42 opcodes**.
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 41 | `WriteDirectionBid` | direction, src | `bids[direction] = regs[src]` in the eight-slot direction bank and marks the bank written (`direction` in `0..7`; an invalid slot writes nothing and marks nothing) |
+
+### Action Vote (T19.F03)
+
+| # | Opcode | Operands | Semantics |
+|---|---|---|---|
+| 42 | `AddVote` | sink, src | `contribution[sink] += regs[src]` on the dispatch-local vote vector (`sink` in `0..27`, the `VoteSink` catalog order; an invalid sink writes nothing and still costs). The dispatch commits its contribution at every exit but energy exhaustion. Inert: nothing reads the vote vector until T19.F04. |
 
 Removed from active V3 mesh ISA:
 - `ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`
@@ -285,6 +293,7 @@ Defined numeric rules:
 | WriteInternalPayload | 0.14 |
 | WriteWorldActionMeta | 0.14 |
 | WriteDirectionBid | 0.14 |
+| AddVote | 0.14 |
 | WriteRouteTarget | 0.10 |
 | PushAction | 0.24 |
 | PopAction | 0.10 |

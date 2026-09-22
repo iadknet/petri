@@ -126,6 +126,8 @@ export function collectNodeBadges(node: NodeGenome): MeshNodeBadge[] {
 			if (sinkName === "RouterGate") badgeSet.add("route");
 			else if (sinkName === "CustomOutput") badgeSet.add("output");
 			else if (sinkName === "WriteSlot" || sinkName === "ClearSlot") badgeSet.add("slot");
+			// The inert vote surface (T19.F03) writes the action channel.
+			else if (sinkName === "ActionVote" || sinkName === "ActionParam") badgeSet.add("action");
 		}
 
 		// Action bank badges

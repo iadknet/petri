@@ -251,6 +251,9 @@ function inferWriteClasses(node: NodeGenome): MeshWriteClass[] {
 				classes.add("payload");
 			} else if ("WriteSlot" in kind || "ClearSlot" in kind) {
 				classes.add("memory");
+			} else if ("ActionVote" in kind || "ActionParam" in kind) {
+				// The inert vote surface (T19.F03) writes the action channel.
+				classes.add("action");
 			}
 		}
 

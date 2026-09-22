@@ -63,6 +63,7 @@ pub fn vm_register_write(instr: &VmInstruction) -> Option<u8> {
         | VmInstruction::WriteInternalPayload { .. }
         | VmInstruction::WriteWorldActionMeta { .. }
         | VmInstruction::WriteDirectionBid { .. }
+        | VmInstruction::AddVote { .. }
         | VmInstruction::PushAction { .. }
         | VmInstruction::PopAction
         | VmInstruction::ExecuteActionQueue
@@ -126,6 +127,7 @@ pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
         | VmInstruction::WriteDirectionBid { src, .. }
+        | VmInstruction::AddVote { src, .. }
         | VmInstruction::WriteRouteGate { src, .. }
         | VmInstruction::SetPriorityBid { src }
         | VmInstruction::StoreSlotImm { src, .. } => vm_reg_bit(*src),
@@ -143,6 +145,7 @@ pub fn vm_is_output_instruction(instr: &VmInstruction) -> bool {
         VmInstruction::WriteInternalPayload { .. }
             | VmInstruction::WriteWorldActionMeta { .. }
             | VmInstruction::WriteDirectionBid { .. }
+            | VmInstruction::AddVote { .. }
             | VmInstruction::PushAction { .. }
             | VmInstruction::PopAction
             | VmInstruction::ExecuteActionQueue

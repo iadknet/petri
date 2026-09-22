@@ -160,9 +160,11 @@ Topology connection semantics (T11.F15, T11.F18):
 ### VM domain
 
 - `VmInstructionMutation` (insert/delete/replace opcode, mutate operands);
-  the fresh-instruction draw is uniform over the 42-opcode catalog, which
+  the fresh-instruction draw is uniform over the 42 drawable opcodes, which
   includes `WriteDirectionBid { direction in 0..8, src }` (T11.F21), and the
-  operand nudge moves its `direction` or `src`; a new `PushAction` draws
+  operand nudge moves its `direction` or `src`; the ISA's 43rd opcode
+  `AddVote` (T19.F03) is never drawn, so no evolved program carries one until
+  T19.F04 lifts the exclusion; a new `PushAction` draws
   `action_type` in `0..=4`, the range
   `decode_world_action` admits (T13.F05); existing values above 4 stay in
   the genome and the raw-field unit step is unchanged
@@ -381,8 +383,10 @@ only their edges are evolvable.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
 - `AddGraphEdge` (all 6 edge-bearing surfaces, `pick_random_surface` uniform
-  over one surface per compute node and sink, three per action slot (gate,
-  param, direction bank), and the execute gate; a direction-bank edge draws
+  over one surface per compute node and per sink whose kind is neither
+  `ActionVote` nor `ActionParam` (T19.F03 excludes both by kind, so the
+  surface list and every draw are what they were with 64 sinks), three per
+  action slot (gate, param, direction bank), and the execute gate; a direction-bank edge draws
   its `direction` uniformly in `0..8`; source sampled by
   `random_graph_source`, which draws a compound `InputLeaf` source's
   `sub_idx` uniformly across the reference's full width via

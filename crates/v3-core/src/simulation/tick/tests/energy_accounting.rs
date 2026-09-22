@@ -17,6 +17,8 @@ fn decision(actions: Vec<WorldAction>) -> MeshOutput {
         work_counters: Default::default(),
         energy_observation: Default::default(),
         termination_reason: TerminationReason::ActionEmitted,
+        votes: Default::default(),
+        commit_counts: Default::default(),
     }
 }
 

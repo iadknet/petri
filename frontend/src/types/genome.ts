@@ -60,11 +60,25 @@ export interface ComputeNode {
 	plasticity?: PlasticityConfig | null;
 }
 
+/** One vote sink in the T19.F03 catalog; the number is a `Direction::ALL` index. */
+export type VoteSink =
+	| "Eat"
+	| { Move: number }
+	| { Reproduce: number }
+	| { StealEnergy: number }
+	| "Terminate"
+	| "Decide";
+
+/** An action kind carrying votes and parameters (T19.F03). */
+export type VoteKind = "Eat" | "Move" | "Reproduce" | "StealEnergy";
+
 export type OutputSinkKind =
 	| { CustomOutput: number }
 	| { RouterGate: number }
 	| { WriteSlot: number }
-	| { ClearSlot: number };
+	| { ClearSlot: number }
+	| { ActionVote: VoteSink }
+	| { ActionParam: [VoteKind, number] };
 
 export interface OutputSink {
 	kind: OutputSinkKind;
@@ -119,6 +133,7 @@ export type VmInstruction =
 	| { ReadInput: { dst: number; ref_idx: number; sub_idx: number } }
 	| { WriteInternalPayload: { slot_idx: number; src: number } }
 	| { WriteWorldActionMeta: { slot_idx: number; src: number } }
+	| { AddVote: { sink: number; src: number } }
 	| { WriteRouteGate: { slot: number; src: number } }
 	| { PushAction: { action_type: number } }
 	| "PopAction"

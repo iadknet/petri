@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { MeshHopTrace } from "../../types/trace.ts";
+import { ZERO_VOTES } from "../../types/trace.ts";
 import { NodeExecutionTrace } from "./NodeExecutionTrace.tsx";
 
 vi.mock("./VmExecutionView.tsx", () => ({
@@ -20,6 +21,7 @@ describe("NodeExecutionTrace", () => {
 	it("renders VmExecutionView when VM trace provided", () => {
 		const hop: MeshHopTrace = {
 			hop_index: 0,
+			vote_contribution: ZERO_VOTES,
 			node_id: 1,
 			input_refs: [{ World: "FoodHere" }],
 			upstream_slots: [0.5],
@@ -48,6 +50,7 @@ describe("NodeExecutionTrace", () => {
 	it("renders GraphExecutionView when Graph trace provided", () => {
 		const hop: MeshHopTrace = {
 			hop_index: 0,
+			vote_contribution: ZERO_VOTES,
 			node_id: 2,
 			input_refs: [{ UpstreamSlot: 0 }],
 			upstream_slots: [0.5],

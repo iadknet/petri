@@ -150,30 +150,30 @@ transmitting; the surface reaches creatures through the body, never a sensor.
 
 ## Implementation Tasks
 
-- [ ] Pin the guard first: add a mutation-on seeded short-run trajectory
+- [x] Pin the guard first: add a mutation-on seeded short-run trajectory
       digest test (positions, energy bits, ages; no genome bytes) and record
       its value on the base commit `07086ed0` before any production change.
-- [ ] `VoteKind`, `VoteSink`, `VoteVector` catalog with index tests;
+- [x] `VoteKind`, `VoteSink`, `VoteVector` catalog with index tests;
       `OutputSinkKind` variants, `new_with_fixed_outputs`, `FIXED_SINK_COUNT`
       99, catalog test.
-- [ ] `pick_random_surface` kind exclusion; `AddVote` in `VmInstruction`,
+- [x] `pick_random_surface` kind exclusion; `AddVote` in `VmInstruction`,
       `random_vm_instruction` unchanged, nudge and classification arms;
       exclusion tests (invariant 3).
-- [ ] `MeshSideOutputs` fields, VM dispatch-local vote and commit, effects
+- [x] `MeshSideOutputs` fields, VM dispatch-local vote and commit, effects
       pass arms for `ActionVote` and `ActionParam`, sum rule, `MeshOutput`.
-- [ ] Trace types, server payloads and assembler (with its fixture tests),
+- [x] Trace types, server payloads and assembler (with its fixture tests),
       frontend types and the five trace fixtures, formatter labels, the
       read-only inspector block and its test.
-- [ ] Re-pin `legacy_default_short_run_identity` after reproducing it twice;
+- [x] Re-pin `legacy_default_short_run_identity` after reproducing it twice;
       list every moved pin in the readings file.
-- [ ] Reference docs of invariant 11.
+- [x] Reference docs of invariant 11.
 
 ## Verification
 
-- [ ] Guard digest test unchanged between `07086ed0` and the feature commit
+- [x] Guard digest test unchanged between `07086ed0` and the feature commit
       -> value and both runs in
       [`docs/progress/readings/t19-f03.md`](../../progress/readings/t19-f03.md).
-- [ ] Focused tests: catalog indices and count; `pick_random_surface` over
+- [x] Focused tests: catalog indices and count; `pick_random_surface` over
       4,096 seeds never returns a vote or parameter sink and, on the founder
       graph, returns for eight fixed seeds the surfaces recorded on
       `07086ed0`; `random_vm_instruction` over 4,096 seeds
@@ -184,12 +184,12 @@ transmitting; the surface reaches creatures through the body, never a sensor.
       `AddVote.sink` is a costed no-op; parameter overwrite; three-mode parity
       (production, observed, traced) on a voting genome -> test names and
       counts in the readings file.
-- [ ] Nothing reads the surface: a grep for `.votes`, `commit_counts`,
+- [x] Nothing reads the surface: a grep for `.votes`, `commit_counts`,
       `action_params`, `vote_contribution`, `ActionVote`, `ActionParam`, and
       `AddVote` over `crates/` and `frontend/src` lists only writers, traces,
       formatters, and tests -> the grep output in the readings file; the
       reviewer proves it.
-- [ ] `cargo test -p v3-core --test viability` -> 28 passed;
+- [x] `cargo test -p v3-core --test viability` -> 28 passed;
       `founder_only_trajectory_digest_is_pinned` unchanged;
       `cargo test -p v3-core --test vm_all_opcodes_e2e` updated for 43
       variants; `make check` exit 0.
@@ -200,6 +200,16 @@ transmitting; the surface reaches creatures through the body, never a sensor.
       and `-goal.json`, local raw hash/byte count and verification time
       checked, series entries point to the summaries, no new full report
       staged, and no epoch re-pinned.
+
+| Command | Result |
+| --- | --- |
+| `cargo test -p v3-core --test viability` | 28 passed |
+| `cargo test -p v3-core --test applied_trajectory` | 2 passed; guard digest `99ef9a14…` identical before and after |
+| `cargo test -p v3-core --test baseline_worlds` | 19 passed, 1 ignored |
+| `cargo test -p v3-core --test vm_all_opcodes_e2e` | 1 passed, 43 discriminants |
+| `cargo test --workspace` | all targets pass |
+| `make check` | exit 0 |
+| `make roadmap-check` | validation passed |
 
 ## Performance and Goal Impact
 
@@ -238,12 +248,12 @@ was crossed, and whether the epoch was re-pinned (it must not be).
 
 ## Success Criteria
 
-- [ ] Every graph genome built by `new_with_fixed_outputs` has the 99-sink
+- [x] Every graph genome built by `new_with_fixed_outputs` has the 99-sink
       catalog in the fixed order; `AddVote` exists at opcode 42; the vote
       vector, per-kind counters, and parameter surface exist in
       `MeshSideOutputs`, `MeshOutput`, the traces, the server payloads, the
       frontend types, and a read-only inspector block.
-- [ ] No mutation draws a vote or parameter sink or an `AddVote`, and no
+- [x] No mutation draws a vote or parameter sink or an `AddVote`, and no
       executor, input, or reading consumes the surface (grep and reviewer
       proof).
 - [ ] Guard digest, founder digest, `FOUNDER_GENOME_SIZE_UNITS` 111, and

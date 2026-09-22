@@ -522,6 +522,25 @@ fn vm_replace_produces_non_noop() {
     );
 }
 
+/// T19.F03: `AddVote` exists in the ISA and is not drawable. The draw must
+/// still reach every one of the 42 older opcodes, so the instruction supply is
+/// unchanged and the vote surface stays inert until T19.F04.
+#[test]
+fn random_vm_instruction_never_yields_add_vote_and_still_reaches_all_42_drawable() {
+    use std::collections::HashSet;
+    let mut discriminants: HashSet<std::mem::Discriminant<VmInstruction>> = HashSet::new();
+    for seed in 0u64..4096 {
+        let mut r = rng(seed);
+        let instr = random_vm_instruction(&mut r, 4, 4, 4);
+        assert!(
+            !matches!(instr, VmInstruction::AddVote { .. }),
+            "seed {seed} drew AddVote"
+        );
+        discriminants.insert(std::mem::discriminant(&instr));
+    }
+    assert_eq!(discriminants.len(), 42);
+}
+
 #[test]
 fn random_vm_instruction_covers_all_families() {
     use std::collections::HashSet;
@@ -2267,6 +2286,10 @@ fn encoded_fields(instruction: &VmInstruction) -> Vec<i64> {
         | VmInstruction::WriteDirectionBid {
             direction: slot_idx,
             src,
+        }
+        | VmInstruction::AddVote {
+            sink: slot_idx,
+            src,
         } => {
             vec![i64::from(*slot_idx), i64::from(*src)]
         }
@@ -2746,6 +2769,7 @@ fn register_fields(instruction: &VmInstruction) -> Vec<u8> {
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
         | VmInstruction::WriteDirectionBid { src, .. }
+        | VmInstruction::AddVote { src, .. }
         | VmInstruction::WriteRouteGate { src, .. }
         | VmInstruction::StoreSlotImm { src, .. } => vec![*src],
         VmInstruction::ReadActionQueueParam { index_src, dst, .. } => vec![*index_src, *dst],

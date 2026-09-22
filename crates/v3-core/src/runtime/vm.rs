@@ -1,5 +1,6 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, MAX_GATE_SLOTS};
+use crate::creature::genome::vote::{VoteSink, VoteVector, VOTE_SINK_COUNT};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::action_decode::{decode_world_action, DirectionBank, DIRECTION_BANK_SLOTS};
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
@@ -165,6 +166,9 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
     // `WriteDirectionBid` lands, then persists between pushes within this
     // dispatch and resets with `meta` at node end.
     let mut bank: Option<DirectionBank> = None;
+    // This dispatch's vote contribution (T19.F03): starts at zeros, sums the
+    // dispatch's own `AddVote`s, and is staged wherever the dispatch commits.
+    let mut vote_contribution: VoteVector = [0.0; VOTE_SINK_COUNT];
     let mut route_gates = RouteGateMap::default();
     let mut pc: usize = 0;
     let mut steps: usize = 0;
@@ -178,10 +182,15 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
     // would round away.
     let mut debt: f64 = 0.0;
 
-    /// Commit the working slot copy back to the creature's shared memory.
+    /// Commit the working slot copy back to the creature's shared memory, and
+    /// stage this dispatch's vote contribution (T19.F03). Every exit of the
+    /// opcode loop but energy exhaustion passes through here, which is exactly
+    /// the boundary at which a dispatch commits. The two pre-loop returns
+    /// (no registers, empty program) execute nothing and stage nothing.
     macro_rules! commit_slots {
         () => {
             *shared_memory = slot_copy;
+            side_outputs.stage_vote_contribution(&vote_contribution);
         };
     }
 
@@ -425,6 +434,15 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 // invalid slot: write ignored, bank stays unwritten
             }
 
+            VmInstruction::AddVote { sink, src } => {
+                // Inert (T19.F03): the contribution is accumulated, committed
+                // at the dispatch boundary, and read by nothing. An invalid
+                // sink writes nothing and still costs.
+                if let Some(vote_sink) = VoteSink::from_index(*sink as usize) {
+                    vote_contribution[vote_sink.index()] += regs[nr(*src, reg_count)];
+                }
+            }
+
             VmInstruction::PushAction { action_type } => {
                 let action = decode_world_action(*action_type, &meta, bank.as_ref());
                 side_outputs.action_queue.push(action);
@@ -640,6 +658,7 @@ pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -
         VmInstruction::WriteInternalPayload { .. } => 0.14,
         VmInstruction::WriteWorldActionMeta { .. } => 0.14,
         VmInstruction::WriteDirectionBid { .. } => 0.14,
+        VmInstruction::AddVote { .. } => 0.14,
         VmInstruction::PushAction { .. } => 0.24,
         VmInstruction::PopAction => 0.10,
         VmInstruction::ReadActionQueueLength { .. } => 0.08,

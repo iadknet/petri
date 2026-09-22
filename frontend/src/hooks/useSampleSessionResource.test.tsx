@@ -4,6 +4,7 @@ import { api } from "../api/rest.ts";
 import { useSamplePlaybackStore } from "../stores/samplePlayback.ts";
 import { useSampleSessionStore } from "../stores/sampleSession.ts";
 import type { ExecutionSample, SampleResponse } from "../types/trace.ts";
+import { ZERO_VOTES } from "../types/trace.ts";
 import { useSampleSessionResource } from "./useSampleSessionResource.ts";
 
 vi.mock("../api/rest.ts", () => ({
@@ -40,6 +41,8 @@ function buildSample(creatureId: number): ExecutionSample {
 				termination_reason: "NoTargets",
 				debug_perception: null,
 				priority_bid: 0,
+				votes: ZERO_VOTES,
+				commit_counts: [0, 0, 0, 0],
 			},
 		],
 	};

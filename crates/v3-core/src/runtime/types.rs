@@ -70,6 +70,10 @@ pub struct ComputeCostReport {
     pub mesh_ramp_cost: f32,
 }
 
+use crate::creature::genome::vote::{
+    VoteVector, VOTE_KIND_COUNT, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT,
+};
+
 /// Accumulated side outputs from VM/graph node execution within a single mesh evaluation.
 /// Passed as `&mut` through the mesh hop chain; consumed by the mesh executor on return.
 #[derive(Debug)]
@@ -82,6 +86,21 @@ pub struct MeshSideOutputs {
     pub work_counters: WorkCounters,
     /// Applied cognition debits and exhausting sink; never used to control execution.
     pub energy_observation: crate::simulation::energy_accounting::CognitionEnergyObservation,
+    /// Inert vote surface (T19.F03): the sanitized sum of the latest committed
+    /// contribution of every node visited this evaluation. Nothing reads it.
+    pub votes: VoteVector,
+    /// Per-kind commit counters (T19.F03). Zero throughout: nothing commits a
+    /// vote to a world action until T19.F04.
+    pub commit_counts: [u32; VOTE_KIND_COUNT],
+    /// Inert parameter surface (T19.F03): a wired `ActionParam(kind, i)` sink
+    /// overwrites `action_params[kind][i]`, last visit wins. Nothing reads it.
+    pub action_params: [[f32; VOTE_PARAM_SLOTS as usize]; VOTE_KIND_COUNT],
+    /// Latest committed contribution per genome node index, in first-commit
+    /// order. A revisit replaces the node's entry rather than adding one.
+    node_contributions: Vec<(usize, VoteVector)>,
+    /// Contribution staged by the dispatch in flight, taken by the mesh loop
+    /// once the dispatch returns. `None` when the dispatch did not commit.
+    staged_contribution: Option<VoteVector>,
 }
 
 impl MeshSideOutputs {
@@ -92,7 +111,44 @@ impl MeshSideOutputs {
             priority_bid: 0.0,
             work_counters: WorkCounters::default(),
             energy_observation: Default::default(),
+            votes: [0.0; VOTE_SINK_COUNT],
+            commit_counts: [0; VOTE_KIND_COUNT],
+            action_params: [[0.0; VOTE_PARAM_SLOTS as usize]; VOTE_KIND_COUNT],
+            node_contributions: Vec::new(),
+            staged_contribution: None,
         }
+    }
+
+    /// Stage this dispatch's vote contribution (T19.F03). Called at the
+    /// boundary where a dispatch commits its effects, which is every exit
+    /// except energy exhaustion; entries are sanitized here.
+    pub(crate) fn stage_vote_contribution(&mut self, contribution: &VoteVector) {
+        self.staged_contribution = Some(contribution.map(sanitize_f32));
+    }
+
+    /// Take the staged contribution as `node_idx`'s latest, replacing that
+    /// node's previous one, and re-sum the mesh vote vector. Returns what the
+    /// hop committed: zeros when the dispatch staged nothing.
+    pub(crate) fn commit_vote_contribution(&mut self, node_idx: usize) -> VoteVector {
+        let Some(contribution) = self.staged_contribution.take() else {
+            return [0.0; VOTE_SINK_COUNT];
+        };
+        match self
+            .node_contributions
+            .iter_mut()
+            .find(|(idx, _)| *idx == node_idx)
+        {
+            Some((_, latest)) => *latest = contribution,
+            None => self.node_contributions.push((node_idx, contribution)),
+        }
+        let mut votes = [0.0f32; VOTE_SINK_COUNT];
+        for (_, latest) in &self.node_contributions {
+            for (sum, value) in votes.iter_mut().zip(latest) {
+                *sum += *value;
+            }
+        }
+        self.votes = votes.map(sanitize_f32);
+        contribution
     }
 }
 
@@ -142,6 +198,12 @@ pub struct MeshOutput {
     /// Why the mesh chain stopped. Carried on every execution mode's output so
     /// the untraced production path can count terminations without a trace.
     pub termination_reason: TerminationReason,
+    /// The evaluation's accumulated vote vector (T19.F03), carried for the
+    /// trace. Nothing else reads it.
+    pub votes: VoteVector,
+    /// Per-kind commit counters (T19.F03), carried for the trace. Zero until
+    /// T19.F04 commits a vote.
+    pub commit_counts: [u32; VOTE_KIND_COUNT],
 }
 
 /// Sanitize an f32 value per v3-vm-isa-spec.md Section 5:

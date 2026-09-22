@@ -1,6 +1,7 @@
 //! HTTP sampler response DTOs owned by the transport layer.
 
 use serde::Serialize;
+use v3_core::creature::genome::vote::{VOTE_KIND_COUNT, VOTE_SINK_COUNT};
 use v3_core::runtime::OUTPUT_SLOT_COUNT;
 
 /// Serialized input-reference shape owned by transport wire DTOs.
@@ -27,6 +28,10 @@ pub struct TickTracePayload {
     pub final_actions: Vec<WorldActionPayload>,
     pub termination_reason: TerminationReasonPayload,
     pub priority_bid: f32,
+    /// Inert vote surface (T19.F03), in `VoteSink` index order.
+    pub votes: [f32; VOTE_SINK_COUNT],
+    /// Per-kind vote commit counters (T19.F03).
+    pub commit_counts: [u32; VOTE_KIND_COUNT],
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -67,6 +72,8 @@ pub struct MeshHopTracePayload {
     pub energy_after: f32,
     pub output_slots: [f32; OUTPUT_SLOT_COUNT],
     pub route: Option<RouteDecisionPayload>,
+    /// The vote contribution this hop committed (T19.F03).
+    pub vote_contribution: [f32; VOTE_SINK_COUNT],
     pub backend_trace: BackendTracePayload,
 }
 

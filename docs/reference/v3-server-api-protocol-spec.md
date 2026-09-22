@@ -663,6 +663,12 @@ Execution-sampler rules:
   - `action_slots[]` entries with `wired`, `gate_weighted_sum`, `fired`,
     `param_values`, `queue_len_before`, `queue_len_after`, `emitted_action`
   - `execute_gate` with `wired`, `weighted_sum`, `queue_non_empty`, `fired`
+- each tick carries the inert vote surface (T19.F03): `votes`, 27 floats in
+  `VoteSink` catalog order, and `commit_counts`, four per-kind counters
+  (`Eat`, `Move`, `Reproduce`, `StealEnergy`), which are zero until T19.F04
+- each hop carries `vote_contribution`, the 27 floats that hop committed;
+  zeros when the dispatch ended exhausted and committed nothing
+- these fields are additive, so `protocol_version` stays `v3alpha2`
 - sampler wire DTO ownership and mapping live in `v3-server/src/transport/`
   (`sample_protocol.rs`, `sample_assembler.rs`)
 - detailed perception field ownership remains in `v3-sensor-spec.md`

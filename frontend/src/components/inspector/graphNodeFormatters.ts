@@ -4,6 +4,7 @@ import type {
 	GraphSource,
 	InputReference,
 	OutputSinkKind,
+	VoteSink,
 } from "../../types/genome.ts";
 import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
 
@@ -63,12 +64,26 @@ export function formatGraphSource(source: GraphSource, inputRefs: InputReference
 	return "?";
 }
 
+/** Format one vote sink of the T19.F03 catalog. */
+export function formatVoteSink(sink: VoteSink): string {
+	if (typeof sink === "string") return sink;
+	if ("Move" in sink) return `Move[${sink.Move}]`;
+	if ("Reproduce" in sink) return `Reproduce[${sink.Reproduce}]`;
+	if ("StealEnergy" in sink) return `StealEnergy[${sink.StealEnergy}]`;
+	return "?";
+}
+
 /** Format an OutputSinkKind as a human-readable label. */
 export function formatOutputSinkKind(kind: OutputSinkKind): string {
 	if ("RouterGate" in kind) return `Route[${kind.RouterGate}]`;
 	if ("CustomOutput" in kind) return `Payload[${kind.CustomOutput}]`;
 	if ("WriteSlot" in kind) return `Write Mem[${kind.WriteSlot}]`;
 	if ("ClearSlot" in kind) return `Clear Mem[${kind.ClearSlot}]`;
+	if ("ActionVote" in kind) return `Vote ${formatVoteSink(kind.ActionVote)}`;
+	if ("ActionParam" in kind) {
+		const [voteKind, slot] = kind.ActionParam;
+		return `Param ${voteKind}[${slot}]`;
+	}
 	return "?";
 }
 
@@ -78,6 +93,8 @@ export function outputSinkSubtitle(kind: OutputSinkKind): string | undefined {
 	if ("RouterGate" in kind) return "route score";
 	if ("WriteSlot" in kind) return "shared memory";
 	if ("ClearSlot" in kind) return "shared memory";
+	if ("ActionVote" in kind) return "action vote (not yet read)";
+	if ("ActionParam" in kind) return "action parameter (not yet read)";
 	return undefined;
 }
 
