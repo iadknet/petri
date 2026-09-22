@@ -243,17 +243,17 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-core --test viability` -> 28 passed;
-      workspace -> 2,092 passed, 1 failed (gate severe, pre re-pin); `npx vitest run` -> 327 passed; `make check` pending.
-      Transcripts in [`docs/progress/readings/t19-f04.md`](../../progress/readings/t19-f04.md).
+- [x] Focused tests (W1 to W19, W17b, viability, workspace, clippy, fmt,
+      vitest) in [`docs/progress/readings/t19-f04.md`](../../progress/readings/t19-f04.md);
+      only the predeclared gate severe fails.
+- [ ] `make check` green after the re-pin.
 - [x] Grep proof: none of `PushAction`, `PopAction`, `ExecuteActionQueue`,
       `WriteDirectionBid`, `ActionSlot`, `ExecuteGate`, `action_bank`,
       `execute_gate`, `MutateActionSlotBehavior`, `ActionEmitted`,
       `DirectionBank` under `crates/` or `frontend/src` (historical specs keep
-      theirs) -> result in the readings file.
+      theirs) -> only the enforcement test (readings file).
 - [x] Founder exactness: truth table, `limit 1`, proptest, and 2,000-ring
-      check pass; the moved pins listed with before and after values in the
-      readings file.
+      check pass; moved pins, before and after, in the readings file.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved as killed, equivalent, or deferred (a long gate
       is budgeted: the deleted surface touches every hub file).
@@ -261,12 +261,13 @@ exit: settle the bid once; actions = queue, or NoOp when empty
       `docs/progress/features/t19-f04-vote-based-action-selection.json` and
       `-goal.json`, local raw hash, byte count, and verification time checked,
       series entries point to the summaries, no full report staged.
-- [ ] Readings file: births probe with the new classes, the one-edge census,
-      drift walk against T19.F03, the T11.F14 and steering evolved halves,
-      Orchards seed 12 to 2,000 ticks (`v3 run`: command, final and minimum
-      population, tick reasons), passes and `Decided` against capped passes,
-      cognition wall per creature-tick, founder per-tick compute cost before
-      and after.
+- [x] Readings file, founder half: the one-edge census and the founder
+      per-tick compute cost before and after.
+- [ ] Readings file, run half: births probe with the new classes, drift walk
+      against T19.F03, the T11.F14 and steering evolved halves, Orchards seed
+      12 to 2,000 ticks (`v3 run`: command, final and minimum population, tick
+      reasons), passes and `Decided` against capped passes, cognition wall per
+      creature-tick.
 
 ## Performance and Goal Impact
 
