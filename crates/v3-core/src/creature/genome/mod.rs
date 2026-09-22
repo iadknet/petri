@@ -578,7 +578,7 @@ mod tests {
             CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
         };
         // 1 node + 1 input_ref + 0 targets + 2 compute_nodes + (1 + 2) compute edges = 7
-        // (unwired sinks, action bank, and execute gate add 0)
+        // (unwired sinks add 0)
         let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs();
         cgp.compute_nodes = vec![
             ComputeNode {

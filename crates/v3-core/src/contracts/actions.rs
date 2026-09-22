@@ -32,7 +32,7 @@ impl WorldAction {
         matches!(self, WorldAction::NoOp)
     }
 
-    /// Return the action type discriminant matching the decode_world_action encoding.
+    /// Return the action type discriminant `ReadActionQueueType` reads.
     /// 0=NoOp, 1=Eat, 2=Move, 3=Reproduce, 4=StealEnergy.
     #[inline]
     pub fn action_type(&self) -> u8 {
@@ -57,7 +57,7 @@ impl WorldAction {
         }
     }
 
-    /// Read back a parameter slot, mirroring the meta buffer layout used during encoding.
+    /// Read back a parameter slot for `ReadActionQueueParam`.
     /// Slot 0 = direction index (as f32), slot 1 = amount (StealEnergy) or
     /// energy_transfer_fraction (Reproduce). Returns 0.0 for unknown slots or
     /// variants without that parameter.

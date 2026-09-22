@@ -1548,7 +1548,7 @@ fn vm_insert_read_bid_motif_inserts_read_input_and_priority_bid_pair() {
     }
     assert!(
         found_pair,
-        "VmInsertReadBidMotif must insert ReadInput + SetPriorityBid before ExecuteActionQueue with matching registers"
+        "VmInsertReadBidMotif must insert ReadInput + SetPriorityBid before the final Halt with matching registers"
     );
 }
 
