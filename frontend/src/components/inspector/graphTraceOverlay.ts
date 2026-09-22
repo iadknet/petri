@@ -1,5 +1,4 @@
 import type { GraphTrace } from "../../types/trace.ts";
-import { formatAction } from "./inputRefUtils.ts";
 
 export interface NodeTraceData {
 	// Compute nodes
@@ -10,13 +9,6 @@ export interface NodeTraceData {
 	weightedSum?: number;
 	appliedValue?: number;
 	applied?: boolean;
-	// Action slots
-	fired?: boolean;
-	emittedAction?: string;
-	queueDelta?: string;
-	// Execute gate
-	gateFired?: boolean;
-	queueNonEmpty?: boolean;
 }
 
 const STATEFUL_KINDS = new Set(["DecayIntegrator", "Momentum", "Oscillator", "AdaptiveGain"]);
@@ -63,25 +55,6 @@ export function buildOutputTraceOverlay(trace: GraphTrace): Map<string, NodeTrac
 			weightedSum: sink.weighted_sum,
 			appliedValue: sink.applied_value,
 			applied: sink.applied,
-		});
-	}
-
-	const slots = trace.action_slots ?? [];
-	for (let i = 0; i < slots.length; i++) {
-		const slot = slots[i];
-		if (!slot) continue;
-		result.set(`act:${i}`, {
-			fired: slot.fired,
-			emittedAction: slot.emitted_action ? formatAction(slot.emitted_action) : undefined,
-			queueDelta: `${slot.queue_len_before}\u2192${slot.queue_len_after}`,
-		});
-	}
-
-	const gate = trace.execute_gate;
-	if (gate) {
-		result.set("gate", {
-			gateFired: gate.fired,
-			queueNonEmpty: gate.queue_non_empty,
 		});
 	}
 

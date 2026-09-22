@@ -1,10 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { TickTrace } from "../../types/trace.ts";
+import type { MeshPassTrace, TickTrace } from "../../types/trace.ts";
 import { VOTE_SINK_COUNT } from "../../types/trace.ts";
 import { VoteSurfaceBlock } from "./VoteSurfaceBlock.tsx";
 
-function makeTick(votes: number[], commitCounts: number[]): TickTrace {
+function makeTick(passes: MeshPassTrace[], commitCounts: number[]): TickTrace {
 	return {
 		tick_number: 3,
 		energy_before: 10,
@@ -18,33 +18,64 @@ function makeTick(votes: number[], commitCounts: number[]): TickTrace {
 		},
 		debug_perception: null,
 		hops: [],
+		passes,
 		final_actions: ["NoOp"],
-		termination_reason: "NoTargets",
+		termination_reason: "NoDecision",
 		priority_bid: 0,
-		votes,
 		commit_counts: commitCounts,
 	};
 }
 
+function zeroVotes(): number[] {
+	return Array.from({ length: VOTE_SINK_COUNT }, () => 0);
+}
+
 describe("VoteSurfaceBlock", () => {
-	it("lists only the non-zero vote entries with their catalog labels", () => {
-		const votes = Array.from({ length: VOTE_SINK_COUNT }, () => 0);
+	it("shows each pass's reason, committed action, and non-zero votes", () => {
+		const votes = zeroVotes();
 		votes[0] = 1.5;
 		votes[3] = -2.25;
 		votes[26] = 0.5;
-		render(<VoteSurfaceBlock tick={makeTick(votes, [0, 0, 0, 0])} />);
+		render(
+			<VoteSurfaceBlock
+				tick={makeTick(
+					[
+						{
+							pass_index: 0,
+							end_reason: "Decided",
+							votes,
+							effective_votes: [1.5, 0, 0, 0],
+							committed: { Eat: { type_idx: 0 } },
+							hops: 2,
+						},
+						{
+							pass_index: 1,
+							end_reason: "NoTargets",
+							votes: zeroVotes(),
+							effective_votes: [-1, 0, 0, 0],
+							committed: null,
+							hops: 1,
+						},
+					],
+					[1, 0, 0, 0],
+				)}
+			/>,
+		);
 
+		expect(screen.getByText("Action Selection · NoDecision")).toBeInTheDocument();
+		expect(screen.getByText("commit Eat(food0)")).toBeInTheDocument();
+		expect(screen.getByText("no commit")).toBeInTheDocument();
 		expect(screen.getByText("Eat: 1.500")).toBeInTheDocument();
 		expect(screen.getByText("Move[2]: -2.250")).toBeInTheDocument();
 		expect(screen.getByText("Decide: 0.500")).toBeInTheDocument();
+		expect(screen.getByText("no votes this pass")).toBeInTheDocument();
 		expect(screen.queryByText(/Terminate:/)).not.toBeInTheDocument();
 	});
 
-	it("says so when the tick recorded no votes, and always shows the four counters", () => {
-		const votes = Array.from({ length: VOTE_SINK_COUNT }, () => 0);
-		render(<VoteSurfaceBlock tick={makeTick(votes, [0, 1, 2, 3])} />);
+	it("says so when the tick ran no passes, and always shows the four bars", () => {
+		render(<VoteSurfaceBlock tick={makeTick([], [0, 1, 2, 3])} />);
 
-		expect(screen.getByText("no votes this tick")).toBeInTheDocument();
+		expect(screen.getByText("no passes this tick")).toBeInTheDocument();
 		expect(screen.getByText("Eat: 0")).toBeInTheDocument();
 		expect(screen.getByText("Move: 1")).toBeInTheDocument();
 		expect(screen.getByText("Reproduce: 2")).toBeInTheDocument();

@@ -54,10 +54,11 @@ export function summarizeBackendDef(backendDef: BackendDef): MeshPresentationSum
 	}
 
 	const graph = backendDef.Graph;
-	const wiredSinks = graph.output_sinks.filter((s) => s.inputs.length > 0).length;
-	const wiredActions = graph.action_bank.filter(
-		(s) => s.gate_inputs.length > 0 || s.param_inputs.length > 0,
+	const wired = graph.output_sinks.filter((s) => s.inputs.length > 0);
+	const wiredActions = wired.filter(
+		(s) => "ActionVote" in s.kind || "ActionParam" in s.kind,
 	).length;
+	const wiredSinks = wired.length - wiredActions;
 	return {
 		label: "Graph",
 		detail: `${graph.compute_nodes.length} compute \u00b7 ${wiredSinks} sinks \u00b7 ${wiredActions} actions`,
@@ -126,15 +127,8 @@ export function collectNodeBadges(node: NodeGenome): MeshNodeBadge[] {
 			if (sinkName === "RouterGate") badgeSet.add("route");
 			else if (sinkName === "CustomOutput") badgeSet.add("output");
 			else if (sinkName === "WriteSlot" || sinkName === "ClearSlot") badgeSet.add("slot");
-			// The inert vote surface (T19.F03) writes the action channel.
+			// Vote and parameter sinks write the action channel.
 			else if (sinkName === "ActionVote" || sinkName === "ActionParam") badgeSet.add("action");
-		}
-
-		// Action bank badges
-		for (const slot of graph.action_bank) {
-			if (slot.gate_inputs.length > 0 || slot.param_inputs.length > 0) {
-				badgeSet.add("action");
-			}
 		}
 	}
 

@@ -252,14 +252,7 @@ function inferWriteClasses(node: NodeGenome): MeshWriteClass[] {
 			} else if ("WriteSlot" in kind || "ClearSlot" in kind) {
 				classes.add("memory");
 			} else if ("ActionVote" in kind || "ActionParam" in kind) {
-				// The inert vote surface (T19.F03) writes the action channel.
-				classes.add("action");
-			}
-		}
-
-		// Action bank contributes action writes
-		for (const slot of graph.action_bank) {
-			if (slot.gate_inputs.length > 0 || slot.param_inputs.length > 0) {
+				// Vote and parameter sinks write the action channel.
 				classes.add("action");
 			}
 		}

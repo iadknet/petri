@@ -21,6 +21,7 @@ describe("NodeExecutionTrace", () => {
 	it("renders VmExecutionView when VM trace provided", () => {
 		const hop: MeshHopTrace = {
 			hop_index: 0,
+			pass_index: 0,
 			vote_contribution: ZERO_VOTES,
 			node_id: 1,
 			input_refs: [{ World: "FoodHere" }],
@@ -36,7 +37,6 @@ describe("NodeExecutionTrace", () => {
 					steps: [],
 					final_registers: [0, 0],
 					final_payload: [],
-					final_meta: [],
 					slot_writes: [],
 				},
 			},
@@ -50,6 +50,7 @@ describe("NodeExecutionTrace", () => {
 	it("renders GraphExecutionView when Graph trace provided", () => {
 		const hop: MeshHopTrace = {
 			hop_index: 0,
+			pass_index: 0,
 			vote_contribution: ZERO_VOTES,
 			node_id: 2,
 			input_refs: [{ UpstreamSlot: 0 }],
@@ -66,13 +67,6 @@ describe("NodeExecutionTrace", () => {
 					stable_passes_count: 0,
 					final_outputs: [0.8],
 					output_sinks: [],
-					action_slots: [],
-					execute_gate: {
-						wired: false,
-						weighted_sum: 0,
-						queue_non_empty: false,
-						fired: false,
-					},
 				},
 			},
 		};

@@ -6,18 +6,12 @@ import type {
 } from "../../types/genome.ts";
 import type { NodeCategory } from "./graphNodeCategories.ts";
 import { categorizeComputeNode } from "./graphNodeCategories.ts";
-import {
-	actionSlotSubtitle,
-	formatActionSlotBehavior,
-	formatOutputSinkKind,
-	getKindLabel,
-	outputSinkSubtitle,
-} from "./graphNodeFormatters.ts";
+import { formatOutputSinkKind, getKindLabel, outputSinkSubtitle } from "./graphNodeFormatters.ts";
 import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
 
 export interface GraphModelNode {
 	id: string;
-	nodeType: "input" | "compute" | "output_sink" | "action_slot" | "execute_gate";
+	nodeType: "input" | "compute" | "output_sink";
 	category: NodeCategory;
 	label: string;
 	subtitle?: string;
@@ -133,11 +127,6 @@ export function buildFullGraphModel(
 	for (const sink of graphDef.output_sinks) {
 		for (const edge of sink.inputs) allGraphEdges.push(edge);
 	}
-	for (const slot of graphDef.action_bank) {
-		for (const edge of slot.gate_inputs) allGraphEdges.push(edge);
-		for (const edge of slot.param_inputs) allGraphEdges.push(edge);
-	}
-	for (const edge of graphDef.execute_gate.inputs) allGraphEdges.push(edge);
 
 	for (const edge of allGraphEdges) {
 		const inId = inputNodeId(edge.source);
@@ -182,42 +171,13 @@ export function buildFullGraphModel(
 		nodes.push({
 			id: `sink:${i}`,
 			nodeType: "output_sink",
-			category: "output_value",
+			category:
+				"ActionVote" in sink.kind || "ActionParam" in sink.kind ? "output_action" : "output_value",
 			label,
 			subtitle,
 			arrayIndex: i,
 			baseWidth: computeBaseWidth(label),
 			height: subtitle ? 32 : 24,
-		});
-	}
-
-	for (let i = 0; i < graphDef.action_bank.length; i++) {
-		const slot = graphDef.action_bank[i];
-		if (!slot || (slot.gate_inputs.length === 0 && slot.param_inputs.length === 0)) continue;
-		const behaviorLabel = formatActionSlotBehavior(slot.behavior);
-		const subtitle = actionSlotSubtitle(slot.behavior);
-		nodes.push({
-			id: `act:${i}`,
-			nodeType: "action_slot",
-			category: "output_action",
-			label: `Act: ${behaviorLabel}`,
-			subtitle,
-			arrayIndex: i,
-			baseWidth: computeBaseWidth(`Act: ${behaviorLabel}`),
-			height: 32,
-		});
-	}
-
-	if (graphDef.execute_gate.inputs.length > 0) {
-		nodes.push({
-			id: "gate",
-			nodeType: "execute_gate",
-			category: "output_gate",
-			label: "Exec Gate",
-			subtitle: "Σ > 0 ∧ queue → emit actions",
-			arrayIndex: 0,
-			baseWidth: computeBaseWidth("Σ > 0 ∧ queue → emit actions"),
-			height: 32,
 		});
 	}
 
@@ -250,47 +210,6 @@ export function buildFullGraphModel(
 				"output",
 				inputNodeIds,
 				`sink:${i}`,
-				cnCount,
-			),
-		);
-	}
-
-	for (let i = 0; i < graphDef.action_bank.length; i++) {
-		const slot = graphDef.action_bank[i];
-		if (!slot || (slot.gate_inputs.length === 0 && slot.param_inputs.length === 0)) continue;
-		allEdges.push(
-			...collectEdgesFromSources(
-				slot.gate_inputs,
-				`act:${i}`,
-				i,
-				"output",
-				inputNodeIds,
-				`act:${i}:gate`,
-				cnCount,
-			),
-		);
-		allEdges.push(
-			...collectEdgesFromSources(
-				slot.param_inputs,
-				`act:${i}`,
-				i,
-				"output",
-				inputNodeIds,
-				`act:${i}:param`,
-				cnCount,
-			),
-		);
-	}
-
-	if (graphDef.execute_gate.inputs.length > 0) {
-		allEdges.push(
-			...collectEdgesFromSources(
-				graphDef.execute_gate.inputs,
-				"gate",
-				0,
-				"output",
-				inputNodeIds,
-				"gate",
 				cnCount,
 			),
 		);

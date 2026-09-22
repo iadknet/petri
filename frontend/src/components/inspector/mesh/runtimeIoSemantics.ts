@@ -51,12 +51,9 @@ export function classifyVmInstruction(instruction: VmInstruction): RuntimeIoSema
 		case "ReadActionQueueParam":
 			flags.readsActionQueue = true;
 			break;
-		case "WriteWorldActionMeta":
-		// The inert vote surface (T19.F03) writes the action channel.
+		// Votes and parameter writes feed the pass's commit.
+		case "WriteActionParam":
 		case "AddVote":
-		case "PushAction":
-		case "PopAction":
-		case "ExecuteActionQueue":
 		case "SetPriorityBid":
 			flags.writesAction = true;
 			break;

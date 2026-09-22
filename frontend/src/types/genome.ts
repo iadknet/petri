@@ -60,7 +60,7 @@ export interface ComputeNode {
 	plasticity?: PlasticityConfig | null;
 }
 
-/** One vote sink in the T19.F03 catalog; the number is a `Direction::ALL` index. */
+/** One vote sink in the catalog; the number is a `Direction::ALL` index. */
 export type VoteSink =
 	| "Eat"
 	| { Move: number }
@@ -69,7 +69,7 @@ export type VoteSink =
 	| "Terminate"
 	| "Decide";
 
-/** An action kind carrying votes and parameters (T19.F03). */
+/** An action kind carrying votes, a bar, and parameters. */
 export type VoteKind = "Eat" | "Move" | "Reproduce" | "StealEnergy";
 
 export type OutputSinkKind =
@@ -85,25 +85,9 @@ export interface OutputSink {
 	inputs: GraphEdge[];
 }
 
-export type WorldActionKind = "Eat" | "Move" | "Reproduce" | "StealEnergy" | "NoOp";
-
-export type ActionSlotBehavior = "Pop" | { Emit: WorldActionKind };
-
-export interface ActionSlot {
-	behavior: ActionSlotBehavior;
-	gate_inputs: GraphEdge[];
-	param_inputs: GraphEdge[];
-}
-
-export interface ExecuteGate {
-	inputs: GraphEdge[];
-}
-
 export interface GraphBackendDef {
 	compute_nodes: ComputeNode[];
 	output_sinks: OutputSink[];
-	action_bank: ActionSlot[];
-	execute_gate: ExecuteGate;
 }
 
 export type VmInstruction =
@@ -132,16 +116,13 @@ export type VmInstruction =
 	| { Jump: { offset: number } }
 	| { ReadInput: { dst: number; ref_idx: number; sub_idx: number } }
 	| { WriteInternalPayload: { slot_idx: number; src: number } }
-	| { WriteWorldActionMeta: { slot_idx: number; src: number } }
+	| { WriteActionParam: { slot_idx: number; src: number } }
 	| { AddVote: { sink: number; src: number } }
 	| { WriteRouteGate: { slot: number; src: number } }
-	| { PushAction: { action_type: number } }
-	| "PopAction"
 	| { ReadActionQueueLength: { dst: number } }
 	| { ReadActionQueueType: { index_src: number; dst: number } }
 	| { ReadActionQueueParam: { index_src: number; param_slot: number; dst: number } }
 	| { SetPriorityBid: { src: number } }
-	| "ExecuteActionQueue"
 	| "Halt"
 	| { LoadSlot: { dst: number; slot_reg: number } }
 	| { StoreSlot: { slot_reg: number; src: number } }

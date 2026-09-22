@@ -1,19 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type {
-	ActionSlot,
-	ComputeNode,
-	GraphBackendDef,
-	GraphEdge,
-	OutputSink,
-} from "../../types/genome.ts";
+import type { ComputeNode, GraphBackendDef, GraphEdge, OutputSink } from "../../types/genome.ts";
 import { buildFullGraphModel } from "./graphFullModel.ts";
 
 function makeGraphDef(overrides: Partial<GraphBackendDef> = {}): GraphBackendDef {
 	return {
 		compute_nodes: [],
 		output_sinks: [],
-		action_bank: [],
-		execute_gate: { inputs: [] },
 		...overrides,
 	};
 }
@@ -95,47 +87,24 @@ describe("buildFullGraphModel", () => {
 		expect(sinkNodes[0]!.id).toBe("sink:0");
 	});
 
-	it("filters out unwired action slots", () => {
-		const wired: ActionSlot = {
-			behavior: "Pop",
-			gate_inputs: [computeEdge(0)],
-			param_inputs: [],
-		};
-		const unwired: ActionSlot = {
-			behavior: { Emit: "Eat" },
-			gate_inputs: [],
-			param_inputs: [],
-		};
-		const paramOnly: ActionSlot = {
-			behavior: { Emit: "Move" },
-			gate_inputs: [],
-			param_inputs: [computeEdge(0)],
-		};
+	it("draws wired vote and parameter sinks as action outputs and skips unwired ones", () => {
+		const vote: OutputSink = { kind: { ActionVote: { Move: 2 } }, inputs: [computeEdge(0)] };
+		const param: OutputSink = { kind: { ActionParam: ["Reproduce", 1] }, inputs: [computeEdge(0)] };
+		const unwired: OutputSink = { kind: { ActionVote: "Eat" }, inputs: [] };
+		const route: OutputSink = { kind: { RouterGate: 0 }, inputs: [computeEdge(0)] };
 		const model = buildFullGraphModel(
 			makeGraphDef({
 				compute_nodes: [{ kind: "Add", inputs: [] }],
-				action_bank: [wired, unwired, paramOnly],
+				output_sinks: [vote, param, unwired, route],
 			}),
 			[],
 		);
-		const actNodes = model.nodes.filter((n) => n.nodeType === "action_slot");
-		// Only wired (index 0) and paramOnly (index 2) should appear
-		expect(actNodes).toHaveLength(2);
-		expect(actNodes.map((n) => n.id)).toEqual(["act:0", "act:2"]);
-	});
-
-	it("creates execute gate node only when wired", () => {
-		const unwired = buildFullGraphModel(makeGraphDef({ execute_gate: { inputs: [] } }), []);
-		expect(unwired.nodes.filter((n) => n.nodeType === "execute_gate")).toHaveLength(0);
-
-		const wired = buildFullGraphModel(
-			makeGraphDef({
-				compute_nodes: [{ kind: "Add", inputs: [] }],
-				execute_gate: { inputs: [computeEdge(0)] },
-			}),
-			[],
-		);
-		expect(wired.nodes.filter((n) => n.nodeType === "execute_gate")).toHaveLength(1);
+		const sinks = model.nodes.filter((n) => n.nodeType === "output_sink");
+		expect(sinks.map((n) => [n.id, n.category, n.label])).toEqual([
+			["sink:0", "output_action", "Vote Move[2]"],
+			["sink:1", "output_action", "Param Reproduce[1]"],
+			["sink:3", "output_value", "Route[0]"],
+		]);
 	});
 
 	it("builds correct edges between layers", () => {
@@ -207,18 +176,6 @@ describe("buildFullGraphModel", () => {
 			[],
 		);
 		expect(model.edges).toHaveLength(0);
-	});
-
-	it("does not create edges from unwired action slots", () => {
-		const model = buildFullGraphModel(
-			makeGraphDef({
-				compute_nodes: [{ kind: "Add", inputs: [] }],
-				action_bank: [{ behavior: "Pop", gate_inputs: [], param_inputs: [] }],
-			}),
-			[],
-		);
-		const actEdges = model.edges.filter((e) => e.targetId.startsWith("act:"));
-		expect(actEdges).toHaveLength(0);
 	});
 
 	it("preserves SharedMemory input source deduplication", () => {

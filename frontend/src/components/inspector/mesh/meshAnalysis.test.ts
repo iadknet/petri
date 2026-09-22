@@ -41,8 +41,6 @@ function makeGenome(): CreatureGenome {
 								inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
 							},
 						],
-						action_bank: [],
-						execute_gate: { inputs: [] },
 					},
 				},
 			},
@@ -66,8 +64,6 @@ function makeGenome(): CreatureGenome {
 					Graph: {
 						compute_nodes: [{ kind: { Constant: 1 }, inputs: [] }],
 						output_sinks: [],
-						action_bank: [],
-						execute_gate: { inputs: [] },
 					},
 				},
 			},

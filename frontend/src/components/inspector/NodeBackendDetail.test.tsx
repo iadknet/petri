@@ -45,8 +45,6 @@ describe("NodeBackendDetail", () => {
 					},
 				],
 				output_sinks: [],
-				action_bank: [],
-				execute_gate: { inputs: [] },
 			},
 		};
 

@@ -12,8 +12,6 @@ describe("GraphExecutionView temporal commit", () => {
 			passes: [],
 			final_outputs: [],
 			output_sinks: [],
-			action_slots: [],
-			execute_gate: { wired: false, weighted_sum: 0, queue_non_empty: false, fired: false },
 		};
 		render(<GraphExecutionView trace={trace} inputRefs={[]} upstreamSlots={[]} detailIndex={0} />);
 		expect(

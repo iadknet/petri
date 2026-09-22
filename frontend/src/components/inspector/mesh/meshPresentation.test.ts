@@ -18,8 +18,8 @@ const vmNode: NodeGenome = {
 			program: [
 				{ ReadInput: { dst: 0, ref_idx: 0, sub_idx: 0 } },
 				{ StoreSlotImm: { slot_idx: 4, src: 0 } },
-				{ WriteWorldActionMeta: { slot_idx: 0, src: 0 } },
-				{ PushAction: { action_type: 2 } },
+				{ WriteActionParam: { slot_idx: 5, src: 0 } },
+				{ AddVote: { sink: 3, src: 0 } },
 				{ WriteRouteGate: { slot: 0, src: 0 } },
 				"Halt",
 			],
@@ -49,8 +49,6 @@ const graphNode: NodeGenome = {
 					inputs: [{ source: { ComputeNode: 0 }, weight: 0.5 }],
 				},
 			],
-			action_bank: [],
-			execute_gate: { inputs: [] },
 		},
 	},
 };
@@ -63,7 +61,7 @@ describe("meshPresentation", () => {
 		expect(describeVmInstruction({ StoreSlotImm: { slot_idx: 4, src: 0 } }).badges).toContain(
 			"slot",
 		);
-		expect(describeVmInstruction({ PushAction: { action_type: 2 } }).badges).toContain("action");
+		expect(describeVmInstruction({ AddVote: { sink: 3, src: 0 } }).badges).toContain("action");
 		expect(describeVmInstruction({ WriteRouteGate: { slot: 0, src: 0 } }).badges).toContain(
 			"route",
 		);

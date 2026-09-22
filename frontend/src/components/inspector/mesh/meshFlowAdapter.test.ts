@@ -48,8 +48,6 @@ const genome: CreatureGenome = {
 							inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
 						},
 					],
-					action_bank: [],
-					execute_gate: { inputs: [] },
 				},
 			},
 		},

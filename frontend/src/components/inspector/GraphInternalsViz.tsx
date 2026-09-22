@@ -66,11 +66,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 			let layerConstraint: "FIRST" | "LAST" | undefined;
 			if (mn.nodeType === "input" || mn.category === "constant") {
 				layerConstraint = "FIRST";
-			} else if (
-				mn.nodeType === "output_sink" ||
-				mn.nodeType === "action_slot" ||
-				mn.nodeType === "execute_gate"
-			) {
+			} else if (mn.nodeType === "output_sink") {
 				layerConstraint = "LAST";
 			}
 			return {
@@ -128,10 +124,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 
 	const inputCount = model.nodes.filter((n) => n.nodeType === "input").length;
 	const computeCount = graphDef.compute_nodes.length;
-	const outputCount = model.nodes.filter(
-		(n) =>
-			n.nodeType === "output_sink" || n.nodeType === "action_slot" || n.nodeType === "execute_gate",
-	).length;
+	const outputCount = model.nodes.filter((n) => n.nodeType === "output_sink").length;
 
 	const currentPass = trace?.passes[detailIndex] ?? null;
 	const height = Math.max(Math.min(layout.totalHeight + 24, 450), 120);
