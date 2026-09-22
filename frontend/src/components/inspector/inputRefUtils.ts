@@ -114,8 +114,16 @@ export function formatInputRefWithSubIndex(ref: InputReference, subIdx: number):
 	return subIdx > 0 ? `${label}[${subIdx}]` : label;
 }
 
+const STRING_REF_COLORS: Record<string, string> = {
+	ActionQueue: "#f59e0b", // amber
+	ActionVotes: "#a78bfa", // violet: the in-tick decision state
+	PreviousPassVotes: "#a78bfa",
+	CommitCounts: "#a78bfa",
+	PreviousOutcome: "#60a5fa", // blue: introspection
+};
+
 export function inputRefColor(ref: InputReference): string {
-	if (typeof ref === "string") return ref === "ActionQueue" ? "#f59e0b" : "#94a3b8";
+	if (typeof ref === "string") return STRING_REF_COLORS[ref] ?? "#94a3b8";
 	if ("World" in ref) return "#34d399"; // green
 	if ("StaticIntrospection" in ref || "DynamicIntrospection" in ref) return "#60a5fa"; // blue
 	return "#94a3b8"; // gray for upstream
