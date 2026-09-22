@@ -162,7 +162,7 @@ because its index resets per dispatch).
       [`docs/progress/readings/t19-f01.md`](../../progress/readings/t19-f01.md).
 - [x] Founder trajectory unchanged: `founder_only_trajectory_digest_is_pinned`
       on `63498f8d36346079f8827c382e2978510357b374ca37759af857afa263f2d0be`.
-- [x] Suites and lints: `cargo test -p v3-core` 1636 lib + 91 passed, 0 failed;
+- [x] Suites and lints: `cargo test -p v3-core` 1637 lib + 91 passed, 0 failed;
       `cargo test -p v3-cli --lib` 120 passed, 0 failed; `cargo clippy --workspace --all-targets` and `cargo fmt --all
       --check` clean.
 - [x] Recipe digest pins: `checked_in_goal_recipe_identities_are_unchanged_by_json_precision`
@@ -172,8 +172,20 @@ because its index resets per dispatch).
       no trajectory change, epoch unchanged. `cargo test -p v3-cli` (whole
       package) 186 passed, 0 failed, 1 ignored; `cargo fmt --all --check`
       clean.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred.
+- [x] Mutation gate, all survivors killed test-only, table in the readings:
+
+      ```
+      $ MUTANTS_ITERATE=0 make rust-mutants
+      rust-mutants: fresh run; no prior mutant results reused
+      rust-mutants: diff against 437e3358701ef9dc03e409f7f9ab9cf28ffb0dd1, output in /Users/istefanek/.local/share/petri-tools/mutants/t19-f01/mutants.out
+      37 mutants tested in 9m: 4 missed, 31 caught, 2 unviable
+
+      rust-mutants: survivors: missed by every test (/Users/istefanek/.local/share/petri-tools/mutants/t19-f01/mutants.out/missed.txt):
+      crates/v3-core/src/simulation/tick.rs:574:60: replace + with - in TickComputeStats::record
+      crates/v3-core/src/simulation/tick.rs:574:60: replace + with * in TickComputeStats::record
+      crates/v3-core/src/simulation/tick.rs:574:34: replace + with - in TickComputeStats::record
+      crates/v3-core/src/simulation/tick.rs:574:34: replace + with * in TickComputeStats::record
+      ```
 - [x] Benchmark summaries stored, raw hash/byte count and verification
       time checked, series entries appended, no full report staged.
 - [x] Mesh tests 23 passed, 0 failed, including the pin on invariant 3's
