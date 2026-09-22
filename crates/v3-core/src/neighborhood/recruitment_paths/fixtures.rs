@@ -188,17 +188,13 @@ fn reactive(backend: ModuleBackend, live: bool) -> NodeGenome {
 /// The catalog's `ActionVote(Move(d))` sink.
 pub(super) fn move_sink(graph: &CgpGraphBackendDef, d: u8) -> &OutputSink {
     graph
-        .output_sinks
-        .iter()
-        .find(|sink| sink.kind == OutputSinkKind::ActionVote(VoteSink::Move(d)))
+        .sink(OutputSinkKind::ActionVote(VoteSink::Move(d)))
         .expect("the fixed catalog holds every Move sink")
 }
 
 fn move_sink_mut(graph: &mut CgpGraphBackendDef, d: u8) -> &mut OutputSink {
     graph
-        .output_sinks
-        .iter_mut()
-        .find(|sink| sink.kind == OutputSinkKind::ActionVote(VoteSink::Move(d)))
+        .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(d)))
         .expect("the fixed catalog holds every Move sink")
 }
 

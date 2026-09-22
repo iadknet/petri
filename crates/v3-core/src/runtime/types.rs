@@ -3,6 +3,7 @@ use crate::creature::genome::cgp::CUSTOM_OUTPUT_COUNT;
 use crate::creature::genome::vote::{
     VoteVector, VOTE_KIND_COUNT, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT,
 };
+use crate::runtime::action_decode::ActionParams;
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::trace::domain::TerminationReason;
 
@@ -83,7 +84,7 @@ pub struct MeshSideOutputs {
     /// Parameter surface: a wired `ActionParam(kind, i)` sink or a
     /// `WriteActionParam` overwrites `action_params[kind][i]`, last write
     /// wins. Zeroed at tick start and read at every commit.
-    pub action_params: [[f32; VOTE_PARAM_SLOTS as usize]; VOTE_KIND_COUNT],
+    pub action_params: [ActionParams; VOTE_KIND_COUNT],
     /// Latest committed contribution per genome node index this pass, in
     /// first-commit order. A revisit replaces the node's entry.
     node_contributions: Vec<(usize, VoteVector)>,
@@ -126,12 +127,7 @@ impl MeshSideOutputs {
     /// A dispatch's observable action effects for tests: its staged vote
     /// contribution (zeros when it staged none) and the parameter surface.
     #[cfg(test)]
-    pub(crate) fn dispatch_effects(
-        &self,
-    ) -> (
-        VoteVector,
-        [[f32; VOTE_PARAM_SLOTS as usize]; VOTE_KIND_COUNT],
-    ) {
+    pub(crate) fn dispatch_effects(&self) -> (VoteVector, [ActionParams; VOTE_KIND_COUNT]) {
         (
             self.staged_contribution.unwrap_or([0.0; VOTE_SINK_COUNT]),
             self.action_params,

@@ -74,9 +74,7 @@ fn with_edge(
         panic!("the one-edge census reads a Graph node");
     };
     graph
-        .output_sinks
-        .iter_mut()
-        .find(|output| output.kind == OutputSinkKind::ActionVote(sink))
+        .sink_mut(OutputSinkKind::ActionVote(sink))
         .expect("every Graph node carries the fixed vote sinks")
         .inputs
         .push(GraphEdge {

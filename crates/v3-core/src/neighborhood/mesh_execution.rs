@@ -499,9 +499,7 @@ mod tests {
             plasticity: None,
         });
         graph
-            .output_sinks
-            .iter_mut()
-            .find(|s| s.kind == OutputSinkKind::CustomOutput(0))
+            .sink_mut(OutputSinkKind::CustomOutput(0))
             .unwrap()
             .inputs
             .push(GraphEdge {
