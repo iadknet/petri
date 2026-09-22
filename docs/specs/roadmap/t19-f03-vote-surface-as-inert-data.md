@@ -185,10 +185,10 @@ transmitting; the surface reaches creatures through the body, never a sensor.
       (production, observed, traced) on a voting genome -> test names and
       counts in the readings file.
 - [x] Nothing reads the surface: a grep for `.votes`, `commit_counts`,
-      `action_params`, `vote_contribution`, `ActionVote`, `ActionParam`, and
-      `AddVote` over `crates/` and `frontend/src` lists only writers, traces,
-      formatters, and tests -> the grep output in the readings file; the
-      reviewer proves it.
+      `action_params`, `vote_contribution`, `ActionVote`, `ActionParam`,
+      `AddVote`, and `is_vote_surface` over `crates/` and `frontend/src` lists
+      only writers, traces, formatters, and tests -> the grep output in the
+      readings file; the reviewer proves it.
 - [x] `cargo test -p v3-core --test viability` -> 28 passed;
       `founder_only_trajectory_digest_is_pinned` unchanged;
       `cargo test -p v3-core --test vm_all_opcodes_e2e` updated for 43
@@ -203,11 +203,12 @@ transmitting; the surface reaches creatures through the body, never a sensor.
 
 | Command | Result |
 | --- | --- |
-| `cargo test -p v3-core --test viability` | 28 passed |
-| `cargo test -p v3-core --test applied_trajectory` | 2 passed; guard digest `99ef9a14…` identical before and after |
-| `cargo test -p v3-core --test baseline_worlds` | 19 passed, 1 ignored |
+| `cargo test -p v3-core --test viability` | 28 passed; `founder_only_trajectory_digest_is_pinned` and `FOUNDER_GENOME_SIZE_UNITS` 111 unchanged |
+| `cargo test -p v3-core --test applied_trajectory` | 2 passed; guard digest `99ef9a14…` identical before and after; re-pinned accounting digest `09b9e53c…` holds |
+| `cargo test -p v3-core --test baseline_worlds` | 19 passed, 1 ignored; re-pinned `legacy_default_short_run_identity` `5811834416729882562` holds |
 | `cargo test -p v3-core --test vm_all_opcodes_e2e` | 1 passed, 43 discriminants |
-| `cargo test --workspace` | all targets pass |
+| `cargo test --workspace` | 24 targets pass |
+| `npm run test` (frontend) | 329 passed, 62 files |
 | `make check` | exit 0 |
 | `make roadmap-check` | validation passed |
 

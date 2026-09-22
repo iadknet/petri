@@ -1,8 +1,7 @@
 import { memo } from "react";
 import type { TickTrace } from "../../types/trace.ts";
-import { voteSinkLabel } from "./vmInstructionFormat.ts";
-
-const COMMIT_KINDS = ["Eat", "Move", "Reproduce", "StealEnergy"] as const;
+import { VOTE_KINDS } from "../../types/trace.ts";
+import { voteSinkLabel } from "./graphNodeFormatters.ts";
 
 interface VoteSurfaceBlockProps {
 	tick: TickTrace;
@@ -38,7 +37,7 @@ export const VoteSurfaceBlock = memo(function VoteSurfaceBlock({ tick }: VoteSur
 				</div>
 			)}
 			<div className="flex flex-wrap gap-1">
-				{COMMIT_KINDS.map((kind, index) => (
+				{VOTE_KINDS.map((kind, index) => (
 					<span key={kind} className="text-[10px] font-mono text-slate-500">
 						{kind}: {tick.commit_counts[index] ?? 0}
 					</span>

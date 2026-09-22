@@ -11,7 +11,7 @@ use crate::config::MutationConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference};
 use crate::creature::genome::cgp::{
     ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, DirectionBidEdge,
-    GraphEdge, GraphSource, OutputSinkKind, WorldActionKind,
+    GraphEdge, GraphSource, WorldActionKind,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::compound::sub_value_count;
@@ -359,10 +359,7 @@ pub(crate) fn pick_random_surface(
     // surface list, its length, and every draw are what they were before the
     // catalog grew. T19.F04 lifts the exclusion without renumbering.
     for (i, sink) in def.output_sinks.iter().enumerate() {
-        if matches!(
-            sink.kind,
-            OutputSinkKind::ActionVote(_) | OutputSinkKind::ActionParam(_, _)
-        ) {
+        if sink.kind.is_vote_surface() {
             continue;
         }
         surfaces.push(EdgeSurface::SinkInput(i));
@@ -2641,12 +2638,7 @@ mod tests {
             .output_sinks
             .iter()
             .enumerate()
-            .filter(|(_, sink)| {
-                matches!(
-                    sink.kind,
-                    OutputSinkKind::ActionVote(_) | OutputSinkKind::ActionParam(_, _)
-                )
-            })
+            .filter(|(_, sink)| sink.kind.is_vote_surface())
             .map(|(i, _)| i)
             .collect();
         assert_eq!(votes_or_params.len(), 35);

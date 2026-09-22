@@ -4,7 +4,7 @@ use crate::contracts::{InputReference, WorldAction, MAX_GATE_SLOTS};
 use crate::creature::genome::cgp::{
     ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, GraphEdge, OutputSinkKind, WorldActionKind,
 };
-use crate::creature::genome::vote::{VoteVector, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT};
+use crate::creature::genome::vote::{VoteVector, VOTE_SINK_COUNT};
 use crate::runtime::action_decode::{decode_world_action, DirectionBank, DIRECTION_BANK_SLOTS};
 use crate::runtime::cgp::sources::resolve_source_post_convergence;
 use crate::runtime::inputs::ResolveCtx;
@@ -233,17 +233,17 @@ pub(crate) fn apply_cgp_graph_effects(
             // contribution and the parameter surface and count no work; no
             // executor or reading consumes either until T19.F04.
             OutputSinkKind::ActionVote(sink) => {
-                let index = sink.index();
-                if index < VOTE_SINK_COUNT {
+                if let Some(entry) = contribution.get_mut(sink.index()) {
                     applied_value = sanitize_f32(wsum);
-                    contribution[index] = applied_value;
+                    *entry = applied_value;
                     applied = true;
                 }
             }
             OutputSinkKind::ActionParam(kind, slot) => {
-                if (slot as usize) < VOTE_PARAM_SLOTS as usize {
+                if let Some(param) = side_outputs.action_params[kind.index()].get_mut(slot as usize)
+                {
                     applied_value = sanitize_f32(wsum);
-                    side_outputs.action_params[kind.index()][slot as usize] = applied_value;
+                    *param = applied_value;
                     applied = true;
                 }
             }

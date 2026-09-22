@@ -1,5 +1,8 @@
 use crate::contracts::{ActionQueue, WorldAction};
 use crate::creature::genome::cgp::CUSTOM_OUTPUT_COUNT;
+use crate::creature::genome::vote::{
+    VoteVector, VOTE_KIND_COUNT, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT,
+};
 use crate::runtime::routing::RouteGateMap;
 use crate::runtime::trace::domain::TerminationReason;
 
@@ -69,10 +72,6 @@ pub struct ComputeCostReport {
     /// Total energy deducted by the per-tick hop ramp this tick (T19.F01).
     pub mesh_ramp_cost: f32,
 }
-
-use crate::creature::genome::vote::{
-    VoteVector, VOTE_KIND_COUNT, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT,
-};
 
 /// Accumulated side outputs from VM/graph node execution within a single mesh evaluation.
 /// Passed as `&mut` through the mesh hop chain; consumed by the mesh executor on return.
