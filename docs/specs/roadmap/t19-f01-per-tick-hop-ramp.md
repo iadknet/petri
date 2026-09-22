@@ -165,20 +165,19 @@ because its index resets per dispatch).
 - [x] Suites and lints: `cargo test -p v3-core` 1636 lib + 91 passed, 0 failed;
       `cargo test -p v3-cli --lib` 120 passed, 0 failed; `cargo clippy --workspace --all-targets` and `cargo fmt --all
       --check` clean.
-- [ ] Recipe digest pins: `checked_in_goal_recipe_identities_are_unchanged_by_json_precision`
-      (`crates/v3-cli/tests/bench_artifacts.rs`) moves its three pins to the
+- [x] Recipe digest pins: `checked_in_goal_recipe_identities_are_unchanged_by_json_precision`
+      (`crates/v3-cli/tests/bench_artifacts.rs`) holds the three pins at the
       goal summary's `current_digest` values, the predeclared consequence of
       the two new `RuntimeConfig` fields serializing (invariant 6); test-only,
-      no trajectory change, epoch unchanged.
+      no trajectory change, epoch unchanged. `cargo test -p v3-cli` (whole
+      package) 186 passed, 0 failed, 1 ignored; `cargo fmt --all --check`
+      clean.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
 - [x] Benchmark summaries stored, raw hash/byte count and verification
       time checked, series entries appended, no full report staged.
-- [x] Review remediation: one P1 (a stale founder digest, corrected here and
-      in invariant 6) and five P3 — two readings corrections, the founder hop
-      assertion tightened to the exact count of 2, a new mesh test pinning
-      invariant 3's debit-before-read ordering, one item deferred below.
-      Rerun clean: mesh tests 23 passed, viability 28 passed, clippy, fmt.
+- [x] Mesh tests 23 passed, 0 failed, including the pin on invariant 3's
+      debit-before-read ordering and the founder hop count of 2.
 
 ## Performance and Goal Impact
 
