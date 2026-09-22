@@ -64,7 +64,7 @@ of the worked cases in its Section 2.3.
 
 ## Executable Features
 
-- [ ] **T19.F01 — Per-Tick Hop Ramp** — Depends on: None
+- [x] **T19.F01 — Per-Tick Hop Ramp** — Depends on: None
   - Goal: Sustained neural activity costs metabolism, so a creature that deliberates past a per-tick allowance of mesh hops pays a charge that rises with every further hop, summed over the tick, beside T03.F10's per-dispatch VM ramp.
 - [ ] **T19.F02 — Live Internal State and Legal Cycles** — Depends on: T19.F01
   - Goal: A nervous system's dynamics run faster than its behavior and a circuit may reverberate, so a mesh node may run any number of times in a tick on its live state, a cycle ends at a survivable per-pass hop cap that keeps the queue, and no tick-start snapshot of internal state exists.

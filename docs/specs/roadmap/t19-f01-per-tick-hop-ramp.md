@@ -1,6 +1,6 @@
 # T19.F01 — Per-Tick Hop Ramp
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-21
 **Feature**: T19.F01
 **Track**: [T19 — Mesh Action Selection and Live State](../../roadmaps/t19-mesh-action-selection-and-live-state.md)
@@ -152,8 +152,8 @@ because its index resets per dispatch).
 
 - [x] Viability under the ramp: `cargo test -p v3-core --test viability`,
       28 passed, 0 failed.
-- [ ] Whole-repo gate (Rust, frontend, docs): `make check`, run by the
-      orchestrator.
+- [x] Whole-repo gate (Rust, frontend, docs): `make check` exit 0 on tested
+      commit 93f3cbe2 (orchestrator, 2026-09-21).
 - [x] Focused tests for invariants 1–5 and the config contract: the seven
       `hop_ramp` tests in `crates/v3-core/src/runtime/mesh.rs` (two proptests),
       the `mesh_ramp` accounting tests in `crates/v3-core/src/simulation/` and
@@ -242,16 +242,16 @@ during the run was the raw block against the projected summary
 
 ## Success Criteria
 
-- [ ] `hop_ramp_allowance` (32) and `hop_ramp_cost` (1e-4) exist in
+- [x] `hop_ramp_allowance` (32) and `hop_ramp_cost` (1e-4) exist in
       `RuntimeConfig` with the documented defaults, normalization, and docs.
-- [ ] Hop `k` in a tick pays `hop_ramp_cost * max(0, k - hop_ramp_allowance)`
+- [x] Hop `k` in a tick pays `hop_ramp_cost * max(0, k - hop_ramp_allowance)`
       in every execution mode, with exhaustion on the ramp ending as `NoOp`
       and attributed to `mesh_ramp`.
-- [ ] `mesh_ramp` is reported as an energy flow and a mortality cause in the
+- [x] `mesh_ramp` is reported as an energy flow and a mortality cause in the
       benchmark summaries.
-- [ ] Gate and goal work counters are unchanged (0.000000%) against T13.F07,
+- [x] Gate and goal work counters are unchanged (0.000000%) against T13.F07,
       the founder digest pin is unchanged, and no epoch is re-pinned.
-- [ ] Mutation gate run with every survivor resolved.
+- [x] Mutation gate run with every survivor resolved.
 
 ## Notes for AI Agents
 
@@ -263,3 +263,5 @@ during the run was the raw block against the projected summary
   `EnergyFlows`, `record_cognition`, the `DeathCause` enum/`ALL`/key,
   `EnergyFlowTracking` and its `From`, and three test key lists; T19.F02
   repeats the pattern and may consolidate it.
+- Cost: `/usage` awaits the user; 4 implementer passes (consults 2/2/2/1);
+  5 spec-owner resumes; review 1 P1, 0 P2, 5 P3.
