@@ -83,7 +83,8 @@ Boundary rules:
 - `sensors/` owns snapshot assembly.
 - `runtime/` reads already-frozen values only.
 - no backend reads live world state directly.
-- dynamic introspection and action queue remain live runtime reads.
+- dynamic introspection, the action queue, and the in-tick decision state
+  (Section 3.6) remain live runtime reads; `PreviousOutcome` is frozen.
 
 ---
 
@@ -430,7 +431,8 @@ Per acting-creature turn, canonical timing is:
 1. Build frozen local and extended perception snapshots from the post-Phase-0
    world state.
 2. Execute runtime mesh evaluation against those frozen snapshots.
-3. Resolve dynamic introspection and action queue live during evaluation.
+3. Resolve dynamic introspection, the action queue, and the in-tick decision
+   state live during evaluation.
 
 Canonical phase order remains in `v3-tick-orchestration-spec.md`.
 
