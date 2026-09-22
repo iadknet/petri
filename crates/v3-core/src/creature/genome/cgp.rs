@@ -188,6 +188,17 @@ pub const FIXED_SINK_COUNT: usize =
 const _: () = assert!(FIXED_SINK_COUNT == 99);
 
 impl CgpGraphBackendDef {
+    /// The output sink of `kind`, when the graph carries it.
+    #[must_use]
+    pub fn sink(&self, kind: OutputSinkKind) -> Option<&OutputSink> {
+        self.output_sinks.iter().find(|sink| sink.kind == kind)
+    }
+
+    /// The output sink of `kind`, mutably, when the graph carries it.
+    pub fn sink_mut(&mut self, kind: OutputSinkKind) -> Option<&mut OutputSink> {
+        self.output_sinks.iter_mut().find(|sink| sink.kind == kind)
+    }
+
     /// Construct a new graph backend with the full fixed output catalog.
     /// All sinks start with empty edges (inert).
     pub fn new_with_fixed_outputs() -> Self {

@@ -352,9 +352,7 @@ mod tests {
 
     fn wire(graph: &mut CgpGraphBackendDef, sink: VoteSink, edge: GraphEdge) {
         graph
-            .output_sinks
-            .iter_mut()
-            .find(|candidate| candidate.kind == OutputSinkKind::ActionVote(sink))
+            .sink_mut(OutputSinkKind::ActionVote(sink))
             .expect("catalog sink")
             .inputs
             .push(edge);
@@ -486,9 +484,7 @@ mod tests {
         };
         let edges = std::mem::take(
             &mut graph
-                .output_sinks
-                .iter_mut()
-                .find(|sink| sink.kind == OutputSinkKind::ActionVote(VoteSink::Move(2)))
+                .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(2)))
                 .unwrap()
                 .inputs,
         );
