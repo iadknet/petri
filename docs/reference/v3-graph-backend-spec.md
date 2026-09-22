@@ -210,7 +210,8 @@ parameters replace them.
   VM's `WriteActionParam`).
 - `Terminate` ends a non-empty tick when its vote is at least the best
   effective vote; `Decide` ends a pass early when some kind's effective vote
-  is positive. Neither commits.
+  is positive, or when the queue is non-empty and `Terminate` is positive.
+  Neither commits.
 
 ---
 
