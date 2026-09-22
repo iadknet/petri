@@ -98,7 +98,8 @@ pub enum VmInstruction {
         dst: u8,
     },
     /// Set the creature's priority bid for turn-order execution.
-    /// Reads `regs[src]`, clamps to non-negative, deducts from energy.
+    /// Reads `regs[src]`, clamps to non-negative, and records it; the mesh
+    /// settles the bid once at evaluation end (T19.F02).
     /// Last-write-wins if called multiple times.
     SetPriorityBid { src: u8 },
     /// Terminal: return accumulated action queue for execution.

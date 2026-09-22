@@ -64,6 +64,10 @@ pub struct PerSeed {
     pub plasticity_updates: u64,
     pub actions_applied: u64,
     pub births: u64,
+    /// Passes that reached the per-pass hop cap (T19.F02); a stored report
+    /// without the key reads as zero.
+    #[serde(default)]
+    pub pass_cap_hits: u64,
     pub final_population: u64,
     pub extinction_tick: Option<u64>,
 }
@@ -78,6 +82,8 @@ pub struct Totals {
     pub plasticity_updates: u64,
     pub actions_applied: u64,
     pub births: u64,
+    #[serde(default)]
+    pub pass_cap_hits: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,6 +100,8 @@ pub struct PerCreatureTick {
     pub actions_applied: Option<String>,
     #[serde(default)]
     pub births: Option<String>,
+    #[serde(default)]
+    pub pass_cap_hits: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -437,6 +445,13 @@ pub struct DriftDepthCheckpoint {
     pub hop_cap_hits: u64,
     pub battery_executions: u64,
     pub hop_cap_fraction: String,
+    /// Capped passes summed over the lineages' battery executions (T19.F02);
+    /// absent from reports measured before it was read.
+    #[serde(default)]
+    pub pass_cap_hits: u64,
+    /// The T19.F02 per-lineage cycle classes; absent from earlier reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cycle_classes: Option<CycleClasses>,
     pub births: NeighborhoodBirths,
     pub silent_per_all_births: String,
     pub changed_per_all_births: String,
@@ -655,6 +670,18 @@ pub struct NeighborhoodBirths {
     pub zero_event_births: u32,
     pub any_events: NeighborhoodTally,
     pub by_events: Vec<NeighborhoodBirthBucket>,
+    /// `any_events` partitioned by whether the offspring's reachable mesh
+    /// carries a cycle (T19.F02); absent from earlier reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by_cycle_carrying: Option<NeighborhoodBirthCyclePartition>,
+}
+
+/// Classified births split by offspring mesh shape (T19.F02): the two
+/// tallies merge to `any_events`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodBirthCyclePartition {
+    pub cycle_carrying: NeighborhoodTally,
+    pub acyclic: NeighborhoodTally,
 }
 
 /// Structural facts about a sampled genome's reachable mesh (T11.F01
@@ -708,6 +735,31 @@ pub struct MeshExecution {
     #[serde(default)]
     pub route_destination_varies: bool,
     pub hop_cap_hits: u64,
+    /// Capped passes summed over the battery (T19.F02); absent from earlier reports.
+    #[serde(default)]
+    pub pass_cap_hits: u64,
+    /// The reachable mesh contains a cycle, self-targets included (T19.F02).
+    #[serde(default)]
+    pub cycle_carrying: bool,
+    /// Some battery execution dispatched a node more than once (T19.F02).
+    #[serde(default)]
+    pub revisiting: bool,
+    /// Some execution dispatched a cycle node and returned a non-`NoOp`
+    /// action list (T19.F02).
+    #[serde(default)]
+    pub productive_cycle: bool,
+}
+
+/// Per-lineage cycle classes pooled over a checkpoint (T19.F02): each a
+/// count of lineages and its fraction of the checkpoint's lineages.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CycleClasses {
+    pub cycle_carrying_lineages: u32,
+    pub cycle_carrying_fraction: String,
+    pub revisiting_lineages: u32,
+    pub revisiting_fraction: String,
+    pub productive_cycle_lineages: u32,
+    pub productive_cycle_fraction: String,
 }
 
 fn undefined_mesh_execution() -> Indicator<MeshExecution> {

@@ -6,6 +6,7 @@
 
 use rand::Rng;
 
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -251,6 +252,39 @@ pub fn vm_forward_slice_random(
     }
     let seed_idx = writers[rng.gen_range(0..writers.len())];
     vm_forward_slice(program, seed_idx)
+}
+
+/// The reachable mesh nodes that lie on a cycle: every node the mesh can
+/// route from `entry_node_id` that can route back to itself through one or
+/// more targets (a self-target counts). Dangling targets and cycles the entry
+/// never reaches are excluded (T19.F02).
+#[must_use]
+pub fn mesh_cycle_nodes(genome: &CreatureGenome) -> BTreeSet<NodeId> {
+    let find_idx = |node_id| genome.nodes.iter().position(|n| n.node_id == node_id);
+    let reachable_targets = |idx: usize| {
+        genome.nodes[idx]
+            .targets
+            .iter()
+            .filter_map(|target| find_idx(target.target_id))
+    };
+    mesh_reachable_nodes(genome)
+        .into_iter()
+        .filter(|&origin| {
+            let mut seen = vec![false; genome.nodes.len()];
+            let mut queue: VecDeque<usize> = reachable_targets(origin).collect();
+            while let Some(idx) = queue.pop_front() {
+                if idx == origin {
+                    return true;
+                }
+                if !seen[idx] {
+                    seen[idx] = true;
+                    queue.extend(reachable_targets(idx));
+                }
+            }
+            false
+        })
+        .map(|idx| genome.nodes[idx].node_id)
+        .collect()
 }
 
 // ── Mesh reachability analysis ──────────────────────────────────────────────

@@ -710,14 +710,11 @@ impl Default for PerceptionRuntimeConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeConfig {
+    /// Per-pass hop cap (T19.F02): a pass dispatches at most this many mesh
+    /// nodes; reaching it ends the evaluation with the queue kept. Default
+    /// 64; must be `>= 1`.
     pub max_mesh_hops: u32,
     pub max_vm_steps: u32,
-    /// Retained and validated, but inactive since the T11.F06 world-tick clock.
-    pub max_graph_relax_iters: u32,
-    /// Retained inactive convergence setting.
-    pub graph_convergence_epsilon: f32,
-    /// Retained inactive convergence setting.
-    pub graph_convergence_stable_passes: u32,
     pub graph_node_base_cost: f32,
     /// Energy cost per plasticity weight update. Default 0.0 (free during initial rollout).
     #[serde(default, alias = "hebbian_update_cost")]
@@ -761,11 +758,8 @@ fn default_action_queue_cap() -> usize {
 impl Default for RuntimeConfig {
     fn default() -> Self {
         Self {
-            max_mesh_hops: 1024,
+            max_mesh_hops: 64,
             max_vm_steps: 10000,
-            max_graph_relax_iters: 15,
-            graph_convergence_epsilon: 1e-3,
-            graph_convergence_stable_passes: 2,
             graph_node_base_cost: 1e-5,
             plasticity_update_cost: 0.0,
             reward_learning_cost: 0.0,
@@ -1104,17 +1098,10 @@ impl SimulationConfig {
 
         let rt = &mut self.runtime;
         if rt.max_mesh_hops < 1 {
-            rt.max_mesh_hops = 1024;
+            rt.max_mesh_hops = 64;
         }
         if rt.max_vm_steps < 1 {
             rt.max_vm_steps = 10000;
-        }
-        if rt.max_graph_relax_iters < 1 {
-            rt.max_graph_relax_iters = 15;
-        }
-        rt.graph_convergence_epsilon = normalize_f32_nonneg(rt.graph_convergence_epsilon, 1e-3);
-        if rt.graph_convergence_stable_passes < 1 {
-            rt.graph_convergence_stable_passes = 2;
         }
         rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 1e-5);
         rt.plasticity_update_cost = normalize_f32_finite_nonneg(rt.plasticity_update_cost, 0.0);
@@ -1594,11 +1581,8 @@ mod tests {
         assert!((cfg.startup.ramps.failed_action_penalty.end - 1.0).abs() < 1e-6);
         assert_eq!(cfg.startup.ramps.failed_action_penalty.target_tick, 62680);
         // Runtime
-        assert_eq!(cfg.runtime.max_mesh_hops, 1024);
+        assert_eq!(cfg.runtime.max_mesh_hops, 64);
         assert_eq!(cfg.runtime.max_vm_steps, 10000);
-        assert_eq!(cfg.runtime.max_graph_relax_iters, 15);
-        assert!((cfg.runtime.graph_convergence_epsilon - 1e-3).abs() < 1e-6);
-        assert_eq!(cfg.runtime.graph_convergence_stable_passes, 2);
         assert!((cfg.runtime.graph_node_base_cost - 1e-5).abs() < 1e-9);
         assert!((cfg.runtime.vm.opcode_cost_multiplier - 1e-6).abs() < 1e-12);
         assert_eq!(cfg.runtime.vm.step_ramp_allowance, 100);
@@ -1772,7 +1756,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.runtime.max_mesh_hops = 0;
         cfg.normalize();
-        assert_eq!(cfg.runtime.max_mesh_hops, 1024);
+        assert_eq!(cfg.runtime.max_mesh_hops, 64);
     }
 
     #[test]
@@ -1822,11 +1806,8 @@ mod tests {
     fn hop_ramp_fields_default_when_absent_from_json() {
         let runtime: RuntimeConfig = serde_json::from_str(
             r#"{
-                "max_mesh_hops": 1024,
+                "max_mesh_hops": 64,
                 "max_vm_steps": 10000,
-                "max_graph_relax_iters": 15,
-                "graph_convergence_epsilon": 0.001,
-                "graph_convergence_stable_passes": 2,
                 "graph_node_base_cost": 0.00001,
                 "vm": {"opcode_cost_multiplier": 0.000001}
             }"#,

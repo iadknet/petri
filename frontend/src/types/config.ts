@@ -217,9 +217,6 @@ export interface PerceptionRuntimeConfig {
 export interface RuntimeConfig {
 	max_mesh_hops: number;
 	max_vm_steps: number;
-	max_graph_relax_iters: number;
-	graph_convergence_epsilon: number;
-	graph_convergence_stable_passes: number;
 	graph_node_base_cost: number;
 	plasticity_update_cost: number;
 	reward_learning_cost: number;

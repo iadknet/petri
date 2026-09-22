@@ -86,9 +86,6 @@ export const MOCK_CONFIG: SimulationConfig = {
 	runtime: {
 		max_mesh_hops: 128,
 		max_vm_steps: 1024,
-		max_graph_relax_iters: 4,
-		graph_convergence_epsilon: 0.001,
-		graph_convergence_stable_passes: 1,
 		graph_node_base_cost: 0.05,
 		plasticity_update_cost: 0.0,
 		reward_learning_cost: 0.0,

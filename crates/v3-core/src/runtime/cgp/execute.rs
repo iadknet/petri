@@ -88,14 +88,16 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
 
     let mut prev_outputs = std::mem::take(&mut graph_runtime.scratch_prev);
     let mut curr_outputs = std::mem::take(&mut graph_runtime.scratch_curr);
+    // Live state (T19.F02): a visit starts from the last committed operator
+    // state and outputs, whether that commit was this tick or earlier.
     let mut candidate_state = std::mem::take(&mut graph_runtime.scratch_backup);
     candidate_state.clear();
-    if let Some(base) = graph_runtime.tick_start_state.get(node_idx) {
+    if let Some(base) = graph_runtime.node_state.get(node_idx) {
         candidate_state.extend_from_slice(base);
     }
     candidate_state.resize(node_count, 0.0);
     prev_outputs.clear();
-    if let Some(base) = graph_runtime.tick_start_outputs.get(node_idx) {
+    if let Some(base) = graph_runtime.node_outputs.get(node_idx) {
         prev_outputs.extend_from_slice(base);
     }
     prev_outputs.resize(node_count, 0.0);
@@ -299,7 +301,6 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             def,
             node_idx,
             &mut graph_runtime.eligibility_traces,
-            &graph_runtime.tick_start_eligibility_traces,
             &graph_runtime.plasticity_weights,
             &prev_outputs,
             &curr_outputs,
@@ -612,8 +613,11 @@ mod clock_tests {
         (memory[1], side)
     }
 
+    /// Internal time is counted in visits (T19.F02): a second visit in the
+    /// same tick starts from the first visit's commit, and ticks without a
+    /// visit hold the last commit without catching up.
     #[test]
-    fn repeated_and_skipped_visits_use_frozen_base_and_last_success() {
+    fn repeated_visits_advance_from_the_last_commit_and_skipped_ticks_hold() {
         let def = graph(ComputeNodeKind::DecayIntegrator(0.5), 0);
         let mut state = GraphRuntimeState::new();
         let config = RuntimeConfig {
@@ -623,13 +627,13 @@ mod clock_tests {
         let mut energy = 100.0;
         state.begin_tick(&[], 0);
         assert_eq!(visit(&def, &mut state, 1.0, &mut energy, &config).0, 0.5);
-        assert_eq!(visit(&def, &mut state, 2.0, &mut energy, &config).0, 1.0);
+        assert_eq!(visit(&def, &mut state, 2.0, &mut energy, &config).0, 1.25);
         assert_eq!(energy, 99.5);
         state.begin_tick(&[], 0);
         state.begin_tick(&[], 0); // no visit: sample and hold, no catch-up
-        assert_eq!(state.node_outputs[0], [1.0]);
+        assert_eq!(state.node_outputs[0], [1.25]);
         assert_eq!(energy, 99.5);
-        assert_eq!(visit(&def, &mut state, 1.0, &mut energy, &config).0, 1.0);
+        assert_eq!(visit(&def, &mut state, 1.0, &mut energy, &config).0, 1.125);
     }
 
     #[test]
@@ -763,9 +767,13 @@ mod clock_tests {
     }
 
     proptest! {
+        /// One visit steps a stateful operator exactly once from its committed
+        /// state whatever disconnected growth the module carries, and a
+        /// second visit in the same tick steps it again from the first
+        /// visit's commit (T19.F02).
         #[test]
-        fn temporal_step_ignores_pass_settings_and_disconnected_nodes(
-            pass_cap in 0..50u32, stable in 0..20u32, extra in 0..10usize,
+        fn temporal_step_advances_once_per_visit_and_ignores_disconnected_nodes(
+            extra in 0..10usize,
             input in -5.0f32..5.0, old in 0.1f32..0.8, family in 0..4u8,
         ) {
             let kind = match family {
@@ -774,7 +782,7 @@ mod clock_tests {
                 2 => ComputeNodeKind::Oscillator(0.125),
                 _ => ComputeNodeKind::AdaptiveGain,
             };
-            let expected_state = match family {
+            let step = |old: f32| match family {
                 0 => 0.75 * old + 0.25 * input,
                 1 => 0.25 * old + 0.75 * input,
                 2 => (old + 0.125).fract(),
@@ -782,14 +790,13 @@ mod clock_tests {
             };
             let mut state = GraphRuntimeState::new(); state.node_state = vec![vec![old]];
             state.begin_tick(&[], 0);
-            let config = RuntimeConfig { max_graph_relax_iters: pass_cap, graph_convergence_stable_passes: stable, graph_convergence_epsilon: 99.0, ..RuntimeConfig::default() };
+            let config = RuntimeConfig::default();
             let def = graph(kind, extra);
             let (_, side) = visit(&def, &mut state, input, &mut 100.0, &config);
-            prop_assert!((state.node_state[0][0] - expected_state).abs() < 1e-6);
+            prop_assert!((state.node_state[0][0] - step(old)).abs() < 1e-6);
             prop_assert_eq!(side.work_counters.graph_relax_iters, 1);
-            let outputs = state.node_outputs.clone();
             visit(&def, &mut state, input, &mut 100.0, &config);
-            prop_assert_eq!(&state.node_outputs, &outputs);
+            prop_assert!((state.node_state[0][0] - step(step(old))).abs() < 1e-6);
         }
     }
 }

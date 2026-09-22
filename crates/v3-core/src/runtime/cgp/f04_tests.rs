@@ -336,8 +336,10 @@ fn unwired_blank_visit_is_free_and_passes_its_bus_through() {
     assert!(visited.side.action_queue.is_empty());
 }
 
+/// One visit per tick steps the integrator once per tick; a second visit in
+/// the same tick steps it again from the first visit's commit (T19.F02).
 #[test]
-fn stateful_module_and_blank_neighbor_each_step_once_per_world_tick() {
+fn stateful_module_and_blank_neighbor_each_step_once_per_visit() {
     let mut stateful = blank();
     stateful.compute_nodes.push(ComputeNode {
         kind: ComputeNodeKind::DecayIntegrator(0.5),
@@ -384,6 +386,18 @@ fn stateful_module_and_blank_neighbor_each_step_once_per_world_tick() {
             assert_eq!(memory_in[2], neighbor_write);
         }
         assert!((energy - (100.0 - 2.0 * per_tick_cost)).abs() < 1e-6);
+        // A revisit within the same tick (no `begin_tick`) advances again.
+        let _ = execute_creature_mesh(
+            &genome,
+            &sensors(),
+            &mut energy,
+            &mut memory_in,
+            &[0.0; 16],
+            &mut state,
+            &config(),
+        );
+        assert!((memory_in[1] - 2.625).abs() < 1e-6);
+        assert!((energy - (100.0 - 3.0 * per_tick_cost)).abs() < 1e-6);
     }
 }
 

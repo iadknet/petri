@@ -68,12 +68,9 @@
     "steal_cost_rate": 0.05000000074505806
   },
   "runtime": {
-    "graph_convergence_epsilon": 0.0010000000474974513,
-    "graph_convergence_stable_passes": 2,
     "graph_node_base_cost": 0.000009999999747378752,
     "max_actions_per_turn": 10,
-    "max_graph_relax_iters": 15,
-    "max_mesh_hops": 1024,
+    "max_mesh_hops": 64,
     "max_vm_steps": 10000,
     "perception": {
       "vision_radius": 5

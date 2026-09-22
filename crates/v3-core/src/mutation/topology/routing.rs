@@ -46,9 +46,9 @@ fn local_destinations(genome: &CreatureGenome, node_idx: usize, target_idx: usiz
         .flat_map(|n| n.targets.iter())
         .chain(node.targets.iter())
         .map(|t| t.target_id)
-        .filter(|id| {
-            *id != node.node_id && *id != current && genome.nodes.iter().any(|n| n.node_id == *id)
-        })
+        // The node itself is a legal destination (T19.F02); only the current
+        // target and missing ids are excluded.
+        .filter(|id| *id != current && genome.nodes.iter().any(|n| n.node_id == *id))
         .collect();
     candidates.sort_unstable();
     candidates.dedup();
@@ -89,7 +89,6 @@ pub(super) fn apply_add_route_target(
         .enumerate()
         .filter(|(_, n)| {
             n.targets.len() == 1
-                && n.targets[0].target_id != n.node_id
                 && genome
                     .nodes
                     .iter()
@@ -240,6 +239,37 @@ mod tests {
 
     fn rng(seed: u64) -> SmallRng {
         SmallRng::seed_from_u64(seed)
+    }
+
+    /// Counts the RNG calls an operator spends, so the T19.F02 self-target
+    /// relaxation can be shown not to change the draw structure.
+    struct CountingRng {
+        inner: SmallRng,
+        calls: usize,
+    }
+    impl rand::RngCore for CountingRng {
+        fn next_u32(&mut self) -> u32 {
+            self.calls += 1;
+            self.inner.next_u32()
+        }
+        fn next_u64(&mut self) -> u64 {
+            self.calls += 1;
+            self.inner.next_u64()
+        }
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            self.calls += 1;
+            self.inner.fill_bytes(dest);
+        }
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+            self.fill_bytes(dest);
+            Ok(())
+        }
+    }
+    fn counting(seed: u64) -> CountingRng {
+        CountingRng {
+            inner: rng(seed),
+            calls: 0,
+        }
     }
 
     // --- lowest_unused_slot tests ---
@@ -411,6 +441,122 @@ mod tests {
         // slot and gate_bias must be untouched; only target_id may change.
         assert_eq!(genome.nodes[0].targets[0].slot, original_slot);
         assert_eq!(genome.nodes[0].targets[0].gate_bias, original_bias);
+    }
+
+    /// T19.F02: a node may be retargeted onto itself when the current
+    /// destination routes back to it. The two-node cycle `0 -> 1 -> 0` leaves
+    /// node 0 exactly one candidate (itself), so the draw is forced whatever
+    /// the seed; the RNG spends the same three draws as any retarget.
+    #[test]
+    fn retarget_draws_a_self_target_from_the_neighborhood() {
+        let mut genome = v3alpha1_founder_genome();
+        genome.nodes[1].targets = vec![RouteTarget {
+            target_id: NodeId::new(0),
+            slot: 0,
+            gate_bias: 0.0,
+        }];
+        let reachable = vec![0];
+        for seed in 0..8 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            apply_retarget_node_target(
+                &mut g,
+                &mut TargetSelector::reachable_only(&reachable, 1.0),
+                &mut r,
+            )
+            .unwrap();
+            assert_eq!(
+                g.nodes[0].targets[0].target_id,
+                NodeId::new(0),
+                "seed {seed}"
+            );
+            assert_eq!(g.nodes[0].targets[0].slot, genome.nodes[0].targets[0].slot);
+        }
+    }
+
+    /// T19.F02: the draw structure is unchanged by the self-target
+    /// relaxation. A retarget whose only candidate is the node itself spends
+    /// exactly the RNG calls of a retarget whose only candidate is another
+    /// node, and an `AddRouteTarget` on a self-looping node spends exactly
+    /// the calls of one on a forward-routing node, seed for seed.
+    #[test]
+    fn self_target_draws_spend_the_same_rng_calls_as_ordinary_draws() {
+        let reachable = vec![0];
+        let mut self_retarget = v3alpha1_founder_genome();
+        self_retarget.nodes[1].targets = vec![RouteTarget {
+            target_id: NodeId::new(0),
+            slot: 0,
+            gate_bias: 0.0,
+        }];
+        let mut forward_retarget = v3alpha1_founder_genome();
+        let mut third = forward_retarget.nodes[1].clone();
+        third.node_id = NodeId::new(2);
+        third.targets = vec![];
+        forward_retarget.nodes.push(third);
+        forward_retarget.nodes[1].targets = vec![RouteTarget {
+            target_id: NodeId::new(2),
+            slot: 0,
+            gate_bias: 0.0,
+        }];
+        let mut self_add = v3alpha1_founder_genome();
+        self_add.nodes[0].targets[0].target_id = NodeId::new(0);
+        let forward_add = v3alpha1_founder_genome();
+        for seed in 0..8 {
+            let mut calls = [0usize; 4];
+            for (slot, genome) in [&self_retarget, &forward_retarget].into_iter().enumerate() {
+                let mut g = genome.clone();
+                let mut r = counting(seed);
+                apply_retarget_node_target(
+                    &mut g,
+                    &mut TargetSelector::reachable_only(&reachable, 1.0),
+                    &mut r,
+                )
+                .unwrap();
+                calls[slot] = r.calls;
+            }
+            for (slot, genome) in [&self_add, &forward_add].into_iter().enumerate() {
+                let mut g = genome.clone();
+                let mut r = counting(seed);
+                apply_add_route_target(
+                    &mut g,
+                    &mut TargetSelector::reachable_only(&reachable, 1.0),
+                    &mut r,
+                    &MutationConfig::default(),
+                )
+                .unwrap();
+                calls[2 + slot] = r.calls;
+            }
+            assert_eq!(calls[0], calls[1], "retarget, seed {seed}");
+            assert_eq!(calls[2], calls[3], "add route target, seed {seed}");
+        }
+    }
+
+    /// T19.F02: a sole self-target is a valid single successor for
+    /// `AddRouteTarget`; the detour forwards to the old successor, the node
+    /// itself.
+    #[test]
+    fn add_route_target_accepts_a_self_looping_node_and_forwards_the_detour_to_it() {
+        let mut genome = v3alpha1_founder_genome();
+        genome.nodes[0].targets[0].target_id = NodeId::new(0);
+        let reachable = vec![0];
+        let mut r = rng(3);
+        apply_add_route_target(
+            &mut genome,
+            &mut TargetSelector::reachable_only(&reachable, 1.0),
+            &mut r,
+            &MutationConfig::default(),
+        )
+        .unwrap();
+        assert_eq!(genome.nodes[0].targets.len(), 2);
+        assert_eq!(genome.nodes[0].targets[0].target_id, NodeId::new(0));
+        let detour_id = genome.nodes[0].targets[1].target_id;
+        let detour = genome
+            .nodes
+            .iter()
+            .find(|n| n.node_id == detour_id)
+            .unwrap();
+        assert_eq!(detour.targets.len(), 1);
+        assert_eq!(detour.targets[0].target_id, NodeId::new(0));
     }
 
     // --- apply_swap_route_targets test ---

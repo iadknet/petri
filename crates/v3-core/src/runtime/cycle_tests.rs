@@ -1,3 +1,6 @@
+//! T19.F02 cycle fixtures: revisits are legal, the per-pass cap is the
+//! only structural exit, and the three execution modes agree on a cycle.
+
 use super::mesh::*;
 use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, RouteTarget};
@@ -7,6 +10,7 @@ use crate::creature::genome::{
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::traced_mesh::execute_creature_mesh_traced;
+use crate::runtime::types::MeshOutput;
 use crate::sensors::{
     perception::{PerceptionSnapshot, SensorSnapshot},
     static_inputs::StaticInputs,
@@ -60,7 +64,7 @@ fn node(id: u32, targets: &[u32]) -> NodeGenome {
             .collect(),
     }
 }
-fn observe(g: &CreatureGenome, cap: u32) -> MeshObservation {
+fn observe(g: &CreatureGenome, cap: u32) -> (MeshOutput, MeshObservation) {
     let config = RuntimeConfig {
         max_mesh_hops: cap,
         ..RuntimeConfig::default()
@@ -75,46 +79,52 @@ fn observe(g: &CreatureGenome, cap: u32) -> MeshObservation {
         &config,
         ObservedMeshExecution::default(),
     )
-    .1
 }
 #[test]
-fn visited_top_choice_falls_through_and_visits_reset_each_tick() {
+fn top_choice_revisits_and_a_cycle_runs_to_the_pass_cap() {
     let g = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![node(0, &[1]), node(1, &[0, 2]), node(2, &[1, 2])],
     };
     for _ in 0..2 {
-        let result = observe(&g, 10);
-        assert_eq!(
-            result.hops,
-            vec![
-                (NodeId::new(0), Some((0, NodeId::new(1)))),
-                (NodeId::new(1), Some((1, NodeId::new(2)))),
-                (NodeId::new(2), None)
-            ]
-        );
+        let (output, result) = observe(&g, 10);
+        assert_eq!(result.hops.len(), 10);
+        for (index, (id, route)) in result.hops.iter().enumerate() {
+            let expected = NodeId::new((index % 2) as u32);
+            assert_eq!(*id, expected, "hop {index}");
+            assert_eq!(*route, Some((0, NodeId::new(((index + 1) % 2) as u32))));
+        }
         assert!(matches!(
             result.termination_reason,
-            TerminationReason::NoTargets
+            TerminationReason::MaxHopsReached
         ));
+        assert_eq!(output.work_counters.pass_cap_hits, 1);
+        assert_eq!(
+            output.actions.len(),
+            RuntimeConfig::default().max_actions_per_turn
+        );
     }
 }
 #[test]
-fn cap_is_real_acyclic_limit_and_final_dispatch_can_complete() {
+fn cap_is_a_per_pass_limit_and_the_final_dispatch_can_complete() {
     let g = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![node(0, &[1]), node(1, &[2]), node(2, &[])],
     };
+    let (capped, result) = observe(&g, 2);
     assert!(matches!(
-        observe(&g, 2).termination_reason,
+        result.termination_reason,
         TerminationReason::MaxHopsReached
     ));
-    assert_eq!(observe(&g, 2).hops.len(), 2);
+    assert_eq!(result.hops.len(), 2);
+    assert_eq!(capped.work_counters.pass_cap_hits, 1);
+    let (complete, result) = observe(&g, 3);
     assert!(matches!(
-        observe(&g, 3).termination_reason,
+        result.termination_reason,
         TerminationReason::NoTargets
     ));
-    assert_eq!(observe(&g, 3).hops.len(), 3);
+    assert_eq!(result.hops.len(), 3);
+    assert_eq!(complete.work_counters.pass_cap_hits, 0);
 }
 #[test]
 fn missing_winner_soft_terminates_without_fallback() {
@@ -122,7 +132,7 @@ fn missing_winner_soft_terminates_without_fallback() {
         entry_node_id: NodeId::new(0),
         nodes: vec![node(0, &[99, 1]), node(1, &[])],
     };
-    let result = observe(&g, 10);
+    let (_, result) = observe(&g, 10);
     assert_eq!(
         result.hops,
         vec![(NodeId::new(0), Some((0, NodeId::new(99))))]
@@ -133,7 +143,7 @@ fn missing_winner_soft_terminates_without_fallback() {
     ));
 }
 #[test]
-fn all_three_modes_match_cycle_fallback_energy_memory_priority_and_cost() {
+fn all_three_modes_match_on_a_revisiting_cycle_energy_memory_priority_and_cost() {
     let g = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![node(0, &[1]), node(1, &[0, 2]), node(2, &[1])],
@@ -186,6 +196,8 @@ fn all_three_modes_match_cycle_fallback_energy_memory_priority_and_cost() {
                 );
                 for output in [&observed, &traced] {
                     assert_eq!(plain.actions, output.actions);
+                    assert_eq!(plain.termination_reason, output.termination_reason);
+                    assert_eq!(plain.energy_observation, output.energy_observation);
                     assert_eq!(plain.priority_bid, output.priority_bid);
                     assert_eq!(plain.cost_report.vm_cost, output.cost_report.vm_cost);
                     assert_eq!(plain.cost_report.graph_cost, output.cost_report.graph_cost);
@@ -217,12 +229,18 @@ fn all_three_modes_match_cycle_fallback_energy_memory_priority_and_cost() {
     }
 }
 proptest! {
+    /// Over arbitrary small meshes, a pass dispatches at most `cap` nodes,
+    /// only the cap ends a pass at exactly `cap` dispatches with
+    /// `MaxHopsReached`, and the cap counter records exactly that.
     #[test]
-    fn dispatch_ids_are_unique_and_bounded_by_nodes_and_cap(edges in prop::collection::vec(prop::collection::vec(0u32..20,0..8),1..20), cap in 1u32..25) {
+    fn dispatches_are_bounded_by_the_cap_and_the_cap_alone_counts_a_capped_pass(edges in prop::collection::vec(prop::collection::vec(0u32..20,0..8),1..20), cap in 1u32..25) {
         let g=CreatureGenome { entry_node_id:NodeId::new(0),nodes:edges.iter().enumerate().map(|(i,e)|node(i as u32,e)).collect() };
-        let result=observe(&g,cap);
-        let ids:std::collections::HashSet<_>=result.hops.iter().map(|(id,_)|*id).collect();
-        prop_assert_eq!(ids.len(),result.hops.len());
-        prop_assert!(ids.len()<=g.nodes.len()); prop_assert!(ids.len()<=cap as usize);
+        let (output, result)=observe(&g,cap);
+        prop_assert!(result.hops.len()<=cap as usize);
+        prop_assert!(result.hops.iter().all(|(id,_)| g.nodes.iter().any(|n| n.node_id==*id)));
+        let capped = matches!(result.termination_reason, TerminationReason::MaxHopsReached);
+        prop_assert_eq!(output.work_counters.pass_cap_hits, u32::from(capped));
+        if capped { prop_assert_eq!(result.hops.len(), cap as usize); }
+        prop_assert_eq!(output.work_counters.mesh_hops as usize, result.hops.len());
     }
 }

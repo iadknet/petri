@@ -108,16 +108,17 @@ fn copy_and_backend_growth_skip_unsafe_predecessors_atomically() {
 
 #[test]
 fn branch_failure_is_atomic_and_orphan_writes_are_preserved() {
-    for case in 0..5 {
+    // A sole self-target is no longer a failure case (T19.F02); the
+    // routing tests cover the detour it grows.
+    for case in 0..4 {
         let mut g = genome(vec![node(0, &[1]), node(1, &[])]);
         match case {
             0 => g.nodes[0].targets[0].target_id = NodeId::new(99),
-            1 => g.nodes[0].targets[0].target_id = NodeId::new(0),
-            2 => {
+            1 => {
                 let target = g.nodes[0].targets[0];
                 g.nodes[0].targets.push(target);
             }
-            3 => {
+            2 => {
                 if let BackendDef::Vm(vm) = &mut g.nodes[0].backend_def {
                     vm.register_count = 0;
                 }
@@ -251,7 +252,6 @@ proptest! {
                 prop_assert_eq!(a.slot, b.slot); prop_assert_eq!(a.gate_bias, b.gate_bias);
                 if a.target_id != b.target_id {
                     changed += 1;
-                    prop_assert_ne!(b.target_id, old.node_id);
                     let mut local: Vec<_> = old.targets.iter().map(|t| t.target_id).collect();
                     if let Some(next) = before.nodes.iter().find(|n| n.node_id == a.target_id) { local.extend(next.targets.iter().map(|t| t.target_id)); }
                     prop_assert!(local.contains(&b.target_id));
@@ -449,7 +449,9 @@ fn added_work_retains_default_behavior_but_can_exhaust_at_the_boundary() {
             before.0.work_counters.mesh_hops + u32::from(input > 0.0)
         );
     }
-    let base_cost = execute(&base, 1.0, 1000.0).0.cost_report.vm_cost;
+    // The fixture's 3.0 bid is settled after the chain (T19.F02), outside
+    // `vm_cost`, so the boundary budget covers it explicitly.
+    let base_cost = execute(&base, 1.0, 1000.0).0.cost_report.vm_cost + 3.0;
     let budget = base_cost + 0.025;
     let before = execute(&base, 1.0, budget);
     let after = execute(&grown, 1.0, budget);

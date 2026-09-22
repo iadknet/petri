@@ -57,14 +57,11 @@ pub(super) fn scenarios() -> Vec<SensorSnapshot> {
 
 /// Ample energy and passes per the T11.F02/T11.F03 neutrality definition:
 /// identical action, output-slot, and shared-memory behavior when both
-/// executions have enough energy and relaxation passes. The base
-/// `graph_node_base_cost` is left at production default so the cost is
-/// real, just affordable at this energy level.
+/// executions have enough energy. The base `graph_node_base_cost` is left
+/// at production default so the cost is real, just affordable at this
+/// energy level.
 pub(super) fn ample_runtime_config() -> RuntimeConfig {
-    RuntimeConfig {
-        max_graph_relax_iters: 32,
-        ..RuntimeConfig::default()
-    }
+    RuntimeConfig::default()
 }
 
 /// Execute `def` against every scenario with ample energy, returning each
@@ -543,18 +540,6 @@ impl RecordingTracer {
     }
 }
 
-/// A fixed pass count with convergence detection disabled
-/// (`graph_convergence_stable_passes` set above `max_graph_relax_iters`),
-/// so parent and child run exactly the same number of raw passes and their
-/// per-node trajectories line up for direct comparison.
-fn fixed_pass_config() -> RuntimeConfig {
-    RuntimeConfig {
-        max_graph_relax_iters: 8,
-        graph_convergence_stable_passes: 1000,
-        ..RuntimeConfig::default()
-    }
-}
-
 fn record(
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
@@ -589,8 +574,8 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
     /// For every seed that produces a compute-consumer split (as opposed to
-    /// a sink/action/execute-gate append), every original node's per-pass
-    /// trajectory survives at its shifted index: nodes below the insertion
+    /// a sink/action/execute-gate append), every original node's value on
+    /// the visit survives at its shifted index: nodes below the insertion
     /// point are untouched, and nodes at or above it shift by one, reading
     /// their own inputs exactly as before (the new identity node adds one
     /// extra index nobody else depended on until this split targeted it).
@@ -627,26 +612,24 @@ proptest! {
             }
         };
 
-        let config = fixed_pass_config();
+        let config = RuntimeConfig::default();
         for sensors in scenarios() {
             let parent_trace = record(&parent, &refs, &config, &sensors);
             let child_trace = record(&child, &refs, &config, &sensors);
-            for pass in 0..config.max_graph_relax_iters {
-                for old_idx in 0..parent.compute_nodes.len() {
-                    let expected = parent_trace.value_at(pass, old_idx);
-                    let actual = child_trace.value_at(pass, mapped(old_idx));
-                    prop_assert_eq!(
-                        expected,
-                        actual,
-                        "seed {}, pass {}, node {} (mapped {}): {:?} vs {:?}",
-                        seed,
-                        pass,
-                        old_idx,
-                        mapped(old_idx),
-                        expected,
-                        actual
-                    );
-                }
+            for old_idx in 0..parent.compute_nodes.len() {
+                let expected = parent_trace.value_at(0, old_idx);
+                let actual = child_trace.value_at(0, mapped(old_idx));
+                prop_assert!(expected.is_some(), "seed {seed}: node {old_idx} was evaluated");
+                prop_assert_eq!(
+                    expected,
+                    actual,
+                    "seed {}, node {} (mapped {}): {:?} vs {:?}",
+                    seed,
+                    old_idx,
+                    mapped(old_idx),
+                    expected,
+                    actual
+                );
             }
         }
     }

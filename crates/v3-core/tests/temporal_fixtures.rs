@@ -5,16 +5,22 @@
 //! settings, that records what the brain's temporal building blocks are
 //! expected to do and what they observably do. Every fixture is `#[test]`
 //! green on the current code. Historical T11.F05 gaps are preserved in its
-//! spec catalogue; T11.F06 graph memory and T11.F07 reward-trace repairs now
-//! pin the explicit world-tick contract in D1–D3 and E1–E3.
+//! spec catalogue. The clock is the per-visit clock of T19.F02: a graph
+//! module's operator state and outputs advance once per visit from the last
+//! committed values (this tick or earlier), eligibility credit adds per
+//! visit and decays once per world tick, and unvisited modules hold. D1–D3
+//! and E1–E3 each visit their module once per tick, so their readings are
+//! unchanged from the world-tick contract they were written against; D4 and
+//! E4 are the revisit companions that separate the two clocks.
 //!
 //! Fixture IDs: A1 (reactive control), B1 (shared-memory delayed cue), B2
 //! (previous-slot one-tick cue), C1 (retention), C2 (retention under decay),
 //! C3 (graph slot write and previous read), D1 (integrator clock), D2
-//! (disconnected-node perturbation), D3 (backward-edge recurrence), E1 (exact
-//! one-edge update, immediate reward), E2 (delayed reward, visited every
-//! tick), E3 (skipped module visits), plus one proptest for the stateful
-//! compute-node convex-combination invariant.
+//! (disconnected-node perturbation), D3 (backward-edge recurrence), D4
+//! (integrator visited twice per tick), E1 (exact one-edge update, immediate
+//! reward), E2 (delayed reward, visited every tick), E3 (skipped module
+//! visits), E4 (trace visited twice per tick), plus one proptest for the
+//! stateful compute-node convex-combination invariant.
 //!
 //! Settings held at production values throughout (`RuntimeConfig::default()`
 //! and `shared_memory.decay_rate == 0.0`), per the spec's Inputs and
@@ -26,9 +32,9 @@
 //!    tick-loop setting.
 //! 2. Fixture C2 sets `shared_memory.decay_rate = 0.1` to characterize
 //!    retention under decay (contrasted with C1's production decay of 0.0).
-//! 3. The original proptest selected one legacy relaxation pass; T11.F06
-//!    makes those settings inactive and explicitly begins the graph tick.
-//!    D1–D3 now assert the repaired clock; historical readings remain in the spec.
+//! 3. The proptest seeds `GraphRuntimeState::node_state` directly and begins
+//!    the graph tick explicitly; D1–D3 assert the per-visit clock through the
+//!    production tick path. Historical readings remain in the spec.
 
 mod common;
 
@@ -911,7 +917,7 @@ fn run_and_observe_integrator_clock(
     (observed_states, observed_passes)
 }
 
-// ── D1–D3: world-tick graph memory ──────────────────────────────────────────
+// ── D1–D3: per-visit graph memory, one visit per tick ──────────────────────
 
 #[test]
 fn d1_integrator_clock() {
@@ -945,6 +951,127 @@ fn d3_backward_edge_recurrence() {
         run_one_traced_tick(&mut sim, target);
         assert_eq!(sim.creatures[target].shared_memory[0], expected);
     }
+}
+
+/// The D4/E4 entry node: counts its dispatches this tick in shared slot 1
+/// and routes to `module` while the count is below `visits + 1` (gate 1.0 on
+/// slot 0 against a constant 0.5 on `exit`'s slot 1), so `module` is
+/// dispatched exactly `visits` times per tick when it routes back here.
+fn revisit_entry_node(node_id: NodeId, module: NodeId, exit: NodeId, visits: f32) -> NodeGenome {
+    NodeGenome {
+        node_id,
+        input_refs: vec![],
+        backend_def: BackendDef::Vm(VmBackendDef {
+            register_count: 3,
+            constants: vec![1.0, visits + 1.0, 0.5],
+            program: vec![
+                VmInstruction::LoadSlotImm {
+                    dst: 0,
+                    slot_idx: 1,
+                },
+                VmInstruction::LoadConst {
+                    dst: 1,
+                    const_idx: 0,
+                },
+                VmInstruction::Add { dst: 0, a: 0, b: 1 },
+                VmInstruction::StoreSlotImm {
+                    slot_idx: 1,
+                    src: 0,
+                },
+                VmInstruction::LoadConst {
+                    dst: 1,
+                    const_idx: 1,
+                },
+                VmInstruction::CmpLt { dst: 2, a: 0, b: 1 },
+                VmInstruction::WriteRouteGate { slot: 0, src: 2 },
+                VmInstruction::LoadConst {
+                    dst: 2,
+                    const_idx: 2,
+                },
+                VmInstruction::WriteRouteGate { slot: 1, src: 2 },
+                VmInstruction::Halt,
+            ],
+        }),
+        targets: vec![
+            RouteTarget {
+                target_id: module,
+                slot: 0,
+                gate_bias: 0.0,
+            },
+            RouteTarget {
+                target_id: exit,
+                slot: 1,
+                gate_bias: 0.0,
+            },
+        ],
+    }
+}
+
+/// The D4/E4 exit node: clears the per-tick visit counter and ends the tick
+/// with an empty queue (`NoOp`).
+fn revisit_exit_node(node_id: NodeId) -> NodeGenome {
+    NodeGenome {
+        node_id,
+        input_refs: vec![],
+        backend_def: BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![
+                VmInstruction::ClearSlot { slot_idx: 1 },
+                VmInstruction::ExecuteActionQueue,
+            ],
+        }),
+        targets: vec![],
+    }
+}
+
+/// Wrap a single-node graph genome's module as node 1 of a revisit mesh:
+/// entry VM node 0 dispatches the module `visits` times per tick, the module
+/// routes back to the entry, and node 2 ends the tick.
+fn revisit_genome(module: CreatureGenome, visits: f32) -> CreatureGenome {
+    let id_entry = NodeId::new(0);
+    let id_module = NodeId::new(1);
+    let id_exit = NodeId::new(2);
+    let mut module = module.nodes.into_iter().next().expect("one module node");
+    module.node_id = id_module;
+    module.targets = vec![RouteTarget {
+        target_id: id_entry,
+        slot: 0,
+        gate_bias: 0.0,
+    }];
+    CreatureGenome {
+        entry_node_id: id_entry,
+        nodes: vec![
+            revisit_entry_node(id_entry, id_module, id_exit, visits),
+            module,
+            revisit_exit_node(id_exit),
+        ],
+    }
+}
+
+// ── D4: integrator visited twice per tick ───────────────────────────────────
+
+/// D4: D1's integrator dispatched twice per tick steps twice per tick, each
+/// visit from the previous visit's commit: the per-visit clock runs at
+/// twice D1's rate (T19.F02).
+#[test]
+fn d4_integrator_visited_twice_per_tick_steps_twice() {
+    let (mut sim, target) = one_creature_sim(
+        revisit_genome(decay_integrator_graph_genome(), 2.0),
+        Position::new(1, 1),
+        100.0,
+    );
+    let mut states = Vec::new();
+    for _ in 0..3 {
+        let tick = run_one_traced_tick(&mut sim, target);
+        assert_eq!(
+            tick.hops.len(),
+            6,
+            "entry, module, entry, module, entry, exit"
+        );
+        states.push(sim.creatures[target].graph_runtime.node_state[1][1]);
+    }
+    assert_eq!(states, [0.75, 0.9375, 0.984_375]);
 }
 
 // ── E1: exact one-edge update, immediate reward ─────────────────────────────
@@ -1151,6 +1278,49 @@ fn e3_skipped_module_visits() {
     }
 }
 
+// ── E4: trace visited twice per tick ────────────────────────────────────────
+
+/// E4: E3's reward-modulated module dispatched twice per tick adds its
+/// activity (`pre * post`, with `post` the learned weight times the unit
+/// `pre`) twice per tick; decay still runs once per world tick, so the trace
+/// follows `t = 0.5 t + 2 w` instead of E2's `t = 0.5 t + w` (T19.F02). The
+/// weight `w` is read before each tick because the EnergyDelta reward moves
+/// it in Phase 2.5, after the visits.
+#[test]
+fn e4_trace_visited_twice_per_tick_adds_twice() {
+    let (mut sim, target) = one_creature_sim(
+        revisit_genome(
+            reward_modulated_node_genome_inert(OutcomeChannel::EnergyDelta),
+            2.0,
+        ),
+        Position::new(5, 5),
+        500.0,
+    );
+    let mut expected_trace = 0.0f32;
+    for tick_num in 1..=3 {
+        let weight = sim.creatures[target]
+            .graph_runtime
+            .plasticity_weights
+            .get(1)
+            .and_then(|module| module.get(1))
+            .and_then(|edges| edges.first())
+            .copied()
+            .unwrap_or(1.0);
+        let tick = run_one_traced_tick(&mut sim, target);
+        assert_eq!(
+            tick.hops.len(),
+            6,
+            "entry, module, entry, module, entry, exit"
+        );
+        expected_trace = 0.5 * expected_trace + 2.0 * weight;
+        let trace = sim.creatures[target].graph_runtime.eligibility_traces[1][1][0];
+        assert!(
+            (trace - expected_trace).abs() < 1e-5,
+            "tick {tick_num}: expected trace {expected_trace}, got {trace}"
+        );
+    }
+}
+
 // ── Proptest: stateful compute-node convex-combination invariant ───────────
 
 fn empty_sensor_snapshot() -> SensorSnapshot {
@@ -1203,10 +1373,9 @@ proptest! {
     /// `[-1e6, 1e6]`, return a value between `state` and `input` inclusive —
     /// both are convex combinations of the prior state and the current
     /// input. Exercised through the fully public `execute_creature_mesh`
-    /// path with an explicit tick-start snapshot,
-    /// with the prior state seeded directly into the public
-    /// `GraphRuntimeState::node_state` field. Assertions do not depend on
-    /// which cases are drawn.
+    /// path, with the prior state seeded directly into the public
+    /// `GraphRuntimeState::node_state` field, the live read base since
+    /// T19.F02. Assertions do not depend on which cases are drawn.
     #[test]
     fn stateful_node_step_stays_between_state_and_input(
         a in 0.0f32..=1.0,
@@ -1217,10 +1386,7 @@ proptest! {
         for kind in [ComputeNodeKind::DecayIntegrator(a), ComputeNodeKind::Momentum(b)] {
             let genome = one_step_stateful_genome(kind, input);
             let sensors = empty_sensor_snapshot();
-            let cfg = v3_core::config::RuntimeConfig {
-                max_graph_relax_iters: 1, // legacy setting is ignored
-                ..v3_core::config::RuntimeConfig::default()
-            };
+            let cfg = v3_core::config::RuntimeConfig::default();
             let mut energy = 1.0e9f32;
             let mut shared_memory = [0.0f32; 16];
             let prev_shared_memory = [0.0f32; 16];

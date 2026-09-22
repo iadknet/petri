@@ -16,8 +16,8 @@ use crate::sensors::perception::SensorSnapshot;
 /// Execute the creature's mesh chain with trace recording.
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
-/// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Mesh execution does not
-/// advance the graph clock. Each mesh node dispatches at most once per tick.
+/// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Nodes may be
+/// dispatched any number of times within the tick, up to the per-pass cap.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh_traced(
     genome: &CreatureGenome,

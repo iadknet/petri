@@ -159,7 +159,7 @@ pub(crate) fn apply_hebbian_updates(
 /// Hebbian weights for genome weights when available.
 ///
 /// Resolves all `GraphSource` variants through the shared CGP source resolver,
-/// preserving the same current-visit/frozen-tick source semantics as the non-plastic path.
+/// preserving the same current-visit/last-commit source semantics as the non-plastic path.
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn collect_weighted_inputs_hebbian(

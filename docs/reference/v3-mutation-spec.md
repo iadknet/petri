@@ -104,8 +104,11 @@ Topology connection semantics (T11.F15, T11.F18):
   Halt charge. Their genome sizes add two and three
   units respectively. State neutrality excludes exhausted budgets and downstream
   live energy introspection; node-local metadata stays local.
-- `AddRouteTarget` selects a node with exactly one valid non-self successor,
-  appends a tied-bias branch to a fresh blank detour forwarding to that successor,
+- `AddRouteTarget` selects a node with exactly one valid successor (the node
+  itself qualifies since T19.F02; the detour then forwards to the node, and a
+  sole self-target still has no route exit because the resolver always
+  selects an existing target), appends a tied-bias branch to a fresh blank
+  detour forwarding to that successor,
   and writes the branch's free gate slot in the same event. Graphs gain one
   weight-1 edge from `random_graph_source` (including full sensor sub-values).
   VMs gain a `WriteRouteGate` from a uniformly sampled existing register before
@@ -119,7 +122,9 @@ Topology connection semantics (T11.F15, T11.F18):
   incumbent points to the original. Incumbent and new slots must have no gate
   writes, the incumbent bias must be finite, and no original-to-predecessor
   path may exist. Select the first slot unused by both targets and backend
-  writes. These conditions prove dormancy even with single-visit filtering.
+  writes. These conditions prove dormancy: a tied later alternative never
+  wins the static resolver, whether or not the mesh revisits the predecessor
+  within a tick (T19.F02 legalized revisits without changing the tie rule).
 - `SwapNodeBackend` uses the same attachment proof to grow an alternate copy
   with the other blank backend, preserving the original. `SwapRouteTargets`
   exchanges only destination IDs to activate an alternative; slots, biases
@@ -130,7 +135,8 @@ Topology connection semantics (T11.F15, T11.F18):
   T11.F08/F09's scope.
 - `RetargetNodeTarget` samples uniformly from the deduplicated union of the
   old successor's successors and the source's other destinations, excluding
-  source, current and missing IDs. No global fallback; empty local choices skip.
+  only the current and missing IDs; the source node itself is a legal
+  destination (T19.F02). No global fallback; empty local choices skip.
 - `RemoveRouteTarget` requires two targets and preserves the earliest
   highest-bias static incumbent and all surviving slots/biases. A removed
   branch may still have been a runtime winner.
@@ -247,11 +253,13 @@ Every current or future mesh backend must meet these four requirements:
 
 1. references are stable by identity or remapped on every structural edit;
 2. every growth operation preserves function at the moment it fires;
-3. persistent state advances once per world tick: graph temporal reads and
-   reward eligibility use an explicit boundary. Initialized eligibility decays
-   even on skipped visits; successful revisits replace activity from one frozen
-   decayed base, using actual evaluation inputs. Reward gain applies eta once
-   to activity-only credit; failed visits never overwrite successful activity;
+3. persistent state advances once per visit (T19.F02): a graph visit reads
+   the last committed operator state and outputs and commits its own; visits
+   per tick are bounded by the per-pass hop cap and priced by the per-tick hop
+   ramp; unvisited modules hold; initialized eligibility decays once per world
+   tick, even on skipped visits, and every successful visit adds its activity
+   from actual evaluation inputs. Reward gain applies eta once to
+   activity-only credit; failed visits never overwrite successful activity;
    and
 4. mutation supply arrives as small steps: at provisional production defaults,
    80% of triggered births request one event, with a bounded configurable tail,
@@ -295,7 +303,7 @@ Growth-versus-connection taxonomy (requirement 2, established for the graph
 and InputRef domains by T11.F03; the VM insert/copy families are T11.F02's
 and T11.F08's): a growth operator adds structure and must be neutral at the
 moment it fires — identical action, output-slot, and shared-memory behavior
-when both executions have enough energy and relaxation passes. Growth
+when both executions have enough energy. Growth
 operators: `AddComputeNode` (all three forms below), `CopyComputeNode`,
 `CopySubgraph`, `InputRef.Add`, the VM `VmCopyInstructionBlock`,
 `VmCopyGeneBackwardSlice`, and `VmCopyGeneForwardSlice`,
@@ -317,8 +325,8 @@ are `RetargetNodeTarget`, `RemoveRouteTarget`, `RemoveNode`, `MutateGateBias`,
 `SwapRouteTargets`, and the explicit macro `ChangeEntryNode`, all owned by
 T11.F15. The retired identity rename is outside this live taxonomy. `CopyEdgeBundle` remains an
 explicit multi-edge macro, as the VM's paired-slot-address operator is. A
-grown node still costs `graph_node_base_cost` per relaxation pass; growth
-neutrality does not extend to energy exhaustion.
+grown node still costs `graph_node_base_cost` per visit; growth neutrality
+does not extend to energy exhaustion.
 
 ### Graph domain
 
@@ -351,7 +359,7 @@ only their edges are evolvable.
   (`CgpGraphBackendDef::insert_compute_node_at`, the insert-with-remap
   inverse of `remove_compute_node_at`), preserving Gauss-Seidel pass order; a
   sink/action/execute-gate consumer appends instead. A split of a backward or
-  self edge may extend convergence by at most one pass. An edge whose source
+  self edge delays that edge's value by one visit. An edge whose source
   is an out-of-range `ComputeNode` (a prior removal's sentinel) is not
   splittable and is excluded from the draw; when the graph has no splittable
   edge the split form is not offered and `AddComputeNode` draws one of the
@@ -362,7 +370,7 @@ only their edges are evolvable.
   `InputLeaf` resolving to
   `DynamicIntrospection(EnergyCurrent)`. An identity node between them caches
   the value during evaluation, while the direct edge resolves it in the
-  post-convergence effects context after the plasticity-cost deduction, so the
+  post-evaluation effects context after the plasticity-cost deduction, so the
   two can differ by `plasticity_cost * weight` (no observable effect under the
   production default `plasticity_update_cost = 0.0`, but the split is not
   function-preserving in general). `EnergyCurrent` is the only excluded key:
@@ -403,9 +411,9 @@ only their edges are evolvable.
   nothing; no backlink is added, and inputs are never coin-flip cleared (a
   copy that should start disconnected is `AddComputeNode`'s disconnected
   form). Placing the copy at `source + 1` rather than at the end is what
-  keeps every copied edge on its original's evaluation phase (T11.F08): under
-  the T11.F06 clock a lower-index source is read from the current visit and a
-  self or higher-index source from the frozen tick-start outputs, so a source
+  keeps every copied edge on its original's evaluation phase (T11.F08): a
+  lower-index source is read from the current visit and a self or
+  higher-index source from the last committed outputs (T19.F02), so a source
   below the original must stay below the copy and a source above must stay
   above. The copy's own inputs take the same index shift as every other
   surviving reference, and a self-edge on the copy reads the copy, so the
@@ -767,10 +775,13 @@ counts by `births_total` for absolute mutated outcomes per all births; add
 `zero_event_births` to silent counts when reporting all behavior-identical births.
 Lower conditional harm alone does not establish fewer dead births overall.
 
-### Applied graph temporal clock (T11.F06)
+### Applied graph temporal clock (T11.F06, per visit since T19.F02)
 
-The node-type persistent-state contract now uses frozen world-tick operator
-state and compute outputs. Ordered combinational paths compute within one
-visit; self/higher-index edges cross the tick boundary. Repeated visits cannot
-accelerate temporal state and unvisited modules hold it. Disconnected node
-growth cannot change an existing node's clock. See `v3-graph-backend-spec.md`.
+The node-type persistent-state contract uses the last committed operator
+state and compute outputs as the read base of every visit. Ordered
+combinational paths compute within one visit; self/higher-index edges read
+the previous visit's commit, whether that visit was this tick or an earlier
+one. Repeated visits within a tick advance temporal state once per visit,
+bounded by the per-pass hop cap and priced by the per-tick hop ramp;
+unvisited modules hold. Disconnected node growth cannot change an existing
+node's clock. See `v3-graph-backend-spec.md`.

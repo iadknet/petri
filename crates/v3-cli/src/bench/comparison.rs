@@ -1,7 +1,7 @@
 //! Report comparison, reference selection, and the series index.
 
 use super::artifacts;
-use super::profiles::{COUNTER_NAMES, GOAL_WORLD_SET};
+use super::profiles::{ADDITIVE_COUNTER_NAMES, COUNTER_NAMES, GOAL_WORLD_SET};
 use super::schema::{
     ByReaderState, CaseComparison, CaseReadingComparison, ComparisonLevel, CounterComparison,
     GoalIndicators, Host, MemorySensitivitySeed, MovesBlockedByCause, PerCreatureTick, PerSeed,
@@ -62,6 +62,7 @@ fn per_creature_tick_value(pct: &PerCreatureTick, name: &str) -> Option<f64> {
         "plasticity_updates" => &pct.plasticity_updates,
         "actions_applied" => &pct.actions_applied,
         "births" => &pct.births,
+        "pass_cap_hits" => &pct.pass_cap_hits,
         _ => unreachable!("unknown counter name: {name}"),
     };
     raw.as_deref().and_then(|s| s.parse::<f64>().ok())
@@ -236,7 +237,7 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
                 .map(|tick| tick as f64),
         ),
     ];
-    // The same six counters the profile totals normalize, in the same order, so
+    // The same counters the profile totals normalize, in the same order, so
     // a per-case row can never drift from the profile-level counter list.
     let counts: [fn(&PerSeed) -> u64; COUNTER_NAMES.len()] = [
         |row| row.mesh_hops,
@@ -245,6 +246,7 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
         |row| row.plasticity_updates,
         |row| row.actions_applied,
         |row| row.births,
+        |row| row.pass_cap_hits,
     ];
     for (name, count) in COUNTER_NAMES.iter().zip(counts) {
         readings.push((
@@ -515,8 +517,11 @@ fn compare_inputs(
     let mut any_severe = false;
 
     for &name in &COUNTER_NAMES {
-        let current_value = per_creature_tick_value(&current.per_creature_tick, name)
-            .expect("a freshly built report always populates every per_creature_tick counter");
+        let current_value = match per_creature_tick_value(&current.per_creature_tick, name) {
+            Some(value) => value,
+            None if ADDITIVE_COUNTER_NAMES.contains(&name) => 0.0,
+            None => panic!("a freshly built report always populates the {name} counter"),
+        };
         let reference_value = per_creature_tick_value(&reference.per_creature_tick, name);
 
         let (level, reference_str, delta_str) = match reference_value {

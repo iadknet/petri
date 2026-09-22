@@ -166,6 +166,36 @@ fn run_tick_counts_only_dispatches_that_ran_out_of_energy() {
     );
 }
 
+/// A pass that reaches `max_mesh_hops` is counted once per creature-tick in
+/// `pass_cap_hits_total` (T19.F02); a chain that ends before the cap adds nothing.
+#[test]
+fn run_tick_counts_passes_that_reach_the_hop_cap() {
+    let mut genome = vm_program_genome(vec![VmInstruction::Halt]);
+    genome.nodes.push(NodeGenome {
+        node_id: NodeId::new(1),
+        ..genome.nodes[0].clone()
+    });
+    genome.nodes[0].targets = vec![crate::contracts::RouteTarget {
+        target_id: NodeId::new(1),
+        slot: 0,
+        gate_bias: 0.0,
+    }];
+    let (mut sim, _id) = make_sim_with_custom_genome(100.0, genome);
+    sim.config.runtime.max_mesh_hops = 1;
+
+    run_tick(&mut sim, &mut None);
+    assert_eq!(sim.stats.pass_cap_hits_total, 1);
+    assert_eq!(sim.stats.mesh_hops_total, 1);
+
+    sim.config.runtime.max_mesh_hops = 2;
+    run_tick(&mut sim, &mut None);
+    assert_eq!(
+        sim.stats.pass_cap_hits_total, 1,
+        "a chain that ends at its last target adds no cap hit"
+    );
+    assert_eq!(sim.stats.mesh_hops_total, 3);
+}
+
 fn cognition_totals(stats: &crate::simulation::stats::SimStats) -> [u64; 7] {
     [
         stats.plasticity_updates_total,

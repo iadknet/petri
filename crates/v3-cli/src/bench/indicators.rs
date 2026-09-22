@@ -6,12 +6,13 @@ use super::schema::{
     cohort_ladder, undefined_drift_depth, undefined_evolved_neighborhood,
     undefined_generation_distribution, undefined_lineage_diversity, undefined_memory_sensitivity,
     undefined_mutational_neighborhood, undefined_recruitment_paths,
-    undefined_temporal_memory_sensitivity, CohortLineageRow, DriftDepth, DriftDepthCheckpoint,
-    EvolvedNeighborhoodHalf, FounderRow, GenerationDistribution, GoalCaseObservation,
-    GoalIndicators, Indicator, LineageDiversity, LineageDiversitySeed, LineageOpportunityRow,
-    MemorySensitivity, MemorySensitivitySeed, MeshExecution, ModuleRecruitment,
-    MutationOpportunities, MutationalNeighborhood, NeighborhoodBattery, NeighborhoodBirthBucket,
-    NeighborhoodBirths, NeighborhoodCompanions, NeighborhoodEvolvedSeed, NeighborhoodFounderHalf,
+    undefined_temporal_memory_sensitivity, CohortLineageRow, CycleClasses, DriftDepth,
+    DriftDepthCheckpoint, EvolvedNeighborhoodHalf, FounderRow, GenerationDistribution,
+    GoalCaseObservation, GoalIndicators, Indicator, LineageDiversity, LineageDiversitySeed,
+    LineageOpportunityRow, MemorySensitivity, MemorySensitivitySeed, MeshExecution,
+    ModuleRecruitment, MutationOpportunities, MutationalNeighborhood, NeighborhoodBattery,
+    NeighborhoodBirthBucket, NeighborhoodBirthCyclePartition, NeighborhoodBirths,
+    NeighborhoodCompanions, NeighborhoodEvolvedSeed, NeighborhoodFounderHalf,
     NeighborhoodOperatorRow, NeighborhoodRead, NeighborhoodReadGenome,
     NeighborhoodRequestedBirthBucket, NeighborhoodSampledGenome, NeighborhoodTally,
     OperatorOpportunityRow, PopulationPersistence, PopulationPersistenceSeed, RetentionRow,
@@ -211,6 +212,24 @@ fn drift_checkpoint(
         hop_cap_hits: mesh.hop_cap_hits,
         battery_executions,
         hop_cap_fraction: fraction_or_undefined(mesh.hop_cap_hits, battery_executions),
+        pass_cap_hits: mesh.pass_cap_hits,
+        cycle_classes: Some(CycleClasses {
+            cycle_carrying_lineages: mesh.cycle_carrying_lineages,
+            cycle_carrying_fraction: fraction_or_undefined(
+                u64::from(mesh.cycle_carrying_lineages),
+                denominator,
+            ),
+            revisiting_lineages: mesh.revisiting_lineages,
+            revisiting_fraction: fraction_or_undefined(
+                u64::from(mesh.revisiting_lineages),
+                denominator,
+            ),
+            productive_cycle_lineages: mesh.productive_cycle_lineages,
+            productive_cycle_fraction: fraction_or_undefined(
+                u64::from(mesh.productive_cycle_lineages),
+                denominator,
+            ),
+        }),
         silent_per_all_births: fraction_or_undefined(
             u64::from(row.births.any_events.silent),
             u64::from(row.births.births_total),
@@ -330,6 +349,10 @@ pub(super) fn mesh_execution_and_steering(
         route_varies_with_input: reading.route_varies_with_input,
         route_destination_varies: reading.route_destination_varies,
         hop_cap_hits: reading.hop_cap_hits as u64,
+        pass_cap_hits: reading.pass_cap_hits as u64,
+        cycle_carrying: reading.cycle_carrying,
+        revisiting: reading.revisiting,
+        productive_cycle: reading.productive_cycle,
     };
     let steering = Steering {
         version: steering::STEERING_VERSION.to_string(),
@@ -527,6 +550,10 @@ fn to_neighborhood_births(result: &BirthResult) -> NeighborhoodBirths {
                 tally: to_neighborhood_tally(tally),
             })
             .collect(),
+        by_cycle_carrying: Some(NeighborhoodBirthCyclePartition {
+            cycle_carrying: to_neighborhood_tally(&result.cycle_carrying),
+            acyclic: to_neighborhood_tally(&result.acyclic),
+        }),
     }
 }
 

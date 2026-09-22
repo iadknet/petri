@@ -132,8 +132,11 @@ fn visit(
     side
 }
 
+/// Every successful visit adds its activity (T19.F02); decay runs once per
+/// world tick in `begin_tick`, so three visits of 3.0 on a decayed base of
+/// 1.0 leave 10.0, and a fourth visit of -2.0 leaves 8.0.
 #[test]
-fn repeated_visits_replace_activity_from_decayed_base() {
+fn repeated_visits_add_activity_on_the_decayed_base() {
     let def = graph(HebbianRule::Classic, 1.0, 0.5);
     let mut state = GraphRuntimeState::new();
     let runtime = RuntimeConfig::default();
@@ -142,16 +145,16 @@ fn repeated_visits_replace_activity_from_decayed_base() {
     assert_eq!(state.eligibility_traces[0][0][0], 2.0);
     begin(&mut state, &def);
     assert_eq!(state.eligibility_traces[0][0][0], 1.0);
-    for _ in 0..3 {
+    for expected in [4.0, 7.0, 10.0] {
         visit(&def, &mut state, 3.0, &mut 100.0, &runtime);
-        assert_eq!(state.eligibility_traces[0][0][0], 4.0);
+        assert_eq!(state.eligibility_traces[0][0][0], expected);
     }
     visit(&def, &mut state, -2.0, &mut 100.0, &runtime);
-    assert_eq!(state.eligibility_traces[0][0][0], -1.0);
+    assert_eq!(state.eligibility_traces[0][0][0], 8.0);
 }
 
 #[test]
-fn recurrent_activity_uses_frozen_self_and_higher_but_current_lower_sources() {
+fn recurrent_activity_uses_committed_self_and_higher_but_current_lower_sources() {
     let mut def = graph(HebbianRule::Classic, 1.0, 0.0);
     def.compute_nodes[0].inputs = vec![
         GraphEdge {
@@ -412,8 +415,13 @@ proptest! {
         prop_assert!((state.eligibility_traces[0][0][0] - expected).abs() < 2e-6);
     }
 
+    /// Disconnected computation adds no credit, and every visit adds its
+    /// activity (T19.F02): `visits` visits of the same module in one tick
+    /// leave `visits` times the single-visit activity on top of the decayed
+    /// base, because a `Constant` input and a fixed `Add` output make each
+    /// visit's activity identical.
     #[test]
-    fn identical_visit_count_and_disconnected_computation_do_not_change_credit(
+    fn disconnected_computation_does_not_change_credit_and_each_visit_adds(
         input in -2.0f32..2.0, lambda in 0.0f32..=1.0, visits in 1usize..8, extras in 0usize..8,
     ) {
         let def = graph(HebbianRule::Classic, 0.5, lambda);
@@ -421,12 +429,15 @@ proptest! {
         bigger.compute_nodes.extend((0..extras).map(|_| ComputeNode { kind: ComputeNodeKind::Oscillator(0.25), inputs: vec![], plasticity: None }));
         let mut once = GraphRuntimeState::new(); let mut repeated = GraphRuntimeState::new();
         let runtime = RuntimeConfig::default();
-        let other_runtime = RuntimeConfig { max_graph_relax_iters: 1, graph_convergence_stable_passes: 99, ..runtime.clone() };
+        let trace = |state: &GraphRuntimeState| state.eligibility_traces.first().and_then(|m| m.first()).and_then(|e| e.first()).copied().unwrap_or(0.0);
         for _ in 0..3 {
             begin(&mut once, &def); begin(&mut repeated, &bigger);
-            visit(&def, &mut once, input, &mut 100.0, &runtime);
-            for _ in 0..visits { visit(&bigger, &mut repeated, input, &mut 100.0, &other_runtime); }
-            prop_assert_eq!(once.eligibility_traces[0][0][0], repeated.eligibility_traces[0][0][0]);
+            let activity = { let base = trace(&once); visit(&def, &mut once, input, &mut 100.0, &runtime); trace(&once) - base };
+            let base = trace(&repeated);
+            for _ in 0..visits { visit(&bigger, &mut repeated, input, &mut 100.0, &runtime); }
+            let expected = base + activity * visits as f32;
+            prop_assert!((repeated.eligibility_traces[0][0][0] - expected).abs() <= 1e-5 * (1.0 + expected.abs()),
+                "{} vs {}", repeated.eligibility_traces[0][0][0], expected);
         }
     }
 

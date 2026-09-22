@@ -3,7 +3,11 @@
 use super::{Battery, Signature};
 use crate::config::RuntimeConfig;
 use crate::contracts::NodeId;
-use crate::creature::genome::{analysis::mesh_reachable_nodes, BackendDef, CreatureGenome};
+use crate::contracts::WorldAction;
+use crate::creature::genome::{
+    analysis::{mesh_cycle_nodes, mesh_reachable_nodes},
+    BackendDef, CreatureGenome,
+};
 use crate::runtime::mesh::{MeshObservation, ObservedMeshExecution};
 use crate::runtime::routing::{resolve_gated_route, RouteGateMap};
 use crate::runtime::trace::domain::TerminationReason;
@@ -26,7 +30,18 @@ pub struct MeshExecutionReading {
     /// (T13.F07): position variation between targets naming the same node
     /// does not count.
     pub route_destination_varies: bool,
+    /// Executions that ended `MaxHopsReached`.
     pub hop_cap_hits: usize,
+    /// Passes that reached the per-pass hop cap, summed over the battery
+    /// (T19.F02). Equals `hop_cap_hits` while a tick is one pass.
+    pub pass_cap_hits: usize,
+    /// The reachable mesh contains a cycle, self-targets included (T19.F02).
+    pub cycle_carrying: bool,
+    /// Some battery execution dispatched a node more than once (T19.F02).
+    pub revisiting: bool,
+    /// Some execution dispatched a node that lies on a cycle and returned an
+    /// action list other than `[NoOp]` (T19.F02).
+    pub productive_cycle: bool,
 }
 
 /// A [`MeshExecutionReading`] with the node ids behind two of its counts.
@@ -133,6 +148,10 @@ pub fn ancestral_payload_replacement(
 struct BatteryObservation {
     executed: BTreeSet<NodeId>,
     hop_cap_hits: usize,
+    pass_cap_hits: usize,
+    cycle_carrying: bool,
+    revisiting: bool,
+    productive_cycle: bool,
     routes: Vec<Routes>,
     destinations: Vec<Routes<NodeId>>,
     baseline: Signature,
@@ -164,16 +183,28 @@ impl Battery {
             .iter()
             .map(|(_, observation)| snapshot_routes(observation))
             .unzip();
+        let cycle_nodes = mesh_cycle_nodes(genome);
         let mut executed = BTreeSet::new();
         let mut hop_cap_hits = 0;
-        for (_, observation) in snapshots.iter().chain(sequences.iter().flatten()) {
-            executed.extend(observation.hops.iter().map(|(id, _)| *id));
+        let mut pass_cap_hits = 0;
+        let mut revisiting = false;
+        let mut productive_cycle = false;
+        for (output, observation) in snapshots.iter().chain(sequences.iter().flatten()) {
             if matches!(
                 observation.termination_reason,
                 TerminationReason::MaxHopsReached
             ) {
                 hop_cap_hits += 1;
             }
+            pass_cap_hits += output.work_counters.pass_cap_hits as usize;
+            let dispatched: BTreeSet<NodeId> = observation.hops.iter().map(|(id, _)| *id).collect();
+            revisiting |= dispatched.len() < observation.hops.len();
+            productive_cycle |= !dispatched.is_disjoint(&cycle_nodes)
+                && output
+                    .actions
+                    .iter()
+                    .any(|action| *action != WorldAction::NoOp);
+            executed.extend(dispatched);
         }
         let baseline = Signature {
             snapshots: snapshots
@@ -193,6 +224,10 @@ impl Battery {
         BatteryObservation {
             executed,
             hop_cap_hits,
+            pass_cap_hits,
+            cycle_carrying: !cycle_nodes.is_empty(),
+            revisiting,
+            productive_cycle,
             routes,
             destinations,
             baseline,
@@ -249,6 +284,10 @@ impl Battery {
         let BatteryObservation {
             executed,
             hop_cap_hits,
+            pass_cap_hits,
+            cycle_carrying,
+            revisiting,
+            productive_cycle,
             routes,
             destinations,
             baseline,
@@ -287,6 +326,10 @@ impl Battery {
                 route_varies_with_input: route_varies_with_input(&routes),
                 route_destination_varies: route_varies_with_input(&destinations),
                 hop_cap_hits,
+                pass_cap_hits,
+                cycle_carrying,
+                revisiting,
+                productive_cycle,
             },
             executed,
             contributing,
@@ -541,6 +584,68 @@ mod tests {
         }
     }
 
+    /// The T19.F02 cycle classes: `cycle_carrying` is static (a reachable
+    /// node can route back to itself), `productive_cycle` needs a dispatched
+    /// cycle node in an execution that returned something other than `NoOp`,
+    /// and `pass_cap_hits` sums the capped passes over the battery.
+    #[test]
+    fn cycle_classes_read_static_cycles_and_productive_executions() {
+        let battery = Battery::generate(2);
+        let config = RuntimeConfig {
+            max_mesh_hops: 2,
+            ..RuntimeConfig::default()
+        };
+        let chain = genome(vec![node(0, &[1], false), node(1, &[], true)]);
+        let r = battery.mesh_execution(&chain, &config, 0.0);
+        assert!(!r.cycle_carrying);
+        assert!(!r.revisiting);
+        assert!(!r.productive_cycle);
+        assert_eq!(r.pass_cap_hits, 0);
+
+        let unreached_cycle = genome(vec![
+            node(0, &[1], false),
+            node(1, &[], true),
+            node(2, &[2], true),
+        ]);
+        assert!(
+            !battery
+                .mesh_execution(&unreached_cycle, &config, 0.0)
+                .cycle_carrying
+        );
+
+        let productive = genome(vec![node(0, &[1], false), node(1, &[0], true)]);
+        let r = battery.mesh_execution(&productive, &config, 0.0);
+        assert!(r.cycle_carrying);
+        assert!(
+            !r.revisiting,
+            "the terminal node ends the pass before any revisit"
+        );
+        assert!(r.productive_cycle);
+        assert_eq!(r.pass_cap_hits, 0);
+
+        // A self-looping push node revisits and is productive: the capped
+        // pass keeps its queue.
+        let looping_push = genome(vec![node(0, &[0], true)]);
+        let mut looping_push_halts = looping_push.clone();
+        if let BackendDef::Vm(def) = &mut looping_push_halts.nodes[0].backend_def {
+            def.program[1] = VmInstruction::Halt;
+        }
+        let r = battery.mesh_execution(&looping_push_halts, &config, 0.0);
+        assert!(r.cycle_carrying && r.revisiting && r.productive_cycle);
+        assert_eq!(r.pass_cap_hits, 80);
+
+        let capped = genome(vec![
+            node(0, &[1], false),
+            node(1, &[2], false),
+            node(2, &[], false),
+        ]);
+        let r = battery.mesh_execution(&capped, &config, 0.0);
+        assert!(!r.cycle_carrying);
+        assert!(!r.productive_cycle);
+        assert_eq!(r.pass_cap_hits, r.hop_cap_hits);
+        assert_eq!(r.pass_cap_hits, 80);
+    }
+
     #[test]
     fn missing_nodes_and_cap_termination_are_not_inferred_from_visits() {
         assert_eq!(reading(&genome(vec![])).executed_node_count, 0);
@@ -553,10 +658,16 @@ mod tests {
             max_mesh_hops: 2,
             ..RuntimeConfig::default()
         };
+        // A Halt-only self-loop runs to the cap in every execution (T19.F02):
+        // one executed node, revisited, never productive.
         let looping = genome(vec![node(0, &[0], false)]);
         let r = battery.mesh_execution(&looping, &config, 0.0);
         assert_eq!(r.executed_node_count, 1);
-        assert_eq!(r.hop_cap_hits, 0);
+        assert_eq!(r.hop_cap_hits, 80);
+        assert_eq!(r.pass_cap_hits, 80);
+        assert!(r.cycle_carrying);
+        assert!(r.revisiting);
+        assert!(!r.productive_cycle);
         let chain = genome(vec![
             node(0, &[1], false),
             node(1, &[2], false),

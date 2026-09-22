@@ -183,11 +183,8 @@ Request (conceptual v3alpha2 shape):
     }
   },
   "runtime": {
-    "max_mesh_hops": 1024,
+    "max_mesh_hops": 64,
     "max_vm_steps": 10000,
-    "max_graph_relax_iters": 15,
-    "graph_convergence_epsilon": 0.001,
-    "graph_convergence_stable_passes": 2,
     "graph_node_base_cost": 0.00001,
     "vm": {
       "opcode_cost_multiplier": 0.000001
@@ -503,11 +500,8 @@ Response:
       }
     },
     "runtime": {
-      "max_mesh_hops": 1024,
+      "max_mesh_hops": 64,
       "max_vm_steps": 10000,
-      "max_graph_relax_iters": 15,
-      "graph_convergence_epsilon": 0.001,
-      "graph_convergence_stable_passes": 2,
       "graph_node_base_cost": 0.00001,
       "vm": {
         "opcode_cost_multiplier": 0.000001

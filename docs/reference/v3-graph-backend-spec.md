@@ -25,8 +25,8 @@ edge between duplicated nodes following the copies, the split exclusion for a
 live `DynamicIntrospection(EnergyCurrent)` reference read directly by a
 non-compute surface on a plasticity-carrying graph, the only key whose value
 differs between the evaluation and effects contexts), which is what keeps a copied edge on the
-evaluation phase Section 8's ordered pass gives it. T11.F06 owns its
-one-world-tick persistent-state clock.
+evaluation phase Section 8's ordered pass gives it. T11.F06 established the
+committed-state clock and T19.F02 made it per visit.
 
 ---
 
@@ -37,7 +37,7 @@ The graph backend uses a three-layer CGP (Cartesian Genetic Programming) model:
 1. **Implicit inputs** — sensor data and shared memory reads are addressable
    sources (`GraphSource`), not physical nodes.
 2. **Compute nodes** — mutable computation layer with free topology mutations.
-   Supports recurrence through frozen world-tick outputs.
+   Supports recurrence through the last committed outputs.
 3. **Fixed structural outputs** — value sinks, action bank, and execute gate.
    Structurally immutable (always present); only edges TO them are evolvable.
 
@@ -266,32 +266,35 @@ evolvable only through edge mutations on the execute gate.
 
 ---
 
-## 8. Evaluation Order and World-Tick Clock
+## 8. Evaluation Order and Per-Visit Clock
 
-Phase 0 calls `graph_runtime.begin_tick(&genome.nodes)`, also used by neighborhood
-sequences, standalone multi-tick callers, and cloned observations. It snapshots
-committed operator state and outputs and decays initialized eligibility. Mesh entry and
-module visits do not advance this clock. A visit is entered when the graph has
-at least one compute node or a wired effect surface (an output sink, action-slot
-gate or param list, or execute gate carrying at least one edge). An entered
-visit evaluates all compute nodes once in index order, including disconnected
-nodes; with zero compute nodes that evaluation is empty and the effects pass
-still runs.
+Phase 0 calls `graph_runtime.begin_tick(&genome.nodes, age)`, also used by
+neighborhood sequences, standalone multi-tick callers, and cloned
+observations. It records the dispatch record's age and decays initialized
+eligibility once; it snapshots nothing (T19.F02). Internal time is counted in
+visits and world time in ticks: a module's state advances once per visit,
+however many visits a tick's pass makes, and the per-pass hop cap and the
+per-tick hop ramp bound and price those visits. A visit is entered when the
+graph has at least one compute node or a wired effect surface (an output
+sink, action-slot gate or param list, or execute gate carrying at least one
+edge). An entered visit evaluates all compute nodes once in index order,
+including disconnected nodes; with zero compute nodes that evaluation is
+empty and the effects pass still runs.
 
 - Lower-index compute sources read the current visit's computed outputs.
-- Self and higher-index sources read frozen tick-start outputs.
-- Stateful operators start from frozen tick-start operator state.
-- A successful visit commits candidate state and outputs. Production mesh
-  dispatch visits each node at most once per tick. Direct backend harness
-  re-entry still recomputes from the frozen base; its last successful call
-  supplies next tick's state. Effects and learning remain per backend call.
+- Self and higher-index sources read the last committed outputs: the last
+  successful visit's, this tick or earlier.
+- Stateful operators start from the last committed operator state.
+- A successful visit commits candidate state and outputs, which the next
+  visit reads whether it comes later this tick or in a later tick. A failed
+  visit leaves the last commit standing. Effects and learning remain per
+  backend call.
 - Unvisited modules hold values without catch-up, fabricated inputs, or charge.
 - Newborn temporal state is zero. Graphs with no compute node and no wired
   effect surface do no work: no charge, no counter, upstream slots pass through.
 
-The former relaxation and convergence config fields remain accepted and
-validated but are ignored by evaluation and allocation; see
-`v3-runtime-config-spec.md`. There is no convergence loop.
+There is no convergence loop and no relaxation configuration; the former
+fields are deleted (`v3-runtime-config-spec.md`).
 
 ---
 
@@ -363,8 +366,9 @@ behavior directly.
 
 Each `RouterGate(slot)` sink writes its weighted sum to one of eight gate
 slots. The mesh chooses the earliest maximum `gate_bias + gate_score` among
-unvisited destination IDs, with the shared soft-float policy. A visited top
-choice falls through; missing winners terminate softly. T11.F15 route addition
+all destination IDs, with the shared soft-float policy; every existing target
+is eligible, the node itself and nodes already dispatched this tick included
+(T19.F02). A missing winner terminates softly. T11.F15 route addition
 pairs a tied branch through a pass-through detour with one weight-1 gate edge
 sampled by `random_graph_source`, including full input sub-value support.
 
@@ -373,16 +377,17 @@ sampled by `random_graph_source`, including full input sub-value support.
 ## 11. Stateful Operators and `graph_state`
 
 `GraphRuntimeState` stores committed `node_state` and `node_outputs`, indexed
-by `[mesh_node_idx][compute_node_idx]`, and frozen tick-start copies of both.
-Missing slots read zero and storage is initialized lazily. Offspring receives
-fresh empty temporal vectors, regardless of learned-weight inheritance.
+by `[mesh_node_idx][compute_node_idx]`; they are the live read base of every
+visit and there is no tick-start copy (T19.F02). Missing slots read zero and
+storage is initialized lazily. Offspring receives fresh empty temporal
+vectors, regardless of learned-weight inheritance.
 
 Trace `passes` contains one entered evaluation, including an unaffordable
 attempt. `node_evaluations` describe candidate computation; `temporal_committed`
 marks whether that candidate was applied. `final_outputs` always reports the
 last successful committed outputs. Legacy `converged` and
 `stable_passes_count` are always false and zero. `max_delta` compares the
-candidate outputs with the frozen tick-start outputs, not a convergence test.
+candidate outputs with the last committed outputs, not a convergence test.
 
 ---
 
@@ -462,31 +467,32 @@ per compute node, one `f32` per input edge.
 ### Eligibility trace clock and activity (Phases 0 and 1)
 
 At world-tick start, every initialized reward-modulated edge decays once,
-including modules never visited this tick. The decayed base is frozen:
+including modules never visited this tick, and is never rolled back:
 
 ```text
-base_t = clamp(trace_decay, 0, 1) * trace_(t-1)
-trace_t = base_t + activity(pre, post, weight)
+trace <- clamp(trace_decay, 0, 1) * trace          (once per world tick)
+trace <- trace + activity(pre, post, weight)        (per successful visit)
 ```
 
-Each successful visit replaces its activity contribution from that base;
-repeated visits do not add decay or duplicate credit. A skipped tick leaves
-only the base. Lambda 0 forgets prior credit; lambda 1 retains it. An isolated
-pulse is discounted by lambda^d after d skipped ticks. Clock bookkeeping
-never initializes unvisited weights/traces or adds energy/work charges.
+Each successful visit adds its activity (T19.F02); a module dispatched twice
+in one tick adds twice, bounded by the per-pass hop cap. A skipped tick
+leaves only the decay. A module first initialized this tick starts from
+zero. Lambda 0 forgets prior credit; lambda 1 retains it. An isolated pulse
+is discounted by lambda^d after d skipped ticks. Clock bookkeeping never
+initializes unvisited weights/traces or adds energy/work charges.
 
 Activity excludes learning rate: Classic `pre*post`, Oja
 `post*(pre-weight*post)`, AntiHebb `-pre*post`, Covariance
 `(pre-0.5)*(post-0.5)`. It uses the unweighted source actually evaluated,
 the node's resulting output and effective evaluation weight. Lower-index
-sources use current-visit outputs; self/higher sources use frozen tick-start
+sources use current-visit outputs; self/higher sources use the last committed
 outputs. Input context includes evaluation-time energy, before later pure
 Hebbian costs. Pure Hebbian updates retain their existing semantics.
 
 Commit activity only after evaluation and plasticity costs are affordable,
-before graph effects. A failed first visit leaves only the decayed base;
-a failed revisit preserves the last successful contribution. Elapsed-time
-decay is never rolled back. Existing charges and work counters still apply.
+before graph effects. A failed visit leaves the trace untouched, whatever
+earlier visits added this tick. Elapsed-time decay is never rolled back.
+Existing charges and work counters still apply.
 
 ### Reward-modulated weight update (Phase 2.5)
 
@@ -576,7 +582,7 @@ Two-layer validation: mutation-time (bound values at creation) and runtime
 | Edge with NaN/Inf weight | `sanitize_f32()` to 0.0 |
 | Sink with empty `inputs` | Inert — does not write |
 | `Emit(NoOp)` that fires | Enqueues `WorldAction::NoOp` (real action with costs) |
-| Direct backend re-entry in one tick | Recompute from frozen tick-start state; production mesh disallows redispatch |
+| Re-entry in one tick (a revisit) | Starts from the previous visit's commit and commits again; bounded by the per-pass hop cap |
 | Missing graph state | Lazily initialized to zeros |
 
 Cross-runtime fallback outcomes are canonical in
