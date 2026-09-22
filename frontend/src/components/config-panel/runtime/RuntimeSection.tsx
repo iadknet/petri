@@ -7,8 +7,9 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		min: 1,
 		max: 1024,
 		step: 1,
-		defaultValue: 1024,
-		tooltip: "Maximum signal propagation hops through the genome mesh per tick",
+		defaultValue: 64,
+		tooltip:
+			"Per-pass hop cap: a pass dispatches at most this many mesh nodes, cycles included; reaching it ends the pass with its queue kept",
 	},
 	{
 		path: "runtime.max_vm_steps",
@@ -18,36 +19,6 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		step: 1,
 		defaultValue: 10000,
 		tooltip: "Maximum VM instructions executed per creature per tick",
-	},
-	{
-		path: "runtime.max_graph_relax_iters",
-		label: "Graph Relax Iters (inactive)",
-		min: 1,
-		max: 100,
-		step: 1,
-		defaultValue: 15,
-		tooltip:
-			"Retained configuration field; graphs now evaluate once per visit on the world-tick clock",
-	},
-	{
-		path: "runtime.graph_convergence_epsilon",
-		label: "Convergence Epsilon (inactive)",
-		min: 0.0001,
-		max: 1,
-		step: 0.0001,
-		defaultValue: 0.001,
-		tooltip:
-			"Retained configuration field; graphs now evaluate once per visit on the world-tick clock",
-	},
-	{
-		path: "runtime.graph_convergence_stable_passes",
-		label: "Stable Passes (inactive)",
-		min: 1,
-		max: 10,
-		step: 1,
-		defaultValue: 2,
-		tooltip:
-			"Retained configuration field; graphs now evaluate once per visit on the world-tick clock",
 	},
 	{
 		path: "runtime.graph_node_base_cost",

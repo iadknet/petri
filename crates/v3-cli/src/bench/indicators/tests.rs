@@ -320,6 +320,10 @@ fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
             knockout_nodes: 3,
             route_varying_lineages: 1,
             hop_cap_hits: 8,
+            pass_cap_hits: 8,
+            cycle_carrying_lineages: 3,
+            revisiting_lineages: 2,
+            productive_cycle_lineages: 1,
         },
         births: BirthResult {
             births_total: 20,
@@ -365,6 +369,21 @@ fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
     assert_eq!(report.route_varying_fraction, "0.250000");
     assert_eq!(report.battery_executions, 320);
     assert_eq!(report.hop_cap_fraction, "0.025000");
+    assert_eq!(report.pass_cap_hits, 8);
+    let cycles = report
+        .cycle_classes
+        .clone()
+        .expect("measured cycle classes");
+    assert_eq!(cycles.cycle_carrying_fraction, "0.750000");
+    assert_eq!(cycles.revisiting_fraction, "0.500000");
+    assert_eq!(cycles.productive_cycle_fraction, "0.250000");
+    let mut historical = serde_json::to_value(&report).unwrap();
+    let object = historical.as_object_mut().unwrap();
+    object.remove("pass_cap_hits");
+    object.remove("cycle_classes");
+    let historical: DriftDepthCheckpoint = serde_json::from_value(historical).unwrap();
+    assert_eq!(historical.pass_cap_hits, 0);
+    assert_eq!(historical.cycle_classes, None);
     assert_eq!(report.silent_per_all_births, "0.250000");
     assert_eq!(report.changed_per_all_births, "0.150000");
     assert_eq!(report.dead_per_all_births, "0.100000");

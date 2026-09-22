@@ -279,59 +279,36 @@ fn bid_program() -> Vec<VmInstruction> {
 }
 
 #[test]
-fn a_priority_bid_is_capped_at_the_effective_energy() {
-    // Allowance 0, ramp 1.0: the first two steps owe 1.08 + 2.20 before the bid,
-    // so a bid of 100 can only take what is left of energy 10.
+fn a_priority_bid_is_recorded_beside_the_ramp_without_being_charged() {
+    // Allowance 0, ramp 1.0: the three steps owe 1.08 + 2.20 + 3.05; the bid
+    // is recorded for the mesh's single settlement (T19.F02) and charges the
+    // dispatch nothing, however large it is.
     let cfg = ramp_config(0, 1.0, 1.0, 1_000);
-    let (result, energy, side_outputs) = run_vm_with_config(
-        bid_program(),
-        1,
-        vec![100.0],
-        &[],
-        zeroed_upstream(),
-        10.0,
-        cfg,
-    );
-
-    assert!(result.energy_exhausted, "spending the remainder exhausts");
-    assert!(
-        energy.abs() < 1e-4,
-        "energy settled at {energy}, expected zero within the settlement's rounding",
-    );
-    assert!(
-        side_outputs.priority_bid <= 10.0 - 3.28,
-        "bid {} reached energy the dispatch already owed",
-        side_outputs.priority_bid,
-    );
+    for bid in [4.0, 100.0] {
+        let (result, energy, side_outputs) = run_vm_with_config(
+            bid_program(),
+            1,
+            vec![bid],
+            &[],
+            zeroed_upstream(),
+            10.0,
+            cfg.clone(),
+        );
+        assert!(!result.energy_exhausted);
+        assert!((side_outputs.priority_bid - bid).abs() < 1e-5);
+        assert_eq!(side_outputs.energy_observation.priority_bid, 0.0);
+        let expected = 10.0 - 6.0 - 0.33;
+        assert!(
+            (energy - expected).abs() < 1e-3,
+            "energy {energy}, expected {expected}",
+        );
+    }
 }
 
 #[test]
-fn a_bid_below_the_effective_energy_is_paid_in_full() {
-    let cfg = ramp_config(0, 1.0, 1.0, 1_000);
-    let (result, energy, side_outputs) = run_vm_with_config(
-        bid_program(),
-        1,
-        vec![4.0],
-        &[],
-        zeroed_upstream(),
-        100.0,
-        cfg,
-    );
-
-    assert!(!result.energy_exhausted);
-    assert!((side_outputs.priority_bid - 4.0).abs() < 1e-5);
-    // 3 steps at allowance 0 cost 1 + 2 + 3 in ramp plus 0.08 + 0.20 + 0.05.
-    let expected = 100.0 - 4.0 - 6.0 - 0.33;
-    assert!(
-        (energy - expected).abs() < 1e-3,
-        "energy {energy}, expected {expected}",
-    );
-}
-
-#[test]
-fn the_traced_bid_step_reports_the_bid_inside_its_energy_cost() {
+fn the_traced_bid_step_reports_only_its_opcode_and_ramp_cost() {
     // Allowance 0, ramp 1.0: LoadConst pays 0.08 + 1, the bid step pays
-    // 0.20 + 2 plus the 4.0 it bids, and Halt pays 0.05 + 3.
+    // 0.20 + 2 (the bid itself is settled by the mesh), and Halt pays 0.05 + 3.
     let cfg = ramp_config(0, 1.0, 1.0, 1_000);
     let costs: Vec<f32> = traced_steps(bid_program(), vec![4.0], 100.0, &cfg)
         .iter()
@@ -339,7 +316,7 @@ fn the_traced_bid_step_reports_the_bid_inside_its_energy_cost() {
         .collect();
 
     assert_eq!(costs.len(), 3);
-    for (index, expected) in [1.08f32, 6.20, 3.05].iter().enumerate() {
+    for (index, expected) in [1.08f32, 2.20, 3.05].iter().enumerate() {
         assert!(
             (costs[index] - expected).abs() < 1e-4,
             "step {index} charged {}, expected {expected}",

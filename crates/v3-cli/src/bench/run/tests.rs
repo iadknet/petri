@@ -614,7 +614,7 @@ proptest! {
     #[test]
     fn profile_totals_are_the_field_wise_sum_of_every_case_row(
         rows in proptest::collection::vec(
-            (0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000),
+            (0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000),
             0..6usize,
         )
     ) {
@@ -632,6 +632,7 @@ proptest! {
                 plasticity_updates: row.5,
                 actions_applied: row.6,
                 births: row.7,
+                pass_cap_hits: row.8,
                 final_population: 0,
                 extinction_tick: None,
             })
@@ -645,6 +646,7 @@ proptest! {
         prop_assert_eq!(totals.plasticity_updates, rows.iter().map(|r| r.5).sum::<u64>());
         prop_assert_eq!(totals.actions_applied, rows.iter().map(|r| r.6).sum::<u64>());
         prop_assert_eq!(totals.births, rows.iter().map(|r| r.7).sum::<u64>());
+        prop_assert_eq!(totals.pass_cap_hits, rows.iter().map(|r| r.8).sum::<u64>());
     }
 }
 

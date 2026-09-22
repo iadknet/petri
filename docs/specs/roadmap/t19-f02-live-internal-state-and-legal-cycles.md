@@ -1,7 +1,7 @@
 # T19.F02 — Live Internal State and Legal Cycles
 
 **Status**: In Progress
-**Last updated**: 2026-09-21
+**Last updated**: 2026-09-22
 **Feature**: T19.F02
 **Track**: [T19 — Mesh Action Selection and Live State](../../roadmaps/t19-mesh-action-selection-and-live-state.md)
 
@@ -67,8 +67,11 @@ steps per sensorimotor step and the count is part of the controller (7.2).
    increments the new `WorkCounters.pass_cap_hits`, reported beside the other
    counters in gate and goal `counters` and as `pass_cap_hits` in the T11.F14
    block beside `hop_cap_hits` (the termination count, which it equals until
-   T19.F04 makes passes plural); the key is additive and a stored report
-   without it reads as zero. The seven tracked `world-recipe-*.json` and the
+   T19.F04 makes passes plural). It is the seventh bench `COUNTER_NAMES`
+   entry: an older summary on the current side reads zero, a reference
+   without it compares `new` (never a literal zero, which the zero-reference
+   rule would call severe), and from T19.F03 on it sits under the standing
+   counter thresholds. The seven tracked `world-recipe-*.json` and the
    `RuntimeSection.tsx` row default set `64`; the goal recipes carry no
    runtime block and take the default.
    Calibration against T19.F01's constants: 64 is 2.9 times the survey's
@@ -97,10 +100,12 @@ steps per sensorimotor step and the count is part of the controller (7.2).
    cost; it no longer debits or exhausts. The bid is settled exactly once, in
    the shared loop, on every exit that is not `EnergyExhausted`: `paid =
    min(bid, energy)`; if `bid >= energy` the creature goes all-in, energy is
-   `0.0`, the evaluation ends `EnergyExhausted` with `NoOp` and
-   `DeathCause::PriorityBid`; otherwise `energy -= paid` and `MeshOutput.priority_bid = paid`.
-   The `priority_bid` flow and death cause keep their keys. A creature that
-   exhausts on compute pays no bid.
+   `0.0`, the evaluation ends `EnergyExhausted` with `NoOp`,
+   `DeathCause::PriorityBid`, and `priority_bid` 0.0; otherwise `energy -= paid`
+   and `MeshOutput.priority_bid = paid`. A zero bid never settles. The
+   `priority_bid` flow and death cause keep their keys; the settled bid is
+   outside every dispatch, so `ComputeCostReport.vm_cost` no longer contains
+   bids. A creature that exhausts on compute pays no bid.
 6. **Exhaustion matrix.** What a failed visit leaves, per substrate; the mesh
    spec's Section 5 states it:
 
@@ -139,9 +144,10 @@ steps per sensorimotor step and the count is part of the controller (7.2).
     from the entry contains a cycle, self-targets included), `revisiting` (some
     battery execution dispatched a node more than once), and
     `productive_cycle` (some execution dispatched a node that lies on a cycle
-    and returned a non-`NoOp` action list). The births probe partitions
-    classified births by `cycle_carrying` offspring with their changed, silent,
-    and dead counts. The memory-sensitivity probe perturbs the committed
+    of the reachable mesh and returned at least one action other than
+    `NoOp`). The births probe partitions classified births under
+    `by_cycle_carrying` into `cycle_carrying` and `acyclic` offspring, each
+    with changed, silent, and dead counts, their merge equal to `any_events`. The memory-sensitivity probe perturbs the committed
     `node_outputs` and `node_state`; `memory-sensitivity-v1` keeps its
     definition and its series re-bases knowingly.
 11. **Docs.** Rewritten, not merely re-tested:
@@ -157,49 +163,51 @@ steps per sensorimotor step and the count is part of the controller (7.2).
 
 ## Implementation Tasks
 
-- [ ] Instrument first, on the unflipped executor: `pass_cap_hits`, the
+- [x] Instrument first, on the unflipped executor: `pass_cap_hits`, the
       three cycle classes, and the births-probe partition (invariants 2, 10);
       run the drift walk (the goal profile's `drift_depth` instrument, through
       an existing entry point or a throwaway harness as T19.F01's readings
       did) on the three goal worlds and store the before reading in
       `docs/progress/readings/t19-f02.md`.
-- [ ] `cargo test -p v3-core --test viability` first (tick-loop mechanics
+- [x] `cargo test -p v3-core --test viability` first (tick-loop mechanics
       change), then TDD on the tests below.
 
 | Tests | Change |
 | --- | --- |
 | The five `runtime/f15_tests.rs` tests and `f15_self_loop_dispatches_once` (`runtime/mesh.rs`) | Replaced by cycle fixtures. W11: a Halt-only self-loop runs 64 hops, `NoOp`, ramp 0.0528 at the defaults, `pass_cap_hits` 1. W12: a self-looping non-terminal push node (`PushAction`, `Halt`) fills the queue to `max_actions_per_turn` and keeps it at the cap. W14: a two-target cycle with a gate on a memory counter exits after the counted visits and keeps its actions |
 | `repeated_and_skipped_visits_use_frozen_base_and_last_success`, `stateful_module_and_blank_neighbor_each_step_once_per_world_tick`, `temporal_probe_detects_each_substrate_and_preserves_live_state`, `birth_applied_reproduction_keeps_parent_and_resets_all_newborn_credit`, the mode-parity assertions on `tick_start_*` in `runtime/mesh.rs` | Inverted to per-visit advance and committed state |
-| T11.F05 fixtures D1 to D3, E1 to E3 (`tests/temporal_fixtures.rs`) | Doc comments and the T11.F05 table rewritten to the per-visit clock; their values stand because each visits once per tick; revisit companions added: an integrator visited twice per tick steps twice, a trace visited twice adds twice |
+| T11.F05 fixtures D1 to D3, E1 to E3 (`tests/temporal_fixtures.rs`) | The fixture module's doc comments rewritten to the per-visit clock (the closed T11.F05 spec and its table stay as history; this spec is the record); their values stand because each visits once per tick; revisit companions added: an integrator visited twice per tick steps twice, a trace visited twice adds twice |
 | Priority bid (`runtime/mesh.rs`, `vm.rs`) | Single charge, all-in, unpaid on compute exhaustion, last-write-wins across a revisit |
 | Mutation (`mutation/topology`) | A self-target is drawn by each operator; RNG draw count unchanged |
-- [ ] Executor and state: invariants 1 to 6 in `mesh.rs`, `routing.rs`
+- [x] Executor and state: invariants 1 to 6 in `mesh.rs`, `routing.rs`
       (resolver call site), `cgp/execute.rs`, `state.rs`, `traces.rs`,
       `vm.rs`; three-mode parity (production, observed, traced) kept.
-- [ ] Mutation operators (invariant 7) with tests that a self-target is drawn.
-- [ ] Config deletion (invariant 8) across crates, recipes, frontend, and
+- [x] Mutation operators (invariant 7) with tests that a self-target is drawn.
+- [x] Config deletion (invariant 8) across crates, recipes, frontend, and
       the recipe-digest pins.
-- [ ] Memory-sensitivity probe on committed state (invariant 10).
-- [ ] Reference docs and frontend types (invariants 8 and 11).
+- [x] Memory-sensitivity probe on committed state (invariant 10).
+- [x] Reference docs and frontend types (invariants 8 and 11).
 
 ## Verification
 
-- [ ] Viability: `cargo test -p v3-core --test viability` -> result.
-- [ ] Focused tests: the table above plus the config tests -> commands and
+- [x] Viability: `cargo test -p v3-core --test viability` -> 28 passed,
+      before and after the flip.
+- [x] Focused tests: the table above plus the config tests -> commands and
       counts in [`docs/progress/readings/t19-f02.md`](../../progress/readings/t19-f02.md).
-- [ ] No snapshot survives: `grep -rn 'tick_start' crates frontend/src`
-      returns nothing (no other use exists today); `grep -rn 'graph_convergence\|max_graph_relax_iters'`
-      over `crates`, `frontend/src`, `world-recipe-*.json`, and
-      `docs/reference` returns nothing.
-- [ ] Founder pin: `founder_only_trajectory_digest_is_pinned` unchanged on
+- [x] No snapshot survives: `grep -rn 'tick_start' crates frontend/src`
+      and `grep -rn 'graph_convergence\|max_graph_relax_iters'` over
+      `crates`, `frontend/src`, `world-recipe-*.json`, and `docs/reference`
+      both return nothing.
+- [x] Founder pin: `founder_only_trajectory_digest_is_pinned` unchanged on
       `63498f8d36346079f8827c382e2978510357b374ca37759af857afa263f2d0be`.
-- [ ] Recipe digest pins moved and `cargo test -p v3-cli` green.
+- [x] Recipe digest pins moved (`d9a4dc8c…`, `d1aff3f5…`, `b24c1225…`) and
+      `cargo test -p v3-cli` green.
 - [ ] Whole-repo gate: `make check` exit 0 on the tested commit.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed here.
 - [ ] Before and after loop-productivity readings (invariant 10) in the
-      readings file: the drift walk on the unflipped executor against the
-      closure goal report's `drift_depth` rows and evolved half.
+      readings file: the drift walk on the unflipped executor (stored)
+      against the closure goal report's `drift_depth` rows and evolved half.
 - [ ] Benchmark summaries stored at
       `docs/progress/features/t19-f02-live-internal-state-and-legal-cycles.json`
       and `-goal.json`, local raw hash/byte count and verification time

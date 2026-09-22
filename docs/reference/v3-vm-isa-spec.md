@@ -96,7 +96,7 @@ The VM defines **42 opcodes**.
 | 29 | `ReadActionQueueLength` | dst | `dst = queue.len() as f32` |
 | 30 | `ReadActionQueueType` | index_src, dst | `dst = queue[reg[index_src]].action_type()` (OOB yields `0.0`) |
 | 31 | `ReadActionQueueParam` | index_src, param_slot, dst | `dst = queue[reg[index_src]].param(param_slot)` (OOB yields `0.0`) |
-| 32 | `SetPriorityBid` | src | read `regs[src]`, clamp non-negative, deduct bid from energy, set creature's turn-order priority bid (last-write-wins) |
+| 32 | `SetPriorityBid` | src | read `regs[src]`, clamp non-negative, record it as the creature's turn-order priority bid (last-write-wins); the mesh settles the bid once at evaluation end (Section 9) |
 | 33 | `ExecuteActionQueue` | none | terminal: return accumulated action queue for execution |
 
 ### Halt and Shared Memory Slots
@@ -136,16 +136,16 @@ These were replaced by unified `ReadInput` + `InputReference` dataflow and
   allowance also pay a charge that rises linearly with the step index, so a
   dispatch that runs to `max_vm_steps` costs a lethal share of a creature's
   energy while ordinary programs and short bounded loops stay nearly free. The
-  ramp index resets at every node dispatch; the mesh hop cap, the single-visit
-  rule, and the per-tick hop ramp (`v3-mesh-execution-spec.md` Section 5) bound
-  the chain. Formula and constants: Section 6.
+  ramp index resets at every node dispatch; the per-pass hop cap and the
+  per-tick hop ramp (`v3-mesh-execution-spec.md` Sections 2 and 5) bound the
+  chain, revisits included. Formula and constants: Section 6.
 - A dispatch accumulates its opcode and ramp charges locally and subtracts the
   sum from the creature's energy exactly once, on whichever exit path ends it.
   Mid-dispatch, the creature's effective energy is its energy minus that
   accumulator: `ReadInput` of `EnergyCurrent` resolves to the effective energy,
-  `EnergyConsumedThisTick` includes the accumulator, `SetPriorityBid` caps the
-  bid at the effective energy, and exhaustion triggers when the effective energy
-  reaches zero or below.
+  `EnergyConsumedThisTick` includes the accumulator, and exhaustion triggers
+  when the effective energy reaches zero or below. `SetPriorityBid` records
+  its bid without charging it (Section 9).
 - `ExecuteActionQueue` is terminal: halts VM and returns accumulated actions.
 - `Halt` halts VM without returning actions (mesh uses action queue state).
 - VM runtime enforces a configurable step cap `max_vm_steps` per node
@@ -209,8 +209,9 @@ Invalid `ref_idx` is a soft default and yields `0.0`.
 `WriteRouteGate(slot, src_reg)` sets one of eight per-slot gate scores.
 - Scores reset to zero at every node dispatch; invalid slots are ignored.
 - Multiple writes to the same slot use last-write-wins and sanitize values.
-- Mesh routing selects the maximum bias-plus-score among unvisited targets,
-  retaining the earliest target on ties; see `v3-mesh-execution-spec.md`.
+- Mesh routing selects the maximum bias-plus-score among all targets, the
+  node itself included, retaining the earliest target on ties; see
+  `v3-mesh-execution-spec.md`.
 - T11.F15 route addition inserts this write before the first terminal using
   the existing structural reference repair and a uniformly sampled register.
 
@@ -318,7 +319,8 @@ defaults (`step_ramp_allowance` 100, `step_ramp_cost` 1e-6) 200 steps cost about
 
 The dispatch accumulates these charges and settles the sum against the
 creature's energy once (Section 3), so charges below the ulp of an `f32` energy
-are not lost. `SetPriorityBid` adds its bid to the same step's spend.
+are not lost. `SetPriorityBid` adds nothing beyond its opcode and ramp
+charge; the bid is settled by the mesh (Section 9).
 
 Canonical owner for `runtime.vm.opcode_cost_multiplier`,
 `runtime.vm.step_ramp_allowance`, and `runtime.vm.step_ramp_cost`:
@@ -420,15 +422,20 @@ per VM evaluation, with a configurable cap (`max_actions_per_turn`).
 Phase 2 (action resolution). Higher bidders act first, gaining priority access to
 contested resources like food.
 
-Semantics:
-- Reads `regs[src]`, clamps to non-negative (`max(0.0, value)`).
-- Caps the bid at the dispatch's effective energy (Section 3) and deducts it
-  from creature energy (on top of the 0.20 opcode cost and the step's ramp
-  charge).
-- If the bid is capped, or the effective energy drops to zero or below after
-  deduction, the creature is exhausted (`NodeResult::exhausted()`).
-- Sets the creature's priority bid for this tick. Last-write-wins if called
-  multiple times (consistent with `WriteRouteTarget`).
+Semantics (T19.F02):
+- Reads `regs[src]`, clamps to non-negative (`max(0.0, value)`; a non-finite
+  read is `0.0`) and records it as the creature's bid for this evaluation.
+  The opcode pays only its 0.20 opcode cost and the step's ramp charge.
+- Last-write-wins if called multiple times, across nodes and across revisits
+  of the same node within the tick.
+- The mesh settles the recorded bid exactly once, after the chain, on every
+  exit that is not already `EnergyExhausted`: `paid = min(bid, energy)`. If
+  `bid >= energy` the creature goes all-in: energy is `0.0`, the evaluation
+  ends `EnergyExhausted` with `NoOp` and `DeathCause::PriorityBid`;
+  otherwise `energy -= paid` and the paid amount is the turn-order bid. A
+  creature that exhausts on compute or the hop ramp pays no bid; a zero bid
+  pays nothing and never exhausts. The `priority_bid` energy flow and death
+  cause keep their keys.
 
 Turn ordering:
 - After cognition (Phase 1), decisions are stable-sorted by bid descending.
@@ -436,7 +443,7 @@ Turn ordering:
   with equal bids (including the default 0.0).
 - Creatures that never call `SetPriorityBid` have bid 0.0 (no cost, no priority).
 
-There is no cap on bid amount beyond the energy the creature actually has left:
-creatures can bid up to their effective energy, what remains after the charges
-the dispatch already owes. Natural selection handles the economics: overbidding
-wastes energy and leads to extinction.
+There is no cap on bid amount beyond the energy the creature actually has left
+when the chain ends: a bid at or above that energy is an all-in. Natural
+selection handles the economics: overbidding wastes energy and leads to
+extinction.

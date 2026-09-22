@@ -13,7 +13,7 @@ pub use mesh::execute_creature_mesh;
 pub use types::{sanitize_f32, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 
 #[cfg(test)]
-mod f15_tests;
+mod cycle_tests;
 
 #[cfg(test)]
 mod cognition_tests;

@@ -71,11 +71,9 @@ impl DispatchRecord {
 pub struct GraphRuntimeState {
     /// Per-node stateful operator state. Indexed as `[mesh_node_idx][internal_node_idx]`.
     pub node_state: Vec<Vec<f32>>,
-    /// Last successful compute outputs, held when a module is unvisited.
+    /// Last committed compute outputs (the last successful visit, this tick
+    /// or earlier), held when a module is unvisited.
     pub node_outputs: Vec<Vec<f32>>,
-    /// Frozen temporal read bases for the current world tick.
-    pub(crate) tick_start_state: Vec<Vec<f32>>,
-    pub(crate) tick_start_outputs: Vec<Vec<f32>>,
     /// Per-edge learned plasticity weights. Indexed as
     /// `[mesh_node_idx][internal_node_idx][edge_idx]`.
     /// Empty inner vec = use genome weights. Lazily initialized on first plasticity evaluation.
@@ -86,10 +84,9 @@ pub struct GraphRuntimeState {
     /// `plasticity_weights`.
     /// Lazily initialized on first reward-modulated evaluation.
     /// Uses `Box<[f32]>` since edge count per node is fixed after init.
-    /// Always reset (not inherited) on reproduction.
+    /// Always reset (not inherited) on reproduction. Decays once per world
+    /// tick; every successful visit adds its activity (T19.F02).
     pub eligibility_traces: Vec<Vec<Box<[f32]>>>,
-    /// Decayed credit frozen at the world boundary; visits replace activity from this base.
-    pub(crate) tick_start_eligibility_traces: Vec<Vec<Box<[f32]>>>,
     /// Scratch: prev_outputs buffer reused across graph evaluations.
     pub(crate) scratch_prev: Vec<f32>,
     /// Scratch: curr_outputs buffer reused across graph evaluations.
@@ -106,18 +103,15 @@ pub struct GraphRuntimeState {
 
 impl GraphRuntimeState {
     /// Begin one world tick before any mesh visits, using the creature genome
-    /// nodes and the creature's current age.
-    /// Unvisited graph outputs hold; initialized eligibility decays with elapsed time.
+    /// nodes and the creature's current age: the dispatch record's age and
+    /// the once-per-world-tick eligibility decay. No internal state is
+    /// snapshotted; visits read and commit the live state (T19.F02).
     pub fn begin_tick(&mut self, nodes: &[NodeGenome], age: u64) {
         self.dispatch_record.begin_tick(age);
-        self.tick_start_state.clone_from(&self.node_state);
-        self.tick_start_outputs.clone_from(&self.node_outputs);
         crate::runtime::plasticity::traces::decay_eligibility_traces(
             nodes,
             &mut self.eligibility_traces,
         );
-        self.tick_start_eligibility_traces
-            .clone_from(&self.eligibility_traces);
     }
 
     /// Create a new empty graph runtime state.
@@ -125,11 +119,8 @@ impl GraphRuntimeState {
         Self {
             node_state: Vec::new(),
             node_outputs: Vec::new(),
-            tick_start_state: Vec::new(),
-            tick_start_outputs: Vec::new(),
             plasticity_weights: Vec::new(),
             eligibility_traces: Vec::new(),
-            tick_start_eligibility_traces: Vec::new(),
             scratch_prev: Vec::new(),
             scratch_curr: Vec::new(),
             scratch_backup: Vec::new(),
@@ -449,11 +440,8 @@ mod tests {
         assert_eq!(state.prev_shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
         assert!(state.graph_runtime.node_state.is_empty());
         assert!(state.graph_runtime.node_outputs.is_empty());
-        assert!(state.graph_runtime.tick_start_state.is_empty());
-        assert!(state.graph_runtime.tick_start_outputs.is_empty());
         assert!(state.graph_runtime.plasticity_weights.is_empty());
         assert!(state.graph_runtime.eligibility_traces.is_empty());
-        assert!(state.graph_runtime.tick_start_eligibility_traces.is_empty());
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
         assert_eq!(state.phenotype_channels, [128, 64, 32, 10, 20, 30]);

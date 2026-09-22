@@ -61,6 +61,14 @@ pub struct MeshTotals {
     pub knockout_nodes: u64,
     pub route_varying_lineages: u32,
     pub hop_cap_hits: u64,
+    /// Capped passes summed over lineages (T19.F02).
+    pub pass_cap_hits: u64,
+    /// Lineages whose reachable mesh contains a cycle (T19.F02).
+    pub cycle_carrying_lineages: u32,
+    /// Lineages that dispatched some node more than once in one execution (T19.F02).
+    pub revisiting_lineages: u32,
+    /// Lineages with a dispatched cycle node in a non-`NoOp` execution (T19.F02).
+    pub productive_cycle_lineages: u32,
 }
 impl MeshTotals {
     fn record(&mut self, reading: MeshExecutionReading) {
@@ -79,6 +87,10 @@ impl MeshTotals {
         self.knockout_nodes += reading.knockout_count as u64;
         self.route_varying_lineages += u32::from(reading.route_varies_with_input);
         self.hop_cap_hits += reading.hop_cap_hits as u64;
+        self.pass_cap_hits += reading.pass_cap_hits as u64;
+        self.cycle_carrying_lineages += u32::from(reading.cycle_carrying);
+        self.revisiting_lineages += u32::from(reading.revisiting);
+        self.productive_cycle_lineages += u32::from(reading.productive_cycle);
     }
 }
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -300,14 +312,14 @@ mod tests {
 
     proptest! {
         #[test]
-        fn mesh_pooling_sums_counts_and_preserves_bounds(rows in prop::collection::vec((0usize..20, 0usize..20, 0usize..20, 0usize..20, any::<bool>(), 0usize..81), 0..50)) {
-            let readings: Vec<_> = rows.into_iter().map(|(total, reach, exec, knockout, varies, cap)| {
+        fn mesh_pooling_sums_counts_and_preserves_bounds(rows in prop::collection::vec((0usize..20, 0usize..20, 0usize..20, 0usize..20, any::<bool>(), 0usize..81, any::<[bool; 3]>()), 0..50)) {
+            let readings: Vec<_> = rows.into_iter().map(|(total, reach, exec, knockout, varies, cap, cycles)| {
                 let reach = reach.min(total);
                 let exec = exec.min(reach);
                 MeshExecutionReading { backends: super::super::mesh_execution::MeshBackendCounts {
                     graph: super::super::mesh_execution::BackendNodeCounts {total: (total / 2) as u64, executed: (exec / 2) as u64, contributing: ((exec-knockout.min(exec))/2) as u64},
                     vm: super::super::mesh_execution::BackendNodeCounts {total: (total-total/2) as u64, executed: (exec-exec/2) as u64, contributing: ((exec-knockout.min(exec))-(exec-knockout.min(exec))/2) as u64},
-                }, total_node_count: total, reachable_node_count: reach, executed_node_count: exec, knockout_count: knockout.min(exec), route_varies_with_input: varies, route_destination_varies: varies, hop_cap_hits: cap }
+                }, total_node_count: total, reachable_node_count: reach, executed_node_count: exec, knockout_count: knockout.min(exec), route_varies_with_input: varies, route_destination_varies: varies, hop_cap_hits: cap, pass_cap_hits: cap, cycle_carrying: cycles[0], revisiting: cycles[1], productive_cycle: cycles[2] }
             }).collect();
             let mut pooled = MeshTotals::default();
             for &reading in &readings { pooled.record(reading); }
@@ -327,6 +339,11 @@ mod tests {
             prop_assert!(pooled.knockout_nodes <= pooled.executed_nodes && pooled.executed_nodes <= pooled.reachable_nodes && pooled.reachable_nodes <= pooled.total_nodes);
             prop_assert!(pooled.route_varying_lineages <= pooled.lineages);
             prop_assert!(pooled.hop_cap_hits <= u64::from(pooled.lineages) * 80);
+            prop_assert_eq!(pooled.pass_cap_hits, readings.iter().map(|r| r.pass_cap_hits as u64).sum::<u64>());
+            prop_assert_eq!(pooled.cycle_carrying_lineages as usize, readings.iter().filter(|r| r.cycle_carrying).count());
+            prop_assert_eq!(pooled.revisiting_lineages as usize, readings.iter().filter(|r| r.revisiting).count());
+            prop_assert_eq!(pooled.productive_cycle_lineages as usize, readings.iter().filter(|r| r.productive_cycle).count());
+            prop_assert!(pooled.cycle_carrying_lineages.max(pooled.revisiting_lineages).max(pooled.productive_cycle_lineages) <= pooled.lineages);
         }
     }
 

@@ -10,7 +10,7 @@ use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node;
-use crate::runtime::routing::resolve_gated_route_where;
+use crate::runtime::routing::resolve_gated_route;
 use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node;
@@ -34,17 +34,20 @@ fn hop_charge(k: u32, allowance: u32, cost: f32) -> f32 {
 /// containing the queued actions, a [`ComputeCostReport`], and the priority bid.
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
-/// `graph_runtime.begin_tick(&genome.nodes, age)`. Mesh execution does not
-/// advance the graph clock. Each mesh node dispatches at most once per tick.
+/// `graph_runtime.begin_tick(&genome.nodes, age)`, which decays eligibility
+/// once per world tick. A node may be dispatched any number of times within
+/// the tick on its live state (T19.F02); the per-pass cap `max_mesh_hops`
+/// bounds the dispatches and the per-tick hop ramp prices them.
 ///
 /// The function walks the genome's node chain starting at `entry_node_id`,
 /// dispatching each node to its VM or Graph backend, routing to subsequent
 /// nodes by resolving each internal node result's route-gate scores, and terminating
-/// when a terminal instruction is reached or a soft-default condition fires.
+/// when a terminal instruction is reached, the cap is hit, or a soft-default
+/// condition fires. The recorded priority bid is settled once at the end.
 ///
-/// All soft-default termination conditions return `vec![WorldAction::NoOp]`.
-/// Energy exhaustion discards the queue and returns `vec![WorldAction::NoOp]`.
-/// Halt without ExecuteActionQueue preserves the accumulated queue (forgiving).
+/// Soft-default and cap terminations keep the accumulated queue (or return
+/// `vec![WorldAction::NoOp]` when it is empty). Energy exhaustion, including
+/// an all-in bid, discards the queue and returns `vec![WorldAction::NoOp]`.
 ///
 /// # Arguments
 /// - `genome`: the creature's node graph
@@ -274,185 +277,178 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
     config: &RuntimeConfig,
     mut mode: M,
 ) -> M::Output {
-    let mut current_node_id = genome.entry_node_id;
     let mut upstream_slots = [0.0f32; OUTPUT_SLOT_COUNT];
     let mut hops: usize = 0;
     let max_hops = config.max_mesh_hops.max(1) as usize;
-    let mut visited = std::collections::HashSet::with_capacity(max_hops.min(genome.nodes.len()));
     let start_energy = *energy;
     let mut report = ComputeCostReport::default();
     let mut side_outputs = MeshSideOutputs::new(config.max_actions_per_turn);
 
-    // Soft default: entry_node_id missing from node set → return NoOp immediately.
-    if find_node_index(&genome.nodes, current_node_id).is_none() {
-        let output = MeshOutput {
-            actions: vec![WorldAction::NoOp],
-            cost_report: report,
-            priority_bid: side_outputs.priority_bid,
-            work_counters: side_outputs.work_counters,
-            energy_observation: side_outputs.energy_observation,
-            termination_reason: TerminationReason::MissingNode,
-        };
-        return mode.finish(output);
-    }
+    // Soft default: entry_node_id missing from node set → NoOp immediately.
+    let termination_reason = match find_node_index(&genome.nodes, genome.entry_node_id) {
+        None => TerminationReason::MissingNode,
+        Some(mut current_idx) => loop {
+            // Per-pass cap (T19.F02): a pass dispatches at most `max_hops`
+            // nodes; reaching the cap ends the evaluation with the queue kept.
+            if hops >= max_hops {
+                side_outputs.work_counters.pass_cap_hits += 1;
+                break TerminationReason::MaxHopsReached;
+            }
 
-    loop {
-        if hops >= max_hops {
-            let output = MeshOutput {
-                actions: side_outputs.action_queue.into_actions_or_noop(),
-                cost_report: report,
-                priority_bid: side_outputs.priority_bid,
-                work_counters: side_outputs.work_counters,
-                energy_observation: side_outputs.energy_observation,
-                termination_reason: TerminationReason::MaxHopsReached,
-            };
-            return mode.finish(output);
-        }
+            let node = &genome.nodes[current_idx];
 
-        // Invariant: verified present before the loop, and after every routing step.
-        let current_idx =
-            find_node_index(&genome.nodes, current_node_id).expect("node must exist in genome");
-        let node = &genome.nodes[current_idx];
-        visited.insert(node.node_id);
+            // One mesh hop is one node dispatch, counted regardless of outcome.
+            side_outputs.work_counters.mesh_hops += 1;
+            // Same event, recorded for the offspring's mutation targeting (T11.F17).
+            // Written from the shared loop, so every execution mode agrees.
+            graph_runtime.dispatch_record.record_dispatch(current_idx);
 
-        // One mesh hop is one node dispatch, counted regardless of outcome.
-        side_outputs.work_counters.mesh_hops += 1;
-        // Same event, recorded for the offspring's mutation targeting (T11.F17).
-        // Written from the shared loop, so every execution mode agrees.
-        graph_runtime.dispatch_record.record_dispatch(current_idx);
-
-        // Per-tick hop ramp (T19.F01): sustained neural activity costs
-        // metabolism. Charged before the dispatch, so an unaffordable hop is
-        // counted and recorded but never executed.
-        let ramp_charge = hop_charge(
-            side_outputs.work_counters.mesh_hops,
-            config.hop_ramp_allowance,
-            config.hop_ramp_cost,
-        );
-        if ramp_charge > 0.0 {
-            let before = *energy;
-            *energy -= ramp_charge;
-            side_outputs.energy_observation.mesh_ramp += applied_debit(before, *energy);
-            report.mesh_ramp_cost += (before - *energy).max(0.0);
-            observe_energy_change(
-                &mut side_outputs.energy_observation.pending_cause,
-                f64::from(before),
-                f64::from(*energy),
-                DeathCause::MeshRamp,
+            // Per-tick hop ramp (T19.F01): sustained neural activity costs
+            // metabolism. Charged before the dispatch, so an unaffordable hop is
+            // counted and recorded but never executed.
+            let ramp_charge = hop_charge(
+                side_outputs.work_counters.mesh_hops,
+                config.hop_ramp_allowance,
+                config.hop_ramp_cost,
             );
-            if *energy <= 0.0 {
-                let output = MeshOutput {
-                    actions: vec![WorldAction::NoOp],
-                    cost_report: report,
-                    priority_bid: side_outputs.priority_bid,
-                    work_counters: side_outputs.work_counters,
-                    energy_observation: side_outputs.energy_observation,
-                    termination_reason: TerminationReason::EnergyExhausted,
-                };
-                return mode.finish(output);
-            }
-        }
-
-        let energy_consumed = (start_energy - *energy).max(0.0);
-
-        // Snapshot energy before node dispatch to attribute cost to the correct backend.
-        let node_energy_before = *energy;
-        let (result, backend_trace) = mode.execute_node(
-            node,
-            current_idx,
-            &upstream_slots,
-            energy,
-            energy_consumed,
-            shared_memory,
-            prev_shared_memory,
-            graph_runtime,
-            sensors,
-            config,
-            &mut side_outputs,
-        );
-
-        // Attribute energy delta to the correct backend.
-        let node_cost = (node_energy_before - *energy).max(0.0);
-        match &node.backend_def {
-            BackendDef::Vm(_) => report.vm_cost += node_cost,
-            BackendDef::Graph(_) => report.graph_cost += node_cost,
-        }
-
-        let route_result = if M::RECORDS_HOPS || (!result.energy_exhausted && !result.terminal) {
-            resolve_gated_route_where(&node.targets, &result.route_gates, |id| {
-                !visited.contains(&id)
-            })
-        } else {
-            None
-        };
-
-        mode.record_hop(
-            hops,
-            node,
-            upstream_slots,
-            node_energy_before,
-            *energy,
-            &result,
-            route_result,
-            backend_trace,
-        );
-
-        // Check exhaustion first: NodeResult::exhausted() discards the action queue.
-        if result.energy_exhausted {
-            let output = MeshOutput {
-                actions: vec![WorldAction::NoOp],
-                cost_report: report,
-                priority_bid: side_outputs.priority_bid,
-                work_counters: side_outputs.work_counters,
-                energy_observation: side_outputs.energy_observation,
-                termination_reason: TerminationReason::EnergyExhausted,
-            };
-            return mode.finish(output);
-        }
-
-        if result.terminal {
-            let output = MeshOutput {
-                actions: side_outputs.action_queue.into_actions_or_noop(),
-                cost_report: report,
-                priority_bid: side_outputs.priority_bid,
-                work_counters: side_outputs.work_counters,
-                energy_observation: side_outputs.energy_observation,
-                termination_reason: TerminationReason::ActionEmitted,
-            };
-            return mode.finish(output);
-        }
-
-        // Routing via per-target gate scoring.
-        match route_result {
-            Some((_idx, id)) => {
-                if find_node_index(&genome.nodes, id).is_none() {
-                    let output = MeshOutput {
-                        actions: side_outputs.action_queue.into_actions_or_noop(),
-                        cost_report: report,
-                        priority_bid: side_outputs.priority_bid,
-                        work_counters: side_outputs.work_counters,
-                        energy_observation: side_outputs.energy_observation,
-                        termination_reason: TerminationReason::MissingNode,
-                    };
-                    return mode.finish(output);
+            if ramp_charge > 0.0 {
+                let before = *energy;
+                *energy -= ramp_charge;
+                side_outputs.energy_observation.mesh_ramp += applied_debit(before, *energy);
+                report.mesh_ramp_cost += (before - *energy).max(0.0);
+                observe_energy_change(
+                    &mut side_outputs.energy_observation.pending_cause,
+                    f64::from(before),
+                    f64::from(*energy),
+                    DeathCause::MeshRamp,
+                );
+                if *energy <= 0.0 {
+                    break TerminationReason::EnergyExhausted;
                 }
-                upstream_slots = result.output_slots;
-                current_node_id = id;
-                hops += 1;
             }
-            None => {
-                let output = MeshOutput {
-                    actions: side_outputs.action_queue.into_actions_or_noop(),
-                    cost_report: report,
-                    priority_bid: side_outputs.priority_bid,
-                    work_counters: side_outputs.work_counters,
-                    energy_observation: side_outputs.energy_observation,
-                    termination_reason: TerminationReason::NoTargets,
-                };
-                return mode.finish(output);
+
+            let energy_consumed = (start_energy - *energy).max(0.0);
+
+            // Snapshot energy before node dispatch to attribute cost to the correct backend.
+            let node_energy_before = *energy;
+            let (result, backend_trace) = mode.execute_node(
+                node,
+                current_idx,
+                &upstream_slots,
+                energy,
+                energy_consumed,
+                shared_memory,
+                prev_shared_memory,
+                graph_runtime,
+                sensors,
+                config,
+                &mut side_outputs,
+            );
+
+            // Attribute energy delta to the correct backend.
+            let node_cost = (node_energy_before - *energy).max(0.0);
+            match &node.backend_def {
+                BackendDef::Vm(_) => report.vm_cost += node_cost,
+                BackendDef::Graph(_) => report.graph_cost += node_cost,
             }
-        }
+
+            // Every existing target is eligible (T19.F02): a node may route to
+            // itself or to any node this tick already dispatched.
+            let route_result = if M::RECORDS_HOPS || (!result.energy_exhausted && !result.terminal)
+            {
+                resolve_gated_route(&node.targets, &result.route_gates)
+            } else {
+                None
+            };
+
+            mode.record_hop(
+                hops,
+                node,
+                upstream_slots,
+                node_energy_before,
+                *energy,
+                &result,
+                route_result,
+                backend_trace,
+            );
+
+            // Check exhaustion first: NodeResult::exhausted() discards the action queue.
+            if result.energy_exhausted {
+                break TerminationReason::EnergyExhausted;
+            }
+
+            if result.terminal {
+                break TerminationReason::ActionEmitted;
+            }
+
+            // Routing via per-target gate scoring.
+            match route_result.map(|(_, id)| find_node_index(&genome.nodes, id)) {
+                Some(Some(next_idx)) => {
+                    upstream_slots = result.output_slots;
+                    current_idx = next_idx;
+                    hops += 1;
+                }
+                Some(None) => break TerminationReason::MissingNode,
+                None => break TerminationReason::NoTargets,
+            }
+        },
+    };
+
+    // Single bid settlement (T19.F02): the recorded bid is paid once, on every
+    // exit that is not already an exhaustion; a bid the creature cannot cover
+    // is an all-in that ends the evaluation exhausted. A creature that
+    // exhausts on compute pays no bid.
+    let (termination_reason, priority_bid) =
+        if termination_reason == TerminationReason::EnergyExhausted {
+            (termination_reason, 0.0)
+        } else {
+            match settle_priority_bid(side_outputs.priority_bid, energy, &mut side_outputs) {
+                Some(paid) => (termination_reason, paid),
+                None => (TerminationReason::EnergyExhausted, 0.0),
+            }
+        };
+    // Exhaustion discards the queue; every other exit keeps it (a missing
+    // entry node has an empty queue, so it reads `NoOp` as before).
+    let actions = if termination_reason == TerminationReason::EnergyExhausted {
+        vec![WorldAction::NoOp]
+    } else {
+        side_outputs.action_queue.into_actions_or_noop()
+    };
+
+    let output = MeshOutput {
+        actions,
+        cost_report: report,
+        priority_bid,
+        work_counters: side_outputs.work_counters,
+        energy_observation: side_outputs.energy_observation,
+        termination_reason,
+    };
+    mode.finish(output)
+}
+
+/// Pay the recorded `bid` against `energy` exactly once: `paid = min(bid,
+/// energy)`. A bid at or above the creature's energy is an all-in that pins
+/// energy to `0.0` and returns `None`; otherwise the paid amount is returned.
+/// A zero bid pays nothing and never exhausts.
+fn settle_priority_bid(
+    bid: f32,
+    energy: &mut f32,
+    side_outputs: &mut MeshSideOutputs,
+) -> Option<f32> {
+    if bid <= 0.0 {
+        return Some(0.0);
     }
+    let before = *energy;
+    let all_in = bid >= before;
+    *energy = if all_in { 0.0 } else { before - bid };
+    side_outputs.energy_observation.priority_bid += applied_debit(before, *energy);
+    observe_energy_change(
+        &mut side_outputs.energy_observation.pending_cause,
+        f64::from(before),
+        f64::from(*energy),
+        DeathCause::PriorityBid,
+    );
+    (!all_in).then_some(bid)
 }
 
 /// Find the index of a node by its `NodeId` via linear scan.
@@ -511,6 +507,18 @@ mod tests {
                 ObservedMeshExecution::default(),
             )
         };
+        // A self-loop is legal (T19.F02): both capped dispatches applied
+        // the self route, and the cap is the real termination.
+        let (_, observed) = observe(&genome, 100.0);
+        assert_eq!(
+            observed.hops,
+            vec![(id, Some((0, id))), (id, Some((0, id)))]
+        );
+        assert!(matches!(
+            observed.termination_reason,
+            TerminationReason::MaxHopsReached
+        ));
+        genome.nodes[0] = vm_halt_with_route(id, 1.0, vec![]);
         let (_, observed) = observe(&genome, 100.0);
         assert_eq!(observed.hops, vec![(id, None)]);
         assert!(matches!(
@@ -737,14 +745,8 @@ mod tests {
                 assert_eq!(memory, observed_memory);
                 assert_eq!(state.node_state, observed_state.node_state);
                 assert_eq!(state.node_outputs, observed_state.node_outputs);
-                assert_eq!(state.tick_start_state, observed_state.tick_start_state);
-                assert_eq!(state.tick_start_outputs, observed_state.tick_start_outputs);
                 assert_eq!(state.plasticity_weights, observed_state.plasticity_weights);
                 assert_eq!(state.eligibility_traces, observed_state.eligibility_traces);
-                assert_eq!(
-                    state.tick_start_eligibility_traces,
-                    observed_state.tick_start_eligibility_traces
-                );
                 // T11.F17: the dispatch record is mode-independent, and a
                 // second tick at a later age refreshes the same entries.
                 let executed = state.dispatch_record.executed_indices(tick, 1);
@@ -772,14 +774,8 @@ mod tests {
                 assert_eq!(state.scratch_w_inputs, observed_state.scratch_w_inputs);
                 assert_eq!(state.node_state, traced_state.node_state);
                 assert_eq!(state.node_outputs, traced_state.node_outputs);
-                assert_eq!(state.tick_start_state, traced_state.tick_start_state);
-                assert_eq!(state.tick_start_outputs, traced_state.tick_start_outputs);
                 assert_eq!(state.plasticity_weights, traced_state.plasticity_weights);
                 assert_eq!(state.eligibility_traces, traced_state.eligibility_traces);
-                assert_eq!(
-                    state.tick_start_eligibility_traces,
-                    traced_state.tick_start_eligibility_traces
-                );
                 assert_eq!(state.scratch_prev, traced_state.scratch_prev);
                 assert_eq!(state.scratch_curr, traced_state.scratch_curr);
                 assert_eq!(state.scratch_backup, traced_state.scratch_backup);
@@ -877,49 +873,176 @@ mod tests {
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
 
-    // ── Test 2: max_hops_exceeded_returns_noop ────────────────────────────────
+    // ── Cycle fixtures (T19.F02) ─────────────────────────────────────────────
 
-    /// A VM node that halts (no action emitted) and routes to itself.
-    /// With max_mesh_hops=3, after 3 hops the executor must return NoOp.
+    fn run(genome: &CreatureGenome, config: &RuntimeConfig, energy: &mut f32) -> MeshOutput {
+        let mut memory = [0.0f32; 16];
+        run_with_memory(genome, config, energy, &mut memory)
+    }
+
+    fn run_with_memory(
+        genome: &CreatureGenome,
+        config: &RuntimeConfig,
+        energy: &mut f32,
+        memory: &mut [f32; 16],
+    ) -> MeshOutput {
+        execute_creature_mesh(
+            genome,
+            &empty_sensor_snapshot(),
+            energy,
+            memory,
+            &[0.0; 16],
+            &mut GraphRuntimeState::new(),
+            config,
+        )
+    }
+
+    /// W11: a Halt-only self-loop is legal and runs to the per-pass cap, 64
+    /// hops at the defaults, paying the T19.F01 ramp
+    /// (`1e-4 * 32 * 33 / 2 = 0.0528`) and counting one capped pass.
     #[test]
-    fn f15_self_loop_dispatches_once() {
+    fn w11_halt_only_self_loop_runs_to_the_pass_cap() {
         let id0 = NodeId::new(0);
-        // Node routes to itself (self-loop); Halt emits no action.
-        let node = NodeGenome {
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: wrap_targets(vec![id0]),
+            }],
+        };
+        let config = default_config();
+        assert_eq!(config.max_mesh_hops, 64);
+        let mut energy = 10.0f32;
+        let output = run(&genome, &config, &mut energy);
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
+        assert_eq!(output.termination_reason, TerminationReason::MaxHopsReached);
+        assert_eq!(output.work_counters.mesh_hops, 64);
+        assert_eq!(output.work_counters.pass_cap_hits, 1);
+        assert!(
+            (output.cost_report.mesh_ramp_cost - 0.0528).abs() < 1e-5,
+            "ramp {}",
+            output.cost_report.mesh_ramp_cost
+        );
+        assert!(energy > 0.0, "one capped pass is survivable");
+    }
+
+    /// W12: a self-looping non-terminal push node fills the queue to
+    /// `max_actions_per_turn` and the cap keeps it there; the capped pass
+    /// still returns the queue.
+    #[test]
+    fn w12_self_looping_push_node_fills_the_queue_and_keeps_it_at_the_cap() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::PushAction { action_type: 1 },
+                        VmInstruction::Halt,
+                    ],
+                }),
+                targets: wrap_targets(vec![id0]),
+            }],
+        };
+        let config = default_config();
+        let output = run(&genome, &config, &mut 10.0);
+        assert_eq!(output.termination_reason, TerminationReason::MaxHopsReached);
+        assert_eq!(output.work_counters.mesh_hops, 64);
+        assert_eq!(output.work_counters.pass_cap_hits, 1);
+        assert_eq!(output.actions.len(), config.max_actions_per_turn);
+        assert!(output
+            .actions
+            .iter()
+            .all(|action| matches!(action, WorldAction::Eat { .. })));
+    }
+
+    /// The W14 entry node: count visits in shared slot 0, push one action per
+    /// visit, and route back to itself while the count is below `limit`
+    /// (gate 1.0 on slot 0 against a constant 0.5 on the exit's slot 1).
+    fn counted_cycle_node(limit: f32, exit: NodeId) -> NodeGenome {
+        let id0 = NodeId::new(0);
+        NodeGenome {
             node_id: id0,
             input_refs: vec![],
             backend_def: BackendDef::Vm(VmBackendDef {
-                register_count: 1,
-                constants: vec![],
-                program: vec![VmInstruction::Halt],
+                register_count: 3,
+                constants: vec![1.0, limit, 0.5],
+                program: vec![
+                    VmInstruction::LoadSlotImm {
+                        dst: 0,
+                        slot_idx: 0,
+                    },
+                    VmInstruction::LoadConst {
+                        dst: 1,
+                        const_idx: 0,
+                    },
+                    VmInstruction::Add { dst: 0, a: 0, b: 1 },
+                    VmInstruction::StoreSlotImm {
+                        slot_idx: 0,
+                        src: 0,
+                    },
+                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::LoadConst {
+                        dst: 1,
+                        const_idx: 1,
+                    },
+                    VmInstruction::CmpLt { dst: 2, a: 0, b: 1 },
+                    VmInstruction::WriteRouteGate { slot: 0, src: 2 },
+                    VmInstruction::LoadConst {
+                        dst: 2,
+                        const_idx: 2,
+                    },
+                    VmInstruction::WriteRouteGate { slot: 1, src: 2 },
+                    VmInstruction::Halt,
+                ],
             }),
-            targets: wrap_targets(vec![id0]), // self-loop
-        };
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![node],
-        };
-        let ss = empty_sensor_snapshot();
-        let mut energy = 1000.0f32;
-        let mut shared_mem = [0.0f32; 16];
-        let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
-        let config = RuntimeConfig {
-            max_mesh_hops: 3,
-            ..RuntimeConfig::default()
-        };
+            targets: wrap_targets(vec![id0, exit]),
+        }
+    }
 
-        let output = execute_creature_mesh(
-            &genome,
-            &ss,
-            &mut energy,
-            &mut shared_mem,
-            &prev_shared_mem,
-            &mut gr,
-            &config,
+    /// W14: a two-target cycle gated on a memory counter exits after the
+    /// counted visits (three dispatches of the entry, then the terminal exit)
+    /// and keeps the actions every visit pushed.
+    #[test]
+    fn w14_counted_cycle_exits_on_its_gate_and_keeps_its_actions() {
+        let exit = NodeId::new(1);
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                counted_cycle_node(3.0, exit),
+                NodeGenome {
+                    node_id: exit,
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::ExecuteActionQueue],
+                    }),
+                    targets: vec![],
+                },
+            ],
+        };
+        let config = default_config();
+        let mut memory = [0.0f32; 16];
+        let output = run_with_memory(&genome, &config, &mut 10.0, &mut memory);
+        assert_eq!(output.termination_reason, TerminationReason::ActionEmitted);
+        assert_eq!(output.work_counters.mesh_hops, 4);
+        assert_eq!(output.work_counters.pass_cap_hits, 0);
+        assert_eq!(output.actions.len(), 3);
+        assert_eq!(
+            memory[0], 3.0,
+            "each visit read the previous visit's commit"
         );
-        assert_eq!(output.actions, vec![WorldAction::NoOp]);
-        assert_eq!(output.work_counters.mesh_hops, 1);
     }
 
     // ── Test 3: empty_targets_returns_noop ───────────────────────────────────
@@ -1206,6 +1329,166 @@ mod tests {
                 type_idx: crate::config::OrdinaryFoodTypeId::default()
             }]
         );
+        assert!(
+            (energy - 97.0).abs() < 1e-3,
+            "the bid is settled once, after the opcode costs: {energy}"
+        );
+        assert!((output.energy_observation.priority_bid - 3.0).abs() < 1e-3);
+    }
+
+    /// A VM node that bids `bid` (from constant 0) and then runs `tail`.
+    fn bidding_node(
+        node_id: NodeId,
+        bid: f32,
+        tail: Vec<VmInstruction>,
+        targets: Vec<NodeId>,
+    ) -> NodeGenome {
+        let mut program = vec![
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            },
+            VmInstruction::SetPriorityBid { src: 0 },
+        ];
+        program.extend(tail);
+        NodeGenome {
+            node_id,
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![bid],
+                program,
+            }),
+            targets: wrap_targets(targets),
+        }
+    }
+
+    /// A bid at or above the creature's energy is an all-in (T19.F02): energy
+    /// lands on exactly `0.0`, the evaluation ends `EnergyExhausted` with
+    /// `NoOp`, and the pending death cause is the bid.
+    #[test]
+    fn priority_bid_all_in_exhausts_at_settlement() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![bidding_node(
+                id0,
+                5.0,
+                vec![
+                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::ExecuteActionQueue,
+                ],
+                vec![],
+            )],
+        };
+        let mut energy = 2.0f32;
+        let output = run(&genome, &default_config(), &mut energy);
+        assert_eq!(energy, 0.0);
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
+        assert_eq!(
+            output.termination_reason,
+            TerminationReason::EnergyExhausted
+        );
+        assert_eq!(output.priority_bid, 0.0);
+        assert_eq!(
+            output.energy_observation.pending_cause,
+            Some(DeathCause::PriorityBid)
+        );
+        assert!((output.energy_observation.priority_bid - 2.0).abs() < 1e-5);
+    }
+
+    /// A creature that exhausts on compute pays no bid: the recorded bid is
+    /// dropped with the queue and energy is untouched by it.
+    #[test]
+    fn priority_bid_is_unpaid_when_compute_exhausts_the_creature() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![bidding_node(
+                id0,
+                0.5,
+                vec![VmInstruction::PushAction { action_type: 1 }; 10_000],
+                vec![],
+            )],
+        };
+        let config = RuntimeConfig {
+            vm: crate::config::VmRuntimeConfig {
+                opcode_cost_multiplier: 1.0,
+                ..RuntimeConfig::default().vm
+            },
+            ..default_config()
+        };
+        let mut energy = 1.0f32;
+        let output = run(&genome, &config, &mut energy);
+        assert_eq!(
+            output.termination_reason,
+            TerminationReason::EnergyExhausted
+        );
+        assert_eq!(output.priority_bid, 0.0);
+        assert_eq!(output.energy_observation.priority_bid, 0.0);
+        assert_eq!(
+            output.energy_observation.pending_cause,
+            Some(DeathCause::VmCompute)
+        );
+    }
+
+    /// Across a revisit the last write wins and the bid is settled once:
+    /// three visits bidding 1, 2, and 3 pay 3, not 6.
+    #[test]
+    fn priority_bid_last_write_wins_across_a_revisit_and_settles_once() {
+        let exit = NodeId::new(1);
+        let mut entry = counted_cycle_node(3.0, exit);
+        if let BackendDef::Vm(def) = &mut entry.backend_def {
+            // After the counter store, bid the visit count held in r0.
+            def.program
+                .insert(4, VmInstruction::SetPriorityBid { src: 0 });
+        }
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                entry,
+                NodeGenome {
+                    node_id: exit,
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::ExecuteActionQueue],
+                    }),
+                    targets: vec![],
+                },
+            ],
+        };
+        let mut energy = 10.0f32;
+        let output = run(&genome, &default_config(), &mut energy);
+        assert_eq!(output.termination_reason, TerminationReason::ActionEmitted);
+        assert_eq!(output.priority_bid, 3.0);
+        assert!((energy - 7.0).abs() < 1e-3, "energy {energy}");
+    }
+
+    /// Non-finite and negative reads record no bid.
+    #[test]
+    fn priority_bid_ignores_negative_and_non_finite_reads() {
+        for raw in [-1.0, f32::NAN, f32::NEG_INFINITY] {
+            let id0 = NodeId::new(0);
+            let genome = CreatureGenome {
+                entry_node_id: id0,
+                nodes: vec![bidding_node(
+                    id0,
+                    raw,
+                    vec![
+                        VmInstruction::PushAction { action_type: 1 },
+                        VmInstruction::ExecuteActionQueue,
+                    ],
+                    vec![],
+                )],
+            };
+            let mut energy = 10.0f32;
+            let output = run(&genome, &default_config(), &mut energy);
+            assert_eq!(output.priority_bid, 0.0);
+            assert_eq!(output.termination_reason, TerminationReason::ActionEmitted);
+            assert!((energy - 10.0).abs() < 1e-3);
+        }
     }
 
     #[test]
@@ -1442,6 +1725,21 @@ mod tests {
             &mut GraphRuntimeState::new(),
             config,
         )
+    }
+
+    #[test]
+    fn pass_cap_hits_counts_only_capped_passes() {
+        let config = RuntimeConfig {
+            max_mesh_hops: 2,
+            ..default_config()
+        };
+        let capped = run_chain(&halting_chain(3), &config, &mut 100.0);
+        assert_eq!(capped.termination_reason, TerminationReason::MaxHopsReached);
+        assert_eq!(capped.work_counters.pass_cap_hits, 1);
+        assert_eq!(capped.work_counters.mesh_hops, 2);
+        let uncapped = run_chain(&halting_chain(2), &config, &mut 100.0);
+        assert_eq!(uncapped.termination_reason, TerminationReason::NoTargets);
+        assert_eq!(uncapped.work_counters.pass_cap_hits, 0);
     }
 
     proptest::proptest! {

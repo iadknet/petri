@@ -847,7 +847,6 @@ mod tests {
         parent.energy = 10000.0;
         parent.graph_runtime.plasticity_weights = vec![vec![Box::new([0.9])]];
         parent.graph_runtime.eligibility_traces = vec![vec![Box::new([99.0])]];
-        parent.graph_runtime.tick_start_eligibility_traces = vec![vec![Box::new([88.0])]];
         parent.graph_runtime.node_state = vec![vec![7.0]];
         parent.graph_runtime.node_outputs = vec![vec![8.0]];
         parent.graph_runtime.dispatch_record.record_dispatch(0);
@@ -877,11 +876,8 @@ mod tests {
             .1;
         assert_eq!(child.graph_runtime.plasticity_weights[0][0][0], 0.9);
         assert!(child.graph_runtime.eligibility_traces.is_empty());
-        assert!(child.graph_runtime.tick_start_eligibility_traces.is_empty());
         assert!(child.graph_runtime.node_state.is_empty());
         assert!(child.graph_runtime.node_outputs.is_empty());
-        assert!(child.graph_runtime.tick_start_state.is_empty());
-        assert!(child.graph_runtime.tick_start_outputs.is_empty());
         assert!(child.graph_runtime.dispatch_record.is_empty());
         let BackendDef::Graph(def) = &child.genome.nodes[0].backend_def else {
             unreachable!()

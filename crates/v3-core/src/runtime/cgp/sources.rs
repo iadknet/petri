@@ -6,7 +6,7 @@ use crate::runtime::inputs::{resolve_input, ResolveCtx};
 ///
 /// For `ComputeNode` sources, uses index order: sources already
 /// evaluated this visit (`idx < current_idx`) read from `curr_outputs`;
-/// self/higher-index sources read frozen tick-start `prev_outputs`.
+/// self/higher-index sources read the last committed `prev_outputs`.
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_source(

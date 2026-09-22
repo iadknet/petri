@@ -378,8 +378,10 @@ fn nan_in_add_becomes_zero() {
 // ── SetPriorityBid overconsumption ──────────────────────────────────────
 
 #[test]
-fn priority_bid_capped_at_available_energy() {
-    // A bid of 500.0 with only 100.0 energy should never drive energy negative.
+fn an_oversized_bid_is_recorded_without_charging_the_dispatch() {
+    // A bid of 500.0 with only 100.0 energy is recorded as-is: the dispatch
+    // pays its opcode costs only and halts; the mesh's single settlement
+    // turns an unaffordable bid into the all-in (T19.F02), never the VM.
     // Uses opcode_cost_multiplier=1.0 for deterministic cost accounting.
     let def = VmBackendDef {
         register_count: 1,
@@ -400,53 +402,6 @@ fn priority_bid_capped_at_available_energy() {
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
-    let _r = execute_vm_node(
-        &def,
-        &[],
-        &zeroed_upstream(),
-        &mut e,
-        0.0,
-        &mut mem,
-        &prev_mem,
-        &ss,
-        &cfg,
-        &mut side_outputs,
-    );
-    // The bid is capped at the effective energy (T03.F10) and the dispatch pins
-    // energy to its own debt before settling, so the pair lands on exactly 0.0:
-    // death at `energy <= 0.0` stays bit-deterministic.
-    assert_eq!(
-        e, 0.0,
-        "a capped priority bid must land energy on exactly 0.0; got {e}",
-    );
-}
-
-#[test]
-fn oversized_bid_produces_exact_all_in_exhaustion() {
-    // When the requested bid (500.0) exceeds available energy, the bid is capped
-    // to the energy the dispatch has not already spent, producing an all-in:
-    // energy lands on zero within one ulp and the creature exhausts.
-    // Uses opcode_cost_multiplier=1.0 for deterministic cost accounting.
-    let starting_energy = 100.0_f32;
-    let def = VmBackendDef {
-        register_count: 1,
-        constants: vec![500.0],
-        program: vec![
-            VmInstruction::LoadConst {
-                dst: 0,
-                const_idx: 0,
-            },
-            VmInstruction::SetPriorityBid { src: 0 },
-            VmInstruction::Halt,
-        ],
-    };
-    let ss = empty_sensor_snapshot();
-    let mut e = starting_energy;
-    let mut mem = [0.0f32; 16];
-    let prev_mem = [0.0f32; 16];
-    let mut cfg = config();
-    cfg.vm.opcode_cost_multiplier = 1.0;
-    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -459,17 +414,12 @@ fn oversized_bid_produces_exact_all_in_exhaustion() {
         &cfg,
         &mut side_outputs,
     );
-    // Capped bid drains all remaining energy → exact zero, not negative. The
-    // T03.F10 dispatch pins energy to its own debt on this path, so the single
-    // settlement subtracts the debt from itself and lands on exactly 0.0.
-    assert_eq!(
-        e, 0.0,
-        "capped bid should drain energy to exactly 0.0; got {e}"
-    );
-    // All-in bid correctly triggers exhaustion.
+    assert!(!r.energy_exhausted);
+    assert_eq!(side_outputs.priority_bid, 500.0);
+    assert_eq!(side_outputs.energy_observation.priority_bid, 0.0);
     assert!(
-        r.energy_exhausted,
-        "creature should be exhausted after all-in capped bid",
+        (e - (100.0 - 0.08 - 0.20 - 0.05)).abs() < 1e-4,
+        "only the opcode costs were paid: {e}"
     );
 }
 

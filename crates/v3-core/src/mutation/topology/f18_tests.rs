@@ -409,7 +409,8 @@ fn both_backend_choices_keep_skips_atomic_and_branch_energy_boundary_real() {
         let base = conditional_fixture(false);
         let mut grown = base.clone();
         controlled_growth(&mut grown, TopologyOperator::AddRouteTarget, graph);
-        let cost = execute(&base, 1.0, 1000.0).0.cost_report.vm_cost;
+        // The fixture's 3.0 bid settles after the chain (T19.F02), outside `vm_cost`.
+        let cost = execute(&base, 1.0, 1000.0).0.cost_report.vm_cost + 3.0;
         let before = execute(&base, 1.0, cost + 0.025);
         let after = execute(&grown, 1.0, cost + 0.025);
         assert!(matches!(

@@ -213,7 +213,7 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
             ramp_allowance,
             ramp_cost,
         );
-        let mut step_energy_cost = charge as f32;
+        let step_energy_cost = charge as f32;
 
         trace_sink.before_instruction(pc, instr, &regs[..reg_count]);
 
@@ -455,44 +455,15 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
             }
 
             VmInstruction::SetPriorityBid { src } => {
-                // The bid is spent immediately (the mesh reads it this tick) and
-                // can never reach energy this dispatch already owes.
+                // Record only (T19.F02): the mesh settles the bid once at the
+                // end of the evaluation. Last write wins; a negative or
+                // non-finite read is no bid.
                 let raw = regs[nr(*src, reg_count)];
-                let bid = if raw > 0.0 {
-                    f64::from(raw).min(effective)
+                side_outputs.priority_bid = if raw.is_finite() && raw > 0.0 {
+                    raw
                 } else {
                     0.0
                 };
-                let paid = bid as f32;
-                let before = *energy;
-                *energy -= paid;
-                step_energy_cost += paid;
-                // A bid the cap bit into is an all-in: it leaves nothing behind
-                // the dispatch's debt, whichever way the `f32` store rounded.
-                // Pin energy to the debt so the single settlement below lands on
-                // exactly 0.0 and death at `energy <= 0.0` stays deterministic.
-                if bid >= effective || effective_energy!() <= 0.0 {
-                    // This is the existing all-in/effective exhaustion decision,
-                    // before the debt-backed store is pinned for final rounding.
-                    observe_energy_change(
-                        &mut side_outputs.energy_observation.pending_cause,
-                        effective,
-                        0.0,
-                        DeathCause::PriorityBid,
-                    );
-                    *energy = debt as f32;
-                    side_outputs.energy_observation.priority_bid += applied_debit(before, *energy);
-                    trace_sink.after_instruction(
-                        pc,
-                        instr,
-                        step_energy_cost,
-                        0.0,
-                        &regs[..reg_count],
-                    );
-                    break NodeResult::exhausted();
-                }
-                side_outputs.energy_observation.priority_bid += applied_debit(before, *energy);
-                side_outputs.priority_bid = paid;
             }
 
             VmInstruction::ExecuteActionQueue => {

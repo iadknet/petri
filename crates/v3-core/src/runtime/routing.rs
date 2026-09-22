@@ -35,32 +35,20 @@ const _: () = assert!(std::mem::size_of::<RouteGateMap>() == 32);
 ///
 /// effective(target) = gate_bias + runtime_gate[target.slot]
 /// Winner = argmax. Ties broken by position (first wins via strict `>`).
-/// Returns `(winning_index, winning_target_id)` or `None` if empty.
+/// Every existing target is eligible (T19.F02): a node may route to itself
+/// or to a node this tick already dispatched. Returns
+/// `(winning_index, winning_target_id)` or `None` if empty.
 #[inline]
 #[must_use]
 pub(crate) fn resolve_gated_route(
     targets: &[RouteTarget],
     gates: &RouteGateMap,
 ) -> Option<(usize, NodeId)> {
-    resolve_gated_route_where(targets, gates, |_| true)
-}
-
-/// Resolve among eligible destinations, preserving the original float and tie policy.
-#[inline]
-pub(crate) fn resolve_gated_route_where(
-    targets: &[RouteTarget],
-    gates: &RouteGateMap,
-    eligible: impl Fn(NodeId) -> bool,
-) -> Option<(usize, NodeId)> {
     let mut best = None;
     let mut best_score = f32::NEG_INFINITY;
-    for (index, target) in targets
-        .iter()
-        .enumerate()
-        .filter(|(_, target)| eligible(target.target_id))
-    {
+    for (index, target) in targets.iter().enumerate() {
         let effective = target.gate_bias + gates.score_for_slot(target.slot);
-        // Even all-NaN/-infinity candidates retain the earliest eligible entry.
+        // Even all-NaN/-infinity candidates retain the earliest entry.
         if best.is_none() {
             best = Some((index, target.target_id));
         }

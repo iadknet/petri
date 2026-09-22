@@ -375,14 +375,14 @@ pub fn observe_temporal_actions(sim: &Simulation) -> Vec<TemporalActionObservati
                     };
                     match substrate {
                         TemporalMemorySubstrate::PreviousSlots => perturb(&mut previous),
+                        // Committed state is the live read base (T19.F02).
                         TemporalMemorySubstrate::PersistedOutputs => graph
-                            .tick_start_outputs
+                            .node_outputs
                             .iter_mut()
                             .for_each(|slots| perturb(slots)),
-                        TemporalMemorySubstrate::OperatorState => graph
-                            .tick_start_state
-                            .iter_mut()
-                            .for_each(|slots| perturb(slots)),
+                        TemporalMemorySubstrate::OperatorState => {
+                            graph.node_state.iter_mut().for_each(|slots| perturb(slots))
+                        }
                     }
                     evaluate(&mut graph, &previous)
                 });
@@ -537,6 +537,7 @@ struct TickComputeStats {
     plasticity_changes: u64,
     shared_memory_writes_changed: u64,
     energy_exhausted_dispatches: u64,
+    pass_cap_hits: u64,
 }
 
 impl Default for TickComputeStats {
@@ -559,6 +560,7 @@ impl Default for TickComputeStats {
             plasticity_changes: 0,
             shared_memory_writes_changed: 0,
             energy_exhausted_dispatches: 0,
+            pass_cap_hits: 0,
         }
     }
 }
@@ -596,6 +598,7 @@ impl TickComputeStats {
         self.plasticity_updates += u64::from(work.plasticity_updates);
         self.plasticity_changes += u64::from(work.plasticity_changes);
         self.shared_memory_writes_changed += u64::from(work.shared_memory_writes_changed);
+        self.pass_cap_hits += u64::from(work.pass_cap_hits);
         if output.termination_reason == TerminationReason::EnergyExhausted {
             self.energy_exhausted_dispatches += 1;
         }
@@ -640,6 +643,7 @@ impl TickComputeStats {
         stats.shared_memory_writes_changed_total += self.shared_memory_writes_changed;
         stats.creature_ticks_total += u64::from(self.creature_count);
         stats.mesh_dispatches_energy_exhausted_total += self.energy_exhausted_dispatches;
+        stats.pass_cap_hits_total += self.pass_cap_hits;
         stats.actions_applied_total += u64::from(
             stats.last_tick_move
                 + stats.last_tick_eat
@@ -1344,7 +1348,6 @@ mod final_action_observation_tests {
         creature.graph_runtime.node_state = vec![vec![0.5]];
         creature.graph_runtime.plasticity_weights = vec![vec![Box::new([0.25])]];
         creature.graph_runtime.eligibility_traces = vec![vec![Box::new([0.125])]];
-        creature.graph_runtime.tick_start_eligibility_traces = vec![vec![Box::new([0.0625])]];
         creature.graph_runtime.scratch_prev = vec![1.0];
         creature.graph_runtime.scratch_curr = vec![2.0];
         creature.graph_runtime.scratch_backup = vec![3.0];
@@ -1385,12 +1388,6 @@ mod final_action_observation_tests {
         assert_eq!(
             sim.creatures[id].graph_runtime.eligibility_traces,
             graph_state_before.eligibility_traces
-        );
-        assert_eq!(
-            sim.creatures[id]
-                .graph_runtime
-                .tick_start_eligibility_traces,
-            graph_state_before.tick_start_eligibility_traces
         );
         assert_eq!(
             sim.creatures[id].graph_runtime.scratch_prev,
@@ -1493,15 +1490,10 @@ mod final_action_observation_tests {
             });
             creature.genome = genome;
             creature.graph_runtime.eligibility_traces = vec![vec![Box::new([0.5]), Box::new([])]];
-            creature.graph_runtime.tick_start_eligibility_traces =
-                vec![vec![Box::new([0.125]), Box::new([])]];
             creature.graph_runtime.plasticity_weights = vec![vec![Box::new([1.0]), Box::new([])]];
             creature.prev_shared_memory[0] = 1.0;
             creature.graph_runtime.node_state = vec![vec![1.0, 0.0]];
             creature.graph_runtime.node_outputs = vec![vec![1.0, 0.0]];
-            // Stale snapshots must be refreshed from committed state before intervention.
-            creature.graph_runtime.tick_start_state = vec![vec![0.0, 0.0]];
-            creature.graph_runtime.tick_start_outputs = vec![vec![0.0, 0.0]];
             let graph_before = creature.graph_runtime.clone();
             let memory_before = creature.shared_memory;
             let previous_before = creature.prev_shared_memory;
@@ -1525,10 +1517,6 @@ mod final_action_observation_tests {
                 graph_before.eligibility_traces
             );
             assert_eq!(
-                creature.graph_runtime.tick_start_eligibility_traces,
-                graph_before.tick_start_eligibility_traces
-            );
-            assert_eq!(
                 creature.graph_runtime.plasticity_weights,
                 graph_before.plasticity_weights
             );
@@ -1536,14 +1524,6 @@ mod final_action_observation_tests {
             assert_eq!(
                 creature.graph_runtime.node_outputs,
                 graph_before.node_outputs
-            );
-            assert_eq!(
-                creature.graph_runtime.tick_start_state,
-                graph_before.tick_start_state
-            );
-            assert_eq!(
-                creature.graph_runtime.tick_start_outputs,
-                graph_before.tick_start_outputs
             );
             assert_eq!(creature.shared_memory, memory_before);
             assert_eq!(creature.prev_shared_memory, previous_before);

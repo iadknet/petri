@@ -73,15 +73,16 @@ pub(crate) fn ensure_eligibility_traces(
     }
 }
 
-/// Commit the last successful visit's activity from the frozen, decayed tick base.
-/// Activity has no learning-rate factor; eta is applied once when reward arrives.
-/// Source replay uses the evaluation context and ordered temporal read bases.
+/// Add one successful visit's activity to the trace (T19.F02): every visit
+/// adds, decay runs once per world tick in `begin_tick`, and a failed visit
+/// never reaches here. Activity has no learning-rate factor; eta is applied
+/// once when reward arrives. Source replay uses the evaluation context and
+/// the ordered read bases the visit itself used.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn update_eligibility_traces(
     def: &CgpGraphBackendDef,
     node_idx: usize,
     eligibility_traces: &mut [Vec<Box<[f32]>>],
-    tick_start_traces: &[Vec<Box<[f32]>>],
     plasticity_weights: &[Vec<Box<[f32]>>],
     prev_outputs: &[f32],
     final_outputs: &[f32],
@@ -130,9 +131,6 @@ pub(crate) fn update_eligibility_traces(
                 &[][..]
             };
 
-        let base_traces = tick_start_traces
-            .get(node_idx)
-            .and_then(|module| module.get(i));
         for (edge_idx, edge) in cnode.inputs.iter().enumerate() {
             if edge_idx >= traces.len() {
                 break;
@@ -164,12 +162,8 @@ pub(crate) fn update_eligibility_traces(
                 HebbianRule::Covariance => (pre - 0.5) * (post - 0.5),
             };
 
-            // A module first initialized this tick has no prior credit, even on a revisit.
-            let base = base_traces
-                .and_then(|edges| edges.get(edge_idx))
-                .copied()
-                .unwrap_or(0.0);
-            traces[edge_idx] = base + activity;
+            // A module first initialized this tick starts from zero credit.
+            traces[edge_idx] += activity;
         }
     }
 }

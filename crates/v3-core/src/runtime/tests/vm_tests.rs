@@ -129,7 +129,7 @@ fn applied_vm_settlement_observation_survives_every_exit() {
 }
 
 #[test]
-fn applied_vm_exhaustion_distinguishes_unexecuted_bid_all_in_and_settlement_rounding() {
+fn applied_vm_exhaustion_distinguishes_unexecuted_bid_and_settlement_rounding() {
     use crate::simulation::energy_accounting::DeathCause;
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
@@ -154,6 +154,8 @@ fn applied_vm_exhaustion_distinguishes_unexecuted_bid_all_in_and_settlement_roun
         f64::from(0.1f32) - f64::from(energy)
     );
 
+    // An unaffordable bid is recorded, not charged (T19.F02): the dispatch
+    // settles only its opcode debt and the mesh's settlement takes the all-in.
     let (result, energy, side) = run_vm_with_config(
         vec![
             VmInstruction::LoadConst {
@@ -169,19 +171,13 @@ fn applied_vm_exhaustion_distinguishes_unexecuted_bid_all_in_and_settlement_roun
         10.0,
         cfg.clone(),
     );
-    assert!(result.energy_exhausted);
-    assert_eq!(energy, 0.0);
-    assert_eq!(
-        side.energy_observation.pending_cause,
-        Some(DeathCause::PriorityBid)
-    );
-    let debt = (f64::from(0.08f32) + f64::from(0.20f32)) as f32;
-    assert_eq!(side.energy_observation.priority_bid, 10.0 - f64::from(debt));
-    assert_eq!(side.energy_observation.vm_compute, f64::from(debt));
-    assert_eq!(
-        side.priority_bid, 0.0,
-        "exhausting bid never publishes a priority"
-    );
+    assert!(!result.energy_exhausted);
+    let debt = f64::from(0.08f32) + f64::from(0.20f32);
+    assert_eq!(energy, 10.0 - debt as f32);
+    assert_eq!(side.energy_observation.pending_cause, None);
+    assert_eq!(side.energy_observation.priority_bid, 0.0);
+    assert!((side.energy_observation.vm_compute - debt).abs() < 1e-6);
+    assert_eq!(side.priority_bid, 100.0);
 
     cfg.vm.opcode_cost_multiplier = 3.0;
     let (result, energy, side) = run_vm_with_config(
@@ -207,8 +203,10 @@ fn applied_vm_exhaustion_distinguishes_unexecuted_bid_all_in_and_settlement_roun
     );
 }
 
+/// Two bids in one dispatch record the last write and charge nothing:
+/// the mesh settles the recorded bid once (T19.F02).
 #[test]
-fn applied_vm_accounting_counts_overwritten_bids_and_separate_settlement() {
+fn applied_vm_accounting_records_overwritten_bids_without_charging() {
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 0.0;
     cfg.vm.step_ramp_cost = 0.0;
@@ -228,8 +226,8 @@ fn applied_vm_accounting_counts_overwritten_bids_and_separate_settlement() {
         10.0,
         cfg,
     );
-    assert_eq!(energy, 6.0);
-    assert_eq!(side.energy_observation.priority_bid, 4.0);
+    assert_eq!(energy, 10.0);
+    assert_eq!(side.energy_observation.priority_bid, 0.0);
     assert_eq!(side.energy_observation.vm_compute, 0.0);
     assert_eq!(side.priority_bid, 2.0);
 }

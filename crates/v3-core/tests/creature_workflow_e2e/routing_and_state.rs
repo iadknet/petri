@@ -134,9 +134,7 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
 
 #[test]
 fn graph_state_persists_across_ticks_e2e() {
-    let mut cfg = test_config();
-    cfg.runtime.max_graph_relax_iters = 1;
-    cfg.runtime.graph_convergence_stable_passes = 1;
+    let cfg = test_config();
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     world.reconfigure_food(cfg.world.food.clone());

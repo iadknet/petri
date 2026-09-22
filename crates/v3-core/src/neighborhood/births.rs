@@ -12,7 +12,7 @@ use rand::SeedableRng;
 use rayon::prelude::*;
 
 use crate::config::MutationConfig;
-use crate::creature::genome::analysis::mesh_reachable_nodes;
+use crate::creature::genome::analysis::{mesh_cycle_nodes, mesh_reachable_nodes};
 use crate::creature::genome::CreatureGenome;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
@@ -35,6 +35,22 @@ pub struct BirthResult {
     pub by_requested_events: BTreeMap<u32, u32>,
     pub any_events: Tally,
     pub by_events: BTreeMap<u32, Tally>,
+    /// `any_events` partitioned by whether the offspring's reachable mesh
+    /// carries a cycle (T19.F02): `cycle_carrying` merged with `acyclic`
+    /// equals `any_events`.
+    pub cycle_carrying: Tally,
+    pub acyclic: Tally,
+}
+
+/// One classified birth: requested and applied event counts, the tally of
+/// its class (empty for a zero-event birth), and whether the offspring's
+/// reachable mesh carries a cycle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BirthOutcome {
+    pub requested_events: u32,
+    pub applied_events: u32,
+    pub tally: Tally,
+    pub cycle_carrying: bool,
 }
 
 impl BirthResult {
@@ -44,6 +60,8 @@ impl BirthResult {
         self.births_total += other.births_total;
         self.zero_event_births += other.zero_event_births;
         self.any_events = self.any_events.merge(other.any_events);
+        self.cycle_carrying = self.cycle_carrying.merge(other.cycle_carrying);
+        self.acyclic = self.acyclic.merge(other.acyclic);
         for (&events, &births) in &other.by_requested_events {
             *self.by_requested_events.entry(events).or_default() += births;
         }
@@ -74,7 +92,7 @@ pub fn per_birth_result(
     let executed =
         battery.executed_indices(subject, context.runtime, context.shared_memory_decay_rate);
 
-    let outcomes: Vec<(u32, u32, Tally)> = (0..births)
+    let outcomes: Vec<BirthOutcome> = (0..births)
         .into_par_iter()
         .map(|birth_index| {
             let mut genome = subject.clone();
@@ -88,37 +106,54 @@ pub fn per_birth_result(
                 &mut rng,
                 context.food_type_count,
             );
+            let cycle_carrying = !mesh_cycle_nodes(&genome).is_empty();
             if summary.applied_events == 0 {
-                return (summary.attempted_events, 0, Tally::default());
+                return BirthOutcome {
+                    requested_events: summary.attempted_events,
+                    applied_events: 0,
+                    tally: Tally::default(),
+                    cycle_carrying,
+                };
             }
             let signature =
                 battery.signature(&genome, context.runtime, context.shared_memory_decay_rate);
-            let tally = Tally::default().record(classify(base, &signature));
-            (summary.attempted_events, summary.applied_events, tally)
+            BirthOutcome {
+                requested_events: summary.attempted_events,
+                applied_events: summary.applied_events,
+                tally: Tally::default().record(classify(base, &signature)),
+                cycle_carrying,
+            }
         })
         .collect();
 
     fold_outcomes(births, outcomes)
 }
 
-/// Fold `(requested_events, applied_events, tally)` per birth into pure integer
-/// accounting. Zero-applied births carry an empty tally and need no evaluation.
-fn fold_outcomes(births_total: u32, outcomes: Vec<(u32, u32, Tally)>) -> BirthResult {
+/// Fold one [`BirthOutcome`] per birth into pure integer accounting.
+/// Zero-applied births carry an empty tally and need no evaluation.
+fn fold_outcomes(births_total: u32, outcomes: Vec<BirthOutcome>) -> BirthResult {
     let mut result = BirthResult {
         births_total,
         ..BirthResult::default()
     };
-    for (requested_events, applied_events, tally) in outcomes {
+    for outcome in outcomes {
         *result
             .by_requested_events
-            .entry(requested_events)
+            .entry(outcome.requested_events)
             .or_default() += 1;
-        if applied_events == 0 {
+        if outcome.applied_events == 0 {
             result.zero_event_births += 1;
         } else {
+            let tally = outcome.tally;
             result.any_events = result.any_events.merge(tally);
-            let bucket = result.by_events.entry(applied_events).or_default();
+            let bucket = result.by_events.entry(outcome.applied_events).or_default();
             *bucket = bucket.merge(tally);
+            let partition = if outcome.cycle_carrying {
+                &mut result.cycle_carrying
+            } else {
+                &mut result.acyclic
+            };
+            *partition = partition.merge(tally);
         }
     }
     result
@@ -129,6 +164,15 @@ mod tests {
     use super::*;
     use crate::neighborhood::classify::{Class, Classification};
     use proptest::prelude::*;
+
+    fn outcome(requested: u32, applied: u32, tally: Tally, cycle_carrying: bool) -> BirthOutcome {
+        BirthOutcome {
+            requested_events: requested,
+            applied_events: applied,
+            tally,
+            cycle_carrying,
+        }
+    }
 
     fn tally_of_one(class: Class) -> Tally {
         Tally::default().record(Classification {
@@ -144,11 +188,11 @@ mod tests {
         let result = fold_outcomes(
             5,
             vec![
-                (0, 0, Tally::default()),
-                (0, 0, Tally::default()),
-                (3, 2, tally_of_one(Class::Changed)),
-                (0, 0, Tally::default()),
-                (0, 0, Tally::default()),
+                outcome(0, 0, Tally::default(), false),
+                outcome(0, 0, Tally::default(), true),
+                outcome(3, 2, tally_of_one(Class::Changed), true),
+                outcome(0, 0, Tally::default(), false),
+                outcome(0, 0, Tally::default(), false),
             ],
         );
         assert_eq!(result.births_total, 5);
@@ -157,6 +201,12 @@ mod tests {
         assert_eq!(result.by_events.len(), 1);
         assert_eq!(result.by_events[&2].trials, 1);
         assert_eq!(result.by_requested_events, BTreeMap::from([(0, 4), (3, 1)]));
+        assert_eq!(result.cycle_carrying, tally_of_one(Class::Changed));
+        assert_eq!(
+            result.acyclic,
+            Tally::default(),
+            "a zero-event birth is not classified, whatever its mesh shape"
+        );
     }
 
     /// `per_birth_result` seeds birth `i` by
@@ -225,6 +275,11 @@ mod tests {
                 battery.signature(&genome, context.runtime, context.shared_memory_decay_rate);
             let tally = Tally::default().record(classify(&base, &signature));
             expected.any_events = expected.any_events.merge(tally);
+            if mesh_cycle_nodes(&genome).is_empty() {
+                expected.acyclic = expected.acyclic.merge(tally);
+            } else {
+                expected.cycle_carrying = expected.cycle_carrying.merge(tally);
+            }
             let bucket = expected
                 .by_events
                 .entry(summary.applied_events)
@@ -238,12 +293,12 @@ mod tests {
     proptest! {
         #[test]
         fn pooling_preserves_all_counts_and_buckets_under_regrouping(
-            outcomes in prop::collection::vec((0u32..4, 0u8..4), 0..50),
+            outcomes in prop::collection::vec((0u32..4, 0u8..4, any::<bool>()), 0..50),
             split in 0usize..50,
         ) {
-            let expanded: Vec<_> = outcomes.iter().map(|&(requested, class)| {
-                if class == 0 { (requested, 0, Tally::default()) }
-                else { (requested + 2, requested + 1, tally_of_one(match class { 1 => Class::Silent, 2 => Class::Changed, _ => Class::Dead })) }
+            let expanded: Vec<_> = outcomes.iter().map(|&(requested, class, cycle)| {
+                if class == 0 { outcome(requested, 0, Tally::default(), cycle) }
+                else { outcome(requested + 2, requested + 1, tally_of_one(match class { 1 => Class::Silent, 2 => Class::Changed, _ => Class::Dead }), cycle) }
             }).collect();
             let split = split.min(expanded.len());
             let a = fold_outcomes(split as u32, expanded[..split].to_vec());
@@ -255,32 +310,33 @@ mod tests {
         }
 
         /// The pooled "any events" tally always equals the by-construction
-        /// merge of every applied-event-count bucket, and every birth is
-        /// accounted for exactly once (as a zero-event birth or in exactly
-        /// one bucket) — independent of which applied-event counts and
-        /// classes proptest draws.
+        /// merge of every applied-event-count bucket and of the cycle
+        /// partition, and every birth is accounted for exactly once (as a
+        /// zero-event birth or in exactly one bucket) — independent of which
+        /// applied-event counts, classes, and mesh shapes proptest draws.
         #[test]
         fn bucket_totals_equal_the_overall_any_events_tally(
             outcomes in prop::collection::vec(
                 (0u32..4, prop::option::of((1u32..5, prop_oneof![
                     Just(Class::Silent), Just(Class::Changed), Just(Class::Dead),
-                ]))),
+                ])), any::<bool>()),
                 0..40,
             ),
         ) {
             let births_total = outcomes.len() as u32;
-            let expanded: Vec<(u32, u32, Tally)> = outcomes
+            let expanded: Vec<BirthOutcome> = outcomes
                 .into_iter()
-                .map(|(skipped, entry)| match entry {
-                    Some((applied, class)) => (applied + skipped, applied, tally_of_one(class)),
-                    None => (skipped, 0, Tally::default()),
+                .map(|(skipped, entry, cycle)| match entry {
+                    Some((applied, class)) => outcome(applied + skipped, applied, tally_of_one(class), cycle),
+                    None => outcome(skipped, 0, Tally::default(), cycle),
                 })
                 .collect();
-            let zero_events_expected = expanded.iter().filter(|o| o.1 == 0).count() as u32;
+            let zero_events_expected = expanded.iter().filter(|o| o.applied_events == 0).count() as u32;
             let mutated_expected = births_total - zero_events_expected;
-            let requested_total: u32 = expanded.iter().map(|o| o.0).sum();
-            let skipped_total: u32 = expanded.iter().map(|o| o.0 - o.1).sum();
+            let requested_total: u32 = expanded.iter().map(|o| o.requested_events).sum();
+            let skipped_total: u32 = expanded.iter().map(|o| o.requested_events - o.applied_events).sum();
             let result = fold_outcomes(births_total, expanded);
+            prop_assert_eq!(result.cycle_carrying.merge(result.acyclic), result.any_events);
             prop_assert_eq!(result.by_requested_events.values().sum::<u32>(), births_total);
             prop_assert_eq!(result.by_requested_events.iter().map(|(events, births)| events * births).sum::<u32>(), requested_total);
             prop_assert_eq!(result.by_events.iter().map(|(events, tally)| events * tally.trials).sum::<u32>() + skipped_total, requested_total);

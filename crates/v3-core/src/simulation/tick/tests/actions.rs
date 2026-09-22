@@ -844,16 +844,12 @@ fn reproduction_resets_reward_credit_including_frozen_tick_base() {
         sim.config.mutation.mutation_probability = 0.0;
         sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
         sim.creatures[parent].graph_runtime.eligibility_traces = vec![vec![Box::new([3.0])]];
-        sim.creatures[parent]
-            .graph_runtime
-            .tick_start_eligibility_traces = vec![vec![Box::new([1.0])]];
         sim.creatures[parent].graph_runtime.plasticity_weights = vec![vec![Box::new([1.5])]];
         let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
         let _ = apply_reproduce(parent, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(sim.creatures.len(), 2, "reproduction must actually succeed");
         let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
         assert!(child.graph_runtime.eligibility_traces.is_empty());
-        assert!(child.graph_runtime.tick_start_eligibility_traces.is_empty());
         assert_eq!(child.age, 0);
         assert_eq!(
             sim.creatures[parent].graph_runtime.eligibility_traces[0][0][0],

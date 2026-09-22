@@ -119,6 +119,10 @@ pub struct WorkCounters {
     /// Executed shared-memory store/clear events exceeding the trace epsilon.
     /// Includes VM writes executed before a later exhaustion discards its copy.
     pub shared_memory_writes_changed: u32,
+    /// Passes that reached the per-pass hop cap (`max_mesh_hops`) and ended
+    /// with their queue kept (T19.F02). Equals the `MaxHopsReached`
+    /// termination count while a tick is one pass.
+    pub pass_cap_hits: u32,
 }
 
 /// Complete output of one creature's mesh evaluation for a single tick.

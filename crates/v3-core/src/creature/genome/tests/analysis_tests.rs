@@ -9,6 +9,7 @@ use crate::creature::genome::cgp::{
 };
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef};
 use rand::SeedableRng;
+use std::collections::BTreeSet;
 
 // ── VM helper tests ─────────────────────────────────────────────────
 
@@ -346,6 +347,52 @@ fn mesh_reachable_handles_cycle() {
         nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![0])],
     };
     assert_eq!(mesh_reachable_nodes(&genome), vec![0, 1]);
+}
+
+/// Cycle membership (T19.F02): reachable nodes that can route back to
+/// themselves, self-targets included; unreachable cycles and dangling
+/// targets never count.
+#[test]
+fn mesh_cycle_nodes_names_reachable_nodes_on_a_cycle() {
+    let ids = |ids: &[u32]| ids.iter().map(|&i| NodeId::new(i)).collect::<BTreeSet<_>>();
+    let genome = |nodes| CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes,
+    };
+    assert!(mesh_cycle_nodes(&genome(vec![
+        simple_vm_node(0, vec![1]),
+        simple_vm_node(1, vec![])
+    ]))
+    .is_empty());
+    assert_eq!(
+        mesh_cycle_nodes(&genome(vec![simple_vm_node(0, vec![0])])),
+        ids(&[0])
+    );
+    assert_eq!(
+        mesh_cycle_nodes(&genome(vec![
+            simple_vm_node(0, vec![1]),
+            simple_vm_node(1, vec![2, 1]),
+            simple_vm_node(2, vec![]),
+        ])),
+        ids(&[1])
+    );
+    assert_eq!(
+        mesh_cycle_nodes(&genome(vec![
+            simple_vm_node(0, vec![1]),
+            simple_vm_node(1, vec![2]),
+            simple_vm_node(2, vec![1, 3]),
+            simple_vm_node(3, vec![99]),
+        ])),
+        ids(&[1, 2])
+    );
+    assert!(mesh_cycle_nodes(&genome(vec![
+        simple_vm_node(0, vec![1]),
+        simple_vm_node(1, vec![]),
+        simple_vm_node(2, vec![3]),
+        simple_vm_node(3, vec![2]),
+    ]))
+    .is_empty());
+    assert!(mesh_cycle_nodes(&genome(vec![])).is_empty());
 }
 
 // ── Mesh backward slice tests ───────────────────────────────────────
