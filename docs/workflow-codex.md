@@ -49,7 +49,10 @@ AI Agents" entries naming them; from each dependency spec the Goal, Inputs and
 Invariants, and Performance predeclaration, opening a readings file only for a
 specific number. It reads relevant code directly. It uses the research-first-planning, spec-writing, and spec-review
 skills to write the flat spec, perform one readiness review, and allow one
-revision. Its self-review is not independent validation. It handles the
+revision. Its self-review is not independent validation. The shared Plan
+step's Codex challenge loop is Claude-only: a Codex run's spec owner is already
+Astra, so a Codex challenge would not be an independent model family, and this
+adapter keeps its single readiness review. It handles the
 shared Plan status updates and runs `make roadmap-check`; the orchestrator
 verifies the result and commits the plan before implementation starts.
 
