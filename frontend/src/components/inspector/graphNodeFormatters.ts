@@ -64,6 +64,30 @@ export function formatGraphSource(source: GraphSource, inputRefs: InputReference
 	return "?";
 }
 
+/** Directions each directed vote sink covers — the `Direction::ALL` index range. */
+const VOTE_DIRECTION_COUNT = 8;
+
+/** The vote sink at a catalog index (T19.F03); null at or above the catalog count. */
+function voteSinkFromIndex(index: number): VoteSink | null {
+	if (index === 0) return "Eat";
+	if (index < 1 + VOTE_DIRECTION_COUNT) return { Move: index - 1 };
+	if (index < 1 + 2 * VOTE_DIRECTION_COUNT) {
+		return { Reproduce: index - 1 - VOTE_DIRECTION_COUNT };
+	}
+	if (index < 1 + 3 * VOTE_DIRECTION_COUNT) {
+		return { StealEnergy: index - 1 - 2 * VOTE_DIRECTION_COUNT };
+	}
+	if (index === 1 + 3 * VOTE_DIRECTION_COUNT) return "Terminate";
+	if (index === 2 + 3 * VOTE_DIRECTION_COUNT) return "Decide";
+	return null;
+}
+
+/** Label the vote sink at a catalog index (T19.F03); out of range reads as invalid. */
+export function voteSinkLabel(index: number): string {
+	const sink = voteSinkFromIndex(index);
+	return sink === null ? `invalid(${index})` : formatVoteSink(sink);
+}
+
 /** Format one vote sink of the T19.F03 catalog. */
 export function formatVoteSink(sink: VoteSink): string {
 	if (typeof sink === "string") return sink;

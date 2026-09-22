@@ -1,4 +1,4 @@
-import type { InputReference, VmInstruction } from "./genome.ts";
+import type { InputReference, VmInstruction, VoteKind } from "./genome.ts";
 
 // ── Execution Sampler types ──────────────────────────────────────────────────
 
@@ -143,8 +143,13 @@ export type WorldAction =
 
 /** Vote sinks in the catalog: Eat, 8 each of Move/Reproduce/StealEnergy, Terminate, Decide. */
 export const VOTE_SINK_COUNT = 27;
-/** Action kinds carrying a vote commit counter: Eat, Move, Reproduce, StealEnergy. */
-export const VOTE_KIND_COUNT = 4;
+/** Action kinds carrying a vote commit counter, in `commit_counts` order. */
+export const VOTE_KINDS: readonly VoteKind[] = Object.freeze([
+	"Eat",
+	"Move",
+	"Reproduce",
+	"StealEnergy",
+]);
 /** A vote vector with no contributions. */
 export const ZERO_VOTES: readonly number[] = Object.freeze(
 	Array.from({ length: VOTE_SINK_COUNT }, () => 0),

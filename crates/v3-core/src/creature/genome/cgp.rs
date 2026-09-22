@@ -129,6 +129,15 @@ pub enum OutputSinkKind {
     ActionParam(VoteKind, u8),
 }
 
+impl OutputSinkKind {
+    /// Whether this sink belongs to the inert vote surface (T19.F03). Mutation
+    /// skips these sinks until T19.F04 lets a genome wire them.
+    #[must_use]
+    pub fn is_vote_surface(self) -> bool {
+        matches!(self, Self::ActionVote(_) | Self::ActionParam(_, _))
+    }
+}
+
 /// Fixed structural output — one per target slot.
 /// Kind is NOT mutated; only inputs (edges) change via mutation.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -281,18 +290,20 @@ impl PartialEq for CgpGraphBackendDef {
 pub const CUSTOM_OUTPUT_COUNT: u8 = 24;
 /// Number of shared memory slots (WriteSlot + ClearSlot each).
 pub const SHARED_MEMORY_SLOTS: u8 = 16;
-/// Total fixed sink count: N CustomOutput + 8 RouterGate + 16 WriteSlot +
-/// 16 ClearSlot + 27 ActionVote + 8 ActionParam.
-pub const FIXED_SINK_COUNT: usize = CUSTOM_OUTPUT_COUNT as usize     // 24 CustomOutput slots
-    + MAX_GATE_SLOTS                 // 8 RouterGate sinks
-    + SHARED_MEMORY_SLOTS as usize   // 16 WriteSlot sinks
-    + SHARED_MEMORY_SLOTS as usize   // 16 ClearSlot sinks
-    + VOTE_SINK_COUNT                // 27 ActionVote sinks (T19.F03)
-    + VOTE_KIND_COUNT * VOTE_PARAM_SLOTS as usize; // 8 ActionParam sinks (T19.F03)
+/// Catalog index of the first `ActionVote` sink, which is also the count of
+/// the sinks before it: N CustomOutput + 8 RouterGate + 16 WriteSlot +
+/// 16 ClearSlot. The vote sinks run from here in `VoteSink` index order, and
+/// the `ActionParam` sinks follow kind-major.
+pub const FIRST_ACTION_VOTE_SINK: usize = CUSTOM_OUTPUT_COUNT as usize // 24 CustomOutput slots
+    + MAX_GATE_SLOTS               // 8 RouterGate sinks
+    + SHARED_MEMORY_SLOTS as usize // 16 WriteSlot sinks
+    + SHARED_MEMORY_SLOTS as usize; // 16 ClearSlot sinks
+const _: () = assert!(FIRST_ACTION_VOTE_SINK == 64);
+/// Total fixed sink count: the sinks before the vote catalog + 27 ActionVote +
+/// 8 ActionParam (T19.F03).
+pub const FIXED_SINK_COUNT: usize =
+    FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT + VOTE_KIND_COUNT * VOTE_PARAM_SLOTS as usize;
 const _: () = assert!(FIXED_SINK_COUNT == 99);
-/// Catalog index of the first `ActionVote` sink; the vote sinks run from here
-/// in `VoteSink` index order, and the `ActionParam` sinks follow kind-major.
-pub const FIRST_ACTION_VOTE_SINK: usize = 64;
 
 impl CgpGraphBackendDef {
     /// Construct a new graph backend with the full fixed output catalog.

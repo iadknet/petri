@@ -1,4 +1,5 @@
 import type { InputReference, VmInstruction } from "../../types/genome.ts";
+import { voteSinkLabel } from "./graphNodeFormatters.ts";
 import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
 import type { RuntimeIoBadge } from "./mesh/runtimeIoSemantics.ts";
 import { classifyVmInstruction } from "./mesh/runtimeIoSemantics.ts";
@@ -199,17 +200,6 @@ function formatStringInstruction(
 	}
 }
 
-/** Label the vote sink at a catalog index (T19.F03); out of range reads as invalid. */
-export function voteSinkLabel(index: number): string {
-	if (index === 0) return "Eat";
-	if (index < 9) return `Move[${index - 1}]`;
-	if (index < 17) return `Reproduce[${index - 9}]`;
-	if (index < 25) return `StealEnergy[${index - 17}]`;
-	if (index === 25) return "Terminate";
-	if (index === 26) return "Decide";
-	return `invalid(${index})`;
-}
-
 /** Safe field access — defaults to 0 for missing keys. */
 function f(p: Record<string, number>, key: string): number {
 	return p[key] ?? 0;
@@ -314,11 +304,8 @@ function formatOperands(
 			return `gate[${f(p, "slot")}] ← ${reg(f(p, "src"))}`;
 		case "WriteInternalPayload":
 			return `payload[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
-		case "AddVote": {
-			const sinkIdx = f(p, "sink");
-			const sink = voteSinkLabel(sinkIdx);
-			return `vote[${sink}] += ${reg(f(p, "src"))}`;
-		}
+		case "AddVote":
+			return `vote[${voteSinkLabel(f(p, "sink"))}] += ${reg(f(p, "src"))}`;
 		case "WriteWorldActionMeta": {
 			const slotIdx = f(p, "slot_idx");
 			const metaCtx = actionCtx?.metaWrites.get(index);
