@@ -191,9 +191,9 @@ transmitting; the surface reaches creatures through the body, never a sensor.
       proves it.
 - [x] Pins hold, `vm_all_opcodes_e2e` covers 43 variants, and `make check`
       exits 0 -> the command table below.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred, listed
-      here.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` (one run; `run-mode.txt`
+      `fresh`): survivor list empty -> the mutation table below, detail in
+      [readings](../../progress/readings/t19-f03.md).
 - [x] Benchmark summaries stored, raw hash/byte count and verification time
       checked, no new full report staged, no epoch re-pinned -> table below,
       full detail in [readings](../../progress/readings/t19-f03.md).
@@ -215,6 +215,15 @@ transmitting; the surface reaches creatures through the body, never a sensor.
 | `make roadmap-check` | validation passed |
 | `cargo test -p v3-core --lib mesh_annotations` | 13 passed |
 | `cargo test -p v3-core --lib vote_surface` | 12 passed |
+
+| Mutation gate | Record |
+| --- | --- |
+| Command | `MUTANTS_ITERATE=0 make rust-mutants` (one fresh run; no second pass, since triage changed no code, test selection, or tool config) |
+| Summary line | `147 mutants tested in 20m: 104 caught, 43 unviable` |
+| Output path | `~/.local/share/petri-tools/mutants/t19-f03/mutants.out` (`run-mode.txt`: `fresh`) |
+| Survivors | None. `missed.txt` and `timeout.txt` are both empty; the target printed `rust-mutants: no survivors` |
+| Inertness mutants | Both `is_vote_surface -> true` and `-> false`, and all five `stage_vote_contribution`/`commit_vote_contribution` mutants (`-> ()`, `-> Default::default()`, `== -> !=`, `+= -> -=`, `+= -> *=`), are in `caught.txt` -> quoted in the readings file |
+| Skips | No `#[mutants::skip]` and no `exclude_re` added or present in this diff |
 
 ## Performance and Goal Impact
 
