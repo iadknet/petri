@@ -8,7 +8,8 @@ export type MeshReadClass =
 	| "occupancy"
 	| "introspection"
 	| "upstream"
-	| "action_queue";
+	| "action_queue"
+	| "decision";
 
 export type MeshWriteClass = "route" | "action" | "memory" | "payload";
 

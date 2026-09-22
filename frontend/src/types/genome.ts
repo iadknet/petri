@@ -151,7 +151,15 @@ export type InputReference =
 	| { StaticIntrospection: string }
 	| { DynamicIntrospection: string }
 	| { UpstreamSlot: number }
-	| "ActionQueue";
+	| "ActionQueue"
+	| DecisionStateReference;
+
+/** The in-tick decision state (T19.F05); `PreviousOutcome` is frozen perception. */
+export type DecisionStateReference =
+	| "ActionVotes"
+	| "PreviousPassVotes"
+	| "CommitCounts"
+	| "PreviousOutcome";
 
 export interface RouteTarget {
 	target_id: number;

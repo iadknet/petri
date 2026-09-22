@@ -62,6 +62,7 @@ const SOURCE_PRIORITY: MeshReadClass[] = [
 	"barrier",
 	"occupancy",
 	"introspection",
+	"decision",
 	"action_queue",
 	"upstream",
 ];
@@ -183,6 +184,14 @@ function inferReadClasses(inputRefs: InputReference[]): MeshReadClass[] {
 		if (typeof inputRef === "string") {
 			if (inputRef === "ActionQueue") {
 				classes.add("action_queue");
+			} else if (inputRef === "PreviousOutcome") {
+				classes.add("introspection");
+			} else if (
+				inputRef === "ActionVotes" ||
+				inputRef === "PreviousPassVotes" ||
+				inputRef === "CommitCounts"
+			) {
+				classes.add("decision");
 			}
 			continue;
 		}
@@ -469,6 +478,8 @@ function formatSourceClass(sourceClass: MeshReadClass): string {
 			return "Upstream";
 		case "action_queue":
 			return "Action Queue";
+		case "decision":
+			return "Decision";
 	}
 }
 

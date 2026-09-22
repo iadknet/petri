@@ -64,6 +64,13 @@ describe("formatInputRef", () => {
 		expect(formatInputRef(ref)).toBe("slot[3]");
 	});
 
+	it("labels the decision-state references by their variant names", () => {
+		expect(formatInputRef("ActionVotes")).toBe("ActionVotes");
+		expect(formatInputRef("PreviousOutcome")).toBe("PreviousOutcome");
+		expect(formatInputRef({ DynamicIntrospection: "HopsThisTick" })).toBe("HopsThisTick");
+		expect(formatInputRefWithSubIndex("CommitCounts", 2)).toBe("CommitCounts[2]");
+	});
+
 	it("handles ActionQueue string variant without crashing", () => {
 		const ref: InputReference = "ActionQueue";
 		expect(formatInputRef(ref)).toBe("ActionQueue");
@@ -94,6 +101,16 @@ describe("inputRefColor", () => {
 	it("returns amber for ActionQueue string variant", () => {
 		const ref: InputReference = "ActionQueue";
 		expect(inputRefColor(ref)).toBe("#f59e0b");
+	});
+
+	it("returns violet for the in-tick decision-state references", () => {
+		for (const ref of ["ActionVotes", "PreviousPassVotes", "CommitCounts"] as const) {
+			expect(inputRefColor(ref)).toBe("#a78bfa");
+		}
+	});
+
+	it("returns blue for the frozen previous outcome", () => {
+		expect(inputRefColor("PreviousOutcome")).toBe("#60a5fa");
 	});
 
 	it("returns gray for unknown string variant", () => {
