@@ -1047,4 +1047,32 @@ mod tests {
         let ids: BTreeSet<_> = genome.nodes.iter().map(|node| node.node_id).collect();
         assert!(sets.executed.is_subset(&ids));
     }
+
+    /// Adding counts sums each reason field by field, so a drift walk's
+    /// aggregate over many readings keeps every reason's total.
+    #[test]
+    fn tick_reason_counts_add_sums_each_reason() {
+        let mut total = TickReasonCounts {
+            no_decision: 10,
+            terminate_voted: 20,
+            action_cap_reached: 30,
+            energy_exhausted: 40,
+        };
+        total.add(&TickReasonCounts {
+            no_decision: 1,
+            terminate_voted: 2,
+            action_cap_reached: 3,
+            energy_exhausted: 4,
+        });
+        assert_eq!(
+            total,
+            TickReasonCounts {
+                no_decision: 11,
+                terminate_voted: 22,
+                action_cap_reached: 33,
+                energy_exhausted: 44,
+            }
+        );
+        assert_eq!(total.total(), 110);
+    }
 }

@@ -880,3 +880,83 @@ fn form_plans() -> Vec<FormPlan> {
 pub fn qualified_paths() -> Vec<QualifiedPath> {
     form_plans().into_iter().map(qualify).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `form`'s step specs and the genome before each step, then the last
+    /// step's result, replayed with the pinned seeds.
+    fn replay(form: &str) -> (Vec<StepSpec>, Vec<CreatureGenome>) {
+        let plan = form_plans()
+            .into_iter()
+            .find(|plan| plan.form == form)
+            .expect("the form is planned");
+        let mut genomes = vec![plan.start.genome.clone()];
+        for (spec, &seed) in plan.specs.iter().zip(plan.seeds) {
+            let before = genomes.last().expect("the start is present");
+            let after = accepted(before, spec.event, seed, &spec.accept)
+                .expect("the pinned seed is accepted");
+            genomes.push(after);
+        }
+        (plan.specs, genomes)
+    }
+
+    fn step_index(specs: &[StepSpec], name: &str) -> usize {
+        specs
+            .iter()
+            .position(|spec| spec.name == name)
+            .expect("the step is planned")
+    }
+
+    fn scaffold_graph_mut(genome: &mut CreatureGenome) -> &mut CgpGraphBackendDef {
+        let scaffold = genome
+            .nodes
+            .iter_mut()
+            .find(|node| node.node_id == SCAFFOLD)
+            .expect("fixture node exists");
+        match &mut scaffold.backend_def {
+            BackendDef::Graph(graph) => graph,
+            BackendDef::Vm(_) => unreachable!("Graph form"),
+        }
+    }
+
+    /// The added `Move(E)` vote edge must carry a strictly positive weight:
+    /// the same edge at weight zero is rejected.
+    #[test]
+    fn east_vote_edge_added_rejects_a_zero_weight_edge() {
+        let (specs, genomes) = replay("graph_unprepared");
+        let index = step_index(&specs, "vote_edge_added");
+        let accept = &specs[index].accept;
+        let (before, after) = (&genomes[index], &genomes[index + 1]);
+        assert!(accept(before, after));
+
+        let mut zero_weight = after.clone();
+        scaffold_graph_mut(&mut zero_weight)
+            .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(EAST)))
+            .expect("the fixed catalog holds every Move sink")
+            .inputs
+            .last_mut()
+            .expect("the step appended an edge")
+            .weight = 0.0;
+
+        assert!(!accept(before, &zero_weight));
+    }
+
+    /// Removing the `Move(N)` vote edge qualifies only when the compute
+    /// nodes are untouched: the same removal with a changed compute-node
+    /// edge weight is rejected.
+    #[test]
+    fn north_vote_removed_rejects_a_changed_compute_node() {
+        let (specs, genomes) = replay("graph_unprepared");
+        let index = step_index(&specs, "north_vote_removed");
+        let accept = &specs[index].accept;
+        let (before, after) = (&genomes[index], &genomes[index + 1]);
+        assert!(accept(before, after));
+
+        let mut changed_compute = after.clone();
+        scaffold_graph_mut(&mut changed_compute).compute_nodes[0].inputs[0].weight += 1.0;
+
+        assert!(!accept(before, &changed_compute));
+    }
+}

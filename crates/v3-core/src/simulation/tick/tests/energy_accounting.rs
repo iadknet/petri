@@ -612,3 +612,29 @@ fn tick_compute_total_sums_vm_graph_and_mesh_ramp_costs() {
     assert_eq!(compute.vm_sum, 1.0);
     assert_eq!(compute.graph_sum, 2.0);
 }
+
+/// Pass and decided-pass counts (T19.F04) sum across creatures within a tick
+/// and accumulate across ticks into the cumulative totals.
+#[test]
+fn tick_compute_passes_and_decided_passes_accumulate_across_creatures_and_ticks() {
+    // Arrange
+    let mut first = decision(vec![WorldAction::NoOp]);
+    first.work_counters.passes = 3;
+    first.work_counters.decided_passes = 2;
+    let mut second = decision(vec![WorldAction::NoOp]);
+    second.work_counters.passes = 4;
+    second.work_counters.decided_passes = 1;
+    let mut stats = crate::simulation::stats::SimStats::default();
+
+    // Act
+    for _tick in 0..2 {
+        let mut compute = super::super::TickComputeStats::default();
+        compute.record(&first);
+        compute.record(&second);
+        compute.commit(&mut stats);
+    }
+
+    // Assert
+    assert_eq!(stats.passes_total, 14);
+    assert_eq!(stats.decided_passes_total, 6);
+}

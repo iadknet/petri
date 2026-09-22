@@ -99,6 +99,19 @@ mod tests {
         }
     }
 
+    /// A directed sink index outside `0..8` clamps to the last direction
+    /// rather than panicking.
+    #[test]
+    fn out_of_range_sink_direction_clamps_to_the_last_direction() {
+        let last = Direction::ALL[Direction::ALL.len() - 1];
+        for d in [8, 9, u8::MAX] {
+            assert_eq!(
+                decode_commit(VoteSink::Move(d), &[0.0, 0.0]),
+                WorldAction::Move(last)
+            );
+        }
+    }
+
     #[test]
     fn eat_reads_its_food_type_from_slot_zero() {
         assert_eq!(

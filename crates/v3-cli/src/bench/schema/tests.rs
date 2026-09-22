@@ -199,3 +199,17 @@ fn historical_goal_aggregates_load_without_versions_and_reserialize_them_absent(
         );
     }
 }
+
+/// A value that is neither an undefined-indicator string nor a reading
+/// object is rejected with an error naming both accepted shapes.
+#[test]
+fn indicator_rejects_a_non_string_non_object_value_naming_both_accepted_shapes() {
+    let error = serde_json::from_str::<Indicator<LineageDiversity>>("5")
+        .expect_err("a number is neither indicator shape");
+    assert!(
+        error
+            .to_string()
+            .contains("expected an undefined-indicator string or a measured reading object"),
+        "unexpected error: {error}"
+    );
+}
