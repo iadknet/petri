@@ -24,9 +24,8 @@ cycles, so the gate and goal trajectories are unchanged by construction.
 - Changing the VM step ramp's constants or its reset-per-dispatch rule.
 - Changing `graph_node_base_cost`, `plasticity_update_cost`, or
   `reward_learning_cost`.
-- Founder changes; the V3Alpha1 founder runs 2 hops and pays nothing.
-- A hop-cap event counter in production stats (T19.F02 adds pass-cap
-  accounting).
+- Founder changes (V3Alpha1 runs 2 hops and pays nothing).
+- A hop-cap event counter in production stats (T19.F02 adds it).
 
 ## Inputs and Invariants
 
@@ -57,8 +56,8 @@ leaves the cap-runner cheap; the review note requires the T03.F10 form); (b)
 raising `graph_node_base_cost` (rejected: it prices graph visits only, and
 the note's Section 1.2 shows a blank detour costs nothing); (c) the T03.F10
 ramp lifted from VM steps to mesh hops (adopted, the note's Section 1.2
-choice). Extending T03.F10's `step_charge` is not possible because its index
-resets per dispatch; the hop index is per tick.
+choice; `step_charge` itself cannot be reused because its index resets per
+dispatch).
 
 1. **Formula.** Hop `k` in a tick (`k` from 1, the value of
    `work_counters.mesh_hops` after the dispatch is counted) pays
@@ -167,7 +166,7 @@ resets per dispatch; the hop index is per tick.
       [`docs/progress/readings/t19-f01.md`](../../progress/readings/t19-f01.md).
 - [x] Founder trajectory unchanged: `founder_only_trajectory_digest_is_pinned`
       on `63498f8d36346079f8827c382e2978510357b374ca37759af857afa263f2d0be`.
-- [x] Suites and lints: `cargo test -p v3-core` 1635 + 91 passed, 0 failed;
+- [x] Suites and lints: `cargo test -p v3-core` 1636 lib + 91 passed, 0 failed;
       `cargo test -p v3-cli --lib` 120 passed, 0 failed; `cargo clippy --workspace --all-targets` and `cargo fmt --all
       --check` clean.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
@@ -189,8 +188,8 @@ same accounting as decay, compute, and actions.
 
 Predeclared compute cost: one saturating subtraction, one multiply, one
 subtraction, and one comparison per mesh hop (2.28 hops per creature-tick on
-the goal profile). Wall time is predeclared flat; a flag (+25%) is accepted
-as host noise, a severe (+100%) is investigated.
+the goal profile). Wall time is predeclared flat; a wall flag (+25%) is
+accepted as host noise and a wall severe (+100%) is investigated, not accepted.
 No epoch re-pin is budgeted for either profile and none may be taken: the
 track's Epochs note binds T19.F01 to unchanged applied behavior.
 
@@ -246,9 +245,10 @@ block; both summaries carry the projected keys.
 
 ## Notes for AI Agents
 
-- Decision: the orchestrator for this run is Fable 5.1, not the Opus 5 the
-  workflow's start check names: the user launched the session with Fable and
-  set the advisor to Fable deliberately.
+- Decision: the orchestrator for this run is Fable 5.1 rather than the Opus 5
+  the workflow's start check names, because the user launched the session
+  with Fable and set the advisor to Fable deliberately; the orchestrator
+  proceeded rather than stall.
 - Deferred: adding one energy-flow key touches `CognitionEnergyObservation`,
   `EnergyFlows`, `record_cognition`, the `DeathCause` enum/`ALL`/key,
   `EnergyFlowTracking` and its `From`, and three test key lists; T19.F02
