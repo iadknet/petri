@@ -4,6 +4,7 @@
 use super::mesh::*;
 use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, RouteTarget};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -53,15 +54,37 @@ fn node(id: u32, targets: &[u32]) -> NodeGenome {
                 VmInstruction::Halt,
             ],
         }),
-        targets: targets
-            .iter()
-            .enumerate()
-            .map(|(i, &id)| RouteTarget {
-                target_id: NodeId::new(id),
-                slot: i as u8,
-                gate_bias: -(i as f32),
-            })
-            .collect(),
+        targets: self::targets(targets),
+    }
+}
+fn targets(targets: &[u32]) -> Vec<RouteTarget> {
+    targets
+        .iter()
+        .enumerate()
+        .map(|(i, &id)| RouteTarget {
+            target_id: NodeId::new(id),
+            slot: i as u8,
+            gate_bias: -(i as f32),
+        })
+        .collect()
+}
+/// A one-constant graph node with no sinks: it routes to its first target.
+fn graph_node(id: u32, target_ids: &[u32]) -> NodeGenome {
+    NodeGenome {
+        node_id: NodeId::new(id),
+        input_refs: vec![],
+        backend_def: BackendDef::Graph(CgpGraphBackendDef {
+            birth_weights: None,
+            compute_nodes: vec![ComputeNode {
+                kind: ComputeNodeKind::Constant(1.0),
+                inputs: vec![],
+                plasticity: None,
+            }],
+            output_sinks: vec![],
+            action_bank: vec![],
+            execute_gate: ExecuteGate { inputs: vec![] },
+        }),
+        targets: targets(target_ids),
     }
 }
 fn observe(g: &CreatureGenome, cap: u32) -> (MeshOutput, MeshObservation) {
@@ -125,6 +148,66 @@ fn cap_is_a_per_pass_limit_and_the_final_dispatch_can_complete() {
     ));
     assert_eq!(result.hops.len(), 3);
     assert_eq!(complete.work_counters.pass_cap_hits, 0);
+}
+/// Each backend's cost is the sum of its dispatches' debits: positive after
+/// one dispatch, larger after three, and the whole energy delta is accounted
+/// for by the backend costs, the hop ramp, and the settled bid.
+#[test]
+fn backend_costs_accumulate_every_dispatch_and_close_the_energy_account() {
+    fn run(g: &CreatureGenome) -> (MeshOutput, f32) {
+        // The default 1e-6 per opcode and 1e-5 per graph node are below the
+        // f32 ulp at 1000 energy; visible rates make each debit measurable.
+        let mut config = RuntimeConfig {
+            max_mesh_hops: 3,
+            graph_node_base_cost: 0.01,
+            ..RuntimeConfig::default()
+        };
+        config.vm.opcode_cost_multiplier = 0.01;
+        let mut energy = 1000.0;
+        let (output, _) = execute_creature_mesh_impl(
+            g,
+            &sensors(),
+            &mut energy,
+            &mut [0.0; 16],
+            &[0.0; 16],
+            &mut GraphRuntimeState::new(),
+            &config,
+            ObservedMeshExecution::default(),
+        );
+        (output, 1000.0 - energy)
+    }
+    type Build = fn(u32, &[u32]) -> NodeGenome;
+    type Cost = fn(&MeshOutput) -> f32;
+    let vm: (Build, Cost) = (node, |o| o.cost_report.vm_cost);
+    let graph: (Build, Cost) = (graph_node, |o| o.cost_report.graph_cost);
+    for (build, cost) in [vm, graph] {
+        let single = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![build(0, &[])],
+        };
+        let chain = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![build(0, &[1]), build(1, &[2]), build(2, &[])],
+        };
+        let (one, one_spent) = run(&single);
+        let (three, three_spent) = run(&chain);
+        assert!(cost(&one) > 0.0, "{:?}", one.cost_report);
+        assert!(
+            cost(&three) > cost(&one),
+            "three dispatches debit more than one: {:?} vs {:?}",
+            three.cost_report,
+            one.cost_report
+        );
+        for (output, spent) in [(&one, one_spent), (&three, three_spent)] {
+            let report = &output.cost_report;
+            let accounted =
+                report.vm_cost + report.graph_cost + report.mesh_ramp_cost + output.priority_bid;
+            assert!(
+                (spent - accounted).abs() < 1e-3,
+                "spent {spent} but accounted {accounted}: {report:?}"
+            );
+        }
+    }
 }
 #[test]
 fn missing_winner_soft_terminates_without_fallback() {
