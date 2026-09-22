@@ -28,13 +28,73 @@ fn is_all_noop(actions: &[WorldAction]) -> bool {
         .all(|action| matches!(action, WorldAction::NoOp))
 }
 
+/// How a `Changed` trial's differing executions relate to the base's
+/// (T19.F04 readings; `Changed` itself is unchanged, so the series
+/// compares). `Other` for every non-`Changed` trial.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChangeShape {
+    /// Every differing execution holds the same multiset of actions in
+    /// another order.
+    Reordered,
+    /// Every differing execution holds the same set of action kinds at
+    /// different counts.
+    Recount,
+    /// Any other change, or a mix of the two across executions.
+    Other,
+}
+
+/// The shape of one differing execution's change.
+fn execution_shape(base: &[WorldAction], candidate: &[WorldAction]) -> ChangeShape {
+    let count = |actions: &[WorldAction], action: &WorldAction| {
+        actions.iter().filter(|other| *other == action).count()
+    };
+    let same_multiset = base.len() == candidate.len()
+        && base
+            .iter()
+            .all(|action| count(base, action) == count(candidate, action));
+    if same_multiset {
+        return ChangeShape::Reordered;
+    }
+    let kind_count = |actions: &[WorldAction], kind: std::mem::Discriminant<WorldAction>| {
+        actions
+            .iter()
+            .filter(|action| std::mem::discriminant(*action) == kind)
+            .count()
+    };
+    let has_kind = |actions: &[WorldAction], kind| kind_count(actions, kind) > 0;
+    let same_kinds = base.iter().chain(candidate).all(|action| {
+        let kind = std::mem::discriminant(action);
+        has_kind(base, kind) && has_kind(candidate, kind)
+    });
+    let other_counts = base.iter().chain(candidate).any(|action| {
+        let kind = std::mem::discriminant(action);
+        kind_count(base, kind) != kind_count(candidate, kind)
+    });
+    if same_kinds && other_counts {
+        ChangeShape::Recount
+    } else {
+        ChangeShape::Other
+    }
+}
+
+/// Every execution of a signature, snapshots first, then each sequence tick.
+fn executions(signature: &Signature) -> impl Iterator<Item = &[WorldAction]> {
+    signature
+        .snapshots
+        .iter()
+        .chain(signature.sequences.iter().flatten())
+        .map(Vec::as_slice)
+}
+
 /// One classification's full detail: the class, whether the two signatures
-/// agree on every snapshot but differ in a sequence, and how many of the
-/// signature's executions differ.
+/// agree on every snapshot but differ in a sequence, the shape of a
+/// `Changed` trial's change, and how many of the signature's executions
+/// differ.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Classification {
     pub class: Class,
     pub changed_only_in_sequences: bool,
+    pub shape: ChangeShape,
     pub differing_executions: u32,
     pub total_executions: u32,
 }
@@ -77,9 +137,25 @@ pub fn classify(base: &Signature, candidate: &Signature) -> Classification {
         }
     };
 
+    let shape = if class == Class::Changed {
+        let mut shapes = executions(base)
+            .zip(executions(candidate))
+            .filter(|(a, b)| a != b)
+            .map(|(a, b)| execution_shape(a, b));
+        let first = shapes.next().unwrap_or(ChangeShape::Other);
+        if shapes.all(|shape| shape == first) {
+            first
+        } else {
+            ChangeShape::Other
+        }
+    } else {
+        ChangeShape::Other
+    };
+
     Classification {
         class,
         changed_only_in_sequences: snapshot_diff == 0 && sequence_diff > 0,
+        shape,
         differing_executions,
         total_executions,
     }
@@ -97,6 +173,10 @@ pub struct Tally {
     pub changed: u32,
     pub dead: u32,
     pub changed_only_in_sequences: u32,
+    /// `Changed` trials whose shape is [`ChangeShape::Reordered`] (T19.F04).
+    pub reordered: u32,
+    /// `Changed` trials whose shape is [`ChangeShape::Recount`] (T19.F04).
+    pub recount: u32,
     /// Sum of `differing_executions` over every changed-or-dead trial, so the
     /// mean fraction of executions that differ is computed once at format
     /// time from two integers rather than accumulated as a running float.
@@ -132,6 +212,11 @@ impl Tally {
         if classification.changed_only_in_sequences {
             self.changed_only_in_sequences += 1;
         }
+        match classification.shape {
+            ChangeShape::Reordered => self.reordered += 1,
+            ChangeShape::Recount => self.recount += 1,
+            ChangeShape::Other => {}
+        }
         self
     }
 
@@ -146,6 +231,8 @@ impl Tally {
         self.changed += other.changed;
         self.dead += other.dead;
         self.changed_only_in_sequences += other.changed_only_in_sequences;
+        self.reordered += other.reordered;
+        self.recount += other.recount;
         self.differing_executions_total += other.differing_executions_total;
         self.total_executions_total += other.total_executions_total;
         self
@@ -248,6 +335,7 @@ mod tests {
         let tally = Tally::default().skip().skip().record(Classification {
             class: Class::Silent,
             changed_only_in_sequences: false,
+            shape: ChangeShape::Other,
             differing_executions: 0,
             total_executions: 80,
         });
@@ -261,6 +349,7 @@ mod tests {
         let tally = Tally::default().skip().record(Classification {
             class: Class::Silent,
             changed_only_in_sequences: false,
+            shape: ChangeShape::Other,
             differing_executions: 0,
             total_executions: 80,
         });
@@ -272,6 +361,7 @@ mod tests {
         let tally = Tally::default().record(Classification {
             class: Class::Changed,
             changed_only_in_sequences: false,
+            shape: ChangeShape::Other,
             differing_executions: 5,
             total_executions: 10,
         });
@@ -288,6 +378,7 @@ mod tests {
         let tally = Tally::default().record(Classification {
             class: Class::Changed,
             changed_only_in_sequences: true,
+            shape: ChangeShape::Reordered,
             differing_executions: 3,
             total_executions: 4,
         });
@@ -295,12 +386,14 @@ mod tests {
         assert_eq!(tally.changed, 1);
         assert_eq!(tally.dead, 0);
         assert_eq!(tally.changed_only_in_sequences, 1);
+        assert_eq!((tally.reordered, tally.recount), (1, 0));
         assert_eq!(tally.differing_executions_total, 3);
         assert_eq!(tally.total_executions_total, 4);
 
         let tally = tally.record(Classification {
             class: Class::Dead,
             changed_only_in_sequences: false,
+            shape: ChangeShape::Other,
             differing_executions: 2,
             total_executions: 5,
         });
@@ -328,6 +421,8 @@ mod tests {
             changed: 5,
             dead: 6,
             changed_only_in_sequences: 7,
+            reordered: 27,
+            recount: 29,
             differing_executions_total: 8,
             total_executions_total: 9,
         };
@@ -338,6 +433,8 @@ mod tests {
             changed: 13,
             dead: 14,
             changed_only_in_sequences: 15,
+            reordered: 31,
+            recount: 37,
             differing_executions_total: 16,
             total_executions_total: 17,
         };
@@ -348,11 +445,101 @@ mod tests {
         assert_eq!(merged.changed, 18);
         assert_eq!(merged.dead, 20);
         assert_eq!(merged.changed_only_in_sequences, 22);
+        assert_eq!((merged.reordered, merged.recount), (58, 66));
         assert_eq!(merged.differing_executions_total, 24);
         assert_eq!(merged.total_executions_total, 26);
     }
 
+    fn snapshots(executions: Vec<Vec<WorldAction>>) -> Signature {
+        Signature {
+            snapshots: executions,
+            sequences: Vec::new(),
+        }
+    }
+
+    const EAT: WorldAction = WorldAction::Eat {
+        type_idx: crate::config::OrdinaryFoodTypeId::new(0),
+    };
+
+    /// T19.F04 readings inside `Changed`: the same multiset in another order
+    /// is `Reordered`; the same action kinds at other counts is `Recount`;
+    /// anything else, or a mix across differing executions, is `Other`.
+    #[test]
+    fn changed_trials_carry_their_reordered_or_recount_shape() {
+        let north = WorldAction::Move(Direction::N);
+        let east = WorldAction::Move(Direction::E);
+        let base = snapshots(vec![vec![EAT, north], vec![EAT]]);
+
+        let reordered = classify(&base, &snapshots(vec![vec![north, EAT], vec![EAT]]));
+        assert_eq!(reordered.class, Class::Changed);
+        assert_eq!(reordered.shape, ChangeShape::Reordered);
+
+        let recount = classify(&base, &snapshots(vec![vec![EAT, north], vec![EAT, EAT]]));
+        assert_eq!(recount.shape, ChangeShape::Recount);
+        let same_kind_other_direction =
+            classify(&base, &snapshots(vec![vec![EAT, north, east], vec![EAT]]));
+        assert_eq!(same_kind_other_direction.shape, ChangeShape::Recount);
+
+        let other = classify(&base, &snapshots(vec![vec![EAT, north], vec![north]]));
+        assert_eq!(other.shape, ChangeShape::Other);
+        let mixed = classify(&base, &snapshots(vec![vec![north, EAT], vec![EAT, EAT]]));
+        assert_eq!(mixed.shape, ChangeShape::Other);
+
+        let silent = classify(&base, &base);
+        assert_eq!(silent.shape, ChangeShape::Other);
+        let dead = classify(&base, &snapshots(vec![vec![], vec![]]));
+        assert_eq!((dead.class, dead.shape), (Class::Dead, ChangeShape::Other));
+
+        let tally = Tally::default()
+            .record(reordered)
+            .record(recount)
+            .record(other)
+            .record(silent);
+        assert_eq!(
+            (tally.changed, tally.reordered, tally.recount),
+            (3, 1, 1),
+            "the shapes are tallies inside Changed, whose count is unchanged"
+        );
+    }
+
     proptest! {
+        /// Reversing the actions of any executions of a base leaves every
+        /// differing execution the same multiset in another order.
+        #[test]
+        fn permuted_executions_are_silent_or_reordered(
+            executions in prop::collection::vec(
+                prop::collection::vec(prop::sample::select(vec![
+                    EAT,
+                    WorldAction::NoOp,
+                    WorldAction::Move(Direction::N),
+                    WorldAction::Move(Direction::S),
+                ]), 0..5),
+                1..6,
+            ),
+            reverse in prop::collection::vec(any::<bool>(), 6),
+        ) {
+            let base = snapshots(executions.clone());
+            let candidate = snapshots(
+                executions
+                    .iter()
+                    .zip(&reverse)
+                    .map(|(actions, &flip)| {
+                        let mut actions = actions.clone();
+                        if flip {
+                            actions.reverse();
+                        }
+                        actions
+                    })
+                    .collect(),
+            );
+            let result = classify(&base, &candidate);
+            match result.class {
+                Class::Silent => prop_assert_eq!(result.shape, ChangeShape::Other),
+                Class::Changed => prop_assert_eq!(result.shape, ChangeShape::Reordered),
+                Class::Dead => prop_assert!(false, "a permutation of a live base is never dead"),
+            }
+        }
+
         #[test]
         fn a_signature_equal_to_its_base_is_always_silent(
             snapshot_bits in prop::collection::vec(any::<bool>(), 0..8),
@@ -403,6 +590,7 @@ mod tests {
             0u32..20,
             0u32..20,
             0u32..20,
+            (0u32..20, 0u32..20),
             0u64..500,
             0u64..2000,
         )
@@ -413,6 +601,7 @@ mod tests {
                     changed,
                     dead,
                     changed_only_in_sequences,
+                    (reordered, recount),
                     differing_executions_total,
                     total_executions_total,
                 )| Tally {
@@ -422,6 +611,8 @@ mod tests {
                     changed,
                     dead,
                     changed_only_in_sequences,
+                    reordered,
+                    recount,
                     differing_executions_total,
                     total_executions_total,
                 },

@@ -178,6 +178,7 @@ mod tests {
         Tally::default().record(Classification {
             class,
             changed_only_in_sequences: false,
+            shape: crate::neighborhood::classify::ChangeShape::Other,
             differing_executions: u32::from(!matches!(class, Class::Silent)),
             total_executions: 80,
         })

@@ -594,11 +594,14 @@ fn neighborhood_tally_conversion_computes_fractions_against_applied_not_trials()
         changed: 4,
         dead: 1,
         changed_only_in_sequences: 1,
+        reordered: 2,
+        recount: 1,
         differing_executions_total: 40,
         total_executions_total: 400,
     };
     let report = to_neighborhood_tally(&tally);
     assert_eq!(report.applied, 8);
+    assert_eq!((report.reordered, report.recount), (2, 1));
     assert_eq!(report.silent_fraction, "0.375000");
     assert_eq!(report.changed_fraction, "0.500000");
     assert_eq!(report.dead_fraction, "0.125000");

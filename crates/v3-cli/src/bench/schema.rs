@@ -653,6 +653,14 @@ pub struct NeighborhoodTally {
     pub changed: u32,
     pub dead: u32,
     pub changed_only_in_sequences: u32,
+    /// `Changed` trials whose differing executions only reorder the base's
+    /// actions (T19.F04); absent from earlier reports.
+    #[serde(default)]
+    pub reordered: u32,
+    /// `Changed` trials whose differing executions keep the base's action
+    /// kinds at other counts (T19.F04); absent from earlier reports.
+    #[serde(default)]
+    pub recount: u32,
     pub silent_fraction: String,
     pub changed_fraction: String,
     pub dead_fraction: String,
