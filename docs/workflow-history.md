@@ -176,6 +176,11 @@ the saving is mostly plan-side (Fable bills to credits) plus the removed Plan
 context; it is a one-line reversal if the next measurement window does not show
 it.
 
+On 2026-09-22, the user moved every Opus 5 role (orchestrator, implementer,
+mutation specialist) to Opus 5.5 at the same efforts. The agent files already
+select `model: opus`, which resolves to the newest Opus, so only the contract
+text changed.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the
