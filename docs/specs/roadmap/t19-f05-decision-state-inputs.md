@@ -120,9 +120,12 @@ Options settled here, all internal to the codebase:
    the five, so every founder genome, `FOUNDER_GENOME_SIZE_UNITS` (97), the
    founder digest, and `founder_only_trajectory_digest_is_pinned` (mutation
    off) are unchanged. Every seeded run with mutation on moves through the
-   draw remap and the introspection kind's third alternative;
-   `legacy_default_short_run_identity` is re-pinned after two agreeing runs.
-   `config_digest` and the v3-cli recipe pin are unchanged.
+   draw remap and the introspection kind's third alternative, so every pin
+   on such a run moves and is re-pinned after two agreeing runs, before and
+   after in the readings file: `legacy_default_short_run_identity`, the two
+   `applied_trajectory` digests, the recruitment-path `InputRef.Add` search
+   seeds, and the drift-walk cohort values. `config_digest` and the v3-cli
+   recipe pin are unchanged.
 7. **Determinism.** No read draws RNG; every value is per-creature state or
    the frozen snapshot, so the parallel cognition phase stays
    order-independent; the outcome store is one write per creature keyed by
@@ -145,10 +148,11 @@ Options settled here, all internal to the codebase:
 | `contracts/inputs.rs`, `runtime/inputs.rs`, `runtime/types.rs`, `runtime/mesh.rs`, `cgp/execute.rs`, `vm.rs` | Variants, `ResolveCtx` fields, `previous_pass_votes`, resolution |
 | `sensors/static_inputs.rs`, `creature/state.rs`, `simulation/tick.rs`, `simulation/outcomes.rs` | The stored block, its Phase 2.5 write, its assembly and scaling |
 | `mutation/sampling.rs`, `mutation/compound.rs`, `mutation/input_ref/mod.rs`, `mesh_annotations.rs`, `cgp_mesh_annotations.rs` | Draw, widths, universe, class |
+| `mutation/types/mod.rs` `MutationAddedNodeInputClass` (the added-node input stats key) | Gains `Decision` (key `decision`); the mapping mirrors `MeshReadClass` exactly: the three compounds are `Decision`, `HopsThisTick` and `PreviousOutcome` are `Introspection` |
 | `creature/sensor_census.rs`, v3-cli `bench/tracking.rs` and its tests | Census set and rows |
 | v3-server `http/creature.rs` class test | `Decision` in the sorted-class fixture |
 | `frontend/src/types/genome.ts`, `creature-detail.ts`, `inspector/inputRefUtils.ts`, `mesh/meshSemantics.ts` and their tests | Type unions, label and color, `decision` read class |
-| `v3-sensor-spec.md` (1, 3.2, 3.3, new 3.6 and 3.7, 8, 10), `v3-mutation-spec.md` (draw and the `Swap` kind table), `v3-mesh-execution-spec.md` (2, 4), `v3-vm-isa-spec.md` (`ReadInput` and upstream resolution), `v3-tick-orchestration-spec.md` (Phase 2.5) | Catalog of 27, widths, classes, the outcome store; no reference doc lists the read classes (grep `action_queue`, 2026-09-22) |
+| `v3-sensor-spec.md` (1, 3.2, 3.3, new 3.6 and 3.7, 8, 10), `v3-mutation-spec.md` (draw and the `Swap` kind table), `v3-mesh-execution-spec.md` (2, 4), `v3-vm-isa-spec.md` (`ReadInput` and upstream resolution), `v3-tick-orchestration-spec.md` (Phase 2.5) | Catalog of 27, widths, classes, the outcome store; no reference doc lists the read classes (grep `action_queue`, 2026-09-22). While the Section 4 matrix gains its rows, its pre-existing "scalar input with `sub_idx > 0` yields `0.0`" row and the ISA spec's matching sentence are corrected to "ignored", which is what `resolve_input` does and what the sensor spec's Section 8 says; a doc correction, not a behavior change |
 
 10. **Worked cases.** Fixtures the implementer realizes on either backend.
     The control of every case is the same genome with the new read replaced
