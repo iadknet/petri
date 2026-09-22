@@ -66,7 +66,7 @@ of the worked cases in its Section 2.3.
 
 - [x] **T19.F01 — Per-Tick Hop Ramp** — Depends on: None
   - Goal: Sustained neural activity costs metabolism, so a creature that deliberates past a per-tick allowance of mesh hops pays a charge that rises with every further hop, summed over the tick, beside T03.F10's per-dispatch VM ramp.
-- [ ] **T19.F02 — Live Internal State and Legal Cycles** — Depends on: T19.F01
+- [x] **T19.F02 — Live Internal State and Legal Cycles** — Depends on: T19.F01
   - Goal: A nervous system's dynamics run faster than its behavior and a circuit may reverberate, so a mesh node may run any number of times in a tick on its live state, a cycle ends at a survivable per-pass hop cap that keeps the queue, and no tick-start snapshot of internal state exists.
 - [ ] **T19.F03 — Vote Surface as Inert Data** — Depends on: T19.F02
   - Goal: A motor pool is wired before it is ever driven, like a silent synapse, so the vote sinks (the four kinds, Terminate, and Decide), the `AddVote` opcode, the vote vector, and the per-kind counters exist everywhere a genome and a trace are represented while nothing reads or draws them.

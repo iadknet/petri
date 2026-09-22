@@ -1,7 +1,7 @@
 # T19.F02 — Live Internal State and Legal Cycles
 
-**Status**: In Progress
-**Last updated**: 2026-09-21
+**Status**: Complete
+**Last updated**: 2026-09-22
 **Feature**: T19.F02
 **Track**: [T19 — Mesh Action Selection and Live State](../../roadmaps/t19-mesh-action-selection-and-live-state.md)
 
@@ -190,7 +190,7 @@ controllers integrate several steps per sensorimotor step (7.2).
       `63498f8d36346079f8827c382e2978510357b374ca37759af857afa263f2d0be`.
 - [x] Recipe digest pins moved (`d9a4dc8c…`, `d1aff3f5…`, `b24c1225…`) and
       `cargo test -p v3-cli` green.
-- [ ] Whole-repo gate: `make check` exit 0 on the tested commit.
+- [x] Whole-repo gate: `make check` exit 0 on the tested commit `f0e00092`.
 - [x] Mutation gate: 4 survivors killed test-only, 2 equivalent, none deferred:
 
       ```
@@ -288,15 +288,15 @@ T19.F01's, since the gate has births under the relaxed draw.
 
 ## Success Criteria
 
-- [ ] No node is ineligible because it already executed; no `tick_start_*`
+- [x] No node is ineligible because it already executed; no `tick_start_*`
       field exists; visits read and commit committed state; traces add per visit.
-- [ ] `max_mesh_hops` 64 keeps the queue and counts `pass_cap_hits`; the
+- [x] `max_mesh_hops` 64 keeps the queue and counts `pass_cap_hits`; the
       seven recipes carry 64; the bid is charged once per tick.
-- [ ] `RetargetNodeTarget` and `AddRouteTarget` can produce a self-target;
+- [x] `RetargetNodeTarget` and `AddRouteTarget` can produce a self-target;
       the convergence fields are gone everywhere named in invariant 8.
-- [ ] Founders byte-identical and the founder digest holds; cycle fixtures,
+- [x] Founders byte-identical and the founder digest holds; cycle fixtures,
       inverted tests, rewritten references, and both loop readings exist.
-- [ ] Mutation gate run with every survivor resolved; gate and goal run with
+- [x] Mutation gate run with every survivor resolved; gate and goal run with
       the epoch handling above.
 
 ## Notes for AI Agents
@@ -308,19 +308,24 @@ T19.F01's, since the gate has births under the relaxed draw.
   unchanged; a later change of either re-reads invariant 2's calibration.
 - Deferred: the legacy graph trace fields `converged`, `stable_passes_count`,
   and `max_delta` are left for T19.F06.
-- Decision: pending the user at closure. Goal `plasticity_updates` +80.48% vs
+- Decision: user accepted the severe on 2026-09-22 (goal epoch
+  re-pinned). Goal `plasticity_updates` +80.48% vs
   T19.F01 (not severe vs the epoch) is the predeclared "up" with no ceiling;
   hops per creature-tick are flat (2.20 vs 2.28) and revisits are rare, so it
   is a trajectory shift under the draw remap, as at T11.F19 (+82%) and
   T17.F02 (+78.9%), not per-visit multiplication. The goal-worlds epoch
   re-pins to this feature's goal summary by the track's Epochs rule, and the
-  gate epoch by the gate rule above; both `epoch_baseline` values are staged
-  in `benchmark-series.json`, the severe itself needs the user's acceptance.
+  gate epoch by the gate rule above; both `epoch_baseline` values are re-pinned
+  in `benchmark-series.json`.
 - Deferred: bench counter registration is spread across `profiles.rs`,
   `comparison.rs`, `run.rs`, and `schema.rs` (`pass_cap_hits` touched all
   four); not consolidated here, T19.F04 reads all four before adding one.
-- Exception: pending the user at closure. Canyon `cycle_carrying` dead per
+- Exception: user accepted on 2026-09-22. Canyon `cycle_carrying` dead per
   birth 1/148 (0.00676) exceeds twice overall (0.003664) by one death at
   depth 2,000; at the overall rate the chance of at least one death in 148
   births is 0.24, so the ceiling has no power at this sample. Reported, not
   remediated; the ceiling is unchanged.
+- Cost: 2 implementer briefs plus 1 remediation pass (2, 2, 2 advisor
+  consults), 2 spec-owner resumes after Plan, reviewer 1 P1 / 1 P2 / 3 P3,
+  mutation 6 survivors (4 killed, 2 equivalent); `/usage` totals not
+  recorded (user command, session unattended).
