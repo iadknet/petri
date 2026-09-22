@@ -257,9 +257,13 @@ exit: settle the bid once; actions = queue, or NoOp when empty
       theirs) -> only the enforcement test (readings file).
 - [x] Founder exactness: truth table, `limit 1`, proptest, and 2,000-ring
       check pass; moved pins, before and after, in the readings file.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      every survivor resolved as killed, equivalent, or deferred (a long gate
-      is budgeted: the deleted surface touches every hub file).
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` at `bf2ca325`: `454
+      mutants tested in 75m: 26 missed, 314 caught, 114 unviable`, 0
+      timeouts; output `~/.local/share/petri-tools/mutants/t19-f04/mutants.out`
+      (kept as `mutants.out.fresh`). Survivors: 24 killed by seven new tests,
+      2 equivalent (`classify.rs:49`, `vote_select.rs:57`), 0 deferred; one
+      fresh run (an earlier attempt stopped at the red baseline, zero mutants
+      tested). Table in the readings file, "Mutation gate".
 - [x] Benchmark summaries stored at
       `docs/progress/features/t19-f04-vote-based-action-selection.json` and
       `-goal.json`, local raw hash, byte count, and verification time checked,
