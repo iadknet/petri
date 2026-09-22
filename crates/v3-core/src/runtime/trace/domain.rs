@@ -2,6 +2,7 @@
 
 use crate::contracts::{InputReference, NodeId, WorldAction};
 use crate::creature::genome::cgp::ComputeNodeKind;
+use crate::creature::genome::vote::{VoteVector, VOTE_KIND_COUNT};
 use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::PerceptionSnapshot;
 use crate::sensors::static_inputs::StaticInputs;
@@ -39,6 +40,11 @@ pub struct TickTrace {
     pub termination_reason: TerminationReason,
     /// Energy bid for turn-order priority (0.0 if none).
     pub priority_bid: f32,
+    /// The tick's accumulated vote vector (T19.F03), in `VoteSink` index
+    /// order. Reported only; nothing reads it.
+    pub votes: VoteVector,
+    /// Per-kind vote commit counters (T19.F03), zero until T19.F04.
+    pub commit_counts: [u32; VOTE_KIND_COUNT],
 }
 
 /// Why the mesh chain terminated for this tick.
@@ -116,6 +122,9 @@ pub struct MeshHopTrace {
     pub energy_after: f32,
     pub output_slots: [f32; OUTPUT_SLOT_COUNT],
     pub route: Option<TraceRouteDecision>,
+    /// The vote contribution this hop committed (T19.F03); zeros when the
+    /// dispatch ended exhausted and committed nothing.
+    pub vote_contribution: VoteVector,
     pub backend_trace: BackendTrace,
 }
 

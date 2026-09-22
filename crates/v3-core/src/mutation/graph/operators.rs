@@ -11,7 +11,7 @@ use crate::config::MutationConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference};
 use crate::creature::genome::cgp::{
     ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, DirectionBidEdge,
-    GraphEdge, GraphSource, WorldActionKind,
+    GraphEdge, GraphSource, OutputSinkKind, WorldActionKind,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::compound::sub_value_count;
@@ -355,7 +355,16 @@ pub(crate) fn pick_random_surface(
     for i in 0..def.compute_nodes.len() {
         surfaces.push(EdgeSurface::ComputeInput(i));
     }
-    for i in 0..def.output_sinks.len() {
+    // The vote and parameter sinks (T19.F03) are excluded by kind, so the
+    // surface list, its length, and every draw are what they were before the
+    // catalog grew. T19.F04 lifts the exclusion without renumbering.
+    for (i, sink) in def.output_sinks.iter().enumerate() {
+        if matches!(
+            sink.kind,
+            OutputSinkKind::ActionVote(_) | OutputSinkKind::ActionParam(_, _)
+        ) {
+            continue;
+        }
         surfaces.push(EdgeSurface::SinkInput(i));
     }
     for i in 0..def.action_bank.len() {
@@ -2599,5 +2608,68 @@ mod tests {
             &sample_input_refs(),
             &MutationConfig::default()
         ));
+    }
+
+    /// The founder graph's surface draws, recorded on `07086ed0` before the
+    /// T19.F03 vote surface existed. `pick_random_surface` skips the vote and
+    /// parameter sinks, so the surface list, its length, and every draw stay
+    /// exactly what they were when the catalog held 64 sinks.
+    const FOUNDER_SURFACE_DRAWS_BEFORE_VOTE_SINKS: [&str; 8] = [
+        "SinkInput(54)",
+        "SinkInput(57)",
+        "SinkInput(63)",
+        "SinkInput(48)",
+        "SinkInput(55)",
+        "ActionParam(3)",
+        "ActionParam(3)",
+        "SinkInput(33)",
+    ];
+
+    fn founder_graph_def() -> CgpGraphBackendDef {
+        crate::creature::cgp_founder::build_cgp_founder_graph_with_thresholds(
+            &MutationConfig::default(),
+            0.5,
+            100,
+            500,
+        )
+    }
+
+    #[test]
+    fn pick_random_surface_never_returns_a_vote_or_parameter_sink() {
+        let def = founder_graph_def();
+        let votes_or_params: Vec<usize> = def
+            .output_sinks
+            .iter()
+            .enumerate()
+            .filter(|(_, sink)| {
+                matches!(
+                    sink.kind,
+                    OutputSinkKind::ActionVote(_) | OutputSinkKind::ActionParam(_, _)
+                )
+            })
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(votes_or_params.len(), 35);
+        for seed in 0u64..4096 {
+            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+            let surface = pick_random_surface(&def, &mut rng).expect("founder graph has surfaces");
+            if let EdgeSurface::SinkInput(i) = surface {
+                assert!(!votes_or_params.contains(&i), "seed {seed} drew sink {i}");
+            }
+        }
+    }
+
+    #[test]
+    fn pick_random_surface_on_the_founder_graph_matches_the_pre_feature_record() {
+        let def = founder_graph_def();
+        let drawn: Vec<String> = (1u64..=8)
+            .map(|seed| {
+                let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+                let surface =
+                    pick_random_surface(&def, &mut rng).expect("founder graph has surfaces");
+                format!("{surface:?}")
+            })
+            .collect();
+        assert_eq!(drawn, FOUNDER_SURFACE_DRAWS_BEFORE_VOTE_SINKS);
     }
 }

@@ -75,6 +75,8 @@ fn assemble_tick(tick: core_trace::TickTrace) -> Result<TickTracePayload, serde_
             core_trace::TerminationReason::MissingNode => TerminationReasonPayload::MissingNode,
         },
         priority_bid: tick.priority_bid,
+        votes: tick.votes,
+        commit_counts: tick.commit_counts,
     })
 }
 
@@ -107,6 +109,7 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
             selected_target_idx: r.selected_target_idx,
             selected_target_id: r.selected_target_id.0,
         }),
+        vote_contribution: hop.vote_contribution,
         backend_trace: match hop.backend_trace {
             core_trace::BackendTrace::Vm(vm) => BackendTracePayload::Vm(VmTracePayload {
                 register_count: vm.register_count,
@@ -208,6 +211,7 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
 #[cfg(test)]
 mod tests {
     use super::*;
+    use v3_core::creature::genome::vote::{VOTE_KIND_COUNT, VOTE_SINK_COUNT};
     use v3_core::runtime::trace::domain::{
         BackendTrace, ExecutionSample, GraphActionSlotTrace, GraphExecuteGateTrace,
         GraphOutputSinkTrace, GraphTrace, MeshHopTrace, TickTrace, TraceGateScore,
@@ -239,6 +243,7 @@ mod tests {
                     energy_before: 10.0,
                     energy_after: 9.5,
                     output_slots: [0.0; OUTPUT_SLOT_COUNT],
+                    vote_contribution: [0.0; VOTE_SINK_COUNT],
                     route: Some(TraceRouteDecision {
                         gate_scores: vec![
                             TraceGateScore {
@@ -272,6 +277,8 @@ mod tests {
                 final_actions: vec![],
                 termination_reason: core_trace::TerminationReason::NoTargets,
                 priority_bid: 0.0,
+                votes: [0.0; VOTE_SINK_COUNT],
+                commit_counts: [0; VOTE_KIND_COUNT],
             }],
         };
 
@@ -312,6 +319,7 @@ mod tests {
                     energy_before: 5.0,
                     energy_after: 4.5,
                     output_slots: [1.0; OUTPUT_SLOT_COUNT],
+                    vote_contribution: [0.0; VOTE_SINK_COUNT],
                     route: Some(TraceRouteDecision {
                         gate_scores: vec![TraceGateScore {
                             slot: 0,
@@ -361,6 +369,8 @@ mod tests {
                 }],
                 termination_reason: core_trace::TerminationReason::ActionEmitted,
                 priority_bid: 0.0,
+                votes: [0.0; VOTE_SINK_COUNT],
+                commit_counts: [0; VOTE_KIND_COUNT],
             }],
         };
 

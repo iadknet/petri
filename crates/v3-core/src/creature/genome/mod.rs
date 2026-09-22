@@ -4,12 +4,14 @@ pub(crate) mod cgp_analysis;
 pub(crate) mod cgp_mesh_annotations;
 pub mod companions;
 pub mod mesh_annotations;
+pub mod vote;
 
 pub use companions::{structural_companions, StructuralCompanions};
+pub use vote::{VoteKind, VoteSink, VoteVector, VOTE_KIND_COUNT, VOTE_SINK_COUNT};
 
 use crate::contracts::{InputReference, NodeId, RouteTarget};
 
-/// A single VM instruction. 42 opcodes per v3-vm-isa-spec.md.
+/// A single VM instruction. 43 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum VmInstruction {
     // ── Arithmetic and Data Movement ─────────────────────────────────────────
@@ -79,6 +81,11 @@ pub enum VmInstruction {
     /// next movement `PushAction` (T11.F21); an invalid slot writes nothing
     /// and leaves the bank unwritten.
     WriteDirectionBid { direction: u8, src: u8 },
+    /// Add `regs[src]` to this dispatch's vote for `VoteSink::from_index(sink)`
+    /// (T19.F03); a sink at or above the catalog count writes nothing and still
+    /// costs. The dispatch commits its vote at every exit but energy
+    /// exhaustion. Inert: nothing reads the vote vector.
+    AddVote { sink: u8, src: u8 },
     /// Write a route gate score for a specific target slot.
     WriteRouteGate { slot: u8, src: u8 },
 
@@ -407,8 +414,9 @@ mod tests {
                 slot_idx: 7,
             },
             VmInstruction::ClearSlot { slot_idx: 2 },
+            VmInstruction::AddVote { sink: 0, src: 1 },
         ];
-        assert_eq!(instructions.len(), 42, "must have exactly 42 opcodes");
+        assert_eq!(instructions.len(), 43, "must have exactly 43 opcodes");
     }
 
     #[test]
@@ -444,7 +452,7 @@ mod tests {
             .boxed()
     }
 
-    /// Every one of the 42 opcodes with arbitrary operands.
+    /// Every one of the 43 opcodes with arbitrary operands.
     fn any_vm_instruction() -> impl Strategy<Value = VmInstruction> {
         use VmInstruction::*;
         Union::new(vec![
@@ -485,6 +493,7 @@ mod tests {
             binary(|slot_idx, src| WriteInternalPayload { slot_idx, src }),
             binary(|slot_idx, src| WriteWorldActionMeta { slot_idx, src }),
             binary(|direction, src| WriteDirectionBid { direction, src }),
+            binary(|sink, src| AddVote { sink, src }),
             binary(|slot, src| WriteRouteGate { slot, src }),
             unary(|action_type| PushAction { action_type }),
             nullary(PopAction),

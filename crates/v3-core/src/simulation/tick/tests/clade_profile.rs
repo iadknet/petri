@@ -21,6 +21,8 @@ fn execute(
         work_counters: Default::default(),
         energy_observation: Default::default(),
         termination_reason: TerminationReason::ActionEmitted,
+        votes: Default::default(),
+        commit_counts: Default::default(),
     };
     super::super::run_phase_2(
         sim,

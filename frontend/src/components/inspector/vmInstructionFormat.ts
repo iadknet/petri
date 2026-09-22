@@ -134,6 +134,7 @@ const OPCODE_LABELS: Record<string, string> = {
 	WriteRouteGate: "gate",
 	WriteInternalPayload: "payload",
 	WriteWorldActionMeta: "set",
+	AddVote: "vote",
 	PushAction: "push",
 	SetPriorityBid: "priority",
 	ReadActionQueueLength: "queue",
@@ -196,6 +197,17 @@ function formatStringInstruction(
 		default:
 			return { label: instruction.toLowerCase(), operands: "", badges };
 	}
+}
+
+/** Label the vote sink at a catalog index (T19.F03); out of range reads as invalid. */
+export function voteSinkLabel(index: number): string {
+	if (index === 0) return "Eat";
+	if (index < 9) return `Move[${index - 1}]`;
+	if (index < 17) return `Reproduce[${index - 9}]`;
+	if (index < 25) return `StealEnergy[${index - 17}]`;
+	if (index === 25) return "Terminate";
+	if (index === 26) return "Decide";
+	return `invalid(${index})`;
 }
 
 /** Safe field access — defaults to 0 for missing keys. */
@@ -302,6 +314,11 @@ function formatOperands(
 			return `gate[${f(p, "slot")}] ← ${reg(f(p, "src"))}`;
 		case "WriteInternalPayload":
 			return `payload[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
+		case "AddVote": {
+			const sinkIdx = f(p, "sink");
+			const sink = voteSinkLabel(sinkIdx);
+			return `vote[${sink}] += ${reg(f(p, "src"))}`;
+		}
 		case "WriteWorldActionMeta": {
 			const slotIdx = f(p, "slot_idx");
 			const metaCtx = actionCtx?.metaWrites.get(index);

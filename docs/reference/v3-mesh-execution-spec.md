@@ -42,8 +42,10 @@ pub fn execute_creature_mesh(
 Boundary intent:
 - `sensors/` owns local and extended perception snapshot assembly.
 - `runtime/` owns node evaluation, routing, and soft-default behavior.
-- `runtime` returns `MeshOutput` (`actions`, cost report, `priority_bid`) to
-  tick orchestration.
+- `runtime` returns `MeshOutput` (`actions`, cost report, `priority_bid`,
+  work counters, and the inert vote surface: `votes` and `commit_counts`,
+  T19.F03) to tick orchestration. The vote fields travel to the trace only;
+  nothing reads them until T19.F04.
 - `tick/orchestrator` owns turn ordering and immediate action application.
 
 ---

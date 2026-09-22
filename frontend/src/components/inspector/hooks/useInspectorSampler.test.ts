@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSamplePlaybackStore } from "../../../stores/samplePlayback.ts";
 import { useSampleSessionStore } from "../../../stores/sampleSession.ts";
 import type { ExecutionSample } from "../../../types/trace.ts";
+import { ZERO_VOTES } from "../../../types/trace.ts";
 import { useInspectorSampler } from "./useInspectorSampler.ts";
 
 const mockClearSampling = vi.fn();
@@ -30,6 +31,7 @@ function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 		hops: [
 			{
 				hop_index: 0,
+				vote_contribution: ZERO_VOTES,
 				node_id: 1,
 				input_refs: [],
 				upstream_slots: [],
@@ -66,6 +68,7 @@ function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 			},
 			{
 				hop_index: 1,
+				vote_contribution: ZERO_VOTES,
 				node_id: 2,
 				input_refs: [],
 				upstream_slots: [],
@@ -104,6 +107,8 @@ function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 		termination_reason: "NoTargets" as const,
 		debug_perception: null,
 		priority_bid: 0,
+		votes: ZERO_VOTES,
+		commit_counts: [0, 0, 0, 0],
 	}));
 
 	return { creature_id: creatureId, ticks };

@@ -3,6 +3,7 @@ import type { PlaybackState, SamplerPosition } from "../../stores/samplePlayback
 import type { ExecutionSample } from "../../types/trace.ts";
 import { MeshHopTimeline } from "./MeshHopTimeline.tsx";
 import { TickTimeline } from "./TickTimeline.tsx";
+import { VoteSurfaceBlock } from "./VoteSurfaceBlock.tsx";
 import { formatActionList } from "./inputRefUtils.ts";
 import type { MeshSemantics } from "./mesh/meshSemantics.ts";
 
@@ -190,6 +191,9 @@ export const SamplerBar = memo(function SamplerBar({
 						onHopSelect={onHopSelect}
 					/>
 				)}
+
+				{/* Inert vote surface (T19.F03) */}
+				{currentTick && <VoteSurfaceBlock tick={currentTick} />}
 			</div>
 		);
 	}

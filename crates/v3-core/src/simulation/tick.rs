@@ -496,6 +496,8 @@ fn run_cognition(
                     final_actions: output.actions.clone(),
                     termination_reason,
                     priority_bid: output.priority_bid,
+                    votes: output.votes,
+                    commit_counts: output.commit_counts,
                 });
                 active.ticks_remaining = active.ticks_remaining.saturating_sub(1);
             }

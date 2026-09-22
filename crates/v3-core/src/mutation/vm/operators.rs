@@ -390,6 +390,12 @@ pub(crate) fn mutate_one_instruction_field(
         | VmInstruction::WriteDirectionBid {
             direction: slot_idx,
             src,
+        }
+        // Unreachable until T19.F04: `random_vm_instruction` never yields
+        // `AddVote`, so no program carries one to nudge (T19.F03).
+        | VmInstruction::AddVote {
+            sink: slot_idx,
+            src,
         } => {
             nudge_one_u8(&mut [slot_idx, src], rng);
             true
@@ -629,6 +635,7 @@ fn for_each_register_ref(instruction: &mut VmInstruction, callback: &mut impl Fn
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
         | VmInstruction::WriteDirectionBid { src, .. }
+        | VmInstruction::AddVote { src, .. }
         | VmInstruction::WriteRouteGate { src, .. }
         | VmInstruction::SetPriorityBid { src }
         | VmInstruction::StoreSlotImm { src, .. } => callback(src),

@@ -2,6 +2,7 @@
 
 use crate::config::RuntimeConfig;
 use crate::contracts::NodeId;
+use crate::creature::genome::vote::VoteVector;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_traced;
@@ -119,6 +120,7 @@ impl MeshExecutionMode for RecordingMeshExecution {
         energy_after: f32,
         result: &NodeResult,
         route_result: Option<(usize, NodeId)>,
+        vote_contribution: VoteVector,
         backend_trace: BackendTrace,
     ) {
         let route = route_result.map(|(selected_target_idx, selected_target_id)| {
@@ -152,6 +154,7 @@ impl MeshExecutionMode for RecordingMeshExecution {
             energy_after,
             output_slots: result.output_slots,
             route,
+            vote_contribution,
             backend_trace,
         });
     }

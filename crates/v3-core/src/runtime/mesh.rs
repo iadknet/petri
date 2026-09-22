@@ -7,6 +7,7 @@
 
 use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, WorldAction};
+use crate::creature::genome::vote::VoteVector;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node;
@@ -113,6 +114,7 @@ pub(crate) trait MeshExecutionMode {
         _energy_after: f32,
         _result: &crate::runtime::types::NodeResult,
         _route_result: Option<(usize, NodeId)>,
+        _vote_contribution: VoteVector,
         _backend_trace: Self::BackendTrace,
     ) {
     }
@@ -244,6 +246,7 @@ impl MeshExecutionMode for ObservedMeshExecution {
         _energy_after: f32,
         result: &crate::runtime::types::NodeResult,
         route_result: Option<(usize, NodeId)>,
+        _vote_contribution: VoteVector,
         _backend_trace: (),
     ) {
         let route = if result.terminal || result.energy_exhausted {
@@ -345,6 +348,12 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 &mut side_outputs,
             );
 
+            // Take the dispatch's vote contribution as this node's latest
+            // (T19.F03). A dispatch that ended exhausted staged nothing, so
+            // the node keeps whatever it last committed and the hop reports
+            // zeros.
+            let vote_contribution = side_outputs.commit_vote_contribution(current_idx);
+
             // Attribute energy delta to the correct backend.
             let node_cost = (node_energy_before - *energy).max(0.0);
             match &node.backend_def {
@@ -369,6 +378,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 *energy,
                 &result,
                 route_result,
+                vote_contribution,
                 backend_trace,
             );
 
@@ -420,6 +430,8 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
         cost_report: report,
         priority_bid,
         work_counters: side_outputs.work_counters,
+        votes: side_outputs.votes,
+        commit_counts: side_outputs.commit_counts,
         energy_observation: side_outputs.energy_observation,
         termination_reason,
     };

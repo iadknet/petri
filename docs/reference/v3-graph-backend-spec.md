@@ -171,16 +171,29 @@ kinds — no input/output/shared-memory kinds.
 
 ```rust
 pub enum OutputSinkKind {
-    CustomOutput(u8),   // 12 slots, indices 0-11
-    RouterGate(u8),     // eight routing gate scores, indices 0-7
-    WriteSlot(u8),      // 16 slots, indices 0-15: shared memory write
-    ClearSlot(u8),      // 16 slots, indices 0-15: shared memory clear
+    CustomOutput(u8),        // 24 slots, indices 0-23
+    RouterGate(u8),          // eight routing gate scores, indices 0-7
+    WriteSlot(u8),           // 16 slots, indices 0-15: shared memory write
+    ClearSlot(u8),           // 16 slots, indices 0-15: shared memory clear
+    ActionVote(VoteSink),    // 27 vote sinks (T19.F03), inert
+    ActionParam(VoteKind, u8), // two parameter slots per kind (T19.F03), inert
 }
 ```
 
-The full sink catalog is fixed at genome construction: 12 CustomOutput + 8
-RouterGate + 16 WriteSlot + 16 ClearSlot = 52 sinks. Mutations can only
-modify edges TO sinks, not add/remove/change sink kinds.
+The full sink catalog is fixed at genome construction: 24 CustomOutput + 8
+RouterGate + 16 WriteSlot + 16 ClearSlot + 27 ActionVote + 8 ActionParam = 99
+sinks. Mutations can only modify edges TO sinks, not add/remove/change sink
+kinds.
+
+`VoteSink` is the fixed vote catalog: `Eat` (index 0), `Move(d)` (`1 + d`),
+`Reproduce(d)` (`9 + d`), `StealEnergy(d)` (`17 + d`) for `d` in the eight
+`Direction::ALL` slots, `Terminate` (25), and `Decide` (26). `VoteKind` is
+`Eat`, `Move`, `Reproduce`, `StealEnergy`, in that order.
+
+Both new kinds are inert until T19.F04: a wired `ActionVote` sink contributes
+to the mesh vote vector and a wired `ActionParam` sink overwrites
+`action_params[kind][slot]`, and nothing reads either. `pick_random_surface`
+skips both, so no mutation can wire them yet.
 
 ### Inert-when-unwired rule
 
@@ -533,11 +546,13 @@ from imposing a constant complexity tax.
 
 ## 15. Fixed Output Catalog Construction
 
-`GraphBackendDef::new_with_fixed_outputs(config)` constructs:
-- 12 `CustomOutput(0..11)` sinks
-- 1 `RouterOutput` sink
-- 16 `WriteSlot(0..15)` sinks
-- 16 `ClearSlot(0..15)` sinks
+`GraphBackendDef::new_with_fixed_outputs(config)` constructs, in this order:
+- 24 `CustomOutput(0..23)` sinks (catalog indices 0..24)
+- 8 `RouterGate(0..7)` sinks (24..32)
+- 16 `WriteSlot(0..15)` sinks (32..48)
+- 16 `ClearSlot(0..15)` sinks (48..64)
+- 27 `ActionVote` sinks in `VoteSink` index order (64..91)
+- 8 `ActionParam` sinks kind-major, two slots per kind (91..99)
 - `action_bank` of `config.action_queue_cap` empty `ActionSlot`s
 - Empty `ExecuteGate`
 

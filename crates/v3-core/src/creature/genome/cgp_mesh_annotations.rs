@@ -79,6 +79,11 @@ pub(crate) fn derive_cgp_annotations(
                 has_stateful_behavior = true;
                 write_classes.insert(MeshWriteClass::Memory);
             }
+            // The inert vote surface (T19.F03) writes the action channel. No
+            // genome reaches this arm until T19.F04 lets mutation wire it.
+            OutputSinkKind::ActionVote(_) | OutputSinkKind::ActionParam(_, _) => {
+                write_classes.insert(MeshWriteClass::Action);
+            }
         }
     }
 

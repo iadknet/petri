@@ -69,6 +69,48 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "c82547de36d3cfed37a1f1db8bc61ecc4b7184a31c8e42de163681bd6daae235"
+        "09b9e53c23451057957fdebd135ea8dc12a49b71e8493e4a155424b527e5ff4b"
+    );
+}
+
+/// Applied-behavior guard for the T19.F03 inert vote surface: a mutation-on
+/// short run digested over positions, energy bits, and ages only, with no
+/// genome bytes. Adding an unread sink catalog, opcode, or vote vector must
+/// leave this value untouched; a moved value means a draw or a read leaked
+/// into applied behavior.
+#[test]
+fn mutation_on_applied_trajectory_guard_is_pinned() {
+    let mut hash = Sha256::new();
+    for seed in [7, 19] {
+        let mut config = SimulationConfig::default();
+        config.world.width = 24;
+        config.world.height = 24;
+        config.population.initial_creatures = 24;
+        config.world.food.initial_coverage = 1.0;
+        config.world.food.initial_density = 1.0;
+        config.mutation.mutation_probability = 1.0;
+        config.mutation.per_birth_mutation_events_min = 2;
+        config.mutation.per_birth_mutation_events_max = 4;
+        let mut sim = seed_simulation(config, seed);
+        for _ in 0..64 {
+            run_tick(&mut sim, &mut None);
+            hash.update(sim.tick.to_le_bytes());
+            hash.update(sim.stats.reproduction_actions_spawned_total.to_le_bytes());
+            hash.update(sim.stats.mutation_events_applied_total.to_le_bytes());
+            for (id, creature) in &sim.creatures {
+                hash.update(id.data().as_ffi().to_le_bytes());
+                hash.update(creature.position.x.to_le_bytes());
+                hash.update(creature.position.y.to_le_bytes());
+                hash.update(creature.energy.to_bits().to_le_bytes());
+                hash.update(creature.age.to_le_bytes());
+            }
+        }
+        assert!(sim.stats.reproduction_actions_spawned_total > 0);
+        assert!(sim.stats.mutation_events_applied_total > 0);
+    }
+    let digest = hex::encode(hash.finalize());
+    assert_eq!(
+        digest,
+        "99ef9a142a40178c4952fe73a29978e69fa0030d9475e92ca22f106d19608273"
     );
 }
