@@ -412,17 +412,17 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 }
 
                 // The `Decide` guard (T19.F04 invariant 2): a committed dispatch
-                // ends the pass when `Decide` is positive and some kind's
-                // effective vote is positive.
+                // ends the pass when `Decide` is positive and the pass end would
+                // act: the queue is non-empty and `Terminate` is positive, or
+                // some kind's effective vote is positive.
+                let votes = &side_outputs.votes;
                 let decided = !result.energy_exhausted
-                    && side_outputs.votes[VoteSink::Decide.index()] > 0.0
-                    && select(
-                        &side_outputs.votes,
-                        &side_outputs.commit_counts,
-                        previous_kind,
-                    )
-                    .winner
-                    .is_some();
+                    && votes[VoteSink::Decide.index()] > 0.0
+                    && ((!side_outputs.action_queue.is_empty()
+                        && votes[VoteSink::Terminate.index()] > 0.0)
+                        || select(votes, &side_outputs.commit_counts, previous_kind)
+                            .winner
+                            .is_some());
 
                 // Every existing target is eligible (T19.F02): a node may route to
                 // itself or to any node this tick already dispatched.

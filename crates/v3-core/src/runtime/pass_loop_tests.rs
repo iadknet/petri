@@ -8,7 +8,7 @@ use crate::contracts::{
 };
 use crate::creature::genome::cgp::{ComputeNodeKind, GraphSource};
 use crate::creature::genome::vote::{VoteKind, VoteSink};
-use crate::creature::genome::VmInstruction;
+use crate::creature::genome::{CreatureGenome, VmInstruction};
 use crate::runtime::trace::domain::{PassEndReason, TerminationReason};
 use crate::runtime::vote_test_support::{
     genome, leaf, run_tick, vm_node, vm_voter, GraphBuilder, Senses,
@@ -443,11 +443,11 @@ fn w16_every_kind_inhibited_is_noop_without_a_stall() {
     );
 }
 
-#[test]
-fn w17_a_decide_vote_exits_a_cycle_that_changes_state() {
-    // Self-loop counting on the bus, `Move W 0.9`, and `[count >= 3] → Decide`
-    // (count > 2.5).
-    let program = counting_program(vec![
+/// W17's self-loop after `prefix`: counting on the bus, `Move W 0.9`, and
+/// `[count >= 3] → Decide` (count > 2.5).
+fn w17_genome(prefix: Vec<VmInstruction>) -> CreatureGenome {
+    let mut extra = prefix;
+    extra.extend([
         VmInstruction::LoadConst {
             dst: 1,
             const_idx: 1,
@@ -466,24 +466,62 @@ fn w17_a_decide_vote_exits_a_cycle_that_changes_state() {
             src: 1,
         },
     ]);
-    let g = genome(vec![vm_node(
+    genome(vec![vm_node(
         0,
         2,
         vec![1.0, 0.9, 2.5],
-        program,
+        counting_program(extra),
         vec![InputReference::UpstreamSlot(0)],
         &[0],
-    )]);
+    )])
+}
+
+#[test]
+fn w17_a_decide_vote_exits_a_cycle_that_changes_state() {
+    let g = w17_genome(vec![]);
     let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
     assert_eq!(tick.actions(), &[mv(W)]);
     assert_eq!(tick.passes[0].end_reason, PassEndReason::Decided);
     assert_eq!(tick.passes[0].hops, 3);
     // Pass 2: the bus carries the count, so `Decide` holds from the first
-    // visit, but `Move W` is 0.9 − 1 and the guard keeps the pass running to
-    // its cap; the pass then ends the tick `NoDecision`.
+    // visit, but `Move W` is 0.9 − 1 and no `Terminate` is voted, so the guard
+    // keeps the pass running to its cap; the pass then ends the tick
+    // `NoDecision`.
     assert_eq!(tick.passes[1].end_reason, PassEndReason::PassCapReached);
     assert_eq!(tick.output.work_counters.decided_passes, 1);
     assert_eq!(tick.output.work_counters.pass_cap_hits, 1);
+    assert_eq!(
+        tick.output.termination_reason,
+        TerminationReason::NoDecision
+    );
+}
+
+#[test]
+fn w17b_a_terminate_vote_lets_decide_end_a_pass_with_nothing_to_commit() {
+    // W17 plus a static `Terminate 1.0`. Pass 1 is W17's: the queue is empty,
+    // so `Terminate` does not satisfy the guard. Pass 2: `Move W` is 0.9 − 1,
+    // but the queue holds `Move W` and `Terminate` is positive, so `Decide`
+    // ends the pass at its first boundary; no kind's effective vote is
+    // positive, so the pass end ends the tick `NoDecision`.
+    let g = w17_genome(vec![
+        VmInstruction::LoadConst {
+            dst: 1,
+            const_idx: 0,
+        },
+        VmInstruction::AddVote {
+            sink: VoteSink::Terminate.index() as u8,
+            src: 1,
+        },
+    ]);
+    let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
+    assert_eq!(tick.actions(), &[mv(W)]);
+    assert_eq!(tick.passes.len(), 2);
+    assert_eq!(tick.passes[0].end_reason, PassEndReason::Decided);
+    assert_eq!(tick.passes[0].hops, 3);
+    assert_eq!(tick.passes[1].end_reason, PassEndReason::Decided);
+    assert_eq!(tick.passes[1].hops, 1);
+    assert_eq!(tick.output.work_counters.decided_passes, 2);
+    assert_eq!(tick.output.work_counters.pass_cap_hits, 0);
     assert_eq!(
         tick.output.termination_reason,
         TerminationReason::NoDecision

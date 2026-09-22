@@ -13,7 +13,7 @@ use crate::runtime::routing::{resolve_gated_route, RouteGateMap};
 use crate::runtime::trace::domain::TerminationReason;
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const MESH_EXECUTION_VERSION: &str = "mesh-execution-v1";
+pub const MESH_EXECUTION_VERSION: &str = "mesh-execution-v2";
 pub const KNOCKOUT_METHOD: &str = "static-successor-bypass-v1";
 
 /// Counts from the complete fixed battery; knockout equality concerns action queues only.
