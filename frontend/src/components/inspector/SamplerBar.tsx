@@ -181,29 +181,32 @@ export const SamplerBar = memo(function SamplerBar({
 					onTickSelect={onTickSelect}
 				/>
 
-				{/* Mesh hop timeline */}
-				{currentTick && (
-					<MeshHopTimeline
-						hops={currentHops}
-						passes={currentTick.passes}
-						meshSemantics={meshSemantics}
-						activeHopIndex={position.hopIndex}
-						terminationReason={currentTick.termination_reason}
-						finalActions={currentTick.final_actions}
-						onHopSelect={onHopSelect}
-					/>
-				)}
+				{/* Passes and decision details scroll within a bounded body so a
+				    ten-pass tick stays reachable inside the clipped inspector. */}
+				<div data-testid="sampler-body" className="max-h-[50vh] overflow-y-auto">
+					{currentTick && (
+						<MeshHopTimeline
+							hops={currentHops}
+							passes={currentTick.passes}
+							meshSemantics={meshSemantics}
+							activeHopIndex={position.hopIndex}
+							terminationReason={currentTick.termination_reason}
+							finalActions={currentTick.final_actions}
+							onHopSelect={onHopSelect}
+						/>
+					)}
 
-				{/* The selected dispatch's recorded decision state (T19.F06) */}
-				{currentTick && selectedHop && (
-					<SelectedHopBlock
-						hop={selectedHop}
-						previousOutcome={currentTick.static_inputs.previous_outcome}
-					/>
-				)}
+					{/* The selected dispatch's recorded decision state (T19.F06) */}
+					{currentTick && selectedHop && (
+						<SelectedHopBlock
+							hop={selectedHop}
+							previousOutcome={currentTick.static_inputs.previous_outcome}
+						/>
+					)}
 
-				{/* Pass detail: votes, bars, effective votes (T19.F06) */}
-				{currentTick && <VoteSurfaceBlock tick={currentTick} />}
+					{/* Pass detail: votes, bars, effective votes (T19.F06) */}
+					{currentTick && <VoteSurfaceBlock tick={currentTick} />}
+				</div>
 			</div>
 		);
 	}
