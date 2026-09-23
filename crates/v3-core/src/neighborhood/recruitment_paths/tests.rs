@@ -755,9 +755,8 @@ fn recruitment_paths_delta_rejects_each_mismatched_precondition() {
 fn recruitment_paths_fixture_sites_and_preparation_are_exact() {
     let starts = starting_forms();
     let expected = [
-        // The T19.F04 vote-based modules: one vote edge replaces the old
-        // action-slot and execute-gate wiring (Graph), and one `AddVote`
-        // replaces the push-and-execute tail (VM).
+        // The T19.F04 vote-based modules: one vote edge (Graph) and one
+        // `AddVote` (VM) select the action.
         ("graph_blank", [1, 2, 1, 0, 1, 1], 9),
         ("graph_copy", [2, 2, 1, 0, 2, 2], 12),
         ("graph_split", [2, 2, 1, 0, 3, 3], 14),
@@ -1011,7 +1010,7 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 }
 
 /// The VM insert and `AddGraphEdge` seeds are the ones the one-off search
-/// found after T19.F04 replaced the action bank with vote sinks (the
+/// found after T19.F04 introduced vote-based action selection (the
 /// fresh-instruction draw gains `AddVote` and the edge surface the 27 vote
 /// sinks, which remaps every seeded draw). A blank module now reaches a
 /// `Move(E)` vote in one edge or one instruction, so both blank forms

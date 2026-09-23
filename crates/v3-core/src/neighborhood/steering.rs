@@ -46,7 +46,7 @@ pub struct SteeringBattery {
 }
 
 /// One genome's `steering-v1` reading: counts over the (a) and (b) scenarios
-/// and the structural bank-written flag.
+/// and the structural `move_voted` flag.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SteeringReading {
     /// Number of (a) scenarios executed (`STEERING_BASE_COUNT * 8`).

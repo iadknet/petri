@@ -75,4 +75,18 @@ for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
   fi
 done
 
+# Retired action-selection names (T19.F06): one execution model remains
+# wherever a reader looks. Tracked and non-ignored untracked files count.
+retired_names='PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|DirectionBank|ActionSlot|ExecuteGate|ActionBid|ActionEmitted|MaxHopsReached|push_action([^_a-z]|$)|pop_action|execute_action_queue|write_direction_bid|write_world_action_meta|direction_bank|action_bank|action_slot|execute_gate|action_queue_cap|actionBank|actionSlot|executeGate|[Aa]ction[ -]bank|[Aa]ction[ -]slot|[Ee]xecute[ -]gate|[Dd]irection[ -]bank'
+retired_status=0
+retired_hits=$(git grep --untracked -n -E "$retired_names" -- crates frontend/src docs/reference) || retired_status=$?
+case $retired_status in
+  0)
+    printf '%s\n' "$retired_hits" >&2
+    fail 'retired action-selection names found above; describe the current model without naming the old one'
+    ;;
+  1) ;;
+  *) fail "retired-name scan failed (git grep exit $retired_status)" ;;
+esac
+
 printf 'Repository policy validation passed.\n'

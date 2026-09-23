@@ -581,7 +581,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(64))]
 
     /// For every seed that produces a compute-consumer split (as opposed to
-    /// a sink/action/execute-gate append), every original node's value on
+    /// an output-sink append), every original node's value on
     /// the visit survives at its shifted index: nodes below the insertion
     /// point are untouched, and nodes at or above it shift by one, reading
     /// their own inputs exactly as before (the new identity node adds one
@@ -684,8 +684,8 @@ proptest! {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(200))]
 
-    /// Over `base_def`'s compute-node input edges (not the sink/action/
-    /// execute-gate surfaces), `GraphRawFieldMutation` never replaces a
+    /// Over `base_def`'s compute-node input edges (not the output-sink
+    /// surfaces), `GraphRawFieldMutation` never replaces a
     /// `GraphSource` variant, and at most one edge changes at all. This
     /// covers "at most one edge, same variant" only; that the changed
     /// field moves by exactly one unit is example-tested separately in

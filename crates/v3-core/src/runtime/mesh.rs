@@ -1152,7 +1152,7 @@ mod tests {
 
     // ── Test 5: vm_node_emits_eat_action ─────────────────────────────────────
 
-    /// A VM node that pushes action_type 1 and executes queue → WorldAction::Eat { type_idx: crate::config::OrdinaryFoodTypeId::default() }.
+    /// A VM node voting for `Eat` commits `WorldAction::Eat` on the default food type.
     #[test]
     fn vm_node_emits_eat_action() {
         let id0 = NodeId::new(0);

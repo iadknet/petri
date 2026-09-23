@@ -201,7 +201,9 @@ If `slot >= 12`, value is `0.0`.
 - `sub_idx / 3` = queue slot
 - `sub_idx % 3`: `0` = action_type, `1` = param0, `2` = param1
 
-Total sub-values: `action_queue_cap * 3` (default `12`).
+Total sub-values: a constant `12`, four slots of three
+(`mutation::compound::ACTION_QUEUE_INPUT_SLOTS`, T19.F06), whatever
+`runtime.max_actions_per_turn` is. A slot past the queue's end reads `0.0`.
 
 ### 3.6 Decision State (Compound, T19.F05)
 

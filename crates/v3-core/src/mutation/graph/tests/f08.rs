@@ -442,7 +442,7 @@ proptest! {
 // ── Split exclusion (replacing T11.F03's documented exception) ─────────────
 
 /// A graph whose only splittable edge is one live introspection reference
-/// read directly by an action slot's parameter surface.
+/// read directly by an `ActionParam` sink.
 fn introspection_edge_def(plasticity: bool, on_compute_input: bool) -> CgpGraphBackendDef {
     let edge = GraphEdge {
         source: GraphSource::InputLeaf {

@@ -22,11 +22,3 @@ fn complexity_effect_consistent_with_types() {
         );
     }
 }
-
-#[test]
-fn graph_operator_catalog_has_no_action_slot_operator() {
-    assert_eq!(GraphOperator::ALL.len(), 21);
-    assert!(GraphOperator::ALL
-        .iter()
-        .all(|op| !format!("{op:?}").contains("ActionSlot")));
-}

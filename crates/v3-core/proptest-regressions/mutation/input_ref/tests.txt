@@ -4,4 +4,4 @@
 #
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
-cc a639ace511a5f93ac0a2f7a8baaa58479e421a5364a2def396e37c3fdf139f93 # shrinks to seed = 3712479678483087848, sizes = [ModuleSize { compute_nodes: 1, edges_per_node: 1, sinks: 0, action_slots: 0, gate_edges: 1, input_refs: 2, instructions: 0, constants: 0 }]
+cc a639ace511a5f93ac0a2f7a8baaa58479e421a5364a2def396e37c3fdf139f93 # shrinks to seed = 3712479678483087848, sizes = [ModuleSize { compute_nodes: 1, edges_per_node: 1, sinks: 0, input_refs: 2, instructions: 0, constants: 0 }] (two ModuleSize fields of a since-deleted surface omitted)

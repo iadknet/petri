@@ -1265,7 +1265,7 @@ mod tests {
     /// (graph) and 8 -> 7 (VM); the selection rows are unchanged.
     /// Re-pinned 2026-09-19 for the 25% large-copy weight default: topology
     /// draws and subsequent RNG histories change; applicability stays intact.
-    /// Re-pinned by T19.F04 (vote sinks replace the action bank, remapping
+    /// Re-pinned by T19.F04 (vote-based action selection, remapping
     /// every VM instruction and Graph edge draw and shrinking the modules;
     /// before/after in `docs/progress/readings/t19-f04.md`); the discard
     /// counts stay zero.

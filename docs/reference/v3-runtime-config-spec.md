@@ -99,7 +99,6 @@ Type posture:
 | `mutation.per_birth_mutation_events_min` | `u32` | `1` | Legacy per-birth rule only. Must be `>= 1`; invalid values fall back to `1`. |
 | `mutation.per_birth_mutation_events_max` | `u32` | `10` | Legacy per-birth rule only. Must be `>= per_birth_mutation_events_min`; lower values normalize to min. |
 | `mutation.per_birth_mutation_event_continuation_probability` | `f64` | `0.2` | Legacy per-birth rule only. After the minimum, probability of requesting another event up to the maximum. Missing field defaults to `0.2`; finite values clamp to `[0.0, 1.0]`, NaN/infinite normalize to `0.2`. |
-| `mutation.action_queue_cap` | `usize` | `4` | Must be clamped to `1..=min(21845, runtime.max_actions_per_turn)`. `21845` preserves `InputReference::ActionQueue` width (`cap * 3`) within `u16`. |
 | `mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
 | `mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |
@@ -146,12 +145,11 @@ outcomes are not held constant by the provisional requested mean.
 Mutation behavior semantics remain canonical in `v3-mutation-spec.md`; this
 section only owns config contract shape/defaults.
 
-Queue-shape coupling invariant:
-- `mutation.action_queue_cap <= runtime.max_actions_per_turn`.
-- Runtime normalization order must normalize `runtime.max_actions_per_turn`
-  first, then clamp `mutation.action_queue_cap` against it.
-- This keeps genome action-slot count, `ActionQueue` input width, and runtime
-  queue execution cap in lockstep.
+The mutation config's queue-width field is deleted as of T19.F06: the
+`ActionQueue` input width is a constant four slots of three sub-values
+(`v3-sensor-spec.md` Section 3.5), and `runtime.max_actions_per_turn` is the
+one cap on the queue. `MutationConfig` rejects unknown fields, so a stored
+config still carrying the field fails to load until it is removed.
 
 ---
 
@@ -190,8 +188,7 @@ Genome carrying cost:
   existing `energy <= 0.0` rule in the same tick.
 - The unit is total genome size (`genome_size()`), which counts every node,
   input reference, target, VM instruction, VM constant, compute node and its
-  edges, wired sink, wired action slot, and wired execute gate with equal
-  weight. It is not reachability-aware, so unreachable and dead structure is
+  edges, and wired output sink and its edges with equal weight. It is not reachability-aware, so unreachable and dead structure is
   charged exactly like the executed core.
 - Is NOT scaled by the complexity or age action multipliers, exactly as
   `energy_decay_per_tick` is not; it is a world-level Phase 0 cost, not an

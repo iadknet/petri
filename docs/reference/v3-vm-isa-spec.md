@@ -120,13 +120,12 @@ Removed from active V3 mesh ISA:
 - `ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`
 - `ReadNeighborCreature`
 - `EmitInternal`
-- `EmitWorldAction` (replaced by `PushAction` + `ExecuteActionQueue`, T09)
-- `PushAction`, `PopAction`, `ExecuteActionQueue`, `WriteDirectionBid`
-  (replaced by `AddVote` and the pass loop, T19.F04); `WriteWorldActionMeta`
-  became `WriteActionParam`
+- `EmitWorldAction` and every opcode that queued or executed an action
+  directly (replaced by `AddVote`, `WriteActionParam`, and the pass loop,
+  T19.F04)
 
 The sensor reads were replaced by unified `ReadInput` + `InputReference`
-dataflow and `output_slots` routing semantics; the action opcodes by votes.
+dataflow and `output_slots` routing semantics; actions are selected by votes.
 
 ---
 
