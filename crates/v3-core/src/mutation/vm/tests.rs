@@ -1945,7 +1945,7 @@ fn vm_raw_field_mutation_sub_idx_bounded() {
                     let width = g.nodes[1]
                         .input_refs
                         .get(*ref_idx as usize)
-                        .map(|r| compound::sub_value_count(r, &config))
+                        .map(compound::sub_value_count)
                         .unwrap_or(1);
                     assert!(
                         *sub_idx < width,

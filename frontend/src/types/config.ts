@@ -203,7 +203,6 @@ export interface MutationConfig {
 	large_copy_weight_percent: number;
 	genome_size_cap: number;
 	genome_size_pressure_enabled: boolean;
-	action_queue_cap: number;
 	phenotype: PhenotypeConfig;
 	reachable_bias: ReachableBiasConfig;
 	executed_bias: number;

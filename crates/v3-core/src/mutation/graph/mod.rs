@@ -149,12 +149,7 @@ impl GraphOperator {
     /// Whether this operator has a site to apply to on one Graph-backend
     /// node. Each arm delegates to the same enumeration the operator draws
     /// its target from, so a node this accepts never skips at application.
-    fn applies_to(
-        self,
-        def: &CgpGraphBackendDef,
-        input_refs: &[InputReference],
-        config: &MutationConfig,
-    ) -> bool {
+    fn applies_to(self, def: &CgpGraphBackendDef, input_refs: &[InputReference]) -> bool {
         match self {
             Self::AlterGraphEdgeWeight | Self::RetargetGraphEdge | Self::RemoveGraphEdge => {
                 operators::has_edge_site(def)
@@ -165,7 +160,7 @@ impl GraphOperator {
             Self::MutateGraphOperatorParam => operators::has_parameterized_compute_node(def),
             Self::AddInternalGraphNode => operators::can_add_compute_node(def),
             Self::AddGraphEdge => operators::can_add_edge(def),
-            Self::GraphRawFieldMutation => operators::has_raw_field_site(def, input_refs, config),
+            Self::GraphRawFieldMutation => operators::has_raw_field_site(def, input_refs),
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
             Self::CopyEdgeBundle => operators::can_copy_edge_bundle(def),
@@ -193,17 +188,13 @@ impl GraphMutator {
     /// Selection draws from this set rather than from every Graph-backend
     /// node, so a refinement operator reaches a module that has a suitable
     /// site instead of landing on one that does not (T13.F03).
-    pub(crate) fn applicable_indices(
-        genome: &CreatureGenome,
-        op: GraphOperator,
-        config: &MutationConfig,
-    ) -> Vec<usize> {
+    pub(crate) fn applicable_indices(genome: &CreatureGenome, op: GraphOperator) -> Vec<usize> {
         genome
             .nodes
             .iter()
             .enumerate()
             .filter(|(_, n)| match &n.backend_def {
-                BackendDef::Graph(def) => op.applies_to(def, &n.input_refs, config),
+                BackendDef::Graph(def) => op.applies_to(def, &n.input_refs),
                 BackendDef::Vm(_) => false,
             })
             .map(|(i, _)| i)
@@ -221,9 +212,9 @@ impl GraphMutator {
         op: GraphOperator,
         targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
-        config: &MutationConfig,
+        _config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        let applicable = Self::applicable_indices(genome, op, config);
+        let applicable = Self::applicable_indices(genome, op);
         if applicable.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -231,7 +222,7 @@ impl GraphMutator {
         let (node_idx, reachability) = targets
             .select(&applicable, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        Self::apply_to_node(genome, op, node_idx, rng, config).map(|()| reachability)
+        Self::apply_to_node(genome, op, node_idx, rng).map(|()| reachability)
     }
 
     /// Dispatch `op` onto one already-selected node.
@@ -240,7 +231,6 @@ impl GraphMutator {
         op: GraphOperator,
         node_idx: usize,
         rng: &mut impl Rng,
-        config: &MutationConfig,
     ) -> Result<(), MutationSkipReason> {
         match op {
             GraphOperator::AlterGraphEdgeWeight => {
@@ -251,18 +241,18 @@ impl GraphMutator {
                 operators::mutate_operator_param(genome, node_idx, rng)
             }
             GraphOperator::AddInternalGraphNode => {
-                operators::add_internal_node(genome, node_idx, rng, config)
+                operators::add_internal_node(genome, node_idx, rng)
             }
             GraphOperator::RemoveInternalGraphNode => {
                 operators::remove_internal_node(genome, node_idx, rng)
             }
-            GraphOperator::AddGraphEdge => operators::add_graph_edge(genome, node_idx, rng, config),
+            GraphOperator::AddGraphEdge => operators::add_graph_edge(genome, node_idx, rng),
             GraphOperator::RetargetGraphEdge => {
-                operators::retarget_graph_edge(genome, node_idx, rng, config)
+                operators::retarget_graph_edge(genome, node_idx, rng)
             }
             GraphOperator::RemoveGraphEdge => operators::remove_graph_edge(genome, node_idx, rng),
             GraphOperator::GraphRawFieldMutation => {
-                operators::apply_graph_raw_field_mutation(genome, node_idx, rng, config)
+                operators::apply_graph_raw_field_mutation(genome, node_idx, rng)
             }
             GraphOperator::CopyInternalNode => {
                 operators::apply_copy_internal_node(genome, node_idx, rng)

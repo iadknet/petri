@@ -111,12 +111,7 @@ fn plasticity(rng: &mut SmallRng) -> Option<PlasticityConfig> {
     })
 }
 
-fn graph_def(
-    rng: &mut SmallRng,
-    size: ModuleSize,
-    refs: &[InputReference],
-    config: &MutationConfig,
-) -> CgpGraphBackendDef {
+fn graph_def(rng: &mut SmallRng, size: ModuleSize, refs: &[InputReference]) -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     // The first `sinks` value sinks and the first `vote_sinks` vote sinks.
     let first_vote = crate::creature::genome::cgp::FIRST_ACTION_VOTE_SINK;
@@ -139,7 +134,7 @@ fn graph_def(
     // name any index, including a dangling one.
     let compute_count = def.compute_nodes.len() as u16;
     let edge = |rng: &mut SmallRng| GraphEdge {
-        source: random_graph_source(compute_count, refs, config, rng),
+        source: random_graph_source(compute_count, refs, rng),
         weight: rng.gen_range(-1.0f32..=1.0),
     };
     for i in 0..def.compute_nodes.len() {
@@ -179,11 +174,7 @@ fn vm_def(rng: &mut SmallRng, size: ModuleSize) -> VmBackendDef {
 }
 
 /// A genome of `sizes.len()` nodes, alternating Graph and VM backends.
-pub(in crate::mutation) fn genome(
-    seed: u64,
-    sizes: &[ModuleSize],
-    config: &MutationConfig,
-) -> CreatureGenome {
+pub(in crate::mutation) fn genome(seed: u64, sizes: &[ModuleSize]) -> CreatureGenome {
     let mut rng = SmallRng::seed_from_u64(seed);
     let nodes = sizes
         .iter()
@@ -191,7 +182,7 @@ pub(in crate::mutation) fn genome(
         .map(|(i, &size)| {
             let refs = input_refs(&mut rng, size.input_refs);
             let backend_def = if i % 2 == 0 {
-                BackendDef::Graph(graph_def(&mut rng, size, &refs, config))
+                BackendDef::Graph(graph_def(&mut rng, size, &refs))
             } else {
                 BackendDef::Vm(vm_def(&mut rng, size))
             };
@@ -252,15 +243,14 @@ proptest! {
         seed in any::<u64>(),
         sizes in prop::collection::vec(module_size(), 1..4),
     ) {
-        let config = MutationConfig::default();
-        let base = genome(seed, &sizes, &config);
+        let base = genome(seed, &sizes);
         for &op in &GraphOperator::ALL {
-            for node_idx in GraphMutator::applicable_indices(&base, op, &config) {
+            for node_idx in GraphMutator::applicable_indices(&base, op) {
                 for apply_seed in 0u64..8 {
                     let mut genome = base.clone();
                     let mut rng = SmallRng::seed_from_u64(seed ^ apply_seed);
                     let result =
-                        GraphMutator::apply_to_node(&mut genome, op, node_idx, &mut rng, &config);
+                        GraphMutator::apply_to_node(&mut genome, op, node_idx, &mut rng);
                     prop_assert!(
                         result.is_ok(),
                         "{op:?} accepted node {node_idx} but skipped: {result:?}"
@@ -277,17 +267,16 @@ proptest! {
         sizes in prop::collection::vec(module_size(), 1..4),
         food_type_count in 1usize..4,
     ) {
-        let config = MutationConfig::default();
-        let base = genome(seed, &sizes, &config);
+        let base = genome(seed, &sizes);
         for &op in &INPUT_REF_OPS {
             for node_idx in
-                InputRefMutator::applicable_indices(&base, op, &config, food_type_count)
+                InputRefMutator::applicable_indices(&base, op, food_type_count)
             {
                 for apply_seed in 0u64..8 {
                     let mut genome = base.clone();
                     let mut rng = SmallRng::seed_from_u64(seed ^ apply_seed);
                     let result = InputRefMutator::apply_to_node(
-                        &mut genome, op, node_idx, &mut rng, &config, food_type_count,
+                        &mut genome, op, node_idx, &mut rng, food_type_count,
                     );
                     prop_assert!(
                         result.is_ok(),
@@ -305,7 +294,7 @@ proptest! {
         sizes in prop::collection::vec(module_size(), 1..4),
     ) {
         let config = MutationConfig::default();
-        let base = genome(seed, &sizes, &config);
+        let base = genome(seed, &sizes);
         for &op in &VmOperator::ALL {
             for node_idx in VmMutator::applicable_indices(&base, op) {
                 for apply_seed in 0u64..8 {
@@ -331,9 +320,9 @@ proptest! {
         sizes in prop::collection::vec(module_size(), 1..4),
     ) {
         let config = MutationConfig::default();
-        let base = genome(seed, &sizes, &config);
+        let base = genome(seed, &sizes);
         for &op in &GraphOperator::ALL {
-            let applicable = GraphMutator::applicable_indices(&base, op, &config);
+            let applicable = GraphMutator::applicable_indices(&base, op);
             let mut genome = base.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut targets = selector();
@@ -371,7 +360,7 @@ proptest! {
             }
         }
         for &op in &INPUT_REF_OPS {
-            let applicable = InputRefMutator::applicable_indices(&base, op, &config, 1);
+            let applicable = InputRefMutator::applicable_indices(&base, op, 1);
             let mut genome = base.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut targets = selector();
@@ -401,11 +390,11 @@ proptest! {
         sizes in prop::collection::vec(module_size(), 1..5),
     ) {
         let config = MutationConfig::default();
-        let base = genome(seed, &sizes, &config);
+        let base = genome(seed, &sizes);
         // Every other node index, ascending, as `TargetSelector` requires.
         let reachable: Vec<usize> = (0..base.nodes.len()).step_by(2).collect();
         for &op in &GraphOperator::ALL {
-            let applicable = GraphMutator::applicable_indices(&base, op, &config);
+            let applicable = GraphMutator::applicable_indices(&base, op);
             if applicable.is_empty() {
                 continue;
             }
@@ -445,7 +434,7 @@ proptest! {
             }
         }
         for &op in &INPUT_REF_OPS {
-            let applicable = InputRefMutator::applicable_indices(&base, op, &config, 1);
+            let applicable = InputRefMutator::applicable_indices(&base, op, 1);
             if applicable.is_empty() {
                 continue;
             }
@@ -476,7 +465,7 @@ proptest! {
         padding in 1usize..4,
     ) {
         let config = MutationConfig::default();
-        let base = genome(seed, &sizes, &config);
+        let base = genome(seed, &sizes);
         let mut padded = base.clone();
         for i in 0..padding {
             let id = (base.nodes.len() + i) as u32;
@@ -487,8 +476,8 @@ proptest! {
             });
         }
         for &op in &GraphOperator::ALL {
-            let before = GraphMutator::applicable_indices(&base, op, &config);
-            let after = GraphMutator::applicable_indices(&padded, op, &config);
+            let before = GraphMutator::applicable_indices(&base, op);
+            let after = GraphMutator::applicable_indices(&padded, op);
             for idx in &before {
                 prop_assert!(after.contains(idx), "{op:?} lost node {idx} to padding");
             }
@@ -519,8 +508,8 @@ proptest! {
             }
         }
         for &op in &INPUT_REF_OPS {
-            let before = InputRefMutator::applicable_indices(&base, op, &config, 1);
-            let after = InputRefMutator::applicable_indices(&padded, op, &config, 1);
+            let before = InputRefMutator::applicable_indices(&base, op, 1);
+            let after = InputRefMutator::applicable_indices(&padded, op, 1);
             for idx in &before {
                 prop_assert!(after.contains(idx), "{op:?} lost node {idx} to padding");
             }
@@ -553,14 +542,13 @@ fn growth_operators_reach_a_blank_graph_module() {
         GraphOperator::AddGraphEdge,
     ] {
         assert_eq!(
-            GraphMutator::applicable_indices(&genome, op, &config),
+            GraphMutator::applicable_indices(&genome, op),
             vec![0],
             "{op:?} must reach a blank Graph module"
         );
     }
     assert!(
-        GraphMutator::applicable_indices(&genome, GraphOperator::CopyInternalNode, &config)
-            .is_empty(),
+        GraphMutator::applicable_indices(&genome, GraphOperator::CopyInternalNode).is_empty(),
         "CopyInternalNode has nothing to copy on a blank module"
     );
 
@@ -576,7 +564,7 @@ fn growth_operators_reach_a_blank_graph_module() {
     )
     .expect("growth applies to a blank module");
     assert_eq!(
-        GraphMutator::applicable_indices(&genome, GraphOperator::CopyInternalNode, &config),
+        GraphMutator::applicable_indices(&genome, GraphOperator::CopyInternalNode),
         vec![0],
         "CopyInternalNode must reach a module that has a compute node"
     );

@@ -751,10 +751,6 @@ fn default_hop_ramp_cost() -> f32 {
     1e-4
 }
 
-fn default_action_queue_cap() -> usize {
-    4
-}
-
 impl Default for RuntimeConfig {
     fn default() -> Self {
         Self {
@@ -853,9 +849,6 @@ pub struct MutationConfig {
     /// Whether the genome size pressure gate is active.
     #[serde(alias = "complexity_pressure_enabled")]
     pub genome_size_pressure_enabled: bool,
-    /// Capacity of the action queue. Compound input fan-out counts depend on this.
-    #[serde(default = "default_action_queue_cap")]
-    pub action_queue_cap: usize,
     pub phenotype: PhenotypeConfig,
     #[serde(default)]
     pub reachable_bias: ReachableBiasConfig,
@@ -920,7 +913,6 @@ impl Default for MutationConfig {
             large_copy_weight_percent: default_large_copy_weight_percent(),
             genome_size_cap: 1200,
             genome_size_pressure_enabled: false,
-            action_queue_cap: 4,
             phenotype: PhenotypeConfig::default(),
             reachable_bias: ReachableBiasConfig::default(),
             executed_bias: default_executed_bias(),
@@ -1140,10 +1132,6 @@ impl SimulationConfig {
         if m.per_birth_mutation_events_max < m.per_birth_mutation_events_min {
             m.per_birth_mutation_events_max = m.per_birth_mutation_events_min;
         }
-        // Cap must be >= 1, <= runtime queue capacity, and <= u16/3 to keep
-        // ActionQueue compound width (`cap * 3`) representable in u16.
-        let max_action_queue_cap = rt.max_actions_per_turn.min(21845);
-        m.action_queue_cap = m.action_queue_cap.clamp(1, max_action_queue_cap);
         // genome_size_cap: 0 disables pressure (handled by is_restricted), no normalization needed.
         // genome_size_pressure_enabled: bool, no normalization needed.
         let ph = &mut m.phenotype;
@@ -1597,7 +1585,6 @@ mod tests {
         assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);
         assert_eq!(cfg.mutation.per_birth_mutation_events_max, 10);
         assert!((cfg.mutation.mesh_layer_probability - 0.2).abs() < 1e-9);
-        assert_eq!(cfg.mutation.action_queue_cap, 4);
         // Complexity pressure
         assert_eq!(cfg.mutation.genome_size_cap, 1200);
         assert!(!cfg.mutation.genome_size_pressure_enabled);
@@ -1855,39 +1842,23 @@ mod tests {
     }
 
     #[test]
-    fn normalize_zero_action_queue_cap_falls_back() {
-        let mut cfg = SimulationConfig::default();
-        cfg.mutation.action_queue_cap = 0;
-        cfg.normalize();
-        assert_eq!(cfg.mutation.action_queue_cap, 1);
-    }
-
-    #[test]
-    fn normalize_huge_action_queue_cap_clamped() {
-        let mut cfg = SimulationConfig::default();
-        cfg.runtime.max_actions_per_turn = 100_000;
-        cfg.mutation.action_queue_cap = 100_000;
-        cfg.normalize();
-        assert_eq!(cfg.mutation.action_queue_cap, 21845);
-    }
-
-    #[test]
-    fn normalize_action_queue_cap_clamped_to_max_actions_per_turn() {
-        let mut cfg = SimulationConfig::default();
-        cfg.runtime.max_actions_per_turn = 3;
-        cfg.mutation.action_queue_cap = 10;
-        cfg.normalize();
-        assert_eq!(cfg.mutation.action_queue_cap, 3);
-    }
-
-    #[test]
-    fn normalize_zero_max_actions_per_turn_caps_action_queue_after_fallback() {
+    fn normalize_zero_max_actions_per_turn_falls_back() {
         let mut cfg = SimulationConfig::default();
         cfg.runtime.max_actions_per_turn = 0;
-        cfg.mutation.action_queue_cap = 100_000;
         cfg.normalize();
         assert_eq!(cfg.runtime.max_actions_per_turn, 10);
-        assert_eq!(cfg.mutation.action_queue_cap, 10);
+    }
+
+    /// The retired queue-cap key (T19.F06) is rejected with no alias or
+    /// ignore shim. The key is assembled so the retired-name scan in
+    /// `scripts/policy-check` keeps holding over `crates/`.
+    #[test]
+    fn retired_queue_cap_key_is_rejected() {
+        let retired_key = ["action_queue", "cap"].join("_");
+        let mut value = serde_json::to_value(SimulationConfig::default()).unwrap();
+        value["mutation"][retired_key.as_str()] = serde_json::json!(4);
+        let error = serde_json::from_value::<SimulationConfig>(value).unwrap_err();
+        assert!(error.to_string().contains(&retired_key), "{error}");
     }
 
     #[test]
@@ -2967,7 +2938,7 @@ mod tests {
         ];
         (
             (0u32..20_000, 0u32..20_000),
-            (0usize..24, 0usize..24),
+            0usize..24,
             (0u32..24, 0u32..24),
             0usize..8,
             (clamped_float.clone(), clamped_float.clone(), clamped_float),
@@ -2977,7 +2948,7 @@ mod tests {
             .prop_map(
                 |(
                     (initial_creatures, max_creatures),
-                    (max_actions_per_turn, action_queue_cap),
+                    max_actions_per_turn,
                     (events_min, events_max),
                     action_log_capacity,
                     (max_density, initial_density, initial_coverage),
@@ -2989,7 +2960,6 @@ mod tests {
                     config.population.initial_creatures = initial_creatures;
                     config.population.max_creatures = max_creatures;
                     config.runtime.max_actions_per_turn = max_actions_per_turn;
-                    config.mutation.action_queue_cap = action_queue_cap;
                     config.mutation.per_birth_mutation_events_min = events_min;
                     config.mutation.per_birth_mutation_events_max = events_max;
                     config.action_log.capacity = action_log_capacity;

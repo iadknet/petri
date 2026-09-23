@@ -33,7 +33,6 @@
     }
   },
   "mutation": {
-    "action_queue_cap": 4,
     "executed_bias": 0.9,
     "executed_window_ticks": 100,
     "genome_size_cap": 1200,

@@ -30,10 +30,10 @@ pub struct InputRefKind {
 /// The kind partition every within-kind rule reads: the operator, its
 /// applicability predicate, and the probes all call this one function.
 #[must_use]
-pub fn input_ref_kind(reference: &InputReference, config: &MutationConfig) -> InputRefKind {
+pub fn input_ref_kind(reference: &InputReference) -> InputRefKind {
     InputRefKind {
         class: classify_input_ref(reference),
-        width: sub_value_count(reference, config),
+        width: sub_value_count(reference),
     }
 }
 
@@ -65,12 +65,11 @@ fn input_reference_universe(food_type_count: usize) -> Vec<InputReference> {
 fn alternatives_in<'a>(
     universe: &'a [InputReference],
     entry: &'a InputReference,
-    config: &'a MutationConfig,
 ) -> impl Iterator<Item = &'a InputReference> + 'a {
-    let kind = input_ref_kind(entry, config);
+    let kind = input_ref_kind(entry);
     universe
         .iter()
-        .filter(move |candidate| *candidate != entry && input_ref_kind(candidate, config) == kind)
+        .filter(move |candidate| *candidate != entry && input_ref_kind(candidate) == kind)
 }
 
 /// The other members of `entry`'s kind: what a `Swap` may replace it with.
@@ -79,28 +78,20 @@ fn alternatives_in<'a>(
 /// and `PreviousOutcome`; typed food at
 /// one food type), so such an entry is not swappable.
 #[must_use]
-pub fn swap_alternatives(
-    entry: &InputReference,
-    config: &MutationConfig,
-    food_type_count: usize,
-) -> Vec<InputReference> {
-    alternatives_in(&input_reference_universe(food_type_count), entry, config)
+pub fn swap_alternatives(entry: &InputReference, food_type_count: usize) -> Vec<InputReference> {
+    alternatives_in(&input_reference_universe(food_type_count), entry)
         .cloned()
         .collect()
 }
 
 /// Indices of the node's swappable entries. The universe is enumerated once
 /// per node, not once per entry.
-fn swappable_indices(
-    node: &NodeGenome,
-    config: &MutationConfig,
-    food_type_count: usize,
-) -> Vec<usize> {
+fn swappable_indices(node: &NodeGenome, food_type_count: usize) -> Vec<usize> {
     let universe = input_reference_universe(food_type_count);
     node.input_refs
         .iter()
         .enumerate()
-        .filter(|(_, entry)| alternatives_in(&universe, entry, config).next().is_some())
+        .filter(|(_, entry)| alternatives_in(&universe, entry).next().is_some())
         .map(|(idx, _)| idx)
         .collect()
 }
@@ -156,16 +147,11 @@ impl InputRefOperator {
     /// Whether the operator has a site on `node` (T13.F03 applicability
     /// predicate; the single source of truth `apply` draws from).
     #[must_use]
-    pub fn applies_to(
-        self,
-        node: &NodeGenome,
-        config: &MutationConfig,
-        food_type_count: usize,
-    ) -> bool {
+    pub fn applies_to(self, node: &NodeGenome, food_type_count: usize) -> bool {
         match self {
             Self::Add => true,
             Self::Prune => !prunable_indices(node).is_empty(),
-            Self::Swap => !swappable_indices(node, config, food_type_count).is_empty(),
+            Self::Swap => !swappable_indices(node, food_type_count).is_empty(),
             Self::RawFieldMutation => node.input_refs.iter().any(is_raw_mutable),
         }
     }
@@ -253,14 +239,14 @@ impl InputRefMutator {
         if op == InputRefOperator::RawFieldMutation {
             return apply_raw_field_mutation(genome, rng, config, food_type_count);
         }
-        let eligible = Self::applicable_indices(genome, op, config, food_type_count);
+        let eligible = Self::applicable_indices(genome, op, food_type_count);
         if eligible.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
         let (node_idx, reachability) = targets
             .select(&eligible, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        Self::apply_to_node(genome, op, node_idx, rng, config, food_type_count)?;
+        Self::apply_to_node(genome, op, node_idx, rng, food_type_count)?;
         Ok(reachability)
     }
 
@@ -269,14 +255,13 @@ impl InputRefMutator {
     pub(crate) fn applicable_indices(
         genome: &CreatureGenome,
         op: InputRefOperator,
-        config: &MutationConfig,
         food_type_count: usize,
     ) -> Vec<usize> {
         genome
             .nodes
             .iter()
             .enumerate()
-            .filter(|(_, node)| op.applies_to(node, config, food_type_count))
+            .filter(|(_, node)| op.applies_to(node, food_type_count))
             .map(|(idx, _)| idx)
             .collect()
     }
@@ -289,7 +274,6 @@ impl InputRefMutator {
         op: InputRefOperator,
         node_idx: usize,
         rng: &mut impl Rng,
-        config: &MutationConfig,
         food_type_count: usize,
     ) -> Result<(), MutationSkipReason> {
         let node = &mut genome.nodes[node_idx];
@@ -299,7 +283,7 @@ impl InputRefMutator {
                 Ok(())
             }
             InputRefOperator::Prune => apply_prune(node, rng),
-            InputRefOperator::Swap => apply_swap(node, rng, config, food_type_count),
+            InputRefOperator::Swap => apply_swap(node, rng, food_type_count),
             InputRefOperator::RawFieldMutation => {
                 unreachable!("RawFieldMutation is genome-wide and never node-targeted")
             }
@@ -344,20 +328,19 @@ fn apply_prune(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), Mutation
 fn apply_swap(
     node: &mut NodeGenome,
     rng: &mut impl Rng,
-    config: &MutationConfig,
     food_type_count: usize,
 ) -> Result<(), MutationSkipReason> {
-    let ref_idx = *swappable_indices(node, config, food_type_count)
+    let ref_idx = *swappable_indices(node, food_type_count)
         .choose(rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let old_ref = &node.input_refs[ref_idx];
-    let new_ref = swap_alternatives(old_ref, config, food_type_count)
+    let new_ref = swap_alternatives(old_ref, food_type_count)
         .choose(rng)
         .cloned()
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     debug_assert_eq!(
-        sub_value_count(&new_ref, config),
-        sub_value_count(old_ref, config),
+        sub_value_count(&new_ref),
+        sub_value_count(old_ref),
         "a within-kind swap keeps the width, so clamp_sub_idx_after_swap removes nothing"
     );
     node.input_refs[ref_idx] = new_ref;

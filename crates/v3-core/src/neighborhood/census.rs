@@ -15,7 +15,6 @@
 
 use rayon::prelude::*;
 
-use crate::config::MutationConfig;
 use crate::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::{BackendDef, CreatureGenome};
@@ -42,13 +41,13 @@ pub struct OneEdgeCensus {
 }
 
 /// Every input-leaf source of `node`, in reference then sub-value order.
-fn input_leaves(genome: &CreatureGenome, node: usize, config: &MutationConfig) -> Vec<GraphSource> {
+fn input_leaves(genome: &CreatureGenome, node: usize) -> Vec<GraphSource> {
     genome.nodes[node]
         .input_refs
         .iter()
         .enumerate()
         .flat_map(|(ref_idx, reference)| {
-            let width = sub_value_count(reference, config).max(1);
+            let width = sub_value_count(reference).max(1);
             (0..width).map(move |sub_idx| GraphSource::InputLeaf {
                 ref_idx: ref_idx as u16,
                 sub_idx,
@@ -90,11 +89,10 @@ pub fn one_edge_census(
     genome: &CreatureGenome,
     node: usize,
     battery: &Battery,
-    mutation_config: &MutationConfig,
     context: &EvalContext,
 ) -> OneEdgeCensus {
     let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
-    let leaves = input_leaves(genome, node, mutation_config);
+    let leaves = input_leaves(genome, node);
     let rows: Vec<SinkRow> = VoteSink::all()
         .collect::<Vec<_>>()
         .into_par_iter()
@@ -134,7 +132,6 @@ mod tests {
             &founder_genome(FounderProfile::V3Alpha1),
             1,
             &battery,
-            &config.mutation,
             &context,
         )
     }

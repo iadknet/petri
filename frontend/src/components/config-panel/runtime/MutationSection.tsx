@@ -116,16 +116,6 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		tooltip: "Probability of switching to a different active color channel (R/G/B)",
 	},
 	{
-		path: "mutation.action_queue_cap",
-		label: "Action Queue Cap",
-		min: 1,
-		max: 16,
-		step: 1,
-		testId: "config-field-mutation-action-queue-cap",
-		defaultValue: 4,
-		tooltip: "Maximum number of actions in the creature action queue",
-	},
-	{
 		path: "mutation.executed_bias",
 		label: "Bias: Executed",
 		min: 0,
