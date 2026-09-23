@@ -141,9 +141,6 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 							{"\u0394"}={currentPass.max_delta.toFixed(4)}
 						</span>
 					) : null}
-					<span className={trace.converged ? "text-emerald-400" : "text-amber-400"}>
-						{trace.converged ? "converged" : "not converged"}
-					</span>
 				</div>
 			) : (
 				<div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">

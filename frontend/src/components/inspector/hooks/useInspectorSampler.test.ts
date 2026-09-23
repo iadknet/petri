@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSamplePlaybackStore } from "../../../stores/samplePlayback.ts";
 import { useSampleSessionStore } from "../../../stores/sampleSession.ts";
 import type { ExecutionSample } from "../../../types/trace.ts";
-import { ZERO_VOTES } from "../../../types/trace.ts";
+import { ZERO_DECISION_INPUTS, ZERO_VOTES } from "../../../types/trace.ts";
 import { useInspectorSampler } from "./useInspectorSampler.ts";
 
 const mockClearSampling = vi.fn();
@@ -27,12 +27,14 @@ function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 			neighbor_barrier: [0, 0, 0, 0],
 			neighbor_occupied: [0, 0, 0, 0],
 			age_ticks: 5,
+			previous_outcome: [0, 0, 0, 0],
 		},
 		hops: [
 			{
 				hop_index: 0,
 				pass_index: 0,
 				vote_contribution: ZERO_VOTES,
+				decision_inputs: ZERO_DECISION_INPUTS,
 				node_id: 1,
 				input_refs: [],
 				upstream_slots: [],
@@ -70,6 +72,7 @@ function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 				hop_index: 1,
 				pass_index: 0,
 				vote_contribution: ZERO_VOTES,
+				decision_inputs: ZERO_DECISION_INPUTS,
 				node_id: 2,
 				input_refs: [],
 				upstream_slots: [],
@@ -88,9 +91,7 @@ function buildSample(creatureId: number, tickCount = 2): ExecutionSample {
 								max_delta: 0,
 							},
 						],
-						converged: false,
 						temporal_committed: true,
-						stable_passes_count: 0,
 						final_outputs: [],
 						output_sinks: [],
 					},

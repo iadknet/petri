@@ -36,9 +36,7 @@ impl RecordingTracer {
     pub(crate) fn into_trace(self) -> GraphTrace {
         GraphTrace {
             passes: self.passes,
-            converged: false,
             temporal_committed: self.temporal_committed,
-            stable_passes_count: 0,
             final_outputs: self.final_outputs,
             output_sinks: self.output_sinks,
         }
@@ -114,9 +112,7 @@ pub(crate) fn execute_graph_node_traced(
     if !def.enters_visit() {
         let trace = GraphTrace {
             passes: Vec::new(),
-            converged: false,
             temporal_committed: false,
-            stable_passes_count: 0,
             final_outputs: Vec::new(),
             output_sinks: Vec::new(),
         };

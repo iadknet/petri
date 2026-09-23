@@ -7,8 +7,6 @@ describe("GraphExecutionView temporal commit", () => {
 	it.each([true, false])("reports applied state when committed=%s", (committed) => {
 		const trace: GraphTrace = {
 			temporal_committed: committed,
-			converged: false,
-			stable_passes_count: 0,
 			passes: [],
 			final_outputs: [],
 			output_sinks: [],

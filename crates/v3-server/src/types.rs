@@ -2,7 +2,7 @@
 use v3_core::config::SimulationConfig;
 pub use v3_core::config::{config_digest, deep_merge, sort_json_keys_recursive};
 
-pub const PROTOCOL_VERSION: &str = "v3alpha3";
+pub const PROTOCOL_VERSION: &str = "v3alpha4";
 
 /// Request body for the `POST /v3/simulation/step` endpoint.
 #[derive(serde::Deserialize, Default)]
@@ -53,6 +53,13 @@ mod tests {
         } else {
             panic!("expected nested object");
         }
+    }
+
+    /// T19.F06 removed trace fields and a config key, a breaking payload
+    /// change.
+    #[test]
+    fn protocol_version_is_v3alpha4() {
+        assert_eq!(PROTOCOL_VERSION, "v3alpha4");
     }
 
     #[test]

@@ -15,6 +15,7 @@ function makeTick(passes: MeshPassTrace[], commitCounts: number[]): TickTrace {
 			neighbor_barrier: [0, 0, 0, 0, 0, 0, 0, 0],
 			neighbor_occupied: [0, 0, 0, 0, 0, 0, 0, 0],
 			age_ticks: 0,
+			previous_outcome: [0, 0, 0, 0],
 		},
 		debug_perception: null,
 		hops: [],

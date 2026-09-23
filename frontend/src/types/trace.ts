@@ -8,6 +8,8 @@ export interface StaticInputsSnapshot {
 	neighbor_barrier: number[];
 	neighbor_occupied: number[];
 	age_ticks: number;
+	/** The scaled previous-outcome channels the genome reads, in `OUTCOME_CHANNELS` order. */
+	previous_outcome: readonly number[];
 }
 
 export interface PerceptionDebugSnapshot {
@@ -70,8 +72,6 @@ export interface GraphOutputSinkTrace {
 export interface GraphTrace {
 	temporal_committed: boolean;
 	passes: GraphPassTrace[];
-	converged: boolean;
-	stable_passes_count: number;
 	final_outputs: number[];
 	output_sinks: GraphOutputSinkTrace[];
 }
@@ -106,7 +106,21 @@ export interface MeshHopTrace {
 	route: TraceRouteDecision | null;
 	/** The vote contribution this hop committed; zeros when it did not. */
 	vote_contribution: readonly number[];
+	/** The decision-state values this dispatch's inputs resolved against. */
+	decision_inputs: DecisionInputs;
 	backend_trace: BackendTrace;
+}
+
+/** The decision-state input values available to one dispatch, as recorded. */
+export interface DecisionInputs {
+	/** `ActionVotes`: the pass's committed votes, in vote sink order. */
+	action_votes: readonly number[];
+	/** `PreviousPassVotes`: the vote vector at the previous pass's end. */
+	previous_pass_votes: readonly number[];
+	/** `CommitCounts`: the per-kind bars, in `VOTE_KINDS` order. */
+	commit_counts: readonly number[];
+	/** `HopsThisTick`: dispatches this tick, this one included. */
+	hops_this_tick: number;
 }
 
 /** Why the tick's pass loop ended. */
@@ -141,10 +155,25 @@ export const VOTE_KINDS: readonly VoteKind[] = Object.freeze([
 	"Reproduce",
 	"StealEnergy",
 ]);
+/** `PreviousOutcome` channels, in `previous_outcome` order. */
+export const OUTCOME_CHANNELS: readonly string[] = Object.freeze([
+	"EnergyDelta",
+	"ActionSuccess",
+	"DamageDelta",
+	"OffspringSuccess",
+]);
 /** A vote vector with no contributions. */
 export const ZERO_VOTES: readonly number[] = Object.freeze(
 	Array.from({ length: VOTE_SINK_COUNT }, () => 0),
 );
+
+/** Decision-state inputs of a dispatch before any vote, commit, or hop. */
+export const ZERO_DECISION_INPUTS: DecisionInputs = Object.freeze({
+	action_votes: ZERO_VOTES,
+	previous_pass_votes: ZERO_VOTES,
+	commit_counts: Object.freeze([0, 0, 0, 0]),
+	hops_this_tick: 0,
+});
 
 /** One pass of a tick: its vote vector, the effective vote per kind against
  * the bars it started with, and the action it committed, if any. */

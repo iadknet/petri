@@ -89,7 +89,7 @@ pub(crate) trait MeshExecutionMode {
     type Output;
 
     /// Whether the mode records hops and passes; the loop builds the pass
-    /// record and resolves diagnostic routes only when it does.
+    /// record only when it does.
     const RECORDS_HOPS: bool;
 
     #[allow(clippy::too_many_arguments)]
@@ -232,7 +232,6 @@ pub(crate) struct ObservedMeshExecution {
 impl MeshExecutionMode for ObservedMeshExecution {
     type BackendTrace = ();
     type Output = (MeshOutput, MeshObservation);
-    // Diagnostic route winners on exhausted or deciding nodes are not applied routes.
     const RECORDS_HOPS: bool = false;
 
     #[inline]
@@ -283,8 +282,7 @@ impl MeshExecutionMode for ObservedMeshExecution {
             self.last_pass = Some(pass_index);
             self.pass_starts.push(self.hops.len());
         }
-        // Without `RECORDS_HOPS` the loop resolves a route only when it
-        // applies one.
+        // The loop resolves a route only when it applies one.
         self.hops.push((node.node_id, route_result));
     }
 
@@ -425,8 +423,10 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                             .is_some());
 
                 // Every existing target is eligible (T19.F02): a node may route to
-                // itself or to any node this tick already dispatched.
-                let route_result = if M::RECORDS_HOPS || (!result.energy_exhausted && !decided) {
+                // itself or to any node this tick already dispatched. A route is
+                // resolved only when one is applied, so every mode records the
+                // same routes (T19.F06).
+                let route_result = if !result.energy_exhausted && !decided {
                     resolve_gated_route(&node.targets, &result.route_gates)
                 } else {
                     None
