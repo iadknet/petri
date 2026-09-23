@@ -212,7 +212,10 @@ Options settled here, all internal to the codebase:
       recorded and reported, not remediated here); raw hash/byte count/
       verification time in
       [readings, "Benchmark runs"](../../progress/readings/t19-f05.md);
-      series entries point to the summaries; no full report staged.
+      `docs/progress/benchmark-series.json` lists both summaries in the gate
+      and goal series with both `epoch_baseline` values unchanged (T19.F04),
+      and `cargo test -p v3-cli --test bench -- series` passes 3 of 3; no
+      full report staged.
 
 ## Performance and Goal Impact
 
@@ -250,16 +253,19 @@ the user decides the re-pin, as at T11.F21 (epoch kept).
 
 **Measured verdict.** Gate: not severe (`severe=false`); `pass_cap_hits`
 flags at +35.11% (below the 50% severe line), every other counter `ok`,
-wall_clock `ok` (+20.64%, matching host). Goal (run once): **severe=true**,
+wall_clock `ok` (+20.64%, matching host). Gate cognition per creature-tick
+(sum of `phase_wall_clock_ms_per_seed[].cognition_ms` over
+`wall_clock_ms_total / wall_clock_ms_per_creature_tick`) flags separately:
+0.000698564 → 0.000952639 ms, +36.37%, above the 25% flag line and below
+severe, against the predeclared "unchanged within the flag threshold"; goal
+cognition moves the other way, 0.001852 → 0.001139 ms (−38.47%), same host
+(`Isaacs-MacBook-Pro-2.local`). Goal (run once): **severe=true**,
 driven by `decided_passes` (+255.43% aggregate; a near-zero counter with
 large, sign-inconsistent per-world swings), `pass_cap_hits` flags
 (+22.68%), every other counter `ok`, wall_clock `ok` (−6.61%). This severe
-carries no predeclared, justified cost under this spec (the predeclaration
-gives `decided_passes` no direction and states a mechanism cost there does
-not fit and is escalated), so per the reference-and-epoch note above it is
-reported to the user with the draw remap as its only predeclared cause; the
-user decides the re-pin. No epoch is re-pinned by this run. Spec owner's
-attribution (from the stored summaries, no further run): the severe is the
+carries no predeclared, justified cost under this spec; the user accepted it
+on 2026-09-22 as draw-remap trajectory movement, and neither epoch is
+re-pinned (both stay T19.F04). Spec owner's attribution (from the stored summaries, no further run): the severe is the
 predeclared trajectory movement, not a mechanism cost. `decided_passes` is
 0.000327 against 0.000092 per creature-tick beside 3.29 `passes` per
 creature-tick, one `Decide` pass in roughly 10,000 versus 38,000: the counter
@@ -293,3 +299,6 @@ artifact identity: [readings, "Benchmark runs"](../../progress/readings/t19-f05.
 
 - Decision: the user declined a derived queued-displacement input and kept
   the five inputs as listed (track "Decisions recorded", 2026-09-21).
+- Decision: the user accepted the goal severe on `decided_passes`
+  (+255.43%) as draw-remap trajectory movement, not a mechanism cost, and
+  kept both the goal and gate epochs at T19.F04 (2026-09-22).
