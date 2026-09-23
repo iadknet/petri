@@ -24,12 +24,21 @@ pub struct MeshExecutionReading {
     pub reachable_node_count: usize,
     pub executed_node_count: usize,
     pub knockout_count: usize,
-    /// Some node applied two different target positions across the snapshots.
+    /// Input-driven: some node applied two different target positions across
+    /// the snapshots. Every snapshot starts from the same reset state, so
+    /// only perception differs between them.
     pub route_varies_with_input: bool,
-    /// Some node applied routes to two different nodes across the snapshots
-    /// (T13.F07): position variation between targets naming the same node
-    /// does not count.
+    /// Input-driven: some node applied routes to two different nodes across
+    /// the snapshots (T13.F07): position variation between targets naming
+    /// the same node does not count.
     pub route_destination_varies: bool,
+    /// State-driven: some node applied two different target positions within
+    /// one snapshot, across passes or revisits. Perception is frozen within
+    /// a tick, so only mesh state differs between them (T19.F06).
+    pub route_varies_within_snapshot: bool,
+    /// State-driven: some node applied routes to two different nodes within
+    /// one snapshot (T19.F06).
+    pub route_destination_varies_within_snapshot: bool,
     /// Battery executions by tick reason (T19.F04).
     pub tick_reasons: TickReasonCounts,
     /// Passes run, summed over the battery (T19.F04).
@@ -143,6 +152,14 @@ pub fn route_varies_with_input<T: Ord>(snapshots: &[Routes<T>]) -> bool {
         }
     }
     false
+}
+
+/// Whether some node applied two different routes within one snapshot: its
+/// set of applied routes in that snapshot has two members (T19.F06).
+pub fn route_varies_within_snapshot<T: Ord>(snapshots: &[Routes<T>]) -> bool {
+    snapshots
+        .iter()
+        .any(|routes| routes.values().any(|set| set.len() > 1))
 }
 
 /// Remove only the chosen node and redirect references through its static winner.
@@ -378,6 +395,10 @@ impl Battery {
                 knockout_count,
                 route_varies_with_input: route_varies_with_input(&routes),
                 route_destination_varies: route_varies_with_input(&destinations),
+                route_varies_within_snapshot: route_varies_within_snapshot(&routes),
+                route_destination_varies_within_snapshot: route_varies_within_snapshot(
+                    &destinations,
+                ),
                 tick_reasons,
                 passes,
                 decided_passes,
@@ -779,6 +800,89 @@ mod tests {
         assert!(r.route_varies_with_input);
         assert!(r.route_destination_varies);
         assert_eq!(r.knockout_count, 1); // the silent losing terminal only
+    }
+
+    /// A router whose gate reads one input and targets `[1, 2]`: position 0
+    /// (node 1, which commits `Eat` and decides) while the input is zero,
+    /// position 1 (node 2, silent) once it is positive.
+    fn gated_router(input: crate::contracts::InputReference, sub_idx: u16) -> NodeGenome {
+        let mut router = node(0, &[1, 2], false);
+        router.input_refs = vec![input];
+        if let BackendDef::Vm(vm) = &mut router.backend_def {
+            vm.program = vec![
+                VmInstruction::ReadInput {
+                    dst: 0,
+                    ref_idx: 0,
+                    sub_idx,
+                },
+                VmInstruction::WriteRouteGate { slot: 1, src: 0 },
+                VmInstruction::Halt,
+            ];
+        }
+        router
+    }
+
+    /// State-driven variation: the router reads the tick's `Eat` commit
+    /// count, so it routes to node 1 on the first pass and to node 2 on the
+    /// second, the same way in every snapshot.
+    #[test]
+    fn route_varying_within_each_snapshot_but_not_across_reads_within_only() {
+        use crate::contracts::InputReference;
+        let g = genome(vec![
+            gated_router(InputReference::CommitCounts, 0),
+            node(1, &[], true),
+            node(2, &[], false),
+        ]);
+        let r = reading(&g);
+        assert!(r.route_varies_within_snapshot);
+        assert!(r.route_destination_varies_within_snapshot);
+        assert!(!r.route_varies_with_input);
+        assert!(!r.route_destination_varies);
+    }
+
+    /// Input-driven variation: the router reads food under the creature,
+    /// one route per snapshot, a different one across snapshots.
+    #[test]
+    fn route_varying_across_snapshots_only_reads_across_only() {
+        use crate::contracts::{InputReference, WorldInputKey};
+        let router = gated_router(
+            InputReference::World(WorldInputKey::FoodHere {
+                type_idx: Default::default(),
+            }),
+            0,
+        );
+        let r = reading(&genome(vec![
+            router,
+            node(1, &[], true),
+            node(2, &[], true),
+        ]));
+        assert!(!r.route_varies_within_snapshot);
+        assert!(!r.route_destination_varies_within_snapshot);
+        assert!(r.route_varies_with_input);
+        assert!(r.route_destination_varies);
+    }
+
+    #[test]
+    fn founder_routes_vary_neither_within_nor_across_snapshots() {
+        let founder =
+            crate::creature::founder::founder_genome(crate::config::FounderProfile::V3Alpha1);
+        let r = reading(&founder);
+        assert!(!r.route_varies_within_snapshot);
+        assert!(!r.route_destination_varies_within_snapshot);
+        assert!(!r.route_varies_with_input);
+        assert!(!r.route_destination_varies);
+    }
+
+    #[test]
+    fn within_snapshot_variation_needs_two_routes_in_one_snapshot() {
+        let id = NodeId::new(0);
+        let one = |p: usize| BTreeMap::from([(id, BTreeSet::from([p]))]);
+        assert!(!route_varies_within_snapshot(&[one(0), one(1)]));
+        assert!(!route_varies_within_snapshot(&[Routes::<usize>::new()]));
+        assert!(route_varies_within_snapshot(&[
+            one(0),
+            BTreeMap::from([(id, BTreeSet::from([0, 1]))])
+        ]));
     }
 
     /// The ancestral counterfactual touches one node's payload and nothing

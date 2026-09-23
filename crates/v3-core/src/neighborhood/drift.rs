@@ -59,7 +59,14 @@ pub struct MeshTotals {
     pub reachable_nodes: u64,
     pub executed_nodes: u64,
     pub knockout_nodes: u64,
+    /// Lineages with some node routing two ways across snapshots (input-driven).
     pub route_varying_lineages: u32,
+    /// Lineages with some node applying two route positions within one
+    /// snapshot (state-driven, T19.F06).
+    pub route_varying_within_snapshot_lineages: u32,
+    /// Lineages with some node routing to two destinations within one
+    /// snapshot (state-driven, T19.F06).
+    pub route_destination_varying_within_snapshot_lineages: u32,
     /// Battery executions by tick reason, summed over lineages (T19.F04).
     pub tick_reasons: super::mesh_execution::TickReasonCounts,
     /// Passes summed over lineages (T19.F04).
@@ -91,6 +98,10 @@ impl MeshTotals {
         self.executed_nodes += reading.executed_node_count as u64;
         self.knockout_nodes += reading.knockout_count as u64;
         self.route_varying_lineages += u32::from(reading.route_varies_with_input);
+        self.route_varying_within_snapshot_lineages +=
+            u32::from(reading.route_varies_within_snapshot);
+        self.route_destination_varying_within_snapshot_lineages +=
+            u32::from(reading.route_destination_varies_within_snapshot);
         self.tick_reasons.add(&reading.tick_reasons);
         self.passes += reading.passes as u64;
         self.decided_passes += reading.decided_passes as u64;
@@ -319,14 +330,14 @@ mod tests {
 
     proptest! {
         #[test]
-        fn mesh_pooling_sums_counts_and_preserves_bounds(rows in prop::collection::vec((0usize..20, 0usize..20, 0usize..20, 0usize..20, any::<bool>(), 0usize..81, any::<[bool; 3]>()), 0..50)) {
-            let readings: Vec<_> = rows.into_iter().map(|(total, reach, exec, knockout, varies, cap, cycles)| {
+        fn mesh_pooling_sums_counts_and_preserves_bounds(rows in prop::collection::vec((0usize..20, 0usize..20, 0usize..20, 0usize..20, any::<bool>(), 0usize..81, any::<[bool; 3]>(), any::<[bool; 2]>()), 0..50)) {
+            let readings: Vec<_> = rows.into_iter().map(|(total, reach, exec, knockout, varies, cap, cycles, within)| {
                 let reach = reach.min(total);
                 let exec = exec.min(reach);
                 MeshExecutionReading { backends: super::super::mesh_execution::MeshBackendCounts {
                     graph: super::super::mesh_execution::BackendNodeCounts {total: (total / 2) as u64, executed: (exec / 2) as u64, contributing: ((exec-knockout.min(exec))/2) as u64},
                     vm: super::super::mesh_execution::BackendNodeCounts {total: (total-total/2) as u64, executed: (exec-exec/2) as u64, contributing: ((exec-knockout.min(exec))-(exec-knockout.min(exec))/2) as u64},
-                }, total_node_count: total, reachable_node_count: reach, executed_node_count: exec, knockout_count: knockout.min(exec), route_varies_with_input: varies, route_destination_varies: varies, tick_reasons: super::super::mesh_execution::TickReasonCounts { no_decision: cap, ..Default::default() }, passes: 2 * cap, decided_passes: cap, pass_cap_hits: cap, cycle_carrying: cycles[0], revisiting: cycles[1], productive_cycle: cycles[2] }
+                }, total_node_count: total, reachable_node_count: reach, executed_node_count: exec, knockout_count: knockout.min(exec), route_varies_with_input: varies, route_destination_varies: varies, route_varies_within_snapshot: within[0], route_destination_varies_within_snapshot: within[1], tick_reasons: super::super::mesh_execution::TickReasonCounts { no_decision: cap, ..Default::default() }, passes: 2 * cap, decided_passes: cap, pass_cap_hits: cap, cycle_carrying: cycles[0], revisiting: cycles[1], productive_cycle: cycles[2] }
             }).collect();
             let mut pooled = MeshTotals::default();
             for &reading in &readings { pooled.record(reading); }
@@ -342,6 +353,8 @@ mod tests {
             }
             prop_assert_eq!(pooled.knockout_nodes, readings.iter().map(|r| r.knockout_count as u64).sum::<u64>());
             prop_assert_eq!(pooled.route_varying_lineages as usize, readings.iter().filter(|r| r.route_varies_with_input).count());
+            prop_assert_eq!(pooled.route_varying_within_snapshot_lineages as usize, readings.iter().filter(|r| r.route_varies_within_snapshot).count());
+            prop_assert_eq!(pooled.route_destination_varying_within_snapshot_lineages as usize, readings.iter().filter(|r| r.route_destination_varies_within_snapshot).count());
             prop_assert_eq!(pooled.tick_reasons.total(), readings.iter().map(|r| r.tick_reasons.total()).sum::<usize>());
             prop_assert_eq!(pooled.passes, readings.iter().map(|r| r.passes as u64).sum::<u64>());
             prop_assert_eq!(pooled.decided_passes, readings.iter().map(|r| r.decided_passes as u64).sum::<u64>());

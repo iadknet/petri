@@ -209,6 +209,9 @@ fn drift_checkpoint(
             u64::from(mesh.route_varying_lineages),
             denominator,
         ),
+        route_varying_within_snapshot_lineages: mesh.route_varying_within_snapshot_lineages,
+        route_destination_varying_within_snapshot_lineages: mesh
+            .route_destination_varying_within_snapshot_lineages,
         battery_executions,
         pass_cap_hits: mesh.pass_cap_hits,
         tick_reasons: mesh.tick_reasons,
@@ -350,6 +353,8 @@ pub(super) fn mesh_execution_and_steering(
         knockout_count: reading.knockout_count as u64,
         route_varies_with_input: reading.route_varies_with_input,
         route_destination_varies: reading.route_destination_varies,
+        route_varies_within_snapshot: reading.route_varies_within_snapshot,
+        route_destination_varies_within_snapshot: reading.route_destination_varies_within_snapshot,
         pass_cap_hits: reading.pass_cap_hits as u64,
         tick_reasons: reading.tick_reasons,
         passes: reading.passes as u64,

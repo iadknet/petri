@@ -490,6 +490,13 @@ pub struct DriftDepthCheckpoint {
     pub mean_knockout_nodes: String,
     pub route_varying_lineages: u32,
     pub route_varying_fraction: String,
+    /// Lineages with some node applying two route positions (respectively
+    /// destinations) within one snapshot: state-driven variation (T19.F06);
+    /// absent from reports measured before it was read.
+    #[serde(default)]
+    pub route_varying_within_snapshot_lineages: u32,
+    #[serde(default)]
+    pub route_destination_varying_within_snapshot_lineages: u32,
     pub battery_executions: u64,
     /// Capped passes summed over the lineages' battery executions (T19.F02);
     /// absent from reports measured before it was read.
@@ -799,6 +806,15 @@ pub struct MeshExecution {
     /// from summaries measured before it was read.
     #[serde(default)]
     pub route_destination_varies: bool,
+    /// Some node applied two different route positions (respectively
+    /// destinations) within one snapshot, across passes or revisits:
+    /// state-driven variation (T19.F06). `route_varies_with_input` and
+    /// `route_destination_varies` compare snapshots: input-driven. Absent
+    /// from reports measured before it was read.
+    #[serde(default)]
+    pub route_varies_within_snapshot: bool,
+    #[serde(default)]
+    pub route_destination_varies_within_snapshot: bool,
     /// Capped passes summed over the battery (T19.F02); absent from earlier reports.
     #[serde(default)]
     pub pass_cap_hits: u64,
