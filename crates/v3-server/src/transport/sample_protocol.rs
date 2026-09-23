@@ -2,6 +2,7 @@
 
 use serde::Serialize;
 use v3_core::creature::genome::vote::{VOTE_KIND_COUNT, VOTE_SINK_COUNT};
+use v3_core::creature::genome::OUTCOME_CHANNEL_COUNT;
 use v3_core::runtime::OUTPUT_SLOT_COUNT;
 
 /// Serialized input-reference shape owned by transport wire DTOs.
@@ -73,6 +74,8 @@ pub struct StaticInputsSnapshotPayload {
     pub neighbor_barrier: [f32; 8],
     pub neighbor_occupied: [f32; 8],
     pub age_ticks: f32,
+    /// The scaled previous-outcome channels the genome reads (T19.F06).
+    pub previous_outcome: [f32; OUTCOME_CHANNEL_COUNT],
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -99,7 +102,18 @@ pub struct MeshHopTracePayload {
     pub route: Option<RouteDecisionPayload>,
     /// The vote contribution this hop committed (T19.F03).
     pub vote_contribution: [f32; VOTE_SINK_COUNT],
+    /// The decision-state values this dispatch's inputs resolved against (T19.F06).
+    pub decision_inputs: DecisionInputsPayload,
     pub backend_trace: BackendTracePayload,
+}
+
+/// The decision-state input values available to one dispatch (T19.F06).
+#[derive(Debug, Clone, Serialize)]
+pub struct DecisionInputsPayload {
+    pub action_votes: [f32; VOTE_SINK_COUNT],
+    pub previous_pass_votes: [f32; VOTE_SINK_COUNT],
+    pub commit_counts: [f32; VOTE_KIND_COUNT],
+    pub hops_this_tick: f32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -153,8 +167,6 @@ pub struct SlotWritePayload {
 #[derive(Debug, Clone, Serialize)]
 pub struct GraphTracePayload {
     pub passes: Vec<GraphPassTracePayload>,
-    pub converged: bool,
-    pub stable_passes_count: u32,
     pub final_outputs: Vec<f32>,
     pub output_sinks: Vec<GraphOutputSinkTracePayload>,
 }

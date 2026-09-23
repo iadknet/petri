@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SamplerPosition } from "../../../stores/samplePlayback.ts";
 import type { CreatureGenome } from "../../../types/genome.ts";
 import type { ExecutionSample } from "../../../types/trace.ts";
-import { ZERO_VOTES } from "../../../types/trace.ts";
+import { ZERO_DECISION_INPUTS, ZERO_VOTES } from "../../../types/trace.ts";
 import { deriveTraceFocus } from "./traceFocus.ts";
 
 const genome: CreatureGenome = {
@@ -62,12 +62,14 @@ const sample: ExecutionSample = {
 				neighbor_barrier: [0, 0, 0, 0],
 				neighbor_occupied: [0, 0, 0, 0],
 				age_ticks: 8,
+				previous_outcome: [0, 0, 0, 0],
 			},
 			hops: [
 				{
 					hop_index: 0,
 					pass_index: 0,
 					vote_contribution: ZERO_VOTES,
+					decision_inputs: ZERO_DECISION_INPUTS,
 					node_id: 1,
 					input_refs: [{ World: "FoodHere" }],
 					upstream_slots: [1],

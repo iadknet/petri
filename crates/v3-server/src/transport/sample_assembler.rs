@@ -3,11 +3,12 @@
 use v3_core::runtime::trace::domain as core_trace;
 
 use crate::transport::sample_protocol::{
-    BackendTracePayload, ExecutionSamplePayload, GateScorePayload, GraphNodeEvalTracePayload,
-    GraphOutputSinkTracePayload, GraphPassTracePayload, GraphTracePayload, MeshHopTracePayload,
-    MeshPassTracePayload, PassEndReasonPayload, PerceptionDebugSnapshotPayload,
-    RouteDecisionPayload, SlotWritePayload, StaticInputsSnapshotPayload, TerminationReasonPayload,
-    TickTracePayload, VmStepTracePayload, VmTracePayload,
+    BackendTracePayload, DecisionInputsPayload, ExecutionSamplePayload, GateScorePayload,
+    GraphNodeEvalTracePayload, GraphOutputSinkTracePayload, GraphPassTracePayload,
+    GraphTracePayload, MeshHopTracePayload, MeshPassTracePayload, PassEndReasonPayload,
+    PerceptionDebugSnapshotPayload, RouteDecisionPayload, SlotWritePayload,
+    StaticInputsSnapshotPayload, TerminationReasonPayload, TickTracePayload, VmStepTracePayload,
+    VmTracePayload,
 };
 
 #[inline]
@@ -42,6 +43,7 @@ fn assemble_tick(tick: core_trace::TickTrace) -> Result<TickTracePayload, serde_
             neighbor_barrier: tick.static_inputs.neighbor_barrier,
             neighbor_occupied: tick.static_inputs.neighbor_occupied,
             age_ticks: tick.static_inputs.age_ticks,
+            previous_outcome: tick.static_inputs.previous_outcome,
         },
         debug_perception: tick
             .debug_perception
@@ -136,6 +138,12 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
             selected_target_id: r.selected_target_id.0,
         }),
         vote_contribution: hop.vote_contribution,
+        decision_inputs: DecisionInputsPayload {
+            action_votes: hop.decision_inputs.action_votes,
+            previous_pass_votes: hop.decision_inputs.previous_pass_votes,
+            commit_counts: hop.decision_inputs.commit_counts,
+            hops_this_tick: hop.decision_inputs.hops_this_tick,
+        },
         backend_trace: match hop.backend_trace {
             core_trace::BackendTrace::Vm(vm) => BackendTracePayload::Vm(VmTracePayload {
                 register_count: vm.register_count,
@@ -190,8 +198,6 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
                             max_delta: p.max_delta,
                         })
                         .collect(),
-                    converged: graph.converged,
-                    stable_passes_count: graph.stable_passes_count,
                     final_outputs: graph.final_outputs,
                     output_sinks: graph
                         .output_sinks
@@ -233,6 +239,7 @@ mod tests {
                     neighbor_barrier: [0.0; 8],
                     neighbor_occupied: [0.0; 8],
                     age_ticks: 0.004,
+                    previous_outcome: [0.0; 4],
                 },
                 debug_perception: None,
                 hops: vec![MeshHopTrace {
@@ -245,6 +252,12 @@ mod tests {
                     energy_after: 9.5,
                     output_slots: [0.0; OUTPUT_SLOT_COUNT],
                     vote_contribution: [0.0; VOTE_SINK_COUNT],
+                    decision_inputs: core_trace::DecisionInputs {
+                        action_votes: [0.0; VOTE_SINK_COUNT],
+                        previous_pass_votes: [0.0; VOTE_SINK_COUNT],
+                        commit_counts: [0.0; VOTE_KIND_COUNT],
+                        hops_this_tick: 1.0,
+                    },
                     route: Some(TraceRouteDecision {
                         gate_scores: vec![
                             TraceGateScore {
@@ -309,6 +322,7 @@ mod tests {
                     neighbor_barrier: [0.0; 8],
                     neighbor_occupied: [0.0; 8],
                     age_ticks: 0.002,
+                    previous_outcome: [0.25, 0.5, 0.0, 1.0],
                 },
                 debug_perception: None,
                 hops: vec![MeshHopTrace {
@@ -321,6 +335,12 @@ mod tests {
                     energy_after: 4.5,
                     output_slots: [1.0; OUTPUT_SLOT_COUNT],
                     vote_contribution: [0.0; VOTE_SINK_COUNT],
+                    decision_inputs: core_trace::DecisionInputs {
+                        action_votes: [0.5; VOTE_SINK_COUNT],
+                        previous_pass_votes: [0.25; VOTE_SINK_COUNT],
+                        commit_counts: [1.0, 0.0, 0.0, 2.0],
+                        hops_this_tick: 3.0,
+                    },
                     route: Some(TraceRouteDecision {
                         gate_scores: vec![TraceGateScore {
                             slot: 0,
@@ -335,8 +355,6 @@ mod tests {
                     backend_trace: BackendTrace::Graph(GraphTrace {
                         temporal_committed: true,
                         passes: vec![],
-                        converged: true,
-                        stable_passes_count: 2,
                         final_outputs: vec![1.0],
                         output_sinks: vec![GraphOutputSinkTrace {
                             wired: true,
@@ -401,5 +419,20 @@ mod tests {
         let json = serde_json::to_value(tick).expect("pass records serialize");
         assert_eq!(json["passes"][0]["end_reason"], "Decided");
         assert_eq!(json["termination_reason"], "NoDecision");
+        assert_eq!(
+            json["static_inputs"]["previous_outcome"],
+            serde_json::json!([0.25, 0.5, 0.0, 1.0])
+        );
+        let hop = &json["hops"][0];
+        assert_eq!(hop["decision_inputs"]["action_votes"][26], 0.5);
+        assert_eq!(hop["decision_inputs"]["previous_pass_votes"][0], 0.25);
+        assert_eq!(
+            hop["decision_inputs"]["commit_counts"],
+            serde_json::json!([1.0, 0.0, 0.0, 2.0])
+        );
+        assert_eq!(hop["decision_inputs"]["hops_this_tick"], 3.0);
+        let graph_json = &hop["backend_trace"]["Graph"];
+        assert!(graph_json.get("converged").is_none());
+        assert!(graph_json.get("stable_passes_count").is_none());
     }
 }

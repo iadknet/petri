@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = "v3alpha3" as const;
+export const PROTOCOL_VERSION = "v3alpha4" as const;
 
 export type SimState = "idle" | "running" | "paused";
 export type ZoomTier = "overview" | "detail" | "inspect";

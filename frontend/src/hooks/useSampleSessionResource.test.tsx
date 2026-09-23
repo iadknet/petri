@@ -34,6 +34,7 @@ function buildSample(creatureId: number): ExecutionSample {
 					neighbor_barrier: [0, 0, 0, 0],
 					neighbor_occupied: [0, 0, 0, 0],
 					age_ticks: 5,
+					previous_outcome: [0, 0, 0, 0],
 				},
 				hops: [],
 				passes: [],

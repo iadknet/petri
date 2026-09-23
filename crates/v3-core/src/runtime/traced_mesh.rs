@@ -1,14 +1,15 @@
 //! Trace recording adapter for the shared mesh routing loop.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::NodeId;
+use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId};
 use crate::creature::genome::vote::VoteVector;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_traced;
+use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode};
 use crate::runtime::trace::domain::{
-    BackendTrace, MeshHopTrace, MeshPassTrace, TraceGateScore, TraceRouteDecision,
+    BackendTrace, DecisionInputs, MeshHopTrace, MeshPassTrace, TraceGateScore, TraceRouteDecision,
 };
 use crate::runtime::traced_vm::execute_vm_node_traced;
 use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
@@ -45,6 +46,9 @@ pub fn execute_creature_mesh_traced(
 struct RecordingMeshExecution {
     hops: Vec<MeshHopTrace>,
     passes: Vec<MeshPassTrace>,
+    /// The decision state the dispatch in flight resolves against, taken
+    /// by the `record_hop` that follows it.
+    dispatch_inputs: Option<DecisionInputs>,
 }
 
 impl RecordingMeshExecution {
@@ -52,7 +56,44 @@ impl RecordingMeshExecution {
         Self {
             hops: Vec::with_capacity(max_hops),
             passes: Vec::new(),
+            dispatch_inputs: None,
         }
+    }
+}
+
+/// Each decision-state input as `resolve_input` returns it to this dispatch.
+/// Nothing commits mid-dispatch, so these are the values every read in the
+/// dispatch sees (T19.F05).
+fn decision_inputs(
+    sensors: &SensorSnapshot,
+    upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
+    energy: f32,
+    energy_consumed: f32,
+    side_outputs: &MeshSideOutputs,
+) -> DecisionInputs {
+    let ctx = ResolveCtx {
+        sensors,
+        upstream_slots,
+        energy,
+        energy_consumed,
+        action_queue: &side_outputs.action_queue,
+        votes: &side_outputs.votes,
+        previous_pass_votes: &side_outputs.previous_pass_votes,
+        commit_counts: &side_outputs.commit_counts,
+        mesh_hops: side_outputs.work_counters.mesh_hops,
+    };
+    let read =
+        |reference: InputReference, sub_idx: usize| resolve_input(&reference, sub_idx as u16, &ctx);
+    DecisionInputs {
+        action_votes: std::array::from_fn(|sub| read(InputReference::ActionVotes, sub)),
+        previous_pass_votes: std::array::from_fn(|sub| {
+            read(InputReference::PreviousPassVotes, sub)
+        }),
+        commit_counts: std::array::from_fn(|sub| read(InputReference::CommitCounts, sub)),
+        hops_this_tick: read(
+            InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
+            0,
+        ),
     }
 }
 
@@ -77,6 +118,13 @@ impl MeshExecutionMode for RecordingMeshExecution {
         config: &RuntimeConfig,
         side_outputs: &mut MeshSideOutputs,
     ) -> (NodeResult, BackendTrace) {
+        self.dispatch_inputs = Some(decision_inputs(
+            sensors,
+            upstream_slots,
+            *energy,
+            energy_consumed,
+            side_outputs,
+        ));
         match &node.backend_def {
             BackendDef::Vm(def) => {
                 let (result, trace) = execute_vm_node_traced(
@@ -160,6 +208,10 @@ impl MeshExecutionMode for RecordingMeshExecution {
             output_slots: result.output_slots,
             route,
             vote_contribution,
+            decision_inputs: self
+                .dispatch_inputs
+                .take()
+                .expect("every recorded hop follows its dispatch"),
             backend_trace,
         });
     }
@@ -191,7 +243,9 @@ mod tests {
     };
     use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
-    use crate::runtime::trace::domain::{BackendTrace, TerminationReason};
+    use crate::runtime::trace::domain::{
+        BackendTrace, PassEndReason, StaticInputsSnapshot, TerminationReason,
+    };
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
     use crate::sensors::typed_food::TypedFoodLocalSnapshot;
@@ -1001,5 +1055,193 @@ mod tests {
             0.01,
             |reason| matches!(reason, TerminationReason::EnergyExhausted),
         );
+    }
+
+    fn run_traced(
+        genome: &CreatureGenome,
+        sensors: &SensorSnapshot,
+        config: &RuntimeConfig,
+        mut energy: f32,
+    ) -> (MeshOutput, Vec<MeshHopTrace>, Vec<MeshPassTrace>) {
+        execute_creature_mesh_traced(
+            genome,
+            sensors,
+            &mut energy,
+            &mut [0.0; 16],
+            &[0.0; 16],
+            &mut GraphRuntimeState::new(),
+            config,
+        )
+    }
+
+    /// Node 0 reads the five decision-state inputs into registers 0..=6 and
+    /// routes to node 1, which votes `Eat` and `Decide` and routes back. Pass
+    /// 0 commits `Eat`; pass 1 reads that pass's votes, the bar of 1, the
+    /// live votes of node 1, and runs to the cap of 4 routed hops.
+    fn decision_reader_genome() -> CreatureGenome {
+        let read = |dst: u8, ref_idx: u16, sub_idx: u16| VmInstruction::ReadInput {
+            dst,
+            ref_idx,
+            sub_idx,
+        };
+        let decide = VoteSink::Decide.index() as u16;
+        let reader = NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![
+                InputReference::ActionVotes,
+                InputReference::PreviousPassVotes,
+                InputReference::CommitCounts,
+                InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
+                InputReference::PreviousOutcome,
+            ],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 7,
+                constants: vec![],
+                program: vec![
+                    read(0, 0, 0),
+                    read(1, 0, decide),
+                    read(2, 1, 0),
+                    read(3, 1, decide),
+                    read(4, 2, 0),
+                    read(5, 3, 0),
+                    read(6, 4, 2),
+                    VmInstruction::Halt,
+                ],
+            }),
+            targets: wrap_targets(vec![NodeId::new(1)]),
+        };
+        let mut voter = vm_emit_node(NodeId::new(1), vec![NodeId::new(0)]);
+        if let BackendDef::Vm(vm) = &mut voter.backend_def {
+            vm.program.insert(
+                2,
+                VmInstruction::AddVote {
+                    sink: VoteSink::Decide.index() as u8,
+                    src: 0,
+                },
+            );
+        }
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![reader, voter],
+        }
+    }
+
+    #[test]
+    fn traced_decision_inputs_are_the_values_the_node_reads() {
+        let genome = decision_reader_genome();
+        let mut sensors = empty_ss();
+        sensors.local.previous_outcome = [0.25, 0.5, 0.75, 1.0];
+        let config = RuntimeConfig {
+            max_mesh_hops: 4,
+            ..default_config()
+        };
+        let (_, hops, passes) = run_traced(&genome, &sensors, &config, 100.0);
+        assert_eq!(passes.len(), 2);
+        let eat = VoteSink::Eat.index();
+        let decide = VoteSink::Decide.index();
+        let reader_hops: Vec<_> = hops
+            .iter()
+            .filter(|h| h.node_id == NodeId::new(0))
+            .collect();
+        assert!(reader_hops.len() >= 3);
+        for hop in &reader_hops {
+            let BackendTrace::Vm(vm) = &hop.backend_trace else {
+                panic!("reader is a VM node");
+            };
+            let inputs = &hop.decision_inputs;
+            assert_eq!(
+                vm.final_registers,
+                vec![
+                    inputs.action_votes[eat],
+                    inputs.action_votes[decide],
+                    inputs.previous_pass_votes[eat],
+                    inputs.previous_pass_votes[decide],
+                    inputs.commit_counts[VoteKind::Eat.index()],
+                    inputs.hops_this_tick,
+                    StaticInputsSnapshot::from(&sensors.local).previous_outcome[2],
+                ],
+                "hop {}",
+                hop.hop_index
+            );
+            assert_eq!(inputs.hops_this_tick, (hop.hop_index + 1) as f32);
+        }
+        // The values are live decision state, not zeros: pass 1 reads pass
+        // 0's votes and bar, and later reads see node 1's committed vote.
+        let pass_one = &reader_hops[1].decision_inputs;
+        assert_eq!(pass_one.previous_pass_votes[eat], 1.0);
+        assert_eq!(pass_one.commit_counts[VoteKind::Eat.index()], 1.0);
+        assert_eq!(reader_hops[2].decision_inputs.action_votes[eat], 1.0);
+    }
+
+    /// A hop records a route exactly when the loop applies one (T19.F04 P3):
+    /// never on the dispatch that decides its pass or ends exhausted, always
+    /// on one routing to a missing node or taken just before the pass cap.
+    #[test]
+    fn traced_hops_record_only_applied_routes() {
+        let config = RuntimeConfig {
+            max_mesh_hops: 4,
+            ..default_config()
+        };
+        let (_, hops, passes) = run_traced(&decision_reader_genome(), &empty_ss(), &config, 100.0);
+        assert_eq!(passes[0].end_reason, PassEndReason::Decided);
+        let deciding = hops
+            .iter()
+            .find(|h| h.pass_index == 0 && h.node_id == NodeId::new(1));
+        assert!(deciding.expect("pass 0 reaches node 1").route.is_none());
+        assert!(hops
+            .iter()
+            .filter(|h| h.pass_index == 1)
+            .all(|h| h.route.is_some()));
+
+        let id = NodeId::new(0);
+        let missing = NodeId::new(99);
+        let node = |program: Vec<VmInstruction>, target: NodeId| NodeGenome {
+            node_id: id,
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program,
+            }),
+            targets: wrap_targets(vec![target]),
+        };
+        let genome = |node| CreatureGenome {
+            entry_node_id: id,
+            nodes: vec![node],
+        };
+
+        let mut exhausting = default_config();
+        exhausting.vm.opcode_cost_multiplier = 1.0;
+        let (_, hops, _) = run_traced(
+            &genome(node(vec![VmInstruction::Noop], id)),
+            &empty_ss(),
+            &exhausting,
+            0.01,
+        );
+        assert!(hops[0].route.is_none(), "exhausted hop");
+
+        let (_, hops, passes) = run_traced(
+            &genome(node(vec![VmInstruction::Halt], missing)),
+            &empty_ss(),
+            &default_config(),
+            100.0,
+        );
+        assert_eq!(passes[0].end_reason, PassEndReason::MissingNode);
+        let route = hops[0].route.as_ref().expect("missing-node route kept");
+        assert_eq!(route.selected_target_id, missing);
+
+        let capped = RuntimeConfig {
+            max_mesh_hops: 1,
+            ..default_config()
+        };
+        let (_, hops, passes) = run_traced(
+            &genome(node(vec![VmInstruction::Halt], id)),
+            &empty_ss(),
+            &capped,
+            100.0,
+        );
+        assert_eq!(passes[0].end_reason, PassEndReason::PassCapReached);
+        assert_eq!(hops.len(), 1);
+        assert!(hops[0].route.is_some(), "route before the cap kept");
     }
 }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { ExecutionSample } from "../types/trace.ts";
-import { ZERO_VOTES } from "../types/trace.ts";
+import { ZERO_DECISION_INPUTS, ZERO_VOTES } from "../types/trace.ts";
 import { useSamplePlaybackStore } from "./samplePlayback.ts";
 
 function makeSample(): ExecutionSample {
@@ -17,12 +17,14 @@ function makeSample(): ExecutionSample {
 					neighbor_barrier: [],
 					neighbor_occupied: [],
 					age_ticks: 0,
+					previous_outcome: [0, 0, 0, 0],
 				},
 				hops: [
 					{
 						hop_index: 0,
 						pass_index: 0,
 						vote_contribution: ZERO_VOTES,
+						decision_inputs: ZERO_DECISION_INPUTS,
 						node_id: 1,
 						input_refs: [],
 						upstream_slots: [],
@@ -60,6 +62,7 @@ function makeSample(): ExecutionSample {
 						hop_index: 1,
 						pass_index: 0,
 						vote_contribution: ZERO_VOTES,
+						decision_inputs: ZERO_DECISION_INPUTS,
 						node_id: 2,
 						input_refs: [],
 						upstream_slots: [],
@@ -85,9 +88,7 @@ function makeSample(): ExecutionSample {
 										max_delta: 0.01,
 									},
 								],
-								converged: false,
 								temporal_committed: true,
-								stable_passes_count: 0,
 								final_outputs: [],
 								output_sinks: [],
 							},
@@ -111,12 +112,14 @@ function makeSample(): ExecutionSample {
 					neighbor_barrier: [],
 					neighbor_occupied: [],
 					age_ticks: 1,
+					previous_outcome: [0, 0, 0, 0],
 				},
 				hops: [
 					{
 						hop_index: 0,
 						pass_index: 0,
 						vote_contribution: ZERO_VOTES,
+						decision_inputs: ZERO_DECISION_INPUTS,
 						node_id: 3,
 						input_refs: [],
 						upstream_slots: [],

@@ -3,6 +3,7 @@
 use crate::contracts::{InputReference, NodeId, WorldAction};
 use crate::creature::genome::cgp::ComputeNodeKind;
 use crate::creature::genome::vote::{VoteVector, VOTE_KIND_COUNT};
+use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
 use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::PerceptionSnapshot;
 use crate::sensors::static_inputs::StaticInputs;
@@ -100,6 +101,9 @@ pub struct StaticInputsSnapshot {
     pub neighbor_barrier: [f32; 8],
     pub neighbor_occupied: [f32; 8],
     pub age_ticks: f32,
+    /// The scaled previous-outcome channels the genome reads
+    /// (`PreviousOutcome`, T19.F06).
+    pub previous_outcome: [f32; OUTCOME_CHANNEL_COUNT],
 }
 
 impl From<&StaticInputs> for StaticInputsSnapshot {
@@ -110,6 +114,7 @@ impl From<&StaticInputs> for StaticInputsSnapshot {
             neighbor_barrier: si.neighbor_barrier,
             neighbor_occupied: si.neighbor_occupied,
             age_ticks: si.age_ticks,
+            previous_outcome: si.previous_outcome,
         }
     }
 }
@@ -163,7 +168,24 @@ pub struct MeshHopTrace {
     /// The vote contribution this hop committed (T19.F03); zeros when the
     /// dispatch ended exhausted and committed nothing.
     pub vote_contribution: VoteVector,
+    /// The decision state this dispatch's inputs resolved against (T19.F06).
+    pub decision_inputs: DecisionInputs,
     pub backend_trace: BackendTrace,
+}
+
+/// The decision-state values a dispatch's resolution context supplied
+/// (T19.F06), each exactly as `resolve_input` returns it: what the node
+/// could read, not proof that it read them.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DecisionInputs {
+    /// `ActionVotes`: the pass's committed votes, in `VoteSink` order.
+    pub action_votes: VoteVector,
+    /// `PreviousPassVotes`: the vote vector at the previous pass's end.
+    pub previous_pass_votes: VoteVector,
+    /// `CommitCounts`: the per-kind bars, in `VoteKind` order.
+    pub commit_counts: [f32; VOTE_KIND_COUNT],
+    /// `HopsThisTick`: dispatches this tick, this one included.
+    pub hops_this_tick: f32,
 }
 
 /// Discriminated union for backend-specific trace data.
@@ -208,9 +230,6 @@ pub struct GraphTrace {
     pub passes: Vec<GraphPassTrace>,
     /// Whether candidate operator state and outputs were committed.
     pub temporal_committed: bool,
-    /// Legacy convergence metadata; always false/zero after T11.F06.
-    pub converged: bool,
-    pub stable_passes_count: u32,
     pub final_outputs: Vec<f32>,
     pub output_sinks: Vec<GraphOutputSinkTrace>,
 }
@@ -285,13 +304,14 @@ mod tests {
             neighbor_occupied: [0.0; 8],
             max_energy: 200.0,
             age_ticks: 0.084,
-            previous_outcome: [0.0; 4],
+            previous_outcome: [0.25, 0.5, 0.0, 1.0],
         };
         let snapshot = StaticInputsSnapshot::from(&si);
         assert_eq!(snapshot.food_here, 0.75);
         assert_eq!(snapshot.neighbor_food, si.neighbor_food);
         assert_eq!(snapshot.neighbor_barrier, si.neighbor_barrier);
         assert_eq!(snapshot.age_ticks, 0.084);
+        assert_eq!(snapshot.previous_outcome, si.previous_outcome);
     }
 
     #[test]
