@@ -56,7 +56,7 @@ applies: every choice is internal to the codebase.
 | Surface | Change |
 | --- | --- |
 | `MutationConfig` (`config/simulation.rs`) | Field, `default_action_queue_cap`, and the normalization clamp deleted; `deny_unknown_fields` rejects a stored config carrying it, with no alias or ignore shim (the T19.F02 precedent). The normalization, proptest, and default tests drop the field |
-| `mutation/compound.rs` | A named constant for four input slots; `ActionQueue` width is `slots × 3` = 12 on every config; `sub_value_count` loses its config parameter and its callers stop passing one |
+| `mutation/compound.rs` | A named constant for four input slots; `ActionQueue` width is `slots × 3` = 12 on every config; `sub_value_count` loses its config parameter, and internal helpers that only forwarded it lose theirs; the public mutator entry points (`GraphMutator::apply`, `TopologyMutator::apply_with_food_type_count`) keep their signatures with the parameter unused (`_config`), as `_food_type_count` already is |
 | Seven tracked recipes | The field is stripped from `world-recipe-extended-age-drain.json`, `-age10-baseline`, `-age10-mutation-half`, `-age10-mutation-quarter`, `-reduced-copy-growth`, `-relaxed-genome-costs`, and `world-recipe-fertility-zones.json`; each still loads |
 | Frontend | `types/config.ts`, `test/fixtures.ts`, `ControlBar.test.tsx`, the `MutationSection` control, and both `bounds.ts` rules and their test; `runtime.max_actions_per_turn` keeps its static bounds |
 | v3-server | `patch_config_names_each_bound_constrained_field_patched_alone` loses the cap case; its `max_actions_per_turn` case (a patch of `2` is no longer rewritten) takes a value normalization still rewrites |
@@ -90,6 +90,10 @@ applies: every choice is internal to the codebase.
 ```text
 PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|DirectionBank|ActionSlot|ExecuteGate|ActionBid|ActionEmitted|MaxHopsReached|push_action([^_a-z]|$)|pop_action|execute_action_queue|write_direction_bid|write_world_action_meta|direction_bank|action_bank|action_slot|execute_gate|action_queue_cap|actionBank|actionSlot|executeGate|[Aa]ction[ -]bank|[Aa]ction[ -]slot|[Ee]xecute[ -]gate|[Dd]irection[ -]bank
 ```
+
+   A test that must spell a retired name to prove it is rejected assembles
+   the name at run time, with a comment citing this invariant; the scan gets no
+   allowlist.
 
    The one hit in a committed seed record,
    `crates/v3-core/proptest-regressions/mutation/input_ref/tests.txt:7`, is a
@@ -163,6 +167,7 @@ PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|D
 | Pass detail | Per kind: the bar at pass start, the best sink vote, and the effective vote (`raw − bar`), the committed kind marked; `Terminate` and `Decide` shown as their own fields, never as kind votes; on the pass that ends a `TerminateVoted` tick, `Terminate` against the winning effective vote; on a `Decided` pass, its `Decide` vote |
 | Selected hop | The node's non-zero vote contribution; the five decision-state values available to this dispatch, labeled by input name (vectors as non-zero sinks, `CommitCounts` per kind, `HopsThisTick`, `PreviousOutcome` per channel) |
 | Routes and graph hops | No route on a hop whose dispatch applied none; no convergence label |
+| Node view | For a node dispatched more than once in the tick, the record of the hop selected in the timeline, not the node's first hop |
 
 7. **Reference and cross-references.** Besides invariant 2: the runtime config
    spec loses the cap row and its invariants and records the removal without
@@ -216,8 +221,15 @@ PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|D
       pass `Decided` and an energy-exhausted hop record no route, while a hop
       routing to a missing node and the hop before a pass cap keep theirs;
       protocol version tests read `v3alpha4`.
-- [ ] Inspector: one frontend test per row of invariant 6; a live check on the
-      dev stack sampling a creature, screenshot path and tick in readings.
+- [ ] Inspector: one frontend test per row of invariant 6. Live check on the dev
+      stack: zoom the world canvas in until the frame carries creatures (the
+      zoomed-out `overview` view has none), click a creature, sample it, and
+      capture one screenshot showing a tick's pass groups with end reasons and
+      hop counts, a pass's per-kind bar, best vote, and effective vote with
+      `Terminate` and `Decide`, and a selected hop's five decision-state values.
+      Creature id, tick, and screenshot path go in readings. If the zoomed-in
+      frame never carries a clickable creature, that goes back to the spec
+      owner as a finding; frontend tests do not stand in for the live check.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Summaries stored at
