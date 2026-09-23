@@ -68,128 +68,19 @@ mod tests {
     use super::*;
     use rand::RngCore;
 
-    #[derive(Default)]
-    struct ZeroCountingRng {
-        draws: usize,
-    }
-
-    impl RngCore for ZeroCountingRng {
-        fn next_u32(&mut self) -> u32 {
-            self.draws += 1;
-            0
-        }
-
-        fn next_u64(&mut self) -> u64 {
-            self.draws += 1;
-            0
-        }
-
-        fn fill_bytes(&mut self, dest: &mut [u8]) {
-            self.draws += 1;
-            dest.fill(0);
-        }
-
-        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-            self.fill_bytes(dest);
-            Ok(())
-        }
-    }
-
-    #[test]
-    fn typed_sampler_single_food_mode_does_not_draw_extra_food_type_rng() {
-        let mut rng = ZeroCountingRng::default();
-        let sampled = random_input_reference_for_food_types(&mut rng, 1);
-        assert_eq!(
-            sampled,
-            InputReference::World(WorldInputKey::FoodHere {
-                type_idx: OrdinaryFoodTypeId::default()
-            })
-        );
-        assert_eq!(
-            rng.draws, 1,
-            "single-food mode should only draw for input-ref key selection"
-        );
-    }
-
-    #[test]
-    fn typed_sampler_multi_food_mode_draws_for_food_type_idx() {
-        let mut rng = ZeroCountingRng::default();
-        let sampled = random_input_reference_for_food_types(&mut rng, 3);
-        assert_eq!(
-            sampled,
-            InputReference::World(WorldInputKey::FoodHere {
-                type_idx: OrdinaryFoodTypeId::default()
-            })
-        );
-        assert_eq!(
-            rng.draws, 2,
-            "multi-food mode should draw once for key selection and once for food type_idx"
-        );
-    }
-    #[test]
-    fn typed_sampler_retains_both_energy_introspection_keys() {
-        for (index, key) in [
-            (5_u64, DynamicIntrospectionKey::EnergyCurrent),
-            (6, DynamicIntrospectionKey::EnergyConsumedThisTick),
-        ] {
-            // The midpoint of this u32 bucket selects the exact catalog index
-            // under rand's multiply-high uniform sampler, with no rejection.
-            let draw = ((index << 32) + (1_u64 << 31)) / 27;
-            let mut rng = rand::rngs::mock::StepRng::new(draw, 0);
-            assert_eq!(
-                random_input_reference_for_food_types(&mut rng, 1),
-                InputReference::DynamicIntrospection(key)
-            );
-        }
-    }
-
-    /// The five decision-state entries sit at catalog indices 14 to 18 and
-    /// each costs the key draw alone.
-    #[test]
-    fn typed_sampler_draws_each_decision_state_input_with_one_draw() {
-        for (index, expected) in [
-            (14_u64, InputReference::ActionVotes),
-            (15, InputReference::PreviousPassVotes),
-            (16, InputReference::CommitCounts),
-            (
-                17,
-                InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
-            ),
-            (18, InputReference::PreviousOutcome),
-        ] {
-            for food_type_count in [1, 3] {
-                let draw = ((index << 32) + (1_u64 << 31)) / 27;
-                let mut rng = CountingStepRng {
-                    inner: rand::rngs::mock::StepRng::new(draw, 0),
-                    draws: 0,
-                };
-                assert_eq!(
-                    random_input_reference_for_food_types(&mut rng, food_type_count),
-                    expected
-                );
-                assert_eq!(rng.draws, 1, "index {index}");
-            }
-        }
-    }
-
-    /// Indices 19 to 26 are the upstream slot, which draws its slot.
-    #[test]
-    fn typed_sampler_upstream_range_starts_after_the_decision_state() {
-        let draw = ((19_u64 << 32) + (1_u64 << 31)) / 27;
-        let mut rng = CountingStepRng {
-            inner: rand::rngs::mock::StepRng::new(draw, 0),
-            draws: 0,
-        };
-        assert!(matches!(
-            random_input_reference_for_food_types(&mut rng, 1),
-            InputReference::UpstreamSlot(_)
-        ));
-        assert_eq!(rng.draws, 2);
-    }
-
+    /// A `StepRng` that counts the draws taken from it.
     struct CountingStepRng {
         inner: rand::rngs::mock::StepRng,
         draws: usize,
+    }
+
+    impl CountingStepRng {
+        fn new(value: u64) -> Self {
+            Self {
+                inner: rand::rngs::mock::StepRng::new(value, 0),
+                draws: 0,
+            }
+        }
     }
 
     impl RngCore for CountingStepRng {
@@ -212,5 +103,92 @@ mod tests {
             self.fill_bytes(dest);
             Ok(())
         }
+    }
+
+    /// The midpoint of catalog index `index`'s u32 bucket: selects that
+    /// index under rand's multiply-high uniform sampler, with no rejection.
+    fn catalog_draw(index: u64) -> u64 {
+        ((index << 32) + (1_u64 << 31)) / 27
+    }
+
+    #[test]
+    fn typed_sampler_single_food_mode_does_not_draw_extra_food_type_rng() {
+        let mut rng = CountingStepRng::new(0);
+        let sampled = random_input_reference_for_food_types(&mut rng, 1);
+        assert_eq!(
+            sampled,
+            InputReference::World(WorldInputKey::FoodHere {
+                type_idx: OrdinaryFoodTypeId::default()
+            })
+        );
+        assert_eq!(
+            rng.draws, 1,
+            "single-food mode should only draw for input-ref key selection"
+        );
+    }
+
+    #[test]
+    fn typed_sampler_multi_food_mode_draws_for_food_type_idx() {
+        let mut rng = CountingStepRng::new(0);
+        let sampled = random_input_reference_for_food_types(&mut rng, 3);
+        assert_eq!(
+            sampled,
+            InputReference::World(WorldInputKey::FoodHere {
+                type_idx: OrdinaryFoodTypeId::default()
+            })
+        );
+        assert_eq!(
+            rng.draws, 2,
+            "multi-food mode should draw once for key selection and once for food type_idx"
+        );
+    }
+    #[test]
+    fn typed_sampler_retains_both_energy_introspection_keys() {
+        for (index, key) in [
+            (5_u64, DynamicIntrospectionKey::EnergyCurrent),
+            (6, DynamicIntrospectionKey::EnergyConsumedThisTick),
+        ] {
+            let mut rng = rand::rngs::mock::StepRng::new(catalog_draw(index), 0);
+            assert_eq!(
+                random_input_reference_for_food_types(&mut rng, 1),
+                InputReference::DynamicIntrospection(key)
+            );
+        }
+    }
+
+    /// The five decision-state entries sit at catalog indices 14 to 18 and
+    /// each costs the key draw alone.
+    #[test]
+    fn typed_sampler_draws_each_decision_state_input_with_one_draw() {
+        for (index, expected) in [
+            (14_u64, InputReference::ActionVotes),
+            (15, InputReference::PreviousPassVotes),
+            (16, InputReference::CommitCounts),
+            (
+                17,
+                InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
+            ),
+            (18, InputReference::PreviousOutcome),
+        ] {
+            for food_type_count in [1, 3] {
+                let mut rng = CountingStepRng::new(catalog_draw(index));
+                assert_eq!(
+                    random_input_reference_for_food_types(&mut rng, food_type_count),
+                    expected
+                );
+                assert_eq!(rng.draws, 1, "index {index}");
+            }
+        }
+    }
+
+    /// Indices 19 to 26 are the upstream slot, which draws its slot.
+    #[test]
+    fn typed_sampler_upstream_range_starts_after_the_decision_state() {
+        let mut rng = CountingStepRng::new(catalog_draw(19));
+        assert!(matches!(
+            random_input_reference_for_food_types(&mut rng, 1),
+            InputReference::UpstreamSlot(_)
+        ));
+        assert_eq!(rng.draws, 2);
     }
 }

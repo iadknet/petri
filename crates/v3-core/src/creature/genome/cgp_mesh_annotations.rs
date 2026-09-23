@@ -12,7 +12,9 @@ use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNodeKind, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::mesh_annotations::{MeshReadClass, MeshWriteClass};
+use crate::creature::genome::mesh_annotations::{
+    classify_input_ref, MeshReadClass, MeshWriteClass,
+};
 
 use super::cgp_analysis::{cgp_live_compute_indices, wired_surface_edges};
 
@@ -92,36 +94,6 @@ pub(crate) fn derive_cgp_annotations(
         has_stateful_behavior,
         live_indices,
     )
-}
-
-fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
-    use crate::contracts::WorldInputKey;
-
-    match input_ref {
-        InputReference::World(key) => match key {
-            WorldInputKey::FoodHere { .. } | WorldInputKey::AreaFoodSummary { .. } => {
-                MeshReadClass::Food
-            }
-            WorldInputKey::NeighborFoodRing { .. } => MeshReadClass::Food,
-            WorldInputKey::NeighborBarrierRing | WorldInputKey::AreaBarrierSummary => {
-                MeshReadClass::Barrier
-            }
-            WorldInputKey::NeighborOccupiedRing | WorldInputKey::AreaOccupancySummary => {
-                MeshReadClass::Occupancy
-            }
-            WorldInputKey::NearbyCreatureCore
-            | WorldInputKey::NearbyCreatureVitals
-            | WorldInputKey::NearbyCreatureIdentity => MeshReadClass::Neighbor,
-        },
-        InputReference::StaticIntrospection(_)
-        | InputReference::DynamicIntrospection(_)
-        | InputReference::PreviousOutcome => MeshReadClass::Introspection,
-        InputReference::ActionVotes
-        | InputReference::PreviousPassVotes
-        | InputReference::CommitCounts => MeshReadClass::Decision,
-        InputReference::UpstreamSlot(_) => MeshReadClass::Upstream,
-        InputReference::ActionQueue => MeshReadClass::ActionQueue,
-    }
 }
 
 #[cfg(test)]

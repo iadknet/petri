@@ -144,9 +144,9 @@ mod tests {
             energy,
             energy_consumed,
             action_queue: &EMPTY_AQ,
-            votes: &[0.0; 27],
-            previous_pass_votes: &[0.0; 27],
-            commit_counts: &[0; 4],
+            votes: &[0.0; VOTE_SINK_COUNT],
+            previous_pass_votes: &[0.0; VOTE_SINK_COUNT],
+            commit_counts: &[0; VOTE_KIND_COUNT],
             mesh_hops: 0,
         }
     }
@@ -269,15 +269,8 @@ mod tests {
         let mut aq = ActionQueue::new(4);
         aq.push(WorldAction::eat(OrdinaryFoodTypeId::default())); // type 1
         let ctx = ResolveCtx {
-            sensors: &ss,
-            upstream_slots: &upstream,
-            energy: 50.0,
-            energy_consumed: 0.0,
             action_queue: &aq,
-            votes: &[0.0; 27],
-            previous_pass_votes: &[0.0; 27],
-            commit_counts: &[0; 4],
-            mesh_hops: 0,
+            ..make_ctx(&ss, &upstream, 50.0, 0.0)
         };
         // sub_idx=0 → slot 0, field 0 (action_type)
         let v = resolve_input(&InputReference::ActionQueue, 0, &ctx);
@@ -292,15 +285,8 @@ mod tests {
         aq.push(WorldAction::NoOp); // slot 0: type=0
         aq.push(WorldAction::Move(Direction::E)); // slot 1: type=2, param0=2.0 (E direction index)
         let ctx = ResolveCtx {
-            sensors: &ss,
-            upstream_slots: &upstream,
-            energy: 50.0,
-            energy_consumed: 0.0,
             action_queue: &aq,
-            votes: &[0.0; 27],
-            previous_pass_votes: &[0.0; 27],
-            commit_counts: &[0; 4],
-            mesh_hops: 0,
+            ..make_ctx(&ss, &upstream, 50.0, 0.0)
         };
         // sub_idx=3 → slot 1 (3/3=1), field 0 (3%3=0) = action_type = 2.0 (Move)
         let v = resolve_input(&InputReference::ActionQueue, 3, &ctx);
@@ -323,15 +309,8 @@ mod tests {
             energy_transfer_fraction: 0.42,
         });
         let ctx = ResolveCtx {
-            sensors: &ss,
-            upstream_slots: &upstream,
-            energy: 50.0,
-            energy_consumed: 0.0,
             action_queue: &aq,
-            votes: &[0.0; 27],
-            previous_pass_votes: &[0.0; 27],
-            commit_counts: &[0; 4],
-            mesh_hops: 0,
+            ..make_ctx(&ss, &upstream, 50.0, 0.0)
         };
         // sub_idx=2 → slot 0, field 2 = param1 = energy_transfer_fraction = 0.42
         let v = resolve_input(&InputReference::ActionQueue, 2, &ctx);
@@ -347,15 +326,8 @@ mod tests {
         let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let aq = ActionQueue::new(4); // empty queue
         let ctx = ResolveCtx {
-            sensors: &ss,
-            upstream_slots: &upstream,
-            energy: 50.0,
-            energy_consumed: 0.0,
             action_queue: &aq,
-            votes: &[0.0; 27],
-            previous_pass_votes: &[0.0; 27],
-            commit_counts: &[0; 4],
-            mesh_hops: 0,
+            ..make_ctx(&ss, &upstream, 50.0, 0.0)
         };
         // Any sub_idx on empty queue returns 0.0
         assert_eq!(resolve_input(&InputReference::ActionQueue, 0, &ctx), 0.0);
@@ -546,7 +518,14 @@ mod tests {
     fn hops_this_tick_is_the_raw_hop_count_and_ignores_sub_idx() {
         let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
-        let ctx = decision_ctx(&ss, &upstream, &[0.0; 27], &[0.0; 27], &[0; 4], 129);
+        let ctx = decision_ctx(
+            &ss,
+            &upstream,
+            &[0.0; VOTE_SINK_COUNT],
+            &[0.0; VOTE_SINK_COUNT],
+            &[0; VOTE_KIND_COUNT],
+            129,
+        );
         let key = InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick);
         for sub in [0u16, 1, 26, u16::MAX] {
             assert_eq!(resolve_input(&key, sub, &ctx), 129.0);
