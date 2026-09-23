@@ -182,17 +182,22 @@ Options settled here, all internal to the codebase:
 
 ## Verification
 
-- [ ] Worked cases V1 to V6 with their controls and the founder
+- [x] Worked cases V1 to V6 with their controls and the founder
       byte-identity checks (`cargo test -p v3-core`): names and transcripts
-      in [`docs/progress/readings/t19-f05.md`](../../progress/readings/t19-f05.md).
-- [ ] `cargo test -p v3-core --test viability` first, then `make check` ->
-      exit 0 (the tick loop gains the Phase 2.5 store).
-- [ ] Draw and kind checks: the 27-entry draw covers every new reference at
+      in [`docs/progress/readings/t19-f05.md`](../../progress/readings/t19-f05.md);
+      the founder pin and `FOUNDER_GENOME_SIZE_UNITS` hold (readings, Pins).
+- [x] `cargo test -p v3-core --test viability` -> 28 passed, then
+      `make check` -> exit 0 at `ca70cbe1` (v3-core lib 1,688 passed,
+      4 ignored; frontend 331 passed).
+- [x] Draw and kind checks: the 27-entry draw covers every new reference at
       one draw each, the existing branch sub-draws unchanged; the swap table
-      of invariant 5 (`Swap` never crosses a class or width).
+      of invariant 5 (`Swap` never crosses a class or width). Tests named in
+      the readings file (supporting tests), green in the `make check` above.
 - [ ] Census: a genome reading each new reference is counted once per
-      reference; `decision_inputs` carries five rows in the gate and goal
-      summaries.
+      reference (`each_decision_state_input_is_counted_once_per_reference`
+      and the v3-cli row tests, green in the `make check` above);
+      `decision_inputs` carries five rows in the gate and goal summaries
+      (awaits the benchmark runs).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred; full
       survivor list here.

@@ -199,7 +199,7 @@ through r15, leaving r16 through r19 available to mutations.
 
 - `ref_idx` selects the `InputReference` from `input_refs`.
 - `sub_idx` selects a sub-value within compound inputs (e.g. `ActionQueue`).
-  For scalar inputs, `sub_idx > 0` returns `0.0`.
+  For scalar inputs, `sub_idx` is ignored and the scalar value is read.
 
 If the referenced variant is `InputReference::UpstreamSlot(slot)`:
 - value is `upstream_slots[slot]` when `slot < 12`

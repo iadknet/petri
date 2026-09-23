@@ -225,7 +225,7 @@ behavior.
 | All effective scores are NaN or negative infinity | Earliest target wins |
 | `ReadInput` `ref_idx` out of range | Yield `0.0` |
 | `ReadInput` `sub_idx` out of range (compound) | Yield `0.0` |
-| Scalar input with `sub_idx > 0` | Yield `0.0` |
+| Scalar input with `sub_idx > 0` | `sub_idx` is ignored; the scalar value is read |
 | `UpstreamSlot` slot out of range | Yield `0.0` |
 | Decision-state compound `sub_idx` at or past its width | Yield `0.0` (no wrap) |
 | Node backend does not write an output slot | Preserve incoming `upstream_slots[slot]` |
