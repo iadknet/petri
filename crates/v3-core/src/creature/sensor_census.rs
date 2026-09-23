@@ -654,6 +654,22 @@ mod tests {
         assert!(dead.decision_inputs.is_empty(), "{dead:?}");
     }
 
+    /// The `decision_inputs` report rows are keyed by these labels, so they
+    /// are the stored-summary contract: the variant names, in catalog order.
+    #[test]
+    fn decision_input_report_labels_are_the_variant_names_in_catalog_order() {
+        assert_eq!(
+            DecisionInputKey::ALL.map(DecisionInputKey::as_key),
+            [
+                "ActionVotes",
+                "PreviousPassVotes",
+                "CommitCounts",
+                "HopsThisTick",
+                "PreviousOutcome",
+            ]
+        );
+    }
+
     #[test]
     fn a_non_world_reference_is_not_a_world_input() {
         let mut graph = empty_graph();
