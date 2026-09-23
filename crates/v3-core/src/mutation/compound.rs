@@ -4,7 +4,7 @@ use crate::creature::genome::OUTCOME_CHANNEL_COUNT;
 
 /// Input slots the `ActionQueue` reference exposes: the first four queued
 /// actions, three sub-values each.
-pub const ACTION_QUEUE_INPUT_SLOTS: u16 = 4;
+const ACTION_QUEUE_INPUT_SLOTS: u16 = 4;
 
 /// Sub-values per `ActionQueue` input slot.
 const ACTION_QUEUE_SUB_VALUES_PER_SLOT: u16 = 3;

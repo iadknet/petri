@@ -1,25 +1,24 @@
 import { memo } from "react";
 import type { VoteKind } from "../../types/genome.ts";
 import type { MeshPassTrace, TickTrace, WorldAction } from "../../types/trace.ts";
-import { VOTE_KINDS } from "../../types/trace.ts";
-import { voteSinkLabel } from "./graphNodeFormatters.ts";
+import { VOTE_KINDS, VOTE_SINK_COUNT } from "../../types/trace.ts";
+import { voteSinkFromIndex, voteSinkLabel } from "./graphNodeFormatters.ts";
 import { formatAction } from "./inputRefUtils.ts";
 
 interface VoteSurfaceBlockProps {
 	tick: TickTrace;
 }
 
-/** Directions each directed kind's sinks cover in the vote catalog. */
-const DIRECTIONS = 8;
+/** The vote catalog, by index. */
+const SINKS = Array.from({ length: VOTE_SINK_COUNT }, (_, index) => voteSinkFromIndex(index));
 /** Catalog indices of each kind's sinks, in `VOTE_KINDS` order. */
-const KIND_SINKS: readonly (readonly number[])[] = [
-	[0],
-	...[0, 1, 2].map((block) =>
-		Array.from({ length: DIRECTIONS }, (_, d) => 1 + block * DIRECTIONS + d),
+const KIND_SINKS: readonly (readonly number[])[] = VOTE_KINDS.map((kind) =>
+	SINKS.flatMap((sink, index) =>
+		sink === kind || (sink !== null && typeof sink === "object" && kind in sink) ? [index] : [],
 	),
-];
-const TERMINATE_SINK = 1 + 3 * DIRECTIONS;
-const DECIDE_SINK = TERMINATE_SINK + 1;
+);
+const TERMINATE_SINK = SINKS.indexOf("Terminate");
+const DECIDE_SINK = SINKS.indexOf("Decide");
 
 /** The vote kind of a committed action; `NoOp` has none. */
 function actionKind(action: WorldAction | null): VoteKind | null {
@@ -39,23 +38,14 @@ function barsPerPass(passes: readonly MeshPassTrace[]): number[][] {
 	});
 }
 
-/** A kind's best sink vote: the lowest-index maximum of its recorded sinks. */
-function bestSinkVote(votes: readonly number[], sinks: readonly number[]): number {
-	let best = votes[sinks[0] ?? 0] ?? 0;
-	for (const sink of sinks) {
-		const vote = votes[sink] ?? 0;
-		if (vote > best) best = vote;
-	}
-	return best;
+/** The largest of recorded values; zero when there are none. */
+function maxRecorded(values: readonly number[]): number {
+	return values.length === 0 ? 0 : Math.max(...values);
 }
 
-/** The largest recorded effective vote: the value the winning kind carries. */
-function winningEffective(effective: readonly number[]): number {
-	let best = effective[0] ?? 0;
-	for (const value of effective) {
-		if (value > best) best = value;
-	}
-	return best;
+/** A kind's best sink vote: the maximum of its recorded sink votes. */
+function bestSinkVote(votes: readonly number[], sinks: readonly number[]): number {
+	return maxRecorded(sinks.map((sink) => votes[sink] ?? 0));
 }
 
 /**
@@ -136,7 +126,7 @@ function PassRow({ pass, bars, endsTerminateVotedTick }: PassRowProps) {
 				{endsTerminateVotedTick ? (
 					<span data-testid="terminate-verdict" className="text-orange-300">
 						Terminate {terminate.toFixed(3)} ≥ winning effective{" "}
-						{winningEffective(pass.effective_votes).toFixed(3)}
+						{maxRecorded(pass.effective_votes).toFixed(3)}
 					</span>
 				) : null}
 				{pass.end_reason === "Decided" ? (

@@ -67,7 +67,7 @@ export function formatGraphSource(source: GraphSource, inputRefs: InputReference
 const VOTE_DIRECTION_COUNT = 8;
 
 /** The vote sink at a catalog index; null at or above the catalog count. */
-function voteSinkFromIndex(index: number): VoteSink | null {
+export function voteSinkFromIndex(index: number): VoteSink | null {
 	if (index === 0) return "Eat";
 	if (index < 1 + VOTE_DIRECTION_COUNT) return { Move: index - 1 };
 	if (index < 1 + 2 * VOTE_DIRECTION_COUNT) {

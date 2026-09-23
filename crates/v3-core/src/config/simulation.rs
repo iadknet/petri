@@ -1850,8 +1850,9 @@ mod tests {
     }
 
     /// The retired queue-cap key (T19.F06) is rejected with no alias or
-    /// ignore shim. The key is assembled so the retired-name scan in
-    /// `scripts/policy-check` keeps holding over `crates/`.
+    /// ignore shim. T19.F06 invariant 2: the retired-name scan in
+    /// `scripts/policy-check` covers `crates/` with no allowlist, so a test
+    /// that must spell a retired name assembles it at run time.
     #[test]
     fn retired_queue_cap_key_is_rejected() {
         let retired_key = ["action_queue", "cap"].join("_");
