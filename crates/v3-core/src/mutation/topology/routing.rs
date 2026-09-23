@@ -1,7 +1,6 @@
 use rand::Rng;
 
 use super::{birth, structural::next_node_id};
-use crate::config::MutationConfig;
 use crate::contracts::{NodeId, RouteTarget, MAX_GATE_SLOTS};
 use crate::creature::genome::cgp::{GraphEdge, OutputSinkKind};
 use crate::creature::genome::CreatureGenome;
@@ -81,7 +80,6 @@ pub(super) fn apply_add_route_target(
     genome: &mut CreatureGenome,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
-    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<_> = genome
         .nodes
@@ -128,7 +126,6 @@ pub(super) fn apply_add_route_target(
             let source = random_graph_source(
                 graph.compute_nodes.len() as u16,
                 &genome.nodes[idx].input_refs,
-                config,
                 rng,
             );
             graph.output_sinks[sink].inputs.push(GraphEdge {
@@ -335,7 +332,6 @@ mod tests {
             &mut genome,
             &mut TargetSelector::reachable_only(&reachable, 1.0),
             &mut r,
-            &MutationConfig::default(),
         );
         assert!(result.is_ok(), "expected Ok, got {:?}", result);
 
@@ -375,7 +371,6 @@ mod tests {
             &mut genome,
             &mut TargetSelector::reachable_only(&[0, 1], 1.0),
             &mut r,
-            &MutationConfig::default(),
         );
         assert_eq!(
             result,
@@ -519,7 +514,6 @@ mod tests {
                     &mut g,
                     &mut TargetSelector::reachable_only(&reachable, 1.0),
                     &mut r,
-                    &MutationConfig::default(),
                 )
                 .unwrap();
                 calls[2 + slot] = r.calls;
@@ -542,7 +536,6 @@ mod tests {
             &mut genome,
             &mut TargetSelector::reachable_only(&reachable, 1.0),
             &mut r,
-            &MutationConfig::default(),
         )
         .unwrap();
         assert_eq!(genome.nodes[0].targets.len(), 2);

@@ -184,9 +184,9 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
-            "sha256:d9a4dc8c530aa1c110c34ef40debd8d6c63bc662b4f1fa3ac026689b19260bd7",
-            "sha256:d1aff3f5df57af7460efca26ad6a74affa6d0b521e3bfc17754be66dd7a0a898",
-            "sha256:b24c1225f2f6e5e22c1d723f748006e7b1a7afac24f4604b7e1883847d0420ef",
+            "sha256:eabc5096a9ed4812bdfc80e62bcea98ba299a478a33b9ad80536bd7fa6cd261f",
+            "sha256:f9d82656032177a0420fb2522a78f3326206e104a663bc42e5aac417c572c4a1",
+            "sha256:790b73ae7e1a3fa7cbd28bccaf95d8cb2a66d24fb8037aeb76aab33ecdf34436",
         ]
     );
 }

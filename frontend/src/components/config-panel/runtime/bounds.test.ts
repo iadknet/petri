@@ -21,16 +21,16 @@ function draftWith(patch: (draft: SimulationConfig) => void): SimulationConfig {
 
 describe("resolveRuntimeBounds", () => {
 	it("returns the static bounds for fields without a cross-field constraint", () => {
-		const field = fieldFor("energy.costs.move_cost");
+		for (const path of ["energy.costs.move_cost", "runtime.max_actions_per_turn"]) {
+			const field = fieldFor(path);
 
-		expect(resolveRuntimeBounds(field, MOCK_CONFIG)).toEqual({ min: field.min, max: field.max });
+			expect(resolveRuntimeBounds(field, MOCK_CONFIG)).toEqual({ min: field.min, max: field.max });
+		}
 	});
 
 	it.each([
 		["population.max_creatures", { min: 50, max: 10000000 }],
 		["world.food.shared.max_density", { min: 1, max: 1 }],
-		["runtime.max_actions_per_turn", { min: 4, max: 20 }],
-		["mutation.action_queue_cap", { min: 1, max: 10 }],
 		["mutation.per_birth_mutation_events_min", { min: 1, max: 4 }],
 		["mutation.per_birth_mutation_events_max", { min: 1, max: 20 }],
 		["action_log.capacity", { min: 1, max: 5000 }],

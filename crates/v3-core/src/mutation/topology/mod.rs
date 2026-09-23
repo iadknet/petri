@@ -165,7 +165,7 @@ impl TopologyMutator {
         op: TopologyOperator,
         targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
-        config: &MutationConfig,
+        _config: &MutationConfig,
         _food_type_count: usize,
     ) -> Result<TargetReachability, MutationSkipReason> {
         match op {
@@ -190,7 +190,7 @@ impl TopologyMutator {
                 routing::apply_retarget_node_target(genome, targets, rng)
             }
             TopologyOperator::AddRouteTarget => {
-                routing::apply_add_route_target(genome, targets, rng, config)
+                routing::apply_add_route_target(genome, targets, rng)
             }
             TopologyOperator::RemoveRouteTarget => {
                 routing::apply_remove_route_target(genome, targets, rng)

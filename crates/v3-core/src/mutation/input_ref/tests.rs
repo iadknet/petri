@@ -107,21 +107,16 @@ fn noop_count(node: &NodeGenome) -> usize {
 
 #[test]
 fn swap_alternatives_follow_the_kind_table() {
-    let config = default_config();
     let food_here =
         |t: u16| InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::new(t)));
     // Typed food is swappable only with more than one food type.
-    assert!(swap_alternatives(&food_here(0), &config, 1).is_empty());
-    assert_eq!(
-        swap_alternatives(&food_here(0), &config, 2),
-        vec![food_here(1)]
-    );
+    assert!(swap_alternatives(&food_here(0), 1).is_empty());
+    assert_eq!(swap_alternatives(&food_here(0), 2), vec![food_here(1)]);
     assert_eq!(
         swap_alternatives(
             &InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
                 1
             ))),
-            &config,
             3
         ),
         vec![
@@ -136,7 +131,7 @@ fn swap_alternatives_follow_the_kind_table() {
     // The four introspection scalars form one kind (T19.F05 adds
     // `HopsThisTick`).
     let energy = InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent);
-    let others = swap_alternatives(&energy, &config, 1);
+    let others = swap_alternatives(&energy, 1);
     assert_eq!(others.len(), 3);
     assert!(others.contains(&InputReference::DynamicIntrospection(
         DynamicIntrospectionKey::HopsThisTick
@@ -144,9 +139,9 @@ fn swap_alternatives_follow_the_kind_table() {
     assert!(!others.contains(&energy));
     assert!(others
         .iter()
-        .all(|r| input_ref_kind(r, &config) == input_ref_kind(&energy, &config)));
+        .all(|r| input_ref_kind(r) == input_ref_kind(&energy)));
     // Upstream slots form one kind.
-    let upstream = swap_alternatives(&InputReference::UpstreamSlot(2), &config, 1);
+    let upstream = swap_alternatives(&InputReference::UpstreamSlot(2), 1);
     assert_eq!(upstream.len(), OUTPUT_SLOT_COUNT - 1);
     assert!(!upstream.contains(&InputReference::UpstreamSlot(2)));
     // Single-member kinds are never swappable.
@@ -163,7 +158,7 @@ fn swap_alternatives_follow_the_kind_table() {
         InputReference::PreviousOutcome,
     ] {
         assert!(
-            swap_alternatives(&lone, &config, 4).is_empty(),
+            swap_alternatives(&lone, 4).is_empty(),
             "{lone:?} must not be swappable"
         );
     }
@@ -173,7 +168,6 @@ fn swap_alternatives_follow_the_kind_table() {
 /// it: a swap can never cross a class or a width.
 #[test]
 fn kind_is_class_and_width() {
-    let config = default_config();
     let ring = InputReference::World(WorldInputKey::neighbor_food_ring(
         OrdinaryFoodTypeId::default(),
     ));
@@ -181,28 +175,25 @@ fn kind_is_class_and_width() {
         OrdinaryFoodTypeId::default(),
     ));
     assert_eq!(
-        input_ref_kind(&ring, &config),
+        input_ref_kind(&ring),
         InputRefKind {
             class: MeshReadClass::Food,
             width: 8
         }
     );
     assert_eq!(
-        input_ref_kind(&summary, &config),
+        input_ref_kind(&summary),
         InputRefKind {
             class: MeshReadClass::Food,
             width: 7
         }
     );
-    assert_ne!(
-        input_ref_kind(&ring, &config),
-        input_ref_kind(&summary, &config)
-    );
+    assert_ne!(input_ref_kind(&ring), input_ref_kind(&summary));
     assert_eq!(
-        input_ref_kind(&InputReference::ActionQueue, &config),
+        input_ref_kind(&InputReference::ActionQueue),
         InputRefKind {
             class: MeshReadClass::ActionQueue,
-            width: config.action_queue_cap as u16 * 3
+            width: 12
         }
     );
 }
@@ -215,7 +206,7 @@ fn kind_is_class_and_width() {
 fn swap_applies_on_both_founder_nodes() {
     let genome = v3alpha1_founder_genome();
     assert_eq!(
-        InputRefMutator::applicable_indices(&genome, InputRefOperator::Swap, &default_config(), 1),
+        InputRefMutator::applicable_indices(&genome, InputRefOperator::Swap, 1),
         vec![0, 1]
     );
 }
@@ -228,7 +219,7 @@ fn prune_applies_to_founder_node_zero_only_and_is_silent() {
     let genome = v3alpha1_founder_genome();
     let config = default_config();
     assert_eq!(
-        InputRefMutator::applicable_indices(&genome, InputRefOperator::Prune, &config, 1),
+        InputRefMutator::applicable_indices(&genome, InputRefOperator::Prune, 1),
         vec![0]
     );
     assert_eq!(prunable_indices(&genome.nodes[0]), vec![4]);
@@ -260,7 +251,6 @@ fn prune_applies_to_founder_node_zero_only_and_is_silent() {
 /// battery signature identical.
 #[test]
 fn prune_on_the_founder_vm_node_is_silent() {
-    let config = default_config();
     let mut genome = crate::creature::founder::vm_decision_founder_genome();
     genome.nodes[1].input_refs.push(InputReference::ActionQueue);
     assert_eq!(prunable_indices(&genome.nodes[1]), vec![7]);
@@ -268,8 +258,7 @@ fn prune_on_the_founder_vm_node_is_silent() {
 
     let mut pruned = genome.clone();
     let mut r = rng(11);
-    InputRefMutator::apply_to_node(&mut pruned, InputRefOperator::Prune, 1, &mut r, &config, 1)
-        .unwrap();
+    InputRefMutator::apply_to_node(&mut pruned, InputRefOperator::Prune, 1, &mut r, 1).unwrap();
     assert_eq!(
         pruned.nodes[1].input_refs,
         crate::creature::founder::vm_decision_founder_genome().nodes[1].input_refs
@@ -429,8 +418,7 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
 /// the decision compounds never share a kind with the introspection ones.
 #[test]
 fn decision_state_kinds_follow_the_swap_table() {
-    let config = default_config();
-    let kind = |reference: &InputReference| input_ref_kind(reference, &config);
+    let kind = |reference: &InputReference| input_ref_kind(reference);
     let hops = InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick);
     for (reference, class, width) in [
         (InputReference::ActionVotes, MeshReadClass::Decision, 27),
@@ -454,14 +442,14 @@ fn decision_state_kinds_follow_the_swap_table() {
         );
     }
     assert_eq!(
-        swap_alternatives(&InputReference::ActionVotes, &config, 3),
+        swap_alternatives(&InputReference::ActionVotes, 3),
         vec![InputReference::PreviousPassVotes]
     );
     assert_eq!(
-        swap_alternatives(&InputReference::PreviousPassVotes, &config, 3),
+        swap_alternatives(&InputReference::PreviousPassVotes, 3),
         vec![InputReference::ActionVotes]
     );
-    let mut hops_partners = swap_alternatives(&hops, &config, 1);
+    let mut hops_partners = swap_alternatives(&hops, 1);
     hops_partners.sort_by_key(|reference| format!("{reference:?}"));
     assert_eq!(
         hops_partners,
@@ -487,17 +475,16 @@ proptest! {
         sizes in prop::collection::vec(module_size(), 1..4),
         food_type_count in 1usize..4,
     ) {
-        let config = default_config();
-        let base = generated_genome(seed, &sizes, &config);
+        let base = generated_genome(seed, &sizes);
         let applicable = InputRefMutator::applicable_indices(
-            &base, InputRefOperator::Swap, &config, food_type_count,
+            &base, InputRefOperator::Swap, food_type_count,
         );
         for node_idx in applicable {
             for apply_seed in 0u64..4 {
                 let mut genome = base.clone();
                 let mut r = rng(seed ^ apply_seed);
                 InputRefMutator::apply_to_node(
-                    &mut genome, InputRefOperator::Swap, node_idx, &mut r, &config, food_type_count,
+                    &mut genome, InputRefOperator::Swap, node_idx, &mut r, food_type_count,
                 )
                 .expect("an accepted node applies");
                 for (idx, node) in genome.nodes.iter().enumerate() {
@@ -515,15 +502,15 @@ proptest! {
                 prop_assert_eq!(changed.len(), 1, "exactly one entry changes");
                 let i = changed[0];
                 prop_assert!(
-                    swap_alternatives(&before.input_refs[i], &config, food_type_count)
+                    swap_alternatives(&before.input_refs[i], food_type_count)
                         .contains(&after.input_refs[i]),
                     "{:?} -> {:?} is not a within-kind step",
                     before.input_refs[i],
                     after.input_refs[i]
                 );
                 prop_assert_eq!(
-                    input_ref_kind(&after.input_refs[i], &config),
-                    input_ref_kind(&before.input_refs[i], &config)
+                    input_ref_kind(&after.input_refs[i]),
+                    input_ref_kind(&before.input_refs[i])
                 );
             }
         }
@@ -537,15 +524,14 @@ proptest! {
         seed in any::<u64>(),
         sizes in prop::collection::vec(module_size(), 1..4),
     ) {
-        let config = default_config();
-        let base = generated_genome(seed, &sizes, &config);
-        let applicable = InputRefMutator::applicable_indices(&base, InputRefOperator::Prune, &config, 1);
+        let base = generated_genome(seed, &sizes);
+        let applicable = InputRefMutator::applicable_indices(&base, InputRefOperator::Prune, 1);
         for node_idx in applicable {
             for apply_seed in 0u64..4 {
                 let mut genome = base.clone();
                 let mut r = rng(seed ^ apply_seed);
                 InputRefMutator::apply_to_node(
-                    &mut genome, InputRefOperator::Prune, node_idx, &mut r, &config, 1,
+                    &mut genome, InputRefOperator::Prune, node_idx, &mut r, 1,
                 )
                 .expect("an accepted node applies");
                 for (idx, node) in genome.nodes.iter().enumerate() {

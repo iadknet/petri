@@ -3568,7 +3568,7 @@ async fn from_config_normalizes_before_storing_and_seeding() {
 /// used to offer, must name its own path (2026-09-07 apply audit, item 4).
 #[tokio::test]
 async fn patch_config_names_each_bound_constrained_field_patched_alone() {
-    let cases: [(&str, &str); 8] = [
+    let cases: [(&str, &str); 7] = [
         (
             "population.max_creatures",
             r#"{"population":{"max_creatures":32}}"#,
@@ -3583,11 +3583,7 @@ async fn patch_config_names_each_bound_constrained_field_patched_alone() {
         ),
         (
             "runtime.max_actions_per_turn",
-            r#"{"runtime":{"max_actions_per_turn":2}}"#,
-        ),
-        (
-            "mutation.action_queue_cap",
-            r#"{"mutation":{"action_queue_cap":12}}"#,
+            r#"{"runtime":{"max_actions_per_turn":0}}"#,
         ),
         (
             "mutation.per_birth_mutation_events_min",

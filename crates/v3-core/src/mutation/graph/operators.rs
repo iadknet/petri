@@ -6,7 +6,6 @@
 
 use rand::Rng;
 
-use crate::config::MutationConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
@@ -79,20 +78,18 @@ pub(super) fn add_internal_node(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-    config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
     let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
-    add_compute_node(def, &input_refs, config, rng)
+    add_compute_node(def, &input_refs, rng)
 }
 
 pub(super) fn add_graph_edge(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-    config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
     let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
-    add_edge(def, &input_refs, config, rng)
+    add_edge(def, &input_refs, rng)
 }
 
 pub(super) fn remove_internal_node(
@@ -108,10 +105,9 @@ pub(super) fn retarget_graph_edge(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-    config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
     let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
-    retarget_edge(def, &input_refs, config, rng)
+    retarget_edge(def, &input_refs, rng)
 }
 
 pub(super) fn remove_graph_edge(
@@ -127,10 +123,9 @@ pub(super) fn apply_graph_raw_field_mutation(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-    config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
     let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
-    raw_field_mutation(def, &input_refs, config, rng)
+    raw_field_mutation(def, &input_refs, rng)
 }
 
 pub(super) fn apply_copy_internal_node(
@@ -172,7 +167,6 @@ pub(super) fn apply_copy_edge_bundle(
 pub(crate) fn random_graph_source(
     compute_count: u16,
     input_refs: &[InputReference],
-    config: &MutationConfig,
     rng: &mut impl Rng,
 ) -> GraphSource {
     let roll: f32 = rng.gen();
@@ -180,7 +174,7 @@ pub(crate) fn random_graph_source(
         GraphSource::ComputeNode(rng.gen_range(0..compute_count))
     } else if roll < 0.8 && !input_refs.is_empty() {
         let ref_idx = rng.gen_range(0..input_refs.len() as u16);
-        let width = sub_value_count(&input_refs[ref_idx as usize], config).max(1);
+        let width = sub_value_count(&input_refs[ref_idx as usize]).max(1);
         GraphSource::InputLeaf {
             ref_idx,
             sub_idx: rng.gen_range(0..width),
@@ -332,7 +326,6 @@ fn remove_edge_at(def: &mut CgpGraphBackendDef, surface: EdgeSurface, idx: usize
 pub(crate) fn add_compute_node(
     def: &mut CgpGraphBackendDef,
     input_refs: &[InputReference],
-    config: &MutationConfig,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let can_split = check_compute_node_capacity(def, 1).is_ok()
@@ -340,7 +333,7 @@ pub(crate) fn add_compute_node(
     let forms = if can_split { 3u8 } else { 2u8 };
     match rng.gen_range(0u8..forms) {
         0 => add_disconnected_node(def, rng),
-        1 => add_bootstrap_node(def, input_refs, config, rng),
+        1 => add_bootstrap_node(def, input_refs, rng),
         _ => split_existing_edge(def, input_refs, rng),
     }
 }
@@ -376,11 +369,10 @@ pub(crate) fn add_disconnected_node(
 pub(crate) fn add_bootstrap_node(
     def: &mut CgpGraphBackendDef,
     input_refs: &[InputReference],
-    config: &MutationConfig,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let compute_count = def.compute_nodes.len() as u16;
-    let source = random_graph_source(compute_count, input_refs, config, rng);
+    let source = random_graph_source(compute_count, input_refs, rng);
     append_compute_node(
         def,
         ComputeNode {
@@ -641,12 +633,11 @@ pub(crate) fn copy_cgp_subgraph(
 pub(crate) fn add_edge(
     def: &mut CgpGraphBackendDef,
     input_refs: &[InputReference],
-    config: &MutationConfig,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let surface = pick_random_surface(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     let compute_count = def.compute_nodes.len() as u16;
-    let source = random_graph_source(compute_count, input_refs, config, rng);
+    let source = random_graph_source(compute_count, input_refs, rng);
     let weight = rng.gen_range(-1.0f32..=1.0);
     push_edge(def, surface, GraphEdge { source, weight });
     if let (Some(weights), EdgeSurface::ComputeInput(node)) = (&mut def.birth_weights, surface) {
@@ -673,13 +664,12 @@ pub(crate) fn remove_edge(
 pub(crate) fn retarget_edge(
     def: &mut CgpGraphBackendDef,
     input_refs: &[InputReference],
-    config: &MutationConfig,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let (surface, edge_idx) =
         pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     let compute_count = def.compute_nodes.len() as u16;
-    let new_source = random_graph_source(compute_count, input_refs, config, rng);
+    let new_source = random_graph_source(compute_count, input_refs, rng);
     let edge = edge_at_mut(def, surface, edge_idx);
     let changed = edge.source != new_source;
     edge.source = new_source;
@@ -817,13 +807,11 @@ fn valid_edge_moves(
     surface: EdgeSurface,
     edge_idx: usize,
     input_refs: &[InputReference],
-    config: &MutationConfig,
 ) -> Vec<EdgeFieldMove> {
     valid_edge_field_moves(
         edge_at(def, surface, edge_idx).source,
         def.compute_nodes.len() as u16,
         input_refs,
-        config,
     )
 }
 
@@ -836,7 +824,6 @@ fn valid_edge_field_moves(
     source: GraphSource,
     compute_count: u16,
     input_refs: &[InputReference],
-    config: &MutationConfig,
 ) -> Vec<EdgeFieldMove> {
     let mut moves = Vec::new();
     match source {
@@ -855,7 +842,7 @@ fn valid_edge_field_moves(
             if ref_idx > 0 {
                 let candidate = (ref_idx - 1) as usize;
                 if let Some(reference) = input_refs.get(candidate) {
-                    let width = sub_value_count(reference, config).max(1);
+                    let width = sub_value_count(reference).max(1);
                     if sub_idx < width {
                         moves.push(EdgeFieldMove::RefIdx(-1));
                     }
@@ -864,14 +851,14 @@ fn valid_edge_field_moves(
             if ref_idx + 1 < ref_count {
                 let candidate = (ref_idx + 1) as usize;
                 if let Some(reference) = input_refs.get(candidate) {
-                    let width = sub_value_count(reference, config).max(1);
+                    let width = sub_value_count(reference).max(1);
                     if sub_idx < width {
                         moves.push(EdgeFieldMove::RefIdx(1));
                     }
                 }
             }
             if (ref_idx as usize) < input_refs.len() {
-                let width = sub_value_count(&input_refs[ref_idx as usize], config).max(1);
+                let width = sub_value_count(&input_refs[ref_idx as usize]).max(1);
                 if sub_idx > 0 {
                     moves.push(EdgeFieldMove::SubIdx(-1));
                 }
@@ -920,10 +907,9 @@ fn apply_edge_field_move(source: &mut GraphSource, mv: EdgeFieldMove) {
 fn raw_field_edge_sites<'a>(
     def: &'a CgpGraphBackendDef,
     input_refs: &'a [InputReference],
-    config: &'a MutationConfig,
 ) -> impl Iterator<Item = (EdgeSurface, usize)> + 'a {
     edge_sites(def).filter(move |&(surface, edge_idx)| {
-        !valid_edge_moves(def, surface, edge_idx, input_refs, config).is_empty()
+        !valid_edge_moves(def, surface, edge_idx, input_refs).is_empty()
     })
 }
 
@@ -939,7 +925,6 @@ fn raw_field_edge_sites<'a>(
 pub(crate) fn raw_field_mutation(
     def: &mut CgpGraphBackendDef,
     input_refs: &[InputReference],
-    config: &MutationConfig,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let param_count = def
@@ -947,7 +932,7 @@ pub(crate) fn raw_field_mutation(
         .iter()
         .filter(|n| is_compute_parameterized(&n.kind))
         .count();
-    let edges: Vec<(EdgeSurface, usize)> = raw_field_edge_sites(def, input_refs, config).collect();
+    let edges: Vec<(EdgeSurface, usize)> = raw_field_edge_sites(def, input_refs).collect();
     let total = param_count + edges.len();
 
     if total == 0 {
@@ -960,7 +945,7 @@ pub(crate) fn raw_field_mutation(
     }
 
     let (surface, edge_idx) = edges[pick - param_count];
-    let moves = valid_edge_moves(def, surface, edge_idx, input_refs, config);
+    let moves = valid_edge_moves(def, surface, edge_idx, input_refs);
     let chosen = moves[rng.gen_range(0..moves.len())];
     let source = edge_at(def, surface, edge_idx).source;
     apply_edge_field_move(&mut edge_at_mut(def, surface, edge_idx).source, chosen);
@@ -1022,15 +1007,8 @@ pub(super) fn can_copy_edge_bundle(def: &CgpGraphBackendDef) -> bool {
 /// `GraphRawFieldMutation`: a parameterized compute node, or an edge with at
 /// least one valid unit move. The parameter check comes first so the common
 /// case never walks the edges.
-pub(super) fn has_raw_field_site(
-    def: &CgpGraphBackendDef,
-    input_refs: &[InputReference],
-    config: &MutationConfig,
-) -> bool {
-    has_parameterized_compute_node(def)
-        || raw_field_edge_sites(def, input_refs, config)
-            .next()
-            .is_some()
+pub(super) fn has_raw_field_site(def: &CgpGraphBackendDef, input_refs: &[InputReference]) -> bool {
+    has_parameterized_compute_node(def) || raw_field_edge_sites(def, input_refs).next().is_some()
 }
 
 /// `AddInternalGraphNode`: the disconnected form appends to any def, so
@@ -1049,7 +1027,7 @@ pub(super) fn can_add_edge(def: &CgpGraphBackendDef) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{MutationConfig, OrdinaryFoodTypeId};
+    use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::{InputReference, WorldInputKey};
     use crate::creature::genome::cgp::{OutputSink, OutputSinkKind};
     use crate::creature::genome::vote::VoteSink;
@@ -1112,7 +1090,7 @@ mod tests {
         let mut rng = test_rng();
         let before = def.compute_nodes.len();
         let input_refs = sample_input_refs();
-        add_compute_node(&mut def, &input_refs, &MutationConfig::default(), &mut rng).unwrap();
+        add_compute_node(&mut def, &input_refs, &mut rng).unwrap();
         assert_eq!(def.compute_nodes.len(), before + 1);
     }
 
@@ -1125,13 +1103,12 @@ mod tests {
     #[test]
     fn add_compute_node_never_sprays_edges() {
         let input_refs = sample_input_refs();
-        let config = MutationConfig::default();
         for seed in 0u64..500 {
             let mut def = minimal_def();
             let before_nodes = def.compute_nodes.len();
             let before_edges = total_edge_count(&def);
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            add_compute_node(&mut def, &input_refs, &config, &mut rng).unwrap();
+            add_compute_node(&mut def, &input_refs, &mut rng).unwrap();
             assert_eq!(def.compute_nodes.len(), before_nodes + 1, "seed {seed}");
             let after_edges = total_edge_count(&def);
             assert!(
@@ -1155,10 +1132,9 @@ mod tests {
     fn add_bootstrap_node_form_has_exactly_one_unwired_input() {
         let mut def = minimal_def();
         let input_refs = sample_input_refs();
-        let config = MutationConfig::default();
         let before = total_edge_count(&def);
         let mut rng = test_rng();
-        add_bootstrap_node(&mut def, &input_refs, &config, &mut rng).unwrap();
+        add_bootstrap_node(&mut def, &input_refs, &mut rng).unwrap();
         assert_eq!(def.compute_nodes.last().unwrap().inputs.len(), 1);
         // No surface reads the new node back.
         let new_idx = (def.compute_nodes.len() - 1) as u16;
@@ -1424,7 +1400,7 @@ mod tests {
         let mut rng = test_rng();
         let before = total_edge_count(&def);
         let input_refs = sample_input_refs();
-        add_edge(&mut def, &input_refs, &MutationConfig::default(), &mut rng).unwrap();
+        add_edge(&mut def, &input_refs, &mut rng).unwrap();
         assert_eq!(total_edge_count(&def), before + 1);
     }
 
@@ -1454,11 +1430,10 @@ mod tests {
         };
         let original = def.compute_nodes[0].inputs[0].source;
         let input_refs = sample_input_refs();
-        let config = MutationConfig::default();
         let mut changed = false;
         for seed in 0u64..20 {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            retarget_edge(&mut def, &input_refs, &config, &mut rng).unwrap();
+            retarget_edge(&mut def, &input_refs, &mut rng).unwrap();
             if def.compute_nodes[0].inputs[0].source != original {
                 changed = true;
                 break;
@@ -1553,12 +1528,11 @@ mod tests {
     fn random_graph_source_covers_variants() {
         let mut rng = test_rng();
         let input_refs = sample_input_refs();
-        let config = MutationConfig::default();
         let mut seen_compute = false;
         let mut seen_input = false;
         let mut seen_shared = false;
         for _ in 0..100 {
-            match random_graph_source(5, &input_refs, &config, &mut rng) {
+            match random_graph_source(5, &input_refs, &mut rng) {
                 GraphSource::ComputeNode(_) => seen_compute = true,
                 GraphSource::InputLeaf { .. } => seen_input = true,
                 GraphSource::SharedMemory { .. } => seen_shared = true,
@@ -1570,10 +1544,9 @@ mod tests {
     #[test]
     fn random_graph_source_fallback_to_shared_memory() {
         let mut rng = test_rng();
-        let config = MutationConfig::default();
         // With 0 compute nodes and 0 input refs, should always return SharedMemory
         for _ in 0..20 {
-            match random_graph_source(0, &[], &config, &mut rng) {
+            match random_graph_source(0, &[], &mut rng) {
                 GraphSource::SharedMemory { slot, .. } => assert!(slot < 16),
                 other => panic!("expected SharedMemory, got {:?}", other),
             }
@@ -1585,14 +1558,13 @@ mod tests {
     #[test]
     fn random_graph_source_reaches_every_sub_value_of_a_compound_reference() {
         let input_refs = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)]; // width 8
-        let config = MutationConfig::default();
         let mut seen: std::collections::HashSet<u16> = std::collections::HashSet::new();
         let mut rng = test_rng();
         for _ in 0..2000 {
             if let GraphSource::InputLeaf {
                 ref_idx: 0,
                 sub_idx,
-            } = random_graph_source(0, &input_refs, &config, &mut rng)
+            } = random_graph_source(0, &input_refs, &mut rng)
             {
                 seen.insert(sub_idx);
             }
@@ -1625,7 +1597,6 @@ mod tests {
 
     #[test]
     fn add_edge_reaches_the_vote_and_parameter_sinks() {
-        let config = MutationConfig::default();
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         def.compute_nodes.push(ComputeNode {
             kind: ComputeNodeKind::Constant(1.0),
@@ -1635,7 +1606,7 @@ mod tests {
 
         let mut rng = test_rng();
         for _ in 0..200 {
-            let _ = add_edge(&mut def, &[], &config, &mut rng);
+            let _ = add_edge(&mut def, &[], &mut rng);
         }
         let wired = |pick: fn(OutputSinkKind) -> bool| {
             def.output_sinks
@@ -1680,11 +1651,10 @@ mod tests {
             ],
             output_sinks: Vec::new(),
         };
-        let config = MutationConfig::default();
         for seed in 0u64..64 {
             let mut d = def.clone();
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            raw_field_mutation(&mut d, &[], &config, &mut rng).unwrap();
+            raw_field_mutation(&mut d, &[], &mut rng).unwrap();
             let GraphSource::ComputeNode(idx) = d.compute_nodes[2].inputs[0].source else {
                 panic!("variant must not change");
             };
@@ -1709,11 +1679,10 @@ mod tests {
             }],
             output_sinks: Vec::new(),
         };
-        let config = MutationConfig::default();
         for seed in 0u64..64 {
             let mut d = def.clone();
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            raw_field_mutation(&mut d, &[], &config, &mut rng).unwrap();
+            raw_field_mutation(&mut d, &[], &mut rng).unwrap();
             match d.compute_nodes[0].inputs[0].source {
                 GraphSource::SharedMemory { slot, previous } => {
                     // Either the slot moved by one unit (wrapping to 15
@@ -1771,11 +1740,10 @@ mod tests {
             ],
             output_sinks: Vec::new(),
         };
-        let config = MutationConfig::default();
         for seed in 0u64..500 {
             let mut d = def.clone();
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            if raw_field_mutation(&mut d, &base_refs, &config, &mut rng).is_err() {
+            if raw_field_mutation(&mut d, &base_refs, &mut rng).is_err() {
                 continue;
             }
             let before_edges: Vec<GraphEdge> = def.compute_nodes[1].inputs.clone();
@@ -1813,10 +1781,9 @@ mod tests {
             }],
             output_sinks: Vec::new(),
         };
-        let config = MutationConfig::default();
         let mut rng = test_rng();
         assert_eq!(
-            raw_field_mutation(&mut def, &[], &config, &mut rng),
+            raw_field_mutation(&mut def, &[], &mut rng),
             Err(MutationSkipReason::NoApplicableTarget)
         );
     }
@@ -1848,8 +1815,7 @@ mod tests {
             }],
         };
         let mut rng = test_rng();
-        let config = MutationConfig::default();
-        add_graph_edge(&mut genome, 0, &mut rng, &config).expect("edge add should succeed");
+        add_graph_edge(&mut genome, 0, &mut rng).expect("edge add should succeed");
         let BackendDef::Graph(after_def) = &genome.nodes[0].backend_def else {
             panic!("expected a Cgp graph node");
         };
@@ -1865,12 +1831,11 @@ mod tests {
     #[test]
     fn random_graph_source_input_leaf_is_the_majority_when_compute_is_empty() {
         let input_refs = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];
-        let config = MutationConfig::default();
         let mut rng = test_rng();
         let mut input_leaf_count = 0u32;
         let mut shared_memory_count = 0u32;
         for _ in 0..2000 {
-            match random_graph_source(0, &input_refs, &config, &mut rng) {
+            match random_graph_source(0, &input_refs, &mut rng) {
                 GraphSource::InputLeaf { .. } => input_leaf_count += 1,
                 GraphSource::SharedMemory { .. } => shared_memory_count += 1,
                 GraphSource::ComputeNode(_) => {
@@ -1910,14 +1875,13 @@ mod tests {
         }
 
         let input_refs = sample_input_refs();
-        let config = MutationConfig::default();
         let mut rng = test_rng();
         let mut saw_disconnected = false;
         let mut saw_bootstrap = false;
         let mut saw_split = false;
         for _ in 0..300 {
             let mut def = fixture();
-            add_compute_node(&mut def, &input_refs, &config, &mut rng).unwrap();
+            add_compute_node(&mut def, &input_refs, &mut rng).unwrap();
             assert_eq!(
                 def.compute_nodes.len(),
                 2,
@@ -1966,30 +1930,29 @@ mod tests {
     /// `idx == compute_count`, distinct from `idx > compute_count`).
     #[test]
     fn valid_edge_field_moves_compute_node_bounds() {
-        let config = MutationConfig::default();
         assert_eq!(
-            valid_edge_field_moves(GraphSource::ComputeNode(0), 1, &[], &config),
+            valid_edge_field_moves(GraphSource::ComputeNode(0), 1, &[]),
             vec![]
         );
         assert_eq!(
-            valid_edge_field_moves(GraphSource::ComputeNode(0), 3, &[], &config),
+            valid_edge_field_moves(GraphSource::ComputeNode(0), 3, &[]),
             vec![EdgeFieldMove::ComputeIdx(1)]
         );
         assert_eq!(
-            valid_edge_field_moves(GraphSource::ComputeNode(2), 3, &[], &config),
+            valid_edge_field_moves(GraphSource::ComputeNode(2), 3, &[]),
             vec![EdgeFieldMove::ComputeIdx(-1)]
         );
         assert_eq!(
-            valid_edge_field_moves(GraphSource::ComputeNode(1), 3, &[], &config),
+            valid_edge_field_moves(GraphSource::ComputeNode(1), 3, &[]),
             vec![EdgeFieldMove::ComputeIdx(-1), EdgeFieldMove::ComputeIdx(1)]
         );
         assert_eq!(
-            valid_edge_field_moves(GraphSource::ComputeNode(3), 3, &[], &config),
+            valid_edge_field_moves(GraphSource::ComputeNode(3), 3, &[]),
             vec![],
             "idx == compute_count is out of range, not the last valid index"
         );
         assert_eq!(
-            valid_edge_field_moves(GraphSource::ComputeNode(5), 3, &[], &config),
+            valid_edge_field_moves(GraphSource::ComputeNode(5), 3, &[]),
             vec![]
         );
     }
@@ -2000,7 +1963,6 @@ mod tests {
     /// both directions simultaneously.
     #[test]
     fn valid_edge_field_moves_input_leaf_bounds() {
-        let config = MutationConfig::default();
         let wide_refs = vec![
             InputReference::World(WorldInputKey::NeighborBarrierRing),
             InputReference::World(WorldInputKey::NeighborBarrierRing),
@@ -2016,8 +1978,7 @@ mod tests {
                     sub_idx: 3
                 },
                 0,
-                &wide_refs,
-                &config
+                &wide_refs
             ),
             vec![
                 EdgeFieldMove::RefIdx(-1),
@@ -2034,8 +1995,7 @@ mod tests {
                     sub_idx: 0
                 },
                 0,
-                &wide_refs,
-                &config
+                &wide_refs
             ),
             vec![
                 EdgeFieldMove::RefIdx(-1),
@@ -2051,8 +2011,7 @@ mod tests {
                     sub_idx: 7
                 },
                 0,
-                &wide_refs,
-                &config
+                &wide_refs
             ),
             vec![
                 EdgeFieldMove::RefIdx(-1),
@@ -2068,8 +2027,7 @@ mod tests {
                     sub_idx: 3
                 },
                 0,
-                &wide_refs,
-                &config
+                &wide_refs
             ),
             vec![
                 EdgeFieldMove::RefIdx(1),
@@ -2084,8 +2042,7 @@ mod tests {
                     sub_idx: 3
                 },
                 0,
-                &wide_refs,
-                &config
+                &wide_refs
             ),
             vec![
                 EdgeFieldMove::RefIdx(-1),
@@ -2108,8 +2065,7 @@ mod tests {
                     sub_idx: 5
                 },
                 0,
-                &mixed_refs,
-                &config
+                &mixed_refs
             ),
             vec![EdgeFieldMove::SubIdx(-1), EdgeFieldMove::SubIdx(1)],
             "neither width-1 neighbor can hold sub_idx 5"
@@ -2122,8 +2078,7 @@ mod tests {
                     sub_idx: 0
                 },
                 0,
-                &mixed_refs,
-                &config
+                &mixed_refs
             ),
             vec![]
         );
@@ -2137,8 +2092,7 @@ mod tests {
                     sub_idx: 1
                 },
                 0,
-                &mixed_refs,
-                &config
+                &mixed_refs
             ),
             vec![EdgeFieldMove::SubIdx(-1), EdgeFieldMove::SubIdx(1)],
             "sub_idx == width exactly must exclude both RefIdx moves"
@@ -2149,7 +2103,6 @@ mod tests {
     /// 16) plus the previous-tick flip, in that fixed order.
     #[test]
     fn valid_edge_field_moves_shared_memory_always_offers_three_moves() {
-        let config = MutationConfig::default();
         assert_eq!(
             valid_edge_field_moves(
                 GraphSource::SharedMemory {
@@ -2157,8 +2110,7 @@ mod tests {
                     previous: false
                 },
                 0,
-                &[],
-                &config
+                &[]
             ),
             vec![
                 EdgeFieldMove::SharedSlot(-1),
@@ -2223,7 +2175,6 @@ mod tests {
     /// apply without skipping.
     #[test]
     fn has_raw_field_site_accepts_either_arm_alone() {
-        let config = MutationConfig::default();
         let input_refs = sample_input_refs();
 
         // Arm 1 only: a parameterized compute node, and no edge anywhere.
@@ -2239,12 +2190,10 @@ mod tests {
         assert_eq!(total_edge_count(&params_only), 0);
         assert!(has_parameterized_compute_node(&params_only));
         assert!(
-            has_raw_field_site(&params_only, &input_refs, &config),
+            has_raw_field_site(&params_only, &input_refs),
             "a parameterized compute node alone is a raw-field site"
         );
-        assert!(
-            raw_field_mutation(&mut params_only, &input_refs, &config, &mut test_rng()).is_ok()
-        );
+        assert!(raw_field_mutation(&mut params_only, &input_refs, &mut test_rng()).is_ok());
 
         // Arm 2 only: no parameterized compute node, but a movable edge.
         let mut edges_only = CgpGraphBackendDef {
@@ -2267,14 +2216,14 @@ mod tests {
             output_sinks: Vec::new(),
         };
         assert!(!has_parameterized_compute_node(&edges_only));
-        assert!(raw_field_edge_sites(&edges_only, &input_refs, &config)
+        assert!(raw_field_edge_sites(&edges_only, &input_refs)
             .next()
             .is_some());
         assert!(
-            has_raw_field_site(&edges_only, &input_refs, &config),
+            has_raw_field_site(&edges_only, &input_refs),
             "a movable edge alone is a raw-field site"
         );
-        assert!(raw_field_mutation(&mut edges_only, &input_refs, &config, &mut test_rng()).is_ok());
+        assert!(raw_field_mutation(&mut edges_only, &input_refs, &mut test_rng()).is_ok());
     }
 
     // ── The edge-surface draw (T19.F04) ─────────────────────────────────────

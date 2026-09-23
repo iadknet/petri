@@ -126,7 +126,6 @@ const MOCK_CONFIG: SimulationConfig = {
 		large_copy_weight_percent: 25,
 		genome_size_cap: 1200,
 		genome_size_pressure_enabled: true,
-		action_queue_cap: 4,
 		phenotype: {
 			channel_step: 1,
 			channel_change_chance: 0.001,

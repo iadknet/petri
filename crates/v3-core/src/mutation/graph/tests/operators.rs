@@ -10,7 +10,7 @@ use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
-use crate::config::{MutationConfig, RuntimeConfig};
+use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, WorldAction, WorldInputKey};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
@@ -343,10 +343,9 @@ proptest! {
     #[test]
     fn add_bootstrap_node_is_neutral_at_fire_time(seed in any::<u64>()) {
         for (label, parent, refs) in fixtures() {
-            let config = MutationConfig::default();
             let mut child = parent.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
-            add_bootstrap_node(&mut child, &refs, &config, &mut rng).unwrap();
+            add_bootstrap_node(&mut child, &refs, &mut rng).unwrap();
             assert_neutral(
                 &format!("add_bootstrap_node[{label}]"),
                 &parent,
@@ -664,12 +663,11 @@ proptest! {
             InputReference::World(WorldInputKey::NeighborBarrierRing),
             InputReference::ActionQueue,
         ];
-        let config = MutationConfig::default();
         let mut rng = SmallRng::seed_from_u64(seed);
         if let GraphSource::InputLeaf { ref_idx, sub_idx } =
-            random_graph_source(3, &refs, &config, &mut rng)
+            random_graph_source(3, &refs, &mut rng)
         {
-            let width = sub_value_count(&refs[ref_idx as usize], &config);
+            let width = sub_value_count(&refs[ref_idx as usize]);
             prop_assert!(
                 sub_idx < width,
                 "seed {}: sub_idx {} >= width {}",
@@ -704,7 +702,7 @@ proptest! {
             .flat_map(|n| n.inputs.iter().map(|e| e.source))
             .collect();
         let mut rng = SmallRng::seed_from_u64(seed);
-        if raw_field_mutation(&mut def, &refs, &MutationConfig::default(), &mut rng)
+        if raw_field_mutation(&mut def, &refs, &mut rng)
             == Err(MutationSkipReason::NoApplicableTarget)
         {
             return Ok(());

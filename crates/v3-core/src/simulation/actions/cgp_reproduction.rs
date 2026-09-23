@@ -68,7 +68,6 @@ pub(crate) fn build_cgp_child_plasticity_weights(def: &mut CgpGraphBackendDef) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::MutationConfig;
     use crate::creature::genome::cgp::{
         ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, FIRST_ACTION_VOTE_SINK,
         FIXED_SINK_COUNT,
@@ -314,10 +313,8 @@ mod tests {
             let mut def = original.clone();
             match operation {
                 0 => alter_edge_weight_in_def(&mut def, &mut rng).unwrap(),
-                1 => retarget_edge(&mut def, &[], &MutationConfig::default(), &mut rng).unwrap(),
-                2 => {
-                    raw_field_mutation(&mut def, &[], &MutationConfig::default(), &mut rng).unwrap()
-                }
+                1 => retarget_edge(&mut def, &[], &mut rng).unwrap(),
+                2 => raw_field_mutation(&mut def, &[], &mut rng).unwrap(),
                 3 => remove_edge(&mut def, &mut rng).unwrap(),
                 _ => copy_edge_bundle(&mut def, &mut rng).unwrap(),
             }
@@ -457,7 +454,6 @@ mod tests {
             add_edge(
                 &mut def,
                 &[],
-                &MutationConfig::default(),
                 &mut rand::rngs::SmallRng::seed_from_u64(seed),
             )
             .unwrap();
@@ -467,7 +463,7 @@ mod tests {
         }
         let mut draw = tracked_def();
         let mut rng = rand::rngs::SmallRng::seed_from_u64(22);
-        retarget_edge(&mut draw, &[], &MutationConfig::default(), &mut rng).unwrap();
+        retarget_edge(&mut draw, &[], &mut rng).unwrap();
         // Replay the draw against its already selected source: no actual rewiring.
         capture_birth_weights(
             &mut draw,
@@ -478,13 +474,7 @@ mod tests {
             ],
         );
         let before = draw.birth_weights.clone();
-        retarget_edge(
-            &mut draw,
-            &[],
-            &MutationConfig::default(),
-            &mut rand::rngs::SmallRng::seed_from_u64(22),
-        )
-        .unwrap();
+        retarget_edge(&mut draw, &[], &mut rand::rngs::SmallRng::seed_from_u64(22)).unwrap();
         assert_eq!(draw.birth_weights, before);
     }
     #[test]
