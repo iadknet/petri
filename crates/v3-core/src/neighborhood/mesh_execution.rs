@@ -885,6 +885,131 @@ mod tests {
         ]));
     }
 
+    type Hop = (NodeId, Option<(usize, NodeId)>);
+
+    fn observation(hops: Vec<Hop>) -> MeshObservation {
+        MeshObservation {
+            hops,
+            pass_starts: vec![0],
+            termination_reason: TerminationReason::NoDecision,
+        }
+    }
+
+    /// The position and destination flags `(within, across)` of the snapshots.
+    fn route_flags(snapshots: &[Vec<Hop>]) -> [(bool, bool); 2] {
+        let (positions, destinations): (Vec<_>, Vec<_>) = snapshots
+            .iter()
+            .map(|hops| snapshot_routes(&observation(hops.clone())))
+            .unzip();
+        [
+            (
+                route_varies_within_snapshot(&positions),
+                route_varies_with_input(&positions),
+            ),
+            (
+                route_varies_within_snapshot(&destinations),
+                route_varies_with_input(&destinations),
+            ),
+        ]
+    }
+
+    /// Per route field (position, destination), the flags defined directly
+    /// from the hop lists: within, a node with two different applied values in
+    /// one snapshot; across, a node whose non-empty applied sets differ
+    /// between two snapshots.
+    fn oracle_flags(snapshots: &[Vec<Hop>]) -> [(bool, bool); 2] {
+        let field = |route: (usize, NodeId), destination: bool| {
+            if destination {
+                route.1 .0 as usize
+            } else {
+                route.0
+            }
+        };
+        [false, true].map(|destination| {
+            let sets: Vec<BTreeMap<NodeId, BTreeSet<usize>>> = snapshots
+                .iter()
+                .map(|hops| {
+                    let mut sets = BTreeMap::<NodeId, BTreeSet<usize>>::new();
+                    for &(node, route) in hops {
+                        if let Some(route) = route {
+                            sets.entry(node)
+                                .or_default()
+                                .insert(field(route, destination));
+                        }
+                    }
+                    sets
+                })
+                .collect();
+            let within = sets.iter().any(|s| s.values().any(|set| set.len() > 1));
+            let across = sets.iter().enumerate().any(|(i, a)| {
+                sets[i + 1..].iter().any(|b| {
+                    a.iter()
+                        .any(|(node, set)| b.get(node).is_some_and(|other| other != set))
+                })
+            });
+            (within, across)
+        })
+    }
+
+    fn hop_strategy() -> impl Strategy<Value = Hop> {
+        (0u32..4, prop::option::of((0usize..3, 0u32..4))).prop_map(|(node, route)| {
+            (
+                NodeId::new(node),
+                route.map(|(position, destination)| (position, NodeId::new(destination))),
+            )
+        })
+    }
+
+    proptest! {
+        /// Within-snapshot variation is two different applied routes for one
+        /// node inside one snapshot; the same routes split across snapshots
+        /// read across-only, and split across nodes read neither.
+        #[test]
+        fn within_snapshot_route_variation_detects_only_one_node_in_one_snapshot(
+            snapshots in prop::collection::vec(prop::collection::vec(hop_strategy(), 0..6), 1..5),
+            at in any::<prop::sample::Index>(),
+            node in 0u32..4,
+            position in 0usize..3,
+            position_step in 1usize..3,
+            destination in 0u32..4,
+            destination_step in 1u32..4,
+        ) {
+            prop_assert_eq!(route_flags(&snapshots), oracle_flags(&snapshots));
+
+            // Two different routes for one node in one snapshot flag within.
+            let mut injected = snapshots.clone();
+            injected[at.index(snapshots.len())].extend([
+                (NodeId::new(node), Some((position, NodeId::new(destination)))),
+                (
+                    NodeId::new(node),
+                    Some((position + position_step, NodeId::new(destination + destination_step))),
+                ),
+            ]);
+            let [(positions_within, _), (destinations_within, _)] = route_flags(&injected);
+            prop_assert!(positions_within && destinations_within);
+
+            // Each hop in its own snapshot: never within, and across, because
+            // the injected node's two routes now sit in different snapshots.
+            let separated: Vec<Vec<Hop>> = injected.concat().into_iter().map(|hop| vec![hop]).collect();
+            prop_assert_eq!(route_flags(&separated), [(false, true); 2]);
+
+            // Each hop on its own node, snapshots kept: neither flag.
+            let mut next = 0u32;
+            let relabeled: Vec<Vec<Hop>> = injected
+                .iter()
+                .map(|hops| {
+                    hops.iter()
+                        .map(|&(_, route)| {
+                            next += 1;
+                            (NodeId::new(next), route)
+                        })
+                        .collect()
+                })
+                .collect();
+            prop_assert_eq!(route_flags(&relabeled), [(false, false); 2]);
+        }
+    }
+
     /// The ancestral counterfactual touches one node's payload and nothing
     /// else; replacing a payload with itself is the identity, and a missing
     /// node leaves the genome unchanged.

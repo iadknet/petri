@@ -242,4 +242,31 @@ describe("SamplerBar", () => {
 		expect(screen.getByTestId("tick-timeline")).toBeDefined();
 		expect(screen.getByTestId("mesh-hop-timeline")).toBeDefined();
 	});
+
+	it("keeps a ten-pass tick's passes and details reachable in a bounded vertical scroll body", () => {
+		const sample = buildSample(1);
+		sample.ticks[0].passes = Array.from({ length: 10 }, (_, pass_index) => ({
+			pass_index,
+			end_reason: "NoTargets" as const,
+			votes: ZERO_VOTES,
+			effective_votes: [0, 0, 0, 0],
+			committed: null,
+			hops: 1,
+		}));
+		render(
+			<SamplerBar
+				{...defaultProps}
+				sample={sample}
+				playbackState="loaded"
+				totalTicks={1}
+				totalHops={2}
+			/>,
+		);
+		const body = screen.getByTestId("sampler-body");
+		expect(body.className).toMatch(/(^|\s)max-h-\S+/);
+		expect(body).toHaveClass("overflow-y-auto");
+		expect(body).toContainElement(screen.getByTestId("mesh-hop-timeline"));
+		expect(body).toContainElement(screen.getByTestId("pass-detail-9"));
+		expect(body).not.toContainElement(screen.getByRole("button", { name: /resample/i }));
+	});
 });

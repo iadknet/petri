@@ -214,14 +214,15 @@ PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|D
       routing one way per snapshot but differently across snapshots reads
       within false, across true; the founder reads both false. The flags reach
       the bench block, drift totals, and `mesh_summary`; a source row without
-      them projects no key.
+      them projects no key. A proptest covers detection (readings).
 - [x] Trace: a traced fixture whose VM node reads each of the five inputs shows
       its read values (VM register writes) equal to the hop's
       `decision_inputs` and the tick's `previous_outcome`; the hop ending a
       pass `Decided` and an energy-exhausted hop record no route, while a hop
       routing to a missing node and the hop before a pass cap keep theirs;
       protocol version tests read `v3alpha4`.
-- [x] Inspector: one frontend test per row of invariant 6. Live check on the dev
+- [x] Inspector: one frontend test per row of invariant 6; a ten-pass tick
+      scrolls in a bounded sampler body. Live check on the dev
       stack: zoom the world canvas in until the frame carries creatures (the
       zoomed-out `overview` view has none), click a creature, sample it, and
       capture one screenshot showing a tick's pass groups with end reasons and
