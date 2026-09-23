@@ -1,6 +1,6 @@
 # T19.F06 — Retirement and Observability
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-23
 **Feature**: T19.F06
 **Track**: [T19 — Mesh Action Selection and Live State](../../roadmaps/t19-mesh-action-selection-and-live-state.md)
@@ -200,7 +200,7 @@ PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|D
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability`, then `make check` exit 0
-      (counts in the readings file).
+      at final `9c47c419` (counts in the readings file).
 - [x] Scan: `scripts/policy-check` passes on the final tree; it fails naming
       `file:line` for a retired name in a tracked file and in a newly created
       untracked file, and passes with `push_action_log` and `pushActions`
@@ -222,13 +222,11 @@ PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|D
       routing to a missing node and the hop before a pass cap keep theirs;
       protocol version tests read `v3alpha4`.
 - [x] Inspector: one frontend test per row of invariant 6; a ten-pass tick
-      scrolls in a bounded sampler body. Live check on the dev
-      stack: zoom the world canvas in until the frame carries creatures (the
-      zoomed-out `overview` view has none), click a creature, sample it, and
-      capture one screenshot showing a tick's pass groups with end reasons and
-      hop counts, a pass's per-kind bar, best vote, and effective vote with
-      `Terminate` and `Decide`, and a selected hop's five decision-state values.
-      Creature id, tick, and screenshot path go in readings.
+      scrolls in a bounded sampler body. Live dev-stack screenshot of a
+      sampled creature shows a tick's pass groups with end reasons and hop
+      counts, a pass's per-kind bar, best vote, and effective vote with
+      `Terminate` and `Decide`, and a selected hop's five decision-state values
+      (creature id, tick, and path in readings).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `96 mutants tested in
       27m: 1 missed, 70 caught, 25 unviable`, output
       `~/.local/share/petri-tools/mutants/t19-f06/`; survivor
@@ -292,15 +290,15 @@ Neither epoch is re-pinned (track "Epochs").
 
 ## Success Criteria
 
-- [ ] `mutation.action_queue_cap` exists nowhere live; the `ActionQueue` width
+- [x] `mutation.action_queue_cap` exists nowhere live; the `ActionQueue` width
       is 12 on every config; the seven recipes load; the digest change is named.
-- [ ] The retired-name scan runs in `make check` and `make check-docs` and
+- [x] The retired-name scan runs in `make check` and `make check-docs` and
       passes; criterion 2's grep finds nothing.
-- [ ] The historical index names the T13 recruitment records and the
+- [x] The historical index names the T13 recruitment records and the
       pre-cutover steering structural readings.
-- [ ] Within-snapshot and across-snapshot route variation are both reported.
-- [ ] The inspector shows every row of invariant 6 from recorded values.
-- [ ] Gate and goal counters are identical to T19.F05 and neither epoch moves.
+- [x] Within-snapshot and across-snapshot route variation are both reported.
+- [x] The inspector shows every row of invariant 6 from recorded values.
+- [x] Gate and goal counters are identical to T19.F05 and neither epoch moves.
 
 ## Notes for AI Agents
 
@@ -312,3 +310,4 @@ Neither epoch is re-pinned (track "Epochs").
   by `deny_unknown_fields`; no alias or ignore shim is added.
 - Exception: user approved 2026-09-23: invariant-6 tests came after the views
   (review P1).
+- Cost: `/usage` awaits the user; 4 implementer passes (advisor 0 each); 1 spec-owner resume; 3 Codex rounds (`ready`); review P1 3, P2 0, P3 0.
