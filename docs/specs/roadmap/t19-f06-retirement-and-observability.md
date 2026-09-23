@@ -194,7 +194,7 @@ PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|D
       (`db99fa09`, `e693cfe9`).
 - [x] Retired-name scan and the removals it forces (2); reference docs and the
       T11.F15 bullet (7); the README index (3) (`e6717261`).
-- [ ] Readings file: digests before and after, recipe loads, the scan's
+- [x] Readings file: digests before and after, recipe loads, the scan's
       failing and passing runs, the browser check, pins.
 
 ## Verification
@@ -221,7 +221,7 @@ PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|D
       pass `Decided` and an energy-exhausted hop record no route, while a hop
       routing to a missing node and the hop before a pass cap keep theirs;
       protocol version tests read `v3alpha4`.
-- [ ] Inspector: one frontend test per row of invariant 6. Live check on the dev
+- [x] Inspector: one frontend test per row of invariant 6. Live check on the dev
       stack: zoom the world canvas in until the frame carries creatures (the
       zoomed-out `overview` view has none), click a creature, sample it, and
       capture one screenshot showing a tick's pass groups with end reasons and
