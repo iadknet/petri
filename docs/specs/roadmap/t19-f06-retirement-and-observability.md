@@ -228,11 +228,12 @@ PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|D
       capture one screenshot showing a tick's pass groups with end reasons and
       hop counts, a pass's per-kind bar, best vote, and effective vote with
       `Terminate` and `Decide`, and a selected hop's five decision-state values.
-      Creature id, tick, and screenshot path go in readings. If the zoomed-in
-      frame never carries a clickable creature, that goes back to the spec
-      owner as a finding; frontend tests do not stand in for the live check.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred.
+      Creature id, tick, and screenshot path go in readings.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `96 mutants tested in
+      27m: 1 missed, 70 caught, 25 unviable`, output
+      `~/.local/share/petri-tools/mutants/t19-f06/`; survivor
+      `operators.rs:860:35` killed by a test. Second fresh run: the first
+      died on disk exhaustion (readings).
 - [x] Summaries stored at
       `docs/progress/features/t19-f06-retirement-and-observability.json` and
       `-goal.json` from `make bench PROFILE=gate
