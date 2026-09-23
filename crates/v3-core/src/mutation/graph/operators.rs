@@ -2082,6 +2082,22 @@ mod tests {
             ),
             vec![]
         );
+        // Dangling ref_idx exactly one past the end (`ref_idx == len`), with
+        // a sub_idx too wide for the last reference: no moves, and no read of
+        // the missing reference. `(ref_idx as usize) < len` must reject this,
+        // not `<=`.
+        assert_eq!(
+            valid_edge_field_moves(
+                GraphSource::InputLeaf {
+                    ref_idx: 3,
+                    sub_idx: 1
+                },
+                0,
+                &mixed_refs
+            ),
+            vec![],
+            "ref_idx == input_refs.len() is out of range, not the last valid index"
+        );
         // Exact boundary: sub_idx equals a narrower neighbor's width on both
         // sides at once (sub_idx == 1 == the width-1 neighbors' width).
         // `sub_idx < width` must reject this, not `sub_idx <= width`.
