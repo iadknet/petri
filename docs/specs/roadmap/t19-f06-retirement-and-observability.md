@@ -309,3 +309,5 @@ Neither epoch is re-pinned (track "Epochs").
   advisor. Codex roles are unchanged.
 - Decision: a stored config carrying the retired queue-cap field is rejected
   by `deny_unknown_fields`; no alias or ignore shim is added.
+- Exception: pending user approval: invariant-6 tests came after the views
+  (review P1).
