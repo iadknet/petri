@@ -258,7 +258,16 @@ carries no predeclared, justified cost under this spec (the predeclaration
 gives `decided_passes` no direction and states a mechanism cost there does
 not fit and is escalated), so per the reference-and-epoch note above it is
 reported to the user with the draw remap as its only predeclared cause; the
-user decides the re-pin. No epoch is re-pinned by this run. `decision_inputs`
+user decides the re-pin. No epoch is re-pinned by this run. Spec owner's
+attribution (from the stored summaries, no further run): the severe is the
+predeclared trajectory movement, not a mechanism cost. `decided_passes` is
+0.000327 against 0.000092 per creature-tick beside 3.29 `passes` per
+creature-tick, one `Decide` pass in roughly 10,000 versus 38,000: the counter
+reads how many lineages carry a `Decide` edge, which this feature's code
+does not touch (the `Decide` guard and the pass loop are unchanged), the
+sign differs across the three worlds, and `passes`, `mesh_hops`, and wall
+per creature-tick are `ok` or down, which a mechanism cost cannot leave
+untouched. `decision_inputs`
 carries five rows in both summaries; goal-world final populations all
 exceed half of T19.F04's; founder-half changed/dead figures are unchanged;
 `config_digest`/`inputs_changed` unchanged. Full figures and byte-for-byte
