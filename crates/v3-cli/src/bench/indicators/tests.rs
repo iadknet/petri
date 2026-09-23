@@ -317,6 +317,8 @@ fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
             executed_nodes: 7,
             knockout_nodes: 3,
             route_varying_lineages: 1,
+            route_varying_within_snapshot_lineages: 2,
+            route_destination_varying_within_snapshot_lineages: 1,
             tick_reasons: neighborhood::mesh_execution::TickReasonCounts {
                 no_decision: 300,
                 terminate_voted: 20,
@@ -371,6 +373,13 @@ fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
     assert_eq!(report.mean_executed_nodes, "1.750000");
     assert_eq!(report.mean_knockout_nodes, "0.750000");
     assert_eq!(report.route_varying_fraction, "0.250000");
+    assert_eq!(
+        (
+            report.route_varying_within_snapshot_lineages,
+            report.route_destination_varying_within_snapshot_lineages
+        ),
+        (2, 1)
+    );
     assert_eq!(report.battery_executions, 320);
     assert_eq!(report.pass_cap_fraction, "0.012500");
     assert_eq!(report.pass_cap_hits, 8);
@@ -1062,4 +1071,80 @@ fn neighborhood_read_of_an_empty_population_has_no_rows_and_undefined_fractions(
     ] {
         assert_eq!(fraction, UNDEFINED);
     }
+}
+
+/// The bench `mesh_execution` block carries both route-variation splits the
+/// battery reads (T19.F06): a router reading the tick's `Eat` commit count
+/// routes two ways within every snapshot and the same way across them.
+#[test]
+fn mesh_execution_block_carries_within_and_across_snapshot_route_flags() {
+    use v3_core::contracts::{InputReference, NodeId, RouteTarget};
+    use v3_core::creature::genome::vote::VoteSink;
+    use v3_core::creature::genome::{
+        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+    };
+    let vm_node = |id: u32, targets: &[u32], program: Vec<VmInstruction>| NodeGenome {
+        node_id: NodeId::new(id),
+        input_refs: vec![],
+        backend_def: BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: vec![1.0],
+            program,
+        }),
+        targets: targets
+            .iter()
+            .enumerate()
+            .map(|(slot, &id)| RouteTarget {
+                target_id: NodeId::new(id),
+                slot: slot as u8,
+                gate_bias: 0.0,
+            })
+            .collect(),
+    };
+    let mut router = vm_node(
+        0,
+        &[1, 2],
+        vec![
+            VmInstruction::ReadInput {
+                dst: 0,
+                ref_idx: 0,
+                sub_idx: 0,
+            },
+            VmInstruction::WriteRouteGate { slot: 1, src: 0 },
+            VmInstruction::Halt,
+        ],
+    );
+    router.input_refs = vec![InputReference::CommitCounts];
+    let eater = vm_node(
+        1,
+        &[],
+        vec![
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            },
+            VmInstruction::AddVote {
+                sink: VoteSink::Eat.index() as u8,
+                src: 0,
+            },
+            VmInstruction::AddVote {
+                sink: VoteSink::Decide.index() as u8,
+                src: 0,
+            },
+            VmInstruction::Halt,
+        ],
+    );
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![router, eater, vm_node(2, &[], vec![VmInstruction::Halt])],
+    };
+    let config = SimulationConfig::default();
+    let context = EvalContext::from_config(&config);
+    let battery = Battery::generate(context.food_type_count);
+    let steering_battery = SteeringBattery::generate(context.food_type_count);
+    let (block, _) = mesh_execution_and_steering(&battery, &steering_battery, &genome, &context);
+    assert!(block.route_varies_within_snapshot);
+    assert!(block.route_destination_varies_within_snapshot);
+    assert!(!block.route_varies_with_input);
+    assert!(!block.route_destination_varies);
 }

@@ -161,6 +161,20 @@ fn mesh_summary(source: &Value) -> Value {
         *out.entry("routeVaries").or_default() += u64::from(row["route_varies_with_input"] == true);
         *out.entry("routeDestinationVaries").or_default() +=
             u64::from(row["route_destination_varies"] == true);
+        // State-driven flags (T19.F06): a row measured before them carries no
+        // key, so the count is kept only over rows that do and is absent,
+        // never zero, when none does.
+        for (target, key) in [
+            ("routeVariesWithinSnapshot", "route_varies_within_snapshot"),
+            (
+                "routeDestinationVariesWithinSnapshot",
+                "route_destination_varies_within_snapshot",
+            ),
+        ] {
+            if let Some(varies) = row.get(key).and_then(Value::as_bool) {
+                *out.entry(target).or_default() += u64::from(varies);
+            }
+        }
     }
     if out.is_empty() {
         Value::Null
@@ -803,7 +817,9 @@ mod tests {
                 "passes": 41,
                 "executions_per_genome": 13,
                 "route_varies_with_input": true,
-                "route_destination_varies": false
+                "route_destination_varies": false,
+                "route_varies_within_snapshot": true,
+                "route_destination_varies_within_snapshot": false
             }},
             {"mesh_execution": {
                 "total_node_count": 17,
@@ -814,7 +830,9 @@ mod tests {
                 "passes": 43,
                 "executions_per_genome": 37,
                 "route_varies_with_input": false,
-                "route_destination_varies": true
+                "route_destination_varies": true,
+                "route_varies_within_snapshot": true,
+                "route_destination_varies_within_snapshot": true
             }},
             {"unmeasured": true}
         ]);
@@ -831,9 +849,26 @@ mod tests {
                 "passes": 84,
                 "execs": 50,
                 "routeVaries": 1,
-                "routeDestinationVaries": 1
+                "routeDestinationVaries": 1,
+                "routeVariesWithinSnapshot": 2,
+                "routeDestinationVariesWithinSnapshot": 1
             })
         );
+    }
+
+    /// A row measured before T19.F06 lacks the within-snapshot flags; the
+    /// projection omits their keys rather than reading them as false.
+    #[test]
+    fn mesh_summary_omits_within_snapshot_keys_no_row_carries() {
+        let summary = mesh_summary(&json!([{"mesh_execution": {
+            "route_varies_with_input": true,
+            "route_destination_varies": true
+        }}]));
+        assert_eq!(summary["routeVaries"], 1);
+        assert!(summary.get("routeVariesWithinSnapshot").is_none());
+        assert!(summary
+            .get("routeDestinationVariesWithinSnapshot")
+            .is_none());
     }
 
     #[test]
