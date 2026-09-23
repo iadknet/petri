@@ -1,6 +1,6 @@
 # T19.F05 — Decision-State Inputs
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-22
 **Feature**: T19.F05
 **Track**: [T19 — Mesh Action Selection and Live State](../../roadmaps/t19-mesh-action-selection-and-live-state.md)
@@ -187,7 +187,7 @@ Options settled here, all internal to the codebase:
       in [`docs/progress/readings/t19-f05.md`](../../progress/readings/t19-f05.md);
       the founder pin and `FOUNDER_GENOME_SIZE_UNITS` hold (readings, Pins).
 - [x] `cargo test -p v3-core --test viability` -> 28 passed, then
-      `make check` -> exit 0 at `ca70cbe1` (v3-core lib 1,688 passed,
+      `make check` -> exit 0 at `ca70cbe1` and final `9f9ce351` (v3-core lib 1,688 passed,
       4 ignored; frontend 331 passed).
 - [x] Draw and kind checks: the 27-entry draw covers every new reference at
       one draw each, the existing branch sub-draws unchanged; the swap table
@@ -291,14 +291,14 @@ artifact identity: [readings, "Benchmark runs"](../../progress/readings/t19-f05.
 
 ## Success Criteria
 
-- [ ] All five references resolve as invariant 1's table says on both
+- [x] All five references resolve as invariant 1's table says on both
       backends, and the worked cases V1 to V6 pass with their controls.
-- [ ] The draw enumerates 27 entries, the kinds and swap partners are as
+- [x] The draw enumerates 27 entries, the kinds and swap partners are as
       invariant 5's table says, and the census reports the five rows.
-- [ ] Founder bytes, size pin, founder digest, founder-only trajectory,
+- [x] Founder bytes, size pin, founder digest, founder-only trajectory,
       `config_digest`, and the recipe pin are unchanged; the short-run
       identity is re-pinned.
-- [ ] Gate and goal summaries stored with the predeclared readings recorded;
+- [x] Gate and goal summaries stored with the predeclared readings recorded;
       the track row checked and this spec Complete.
 
 ## Notes for AI Agents
@@ -308,3 +308,4 @@ artifact identity: [readings, "Benchmark runs"](../../progress/readings/t19-f05.
 - Decision: the user accepted the goal severe on `decided_passes`
   (+255.43%) as draw-remap trajectory movement, not a mechanism cost, and
   kept both the goal and gate epochs at T19.F04 (2026-09-22).
+- Cost: `/usage` awaits the user; 3 implementer passes (advisor 2, 2, 2); 2 spec-owner resumes; 2 Codex rounds (`ready`); review P1 2, P2 1, P3 0.
