@@ -245,7 +245,9 @@ describe("SamplerBar", () => {
 
 	it("keeps a ten-pass tick's passes and details reachable in a bounded vertical scroll body", () => {
 		const sample = buildSample(1);
-		sample.ticks[0].passes = Array.from({ length: 10 }, (_, pass_index) => ({
+		const tick = sample.ticks[0];
+		if (!tick) throw new Error("buildSample(1) must produce one tick");
+		tick.passes = Array.from({ length: 10 }, (_, pass_index) => ({
 			pass_index,
 			end_reason: "NoTargets" as const,
 			votes: ZERO_VOTES,
