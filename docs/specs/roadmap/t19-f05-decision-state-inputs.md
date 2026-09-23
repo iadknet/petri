@@ -199,9 +199,15 @@ Options settled here, all internal to the codebase:
       `decision_inputs` carries five rows in the gate and goal summaries
       (confirmed in both stored summaries; see
       [readings, "Benchmark runs"](../../progress/readings/t19-f05.md)).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred; full
-      survivor list here.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` at `1c585f4b` (mode
+      `fresh`): `52 mutants tested in 15m: 2 missed, 39 caught, 11
+      unviable`, no timeouts; output
+      `~/.local/share/petri-tools/mutants/t19-f05/mutants.out`. Survivors,
+      both **killed** by
+      `decision_input_report_labels_are_the_variant_names_in_catalog_order`:
+      `sensor_census.rs:64:9` `DecisionInputKey::as_key` -> `""` and ->
+      `"xyzzy"` (iterate pass: 2 caught). Test-only triage, so no second
+      fresh run.
 - [x] Benchmark summaries stored at
       `docs/progress/features/t19-f05-decision-state-inputs.json` (103,004
       bytes, `sha256:5088c5f0…ba8b2`) and `-goal.json` (7,727,539 bytes,
