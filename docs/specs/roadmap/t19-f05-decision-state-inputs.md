@@ -176,7 +176,7 @@ Options settled here, all internal to the codebase:
 - [x] Draw, widths, universe, class, census, and the bench rows (5, 8).
 - [x] Frontend types and minimal rendering; server class fixture (9).
 - [x] Reference specs (9); re-pin `legacy_default_short_run_identity` (6).
-- [ ] Readings file: worked-case transcripts, the pin before and after, the
+- [x] Readings file: worked-case transcripts, the pin before and after, the
       births probe and drift walk against T19.F04, the census rows from the
       goal summary.
 
@@ -193,20 +193,26 @@ Options settled here, all internal to the codebase:
       one draw each, the existing branch sub-draws unchanged; the swap table
       of invariant 5 (`Swap` never crosses a class or width). Tests named in
       the readings file (supporting tests), green in the `make check` above.
-- [ ] Census: a genome reading each new reference is counted once per
+- [x] Census: a genome reading each new reference is counted once per
       reference (`each_decision_state_input_is_counted_once_per_reference`
       and the v3-cli row tests, green in the `make check` above);
       `decision_inputs` carries five rows in the gate and goal summaries
-      (awaits the benchmark runs).
+      (confirmed in both stored summaries; see
+      [readings, "Benchmark runs"](../../progress/readings/t19-f05.md)).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred; full
       survivor list here.
-- [ ] Benchmark summaries stored at
-      `docs/progress/features/t19-f05-decision-state-inputs.json` and
-      `-goal.json` (`make bench PROFILE=gate FEATURE=t19-f05-decision-state-inputs`,
-      `make bench PROFILE=goal FEATURE=t19-f05-decision-state-inputs`), local
-      raw hash and byte count and verification time checked, series entries
-      point to the summaries, no full report staged.
+- [x] Benchmark summaries stored at
+      `docs/progress/features/t19-f05-decision-state-inputs.json` (103,004
+      bytes, `sha256:5088c5f0…ba8b2`) and `-goal.json` (7,727,539 bytes,
+      `sha256:f7dd2872…9c922`) (`make bench PROFILE=gate
+      FEATURE=t19-f05-decision-state-inputs` exit 0 not severe;
+      `make bench PROFILE=goal FEATURE=t19-f05-decision-state-inputs`, run
+      once, CLI exit 3 / `make` exit 2, **severe=true** on `decided_passes`,
+      recorded and reported, not remediated here); raw hash/byte count/
+      verification time in
+      [readings, "Benchmark runs"](../../progress/readings/t19-f05.md);
+      series entries point to the summaries; no full report staged.
 
 ## Performance and Goal Impact
 
@@ -242,7 +248,21 @@ the user decides the re-pin, as at T11.F21 (epoch kept).
 | `config_digest`, founder digest, `FOUNDER_GENOME_SIZE_UNITS` | Unchanged (`inputs_changed` false) |
 | `legacy_default_short_run_identity` | Moves; re-pinned and listed |
 
-**Measured verdict.** Not yet measured.
+**Measured verdict.** Gate: not severe (`severe=false`); `pass_cap_hits`
+flags at +35.11% (below the 50% severe line), every other counter `ok`,
+wall_clock `ok` (+20.64%, matching host). Goal (run once): **severe=true**,
+driven by `decided_passes` (+255.43% aggregate; a near-zero counter with
+large, sign-inconsistent per-world swings), `pass_cap_hits` flags
+(+22.68%), every other counter `ok`, wall_clock `ok` (−6.61%). This severe
+carries no predeclared, justified cost under this spec (the predeclaration
+gives `decided_passes` no direction and states a mechanism cost there does
+not fit and is escalated), so per the reference-and-epoch note above it is
+reported to the user with the draw remap as its only predeclared cause; the
+user decides the re-pin. No epoch is re-pinned by this run. `decision_inputs`
+carries five rows in both summaries; goal-world final populations all
+exceed half of T19.F04's; founder-half changed/dead figures are unchanged;
+`config_digest`/`inputs_changed` unchanged. Full figures and byte-for-byte
+artifact identity: [readings, "Benchmark runs"](../../progress/readings/t19-f05.md).
 
 - Summaries: [gate](../../progress/features/t19-f05-decision-state-inputs.json),
   [goal](../../progress/features/t19-f05-decision-state-inputs-goal.json).
