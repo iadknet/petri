@@ -182,34 +182,35 @@ PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|D
 
 ## Implementation Tasks
 
-- [ ] Config retirement, width constant, recipes, frontend config surfaces,
-      server test (1); tests first where behavior is asserted.
-- [ ] Route split through every carrier (4).
-- [ ] Trace and protocol (5), then the inspector views (6) with their tests.
-- [ ] Retired-name scan and the removals it forces (2); reference docs and the
-      T11.F15 bullet (7); the README index (3).
+- [x] Config retirement, width constant, recipes, frontend config surfaces,
+      server test (1); tests first where behavior is asserted (`02d33611`).
+- [x] Route split through every carrier (4) (`5c20b1eb`).
+- [x] Trace and protocol (5), then the inspector views (6) with their tests
+      (`db99fa09`, `e693cfe9`).
+- [x] Retired-name scan and the removals it forces (2); reference docs and the
+      T11.F15 bullet (7); the README index (3) (`e6717261`).
 - [ ] Readings file: digests before and after, recipe loads, the scan's
       failing and passing runs, the browser check, pins.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability`, then `make check` exit 0
+- [x] `cargo test -p v3-core --test viability`, then `make check` exit 0
       (counts in the readings file).
-- [ ] Scan: `scripts/policy-check` passes on the final tree; it fails naming
+- [x] Scan: `scripts/policy-check` passes on the final tree; it fails naming
       `file:line` for a retired name in a tracked file and in a newly created
       untracked file, and passes with `push_action_log` and `pushActions`
       present (temporary edits, reverted; transcript in readings).
-- [ ] Config: each of the seven recipes loads through `v3-cli run --ticks 1
+- [x] Config: each of the seven recipes loads through `v3-cli run --ticks 1
       --config <recipe>`; a config carrying the field is rejected; the
       `ActionQueue` width is 12 at `max_actions_per_turn` 1, 4, 10, and 20; the
       pins of invariant 8 pass unedited; digests before and after in readings.
-- [ ] Route split fixtures: a node routing two ways within each snapshot and
+- [x] Route split fixtures: a node routing two ways within each snapshot and
       identically across snapshots reads within true, across false; a node
       routing one way per snapshot but differently across snapshots reads
       within false, across true; the founder reads both false. The flags reach
       the bench block, drift totals, and `mesh_summary`; a source row without
       them projects no key.
-- [ ] Trace: a traced fixture whose VM node reads each of the five inputs shows
+- [x] Trace: a traced fixture whose VM node reads each of the five inputs shows
       its read values (VM register writes) equal to the hop's
       `decision_inputs` and the tick's `previous_outcome`; the hop ending a
       pass `Decided` and an energy-exhausted hop record no route, while a hop
