@@ -196,9 +196,8 @@ the result.
 
 ## 6. Votes and Parameters
 
-The action bank, its `ActionSlotBehavior`/`WorldActionKind` catalog, the
-direction bank, and the execute gate were deleted by T19.F04; votes and
-parameters replace them.
+A graph selects actions through its `ActionVote` and `ActionParam` sinks
+(T19.F04).
 
 - A kind's action count is its vote: at the pass end the kind with the
   highest effective vote (best sink's vote minus the kind's bar, its commits
@@ -215,7 +214,7 @@ parameters replace them.
 
 ---
 
-## 7. Deleted: ExecuteGate
+## 7. Pass Ends
 
 A pass ends at the chain's natural end (`NoTargets`, `MissingNode`), at the
 per-pass hop cap, or when a `Decide` vote holds (`v3-mesh-execution-spec.md`
@@ -319,9 +318,8 @@ vectors, regardless of learned-weight inheritance.
 Trace `passes` contains one entered evaluation, including an unaffordable
 attempt. `node_evaluations` describe candidate computation; `temporal_committed`
 marks whether that candidate was applied. `final_outputs` always reports the
-last successful committed outputs. Legacy `converged` and
-`stable_passes_count` are always false and zero. `max_delta` compares the
-candidate outputs with the last committed outputs, not a convergence test.
+last successful committed outputs. `max_delta` compares the candidate
+outputs with the last committed outputs, not a convergence test.
 
 ---
 
@@ -479,13 +477,10 @@ All sinks start with empty edge Vecs (inert until evolution wires them).
 
 ### Queue-size contract
 
-`MutationConfig::action_queue_cap` (default 4) sets the width of the queue
-the genome can read:
-- `InputReference::ActionQueue` width = `action_queue_cap * 3`.
-- Invariant: `action_queue_cap <= max_actions_per_turn`.
-- Normalization order: `max_actions_per_turn` is normalized first, then
-  `action_queue_cap` is clamped to
-  `1..=min(21845, max_actions_per_turn)`.
+The genome reads the first four queued actions:
+`InputReference::ActionQueue` is a constant four slots of three sub-values,
+12 in all (`mutation::compound::ACTION_QUEUE_INPUT_SLOTS`), on every config
+(T19.F06). A slot past the queue's end reads `0.0`.
 
 The number of actions a tick commits is bounded by
 `runtime.max_actions_per_turn`, not by the genome.

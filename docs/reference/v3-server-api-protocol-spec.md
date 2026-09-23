@@ -1,6 +1,6 @@
 # V3 Server API and Protocol Spec
 
-Reference specification for canonical v3alpha3 server HTTP/WebSocket contracts,
+Reference specification for canonical v3alpha4 server HTTP/WebSocket contracts,
 lifecycle transitions, and error semantics.
 
 Status: Active
@@ -21,7 +21,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- v3alpha3 protocol-version posture;
+- v3alpha4 protocol-version posture;
 - canonical HTTP endpoint contracts for simulation lifecycle, status/frame, and
   config read/patch surfaces;
 - canonical WebSocket event envelope and payload mapping;
@@ -50,10 +50,14 @@ Current viewport-transport addenda:
 Version contract:
 - `protocol_version` is required in all top-level HTTP responses and WebSocket
   event envelopes.
-- Canonical value: `"v3alpha3"`.
-- Breaking payload changes require protocol-version bump. `v3alpha3`
-  (T19.F04) removed the action bank, execute gate, and VM metadata trace
-  fields and the old termination reasons, and added pass records.
+- Canonical value: `"v3alpha4"`.
+- Breaking payload changes require protocol-version bump. `v3alpha4`
+  (T19.F06) removed the graph trace's always-false `converged` and
+  always-zero `stable_passes_count` and a retired `mutation` config key
+  (a stored config carrying it is rejected), and added each hop's
+  `decision_inputs` and the tick's `static_inputs.previous_outcome`.
+  `v3alpha3` (T19.F04) introduced pass records, the vote-based termination
+  reasons, and the VM trace without a metadata buffer.
 - Server transport versioning is independent from the CLI NDJSON contract; a
   server bump does not automatically change the CLI protocol version.
 - Documented v3alpha2 exception: food-density payloads and food config shape
@@ -90,7 +94,7 @@ Base path: `/v3`.
 
 ### 4.1 `POST /v3/simulation/startup`
 
-Request (conceptual v3alpha3 shape):
+Request (conceptual v3alpha4 shape):
 
 ```json
 {
@@ -238,7 +242,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
@@ -259,7 +263,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "state": "running",
   "tick": 123
 }
@@ -274,7 +278,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "state": "paused",
   "tick": 123
 }
@@ -303,7 +307,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "state": "paused",
   "tick": 124,
   "steps_applied": 1
@@ -316,7 +320,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "state": "running",
   "tick": 124,
   "population": 48,
@@ -370,7 +374,7 @@ Response (full sparse frame):
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "state": "running",
   "tick": 124,
   "width": 1600,
@@ -419,7 +423,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "state": "paused",
   "config": {
     "population": {
@@ -567,7 +571,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "state": "paused",
   "config": { "...": "effective config" }
 }
@@ -598,7 +602,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "status": "recording",
   "ticks_requested": 5,
   "include_perception_debug": false
@@ -611,7 +615,7 @@ Recording response:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "status": "recording",
   "ticks_completed": 2,
   "ticks_remaining": 3
@@ -622,7 +626,7 @@ Complete response:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "status": "complete",
   "sample": {
     "creature_id": 7,
@@ -675,6 +679,22 @@ Execution-sampler rules:
 - each hop carries `pass_index` beside the tick-wide `hop_index`, and
   `vote_contribution`, the 27 floats that hop committed; zeros when the
   dispatch ended exhausted and committed nothing
+- each hop carries `decision_inputs` (T19.F06), the decision-state values
+  the dispatch's inputs resolved against, each as the input read returns
+  it: `action_votes` (27, `ActionVotes`), `previous_pass_votes` (27,
+  `PreviousPassVotes`), `commit_counts` (4 floats, `CommitCounts`), and
+  `hops_this_tick` (`HopsThisTick`); they are what the node could read, not
+  proof of a read
+- `static_inputs.previous_outcome` holds the four scaled `PreviousOutcome`
+  channels the genome reads (`EnergyDelta`, `ActionSuccess`, `DamageDelta`,
+  `OffspringSuccess`)
+- a hop's `route` is recorded exactly when the pass loop applies one: `null`
+  on a dispatch that ended exhausted or decided its pass; kept on a route
+  toward a missing node and on the route taken just before the per-pass cap.
+  A hop the per-tick ramp cannot afford counts in its pass's `hops` but is
+  not recorded
+- the Graph trace carries `max_delta` per evaluation and no convergence
+  fields
 - the VM trace has no metadata buffer (`final_meta` was removed)
 - sampler wire DTO ownership and mapping live in `v3-server/src/transport/`
   (`sample_protocol.rs`, `sample_assembler.rs`)
@@ -696,7 +716,7 @@ Response (full, no query parameters):
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
@@ -733,7 +753,7 @@ Field definitions:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `protocol_version` | string | Always `"v3alpha3"`. |
+| `protocol_version` | string | Always `"v3alpha4"`. |
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
@@ -786,7 +806,7 @@ Event envelope:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "event": "status",
   "tick": 124,
   "payload": {}
@@ -870,7 +890,7 @@ Envelope/payload consistency rules:
 Emission frequency:
 - Events are emitted once per completed tick while the simulation is `running`.
 - Implementations may throttle emission (for example emit every Nth tick) for
-  performance, but must document the throttle policy. The default v3alpha3
+  performance, but must document the throttle policy. The default v3alpha4
   behavior is per-tick emission.
 
 Ordering rules:
@@ -887,7 +907,7 @@ All non-2xx HTTP responses use:
 
 ```json
 {
-  "protocol_version": "v3alpha3",
+  "protocol_version": "v3alpha4",
   "error": {
     "code": "validation_rejected",
     "message": "startup request failed validation",
@@ -913,7 +933,7 @@ Required error codes:
 
 ---
 
-## 7. Out-of-Scope API Surfaces (v3alpha3)
+## 7. Out-of-Scope API Surfaces (v3alpha4)
 
 Not part of this version:
 - `GET /v3/simulation/snapshot`
@@ -935,7 +955,7 @@ Snapshot import/export contracts require a follow-up spec.
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`
 
-This file remains canonical for v3alpha3 server transport/API semantics.
+This file remains canonical for v3alpha4 server transport/API semantics.
 
 ---
 

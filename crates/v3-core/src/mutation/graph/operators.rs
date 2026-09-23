@@ -896,8 +896,8 @@ fn apply_edge_field_move(source: &mut GraphSource, mv: EdgeFieldMove) {
             *previous = !*previous;
         }
         (source, mv) => unreachable!(
-            "valid_edge_field_moves only returns moves matching the source variant and \
-             direction moves are applied to the bank edge, not its source; got {source:?} with {mv:?}"
+            "valid_edge_field_moves only returns moves matching the source variant; \
+             got {source:?} with {mv:?}"
         ),
     }
 }

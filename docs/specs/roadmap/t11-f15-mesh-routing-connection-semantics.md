@@ -801,3 +801,6 @@ T11.F10 still owns complete track-floor closure and useful remembered decisions.
   The orchestrator reruns `make check` on the rebased closing content and
   records its resulting tested commit in the parent task before fast-forward.
   No user intervention or requirement change was needed for reconciliation.
+- Decision: the single-visit rule and the visit-filtered fallback specified
+  here were retired by T19.F02 at the user's requirement (2026-09-21);
+  the live routing contract is `docs/reference/v3-mesh-execution-spec.md`.

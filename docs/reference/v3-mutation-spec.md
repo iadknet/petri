@@ -330,8 +330,7 @@ does not extend to energy exhaustion.
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
 (the 99 output sinks, vote and parameter sinks included) are never
-added/removed/retyped — only their edges are evolvable. The action bank, the
-execute gate, and `MutateActionSlotBehavior` were deleted by T19.F04.
+added/removed/retyped — only their edges are evolvable.
 
 - `AlterGraphEdgeWeight` (both edge-bearing surfaces: compute inputs and sink
   inputs)
