@@ -232,7 +232,7 @@ PushAction|PopAction|ExecuteActionQueue|WriteDirectionBid|WriteWorldActionMeta|D
       owner as a finding; frontend tests do not stand in for the live check.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
-- [ ] Summaries stored at
+- [x] Summaries stored at
       `docs/progress/features/t19-f06-retirement-and-observability.json` and
       `-goal.json` from `make bench PROFILE=gate
       FEATURE=t19-f06-retirement-and-observability` and `make bench
@@ -269,7 +269,20 @@ Neither epoch is re-pinned (track "Epochs").
 | Wall and cognition per creature-tick | No direction; the production path adds no work and the battery adds one set pass per node per snapshot, so a flag is reported with host identity and the phase it falls in, attribution pending investigation, not dismissed |
 | Pins of invariant 8 | Unchanged |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Fits the predeclaration; measured at `a81276de` on
+`Isaacs-MacBook-Pro-2.local` (the T19.F04/F05 host).
+
+| Profile | Command | CLI exit (source) | Outer exit (source) | `severe` | Threshold verdict | Summary (bytes, sha256) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Gate | `make bench PROFILE=gate FEATURE=t19-f06-retirement-and-observability` | 0 (`measurement_evidence.cli_exit`) | 0 (`make`, shell `$?`) | false | vs T19.F04: `pass_cap_hits` +35.11% flag, wall +35.49% flag, rest ok; vs T19.F05: every counter 0.000000, wall +12.31% ok | [gate](../../progress/features/t19-f06-retirement-and-observability.json) 105,576, `ba955d43…` |
+| Goal (once) | `make bench PROFILE=goal FEATURE=t19-f06-retirement-and-observability` | 3 (`measurement_evidence.cli_exit`; `make: *** [bench] Error 3`) | 2 (`make`, shell `$?`) | true | vs T19.F04: `decided_passes` +255.43% severe (predeclared, user-accepted 2026-09-22), `pass_cap_hits` +22.68% flag, rest ok, wall +15.13% ok; vs T19.F05: severe=false, every counter 0.000000, wall +23.29% ok | [goal](../../progress/features/t19-f06-retirement-and-observability-goal.json) 7,762,480, `ad3121fc…` |
+
+- `deterministic` diff against T19.F05: gate adds only the founder
+  within-snapshot flags (`false`); goal differs only in case digests,
+  `recruitment_paths` config and digest, and the new within-snapshot fields.
+  Every existing counter and indicator is identical.
+- Gate wall flag: cognition phase, host above; attribution pending, not
+  dismissed. Raw hashes, wall caps, and first readings are in the readings file.
 
 - Summaries: [gate](../../progress/features/t19-f06-retirement-and-observability.json),
   [goal](../../progress/features/t19-f06-retirement-and-observability-goal.json).
