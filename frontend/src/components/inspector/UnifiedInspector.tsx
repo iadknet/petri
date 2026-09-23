@@ -75,7 +75,13 @@ export function UnifiedInspector({
 		if (!currentTick) {
 			return null;
 		}
-		const matchingHop = currentTick.hops.find((hop) => hop.node_id === mesh.detailNode!.id);
+		// The selected dispatch when it belongs to this node (a node may be
+		// dispatched in several passes), else the node's first dispatch.
+		const selectedHop = currentTick.hops[sampler.position.hopIndex];
+		const matchingHop =
+			selectedHop?.node_id === mesh.detailNode.id
+				? selectedHop
+				: currentTick.hops.find((hop) => hop.node_id === mesh.detailNode!.id);
 		if (!matchingHop) {
 			return null;
 		}

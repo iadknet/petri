@@ -2,9 +2,9 @@ import { memo } from "react";
 import type { PlaybackState, SamplerPosition } from "../../stores/samplePlayback.ts";
 import type { ExecutionSample } from "../../types/trace.ts";
 import { MeshHopTimeline } from "./MeshHopTimeline.tsx";
+import { SelectedHopBlock } from "./SelectedHopBlock.tsx";
 import { TickTimeline } from "./TickTimeline.tsx";
 import { VoteSurfaceBlock } from "./VoteSurfaceBlock.tsx";
-import { formatActionList } from "./inputRefUtils.ts";
 import type { MeshSemantics } from "./mesh/meshSemantics.ts";
 
 const SPEED_OPTIONS = [250, 500, 1000, 2000] as const;
@@ -58,6 +58,7 @@ export const SamplerBar = memo(function SamplerBar({
 
 	const currentTick = sample?.ticks[position.tickIndex];
 	const currentHops = currentTick?.hops ?? [];
+	const selectedHop = currentHops[position.hopIndex];
 
 	// Error state
 	if (samplingError !== null) {
@@ -184,15 +185,24 @@ export const SamplerBar = memo(function SamplerBar({
 				{currentTick && (
 					<MeshHopTimeline
 						hops={currentHops}
+						passes={currentTick.passes}
 						meshSemantics={meshSemantics}
 						activeHopIndex={position.hopIndex}
 						terminationReason={currentTick.termination_reason}
-						finalAction={formatActionList(currentTick.final_actions)}
+						finalActions={currentTick.final_actions}
 						onHopSelect={onHopSelect}
 					/>
 				)}
 
-				{/* Inert vote surface (T19.F03) */}
+				{/* The selected dispatch's recorded decision state (T19.F06) */}
+				{currentTick && selectedHop && (
+					<SelectedHopBlock
+						hop={selectedHop}
+						previousOutcome={currentTick.static_inputs.previous_outcome}
+					/>
+				)}
+
+				{/* Pass detail: votes, bars, effective votes (T19.F06) */}
 				{currentTick && <VoteSurfaceBlock tick={currentTick} />}
 			</div>
 		);

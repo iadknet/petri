@@ -32,7 +32,7 @@ function zeroVotes(): number[] {
 }
 
 describe("VoteSurfaceBlock", () => {
-	it("shows each pass's reason, committed action, and non-zero votes", () => {
+	it("shows each pass's reason, commit, kind votes, and Terminate and Decide as their own fields", () => {
 		const votes = zeroVotes();
 		votes[0] = 1.5;
 		votes[3] = -2.25;
@@ -68,9 +68,65 @@ describe("VoteSurfaceBlock", () => {
 		expect(screen.getByText("no commit")).toBeInTheDocument();
 		expect(screen.getByText("Eat: 1.500")).toBeInTheDocument();
 		expect(screen.getByText("Move[2]: -2.250")).toBeInTheDocument();
-		expect(screen.getByText("Decide: 0.500")).toBeInTheDocument();
-		expect(screen.getByText("no votes this pass")).toBeInTheDocument();
-		expect(screen.queryByText(/Terminate:/)).not.toBeInTheDocument();
+		expect(screen.getByText("no kind votes this pass")).toBeInTheDocument();
+		// Decide and Terminate are fields of the pass, never kind votes.
+		expect(screen.queryByText("Decide: 0.500")).not.toBeInTheDocument();
+		expect(screen.getByTestId("decide-0")).toHaveTextContent("Decide 0.500");
+		expect(screen.getByTestId("terminate-0")).toHaveTextContent("Terminate 0.000");
+		expect(screen.getByTestId("decided-0")).toHaveTextContent("ended by Decide 0.500");
+		expect(screen.queryByTestId("decided-1")).not.toBeInTheDocument();
+		expect(screen.queryByTestId("terminate-verdict")).not.toBeInTheDocument();
+	});
+
+	it("shows the recorded effective vote beside the best sink vote and bar, not a recomputation", () => {
+		const votes = zeroVotes();
+		votes[1] = 0.3; // Move[0]
+		votes[4] = 0.9; // Move[3], the kind's best sink
+		render(
+			<VoteSurfaceBlock
+				tick={makeTick(
+					[
+						{
+							pass_index: 0,
+							end_reason: "NoTargets",
+							votes,
+							// Deliberately not best − bar: the view must show what was recorded.
+							effective_votes: [0, 0.125, 0, 0],
+							committed: null,
+							hops: 1,
+						},
+					],
+					[0, 0, 0, 0],
+				)}
+			/>,
+		);
+
+		expect(screen.getByTestId("effective-0-Move")).toHaveTextContent("Move 0.900 − 0 = 0.125");
+	});
+
+	it("shows Terminate against the winning effective vote on the pass that ends a TerminateVoted tick", () => {
+		const votes = zeroVotes();
+		votes[0] = 0.4;
+		votes[25] = 0.75;
+		const tick = makeTick(
+			[
+				{
+					pass_index: 0,
+					end_reason: "NoTargets",
+					votes,
+					effective_votes: [0.4, -1, 0.2, 0],
+					committed: null,
+					hops: 3,
+				},
+			],
+			[0, 1, 0, 0],
+		);
+		tick.termination_reason = "TerminateVoted";
+		render(<VoteSurfaceBlock tick={tick} />);
+
+		expect(screen.getByTestId("terminate-verdict")).toHaveTextContent(
+			"Terminate 0.750 ≥ winning effective 0.400",
+		);
 	});
 
 	it("shows each pass's effective vote per kind against the bar so the commits line up", () => {
