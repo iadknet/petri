@@ -1,7 +1,7 @@
 # T19 — Mesh Action Selection and Live State
 
 **Status**: In Progress
-**Last updated**: 2026-09-22
+**Last updated**: 2026-09-23
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -74,7 +74,7 @@ of the worked cases in its Section 2.3.
   - Goal: Motor programs compete and the winner habituates, as in basal ganglia selection and competitive queuing of serial order, so a tick becomes a sequence of passes, each ended by the genome's `Decide` vote or by the chain's end, in which the action kind with the largest effective vote commits one action and its bar rises by one unit, with the push, pop, execute, bank, and gate machinery deleted in the same commit and the founders re-expressed exactly.
 - [x] **T19.F05 — Decision-State Inputs** — Depends on: T19.F04
   - Goal: Corollary discharge, a brain sensing what it just decided and how tired it is, so the current and previous pass's votes, the per-kind commit counts, hops this tick, and the previous tick's outcome channels become drawable inputs.
-- [ ] **T19.F06 — Retirement and Observability** — Depends on: T19.F04, T19.F05
+- [x] **T19.F06 — Retirement and Observability** — Depends on: T19.F04, T19.F05
   - Goal: Removal of a rule with no natural analog, so one execution model remains, the bank's last config field and readings are retired or marked historical, and the inspector shows passes.
 
 ## Notes for AI Agents
