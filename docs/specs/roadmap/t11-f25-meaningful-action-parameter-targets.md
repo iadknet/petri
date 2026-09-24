@@ -147,8 +147,13 @@ Fixed design:
       and `...-goal.json`. Local raw hash, byte count and verification time are
       checked, series entries point to the summaries, and no new full report
       is staged. Gate series `epoch_baseline` re-pinned per the user decision
-      below; goal series `epoch_baseline` left unchanged (goal severe result
-      is unresolved, see Measured verdict).
+      below; goal severes accepted and the goal series `epoch_baseline`
+      kept at T19.F04 per the user decision below.
+- [x] Self-review (`simplify`) left production code unchanged (test oracles
+      only), then `cargo test -p v3-core --lib mutation` (424 passed),
+      `cargo test -p v3-core --lib action_decode` (9 passed),
+      `cargo clippy --workspace --all-targets -- -D warnings` and
+      `cargo check --workspace --all-targets` all exit 0.
 
 ## Performance and Goal Impact
 
