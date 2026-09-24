@@ -108,7 +108,9 @@ pub enum StaticIntrospectionKey {
 pub enum DynamicIntrospectionKey {
     /// Current energy level.
     EnergyCurrent,
-    /// Total energy consumed by Eat actions this tick so far.
+    /// Energy spent since this tick's mesh run began (earlier dispatches and
+    /// hop ramp charges), as a fraction of max energy. A VM read also counts
+    /// its own in-flight step costs; a graph node reads the pre-dispatch value.
     EnergyConsumedThisTick,
     /// Mesh hops dispatched this tick, the one in flight included; a raw
     /// count (T19.F05).

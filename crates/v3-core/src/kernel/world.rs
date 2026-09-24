@@ -149,14 +149,6 @@ impl WorldState {
         self.food.food_at_type(pos, type_idx)
     }
 
-    /// Get the dominant food type (highest per-type density), if any, for a cell.
-    ///
-    /// Compatibility helper for transitional single-type consumers. Cells may
-    /// contain multiple food types simultaneously.
-    pub fn dominant_food_type_at(&self, pos: Position) -> Option<OrdinaryFoodTypeId> {
-        self.food.dominant_food_type_at(pos)
-    }
-
     /// Set food density at a position directly.
     /// Transitional delegate to `FoodResource::set_food`.
     pub fn set_food(&mut self, pos: Position, value: f32) {

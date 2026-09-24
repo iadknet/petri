@@ -749,7 +749,6 @@ No global topology rewrite is required.
 
 - `ParseabilityViolation`
 - `NoApplicableTarget`
-- `BudgetExhausted`
 
 ---
 

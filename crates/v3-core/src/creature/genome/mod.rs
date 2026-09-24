@@ -307,7 +307,7 @@ mod tests {
     use proptest::strategy::Union;
 
     #[test]
-    fn vm_instruction_all_42_variants_constructible() {
+    fn vm_instruction_all_39_variants_constructible() {
         let instructions: Vec<VmInstruction> = vec![
             VmInstruction::Noop,
             VmInstruction::LoadConst {

@@ -1025,7 +1025,6 @@ fn mutation_skip_reason_tracking_accumulates_correctly() {
             reason,
             v3_core::mutation::MutationSkipReason::ParseabilityViolation
                 | v3_core::mutation::MutationSkipReason::NoApplicableTarget
-                | v3_core::mutation::MutationSkipReason::BudgetExhausted
         );
         assert!(is_valid, "unexpected skip reason key: {:?}", reason);
     }

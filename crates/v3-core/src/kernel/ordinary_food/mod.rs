@@ -5,9 +5,7 @@ mod state;
 
 use rand::Rng;
 
-use crate::config::{
-    FoodConfig, FoodResourceConfig, FoodTypeConfig, OrdinaryFoodTypeId, WorldEdgeMode,
-};
+use crate::config::{FoodConfig, FoodResourceConfig, OrdinaryFoodTypeId, WorldEdgeMode};
 use crate::contracts::Position;
 use crate::kernel::Grid;
 
@@ -62,22 +60,6 @@ impl FoodResource {
             return 0.0;
         }
         self.state.food_at_type(pos, type_idx)
-    }
-
-    #[must_use]
-    pub fn dominant_food_type_at(&self, pos: Position) -> Option<OrdinaryFoodTypeId> {
-        let mut best: Option<(OrdinaryFoodTypeId, f32)> = None;
-        for entry in self.catalog.entries() {
-            let density = self.state.food_at_type(pos, entry.id);
-            if density <= 0.0 {
-                continue;
-            }
-            match best {
-                Some((_, best_density)) if best_density >= density => {}
-                _ => best = Some((entry.id, density)),
-            }
-        }
-        best.map(|(type_idx, _)| type_idx)
     }
 
     #[must_use]
@@ -208,11 +190,6 @@ impl FoodResource {
     #[must_use]
     pub fn food_types(&self) -> &[OrdinaryFoodTypeEntry] {
         self.catalog.entries()
-    }
-
-    #[must_use]
-    pub fn food_type_configs(&self) -> &[FoodTypeConfig] {
-        &self.config.types
     }
 
     #[must_use]

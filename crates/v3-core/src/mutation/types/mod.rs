@@ -11,12 +11,6 @@ pub enum ComplexityEffect {
 }
 
 impl ComplexityEffect {
-    /// Returns true if this effect is `Increasing`.
-    #[must_use]
-    pub const fn is_increasing(self) -> bool {
-        matches!(self, Self::Increasing)
-    }
-
     /// Returns true if this effect is `Decreasing`.
     #[must_use]
     pub const fn is_decreasing(self) -> bool {
@@ -31,7 +25,6 @@ impl ComplexityEffect {
 pub enum MutationSkipReason {
     ParseabilityViolation,
     NoApplicableTarget,
-    BudgetExhausted,
 }
 
 impl MutationSkipReason {
@@ -41,7 +34,6 @@ impl MutationSkipReason {
         match self {
             Self::ParseabilityViolation => "ParseabilityViolation",
             Self::NoApplicableTarget => "NoApplicableTarget",
-            Self::BudgetExhausted => "BudgetExhausted",
         }
     }
 }
