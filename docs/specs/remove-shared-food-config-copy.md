@@ -270,3 +270,4 @@ decision.
 | --- | --- | --- |
 | PRD 1 | `task-mufxycp5-gv06qp` | not-ready: missed `ControlBar.test.tsx` mock (fixed); advisories on `status.rs` branch, `cache.rs` live fertility, raw-report typed parse (all applied) |
 | PRD 2 | `task-mufy3gsy-q4b0aj` | ready; advisory on `docs/benchmark-artifacts.md` and the opt-in historical corpus test (applied) |
+| Implementation 1 | `task-mufyq22m-remmiy` | no P1/P2; one P3 (`docs/benchmark-artifacts.md` wording contradiction, fixed) |
