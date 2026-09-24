@@ -1,6 +1,6 @@
 # T11.F24 — Stable Parent Membership During Mutation
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-24
 **Feature**: T11.F24
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -115,7 +115,7 @@ Fixed design:
       and new values in the readings file. No predicate may be weakened.
       No pinned value changed under `cargo test --workspace`, so nothing is
       re-pinned.
-- [ ] Record gate and goal readings as the Performance section requires.
+- [x] Record gate and goal readings as the Performance section requires.
 
 ## Verification
 
@@ -238,16 +238,17 @@ predicted.
 
 ## Success Criteria
 
-- [ ] Membership at every draw of a birth follows the parent's carried nodes
+- [x] Membership at every draw of a birth follows the parent's carried nodes
       through removal, addition and id reuse. Regressions and proptest are
       green, and the telemetry is truthful.
-- [ ] Births with no draw after a mesh-node removal are byte-identical to
+- [x] Births with no draw after a mesh-node removal are byte-identical to
       the index rule, and T11.F17's founder test is unchanged.
-- [ ] Re-pinned values are attributed and listed. `make check` and the
+- [x] Re-pinned values are attributed and listed. `make check` and the
       mutation gate pass, with every survivor resolved.
-- [ ] Gate and goal summaries are stored, and the target telemetry and
+- [x] Gate and goal summaries are stored, and the target telemetry and
       founder rows are read before and after per world.
 
 ## Notes for AI Agents
 
 - Decision: Fable credits are exhausted, so this feature's spec owner runs on Opus (Agent model parameter `opus`, high-effort intent) instead of Fable 5.1 `high`, is resumed with `SendMessage`, and no Fable advisor is used anywhere in the run (workflow launch step 3 is skipped; the implementer runs without an advisor).
+- Cost: `/usage` totals at closure await the user (a user command); implementer passes 3 (build, self-review, post-review remediation), advisor consults 0 in each; spec-owner resumes after Plan 2; Codex challenge rounds 2, final `verdict: ready`; Codex reviewer findings P1 1, P2 2, P3 0, all fixed in `939181b3`.
