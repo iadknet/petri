@@ -6,7 +6,7 @@
 
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::vote::{
-    VoteKind, VoteSink, VOTE_KIND_COUNT, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT,
+    ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
 };
 
 // ── Edge addressing ─────────────────────────────────────────────────────────
@@ -123,9 +123,9 @@ pub enum OutputSinkKind {
     /// Contribute to the pass vote `votes[sink.index()]` (T19.F03). 27 sinks;
     /// the pass end commits from them (T19.F04).
     ActionVote(VoteSink),
-    /// Overwrite `action_params[kind][slot]` (T19.F03), `slot` in `0..2`,
-    /// read when a pass commits `kind` (T19.F04).
-    ActionParam(VoteKind, u8),
+    /// Overwrite `action_params[field.index()]` (T11.F27), read when a pass
+    /// commits `field.kind()` (T19.F04).
+    ActionParam(ActionParamField),
 }
 
 /// Fixed structural output — one per target slot.
@@ -175,17 +175,17 @@ pub const SHARED_MEMORY_SLOTS: u8 = 16;
 /// Catalog index of the first `ActionVote` sink, which is also the count of
 /// the sinks before it: N CustomOutput + 8 RouterGate + 16 WriteSlot +
 /// 16 ClearSlot. The vote sinks run from here in `VoteSink` index order, and
-/// the `ActionParam` sinks follow kind-major.
+/// the `ActionParam` sinks follow in `ActionParamField::ALL` order.
 pub const FIRST_ACTION_VOTE_SINK: usize = CUSTOM_OUTPUT_COUNT as usize // 24 CustomOutput slots
     + MAX_GATE_SLOTS               // 8 RouterGate sinks
     + SHARED_MEMORY_SLOTS as usize // 16 WriteSlot sinks
     + SHARED_MEMORY_SLOTS as usize; // 16 ClearSlot sinks
 const _: () = assert!(FIRST_ACTION_VOTE_SINK == 64);
 /// Total fixed sink count: the sinks before the vote catalog + 27 ActionVote +
-/// 8 ActionParam (T19.F03).
+/// 3 ActionParam (T11.F27).
 pub const FIXED_SINK_COUNT: usize =
-    FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT + VOTE_KIND_COUNT * VOTE_PARAM_SLOTS as usize;
-const _: () = assert!(FIXED_SINK_COUNT == 99);
+    FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT + ACTION_PARAM_FIELD_COUNT;
+const _: () = assert!(FIXED_SINK_COUNT == 94);
 
 impl CgpGraphBackendDef {
     /// The output sink of `kind`, when the graph carries it.
@@ -244,14 +244,12 @@ impl CgpGraphBackendDef {
             });
         }
 
-        // 8 ActionParam sinks, kind-major (T19.F03).
-        for kind in VoteKind::ALL {
-            for slot in 0..VOTE_PARAM_SLOTS {
-                output_sinks.push(OutputSink {
-                    kind: OutputSinkKind::ActionParam(kind, slot),
-                    inputs: Vec::new(),
-                });
-            }
+        // 3 ActionParam sinks in `ActionParamField::ALL` order (T11.F27).
+        for field in ActionParamField::ALL {
+            output_sinks.push(OutputSink {
+                kind: OutputSinkKind::ActionParam(field),
+                inputs: Vec::new(),
+            });
         }
 
         Self {
@@ -530,19 +528,19 @@ mod tests {
                 OutputSinkKind::ActionVote(sink)
             );
         }
-        // The parameter sinks occupy 91..99, kind-major.
+        // The three parameter sinks occupy 91..94 in `ActionParamField::ALL`
+        // order (T11.F27).
         let first_param = FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT;
         assert_eq!(first_param, 91);
-        for (kind_index, kind) in VoteKind::ALL.into_iter().enumerate() {
-            for slot in 0..VOTE_PARAM_SLOTS {
-                let index = first_param + kind_index * VOTE_PARAM_SLOTS as usize + slot as usize;
-                assert_eq!(
-                    def.output_sinks[index].kind,
-                    OutputSinkKind::ActionParam(kind, slot)
-                );
-            }
-        }
-        assert_eq!(def.output_sinks.len(), 99);
+        let params: Vec<OutputSinkKind> = def.output_sinks[first_param..]
+            .iter()
+            .map(|sink| sink.kind)
+            .collect();
+        assert_eq!(
+            params,
+            ActionParamField::ALL.map(OutputSinkKind::ActionParam)
+        );
+        assert_eq!(def.output_sinks.len(), 94);
 
         // All sinks start with empty edges
         for sink in &def.output_sinks {
@@ -718,7 +716,7 @@ mod tests {
             GraphSource::ComputeNode(0)
         );
 
-        // Last sink (ActionParam(StealEnergy, 1)) edge to Relu: was CN(2), now CN(1)
+        // Last sink (ActionParam(StealEnergyAmount)) edge to Relu: was CN(2), now CN(1)
         assert_eq!(
             def.output_sinks[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::ComputeNode(1)
@@ -833,7 +831,7 @@ mod tests {
             def.output_sinks[FIRST_ACTION_VOTE_SINK].inputs[0].source,
             GraphSource::ComputeNode(0)
         );
-        // Last sink (ActionParam(StealEnergy, 1)) edge to Relu: was CN(1), now CN(2).
+        // Last sink (ActionParam(StealEnergyAmount)) edge to Relu: was CN(1), now CN(2).
         assert_eq!(
             def.output_sinks[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::ComputeNode(2)
@@ -1020,7 +1018,7 @@ mod tests {
                 sub_idx: 0,
             }
         );
-        // Last sink (ActionParam(StealEnergy, 1)): ref_idx 3 -> 2
+        // Last sink (ActionParam(StealEnergyAmount)): ref_idx 3 -> 2
         assert_eq!(
             def.output_sinks[FIXED_SINK_COUNT - 1].inputs[0].source,
             GraphSource::InputLeaf {

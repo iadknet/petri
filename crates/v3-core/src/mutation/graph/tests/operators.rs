@@ -16,7 +16,7 @@ use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use crate::creature::genome::vote::{VoteKind, VoteSink};
+use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::state::GraphRuntimeState;
 use crate::mutation::graph::operators::{
     add_bootstrap_node, add_disconnected_node, copy_cgp_subgraph, copy_compute_node,
@@ -195,7 +195,7 @@ pub(super) fn base_def() -> CgpGraphBackendDef {
                 }],
             },
             OutputSink {
-                kind: OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+                kind: OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
                 inputs: vec![GraphEdge {
                     source: GraphSource::ComputeNode(2),
                     weight: 1.0,
@@ -274,7 +274,7 @@ pub(super) fn plasticity_def() -> CgpGraphBackendDef {
                 }],
             },
             OutputSink {
-                kind: OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+                kind: OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
                 inputs: vec![GraphEdge {
                     // Directly on a non-compute surface: T11.F08's split
                     // exclusion skips this edge instead of caching its value

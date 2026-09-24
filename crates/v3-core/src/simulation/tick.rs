@@ -1269,7 +1269,7 @@ mod final_action_observation_tests {
                     register_count: 3,
                     constants: vec![0.5, 1.0],
                     // Reproduce NE when slot 0 exceeds 0.5, else N, with
-                    // slot 0 as the transfer fraction (params[Reproduce][1]).
+                    // slot 0 as the transfer fraction (`ReproduceTransferFraction`).
                     program: vec![
                         VmInstruction::LoadSlotImm {
                             dst: 0,
@@ -1281,7 +1281,7 @@ mod final_action_observation_tests {
                         },
                         VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
                         VmInstruction::WriteActionParam {
-                            slot_idx: 5,
+                            field_idx: 1,
                             src: 0,
                         },
                         VmInstruction::AddVote { sink: 10, src: 2 },

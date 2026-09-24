@@ -119,11 +119,11 @@ fn sample_vm_program() -> Vec<VmInstruction> {
             src: 10,
         },
         VmInstruction::WriteActionParam {
-            slot_idx: 0,
+            field_idx: 0,
             src: 15,
         },
         VmInstruction::WriteActionParam {
-            slot_idx: 0,
+            field_idx: 0,
             src: 15,
         },
         // A vote from r15 (T19.F04); the food branch below adds the `Eat` vote.
@@ -223,11 +223,11 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
             src: 0,
         },
         VmInstruction::WriteActionParam {
-            slot_idx: 0,
+            field_idx: 0,
             src: 0,
         },
         VmInstruction::WriteActionParam {
-            slot_idx: 0,
+            field_idx: 0,
             src: 0,
         },
         VmInstruction::WriteRouteGate { slot: 0, src: 0 },

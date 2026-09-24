@@ -384,7 +384,7 @@ mod tests {
                     if matches!(
                         sink.kind,
                         crate::creature::genome::cgp::OutputSinkKind::ActionVote(_)
-                            | crate::creature::genome::cgp::OutputSinkKind::ActionParam(_, _)
+                            | crate::creature::genome::cgp::OutputSinkKind::ActionParam(_)
                     ) {
                         sink.inputs.clear();
                     }

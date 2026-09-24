@@ -236,7 +236,7 @@ mod tests {
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
         OutputSinkKind,
     };
-    use crate::creature::genome::vote::{VoteKind, VoteSink};
+    use crate::creature::genome::vote::{ActionParamField, VoteKind, VoteSink};
     use crate::creature::genome::{
         BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef,
         VmInstruction,
@@ -522,7 +522,7 @@ mod tests {
                             }],
                         },
                         OutputSink {
-                            kind: OutputSinkKind::ActionParam(VoteKind::Eat, 0),
+                            kind: OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
                             inputs: vec![GraphEdge {
                                 source: GraphSource::ComputeNode(0),
                                 weight: f32::INFINITY,

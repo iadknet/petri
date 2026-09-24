@@ -1,7 +1,7 @@
 use crate::contracts::{ActionQueue, WorldAction};
 use crate::creature::genome::cgp::CUSTOM_OUTPUT_COUNT;
 use crate::creature::genome::vote::{
-    VoteVector, VOTE_KIND_COUNT, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT,
+    VoteVector, ACTION_PARAM_FIELD_COUNT, VOTE_KIND_COUNT, VOTE_SINK_COUNT,
 };
 use crate::runtime::action_decode::ActionParams;
 use crate::runtime::routing::RouteGateMap;
@@ -84,10 +84,11 @@ pub struct MeshSideOutputs {
     /// Per-kind bars (T19.F04): commits of each kind this tick. Zeroed at
     /// tick start, raised by one per commit.
     pub commit_counts: [u32; VOTE_KIND_COUNT],
-    /// Parameter surface: a wired `ActionParam(kind, i)` sink or a
-    /// `WriteActionParam` overwrites `action_params[kind][i]`, last write
-    /// wins. Zeroed at tick start and read at every commit.
-    pub action_params: [ActionParams; VOTE_KIND_COUNT],
+    /// Parameter surface, indexed by `ActionParamField::index` (T11.F27): a
+    /// wired `ActionParam(field)` sink or a `WriteActionParam` overwrites its
+    /// field, last write wins. Zeroed at tick start, kept across passes, and
+    /// read at every commit.
+    pub action_params: ActionParams,
     /// Latest committed contribution per genome node index this pass, in
     /// first-commit order. A revisit replaces the node's entry.
     node_contributions: Vec<(usize, VoteVector)>,
@@ -107,7 +108,7 @@ impl MeshSideOutputs {
             votes: [0.0; VOTE_SINK_COUNT],
             previous_pass_votes: [0.0; VOTE_SINK_COUNT],
             commit_counts: [0; VOTE_KIND_COUNT],
-            action_params: [[0.0; VOTE_PARAM_SLOTS as usize]; VOTE_KIND_COUNT],
+            action_params: [0.0; ACTION_PARAM_FIELD_COUNT],
             node_contributions: Vec::new(),
             staged_contribution: None,
         }
@@ -133,7 +134,7 @@ impl MeshSideOutputs {
     /// A dispatch's observable action effects for tests: its staged vote
     /// contribution (zeros when it staged none) and the parameter surface.
     #[cfg(test)]
-    pub(crate) fn dispatch_effects(&self) -> (VoteVector, [ActionParams; VOTE_KIND_COUNT]) {
+    pub(crate) fn dispatch_effects(&self) -> (VoteVector, ActionParams) {
         (
             self.staged_contribution.unwrap_or([0.0; VOTE_SINK_COUNT]),
             self.action_params,

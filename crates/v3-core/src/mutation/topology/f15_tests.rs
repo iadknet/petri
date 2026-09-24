@@ -372,8 +372,8 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
             ],
         });
     }
-    // Node 1 carries the bus value (3.0) into the `Move` parameter slot and
-    // votes one `Move(SE)`.
+    // Node 1 carries the bus value (3.0) into the `Eat` food-type field, which
+    // node 0's `Eat` vote commits, and votes one `Move(SE)`.
     g.nodes[1].input_refs = vec![InputReference::UpstreamSlot(0)];
     g.nodes[1].backend_def = BackendDef::Vm(VmBackendDef {
         register_count: 1,
@@ -385,7 +385,7 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
                 sub_idx: 0,
             },
             VmInstruction::WriteActionParam {
-                slot_idx: 3,
+                field_idx: 0,
                 src: 0,
             },
             VmInstruction::LoadConst {

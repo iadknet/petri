@@ -18,7 +18,7 @@ const vmNode: NodeGenome = {
 			program: [
 				{ ReadInput: { dst: 0, ref_idx: 0, sub_idx: 0 } },
 				{ StoreSlotImm: { slot_idx: 4, src: 0 } },
-				{ WriteActionParam: { slot_idx: 5, src: 0 } },
+				{ WriteActionParam: { field_idx: 1, src: 0 } },
 				{ AddVote: { sink: 3, src: 0 } },
 				{ WriteRouteGate: { slot: 0, src: 0 } },
 				"Halt",

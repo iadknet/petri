@@ -1,6 +1,6 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, MAX_GATE_SLOTS};
-use crate::creature::genome::vote::{VoteSink, VoteVector, VOTE_PARAM_SLOTS, VOTE_SINK_COUNT};
+use crate::creature::genome::vote::{VoteSink, VoteVector, VOTE_SINK_COUNT};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::routing::RouteGateMap;
@@ -408,17 +408,11 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 // invalid slot: write ignored
             }
 
-            VmInstruction::WriteActionParam { slot_idx, src } => {
-                // The parameter surface (T19.F04): `slot_idx` addresses
-                // `params[slot_idx / 2][slot_idx % 2]`, overwriting. An
-                // invalid slot is ignored.
-                let per_kind = usize::from(VOTE_PARAM_SLOTS);
-                let slot = usize::from(*slot_idx);
-                if let Some(param) = side_outputs
-                    .action_params
-                    .get_mut(slot / per_kind)
-                    .map(|params| &mut params[slot % per_kind])
-                {
+            VmInstruction::WriteActionParam { field_idx, src } => {
+                // The parameter surface (T11.F27): `field_idx` is the
+                // `ActionParamField::ALL` position, overwriting. An invalid
+                // field is ignored.
+                if let Some(param) = side_outputs.action_params.get_mut(usize::from(*field_idx)) {
                     *param = regs[nr(*src, reg_count)];
                 }
             }

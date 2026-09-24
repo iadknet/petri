@@ -75,9 +75,10 @@ pub enum VmInstruction {
     // ── Output and Routing Writes ─────────────────────────────────────────────
     /// Overwrite internal payload slot; invalid slot write ignored.
     WriteInternalPayload { slot_idx: u8, src: u8 },
-    /// Overwrite parameter-surface slot `params[slot_idx / 2][slot_idx % 2]`
-    /// (`slot_idx` in `0..8`, T19.F04); an invalid slot write is ignored.
-    WriteActionParam { slot_idx: u8, src: u8 },
+    /// Overwrite parameter-surface field `action_params[field_idx]`, the
+    /// `ActionParamField::ALL` position (`field_idx` in `0..3`, T11.F27); a
+    /// write to an invalid field is ignored and still costs.
+    WriteActionParam { field_idx: u8, src: u8 },
     /// Add `regs[src]` to this dispatch's vote for `VoteSink::from_index(sink)`
     /// (T19.F03); a sink at or above the catalog count writes nothing and still
     /// costs. The dispatch commits its vote at every exit but energy
@@ -350,7 +351,7 @@ mod tests {
                 src: 1,
             },
             VmInstruction::WriteActionParam {
-                slot_idx: 0,
+                field_idx: 0,
                 src: 1,
             },
             VmInstruction::WriteRouteGate { slot: 0, src: 0 },
@@ -464,7 +465,7 @@ mod tests {
                 })
                 .boxed(),
             binary(|slot_idx, src| WriteInternalPayload { slot_idx, src }),
-            binary(|slot_idx, src| WriteActionParam { slot_idx, src }),
+            binary(|field_idx, src| WriteActionParam { field_idx, src }),
             binary(|sink, src| AddVote { sink, src }),
             binary(|slot, src| WriteRouteGate { slot, src }),
             unary(|dst| ReadActionQueueLength { dst }),
@@ -706,7 +707,7 @@ mod tests {
                         program: vec![
                             VmInstruction::AddVote { sink: 25, src: 0 },
                             VmInstruction::WriteActionParam {
-                                slot_idx: 0,
+                                field_idx: 0,
                                 src: 0,
                             },
                         ],
@@ -729,7 +730,7 @@ mod tests {
                             },
                             VmInstruction::AddVote { sink: 25, src: 0 },
                             VmInstruction::WriteActionParam {
-                                slot_idx: 0,
+                                field_idx: 0,
                                 src: 0,
                             },
                         ],
@@ -798,6 +799,123 @@ mod tests {
         let json = serde_json::to_string(&genome).unwrap();
         let genome2: CreatureGenome = serde_json::from_str(&json).unwrap();
         assert_eq!(genome, genome2);
+    }
+
+    /// A two-node genome with all three action-parameter fields wired by a
+    /// Graph node and written by a VM node (T11.F27).
+    fn all_param_fields_genome() -> CreatureGenome {
+        use crate::creature::genome::cgp::{
+            CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind,
+        };
+        use crate::creature::genome::vote::ActionParamField;
+        let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
+        for (i, field) in ActionParamField::ALL.into_iter().enumerate() {
+            graph
+                .sink_mut(OutputSinkKind::ActionParam(field))
+                .expect("fixed catalog carries every field")
+                .inputs
+                .push(GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    weight: 0.5 + i as f32,
+                });
+        }
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![InputReference::DynamicIntrospection(
+                        DynamicIntrospectionKey::EnergyCurrent,
+                    )],
+                    backend_def: BackendDef::Graph(graph),
+                    targets: vec![],
+                },
+                NodeGenome {
+                    node_id: NodeId::new(1),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![0.25],
+                        program: ActionParamField::ALL
+                            .into_iter()
+                            .map(|field| VmInstruction::WriteActionParam {
+                                field_idx: field.index() as u8,
+                                src: 0,
+                            })
+                            .collect(),
+                    }),
+                    targets: vec![],
+                },
+            ],
+        }
+    }
+
+    /// T11.F27 boundary: a current-format genome with every parameter field
+    /// wired by both backends round-trips equal, in the new serialized shape.
+    #[test]
+    fn current_format_param_genome_round_trips() {
+        let genome = all_param_fields_genome();
+        let json = serde_json::to_string(&genome).unwrap();
+        assert!(json.contains(r#"{"ActionParam":"EatFoodType"}"#), "{json}");
+        assert!(json.contains(r#"{"WriteActionParam":{"field_idx":2,"src":0}}"#));
+        assert_eq!(
+            serde_json::from_str::<CreatureGenome>(&json).unwrap(),
+            genome
+        );
+    }
+
+    /// T11.F27 boundary: a pre-F27 genome carrying an old `ActionParam` sink
+    /// or an old `WriteActionParam { slot_idx, .. }` fails to deserialize.
+    #[test]
+    fn pre_f27_param_shapes_are_rejected() {
+        let json = serde_json::to_string(&all_param_fields_genome()).unwrap();
+        for (new, old) in [
+            (
+                r#"{"ActionParam":"EatFoodType"}"#,
+                r#"{"ActionParam":["Eat",0]}"#,
+            ),
+            (
+                r#"{"ActionParam":"StealEnergyAmount"}"#,
+                r#"{"ActionParam":["StealEnergy",1]}"#,
+            ),
+            (
+                r#"{"WriteActionParam":{"field_idx":0,"src":0}}"#,
+                r#"{"WriteActionParam":{"slot_idx":0,"src":0}}"#,
+            ),
+        ] {
+            let old_json = json.replacen(new, old, 1);
+            assert_ne!(old_json, json, "{new} present");
+            assert!(
+                serde_json::from_str::<CreatureGenome>(&old_json).is_err(),
+                "{old} must be rejected"
+            );
+        }
+    }
+
+    /// T11.F27 boundary: a pre-F27 VM genome without `WriteActionParam`
+    /// deserializes unchanged, because its meaning did not change.
+    #[test]
+    fn unaffected_pre_f27_vm_genome_deserializes() {
+        let pre_f27 = r#"{"entry_node_id":0,"nodes":[{"node_id":0,"input_refs":[],
+            "backend_def":{"Vm":{"register_count":2,"constants":[1.0,2.0],
+            "program":[{"Add":{"dst":0,"a":1,"b":1}},{"AddVote":{"sink":0,"src":0}},"Halt"]}},
+            "targets":[]}]}"#;
+        let genome: CreatureGenome = serde_json::from_str(pre_f27).unwrap();
+        let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def else {
+            panic!("expected a VM node");
+        };
+        assert_eq!(
+            vm.program,
+            [
+                VmInstruction::Add { dst: 0, a: 1, b: 1 },
+                VmInstruction::AddVote { sink: 0, src: 0 },
+                VmInstruction::Halt,
+            ]
+        );
+        assert_eq!(vm.constants, [1.0, 2.0]);
     }
 
     #[test]

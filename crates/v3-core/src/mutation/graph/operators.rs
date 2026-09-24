@@ -8,9 +8,8 @@ use rand::Rng;
 
 use crate::contracts::{DynamicIntrospectionKey, InputReference};
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
 };
-use crate::creature::genome::vote::is_decoded_action_param;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::types::MutationSkipReason;
@@ -259,32 +258,16 @@ fn pick_random_edge(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Option<(Edg
     edge_sites(def).nth(rng.gen_range(0..total))
 }
 
-/// Whether a fresh edge may target `kind`: every sink except an
-/// `ActionParam` field the decoder never reads (T11.F25). Existing edges on
-/// such a sink stay reachable by the pruning and retargeting operators.
-fn is_fresh_edge_sink(kind: OutputSinkKind) -> bool {
-    match kind {
-        OutputSinkKind::ActionParam(kind, slot) => is_decoded_action_param(kind, slot),
-        _ => true,
-    }
-}
-
 /// Pick a random edge container (surface) to add an edge to: one uniform
-/// draw over every compute node, then every sink in vector order except the
-/// undecoded parameter sinks (T11.F25). A chosen sink keeps its vector index.
-/// Returns `None`, consuming no RNG, when nothing is drawable.
+/// draw over every compute node, then every sink in vector order. Every sink
+/// is drawable, since the catalog holds only decoded parameter fields
+/// (T11.F27). Returns `None`, consuming no RNG, when the def has neither.
 pub(crate) fn pick_random_surface(
     def: &CgpGraphBackendDef,
     rng: &mut impl Rng,
 ) -> Option<EdgeSurface> {
     let compute = def.compute_nodes.len();
-    let mut sinks = def
-        .output_sinks
-        .iter()
-        .enumerate()
-        .filter(|(_, sink)| is_fresh_edge_sink(sink.kind))
-        .map(|(i, _)| i);
-    let total = compute + sinks.clone().count();
+    let total = compute + def.output_sinks.len();
     if total == 0 {
         return None;
     }
@@ -292,7 +275,7 @@ pub(crate) fn pick_random_surface(
     Some(if pick < compute {
         EdgeSurface::ComputeInput(pick)
     } else {
-        EdgeSurface::SinkInput(sinks.nth(pick - compute)?)
+        EdgeSurface::SinkInput(pick - compute)
     })
 }
 
@@ -1035,15 +1018,11 @@ pub(super) const fn can_add_compute_node(_def: &CgpGraphBackendDef) -> bool {
     true
 }
 
-/// `AddGraphEdge`: any compute node or fresh-edge sink is a surface, the set
+/// `AddGraphEdge`: any compute node or sink is a surface, the set
 /// `pick_random_surface` draws from. Every graph built on the fixed catalog
 /// qualifies.
 pub(super) fn can_add_edge(def: &CgpGraphBackendDef) -> bool {
-    !def.compute_nodes.is_empty()
-        || def
-            .output_sinks
-            .iter()
-            .any(|sink| is_fresh_edge_sink(sink.kind))
+    !def.compute_nodes.is_empty() || !def.output_sinks.is_empty()
 }
 
 #[cfg(test)]
@@ -1052,7 +1031,7 @@ mod tests {
     use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::{InputReference, WorldInputKey};
     use crate::creature::genome::cgp::{OutputSink, OutputSinkKind};
-    use crate::creature::genome::vote::{VoteKind, VoteSink};
+    use crate::creature::genome::vote::{ActionParamField, VoteSink};
     use rand::SeedableRng;
 
     fn test_rng() -> rand::rngs::SmallRng {
@@ -1636,10 +1615,7 @@ mod tests {
                 .any(|sink| pick(sink.kind) && !sink.inputs.is_empty())
         };
         assert!(wired(|kind| matches!(kind, OutputSinkKind::ActionVote(_))));
-        assert!(wired(|kind| matches!(
-            kind,
-            OutputSinkKind::ActionParam(_, _)
-        )));
+        assert!(wired(|kind| matches!(kind, OutputSinkKind::ActionParam(_))));
     }
 
     // ── Raw-field mutation tests ────────────────────────────────────────────
@@ -2278,156 +2254,77 @@ mod tests {
     }
 
     /// The draw is one uniform `gen_range` over every compute node, then every
-    /// sink in vector order except the undecoded parameter sinks, each keeping
-    /// its original vector index (T11.F25).
+    /// sink in vector order (T11.F27): on the fixed catalog that is one
+    /// `gen_range(0..c + 94)`, `k < c` naming `ComputeInput(k)` and otherwise
+    /// `SinkInput(k - c)`.
     #[test]
-    fn pick_random_surface_draws_uniformly_over_compute_nodes_and_drawable_sinks() {
+    fn pick_random_surface_draws_uniformly_over_compute_nodes_and_every_sink() {
         let def = founder_graph_def();
-        let reference: Vec<EdgeSurface> = (0..def.compute_nodes.len())
-            .map(EdgeSurface::ComputeInput)
-            .chain(
-                (0..def.output_sinks.len())
-                    .filter(|&i| is_fresh_edge_sink(def.output_sinks[i].kind))
-                    .map(EdgeSurface::SinkInput),
-            )
-            .collect();
-        assert_eq!(reference.len(), def.compute_nodes.len() + 94);
+        let compute = def.compute_nodes.len();
+        assert_eq!(def.output_sinks.len(), 94);
         let mut drawn = std::collections::HashSet::new();
         for seed in 0u64..16_384 {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let surface = pick_random_surface(&def, &mut rng).expect("founder graph has surfaces");
             let mut replay = rand::rngs::SmallRng::seed_from_u64(seed);
-            assert_eq!(surface, reference[replay.gen_range(0..reference.len())]);
+            let k = replay.gen_range(0..compute + 94);
+            let expected = if k < compute {
+                EdgeSurface::ComputeInput(k)
+            } else {
+                EdgeSurface::SinkInput(k - compute)
+            };
+            assert_eq!(surface, expected);
             assert_eq!(rng.gen::<u64>(), replay.gen::<u64>(), "one draw only");
             drawn.insert(surface);
         }
-        assert_eq!(
-            drawn.len(),
-            reference.len(),
-            "every candidate stays drawable"
-        );
-        assert!(pick_random_surface(
-            &CgpGraphBackendDef {
-                birth_weights: None,
-                compute_nodes: Vec::new(),
-                output_sinks: Vec::new(),
-            },
-            &mut test_rng()
-        )
-        .is_none());
+        assert_eq!(drawn.len(), compute + 94, "every candidate stays drawable");
+        let empty = CgpGraphBackendDef {
+            birth_weights: None,
+            compute_nodes: Vec::new(),
+            output_sinks: Vec::new(),
+        };
+        let mut rng = test_rng();
+        let mut untouched = rng.clone();
+        assert!(!can_add_edge(&empty));
+        assert!(pick_random_surface(&empty, &mut rng).is_none());
+        assert_eq!(rng.gen::<u64>(), untouched.gen::<u64>(), "no RNG consumed");
     }
 
-    /// Fresh `AddGraphEdge` targets never land on an undecoded parameter sink,
-    /// and each decoded parameter sink is reached.
+    /// Fresh `AddGraphEdge` targets reach each of the three parameter sinks.
     #[test]
-    fn add_edge_wires_only_decoded_parameter_sinks() {
+    fn add_edge_reaches_every_parameter_sink() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let mut rng = test_rng();
         for _ in 0..4_000 {
             add_edge(&mut def, &[], &mut rng).expect("fixed catalog has surfaces");
         }
-        for sink in &def.output_sinks {
-            if let OutputSinkKind::ActionParam(kind, slot) = sink.kind {
-                assert_eq!(
-                    !sink.inputs.is_empty(),
-                    is_decoded_action_param(kind, slot),
-                    "{kind:?} slot {slot}"
-                );
-            }
-        }
-    }
-
-    /// `can_add_edge` agrees with the draw on partial and mixed sink lists; a
-    /// def whose only sinks are undecoded parameters draws nothing and
-    /// consumes no RNG.
-    #[test]
-    fn can_add_edge_agrees_with_the_surface_draw_on_partial_sink_lists() {
-        let undecoded_only = vec![
-            sink(OutputSinkKind::ActionParam(VoteKind::Eat, 1)),
-            sink(OutputSinkKind::ActionParam(VoteKind::Move, 0)),
-            sink(OutputSinkKind::ActionParam(VoteKind::Move, 1)),
-            sink(OutputSinkKind::ActionParam(VoteKind::Reproduce, 0)),
-            sink(OutputSinkKind::ActionParam(VoteKind::StealEnergy, 0)),
-        ];
-        let mut mixed = undecoded_only.clone();
-        mixed.insert(2, sink(OutputSinkKind::ActionParam(VoteKind::Reproduce, 1)));
-        mixed.push(sink(OutputSinkKind::WriteSlot(3)));
-        let cases = [
-            (Vec::new(), 0, Vec::new()),
-            (Vec::new(), 1, vec![EdgeSurface::ComputeInput(0)]),
-            (undecoded_only.clone(), 0, Vec::new()),
-            (undecoded_only, 1, vec![EdgeSurface::ComputeInput(0)]),
-            (
-                mixed,
-                0,
-                vec![EdgeSurface::SinkInput(2), EdgeSurface::SinkInput(6)],
-            ),
-        ];
-        for (sinks, compute, expected) in cases {
-            let def = CgpGraphBackendDef {
-                birth_weights: None,
-                compute_nodes: (0..compute)
-                    .map(|_| ComputeNode {
-                        kind: ComputeNodeKind::WeightedSum,
-                        inputs: Vec::new(),
-                        plasticity: None,
-                    })
-                    .collect(),
-                output_sinks: sinks,
-            };
-            assert_eq!(can_add_edge(&def), !expected.is_empty());
-            let mut drawn = std::collections::HashSet::new();
-            for seed in 0u64..256 {
-                let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-                let mut untouched = rng.clone();
-                match pick_random_surface(&def, &mut rng) {
-                    Some(surface) => {
-                        assert!(expected.contains(&surface), "{surface:?}");
-                        drawn.insert(surface);
-                    }
-                    None => {
-                        assert!(expected.is_empty());
-                        assert_eq!(rng.gen::<u64>(), untouched.gen::<u64>(), "no RNG consumed");
-                    }
-                }
-            }
-            assert_eq!(drawn.len(), expected.len());
+        for field in ActionParamField::ALL {
+            let sink = def
+                .sink(OutputSinkKind::ActionParam(field))
+                .expect("fixed catalog carries every field");
+            assert!(!sink.inputs.is_empty(), "{field:?}");
         }
     }
 
     fn arb_sink_kind() -> impl proptest::strategy::Strategy<Value = OutputSinkKind> {
         use proptest::prelude::*;
         prop_oneof![
-            (0..VoteKind::ALL.len(), 0u8..2)
-                .prop_map(|(k, slot)| OutputSinkKind::ActionParam(VoteKind::ALL[k], slot)),
+            (0..ActionParamField::ALL.len())
+                .prop_map(|f| OutputSinkKind::ActionParam(ActionParamField::ALL[f])),
             (0u8..12).prop_map(OutputSinkKind::CustomOutput),
             (0u8..16).prop_map(OutputSinkKind::WriteSlot),
             Just(OutputSinkKind::ActionVote(VoteSink::Eat)),
         ]
     }
 
-    fn arb_undecoded_param_kind() -> impl proptest::strategy::Strategy<Value = OutputSinkKind> {
-        use proptest::prelude::*;
-        (0..VoteKind::ALL.len(), 0u8..2)
-            .prop_map(|(k, slot)| (VoteKind::ALL[k], slot))
-            .prop_filter("undecoded parameter", |&(kind, slot)| {
-                !is_decoded_action_param(kind, slot)
-            })
-            .prop_map(|(kind, slot)| OutputSinkKind::ActionParam(kind, slot))
-    }
-
     proptest::proptest! {
-        /// T11.F25 Graph draw row: over generated sink lists (mixed, empty,
-        /// all-undecoded) and compute counts, the surface draw is one
-        /// `gen_range` over compute nodes then the drawable sinks by original
-        /// vector index, never an undecoded parameter sink; `can_add_edge`
-        /// holds exactly when the draw returns `Some`; `None` consumes no RNG.
+        /// T11.F27 Graph draw row: over generated sink lists and compute
+        /// counts, the surface draw is one `gen_range` over compute nodes then
+        /// every sink by vector index; `can_add_edge` holds exactly when the
+        /// draw returns `Some`; `None` consumes no RNG.
         #[test]
-        fn pick_random_surface_matches_the_drawable_reference(
-            kinds in proptest::prop_oneof![
-                proptest::collection::vec(arb_sink_kind(), 0..12),
-                proptest::collection::vec(arb_undecoded_param_kind(), 0..6),
-            ],
+        fn pick_random_surface_matches_the_reference(
+            kinds in proptest::collection::vec(arb_sink_kind(), 0..12),
             compute in 0usize..4,
             seed in proptest::prelude::any::<u64>(),
         ) {
@@ -2443,16 +2340,9 @@ mod tests {
                     .collect(),
                 output_sinks: kinds.into_iter().map(sink).collect(),
             };
-            let undecoded = |kind: OutputSinkKind| {
-                matches!(kind, OutputSinkKind::ActionParam(k, s) if !is_decoded_action_param(k, s))
-            };
             let reference: Vec<EdgeSurface> = (0..compute)
                 .map(EdgeSurface::ComputeInput)
-                .chain(
-                    (0..def.output_sinks.len())
-                        .filter(|&i| !undecoded(def.output_sinks[i].kind))
-                        .map(EdgeSurface::SinkInput),
-                )
+                .chain((0..def.output_sinks.len()).map(EdgeSurface::SinkInput))
                 .collect();
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let mut replay = rng.clone();
@@ -2467,34 +2357,8 @@ mod tests {
                     let expected = reference[replay.gen_range(0..reference.len())];
                     prop_assert_eq!(surface, expected);
                     prop_assert_eq!(rng.gen::<u64>(), replay.gen::<u64>(), "one draw only");
-                    if let EdgeSurface::SinkInput(i) = surface {
-                        prop_assert!(i < def.output_sinks.len());
-                        prop_assert!(!undecoded(def.output_sinks[i].kind), "{:?}", def.output_sinks[i].kind);
-                    }
                 }
             }
         }
-    }
-
-    /// Existing structure on an undecoded parameter sink stays prunable:
-    /// `RemoveGraphEdge` reaches it (T11.F25 keeps pruning unchanged).
-    #[test]
-    fn remove_edge_prunes_an_edge_on_an_undecoded_parameter_sink() {
-        let mut def = CgpGraphBackendDef {
-            birth_weights: None,
-            compute_nodes: Vec::new(),
-            output_sinks: vec![OutputSink {
-                kind: OutputSinkKind::ActionParam(VoteKind::Move, 0),
-                inputs: vec![GraphEdge {
-                    source: GraphSource::InputLeaf {
-                        ref_idx: 0,
-                        sub_idx: 0,
-                    },
-                    weight: 0.5,
-                }],
-            }],
-        };
-        remove_edge(&mut def, &mut test_rng()).expect("one edge to remove");
-        assert!(def.output_sinks[0].inputs.is_empty());
     }
 }

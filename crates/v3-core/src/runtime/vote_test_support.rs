@@ -7,7 +7,7 @@ use crate::contracts::{InputReference, NodeId, RouteTarget, WorldAction};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::{VoteKind, VoteSink};
+use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -137,14 +137,13 @@ impl GraphBuilder {
         self.sink(OutputSinkKind::ActionVote(sink), inputs)
     }
 
-    /// Append edges to the parameter sink `(kind, slot)`.
+    /// Append edges to the parameter sink of `field`.
     pub(crate) fn param(
         &mut self,
-        kind: VoteKind,
-        slot: u8,
+        field: ActionParamField,
         inputs: &[(GraphSource, f32)],
     ) -> &mut Self {
-        self.sink(OutputSinkKind::ActionParam(kind, slot), inputs)
+        self.sink(OutputSinkKind::ActionParam(field), inputs)
     }
 
     pub(crate) fn build(

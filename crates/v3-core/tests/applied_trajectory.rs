@@ -12,6 +12,10 @@
 //! full initial food coverage now reaches the seeder through `types[0]`
 //! (it had been written to the retired shared copy, leaving coverage at the
 //! 0.54 default); dropping those two lines restores both old digests.
+//! T11.F27 re-pinned the first digest on top of that fix for the serialized
+//! genome shape alone (three `ActionParam(ActionParamField)` sinks, 94 sinks
+//! per graph); the digest recomputed without genome bytes matches the
+//! food-fixture tree, so T11.F27 did not move the simulation.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -76,7 +80,7 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "93ba762bb64d24032df8821f5f0b3f50b5b9c3a29f340aabf7a29186f03fda65"
+        "6ee41ec18b3f8cae35d8158e77eba4508ac1001e9208ef6891e5bae845e7a6d8"
     );
 }
 

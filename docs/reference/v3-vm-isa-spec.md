@@ -86,7 +86,7 @@ fresh-instruction draw (`mutation/vm/operators.rs`), which covers all 39;
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 24 | `WriteInternalPayload` | slot_idx, src | overwrites payload slot value (payload buffer starts from incoming `upstream_slots`; invalid slot write ignored) |
-| 25 | `WriteActionParam` | slot_idx, src | `action_params[slot_idx / 2][slot_idx % 2] = regs[src]` on the tick's parameter surface (`slot_idx` in `0..8`, kinds in `VoteKind` order `Eat, Move, Reproduce, StealEnergy`; an invalid slot is ignored) |
+| 25 | `WriteActionParam` | field_idx, src | `action_params[field_idx] = regs[src]` on the tick's three-field parameter surface (`field_idx` in `0..3`, the `ActionParamField` order `EatFoodType, ReproduceTransferFraction, StealEnergyAmount`; an invalid field is ignored and still costs) |
 | 26 | `WriteRouteGate` | slot, src_reg | write one routing gate score (`f32`) |
 
 ### Action Queue Reads
@@ -95,7 +95,7 @@ fresh-instruction draw (`mutation/vm/operators.rs`), which covers all 39;
 |---|---|---|---|
 | 27 | `ReadActionQueueLength` | dst | `dst = queue.len() as f32` (the actions committed by earlier passes this tick) |
 | 28 | `ReadActionQueueType` | index_src, dst | `dst = queue[reg[index_src]].action_type()` (OOB yields `0.0`) |
-| 29 | `ReadActionQueueParam` | index_src, param_slot, dst | `dst = queue[reg[index_src]].param(param_slot)` (OOB yields `0.0`) |
+| 29 | `ReadActionQueueParam` | index_src, param_slot, dst | `dst = queue[reg[index_src]].param(param_slot)` (OOB yields `0.0`; only slots `0` and `1` carry a value) |
 
 ### Halt, Shared Memory Slots, and Priority Bid
 
@@ -182,7 +182,7 @@ All genome-derived indexes are handled without panic:
 - **Register index**: normalized by modulo `register_count`.
 - **Constant index**: if `constants` empty -> `0.0`; else modulo `constants.len()`.
 - **Payload slot index**: valid when `< 12`; otherwise write ignored.
-- **Action parameter slot index**: valid when `< 8`; otherwise write ignored.
+- **Action parameter field index**: valid when `< 3`; otherwise write ignored.
 - **Vote sink index**: valid when `< 27`; otherwise the vote is dropped.
 
 If `register_count == 0`, VM halts immediately (no votes).
@@ -342,8 +342,8 @@ VM node evaluation maintains:
 - a dispatch-local vote contribution (27 entries, `VoteSink` order)
 - eight route gate scores
 
-and writes the tick's parameter surface (`action_params`, 4 kinds by 2
-slots) in place.
+and writes the tick's parameter surface (`action_params`, one entry per
+`ActionParamField`) in place.
 
 Initialization at the start of each VM node evaluation:
 - internal payload buffer is copied from incoming `upstream_slots`
@@ -351,8 +351,8 @@ Initialization at the start of each VM node evaluation:
 - all eight route gate scores start at `0.0`
 
 The parameter surface is zeroed at tick start only; a dispatch overwrites the
-slots it writes and the value stands until the next write or the commit that
-reads it.
+fields it writes and the value stands, across passes, until the next write
+or the tick ends.
 
 All writes are last-write-wins per slot/register; votes add within the
 dispatch. If `WriteInternalPayload` targets an invalid slot (`>= 12`), the
@@ -363,22 +363,22 @@ write is ignored and existing payload slot values are preserved.
 A node's votes say which action and how many; the pass end commits at most
 one (`v3-mesh-execution-spec.md` Section 2): the kind with the highest
 effective vote (its best sink's vote minus its bar), in the direction of its
-best sink. The committed action reads its kind's parameter row:
+best sink. The committed action reads its kind's parameter field:
 
 | Kind | Sinks (`AddVote` index) | Parameters read at commit |
 |---|---|---|
-| `Eat` | 0 | `action_params[Eat][0]` = food type index (rounded; non-finite or negative reads 0) |
+| `Eat` | 0 | `EatFoodType` (field 0) = food type index (rounded; non-finite or negative reads 0) |
 | `Move` | 1 to 8 (`Direction::ALL` order `N, NE, E, SE, S, SW, W, NW`) | none |
-| `Reproduce` | 9 to 16 | `action_params[Reproduce][1]` = offspring transfer fraction, `clamp_unit_interval` |
-| `StealEnergy` | 17 to 24 | `action_params[StealEnergy][1]` = amount, `clamp_non_negative_finite` |
+| `Reproduce` | 9 to 16 | `ReproduceTransferFraction` (field 1) = offspring transfer fraction, `clamp_unit_interval` |
+| `StealEnergy` | 17 to 24 | `StealEnergyAmount` (field 2) = amount, `clamp_non_negative_finite` |
 | `Terminate` | 25 | never commits; ends a non-empty tick when it holds the best effective vote |
 | `Decide` | 26 | never commits; ends the pass early when some kind's effective vote is positive, or the queue is non-empty and `Terminate` is positive |
 
-`WriteActionParam` slot indexes: `0` `Eat[0]`, `1` `Eat[1]`, `2` `Move[0]`,
-`3` `Move[1]`, `4` `Reproduce[0]`, `5` `Reproduce[1]`, `6`
-`StealEnergy[0]`, `7` `StealEnergy[1]`. Slots no commit reads are reserved:
-storage and execution keep `0..8`, and a fresh mutation draw names only the
-decoded slots `0`, `5` and `7` (T11.F25).
+`WriteActionParam` field indexes (T11.F27): `0` `EatFoodType`, `1`
+`ReproduceTransferFraction`, `2` `StealEnergyAmount`. The surface holds only
+the fields a commit reads. A serialized pre-T11.F27 genome whose program
+holds `WriteActionParam { slot_idx, .. }` fails to deserialize; no conversion
+path exists.
 
 At node end:
 - the internal payload buffer is emitted as `NodeResult.output_slots`

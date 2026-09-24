@@ -157,12 +157,12 @@ pub enum OutputSinkKind {
     WriteSlot(u8),           // 16 slots, indices 0-15: shared memory write
     ClearSlot(u8),           // 16 slots, indices 0-15: shared memory clear
     ActionVote(VoteSink),    // 27 vote sinks
-    ActionParam(VoteKind, u8), // two parameter slots per kind
+    ActionParam(ActionParamField), // 3 decoded parameter fields
 }
 ```
 
 The full sink catalog is fixed at genome construction: 24 CustomOutput + 8
-RouterGate + 16 WriteSlot + 16 ClearSlot + 27 ActionVote + 8 ActionParam = 99
+RouterGate + 16 WriteSlot + 16 ClearSlot + 27 ActionVote + 3 ActionParam = 94
 sinks. Mutations can only modify edges TO sinks, not add/remove/change sink
 kinds.
 
@@ -170,16 +170,22 @@ kinds.
 `Reproduce(d)` (`9 + d`), `StealEnergy(d)` (`17 + d`) for `d` in the eight
 `Direction::ALL` slots, `Terminate` (25), and `Decide` (26). `VoteKind` is
 `Eat`, `Move`, `Reproduce`, `StealEnergy`, in that order.
+`ActionParamField` holds exactly the fields the commit decoder reads, in the
+order `EatFoodType`, `ReproduceTransferFraction`, `StealEnergyAmount`
+(T11.F27); `Move` has no parameter field.
 
 A wired `ActionVote` sink writes its weighted sum into the visit's vote
 contribution, which replaces the node's earlier contribution in the pass; a
-wired `ActionParam(kind, slot)` sink overwrites `action_params[kind][slot]`
-on the tick's parameter surface. The pass end reads both
+wired `ActionParam(field)` sink overwrites `action_params[field.index()]`
+on the tick's three-field parameter surface. The pass end reads both
 (`v3-mesh-execution-spec.md` Section 2); votes are how the graph acts, so a
 graph with no wired vote sink never commits an action. `pick_random_surface`
-draws uniformly over the compute nodes and then every sink except the five
-`ActionParam` sinks the commit decoder never reads, the vote sinks and the
-decoded parameter sinks included (T19.F04, T11.F25).
+makes one uniform draw over the compute nodes and then every sink in vector
+order (T11.F27).
+
+Serialized genomes carry the field by name (`{"ActionParam":"EatFoodType"}`).
+A pre-T11.F27 genome with an old `{"ActionParam":["Eat",0]}` sink fails to
+deserialize; no conversion path exists.
 
 ### Inert-when-unwired rule
 
@@ -204,10 +210,11 @@ A graph selects actions through its `ActionVote` and `ActionParam` sinks
   highest effective vote (best sink's vote minus the kind's bar, its commits
   so far this tick) commits once, in its best sink's direction; a vote of
   `v` therefore commits `ceil(v)` actions over successive passes.
-- Parameters are read at commit from `action_params[kind]`: `Eat` its food
-  type at slot 0, `Reproduce` its transfer fraction and `StealEnergy` its
-  amount at slot 1 (`runtime::action_decode::decode_commit`, shared with the
-  VM's `WriteActionParam`).
+- Parameters are read at commit from the kind's field: `Eat` reads
+  `EatFoodType`, `Reproduce` `ReproduceTransferFraction`, `StealEnergy`
+  `StealEnergyAmount`, and `Move` nothing
+  (`runtime::action_decode::decode_commit`, shared with the VM's
+  `WriteActionParam`).
 - `Terminate` ends a non-empty tick when its vote is at least the best
   effective vote; `Decide` ends a pass early when some kind's effective vote
   is positive, or when the queue is non-empty and `Terminate` is positive.
@@ -275,7 +282,7 @@ Iterate `output_sinks`. For each sink with non-empty `inputs`:
   - `ClearSlot(slot)`: `shared_memory[slot % 16] = 0.0` (wsum is ignored;
     the act of having edges and firing is what clears).
   - `ActionVote(sink)`: `contribution[sink] = sanitize_f32(wsum)`.
-  - `ActionParam(kind, slot)`: `action_params[kind][slot] = sanitize_f32(wsum)`.
+  - `ActionParam(field)`: `action_params[field.index()] = sanitize_f32(wsum)`.
 
 Sinks with empty `inputs` are inert — no write occurs. A visit that reaches
 its effects stages its vote contribution; an exhausted visit stages nothing.
@@ -472,7 +479,7 @@ from imposing a constant complexity tax.
 - 16 `WriteSlot(0..15)` sinks (32..48)
 - 16 `ClearSlot(0..15)` sinks (48..64)
 - 27 `ActionVote` sinks in `VoteSink` index order (64..91)
-- 8 `ActionParam` sinks kind-major, two slots per kind (91..99)
+- 3 `ActionParam` sinks in `ActionParamField::ALL` order (91..94)
 
 All sinks start with empty edge Vecs (inert until evolution wires them).
 

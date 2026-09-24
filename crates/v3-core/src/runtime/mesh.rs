@@ -490,7 +490,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 }
                 Some((sink, _)) => {
                     let kind = sink.kind().expect("a committed sink has a kind");
-                    let action = decode_commit(sink, &side_outputs.action_params[kind.index()]);
+                    let action = decode_commit(sink, &side_outputs.action_params);
                     side_outputs.action_queue.push(action);
                     side_outputs.commit_counts[kind.index()] += 1;
                     previous_kind = Some(kind);

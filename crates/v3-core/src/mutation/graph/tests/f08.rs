@@ -18,7 +18,7 @@ use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use crate::creature::genome::vote::{VoteKind, VoteSink};
+use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::genome::PlasticityConfig;
 use crate::creature::state::GraphRuntimeState;
 use crate::mutation::graph::operators::{
@@ -215,7 +215,7 @@ pub(super) fn phase_def() -> CgpGraphBackendDef {
                 }],
             },
             OutputSink {
-                kind: OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+                kind: OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
                 inputs: vec![GraphEdge {
                     source: GraphSource::ComputeNode(1),
                     weight: 1.0,
@@ -469,7 +469,7 @@ fn introspection_edge_def(plasticity: bool, on_compute_input: bool) -> CgpGraphB
             }),
         }],
         output_sinks: vec![OutputSink {
-            kind: OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+            kind: OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
             inputs: if on_compute_input {
                 Vec::new()
             } else {

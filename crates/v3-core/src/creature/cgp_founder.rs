@@ -14,7 +14,7 @@
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::{VoteKind, VoteSink};
+use crate::creature::genome::vote::{ActionParamField, VoteSink};
 
 /// The founder's age gate on the unit scale the brain reads `AgeTicks` on:
 /// `(min_reproduce_age - 0.5) / age_reference_ticks`. Threshold uses strict
@@ -150,7 +150,7 @@ fn compute(kind: ComputeNodeKind, inputs: Vec<GraphEdge>) -> ComputeNode {
 /// - `Eat = f - 2g - 2q` (V3Alpha1) or `1 - 2g - 2q` (ForageFirst)
 /// - `Move[d] = 0.5 + 0.4·ring[d] - 2g - 2q` on the cardinal sinks
 /// - `Reproduce[d] = g·(0.5 + 0.4·ring[d])` on the cardinal sinks
-/// - `Terminate = q`, `ActionParam(Reproduce, 1) = transfer_fraction`
+/// - `Terminate = q`, `ActionParam(ReproduceTransferFraction) = transfer_fraction`
 #[must_use]
 pub(crate) fn build_cgp_founder_decision_graph(
     forage_first: bool,
@@ -248,7 +248,7 @@ pub(crate) fn build_cgp_founder_decision_graph(
     );
     wire(
         &mut def,
-        OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+        OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
         vec![edge(fraction, 1.0)],
     );
     def

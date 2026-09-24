@@ -61,12 +61,16 @@ pub enum BackendDef {
 `VmBackendDef` is defined in `v3-vm-isa-spec.md`.
 `GraphBackendDef` is defined in `v3-graph-backend-spec.md`. The graph backend
 uses a CGP-style layered model with implicit inputs, mutable compute nodes,
-and fixed structural outputs (the sinks). The fixed catalog holds 99 sinks: 24 `CustomOutput`, 8
-`RouterGate`, 16 `WriteSlot`, 16 `ClearSlot`, 27 `ActionVote`, and 8
-`ActionParam`; the vote and parameter sinks are how a graph acts
+and fixed structural outputs (the sinks). The fixed catalog holds 94 sinks: 24 `CustomOutput`, 8
+`RouterGate`, 16 `WriteSlot`, 16 `ClearSlot`, 27 `ActionVote`, and 3
+`ActionParam`, one per decoded parameter field (T11.F27); the vote and parameter sinks are how a graph acts
 (`v3-mesh-execution-spec.md` Section 2) and are drawable by mutation.
 `genome_size` counts wired sinks only, so unwired sinks add nothing to it;
 the founder is 97 units.
+A serialized genome from before T11.F27 that carries an old parameter sink
+(`{"ActionParam":["Eat",0]}`) or an old `WriteActionParam { slot_idx, .. }`
+fails to deserialize; there is no conversion path. A pre-T11.F27 genome with
+neither deserializes unchanged.
 Topology examples are documented in `v3-genome-topology-examples.md`.
 
 ---

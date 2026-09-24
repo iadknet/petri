@@ -1,5 +1,5 @@
 import type { InputReference, VmInstruction } from "../../types/genome.ts";
-import { voteSinkLabel } from "./graphNodeFormatters.ts";
+import { actionParamTargetLabel, voteSinkLabel } from "./graphNodeFormatters.ts";
 import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
 import type { RuntimeIoBadge } from "./mesh/runtimeIoSemantics.ts";
 import { classifyVmInstruction } from "./mesh/runtimeIoSemantics.ts";
@@ -9,20 +9,6 @@ export interface ReadableInstruction {
 	operands: string;
 	badges: RuntimeIoBadge[];
 }
-
-/** Parameter surface names, indexed by `slot_idx`: `params[kind][i]` with
- * `kind = slot_idx / 2` in `VOTE_KINDS` order and `i = slot_idx % 2`. The
- * named entries are the ones a commit decodes. */
-const ACTION_PARAM_NAMES: readonly string[] = [
-	"Eat.food",
-	"Eat[1]",
-	"Move[0]",
-	"Move[1]",
-	"Reproduce[0]",
-	"Reproduce.frac",
-	"StealEnergy[0]",
-	"StealEnergy.amt",
-];
 
 /**
  * Map raw opcode names to short, readable display labels.
@@ -226,11 +212,8 @@ function formatOperands(
 			return `payload[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
 		case "AddVote":
 			return `vote[${voteSinkLabel(f(p, "sink"))}] += ${reg(f(p, "src"))}`;
-		case "WriteActionParam": {
-			const slotIdx = f(p, "slot_idx");
-			const slotLabel = ACTION_PARAM_NAMES[slotIdx] ?? `param[${slotIdx}]`;
-			return `param ${slotLabel} ← ${reg(f(p, "src"))}`;
-		}
+		case "WriteActionParam":
+			return `${actionParamTargetLabel(f(p, "field_idx"))} ← ${reg(f(p, "src"))}`;
 		case "SetPriorityBid":
 			return `priority ← ${reg(f(p, "src"))}`;
 		case "ReadActionQueueLength":

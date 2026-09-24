@@ -89,7 +89,10 @@ describe("buildFullGraphModel", () => {
 
 	it("draws wired vote and parameter sinks as action outputs and skips unwired ones", () => {
 		const vote: OutputSink = { kind: { ActionVote: { Move: 2 } }, inputs: [computeEdge(0)] };
-		const param: OutputSink = { kind: { ActionParam: ["Reproduce", 1] }, inputs: [computeEdge(0)] };
+		const param: OutputSink = {
+			kind: { ActionParam: "ReproduceTransferFraction" },
+			inputs: [computeEdge(0)],
+		};
 		const unwired: OutputSink = { kind: { ActionVote: "Eat" }, inputs: [] };
 		const route: OutputSink = { kind: { RouterGate: 0 }, inputs: [computeEdge(0)] };
 		const model = buildFullGraphModel(
@@ -102,7 +105,7 @@ describe("buildFullGraphModel", () => {
 		const sinks = model.nodes.filter((n) => n.nodeType === "output_sink");
 		expect(sinks.map((n) => [n.id, n.category, n.label])).toEqual([
 			["sink:0", "output_action", "Vote Move[2]"],
-			["sink:1", "output_action", "Param Reproduce[1]"],
+			["sink:1", "output_action", "Param Reproduce.frac"],
 			["sink:3", "output_value", "Route[0]"],
 		]);
 	});
