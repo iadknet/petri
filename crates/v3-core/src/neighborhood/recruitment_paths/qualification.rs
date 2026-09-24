@@ -792,15 +792,18 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 // `AddVote`, and the edge-surface draw covers the vote and parameter sinks.
 // Re-pinned by T19.F05: the input-reference draw grows from 22 to 27
 // entries, which moves the cue and ring additions.
+// Re-pinned by T11.F25: the edge-surface draw skips the five undecoded
+// parameter sinks, which moves every `vote_edge_added` seed (57 -> 102,
+// 103 -> 743).
 
 const SWAP: u64 = 0;
-const GRAPH_BLANK_SEEDS: &[u64] = &[201, 57, SWAP];
-const GRAPH_DETOUR_SEEDS: &[u64] = &[201, 57];
-const GRAPH_COPY_SEEDS: &[u64] = &[103, SWAP];
-const GRAPH_SPLIT_SEEDS: &[u64] = &[103, SWAP];
+const GRAPH_BLANK_SEEDS: &[u64] = &[201, 102, SWAP];
+const GRAPH_DETOUR_SEEDS: &[u64] = &[201, 102];
+const GRAPH_COPY_SEEDS: &[u64] = &[743, SWAP];
+const GRAPH_SPLIT_SEEDS: &[u64] = &[743, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
 /// Ring, retarget, remove north, add east, swap.
-const GRAPH_UNPREPARED_SEEDS: &[u64] = &[1, 32, 5, 103, SWAP];
+const GRAPH_UNPREPARED_SEEDS: &[u64] = &[1, 32, 5, 743, SWAP];
 /// Ring, ref_idx, sub_idx, sub_idx, vote to east, swap.
 const VM_UNPREPARED_SEEDS: &[u64] = &[1, 18, 25, 25, 66_421, SWAP];
 /// Cue, read, vote, swap.

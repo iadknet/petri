@@ -162,8 +162,11 @@ Topology connection semantics (T11.F15, T11.F18):
 - `VmInstructionMutation` (insert/delete/replace opcode, mutate operands);
   the fresh-instruction draw is uniform over all 39 opcodes (T19.F04), which
   include `AddVote { sink in 0..27, src }` (the sink drawn uniformly over the
-  vote catalog) and `WriteActionParam { slot_idx in 0..8, src }`; the operand
-  nudge moves an `AddVote`'s `sink` or `src`
+  vote catalog) and `WriteActionParam { slot_idx, src }`, whose `slot_idx`
+  is drawn uniformly over the decoded parameter fields `{0, 5, 7}` (T11.F25,
+  `DECODED_ACTION_PARAM_FLAT_SLOTS`; storage stays `0..8`); the operand
+  nudge moves an `AddVote`'s `sink` or `src`, and the raw-field move can
+  still step a `slot_idx` onto an undecoded slot
 - `VmConstantMutation` — one constant `c` of the pool, drawn uniformly, moves
   by `u × max(|c|, 1)` with `u` uniform in [−0.1, 0.1] (the graph parameter
   step; T11.F23): a unit-scale constant moves as a graph parameter does, a
@@ -376,8 +379,12 @@ added/removed/retyped — only their edges are evolvable.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
 - `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` uniform
-  over one surface per compute node and one per sink, all 99 sinks including
-  the 27 vote and 8 parameter sinks (T19.F04 lifted T19.F03's exclusion);
+  over one surface per compute node and one per sink except the five
+  parameter sinks the commit decoder never reads: 94 of the 99 sinks, the
+  27 vote sinks and the decoded parameter sinks `Eat[0]`, `Reproduce[1]`,
+  `StealEnergy[1]` included (T11.F25; a chosen sink keeps its vector index,
+  and existing edges on undecoded sinks stay reachable by the other edge
+  operators);
   source sampled by
   `random_graph_source`, which draws a compound `InputLeaf` source's
   `sub_idx` uniformly across the reference's full width via

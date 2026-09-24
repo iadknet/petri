@@ -376,7 +376,9 @@ best sink. The committed action reads its kind's parameter row:
 
 `WriteActionParam` slot indexes: `0` `Eat[0]`, `1` `Eat[1]`, `2` `Move[0]`,
 `3` `Move[1]`, `4` `Reproduce[0]`, `5` `Reproduce[1]`, `6`
-`StealEnergy[0]`, `7` `StealEnergy[1]`. Slots no commit reads are reserved.
+`StealEnergy[0]`, `7` `StealEnergy[1]`. Slots no commit reads are reserved:
+storage and execution keep `0..8`, and a fresh mutation draw names only the
+decoded slots `0`, `5` and `7` (T11.F25).
 
 At node end:
 - the internal payload buffer is emitted as `NodeResult.output_slots`

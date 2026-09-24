@@ -108,34 +108,35 @@ Fixed design:
 
 ## Implementation Tasks
 
-- [ ] Write failing tests first: the catalog–decoder agreement test, and
+- [x] Write failing tests first: the catalog–decoder agreement test, and
       draw tests showing that fresh Graph and VM parameter targets are only
       decoded fields while each decoded field stays drawable. Also show that
       every non-parameter sink and every compute node stays drawable, and that
       `can_add_edge` agrees with the draw on partial and mixed sink lists,
       including a def whose only sinks are undecoded parameters, where the
       draw consumes no RNG.
-- [ ] Add the catalog and derive both draws from it (Fixed design). Update
+- [x] Add the catalog (`DECODED_ACTION_PARAMS`, flat
+      `DECODED_ACTION_PARAM_FLAT_SLOTS`) and derive both draws from it (Fixed design). Update
       the doc comments that say "every sink" and the test
       `pick_random_surface_draws_uniformly_over_compute_nodes_and_every_sink`
       to the new candidate list, with the uniform-draw assertion kept.
-- [ ] Add a regression test showing that existing structure on undecoded fields
+- [x] Add a regression test showing that existing structure on undecoded fields
       is still reachable: `RemoveGraphEdge` can remove an edge on an undecoded
       `ActionParam` sink, and VM delete can remove a `WriteActionParam` to an
       undecoded slot.
-- [ ] Update `docs/reference/v3-mutation-spec.md` (the VM fresh-instruction
+- [x] Update `docs/reference/v3-mutation-spec.md` (the VM fresh-instruction
       draw near "`WriteActionParam { slot_idx in 0..8, src }`" and
       `AddGraphEdge`'s "all 99 sinks"), `v3-graph-backend-spec.md` (the
       `pick_random_surface` sentence), and `v3-vm-isa-spec.md` (the slot-index
       list: storage `0..8` stays, and mutation draws only decoded slots).
-- [ ] Re-pin any trajectory, replay, drift or recruitment-paths test value
+- [x] Re-pin any trajectory, replay, drift or recruitment-paths test value
       that changes. List each old and new value in the readings with the
       attributing draw. No predicate may be weakened.
 - [ ] Record gate and goal readings as Performance requires.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first, then
+- [x] `cargo test -p v3-core --test viability` first, then
       `cargo test -p v3-core --lib mutation` and the new tests, with the red
       run and green run in [readings](../../progress/readings/t11-f25.md).
 - [ ] `make check` exits 0 in the worktree.
