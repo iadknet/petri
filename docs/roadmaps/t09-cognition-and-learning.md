@@ -1,7 +1,7 @@
 # T09 — Cognition and Learning
 
 **Status**: Planned
-**Last updated**: 2026-09-04
+**Last updated**: 2026-09-23
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -39,6 +39,7 @@ controllers against reactive and minimized surrogates.
 
 ## Notes for AI Agents
 
+- Input-evolvability follow-up, 2026-09-23: [T20](t20-input-evolvability-and-structured-variation.md) owns general input recruitment and structured refinement, qualified first on Graph with learning off. Its learning branch is conditional on a demonstrated ecological need. T09 retains general cognition assays and F03's unstarted qualification of native plasticity; only T20.F14's incremental learning comparison depends on it. T20's inherited discovery, retention, ecological transfer and Graph availability do not wait for T09.F03.
 - Restructured 2026-09-04 after the [brain evolvability audit](../strategy/brain-evolvability-audit-2026-09-04.md): brain architecture, execution clocks, and mutation accessibility moved to T11. T09.F02 became T11.F10, T09.F09 became T11.F05, T09.F10 became T11.F06, and T09.F11 became T11.F07. Those IDs are retired here and never reused. T09 tests what the repaired substrate does in the world; the track title reverts from Brain Architecture, Cognition, and Learning to Cognition and Learning.
 - T09.F08 is a diagnostic checkpoint, not a shared-memory go/no-go. Retain T01.F12's named shared-memory-sensitivity indicator and add separate interventions for current plus previous shared memory, persistent graph state, learned weights, and reward traces, plus combined history interventions. Validate them on the T11.F05 reactive and temporal fixtures. Distinguish inherited parameters from acquired state, hold starting world/body state and RNGs fixed, and report action/state differences and subsequent survival, resource, and reproductive outcomes over bounded paired trajectories, grouped by lineage with uncertainty. Reuse in-process world cloning and replay of short trajectories; no generic specimen serialization or campaign infrastructure is required. Wire new indicators into the goal profile and version changed definitions instead of rewriting old readings.
 - Interpret T09.F08 with the T11 readings: runtime failures require targeted repair in T11; a capable controller that evolution does not find motivates T11 accessibility work; evolved temporal behavior without a demonstrated benefit motivates examination of ecological pressure and realized costs. An inadequate exposure or inconclusive comparator is recorded as such. Neither zero shared-memory sensitivity nor any positive action difference alone decides whether the brain is adequate. A demonstrated blocker pauses dependent cognition claims and gets one bounded follow-up feature before their continuation; it does not automatically halt unrelated ecology work.

@@ -1,7 +1,7 @@
 # T13 — Neutral Module Recruitment
 
 **Status**: In Progress
-**Last updated**: 2026-09-21
+**Last updated**: 2026-09-23
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -49,6 +49,7 @@ selection can be distinguished before changing the substrate.
 
 ## Notes for AI Agents
 
+- Input-evolvability follow-up, 2026-09-23: [T20](t20-input-evolvability-and-structured-variation.md) owns general input access and structured inherited refinement inside Graph nodes, with VM later and learning conditional. It reuses T13's applied opportunity, ancestry, contribution and retention observations. T13 retains whole-module recruitment, contextual copies and its F08–F10 campaigns; T20 does not change their dependencies or recorded gates.
 - **F07–F10 continuation (added 2026-09-19).** The independently reviewed [incremental recruitment report](../strategy/incremental-recruitment-research-2026-09-19.md) and its [evidence audit](../strategy/incremental-recruitment-research-2026-09-19.evidence.json) supply the stage definitions, comparisons, numerical gates, resource caps and falsifiers. The master appends these four features after existing priorities; it does not reopen completed features, select an architectural winner or switch defaults. F07 maps to S0, F08 to S2–S4 and the shared fresh-lineage panel, F09 to S6, and F10 to S1 base qualification plus S7 transfer. S5 is conditional work through T11.F13's owner; any required scope/dependency amendment is recorded prospectively before dependent execution, not silently included in F08.
 - **Continuation handoff.** Each feature produces its flat spec, focused verification, existing gate/goal summaries and compact readings with source/recipe identity, exposure, confidence bounds, artifact hashes and an explicit downstream qualification verdict. Keep full replayable artifacts under the existing ignored benchmark root. The [report's execution handoff](../strategy/incremental-recruitment-research-2026-09-19.md#execution-handoff) identifies the required Plan inputs and feature outputs. A checked observation row does not establish biological qualification: the dependent Plan step must read the predecessor's verdict and stop on negative or inconclusive required evidence. It must not implement prerequisites, lower gates or enable a candidate by default to make progress. Conditional supply work discovered after T11.F13 has closed needs a prospectively authorized T11 follow-up; do not reopen or rewrite its historical evidence.
 - **F07 scope.** Extend existing recruitment observations under current production supply, retaining the fixed historical legacy panel as a separately versioned comparison. Record target-local exposure, route destination versus route-position variation, and creation/copy/deletion ancestry. Compare a recruit with its ancestral payload on the same route (birth payload for de novo nodes), alongside bypass and starting-controller comparisons. Copied old computation alone cannot score as specialization. Observations consume no production mutation RNG and change no founder, operator, rate or cost. The S0 cap is 1,852,416 proposals, 2 host-hours and 2 GiB compact raw output, subject to the report's separate replay/feasibility pilot. Honest nulls can close this measurement feature; invalid observations cannot.
