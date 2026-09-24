@@ -405,8 +405,8 @@ fn recruitment_paths_every_observed_sibling_replays_the_unmodified_engine() {
                 let mut rng = SmallRng::seed_from_u64(record.seed);
                 let summary = MutationEngine::apply_mutations_on_units(
                     &mut child,
-                    crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS,
-                    &super::experiment::proposal_mutation_config(),
+                    Supply::FounderUnits.units(&parent),
+                    &crate::config::MutationConfig::default(),
                     &reachable,
                     ParentExecuted::Indices(&executed),
                     &mut rng,

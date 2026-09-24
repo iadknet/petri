@@ -230,14 +230,6 @@ fn reachable_ids(genome: &CreatureGenome, reachable: &[usize]) -> BTreeSet<NodeI
         .collect()
 }
 
-/// The mutation config every panel's proposals run: the default config.
-/// The legacy panel draws it on [`Supply::FounderUnits`], like the drift walk
-/// (T11.F20).
-#[cfg(test)]
-pub(super) fn proposal_mutation_config() -> crate::config::MutationConfig {
-    crate::config::MutationConfig::default()
-}
-
 /// One arm's context: its start, policy, and the panel it runs under.
 struct ArmContext<'a> {
     start: &'a Start,
@@ -1135,7 +1127,7 @@ pub fn observe(sizes: Sizes) -> Report {
     Report { version: VERSION.into(), config_digest: crate::config::config_digest(config), config: config.clone(), sizes,
         supply: Supply::FounderUnits, supply_rule: Supply::FounderUnits.rule(),
         task_definition: "Eight fresh 12x12 one-tick scenes; energy 50; zero learned state; here/east/north food 0/1. A: FoodHere(0)>0; B: NeighborFood(E,0)>0. Exact [Move(E)] plus east displacement or [NoOp] plus no displacement. Score=correct/8; practical margin=1/8.".into(),
-        mutation_context: format!("Default MutationConfig; per-unit supply drawn on the canonical V3Alpha1 founder's genome_size() {}, not the parent's own: Binomial({}, per_unit_rate) events per proposal; SmallRng seed=13020000+batch*1000000+lineage*10000+generation_zero_based*2+sibling. Reachability and ParentExecuted indices from all eight task ticks recomputed before each sibling pair; observations consume no mutation RNG.", crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS, crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS),
+        mutation_context: format!("Default MutationConfig; per-unit supply drawn on the canonical V3Alpha1 founder's genome_size() {units}, not the parent's own: Binomial({units}, per_unit_rate) events per proposal; SmallRng seed=13020000+batch*1000000+lineage*10000+generation_zero_based*2+sibling. Reachability and ParentExecuted indices from all eight task ticks recomputed before each sibling pair; observations consume no mutation RNG.", units = crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS),
         construction_resolution: "Constructed authored fixtures and controlled helper seeds; genomes frozen before discovery. Construction-only tracker opportunities are excluded from proposal totals; creation registration precedes preparation.".into(),
         observation_resolution: "Both siblings every generation; first discovery by discovery horizon; retention on same (lineage,node,creation-depth) after followup generations including held parents. Full 80-execution battery/cohort checkpoints at 0/discovery/end; first-fact dates are observation-censored. Replay deltas are complete whole-birth transitions with ordered events, not per-event field causation. Selected-inapplicable backend comes from Graph/VM domain or the target's before/after node; transient deleted targets without backend evidence remain explicitly unresolved. T13.F07: specialization is task-live, score >= start+1, bypass loss >= 1, ancestral-payload loss >= 1 and every generation-0 correct scene preserved; the ladder and classification read the retained chain; the +64 horizon is censored on this panel.".into(),
         rng_control: "NotApplicable: no added-draw or constructor intervention; observation never advances mutation RNG. Equal seeds need not produce equal transitions after genotype/site divergence; paired fingerprints include complete deltas, ordered events and a draw from a clone of the post-call RNG.".into(),
