@@ -46,7 +46,7 @@ Codex reviewer does that so your blind spots are challenged rather than shared.
   perform one readiness review. Your self-review is not independent
   validation; the Codex challenge loop is.
 - Run the Codex challenge loop exactly as the workflow's "Plan" section
-  defines it: up to three rounds, each a fresh read-only Codex Astra `xhigh`
+  defines it: up to three rounds, each a fresh read-only Codex Astra `high`
   job started in the background and awaited with `status --wait`, with the
   brief written outside the worktree. Answer every blocking finding with a
   spec edit or a one-sentence rebuttal grounded in the roadmap row, the

@@ -198,6 +198,11 @@ on a `.claude/worktrees/` path is scoped to that worktree and that
 `gpt-6-astra` passes through the plugin unchanged. Codex runs keep their single
 readiness review, since their spec owner is already Astra.
 
+On 2026-09-24, the user moved every Codex review from Astra `xhigh` to Astra
+`high`: the Claude spec challenge rounds, the Claude final review, and the
+Codex adapter's fresh-context reviewer. The Codex adapter's spec owner and
+implementer stay at `xhigh`; they write and remediate rather than review.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the

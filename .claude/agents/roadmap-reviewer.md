@@ -2,7 +2,7 @@
 name: roadmap-reviewer
 description: >-
   Checklist for the final roadmap diff review, which a fresh read-only Codex
-  Astra xhigh context performs in both Claude and Codex runs (see the Review
+  Astra high context performs in both Claude and Codex runs (see the Review
   section of docs/workflow.md). Do not spawn this agent for a roadmap feature;
   the orchestrator hands this file to Codex as its checklist.
 model: fable
