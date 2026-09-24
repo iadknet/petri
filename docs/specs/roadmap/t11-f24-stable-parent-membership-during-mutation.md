@@ -130,6 +130,12 @@ Fixed design:
       code. Afterwards `--lib mutation` passes 417, with 1 ignored, and
       `cargo clippy --workspace --all-targets -- -D warnings` exits 0
       (2026-09-24).
+- [x] Review remediation: `BirthMembership` repairs owned sorted member
+      sets in place on each removal (drop the removed index, shift later
+      ones down), which is O(node count), and the provenance vector is gone.
+      The T11.F24 regressions and proptests pass unedited. Viability passes
+      28, `--lib mutation` passes 417 with 1 ignored, clippy `-D warnings`
+      exits 0, and `make check` exits 0 (2026-09-24).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       full survivor list stays here.
@@ -141,8 +147,9 @@ Fixed design:
       the summaries, and no new full report is staged. Gate: `severe=false`
       against both stored references. Goal: `severe=false` against the
       `t19-f04` epoch, but `severe=true` against the latest closure
-      (`plasticity_updates` +113.73%, exceeding the +100% threshold) — an
-      unresolved blocker-rule decision, not remediated by this record.
+      (`plasticity_updates` +113.73%, over the +50% severe work threshold).
+      The user accepted this on 2026-09-24 and the epoch is kept; see
+      Performance and Goal Impact.
 
 ## Performance and Goal Impact
 
@@ -187,18 +194,29 @@ event occurred in this battery, consistent with the predeclaration.
 
 Goal: `severe=false` against the `t19-f04` epoch. **`severe=true` against the
 latest closure `t11-f20`**: `plasticity_updates` +113.73% (0.371941 vs.
-0.174022), over the +100% work-counter threshold. All other goal work
-counters are `ok`. This is not the "no measurable compute cost" the
-predeclaration expected, and per the spec's own blocker rule it is a user
-decision, not resolved here.
+0.174022), over the +50% severe work threshold. All other goal work
+counters are `ok`. The fix does not touch the Hebbian runtime. The cause is
+trajectory divergence: this is the first goal-trajectory change since T19.F05,
+and the T19.F05, T19.F06 and T11.F20 goal summaries share one trajectory.
+Per-seed plasticity per creature-tick for Orchards, Canyon and Confluence was
+0.294 / 0.097 / 0.123 in that trajectory, 0.278 / 0.339 / 0.334 at the epoch,
+and 0.449 / 0.573 / 0.162 now. Against the epoch the move is only +17.52%, a
+flag.
+
+User decision, 2026-09-24, verbatim: "Accept, keep epoch". The user accepts
+the severe goal `plasticity_updates` result against T11.F20 (+113.73%) as
+trajectory divergence, and the goal-worlds epoch stays at T19.F04 (not
+re-pinned). The gate epoch is also unchanged.
 
 Founder rows (`founder_changed_per_all_births`, `founder_dead_per_all_births`)
 are unchanged in all three worlds against both references (0% delta), as
 predeclared. No extinction: minimum populations 29 / 739 / 98 across the
-three worlds. `mutation_supply` target ratios per world (reachable/executed/
-unreachable divided by `events_applied_total`) are recorded in the readings;
-no prior reading exists for a before/after comparison since this is the first
-time the ratio is read this way.
+three worlds. The `mutation_supply` target ratios per world (reachable,
+unreachable and executed, each divided by `events_applied_total`) are
+tabled before (T19.F04 epoch and T11.F20) and after in the readings. Eight
+of the nine sit between the two references. The ninth, Confluence
+executed/applied, reads 0.824763 against the epoch's 0.824674. No sign was
+predicted.
 
 - Summaries: [gate](../../progress/features/t11-f24-stable-parent-membership-during-mutation.json),
   [goal](../../progress/features/t11-f24-stable-parent-membership-during-mutation-goal.json).
