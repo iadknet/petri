@@ -316,7 +316,8 @@ mod tests {
         let barrier_pos = Position::new(5, 5);
         w.set_barrier(barrier_pos, true);
         let mut rng = SmallRng::seed_from_u64(0);
-        let food_cfg = default_config().world.food;
+        let mut food_cfg = default_config().world.food;
+        food_cfg.types[0].initial_coverage = 1.0; // guarantee all non-barrier cells are seeded
         w.reconfigure_food(food_cfg);
         w.seed_food(&mut rng);
         assert!((w.food_at(barrier_pos) - 0.0).abs() < 1e-6);

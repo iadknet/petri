@@ -41,6 +41,8 @@ fn reproducibility_config() -> SimulationConfig {
     cfg.world.width = 96;
     cfg.world.height = 96;
     cfg.population.initial_creatures = 150;
+    cfg.world.food.types[0].initial_coverage = 1.0;
+    cfg.world.food.types[0].initial_density = 1.0;
     // About six requested events per founder-sized birth (0.06 per unit).
     cfg.mutation.per_unit_rate = 0.06;
     cfg.mutation.mesh_layer_probability = 0.5;

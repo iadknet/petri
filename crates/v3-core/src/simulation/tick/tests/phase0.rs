@@ -30,6 +30,7 @@ fn phase_0_removes_dead_creatures() {
 fn phase_0_grows_food() {
     let mut cfg = small_config();
     cfg.world.food.growth_rate = 1.0;
+    cfg.world.food.types[0].initial_coverage = 0.0;
     let mut sim = seed_simulation(cfg, 42);
     let before = sim.world.total_food();
     run_phase_0(&mut sim);

@@ -449,7 +449,9 @@ fn vm_eats_when_food_here() {
 
     // Build a world with food everywhere
     let mut world = WorldState::new(5, 5, WorldEdgeMode::Wrap);
-    let food_cfg = SimulationConfig::default().world.food;
+    let mut food_cfg = SimulationConfig::default().world.food;
+    food_cfg.types[0].initial_coverage = 1.0;
+    food_cfg.types[0].initial_density = 1.0;
     world.reconfigure_food(food_cfg);
     let mut rng = SmallRng::seed_from_u64(42);
     world.seed_food(&mut rng);
