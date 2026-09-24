@@ -397,25 +397,29 @@ fn engine_with_founder_genome_does_not_panic() {
 
 #[test]
 fn diversity_test_mutated_clones_differ_from_original() {
-    // Mutate 100 founder clones, verify 80%+ differ from original.
+    // Mutate 100 founder clones, verify 80%+ differ from original. The
+    // single-event case is the low-exposure guard: the retired 1–3 rule at
+    // continuation 0.2 requested one event on 80% of births (mean 1.24), so
+    // one event per clone is at or below that exposure.
     let mut config = SimulationConfig::default().mutation;
     config.per_unit_rate = 1.0;
 
     let original = crate::creature::founder::vm_decision_founder_genome();
-    let mut differ_count = 0;
-    for seed in 0u64..100 {
-        let mut genome = original.clone();
-        let mut r = rng(seed);
-        apply_events(&mut genome, &config, &[], &mut r, 3);
-        if genome != original {
-            differ_count += 1;
+    for events in [1, 3] {
+        let mut differ_count = 0;
+        for seed in 0u64..100 {
+            let mut genome = original.clone();
+            let mut r = rng(seed);
+            apply_events(&mut genome, &config, &[], &mut r, events);
+            if genome != original {
+                differ_count += 1;
+            }
         }
+        assert!(
+            differ_count >= 80,
+            "at least 80% must differ at {events} event(s); got {differ_count}/100"
+        );
     }
-    assert!(
-        differ_count >= 80,
-        "at least 80% must differ; got {}/100",
-        differ_count
-    );
 }
 
 #[test]

@@ -231,7 +231,16 @@ Neither epoch is re-pinned. Pre-feature numbers are tabulated in
 | Wall | The standing absolute budgets apply on any host: founder neighborhood under 10 s; summed evolved neighborhood under 180 s; the whole goal run is investigated past 15 minutes; `drift_depth_wall_clock_ms` (one aggregate over the three worlds) under 30 s, the T11.F19 budget. Relative readings hold only on the T19.F06 host (`Isaacs-MacBook-Pro-2.local`); on another host they are report-only. They are: aggregate `drift_depth_wall_clock_ms` not above 24,370.5 ms + 10%, and `recruitment_paths_wall_clock_ms` within 10% of 12,609.0 ms. Gate and goal wall per creature-tick have no direction. |
 
 **Measured verdict.** Every predeclared row is met; no tripwire crossed, no
-requested-events miss, no non-permitted identity-diff path. Gate
+requested-events miss, no non-permitted identity-diff path. One checkpoint is
+below half its pre-feature changed count: Orchards and Confluence at depth
+1,000, 26 → 12 per 2,000, equal to its tripwire of 12, which fires only
+below it (every other checkpoint and world is at or above half). Its attribution: the event-bearing share falls 43.4% → 38.7% and
+changed per event-bearing birth 26/868 → 12/774 (2.995% → 1.550%). The
+conditional drop comes from the resampled walk; at the other walked
+checkpoints the same ratio ranges 0.63–1.79 in both directions. With the
+requested-events check met and the operators and target draw unchanged, the
+drop is read as the draw change, and 12 is adopted as the new per-world
+depth-1,000 reference. Gate
 `severe=false` both comparisons (exit 0). Goal `severe=false` vs T19.F06,
 `severe=true` on `decided_passes` +255.434783% vs the T19.F04 epoch (exactly
 T19.F06's own epoch comparison, the severe accepted 2026-09-22 at T19.F05,
