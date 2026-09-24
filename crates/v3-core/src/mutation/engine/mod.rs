@@ -9,7 +9,7 @@ use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::pressure;
-use crate::mutation::reachability::{ParentExecuted, TargetSelector, TargetSets};
+use crate::mutation::reachability::{BirthMembership, ParentExecuted, TargetSelector};
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
     MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationEventRecord,
@@ -99,6 +99,11 @@ impl MutationEngine {
     /// requested events. The drift walk and `recruitment_paths` pass the
     /// instrument constant `FOUNDER_GENOME_SIZE_UNITS` (T11.F20); engine
     /// tests pass explicit counts (rate 1.0 on N units requests exactly N).
+    ///
+    /// `parent_reachable_nodes` and `parent_executed` are sorted parent node
+    /// indices. Every target draw sees them through [`BirthMembership`]: a
+    /// child node counts as a member only when the parent carried it, however
+    /// earlier events of this birth removed or added nodes (T11.F24).
     #[allow(
         clippy::too_many_lines,
         reason = "one match arm per mutation event kind; splitting it would spread \
@@ -132,21 +137,30 @@ impl MutationEngine {
         } else {
             config.executed_bias
         };
-        let sets = TargetSets::new(parent_reachable_nodes, executed.as_ref());
-        let selector = |domain_bias: f64| {
-            sets.selector(
-                pressure_adjusted_bias(domain_bias, restricted),
-                executed_bias,
-            )
-        };
+        // The parent's sets are the targeting policy (T11.F17); which current
+        // child nodes are their members follows the birth's removals and
+        // additions (T11.F24).
+        let mut membership = BirthMembership::new(
+            parent_reachable_nodes,
+            executed.as_ref(),
+            genome.nodes.len(),
+        );
 
         let mut summary = MutationSummary::zero();
         // Reused across events: the ids the genome carries before each event,
-        // so a selected index can be recorded as the node it named (T13.F01).
+        // so a selected index can be recorded as the node it named (T13.F01)
+        // and membership can follow the event.
         let mut node_ids: Vec<NodeId> = Vec::with_capacity(genome.nodes.len());
         for _ in 0..event_count {
             node_ids.clear();
             node_ids.extend(genome.nodes.iter().map(|node| node.node_id));
+            let sets = membership.sets();
+            let selector = |domain_bias: f64| {
+                sets.selector(
+                    pressure_adjusted_bias(domain_bias, restricted),
+                    executed_bias,
+                )
+            };
             // Every operator this event tried and threw away for reporting no
             // applicable site, with the node it first selected (T13.F01).
             let mut discarded: Vec<(MutationOperator, Option<NodeId>)> = Vec::new();
@@ -386,7 +400,9 @@ impl MutationEngine {
                     }
                     summary.record_reachability(reachability);
                     summary.record_executed_targets(executed_hits);
+                    membership.observe_event(&node_ids, &genome.nodes);
                 }
+                // A skipped attempt restored the genome, so membership stands.
                 Err(reason) => summary.record_skipped(operator, reason),
             }
         }
@@ -729,3 +745,6 @@ pub(crate) fn input_ref_operator_key(op: InputRefOperator) -> MutationOperator {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod membership_tests;
