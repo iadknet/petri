@@ -1,0 +1,2130 @@
+{
+  "source": "df35975f805e11324b196535d8d391569270f07b",
+  "metadata": {
+    "checkpoints": [
+      0,
+      22,
+      250,
+      1000,
+      2000
+    ],
+    "config_digest": "sha256:0a8056385815650cf43da24435aaca43d95dde2829142427eca213602575a890",
+    "food_types": 2,
+    "kind": "metadata",
+    "lineages": 20
+  },
+  "wall_seconds": 9.483,
+  "stored_checkpoint_tallies_match": true,
+  "checkpoint_births": 10000,
+  "control_proposals": 12000,
+  "checkpoints": [
+    {
+      "depth": 0,
+      "parents": 20,
+      "all_noop_parents": 0,
+      "one_unique_queue_parents": 0,
+      "mean_nodes": 2.0,
+      "mean_executed": 2.0,
+      "mean_contributing": 2.0,
+      "zero_contributing_parents": 0,
+      "births": {
+        "trials": 600,
+        "silent": 295,
+        "changed": 305,
+        "dead": 0,
+        "skipped": 0
+      },
+      "parent_strata": {
+        "has_non_noop": {
+          "parents": 20,
+          "births": {
+            "trials": 600,
+            "silent": 295,
+            "changed": 305,
+            "dead": 0,
+            "skipped": 0
+          }
+        },
+        "all_noop": {
+          "parents": 0,
+          "births": {
+            "trials": 0,
+            "silent": 0,
+            "changed": 0,
+            "dead": 0,
+            "skipped": 0
+          }
+        }
+      }
+    },
+    {
+      "depth": 22,
+      "parents": 20,
+      "all_noop_parents": 2,
+      "one_unique_queue_parents": 2,
+      "mean_nodes": 3.2,
+      "mean_executed": 2.5,
+      "mean_contributing": 1.9,
+      "zero_contributing_parents": 2,
+      "births": {
+        "trials": 706,
+        "silent": 450,
+        "changed": 244,
+        "dead": 12,
+        "skipped": 0
+      },
+      "parent_strata": {
+        "has_non_noop": {
+          "parents": 18,
+          "births": {
+            "trials": 637,
+            "silent": 389,
+            "changed": 236,
+            "dead": 12,
+            "skipped": 0
+          }
+        },
+        "all_noop": {
+          "parents": 2,
+          "births": {
+            "trials": 69,
+            "silent": 61,
+            "changed": 8,
+            "dead": 0,
+            "skipped": 0
+          }
+        }
+      }
+    },
+    {
+      "depth": 250,
+      "parents": 20,
+      "all_noop_parents": 7,
+      "one_unique_queue_parents": 11,
+      "mean_nodes": 9.25,
+      "mean_executed": 3.3,
+      "mean_contributing": 1.2,
+      "zero_contributing_parents": 7,
+      "births": {
+        "trials": 753,
+        "silent": 709,
+        "changed": 39,
+        "dead": 5,
+        "skipped": 0
+      },
+      "parent_strata": {
+        "has_non_noop": {
+          "parents": 13,
+          "births": {
+            "trials": 501,
+            "silent": 457,
+            "changed": 39,
+            "dead": 5,
+            "skipped": 0
+          }
+        },
+        "all_noop": {
+          "parents": 7,
+          "births": {
+            "trials": 252,
+            "silent": 252,
+            "changed": 0,
+            "dead": 0,
+            "skipped": 0
+          }
+        }
+      }
+    },
+    {
+      "depth": 1000,
+      "parents": 20,
+      "all_noop_parents": 9,
+      "one_unique_queue_parents": 18,
+      "mean_nodes": 33.15,
+      "mean_executed": 6.1,
+      "mean_contributing": 0.6,
+      "zero_contributing_parents": 9,
+      "births": {
+        "trials": 774,
+        "silent": 766,
+        "changed": 6,
+        "dead": 2,
+        "skipped": 0
+      },
+      "parent_strata": {
+        "has_non_noop": {
+          "parents": 11,
+          "births": {
+            "trials": 444,
+            "silent": 437,
+            "changed": 5,
+            "dead": 2,
+            "skipped": 0
+          }
+        },
+        "all_noop": {
+          "parents": 9,
+          "births": {
+            "trials": 330,
+            "silent": 329,
+            "changed": 1,
+            "dead": 0,
+            "skipped": 0
+          }
+        }
+      }
+    },
+    {
+      "depth": 2000,
+      "parents": 20,
+      "all_noop_parents": 10,
+      "one_unique_queue_parents": 18,
+      "mean_nodes": 69.35,
+      "mean_executed": 9.05,
+      "mean_contributing": 0.6,
+      "zero_contributing_parents": 10,
+      "births": {
+        "trials": 774,
+        "silent": 769,
+        "changed": 5,
+        "dead": 0,
+        "skipped": 0
+      },
+      "parent_strata": {
+        "has_non_noop": {
+          "parents": 10,
+          "births": {
+            "trials": 365,
+            "silent": 360,
+            "changed": 5,
+            "dead": 0,
+            "skipped": 0
+          }
+        },
+        "all_noop": {
+          "parents": 10,
+          "births": {
+            "trials": 409,
+            "silent": 409,
+            "changed": 0,
+            "dead": 0,
+            "skipped": 0
+          }
+        }
+      }
+    }
+  ],
+  "controls": [
+    {
+      "depth": 0,
+      "arm": "executed_0.9",
+      "totals": {
+        "trials": 2000,
+        "silent": 797,
+        "changed": 665,
+        "dead": 0,
+        "skipped": 538
+      },
+      "first_parent_target_class": {
+        "contributing": {
+          "trials": 1276,
+          "silent": 796,
+          "changed": 480,
+          "dead": 0,
+          "skipped": 0
+        },
+        "no_node_target": {
+          "trials": 724,
+          "silent": 1,
+          "changed": 185,
+          "dead": 0,
+          "skipped": 538
+        }
+      },
+      "operators": {
+        "Graph/Some(GraphAddGraphEdge)": {
+          "trials": 31,
+          "silent": 26,
+          "changed": 5,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAddInternalGraphNode)": {
+          "trials": 6,
+          "silent": 6,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAlterGraphEdgeWeight)": {
+          "trials": 71,
+          "silent": 42,
+          "changed": 29,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyEdgeBundle)": {
+          "trials": 31,
+          "silent": 7,
+          "changed": 24,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyInternalNode)": {
+          "trials": 14,
+          "silent": 14,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopySubgraph)": {
+          "trials": 25,
+          "silent": 25,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphEnableHebbian)": {
+          "trials": 24,
+          "silent": 21,
+          "changed": 3,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateGraphOperatorParam)": {
+          "trials": 81,
+          "silent": 42,
+          "changed": 39,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRawFieldMutation)": {
+          "trials": 95,
+          "silent": 15,
+          "changed": 80,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveGraphEdge)": {
+          "trials": 40,
+          "silent": 5,
+          "changed": 35,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveInternalGraphNode)": {
+          "trials": 21,
+          "silent": 3,
+          "changed": 18,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRetargetGraphEdge)": {
+          "trials": 36,
+          "silent": 7,
+          "changed": 29,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphSwapGraphOperator)": {
+          "trials": 31,
+          "silent": 4,
+          "changed": 27,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefAdd)": {
+          "trials": 102,
+          "silent": 102,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefPrune)": {
+          "trials": 107,
+          "silent": 107,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefRawFieldMutation)": {
+          "trials": 181,
+          "silent": 1,
+          "changed": 180,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefSwap)": {
+          "trials": 185,
+          "silent": 0,
+          "changed": 185,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddNode)": {
+          "trials": 43,
+          "silent": 43,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddRouteTarget)": {
+          "trials": 83,
+          "silent": 83,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyChangeEntryNode)": {
+          "trials": 5,
+          "silent": 0,
+          "changed": 5,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshBackwardSlice)": {
+          "trials": 9,
+          "silent": 7,
+          "changed": 2,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshForwardSlice)": {
+          "trials": 9,
+          "silent": 5,
+          "changed": 4,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyNode)": {
+          "trials": 10,
+          "silent": 10,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyMutateGateBias)": {
+          "trials": 155,
+          "silent": 155,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySpliceNode)": {
+          "trials": 28,
+          "silent": 28,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySwapNodeBackend)": {
+          "trials": 39,
+          "silent": 39,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/None": {
+          "trials": 538,
+          "silent": 0,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 538
+        }
+      },
+      "applied_but_equal_genome": 6
+    },
+    {
+      "depth": 0,
+      "arm": "executed_0.0",
+      "totals": {
+        "trials": 2000,
+        "silent": 797,
+        "changed": 665,
+        "dead": 0,
+        "skipped": 538
+      },
+      "first_parent_target_class": {
+        "contributing": {
+          "trials": 1276,
+          "silent": 796,
+          "changed": 480,
+          "dead": 0,
+          "skipped": 0
+        },
+        "no_node_target": {
+          "trials": 724,
+          "silent": 1,
+          "changed": 185,
+          "dead": 0,
+          "skipped": 538
+        }
+      },
+      "operators": {
+        "Graph/Some(GraphAddGraphEdge)": {
+          "trials": 31,
+          "silent": 26,
+          "changed": 5,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAddInternalGraphNode)": {
+          "trials": 6,
+          "silent": 6,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAlterGraphEdgeWeight)": {
+          "trials": 71,
+          "silent": 42,
+          "changed": 29,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyEdgeBundle)": {
+          "trials": 31,
+          "silent": 7,
+          "changed": 24,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyInternalNode)": {
+          "trials": 14,
+          "silent": 14,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopySubgraph)": {
+          "trials": 25,
+          "silent": 25,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphEnableHebbian)": {
+          "trials": 24,
+          "silent": 21,
+          "changed": 3,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateGraphOperatorParam)": {
+          "trials": 81,
+          "silent": 42,
+          "changed": 39,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRawFieldMutation)": {
+          "trials": 95,
+          "silent": 15,
+          "changed": 80,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveGraphEdge)": {
+          "trials": 40,
+          "silent": 5,
+          "changed": 35,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveInternalGraphNode)": {
+          "trials": 21,
+          "silent": 3,
+          "changed": 18,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRetargetGraphEdge)": {
+          "trials": 36,
+          "silent": 7,
+          "changed": 29,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphSwapGraphOperator)": {
+          "trials": 31,
+          "silent": 4,
+          "changed": 27,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefAdd)": {
+          "trials": 102,
+          "silent": 102,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefPrune)": {
+          "trials": 107,
+          "silent": 107,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefRawFieldMutation)": {
+          "trials": 181,
+          "silent": 1,
+          "changed": 180,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefSwap)": {
+          "trials": 185,
+          "silent": 0,
+          "changed": 185,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddNode)": {
+          "trials": 43,
+          "silent": 43,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddRouteTarget)": {
+          "trials": 83,
+          "silent": 83,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyChangeEntryNode)": {
+          "trials": 5,
+          "silent": 0,
+          "changed": 5,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshBackwardSlice)": {
+          "trials": 9,
+          "silent": 7,
+          "changed": 2,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshForwardSlice)": {
+          "trials": 9,
+          "silent": 5,
+          "changed": 4,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyNode)": {
+          "trials": 10,
+          "silent": 10,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyMutateGateBias)": {
+          "trials": 155,
+          "silent": 155,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySpliceNode)": {
+          "trials": 28,
+          "silent": 28,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySwapNodeBackend)": {
+          "trials": 39,
+          "silent": 39,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/None": {
+          "trials": 538,
+          "silent": 0,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 538
+        }
+      },
+      "applied_but_equal_genome": 6
+    },
+    {
+      "depth": 0,
+      "arm": "contributing_oracle_1.0",
+      "totals": {
+        "trials": 2000,
+        "silent": 797,
+        "changed": 665,
+        "dead": 0,
+        "skipped": 538
+      },
+      "first_parent_target_class": {
+        "contributing": {
+          "trials": 1276,
+          "silent": 796,
+          "changed": 480,
+          "dead": 0,
+          "skipped": 0
+        },
+        "no_node_target": {
+          "trials": 724,
+          "silent": 1,
+          "changed": 185,
+          "dead": 0,
+          "skipped": 538
+        }
+      },
+      "operators": {
+        "Graph/Some(GraphAddGraphEdge)": {
+          "trials": 31,
+          "silent": 26,
+          "changed": 5,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAddInternalGraphNode)": {
+          "trials": 6,
+          "silent": 6,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAlterGraphEdgeWeight)": {
+          "trials": 71,
+          "silent": 42,
+          "changed": 29,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyEdgeBundle)": {
+          "trials": 31,
+          "silent": 7,
+          "changed": 24,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyInternalNode)": {
+          "trials": 14,
+          "silent": 14,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopySubgraph)": {
+          "trials": 25,
+          "silent": 25,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphEnableHebbian)": {
+          "trials": 24,
+          "silent": 21,
+          "changed": 3,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateGraphOperatorParam)": {
+          "trials": 81,
+          "silent": 42,
+          "changed": 39,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRawFieldMutation)": {
+          "trials": 95,
+          "silent": 15,
+          "changed": 80,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveGraphEdge)": {
+          "trials": 40,
+          "silent": 5,
+          "changed": 35,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveInternalGraphNode)": {
+          "trials": 21,
+          "silent": 3,
+          "changed": 18,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRetargetGraphEdge)": {
+          "trials": 36,
+          "silent": 7,
+          "changed": 29,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphSwapGraphOperator)": {
+          "trials": 31,
+          "silent": 4,
+          "changed": 27,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefAdd)": {
+          "trials": 102,
+          "silent": 102,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefPrune)": {
+          "trials": 107,
+          "silent": 107,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefRawFieldMutation)": {
+          "trials": 181,
+          "silent": 1,
+          "changed": 180,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefSwap)": {
+          "trials": 185,
+          "silent": 0,
+          "changed": 185,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddNode)": {
+          "trials": 43,
+          "silent": 43,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddRouteTarget)": {
+          "trials": 83,
+          "silent": 83,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyChangeEntryNode)": {
+          "trials": 5,
+          "silent": 0,
+          "changed": 5,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshBackwardSlice)": {
+          "trials": 9,
+          "silent": 7,
+          "changed": 2,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshForwardSlice)": {
+          "trials": 9,
+          "silent": 5,
+          "changed": 4,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyNode)": {
+          "trials": 10,
+          "silent": 10,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyMutateGateBias)": {
+          "trials": 155,
+          "silent": 155,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySpliceNode)": {
+          "trials": 28,
+          "silent": 28,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySwapNodeBackend)": {
+          "trials": 39,
+          "silent": 39,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/None": {
+          "trials": 538,
+          "silent": 0,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 538
+        }
+      },
+      "applied_but_equal_genome": 6
+    },
+    {
+      "depth": 2000,
+      "arm": "executed_0.9",
+      "totals": {
+        "trials": 2000,
+        "silent": 1987,
+        "changed": 13,
+        "dead": 0,
+        "skipped": 0
+      },
+      "first_parent_target_class": {
+        "contributing": {
+          "trials": 233,
+          "silent": 221,
+          "changed": 12,
+          "dead": 0,
+          "skipped": 0
+        },
+        "executed_noncontributing": {
+          "trials": 1161,
+          "silent": 1160,
+          "changed": 1,
+          "dead": 0,
+          "skipped": 0
+        },
+        "no_node_target": {
+          "trials": 182,
+          "silent": 182,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "unexecuted": {
+          "trials": 424,
+          "silent": 424,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        }
+      },
+      "operators": {
+        "Graph/Some(GraphAddGraphEdge)": {
+          "trials": 31,
+          "silent": 31,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAddInternalGraphNode)": {
+          "trials": 20,
+          "silent": 20,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAlterGraphEdgeWeight)": {
+          "trials": 48,
+          "silent": 48,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyEdgeBundle)": {
+          "trials": 32,
+          "silent": 30,
+          "changed": 2,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyInternalNode)": {
+          "trials": 14,
+          "silent": 14,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopySubgraph)": {
+          "trials": 17,
+          "silent": 17,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphDisableHebbian)": {
+          "trials": 14,
+          "silent": 14,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphDisableRewardModulation)": {
+          "trials": 8,
+          "silent": 8,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphEnableHebbian)": {
+          "trials": 11,
+          "silent": 11,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphEnableRewardModulation)": {
+          "trials": 13,
+          "silent": 13,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateGraphOperatorParam)": {
+          "trials": 57,
+          "silent": 52,
+          "changed": 5,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateHebbianRate)": {
+          "trials": 50,
+          "silent": 50,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateHebbianRule)": {
+          "trials": 23,
+          "silent": 23,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateRewardSource)": {
+          "trials": 7,
+          "silent": 7,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateTraceDecay)": {
+          "trials": 29,
+          "silent": 29,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRawFieldMutation)": {
+          "trials": 58,
+          "silent": 56,
+          "changed": 2,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveGraphEdge)": {
+          "trials": 18,
+          "silent": 18,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveInternalGraphNode)": {
+          "trials": 10,
+          "silent": 10,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRetargetGraphEdge)": {
+          "trials": 33,
+          "silent": 32,
+          "changed": 1,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphSwapGraphOperator)": {
+          "trials": 28,
+          "silent": 27,
+          "changed": 1,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphToggleHebbianLamarckian)": {
+          "trials": 24,
+          "silent": 24,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefAdd)": {
+          "trials": 98,
+          "silent": 98,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefPrune)": {
+          "trials": 98,
+          "silent": 98,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefRawFieldMutation)": {
+          "trials": 178,
+          "silent": 178,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefSwap)": {
+          "trials": 182,
+          "silent": 180,
+          "changed": 2,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddNode)": {
+          "trials": 27,
+          "silent": 27,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddRouteTarget)": {
+          "trials": 46,
+          "silent": 46,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyChangeEntryNode)": {
+          "trials": 4,
+          "silent": 4,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshBackwardSlice)": {
+          "trials": 8,
+          "silent": 8,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshForwardSlice)": {
+          "trials": 7,
+          "silent": 7,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyNode)": {
+          "trials": 6,
+          "silent": 6,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyMutateGateBias)": {
+          "trials": 85,
+          "silent": 85,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyRemoveNode)": {
+          "trials": 19,
+          "silent": 19,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyRemoveRouteTarget)": {
+          "trials": 30,
+          "silent": 30,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyRetargetNodeTarget)": {
+          "trials": 35,
+          "silent": 35,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySpliceNode)": {
+          "trials": 12,
+          "silent": 12,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySwapNodeBackend)": {
+          "trials": 20,
+          "silent": 20,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySwapRouteTargets)": {
+          "trials": 82,
+          "silent": 82,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmConstantMutation)": {
+          "trials": 62,
+          "silent": 62,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyConstantBlock)": {
+          "trials": 17,
+          "silent": 17,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyGeneBackwardSlice)": {
+          "trials": 15,
+          "silent": 15,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyGeneForwardSlice)": {
+          "trials": 16,
+          "silent": 16,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyInstructionBlock)": {
+          "trials": 17,
+          "silent": 17,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyInstructionBlockRemapped)": {
+          "trials": 22,
+          "silent": 22,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmDeleteInstruction)": {
+          "trials": 18,
+          "silent": 18,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInsertLoadCompareMotif)": {
+          "trials": 23,
+          "silent": 23,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInsertReadBidMotif)": {
+          "trials": 38,
+          "silent": 38,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInsertReadStoreMotif)": {
+          "trials": 27,
+          "silent": 27,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInstructionMutation)": {
+          "trials": 42,
+          "silent": 42,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInstructionRawFieldMutation)": {
+          "trials": 64,
+          "silent": 64,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmMutatePairedSlotAddress)": {
+          "trials": 72,
+          "silent": 72,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmMutateSlotAddress)": {
+          "trials": 55,
+          "silent": 55,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmRegisterCountMutation)": {
+          "trials": 30,
+          "silent": 30,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        }
+      },
+      "applied_but_equal_genome": 19
+    },
+    {
+      "depth": 2000,
+      "arm": "executed_0.0",
+      "totals": {
+        "trials": 2000,
+        "silent": 1999,
+        "changed": 1,
+        "dead": 0,
+        "skipped": 0
+      },
+      "first_parent_target_class": {
+        "contributing": {
+          "trials": 53,
+          "silent": 52,
+          "changed": 1,
+          "dead": 0,
+          "skipped": 0
+        },
+        "executed_noncontributing": {
+          "trials": 251,
+          "silent": 251,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "no_node_target": {
+          "trials": 182,
+          "silent": 182,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "unexecuted": {
+          "trials": 1514,
+          "silent": 1514,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        }
+      },
+      "operators": {
+        "Graph/Some(GraphAddGraphEdge)": {
+          "trials": 31,
+          "silent": 31,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAddInternalGraphNode)": {
+          "trials": 20,
+          "silent": 20,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAlterGraphEdgeWeight)": {
+          "trials": 48,
+          "silent": 48,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyEdgeBundle)": {
+          "trials": 32,
+          "silent": 32,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyInternalNode)": {
+          "trials": 14,
+          "silent": 14,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopySubgraph)": {
+          "trials": 17,
+          "silent": 17,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphDisableHebbian)": {
+          "trials": 14,
+          "silent": 14,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphDisableRewardModulation)": {
+          "trials": 8,
+          "silent": 8,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphEnableHebbian)": {
+          "trials": 11,
+          "silent": 11,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphEnableRewardModulation)": {
+          "trials": 13,
+          "silent": 13,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateGraphOperatorParam)": {
+          "trials": 57,
+          "silent": 57,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateHebbianRate)": {
+          "trials": 50,
+          "silent": 50,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateHebbianRule)": {
+          "trials": 23,
+          "silent": 23,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateRewardSource)": {
+          "trials": 7,
+          "silent": 7,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateTraceDecay)": {
+          "trials": 29,
+          "silent": 29,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRawFieldMutation)": {
+          "trials": 58,
+          "silent": 58,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveGraphEdge)": {
+          "trials": 18,
+          "silent": 18,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveInternalGraphNode)": {
+          "trials": 10,
+          "silent": 10,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRetargetGraphEdge)": {
+          "trials": 33,
+          "silent": 32,
+          "changed": 1,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphSwapGraphOperator)": {
+          "trials": 28,
+          "silent": 28,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphToggleHebbianLamarckian)": {
+          "trials": 24,
+          "silent": 24,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefAdd)": {
+          "trials": 98,
+          "silent": 98,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefPrune)": {
+          "trials": 98,
+          "silent": 98,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefRawFieldMutation)": {
+          "trials": 178,
+          "silent": 178,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefSwap)": {
+          "trials": 182,
+          "silent": 182,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddNode)": {
+          "trials": 27,
+          "silent": 27,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddRouteTarget)": {
+          "trials": 46,
+          "silent": 46,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyChangeEntryNode)": {
+          "trials": 4,
+          "silent": 4,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshBackwardSlice)": {
+          "trials": 8,
+          "silent": 8,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshForwardSlice)": {
+          "trials": 7,
+          "silent": 7,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyNode)": {
+          "trials": 6,
+          "silent": 6,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyMutateGateBias)": {
+          "trials": 85,
+          "silent": 85,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyRemoveNode)": {
+          "trials": 19,
+          "silent": 19,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyRemoveRouteTarget)": {
+          "trials": 30,
+          "silent": 30,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyRetargetNodeTarget)": {
+          "trials": 35,
+          "silent": 35,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySpliceNode)": {
+          "trials": 12,
+          "silent": 12,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySwapNodeBackend)": {
+          "trials": 20,
+          "silent": 20,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySwapRouteTargets)": {
+          "trials": 82,
+          "silent": 82,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmConstantMutation)": {
+          "trials": 62,
+          "silent": 62,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyConstantBlock)": {
+          "trials": 17,
+          "silent": 17,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyGeneBackwardSlice)": {
+          "trials": 15,
+          "silent": 15,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyGeneForwardSlice)": {
+          "trials": 16,
+          "silent": 16,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyInstructionBlock)": {
+          "trials": 17,
+          "silent": 17,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyInstructionBlockRemapped)": {
+          "trials": 22,
+          "silent": 22,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmDeleteInstruction)": {
+          "trials": 18,
+          "silent": 18,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInsertLoadCompareMotif)": {
+          "trials": 23,
+          "silent": 23,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInsertReadBidMotif)": {
+          "trials": 38,
+          "silent": 38,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInsertReadStoreMotif)": {
+          "trials": 27,
+          "silent": 27,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInstructionMutation)": {
+          "trials": 42,
+          "silent": 42,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInstructionRawFieldMutation)": {
+          "trials": 64,
+          "silent": 64,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmMutatePairedSlotAddress)": {
+          "trials": 72,
+          "silent": 72,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmMutateSlotAddress)": {
+          "trials": 55,
+          "silent": 55,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmRegisterCountMutation)": {
+          "trials": 30,
+          "silent": 30,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        }
+      },
+      "applied_but_equal_genome": 17
+    },
+    {
+      "depth": 2000,
+      "arm": "contributing_oracle_1.0",
+      "totals": {
+        "trials": 2000,
+        "silent": 1975,
+        "changed": 25,
+        "dead": 0,
+        "skipped": 0
+      },
+      "first_parent_target_class": {
+        "contributing": {
+          "trials": 460,
+          "silent": 435,
+          "changed": 25,
+          "dead": 0,
+          "skipped": 0
+        },
+        "executed_noncontributing": {
+          "trials": 211,
+          "silent": 211,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "no_node_target": {
+          "trials": 182,
+          "silent": 182,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "unexecuted": {
+          "trials": 1147,
+          "silent": 1147,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        }
+      },
+      "operators": {
+        "Graph/Some(GraphAddGraphEdge)": {
+          "trials": 31,
+          "silent": 31,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAddInternalGraphNode)": {
+          "trials": 20,
+          "silent": 20,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphAlterGraphEdgeWeight)": {
+          "trials": 48,
+          "silent": 47,
+          "changed": 1,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyEdgeBundle)": {
+          "trials": 32,
+          "silent": 30,
+          "changed": 2,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopyInternalNode)": {
+          "trials": 14,
+          "silent": 14,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphCopySubgraph)": {
+          "trials": 17,
+          "silent": 17,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphDisableHebbian)": {
+          "trials": 14,
+          "silent": 14,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphDisableRewardModulation)": {
+          "trials": 8,
+          "silent": 8,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphEnableHebbian)": {
+          "trials": 11,
+          "silent": 10,
+          "changed": 1,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphEnableRewardModulation)": {
+          "trials": 13,
+          "silent": 13,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateGraphOperatorParam)": {
+          "trials": 57,
+          "silent": 51,
+          "changed": 6,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateHebbianRate)": {
+          "trials": 50,
+          "silent": 50,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateHebbianRule)": {
+          "trials": 23,
+          "silent": 23,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateRewardSource)": {
+          "trials": 7,
+          "silent": 7,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphMutateTraceDecay)": {
+          "trials": 29,
+          "silent": 29,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRawFieldMutation)": {
+          "trials": 58,
+          "silent": 57,
+          "changed": 1,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveGraphEdge)": {
+          "trials": 18,
+          "silent": 18,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRemoveInternalGraphNode)": {
+          "trials": 10,
+          "silent": 8,
+          "changed": 2,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphRetargetGraphEdge)": {
+          "trials": 33,
+          "silent": 31,
+          "changed": 2,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphSwapGraphOperator)": {
+          "trials": 28,
+          "silent": 26,
+          "changed": 2,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Graph/Some(GraphToggleHebbianLamarckian)": {
+          "trials": 24,
+          "silent": 24,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefAdd)": {
+          "trials": 98,
+          "silent": 98,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefPrune)": {
+          "trials": 98,
+          "silent": 98,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefRawFieldMutation)": {
+          "trials": 178,
+          "silent": 178,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "InputRef/Some(InputRefSwap)": {
+          "trials": 182,
+          "silent": 174,
+          "changed": 8,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddNode)": {
+          "trials": 27,
+          "silent": 27,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyAddRouteTarget)": {
+          "trials": 46,
+          "silent": 46,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyChangeEntryNode)": {
+          "trials": 4,
+          "silent": 4,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshBackwardSlice)": {
+          "trials": 8,
+          "silent": 8,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyMeshForwardSlice)": {
+          "trials": 7,
+          "silent": 7,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyCopyNode)": {
+          "trials": 6,
+          "silent": 6,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyMutateGateBias)": {
+          "trials": 85,
+          "silent": 85,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyRemoveNode)": {
+          "trials": 19,
+          "silent": 19,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyRemoveRouteTarget)": {
+          "trials": 30,
+          "silent": 30,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologyRetargetNodeTarget)": {
+          "trials": 35,
+          "silent": 35,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySpliceNode)": {
+          "trials": 12,
+          "silent": 12,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySwapNodeBackend)": {
+          "trials": 20,
+          "silent": 20,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Topology/Some(TopologySwapRouteTargets)": {
+          "trials": 82,
+          "silent": 82,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmConstantMutation)": {
+          "trials": 62,
+          "silent": 62,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyConstantBlock)": {
+          "trials": 17,
+          "silent": 17,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyGeneBackwardSlice)": {
+          "trials": 15,
+          "silent": 15,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyGeneForwardSlice)": {
+          "trials": 16,
+          "silent": 16,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyInstructionBlock)": {
+          "trials": 17,
+          "silent": 17,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmCopyInstructionBlockRemapped)": {
+          "trials": 22,
+          "silent": 22,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmDeleteInstruction)": {
+          "trials": 18,
+          "silent": 18,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInsertLoadCompareMotif)": {
+          "trials": 23,
+          "silent": 23,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInsertReadBidMotif)": {
+          "trials": 38,
+          "silent": 38,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInsertReadStoreMotif)": {
+          "trials": 27,
+          "silent": 27,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInstructionMutation)": {
+          "trials": 42,
+          "silent": 42,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmInstructionRawFieldMutation)": {
+          "trials": 64,
+          "silent": 64,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmMutatePairedSlotAddress)": {
+          "trials": 72,
+          "silent": 72,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmMutateSlotAddress)": {
+          "trials": 55,
+          "silent": 55,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        },
+        "Vm/Some(VmRegisterCountMutation)": {
+          "trials": 30,
+          "silent": 30,
+          "changed": 0,
+          "dead": 0,
+          "skipped": 0
+        }
+      },
+      "applied_but_equal_genome": 15
+    }
+  ],
+  "limitations": [
+    "Single current Orchards configuration; first20 fixed chart lineages, not fresh independently sampled populations.",
+    "Founder controls repeat one genotype with separate seed streams.",
+    "Actionless and contributing are finite-battery properties, not ecological viability or usefulness.",
+    "First selected node is not a causal attribution to all modified tissue.",
+    "Contributing-set arm uses an observation oracle and normal fallback, not a production candidate or upper bound.",
+    "No selected-genome, expanded-battery, multistep discovery, or reproductive-benefit comparison."
+  ],
+  "panel_sha256": "6b6d8926f57203b710b5ec907dc52aa069a3e5cbf9ea82b6c518b814e0d19ee2"
+}
