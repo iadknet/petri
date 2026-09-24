@@ -654,6 +654,27 @@ mod tests {
         }
     }
 
+    /// A parent-set entry at the parent's node count names no carried node,
+    /// so the first removal drops it instead of shifting it onto a node this
+    /// birth created at that index.
+    #[test]
+    fn birth_membership_drops_entries_at_the_parent_node_count_on_removal() {
+        let reachable = vec![0, 2];
+        let executed = vec![1, 2];
+        let mut membership = BirthMembership::new(&reachable, &executed, 2);
+        let carried = [NodeId::new(4), NodeId::new(7)];
+        let created = NodeId::new(8);
+
+        let mut after: Vec<NodeGenome> = carried.iter().copied().map(bare_node).collect();
+        after.push(bare_node(created));
+        membership.observe_event(&carried, &after);
+        membership.observe_event(&[carried[0], carried[1], created], &after[1..]);
+
+        let sets = membership.sets();
+        assert!(sets.reachable.is_empty(), "reachable: {:?}", sets.reachable);
+        assert_eq!(sets.executed, [0]);
+    }
+
     #[test]
     fn empty_eligible_returns_none() {
         let mut rng = seeded_rng(0);

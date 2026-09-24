@@ -136,9 +136,23 @@ Fixed design:
       The T11.F24 regressions and proptests pass unedited. Viability passes
       28, `--lib mutation` passes 417 with 1 ignored, clippy `-D warnings`
       exits 0, and `make check` exits 0 (2026-09-24).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred. The
-      full survivor list stays here.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on `939181b3`
+      (2026-09-24): `10 mutants tested in 4m: 1 missed, 7 caught, 2
+      unviable`, diffed against `562f5e96`, output in
+      `~/.local/share/petri-tools/mutants/t11-f24/mutants.out`. Survivors:
+      - `crates/v3-core/src/mutation/reachability.rs:195:54: replace < with
+        <= in BirthMembership<'a>::observe_event` (missed): **killed**. The
+        new unit test
+        `birth_membership_drops_entries_at_the_parent_node_count_on_removal`
+        in the same file checks that a set entry equal to the parent's node
+        count is dropped on the first removal. Without the fix, that entry
+        would shift onto a node created in this birth.
+        `MUTANTS_ITERATE=1 make rust-mutants` then reported `1 mutant tested
+        in 89s: 1 caught`.
+
+      No production code, test selection, or mutation configuration changed,
+      and no test was weakened, so no second fresh run is needed. The
+      incremental pass reused the same output directory.
 - [x] Gate and goal benchmark summaries are stored at
       `docs/progress/features/t11-f24-stable-parent-membership-during-mutation.json`
       and `...-goal.json`. Local raw hash, byte count, and verification time
