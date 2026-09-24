@@ -211,18 +211,40 @@ Goal: `make bench PROFILE=goal FEATURE=t11-f25-meaningful-action-parameter-targe
 `births`, `pass_cap_hits`, `passes` are `ok`. Against the latest closure,
 T11.F24: `vm_steps` +202.71% (severe), `decided_passes` +34.55% (severe),
 `mesh_hops` +26.74%, `graph_relax_iters` +20.19%, `plasticity_updates`
-+21.18%, `actions_applied` +26.34%, `passes` +16.51%, `decided_passes` flag
-(all flag); `births` and `pass_cap_hits` `ok`. No extinction: `final_population`
++21.18%, `actions_applied` +26.34%, `passes` +16.51% (all flag); `births`
+and `pass_cap_hits` `ok`. No extinction: `final_population`
 4877/3221/1219 across the three goal-worlds-v1 seeds, `extinction_tick` null
 on all three. `neighborhood_evolved_wall_clock_ms_total` 5317.7 ms, well
 under the 180 s cap; `neighborhood_founder_wall_clock_ms` 280.1 ms, under the
-10 s cap. This `vm_steps`/`decided_passes` severity is not covered by the
-Predeclaration table above (which named only `AddGraphEdge`-filter and
-opcode-25-draw trajectory shifts with no predicted sign) and is not covered
-by the user decision above, which addressed only the gate `pass_cap_hits`
-counter. It is reported to the orchestrator as an unresolved, unexpected
-result; the goal series `epoch_baseline` is left unchanged pending a
-separate user decision.
+10 s cap.
+
+Attribution of the goal severes, from the stored per-seed rows (`vm_steps`
+per creature-tick, then `decided_passes` counts, listed as T19.F04 / T11.F24 /
+T11.F25):
+
+| World (seed) | `vm_steps` per creature-tick | `decided_passes` | Final population | Final mean mesh nodes | Final mean genome size |
+| --- | --- | --- | --- | --- | --- |
+| Orchards (11) | 1.100 / 0.648 / 0.577 | 835 / 2,889 / 2,339 | 1,331 / 4,990 / 4,877 | 5.12 / 5.49 / 4.21 | 185 / 205 / 129 |
+| Canyon (22) | 1.440 / 1.452 / 0.753 | 1,903 / 313 / 500 | 3,961 / 2,194 / 3,221 | 6.08 / 4.69 / 3.82 | 198 / 121 / 122 |
+| Confluence (33) | 0.680 / 0.461 / 5.232 | 1,083 / 1,720 / 2,943 | 5,464 / 7,103 / 1,219 | 4.33 / 4.03 / 8.69 | 137 / 132 / 232 |
+
+One world drives both pooled severes. In Confluence a large-brained lineage
+took over: mean mesh nodes doubled, genome size rose by about 100 units, the
+VM-operator share of mutation carriers rose to 16.4% (T11.F24 9.0%, T19.F04
+8.8%), and `vm_steps` rose sevenfold to elevenfold. In Orchards and Canyon,
+`vm_steps` fell below both references. The runtime and the VM's control flow
+are unchanged, since the feature alters only which slot a fresh
+`WriteActionParam` names and which sink `AddGraphEdge` picks. The result is
+therefore selection on one seed's trajectory, not a per-execution cost or a
+defect. Fresh VM parameter writes now always reach a decoded field, which
+plausibly makes VM nodes load-bearing more often, but opposite signs in the
+other two worlds and one seed per world cannot separate that from trajectory
+divergence. The predeclaration covers the result: work counters "No
+direction; standard thresholds", and a severe goes to the user. Confluence's
+final population (1,219) is below half of both references, and its plateau
+(3,609) is below half of T11.F24's; this is reported to the user, not an
+extinction. The goal series `epoch_baseline` stays at T19.F04 pending the
+user decision, which is recorded here verbatim.
 
 - Summaries: [gate](../../progress/features/t11-f25-meaningful-action-parameter-targets.json),
   [goal](../../progress/features/t11-f25-meaningful-action-parameter-targets-goal.json).
