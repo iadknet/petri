@@ -61,15 +61,12 @@ fn patch_touches_failed_action_penalty(patch: &serde_json::Value) -> bool {
 }
 
 fn patch_touches_fertility_generation_layers(patch: &serde_json::Value) -> bool {
-    let food = patch.get("world").and_then(|w| w.get("food"));
-    let direct_layers = food
+    patch
+        .get("world")
+        .and_then(|w| w.get("food"))
         .and_then(|f| f.get("fertility"))
-        .and_then(|fertility| fertility.get("layers"));
-    let shared_layers = food
-        .and_then(|f| f.get("shared"))
-        .and_then(|shared| shared.get("fertility"))
-        .and_then(|fertility| fertility.get("layers"));
-    direct_layers.is_some() || shared_layers.is_some()
+        .and_then(|fertility| fertility.get("layers"))
+        .is_some()
 }
 
 fn patch_touches_disallowed_food_runtime_paths(patch: &serde_json::Value) -> bool {

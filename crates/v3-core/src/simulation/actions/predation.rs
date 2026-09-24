@@ -211,7 +211,6 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.world.width = 10;
         cfg.world.height = 10;
-        cfg.world.food.initial_coverage = 0.0;
         cfg.world.food.growth_rate = 0.0;
 
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
@@ -266,7 +265,6 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.world.width = 10;
         cfg.world.height = 10;
-        cfg.world.food.initial_coverage = 0.0;
         cfg.world.food.growth_rate = 0.0;
 
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);

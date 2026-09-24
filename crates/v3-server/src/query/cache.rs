@@ -168,9 +168,7 @@ pub fn build_food_fertility_u8(food: &FoodResource) -> std::sync::Arc<[u8]> {
 
 #[cfg(test)]
 mod tests {
-    use v3_core::config::{
-        FertilityConfig, FertilityLayer, FoodConfig, FoodResourceConfig, WorldEdgeMode,
-    };
+    use v3_core::config::{FertilityConfig, FertilityLayer, FoodConfig, WorldEdgeMode};
     use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
     use v3_core::kernel::FoodResource;
 
@@ -248,7 +246,7 @@ mod tests {
         max_fert: f32,
         uniform_value: f32,
     ) -> FoodResource {
-        let config = FoodResourceConfig {
+        let config = FoodConfig {
             fertility: FertilityConfig {
                 enabled: true,
                 min_fertility: min_fert,
@@ -261,14 +259,9 @@ mod tests {
                     target: v3_core::config::FertilityLayerTarget::default(),
                 }],
             },
-            ..FoodResourceConfig::default()
+            ..FoodConfig::default()
         };
-        let mut food = FoodResource::new(
-            width,
-            height,
-            FoodConfig::single_type(config),
-            WorldEdgeMode::Wrap,
-        );
+        let mut food = FoodResource::new(width, height, config, WorldEdgeMode::Wrap);
         food.seed_fertility(42);
         food
     }

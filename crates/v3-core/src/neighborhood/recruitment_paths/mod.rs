@@ -32,7 +32,6 @@ pub fn task_config() -> SimulationConfig {
     config.world.width = 12;
     config.world.height = 12;
     config.population.initial_creatures = 0;
-    config.world.food.initial_coverage = 0.0;
     config.world.food.growth_rate = 0.0;
     config.world.food.recovery_spawn_rate = 0.0;
     for food in &mut config.world.food.types {

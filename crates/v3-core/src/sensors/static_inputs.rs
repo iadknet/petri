@@ -208,8 +208,6 @@ mod tests {
         use rand::rngs::SmallRng;
         use rand::SeedableRng;
         let mut food_cfg = SimulationConfig::default().world.food;
-        food_cfg.initial_coverage = 1.0;
-        food_cfg.initial_density = 1.0;
         food_cfg.types[0].initial_coverage = 1.0;
         food_cfg.types[0].initial_density = 1.0;
         world.reconfigure_food(food_cfg);
@@ -227,8 +225,6 @@ mod tests {
         use rand::rngs::SmallRng;
         use rand::SeedableRng;
         let mut food_cfg = SimulationConfig::default().world.food;
-        food_cfg.initial_coverage = 1.0;
-        food_cfg.initial_density = 1.0;
         food_cfg.types[0].initial_coverage = 1.0;
         food_cfg.types[0].initial_density = 1.0;
         world.reconfigure_food(food_cfg);

@@ -279,7 +279,6 @@ fn build_simulation(food_here: f32) -> (Simulation, CreatureId, Position) {
     let mut cfg = SimulationConfig::default();
     cfg.world.width = 8;
     cfg.world.height = 8;
-    cfg.world.food.initial_coverage = 0.0;
     cfg.world.food.growth_rate = 0.0;
     cfg.energy.lifecycle.energy_decay_per_tick = 0.0;
 

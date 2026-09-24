@@ -15,8 +15,6 @@ pub enum WorldEdgeMode {
 #[serde(deny_unknown_fields)]
 pub struct FoodResourceConfig {
     pub growth_rate: f32,
-    pub initial_density: f32,
-    pub initial_coverage: f32,
     pub spread_threshold_ratio: f32,
     pub spread_density_ratio: f32,
     pub recovery_spawn_rate: f32,
@@ -26,18 +24,12 @@ pub struct FoodResourceConfig {
     pub occupancy_depletion: OccupancyDepletionConfig,
     #[serde(default)]
     pub grazing: GrazingConfig,
-    #[serde(default)]
-    pub fertility: FertilityConfig,
-    #[serde(default)]
-    pub annealing: AnnealingConfig,
 }
 
 impl Default for FoodResourceConfig {
     fn default() -> Self {
         Self {
             growth_rate: 0.09,
-            initial_density: 1.0,
-            initial_coverage: 0.54,
             spread_threshold_ratio: 0.8,
             spread_density_ratio: 0.25,
             recovery_spawn_rate: 0.01,
@@ -45,8 +37,6 @@ impl Default for FoodResourceConfig {
             max_density: 1.0,
             occupancy_depletion: OccupancyDepletionConfig::default(),
             grazing: GrazingConfig::default(),
-            fertility: FertilityConfig::default(),
-            annealing: AnnealingConfig::default(),
         }
     }
 }
@@ -273,23 +263,14 @@ impl Default for FoodConfig {
 impl FoodConfig {
     /// Wrap a shared food substrate config into a single-type food config.
     ///
-    /// The one synthesized food type inherits the shared initial density and
-    /// coverage, and the top-level fertility and annealing settings mirror the
-    /// shared ones, so a world configured this way has exactly one ordinary-food
-    /// type. Used for placeholder configs and for tests that only vary the
-    /// shared substrate.
+    /// The food type catalog, fertility, and annealing take their defaults, so
+    /// a world configured this way has exactly one ordinary-food type. Used for
+    /// placeholder configs and for tests that only vary the shared substrate.
     #[must_use]
     pub fn single_type(shared: FoodResourceConfig) -> Self {
-        let primary_type = FoodTypeConfig {
-            initial_density: shared.initial_density,
-            initial_coverage: shared.initial_coverage,
-            ..FoodTypeConfig::default()
-        };
         Self {
-            types: vec![primary_type],
-            fertility: shared.fertility.clone(),
-            annealing: shared.annealing.clone(),
             shared,
+            ..Self::default()
         }
     }
 }
@@ -1157,14 +1138,12 @@ fn normalize_world_food(world: &mut WorldConfig) {
 fn normalize_food_config(food: &mut FoodConfig) {
     normalize_food_shared(&mut food.shared);
     normalize_food_types(food);
-    sync_shared_from_canonical_food(food);
     normalize_food_layer_targets(food);
 }
 
 fn normalize_food_shared(shared: &mut FoodResourceConfig) {
     shared.max_density = normalize_f32_finite_positive(shared.max_density, 1.0);
     shared.growth_rate = normalize_f32_clamp(shared.growth_rate, 0.0, 1.0, 0.09);
-    shared.initial_coverage = normalize_f32_clamp(shared.initial_coverage, 0.0, 1.0, 0.54);
     shared.spread_threshold_ratio =
         normalize_f32_clamp(shared.spread_threshold_ratio, 0.0, 1.0, 0.8);
     shared.spread_density_ratio = normalize_f32_clamp(shared.spread_density_ratio, 0.0, 1.0, 0.25);
@@ -1182,12 +1161,6 @@ fn normalize_food_shared(shared: &mut FoodResourceConfig) {
         0 => DEFAULT_GRAZING_RECOVERY_TICKS,
         ticks => ticks.min(MAX_GRAZING_RECOVERY_TICKS),
     };
-    shared.initial_density = normalize_f32_clamp(
-        shared.initial_density,
-        0.0,
-        shared.max_density,
-        shared.max_density,
-    );
 }
 
 fn normalize_food_types(food: &mut FoodConfig) {
@@ -1215,15 +1188,6 @@ fn normalize_food_types(food: &mut FoodConfig) {
             .filter(|v| v.is_finite())
             .map(|v| v.clamp(0.0, 1.0));
     }
-}
-
-fn sync_shared_from_canonical_food(food: &mut FoodConfig) {
-    if let Some(primary_type) = food.types.first() {
-        food.shared.initial_density = primary_type.initial_density;
-        food.shared.initial_coverage = primary_type.initial_coverage;
-    }
-    food.shared.fertility = food.fertility.clone();
-    food.shared.annealing = food.annealing.clone();
 }
 
 fn normalize_food_layer_targets(food: &mut FoodConfig) {
@@ -1388,8 +1352,8 @@ mod tests {
         assert_eq!(cfg.world.height, 1600);
         assert!(matches!(cfg.world.edge_mode, WorldEdgeMode::Wrap));
         assert!((cfg.world.food.growth_rate - 0.09).abs() < 1e-6);
-        assert!((cfg.world.food.initial_density - 1.0).abs() < 1e-6);
-        assert!((cfg.world.food.initial_coverage - 0.54).abs() < 1e-6);
+        assert!((cfg.world.food.types[0].initial_density - 1.0).abs() < 1e-6);
+        assert!((cfg.world.food.types[0].initial_coverage - 0.54).abs() < 1e-6);
         assert!((cfg.world.food.spread_threshold_ratio - 0.8).abs() < 1e-6);
         assert!((cfg.world.food.spread_density_ratio - 0.25).abs() < 1e-6);
         assert!((cfg.world.food.recovery_spawn_rate - 0.01).abs() < 1e-6);
@@ -1548,9 +1512,9 @@ mod tests {
     fn normalize_initial_density_clamps_to_max_density() {
         let mut cfg = SimulationConfig::default();
         cfg.world.food.max_density = 0.8;
-        cfg.world.food.initial_density = 1.5;
+        cfg.world.food.types[0].initial_density = 1.5;
         cfg.normalize();
-        assert!((cfg.world.food.initial_density - 0.8).abs() < 1e-6);
+        assert!((cfg.world.food.types[0].initial_density - 0.8).abs() < 1e-6);
     }
 
     #[test]
@@ -2551,23 +2515,41 @@ mod tests {
             }
             assert!(matches!(layer.target, FertilityLayerTarget::AllFoods));
         }
-        assert!(!config.shared.annealing.enabled);
-        assert_eq!(config.shared.annealing.ramp_ticks, 5000);
+        assert!(!config.annealing.enabled);
+        assert_eq!(config.annealing.ramp_ticks, 5000);
     }
 
     #[test]
     fn food_config_deserializes_with_defaults_when_omitted() {
-        let json = r#"{"shared":{"growth_rate":0.09,"initial_density":1.0,"initial_coverage":0.54,"spread_threshold_ratio":0.8,"spread_density_ratio":0.25,"recovery_spawn_rate":0.01,"recovery_floor_ratio":0.01,"max_density":1.0}}"#;
+        let json = r#"{"shared":{"growth_rate":0.09,"spread_threshold_ratio":0.8,"spread_density_ratio":0.25,"recovery_spawn_rate":0.01,"recovery_floor_ratio":0.01,"max_density":1.0}}"#;
         let config: FoodConfig = serde_json::from_str(json).unwrap();
         assert!(config.shared.occupancy_depletion.enabled);
         assert!(config.fertility.enabled);
-        assert!(!config.shared.annealing.enabled);
+        assert!(!config.annealing.enabled);
         assert_eq!(config.types.len(), 1);
         assert_eq!(config.fertility.layers.len(), 2);
         assert!(matches!(
             config.fertility.layers[0].target,
             FertilityLayerTarget::AllFoods
         ));
+    }
+
+    /// The shared substrate no longer carries a copy of the per-type initial
+    /// values or the top-level fertility and annealing settings.
+    #[test]
+    fn shared_food_config_rejects_the_retired_copy_keys() {
+        for key in [
+            "initial_density",
+            "initial_coverage",
+            "fertility",
+            "annealing",
+        ] {
+            let mut shared = serde_json::to_value(FoodResourceConfig::default()).unwrap();
+            assert!(shared.get(key).is_none(), "{key} is still serialized");
+            shared[key] = serde_json::json!({});
+            let error = serde_json::from_value::<FoodResourceConfig>(shared).unwrap_err();
+            assert!(error.to_string().contains(key), "{key}: {error}");
+        }
     }
 
     #[test]
@@ -2598,7 +2580,7 @@ mod tests {
     #[test]
     fn grazing_block_and_its_fields_are_serde_defaulted() {
         let without_block: FoodResourceConfig = serde_json::from_str(
-            r#"{"growth_rate":0.1,"initial_density":1.0,"initial_coverage":0.5,
+            r#"{"growth_rate":0.1,
                 "spread_threshold_ratio":0.8,"spread_density_ratio":0.25,
                 "recovery_spawn_rate":0.01,"recovery_floor_ratio":0.01,"max_density":1.0}"#,
         )
@@ -2691,7 +2673,6 @@ mod tests {
         normalize_food_config(&mut food);
 
         assert!((food.types[0].initial_density - 0.5).abs() < 1e-6);
-        assert!((food.shared.initial_density - 0.5).abs() < 1e-6);
     }
 
     #[test]
@@ -2741,63 +2722,24 @@ mod tests {
         ));
     }
 
+    /// `single_type` keeps the given substrate and takes every other food
+    /// setting from the defaults, so the default substrate yields exactly the
+    /// default food config.
     #[test]
-    fn normalize_syncs_primary_food_type_density_and_coverage_into_shared_fields() {
-        let mut cfg = SimulationConfig::default();
-        cfg.world.food.types[0].initial_density = 0.72;
-        cfg.world.food.types[0].initial_coverage = 0.31;
-
-        cfg.normalize();
-
-        assert!((cfg.world.food.shared.initial_density - 0.72).abs() < 1e-6);
-        assert!((cfg.world.food.shared.initial_coverage - 0.31).abs() < 1e-6);
-    }
-
-    #[test]
-    fn normalize_syncs_top_level_fertility_and_annealing_into_shared_runtime_config() {
-        let mut cfg = SimulationConfig::default();
-        cfg.world.food.fertility.enabled = false;
-        cfg.world.food.annealing.enabled = true;
-        cfg.world.food.annealing.ramp_ticks = 1234;
-
-        cfg.normalize();
-
-        assert!(!cfg.world.food.shared.fertility.enabled);
-        assert!(cfg.world.food.shared.annealing.enabled);
-        assert_eq!(cfg.world.food.shared.annealing.ramp_ticks, 1234);
-    }
-
-    #[test]
-    fn single_type_preserves_top_level_fertility_and_annealing() {
-        let mut shared = FoodResourceConfig::default();
-        shared.fertility.enabled = false;
-        shared.fertility.min_fertility = 0.25;
-        shared.fertility.max_fertility = 1.25;
-        shared.annealing.enabled = true;
-        shared.annealing.ramp_ticks = 777;
-
-        let config = FoodConfig::single_type(shared.clone());
-
-        assert_eq!(config.fertility.enabled, shared.fertility.enabled);
-        assert!((config.fertility.min_fertility - shared.fertility.min_fertility).abs() < 1e-6);
-        assert!((config.fertility.max_fertility - shared.fertility.max_fertility).abs() < 1e-6);
-        assert_eq!(config.annealing.enabled, shared.annealing.enabled);
-        assert_eq!(config.annealing.ramp_ticks, shared.annealing.ramp_ticks);
-    }
-
-    #[test]
-    fn single_type_syncs_primary_type_density_and_coverage() {
+    fn single_type_wraps_the_shared_substrate_around_default_food_settings() {
         let shared = FoodResourceConfig {
-            initial_density: 0.77,
-            initial_coverage: 0.33,
+            growth_rate: 0.77,
             ..FoodResourceConfig::default()
         };
 
-        let config = FoodConfig::single_type(shared.clone());
+        let config = FoodConfig::single_type(shared);
 
-        assert_eq!(config.types.len(), 1);
-        assert!((config.types[0].initial_density - shared.initial_density).abs() < 1e-6);
-        assert!((config.types[0].initial_coverage - shared.initial_coverage).abs() < 1e-6);
+        assert_eq!(config.types, FoodConfig::default().types);
+        assert!((config.shared.growth_rate - 0.77).abs() < 1e-6);
+        assert_eq!(
+            serde_json::to_value(FoodConfig::single_type(FoodResourceConfig::default())).unwrap(),
+            serde_json::to_value(FoodConfig::default()).unwrap()
+        );
     }
 
     /// Guards the failure mode recorded in the 2026-09-07 config panel apply
@@ -2844,8 +2786,6 @@ mod tests {
                     config.runtime.max_actions_per_turn = max_actions_per_turn;
                     config.action_log.capacity = action_log_capacity;
                     config.world.food.shared.max_density = max_density;
-                    config.world.food.shared.initial_density = initial_density;
-                    config.world.food.shared.initial_coverage = initial_coverage;
                     for food_type in &mut config.world.food.types {
                         food_type.initial_density = initial_density;
                         food_type.initial_coverage = initial_coverage;

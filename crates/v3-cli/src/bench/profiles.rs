@@ -282,7 +282,6 @@ pub fn build_config(params: &ProfileParams) -> SimulationConfig {
     config.world.height = params.height;
     config.population.initial_creatures = params.founders;
     if let Some(coverage) = params.food_coverage {
-        config.world.food.shared.initial_coverage = coverage;
         for food_type in &mut config.world.food.types {
             food_type.initial_coverage = coverage;
         }

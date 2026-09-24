@@ -54,8 +54,6 @@ fn viability_config() -> SimulationConfig {
     // Fewer creatures for test speed
     cfg.population.initial_creatures = 10;
     // Full food coverage to compensate for small world
-    cfg.world.food.initial_coverage = 1.0;
-    cfg.world.food.initial_density = 1.0;
     cfg
 }
 
@@ -69,7 +67,6 @@ fn high_coverage_economics_probe_config() -> SimulationConfig {
     cfg.world.width = 32;
     cfg.world.height = 32;
     cfg.population.initial_creatures = 20;
-    cfg.world.food.initial_coverage = 1.0;
     cfg
 }
 
@@ -325,7 +322,6 @@ fn creatures_can_eat_food() {
         let mut c = SimulationConfig::default();
         c.world.width = 10;
         c.world.height = 10;
-        c.world.food.initial_coverage = 0.0;
         c.world.food.growth_rate = 0.0;
         c.population.initial_creatures = 0;
         c
@@ -335,8 +331,6 @@ fn creatures_can_eat_food() {
     let pos = Position::new(5, 5);
     {
         let mut food_cfg = cfg.world.food.clone();
-        food_cfg.initial_coverage = 1.0;
-        food_cfg.initial_density = 1.0;
         food_cfg.types[0].initial_coverage = 1.0;
         world.reconfigure_food(food_cfg);
         let mut rng = SmallRng::seed_from_u64(0);
@@ -397,7 +391,6 @@ fn founder_eats_primary_type_and_preserves_other_food() {
         .push(v3_core::config::FoodTypeConfig::default());
     cfg.world.width = 5;
     cfg.world.height = 5;
-    cfg.world.food.initial_coverage = 0.0;
     cfg.world.food.growth_rate = 0.0;
     cfg.population.initial_creatures = 0;
 
@@ -445,7 +438,6 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
     cfg.world.width = 10;
     cfg.world.height = 10;
     cfg.population.initial_creatures = 0;
-    cfg.world.food.initial_coverage = 0.0;
     cfg.world.food.growth_rate = 0.0;
     cfg.runtime.graph_node_base_cost = 0.1;
     cfg.energy.lifecycle.max_energy = 120.0;
@@ -502,7 +494,6 @@ fn founder_does_not_attempt_reproduce_when_below_min_reproduce_age() {
     cfg.world.width = 10;
     cfg.world.height = 10;
     cfg.population.initial_creatures = 0;
-    cfg.world.food.initial_coverage = 0.0;
     cfg.world.food.growth_rate = 0.0;
     cfg.runtime.graph_node_base_cost = 0.1;
     cfg.energy.lifecycle.max_energy = 120.0;
@@ -556,7 +547,6 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
     cfg.world.width = 10;
     cfg.world.height = 10;
     cfg.population.initial_creatures = 0;
-    cfg.world.food.initial_coverage = 0.0;
     cfg.world.food.growth_rate = 0.0;
     // Production initial_energy (20.0) is below the founder reproduce threshold (24.0)
 
@@ -1006,8 +996,6 @@ fn mutation_skip_reason_tracking_accumulates_correctly() {
     cfg.population.initial_creatures = 10;
     // About three requested events per founder birth (0.03 per unit).
     cfg.mutation.per_unit_rate = 0.03;
-    cfg.world.food.initial_coverage = 0.8;
-    cfg.world.food.initial_density = 1.0;
     cfg.world.food.growth_rate = 0.5;
     cfg.energy.costs.reproduce_cost = 1.0;
     let mut sim = seed_simulation(cfg, 42);

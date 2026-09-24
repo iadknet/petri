@@ -30,7 +30,6 @@ pub(crate) fn test_config() -> SimulationConfig {
     let mut cfg = SimulationConfig::default();
     cfg.world.width = 12;
     cfg.world.height = 12;
-    cfg.world.food.initial_coverage = 0.0;
     cfg.world.food.growth_rate = 0.0;
     // Both world-level Phase 0 energy charges are off, so a fixture that reads
     // a creature's energy difference across a tick reads only what the tick's

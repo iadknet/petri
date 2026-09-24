@@ -24,8 +24,6 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
         config.world.width = 24;
         config.world.height = 24;
         config.population.initial_creatures = 24;
-        config.world.food.initial_coverage = 1.0;
-        config.world.food.initial_density = 1.0;
         // About three requested events per founder birth, the retired
         // two-to-four-event fixture's exposure (T11.F20).
         config.mutation.per_unit_rate = 0.03;
@@ -90,8 +88,6 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
         config.world.width = 24;
         config.world.height = 24;
         config.population.initial_creatures = 24;
-        config.world.food.initial_coverage = 1.0;
-        config.world.food.initial_density = 1.0;
         let mut sim = seed_simulation(config, seed);
         for _ in 0..64 {
             run_tick(&mut sim, &mut None);
