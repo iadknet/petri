@@ -1,7 +1,7 @@
 # T07 — Communication and Social Evolution
 
 **Status**: Planned
-**Last updated**: 2026-09-08
+**Last updated**: 2026-09-23
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -23,7 +23,7 @@ tested.
 - [ ] **T07.F01 — Costly Evolvable Signal Emission** — Depends on: T03.F01
   - Goal: Scent. Creatures can emit signals on a few channels at an energy cost, with no meaning attached by the simulation.
 - [ ] **T07.F02 — Signal Perception and Identity Context** — Depends on: T07.F01
-  - Goal: Smelling. Creatures perceive nearby signals along with kin and identity context, so meaning can arise from who sent what.
+  - Goal: Smelling. Creatures perceive nearby signals with carried kin-tag and phenotype cues, so meaning can arise from who sent what.
 - [ ] **T07.F03 — Spatial and Temporal Signal Medium** — Depends on: T07.F01
   - Goal: Pheromone trails. Signals diffuse through space and fade over time, so a signal carries history and place.
 - [ ] **T07.F04 — Live, Replay, and Ghost Social Assays** — Depends on: T07.F02, T07.F03, T10.F05
@@ -40,7 +40,7 @@ tested.
 - T07.F01–F03/F05/F06 must enable their signal medium and social interaction opportunities in all three standard goal environments under the [shared baseline contract](../workflow.md#environmental-pressures-in-the-standard-baseline). Report applied effects without assigning signal meaning or forcing cooperation.
 
 - Do not encode meanings such as food, danger, kin, or cooperation into signal channels. Meaning must arise from sender-receiver effects.
-- Existing identity and kin-affinity inputs may provide context, but lineage labels must not become automatic cooperation bonuses.
+- Reuse carried identity and kin-affinity cues under T16.F03's contract. Lineage IDs remain observational metadata, never creature inputs or automatic cooperation bonuses; T07 does not duplicate T16's identity repair or T20's general input recruitment.
 - A social-cognition claim requires loss under a nonresponsive or temporally mismatched partner, not merely activity near another creature.
 - T07.F06 depends on the medium and the transfer actions, not on the T07.F04 assays or the T09.F01 qualification suite; those belong to the deferred proof phase.
 - T07.F01 through T07.F03 must retain signal channel count, energetic cost, diffusion, decay, and noise as treatment parameters. Their feature specs must include a bounded fixture or short-evolution comparison of at least two viable parameterizations; no cited study selects Petri's numerical values in advance.

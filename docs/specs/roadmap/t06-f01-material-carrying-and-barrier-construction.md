@@ -1,7 +1,7 @@
 # T06.F01 — Material Carrying and Barrier Construction
 
 **Status**: Planned
-**Last updated**: 2026-09-04
+**Last updated**: 2026-09-23
 **Feature**: T06.F01
 **Track**: [T06 — Niche Construction and Ecological Inheritance](../../roadmaps/t06-niche-construction-and-ecological-inheritance.md)
 
@@ -30,8 +30,9 @@ world, action, energy, and lifecycle machinery:
 - [World geometry and occupancy](../../reference/v3-world-grid-spec.md).
 - [Tick ordering](../../reference/v3-tick-orchestration-spec.md).
 - [Sensors](../../reference/v3-sensor-spec.md).
-- `crates/v3-core/src/contracts/actions.rs`, `runtime/action_decode.rs`, and
-  `runtime/cgp/effects.rs` for controller-accessible actions.
+- [Mesh action selection](../../reference/v3-mesh-execution-spec.md) and
+  [VM instruction semantics](../../reference/v3-vm-isa-spec.md), plus
+  `crates/v3-core/src/contracts/actions.rs`, for controller-accessible actions.
 - `crates/v3-core/src/simulation/actions/`, `simulation/tick.rs`, and
   `simulation/simulation.rs` for application and removal.
 
@@ -60,6 +61,12 @@ Storage contract:
 
 Action contract (names describe semantics; encodings follow existing conventions):
 
+New actions extend the existing vote-kind, sink and parameter interfaces in both
+supported backends, with normal pass competition and per-kind habituation.
+No separate queue-building or action-selection path is introduced. Input
+declarations use the existing reference contract; general recruitment/refinement
+changes remain T20's responsibility.
+
 | Action | Parameters | Successful effect |
 | --- | --- | --- |
 | Pick up barrier | Adjacent direction, destination slot | Remove one barrier from the resolved neighbor and put it in the empty slot. |
@@ -79,10 +86,11 @@ Action contract (names describe semantics; encodings follow existing conventions
 - Changes apply immediately in normal sequential action order. A barrier can
   block a later move or placement in that tick; removing one can enable a later
   action. Frozen cognition inputs are not recomputed mid-tick.
-- Charge a handling action cost on every attempt, plus the existing failed-action
-  penalty when appropriate. Use the existing energy adjustment and affordability
-  rules, without double-charging. Initial handling base costs equal the existing
-  base move cost; expose finite nonnegative values through the existing config.
+- Charge the handling action's effort cost on every attempt through the existing
+  energy adjustment and affordability rules, without a separate failure penalty
+  or double-charging; T16.F02 owns global penalty retirement. Initial handling
+  base costs equal the existing base move cost; expose finite nonnegative values
+  through the existing config.
 - Loaded movement has base cost `move_cost + occupied_slots * carry_cost` before
   the existing age/complexity adjustments. The surcharge applies to attempted
   moves, including blocked moves, just as the existing move cost does. Initial
@@ -149,7 +157,8 @@ Persistence and death contract:
       decoding, and inspection/serialization round trips for inventory/provenance.
 - [ ] Run `cargo test -p v3-core --test viability` first when changing defaults or
       tick-loop mechanics, focused tests, `make roadmap-check`, and `make check`.
-- [ ] Benchmark report stored at `docs/progress/features/t06-f01.json`.
+- [ ] Benchmark summary stored at `docs/progress/features/t06-f01.json`, with raw
+      reports and provenance under the [artifact contract](../../benchmark-artifacts.md).
 
 ## Performance and Goal Impact
 
@@ -165,9 +174,10 @@ a severe regression or a baseline change.
 
 At implementation closure record deterministic work and wall-clock deltas per
 creature-tick against the previous closed feature and pinned epoch baseline,
-threshold results, dated goal-profile indicators, and a second-run determinism
-check. Report applied construction, loaded movement cost, and destroyed drops
-through existing reporting. No new diversity or cognition metric is introduced;
+threshold results, dated goal-profile indicators, and the verification and
+benchmark records required by `docs/workflow.md`. Report applied construction,
+loaded movement cost, and destroyed drops through existing reporting.
+No new diversity or cognition metric is introduced;
 observing a construction does not prove adaptive ecological inheritance.
 
 ## Success Criteria

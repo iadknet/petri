@@ -1,7 +1,7 @@
 # T12 — World Composition and Baseline Worlds
 
 **Status**: In Progress
-**Last updated**: 2026-09-08
+**Last updated**: 2026-09-23
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -17,7 +17,7 @@ is what later environmental features are read against.
 
 - [ ] A world config with terrain layers and seeds regenerates the identical world in any process and at any thread count, verified inside `make check`.
 - [x] Food types can differ in energy per bite, coverage, regrowth, and recovery through the world config alone, production defaults unchanged, so a rich rare food and a poor abundant one can share a world.
-- [x] Any world reachable in the app or the CLI can be saved as a recipe and loaded back by both, and every benchmark report that reads a recipe records its path and digest.
+- [x] Procedural world recipes can be saved and loaded by both the app and the CLI, and every benchmark report that reads a recipe records its path and digest; saving manual overlays remains F05.
 - [ ] A named baseline world set exists in Git, each recipe with a stored persistence reading at production defaults, and every environmental mechanism feature closed after it records its readings on that set.
 - [ ] Saved templates preserve procedural settings and seeds alongside manual terrain additions and erasures, and loading regenerates the base then applies those overrides identically in the app and CLI.
 - [ ] Production defaults stay barrier-free, so this track's infrastructure features leave the gate and goal trajectories unchanged.
