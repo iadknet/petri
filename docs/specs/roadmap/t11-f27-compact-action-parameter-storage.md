@@ -167,8 +167,9 @@ Fixed design:
       `cargo test -p v3-core --test reproducibility` passes; results in
       readings.
 - [ ] `make check` exits 0 in the worktree, frontend tests included.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred.
+- [x] Fresh mutants run (`bab88f34`): `54 mutants tested in 9m: 23
+      caught, 31 unviable`; no survivors. Output
+      `~/.local/share/petri-tools/mutants/t11-f27/mutants.out`.
 - [x] Gate and goal summaries stored at
       `docs/progress/features/t11-f27-compact-action-parameter-storage.json`
       and `...-goal.json`. Local raw hash, byte count and verification time
