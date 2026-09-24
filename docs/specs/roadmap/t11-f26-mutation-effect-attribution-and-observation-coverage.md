@@ -87,7 +87,7 @@ mutation call or battery execution for these rows.
 | `distinct_queues_histogram` | parents by distinct-queue count, buckets 1, 2, 3–4, 5–8, 9+ |
 | `births_total`, `zero_requested`, `requested_all_skipped`, `event_bearing` | partition of births |
 | `requested_events_total`, `applied_events_total` | integer sums |
-| `genome_identical` | event-bearing births whose child genome equals the parent bitwise |
+| `genome_identical` | event-bearing births whose child genome equals the parent under genome identity: equal `Debug` rendering, which distinguishes -0.0, ignores NaN payloads, and omits the birth-only `birth_weights` that `cgp.rs` excludes from identity |
 | `from_actionless`, `from_acting` | silent/changed/dead/zero-applied births split by parent capability |
 
 **2. Single-event attribution cohorts.** Diagnostic proposals, not production
@@ -110,15 +110,15 @@ executions using traced execution, on two named records per execution:
 
 | Record | Fields compared |
 | --- | --- |
-| Computation | per hop: node id, upstream slots, output slots, vote contribution, route decision, and every applied output-sink or action-parameter value the backend trace records; per pass: votes, effective votes, committed action |
-| State and cost | after each execution: shared memory, remaining energy, work counters, priority bid, and graph runtime state (`node_state`, `node_outputs`, `plasticity_weights`, `eligibility_traces`) aligned by node id, where a node present on one side only differs when it holds state |
+| Computation | per hop: node id, upstream slots, output slots, vote contribution, route decision (selected target index and id, and every gate's computed runtime and effective scores), and every applied output-sink, action-parameter or shared-memory write value the backend trace records; per pass: votes, effective votes, committed action. Genome content copied into traces (gate bias, input refs, VM instructions and constants, graph node kinds) is never compared. The VM trace records no action-parameter writes, so VM parameter values are not compared |
+| State and cost | after each execution: shared memory, remaining energy, work counters, priority bid, and graph runtime state (`node_state`, `node_outputs`, `plasticity_weights`, `eligibility_traces`) aligned by node id, where a node present on one side only differs when it stores any scalar, zeros included (empty placeholders do not count) |
 
 Categories partition applied proposals, in this precedence:
 
 | Category | Rule |
 | --- | --- |
 | `action_changed` / `action_dead` | the existing classifier's Changed / Dead |
-| `genome_identical` | child genome bitwise equal to parent |
+| `genome_identical` | child genome equal to parent under the genome identity below |
 | `unexecuted_edit` | no node whose genome differs by node id (added, removed or edited; entry change counts as edited) is dispatched in any execution of parent or child |
 | `masked_before_selection` | computation record differs somewhere (including a parameter value decoded to the same action), actions identical |
 | `state_or_cost_only` | computation identical, state-and-cost record differs |
@@ -145,7 +145,7 @@ fresh cognition state:
 | Group | Content |
 | --- | --- |
 | `recorded` | up to 32 living creatures of this world's terminal population, sampled `SmallRng::seed_from_u64(23_000_000 + world_seed)` without replacement from the id-sorted population, in sample order; snapshot from the production assemblers with typed local food and extended perception both assembled unconditionally (the donor's genome never gates an input); the creature's own energy |
-| `authored` | 24 contexts: context `i` copies `neighborhood-v1` snapshot `i` and sets channel group `i mod 8` (neighbor barriers, previous outcomes, area food and typed area food, area barrier, area occupancy, nearby core, nearby vitals, nearby identity; all zero in `neighborhood-v1`) to values drawn inside each field's production range from `SmallRng::seed_from_u64(25_000_000 + i)`; labelled not guaranteed realizable |
+| `authored` | 24 contexts: context `i` copies `neighborhood-v1` snapshot `i` and sets channel group `i mod 8` (neighbor barriers, previous outcomes, area food and typed area food, area barrier, area occupancy, nearby core, nearby vitals, nearby identity; all zero in `neighborhood-v1`) to values drawn inside each field's production range from `SmallRng::seed_from_u64(25_000_000 + i)` (previous outcomes: EnergyDelta in [-1, 1], ActionSuccess in [0, 1], DamageDelta in [-1, 0], OffspringSuccess uniform over {0, 1}); labelled not guaranteed realizable |
 | `sequences` | 4 sequences × 32 ticks; sequence `s` tick `t` uses recorded context `(8s + t) mod r` (`r` recorded contexts; authored contexts, same rule, when `r < 4`); production shared-memory bookkeeping, energy reset to the context's value each tick; ticks 1–4 and 5–32 reported apart |
 
 Any change to these rules bumps the version; tests pin representative
@@ -218,8 +218,8 @@ apportioned.
 
 - [ ] Focused tests: reconciliation (strata vs existing tallies, category
       partition), the attribution precedence on constructed pairs (one per
-      category, including a graph-state-only change and a parameter change
-      decoded to the same action; a pair whose computation and state both
+      category, including a graph-state-only change and a Graph parameter
+      change decoded to the same action; a pair whose computation and state both
       change with identical actions counts in `masked_before_selection` and
       in `silent_with_state_or_cost`; operator and `domain_exhausted` rows
       reconcile with proposals and skips), the three controls, unconditional
