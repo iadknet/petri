@@ -72,6 +72,7 @@ fn clamp_non_negative_finite(v: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::creature::genome::vote::{is_decoded_action_param, VoteKind};
     use proptest::prelude::*;
 
     #[test]
@@ -180,7 +181,55 @@ mod tests {
         }
     }
 
+    /// `decode_commit` for `kind`'s sinks with `value` in `slot` and `other`
+    /// in the remaining slot.
+    fn decode_kind(kind: VoteKind, slot: u8, value: f32, other: f32) -> Vec<WorldAction> {
+        let mut params = [other; VOTE_PARAM_SLOTS as usize];
+        params[usize::from(slot)] = value;
+        VoteSink::all()
+            .filter(|sink| sink.kind() == Some(kind))
+            .map(|sink| decode_commit(sink, &params))
+            .collect()
+    }
+
+    /// T11.F25: the decoded-parameter catalog agrees with the decoder. Some
+    /// pair of finite values in one slot, the other fixed, changes a kind's
+    /// committed action exactly when the pair is catalogued.
+    #[test]
+    fn decoded_action_param_catalog_matches_decode_commit() {
+        const PROBES: [f32; 5] = [0.0, 0.25, 0.5, 1.0, 3.0];
+        for kind in VoteKind::ALL {
+            for slot in 0..VOTE_PARAM_SLOTS {
+                let changes = PROBES.iter().any(|&a| {
+                    PROBES.iter().any(|&b| {
+                        decode_kind(kind, slot, a, 0.0) != decode_kind(kind, slot, b, 0.0)
+                    })
+                });
+                assert_eq!(
+                    changes,
+                    is_decoded_action_param(kind, slot),
+                    "{kind:?} slot {slot}"
+                );
+            }
+        }
+    }
+
     proptest! {
+        /// T11.F25: no finite value in an uncatalogued slot changes the
+        /// committed action, whatever the other slot holds.
+        #[test]
+        fn undecoded_action_params_never_change_the_commit(
+            kind_index in 0..VoteKind::ALL.len(),
+            slot in 0..VOTE_PARAM_SLOTS,
+            a in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
+            b in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
+            other in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
+        ) {
+            let kind = VoteKind::ALL[kind_index];
+            prop_assume!(!is_decoded_action_param(kind, slot));
+            prop_assert_eq!(decode_kind(kind, slot, a, other), decode_kind(kind, slot, b, other));
+        }
+
         #[test]
         fn reproduce_fraction_always_lands_in_unit_interval(raw in prop::num::f32::ANY) {
             let WorldAction::Reproduce {

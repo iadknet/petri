@@ -5,7 +5,10 @@
 //! runs agree. Intentional changes to production defaults must update it only
 //! after the new trajectory has been reproduced. T11.F20 re-pinned the
 //! first digest after two agreeing runs: its fixture moved from the retired
-//! two-to-four-event per-birth rule to `per_unit_rate = 0.03`.
+//! two-to-four-event per-birth rule to `per_unit_rate = 0.03`. T11.F25
+//! re-pinned both digests: the `AddGraphEdge` surface draw skips the
+//! undecoded parameter sinks (restoring that draw alone restores both old
+//! digests).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -70,7 +73,7 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "c04e289ea84f8aa255eadef8f3dfd45e94f79ac7c8235d6f8807933b36eafc95"
+        "dd28049c8c37ae68f52750c300090870190c3b4e98e6acc9328d4eb78a0bee19"
     );
 }
 
@@ -109,6 +112,6 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "03761998705760977cbe31da198d2afda2da189b3b6ac31c011e557bea9fb431"
+        "e0f75b16be1581697eb54fe5cae69fe281e5c98fe76fb8db40774dbfcf629f37"
     );
 }

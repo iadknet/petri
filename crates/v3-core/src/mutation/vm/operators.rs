@@ -4,7 +4,7 @@ use std::ops::Range;
 use crate::config::MutationConfig;
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
-use crate::creature::genome::vote::VOTE_SINK_COUNT;
+use crate::creature::genome::vote::{DECODED_ACTION_PARAM_FLAT_SLOTS, VOTE_SINK_COUNT};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmBackendDef, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
 
@@ -224,8 +224,10 @@ pub(crate) fn random_vm_instruction(
             slot_idx: rng.gen_range(0u8..8),
             src: rng.gen_range(0..rc),
         },
+        // Only the fields `decode_commit` reads (T11.F25); storage keeps `0..8`.
         25 => VmInstruction::WriteActionParam {
-            slot_idx: rng.gen_range(0u8..8),
+            slot_idx: DECODED_ACTION_PARAM_FLAT_SLOTS
+                [rng.gen_range(0..DECODED_ACTION_PARAM_FLAT_SLOTS.len())],
             src: rng.gen_range(0..rc),
         },
         26 => VmInstruction::WriteRouteGate {

@@ -6,7 +6,7 @@ use super::*;
 use crate::contracts::NodeId;
 use crate::creature::founder::vm_decision_founder_genome as v3alpha1_founder_genome;
 use crate::creature::genome::analysis::vm_forward_slice;
-use crate::creature::genome::vote::VOTE_SINK_COUNT;
+use crate::creature::genome::vote::{DECODED_ACTION_PARAM_FLAT_SLOTS, VOTE_SINK_COUNT};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -564,6 +564,69 @@ proptest! {
             }
         }
     }
+}
+
+/// T11.F25: a fresh `WriteActionParam` targets only a decoded parameter
+/// field, and every decoded field is reached.
+#[test]
+fn random_vm_instruction_write_action_param_reaches_every_decoded_slot() {
+    let mut reached = [false; DECODED_ACTION_PARAM_FLAT_SLOTS.len()];
+    for seed in 0u64..16_384 {
+        if let VmInstruction::WriteActionParam { slot_idx, .. } =
+            random_vm_instruction(&mut rng(seed), 4, 4, 4)
+        {
+            let position = DECODED_ACTION_PARAM_FLAT_SLOTS
+                .iter()
+                .position(|&slot| slot == slot_idx)
+                .unwrap_or_else(|| panic!("undecoded slot {slot_idx}"));
+            reached[position] = true;
+        }
+    }
+    assert_eq!(reached, [true; DECODED_ACTION_PARAM_FLAT_SLOTS.len()]);
+}
+
+proptest! {
+    /// T11.F25: no fresh `WriteActionParam` names an undecoded slot.
+    #[test]
+    fn random_vm_instruction_never_draws_an_undecoded_action_param_slot(seed in any::<u64>()) {
+        let mut r = rng(seed);
+        for _ in 0..64 {
+            if let VmInstruction::WriteActionParam { slot_idx, .. } =
+                random_vm_instruction(&mut r, 4, 4, 4)
+            {
+                prop_assert!(DECODED_ACTION_PARAM_FLAT_SLOTS.contains(&slot_idx), "slot {slot_idx}");
+            }
+        }
+    }
+}
+
+/// T11.F25 keeps pruning: VM delete still removes a `WriteActionParam` to an
+/// undecoded slot.
+#[test]
+fn vm_delete_instruction_removes_a_write_to_an_undecoded_param_slot() {
+    let undecoded = VmInstruction::WriteActionParam {
+        slot_idx: 2,
+        src: 0,
+    };
+    let mut removed = false;
+    for seed in 0u64..64 {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![VmInstruction::Noop, undecoded.clone()];
+        }
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmDeleteInstruction,
+            &mut TargetSelector::reachable_only(&[], 0.0),
+            &mut rng(seed),
+            &MutationConfig::default(),
+        )
+        .expect("two-instruction program is deletable");
+        if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            removed |= vm.program == [VmInstruction::Noop];
+        }
+    }
+    assert!(removed);
 }
 
 #[test]

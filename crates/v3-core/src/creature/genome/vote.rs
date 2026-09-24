@@ -38,7 +38,7 @@ impl VoteKind {
 
     /// Index in `0..VOTE_KIND_COUNT`, the position in the per-kind counters.
     #[must_use]
-    pub fn index(self) -> usize {
+    pub const fn index(self) -> usize {
         match self {
             Self::Eat => 0,
             Self::Move => 1,
@@ -52,6 +52,43 @@ impl VoteKind {
     pub fn from_index(index: usize) -> Option<Self> {
         Self::ALL.get(index).copied()
     }
+}
+
+/// The action-parameter fields the commit decoder (`decode_commit`) reads, in
+/// kind-major order (T11.F25): `Eat` food type, `Reproduce` transfer fraction,
+/// `StealEnergy` amount. Fresh mutation draws of a Graph `ActionParam` sink or
+/// a VM `WriteActionParam` slot come only from this catalog; storage keeps all
+/// `VOTE_KIND_COUNT * VOTE_PARAM_SLOTS` fields. A feature that decodes another
+/// field extends this catalog and the decoder together.
+pub const DECODED_ACTION_PARAMS: [(VoteKind, u8); 3] = [
+    (VoteKind::Eat, 0),
+    (VoteKind::Reproduce, 1),
+    (VoteKind::StealEnergy, 1),
+];
+
+/// The flat parameter-surface index of `(kind, slot)`, the VM
+/// `WriteActionParam.slot_idx` addressing: `kind.index() * VOTE_PARAM_SLOTS + slot`.
+#[must_use]
+pub const fn action_param_flat_index(kind: VoteKind, slot: u8) -> u8 {
+    kind.index() as u8 * VOTE_PARAM_SLOTS + slot
+}
+
+/// [`DECODED_ACTION_PARAMS`] as flat indices, in catalog order.
+pub const DECODED_ACTION_PARAM_FLAT_SLOTS: [u8; DECODED_ACTION_PARAMS.len()] = {
+    let mut flat = [0; DECODED_ACTION_PARAMS.len()];
+    let mut i = 0;
+    while i < flat.len() {
+        let (kind, slot) = DECODED_ACTION_PARAMS[i];
+        flat[i] = action_param_flat_index(kind, slot);
+        i += 1;
+    }
+    flat
+};
+
+/// Whether `decode_commit` reads parameter `slot` of `kind`.
+#[must_use]
+pub fn is_decoded_action_param(kind: VoteKind, slot: u8) -> bool {
+    DECODED_ACTION_PARAMS.contains(&(kind, slot))
 }
 
 /// One addressable vote sink. `Terminate` and `Decide` carry no kind: they
@@ -129,6 +166,17 @@ impl VoteSink {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decoded_action_params_flatten_to_slots_zero_five_and_seven() {
+        assert_eq!(DECODED_ACTION_PARAM_FLAT_SLOTS, [0, 5, 7]);
+        let decoded: Vec<(VoteKind, u8)> = VoteKind::ALL
+            .into_iter()
+            .flat_map(|kind| (0..VOTE_PARAM_SLOTS).map(move |slot| (kind, slot)))
+            .filter(|&(kind, slot)| is_decoded_action_param(kind, slot))
+            .collect();
+        assert_eq!(decoded, DECODED_ACTION_PARAMS);
+    }
 
     #[test]
     fn catalog_indices_are_the_pinned_order() {

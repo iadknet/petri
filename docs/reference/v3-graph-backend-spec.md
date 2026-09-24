@@ -177,8 +177,9 @@ wired `ActionParam(kind, slot)` sink overwrites `action_params[kind][slot]`
 on the tick's parameter surface. The pass end reads both
 (`v3-mesh-execution-spec.md` Section 2); votes are how the graph acts, so a
 graph with no wired vote sink never commits an action. `pick_random_surface`
-draws uniformly over the compute nodes and then all 99 sinks, vote and
-parameter sinks included (T19.F04).
+draws uniformly over the compute nodes and then every sink except the five
+`ActionParam` sinks the commit decoder never reads, the vote sinks and the
+decoded parameter sinks included (T19.F04, T11.F25).
 
 ### Inert-when-unwired rule
 

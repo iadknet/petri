@@ -94,7 +94,9 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// The hash below pins the short production-default trajectory after two runs
 /// agree. Intentional changes to production defaults must update it only after
 /// the new trajectory has been reproduced. Re-pinned by T19.F05 (the input
-/// reference draw grows from 22 to 27 entries, remapping mutated births).
+/// reference draw grows from 22 to 27 entries, remapping mutated births) and
+/// by T11.F25 (the `AddGraphEdge` surface draw skips the undecoded parameter
+/// sinks; restoring that draw alone restores the old hash).
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -122,7 +124,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 7548337837478651677);
+    assert_eq!(hash.finish(), 7552184245034446484);
 }
 
 use proptest::prelude::*;

@@ -1020,7 +1020,9 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 /// `FoodHere` and move each consumer onto it; `vm_unprepared` replaces the
 /// zeroed direction vote with the `Move(E)` vote in one
 /// `VmInstructionMutation`. T19.F05 moved the `InputRef.Add` seeds: the
-/// input-reference draw grows from 22 to 27 entries.
+/// input-reference draw grows from 22 to 27 entries. T11.F25 moved the
+/// `GraphAddGraphEdge` seeds (57 -> 102, 103 -> 743): the edge-surface draw
+/// skips the undecoded parameter sinks.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1043,11 +1045,11 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
         [
             (
                 "graph_blank",
-                vec![(InputRefAdd, 201), (GraphAddGraphEdge, 57), swap],
+                vec![(InputRefAdd, 201), (GraphAddGraphEdge, 102), swap],
                 None,
             ),
-            ("graph_copy", vec![(GraphAddGraphEdge, 103), swap], None),
-            ("graph_split", vec![(GraphAddGraphEdge, 103), swap], None),
+            ("graph_copy", vec![(GraphAddGraphEdge, 743), swap], None),
+            ("graph_split", vec![(GraphAddGraphEdge, 743), swap], None),
             (
                 "vm_blank",
                 vec![
@@ -1065,7 +1067,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                     (InputRefAdd, 1),
                     (GraphRetargetGraphEdge, 32),
                     (GraphRemoveGraphEdge, 5),
-                    (GraphAddGraphEdge, 103),
+                    (GraphAddGraphEdge, 743),
                     swap,
                 ],
                 None,
@@ -1084,7 +1086,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             ),
             (
                 "graph_detour",
-                vec![(InputRefAdd, 201), (GraphAddGraphEdge, 57)],
+                vec![(InputRefAdd, 201), (GraphAddGraphEdge, 102)],
                 None,
             ),
             (
