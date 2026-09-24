@@ -41,6 +41,77 @@ mod recipe_tests {
         }
     }
 
+    /// T11.F20: a recipe carrying any retired per-birth supply key fails to
+    /// resolve, with no alias, and names the key.
+    #[test]
+    fn recipe_rejects_the_retired_per_birth_supply_keys() {
+        for (key, value) in [
+            ("mutation_probability", json!(0.44)),
+            ("per_birth_mutation_events_min", json!(1)),
+            ("per_birth_mutation_events_max", json!(10)),
+            (
+                "per_birth_mutation_event_continuation_probability",
+                json!(0.2),
+            ),
+            ("per_unit_supply_enabled", json!(true)),
+        ] {
+            let error = resolve_config(
+                &SimulationConfig::default(),
+                json!({"mutation": {key: value}}),
+            )
+            .unwrap_err();
+            assert!(error.to_string().contains(key), "{key}: {error}");
+        }
+    }
+
+    /// The seven tracked root recipes resolve once the retired keys are gone.
+    #[test]
+    fn root_world_recipes_resolve() {
+        for (name, source) in [
+            (
+                "extended-age-drain-age10-baseline",
+                include_str!("../../../../world-recipe-extended-age-drain-age10-baseline.json"),
+            ),
+            (
+                "extended-age-drain-age10-mutation-half",
+                include_str!(
+                    "../../../../world-recipe-extended-age-drain-age10-mutation-half.json"
+                ),
+            ),
+            (
+                "extended-age-drain-age10-mutation-quarter",
+                include_str!(
+                    "../../../../world-recipe-extended-age-drain-age10-mutation-quarter.json"
+                ),
+            ),
+            (
+                "extended-age-drain-reduced-copy-growth",
+                include_str!(
+                    "../../../../world-recipe-extended-age-drain-reduced-copy-growth.json"
+                ),
+            ),
+            (
+                "extended-age-drain-relaxed-genome-costs",
+                include_str!(
+                    "../../../../world-recipe-extended-age-drain-relaxed-genome-costs.json"
+                ),
+            ),
+            (
+                "extended-age-drain",
+                include_str!("../../../../world-recipe-extended-age-drain.json"),
+            ),
+            (
+                "fertility-zones",
+                include_str!("../../../../world-recipe-fertility-zones.json"),
+            ),
+        ] {
+            let recipe: Value = serde_json::from_str(source).unwrap();
+            if let Err(error) = resolve_config(&SimulationConfig::default(), recipe) {
+                panic!("{name}: {error}");
+            }
+        }
+    }
+
     #[test]
     fn recipe_validation_reports_fields_and_accepts_first_ramp_tick() {
         let error = resolve_config(&SimulationConfig::default(), json!(null)).unwrap_err();

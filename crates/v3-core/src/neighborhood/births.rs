@@ -75,10 +75,41 @@ impl BirthResult {
 
 /// Run `births` seeded production births from `subject`, seeded by
 /// `seed_offset + BIRTH_SEED_BASE + birth_index`, and classify every
-/// mutated (nonzero-event) offspring against `base`.
+/// mutated (nonzero-event) offspring against `base`. Each birth draws its
+/// supply on the subject's own `genome_size()`, as production does.
 #[must_use]
 pub fn per_birth_result(
     subject: &CreatureGenome,
+    base: &Signature,
+    battery: &Battery,
+    mutation_config: &MutationConfig,
+    context: &EvalContext,
+    births: u32,
+    seed_offset: u64,
+) -> BirthResult {
+    per_birth_result_on_units(
+        subject,
+        subject.genome_size(),
+        base,
+        battery,
+        mutation_config,
+        context,
+        births,
+        seed_offset,
+    )
+}
+
+/// [`per_birth_result`] with every birth's supply drawn on `units` instead of
+/// the subject's own size: the drift walk's checkpoint births pass the
+/// instrument constant `FOUNDER_GENOME_SIZE_UNITS` (T11.F20).
+#[allow(
+    clippy::too_many_arguments,
+    reason = "per_birth_result's seven inputs plus the supply unit count"
+)]
+#[must_use]
+pub fn per_birth_result_on_units(
+    subject: &CreatureGenome,
+    units: u32,
     base: &Signature,
     battery: &Battery,
     mutation_config: &MutationConfig,
@@ -98,8 +129,9 @@ pub fn per_birth_result(
             let mut genome = subject.clone();
             let mut rng =
                 SmallRng::seed_from_u64(seed_offset + BIRTH_SEED_BASE + u64::from(birth_index));
-            let summary = MutationEngine::apply_mutations_with_food_type_count(
+            let summary = MutationEngine::apply_mutations_on_units(
                 &mut genome,
+                units,
                 mutation_config,
                 &reachable,
                 ParentExecuted::Indices(&executed),

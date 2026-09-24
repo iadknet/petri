@@ -181,7 +181,7 @@ fn drift_is_goal_only_once_and_historical_fields_are_unavailable() {
     let Indicator::Defined(drift) = &goal.deterministic.goal_indicators.drift_depth else {
         panic!("goal drift missing")
     };
-    assert_eq!(drift.version, "drift-depth-v3");
+    assert_eq!(drift.version, "drift-depth-v4");
     assert_eq!(drift.recruitment_version, "module-recruitment-v1");
     assert!(drift.module_identity.contains("creation depth"));
     assert!(drift.provenance_rule.contains("Topology.CopyNode"));
@@ -208,8 +208,8 @@ fn drift_is_goal_only_once_and_historical_fields_are_unavailable() {
     );
     assert_eq!(
         drift.supply_rule,
-        "legacy per-birth rule (per_unit_supply_enabled forced false): \
-         mutation_probability 0.44, events 1 to 10, continuation 0.2"
+        "per-unit draw on the canonical V3Alpha1 founder's genome_size() 97 at \
+         per_unit_rate 0.005: Binomial(97, 0.005) events per walk and checkpoint birth"
     );
     assert_eq!(
         (

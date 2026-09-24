@@ -160,36 +160,36 @@ Fixed design:
 
 ## Implementation Tasks
 
-- [ ] `cargo test -p v3-core --test viability` is the first test command of
+- [x] `cargo test -p v3-core --test viability` is the first test command of
       implementation, run as a pre-change baseline. Then config, engine, and
       rejection (invariants 1, 4, 6), test first. Once `MutationConfig` changes
       shape and compiles, viability is again the first test command run.
-- [ ] Instruments on the founder-pinned draw: drift `v4` and `supply_rule`;
+- [x] Instruments on the founder-pinned draw: drift `v4` and `supply_rule`;
       recruitment-paths `Supply`, `mutation_context`, and re-pins
       (invariant 2).
-- [ ] Re-express every fixed-count test (invariant 5) across v3-core, v3-cli,
+- [x] Re-express every fixed-count test (invariant 5) across v3-core, v3-cli,
       and v3-server.
-- [ ] Root recipes and goal recipe digest pins.
-- [ ] Frontend panel, types, fixtures, and tests.
-- [ ] The four reference docs.
+- [x] Root recipes and goal recipe digest pins.
+- [x] Frontend panel, types, fixtures, and tests.
+- [x] The four reference docs.
 - [ ] Gate and goal benchmarks, with readings in
       `docs/progress/readings/t11-f20.md`.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` passes as the first test
+- [x] `cargo test -p v3-core --test viability` passes as the first test
       command of implementation and again as the first after the shape
       change. Output goes in readings.
-- [ ] Focused tests: retired-key rejection (config, recipe, runtime patch);
+- [x] Focused tests: retired-key rejection (config, recipe, runtime patch);
       the instrument-constant pin; the drift walk drawing on the constant
       whatever the walked size; recruitment-paths re-pins; the short-run
       identity hash unchanged; the founder pin unchanged. Names and results go
       in readings.
-- [ ] Retirement is complete. `rg` over `crates/`, `frontend/src/`,
+- [x] Retirement is complete. `rg` over `crates/`, `frontend/src/`,
       `docs/reference/`, and the root recipes for the five retired names,
       `with_legacy_supply`, and "Per-Unit Supply" finds only the rejection
       tests. Command and output go in readings.
-- [ ] `make check` passes in the worktree.
+- [x] `make check` passes in the worktree.
 - [ ] Production identity (invariant 3). Diff the new gate and goal raw
       reports' `deterministic` sections against T19.F06's raw reports. The
       diff lists only the permitted paths, and both reports' comparisons load

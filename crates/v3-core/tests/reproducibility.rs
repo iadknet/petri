@@ -13,7 +13,7 @@
 //!
 //! Configuration: production `SimulationConfig::default()` economics with a
 //! 96-by-96 world, 150 founders, full initial food coverage and density, and
-//! `mutation_probability = 1.0`, 4 to 10 mutation events per birth, and
+//! `per_unit_rate = 0.06` (about six mutation events per founder-sized birth), and
 //! `mesh_layer_probability = 0.5`, so the corrected operators are reached
 //! within the unchanged 250-tick horizon. The T19.F04 founder is all Graph,
 //! so every founder genome gets a VM node routed after its decision node
@@ -43,10 +43,8 @@ fn reproducibility_config() -> SimulationConfig {
     cfg.population.initial_creatures = 150;
     cfg.world.food.initial_coverage = 1.0;
     cfg.world.food.initial_density = 1.0;
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 1.0;
-    cfg.mutation.per_birth_mutation_events_min = 4;
-    cfg.mutation.per_birth_mutation_events_max = 10;
+    // About six requested events per founder-sized birth (0.06 per unit).
+    cfg.mutation.per_unit_rate = 0.06;
     cfg.mutation.mesh_layer_probability = 0.5;
     cfg
 }

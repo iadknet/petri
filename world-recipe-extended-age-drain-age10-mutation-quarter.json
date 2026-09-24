@@ -40,12 +40,7 @@
     "genome_size_pressure_enabled": false,
     "mesh_layer_probability": 0.2,
     "large_copy_weight_percent": 25,
-    "mutation_probability": 0.44,
-    "per_birth_mutation_event_continuation_probability": 0.2,
-    "per_birth_mutation_events_max": 10,
-    "per_birth_mutation_events_min": 1,
     "per_unit_rate": 0.00125,
-    "per_unit_supply_enabled": true,
     "phenotype": {
       "channel_change_chance": 0.0010000000474974513,
       "channel_step": 1,

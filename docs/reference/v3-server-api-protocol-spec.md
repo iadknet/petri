@@ -197,11 +197,7 @@ Request (conceptual v3alpha4 shape):
     }
   },
   "mutation": {
-    "per_unit_supply_enabled": true,
     "per_unit_rate": 0.005,
-    "mutation_probability": 0.303,
-    "per_birth_mutation_events_min": 1,
-    "per_birth_mutation_events_max": 10,
     "phenotype": {
       "channel_step": 1,
       "channel_change_chance": 0.001,
@@ -224,7 +220,11 @@ Request rules:
 - Startup/config keyspace is canonical from `v3-world-grid-spec.md` and
   `v3-runtime-config-spec.md`.
 - Mutation tuning lives at top-level `mutation.*` in the startup/config keyspace
-  (not under `runtime.*`).
+  (not under `runtime.*`). `mutation.per_unit_rate` is the only mutation-count
+  field: each birth requests `Binomial(genome_size(), per_unit_rate)` events,
+  and the drift walk and recruitment-paths instruments draw the same rule on
+  the canonical founder's 97 units. The keys of the retired per-birth rule
+  are unknown fields and are rejected (T11.F20).
 - Startup-only controls live under `startup.*` and are restart-only, as are
   `population.initial_creatures` and `population.founder_profile` (Section
   4.8).
@@ -514,11 +514,7 @@ Response:
       }
     },
     "mutation": {
-      "per_unit_supply_enabled": true,
       "per_unit_rate": 0.005,
-      "mutation_probability": 0.303,
-      "per_birth_mutation_events_min": 1,
-      "per_birth_mutation_events_max": 10,
       "phenotype": {
         "channel_step": 1,
         "channel_change_chance": 0.001,

@@ -60,30 +60,23 @@ describe("ConfigPanel", () => {
 		);
 	});
 
-	it("edits mutation event continuation probability in the runtime draft", () => {
+	it("edits the per-unit rate in the runtime draft and offers no retired supply control", () => {
 		render(<ConfigPanel />);
-		const field = screen.getByTestId("config-field-mutation-event-continuation-probability");
-		expect(field).toHaveValue(0.2);
-		fireEvent.change(field, { target: { value: "0.35" } });
-		expect(
-			useConfigStore.getState().localDraft?.mutation
-				.per_birth_mutation_event_continuation_probability,
-		).toBe(0.35);
-	});
-
-	it("edits the per-unit supply toggle and rate in the runtime draft", () => {
-		render(<ConfigPanel />);
-		const enabled = screen.getByTestId("config-field-mutation-per-unit-supply-enabled");
 		const rate = screen.getByTestId("config-field-mutation-per-unit-rate");
-		expect(enabled).toBeChecked();
 		expect(rate).toHaveValue(0.005);
+		for (const retired of [
+			"config-field-mutation-per-unit-supply-enabled",
+			"config-field-mutation-mutation-probability",
+			"config-field-mutation-events-min",
+			"config-field-mutation-events-max",
+			"config-field-mutation-event-continuation-probability",
+		]) {
+			expect(screen.queryByTestId(retired)).toBeNull();
+		}
 
-		fireEvent.click(enabled);
 		fireEvent.change(rate, { target: { value: "0.01" } });
 
-		const mutation = useConfigStore.getState().localDraft?.mutation;
-		expect(mutation?.per_unit_supply_enabled).toBe(false);
-		expect(mutation?.per_unit_rate).toBe(0.01);
+		expect(useConfigStore.getState().localDraft?.mutation.per_unit_rate).toBe(0.01);
 	});
 
 	it("edits the relative large-copy weight in the runtime draft", () => {

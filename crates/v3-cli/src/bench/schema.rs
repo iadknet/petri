@@ -457,9 +457,11 @@ pub struct DriftDepth {
     pub module_identity: String,
     #[serde(default)]
     pub provenance_rule: String,
-    /// The mutation supply rule and values the walk ran (T11.F19): always the
-    /// legacy per-birth rule, whatever production selects. Empty in earlier
-    /// reports, whose walks ran the same rule as production's default.
+    /// The mutation supply rule and values the walk ran. In `drift-depth-v4`
+    /// (T11.F20) the per-unit draw on the canonical founder's fixed
+    /// `genome_size()`, whatever the walked genome's size; in v3 (T11.F19)
+    /// the retired per-birth rule. Empty in earlier reports, whose walks ran
+    /// the same rule as production's default.
     #[serde(default)]
     pub supply_rule: String,
     pub executions_per_genome: u32,

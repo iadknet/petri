@@ -37,8 +37,7 @@ pub(crate) fn test_config() -> SimulationConfig {
     // own behavior cost it.
     cfg.energy.lifecycle.energy_decay_per_tick = 0.0;
     cfg.energy.lifecycle.genome_carry_cost_per_unit = 0.0;
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 0.0;
+    cfg.mutation.per_unit_rate = 0.0;
     cfg
 }
 

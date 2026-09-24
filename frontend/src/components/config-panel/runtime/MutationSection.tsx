@@ -1,7 +1,5 @@
 import type { BooleanFieldDef, FieldDef } from "../shared/types.ts";
 
-const LEGACY_ONLY = "Legacy per-birth rule; applies only when Per-Unit Supply is off.";
-
 export const MUTATION_FIELDS: FieldDef[] = [
 	{
 		path: "mutation.per_unit_rate",
@@ -13,46 +11,6 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		defaultValue: 0.005,
 		tooltip:
 			"Chance that each genome unit requests one mutation event at birth; the founder's 97 units expect about 0.49 events. This field caps at 0.1; the runtime accepts up to 1.",
-	},
-	{
-		path: "mutation.mutation_probability",
-		label: "Mutation Prob.",
-		min: 0,
-		max: 1,
-		step: 0.001,
-		testId: "config-field-mutation-mutation-probability",
-		defaultValue: 0.44,
-		tooltip: `Probability that a newborn genome undergoes mutation. ${LEGACY_ONLY}`,
-	},
-	{
-		path: "mutation.per_birth_mutation_events_min",
-		label: "Min Events/Birth",
-		min: 0,
-		max: 20,
-		step: 1,
-		testId: "config-field-mutation-events-min",
-		defaultValue: 1,
-		tooltip: `Minimum number of mutation events per birth when mutation triggers. ${LEGACY_ONLY}`,
-	},
-	{
-		path: "mutation.per_birth_mutation_events_max",
-		label: "Max Events/Birth",
-		min: 0,
-		max: 20,
-		step: 1,
-		testId: "config-field-mutation-events-max",
-		defaultValue: 10,
-		tooltip: `Maximum number of mutation events per birth when mutation triggers. ${LEGACY_ONLY}`,
-	},
-	{
-		path: "mutation.per_birth_mutation_event_continuation_probability",
-		label: "Continue Events Prob.",
-		min: 0,
-		max: 1,
-		step: 0.01,
-		testId: "config-field-mutation-event-continuation-probability",
-		defaultValue: 0.2,
-		tooltip: `After the minimum, chance to request another mutation event up to the maximum. ${LEGACY_ONLY}`,
 	},
 	{
 		path: "mutation.mesh_layer_probability",
@@ -183,14 +141,6 @@ export const MUTATION_FIELDS: FieldDef[] = [
 ];
 
 export const MUTATION_TOGGLES: BooleanFieldDef[] = [
-	{
-		path: "mutation.per_unit_supply_enabled",
-		label: "Per-Unit Supply",
-		testId: "config-field-mutation-per-unit-supply-enabled",
-		defaultValue: true,
-		tooltip:
-			"When enabled, each birth requests Binomial(genome size, Rate / Unit) mutation events; when off, the legacy per-birth fields apply",
-	},
 	{
 		path: "mutation.genome_size_pressure_enabled",
 		label: "Genome Size Pressure",

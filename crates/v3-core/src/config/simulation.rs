@@ -818,23 +818,12 @@ impl Default for ReachableBiasConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MutationConfig {
-    /// Production supply rule (T11.F19): one Bernoulli trial at `per_unit_rate`
-    /// per `genome_size()` unit of the parent, so the requested event count is
-    /// `Binomial(genome_size(), per_unit_rate)`. When `false`, the four
-    /// per-birth fields below run as the disabled legacy rule.
-    #[serde(default = "default_per_unit_supply_enabled")]
-    pub per_unit_supply_enabled: bool,
-    /// Chance that one genome unit requests a mutation event at birth.
+    /// Chance that one genome unit requests a mutation event at birth: the
+    /// only supply rule (T11.F19, T11.F20). A birth draws one Bernoulli trial
+    /// per unit, so the requested event count is `Binomial(units, per_unit_rate)`
+    /// with `units` the parent's own `genome_size()`.
     #[serde(default = "default_per_unit_rate")]
     pub per_unit_rate: f64,
-    /// Legacy per-birth rule: trigger roll. Runs only when
-    /// `per_unit_supply_enabled` is `false`.
-    pub mutation_probability: f64,
-    pub per_birth_mutation_events_min: u32,
-    pub per_birth_mutation_events_max: u32,
-    /// Chance to request another event after the minimum, up to the maximum.
-    #[serde(default = "default_mutation_event_continuation_probability")]
-    pub per_birth_mutation_event_continuation_probability: f64,
     /// Probability of selecting the mesh (Topology) layer per mutation event.
     /// Complement (1 - this) selects the node-internal layer (VM/Graph/InputRef).
     pub mesh_layer_probability: f64,
@@ -862,29 +851,10 @@ pub struct MutationConfig {
     pub executed_window_ticks: u64,
 }
 
-impl MutationConfig {
-    /// This config on the legacy per-birth supply rule: `per_unit_supply_enabled`
-    /// forced `false`, every other field kept. The fixed-count control the
-    /// drift walk and `recruitment_paths` run on (T11.F19).
-    #[must_use]
-    pub fn with_legacy_supply(mut self) -> Self {
-        self.per_unit_supply_enabled = false;
-        self
-    }
-}
-
-fn default_per_unit_supply_enabled() -> bool {
-    true
-}
-
 /// Per genome unit: the 97-unit V3Alpha1 founder (T19.F04) requests about
 /// 0.485 events per birth; the founder pin test holds the two together.
 fn default_per_unit_rate() -> f64 {
     0.005
-}
-
-fn default_mutation_event_continuation_probability() -> f64 {
-    0.2
 }
 
 fn default_executed_bias() -> f64 {
@@ -902,13 +872,7 @@ fn default_executed_window_ticks() -> u64 {
 impl Default for MutationConfig {
     fn default() -> Self {
         Self {
-            per_unit_supply_enabled: default_per_unit_supply_enabled(),
             per_unit_rate: default_per_unit_rate(),
-            mutation_probability: 0.44,
-            per_birth_mutation_events_min: 1,
-            per_birth_mutation_events_max: 10,
-            per_birth_mutation_event_continuation_probability:
-                default_mutation_event_continuation_probability(),
             mesh_layer_probability: 0.2,
             large_copy_weight_percent: default_large_copy_weight_percent(),
             genome_size_cap: 1200,
@@ -1116,22 +1080,8 @@ impl SimulationConfig {
         } else {
             default_per_unit_rate()
         };
-        // per_unit_supply_enabled: bool, no normalization needed.
-        m.mutation_probability = m.mutation_probability.clamp(0.0, 1.0);
         m.mesh_layer_probability = m.mesh_layer_probability.clamp(0.0, 1.0);
         m.large_copy_weight_percent = m.large_copy_weight_percent.min(100);
-        let continuation = m.per_birth_mutation_event_continuation_probability;
-        m.per_birth_mutation_event_continuation_probability = if continuation.is_finite() {
-            continuation.clamp(0.0, 1.0)
-        } else {
-            default_mutation_event_continuation_probability()
-        };
-        if m.per_birth_mutation_events_min < 1 {
-            m.per_birth_mutation_events_min = 1;
-        }
-        if m.per_birth_mutation_events_max < m.per_birth_mutation_events_min {
-            m.per_birth_mutation_events_max = m.per_birth_mutation_events_min;
-        }
         // genome_size_cap: 0 disables pressure (handled by is_restricted), no normalization needed.
         // genome_size_pressure_enabled: bool, no normalization needed.
         let ph = &mut m.phenotype;
@@ -1386,80 +1336,11 @@ mod tests {
     }
 
     #[test]
-    fn continuation_probability_defaults_when_missing() {
+    fn per_unit_rate_defaults_when_missing() {
         let mut json = serde_json::to_value(MutationConfig::default()).unwrap();
-        json.as_object_mut()
-            .unwrap()
-            .remove("per_birth_mutation_event_continuation_probability");
+        json.as_object_mut().unwrap().remove("per_unit_rate");
         let config: MutationConfig = serde_json::from_value(json).unwrap();
-        assert_eq!(
-            config.per_birth_mutation_event_continuation_probability,
-            0.2
-        );
-    }
-
-    #[test]
-    fn continuation_probability_nonfinite_uses_default() {
-        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            let mut config = SimulationConfig::default();
-            config
-                .mutation
-                .per_birth_mutation_event_continuation_probability = value;
-            config.normalize();
-            assert_eq!(
-                config
-                    .mutation
-                    .per_birth_mutation_event_continuation_probability,
-                0.2
-            );
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn mutation_supply_normalizes_and_roundtrips(
-            min in any::<u32>(), max in any::<u32>(), continuation in -2.0f64..3.0,
-        ) {
-            let mut config = SimulationConfig::default();
-            config.mutation.per_birth_mutation_events_min = min;
-            config.mutation.per_birth_mutation_events_max = max;
-            config.mutation.per_birth_mutation_event_continuation_probability = continuation;
-            config.normalize();
-            let m = &config.mutation;
-            prop_assert_eq!(m.per_birth_mutation_events_min, min.max(1));
-            prop_assert_eq!(m.per_birth_mutation_events_max, max.max(min.max(1)));
-            prop_assert_eq!(m.per_birth_mutation_event_continuation_probability, continuation.clamp(0.0, 1.0));
-            let decoded: MutationConfig = serde_json::from_str(&serde_json::to_string(m).unwrap()).unwrap();
-            prop_assert_eq!(decoded.per_birth_mutation_events_min, m.per_birth_mutation_events_min);
-            prop_assert_eq!(decoded.per_birth_mutation_events_max, m.per_birth_mutation_events_max);
-            prop_assert!((decoded.per_birth_mutation_event_continuation_probability - m.per_birth_mutation_event_continuation_probability).abs() < 1e-15);
-        }
-    }
-
-    #[test]
-    fn per_unit_supply_fields_default_when_missing() {
-        let mut json = serde_json::to_value(MutationConfig::default()).unwrap();
-        let object = json.as_object_mut().unwrap();
-        object.remove("per_unit_supply_enabled");
-        object.remove("per_unit_rate");
-        let config: MutationConfig = serde_json::from_value(json).unwrap();
-        assert!(config.per_unit_supply_enabled);
         assert_eq!(config.per_unit_rate, default_per_unit_rate());
-    }
-
-    #[test]
-    fn with_legacy_supply_flips_only_the_supply_flag() {
-        let config = MutationConfig {
-            per_unit_rate: 0.25,
-            mutation_probability: 0.75,
-            ..MutationConfig::default()
-        };
-        let mut expected = serde_json::to_value(&config).unwrap();
-        expected["per_unit_supply_enabled"] = serde_json::Value::Bool(false);
-
-        let legacy = config.with_legacy_supply();
-
-        assert_eq!(serde_json::to_value(&legacy).unwrap(), expected);
     }
 
     #[test]
@@ -1496,7 +1377,6 @@ mod tests {
             prop_assert_eq!(m.per_unit_rate, rate.clamp(0.0, 1.0));
             let decoded: MutationConfig = serde_json::from_str(&serde_json::to_string(m).unwrap()).unwrap();
             prop_assert!((decoded.per_unit_rate - m.per_unit_rate).abs() < 1e-15);
-            prop_assert_eq!(decoded.per_unit_supply_enabled, m.per_unit_supply_enabled);
         }
     }
 
@@ -1581,9 +1461,7 @@ mod tests {
         // Perception
         assert_eq!(cfg.runtime.perception.vision_radius, 5);
         // Mutation
-        assert!((cfg.mutation.mutation_probability - 0.44).abs() < 1e-9);
-        assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);
-        assert_eq!(cfg.mutation.per_birth_mutation_events_max, 10);
+        assert!((cfg.mutation.per_unit_rate - 0.005).abs() < 1e-12);
         assert!((cfg.mutation.mesh_layer_probability - 0.2).abs() < 1e-9);
         // Complexity pressure
         assert_eq!(cfg.mutation.genome_size_cap, 1200);
@@ -1830,18 +1708,6 @@ mod tests {
     }
 
     #[test]
-    fn normalize_mutation_events_max_below_min_corrects() {
-        let mut cfg = SimulationConfig::default();
-        cfg.mutation.per_birth_mutation_events_min = 3;
-        cfg.mutation.per_birth_mutation_events_max = 1; // below min
-        cfg.normalize();
-        assert!(
-            cfg.mutation.per_birth_mutation_events_max
-                >= cfg.mutation.per_birth_mutation_events_min
-        );
-    }
-
-    #[test]
     fn normalize_zero_max_actions_per_turn_falls_back() {
         let mut cfg = SimulationConfig::default();
         cfg.runtime.max_actions_per_turn = 0;
@@ -1853,6 +1719,27 @@ mod tests {
     /// ignore shim. T19.F06 invariant 2: the retired-name scan in
     /// `scripts/policy-check` covers `crates/` with no allowlist, so a test
     /// that must spell a retired name assembles it at run time.
+    /// T11.F20: the legacy per-birth supply rule is retired with no alias, so
+    /// a config carrying any of its keys fails strict deserialization.
+    #[test]
+    fn retired_per_birth_supply_keys_are_rejected() {
+        for (key, value) in [
+            ("mutation_probability", serde_json::json!(0.44)),
+            ("per_birth_mutation_events_min", serde_json::json!(1)),
+            ("per_birth_mutation_events_max", serde_json::json!(10)),
+            (
+                "per_birth_mutation_event_continuation_probability",
+                serde_json::json!(0.2),
+            ),
+            ("per_unit_supply_enabled", serde_json::json!(true)),
+        ] {
+            let mut value_json = serde_json::to_value(SimulationConfig::default()).unwrap();
+            value_json["mutation"][key] = value;
+            let error = serde_json::from_value::<SimulationConfig>(value_json).unwrap_err();
+            assert!(error.to_string().contains(key), "{key}: {error}");
+        }
+    }
+
     #[test]
     fn retired_queue_cap_key_is_rejected() {
         let retired_key = ["action_queue", "cap"].join("_");
@@ -1917,9 +1804,7 @@ mod tests {
         let cfg2: SimulationConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(cfg.world.width, cfg2.world.width);
         assert_eq!(cfg.runtime.max_mesh_hops, cfg2.runtime.max_mesh_hops);
-        assert!(
-            (cfg.mutation.mutation_probability - cfg2.mutation.mutation_probability).abs() < 1e-12
-        );
+        assert!((cfg.mutation.per_unit_rate - cfg2.mutation.per_unit_rate).abs() < 1e-12);
         assert!((cfg.predation.steal_cost_rate - cfg2.predation.steal_cost_rate).abs() < 1e-6);
     }
 
@@ -2940,20 +2825,16 @@ mod tests {
         (
             (0u32..20_000, 0u32..20_000),
             0usize..24,
-            (0u32..24, 0u32..24),
             0usize..8,
             (clamped_float.clone(), clamped_float.clone(), clamped_float),
-            prop_oneof![Just(f64::NAN), -0.5f64..1.5f64],
             prop_oneof![Just(f64::NAN), -0.5f64..1.5f64],
         )
             .prop_map(
                 |(
                     (initial_creatures, max_creatures),
                     max_actions_per_turn,
-                    (events_min, events_max),
                     action_log_capacity,
                     (max_density, initial_density, initial_coverage),
-                    mutation_probability,
                     per_unit_rate,
                 )| {
                     let mut config = SimulationConfig::default();
@@ -2961,10 +2842,7 @@ mod tests {
                     config.population.initial_creatures = initial_creatures;
                     config.population.max_creatures = max_creatures;
                     config.runtime.max_actions_per_turn = max_actions_per_turn;
-                    config.mutation.per_birth_mutation_events_min = events_min;
-                    config.mutation.per_birth_mutation_events_max = events_max;
                     config.action_log.capacity = action_log_capacity;
-                    config.mutation.mutation_probability = mutation_probability;
                     config.world.food.shared.max_density = max_density;
                     config.world.food.shared.initial_density = initial_density;
                     config.world.food.shared.initial_coverage = initial_coverage;

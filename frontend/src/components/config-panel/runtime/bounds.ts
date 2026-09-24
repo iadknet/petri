@@ -21,13 +21,6 @@ const DRAFT_BOUNDS: Record<
 	"world.food.shared.max_density": (draft, field) => ({
 		min: Math.max(field.min, ...draft.world.food.types.map((type) => type.initial_density)),
 	}),
-	"mutation.per_birth_mutation_events_min": (draft) => ({
-		min: 1,
-		max: draft.mutation.per_birth_mutation_events_max,
-	}),
-	"mutation.per_birth_mutation_events_max": (draft) => ({
-		min: draft.mutation.per_birth_mutation_events_min,
-	}),
 	"action_log.capacity": () => ({ min: 1 }),
 };
 

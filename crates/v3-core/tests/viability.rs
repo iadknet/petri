@@ -221,8 +221,7 @@ fn canonical_founder_consumes_primary_food_and_reproduces() {
     let mut cfg = viability_config();
     cfg.population.initial_creatures = 20;
     cfg.world.food.growth_rate = 0.0;
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 0.0;
+    cfg.mutation.per_unit_rate = 0.0;
     let mut sim = seed_simulation(cfg, 2026);
     let primary_before = sim
         .world
@@ -260,8 +259,7 @@ fn canonical_founder_consumes_primary_food_and_reproduces() {
 #[test]
 fn founders_only_run_has_no_energy_rejected_reproduce_attempts() {
     let mut cfg = viability_config();
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 0.0;
+    cfg.mutation.per_unit_rate = 0.0;
     let mut sim = seed_simulation(cfg, 2026);
 
     for _ in 0..2_000 {
@@ -598,7 +596,7 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
 
 // ── Stage 5: Mutation + phenotype divergence ──────────────────────────────────
 
-/// With mutation_probability=1.0, at some point during 30 ticks a creature must
+/// With about two requested events per founder birth, at some point during 30 ticks a creature must
 /// carry a phenotype_rgb that differs from the founder baseline [204, 61, 61].
 ///
 /// We track divergence across all ticks rather than only at the end, because
@@ -607,10 +605,8 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
 #[test]
 fn mutation_offspring_diverge_from_parent_over_time() {
     let mut cfg = viability_config();
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 1.0;
-    cfg.mutation.per_birth_mutation_events_min = 1;
-    cfg.mutation.per_birth_mutation_events_max = 2;
+    // About two requested events per founder birth (0.02 per unit).
+    cfg.mutation.per_unit_rate = 0.02;
 
     let mut sim = seed_simulation(cfg, 42);
     let mut ever_diverged = false;
@@ -628,7 +624,7 @@ fn mutation_offspring_diverge_from_parent_over_time() {
 
     assert!(
         ever_diverged,
-        "after 30 ticks with mutation_probability=1.0, no creature ever diverged from founder phenotype"
+        "after 30 ticks at per_unit_rate 0.02, no creature ever diverged from founder phenotype"
     );
 }
 
@@ -640,16 +636,17 @@ fn mutation_accounting_invariant_in_viability() {
     use v3_core::creature::founder::v3alpha1_founder_genome;
 
     let mut cfg = SimulationConfig::default().mutation;
-    cfg.per_unit_supply_enabled = false;
-    cfg.mutation_probability = 1.0;
-    cfg.per_birth_mutation_events_min = 1;
-    cfg.per_birth_mutation_events_max = 5;
+    // Rate 1.0 on three units: exactly three requested events per call. The
+    // genome carries its mutations from seed to seed, so a draw on its own
+    // growing size would compound.
+    cfg.per_unit_rate = 1.0;
 
     let mut genome = v3alpha1_founder_genome();
     for seed in 0u64..1000 {
         let mut rng = SmallRng::seed_from_u64(seed);
-        let summary = MutationEngine::apply_mutations_with_food_type_count(
+        let summary = MutationEngine::apply_mutations_on_units(
             &mut genome,
+            3,
             &cfg,
             &[],
             ParentExecuted::NONE,
@@ -673,10 +670,8 @@ fn mutation_reachability_telemetry_accumulates() {
     use v3_core::creature::genome::analysis::mesh_reachable_nodes;
 
     let mut cfg = SimulationConfig::default().mutation;
-    cfg.per_unit_supply_enabled = false;
-    cfg.mutation_probability = 1.0;
-    cfg.per_birth_mutation_events_min = 3;
-    cfg.per_birth_mutation_events_max = 8;
+    // About five requested events per founder birth (0.05 per unit).
+    cfg.per_unit_rate = 0.05;
     cfg.reachable_bias.topology = 0.7;
     cfg.reachable_bias.vm = 0.7;
     cfg.reachable_bias.graph = 0.7;
@@ -707,7 +702,7 @@ fn mutation_reachability_telemetry_accumulates() {
         total_applied += summary.applied_events;
     }
 
-    // With 500 seeds × 3-8 events each, we should see a mix of categories.
+    // With 500 seeds at about five events each, we should see a mix of categories.
     assert!(
         total_reachable > 0,
         "expected some reachable-target events, got 0"
@@ -724,7 +719,7 @@ fn mutation_reachability_telemetry_accumulates() {
     );
 }
 
-/// When mutation_probability=0.0, child must inherit parent phenotype unchanged.
+/// When per_unit_rate=0.0, child must inherit parent phenotype unchanged.
 #[test]
 fn phenotype_inherits_unchanged_when_no_genome_mutation() {
     use slotmap::SlotMap;
@@ -735,8 +730,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
     let mut cfg = SimulationConfig::default();
     cfg.world.width = 10;
     cfg.world.height = 10;
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 0.0;
+    cfg.mutation.per_unit_rate = 0.0;
     cfg.energy.lifecycle.max_energy = 120.0;
     cfg.energy.costs.reproduce_cost = 1.0;
     cfg.runtime.graph_node_base_cost = 0.1;
@@ -769,13 +763,13 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
     if let Some(child) = child {
         assert_eq!(
             child.phenotype_channels, FOUNDER_CHANNELS,
-            "child phenotype must be identical to parent when mutation_probability=0.0"
+            "child phenotype must be identical to parent when per_unit_rate=0.0"
         );
     }
     // If no child was produced this tick, the test is vacuously satisfied (no mutation check needed).
 }
 
-/// When mutation_probability=0.0, child must inherit parent identity unchanged
+/// When per_unit_rate=0.0, child must inherit parent identity unchanged
 /// (same lineage_id, same kin_tag since applied_events == 0).
 #[test]
 fn identity_inherits_unchanged_when_no_genome_mutation() {
@@ -788,8 +782,7 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
     let mut cfg = SimulationConfig::default();
     cfg.world.width = 10;
     cfg.world.height = 10;
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 0.0;
+    cfg.mutation.per_unit_rate = 0.0;
     cfg.energy.lifecycle.max_energy = 120.0;
     cfg.energy.costs.reproduce_cost = 1.0;
     cfg.runtime.graph_node_base_cost = 0.1;
@@ -824,7 +817,7 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
         );
         assert_eq!(
             child.identity.kin_tag, parent_identity.kin_tag,
-            "child kin_tag must be unchanged when mutation_probability=0.0"
+            "child kin_tag must be unchanged when per_unit_rate=0.0"
         );
     }
 }
@@ -833,10 +826,8 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
 #[test]
 fn viability_still_passes_with_real_mutations() {
     let mut cfg = viability_config();
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 1.0;
-    cfg.mutation.per_birth_mutation_events_min = 1;
-    cfg.mutation.per_birth_mutation_events_max = 2;
+    // About two requested events per founder birth (0.02 per unit).
+    cfg.mutation.per_unit_rate = 0.02;
 
     let mut sim = seed_simulation(cfg, 42);
     let metrics = run_ticks_with_metrics(&mut sim, 20);
@@ -860,7 +851,6 @@ fn viability_still_passes_with_real_mutations() {
 #[test]
 fn viability_still_passes_with_per_unit_mutations() {
     let mut cfg = viability_config();
-    cfg.mutation.per_unit_supply_enabled = true;
     cfg.mutation.per_unit_rate = 0.05;
 
     let mut sim = seed_simulation(cfg, 42);
@@ -1014,10 +1004,8 @@ fn mutation_skip_reason_tracking_accumulates_correctly() {
     cfg.world.width = 32;
     cfg.world.height = 32;
     cfg.population.initial_creatures = 10;
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 1.0;
-    cfg.mutation.per_birth_mutation_events_min = 3;
-    cfg.mutation.per_birth_mutation_events_max = 3;
+    // About three requested events per founder birth (0.03 per unit).
+    cfg.mutation.per_unit_rate = 0.03;
     cfg.world.food.initial_coverage = 0.8;
     cfg.world.food.initial_density = 1.0;
     cfg.world.food.growth_rate = 0.5;
@@ -1086,8 +1074,7 @@ fn founder_only_trajectory_digest_is_pinned() {
     use slotmap::Key;
 
     let mut cfg = viability_config();
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 0.0;
+    cfg.mutation.per_unit_rate = 0.0;
     let mut sim = seed_simulation(cfg, 2026);
     let mut hash = Sha256::new();
     for _ in 0..2_000 {

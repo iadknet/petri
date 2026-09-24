@@ -5,6 +5,7 @@ use super::recruitment::{BirthObservation, RecruitmentCheckpoint, RecruitmentTra
 use super::{births, Battery, BirthResult, EvalContext};
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
+use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
 use crate::creature::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
@@ -12,7 +13,7 @@ use rand::{rngs::SmallRng, SeedableRng};
 use rayon::prelude::*;
 use std::collections::BTreeSet;
 
-pub const VERSION: &str = "drift-depth-v3";
+pub const VERSION: &str = "drift-depth-v4";
 /// How the walk keeps each lineage's executed node set current (T11.F17).
 pub const EXECUTED_SOURCE: &str = "battery hop records (mesh-execution-v2), node ids";
 pub const EXECUTED_REFRESH: &str =
@@ -130,21 +131,22 @@ pub struct DriftWalk {
 /// `supply_rule` metadata.
 #[must_use]
 pub fn supply_rule(mutation: &MutationConfig) -> String {
+    let rate = mutation.per_unit_rate;
     format!(
-        "legacy per-birth rule (per_unit_supply_enabled forced false): \
-         mutation_probability {}, events {} to {}, continuation {}",
-        mutation.mutation_probability,
-        mutation.per_birth_mutation_events_min,
-        mutation.per_birth_mutation_events_max,
-        mutation.per_birth_mutation_event_continuation_probability,
+        "per-unit draw on the canonical V3Alpha1 founder's genome_size() \
+         {FOUNDER_GENOME_SIZE_UNITS} at per_unit_rate {rate}: \
+         Binomial({FOUNDER_GENOME_SIZE_UNITS}, {rate}) events per walk and checkpoint birth",
     )
 }
 
 /// Retain every production birth unconditionally. Checkpoint reads borrow genomes
 /// and use separate trial RNGs; they never consume the persistent walk streams.
 ///
-/// Every walk birth and checkpoint birth runs the legacy per-birth supply rule
-/// (see [`supply_rule`]); the config's per-unit fields are ignored here.
+/// Every walk birth and checkpoint birth draws the production per-unit rule
+/// on the instrument constant [`FOUNDER_GENOME_SIZE_UNITS`], not on the walked
+/// genome's own size (see [`supply_rule`], T11.F20): under drift the own-size
+/// draw would grow the mesh without bound, so the fixed units keep the walk's
+/// exposure an instrument constant.
 #[must_use]
 pub fn observe(
     founder: &CreatureGenome,
@@ -155,9 +157,6 @@ pub fn observe(
 ) -> DriftWalk {
     assert!(sizes.birth_lineages <= sizes.lineages);
     assert!(sizes.checkpoints.windows(2).all(|pair| pair[0] < pair[1]));
-    // The walk stays the fixed-count control whatever supply rule production
-    // selects (T11.F19); nothing else is overridden.
-    let mutation = &mutation.clone().with_legacy_supply();
     let mut genomes: Vec<_> = (0..sizes.lineages).map(|_| founder.clone()).collect();
     let mut rngs: Vec<_> = (0..sizes.lineages)
         .map(|index| SmallRng::seed_from_u64(WALK_SEED_BASE + u64::from(index)))
@@ -191,8 +190,9 @@ pub fn observe(
             {
                 let reachable = mesh_reachable_nodes(genome);
                 let executed = indices_for_node_ids(genome, ids);
-                let summary = MutationEngine::apply_mutations_with_food_type_count(
+                let summary = MutationEngine::apply_mutations_on_units(
                     genome,
+                    FOUNDER_GENOME_SIZE_UNITS,
                     mutation,
                     &reachable,
                     ParentExecuted::Indices(&executed),
@@ -278,8 +278,9 @@ fn observe_checkpoint(
         sets.push(reading);
         if index < sizes.birth_lineages as usize {
             let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
-            row.births = row.births.merge(&births::per_birth_result(
+            row.births = row.births.merge(&births::per_birth_result_on_units(
                 genome,
+                FOUNDER_GENOME_SIZE_UNITS,
                 &base,
                 battery,
                 mutation,
@@ -300,12 +301,10 @@ mod tests {
 
     use proptest::prelude::*;
 
-    /// The production config on the legacy supply rule the walk forces, so a
-    /// hand replay of the walk's births draws the same counts.
+    /// The production config; a hand replay of the walk's births draws on
+    /// [`FOUNDER_GENOME_SIZE_UNITS`] as the walk does.
     fn replay_config() -> SimulationConfig {
-        let mut config = SimulationConfig::default();
-        config.mutation = config.mutation.with_legacy_supply();
-        config
+        SimulationConfig::default()
     }
 
     /// Mirror [`observe`]'s executed-set cadence for a single-lineage replay:
@@ -413,8 +412,9 @@ mod tests {
         for depth in 1..=22 {
             let reachable = mesh_reachable_nodes(&genomes[0]);
             let executed = replay_executed(depth - 1, &genomes[0], &battery, &context, &mut ids);
-            let summary = MutationEngine::apply_mutations_with_food_type_count(
+            let summary = MutationEngine::apply_mutations_on_units(
                 &mut genomes[0],
+                FOUNDER_GENOME_SIZE_UNITS,
                 &config.mutation,
                 &reachable,
                 ParentExecuted::Indices(&executed),
@@ -461,16 +461,18 @@ mod tests {
                 let mut without = before[0].clone();
                 let mut with = genomes[0].clone();
                 let next_executed = indices_for_node_ids(&genomes[0], &ids);
-                MutationEngine::apply_mutations_with_food_type_count(
+                MutationEngine::apply_mutations_on_units(
                     &mut without,
+                    FOUNDER_GENOME_SIZE_UNITS,
                     &config.mutation,
                     &mesh_reachable_nodes(&before[0]),
                     ParentExecuted::Indices(&next_executed),
                     &mut rng_before.clone(),
                     context.food_type_count,
                 );
-                MutationEngine::apply_mutations_with_food_type_count(
+                MutationEngine::apply_mutations_on_units(
                     &mut with,
+                    FOUNDER_GENOME_SIZE_UNITS,
                     &config.mutation,
                     &mesh_reachable_nodes(&genomes[0]),
                     ParentExecuted::Indices(&next_executed),
@@ -514,8 +516,9 @@ mod tests {
                     let reachable = mesh_reachable_nodes(&genome);
                     let executed =
                         replay_executed(depth - 1, &genome, &battery, &context, &mut ids);
-                    applied += MutationEngine::apply_mutations_with_food_type_count(
+                    applied += MutationEngine::apply_mutations_on_units(
                         &mut genome,
+                        FOUNDER_GENOME_SIZE_UNITS,
                         &config.mutation,
                         &reachable,
                         ParentExecuted::Indices(&executed),
@@ -538,8 +541,9 @@ mod tests {
                             context.runtime,
                             context.shared_memory_decay_rate,
                         );
-                        row.births = row.births.clone().merge(&births::per_birth_result(
+                        row.births = row.births.clone().merge(&births::per_birth_result_on_units(
                             &genome,
+                            FOUNDER_GENOME_SIZE_UNITS,
                             &base,
                             &battery,
                             &config.mutation,
@@ -591,8 +595,9 @@ mod tests {
                             indices_for_node_ids(&genome, &ids)
                         };
                         let reachable = mesh_reachable_nodes(&genome);
-                        MutationEngine::apply_mutations_with_food_type_count(
+                        MutationEngine::apply_mutations_on_units(
                             &mut genome,
+                            FOUNDER_GENOME_SIZE_UNITS,
                             &config.mutation,
                             &reachable,
                             ParentExecuted::Indices(&executed),
@@ -654,8 +659,9 @@ mod tests {
             for step in 0..DEPTH {
                 let executed = replay_executed(step, &genome, &battery, &context, &mut ids);
                 let reachable = mesh_reachable_nodes(&genome);
-                MutationEngine::apply_mutations_with_food_type_count(
+                MutationEngine::apply_mutations_on_units(
                     &mut genome,
+                    FOUNDER_GENOME_SIZE_UNITS,
                     &config.mutation,
                     &reachable,
                     ParentExecuted::Indices(&executed),
@@ -742,42 +748,54 @@ mod tests {
         )
         .checkpoints;
         assert_eq!(sparse[1].mesh, dense[2].mesh);
-        config.mutation.mutation_probability = 0.0;
+        config.mutation.per_unit_rate = 0.0;
         let context = EvalContext::from_config(&config);
         let zero = observe(&founder, &battery, &config.mutation, &context, sizes).checkpoints;
         assert_eq!(zero[0].mesh, zero[1].mesh);
         assert!(zero.iter().all(|r| r.births.zero_event_births == 2));
     }
 
-    /// The walk is the fixed-count control (T11.F19): it runs the legacy
-    /// per-birth rule whatever supply rule the config it receives selects, so
-    /// its births and checkpoint rows are identical either way, and its
-    /// metadata names the rule and values in force.
+    /// T11.F20: every walk birth and every checkpoint birth draws the per-unit
+    /// rule on the instrument constant, whatever the walked genome's size. At
+    /// rate 1.0 each such birth requests exactly `FOUNDER_GENOME_SIZE_UNITS`
+    /// events, from a subject of another size and from the grown genomes the
+    /// walk reaches; the metadata names the pinned draw.
     #[test]
-    fn the_walk_forces_the_legacy_supply_rule_whatever_the_config_selects() {
-        let config = SimulationConfig::default();
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+    fn the_walk_draws_on_the_founder_unit_count_whatever_the_walked_size() {
+        let mut config = SimulationConfig::default();
+        config.mutation.per_unit_rate = 1.0;
+        let subject = crate::creature::founder::vm_decision_founder_genome();
+        assert_ne!(subject.genome_size(), FOUNDER_GENOME_SIZE_UNITS);
         let battery = Battery::generate(2);
+        let context = EvalContext::from_config(&config);
         let sizes = DriftSizes {
-            lineages: 3,
+            lineages: 2,
             birth_lineages: 2,
             births: 3,
-            checkpoints: &[0, 5],
+            checkpoints: &[0, 3],
         };
-        let context = EvalContext::from_config(&config);
-        let mut production_mutation = config.mutation.clone();
-        assert!(production_mutation.per_unit_supply_enabled);
-        production_mutation.per_unit_rate = 1.0;
-        let production = observe(&founder, &battery, &production_mutation, &context, sizes);
-        let mut legacy_mutation = config.mutation.clone();
-        legacy_mutation.per_unit_supply_enabled = false;
-        let legacy = observe(&founder, &battery, &legacy_mutation, &context, sizes);
-        assert_eq!(production.checkpoints, legacy.checkpoints);
-        assert_eq!(production.recruitment, legacy.recruitment);
+        let walk = observe(&subject, &battery, &config.mutation, &context, sizes);
+        let units = u64::from(FOUNDER_GENOME_SIZE_UNITS);
+        for row in &walk.checkpoints {
+            assert_eq!(
+                row.births.by_requested_events,
+                std::collections::BTreeMap::from([(FOUNDER_GENOME_SIZE_UNITS, 6)]),
+                "depth {}: checkpoint births draw on the constant",
+                row.depth
+            );
+        }
         assert_eq!(
-            supply_rule(&production_mutation),
-            "legacy per-birth rule (per_unit_supply_enabled forced false): \
-             mutation_probability 0.44, events 1 to 10, continuation 0.2"
+            walk.recruitment[1].opportunities.attempted,
+            3 * 2 * units,
+            "walk births draw on the constant"
+        );
+        assert_eq!(
+            supply_rule(&SimulationConfig::default().mutation),
+            format!(
+                "per-unit draw on the canonical V3Alpha1 founder's genome_size() \
+                 {FOUNDER_GENOME_SIZE_UNITS} at per_unit_rate 0.005: \
+                 Binomial({FOUNDER_GENOME_SIZE_UNITS}, 0.005) events per walk and checkpoint birth"
+            )
         );
     }
 
@@ -821,19 +839,21 @@ mod tests {
         // per birth and its graph decision node changes every
         // node-internal draw. Re-pinned by T19.F05: the input-reference draw
         // grows from 22 to 27 entries, so every input-reference event draws
-        // differently.
-        assert_eq!(reading.cohort.created, 12);
-        assert_eq!(reading.cohort.dispatched(), 4);
-        // Six cohort modules reached dispatch, the median five generations
+        // differently. Re-pinned by T11.F20 (drift-depth-v4): every walk
+        // birth draws Binomial(97, 0.005) instead of the retired per-birth
+        // rule, so the lineages and their module dates change.
+        assert_eq!(reading.cohort.created, 9);
+        assert_eq!(reading.cohort.dispatched(), 7);
+        // Seven cohort modules reached dispatch, the median seven generations
         // after the birth that created them: later births, or a dispatch date
         // taken only at the closing checkpoint, would both read higher.
         assert_eq!(
             reading.time_to_first(CohortFact::Dispatch),
             &TimeToFirst {
-                reached: 6,
-                median_generations: Some(5),
+                reached: 7,
+                median_generations: Some(7),
                 censored_deleted: 0,
-                censored_present: 6,
+                censored_present: 2,
             },
         );
         // T11.F22 re-pin: the within-kind `Swap` and consumer-preserving
@@ -842,14 +862,15 @@ mod tests {
         // modules reached an internal change. With the 25% copy default,
         // three reach an internal change, still a median five generations
         // after birth; on the T19.F04 vote founder six do, at the same
-        // median.
+        // median. On the T11.F20 walk three do, a median one generation
+        // after birth.
         assert_eq!(
             reading.time_to_first(CohortFact::InternalChange),
             &TimeToFirst {
-                reached: 6,
-                median_generations: Some(5),
-                censored_deleted: 1,
-                censored_present: 5,
+                reached: 3,
+                median_generations: Some(1),
+                censored_deleted: 0,
+                censored_present: 6,
             },
         );
     }

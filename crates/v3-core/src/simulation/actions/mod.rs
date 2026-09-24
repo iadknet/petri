@@ -890,10 +890,8 @@ mod tests {
         for seed in 0u64..10_000 {
             let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
             sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
-            sim.config.mutation.per_unit_supply_enabled = false;
-            sim.config.mutation.mutation_probability = 1.0;
-            sim.config.mutation.per_birth_mutation_events_min = 1;
-            sim.config.mutation.per_birth_mutation_events_max = 1;
+            // Rate 1.0: every genome unit requests one event.
+            sim.config.mutation.per_unit_rate = 1.0;
             sim.config.mutation.phenotype.channel_change_chance = 0.0;
             sim.config.mutation.phenotype.polarity_flip_chance = 0.0;
             sim.config.mutation.phenotype.channel_step = 1;
@@ -939,10 +937,8 @@ mod tests {
         for seed in 0u64..10_000 {
             let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
             sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
-            sim.config.mutation.per_unit_supply_enabled = false;
-            sim.config.mutation.mutation_probability = 1.0;
-            sim.config.mutation.per_birth_mutation_events_min = 1;
-            sim.config.mutation.per_birth_mutation_events_max = 1;
+            // Rate 1.0: every genome unit requests one event.
+            sim.config.mutation.per_unit_rate = 1.0;
             sim.config.mutation.phenotype.channel_change_chance = 0.0;
             sim.config.mutation.phenotype.polarity_flip_chance = 0.0;
             sim.config.mutation.phenotype.channel_step = 1;
@@ -994,10 +990,8 @@ mod tests {
         let pos = Position::new(5, 5);
         let (mut sim, parent_id) = make_sim_one_creature(pos, 400.0);
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
-        sim.config.mutation.per_unit_supply_enabled = false;
-        sim.config.mutation.mutation_probability = 1.0;
-        sim.config.mutation.per_birth_mutation_events_min = 6;
-        sim.config.mutation.per_birth_mutation_events_max = 6;
+        // Rate 1.0: every genome unit requests one event.
+        sim.config.mutation.per_unit_rate = 1.0;
         // Stand in for lived ticks: the parent dispatched both mesh nodes.
         for index in 0..sim.creatures[parent_id].genome.nodes.len() {
             sim.creatures[parent_id]
@@ -1041,10 +1035,8 @@ mod tests {
         // Arrange
         let (mut sim, parent_id) = make_sim_one_creature(Position::new(5, 5), 400.0);
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
-        sim.config.mutation.per_unit_supply_enabled = false;
-        sim.config.mutation.mutation_probability = 1.0;
-        sim.config.mutation.per_birth_mutation_events_min = 6;
-        sim.config.mutation.per_birth_mutation_events_max = 6;
+        // Rate 1.0: every genome unit requests one event.
+        sim.config.mutation.per_unit_rate = 1.0;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
 
         // Act
@@ -1082,10 +1074,8 @@ mod tests {
         // unparseable, so each selected operator is rolled back and skipped.
         let (mut sim, parent_id) = make_sim_one_creature(Position::new(5, 5), 400.0);
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
-        sim.config.mutation.per_unit_supply_enabled = false;
-        sim.config.mutation.mutation_probability = 1.0;
-        sim.config.mutation.per_birth_mutation_events_min = 6;
-        sim.config.mutation.per_birth_mutation_events_max = 6;
+        // Rate 1.0: every genome unit requests one event.
+        sim.config.mutation.per_unit_rate = 1.0;
         let duplicate = sim.creatures[parent_id].genome.nodes[0].clone();
         sim.creatures[parent_id].genome.nodes.push(duplicate);
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
@@ -1128,10 +1118,8 @@ mod tests {
             80.0,
         );
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
-        sim.config.mutation.per_unit_supply_enabled = false;
-        sim.config.mutation.mutation_probability = 1.0;
-        sim.config.mutation.per_birth_mutation_events_min = 3;
-        sim.config.mutation.per_birth_mutation_events_max = 3;
+        // Rate 1.0: every genome unit requests one event.
+        sim.config.mutation.per_unit_rate = 1.0;
 
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);

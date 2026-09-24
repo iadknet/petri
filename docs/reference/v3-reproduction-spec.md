@@ -77,14 +77,14 @@ This document does not define:
 ---
 
 Mutation supply is owned by `v3-mutation-spec.md` and configured by
-`v3-runtime-config-spec.md`. The production engine requests
-`Binomial(genome_size(), per_unit_rate)` events per birth (T11.F19): every
-unit of structure the parent carries is an independent 0.005 chance of one
-event, so the 111-unit founder expects about 0.555 requested events per birth
-and a larger genome pays its size in exposure. The legacy per-birth rule
-(trigger 0.44, bounded geometric count with minimum 1, maximum 10,
-continuation 0.2) is disabled in production and kept as the drift walk's
-fixed-count control. Requested events become attempts;
+`v3-runtime-config-spec.md`. The engine has one supply rule and requests
+`Binomial(genome_size(), per_unit_rate)` events per birth (T11.F19,
+T11.F20): every unit of structure the parent carries is an independent 0.005
+chance of one event, so the 97-unit V3Alpha1 founder expects about 0.485
+requested events per birth and a larger genome pays its size in exposure. The
+drift walk and the recruitment-paths legacy panel draw the same rule on the
+founder's 97 units whatever the walked genome's size, so their exposure is an
+instrument constant. Requested events become attempts;
 skipped events are not extra requests, and applied count governs downstream
 mutation effects. Compare both conditional mutated-birth outcomes and absolute
 outcomes per all births when interpreting this supply.

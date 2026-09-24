@@ -19,26 +19,13 @@ use crate::mutation::vm::{VmMutator, VmOperator};
 
 /// Draw requested supply from normalized config, independently of operator success.
 ///
-/// Production rule (T11.F19): one Bernoulli trial per genome unit at
-/// `per_unit_rate`, so the count is `Binomial(genome_size, per_unit_rate)`
-/// with no trigger, minimum, maximum, or continuation. The disabled legacy
-/// rule below keeps its exact RNG consumption for the drift walk and T11.F13.
-fn requested_event_count(config: &MutationConfig, genome_size: u32, rng: &mut impl Rng) -> u32 {
-    if config.per_unit_supply_enabled {
-        return (0..genome_size)
-            .map(|_| u32::from(rng.gen_bool(config.per_unit_rate)))
-            .sum();
-    }
-    if !rng.gen_bool(config.mutation_probability) {
-        return 0;
-    }
-    let mut count = config.per_birth_mutation_events_min;
-    while count < config.per_birth_mutation_events_max
-        && rng.gen_bool(config.per_birth_mutation_event_continuation_probability)
-    {
-        count += 1;
-    }
-    count
+/// The one supply rule (T11.F19, T11.F20): one Bernoulli trial per unit at
+/// `per_unit_rate`, so the count is `Binomial(units, per_unit_rate)` with no
+/// trigger, minimum, maximum, or continuation. The caller supplies `units`.
+fn requested_event_count(config: &MutationConfig, units: u32, rng: &mut impl Rng) -> u32 {
+    (0..units)
+        .map(|_| u32::from(rng.gen_bool(config.per_unit_rate)))
+        .sum()
 }
 
 /// What one attempted mutation event produced, once an operator of the drawn
@@ -83,11 +70,10 @@ impl MutationEngine {
 
     /// Apply mutation events to a child genome using the configured number of
     /// available food types for typed input-ref/topology sampling.
-    #[allow(
-        clippy::too_many_lines,
-        reason = "one match arm per mutation event kind; splitting it would spread \
-                  the operator dispatch table across several functions"
-    )]
+    ///
+    /// Every production birth and reading comes through here: the supply draw
+    /// runs on the genome's own `genome_size()`, read once before any event.
+    /// The child starts as the parent's copy, so this is the parent's size.
     pub fn apply_mutations_with_food_type_count(
         genome: &mut CreatureGenome,
         config: &MutationConfig,
@@ -96,9 +82,38 @@ impl MutationEngine {
         rng: &mut impl Rng,
         food_type_count: usize,
     ) -> MutationSummary {
-        // The genome is immutable after birth, so its size read once here is
-        // the count's population.
-        let event_count = requested_event_count(config, genome.genome_size(), rng);
+        let units = genome.genome_size();
+        Self::apply_mutations_on_units(
+            genome,
+            units,
+            config,
+            parent_reachable_nodes,
+            parent_executed,
+            rng,
+            food_type_count,
+        )
+    }
+
+    /// [`Self::apply_mutations_with_food_type_count`] with the supply draw on
+    /// a caller-supplied unit count: `Binomial(units, per_unit_rate)`
+    /// requested events. The drift walk and `recruitment_paths` pass the
+    /// instrument constant `FOUNDER_GENOME_SIZE_UNITS` (T11.F20); engine
+    /// tests pass explicit counts (rate 1.0 on N units requests exactly N).
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one match arm per mutation event kind; splitting it would spread \
+                  the operator dispatch table across several functions"
+    )]
+    pub fn apply_mutations_on_units(
+        genome: &mut CreatureGenome,
+        units: u32,
+        config: &MutationConfig,
+        parent_reachable_nodes: &[usize],
+        parent_executed: ParentExecuted<'_>,
+        rng: &mut impl Rng,
+        food_type_count: usize,
+    ) -> MutationSummary {
+        let event_count = requested_event_count(config, units, rng);
         if event_count == 0 {
             return MutationSummary::zero();
         }
