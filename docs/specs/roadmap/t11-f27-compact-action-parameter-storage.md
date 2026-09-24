@@ -169,11 +169,14 @@ Fixed design:
 - [ ] `make check` exits 0 in the worktree, frontend tests included.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
-- [ ] Gate and goal summaries stored at
+- [x] Gate and goal summaries stored at
       `docs/progress/features/t11-f27-compact-action-parameter-storage.json`
       and `...-goal.json`. Local raw hash, byte count and verification time
       are checked, series entries point to the summaries, and no new full
-      report is staged.
+      report is staged. Gate not severe; goal severe against the T19.F04
+      epoch only (inherited, user decision below), not severe against the
+      latest closure; readings in
+      [`docs/progress/readings/t11-f27.md`](../../progress/readings/t11-f27.md#benchmark-gate-and-goal-benchmark-specialist-2026-09-24).
 
 ## Performance and Goal Impact
 
@@ -210,7 +213,20 @@ flag-only, and the observation caps are unchanged.
 No goal indicator counts undecoded parameter fields. The catalog, boundary
 and draw tests are the evidence that the Goal holds.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Both profiles ran on `07d34258`, which is rebased onto main `a9f59893` and so includes the dead-code and shared-food-config cleanups.
+
+Gate: `make bench PROFILE=gate FEATURE=t11-f27-compact-action-parameter-storage`, `v3-cli` exit 0 and outer exit 0. Against `t11-f25-meaningful-action-parameter-targets.json`, the epoch and latest closure, it is not severe and every counter is at 0.000% delta.
+
+Goal: `make bench PROFILE=goal FEATURE=t11-f27-compact-action-parameter-storage`, `v3-cli` exit 3 and outer `make` exit 3. Exit 3 is v3-cli's "severe work-counter regression against a stored reference" (`v3-cli/src/main.rs:573-575`), and both artifacts were written.
+- Against the epoch `t19-f04-vote-based-action-selection-goal.json`: severe. `vm_steps` is +134.82% and `decided_passes` +76.09%, both severe. `plasticity_updates` +42.32% and `mesh_hops` +10.51% are flagged.
+- Against the latest closure `t11-f25-meaningful-action-parameter-targets-goal.json`: not severe, and every counter is `ok`. `decided_passes` is +9.46%, just under the flag, and `actions_applied` −0.44%. The other seven are within ±0.34%.
+- No extinction. Final population is 4088/3221/1219 for seeds 11/22/33.
+
+Observed outcome against the predeclaration: the expected early divergence in every world did not occur. Canyon (22) and Confluence (33) reproduce T11.F25's per-seed counters and populations exactly. Orchards (11) diverges late: final population 4877 → 4088, plateau 3873 → 3707, `decided_passes` 2339 → 2844, and its minimum population (18) is unchanged. This fits the design and does not show that the change fails to reach runtime. For founder-derived genomes, the representation map is behavior-preserving (Determinism row), and a changed opcode-29 `param_slot` alters behavior only when that read feeds an output. A field-operand nudge alters behavior only when the nudged write executes and is committed, and `vm_steps` counts instructions whatever their operands. The commit-path tests are the runtime evidence.
+
+The Orchards divergence is not attributed between this feature and the rebased cleanups. The food-config cleanup declares and tests no trajectory change, and the gate plus two worlds are identical, so this feature is the likelier cause. No attribution run was made, and this predeclaration does not require one. Case `config_digest`s moved through cleanup `4e1dfbb5` (removed recipe keys), not this feature.
+
+Decision (spec owner ruling, 2026-09-24): the goal severe against the T19.F04 epoch goes to the user under this spec's blocker rule. The condition is inherited: at T11.F25 the user accepted `vm_steps` +134.55% and `decided_passes` +60.87% against this epoch ("Accept, keep epoch"). This feature adds `vm_steps` +0.11% and `decided_passes` +9.46% against that closure, both under the flag threshold. It does not waive the check. The predeclared epoch re-pin is not needed: trajectories barely moved, so it would only swap T19.F04 for a near-copy of T11.F25. The recommended answer is to accept and keep the epoch at T19.F04. The user's reply is recorded here verbatim.
 
 - Summaries: [gate](../../progress/features/t11-f27-compact-action-parameter-storage.json),
   [goal](../../progress/features/t11-f27-compact-action-parameter-storage-goal.json).

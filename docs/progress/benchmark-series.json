@@ -56,7 +56,8 @@
       "docs/progress/features/t19-f06-retirement-and-observability.json",
       "docs/progress/features/t11-f20-per-birth-supply-rule-retirement.json",
       "docs/progress/features/t11-f24-stable-parent-membership-during-mutation.json",
-      "docs/progress/features/t11-f25-meaningful-action-parameter-targets.json"
+      "docs/progress/features/t11-f25-meaningful-action-parameter-targets.json",
+      "docs/progress/features/t11-f27-compact-action-parameter-storage.json"
     ]
   },
   "goal": {
@@ -132,7 +133,8 @@
       "docs/progress/features/t19-f06-retirement-and-observability-goal.json",
       "docs/progress/features/t11-f20-per-birth-supply-rule-retirement-goal.json",
       "docs/progress/features/t11-f24-stable-parent-membership-during-mutation-goal.json",
-      "docs/progress/features/t11-f25-meaningful-action-parameter-targets-goal.json"
+      "docs/progress/features/t11-f25-meaningful-action-parameter-targets-goal.json",
+      "docs/progress/features/t11-f27-compact-action-parameter-storage-goal.json"
     ]
   }
 }
