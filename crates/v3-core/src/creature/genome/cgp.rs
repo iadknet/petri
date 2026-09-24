@@ -112,7 +112,7 @@ pub struct ComputeNode {
 /// Output sink kinds — fixed catalog, not evolvable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum OutputSinkKind {
-    /// Write to `output_slots[slot]`. 12 slots, indices 0-11.
+    /// Write to `output_slots[slot]`. 24 slots, indices 0-23.
     CustomOutput(u8),
     /// Write to `route_gates.scores[slot]`. 8 slots, indices 0-7.
     RouterGate(u8),

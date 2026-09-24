@@ -1,6 +1,5 @@
 //! Query-side simulation caches.
 
-use crate::query::spatial_index::ViewRect;
 use crate::state::FramePayload;
 use crate::transport::session::ViewSubscription;
 use v3_core::config::OrdinaryFoodTypeId;
@@ -19,16 +18,6 @@ impl DirtyRect {
     #[must_use]
     pub fn empty() -> Self {
         Self::default()
-    }
-
-    #[must_use]
-    pub fn as_view_rect(self) -> ViewRect {
-        ViewRect {
-            x: self.x,
-            y: self.y,
-            width: self.width,
-            height: self.height,
-        }
     }
 }
 

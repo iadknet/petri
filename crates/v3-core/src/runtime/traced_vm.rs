@@ -10,7 +10,6 @@ use crate::sensors::perception::SensorSnapshot;
 
 /// Execute a VM backend node with trace recording.
 #[allow(clippy::too_many_arguments)]
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn execute_vm_node_traced(
     def: &VmBackendDef,
     input_refs: &[InputReference],

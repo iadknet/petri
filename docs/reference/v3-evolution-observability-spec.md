@@ -141,7 +141,6 @@ Mutation accounting invariants:
 
 - `ParseabilityViolation`
 - `NoApplicableTarget`
-- `BudgetExhausted`
 
 ### `ReproductionActionResult` rejections (minimum)
 

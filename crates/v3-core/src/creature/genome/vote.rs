@@ -4,7 +4,7 @@
 //! and index order of every vote sink and of the per-kind parameter slots; the
 //! graph sink catalog, the `AddVote` opcode, the mesh vote vector, and the
 //! traces all read their positions from here. Nothing in this module carries
-//! runtime state, and nothing reads the surface until T19.F04.
+//! runtime state; the pass end commits from the surface (T19.F04).
 
 /// The four world-action kinds a creature can vote for.
 pub const VOTE_KIND_COUNT: usize = 4;

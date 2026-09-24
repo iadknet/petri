@@ -30,7 +30,6 @@ use crate::simulation::energy_accounting::{applied_debit, observe_energy_change,
 /// # Returns
 /// `NodeResult` — the mesh executor checks `energy_exhausted` and routes on the gates.
 #[allow(clippy::too_many_arguments)]
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn execute_vm_node(
     def: &VmBackendDef,
     input_refs: &[InputReference],
