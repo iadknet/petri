@@ -88,7 +88,7 @@ a representation only where the neighborhood reading still shows a gap.
 
 - [x] **T11.F24 — Stable Parent Membership During Mutation** — Depends on: T11.F17, T13.F01
   - Goal: Mutations follow the tissue that existed in the parent: later events in one birth retain correct parent-reachable and parent-executed membership after deletion or addition changes the child's node indices.
-- [ ] **T11.F25 — Meaningful Action-Parameter Targets** — Depends on: T19.F04
+- [x] **T11.F25 — Meaningful Action-Parameter Targets** — Depends on: T19.F04
   - Goal: Variation reaches expressed action traits: new Graph and VM parameter connections target fields the body's current action decoder actually consumes.
 - [ ] **T11.F26 — Mutation-Effect Attribution and Observation Coverage** — Depends on: T11.F16, T11.F20, T11.F24, T11.F25, T14.F12, T19.F06
   - Goal: Show in the Petri progress report whether applied mutations change a creature's computation, state or actions, separating observed barriers to behavioral change from changes missed by the observation battery; observation only.
