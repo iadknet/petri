@@ -154,6 +154,14 @@ Fixed design:
       `cargo test -p v3-core --lib action_decode` (9 passed),
       `cargo clippy --workspace --all-targets -- -D warnings` and
       `cargo check --workspace --all-targets` all exit 0.
+- [x] Property test `pick_random_surface_matches_the_drawable_reference`
+      (`mutation/graph/operators.rs`) covers the Graph draw row over generated
+      sink lists (mixed, empty, all-undecoded), 0–3 compute nodes and seeds:
+      no undecoded target, original sink index, `can_add_edge` iff `Some`,
+      no RNG on `None`, one `gen_range` on `Some`. A forced
+      `is_fresh_edge_sink => true` mutant fails it. Then
+      `cargo test -p v3-core --lib mutation` (425 passed), clippy with
+      `-D warnings` and `cargo fmt --all -- --check` exit 0.
 
 ## Performance and Goal Impact
 
@@ -214,7 +222,7 @@ Goal: `make bench PROFILE=goal FEATURE=t11-f25-meaningful-action-parameter-targe
 0.000148 vs 0.000092 (+60.87%, severe), `mesh_hops` +10.68% (flag),
 `plasticity_updates` +42.41% (flag); `graph_relax_iters`, `actions_applied`,
 `births`, `pass_cap_hits`, `passes` are `ok`. Against the latest closure,
-T11.F24: `vm_steps` +202.71% (severe), `decided_passes` +34.55% (severe),
+T11.F24: `vm_steps` +202.71% (severe); `decided_passes` +34.55%,
 `mesh_hops` +26.74%, `graph_relax_iters` +20.19%, `plasticity_updates`
 +21.18%, `actions_applied` +26.34%, `passes` +16.51% (all flag); `births`
 and `pass_cap_hits` `ok`. No extinction: `final_population`
