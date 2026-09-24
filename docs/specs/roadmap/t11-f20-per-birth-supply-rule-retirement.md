@@ -1,6 +1,6 @@
 # T11.F20 — Per-Birth Supply Rule Retirement
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-23
 **Feature**: T11.F20
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -258,12 +258,12 @@ detail: [readings](../../progress/readings/t11-f20.md).
 
 ## Success Criteria
 
-- [ ] `MutationConfig` carries only the per-unit rate for supply. A config
+- [x] `MutationConfig` carries only the per-unit rate for supply. A config
       carrying a retired key is rejected. No panel control, reference doc, or
       recipe names the per-birth rule.
-- [ ] Production is byte-identical to `2c09fd76` apart from the permitted
+- [x] Production is byte-identical to `2c09fd76` apart from the permitted
       paths (invariant 3).
-- [ ] The drift walk (`drift-depth-v4`) and recruitment paths draw on the
+- [x] The drift walk (`drift-depth-v4`) and recruitment paths draw on the
       founder-pinned per-unit count. Their new rows are recorded as the
       reference, and no tripwire is crossed.
 
@@ -271,3 +271,4 @@ detail: [readings](../../progress/readings/t11-f20.md).
 
 - Decision: Fable credits were exhausted, so at the user's direction no role used Fable 5.1 — the spec owner ran on Opus 5.5 (Agent model parameter), implementer briefs were told not to consult the advisor, and the orchestrator ran no /advisor fable and consulted no advisor.
 - Decision: the drift walk and the recruitment-paths legacy panel draw `Binomial(canonical founder genome_size(), per_unit_rate)` (track row, user direction 2026-09-14/2026-09-21); a later change to the canonical founder's size or the default rate moves both instruments' rows and must bump `drift-depth` and re-pin the recruitment-paths tests.
+- Cost: `/usage` awaits the user; 3 implementer passes, 0 advisor consults; 1 spec-owner resume; 3 challenge rounds, ready; review P1 1, P2 2, P3 0, all fixed.
