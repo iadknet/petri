@@ -124,7 +124,12 @@ Fixed design:
       transcript go to [readings](../../progress/readings/t11-f24.md).
       2026-09-24: viability 28 passed; `--lib mutation` 417 passed, 1
       ignored; the red run failed all six regressions.
-- [x] `make check` exits 0 in the worktree (2026-09-24).
+- [x] `make check` exits 0 in the worktree (2026-09-24). The fix is
+      commit `0a1c5e69`.
+- [x] Self-review: the `simplify` pass over `3ce526f3..0a1c5e69` changes no
+      code. Afterwards `--lib mutation` passes 417, with 1 ignored, and
+      `cargo clippy --workspace --all-targets -- -D warnings` exits 0
+      (2026-09-24).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       full survivor list stays here.
