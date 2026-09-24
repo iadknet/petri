@@ -91,7 +91,7 @@ Fixed design:
 
 ## Implementation Tasks
 
-- [ ] Write failing regressions first. Cover removal followed by a targeted
+- [x] Write failing regressions first. Cover removal followed by a targeted
       event (a carried node after the removed index keeps its membership),
       and removal followed by addition and then a targeted event (the new
       node is a non-member at a reused id and at a former member index).
@@ -101,26 +101,30 @@ Fixed design:
       after a removal. Every regression asserts the resulting draw and the
       truthful telemetry: the reachability class, the executed-target count,
       and the event record.
-- [ ] Add proptest coverage (v3-core) of the membership rule over generated
+- [x] Add proptest coverage (v3-core) of the membership rule over generated
       genomes and event sequences, and of the equivalence invariant for
       births with no draw after a mesh-node removal.
-- [ ] Implement the membership rule in the engine. Update the engine and
+- [x] Implement the membership rule in the engine. Update the engine and
       `reachability.rs` doc comments that describe the parent sets. In
       `docs/reference/v3-mutation-spec.md`, the "Executed layer" item 2
       describes stale indices after `RemoveNode`; replace that sentence with
       the within-birth membership rule, which applies to every engine caller.
-- [ ] Re-pin any pinned trajectory, replay, or recruitment-paths/drift test
+- [x] Re-pin any pinned trajectory, replay, or recruitment-paths/drift test
       value that changes. Before re-pinning, show that a birth in which a
       mesh node was removed before a later draw caused the change. List old
       and new values in the readings file. No predicate may be weakened.
+      No pinned value changed under `cargo test --workspace`, so nothing is
+      re-pinned.
 - [ ] Record gate and goal readings as the Performance section requires.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first, then
+- [x] `cargo test -p v3-core --test viability` first, then
       `cargo test -p v3-core --lib mutation`. Results and the red-run
       transcript go to [readings](../../progress/readings/t11-f24.md).
-- [ ] `make check` exits 0 in the worktree.
+      2026-09-24: viability 28 passed; `--lib mutation` 417 passed, 1
+      ignored; the red run failed all six regressions.
+- [x] `make check` exits 0 in the worktree (2026-09-24).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       full survivor list stays here.

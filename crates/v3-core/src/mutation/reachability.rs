@@ -6,13 +6,18 @@
 //! The parent's cached reachable set is used to bias mutations on the offspring.
 //! After mutations, the offspring's actual reachable set may differ. This is
 //! intentional — mutations are biased toward what was functional in the parent.
-//! The offspring gets a fresh BFS via `CreatureState::new()`.
+//! The offspring gets a fresh BFS via `CreatureState::new()`. Within a birth,
+//! [`BirthMembership`] maps the parent's sets onto the child's current nodes,
+//! so earlier removals and additions never move membership between nodes.
 
 use std::borrow::Cow;
+use std::cmp::Ordering;
 
 use rand::Rng;
 
 use super::types::TargetReachability;
+use crate::contracts::NodeId;
+use crate::creature::genome::NodeGenome;
 use crate::creature::state::DispatchRecord;
 
 /// Where a birth's executed node set comes from.
@@ -100,8 +105,123 @@ pub fn biased_select_from(
     Some((picked, classification))
 }
 
-/// A parent's reachable and recently executed node sets, from which one
-/// [`TargetSelector`] is built per mutation event.
+#[cfg(test)]
+thread_local! {
+    /// Test-only oracle switch: while set on a thread, membership never
+    /// follows removals, reproducing the pre-T11.F24 index-set targeting so
+    /// equivalence can be checked against it.
+    pub(crate) static FROZEN_MEMBERSHIP: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+}
+
+/// Which of a child's current mesh nodes are parent-set members, maintained
+/// across the events of one birth (T11.F24).
+///
+/// A child node is a member of the parent's reachable (executed) set exactly
+/// when it has been present since the birth began, no event of this birth
+/// created it, and its parent index is in the parent's set. Until the birth's
+/// first applied mesh-node removal the child's first nodes sit at their parent
+/// indices and every added node sits after them, so the parent's index sets
+/// are borrowed as they are. From the first removal on, each current node's
+/// provenance (its parent index, or `None` when created in this birth) is
+/// tracked, and the member sets are derived from it. Created nodes never
+/// count, even on a removed node's `NodeId` or former index. Maintaining this
+/// consumes no RNG.
+#[derive(Debug)]
+pub struct BirthMembership<'a> {
+    parent_reachable: &'a [usize],
+    parent_executed: &'a [usize],
+    /// The child's node count when the birth began: its parent's node count.
+    parent_len: usize,
+    /// Per current child index, the parent index it was carried from; `None`
+    /// until the first applied mesh-node removal.
+    provenance: Option<Vec<Option<usize>>>,
+    reachable: Vec<usize>,
+    executed: Vec<usize>,
+}
+
+impl<'a> BirthMembership<'a> {
+    /// Membership at the start of a birth whose child copies a parent of
+    /// `parent_len` mesh nodes. Both sets are sorted ascending parent indices.
+    #[must_use]
+    pub const fn new(
+        parent_reachable: &'a [usize],
+        parent_executed: &'a [usize],
+        parent_len: usize,
+    ) -> Self {
+        Self {
+            parent_reachable,
+            parent_executed,
+            parent_len,
+            provenance: None,
+            reachable: Vec::new(),
+            executed: Vec::new(),
+        }
+    }
+
+    /// The member sets as sorted ascending current child indices.
+    #[must_use]
+    pub fn sets(&self) -> TargetSets<'_> {
+        if self.provenance.is_some() {
+            TargetSets::new(&self.reachable, &self.executed)
+        } else {
+            TargetSets::new(self.parent_reachable, self.parent_executed)
+        }
+    }
+
+    /// Follow one mutation event from the node ids the child carried before
+    /// it to the nodes it carries after it.
+    ///
+    /// Relies on the within-event identity of every mesh-node-changing
+    /// operator: one event either removes a single node, keeping the others
+    /// in order, or appends nodes on ids the child did not carry. A discarded
+    /// or rejected attempt restores the genome, so it arrives here unchanged.
+    pub fn observe_event(&mut self, before: &[NodeId], after: &[NodeGenome]) {
+        #[cfg(test)]
+        if FROZEN_MEMBERSHIP.with(std::cell::Cell::get) {
+            return;
+        }
+        match after.len().cmp(&before.len()) {
+            Ordering::Equal => {}
+            Ordering::Greater => {
+                if let Some(provenance) = self.provenance.as_mut() {
+                    provenance.resize(after.len(), None);
+                }
+            }
+            Ordering::Less => {
+                debug_assert_eq!(after.len() + 1, before.len(), "one event removes one node");
+                let parent_len = self.parent_len;
+                let provenance = self.provenance.get_or_insert_with(|| {
+                    (0..before.len())
+                        .map(|index| (index < parent_len).then_some(index))
+                        .collect()
+                });
+                let removed = before
+                    .iter()
+                    .zip(after)
+                    .position(|(id, node)| *id != node.node_id)
+                    .unwrap_or(after.len());
+                provenance.remove(removed);
+                let members = |set: &[usize]| -> Vec<usize> {
+                    provenance
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, origin)| {
+                            origin.is_some_and(|parent| set.binary_search(&parent).is_ok())
+                        })
+                        .map(|(index, _)| index)
+                        .collect()
+                };
+                self.reachable = members(self.parent_reachable);
+                self.executed = members(self.parent_executed);
+            }
+        }
+    }
+}
+
+/// The child nodes that are members of the parent's reachable and recently
+/// executed sets, from which one [`TargetSelector`] is built per mutation
+/// event.
 #[derive(Debug, Clone, Copy)]
 pub struct TargetSets<'a> {
     reachable: &'a [usize],
@@ -128,11 +248,12 @@ impl<'a> TargetSets<'a> {
 /// The parent-derived inputs to one mutation event's target draws, and the
 /// tally of picks that landed on a node the parent recently executed.
 ///
-/// Both node sets are sorted ascending mesh node indices in the parent's
-/// genome: `reachable` from the entry-node BFS, `executed` from the parent's
-/// dispatch record within the configured window (T11.F17). One selector is
-/// built per mutation event and passed to the domain mutator, which draws
-/// every target of that event through [`TargetSelector::select`].
+/// Both node sets are sorted ascending mesh node indices into the child as it
+/// stands before the event: the current members of the parent's `reachable`
+/// set (entry-node BFS) and `executed` set (the parent's dispatch record
+/// within the configured window, T11.F17), as [`BirthMembership`] maps them.
+/// One selector is built per mutation event and passed to the domain mutator,
+/// which draws every target of that event through [`TargetSelector::select`].
 #[derive(Debug)]
 pub struct TargetSelector<'a> {
     reachable: &'a [usize],
@@ -424,6 +545,118 @@ mod tests {
             prop_assert_eq!(selector.select(&eligible, &mut rng), expected);
             prop_assert_eq!(selector.executed_hits(), 0);
             prop_assert_eq!(rng.gen::<u64>(), expected_rng.gen::<u64>());
+        }
+    }
+
+    /// One scripted change to a child's node vector, as one applied event
+    /// makes it: remove the node at an index, append nodes on fresh ids the
+    /// way `next_node_id` allocates them, or leave the vector alone (a
+    /// node-internal event, or an attempt that was rolled back).
+    #[derive(Debug, Clone)]
+    enum Step {
+        Remove(usize),
+        Append(u8),
+        Unchanged,
+    }
+
+    fn step() -> impl Strategy<Value = Step> {
+        prop_oneof![
+            any::<usize>().prop_map(Step::Remove),
+            (1u8..4).prop_map(Step::Append),
+            Just(Step::Unchanged),
+        ]
+    }
+
+    fn bare_node(node_id: NodeId) -> NodeGenome {
+        NodeGenome {
+            node_id,
+            input_refs: Vec::new(),
+            backend_def: crate::creature::genome::BackendDef::Vm(
+                crate::creature::genome::VmBackendDef {
+                    register_count: 1,
+                    constants: Vec::new(),
+                    program: vec![crate::creature::genome::VmInstruction::Halt],
+                },
+            ),
+            targets: Vec::new(),
+        }
+    }
+
+    /// The next free id at or above the current maximum plus one, as
+    /// `topology::structural::next_node_id` allocates it: removing the
+    /// maximum id makes it free again.
+    fn next_free_id(nodes: &[(NodeId, Option<usize>)]) -> NodeId {
+        let mut candidate = nodes
+            .iter()
+            .map(|(id, _)| id.0)
+            .max()
+            .unwrap_or(0)
+            .wrapping_add(1);
+        while nodes.iter().any(|(id, _)| id.0 == candidate) {
+            candidate = candidate.wrapping_add(1);
+        }
+        NodeId::new(candidate)
+    }
+
+    proptest! {
+        /// Over sparse, shuffled parent ids and any script of removals,
+        /// appends, and unchanged events, a current child index is a member
+        /// exactly when its node was carried from a parent index in the set.
+        /// The oracle tags each node with its provenance directly; the
+        /// membership sees only ids. Until the first removal the parent's
+        /// slices are handed out as they are.
+        #[test]
+        fn birth_membership_follows_provenance_not_position(
+            parent_ids in prop::collection::btree_set(0u32..48, 1..10)
+                .prop_map(|ids| ids.into_iter().collect::<Vec<_>>())
+                .prop_shuffle(),
+            reachable_flags in prop::collection::vec(any::<bool>(), 10),
+            executed_flags in prop::collection::vec(any::<bool>(), 10),
+            steps in prop::collection::vec(step(), 0..16),
+        ) {
+            let parent_len = parent_ids.len();
+            let reachable = subset(&reachable_flags[..parent_len]);
+            let executed = subset(&executed_flags[..parent_len]);
+            let mut membership = BirthMembership::new(&reachable, &executed, parent_len);
+            let mut nodes: Vec<(NodeId, Option<usize>)> = parent_ids
+                .iter()
+                .enumerate()
+                .map(|(index, &id)| (NodeId::new(id), Some(index)))
+                .collect();
+            let mut removed_any = false;
+            for step in steps {
+                let before: Vec<NodeId> = nodes.iter().map(|(id, _)| *id).collect();
+                match step {
+                    Step::Remove(at) if nodes.len() > 1 => {
+                        nodes.remove(at % nodes.len());
+                        removed_any = true;
+                    }
+                    Step::Append(count) => {
+                        for _ in 0..count {
+                            let id = next_free_id(&nodes);
+                            nodes.push((id, None));
+                        }
+                    }
+                    Step::Remove(_) | Step::Unchanged => {}
+                }
+                let after: Vec<NodeGenome> = nodes.iter().map(|(id, _)| bare_node(*id)).collect();
+                membership.observe_event(&before, &after);
+
+                let sets = membership.sets();
+                if !removed_any {
+                    prop_assert!(std::ptr::eq(sets.reachable, reachable.as_slice()));
+                    prop_assert!(std::ptr::eq(sets.executed, executed.as_slice()));
+                }
+                for (set, parent_set) in [(sets.reachable, &reachable), (sets.executed, &executed)] {
+                    let expected: Vec<usize> = nodes
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, (_, origin))| origin.is_some_and(|p| parent_set.contains(&p)))
+                        .map(|(index, _)| index)
+                        .collect();
+                    prop_assert_eq!(set, expected.as_slice());
+                }
+            }
         }
     }
 

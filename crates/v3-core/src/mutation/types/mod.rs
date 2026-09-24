@@ -514,7 +514,7 @@ pub struct MutationOperatorFunnel {
 /// Summary returned by `MutationEngine` for every offspring.
 ///
 /// Accounting invariant: `attempted_events == applied_events + skipped_events`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MutationSummary {
     pub attempted_events: u32,
     pub applied_events: u32,

@@ -621,9 +621,14 @@ Executed layer (`TargetSelector::select`), applied in all four domains:
    therefore byte-identical to the pre-feature draw, so single-event founder
    births are identical, while a multi-event founder birth whose earlier event
    adds a node diverges from that draw on. Both the executed and reachable
-   sets are fixed once per birth in the parent's node indices; after a
-   mid-birth `RemoveNode`, later indices in both sets are stale by one for the
-   rest of that birth (the drift harness maps by `NodeId` and is not affected).
+   sets are resolved once per birth in the parent's node indices, and at
+   every draw of the birth a child node is a member exactly when it has been
+   present since the birth began, no event of this birth created it, and its
+   parent index is in the set (T11.F24). Carried nodes keep their membership
+   when a mid-birth `RemoveNode` shifts their index, and a node added during
+   the birth never counts, even on a removed node's `NodeId` or former index.
+   This holds for every engine caller, the drift walk and other `neighborhood`
+   readings included.
 3. Otherwise roll RNG once against `executed_bias`. On success, and when
    `eligible ∩ executed` is non-empty, pick uniformly from that intersection.
    On a failed roll or an empty intersection, fall through to the
