@@ -54,6 +54,8 @@ fn viability_config() -> SimulationConfig {
     // Fewer creatures for test speed
     cfg.population.initial_creatures = 10;
     // Full food coverage to compensate for small world
+    cfg.world.food.types[0].initial_coverage = 1.0;
+    cfg.world.food.types[0].initial_density = 1.0;
     cfg
 }
 
@@ -67,6 +69,7 @@ fn high_coverage_economics_probe_config() -> SimulationConfig {
     cfg.world.width = 32;
     cfg.world.height = 32;
     cfg.population.initial_creatures = 20;
+    cfg.world.food.types[0].initial_coverage = 1.0;
     cfg
 }
 
@@ -323,20 +326,18 @@ fn creatures_can_eat_food() {
         c.world.width = 10;
         c.world.height = 10;
         c.world.food.growth_rate = 0.0;
+        // Every cell starts with food. The world is seeded from this same
+        // food config, so `Simulation::new` reapplies it without clearing.
+        c.world.food.types[0].initial_coverage = 1.0;
+        c.world.food.types[0].initial_density = 1.0;
         c.population.initial_creatures = 0;
         c
     };
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let pos = Position::new(5, 5);
-    {
-        let mut food_cfg = cfg.world.food.clone();
-        food_cfg.types[0].initial_coverage = 1.0;
-        world.reconfigure_food(food_cfg);
-        let mut rng = SmallRng::seed_from_u64(0);
-        world.seed_food(&mut rng);
-    }
-    let food_before = world.food_at(pos);
+    world.reconfigure_food(cfg.world.food.clone());
+    world.seed_food(&mut SmallRng::seed_from_u64(0));
 
     // Use production initial_energy (below founder reproduce threshold of 24.0)
     // so the creature eats rather than reproduces.
@@ -360,6 +361,11 @@ fn creatures_can_eat_food() {
     let energy_before = creatures[creature_id].energy;
 
     let mut sim = Simulation::new(world, creatures, 0, cfg, 42);
+    let food_before = sim.world.food_at(pos);
+    assert!(
+        food_before > 0.0,
+        "the founder's cell must hold food when the tick starts"
+    );
     run_tick(&mut sim, &mut None);
 
     let food_after = sim.world.food_at(pos);
@@ -996,6 +1002,8 @@ fn mutation_skip_reason_tracking_accumulates_correctly() {
     cfg.population.initial_creatures = 10;
     // About three requested events per founder birth (0.03 per unit).
     cfg.mutation.per_unit_rate = 0.03;
+    cfg.world.food.types[0].initial_coverage = 0.8;
+    cfg.world.food.types[0].initial_density = 1.0;
     cfg.world.food.growth_rate = 0.5;
     cfg.energy.costs.reproduce_cost = 1.0;
     let mut sim = seed_simulation(cfg, 42);
@@ -1049,11 +1057,16 @@ fn ordinary_food_alone_replenishes_energy_and_reproduces() {
 /// Intentional changes to production defaults must update this pin only after
 /// the new trajectory has been reproduced. Re-pinned by T19.F04 (the vote
 /// founder, 97 genome units): 185 births became 323; before/after in
-/// `docs/progress/readings/t19-f04.md`.
-/// GNU/Linux has a separate pin because fertility generation's `f32::exp`
-/// rounds differently from macOS. Both trajectories have identical positions
-/// and births; replaying either platform's exp results reproduces its digest
-/// on the other. Reproducibility is scoped to locked versions/platform per
+/// `docs/progress/readings/t19-f04.md`. Re-pinned by the food-fixture fix
+/// (`docs/specs/fix-food-test-fixtures.md`): `viability_config`'s full initial
+/// food coverage now reaches the seeder, so 323 births became 199; dropping
+/// the two `types[0]` lines restores the previous pins.
+/// At the old 0.54 coverage GNU/Linux needed a separate pin because
+/// fertility generation's `f32::exp` rounds differently from macOS (identical
+/// positions and births, different digests). Under full coverage macOS aarch64
+/// and GNU/Linux aarch64 produce the same digest, so the platform branch was
+/// removed; reintroduce it if a split reappears. x86_64 is not measured here.
+/// Reproducibility is scoped to locked versions/platform per
 /// `docs/reference/v3-startup-seeding-spec.md`.
 #[test]
 fn founder_only_trajectory_digest_is_pinned() {
@@ -1089,13 +1102,8 @@ fn founder_only_trajectory_digest_is_pinned() {
         }
     }
     let digest = hex::encode(hash.finalize());
-    let expected_digest = if cfg!(all(target_os = "linux", target_env = "gnu")) {
-        // Reproduced on GNU/Linux aarch64 with Rust 1.93.0; matches x86_64 CI.
-        "57986127fb8baa4fc3859ecf23f4941a0691473c9490f3a3e4b052e3eb9e019a"
-    } else {
-        // Original macOS aarch64 pin; preserve this baseline on other targets.
-        "54db30adef8c1c9e047f3eeb1e988e2581c6e43b28183d01c5ea23b7800e529c"
-    };
+    // Same value on macOS aarch64 and GNU/Linux aarch64 (Rust 1.93.0).
+    let expected_digest = "ad2f93e100d1f7962b68dcb6f35b65d3d6b4972ef0efee15de5b0e4df06dfc52";
 
     assert_eq!(sim.stats.mutation_events_applied_total, 0);
     assert_eq!(
@@ -1104,6 +1112,6 @@ fn founder_only_trajectory_digest_is_pinned() {
             sim.creatures.len(),
             digest.as_str()
         ),
-        (323, 0, expected_digest)
+        (199, 0, expected_digest)
     );
 }

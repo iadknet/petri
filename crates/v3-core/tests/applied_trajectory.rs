@@ -8,7 +8,10 @@
 //! two-to-four-event per-birth rule to `per_unit_rate = 0.03`. T11.F25
 //! re-pinned both digests: the `AddGraphEdge` surface draw skips the
 //! undecoded parameter sinks (restoring that draw alone restores both old
-//! digests).
+//! digests). The food-fixture fix re-pinned both digests: the fixtures'
+//! full initial food coverage now reaches the seeder through `types[0]`
+//! (it had been written to the retired shared copy, leaving coverage at the
+//! 0.54 default); dropping those two lines restores both old digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -24,6 +27,8 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
         config.world.width = 24;
         config.world.height = 24;
         config.population.initial_creatures = 24;
+        config.world.food.types[0].initial_coverage = 1.0;
+        config.world.food.types[0].initial_density = 1.0;
         // About three requested events per founder birth, the retired
         // two-to-four-event fixture's exposure (T11.F20).
         config.mutation.per_unit_rate = 0.03;
@@ -71,7 +76,7 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "dd28049c8c37ae68f52750c300090870190c3b4e98e6acc9328d4eb78a0bee19"
+        "93ba762bb64d24032df8821f5f0b3f50b5b9c3a29f340aabf7a29186f03fda65"
     );
 }
 
@@ -88,6 +93,8 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
         config.world.width = 24;
         config.world.height = 24;
         config.population.initial_creatures = 24;
+        config.world.food.types[0].initial_coverage = 1.0;
+        config.world.food.types[0].initial_density = 1.0;
         let mut sim = seed_simulation(config, seed);
         for _ in 0..64 {
             run_tick(&mut sim, &mut None);
@@ -108,6 +115,6 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "e0f75b16be1581697eb54fe5cae69fe281e5c98fe76fb8db40774dbfcf629f37"
+        "44ead4e700027eb43138d562a88a3581beb84f002432e37f98bc12b0f97d67f0"
     );
 }

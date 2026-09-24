@@ -6,6 +6,8 @@ fn default_config() -> SimulationConfig {
     cfg.world.width = 32;
     cfg.world.height = 32;
     cfg.population.initial_creatures = 10;
+    cfg.world.food.types[0].initial_coverage = 0.6;
+    cfg.world.food.types[0].initial_density = 1.0;
     cfg.world.food.growth_rate = 0.25;
     cfg.energy.lifecycle.max_energy = 160.0;
     cfg.energy.costs.reproduce_cost = 1.0;

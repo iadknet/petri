@@ -1479,6 +1479,8 @@ async fn health_payload_contains_mutation_skip_by_reason() {
     cfg.population.initial_creatures = 5;
     // About three requested events per founder birth (0.03 per unit).
     cfg.mutation.per_unit_rate = 0.03;
+    cfg.world.food.types[0].initial_coverage = 0.8;
+    cfg.world.food.types[0].initial_density = 1.0;
     cfg.world.food.growth_rate = 0.5;
     cfg.energy.costs.reproduce_cost = 1.0;
 
