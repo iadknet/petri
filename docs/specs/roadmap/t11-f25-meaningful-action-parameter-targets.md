@@ -139,7 +139,7 @@ Fixed design:
 - [x] `cargo test -p v3-core --test viability` first, then
       `cargo test -p v3-core --lib mutation` and the new tests, with the red
       run and green run in [readings](../../progress/readings/t11-f25.md).
-- [x] `make check` exits 0 in the worktree (tested commit `b1a41c8c`, 2026-09-24).
+- [x] `make check` exits 0 in the worktree (tested commit `0b342e54`, rebased onto main `4a5dfc0e`, 2026-09-24).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on `e2cebdf5`
       (2026-09-24, run mode `fresh`): `28 mutants tested in 11m: 23 caught,
       4 unviable, 1 timeouts`, diffed against `df35975f`, output in
