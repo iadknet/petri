@@ -193,8 +193,13 @@ Fixed design:
 - [x] Production identity (invariant 3). Gate: 0 differing paths. Goal: 10
       differing paths, all within the permitted list. Both comparisons
       loaded the T19.F04 and T19.F06 summaries. Path list in readings.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
+      and every survivor resolved. Ran once at 71f678b6 (diff base 2c09fd76):
+      `29 mutants tested in 9m: 19 caught, 10 unviable`; `rust-mutants: no
+      survivors`. Output
+      `~/.local/share/petri-tools/mutants/t11-f20/mutants.out` (run mode
+      fresh). Survivors: none (0 missed, 0 timeouts); no tests added and no
+      second fresh run.
 - [x] Benchmark summaries stored at
       `docs/progress/features/t11-f20-per-birth-supply-rule-retirement.json`
       and `…-goal.json`, with local raw hash and byte count checked. Series
