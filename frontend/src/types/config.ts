@@ -38,8 +38,6 @@ export type FoodFertilityLayerTarget = "AllFoods" | { SingleType: { type_idx: nu
 
 export interface FoodSharedConfig {
 	growth_rate: number;
-	initial_density: number;
-	initial_coverage: number;
 	spread_threshold_ratio: number;
 	spread_density_ratio: number;
 	recovery_spawn_rate: number;

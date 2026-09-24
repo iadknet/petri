@@ -111,8 +111,6 @@ Request (conceptual v3alpha4 shape):
     "food": {
       "shared": {
         "growth_rate": 0.09,
-        "initial_density": 1.0,
-        "initial_coverage": 0.54,
         "spread_threshold_ratio": 0.8,
         "spread_density_ratio": 0.25,
         "recovery_spawn_rate": 0.01,
@@ -438,8 +436,6 @@ Response:
       "food": {
         "shared": {
           "growth_rate": 0.09,
-          "initial_density": 1.0,
-          "initial_coverage": 0.54,
           "spread_threshold_ratio": 0.8,
           "spread_density_ratio": 0.25,
           "recovery_spawn_rate": 0.01,

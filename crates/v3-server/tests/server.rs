@@ -1479,8 +1479,6 @@ async fn health_payload_contains_mutation_skip_by_reason() {
     cfg.population.initial_creatures = 5;
     // About three requested events per founder birth (0.03 per unit).
     cfg.mutation.per_unit_rate = 0.03;
-    cfg.world.food.initial_coverage = 0.8;
-    cfg.world.food.initial_density = 1.0;
     cfg.world.food.growth_rate = 0.5;
     cfg.energy.costs.reproduce_cost = 1.0;
 
@@ -3625,9 +3623,9 @@ async fn patch_config_reason_names_the_cross_field_path_it_would_move() {
         .await
         .unwrap();
 
-    // Lowering the shared maximum density below the initial density moves
-    // the initial density with it (T11.F20 retired the min/max event pair
-    // this test used to read).
+    // Lowering the shared maximum density below the primary food type's
+    // initial density moves that initial density with it (T11.F20 retired the
+    // min/max event pair this test used to read).
     let patch = r#"{"world":{"food":{"shared":{"max_density":0.5}}}}"#;
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
 
@@ -3637,9 +3635,35 @@ async fn patch_config_reason_names_the_cross_field_path_it_would_move() {
         .expect("string reason");
     assert!(reason.contains("0.5"), "reason: {reason}");
     assert!(
-        reason.contains("world.food.shared.initial_density"),
+        reason.contains("world.food.types.0.initial_density"),
         "reason: {reason}"
     );
+}
+
+/// The shared food substrate no longer carries a copy of the per-type initial
+/// values or the top-level fertility and annealing settings, so a runtime
+/// patch naming them is refused and stores nothing.
+#[tokio::test]
+async fn patch_config_rejects_retired_shared_food_copy_keys() {
+    for patch in [
+        r#"{"world":{"food":{"shared":{"initial_density":0.5}}}}"#,
+        r#"{"world":{"food":{"shared":{"initial_coverage":0.5}}}}"#,
+        r#"{"world":{"food":{"shared":{"fertility":{"enabled":false}}}}}"#,
+        r#"{"world":{"food":{"shared":{"annealing":{"enabled":true}}}}}"#,
+    ] {
+        let a = app();
+        a.clone()
+            .oneshot(startup_req(r#"{"seed":1}"#))
+            .await
+            .unwrap();
+        let (_, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+
+        let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{patch}: {body}");
+        let (_, after) = do_request(a, get_req("/v3/simulation/config")).await;
+        assert_eq!(after["config"], before["config"], "{patch}");
+    }
 }
 
 /// The audit's mixed patch: three acceptable edits plus one refused edit are

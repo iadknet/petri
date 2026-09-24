@@ -178,7 +178,10 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
 /// These digests pin the fully resolved checked-in recipes. Intentional changes
 /// to inherited production defaults must update them after repeated resolution.
 /// T11.F20 re-pinned all three after two agreeing runs: the resolved
-/// `MutationConfig` carries five keys fewer.
+/// `MutationConfig` carries five keys fewer. The shared-food-copy removal
+/// re-pinned all three: `world.food.shared` no longer carries
+/// `initial_density`, `initial_coverage`, `fertility`, or `annealing`, and
+/// re-adding those synced values reproduces the previous digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let actual = GOAL_RECIPE_NAMES
@@ -186,9 +189,9 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
-            "sha256:0a8056385815650cf43da24435aaca43d95dde2829142427eca213602575a890",
-            "sha256:4edca49b17a6a16ce8e8cfbc9460c3076b70be99841a4ac1c7af974e71133cbc",
-            "sha256:09398394d4769af786833bc7e20c530b6511d3a1b07b5ce6aa6c50a345b341f6",
+            "sha256:7f91cd5ccb476cc4013e8dc3fe5f050dcf159f39dce621be55a92fdc0aac47ff",
+            "sha256:88ef5abaec2d99ba5934e517dcdd045344b73a4c73149f90133f8fb4f692e7b4",
+            "sha256:48722f834746b54ff6964afdb406dc69e321fa2946ebf4571d6977a609bba9b2",
         ]
     );
 }

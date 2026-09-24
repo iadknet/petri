@@ -4,6 +4,9 @@
 versioned summary. Commit the summary and concise readings. Full reports,
 including small gate reports, stay out of Git. Existing historical reports
 remain valid comparison inputs; historical migration belongs to T15.F02.
+Committed summaries are the durable comparison inputs: a full report embeds
+typed config, so one written before a config key was retired no longer loads
+and is regenerated rather than migrated.
 
 | Profile | Full report in the main checkout | Summary in the calling checkout |
 | --- | --- | --- |

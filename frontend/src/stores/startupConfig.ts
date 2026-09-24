@@ -78,8 +78,6 @@ function createFoodType(index: number): FoodTypeConfig {
 function defaultFoodShared(): FoodSharedConfig {
 	return {
 		growth_rate: 0.09,
-		initial_density: 1.0,
-		initial_coverage: 0.54,
 		spread_threshold_ratio: 0.8,
 		spread_density_ratio: 0.25,
 		recovery_spawn_rate: 0.01,
@@ -201,13 +199,10 @@ function normalizeFoodConfig(food: StartupFoodConfig): StartupFoodConfig {
 					normalizeFoodType(cloneFoodType(type), index, shared.max_density),
 				)
 			: [createFoodType(0)];
-	const primaryType = types[0]!;
 
 	return {
 		shared: {
 			growth_rate: shared.growth_rate,
-			initial_density: primaryType.initial_density,
-			initial_coverage: primaryType.initial_coverage,
 			spread_threshold_ratio: shared.spread_threshold_ratio,
 			spread_density_ratio: shared.spread_density_ratio,
 			recovery_spawn_rate: shared.recovery_spawn_rate,
@@ -258,8 +253,6 @@ function fromServerFoodConfig(config: SimulationConfig["world"]["food"]): Startu
 	return normalizeFoodConfig({
 		shared: {
 			growth_rate: config.shared.growth_rate,
-			initial_density: config.shared.initial_density,
-			initial_coverage: config.shared.initial_coverage,
 			spread_threshold_ratio: config.shared.spread_threshold_ratio,
 			spread_density_ratio: config.shared.spread_density_ratio,
 			recovery_spawn_rate: config.shared.recovery_spawn_rate,
@@ -398,8 +391,6 @@ function buildStartupFoodRequest(food: StartupFoodConfig): StartupFoodRequest {
 	return {
 		shared: {
 			growth_rate: normalized.shared.growth_rate,
-			initial_density: normalized.shared.initial_density,
-			initial_coverage: normalized.shared.initial_coverage,
 			spread_threshold_ratio: normalized.shared.spread_threshold_ratio,
 			spread_density_ratio: normalized.shared.spread_density_ratio,
 			recovery_spawn_rate: normalized.shared.recovery_spawn_rate,

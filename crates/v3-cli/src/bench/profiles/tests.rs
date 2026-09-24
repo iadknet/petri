@@ -38,10 +38,6 @@ fn omitting_food_coverage_leaves_production_coverage_untouched() {
 
     assert_eq!(coverages, default_coverages);
     assert_eq!(coverages, vec![0.54]);
-    assert!(
-        (config.world.food.shared.initial_coverage - 0.54).abs() < 1e-6,
-        "normalize() makes the shared coverage follow the primary food type"
-    );
 }
 
 #[test]

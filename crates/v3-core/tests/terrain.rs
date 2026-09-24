@@ -207,7 +207,6 @@ fn production_sized_startup_has_no_runtime_pattern_area_cap() {
     cfg.world.width = 1600;
     cfg.world.height = 1600;
     cfg.population.initial_creatures = 0;
-    cfg.world.food.initial_coverage = 0.0;
     cfg.world.terrain = vec![layer(
         PatternParams::ParallelLines {
             spacing: 255,

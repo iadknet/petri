@@ -137,7 +137,7 @@ describe("ConfigPanel", () => {
 		});
 
 		expect(useStartupConfigStore.getState().preset.world.food.types[0]!.initial_density).toBe(0.75);
-		expect(useConfigStore.getState().localDraft?.world.food.shared.initial_density).toBe(1.0);
+		expect(useConfigStore.getState().localDraft?.world.food.types[0]?.initial_density).toBe(1.0);
 	});
 
 	it("applies runtime field disable rules by simulation state", () => {

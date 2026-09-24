@@ -32,8 +32,6 @@ const MOCK_CONFIG: SimulationConfig = {
 		food: {
 			shared: {
 				growth_rate: 0.2,
-				initial_density: 1.0,
-				initial_coverage: 0.4,
 				spread_threshold_ratio: 0.8,
 				spread_density_ratio: 0.25,
 				recovery_spawn_rate: 0.05,

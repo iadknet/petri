@@ -117,8 +117,6 @@ This file is the canonical owner for world/grid config keys/defaults.
 | `world.terrain` | `TerrainLayer[]` | `[]` | Ordered additive barrier layers; absent defaults to empty. |
 | `world.world_seed` | `Option<u64>` | absent/null | Effective terrain/fertility seed is this value or the run seed. |
 | `world.food.shared.growth_rate` | `f32` | `0.09` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.09`. |
-| `world.food.shared.initial_density` | `f32` | `1.0` | Clamp to `[0.0, max_density]`; invalid falls back to `max_density`. |
-| `world.food.shared.initial_coverage` | `f32` | `0.54` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.54`. The two default typed entries seed independently at `0.27` each. |
 | `world.food.shared.spread_threshold_ratio` | `f32` | `0.8` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.8`. |
 | `world.food.shared.spread_density_ratio` | `f32` | `0.25` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.25`. Fraction of growth delta deposited to neighbor during spread. |
 | `world.food.shared.recovery_spawn_rate` | `f32` | `0.01` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.01`. |
@@ -131,6 +129,8 @@ This file is the canonical owner for world/grid config keys/defaults.
 | `world.food.shared.grazing.floor` | `f32` | `0.05` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.05`. `floor <= factor` is not required. |
 | `world.food.shared.grazing.recovery_ticks` | `u32` | `1000` | Clamped to `[1, 10000]`; zero or missing falls back to `1000`. At the start of every Phase 0 growth pass each non-barrier cell of every type advances `min(1.0, modifier + 1 / recovery_ticks)`, empty cells included; barrier cells stay `1.0`. |
 | `world.food.types` | `FoodTypeConfig[]` | `[Primary Food]` | Ordered list of configured ordinary-food types. List position is the stable per-run `OrdinaryFoodTypeId`; each entry carries display metadata and startup seeding knobs. Empty lists normalize to one green Primary Food with density `1.0` and coverage `0.54`. |
+| `world.food.types[].initial_density` | `f32` | `1.0` | Clamp to `[0.0, world.food.shared.max_density]`; invalid falls back to `max_density`. |
+| `world.food.types[].initial_coverage` | `f32` | `0.54` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.54`. |
 | `world.food.fertility.layers[].target` | `enum{AllFoods,SingleType{type_idx}}` | `AllFoods` | Fertility layer selector. Invalid/unknown targeted type indices normalize to `AllFoods` during config normalization. |
 
 Terrain layers contain required `params: PatternParams` and optional/null `bounds:
@@ -161,9 +161,10 @@ Food-type catalog posture:
   consumed density by the effective reward, then caps energy and charges the
   existing action cost. Growth/recovery resolve once per type and retain the
   existing local/spread/recovery formulas and suppression telemetry.
-- The primary type (`types[0]`) is mirrored into
-  `world.food.shared.initial_density` and
-  `world.food.shared.initial_coverage` during config normalization.
+- Initial density and coverage live only on each `world.food.types[]` entry,
+  and fertility and annealing only at `world.food.fertility` and
+  `world.food.annealing`; `world.food.shared` carries no copy of them and
+  rejects those keys as unknown fields.
 - Default types are seeded independently: each type shuffles the passable-cell
   candidate list separately and takes its own rounded coverage target. A shared
   ordering is not reused across types, so equal coverages do not imply equal
@@ -249,10 +250,12 @@ v3alpha1; it only modulates regrowth through the depletion layer.
 World initialization food seeding:
 - clear prior food;
 - enumerate non-barrier candidate cells;
-- sample exactly
-  `round(world.food.shared.initial_coverage * candidate_count)` unique cells;
-- set sampled cells to
-  `clamp(world.food.shared.initial_density, 0.0, world.food.shared.max_density)`.
+- for each food type `t` in `world.food.types`, shuffle the candidates
+  (restricted to fertile cells when `t.initial_fertility_only` is set and
+  fertility is enabled) independently and sample exactly
+  `round(t.initial_coverage * candidate_count)` unique cells;
+- set that type's density on its sampled cells to
+  `clamp(t.initial_density, 0.0, world.food.shared.max_density)`.
 
 Startup flow and founder-baseline policy consuming these world seeding semantics
 are canonical in `v3-startup-seeding-spec.md`.

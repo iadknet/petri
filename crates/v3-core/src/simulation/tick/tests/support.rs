@@ -66,7 +66,6 @@ pub(super) fn make_sim_two_creatures(
 ) -> (Simulation, CreatureId, CreatureId) {
     let mut cfg = small_config();
     cfg.world.food.growth_rate = 0.0;
-    cfg.world.food.initial_coverage = 0.0;
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     world.reconfigure_food(cfg.world.food.clone());
@@ -119,7 +118,6 @@ pub(super) fn make_sim_two_creatures(
 pub(super) fn make_sim_with_one_creature(energy: f32) -> (Simulation, CreatureId) {
     let mut cfg = small_config();
     cfg.world.food.growth_rate = 0.0;
-    cfg.world.food.initial_coverage = 0.0;
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     world.reconfigure_food(cfg.world.food.clone());
@@ -159,7 +157,6 @@ pub(super) fn make_sim_with_custom_genome(
 ) -> (Simulation, CreatureId) {
     let mut cfg = small_config();
     cfg.world.food.growth_rate = 0.0;
-    cfg.world.food.initial_coverage = 0.0;
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     world.reconfigure_food(cfg.world.food.clone());

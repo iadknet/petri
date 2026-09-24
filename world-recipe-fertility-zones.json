@@ -140,53 +140,6 @@
         "min_fertility": 0.0
       },
       "shared": {
-        "annealing": {
-          "enabled": false,
-          "initial_max_fertility": 1.5,
-          "initial_min_fertility": 0.30000001192092896,
-          "ramp_ticks": 5000
-        },
-        "fertility": {
-          "enabled": true,
-          "layers": [
-            {
-              "algorithm": {
-                "PoissonBlobs": {
-                  "blob_count": 90,
-                  "falloff": 0.6000000238418579,
-                  "max_radius": 100.0,
-                  "min_radius": 15.0,
-                  "seed": null
-                }
-              },
-              "target": {
-                "SingleType": {
-                  "type_idx": 0
-                }
-              },
-              "weight": 1.0
-            },
-            {
-              "algorithm": {
-                "PoissonBlobs": {
-                  "blob_count": 5000,
-                  "falloff": 0.5,
-                  "max_radius": 5.0,
-                  "min_radius": 1.0,
-                  "seed": null
-                }
-              },
-              "target": {
-                "SingleType": {
-                  "type_idx": 1
-                }
-              },
-              "weight": 1.0
-            }
-          ],
-          "max_fertility": 2.0,
-          "min_fertility": 0.0
-        },
         "grazing": {
           "enabled": true,
           "factor": 0.5,
@@ -194,8 +147,6 @@
           "recovery_ticks": 1000
         },
         "growth_rate": 0.09000000357627869,
-        "initial_coverage": 0.5400000214576721,
-        "initial_density": 1.0,
         "max_density": 1.0,
         "occupancy_depletion": {
           "deposit_per_occupied_tick": 0.07999999821186066,
