@@ -162,11 +162,12 @@ Topology connection semantics (T11.F15, T11.F18):
 - `VmInstructionMutation` (insert/delete/replace opcode, mutate operands);
   the fresh-instruction draw is uniform over all 39 opcodes (T19.F04), which
   include `AddVote { sink in 0..27, src }` (the sink drawn uniformly over the
-  vote catalog) and `WriteActionParam { slot_idx, src }`, whose `slot_idx`
-  is drawn uniformly over the decoded parameter fields `{0, 5, 7}` (T11.F25,
-  `DECODED_ACTION_PARAM_FLAT_SLOTS`; storage stays `0..8`); the operand
-  nudge moves an `AddVote`'s `sink` or `src`, and the raw-field move can
-  still step a `slot_idx` onto an undecoded slot
+  vote catalog), `WriteActionParam { field_idx, src }`, whose `field_idx` is
+  one uniform draw over `ActionParamField::ALL` (`0..3`, T11.F27), and
+  `ReadActionQueueParam`, whose `param_slot` is drawn from `0..2`, the queue
+  parameter slots that carry a value (T11.F27); the operand nudge moves an
+  `AddVote`'s `sink` or `src`, and the raw-field move can still step a
+  `field_idx` to `3` or more, a write the VM ignores
 - `VmConstantMutation` — one constant `c` of the pool, drawn uniformly, moves
   by `u × max(|c|, 1)` with `u` uniform in [−0.1, 0.1] (the graph parameter
   step; T11.F23): a unit-scale constant moves as a graph parameter does, a
@@ -332,7 +333,7 @@ does not extend to energy exhaustion.
 ### Graph domain
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
-(the 99 output sinks, vote and parameter sinks included) are never
+(the 94 output sinks, vote and parameter sinks included) are never
 added/removed/retyped — only their edges are evolvable.
 
 - `AlterGraphEdgeWeight` (both edge-bearing surfaces: compute inputs and sink
@@ -378,13 +379,10 @@ added/removed/retyped — only their edges are evolvable.
   split's neutrality property holds unconditionally.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
-- `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` uniform
-  over one surface per compute node and one per sink except the five
-  parameter sinks the commit decoder never reads: 94 of the 99 sinks, the
-  27 vote sinks and the decoded parameter sinks `Eat[0]`, `Reproduce[1]`,
-  `StealEnergy[1]` included (T11.F25; a chosen sink keeps its vector index,
-  and existing edges on undecoded sinks stay reachable by the other edge
-  operators);
+- `AddGraphEdge` (both edge-bearing surfaces, `pick_random_surface` one
+  uniform draw over one surface per compute node and one per sink in vector
+  order: all 94 sinks, the 27 vote sinks and the three parameter sinks
+  included (T11.F27);
   source sampled by
   `random_graph_source`, which draws a compound `InputLeaf` source's
   `sub_idx` uniformly across the reference's full width via

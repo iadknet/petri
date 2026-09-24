@@ -1,29 +1,31 @@
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{Direction, WorldAction};
-use crate::creature::genome::vote::{VoteSink, VOTE_PARAM_SLOTS};
+use crate::creature::genome::vote::{ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT};
 
-/// A kind's parameter slots, the row of the parameter surface a commit reads.
-pub type ActionParams = [f32; VOTE_PARAM_SLOTS as usize];
+/// The parameter surface a commit reads, indexed by `ActionParamField::index`.
+pub type ActionParams = [f32; ACTION_PARAM_FIELD_COUNT];
 
 /// Decode the action a pass commits (T19.F04): the direction is the winning
-/// sink's, and the kind's parameter slots supply the rest with today's
-/// `meta[i]` meaning minus the direction: `Eat` reads its food type at slot
-/// 0, `Reproduce` its transfer fraction and `StealEnergy` its amount at slot
-/// 1. `Terminate` and `Decide` never commit and decode to `NoOp`.
+/// sink's, and the kind's parameter field supplies the rest (T11.F27): `Eat`
+/// reads `EatFoodType`, `Reproduce` `ReproduceTransferFraction` and
+/// `StealEnergy` `StealEnergyAmount`; `Move` reads nothing. `Terminate` and
+/// `Decide` never commit and decode to `NoOp`.
 #[must_use]
 pub fn decode_commit(sink: VoteSink, params: &ActionParams) -> WorldAction {
     match sink {
         VoteSink::Eat => WorldAction::Eat {
-            type_idx: decode_food_type_idx(params[0]),
+            type_idx: decode_food_type_idx(params[ActionParamField::EatFoodType.index()]),
         },
         VoteSink::Move(d) => WorldAction::Move(sink_direction(d)),
         VoteSink::Reproduce(d) => WorldAction::Reproduce {
             direction: sink_direction(d),
-            energy_transfer_fraction: clamp_unit_interval(params[1]),
+            energy_transfer_fraction: clamp_unit_interval(
+                params[ActionParamField::ReproduceTransferFraction.index()],
+            ),
         },
         VoteSink::StealEnergy(d) => WorldAction::StealEnergy {
             direction: sink_direction(d),
-            amount: clamp_non_negative_finite(params[1]),
+            amount: clamp_non_negative_finite(params[ActionParamField::StealEnergyAmount.index()]),
         },
         VoteSink::Terminate | VoteSink::Decide => WorldAction::NoOp,
     }
@@ -72,7 +74,6 @@ fn clamp_non_negative_finite(v: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::creature::genome::vote::{is_decoded_action_param, VoteKind};
     use proptest::prelude::*;
 
     #[test]
@@ -80,18 +81,18 @@ mod tests {
         for (d, direction) in Direction::ALL.into_iter().enumerate() {
             let d = d as u8;
             assert_eq!(
-                decode_commit(VoteSink::Move(d), &[9.0, 9.0]),
+                decode_commit(VoteSink::Move(d), &[9.0, 9.0, 9.0]),
                 WorldAction::Move(direction)
             );
             assert_eq!(
-                decode_commit(VoteSink::Reproduce(d), &[0.0, 0.25]),
+                decode_commit(VoteSink::Reproduce(d), &[0.0, 0.25, 0.0]),
                 WorldAction::Reproduce {
                     direction,
                     energy_transfer_fraction: 0.25,
                 }
             );
             assert_eq!(
-                decode_commit(VoteSink::StealEnergy(d), &[0.0, 3.0]),
+                decode_commit(VoteSink::StealEnergy(d), &[0.0, 0.0, 3.0]),
                 WorldAction::StealEnergy {
                     direction,
                     amount: 3.0,
@@ -107,21 +108,21 @@ mod tests {
         let last = Direction::ALL[Direction::ALL.len() - 1];
         for d in [8, 9, u8::MAX] {
             assert_eq!(
-                decode_commit(VoteSink::Move(d), &[0.0, 0.0]),
+                decode_commit(VoteSink::Move(d), &[0.0; 3]),
                 WorldAction::Move(last)
             );
         }
     }
 
     #[test]
-    fn eat_reads_its_food_type_from_slot_zero() {
+    fn eat_reads_its_food_type_field() {
         assert_eq!(
-            decode_commit(VoteSink::Eat, &[3.0, 8.0]),
+            decode_commit(VoteSink::Eat, &[3.0, 8.0, 8.0]),
             WorldAction::eat(OrdinaryFoodTypeId::new(3))
         );
         for raw in [f32::NAN, f32::INFINITY, -1.0] {
             assert_eq!(
-                decode_commit(VoteSink::Eat, &[raw, 0.0]),
+                decode_commit(VoteSink::Eat, &[raw, 0.0, 0.0]),
                 WorldAction::eat(OrdinaryFoodTypeId::default())
             );
         }
@@ -130,11 +131,11 @@ mod tests {
     #[test]
     fn pass_control_sinks_decode_to_noop() {
         assert_eq!(
-            decode_commit(VoteSink::Terminate, &[1.0, 1.0]),
+            decode_commit(VoteSink::Terminate, &[1.0; 3]),
             WorldAction::NoOp
         );
         assert_eq!(
-            decode_commit(VoteSink::Decide, &[1.0, 1.0]),
+            decode_commit(VoteSink::Decide, &[1.0; 3]),
             WorldAction::NoOp
         );
     }
@@ -143,7 +144,7 @@ mod tests {
     fn steal_amount_is_non_negative_finite() {
         for raw in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -2.0] {
             assert_eq!(
-                decode_commit(VoteSink::StealEnergy(0), &[0.0, raw]),
+                decode_commit(VoteSink::StealEnergy(0), &[0.0, 0.0, raw]),
                 WorldAction::StealEnergy {
                     direction: Direction::N,
                     amount: 0.0,
@@ -169,7 +170,7 @@ mod tests {
             let WorldAction::Reproduce {
                 energy_transfer_fraction,
                 ..
-            } = decode_commit(VoteSink::Reproduce(0), &[0.0, raw])
+            } = decode_commit(VoteSink::Reproduce(0), &[0.0, raw, 0.0])
             else {
                 panic!("expected Reproduce");
             };
@@ -181,53 +182,49 @@ mod tests {
         }
     }
 
-    /// `decode_commit` for `kind`'s sinks with `value` in `slot` and `other`
-    /// in the remaining slot.
-    fn decode_kind(kind: VoteKind, slot: u8, value: f32, other: f32) -> Vec<WorldAction> {
-        let mut params = [other; VOTE_PARAM_SLOTS as usize];
-        params[usize::from(slot)] = value;
+    /// `decode_commit` for every sink `field` is read by, with `value` in
+    /// `field` and every other field zero.
+    fn decode_field(field: ActionParamField, value: f32) -> Vec<WorldAction> {
+        let mut params = [0.0; ACTION_PARAM_FIELD_COUNT];
+        params[field.index()] = value;
         VoteSink::all()
-            .filter(|sink| sink.kind() == Some(kind))
+            .filter(|sink| sink.kind() == Some(field.kind()))
             .map(|sink| decode_commit(sink, &params))
             .collect()
     }
 
-    /// T11.F25: the decoded-parameter catalog agrees with the decoder. Some
-    /// pair of finite values in one slot, the other fixed, changes a kind's
-    /// committed action exactly when the pair is catalogued.
+    /// T11.F27 decoder agreement, sensitivity: every catalogued field has a
+    /// pair of finite values, the other fields fixed, that changes the action
+    /// its kind's sinks commit.
     #[test]
-    fn decoded_action_param_catalog_matches_decode_commit() {
+    fn every_action_param_field_changes_its_kinds_commit() {
         const PROBES: [f32; 5] = [0.0, 0.25, 0.5, 1.0, 3.0];
-        for kind in VoteKind::ALL {
-            for slot in 0..VOTE_PARAM_SLOTS {
-                let changes = PROBES.iter().any(|&a| {
-                    PROBES.iter().any(|&b| {
-                        decode_kind(kind, slot, a, 0.0) != decode_kind(kind, slot, b, 0.0)
-                    })
-                });
-                assert_eq!(
-                    changes,
-                    is_decoded_action_param(kind, slot),
-                    "{kind:?} slot {slot}"
-                );
-            }
+        for field in ActionParamField::ALL {
+            let changes = PROBES.iter().any(|&a| {
+                PROBES
+                    .iter()
+                    .any(|&b| decode_field(field, a) != decode_field(field, b))
+            });
+            assert!(changes, "{field:?}");
         }
     }
 
     proptest! {
-        /// T11.F25: no finite value in an uncatalogued slot changes the
-        /// committed action, whatever the other slot holds.
+        /// T11.F27 decoder agreement, independence: a field never changes
+        /// the action of a sink of another kind, including `Move`,
+        /// `Terminate` and `Decide`, whatever finite values the surface holds.
         #[test]
-        fn undecoded_action_params_never_change_the_commit(
-            kind_index in 0..VoteKind::ALL.len(),
-            slot in 0..VOTE_PARAM_SLOTS,
-            a in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
-            b in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
-            other in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
+        fn a_field_never_changes_another_kinds_commit(
+            field_index in 0..ActionParamField::ALL.len(),
+            base in prop::array::uniform3(prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO),
+            value in prop::num::f32::NORMAL | prop::num::f32::SUBNORMAL | prop::num::f32::ZERO,
         ) {
-            let kind = VoteKind::ALL[kind_index];
-            prop_assume!(!is_decoded_action_param(kind, slot));
-            prop_assert_eq!(decode_kind(kind, slot, a, other), decode_kind(kind, slot, b, other));
+            let field = ActionParamField::ALL[field_index];
+            let mut changed = base;
+            changed[field.index()] = value;
+            for sink in VoteSink::all().filter(|sink| sink.kind() != Some(field.kind())) {
+                prop_assert_eq!(decode_commit(sink, &base), decode_commit(sink, &changed), "{:?}", sink);
+            }
         }
 
         #[test]
@@ -235,7 +232,7 @@ mod tests {
             let WorldAction::Reproduce {
                 energy_transfer_fraction,
                 ..
-            } = decode_commit(VoteSink::Reproduce(2), &[0.0, raw])
+            } = decode_commit(VoteSink::Reproduce(2), &[0.0, raw, 0.0])
             else {
                 panic!("expected Reproduce");
             };

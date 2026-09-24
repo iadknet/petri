@@ -206,11 +206,11 @@ profile's reproduce gate `g` (`can` for V3Alpha1; `can · (1 - f)`, built as
 | `Move[d]`, `d` in N, E, S, W | `0.5 + 0.4·ring[d] - 2g - 2q` |
 | `Reproduce[d]`, `d` in N, E, S, W | `g·(0.5 + 0.4·ring[d])` |
 | `Terminate` | `q` |
-| `ActionParam(Reproduce, 1)` | the profile's transfer fraction (a `Constant` node) |
+| `ActionParam(ReproduceTransferFraction)` | the profile's transfer fraction (a `Constant` node) |
 
 `population.founder_profile` selects one row below by wire name. A profile
 changes only the strict energy threshold in Node 0 and the priority and
-transfer fraction (the `Constant` wired into `ActionParam(Reproduce, 1)`, the
+transfer fraction (the `Constant` wired into `ActionParam(ReproduceTransferFraction)`, the
 share of the parent's post-cost energy the child starts with) in Node 1; the 2-node mesh, its input references, compute nodes, and output
 wiring are shared by every profile. The energy threshold is the founder's own
 constant on the unit scale (it gates on fullness and is not recomputed from

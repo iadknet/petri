@@ -69,8 +69,18 @@ export type VoteSink =
 	| "Terminate"
 	| "Decide";
 
-/** An action kind carrying votes, a bar, and parameters. */
+/** An action kind carrying votes and a bar. */
 export type VoteKind = "Eat" | "Move" | "Reproduce" | "StealEnergy";
+
+/** One action-parameter field the commit decoder reads (T11.F27). */
+export type ActionParamField = "EatFoodType" | "ReproduceTransferFraction" | "StealEnergyAmount";
+
+/** Catalog order: the Graph sink order and the VM `field_idx` addressing. */
+export const ACTION_PARAM_FIELDS: readonly ActionParamField[] = Object.freeze([
+	"EatFoodType",
+	"ReproduceTransferFraction",
+	"StealEnergyAmount",
+]);
 
 export type OutputSinkKind =
 	| { CustomOutput: number }
@@ -78,7 +88,7 @@ export type OutputSinkKind =
 	| { WriteSlot: number }
 	| { ClearSlot: number }
 	| { ActionVote: VoteSink }
-	| { ActionParam: [VoteKind, number] };
+	| { ActionParam: ActionParamField };
 
 export interface OutputSink {
 	kind: OutputSinkKind;
@@ -116,7 +126,7 @@ export type VmInstruction =
 	| { Jump: { offset: number } }
 	| { ReadInput: { dst: number; ref_idx: number; sub_idx: number } }
 	| { WriteInternalPayload: { slot_idx: number; src: number } }
-	| { WriteActionParam: { slot_idx: number; src: number } }
+	| { WriteActionParam: { field_idx: number; src: number } }
 	| { AddVote: { sink: number; src: number } }
 	| { WriteRouteGate: { slot: number; src: number } }
 	| { ReadActionQueueLength: { dst: number } }

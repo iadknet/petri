@@ -135,13 +135,10 @@ pub(crate) fn apply_cgp_graph_effects(
                     applied = true;
                 }
             }
-            OutputSinkKind::ActionParam(kind, slot) => {
-                if let Some(param) = side_outputs.action_params[kind.index()].get_mut(slot as usize)
-                {
-                    applied_value = sanitize_f32(wsum);
-                    *param = applied_value;
-                    applied = true;
-                }
+            OutputSinkKind::ActionParam(field) => {
+                applied_value = sanitize_f32(wsum);
+                side_outputs.action_params[field.index()] = applied_value;
+                applied = true;
             }
         }
 

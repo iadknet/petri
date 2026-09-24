@@ -155,7 +155,7 @@ fn tick_action_log_records_applied_food_type_amount_and_result() {
                         const_idx: 0,
                     },
                     VmInstruction::WriteActionParam {
-                        slot_idx: 0,
+                        field_idx: 0,
                         src: 0,
                     },
                     VmInstruction::AddVote { sink: 0, src: 0 },
@@ -978,7 +978,7 @@ fn founder_reproduce_charge_is_bit_identical_with_and_without_the_replication_ra
 }
 
 /// A one-node VM genome that eats the named food type: write the type index
-/// to the `Eat` parameter slot the commit decodes, then vote one `Eat`.
+/// to the `EatFoodType` field the commit decodes, then vote one `Eat`.
 fn eat_type_genome(type_idx: u16) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -994,7 +994,7 @@ fn eat_type_genome(type_idx: u16) -> CreatureGenome {
                         const_idx: 0,
                     },
                     VmInstruction::WriteActionParam {
-                        slot_idx: 0,
+                        field_idx: 0,
                         src: 0,
                     },
                     VmInstruction::LoadConst {

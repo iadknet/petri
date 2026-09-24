@@ -1,9 +1,11 @@
-import type {
-	ComputeNodeKind,
-	GraphSource,
-	InputReference,
-	OutputSinkKind,
-	VoteSink,
+import {
+	ACTION_PARAM_FIELDS,
+	type ActionParamField,
+	type ComputeNodeKind,
+	type GraphSource,
+	type InputReference,
+	type OutputSinkKind,
+	type VoteSink,
 } from "../../types/genome.ts";
 import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
 
@@ -96,6 +98,20 @@ export function formatVoteSink(sink: VoteSink): string {
 	return "?";
 }
 
+/** Short label of each action-parameter field. */
+const ACTION_PARAM_FIELD_LABELS: Readonly<Record<ActionParamField, string>> = {
+	EatFoodType: "Eat.food",
+	ReproduceTransferFraction: "Reproduce.frac",
+	StealEnergyAmount: "StealEnergy.amt",
+};
+
+/** Target of a VM `WriteActionParam` at `field_idx`: `param <field>`, or
+ * `param[i]` for an index outside the catalog, which the VM ignores. */
+export function actionParamTargetLabel(fieldIdx: number): string {
+	const field = ACTION_PARAM_FIELDS[fieldIdx];
+	return field ? `param ${ACTION_PARAM_FIELD_LABELS[field]}` : `param[${fieldIdx}]`;
+}
+
 /** Format an OutputSinkKind as a human-readable label. */
 export function formatOutputSinkKind(kind: OutputSinkKind): string {
 	if ("RouterGate" in kind) return `Route[${kind.RouterGate}]`;
@@ -103,10 +119,7 @@ export function formatOutputSinkKind(kind: OutputSinkKind): string {
 	if ("WriteSlot" in kind) return `Write Mem[${kind.WriteSlot}]`;
 	if ("ClearSlot" in kind) return `Clear Mem[${kind.ClearSlot}]`;
 	if ("ActionVote" in kind) return `Vote ${formatVoteSink(kind.ActionVote)}`;
-	if ("ActionParam" in kind) {
-		const [voteKind, slot] = kind.ActionParam;
-		return `Param ${voteKind}[${slot}]`;
-	}
+	if ("ActionParam" in kind) return `Param ${ACTION_PARAM_FIELD_LABELS[kind.ActionParam]}`;
 	return "?";
 }
 

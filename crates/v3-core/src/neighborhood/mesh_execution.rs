@@ -538,7 +538,7 @@ mod tests {
                     sub_idx: 0,
                 },
                 VmInstruction::WriteActionParam {
-                    slot_idx: 0,
+                    field_idx: 0,
                     src: 0,
                 },
                 VmInstruction::AddVote { sink: 0, src: 0 },
@@ -1065,7 +1065,7 @@ mod tests {
                     slot_idx: 0,
                 },
                 VmInstruction::WriteActionParam {
-                    slot_idx: 0,
+                    field_idx: 0,
                     src: 0,
                 },
                 VmInstruction::AddVote { sink: 0, src: 0 },
@@ -1160,7 +1160,7 @@ mod tests {
             vm.constants[0] = 5.0;
         }
         // The consumer steals the bus value: it writes upstream slot 0 into
-        // the `StealEnergy` amount (parameter slot 7) and votes one steal.
+        // the `StealEnergyAmount` field and votes one steal.
         let mut consumer = node(2, &[], false);
         consumer.input_refs = vec![InputReference::UpstreamSlot(0)];
         if let BackendDef::Vm(vm) = &mut consumer.backend_def {
@@ -1171,7 +1171,7 @@ mod tests {
                     sub_idx: 0,
                 },
                 VmInstruction::WriteActionParam {
-                    slot_idx: 7,
+                    field_idx: 2,
                     src: 0,
                 },
                 VmInstruction::LoadConst {

@@ -82,7 +82,7 @@ pub(crate) fn derive_cgp_annotations(
                 write_classes.insert(MeshWriteClass::Memory);
             }
             // The vote and parameter sinks write the action channel (T19.F04).
-            OutputSinkKind::ActionVote(_) | OutputSinkKind::ActionParam(_, _) => {
+            OutputSinkKind::ActionVote(_) | OutputSinkKind::ActionParam(_) => {
                 write_classes.insert(MeshWriteClass::Action);
             }
         }
@@ -104,7 +104,7 @@ mod tests {
     use crate::creature::genome::cgp::{
         ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind,
     };
-    use crate::creature::genome::vote::{VoteKind, VoteSink};
+    use crate::creature::genome::vote::{ActionParamField, VoteSink};
 
     #[test]
     fn empty_graph_no_annotations() {
@@ -185,7 +185,7 @@ mod tests {
     fn vote_and_parameter_sinks_produce_action_writes() {
         for kind in [
             OutputSinkKind::ActionVote(VoteSink::Eat),
-            OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+            OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
         ] {
             let def = CgpGraphBackendDef {
                 birth_weights: None,

@@ -6,7 +6,7 @@ use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use crate::creature::genome::vote::{VoteKind, VoteSink};
+use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -367,7 +367,7 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
                 inputs: vec![leaf(4)],
             },
             OutputSink {
-                kind: OutputSinkKind::ActionParam(VoteKind::Eat, 0),
+                kind: OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
                 inputs: vec![leaf(0)],
             },
             OutputSink {

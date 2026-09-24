@@ -1,6 +1,8 @@
 use super::*;
 use crate::config::EnergyLifecycleConfig;
-use crate::creature::genome::vote::{VoteSink, VOTE_SINK_COUNT};
+use crate::creature::genome::vote::{
+    ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
+};
 use crate::creature::identity::CreatureIdentityState;
 
 // ── AddVote and WriteActionParam (T19.F04) ─────────────────────────────────
@@ -40,35 +42,67 @@ fn add_vote_sums_into_the_staged_contribution_and_never_touches_the_queue() {
     assert_eq!(committed.iter().filter(|v| **v != 0.0).count(), 1);
 }
 
+/// Run `LoadConst r0 ← constants[0]; WriteActionParam { field_idx, r0 }; Halt`.
+fn run_single_param_write(field_idx: u8, value: f32) -> (f32, MeshSideOutputs) {
+    // Nominal opcode costs, so the charge is visible at this energy scale.
+    let costed = RuntimeConfig {
+        vm: crate::config::VmRuntimeConfig {
+            opcode_cost_multiplier: 1.0,
+            step_ramp_cost: 0.0,
+            ..crate::config::VmRuntimeConfig::default()
+        },
+        ..config()
+    };
+    let (_, energy, side) = run_vm_with_config(
+        vec![
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            },
+            VmInstruction::WriteActionParam { field_idx, src: 0 },
+            VmInstruction::Halt,
+        ],
+        1,
+        vec![value],
+        &[],
+        zeroed_upstream(),
+        100.0,
+        costed,
+    );
+    (energy, side)
+}
+
+/// T11.F27: field `i` writes surface cell `i`, the `ActionParamField::ALL`
+/// position.
 #[test]
-fn write_action_param_addresses_the_surface_kind_major() {
-    for slot in 0u8..8 {
-        let (_, _, side) = run_vm(
-            vec![
-                VmInstruction::LoadConst {
-                    dst: 0,
-                    const_idx: 0,
-                },
-                VmInstruction::WriteActionParam {
-                    slot_idx: slot,
-                    src: 0,
-                },
-                VmInstruction::Halt,
-            ],
-            1,
-            vec![7.0],
-            &[],
-            zeroed_upstream(),
-            100.0,
+fn write_action_param_field_i_writes_surface_cell_i() {
+    for field in ActionParamField::ALL {
+        let (_, side) = run_single_param_write(field.index() as u8, 7.0);
+        let mut expected = [0.0f32; ACTION_PARAM_FIELD_COUNT];
+        expected[field.index()] = 7.0;
+        assert_eq!(side.action_params, expected, "{field:?}");
+    }
+}
+
+/// T11.F27: a field index at or above the catalog count writes nothing and
+/// pays the same opcode charge as a valid write.
+#[test]
+fn write_action_param_ignores_and_charges_an_invalid_field() {
+    let (valid_energy, _) = run_single_param_write(0, 7.0);
+    for field_idx in [ACTION_PARAM_FIELD_COUNT as u8, 8, u8::MAX] {
+        let (energy, side) = run_single_param_write(field_idx, 7.0);
+        assert_eq!(side.action_params, [0.0; ACTION_PARAM_FIELD_COUNT]);
+        assert_eq!(
+            energy.to_bits(),
+            valid_energy.to_bits(),
+            "field {field_idx}"
         );
-        let mut expected = [[0.0f32; 2]; 4];
-        expected[usize::from(slot / 2)][usize::from(slot % 2)] = 7.0;
-        assert_eq!(side.action_params, expected, "slot {slot}");
+        assert!(energy < 100.0);
     }
 }
 
 #[test]
-fn write_action_param_overwrites_and_ignores_an_invalid_slot() {
+fn write_action_param_overwrites_and_ignores_an_invalid_field() {
     let (_, _, side) = run_vm(
         vec![
             VmInstruction::LoadConst {
@@ -76,7 +110,7 @@ fn write_action_param_overwrites_and_ignores_an_invalid_slot() {
                 const_idx: 0,
             },
             VmInstruction::WriteActionParam {
-                slot_idx: 3,
+                field_idx: 1,
                 src: 0,
             },
             VmInstruction::LoadConst {
@@ -84,15 +118,15 @@ fn write_action_param_overwrites_and_ignores_an_invalid_slot() {
                 const_idx: 1,
             },
             VmInstruction::WriteActionParam {
-                slot_idx: 3,
+                field_idx: 1,
                 src: 0,
             },
             VmInstruction::WriteActionParam {
-                slot_idx: 8,
+                field_idx: 3,
                 src: 0,
             },
             VmInstruction::WriteActionParam {
-                slot_idx: 255,
+                field_idx: 255,
                 src: 0,
             },
             VmInstruction::Halt,
@@ -103,9 +137,7 @@ fn write_action_param_overwrites_and_ignores_an_invalid_slot() {
         zeroed_upstream(),
         100.0,
     );
-    let mut expected = [[0.0f32; 2]; 4];
-    expected[1][1] = -2.0;
-    assert_eq!(side.action_params, expected);
+    assert_eq!(side.action_params, [0.0, -2.0, 0.0]);
 }
 
 // ── ReadInput opcode ──────────────────────────────────────────────────────

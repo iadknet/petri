@@ -1,7 +1,7 @@
 //! The action-vote catalog (T19.F03).
 //!
 //! A motor pool wired before it is ever driven. The catalog fixes the identity
-//! and index order of every vote sink and of the per-kind parameter slots; the
+//! and index order of every vote sink and of the action-parameter fields; the
 //! graph sink catalog, the `AddVote` opcode, the mesh vote vector, and the
 //! traces all read their positions from here. Nothing in this module carries
 //! runtime state; the pass end commits from the surface (T19.F04).
@@ -13,8 +13,8 @@ pub const VOTE_KIND_COUNT: usize = 4;
 pub const VOTE_SINK_COUNT: usize = 27;
 /// Directions a directed vote sink covers — the `Direction::ALL` index range.
 pub const VOTE_DIRECTION_COUNT: u8 = 8;
-/// Parameter slots per kind, mirroring the shared `[f32; 2]` decode buffer.
-pub const VOTE_PARAM_SLOTS: u8 = 2;
+/// Action-parameter fields: the fields `decode_commit` reads (T11.F27).
+pub const ACTION_PARAM_FIELD_COUNT: usize = 3;
 
 const _: () = assert!(VOTE_DIRECTION_COUNT as usize == crate::contracts::Direction::ALL.len());
 const _: () = assert!(VOTE_SINK_COUNT == 2 + 1 + 3 * VOTE_DIRECTION_COUNT as usize);
@@ -32,7 +32,7 @@ pub enum VoteKind {
 }
 
 impl VoteKind {
-    /// Catalog order, which is also the `ActionParam` kind-major order.
+    /// Catalog order, which is also the per-kind counter order.
     pub const ALL: [Self; VOTE_KIND_COUNT] =
         [Self::Eat, Self::Move, Self::Reproduce, Self::StealEnergy];
 
@@ -54,41 +54,49 @@ impl VoteKind {
     }
 }
 
-/// The action-parameter fields the commit decoder (`decode_commit`) reads, in
-/// kind-major order (T11.F25): `Eat` food type, `Reproduce` transfer fraction,
-/// `StealEnergy` amount. Fresh mutation draws of a Graph `ActionParam` sink or
-/// a VM `WriteActionParam` slot come only from this catalog; storage keeps all
-/// `VOTE_KIND_COUNT * VOTE_PARAM_SLOTS` fields. A feature that decodes another
-/// field extends this catalog and the decoder together.
-pub const DECODED_ACTION_PARAMS: [(VoteKind, u8); 3] = [
-    (VoteKind::Eat, 0),
-    (VoteKind::Reproduce, 1),
-    (VoteKind::StealEnergy, 1),
-];
-
-/// The flat parameter-surface index of `(kind, slot)`, the VM
-/// `WriteActionParam.slot_idx` addressing: `kind.index() * VOTE_PARAM_SLOTS + slot`.
-#[must_use]
-pub const fn action_param_flat_index(kind: VoteKind, slot: u8) -> u8 {
-    kind.index() as u8 * VOTE_PARAM_SLOTS + slot
+/// One action-parameter field, a value the commit decoder (`decode_commit`)
+/// reads (T11.F27). The catalog holds exactly the decoded fields, in
+/// kind-major order, so no Graph sink, VM `WriteActionParam` field index or
+/// surface cell names a field the body never reads. A feature that decodes
+/// another field extends this catalog and the decoder together.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum ActionParamField {
+    /// The food type an `Eat` commit targets.
+    EatFoodType,
+    /// The energy fraction a `Reproduce` commit transfers to the child.
+    ReproduceTransferFraction,
+    /// The energy a `StealEnergy` commit takes.
+    StealEnergyAmount,
 }
 
-/// [`DECODED_ACTION_PARAMS`] as flat indices, in catalog order.
-pub const DECODED_ACTION_PARAM_FLAT_SLOTS: [u8; DECODED_ACTION_PARAMS.len()] = {
-    let mut flat = [0; DECODED_ACTION_PARAMS.len()];
-    let mut i = 0;
-    while i < flat.len() {
-        let (kind, slot) = DECODED_ACTION_PARAMS[i];
-        flat[i] = action_param_flat_index(kind, slot);
-        i += 1;
-    }
-    flat
-};
+impl ActionParamField {
+    /// Catalog order: the Graph sink order, the VM `field_idx` addressing,
+    /// and the parameter-surface index.
+    pub const ALL: [Self; ACTION_PARAM_FIELD_COUNT] = [
+        Self::EatFoodType,
+        Self::ReproduceTransferFraction,
+        Self::StealEnergyAmount,
+    ];
 
-/// Whether `decode_commit` reads parameter `slot` of `kind`.
-#[must_use]
-pub fn is_decoded_action_param(kind: VoteKind, slot: u8) -> bool {
-    DECODED_ACTION_PARAMS.contains(&(kind, slot))
+    /// Position in [`Self::ALL`], in `0..ACTION_PARAM_FIELD_COUNT`.
+    #[must_use]
+    pub const fn index(self) -> usize {
+        match self {
+            Self::EatFoodType => 0,
+            Self::ReproduceTransferFraction => 1,
+            Self::StealEnergyAmount => 2,
+        }
+    }
+
+    /// The world-action kind whose commit reads this field.
+    #[must_use]
+    pub const fn kind(self) -> VoteKind {
+        match self {
+            Self::EatFoodType => VoteKind::Eat,
+            Self::ReproduceTransferFraction => VoteKind::Reproduce,
+            Self::StealEnergyAmount => VoteKind::StealEnergy,
+        }
+    }
 }
 
 /// One addressable vote sink. `Terminate` and `Decide` carry no kind: they
@@ -168,14 +176,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn decoded_action_params_flatten_to_slots_zero_five_and_seven() {
-        assert_eq!(DECODED_ACTION_PARAM_FLAT_SLOTS, [0, 5, 7]);
-        let decoded: Vec<(VoteKind, u8)> = VoteKind::ALL
-            .into_iter()
-            .flat_map(|kind| (0..VOTE_PARAM_SLOTS).map(move |slot| (kind, slot)))
-            .filter(|&(kind, slot)| is_decoded_action_param(kind, slot))
-            .collect();
-        assert_eq!(decoded, DECODED_ACTION_PARAMS);
+    fn action_param_fields_are_the_decoded_catalog_in_kind_major_order() {
+        assert_eq!(
+            ActionParamField::ALL,
+            [
+                ActionParamField::EatFoodType,
+                ActionParamField::ReproduceTransferFraction,
+                ActionParamField::StealEnergyAmount,
+            ]
+        );
+        for (index, field) in ActionParamField::ALL.into_iter().enumerate() {
+            assert_eq!(field.index(), index);
+        }
+        let kinds = ActionParamField::ALL.map(ActionParamField::kind);
+        assert_eq!(
+            kinds,
+            [VoteKind::Eat, VoteKind::Reproduce, VoteKind::StealEnergy]
+        );
+        for field in ActionParamField::ALL {
+            let json = serde_json::to_string(&field).unwrap();
+            assert_eq!(json, format!("\"{field:?}\""));
+            assert_eq!(
+                serde_json::from_str::<ActionParamField>(&json).unwrap(),
+                field
+            );
+        }
     }
 
     #[test]

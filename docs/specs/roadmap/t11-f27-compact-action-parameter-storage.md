@@ -107,18 +107,18 @@ Fixed design:
 | Catalog | `creature/genome/vote.rs` defines `ActionParamField` with variants `EatFoodType`, `ReproduceTransferFraction`, `StealEnergyAmount`, in that order (T11.F25's kind-major catalog order). `ALL` gives the order, `index()` is the position in `0..3` and `kind()` gives the `VoteKind`. The T11.F25 catalog items and `VOTE_PARAM_SLOTS` are removed or replaced when nothing else needs them. |
 | Graph sinks | `OutputSinkKind::ActionParam(ActionParamField)`. `new_with_fixed_outputs` appends the three sinks in `ALL` order after the 27 vote sinks, at indices 91..94. `FIXED_SINK_COUNT` = 94, const-asserted. |
 | VM | `WriteActionParam { field_idx: u8, src: u8 }`. It writes `action_params[field_idx]` when `field_idx < 3`, and an invalid index is ignored. Cost stays 0.14. The rename from `slot_idx` is the serialization boundary for VM genomes. |
-| Runtime | `action_params` is `[f32; 3]`, indexed by `ActionParamField::index()`, zeroed at tick start, last write wins. `decode_commit` receives the surface and reads only its kind's field: `EatFoodType` for `Eat`, `ReproduceTransferFraction` for `Reproduce`, `StealEnergyAmount` for `StealEnergy`, nothing for `Move`. Clamping and sanitizing are unchanged. |
+| Runtime | `action_params` is `[f32; 3]`, indexed by `ActionParamField::index()`, local to one mesh run and zero at its start, last write wins. `decode_commit` receives the surface and reads only its kind's field: `EatFoodType` for `Eat`, `ReproduceTransferFraction` for `Reproduce`, `StealEnergyAmount` for `StealEnergy`, nothing for `Move`. Clamping and sanitizing are unchanged. |
 | Decoder agreement | Tests tie the catalog to the decoder. Sensitivity: for every field, some pair of finite values in that field alone, with the others fixed, changes the action `decode_commit` returns for its kind's sinks. Independence, as a property over arbitrary finite values of every field: a field never changes the action for a sink of another kind, and no field changes `Move`, `Terminate` or `Decide`. This replaces T11.F25's `undecoded_action_params_never_change_the_commit`. |
 | Graph draw | `pick_random_surface` makes one uniform `gen_range` over compute nodes then every sink in vector order. The T11.F25 filter goes, because every sink is drawable, and `can_add_edge` is true when the def has any compute node or sink. On a fixed-catalog def this is the same `gen_range(0..c + 94)`, which picks the same sink kind as T11.F25. |
 | VM draws | Opcode 25: `field_idx = ActionParamField::ALL[rng.gen_range(0..ActionParamField::ALL.len())].index()`, the same single `usize` `gen_range(0..3)` as T11.F25, naming the same field. Opcode 29: `param_slot: rng.gen_range(0..2)`. Other operands and opcodes are unchanged. |
 | Boundary | Reject the affected old shapes. A pre-F27 genome that contains an old `ActionParam` sink (`{"ActionParam":["Eat",0]}`) or an old `WriteActionParam` (`{"slot_idx":…}`) fails to deserialize with serde's error. Every graph built by `new_with_fixed_outputs` carries the old parameter sinks, so every pre-F27 production graph genome is rejected. A pre-F27 genome that contains neither, such as a VM-only genome without `WriteActionParam`, deserializes unchanged, because its meaning did not change. No conversion path exists, so no conversion has to preserve old slots 0/5/7 or VM jump targets. |
-| Frontend | The TypeScript genome types and inspector labels follow the new shapes: three named parameter sinks and three `WriteActionParam` field labels, with `param[i]` for an invalid index. Frontend tests use fixtures in the serialized shape (the three Graph parameter sinks, VM `field_idx` 0, 1, 2 and 3) and assert the distinct labels, so a missed rename cannot label every write as `Eat`. |
+| Frontend | The TypeScript genome types and inspector labels follow the new shapes: three named parameter sinks and three `WriteActionParam` field labels, with an invalid index rendered as `param[i] ← rN`. Frontend tests use fixtures in the serialized shape (the three Graph parameter sinks, VM `field_idx` 0, 1, 2 and 3) and assert the distinct labels, so a missed rename cannot label every write as `Eat`. |
 | Determinism and equivalence | Draws remain pure functions of the seeded RNG. Two draws keep T11.F25's RNG use, and focused tests pin it against a cloned RNG. On a fixed-catalog def, `pick_random_surface` makes exactly one `gen_range(0..c + 94)` and returns `ComputeInput(k)` or `SinkInput(k - c)`. A def with neither compute nodes nor sinks returns `None` without consuming RNG. Opcode 25's field is the one `gen_range(0..3)` names, with the same RNG state afterward. Expected consequence, read through the re-pins and not claimed as a proof: a run from the production founder follows T11.F25 until the first birth that makes a fresh opcode-29 draw or nudges a `WriteActionParam`'s field operand, under the representation map (sink indices 96 → 92 and 98 → 93, field indices 0/5/7 → 0/1/2). Values derived from serialized genomes, such as payload hashes and fingerprints, change without a trajectory change. Every re-pinned value is attributed to one of these causes or to the trajectory downstream of such a birth. |
 | Cost | Negligible: three floats instead of eight per mesh evaluation, and 94 sinks instead of 99 per graph scan. |
 
 ## Implementation Tasks
 
-- [ ] Write failing tests first: decoder agreement; the fixed catalog (94
+- [x] Write failing tests first: decoder agreement; the fixed catalog (94
       sinks, the three parameter sinks at 91..94 in `ALL` order); VM write
       addressing (field `i` writes surface `i`, `field_idx` ≥ 3 ignored and
       charged); the Determinism row's RNG-use tests; opcode-25 draws cover
@@ -128,19 +128,21 @@ Fixed design:
       `WriteActionParam { slot_idx, .. }` JSON fail to deserialize, an
       unaffected pre-F27 VM genome deserializes, and a current-format genome
       with all three fields wired by both backends round-trips equal).
-- [ ] Cover the commit path end to end, with new or existing runtime tests
+- [x] Cover the commit path end to end, with new or existing runtime tests
       (`runtime/vote_surface_tests.rs`, `runtime/pass_loop_tests.rs`). Each
       of the three fields, written by a Graph sink and by a VM write, must
       reach the committed `WorldAction`. The last write across Graph and VM
-      nodes must win, the surface must persist across passes within a tick,
-      and it must be zero at the next tick's start.
-- [ ] Implement the fixed design in core (catalog, sinks, runtime surface,
+      nodes must win, and the surface must persist across passes within a
+      tick. The surface is local to one mesh run (`MeshSideOutputs::new` in
+      `runtime/mesh.rs`), so a commit that reads a field no node wrote in that
+      run decodes it as zero.
+- [x] Implement the fixed design in core (catalog, sinks, runtime surface,
       decoder, graph effects, VM execution, draws, raw-field nudge on the
       renamed operand), then the frontend types and labels. Update the doc
       comments that describe the eight-slot surface.
-- [ ] Update the five reference docs listed in Inputs to the three-field
+- [x] Update the five reference docs listed in Inputs to the three-field
       layout, the `0..2` queue-parameter draw and the reject boundary.
-- [ ] Re-pin every trajectory, replay, drift, recruitment-paths, hash or
+- [x] Re-pin every trajectory, replay, drift, recruitment-paths, hash or
       fingerprint test value that changes. List each old and new value in the
       readings with its attribution (Determinism row). No predicate may be
       weakened, and a changed founder-behavior pin (a run without mutation)
@@ -149,12 +151,17 @@ Fixed design:
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first, then
+- [x] `cargo test -p v3-core --test viability` first, then
       `cargo test -p v3-core --lib` and the new tests, with the red run and
       green run in [readings](../../progress/readings/t11-f27.md).
-- [ ] The focused tests from the first two Implementation Tasks pass, named
-      in readings.
-- [ ] Current-format replay: the recruitment test
+- [x] The focused tests from the first two Implementation Tasks pass, named
+      in readings, including the mesh-run-local zero decode and the exact
+      `param[3] ← r1` frontend label.
+- [x] `cargo clippy --workspace --all-targets -- -D warnings`,
+      `cargo fmt --all --check`, `cargo test --workspace --no-fail-fast`, and
+      from `frontend/` `npx tsc -b`, `npx biome check src/` and
+      `npx vitest run` pass; results in readings.
+- [x] Current-format replay: the recruitment test
       `a_complete_run_writes_the_record_summary_and_replay_check`
       (`v3-cli/src/recruitment.rs`) matches every proposal, and
       `cargo test -p v3-core --test reproducibility` passes; results in
@@ -211,7 +218,7 @@ and draw tests are the evidence that the Goal holds.
 
 ## Success Criteria
 
-- [ ] The Graph sink catalog, the VM `WriteActionParam` address space and the
+- [x] The Graph sink catalog, the VM `WriteActionParam` address space and the
       runtime surface hold exactly the three decoded fields, tested against
       `decode_commit`, and fresh `ReadActionQueueParam` draws stay in `0..2`.
 - [ ] Pre-F27 serialized genomes carrying parameter structure are rejected,

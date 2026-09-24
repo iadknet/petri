@@ -12,7 +12,7 @@ use crate::contracts::{
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use crate::creature::genome::vote::{VoteKind, VoteSink};
+use crate::creature::genome::vote::{ActionParamField, VoteSink};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute::execute_graph_node;
@@ -248,7 +248,7 @@ fn memory_vote_and_leaf_parameter_commit_an_eat_of_the_leaf_type() {
     );
     wire(
         &mut def,
-        OutputSinkKind::ActionParam(VoteKind::Eat, 0),
+        OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
         leaf(1.0),
     );
     let mut memory_in = [0.0; 16];
@@ -281,7 +281,7 @@ fn a_vote_or_parameter_edge_alone_enters_a_visit() {
         ),
         (
             "parameter edge only",
-            OutputSinkKind::ActionParam(VoteKind::Reproduce, 1),
+            OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
         ),
     ] {
         let mut def = blank();
@@ -524,7 +524,7 @@ fn wired_def(surface: u8, source: u8, slot: u8, weight: f32) -> CgpGraphBackendD
         ),
         5 => wire(
             &mut def,
-            OutputSinkKind::ActionParam(VoteKind::Eat, slot % 2),
+            OutputSinkKind::ActionParam(ActionParamField::ALL[usize::from(slot % 3)]),
             edge,
         ),
         _ => wire(
@@ -592,7 +592,7 @@ proptest! {
         prop_assert_eq!(visited.energy, energy);
         prop_assert_eq!(visited.side.work_counters.graph_relax_iters, 0);
         prop_assert_eq!(visited.side.energy_observation.graph_compute, 0.0);
-        prop_assert_eq!(visited.side.action_params, [[0.0; 2]; 4]);
+        prop_assert_eq!(visited.side.action_params, [0.0; 3]);
     }
 
     /// Exhaustion: energy at most the entry charge exhausts before any effect.
@@ -610,7 +610,7 @@ proptest! {
         prop_assert!(visited.result.energy_exhausted);
         prop_assert_eq!(visited.memory, memory_in);
         prop_assert_eq!(visited.side.commit_vote_contribution(0), [0.0; 27]);
-        prop_assert_eq!(visited.side.action_params, [[0.0; 2]; 4]);
+        prop_assert_eq!(visited.side.action_params, [0.0; 3]);
         prop_assert_eq!(visited.energy, energy - BASE_COST);
         prop_assert_eq!(visited.side.work_counters.graph_relax_iters, 1);
         prop_assert_eq!(

@@ -7,7 +7,7 @@ use crate::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, WorldAction, WorldInputKey,
 };
 use crate::creature::genome::cgp::{ComputeNodeKind, GraphSource};
-use crate::creature::genome::vote::{VoteKind, VoteSink};
+use crate::creature::genome::vote::{ActionParamField, VoteKind, VoteSink};
 use crate::creature::genome::{CreatureGenome, VmInstruction};
 use crate::runtime::trace::domain::{PassEndReason, TerminationReason};
 use crate::runtime::vote_test_support::{
@@ -595,8 +595,11 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
     let one = graph.constant(1.0);
     let fraction = graph.constant(0.25);
     graph.vote(VoteSink::Reproduce(W), &[(one, 1.0)]);
-    graph.param(VoteKind::Reproduce, 1, &[(fraction, 1.0)]);
-    graph.param(VoteKind::StealEnergy, 1, &[(fraction, 8.0)]);
+    graph.param(
+        ActionParamField::ReproduceTransferFraction,
+        &[(fraction, 1.0)],
+    );
+    graph.param(ActionParamField::StealEnergyAmount, &[(fraction, 8.0)]);
     let steal = vm_node(
         1,
         1,
@@ -606,9 +609,9 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
                 dst: 0,
                 const_idx: 0,
             },
-            // params[Eat][0] (slot 0) = 3: food type 3.
+            // EatFoodType = 3: food type 3.
             VmInstruction::WriteActionParam {
-                slot_idx: 0,
+                field_idx: ActionParamField::EatFoodType.index() as u8,
                 src: 0,
             },
             VmInstruction::LoadConst {
@@ -623,9 +626,9 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
                 sink: VoteSink::Eat.index() as u8,
                 src: 0,
             },
-            // An invalid slot is ignored.
+            // An invalid field is ignored.
             VmInstruction::WriteActionParam {
-                slot_idx: 8,
+                field_idx: 3,
                 src: 0,
             },
             VmInstruction::Halt,
@@ -635,20 +638,187 @@ fn a_commit_decodes_the_parameter_surface_of_its_kind() {
     );
     let g = genome(vec![graph.build(0, vec![], &[1]), steal]);
     let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
+    assert_eq!(tick.actions(), &three_param_commits(3, 0.25, 2.0));
+}
+
+/// The commits of a tick that votes `Eat`, `Reproduce(W)` and
+/// `StealEnergy(N)` once each with the given parameter surface.
+fn three_param_commits(food: u16, fraction: f32, amount: f32) -> [WorldAction; 3] {
+    [
+        WorldAction::eat(OrdinaryFoodTypeId::new(food)),
+        WorldAction::Reproduce {
+            direction: Direction::W,
+            energy_transfer_fraction: fraction,
+        },
+        WorldAction::StealEnergy {
+            direction: Direction::N,
+            amount,
+        },
+    ]
+}
+
+/// The surface values and the vote each end-to-end fixture writes.
+const FIELD_VALUES: [(ActionParamField, f32); 3] = [
+    (ActionParamField::EatFoodType, 3.0),
+    (ActionParamField::ReproduceTransferFraction, 0.25),
+    (ActionParamField::StealEnergyAmount, 2.0),
+];
+const FIELD_VOTES: [VoteSink; 3] = [
+    VoteSink::Eat,
+    VoteSink::Reproduce(W),
+    VoteSink::StealEnergy(N),
+];
+
+/// A graph node wiring every `(field, value)` to a constant sink and voting
+/// each of `votes` once.
+fn graph_param_writer(
+    id: u32,
+    fields: &[(ActionParamField, f32)],
+    votes: &[VoteSink],
+    target_ids: &[u32],
+) -> crate::creature::genome::NodeGenome {
+    let mut graph = GraphBuilder::new();
+    let one = graph.constant(1.0);
+    for &(field, value) in fields {
+        let constant = graph.constant(value);
+        graph.param(field, &[(constant, 1.0)]);
+    }
+    for &sink in votes {
+        graph.vote(sink, &[(one, 1.0)]);
+    }
+    graph.build(id, vec![], target_ids)
+}
+
+/// A VM node writing every `(field, value)` with `WriteActionParam` and
+/// voting each of `votes` once.
+fn vm_param_writer(
+    id: u32,
+    fields: &[(ActionParamField, f32)],
+    votes: &[VoteSink],
+    target_ids: &[u32],
+) -> crate::creature::genome::NodeGenome {
+    let mut constants = vec![1.0];
+    let mut program = Vec::new();
+    for &(field, value) in fields {
+        program.push(VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: constants.len() as u8,
+        });
+        constants.push(value);
+        program.push(VmInstruction::WriteActionParam {
+            field_idx: field.index() as u8,
+            src: 0,
+        });
+    }
+    program.push(VmInstruction::LoadConst {
+        dst: 0,
+        const_idx: 0,
+    });
+    for &sink in votes {
+        program.push(VmInstruction::AddVote {
+            sink: sink.index() as u8,
+            src: 0,
+        });
+    }
+    program.push(VmInstruction::Halt);
+    vm_node(id, 1, constants, program, vec![], target_ids)
+}
+
+/// T11.F27: each of the three fields, written by a Graph sink and by a VM
+/// write, reaches the committed `WorldAction` of its kind.
+#[test]
+fn every_param_field_reaches_its_commit_from_either_backend() {
+    for writer in [graph_param_writer, vm_param_writer] {
+        let g = genome(vec![writer(0, &FIELD_VALUES, &FIELD_VOTES, &[])]);
+        let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
+        assert_eq!(tick.actions(), &three_param_commits(3, 0.25, 2.0));
+    }
+}
+
+/// T11.F27: the last write in the pass wins across Graph and VM nodes.
+#[test]
+fn the_last_param_write_wins_across_graph_and_vm_nodes() {
+    let eat_food = |value: f32| [(ActionParamField::EatFoodType, value)];
+    let graph_then_vm = genome(vec![
+        graph_param_writer(0, &eat_food(3.0), &[], &[1]),
+        vm_param_writer(1, &eat_food(5.0), &[VoteSink::Eat], &[]),
+    ]);
+    let vm_then_graph = genome(vec![
+        vm_param_writer(0, &eat_food(5.0), &[], &[1]),
+        graph_param_writer(1, &eat_food(3.0), &[VoteSink::Eat], &[]),
+    ]);
+    for (g, food) in [(graph_then_vm, 5), (vm_then_graph, 3)] {
+        let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
+        assert_eq!(
+            tick.actions(),
+            &[WorldAction::eat(OrdinaryFoodTypeId::new(food))]
+        );
+    }
+}
+
+/// T11.F27: a commit reading a field no node wrote in its mesh run decodes
+/// it as zero, since the surface is local to one run. Each writer sets only
+/// `EatFoodType` and votes all three parameterized kinds.
+#[test]
+fn a_field_unwritten_in_the_mesh_run_decodes_as_zero() {
+    for writer in [graph_param_writer, vm_param_writer] {
+        let g = genome(vec![writer(0, &FIELD_VALUES[..1], &FIELD_VOTES, &[])]);
+        let tick = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
+        assert_eq!(tick.actions(), &three_param_commits(3, 0.0, 0.0));
+    }
+}
+
+/// T11.F27: a field written in one pass stays on the surface for a later
+/// pass's commit. The node writes `EatFoodType = 3` and votes `Move(E)` while
+/// shared-memory slot 0 is clear, setting the slot as it writes; once the
+/// slot is set it only votes `Eat`.
+#[test]
+fn the_param_surface_persists_across_passes() {
+    let program = vec![
+        VmInstruction::LoadSlotImm {
+            dst: 0,
+            slot_idx: 0,
+        },
+        // Slot clear: jump to the write block at 5.
+        VmInstruction::JumpIfZero { cond: 0, offset: 3 },
+        VmInstruction::LoadConst {
+            dst: 1,
+            const_idx: 1,
+        },
+        VmInstruction::AddVote {
+            sink: VoteSink::Eat.index() as u8,
+            src: 1,
+        },
+        VmInstruction::Halt,
+        VmInstruction::LoadConst {
+            dst: 1,
+            const_idx: 0,
+        },
+        VmInstruction::WriteActionParam {
+            field_idx: ActionParamField::EatFoodType.index() as u8,
+            src: 1,
+        },
+        VmInstruction::StoreSlotImm {
+            slot_idx: 0,
+            src: 1,
+        },
+        VmInstruction::LoadConst {
+            dst: 1,
+            const_idx: 1,
+        },
+        VmInstruction::AddVote {
+            sink: VoteSink::Move(E).index() as u8,
+            src: 1,
+        },
+        VmInstruction::Halt,
+    ];
+    let g = genome(vec![vm_node(0, 2, vec![3.0, 1.0], program, vec![], &[])]);
+    let first = run_tick(&g, Senses::default(), &config(), 20.0, [0.0; 16]);
     assert_eq!(
-        tick.actions(),
-        &[
-            WorldAction::eat(OrdinaryFoodTypeId::new(3)),
-            WorldAction::Reproduce {
-                direction: Direction::W,
-                energy_transfer_fraction: 0.25,
-            },
-            WorldAction::StealEnergy {
-                direction: Direction::N,
-                amount: 2.0,
-            },
-        ]
+        first.actions(),
+        &[mv(E), WorldAction::eat(OrdinaryFoodTypeId::new(3))]
     );
+    assert_eq!(first.memory[0], 3.0);
 }
 
 #[test]

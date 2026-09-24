@@ -4,7 +4,7 @@ use std::ops::Range;
 use crate::config::MutationConfig;
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
-use crate::creature::genome::vote::{DECODED_ACTION_PARAM_FLAT_SLOTS, VOTE_SINK_COUNT};
+use crate::creature::genome::vote::{ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmBackendDef, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
 
@@ -224,10 +224,10 @@ pub(crate) fn random_vm_instruction(
             slot_idx: rng.gen_range(0u8..8),
             src: rng.gen_range(0..rc),
         },
-        // Only the fields `decode_commit` reads (T11.F25); storage keeps `0..8`.
+        // One `ActionParamField` position (T11.F27), the single `usize` draw
+        // T11.F25 made.
         25 => VmInstruction::WriteActionParam {
-            slot_idx: DECODED_ACTION_PARAM_FLAT_SLOTS
-                [rng.gen_range(0..DECODED_ACTION_PARAM_FLAT_SLOTS.len())],
+            field_idx: rng.gen_range(0..ACTION_PARAM_FIELD_COUNT) as u8,
             src: rng.gen_range(0..rc),
         },
         26 => VmInstruction::WriteRouteGate {
@@ -243,7 +243,8 @@ pub(crate) fn random_vm_instruction(
         },
         29 => VmInstruction::ReadActionQueueParam {
             index_src: rng.gen_range(0..rc),
-            param_slot: rng.gen_range(0..8),
+            // Only the queue-parameter slots that can carry a value (T11.F27).
+            param_slot: rng.gen_range(0..2),
             dst: rng.gen_range(0..rc),
         },
         30 => VmInstruction::Halt,
@@ -381,7 +382,10 @@ pub(crate) fn mutate_one_instruction_field(
             true
         }
         VmInstruction::WriteInternalPayload { slot_idx, src }
-        | VmInstruction::WriteActionParam { slot_idx, src }
+        | VmInstruction::WriteActionParam {
+            field_idx: slot_idx,
+            src,
+        }
         | VmInstruction::AddVote {
             sink: slot_idx,
             src,

@@ -106,7 +106,10 @@ fn empty_sensor_snapshot() -> SensorSnapshot {
 struct Run {
     result: NodeResult,
     /// The dispatch's committed vote contribution and parameter surface.
-    actions: (crate::creature::genome::vote::VoteVector, [[f32; 2]; 4]),
+    actions: (
+        crate::creature::genome::vote::VoteVector,
+        crate::runtime::action_decode::ActionParams,
+    ),
     memory: [f32; 16],
     steps: u32,
 }

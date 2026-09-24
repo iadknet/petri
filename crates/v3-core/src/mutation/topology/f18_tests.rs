@@ -147,7 +147,7 @@ fn stateful_fixture(source_graph: bool) -> CreatureGenome {
                 src: 0,
             },
             VmInstruction::WriteActionParam {
-                slot_idx: 0,
+                field_idx: 0,
                 src: 0,
             },
             VmInstruction::AddVote { sink: 0, src: 0 },

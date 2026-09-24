@@ -67,7 +67,7 @@ fn is_output_matches_side_effecting_writes() {
         src: 0
     }));
     assert!(vm_is_output_instruction(&VmInstruction::WriteActionParam {
-        slot_idx: 0,
+        field_idx: 0,
         src: 0
     }));
     assert!(!vm_is_output_instruction(&VmInstruction::Noop));
@@ -608,7 +608,7 @@ fn functional_complexity_excludes_unreachable_nodes() {
                     program: vec![
                         VmInstruction::AddVote { sink: 25, src: 0 },
                         VmInstruction::WriteActionParam {
-                            slot_idx: 0,
+                            field_idx: 0,
                             src: 0,
                         },
                     ],
@@ -628,7 +628,7 @@ fn functional_complexity_excludes_unreachable_nodes() {
                     program: vec![
                         VmInstruction::AddVote { sink: 25, src: 0 },
                         VmInstruction::WriteActionParam {
-                            slot_idx: 0,
+                            field_idx: 0,
                             src: 0,
                         },
                     ],

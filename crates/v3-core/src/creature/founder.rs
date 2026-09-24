@@ -33,7 +33,7 @@ pub struct FounderReproducePolicy {
     /// the fraction is its own constant, not recomputed from `max_energy`.
     pub energy_threshold: f32,
     /// The fraction of the parent's post-cost energy the child starts with:
-    /// node 1's constant on `ActionParam(Reproduce, 1)` (T19.F04).
+    /// node 1's constant on `ActionParam(ReproduceTransferFraction)` (T19.F04, T11.F27).
     pub transfer_fraction: f32,
 }
 
@@ -231,9 +231,9 @@ pub(crate) fn vm_decision_founder_genome() -> CreatureGenome {
     }
     program.extend([
         load(19, 5),
-        // params[Reproduce][1].
+        // ReproduceTransferFraction.
         VmInstruction::WriteActionParam {
-            slot_idx: 5,
+            field_idx: 1,
             src: 19,
         },
         VmInstruction::Halt,

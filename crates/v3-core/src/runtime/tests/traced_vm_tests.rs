@@ -942,7 +942,7 @@ fn result_equivalence_all_41_opcodes() {
                         const_idx: 0,
                     },
                     VmInstruction::WriteActionParam {
-                        slot_idx: 0,
+                        field_idx: 0,
                         src: 0,
                     },
                     VmInstruction::AddVote { sink: 1, src: 0 },
@@ -964,7 +964,7 @@ fn result_equivalence_all_41_opcodes() {
                         const_idx: 0,
                     },
                     VmInstruction::WriteActionParam {
-                        slot_idx: 5,
+                        field_idx: 1,
                         src: 0,
                     },
                     VmInstruction::AddVote { sink: 1, src: 0 },

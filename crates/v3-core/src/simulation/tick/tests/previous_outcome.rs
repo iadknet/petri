@@ -123,15 +123,15 @@ fn an_eat_on_food_is_read_next_tick_as_its_scaled_outcome() {
 
 #[test]
 fn a_newborn_stores_zeros_and_its_parent_counts_the_birth() {
-    // Vote Reproduce N with transfer fraction 1 (parameter slot 5:
-    // Reproduce's slot 1), capped at the default litter.
+    // Vote Reproduce N with transfer fraction 1 (field 1,
+    // `ReproduceTransferFraction`), capped at the default litter.
     let genome = outcome_genome(vec![
         VmInstruction::LoadConst {
             dst: 0,
             const_idx: 0,
         },
         VmInstruction::WriteActionParam {
-            slot_idx: 5,
+            field_idx: 1,
             src: 0,
         },
         VmInstruction::AddVote {

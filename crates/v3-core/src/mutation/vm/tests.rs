@@ -6,7 +6,7 @@ use super::*;
 use crate::contracts::NodeId;
 use crate::creature::founder::vm_decision_founder_genome as v3alpha1_founder_genome;
 use crate::creature::genome::analysis::vm_forward_slice;
-use crate::creature::genome::vote::{DECODED_ACTION_PARAM_FLAT_SLOTS, VOTE_SINK_COUNT};
+use crate::creature::genome::vote::{ActionParamField, VOTE_SINK_COUNT};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -566,67 +566,76 @@ proptest! {
     }
 }
 
-/// T11.F25: a fresh `WriteActionParam` targets only a decoded parameter
-/// field, and every decoded field is reached.
+/// T11.F27: a fresh `WriteActionParam` names a catalogued field, and every
+/// field is reached.
 #[test]
-fn random_vm_instruction_write_action_param_reaches_every_decoded_slot() {
-    let mut reached = [false; DECODED_ACTION_PARAM_FLAT_SLOTS.len()];
+fn random_vm_instruction_write_action_param_reaches_every_field() {
+    let mut reached = [false; ActionParamField::ALL.len()];
     for seed in 0u64..16_384 {
-        if let VmInstruction::WriteActionParam { slot_idx, .. } =
+        if let VmInstruction::WriteActionParam { field_idx, .. } =
             random_vm_instruction(&mut rng(seed), 4, 4, 4)
         {
-            let position = DECODED_ACTION_PARAM_FLAT_SLOTS
-                .iter()
-                .position(|&slot| slot == slot_idx)
-                .unwrap_or_else(|| panic!("undecoded slot {slot_idx}"));
-            reached[position] = true;
+            let field = usize::from(field_idx);
+            assert!(field < ActionParamField::ALL.len(), "field {field_idx}");
+            reached[field] = true;
         }
     }
-    assert_eq!(reached, [true; DECODED_ACTION_PARAM_FLAT_SLOTS.len()]);
+    assert_eq!(reached, [true; ActionParamField::ALL.len()]);
+}
+
+/// T11.F27: a fresh `ReadActionQueueParam` names a queue-parameter slot that
+/// can carry a value, and both slots are drawn.
+#[test]
+fn random_vm_instruction_read_action_queue_param_draws_both_slots() {
+    let mut reached = [false; 2];
+    for seed in 0u64..16_384 {
+        if let VmInstruction::ReadActionQueueParam { param_slot, .. } =
+            random_vm_instruction(&mut rng(seed), 4, 4, 4)
+        {
+            let slot = usize::from(param_slot);
+            assert!(slot < reached.len(), "param_slot {param_slot}");
+            reached[slot] = true;
+        }
+    }
+    assert_eq!(reached, [true; 2]);
 }
 
 proptest! {
-    /// T11.F25: no fresh `WriteActionParam` names an undecoded slot.
+    /// T11.F27 Determinism row: an opcode-25 draw names the field one
+    /// `gen_range(0..3)` picks from `ActionParamField::ALL` (T11.F25's single
+    /// `usize` draw), then draws `src`, leaving the RNG where that sequence
+    /// leaves it. Opcode 29 draws `param_slot` from `0..2` between its two
+    /// register operands.
     #[test]
-    fn random_vm_instruction_never_draws_an_undecoded_action_param_slot(seed in any::<u64>()) {
+    fn opcode_25_and_29_draws_match_their_pinned_rng_use(seed in any::<u64>()) {
         let mut r = rng(seed);
         for _ in 0..64 {
-            if let VmInstruction::WriteActionParam { slot_idx, .. } =
-                random_vm_instruction(&mut r, 4, 4, 4)
-            {
-                prop_assert!(DECODED_ACTION_PARAM_FLAT_SLOTS.contains(&slot_idx), "slot {slot_idx}");
+            let mut replay = r.clone();
+            let instruction = random_vm_instruction(&mut r, 4, 4, 4);
+            match replay.gen_range(0u8..39) {
+                25 => {
+                    let field = ActionParamField::ALL[replay.gen_range(0..ActionParamField::ALL.len())];
+                    let src = replay.gen_range(0..4u8);
+                    prop_assert_eq!(
+                        &instruction,
+                        &VmInstruction::WriteActionParam { field_idx: field.index() as u8, src }
+                    );
+                    prop_assert_eq!(r.clone().gen::<u64>(), replay.gen::<u64>());
+                }
+                29 => {
+                    let index_src = replay.gen_range(0..4u8);
+                    let param_slot = replay.gen_range(0..2u8);
+                    let dst = replay.gen_range(0..4u8);
+                    prop_assert_eq!(
+                        &instruction,
+                        &VmInstruction::ReadActionQueueParam { index_src, param_slot, dst }
+                    );
+                    prop_assert_eq!(r.clone().gen::<u64>(), replay.gen::<u64>());
+                }
+                _ => {}
             }
         }
     }
-}
-
-/// T11.F25 keeps pruning: VM delete still removes a `WriteActionParam` to an
-/// undecoded slot.
-#[test]
-fn vm_delete_instruction_removes_a_write_to_an_undecoded_param_slot() {
-    let undecoded = VmInstruction::WriteActionParam {
-        slot_idx: 2,
-        src: 0,
-    };
-    let mut removed = false;
-    for seed in 0u64..64 {
-        let mut genome = v3alpha1_founder_genome();
-        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
-            vm.program = vec![VmInstruction::Noop, undecoded.clone()];
-        }
-        VmMutator::apply(
-            &mut genome,
-            VmOperator::VmDeleteInstruction,
-            &mut TargetSelector::reachable_only(&[], 0.0),
-            &mut rng(seed),
-            &MutationConfig::default(),
-        )
-        .expect("two-instruction program is deletable");
-        if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
-            removed |= vm.program == [VmInstruction::Noop];
-        }
-    }
-    assert!(removed);
 }
 
 #[test]
@@ -2228,11 +2237,11 @@ fn operand_bearing_instructions() -> Vec<VmInstruction> {
             src: 8,
         },
         VmInstruction::WriteActionParam {
-            slot_idx: 4,
+            field_idx: 4,
             src: 8,
         },
         VmInstruction::WriteActionParam {
-            slot_idx: 4,
+            field_idx: 4,
             src: 8,
         },
         VmInstruction::WriteRouteGate { slot: 4, src: 8 },
@@ -2320,7 +2329,10 @@ fn encoded_fields(instruction: &VmInstruction) -> Vec<i64> {
             vec![i64::from(*dst), i64::from(*ref_idx), i64::from(*sub_idx)]
         }
         VmInstruction::WriteInternalPayload { slot_idx, src }
-        | VmInstruction::WriteActionParam { slot_idx, src }
+        | VmInstruction::WriteActionParam {
+            field_idx: slot_idx,
+            src,
+        }
         | VmInstruction::AddVote {
             sink: slot_idx,
             src,
@@ -2714,11 +2726,11 @@ fn register_bearing_instructions(raw: u8) -> Vec<VmInstruction> {
             src: raw,
         },
         VmInstruction::WriteActionParam {
-            slot_idx: 0,
+            field_idx: 0,
             src: raw,
         },
         VmInstruction::WriteActionParam {
-            slot_idx: 0,
+            field_idx: 0,
             src: raw,
         },
         VmInstruction::WriteRouteGate { slot: 0, src: raw },
