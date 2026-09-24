@@ -18,6 +18,7 @@ use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::neighborhood::battery::{Battery, Signature};
 use crate::neighborhood::classify::{classify, Tally};
+use crate::neighborhood::mutation_effects::genome_identity;
 use crate::neighborhood::EvalContext;
 
 /// Seed base for per-birth trials.
@@ -73,6 +74,141 @@ impl BirthResult {
     }
 }
 
+/// Distinct-queue buckets of the exposure histogram (T11.F26): 1, 2, 3–4,
+/// 5–8, 9+.
+pub const QUEUE_BUCKETS: [&str; 5] = ["1", "2", "3-4", "5-8", "9+"];
+
+/// The [`QUEUE_BUCKETS`] position of a parent with `distinct` queues; `0`
+/// for an empty signature.
+#[must_use]
+pub fn queue_bucket(distinct: usize) -> usize {
+    match distinct {
+        0..=1 => 0,
+        2 => 1,
+        3..=4 => 2,
+        5..=8 => 3,
+        _ => 4,
+    }
+}
+
+/// One parent-capability side of the exposure split: that side's births by
+/// outcome, zero-applied births included.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CapabilitySplit {
+    pub silent: u32,
+    pub changed: u32,
+    pub dead: u32,
+    pub zero_applied: u32,
+}
+
+impl CapabilitySplit {
+    #[must_use]
+    pub fn merge(self, other: Self) -> Self {
+        Self {
+            silent: self.silent + other.silent,
+            changed: self.changed + other.changed,
+            dead: self.dead + other.dead,
+            zero_applied: self.zero_applied + other.zero_applied,
+        }
+    }
+}
+
+/// Exposure strata (T11.F26) folded from births a reading already runs:
+/// parent capability, the partition of births by requested and applied
+/// events, and event-bearing births whose child genome is identical to the
+/// parent. Integer-only; [`BirthExposure::merge`] is field-wise addition.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct BirthExposure {
+    pub parents: u32,
+    /// Parents whose every battery execution is `NoOp`.
+    pub parents_all_noop: u32,
+    /// Parents with exactly one distinct action queue across the battery.
+    pub parents_one_queue: u32,
+    /// Parents by distinct-queue count, bucketed by [`QUEUE_BUCKETS`].
+    pub distinct_queues_histogram: [u32; 5],
+    pub births_total: u32,
+    /// Births that drew no event.
+    pub zero_requested: u32,
+    /// Births that drew events and applied none.
+    pub requested_all_skipped: u32,
+    /// Births that applied at least one event.
+    pub event_bearing: u32,
+    pub requested_events_total: u64,
+    pub applied_events_total: u64,
+    /// Event-bearing births whose child genome equals the parent under
+    /// [`super::mutation_effects::genome_identity`].
+    pub genome_identical: u32,
+    pub from_actionless: CapabilitySplit,
+    pub from_acting: CapabilitySplit,
+}
+
+impl BirthExposure {
+    #[must_use]
+    pub fn merge(mut self, other: &Self) -> Self {
+        self.parents += other.parents;
+        self.parents_all_noop += other.parents_all_noop;
+        self.parents_one_queue += other.parents_one_queue;
+        for (bucket, count) in self
+            .distinct_queues_histogram
+            .iter_mut()
+            .zip(other.distinct_queues_histogram)
+        {
+            *bucket += count;
+        }
+        self.births_total += other.births_total;
+        self.zero_requested += other.zero_requested;
+        self.requested_all_skipped += other.requested_all_skipped;
+        self.event_bearing += other.event_bearing;
+        self.requested_events_total += other.requested_events_total;
+        self.applied_events_total += other.applied_events_total;
+        self.genome_identical += other.genome_identical;
+        self.from_actionless = self.from_actionless.merge(other.from_actionless);
+        self.from_acting = self.from_acting.merge(other.from_acting);
+        self
+    }
+}
+
+/// Fold one parent's births into exposure strata. `outcomes` pairs each
+/// birth with whether its child genome is identical to the parent.
+fn fold_exposure(base: &Signature, outcomes: &[(BirthOutcome, bool)]) -> BirthExposure {
+    let actionless = base.all_noop();
+    let distinct = base.distinct_queue_count();
+    let mut exposure = BirthExposure {
+        parents: 1,
+        parents_all_noop: u32::from(actionless),
+        parents_one_queue: u32::from(distinct == 1),
+        births_total: outcomes.len() as u32,
+        ..BirthExposure::default()
+    };
+    exposure.distinct_queues_histogram[queue_bucket(distinct)] = 1;
+    let side = if actionless {
+        &mut exposure.from_actionless
+    } else {
+        &mut exposure.from_acting
+    };
+    for (outcome, _) in outcomes {
+        side.silent += outcome.tally.silent;
+        side.changed += outcome.tally.changed;
+        side.dead += outcome.tally.dead;
+        if outcome.applied_events == 0 {
+            side.zero_applied += 1;
+        }
+    }
+    for (outcome, identical) in outcomes {
+        exposure.requested_events_total += u64::from(outcome.requested_events);
+        exposure.applied_events_total += u64::from(outcome.applied_events);
+        if outcome.requested_events == 0 {
+            exposure.zero_requested += 1;
+        } else if outcome.applied_events == 0 {
+            exposure.requested_all_skipped += 1;
+        } else {
+            exposure.event_bearing += 1;
+            exposure.genome_identical += u32::from(*identical);
+        }
+    }
+    exposure
+}
+
 /// Run `births` seeded production births from `subject`, seeded by
 /// `seed_offset + BIRTH_SEED_BASE + birth_index`, and classify every
 /// mutated (nonzero-event) offspring against `base`. Each birth draws its
@@ -88,6 +224,29 @@ pub fn per_birth_result(
     seed_offset: u64,
 ) -> BirthResult {
     per_birth_result_on_units(
+        subject,
+        subject.genome_size(),
+        base,
+        battery,
+        mutation_config,
+        context,
+        births,
+        seed_offset,
+    )
+}
+
+/// [`per_birth_result`] and the exposure strata of the same births (T11.F26).
+#[must_use]
+pub fn per_birth_reading(
+    subject: &CreatureGenome,
+    base: &Signature,
+    battery: &Battery,
+    mutation_config: &MutationConfig,
+    context: &EvalContext,
+    births: u32,
+    seed_offset: u64,
+) -> (BirthResult, BirthExposure) {
+    per_birth_reading_on_units(
         subject,
         subject.genome_size(),
         base,
@@ -117,13 +276,45 @@ pub fn per_birth_result_on_units(
     births: u32,
     seed_offset: u64,
 ) -> BirthResult {
+    per_birth_reading_on_units(
+        subject,
+        units,
+        base,
+        battery,
+        mutation_config,
+        context,
+        births,
+        seed_offset,
+    )
+    .0
+}
+
+/// [`per_birth_result_on_units`] and, from the same births, the exposure
+/// strata of T11.F26. Draws exactly the same mutations: exposure only reads
+/// each birth's summary and compares its child genome with the subject.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "per_birth_result_on_units's inputs, unchanged"
+)]
+#[must_use]
+pub fn per_birth_reading_on_units(
+    subject: &CreatureGenome,
+    units: u32,
+    base: &Signature,
+    battery: &Battery,
+    mutation_config: &MutationConfig,
+    context: &EvalContext,
+    births: u32,
+    seed_offset: u64,
+) -> (BirthResult, BirthExposure) {
     let reachable = mesh_reachable_nodes(subject);
+    let identity = genome_identity(subject);
     // Observation stand-in for a live parent's dispatch record (T11.F17):
     // the nodes this subject dispatches anywhere in the battery.
     let executed =
         battery.executed_indices(subject, context.runtime, context.shared_memory_decay_rate);
 
-    let outcomes: Vec<BirthOutcome> = (0..births)
+    let outcomes: Vec<(BirthOutcome, bool)> = (0..births)
         .into_par_iter()
         .map(|birth_index| {
             let mut genome = subject.clone();
@@ -140,25 +331,32 @@ pub fn per_birth_result_on_units(
             );
             let cycle_carrying = !mesh_cycle_nodes(&genome).is_empty();
             if summary.applied_events == 0 {
-                return BirthOutcome {
+                let outcome = BirthOutcome {
                     requested_events: summary.attempted_events,
                     applied_events: 0,
                     tally: Tally::default(),
                     cycle_carrying,
                 };
+                return (outcome, false);
             }
             let signature =
                 battery.signature(&genome, context.runtime, context.shared_memory_decay_rate);
-            BirthOutcome {
+            let outcome = BirthOutcome {
                 requested_events: summary.attempted_events,
                 applied_events: summary.applied_events,
                 tally: Tally::default().record(classify(base, &signature)),
                 cycle_carrying,
-            }
+            };
+            (outcome, genome_identity(&genome) == identity)
         })
         .collect();
 
-    fold_outcomes(births, outcomes)
+    let exposure = fold_exposure(base, &outcomes);
+    let result = fold_outcomes(
+        births,
+        outcomes.into_iter().map(|(outcome, _)| outcome).collect(),
+    );
+    (result, exposure)
 }
 
 /// Fold one [`BirthOutcome`] per birth into pure integer accounting.
@@ -323,7 +521,123 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
+    /// The exposure strata come from the same births as the result: the
+    /// wrapped result is unchanged, the births partition, the capability
+    /// split reconciles with the pooled tally, and the parent's capability
+    /// matches its signature.
+    #[test]
+    fn exposure_reconciles_with_the_birth_result_it_is_folded_beside() {
+        use crate::config::SimulationConfig;
+        use crate::creature::founder::founder_genome;
+
+        let config = SimulationConfig::default();
+        let subject = founder_genome(crate::config::FounderProfile::V3Alpha1);
+        let battery = Battery::generate(config.world.food.types.len());
+        let context = EvalContext::from_config(&config);
+        let base = battery.signature(&subject, context.runtime, context.shared_memory_decay_rate);
+        let (result, exposure) = per_birth_reading(
+            &subject,
+            &base,
+            &battery,
+            &config.mutation,
+            &context,
+            60,
+            77,
+        );
+
+        assert_eq!(
+            result,
+            per_birth_result(
+                &subject,
+                &base,
+                &battery,
+                &config.mutation,
+                &context,
+                60,
+                77
+            )
+        );
+        assert_eq!(exposure.births_total, result.births_total);
+        assert_eq!(
+            exposure.zero_requested + exposure.requested_all_skipped + exposure.event_bearing,
+            exposure.births_total
+        );
+        assert_eq!(
+            exposure.zero_requested,
+            result.by_requested_events.get(&0).copied().unwrap_or(0)
+        );
+        assert_eq!(exposure.event_bearing, result.any_events.trials);
+        let split = exposure.from_actionless.merge(exposure.from_acting);
+        assert_eq!(split.silent, result.any_events.silent);
+        assert_eq!(split.changed, result.any_events.changed);
+        assert_eq!(split.dead, result.any_events.dead);
+        assert_eq!(split.zero_applied, result.zero_event_births);
+        assert_eq!(exposure.parents, 1);
+        assert_eq!(exposure.parents_all_noop, u32::from(base.all_noop()));
+        assert_eq!(
+            exposure.from_actionless,
+            CapabilitySplit::default(),
+            "the founder acts"
+        );
+        assert_eq!(
+            exposure.distinct_queues_histogram[queue_bucket(base.distinct_queue_count())],
+            1
+        );
+        assert!(exposure.applied_events_total <= exposure.requested_events_total);
+    }
+
+    #[test]
+    fn queue_buckets_follow_the_predeclared_edges() {
+        let buckets: Vec<usize> = [1, 2, 3, 4, 5, 8, 9, 80]
+            .into_iter()
+            .map(queue_bucket)
+            .collect();
+        assert_eq!(buckets, [0, 1, 2, 2, 3, 3, 4, 4]);
+    }
+
     proptest! {
+        /// Exposure folding partitions every birth exactly once, and its
+        /// capability split sums to the birth fold's tallies, whatever the
+        /// outcomes drawn.
+        #[test]
+        fn exposure_partitions_births_and_reconciles_with_the_fold(
+            outcomes in prop::collection::vec(
+                (0u32..3, prop::option::of((1u32..3, 0u8..3)), any::<bool>()),
+                0..40,
+            ),
+            actionless in any::<bool>(),
+        ) {
+            let paired: Vec<(BirthOutcome, bool)> = outcomes
+                .iter()
+                .map(|&(skipped, applied, identical)| match applied {
+                    Some((applied, class)) => (outcome(applied + skipped, applied, tally_of_one(match class { 0 => Class::Silent, 1 => Class::Changed, _ => Class::Dead }), false), identical),
+                    None => (outcome(skipped, 0, Tally::default(), false), identical),
+                })
+                .collect();
+            let action = if actionless {
+                crate::contracts::WorldAction::NoOp
+            } else {
+                crate::contracts::WorldAction::Move(crate::contracts::Direction::ALL[0])
+            };
+            let base = Signature { snapshots: vec![vec![action]; 3], sequences: Vec::new() };
+            let exposure = fold_exposure(&base, &paired);
+            let result = fold_outcomes(paired.len() as u32, paired.iter().map(|(o, _)| *o).collect());
+            prop_assert_eq!(exposure.zero_requested + exposure.requested_all_skipped + exposure.event_bearing, exposure.births_total);
+            prop_assert_eq!(exposure.births_total, result.births_total);
+            let split = exposure.from_actionless.merge(exposure.from_acting);
+            prop_assert_eq!(split.silent, result.any_events.silent);
+            prop_assert_eq!(split.changed, result.any_events.changed);
+            prop_assert_eq!(split.dead, result.any_events.dead);
+            prop_assert_eq!(split.zero_applied, result.zero_event_births);
+            let empty = if actionless { exposure.from_acting } else { exposure.from_actionless };
+            prop_assert_eq!(empty, CapabilitySplit::default());
+            prop_assert!(exposure.genome_identical <= exposure.event_bearing);
+            prop_assert_eq!(exposure.applied_events_total, paired.iter().map(|(o, _)| u64::from(o.applied_events)).sum::<u64>());
+            let doubled = exposure.merge(&exposure);
+            prop_assert_eq!(doubled.births_total, 2 * exposure.births_total);
+            prop_assert_eq!(doubled.distinct_queues_histogram.iter().sum::<u32>(), 2);
+        }
+
         #[test]
         fn pooling_preserves_all_counts_and_buckets_under_regrouping(
             outcomes in prop::collection::vec((0u32..4, 0u8..4, any::<bool>()), 0..50),

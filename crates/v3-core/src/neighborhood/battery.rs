@@ -134,9 +134,35 @@ impl Battery {
     }
 
     /// The single-tick snapshot scenarios, in battery order.
-    #[cfg(test)]
     pub(super) fn snapshots(&self) -> &[Scenario] {
         &self.snapshots
+    }
+
+    /// The length of each sequence, in battery order.
+    pub(super) fn sequence_lengths(&self) -> impl Iterator<Item = usize> + '_ {
+        self.sequences.iter().map(Vec::len)
+    }
+
+    /// Run every battery execution in signature order (snapshots, then each
+    /// sequence tick) and hand each output, with the cognition state it left,
+    /// to `read`.
+    pub(super) fn run_reading<M: MeshExecutionMode, T>(
+        &self,
+        genome: &CreatureGenome,
+        runtime: &RuntimeConfig,
+        decay_rate: f32,
+        mode: impl FnMut() -> M,
+        read: impl FnMut(M::Output, PostState<'_>) -> T,
+    ) -> Vec<T> {
+        run_panel(
+            genome,
+            &self.snapshots,
+            &self.sequences,
+            runtime,
+            decay_rate,
+            mode,
+            read,
+        )
     }
 
     /// Evaluate `genome`'s complete execution signature against this battery.
@@ -204,11 +230,6 @@ impl Battery {
         execute_scenario_tick(genome, scenario, runtime, mode)
     }
 
-    /// Execute one sequence of ticks, applying the production shared-memory
-    /// bookkeeping between ticks (a fresh snapshot-then-decay before each
-    /// tick's cognition, mirroring `run_phase_0`'s order within a tick).
-    /// Energy resets to each tick's scenario value; shared memory
-    /// and graph state persist across the sequence.
     fn execute_sequence<M: MeshExecutionMode>(
         &self,
         genome: &CreatureGenome,
@@ -217,29 +238,91 @@ impl Battery {
         decay_rate: f32,
         mode: &mut impl FnMut() -> M,
     ) -> Vec<M::Output> {
-        let mut shared_memory = [0.0f32; 16];
-        let mut prev_shared_memory = [0.0f32; 16];
-        let mut graph_runtime = GraphRuntimeState::new();
-        sequence
-            .iter()
-            .enumerate()
-            .map(|(tick, scenario)| {
-                graph_runtime.begin_tick(&genome.nodes, tick as u64);
-                advance_shared_memory(&mut shared_memory, &mut prev_shared_memory, decay_rate);
-                let mut energy = scenario.energy;
-                execute_creature_mesh_impl(
-                    genome,
-                    &scenario.sensors,
-                    &mut energy,
-                    &mut shared_memory,
-                    &prev_shared_memory,
-                    &mut graph_runtime,
-                    runtime,
-                    mode(),
-                )
-            })
-            .collect()
+        execute_sequence_reading(
+            genome,
+            sequence,
+            runtime,
+            decay_rate,
+            mode,
+            &mut |output, _| output,
+        )
     }
+}
+
+/// The cognition state one execution left behind, lent to a reader.
+pub(super) struct PostState<'a> {
+    pub energy: f32,
+    pub shared_memory: &'a [f32; 16],
+    pub graph_runtime: &'a GraphRuntimeState,
+}
+
+/// Run `singles` (each from fresh state), then every tick of every sequence
+/// (state persisting within a sequence), handing each output and the state it
+/// left to `read`, in that order.
+pub(super) fn run_panel<M: MeshExecutionMode, T>(
+    genome: &CreatureGenome,
+    singles: &[Scenario],
+    sequences: &[Vec<Scenario>],
+    runtime: &RuntimeConfig,
+    decay_rate: f32,
+    mut mode: impl FnMut() -> M,
+    mut read: impl FnMut(M::Output, PostState<'_>) -> T,
+) -> Vec<T> {
+    let mut readings: Vec<T> = singles
+        .iter()
+        .map(|scenario| execute_scenario_tick_reading(genome, scenario, runtime, mode(), &mut read))
+        .collect();
+    for sequence in sequences {
+        readings.extend(execute_sequence_reading(
+            genome, sequence, runtime, decay_rate, &mut mode, &mut read,
+        ));
+    }
+    readings
+}
+
+/// Execute one sequence of ticks, applying the production shared-memory
+/// bookkeeping between ticks (a fresh snapshot-then-decay before each
+/// tick's cognition, mirroring `run_phase_0`'s order within a tick).
+/// Energy resets to each tick's scenario value; shared memory
+/// and graph state persist across the sequence.
+fn execute_sequence_reading<M: MeshExecutionMode, T>(
+    genome: &CreatureGenome,
+    sequence: &[Scenario],
+    runtime: &RuntimeConfig,
+    decay_rate: f32,
+    mode: &mut impl FnMut() -> M,
+    read: &mut impl FnMut(M::Output, PostState<'_>) -> T,
+) -> Vec<T> {
+    let mut shared_memory = [0.0f32; 16];
+    let mut prev_shared_memory = [0.0f32; 16];
+    let mut graph_runtime = GraphRuntimeState::new();
+    sequence
+        .iter()
+        .enumerate()
+        .map(|(tick, scenario)| {
+            graph_runtime.begin_tick(&genome.nodes, tick as u64);
+            advance_shared_memory(&mut shared_memory, &mut prev_shared_memory, decay_rate);
+            let mut energy = scenario.energy;
+            let output = execute_creature_mesh_impl(
+                genome,
+                &scenario.sensors,
+                &mut energy,
+                &mut shared_memory,
+                &prev_shared_memory,
+                &mut graph_runtime,
+                runtime,
+                mode(),
+            );
+            read(
+                output,
+                PostState {
+                    energy,
+                    shared_memory: &shared_memory,
+                    graph_runtime: &graph_runtime,
+                },
+            )
+        })
+        .collect()
 }
 
 /// One tick of `genome` against `scenario` from zeroed shared memory, zeroed
@@ -251,11 +334,21 @@ pub(super) fn execute_scenario_tick<M: MeshExecutionMode>(
     runtime: &RuntimeConfig,
     mode: M,
 ) -> M::Output {
+    execute_scenario_tick_reading(genome, scenario, runtime, mode, |output, _| output)
+}
+
+fn execute_scenario_tick_reading<M: MeshExecutionMode, T>(
+    genome: &CreatureGenome,
+    scenario: &Scenario,
+    runtime: &RuntimeConfig,
+    mode: M,
+    read: impl FnOnce(M::Output, PostState<'_>) -> T,
+) -> T {
     let mut energy = scenario.energy;
     let mut shared_memory = [0.0f32; 16];
     let prev_shared_memory = [0.0f32; 16];
     let mut graph_runtime = GraphRuntimeState::new();
-    execute_creature_mesh_impl(
+    let output = execute_creature_mesh_impl(
         genome,
         &scenario.sensors,
         &mut energy,
@@ -264,6 +357,14 @@ pub(super) fn execute_scenario_tick<M: MeshExecutionMode>(
         &mut graph_runtime,
         runtime,
         mode,
+    );
+    read(
+        output,
+        PostState {
+            energy,
+            shared_memory: &shared_memory,
+            graph_runtime: &graph_runtime,
+        },
     )
 }
 
@@ -281,6 +382,34 @@ impl Signature {
     #[must_use]
     pub fn execution_count(&self) -> usize {
         self.snapshots.len() + self.sequences.iter().map(Vec::len).sum::<usize>()
+    }
+
+    /// Every execution's action queue: the snapshots, then each sequence tick.
+    pub fn executions(&self) -> impl Iterator<Item = &[WorldAction]> {
+        self.snapshots
+            .iter()
+            .chain(self.sequences.iter().flatten())
+            .map(Vec::as_slice)
+    }
+
+    /// Whether every execution returned only `NoOp` (an actionless genome).
+    #[must_use]
+    pub fn all_noop(&self) -> bool {
+        self.executions()
+            .all(|queue| queue.iter().all(|action| *action == WorldAction::NoOp))
+    }
+
+    /// The number of distinct action queues across the executions, under the
+    /// classifier's queue equality.
+    #[must_use]
+    pub fn distinct_queue_count(&self) -> usize {
+        let mut distinct: Vec<&[WorldAction]> = Vec::new();
+        for queue in self.executions() {
+            if !distinct.contains(&queue) {
+                distinct.push(queue);
+            }
+        }
+        distinct.len()
     }
 }
 

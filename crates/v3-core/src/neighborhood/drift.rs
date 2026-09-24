@@ -2,7 +2,7 @@
 
 use super::mesh_execution::{indices_for_node_ids, MeshExecutionReading, MeshExecutionSets};
 use super::recruitment::{BirthObservation, RecruitmentCheckpoint, RecruitmentTracker};
-use super::{births, Battery, BirthResult, EvalContext};
+use super::{births, Battery, BirthExposure, BirthResult, EvalContext};
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
@@ -117,6 +117,9 @@ pub struct Checkpoint {
     pub depth: u64,
     pub mesh: MeshTotals,
     pub births: BirthResult,
+    /// Exposure strata of the same births (T11.F26); not part of the
+    /// `drift-depth-v4` projection.
+    pub exposure: BirthExposure,
 }
 
 /// One walk's readings: the unchanged depth checkpoints, and beside them the
@@ -125,6 +128,9 @@ pub struct Checkpoint {
 pub struct DriftWalk {
     pub checkpoints: Vec<Checkpoint>,
     pub recruitment: Vec<RecruitmentCheckpoint>,
+    /// The birth lineages' genomes at the last checkpoint, in lineage order:
+    /// the drift cohort of T11.F26.
+    pub final_birth_genomes: Vec<CreatureGenome>,
 }
 
 /// The supply rule and values a walk over `mutation` runs, for the report's
@@ -223,9 +229,11 @@ pub fn observe(
         readings.push(row);
         recruitment.push(tracker.checkpoint(depth));
     }
+    genomes.truncate(sizes.birth_lineages as usize);
     DriftWalk {
         checkpoints: readings,
         recruitment,
+        final_birth_genomes: genomes,
     }
 }
 
@@ -278,7 +286,7 @@ fn observe_checkpoint(
         sets.push(reading);
         if index < sizes.birth_lineages as usize {
             let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
-            row.births = row.births.merge(&births::per_birth_result_on_units(
+            let (births, exposure) = births::per_birth_reading_on_units(
                 genome,
                 FOUNDER_GENOME_SIZE_UNITS,
                 &base,
@@ -287,7 +295,9 @@ fn observe_checkpoint(
                 context,
                 sizes.births,
                 BIRTH_OFFSET_BASE + BIRTH_LINEAGE_MULTIPLIER * (index as u64 + 1) + depth,
-            ));
+            );
+            row.births = row.births.merge(&births);
+            row.exposure = row.exposure.merge(&exposure);
         }
     }
     (row, sets)
@@ -506,6 +516,7 @@ mod tests {
         let walk = observe(&founder, &battery, &config.mutation, &context, sizes);
         let actual = walk.checkpoints;
         let mut expected = vec![Checkpoint::default(); 3];
+        let mut final_genomes = Vec::new();
         let mut applied = 0;
         for index in 0..3 {
             let mut genome = founder.clone();
@@ -541,7 +552,7 @@ mod tests {
                             context.runtime,
                             context.shared_memory_decay_rate,
                         );
-                        row.births = row.births.clone().merge(&births::per_birth_result_on_units(
+                        let (births, exposure) = births::per_birth_reading_on_units(
                             &genome,
                             FOUNDER_GENOME_SIZE_UNITS,
                             &base,
@@ -550,13 +561,22 @@ mod tests {
                             &context,
                             4,
                             7_000_000 + 1_000 * (index + 1) + depth,
-                        ));
+                        );
+                        row.births = row.births.clone().merge(&births);
+                        row.exposure = row.exposure.merge(&exposure);
                     }
                 }
+            }
+            if index < 2 {
+                final_genomes.push(genome);
             }
         }
         assert!(applied > 0);
         assert_eq!(actual, expected);
+        assert_eq!(walk.final_birth_genomes, final_genomes);
+        assert!(actual
+            .iter()
+            .all(|r| r.exposure.births_total == r.births.births_total && r.exposure.parents == 2));
         assert_eq!(founder, before);
         assert!(actual
             .iter()

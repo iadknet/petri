@@ -393,6 +393,7 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
                 neighborhood: NeighborhoodSizes::default(),
                 drift: Default::default(),
                 recruitment: v3_core::neighborhood::recruitment_paths::Sizes::PRODUCTION,
+                mutation_effects: Default::default(),
             };
             if params.recipe.is_some() {
                 let config = bench::build_config(&params);

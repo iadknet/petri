@@ -1440,6 +1440,130 @@
     app.appendChild(q.section);
   }
 
+  // Display rows for one world's `mutation_effects` block (T11.F26), pure over
+  // the block so fixtures can check every count and ratio shown. A report
+  // without the block reads "not measured"; an Undefined block or cohort
+  // reads "undefined: <reason>"; a zero denominator reads "undefined".
+  const COHORT_NAMES = ['founder', 'drift', 'selected'];
+  function mutationEffectsView(block) {
+    if (block === undefined || block === null) return { status: NOT_MEASURED };
+    if (typeof block === 'string') return { status: `undefined: ${block}` };
+    const share = (n, d) => (Number.isFinite(n) && d > 0 ? `${fmt(n, 0)} of ${fmt(d, 0)} (${pct(n / d)})` : 'undefined');
+    const perBirth = (n, d) => (d > 0 ? fmt(n / d, 3) : 'undefined');
+    const fields = block.count_fields || [];
+    const counts = (row) => Object.fromEntries(fields.map((f, i) => [f, num((row || [])[i])]));
+    const sideSum = (side) => sum(['silent', 'changed', 'dead', 'zero_applied'].map((k) => num(get(side, k))));
+    const exposure = (block.exposure || []).map((r) => {
+      const births = num(r.births_total);
+      return {
+        panel: r.panel, supply: r.supply,
+        requestedPerBirth: perBirth(num(r.requested_events_total), births),
+        appliedPerBirth: perBirth(num(r.applied_events_total), births),
+        zeroApplied: share(num(r.zero_requested) + num(r.requested_all_skipped), births),
+        identical: share(num(r.genome_identical), num(r.event_bearing)),
+        allNoop: share(num(r.parents_all_noop), num(r.parents)),
+        oneQueue: share(num(r.parents_one_queue), num(r.parents)),
+        fromActing: share(sideSum(r.from_acting), births),
+      };
+    });
+    const mean = (rows, key) => (rows.length ? fmt(sum(rows.map((p) => num(p[key]))) / rows.length, 1) : 'undefined');
+    const cohorts = (block.cohorts || []).map((c, i) => {
+      const name = COHORT_NAMES[i] || `cohort ${i}`;
+      if (typeof c === 'string') return { name, status: `undefined: ${c}` };
+      const t = counts(c.totals);
+      const applied = t.proposals - t.skipped;
+      const silent = applied - t.action_changed - t.action_dead;
+      const cov = c.coverage || {};
+      const pairs = num(cov.pairs_sampled);
+      const parents = c.parents || [];
+      const detail = (rows) => (rows || []).map((r) => {
+        const k = counts(r.counts);
+        return [r.key, fmt(k.proposals, 0), fmt(k.skipped, 0), fmt(k.proposals - k.skipped, 0)]
+          .concat(fields.slice(2).map((f) => fmt(k[f], 0)));
+      });
+      return {
+        name, identity: c.identity,
+        parents: `${fmt(num(c.parents_evaluated), 0)} of ${fmt(num(c.parents_requested), 0)} requested`,
+        meanDepthOrGeneration: mean(parents, 'depth_or_generation'),
+        meanGenomeSize: mean(parents, 'genome_size'),
+        proposals: fmt(t.proposals, 0), skipped: fmt(t.skipped, 0), applied: fmt(applied, 0),
+        categories: fields.slice(2, 9).map((f) => [f, share(t[f], applied)]),
+        actionEffects: share(t.action_changed + t.action_dead, applied),
+        silentWithStateOrCost: share(t.silent_with_state_or_cost, silent),
+        unresolved: share(t.unresolved, applied),
+        consistencyViolations: fmt(t.consistency_violations, 0),
+        coverage: {
+          pairs: `${fmt(pairs, 0)} of ${fmt(num(cov.pairs_requested), 0)} requested`,
+          recorded: cov.differ_recorded === null || cov.differ_recorded === undefined ? 'undefined' : share(num(cov.differ_recorded), pairs),
+          authored: share(num(cov.differ_authored), pairs),
+          early: share(num(cov.differ_sequence_ticks_1_4), pairs),
+          late: share(num(cov.differ_sequence_ticks_5_32), pairs),
+          any: share(num(cov.differ_any), pairs),
+          stateOnly: share(num(cov.state_or_cost_only), pairs),
+          noopActing: share(num(cov.all_noop_parents_acting), num(cov.all_noop_parents)),
+        },
+        operators: detail(c.operators),
+        targets: detail(c.targets),
+      };
+    });
+    const cov = block.coverage || {};
+    const recorded = cov.recorded;
+    return {
+      status: 'measured', version: block.version, batteryVersion: block.battery_version, coverageVersion: cov.version, fields,
+      exposure, cohorts,
+      recorded: typeof recorded === 'string' || recorded === undefined
+        ? `undefined: ${recorded || NOT_MEASURED}`
+        : `${fmt(num(recorded.actual), 0)} of ${fmt(num(recorded.requested), 0)} requested`,
+      sequenceSource: cov.sequence_source,
+      controls: (cov.controls || []).map((x) => [x.name, x.passed ? 'passed' : 'failed', (x.differing_groups || []).join(', ') || 'none']),
+    };
+  }
+
+  function renderMutationEffects(M, cards) {
+    const views = M.worlds.map((w) => ({ w, v: mutationEffectsView(M.latest ? get(worldCase(M.latest.rep, w.name), 'mutation_effects') : undefined) }));
+    const label = M.latest ? `latest goal-worlds-v1 closure ${M.latest.label}` : NOT_MEASURED;
+    const note = (c) => {
+      const p = el('p', 'sub', 'An action change is not evidence of useful behavior. Drift depth and selected generation, and pinned and own-size supply, are separate panels, never one trend. ');
+      const a = el('a', null, 'Closure reading (T11.F26)');
+      a.href = 'readings/t11-f26.md';
+      p.appendChild(a);
+      c.card.appendChild(p);
+    };
+    const add = (title, sub, headers, rowsOf) => {
+      const rows = [];
+      views.forEach(({ w, v }) => {
+        if (v.status !== 'measured') { rows.push([w.short, v.status].concat(headers.slice(2).map(() => ''))); return; }
+        rowsOf(v).forEach((r) => rows.push([w.short].concat(r)));
+      });
+      const c = card(title, `${sub} · ${label}`);
+      c.card.appendChild(table(headers, rows));
+      if (!cards.querySelector('a[href="readings/t11-f26.md"]')) note(c);
+      cards.appendChild(c.card);
+    };
+    const cohortRows = (v, cells) => v.cohorts.map((c) => (c.status ? [c.name, c.status] : [c.name].concat(cells(c))));
+    add('Mutation exposure per birth', 'mutation_effects.exposure (mutation-effects-v1): events per birth over births_total; zero-applied over births_total; genome-identical over event-bearing births',
+      ['World', 'Panel', 'Supply', 'Requested / birth', 'Applied / birth', 'Zero-applied births', 'Genome-identical births'],
+      (v) => v.exposure.map((r) => [r.panel, r.supply, r.requestedPerBirth, r.appliedPerBirth, r.zeroApplied, r.identical]));
+    add('Parent capability', 'mutation_effects.exposure: all-NoOp and one-queue parents over parents; births from acting parents over births_total',
+      ['World', 'Panel', 'All-NoOp parents', 'One-queue parents', 'Births from acting parents'],
+      (v) => v.exposure.map((r) => [r.panel, r.allNoop, r.oneQueue, r.fromActing]));
+    add('Single-event attribution by category', 'mutation_effects.cohorts[].totals (mutation-effects-v1): each category over applied proposals; cohort identity by mean depth or generation and genome size',
+      ['World', 'Cohort', 'Identity', 'Parents', 'Mean depth / generation', 'Mean genome size', 'Applied of proposals', 'action_changed', 'action_dead', 'genome_identical', 'unexecuted_edit', 'masked_before_selection', 'state_or_cost_only', 'unresolved'],
+      (v) => cohortRows(v, (c) => [c.identity, c.parents, c.meanDepthOrGeneration, c.meanGenomeSize, `${c.applied} of ${c.proposals}`].concat(c.categories.map((x) => x[1]))));
+    add('State or cost changes beside action changes', 'action_changed + action_dead over applied proposals; silent_with_state_or_cost over action-silent applied proposals; consistency violations expected 0',
+      ['World', 'Cohort', 'Action changed or dead', 'Silent with a state or cost change', 'Unresolved', 'Consistency violations'],
+      (v) => cohortRows(v, (c) => [c.actionEffects, c.silentWithStateOrCost, c.unresolved, c.consistencyViolations]));
+    add('Battery-silent pairs on the extended contexts', 'mutation_effects.cohorts[].coverage (neighborhood-coverage-v1): pairs differing in actions over pairs sampled, per group; all-NoOp parents acting on the extension over all-NoOp parents; silent means silent on the original battery named per row; authored contexts are not guaranteed realizable',
+      ['World', 'Cohort', 'Original battery', 'Pairs', 'Recorded', 'Authored', 'Ticks 1–4', 'Ticks 5–32', 'Any group', 'State or cost only', 'All-NoOp parents acting'],
+      (v) => cohortRows(v, (c) => [v.batteryVersion, c.coverage.pairs, c.coverage.recorded, c.coverage.authored, c.coverage.early, c.coverage.late, c.coverage.any, c.coverage.stateOnly, c.coverage.noopActing]));
+    add('Coverage controls and recorded contexts', 'mutation_effects.coverage.controls: each control run on every report; recorded contexts actual of requested',
+      ['World', 'Control', 'Outcome', 'Groups differing', 'Recorded contexts', 'Sequence source'],
+      (v) => v.controls.map((x) => x.concat([v.recorded, v.sequenceSource])));
+    add('Per-cohort detail by operator and first-target class', 'mutation_effects.cohorts[].operators and .targets: proposals, skipped, applied and category counts; a target class is a stratum label, never a cause',
+      ['World', 'Cohort', 'Row', 'Proposals', 'Skipped', 'Applied', 'action_changed', 'action_dead', 'genome_identical', 'unexecuted_edit', 'masked_before_selection', 'state_or_cost_only', 'unresolved', 'silent_with_state_or_cost', 'consistency_violations'],
+      (v) => v.cohorts.flatMap((c) => (c.status ? [[c.name, c.status]] : c.operators.concat(c.targets).map((r) => [c.name].concat(r)))));
+  }
+
   function renderEvolvable(M, app) {
     const q = question('4. Is the substrate still evolvable?', 'Whether one mutation of a living genome still changes behavior, at birth and after 2,000 mutations of drift. Where mutations land in the genome. Not measured yet: evolutionary activity, adaptive novelty.');
     q.cards.appendChild(row({
@@ -1536,6 +1660,7 @@
       c.card.appendChild(table(['Closure', 'World', 'Genomes', 'Total nodes', 'Reachable', 'Executed', 'Knockouts', 'Route varies', 'Capped passes', 'Executions'], rows, (i) => (rows[i][1] === 'default world, seeds pooled' ? 'hist' : null)));
       q.cards.appendChild(c.card);
     }
+    renderMutationEffects(M, q.cards);
     app.appendChild(q.section);
   }
 

@@ -8,6 +8,7 @@
 pub mod artifacts;
 mod comparison;
 mod indicators;
+pub mod mutation_effects;
 mod profiles;
 mod run;
 mod schema;

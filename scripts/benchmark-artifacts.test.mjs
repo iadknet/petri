@@ -20,9 +20,115 @@ function page(reports) {
     },
   });
   vm.runInContext(script.slice(0, script.indexOf('  // ── Boot')) +
-    'globalThis.api = {loadAll, meshSums, artifactNotice, num, get};})();', context);
+    'globalThis.api = {loadAll, meshSums, artifactNotice, num, get, mutationEffectsView};})();', context);
   return context.api;
 }
+
+const COUNT_FIELDS = ['proposals', 'skipped', 'action_changed', 'action_dead', 'genome_identical',
+  'unexecuted_edit', 'masked_before_selection', 'state_or_cost_only', 'unresolved',
+  'silent_with_state_or_cost', 'consistency_violations'];
+
+function effectsBlock() {
+  const cohort = (totals, parents, requested) => ({
+    cohort: 'drift', identity: 'fixture cohort', parents_requested: requested, parents_evaluated: parents.length,
+    totals, parents,
+    operators: [{ key: 'Graph.AlterGraphEdgeWeight', counts: totals }],
+    targets: [{ key: 'knockout_contributing', counts: totals }],
+    coverage: { parents_evaluated: parents.length, pairs_requested: 20, pairs_sampled: 8, differ_recorded: 2,
+      differ_authored: 1, differ_sequence_ticks_1_4: 0, differ_sequence_ticks_5_32: 4, differ_any: 5,
+      state_or_cost_only: 1, all_noop_parents: 1, all_noop_parents_acting: 1 },
+  });
+  const parent = (depth, size) => ({ index: 0, depth_or_generation: depth, genome_size: size, total_nodes: 4,
+    reachable_nodes: 3, executed_nodes: 2, contributing_nodes: 1, all_noop: false, distinct_queues: 3,
+    counts: [10, 2, 1, 0, 1, 2, 2, 1, 1, 3, 0] });
+  return {
+    version: 'mutation-effects-v1', battery_version: 'neighborhood-v1', count_fields: COUNT_FIELDS, queue_buckets: ['1', '2', '3-4', '5-8', '9+'],
+    exposure: [{ panel: 'drift@2000', supply: 'pinned 97 units (drift chart)', parents: 20, parents_all_noop: 5,
+      parents_one_queue: 6, distinct_queues_histogram: [6, 4, 4, 4, 2], births_total: 200, zero_requested: 50,
+      requested_all_skipped: 10, event_bearing: 140, requested_events_total: 300, applied_events_total: 240,
+      genome_identical: 14, from_actionless: { silent: 30, changed: 0, dead: 0, zero_applied: 20 },
+      from_acting: { silent: 70, changed: 30, dead: 10, zero_applied: 40 } }],
+    cohorts: [
+      cohort([100, 20, 10, 2, 8, 20, 20, 10, 10, 25, 0], [parent(0, 97)], 1),
+      cohort([200, 0, 20, 4, 16, 40, 40, 40, 40, 50, 1], [parent(2000, 300), parent(2000, 100)], 20),
+      'extinct: no living creature at the terminal tick',
+    ],
+    coverage: { version: 'neighborhood-coverage-v1', recorded: { requested: 32, actual: 32 }, sequence_source: 'recorded',
+      controls: [{ name: 'same_genome', passed: true, differing_groups: [] },
+        { name: 'slow_integrator_after_tick_4', passed: false, differing_groups: ['sequence_ticks_5_32'] }] },
+  };
+}
+
+test('mutation-effects view shows counts and ratios over their stored denominators', () => {
+  const api = page({});
+  const view = api.mutationEffectsView(effectsBlock());
+  assert.equal(view.status, 'measured');
+  assert.equal(view.batteryVersion, 'neighborhood-v1');
+  const [row] = view.exposure;
+  assert.equal(row.requestedPerBirth, '1.5');
+  assert.equal(row.appliedPerBirth, '1.2');
+  assert.equal(row.zeroApplied, '60 of 200 (30%)');
+  assert.equal(row.identical, '14 of 140 (10%)');
+  assert.equal(row.allNoop, '5 of 20 (25%)');
+  assert.equal(row.oneQueue, '6 of 20 (30%)');
+  assert.equal(row.fromActing, '150 of 200 (75%)');
+  const [founder, drift, selected] = view.cohorts;
+  assert.equal(founder.applied, '80');
+  assert.deepEqual(founder.categories.map((c) => c[0]), COUNT_FIELDS.slice(2, 9));
+  assert.equal(founder.categories[0][1], '10 of 80 (12.5%)');
+  assert.equal(founder.unresolved, '10 of 80 (12.5%)');
+  assert.equal(founder.actionEffects, '12 of 80 (15%)');
+  assert.equal(founder.silentWithStateOrCost, '25 of 68 (36.76%)');
+  assert.equal(drift.parents, '2 of 20 requested');
+  assert.equal(drift.meanDepthOrGeneration, '2,000');
+  assert.equal(drift.meanGenomeSize, '200');
+  assert.equal(drift.consistencyViolations, '1');
+  assert.equal(drift.coverage.pairs, '8 of 20 requested');
+  assert.equal(drift.coverage.recorded, '2 of 8 (25%)');
+  assert.equal(drift.coverage.late, '4 of 8 (50%)');
+  assert.equal(drift.coverage.any, '5 of 8 (62.5%)');
+  assert.equal(drift.coverage.noopActing, '1 of 1 (100%)');
+  assert.deepEqual(Array.from(drift.operators[0]).slice(0, 4), ['Graph.AlterGraphEdgeWeight', '200', '0', '200']);
+  assert.equal(selected.status, 'undefined: extinct: no living creature at the terminal tick');
+  assert.equal(view.recorded, '32 of 32 requested');
+  assert.deepEqual(Array.from(view.controls[1]), ['slow_integrator_after_tick_4', 'failed', 'sequence_ticks_5_32']);
+});
+
+test('mutation-effects view reads historical, zero-denominator and short-sample blocks honestly', () => {
+  const api = page({});
+  assert.equal(api.mutationEffectsView(undefined).status, 'not measured');
+  assert.equal(api.mutationEffectsView('Undefined').status, 'undefined: Undefined');
+
+  const zero = effectsBlock();
+  zero.exposure[0] = { ...zero.exposure[0], births_total: 0, event_bearing: 0, parents: 0, requested_events_total: 0,
+    applied_events_total: 0, zero_requested: 0, requested_all_skipped: 0, genome_identical: 0, parents_all_noop: 0,
+    from_actionless: { silent: 0, changed: 0, dead: 0, zero_applied: 0 }, from_acting: { silent: 0, changed: 0, dead: 0, zero_applied: 0 } };
+  zero.cohorts[0].totals = [5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  zero.cohorts[0].coverage = { ...zero.cohorts[0].coverage, pairs_sampled: 0, differ_recorded: null, all_noop_parents: 0 };
+  const view = api.mutationEffectsView(zero);
+  assert.equal(view.exposure[0].requestedPerBirth, 'undefined');
+  assert.equal(view.exposure[0].zeroApplied, 'undefined');
+  assert.equal(view.exposure[0].allNoop, 'undefined');
+  const founder = view.cohorts[0];
+  assert.ok(founder.categories.every((c) => c[1] === 'undefined'));
+  assert.equal(founder.silentWithStateOrCost, 'undefined');
+  assert.equal(founder.coverage.recorded, 'undefined');
+  assert.equal(founder.coverage.any, 'undefined');
+  assert.equal(founder.coverage.noopActing, 'undefined');
+
+  const short = effectsBlock();
+  short.coverage.recorded = { requested: 32, actual: 2 };
+  short.coverage.sequence_source = 'authored';
+  short.cohorts[1].parents_evaluated = 1;
+  short.cohorts[1].parents = short.cohorts[1].parents.slice(0, 1);
+  const shortView = api.mutationEffectsView(short);
+  assert.equal(shortView.recorded, '2 of 32 requested');
+  assert.equal(shortView.sequenceSource, 'authored');
+  assert.equal(shortView.cohorts[1].parents, '1 of 20 requested');
+  const extinct = effectsBlock();
+  extinct.coverage.recorded = 'extinct: no living creature at the terminal tick';
+  assert.equal(api.mutationEffectsView(extinct).recorded, 'undefined: extinct: no living creature at the terminal tick');
+});
 
 test('progress page reads mixed artifacts and retained mesh totals without opening raw', async () => {
   const full = {

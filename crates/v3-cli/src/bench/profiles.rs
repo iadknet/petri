@@ -126,6 +126,10 @@ pub struct ProfileParams {
     /// profiles run `Sizes::PRODUCTION`; test fixtures pass `Sizes::TEST`,
     /// which `cfg(test)` cannot select for integration tests.
     pub recruitment: neighborhood::recruitment_paths::Sizes,
+    /// Sizes of the world-set-only mutation-effects reading (T11.F26).
+    /// Production profiles run `Sizes::PRODUCTION`; fixtures pass the small
+    /// default.
+    pub mutation_effects: neighborhood::mutation_effects::Sizes,
 }
 
 /// Predeclared gate profile constants (T10.F10 Inputs and Invariants).
@@ -149,6 +153,7 @@ pub fn gate_profile_params() -> ProfileParams {
         neighborhood: NeighborhoodSizes::PRODUCTION,
         drift: neighborhood::drift::DriftSizes::PRODUCTION,
         recruitment: neighborhood::recruitment_paths::Sizes::PRODUCTION,
+        mutation_effects: neighborhood::mutation_effects::Sizes::PRODUCTION,
     }
 }
 
@@ -166,6 +171,7 @@ pub fn goal_profile_params() -> ProfileParams {
         neighborhood: NeighborhoodSizes::PRODUCTION,
         drift: neighborhood::drift::DriftSizes::PRODUCTION,
         recruitment: neighborhood::recruitment_paths::Sizes::PRODUCTION,
+        mutation_effects: neighborhood::mutation_effects::Sizes::PRODUCTION,
     }
 }
 

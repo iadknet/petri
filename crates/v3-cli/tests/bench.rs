@@ -47,6 +47,7 @@ fn tiny_report() -> bench::Report {
         neighborhood: bench::NeighborhoodSizes::default(),
         drift: Default::default(),
         recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
+        mutation_effects: Default::default(),
     };
     bench::build_report(&params, "t10-f10-synthetic-check").expect("a valid profile")
 }
@@ -67,6 +68,7 @@ fn tiny_sweep_params() -> bench::ProfileParams {
         neighborhood: bench::NeighborhoodSizes::default(),
         drift: Default::default(),
         recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
+        mutation_effects: Default::default(),
     }
 }
 
@@ -87,6 +89,7 @@ fn tiny_goal_params() -> bench::ProfileParams {
         neighborhood: bench::NeighborhoodSizes::default(),
         drift: Default::default(),
         recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
+        mutation_effects: Default::default(),
     }
 }
 

@@ -190,11 +190,11 @@ action change is not evidence of useful behavior.
 
 ## Implementation Tasks
 
-- [ ] Core: exposure strata folded from the existing drift checkpoint and
+- [x] Core: exposure strata folded from the existing drift checkpoint and
       read executions, the attribution cohorts and partition, the coverage
       extension with its contexts and controls, all in `neighborhood`.
-- [ ] Bench: `mutation_effects` per case, timing fields, summary projection.
-- [ ] Progress report section and its fixtures.
+- [x] Bench: `mutation_effects` per case, timing fields, summary projection.
+- [x] Progress report section and its fixtures.
 - [ ] Closure reading: the table below filled from the goal summary in
       `docs/progress/readings/t11-f26.md`, one row per candidate bottleneck
       per world, each row naming its evidence and owner.
@@ -216,7 +216,7 @@ apportioned.
 
 ## Verification
 
-- [ ] Focused tests: reconciliation (strata vs existing tallies, category
+- [x] Focused tests: reconciliation (strata vs existing tallies, category
       partition), the attribution precedence on constructed pairs (one per
       category, including a graph-state-only change and a Graph parameter
       change decoded to the same action; a pair whose computation and state both
@@ -237,7 +237,7 @@ apportioned.
       displayed counts and ratios checked against the fixture summary; a
       browser inspection of the served report with a screenshot path in
       readings.
-- [ ] `make check` exits 0.
+- [x] `make check` exits 0 (see readings).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved as killed, equivalent, or deferred.
 - [ ] Gate and goal summaries stored at

@@ -2,6 +2,7 @@ mod actions;
 mod clade_profile;
 mod dispatch_record;
 mod energy_accounting;
+mod full_sensor_inputs;
 mod logging;
 mod ordering;
 mod phase0;

@@ -43,7 +43,7 @@ pub fn execute_creature_mesh_traced(
     )
 }
 
-struct RecordingMeshExecution {
+pub(crate) struct RecordingMeshExecution {
     hops: Vec<MeshHopTrace>,
     passes: Vec<MeshPassTrace>,
     /// The decision state the dispatch in flight resolves against, taken
@@ -52,7 +52,7 @@ struct RecordingMeshExecution {
 }
 
 impl RecordingMeshExecution {
-    fn new(max_hops: usize) -> Self {
+    pub(crate) fn new(max_hops: usize) -> Self {
         Self {
             hops: Vec::with_capacity(max_hops),
             passes: Vec::new(),

@@ -408,6 +408,7 @@ fn goal_indicators(source: &Value, report: &Report) -> Result<Value, String> {
                     "reachable_structure_size_distribution",
                     "drift_depth",
                     "neighborhood_read",
+                    "mutation_effects",
                 ] {
                     if let Some(value) = case.get(key) {
                         projected[key] = value.clone();

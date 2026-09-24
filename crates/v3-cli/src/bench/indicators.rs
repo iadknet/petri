@@ -251,24 +251,40 @@ fn drift_checkpoint(
     }
 }
 
+/// What the drift walk hands the mutation-effects reading (T11.F26): each
+/// checkpoint's exposure strata and the birth lineages at the last one.
+pub(super) struct DriftCohortInputs {
+    pub exposure: Vec<(u64, neighborhood::BirthExposure)>,
+    pub parents: Vec<neighborhood::mutation_effects::CohortParent>,
+}
+
 pub(super) fn timed_drift_depth(
     params: &ProfileParams,
     config: &SimulationConfig,
     battery: Option<&Battery>,
-) -> (Indicator<DriftDepth>, Option<f64>) {
+) -> (
+    Indicator<DriftDepth>,
+    Option<f64>,
+    Option<DriftCohortInputs>,
+) {
     if params.name != "goal" && params.name != GOAL_WORLD_SET {
-        return (undefined_drift_depth(), None);
+        return (undefined_drift_depth(), None, None);
     }
     let started = Instant::now();
-    let reading = compute_drift_depth(config, battery.expect("goal battery"), params.drift);
-    (Indicator::Defined(reading), Some(millis(started.elapsed())))
+    let (reading, cohort) =
+        compute_drift_depth(config, battery.expect("goal battery"), params.drift);
+    (
+        Indicator::Defined(reading),
+        Some(millis(started.elapsed())),
+        Some(cohort),
+    )
 }
 
 fn compute_drift_depth(
     config: &SimulationConfig,
     battery: &Battery,
     sizes: neighborhood::drift::DriftSizes,
-) -> DriftDepth {
+) -> (DriftDepth, DriftCohortInputs) {
     use neighborhood::{battery as fixed_battery, drift, mesh_execution, recruitment};
     let founder = founder_genome(v3_core::config::FounderProfile::V3Alpha1);
     let readings = drift::observe(
@@ -278,7 +294,27 @@ fn compute_drift_depth(
         &EvalContext::from_config(config),
         sizes,
     );
-    DriftDepth {
+    let last_depth = readings.checkpoints.last().map_or(0, |row| row.depth);
+    let cohort = DriftCohortInputs {
+        exposure: readings
+            .checkpoints
+            .iter()
+            .map(|row| (row.depth, row.exposure))
+            .collect(),
+        parents: readings
+            .final_birth_genomes
+            .iter()
+            .enumerate()
+            .map(
+                |(lineage, genome)| neighborhood::mutation_effects::CohortParent {
+                    index: lineage as u64,
+                    depth_or_generation: last_depth,
+                    genome: genome.clone(),
+                },
+            )
+            .collect(),
+    };
+    let depth = DriftDepth {
         version: drift::VERSION.to_string(),
         founder: "V3Alpha1".to_string(),
         lineages: sizes.lineages,
@@ -312,7 +348,8 @@ fn compute_drift_depth(
             .zip(&readings.recruitment)
             .map(|(row, recruitment)| drift_checkpoint(row, recruitment))
             .collect(),
-    }
+    };
+    (depth, cohort)
 }
 
 pub(super) fn generation_distribution(
@@ -614,7 +651,7 @@ pub(super) fn compute_founder_neighborhood(
 
 /// The living population's ids in ascending order: the rank space every
 /// final-population sample is drawn from.
-fn sorted_creature_ids(
+pub(super) fn sorted_creature_ids(
     sim: &v3_core::simulation::Simulation,
 ) -> Vec<v3_core::contracts::CreatureId> {
     let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
@@ -714,7 +751,8 @@ pub(super) fn evolved_neighborhood_for_seed(
 /// a seeded uniform sample of the id-sorted population, each genome's
 /// production births through the unchanged `per_birth_result`, pooled by
 /// integer merge in sample order. Reads the terminal population only; the
-/// evolved half's reading is untouched.
+/// evolved half's reading is untouched. Beside it, the exposure strata of the
+/// same births (T11.F26), pooled in sample order.
 pub(super) fn neighborhood_read_for_seed(
     seed: u64,
     sim: &v3_core::simulation::Simulation,
@@ -722,13 +760,14 @@ pub(super) fn neighborhood_read_for_seed(
     mutation_config: &MutationConfig,
     context: &EvalContext,
     sizes: NeighborhoodSizes,
-) -> NeighborhoodRead {
+) -> (NeighborhoodRead, neighborhood::BirthExposure) {
     let creature_ids = sorted_creature_ids(sim);
     let population_size = creature_ids.len();
     let ranks = read_sample_ranks(population_size, sizes.read_sample as usize, seed);
 
     let mut genomes = Vec::with_capacity(ranks.len());
     let mut pooled = BirthResult::default();
+    let mut exposure = neighborhood::BirthExposure::default();
     let mut generation_sum = 0u64;
     let mut genome_size_sum = 0u64;
     let mut total_nodes = 0u64;
@@ -741,7 +780,7 @@ pub(super) fn neighborhood_read_for_seed(
         let genome = &creature.genome;
         let seed_offset = READ_SEED_BASE + READ_GENOME_MULTIPLIER * (genome_index as u64 + 1);
         let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
-        let births = neighborhood::births::per_birth_result(
+        let (births, genome_exposure) = neighborhood::births::per_birth_reading(
             genome,
             &base,
             battery,
@@ -750,6 +789,7 @@ pub(super) fn neighborhood_read_for_seed(
             sizes.read_births,
             seed_offset,
         );
+        exposure = exposure.merge(&genome_exposure);
         let executed = battery
             .executed_indices(genome, context.runtime, context.shared_memory_decay_rate)
             .len() as u64;
@@ -783,7 +823,7 @@ pub(super) fn neighborhood_read_for_seed(
 
     let sample_size = ranks.len() as u64;
     let births_total = u64::from(pooled.births_total);
-    NeighborhoodRead {
+    let read = NeighborhoodRead {
         version: NEIGHBORHOOD_READ_VERSION.to_string(),
         battery_version: BATTERY_VERSION.to_string(),
         sample_seed_formula: format!("{READ_SEED_BASE} + world_seed"),
@@ -816,7 +856,8 @@ pub(super) fn neighborhood_read_for_seed(
         executed_nodes,
         mean_executed_nodes: fraction_or_undefined(executed_nodes, sample_size),
         genomes,
-    }
+    };
+    (read, exposure)
 }
 
 fn percentile(sorted: &[u32], p: f64) -> u32 {

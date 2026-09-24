@@ -1,6 +1,7 @@
 //! Serialised report types and their `undefined_*` constructors.
 
 use super::comparison::{Comparison, MeasuredIdentity};
+use super::mutation_effects::{undefined_mutation_effects, MutationEffects};
 use super::profiles::GoalCase;
 use super::run::millis;
 use super::tracking::{PersistenceSample, WorldTracking};
@@ -138,6 +139,10 @@ pub struct GoalCaseObservation {
     /// (T14.F12); unmeasured, never zero, in reports stored before it.
     #[serde(default = "undefined_neighborhood_read")]
     pub neighborhood_read: Indicator<NeighborhoodRead>,
+    /// Mutation-effect attribution and observation coverage (T11.F26);
+    /// unmeasured in reports stored before it.
+    #[serde(default = "undefined_mutation_effects")]
+    pub mutation_effects: Indicator<MutationEffects>,
 }
 
 /// The rates [`WorldTracking`] implies, derived once so a total and its
@@ -1091,6 +1096,12 @@ pub struct Environment {
     pub neighborhood_read_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
     #[serde(default)]
     pub neighborhood_read_wall_clock_ms_total: f64,
+    /// Mutation-effects wall time per seed (T11.F26, goal world set only),
+    /// outside every timer above.
+    #[serde(default)]
+    pub mutation_effects_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
+    #[serde(default)]
+    pub mutation_effects_wall_clock_ms_total: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

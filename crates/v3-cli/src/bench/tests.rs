@@ -92,6 +92,7 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
         neighborhood: NeighborhoodSizes::default(),
         drift: Default::default(),
         recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
+        mutation_effects: Default::default(),
     });
 
     // Act
@@ -172,6 +173,7 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
         neighborhood: NeighborhoodSizes::default(),
         drift: Default::default(),
         recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
+        mutation_effects: Default::default(),
     });
 
     // Act
@@ -296,6 +298,7 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
         neighborhood: NeighborhoodSizes::default(),
         drift: Default::default(),
         recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
+        mutation_effects: Default::default(),
     });
 
     // Act
@@ -365,6 +368,7 @@ pub(super) fn small_profile(name: &str) -> ProfileParams {
         neighborhood: NeighborhoodSizes::default(),
         drift: Default::default(),
         recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
+        mutation_effects: Default::default(),
     }
 }
 
@@ -381,6 +385,7 @@ fn world_set_case_tracking_matches_a_replayed_run() {
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
     params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
+    params.mutation_effects = Default::default();
     let (report, _) = run_deterministic(&params).expect("a valid profile");
 
     for (index, case) in report.goal_indicators.cases.iter().enumerate() {
@@ -468,6 +473,7 @@ pub(super) fn small_world_set_params() -> ProfileParams {
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
     params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
+    params.mutation_effects = Default::default();
     params
 }
 
