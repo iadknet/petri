@@ -110,3 +110,4 @@ Line numbers are at `2a346774`. "Zero callers" means a repo-wide grep
 | --- | --- | --- |
 | PRD 1 | `task-mufxskpi-0qd6sn` | not-ready: unused `FoodTypeConfig` import (fixed); three advisories applied or rebutted |
 | PRD 2 | `task-mufxyqkx-e2h9u0` | ready |
+| Implementation 1 | `task-mufyaca0-lbobbc` | no findings (reviewed `841ee0b1`) |
