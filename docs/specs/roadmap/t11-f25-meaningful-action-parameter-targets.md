@@ -1,6 +1,6 @@
 # T11.F25 — Meaningful Action-Parameter Targets
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-24
 **Feature**: T11.F25
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -132,14 +132,14 @@ Fixed design:
 - [x] Re-pin any trajectory, replay, drift or recruitment-paths test value
       that changes. List each old and new value in the readings with the
       attributing draw. No predicate may be weakened.
-- [ ] Record gate and goal readings as Performance requires.
+- [x] Record gate and goal readings as Performance requires.
 
 ## Verification
 
 - [x] `cargo test -p v3-core --test viability` first, then
       `cargo test -p v3-core --lib mutation` and the new tests, with the red
       run and green run in [readings](../../progress/readings/t11-f25.md).
-- [ ] `make check` exits 0 in the worktree.
+- [x] `make check` exits 0 in the worktree (tested commit `b1a41c8c`, 2026-09-24).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on `e2cebdf5`
       (2026-09-24, run mode `fresh`): `28 mutants tested in 11m: 23 caught,
       4 unviable, 1 timeouts`, diffed against `df35975f`, output in
@@ -159,11 +159,8 @@ Fixed design:
       is staged. Gate series `epoch_baseline` re-pinned per the user decision
       below; goal severes accepted and the goal series `epoch_baseline`
       kept at T19.F04 per the user decision below.
-- [x] Self-review (`simplify`) left production code unchanged (test oracles
-      only), then `cargo test -p v3-core --lib mutation` (424 passed),
-      `cargo test -p v3-core --lib action_decode` (9 passed),
-      `cargo clippy --workspace --all-targets -- -D warnings` and
-      `cargo check --workspace --all-targets` all exit 0.
+- [x] Self-review (`simplify`) changed test oracles only; production code
+      unchanged.
 - [x] Property test `pick_random_surface_matches_the_drawable_reference`
       (`mutation/graph/operators.rs`) covers the Graph draw row over generated
       sink lists (mixed, empty, all-undecoded), 0–3 compute nodes and seeds:
@@ -276,15 +273,16 @@ extinction. User decision (verbatim, 2026-09-24, in reply to the severe goal
 
 ## Success Criteria
 
-- [ ] Every fresh Graph and VM parameter-target draw lands on a field in the
+- [x] Every fresh Graph and VM parameter-target draw lands on a field in the
       decoded catalog, each decoded field stays drawable, and the catalog is
       tested against `decode_commit`.
-- [ ] Storage, runtime, pruning of existing structure, and births without a
+- [x] Storage, runtime, pruning of existing structure, and births without a
       changed draw are unchanged, and every re-pinned value is attributed.
-- [ ] `make check` and the mutation gate pass with every survivor resolved,
+- [x] `make check` and the mutation gate pass with every survivor resolved,
       and the gate and goal summaries are stored and read against the
       predeclaration.
 
 ## Notes for AI Agents
 
 - Decision: Fable credits are exhausted, so this feature's spec owner runs on Opus (high-effort intent) instead of Fable 5.1 `high`, is resumed with `SendMessage`, and no Fable advisor is used anywhere in the run (workflow launch step 3 is skipped).
+- Cost: `/usage` awaits the user; 3 implementer passes, 0 advisor consults; 2 spec-owner resumes; 2 challenge rounds (`ready`); review 2 P1, 1 P2, 0 P3, all remediated.
