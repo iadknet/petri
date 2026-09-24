@@ -133,11 +133,16 @@ Fixed design:
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       full survivor list stays here.
-- [ ] Gate and goal benchmark summaries are stored at
+- [x] Gate and goal benchmark summaries are stored at
       `docs/progress/features/t11-f24-stable-parent-membership-during-mutation.json`
       and `...-goal.json`. Local raw hash, byte count, and verification time
-      are checked, series entries point to the summaries, and no new full
-      report is staged.
+      are checked (2026-09-24, see
+      [readings](../../progress/readings/t11-f24.md)), series entries point to
+      the summaries, and no new full report is staged. Gate: `severe=false`
+      against both stored references. Goal: `severe=false` against the
+      `t19-f04` epoch, but `severe=true` against the latest closure
+      (`plasticity_updates` +113.73%, exceeding the +100% threshold) — an
+      unresolved blocker-rule decision, not remediated by this record.
 
 ## Performance and Goal Impact
 
@@ -171,7 +176,29 @@ are flag-only. The observation caps stay as they are: founder 10 s, evolved
 | Goal `final_population`, `plateau_population`, births per creature-tick per world | Move; no sign; an extinction is a blocker |
 | Goal evolved changed/dead, drift depth, recruitment paths, lineage diversity | No direction; recorded |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Measured 2026-09-24, tested commit `9995dfee` (full
+detail in [readings](../../progress/readings/t11-f24.md)).
+
+Gate: `severe=false` against both the `t19-f04` epoch and the latest closure
+`t11-f20`; the latest-closure comparison is byte-identical across every work
+counter (0.000000% delta). Founder battery `any_events` is identical to both
+references (`applied=139, changed=68, dead=0`) — no removal-then-later-draw
+event occurred in this battery, consistent with the predeclaration.
+
+Goal: `severe=false` against the `t19-f04` epoch. **`severe=true` against the
+latest closure `t11-f20`**: `plasticity_updates` +113.73% (0.371941 vs.
+0.174022), over the +100% work-counter threshold. All other goal work
+counters are `ok`. This is not the "no measurable compute cost" the
+predeclaration expected, and per the spec's own blocker rule it is a user
+decision, not resolved here.
+
+Founder rows (`founder_changed_per_all_births`, `founder_dead_per_all_births`)
+are unchanged in all three worlds against both references (0% delta), as
+predeclared. No extinction: minimum populations 29 / 739 / 98 across the
+three worlds. `mutation_supply` target ratios per world (reachable/executed/
+unreachable divided by `events_applied_total`) are recorded in the readings;
+no prior reading exists for a before/after comparison since this is the first
+time the ratio is read this way.
 
 - Summaries: [gate](../../progress/features/t11-f24-stable-parent-membership-during-mutation.json),
   [goal](../../progress/features/t11-f24-stable-parent-membership-during-mutation-goal.json).
