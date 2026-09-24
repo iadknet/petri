@@ -1,6 +1,6 @@
 # T11.F27 — Compact Action-Parameter Storage
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-24
 **Feature**: T11.F27
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -147,7 +147,7 @@ Fixed design:
       readings with its attribution (Determinism row). No predicate may be
       weakened, and a changed founder-behavior pin (a run without mutation)
       is a defect, not a re-pin.
-- [ ] Record gate and goal readings as Performance requires.
+- [x] Record gate and goal readings as Performance requires.
 
 ## Verification
 
@@ -166,7 +166,7 @@ Fixed design:
       (`v3-cli/src/recruitment.rs`) matches every proposal, and
       `cargo test -p v3-core --test reproducibility` passes; results in
       readings.
-- [ ] `make check` exits 0 in the worktree, frontend tests included.
+- [x] `make check` exits 0 in the worktree, frontend included (`869d8339`).
 - [x] Fresh mutants run (`bab88f34`): `54 mutants tested in 9m: 23
       caught, 31 unviable`; no survivors. Output
       `~/.local/share/petri-tools/mutants/t11-f27/mutants.out`.
@@ -238,10 +238,10 @@ Decision (user decision 2026-09-24, "Accept, re-pin epoch"): the goal severe aga
 - [x] The Graph sink catalog, the VM `WriteActionParam` address space and the
       runtime surface hold exactly the three decoded fields, tested against
       `decode_commit`, and fresh `ReadActionQueueParam` draws stay in `0..2`.
-- [ ] Pre-F27 serialized genomes carrying parameter structure are rejected,
+- [x] Pre-F27 serialized genomes carrying parameter structure are rejected,
       current-format genomes round-trip, replay matches, and founder behavior
       is unchanged with every re-pinned value attributed.
-- [ ] `make check` and the mutation gate pass with every survivor resolved,
+- [x] `make check` and the mutation gate pass with every survivor resolved,
       and the gate and goal summaries are stored and read against the
       predeclaration.
 
