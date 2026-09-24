@@ -216,6 +216,34 @@ fn assemble_sensor_inputs(
     sim: &Simulation,
     queue: &[CreatureId],
 ) -> Vec<(CreatureId, SensorSnapshot)> {
+    assemble_sensor_inputs_with(
+        sim,
+        queue,
+        genome_uses_typed_local_food,
+        genome_uses_extended_perception,
+    )
+}
+
+/// The production sensor assemblers with typed local food and extended
+/// perception assembled for every creature, whatever its genome reads: the
+/// complete snapshot a creature's cell and neighbors offer, for observation
+/// panels that run other genomes on it (T11.F26 recorded contexts).
+/// Skips ids that are not alive; never advances or mutates the simulation.
+#[must_use]
+pub fn assemble_full_sensor_inputs(
+    sim: &Simulation,
+    queue: &[CreatureId],
+) -> Vec<(CreatureId, SensorSnapshot)> {
+    assemble_sensor_inputs_with(sim, queue, |_| true, |_| true)
+}
+
+#[inline]
+fn assemble_sensor_inputs_with(
+    sim: &Simulation,
+    queue: &[CreatureId],
+    uses_typed_local_food: impl Fn(&crate::creature::genome::CreatureGenome) -> bool,
+    uses_extended_perception: impl Fn(&crate::creature::genome::CreatureGenome) -> bool,
+) -> Vec<(CreatureId, SensorSnapshot)> {
     let perception_config = PerceptionConfig::from_sim_config(&sim.config);
     let vis_table = get_visibility_table(perception_config.vision_radius);
     let mut visible_scratch = VisibilityScratch::default();
@@ -225,12 +253,12 @@ fn assemble_sensor_inputs(
         .map(|&id| {
             let creature = &sim.creatures[id];
             let local = assemble_static_inputs(&sim.world, creature, &sim.config.energy.lifecycle);
-            let typed_local_food = if genome_uses_typed_local_food(&creature.genome) {
+            let typed_local_food = if uses_typed_local_food(&creature.genome) {
                 assemble_typed_food_local_snapshot(&sim.world, creature.position)
             } else {
                 TypedFoodLocalSnapshot::zero()
             };
-            let perception = if genome_uses_extended_perception(&creature.genome) {
+            let perception = if uses_extended_perception(&creature.genome) {
                 let visible = compute_visible_cells_into(
                     creature.position,
                     &sim.world,

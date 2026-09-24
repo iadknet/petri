@@ -343,6 +343,7 @@ fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
             },
             ..BirthResult::default()
         },
+        exposure: neighborhood::BirthExposure::default(),
     };
     let report = drift_checkpoint(row, &empty_recruitment(250));
     let backends = report.backends.expect("measured backend totals");
@@ -904,7 +905,8 @@ fn neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births() {
         ..NeighborhoodSizes::default()
     };
 
-    let actual = neighborhood_read_for_seed(11, &sim, &battery, &config.mutation, &context, sizes);
+    let actual =
+        neighborhood_read_for_seed(11, &sim, &battery, &config.mutation, &context, sizes).0;
 
     let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
     creature_ids.sort();
@@ -1053,7 +1055,8 @@ fn neighborhood_read_of_an_empty_population_has_no_rows_and_undefined_fractions(
         &config.mutation,
         &context,
         NeighborhoodSizes::default(),
-    );
+    )
+    .0;
 
     assert_eq!(actual.population_size, 0);
     assert_eq!(actual.sample_size, 0);

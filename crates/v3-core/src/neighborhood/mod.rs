@@ -22,6 +22,7 @@ pub mod classify;
 pub mod companions;
 pub mod drift;
 pub mod mesh_execution;
+pub mod mutation_effects;
 pub mod operators;
 pub mod recruitment;
 pub mod recruitment_paths;
@@ -29,7 +30,7 @@ pub mod sample;
 pub mod steering;
 
 pub use battery::{Battery, Signature};
-pub use births::BirthResult;
+pub use births::{BirthExposure, BirthResult};
 pub use classify::{classify, Class, Classification, Tally};
 pub use companions::{structural_companions, StructuralCompanions};
 pub use operators::{operator_catalog, OperatorRow};

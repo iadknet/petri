@@ -1144,6 +1144,69 @@ fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloa
     );
 }
 
+/// A world's `mutation_effects` block (T11.F26) is projected into the summary
+/// whole, and a source without it projects none.
+#[test]
+fn world_mutation_effects_is_projected_whole() {
+    use v3_core::neighborhood::mutation_effects as effects;
+    let mut config = v3_core::config::SimulationConfig::default();
+    config.world.width = 16;
+    config.world.height = 16;
+    config.population.initial_creatures = 3;
+    let sim = v3_core::simulation::seed_simulation(config.clone(), 3);
+    let battery = v3_core::neighborhood::Battery::generate(config.world.food.types.len());
+    let founder =
+        v3_core::creature::founder::founder_genome(v3_core::config::FounderProfile::V3Alpha1);
+    let context = v3_core::neighborhood::EvalContext::from_config(&config);
+    let sizes = effects::Sizes {
+        parents: 1,
+        proposals: 2,
+        pairs_per_parent: 1,
+        recorded_contexts: 2,
+    };
+    let reading = effects::observe(
+        effects::WorldInputs {
+            founder: &founder,
+            drift: &[],
+            selected: Err("extinct: no living creature at the terminal tick"),
+            sim: &sim,
+            world_seed: 3,
+        },
+        &battery,
+        &config.mutation,
+        &context,
+        sizes,
+    );
+    let block = serde_json::to_value(bench::mutation_effects::project(
+        &reading,
+        &bench::mutation_effects::ExposureInputs {
+            drift: &[],
+            read: None,
+        },
+        sizes,
+    ))
+    .unwrap();
+
+    let dir = Temp::new();
+    let path = dir.0.join("raw.json");
+    let mut source = world_source();
+    source["deterministic"]["goal_indicators"]["cases"][0]["mutation_effects"] = block.clone();
+    let raw = serde_json::to_vec(&source).unwrap();
+    std::fs::write(&path, &raw).unwrap();
+    let summary = artifacts::summarize(&raw, &path, &provenance()).unwrap();
+    assert_eq!(
+        summary.deterministic["goal_indicators"]["cases"][0]["mutation_effects"],
+        block
+    );
+
+    let historical = serde_json::to_vec(&world_source()).unwrap();
+    std::fs::write(&path, &historical).unwrap();
+    let summary = artifacts::summarize(&historical, &path, &provenance()).unwrap();
+    assert!(summary.deterministic["goal_indicators"]["cases"][0]
+        .get("mutation_effects")
+        .is_none());
+}
+
 /// A world's `neighborhood_read` block (T14.F12) is projected into the
 /// summary whole, beside `drift_depth`, and a source without it projects
 /// none rather than an empty or zero block.

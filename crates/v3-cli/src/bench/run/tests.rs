@@ -52,6 +52,7 @@ fn goal_cases_keep_distinct_full_population_structure_distributions() {
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
     params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
+    params.mutation_effects = Default::default();
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let mut expected_cases = Vec::new();
     let mut pooled = Vec::new();
@@ -93,6 +94,7 @@ fn goal_world_set_executes_three_named_configs_with_case_observations() {
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
     params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
+    params.mutation_effects = Default::default();
     let (report, timings) = run_deterministic(&params).expect("a valid profile");
     assert_eq!(report.profile.name, "goal-worlds-v1");
     assert_eq!(report.per_seed.len(), 3);
@@ -326,6 +328,7 @@ fn synthetic_timings(seed_wall_clock_ms: &[f64]) -> RunTimings {
         recruitment_paths_wall_clock_ms: None,
         neighborhood_evolved_wall_clock_ms_per_seed: Vec::new(),
         neighborhood_read_wall_clock_ms_per_seed: Vec::new(),
+        mutation_effects_wall_clock_ms_per_seed: Vec::new(),
     }
 }
 
