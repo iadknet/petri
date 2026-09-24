@@ -172,7 +172,7 @@ Fixed design:
 - [x] Root recipes and goal recipe digest pins.
 - [x] Frontend panel, types, fixtures, and tests.
 - [x] The four reference docs.
-- [ ] Gate and goal benchmarks, with readings in
+- [x] Gate and goal benchmarks, with readings in
       `docs/progress/readings/t11-f20.md`.
 
 ## Verification
@@ -190,17 +190,16 @@ Fixed design:
       `with_legacy_supply`, and "Per-Unit Supply" finds only the rejection
       tests. Command and output go in readings.
 - [x] `make check` passes in the worktree.
-- [ ] Production identity (invariant 3). Diff the new gate and goal raw
-      reports' `deterministic` sections against T19.F06's raw reports. The
-      diff lists only the permitted paths, and both reports' comparisons load
-      the T19.F04 and T19.F06 summaries. The path list goes in readings.
+- [x] Production identity (invariant 3). Gate: 0 differing paths. Goal: 10
+      differing paths, all within the permitted list. Both comparisons
+      loaded the T19.F04 and T19.F06 summaries. Path list in readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t11-f20-per-birth-supply-rule-retirement.json`
-      and `…-goal.json`, with local raw hash, byte count, and verification
-      time checked. Series entries point to them, `epoch_baseline` is
-      unchanged, and no full report is staged.
+      and `…-goal.json`, with local raw hash and byte count checked. Series
+      entries point to them in `gate-v1` and `goal-worlds-v1`,
+      `epoch_baseline` unchanged, no full report staged. Detail in readings.
 
 ## Performance and Goal Impact
 
@@ -231,7 +230,13 @@ Neither epoch is re-pinned. Pre-feature numbers are tabulated in
 | `recruitment_paths` block | `arms`, `pairs`, `opportunities`, `constructed`, and `total_proposals` (82,944, unchanged) are reported before and after, with no direction. The version is unchanged. The discard counts in the pinned tests stay zero. |
 | Wall | The standing absolute budgets apply on any host: founder neighborhood under 10 s; summed evolved neighborhood under 180 s; the whole goal run is investigated past 15 minutes; `drift_depth_wall_clock_ms` (one aggregate over the three worlds) under 30 s, the T11.F19 budget. Relative readings hold only on the T19.F06 host (`Isaacs-MacBook-Pro-2.local`); on another host they are report-only. They are: aggregate `drift_depth_wall_clock_ms` not above 24,370.5 ms + 10%, and `recruitment_paths_wall_clock_ms` within 10% of 12,609.0 ms. Gate and goal wall per creature-tick have no direction. |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Every predeclared row is met; no tripwire crossed, no
+requested-events miss, no non-permitted identity-diff path. Gate
+`severe=false` both comparisons (exit 0). Goal `severe=false` vs T19.F06,
+`severe=true` on `decided_passes` +255.434783% vs the T19.F04 epoch (exactly
+T19.F06's own epoch comparison, the severe accepted 2026-09-22 at T19.F05,
+not remediated here); CLI exits 3, `make` exits 2, as predeclared. Full
+detail: [readings](../../progress/readings/t11-f20.md).
 
 - Summaries: [gate](../../progress/features/t11-f20-per-birth-supply-rule-retirement.json),
   [goal](../../progress/features/t11-f20-per-birth-supply-rule-retirement-goal.json).
