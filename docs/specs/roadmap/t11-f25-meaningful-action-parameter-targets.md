@@ -140,8 +140,18 @@ Fixed design:
       `cargo test -p v3-core --lib mutation` and the new tests, with the red
       run and green run in [readings](../../progress/readings/t11-f25.md).
 - [ ] `make check` exits 0 in the worktree.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on `e2cebdf5`
+      (2026-09-24, run mode `fresh`): `28 mutants tested in 11m: 23 caught,
+      4 unviable, 1 timeouts`, diffed against `df35975f`, output in
+      `~/.local/share/petri-tools/mutants/t11-f25/mutants.out`. No missed
+      mutants. Survivors:
+      - `crates/v3-core/src/creature/genome/vote.rs:83:11: replace += with *=`
+        (timeout): **equivalent**. It times out while building: `i *= 1`
+        keeps `i` at 0, so const evaluation of
+        `DECODED_ACTION_PARAM_FLAT_SLOTS` never ends and no binary exists
+        for a test to observe.
+
+      Nothing changed in triage, so no second fresh run is needed.
 - [x] Gate and goal summaries are stored at
       `docs/progress/features/t11-f25-meaningful-action-parameter-targets.json`
       and `...-goal.json`. Local raw hash, byte count and verification time are
