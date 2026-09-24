@@ -181,7 +181,20 @@ wall-time moves are flag-only. The observation caps are unchanged.
 No goal indicator counts parameter-target decoding. The draw tests are the
 evidence that the Goal holds.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Pending the stored gate and goal summaries. At
+implementer commit `755afc2d`, the gate series test
+`gate_profile_has_no_severe_regression_against_series_references`, which
+runs inside `make check`, reports a severe result. Gate `pass_cap_hits` is
+0.001364 per creature-tick against the T19.F04 epoch's 0.000752 (+81.4%).
+Against the latest closure, T11.F24's 0.001016, it is +34%, a flag. The test
+passes at parent `2a2371fa`, and it passes again with only the old graph
+surface draw restored, so the cause is the `AddGraphEdge` filter. That is the
+trajectory divergence predeclared above. This is a rare-event counter whose
+per-seed counts already swung between closures (T19.F04 144/35/30, T11.F24
+0/26/256), and it stays far below T19.F02's 10%-of-creature-ticks ceiling. A
+user decision is required under the blocker rule: accept the severe and
+re-pin the gate epoch, or do not. Keeping the epoch leaves `make check` red.
+The decision is recorded here verbatim.
 
 - Summaries: [gate](../../progress/features/t11-f25-meaningful-action-parameter-targets.json),
   [goal](../../progress/features/t11-f25-meaningful-action-parameter-targets-goal.json).
