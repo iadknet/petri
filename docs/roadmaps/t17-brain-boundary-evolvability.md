@@ -1,31 +1,33 @@
 # T17 — Brain Boundary Evolvability
 
 **Status**: In Progress
-**Last updated**: 2026-09-21
+**Last updated**: 2026-09-23
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
 
-Every value that crosses between a creature's brain and its world or body is
-on the scale the brain's mutation operators already assume, so a
-sensor-driven rule for how much to invest, how much to take, or when to act
-is one edge away instead of a scaling construction. The
+Energy- and age-based decisions and resource transfers use scales that the
+brain's mutation operators can readily tune. The
 [reproduction-collapse research note](../strategy/reproduction-collapse-research-2026-09-18.md)
-(Section 8) audited every boundary value: new graph thresholds, constants,
-and edge weights are drawn in [−1, 1], parameter steps are ±0.1, and the
-Covariance Hebbian rule is `(pre − 0.5)(post − 0.5)`, yet the parent's own
-energy, age, and generation reach the brain in raw units and the reproduce
-transfer and steal amounts leave it in raw energy. Afterward a creature can
-evolve, in one mutation, an offspring investment that follows the food around
-it or the time since it last ate, and a threshold on its own energy that a
-new compute node can actually tune.
+(Section 8) identified raw energy and age inputs and raw energy transfers as
+requiring scaling constructions, while new graph thresholds, constants,
+and edge weights are drawn in [−1, 1] and parameter steps are ±0.1.
+T17.F01 made offspring investment a fraction of the parent's post-cost
+energy; T17.F02 normalized `EnergyCurrent`, `EnergyConsumedThisTick`, and
+`AgeTicks` to [0, 1] and removed `Generation` from the input keyset.
+The remaining work makes the steal amount a fraction and provides per-type
+Eat votes when a third ordinary food type exists. T19's `HopsThisTick`,
+`CommitCounts`, and `OffspringSuccess` retain their raw-count semantics;
+action votes remain graded preferences, without a blanket unit-scale rule.
 
 ## Track Success Criteria
 
-- [ ] Every introspective input (`EnergyCurrent`, `EnergyConsumedThisTick`,
-  `AgeTicks`, `Generation`) reaches the brain as a value in [0, 1], and the
-  founder's behavior is unchanged by construction (its gates re-expressed on
-  the new scale, verified by the founder tests and the viability test).
+- [x] `EnergyCurrent`, `EnergyConsumedThisTick`, and `AgeTicks` reach the brain
+  in [0, 1], and `Generation` is absent from the input keyset. T17.F02's scale
+  conversion preserves founder behavior by construction, verified by the
+  founder tests and the viability test. T19's `HopsThisTick`, `CommitCounts`,
+  and `OffspringSuccess` remain raw counts, and action votes retain their
+  graded preference semantics.
 - [ ] The reproduce transfer and the steal amount are fractions in [0, 1] at
   the action boundary, and a founder attempts only births that physiology
   accepts.
@@ -41,8 +43,8 @@ new compute node can actually tune.
   - Goal: A creature feels how full, how tired, and how old it is as a share of itself, not in joules or ticks. `EnergyCurrent` and `EnergyConsumedThisTick` reach the brain as fractions of `max_energy`; `AgeTicks` as a saturating fraction of a configured reference span (T03.F07's lifespan is its later denominator); `Generation` is removed from the input key set or saturates the same way. The founder's gates are re-expressed exactly (32 → 0.16 of 200 since T17.F01; the age gate on the same span) so its behavior is identical by construction. Evidence: a new `Threshold` drawn in [−1, 1] against raw energy is always on; the founder's 30 needs ~700 ±0.1 steps to reach 100; Covariance with `pre` = 20–200 drives the weight to its clamp in one tick, which is the six Orchards Hebbian carriers; 14 of the 59 Orchards survivors had `Generation` (1–6) swapped in for energy or age as a constant gate. Predeclared: the T11.F14 changed/silent/dead readings and the goal trajectories move (epoch re-pin recorded); founder gate behavior unchanged.
 - [ ] **T17.F03 — Steal Amount as a Fraction** — Depends on: T17.F01, T19.F04
   - Goal: A bite takes a share of the prey, not a fixed calorie count. The steal action's amount meta becomes a fraction in [0, 1] of the victim's current energy, capped by the existing config limit (Polyworld's attack depletion scales with the attacker's state and is capped). Predeclared: predation transfer per event in the goal reports is read before and after.
-- [ ] **T17.F04 — Per-Type Eat Bank** — Depends on: T11.F21, T19.F04
-  - Goal: Which food to bite is a bid per food type, as direction became a bid per direction in T11.F21. Today the eat action's type index is a rounded scalar, which a [0, 1] sensor drives correctly for exactly two food types and not for three. Trigger: a baseline world or T02/T12 feature with a third ordinary food type; until then unscheduled.
+- [ ] **T17.F04 — Per-Type Eat Votes** — Depends on: T11.F21, T19.F04
+  - Goal: Competing food preferences: one vote per food type lets a creature select what to eat directly from its sensory inputs when worlds offer more than two ordinary food types.
 
 ## Notes for AI Agents
 
@@ -64,13 +66,21 @@ new compute node can actually tune.
   exists when it lands (V3Alpha1, the forage-first variants, and T18.F01's
   specialized profile if it is already built); T18.F02 depends on it so the
   default founder is born on the unit scale. T17.F03 reuses F01's decode. T17.F04 waits for its trigger.
-- Hazard to carry into every spec here: the founder's reproduce branch is
-  terminal (`ExecuteActionQueue` halts the VM), so the founder forages or
-  breeds per tick, never both. Any feature that can make physiology refuse a
-  founder attempt must either keep the founder's brain gate at or above the
-  acceptance region or change the founder to queue reproduce and forage in
-  one tick. A refused attempt is free since T16.F01 but still costs the tick.
+- Hazard to carry into every spec here: T19 preserved the canonical founder's
+  reproduce-or-forage behavior through votes and its queue-reading branch.
+  Any feature that can make physiology refuse a founder attempt must either
+  keep its brain gate at or above the acceptance region or explicitly change
+  its plan to include foraging. A rejected attempt is free since T16.F01 but
+  can still forfeit the tick's foraging opportunity; no retired terminal
+  instruction is part of this contract.
 - These are mechanism features under the natural-analog rule; each goal
   line names its analog. None adds a sensor, an operator, or an assay.
 - Priority: not in the order of new starts until the user places it.
-- T19, 2026-09-21: the mesh action-selection refactor ([T19](t19-mesh-action-selection-and-live-state.md)) replaces the action meta slots with per-kind parameter surfaces and the per-kind action bank with vote sinks (`Eat[t]` per food type), which are the surfaces T17.F03 and T17.F04 are written on, so both now depend on T19.F04 and are re-read against the note's Section 2.1 when placed.
+- Post-T19 contract, corrected 2026-09-23: the runtime has one `Eat` vote,
+  with a rounded scalar food type in `action_params[Eat][0]`, and directional
+  votes for Move, Reproduce and StealEnergy. T17.F03 changes the StealEnergy
+  amount parameter; T17.F04 remains unfinished and would add per-type Eat
+  votes. Its trigger remains a baseline world or T02/T12 feature introducing
+  a third ordinary food type; until then it is unscheduled. Follow the
+  [current commit decoder](../reference/v3-mesh-execution-spec.md#2-pass-loop-and-action-selection),
+  not the superseded note claiming `Eat[t]` already exists.

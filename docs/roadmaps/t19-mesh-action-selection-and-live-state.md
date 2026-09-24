@@ -79,6 +79,10 @@ of the worked cases in its Section 2.3.
 
 ## Notes for AI Agents
 
+- All six implementation features are closed. The track remains In Progress
+  because T11.F10's comparative discovery/retention protocol is still pending;
+  the closed F02/F04/F06 specs explicitly leave that measurement to F10.
+  Completed runtime work does not establish that empirical success criterion.
 - Origin, 2026-09-21: created at the user's direction from the
   [mesh action-selection review](../strategy/mesh-action-selection-review-2026-09-20.md),
   an adversarial review of a Codex handoff, and revised the same day after two
@@ -109,11 +113,12 @@ of the worked cases in its Section 2.3.
 - Two rules set at the reviews and confirmed by the user (2026-09-21), both
   in the note's Sections 2.3 and 2.5: the bar is per action *kind* (Eat, Move,
   Reproduce, Steal; Terminate and Decide are sinks, never committed, with no
-  bar) and T11.F21's within-kind argmax picks the direction or type, because a
+  bar) and T11.F21's within-kind argmax picks the direction, because a
   per-sink bar made every positive direction commit in turn and the founder
   could not be ported; and a node revisited inside a pass replaces its own
   earlier contribution, so a static cycle re-judges rather than inflates a
-  vote.
+  vote. Eat still has one vote and reads a scalar food type from
+  `action_params[Eat][0]`; per-type Eat votes remain T17.F04's unfinished work.
 - Scope, T19.F01: `hop_ramp_allowance` and `hop_ramp_cost` in
   `RuntimeConfig`, charged per hop across the tick in the shared executor
   loop; the ISA and mesh spec cost sections. Founders unchanged. The allowance
@@ -252,12 +257,12 @@ of the worked cases in its Section 2.3.
   2026-09-21 ahead of T11.F20 in the master roadmap; T11.F10 now depends on
   T19.F06 and runs its discovery protocol on the pre-track commit, the T19.F02
   closure, and the T19.F04 closure; T17.F03 and T17.F04 now depend on T19.F04
-  because the steal parameter and the eat bank are surfaces the cutover
-  replaces; T18 is on hold until this track closes and is then re-planned on
-  the vote surface (its layout needs no executor node and its router reading
-  changes meaning), so T18.F01 depends on T19.F06, the completion join, and
-  T13.F08 waits behind it; T13.F08's "acyclic reachable mesh" wording encodes
-  the retired rule and is revisited when T18 is re-planned. T02.F01 (seasons)
+  because they extend the current steal parameter and Eat vote surfaces.
+  T18 was re-planned on the vote surface on 2026-09-23 and remains unscheduled;
+  its F01 depends on the completed T19.F06 implementation join, and T13.F08
+  waits behind it. T13's revised neutrality proof follows legal revisits and
+  live state; any acyclic restriction is candidate eligibility only.
+  T02.F01 (seasons)
   follows T11.F10 so demand is read on the new substrate.
 - Contract text that encodes the rejected model and must be rewritten by
   T19.F02 and T19.F04, not merely re-tested: `docs/reference/v3-mutation-spec.md`

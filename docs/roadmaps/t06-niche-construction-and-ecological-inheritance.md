@@ -1,7 +1,7 @@
 # T06 — Niche Construction and Ecological Inheritance
 
 **Status**: Planned
-**Last updated**: 2026-09-08
+**Last updated**: 2026-09-23
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -40,6 +40,7 @@ themselves and for other lineages across lifetimes and generations.
 
 - Advance designs requested 2026-09-04: [T06.F01 spec](../specs/roadmap/t06-f01-material-carrying-and-barrier-construction.md) and [T06.F02 spec](../specs/roadmap/t06-f02-food-transport-and-caching.md). Both remain Planned. F01 reuses T12.F01 seeded barriers (moved from T02.F02 on 2026-09-08; T02.F02 keeps their visibility behavior, which the sensor contract already provides); F02 transports uneaten food and does not require T03.F05 internal energy-storage traits. Trails are outside these two features. F04 covers habitat properties beyond F01's barrier relocation.
 - The applied world grid owns environmental truth. Construction actions must change that state through normal action resolution and energy accounting.
+- F01/F02 use T19's vote interface and frozen external perception, with validity checked against applied action-time state. Handling pays effort without adding a failure penalty; T16.F02 owns global penalty retirement. Stored food retains its type's effective nutrition, including the shared-default fallback. Inventory inputs use ordinary references; T20 owns general recruitment/refinement, not inventory physiology. The advance specs follow the current benchmark artifact and single goal-run contracts.
 - A creature merely consuming or occupying a cell is not sufficient evidence of niche construction; the change must alter later selection and survive long enough to be assayed.
 - Treat persistence as an experimental variable. Too little prevents inheritance, while excessive persistence can lock in stale or maladaptive structures.
 - Research basis reviewed 2026-09-02: [Evolution of Complex Niche-Constructing Behaviors and Ecological Inheritance](https://doi.org/10.3389/frobt.2020.600387) and [Evolutionary consequences of niche construction](https://doi.org/10.1073/pnas.96.18.10242).

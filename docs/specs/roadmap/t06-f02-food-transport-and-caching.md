@@ -1,7 +1,7 @@
 # T06.F02 — Food Transport and Caching
 
 **Status**: Planned
-**Last updated**: 2026-09-04
+**Last updated**: 2026-09-23
 **Feature**: T06.F02
 **Track**: [T06 — Niche Construction and Ecological Inheritance](../../roadmaps/t06-niche-construction-and-ecological-inheritance.md)
 
@@ -17,7 +17,7 @@ with construction for capacity and incurs loaded movement cost.
 - Additional inventory capacity, evolving capacity, containers, private caches,
   ownership enforcement, direct gifts, or automatic cache-seeking behavior.
 - Internal fat/reserve traits, digestion specialization, new food types, or
-  byproduct conversion. Existing ordinary typed food and the shared energy reward remain authoritative.
+  byproduct conversion. Existing ordinary typed food and per-type nutrition remain authoritative.
 - Merging conflicting deposited food, resetting freshness on pickup, or growing
   harvested food while it is carried or cached.
 - Confirmatory evidence that hoarding or cognition evolves from this mechanism.
@@ -32,8 +32,10 @@ Use the [world food contract](../../reference/v3-world-grid-spec.md),
 [tick order](../../reference/v3-tick-orchestration-spec.md), and existing ordinary
 food implementation in `crates/v3-core/src/kernel/ordinary_food/` and typed
 sensors in `crates/v3-core/src/sensors/typed_food.rs`. Current food is stored in
-per-type density planes, with per-run stable type IDs. Feeding uses the shared
-`energy.costs.eat_reward_per_food` setting.
+per-type density planes, with per-run stable type IDs. Feeding uses each type's
+effective `energy_per_unit`, falling back to `energy.costs.eat_reward_per_food`
+when no per-type value is configured. Storage preserves that food-type identity
+and uses the same effective nutrition as ground consumption.
 Internal energy storage in T03.F05 is not a prerequisite for carrying uneaten food.
 
 Research considered contextual pickup/drop and separate operations (the
@@ -70,14 +72,15 @@ Actions and feeding:
 | --- | --- | --- |
 | Pick up food | Food type, empty destination slot | Transfer up to one parcel capacity from the actor's current cell. |
 | Place food | Food source slot | Transfer the whole parcel to the actor's current cell, replacing conflicting food. |
-| Eat from storage | Food source slot | Consume that parcel using the shared energy reward and existing energy cap, then empty the slot. |
+| Eat from storage | Food source slot | Consume that parcel using its type's effective energy per unit and the existing energy cap, then empty the slot. |
 
 - Retain current ground Eat behavior. Make stored-food consumption an explicit
   controller choice, not an automatic fallback when ground food is absent.
 - Pickup/placement use F01 handling cost conventions; their initial base costs
   equal barrier pickup/placement respectively. Eating from storage uses existing
-  Eat cost and shared `energy.costs.eat_reward_per_food` semantics. Handling yields
-  no energy.
+  Eat cost and the selected type's effective energy per unit, including its
+  shared-default fallback. Handling yields no energy. New actions use F01's
+  extension of the existing vote interface.
 - Deliberate placement permits the acting creature's own occupancy. It still
   rejects barriers and other actual occupation blockers; no adjacent target is
   chosen. On failure the parcel stays in its slot and destination is unchanged.
@@ -153,8 +156,10 @@ Clock and world ecology:
       failure, with explicit consumption/expiry/overwrite/destruction sinks.
 - [ ] Verify mixed four-slot loads, partially filled occupied slots, no top-up,
       bounded pickup and remainder, insufficient storage, and invalid selections.
-- [ ] Verify pickup yields no energy; stored eating uses the shared energy reward,
-      existing caps and costs; placing then eating cannot multiply food or energy.
+- [ ] Verify pickup yields no energy; stored eating uses the same effective
+      per-type nutrition as ground eating, including explicit overrides and the
+      shared fallback, with existing caps and costs; placing then eating cannot
+      multiply food or energy.
 - [ ] Verify pickup/place/re-pickup and death drops preserve food properties and
       expiry; test just before, at, and after expiry while carried and cached.
 - [ ] Verify 0.25 units replacing 0.80 same-type units leaves 0.25, not 1.05 or
@@ -172,7 +177,8 @@ Clock and world ecology:
       supported, and rejection of invalidating config changes.
 - [ ] Run `cargo test -p v3-core --test viability` first when changing defaults or
       tick-loop mechanics, focused tests, `make roadmap-check`, and `make check`.
-- [ ] Benchmark report stored at `docs/progress/features/t06-f02.json`.
+- [ ] Benchmark summary stored at `docs/progress/features/t06-f02.json`, with raw
+      reports and provenance under the [artifact contract](../../benchmark-artifacts.md).
 
 ## Performance and Goal Impact
 
@@ -189,7 +195,8 @@ does not authorize a severe regression or a baseline change.
 
 At closure record deterministic work and wall-clock deltas per creature-tick
 against the previous closed feature and pinned epoch baseline, threshold results,
-dated goal-profile indicator readings, and second-run determinism checks. Include
+dated goal-profile indicator readings, and the verification and benchmark records
+required by `docs/workflow.md`. Include
 applied food transfers and losses in existing reporting. This feature introduces
 no new diversity or cognition measure; a scripted cache demonstration proves the
 mechanism, not that a caching strategy evolves.

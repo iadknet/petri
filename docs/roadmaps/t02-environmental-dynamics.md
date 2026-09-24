@@ -1,7 +1,7 @@
 # T02 — Environmental Dynamics
 
 **Status**: In Progress
-**Last updated**: 2026-09-15
+**Last updated**: 2026-09-23
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -29,7 +29,7 @@ the world becoming a scripted puzzle with one permanent solution.
   - Goal: Overgrazing. Every bite halves the grazed cell's fertility for that food type, repeated bites compound down to a floor, and a bitten cell takes about 500 ticks to recover, so a patch grazed too recently yields less and the value of a place depends on its history and not only on what is visible now.
 - [ ] **T02.F05 — Natural Disturbance and Recovery** — Depends on: T02.F01
   - Goal: Fire and flood. Rare stochastic events clear regions of food, which then recolonize, so resilience, recolonization, and strategy turnover can be measured.
-- [ ] **T02.F06 — Temporal-Memory Selection Characterization Campaign** — Depends on: T02.F04, T09.F01, T10.F08
+- [ ] **T02.F06 — Temporal-Memory Selection Characterization Campaign** — Depends on: T02.F01, T02.F04, T09.F01, T10.F08
   - Goal: Deferred proof phase. Long replicated runs that estimate how strongly the seasonal world selects for memory.
 - [ ] **T02.F07 — Environmental Transfer and Robustness Characterization Campaign** — Depends on: T01.F06, T02.F05, T10.F08
   - Goal: Deferred proof phase. Do evolved strategies hold up under weather they never saw?
@@ -44,6 +44,6 @@ the world becoming a scripted puzzle with one permanent solution.
 - Seasons reach creatures through the world, never through a sensor. The season driver is smooth rather than stepped, and years vary (a late spring, a mild winter), because variance is what makes prediction worth more than a fixed rhythm. Simple seasonality plus a perfect current-state sensor is a reactive task; memory pressure comes from occlusion, delayed consequences, regional offsets, and recovery lag.
 - T02.F02 builds on machinery that already exists: the world grid has a barrier layer, the sensor visibility contract in `docs/reference/v3-sensor-spec.md` already treats barriers as opaque with line-of-sight ray casting and a strict-corner rule, and from 2026-09-08 seeded terrain generation belongs to T12.F01 (`world.terrain` in the world config, applied at startup), which this feature depends on and no longer implements. The feature verifies the occluded condition across all three standard goal environments, with persistence and passable-area readings, creature opacity as a config option, and sensor noise as a parameter that remains off in production defaults but is explicitly enabled in the three baseline cases. T04.F03 reuses T12.F01's terrain for habitat patches. The re-scope and its evidence are in the [world seeding research note](../strategy/world-seeding-research-2026-09-08.md).
 - Authored fixed schedules are experimental treatments, never the production world. Endogenous changing pressures belong to T05 and T06.
-- T02.F06 and T02.F07 belong to the deferred proof phase and cannot be cited as confirmatory program evidence; final temporal and transfer claims are tested by the T01.F09-gated T09.F07 campaign if that phase runs.
+- T02.F06 explicitly depends on F01's seasons: F04's grazing no longer supplies that prerequisite transitively. T02.F06 and T02.F07 belong to the deferred proof phase and cannot be cited as confirmatory program evidence; final temporal and transfer claims are tested by the T01.F09-gated T09.F07 campaign if that phase runs.
 - Research basis reviewed 2026-09-02: [Environmental memory alters the fitness effects of adaptive mutations in fluctuating environments](https://doi.org/10.1038/s41559-024-02475-9).
 - Options considered were global seasons, stochastic variation, local cycles, and external curriculum generation. Start with seasons and regional offsets because they fit Petri's existing world model, feel natural, and support controlled counterfactuals without adding an external optimizer.

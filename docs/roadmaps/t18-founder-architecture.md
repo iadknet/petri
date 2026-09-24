@@ -1,89 +1,78 @@
 # T18 — Founder Architecture
 
 **Status**: Planned
-**Last updated**: 2026-09-21
+**Last updated**: 2026-09-23
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
 
-The founder is born with a nervous system divided the way evolution is
-asked to extend it: a sensory node that reads the world and writes what it
-saw to memory, a router whose route is a live decision, one motor node per
-action kind (eat, move, reproduce) with its own gate, and a terminal node
-that commits the queue. Every one of those parts is an existing graph
-primitive (`WriteSlot`, `RouterGate`, the per-kind action bank with its
-direction bank, the execute gate); the founder today wires none of them and
-runs its decisions through a 70-instruction VM program with 26 relative
-jumps in which a tick is reproduce *or* eat-and-move. Afterward the
-population's decision core starts as five small graph nodes on the executed
-chain, so routing, memory, and per-action gates receive mutation supply
-from tick zero and a lesion in one motor path no longer takes the others
-with it. The natural analog is the functional segregation of a nervous
-system into afferent, central, and efferent divisions with one motor pool
-per effector. Evidence and the measured probe are the
-[founder refactor research note](../strategy/founder-refactor-research-2026-09-18.md).
+Give the founder a modular Graph brain whose sensing, memory, routing and
+motor contributions can vary without destroying its other abilities. Functional
+segregation into sensory circuits and motor pools is the natural analog; the
+profile uses T19's votes and live internal state, with its layout chosen through
+bounded comparisons against the current canonical founder.
 
 ## Track Success Criteria
 
-- [ ] A specialized-node founder profile exists, every node a graph
-  backend, and on the founder tests it moves exactly as V3Alpha1 does
-  (first-argmax over the cardinal ring, measured at 0 mismatches in 2,000
-  random rings) while eating, moving, and reproducing in one tick.
-- [ ] The T11.F14 battery and births probe carry founder rows for both
-  profiles, so changed, silent, dead, and sterile fractions per birth are
-  attributable to the layout (probe: sterile 2.7% against 4.6% per birth;
-  `genome_size` 55 against 111).
-- [ ] The specialized profile is the default founder, the gate and goal
-  epochs are re-pinned on it, and V3Alpha1 remains selectable as the
-  control.
+- [ ] A specialized Graph founder profile uses the current vote interface and
+  demonstrates useful memory and routing contributions through matched lesions.
+- [ ] The profile preserves the canonical founder's first-argmax cardinal-food
+  steering on the founder fixtures and the 2,000-ring direction check, and can
+  eat, move and reproduce in one tick when physiology and action budgets permit.
+- [ ] Both profiles have current-substrate readings for changed, silent, dead
+  and sterile births, genome size, applied costs, persistence and fertility.
+- [ ] The specialized profile becomes the default in F02, with both benchmark
+  epochs re-pinned and V3Alpha1 retained as a selectable control.
 
 ## Executable Features
 
 - [ ] **T18.F01 — Specialized-Node Founder Profile** — Depends on: T11.F21, T11.F22, T19.F06
-  - Goal: A creature is born with a body plan for its brain: one node senses and remembers, one node per act moves the body, one node decides whether to breed, one node commits. New `FounderProfile` (wire name decided in the spec) built in `creature/founder.rs` from existing graph primitives only, chain `sense → eat → move → router → { reproduce → execute | execute }`: a sense node reading the V3Alpha1 inputs and writing food-here, the energy-and-age gate, and the cardinal primary-food ring to shared memory; eat gated on food-here; move always, with four direction-bid edges from the ring; a router node whose `RouterGate` reads the gate from memory and whose two targets are the reproduce node (bias 0, scored by the gate) and the executor (bias 0.5), so the route *is* the reproduce decision and the reproduce node's own gate is a constant (a decision lives in exactly one place; a router whose choice a downstream gate repeats is a knockout node, the live survey's non-contributing detour); reproduce placing the child behind the move (bids reversed, scalar direction S) with a constant transfer; a terminal node whose execute gate is a constant. Chain order is action order: Eat → Move → Reproduce, so the vacated cell is free for the child, and the router sits after the motor nodes so a route broken by mutation still leaves a queued action. Analog: Calabretta, Nolfi, Parisi and Wagner 2000 start with one gated module per effector and let duplication specialize them; Nolfi 1997's hand-partitioned state router (its architecture D) reached the plateau later than the per-effector form, so the spec reads this routed layout beside the serial-gated variant the research note probed (reproduce gated in its own node, no router) on the births probe and Orchards, and records which ships. Per-profile `genome_size` anchor for the replication cost. Predeclared, from the probe (both layouts read in vitro and on Orchards seed 11): founder rows of the battery and births probe for the new profile beside V3Alpha1 (changed, silent, dead, sterile; probe: serial-gated 0.059 changed per birth, 0.8% dead per mutated birth, 2.7% sterile; routed 0.083 changed, 0.13% dead, 4.3% sterile, the extra sterility being `SwapRouteTargets` and `RemoveRouteTarget` on the router, the measured price of a decision that lives in a route); viability on the gate profile; Orchards seeds 11 and 12 to 2,000 ticks read for trough fertile share and rebuild (probe, seed 11: serial-gated 70% fertile at the first trough against the control's 10%, rebuild to 956, second famine fatal; routed 4% at the trough, rebuild to 2,123, no second collapse, 5,110 alive and 60% fertile at tick 2,000 while both others are under 10 creatures; one seed, so the direction is read, not predeclared; the breed-at-15%-condition rule stays T17's). Gate and goal trajectories unchanged: the default profile does not move here.
+  - Goal: Functional segregation of a nervous system: a selectable Graph founder separates useful sensory, memory, routing and motor contributions on the vote surface while preserving foraging competence and permitting reproduction in the same tick.
 - [ ] **T18.F02 — Specialized Founder as the Default** — Depends on: T18.F01, T17.F02
-  - Goal: Every world starts from the specialized founder. `FounderProfile::default()` becomes the T18.F01 profile; `FOUNDER_GENOME_SIZE_UNITS` is re-anchored to it; the seeding spec's Section 5.1 describes it as canonical; the founder rows of every indicator (battery, births, drift walk, steering, mesh execution) are re-baselined and V3Alpha1 stays selectable as the control. Placed after T17.F02 so the default founder is born with its energy gate on the unit scale (`Threshold(0.15)`) and is never re-expressed. Predeclared: the gate and goal trajectories move and both epochs are re-pinned in the closing commit (the roadmap's epoch rule); births per creature-tick on the gate profile read before and after; T17's carried hazard ("the founder must queue reproduce and forage in one tick, or keep its gate at or above acceptance") is discharged for the default founder and T17.F01's founder constraint is rewritten to say so.
+  - Goal: Every world starts from the qualified specialized founder on the current unit scale, with V3Alpha1 selectable as the control and all founder-dependent anchors and readings updated.
 
 ## Notes for AI Agents
 
-- Origin, 2026-09-18: created at the user's direction after the
-  [founder refactor research note](../strategy/founder-refactor-research-2026-09-18.md),
-  which read the engine's primitives, the prior art (Nolfi 1997 and
-  Calabretta et al. 2000 in full), and a scratch-worktree probe of a
-  five-node serial founder beside V3Alpha1. The user's decisions: a new
-  profile first, V3Alpha1 kept as the control; the specialized profile
-  becomes the default when done; the founder should carry a router that
-  makes a real decision. The owned-route shape (the router's route is the
-  reproduce decision, the reproduce gate a constant) is the note's design
-  for that, unmeasured at creation; F01's spec reads it beside the
-  serial-gated variant.
-- A decision lives in exactly one place. A router whose choice a downstream
-  action gate repeats contributes nothing and reads as a knockout node.
-  Every router path ends in a motor node, and routers sit after the eat node
-  where the layout allows, so a route broken by mutation still leaves a
-  queued action (the executor returns the queue accumulated before a broken
-  hop).
-- What the track is not: it does not change the reproduce transfer, the
-  energy scale, or the famine rule (T17 and the deferred collapse
-  discussion); it does not add fan-out to the mesh executor (one successor
-  per hop stays; a router that picks *the action* re-creates the
-  reproduce-or-forage tick); it adds no sensor, operator, or assay. The
-  topology weight rescale that made `ChangeEntryNode` 1 draw in 211 was made
-  on 2026-09-18 ahead of this track (in the working tree, gate decision
-  pending at creation) and is not part of it.
-- Whether routing becomes load-bearing in the population is not this
-  track's claim. The live survey found nothing in the current worlds pays
-  for a second decision; the founder seeds the pattern, an ecology that
-  needs memory (T02 seasons, T11.F10's temporal tasks) creates the demand.
-  Read the survey's contributing-node and load-bearing-route counters at
-  each closure, without a predeclared direction.
-- On hold, 2026-09-21 (user decision): T19, the mesh action-selection and
-  live-state refactor, retires the execute gate and the per-kind action bank
-  this track's layout is built on. T18.F01 now depends on T19.F06 and is out
-  of the order of new starts; the user expects to re-plan this track on the
-  vote surface once T19 closes (the layout needs no executor node, and a
-  router whose route is the reproduce decision competes with a vote that reads
-  the plan, so the F01 probe's readings are retaken there). T18.F02 stays
-  unplaced until T17.F02 is placed. T13.F08 waits behind T18.F01. Evidence:
-  the [mesh action-selection review](../strategy/mesh-action-selection-review-2026-09-20.md),
-  Sections 1.10 and 5.
+- Scope revision, 2026-09-23: the user-approved roadmap cleanup replaces the
+  pre-T19 layout. F01 and F02 remain unscheduled; T19's completion does not
+  add them to the master priority order. The earlier decision to introduce a
+  separate profile and then make it the default remains split across these
+  two features. T13.F08 still depends on F01.
+- The [founder refactor research note](../strategy/founder-refactor-research-2026-09-18.md)
+  records the original motivation and measurements. Its action-bank and
+  execute-gate layouts, fixed node counts, genome sizes and outcome estimates
+  are historical evidence, not the design or numerical baseline for F01.
+  The [T19 contract](t19-mesh-action-selection-and-live-state.md) governs
+  votes, per-kind bars, Decide/Terminate, legal revisits, live internal state
+  and frozen external perception. No executor node or chain-order-to-action-order
+  assumption carries forward.
+- F01 uses existing Graph primitives and inputs. Its just-in-time spec chooses
+  a compact layout and compares a router that makes a real decision with a
+  serial vote-based alternative. A router repeated by an equivalent downstream
+  gate is not a useful contribution. Demonstrate each claimed memory/routing
+  role with a matched lesion; authored founder modules are not evolved recruits.
+- Express action order through votes and available decision-state inputs,
+  including the queue or commit counts where needed. Reproduction targeting
+  must account for earlier planned movement while using frozen perception;
+  verify the applied sequence, target occupancy and physiology rather than
+  assuming node order determines the queue. Gates use the current unit scale
+  and actual acceptance region, not the old threshold or transfer constants.
+- Predeclare the routed-versus-serial comparison, selection rule, costs and
+  expected indicator directions before measuring. Retake founder fixtures,
+  births/neighborhood and mesh-execution readings on the current substrate;
+  compare both candidates with the current canonical founder in Orchards
+  seeds 11 and 12 through 2,000 ticks, including fertility at troughs, rebuilding
+  and persistence. Historical success does not establish current viability.
+  Keep the default founder and ordinary gate/goal trajectories unchanged in F01.
+- F02 changes the default only after F01 delivers its verified profile.
+  Update `FounderProfile::default()`, the canonical genome-size and replication
+  anchors, startup-seeding reference, and every founder-based indicator
+  (neighborhood, births, drift, steering and mesh execution). Re-pin gate and
+  goal epochs and read births per creature-tick before and after. Record how
+  the new profile handles rejected reproduction without losing its foraging
+  opportunity; retain V3Alpha1's own behavioral contract as the control.
+- The track changes founder wiring, not reproduction physiology, famine rules,
+  sensors, mutation operators, learning mechanisms or runtime scheduling.
+  T20 owns general input recruitment and structured variation. Use current
+  observation machinery; new founder wiring alone proves neither evolution
+  of modularity nor ecological demand for additional decisions.
