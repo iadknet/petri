@@ -2270,17 +2270,6 @@ mod tests {
         crate::creature::cgp_founder::build_cgp_founder_graph_with_thresholds(0.5, 100, 500)
     }
 
-    /// A sink a fresh edge may target: every sink except an `ActionParam`
-    /// field the decoder never reads (T11.F25).
-    fn expected_drawable(kind: OutputSinkKind) -> bool {
-        match kind {
-            OutputSinkKind::ActionParam(kind, slot) => {
-                crate::creature::genome::vote::DECODED_ACTION_PARAMS.contains(&(kind, slot))
-            }
-            _ => true,
-        }
-    }
-
     fn sink(kind: OutputSinkKind) -> OutputSink {
         OutputSink {
             kind,
@@ -2298,7 +2287,7 @@ mod tests {
             .map(EdgeSurface::ComputeInput)
             .chain(
                 (0..def.output_sinks.len())
-                    .filter(|&i| expected_drawable(def.output_sinks[i].kind))
+                    .filter(|&i| is_fresh_edge_sink(def.output_sinks[i].kind))
                     .map(EdgeSurface::SinkInput),
             )
             .collect();
@@ -2339,9 +2328,11 @@ mod tests {
         }
         for sink in &def.output_sinks {
             if let OutputSinkKind::ActionParam(kind, slot) = sink.kind {
-                let decoded =
-                    crate::creature::genome::vote::DECODED_ACTION_PARAMS.contains(&(kind, slot));
-                assert_eq!(!sink.inputs.is_empty(), decoded, "{kind:?} slot {slot}");
+                assert_eq!(
+                    !sink.inputs.is_empty(),
+                    is_decoded_action_param(kind, slot),
+                    "{kind:?} slot {slot}"
+                );
             }
         }
     }
