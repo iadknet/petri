@@ -142,11 +142,13 @@ Fixed design:
 - [ ] `make check` exits 0 in the worktree.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
-- [ ] Gate and goal summaries are stored at
+- [x] Gate and goal summaries are stored at
       `docs/progress/features/t11-f25-meaningful-action-parameter-targets.json`
       and `...-goal.json`. Local raw hash, byte count and verification time are
       checked, series entries point to the summaries, and no new full report
-      is staged.
+      is staged. Gate series `epoch_baseline` re-pinned per the user decision
+      below; goal series `epoch_baseline` left unchanged (goal severe result
+      is unresolved, see Measured verdict).
 
 ## Performance and Goal Impact
 
@@ -181,20 +183,46 @@ wall-time moves are flag-only. The observation caps are unchanged.
 No goal indicator counts parameter-target decoding. The draw tests are the
 evidence that the Goal holds.
 
-**Measured verdict.** Pending the stored gate and goal summaries. At
-implementer commit `755afc2d`, the gate series test
-`gate_profile_has_no_severe_regression_against_series_references`, which
-runs inside `make check`, reports a severe result. Gate `pass_cap_hits` is
-0.001364 per creature-tick against the T19.F04 epoch's 0.000752 (+81.4%).
-Against the latest closure, T11.F24's 0.001016, it is +34%, a flag. The test
-passes at parent `2a2371fa`, and it passes again with only the old graph
-surface draw restored, so the cause is the `AddGraphEdge` filter. That is the
-trajectory divergence predeclared above. This is a rare-event counter whose
-per-seed counts already swung between closures (T19.F04 144/35/30, T11.F24
-0/26/256), and it stays far below T19.F02's 10%-of-creature-ticks ceiling. A
-user decision is required under the blocker rule: accept the severe and
-re-pin the gate epoch, or do not. Keeping the epoch leaves `make check` red.
-The decision is recorded here verbatim.
+**Measured verdict.**
+
+Gate: `make bench PROFILE=gate FEATURE=t11-f25-meaningful-action-parameter-targets`
+(`v3-cli` exit 3, severe). Against the T19.F04 epoch, `pass_cap_hits` is
+0.001364 per creature-tick vs 0.000752 (+81.4%, severe); all other eight
+`COUNTER_NAMES` are `ok`. Against the latest closure, T11.F24's 0.001016, it
+is +34.25% (flag); all others `ok`. The gate series test
+`gate_profile_has_no_severe_regression_against_series_references` failed
+before the re-pin below and now passes (`cargo test -p v3-cli --test bench
+gate_profile_has_no_severe_regression_against_series_references`: `ok`,
+1 passed). This is the rare-event `AddGraphEdge`-filter divergence
+predeclared above.
+
+User decision (verbatim, 2026-09-24, in reply to the severe gate
+`pass_cap_hits` 0.001364 vs the T19.F04 epoch 0.000752, +81.4%): "accept and
+re-pin". The gate series `epoch_baseline` in
+`docs/progress/benchmark-series.json` is re-pinned from
+`docs/progress/features/t19-f04-vote-based-action-selection.json` to
+`docs/progress/features/t11-f25-meaningful-action-parameter-targets.json`.
+
+Goal: `make bench PROFILE=goal FEATURE=t11-f25-meaningful-action-parameter-targets`
+(`v3-cli` exit 3, severe). Against the T19.F04 epoch (goal-worlds-v1):
+`vm_steps` 2.403726 vs 1.024805 (+134.55%, severe), `decided_passes`
+0.000148 vs 0.000092 (+60.87%, severe), `mesh_hops` +10.68% (flag),
+`plasticity_updates` +42.41% (flag); `graph_relax_iters`, `actions_applied`,
+`births`, `pass_cap_hits`, `passes` are `ok`. Against the latest closure,
+T11.F24: `vm_steps` +202.71% (severe), `decided_passes` +34.55% (severe),
+`mesh_hops` +26.74%, `graph_relax_iters` +20.19%, `plasticity_updates`
++21.18%, `actions_applied` +26.34%, `passes` +16.51%, `decided_passes` flag
+(all flag); `births` and `pass_cap_hits` `ok`. No extinction: `final_population`
+4877/3221/1219 across the three goal-worlds-v1 seeds, `extinction_tick` null
+on all three. `neighborhood_evolved_wall_clock_ms_total` 5317.7 ms, well
+under the 180 s cap; `neighborhood_founder_wall_clock_ms` 280.1 ms, under the
+10 s cap. This `vm_steps`/`decided_passes` severity is not covered by the
+Predeclaration table above (which named only `AddGraphEdge`-filter and
+opcode-25-draw trajectory shifts with no predicted sign) and is not covered
+by the user decision above, which addressed only the gate `pass_cap_hits`
+counter. It is reported to the orchestrator as an unresolved, unexpected
+result; the goal series `epoch_baseline` is left unchanged pending a
+separate user decision.
 
 - Summaries: [gate](../../progress/features/t11-f25-meaningful-action-parameter-targets.json),
   [goal](../../progress/features/t11-f25-meaningful-action-parameter-targets-goal.json).
