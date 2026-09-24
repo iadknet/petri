@@ -55,7 +55,9 @@ Boundary intent:
 A tick is a sequence of passes (T19.F04). Each pass runs the routing chain
 from `entry_node_id`; nodes vote into the 27-sink vote vector `V` (`Eat`, 8
 `Move`, 8 `Reproduce`, 8 `StealEnergy`, `Terminate`, `Decide`) and write the
-parameter surface `action_params[kind][0..2]`; at the pass end at most one
+three-field parameter surface `action_params` (indexed by `ActionParamField`:
+`EatFoodType`, `ReproduceTransferFraction`, `StealEnergyAmount`); at the pass
+end at most one
 action commits. A node may be dispatched any number of times within a pass
 (T19.F02): cycles and self-targets are legal, every dispatch runs on the
 creature's live state, and the per-pass hop cap is the only structural bound
@@ -91,12 +93,14 @@ exit: settle the bid once; actions = queue, or NoOp when empty
 ```
 
 Commit decode (`runtime/action_decode.rs`): the direction is the winning
-sink's; `Eat` reads its food type from `action_params[Eat][0]` (rounded,
-non-finite or negative reads type 0), `Reproduce` its transfer fraction from
-`action_params[Reproduce][1]` (clamped to `[0, 1]`), and `StealEnergy` its
-amount from `action_params[StealEnergy][1]` (non-negative finite, else 0).
-The parameter surface is zeroed at tick start, overwritten per visit, and
-read at commit.
+sink's, and only the committed kind's own field is read: `Eat` reads its
+food type from `EatFoodType` (rounded, non-finite or negative reads type 0),
+`Reproduce` its transfer fraction from `ReproduceTransferFraction` (clamped to
+`[0, 1]`, non-finite reads 0), and `StealEnergy` its amount from
+`StealEnergyAmount` (non-negative finite, else 0). `Move` reads no field, and
+`Terminate` and `Decide`
+never commit and decode to `NoOp`. The parameter surface is zeroed
+at tick start, overwritten per visit, and read at commit.
 
 Guards and ties:
 - `Decide` ends a pass only when the pass end would act: some kind's
