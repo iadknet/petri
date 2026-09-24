@@ -122,22 +122,22 @@ thread_local! {
 /// created it, and its parent index is in the parent's set. Until the birth's
 /// first applied mesh-node removal the child's first nodes sit at their parent
 /// indices and every added node sits after them, so the parent's index sets
-/// are borrowed as they are. From the first removal on, each current node's
-/// provenance (its parent index, or `None` when created in this birth) is
-/// tracked, and the member sets are derived from it. Created nodes never
-/// count, even on a removed node's `NodeId` or former index. Maintaining this
-/// consumes no RNG.
+/// are borrowed as they are. The first removal copies their entries below the
+/// parent's node count into owned sets; each removal then drops the removed
+/// index and shifts every later member down by one. Carried nodes always
+/// precede the nodes created in this birth (events only append or remove), so
+/// a member index never lands on a created node, even one on a removed node's
+/// `NodeId` or former index. Maintaining this consumes no RNG and costs
+/// O(member count) per removal.
 #[derive(Debug)]
 pub struct BirthMembership<'a> {
     parent_reachable: &'a [usize],
     parent_executed: &'a [usize],
     /// The child's node count when the birth began: its parent's node count.
     parent_len: usize,
-    /// Per current child index, the parent index it was carried from; `None`
-    /// until the first applied mesh-node removal.
-    provenance: Option<Vec<Option<usize>>>,
-    reachable: Vec<usize>,
-    executed: Vec<usize>,
+    /// The current reachable and executed members from the birth's first
+    /// applied mesh-node removal on; `None` before it.
+    repaired: Option<(Vec<usize>, Vec<usize>)>,
 }
 
 impl<'a> BirthMembership<'a> {
@@ -153,19 +153,16 @@ impl<'a> BirthMembership<'a> {
             parent_reachable,
             parent_executed,
             parent_len,
-            provenance: None,
-            reachable: Vec::new(),
-            executed: Vec::new(),
+            repaired: None,
         }
     }
 
     /// The member sets as sorted ascending current child indices.
     #[must_use]
     pub fn sets(&self) -> TargetSets<'_> {
-        if self.provenance.is_some() {
-            TargetSets::new(&self.reachable, &self.executed)
-        } else {
-            TargetSets::new(self.parent_reachable, self.parent_executed)
+        match &self.repaired {
+            Some((reachable, executed)) => TargetSets::new(reachable, executed),
+            None => TargetSets::new(self.parent_reachable, self.parent_executed),
         }
     }
 
@@ -176,45 +173,42 @@ impl<'a> BirthMembership<'a> {
     /// operator: one event either removes a single node, keeping the others
     /// in order, or appends nodes on ids the child did not carry. A discarded
     /// or rejected attempt restores the genome, so it arrives here unchanged.
+    /// Appends need no handling: every member index is below the child's
+    /// length before the event.
     pub fn observe_event(&mut self, before: &[NodeId], after: &[NodeGenome]) {
         #[cfg(test)]
         if FROZEN_MEMBERSHIP.with(std::cell::Cell::get) {
             return;
         }
-        match after.len().cmp(&before.len()) {
-            Ordering::Equal => {}
-            Ordering::Greater => {
-                if let Some(provenance) = self.provenance.as_mut() {
-                    provenance.resize(after.len(), None);
+        if after.len() >= before.len() {
+            return;
+        }
+        debug_assert_eq!(after.len() + 1, before.len(), "one event removes one node");
+        let removed = before
+            .iter()
+            .zip(after)
+            .position(|(id, node)| *id != node.node_id)
+            .unwrap_or(after.len());
+        // Only parent indices name carried nodes; a set entry at or past
+        // `parent_len` never had a node to follow.
+        let carried = |set: &[usize]| -> Vec<usize> {
+            set[..set.partition_point(|&index| index < self.parent_len)].to_vec()
+        };
+        let (reachable, executed) = self.repaired.get_or_insert_with(|| {
+            (
+                carried(self.parent_reachable),
+                carried(self.parent_executed),
+            )
+        });
+        for set in [reachable, executed] {
+            set.retain_mut(|index| match (*index).cmp(&removed) {
+                Ordering::Less => true,
+                Ordering::Equal => false,
+                Ordering::Greater => {
+                    *index -= 1;
+                    true
                 }
-            }
-            Ordering::Less => {
-                debug_assert_eq!(after.len() + 1, before.len(), "one event removes one node");
-                let parent_len = self.parent_len;
-                let provenance = self.provenance.get_or_insert_with(|| {
-                    (0..before.len())
-                        .map(|index| (index < parent_len).then_some(index))
-                        .collect()
-                });
-                let removed = before
-                    .iter()
-                    .zip(after)
-                    .position(|(id, node)| *id != node.node_id)
-                    .unwrap_or(after.len());
-                provenance.remove(removed);
-                let members = |set: &[usize]| -> Vec<usize> {
-                    provenance
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, origin)| {
-                            origin.is_some_and(|parent| set.binary_search(&parent).is_ok())
-                        })
-                        .map(|(index, _)| index)
-                        .collect()
-                };
-                self.reachable = members(self.parent_reachable);
-                self.executed = members(self.parent_executed);
-            }
+            });
         }
     }
 }
