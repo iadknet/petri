@@ -1075,6 +1075,11 @@ fn ordinary_food_alone_replenishes_energy_and_reproduces() {
 /// the new trajectory has been reproduced. Re-pinned by T19.F04 (the vote
 /// founder, 97 genome units): 185 births became 323; before/after in
 /// `docs/progress/readings/t19-f04.md`.
+/// GNU/Linux has a separate pin because fertility generation's `f32::exp`
+/// rounds differently from macOS. Both trajectories have identical positions
+/// and births; replaying either platform's exp results reproduces its digest
+/// on the other. Reproducibility is scoped to locked versions/platform per
+/// `docs/reference/v3-startup-seeding-spec.md`.
 #[test]
 fn founder_only_trajectory_digest_is_pinned() {
     use sha2::{Digest, Sha256};
@@ -1110,6 +1115,13 @@ fn founder_only_trajectory_digest_is_pinned() {
         }
     }
     let digest = hex::encode(hash.finalize());
+    let expected_digest = if cfg!(all(target_os = "linux", target_env = "gnu")) {
+        // Reproduced on GNU/Linux aarch64 with Rust 1.93.0; matches x86_64 CI.
+        "57986127fb8baa4fc3859ecf23f4941a0691473c9490f3a3e4b052e3eb9e019a"
+    } else {
+        // Original macOS aarch64 pin; preserve this baseline on other targets.
+        "54db30adef8c1c9e047f3eeb1e988e2581c6e43b28183d01c5ea23b7800e529c"
+    };
 
     assert_eq!(sim.stats.mutation_events_applied_total, 0);
     assert_eq!(
@@ -1118,10 +1130,6 @@ fn founder_only_trajectory_digest_is_pinned() {
             sim.creatures.len(),
             digest.as_str()
         ),
-        (
-            323,
-            0,
-            "54db30adef8c1c9e047f3eeb1e988e2581c6e43b28183d01c5ea23b7800e529c"
-        )
+        (323, 0, expected_digest)
     );
 }
