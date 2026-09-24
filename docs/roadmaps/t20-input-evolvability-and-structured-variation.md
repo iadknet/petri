@@ -1,7 +1,7 @@
 # T20 — Input Evolvability and Structured Variation
 
 **Status**: Planned
-**Last updated**: 2026-09-23
+**Last updated**: 2026-09-24
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -41,7 +41,7 @@ and rollout gates, not a prerequisite for inherited improvements.
 
 ## Executable Features
 
-- [ ] **T20.F01 — Input-Use Baseline and Ecological Opportunity** — Depends on: T19.F06, T11.F20, T11.F22, T11.F24, T11.F25, T12.F04
+- [ ] **T20.F01 — Input-Use Baseline and Ecological Opportunity** — Depends on: T19.F06, T11.F20, T11.F22, T11.F24, T11.F25, T11.F26, T12.F04
   - Goal: Measure where input use stops between declaration and retained behavior, and whether competent use of differently shaped inputs can improve reproduction in the existing worlds at native costs.
 - [ ] **T20.F02 — Graph Neutral-Connection Contract** — Depends on: T20.F01
   - Goal: Initially silent afferents: a Graph node can acquire a refinable input connection without changing its incumbent signal or overwriting state, using existing edges wherever they suffice.
@@ -157,7 +157,10 @@ execution, reproduction or physiology.
 the conditional learning extensions described here, within the existing runtime
 and mutator. [T11](t11-brain-genotype-phenotype-map.md) retains general encoding,
 supply, clocks and learned-state inheritance; F24/F25 own the prerequisite
-target-identity and active-parameter repairs. T20.F03 owns the scoped VM fresh-read
+target-identity and active-parameter repairs. T11.F26 owns general mutation-effect
+attribution and the separately versioned observation extension; F01 consumes that
+handoff and adds input-family/channel attribution and ecological opportunity
+qualification rather than duplicating whole-brain diagnosis. T20.F03 owns the scoped VM fresh-read
 and payload-draw corrections S1/M2 alongside its backend extension.
 [T13](t13-neutral-module-recruitment.md) retains whole-module/contextual-copy work;
 reuse its applied opportunity, ancestry and contribution observations.
@@ -176,7 +179,7 @@ and applied accounting, without a separate observability framework.
 
 | Feature | Bounded deliverable and verification boundary |
 | --- | --- |
-| F01 | Extend/version existing probes for family/channel declaration → connection → executed read → causal applied effect → retention, with nonzero barrier, extended and outcome scenes (S2/S3); retain structural census semantics. On 2–3 predeclared family shapes, compare competent authored use against founders and representative incumbents, plus matched ablations, in the standard worlds at native costs. Measure actual offspring and preserve competence; test exposure and controller adequacy before interpreting a null. Record Graph feasibility using ordinary edges, perception/carrying/work costs, the current two-step discovery baseline, and positive/negative/inconclusive opportunity by family. Preserve source identities; historical pre-repair results are not pooled into the baseline. Record VM cost concerns for F03 without making VM feasibility a gate. No new ecology or production mutation policy. |
+| F01 | Reuse T11.F26's mutation-effect and coverage handoff; extend/version existing probes for family/channel declaration → connection → executed read → causal applied effect → retention, with nonzero barrier, extended and outcome scenes (S2/S3); retain structural census semantics. On 2–3 predeclared family shapes, compare competent authored use against founders and representative incumbents, plus matched ablations, in the standard worlds at native costs. Measure actual offspring and preserve competence; test exposure and controller adequacy before interpreting a null. Record Graph feasibility using ordinary edges, perception/carrying/work costs, the current two-step discovery baseline, and positive/negative/inconclusive opportunity by family. Preserve source identities; historical pre-repair results are not pooled into the baseline. Record VM cost concerns for F03 without making VM feasibility a gate. No new ecology or production mutation policy. |
 | F02 | Establish the general Graph neutral-consumer contract with authored/property fixtures, stable references, copying, deletion, round trips and independent coefficient access. Use current Graph edges; representation changes are conditional on a demonstrated failure and require a prospective scope amendment. Exclude unsafe zero-write sinks unless the chosen semantics prove neutrality. Account for capacity/budget failure and extra work. This feature can close on validated existing behavior and fixtures; it does not require a new projection object or evaluator. |
 | F04 | Add an explicit, bounded declare-and-connect mutation for any legal input family, using F02's eligible consumers. Preserve `InputRef.Add` as neutral declaration and the existing separate connection path; do not silently redefine either. Predeclare single-channel versus whole-family bundle arms and bounded destination selection, preserve present coefficients, and fail atomically. Existing shared-memory sources need only connection; new nodes remain subject to T13's routing contract and are not automatically wired to everything. Pruning persists until an explicit later recruitment event. Keep supply policy fixed and report actual target exposure, genomic growth and costs. |
 | F05 | Add coordinated inherited steps over declared repeated meanings using ordinary coefficients, with independent residual refinement and deletion. Candidate cases include cyclic direction relationships and homologous fields across the four nearby-creature slots, without treating rank as direction. Compare scalar/additive versus coordinated steps under declared event and vector-step bounds, recording coefficients touched and costs. No new learner or generic pattern language. Verify applicable and inapplicable shapes; F09 decides the empirical scope that qualifies. |
