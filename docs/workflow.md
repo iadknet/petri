@@ -19,8 +19,8 @@ Claude:
 | Implementer | Opus 5.5, effort `medium`, Fable 5.1 advisor | `.claude/agents/roadmap-implementer.md` |
 | Benchmark specialist | Sonnet 5, default effort | `.claude/agents/roadmap-benchmark-specialist.md` |
 | Mutation specialist | Opus 5.5, effort `medium` | `.claude/agents/roadmap-mutation-specialist.md` |
-| Spec challenger | Codex Astra (`gpt-6-astra`), effort `xhigh`, read-only, fresh thread per round | run by the spec owner; see "Codex channel" |
-| Reviewer | Codex Astra (`gpt-6-astra`), effort `xhigh`, read-only, fresh thread | run by the orchestrator; checklist `.claude/agents/roadmap-reviewer.md` |
+| Spec challenger | Codex Astra (`gpt-6-astra`), effort `high`, read-only, fresh thread per round | run by the spec owner; see "Codex channel" |
+| Reviewer | Codex Astra (`gpt-6-astra`), effort `high`, read-only, fresh thread | run by the orchestrator; checklist `.claude/agents/roadmap-reviewer.md` |
 
 The orchestrator delegates, verifies, and integrates; the thinking that needs
 the frontier model — writing the spec and resolving requirement questions
@@ -51,13 +51,13 @@ each other or competing builds, tests, servers, or measurements.
 plugin's companion script as read-only `task` jobs. The slash commands cannot
 be model-invoked, so call the script directly, resolving its versioned path at
 run time. Write each brief to a file outside the worktree (the session
-scratchpad or `mktemp`) so it never appears in the diff. A job at `xhigh` can
+scratchpad or `mktemp`) so it never appears in the diff. A Codex job can
 outlast the 600-second Bash limit, so start it in the background, wait, and
 re-run the wait while the job is still running:
 
 ```sh
 CODEX=$(ls -d ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | sort -V | tail -1)
-node "$CODEX" task --background --json --fresh --model gpt-6-astra --effort xhigh \
+node "$CODEX" task --background --json --fresh --model gpt-6-astra --effort high \
   --cwd "$WORKTREE" --prompt-file "$BRIEF"            # prints {"jobId": ...}
 node "$CODEX" status "$JOB" --wait --timeout-ms 540000 --cwd "$WORKTREE" --json
 node "$CODEX" result "$JOB" --cwd "$WORKTREE"
@@ -118,7 +118,7 @@ completion conditions. Generating either template does not execute it.
 Substitute `<TNN.FNN>` and the lowercase `<tnn-fnn>` worktree name.
 
 ```
-/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, the gate and goal baseline runs and their records to roadmap-benchmark-specialist, and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the final diff review as a fresh read-only Codex Astra xhigh job through the Codex channel; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
+/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, the gate and goal baseline runs and their records to roadmap-benchmark-specialist, and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the final diff review as a fresh read-only Codex Astra high job through the Codex channel; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
 ```
 
 The `/goal` evaluator reads only this conversation and runs no commands, so
@@ -178,7 +178,7 @@ only when that verdict is `ready` or every open blocking finding carries a
 rebuttal that round accepted.
 
 **Codex challenge loop.** The spec owner runs up to three rounds, each a fresh
-Codex Astra `xhigh` job through the Codex channel. Its brief names the spec
+Codex Astra `high` job through the Codex channel. Its brief names the spec
 path, the original requirement, the roadmap contract, the feature's track row,
 dependency rows, and matching Notes entries, and asks Codex to break confidence
 that the spec is ready to implement. The attack surface is contradiction with
@@ -333,7 +333,7 @@ unresolved survivor is a blocker to report, not a number to hide.
 
 ### Review
 
-Run the final diff review as a fresh Codex Astra `xhigh` job through the Codex
+Run the final diff review as a fresh Codex Astra `high` job through the Codex
 channel. Its brief gives the worktree path, the feature ID, the spec path, and
 the spec sections the review needs: Goal, Inputs and Invariants, Verification,
 and Performance and Goal Impact when the feature is subject to it. It tells
