@@ -243,8 +243,9 @@ divergence. The predeclaration covers the result: work counters "No
 direction; standard thresholds", and a severe goes to the user. Confluence's
 final population (1,219) is below half of both references, and its plateau
 (3,609) is below half of T11.F24's; this is reported to the user, not an
-extinction. The goal series `epoch_baseline` stays at T19.F04 pending the
-user decision, which is recorded here verbatim.
+extinction. User decision (verbatim, 2026-09-24, in reply to the severe goal
+`vm_steps` and `decided_passes`): "Accept, keep epoch". The goal series
+`epoch_baseline` stays at T19.F04.
 
 - Summaries: [gate](../../progress/features/t11-f25-meaningful-action-parameter-targets.json),
   [goal](../../progress/features/t11-f25-meaningful-action-parameter-targets-goal.json).
