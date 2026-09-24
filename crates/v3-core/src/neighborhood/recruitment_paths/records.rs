@@ -90,34 +90,41 @@ impl Sizes {
     }
 }
 
-/// Which mutation supply rule the proposals draw under.
+/// Which unit count the proposals' per-unit supply draw runs on. Both draw
+/// `Binomial(units, per_unit_rate)` at `MutationConfig::default()`'s rate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Supply {
-    /// `MutationConfig::default().with_legacy_supply()`: the fixed per-birth
-    /// count the recorded T13.F02/F06 baselines were taken on.
-    Legacy,
-    /// `MutationConfig::default()`: the per-unit draw on the child's own
-    /// `genome_size()` production runs.
+    /// The instrument constant `FOUNDER_GENOME_SIZE_UNITS`, the canonical
+    /// V3Alpha1 founder's `genome_size()`, whatever the parent's size
+    /// (T11.F20): the legacy panel's fixed exposure, like the drift walk.
+    FounderUnits,
+    /// The per-unit draw on the child's own `genome_size()`, as production
+    /// runs.
     Production,
 }
 
 impl Supply {
+    /// The unit count a proposal from `parent` draws its supply on.
     #[must_use]
-    pub fn mutation_config(self) -> crate::config::MutationConfig {
-        let config = crate::config::MutationConfig::default();
+    pub fn units(self, parent: &crate::creature::genome::CreatureGenome) -> u32 {
         match self {
-            Self::Legacy => config.with_legacy_supply(),
-            Self::Production => config,
+            Self::FounderUnits => crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS,
+            Self::Production => parent.genome_size(),
         }
     }
 
     /// The `supply_rule` string a record carries.
     #[must_use]
-    pub const fn rule(self) -> &'static str {
+    pub fn rule(self) -> String {
         match self {
-            Self::Legacy => "legacy per-birth supply (per_unit_supply_enabled forced false)",
-            Self::Production => "production per-unit supply on the child's own genome_size()",
+            Self::FounderUnits => format!(
+                "per-unit supply on the canonical V3Alpha1 founder's genome_size() {}",
+                crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS
+            ),
+            Self::Production => {
+                "production per-unit supply on the child's own genome_size()".to_owned()
+            }
         }
     }
 }
@@ -144,7 +151,7 @@ impl Panel {
             Sizes::PRODUCTION
         );
         Self {
-            supply: Supply::Legacy,
+            supply: Supply::FounderUnits,
             sizes,
         }
     }
@@ -171,7 +178,7 @@ impl Panel {
     #[must_use]
     pub const fn version(self) -> &'static str {
         match self.supply {
-            Supply::Legacy => super::VERSION,
+            Supply::FounderUnits => super::VERSION,
             Supply::Production => S0_VERSION,
         }
     }

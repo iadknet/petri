@@ -1477,10 +1477,8 @@ async fn health_payload_contains_mutation_skip_by_reason() {
     cfg.world.width = 16;
     cfg.world.height = 16;
     cfg.population.initial_creatures = 5;
-    cfg.mutation.per_unit_supply_enabled = false;
-    cfg.mutation.mutation_probability = 1.0;
-    cfg.mutation.per_birth_mutation_events_min = 3;
-    cfg.mutation.per_birth_mutation_events_max = 3;
+    // About three requested events per founder birth (0.03 per unit).
+    cfg.mutation.per_unit_rate = 0.03;
     cfg.world.food.initial_coverage = 0.8;
     cfg.world.food.initial_density = 1.0;
     cfg.world.food.growth_rate = 0.5;
@@ -3568,7 +3566,7 @@ async fn from_config_normalizes_before_storing_and_seeding() {
 /// used to offer, must name its own path (2026-09-07 apply audit, item 4).
 #[tokio::test]
 async fn patch_config_names_each_bound_constrained_field_patched_alone() {
-    let cases: [(&str, &str); 7] = [
+    let cases: [(&str, &str); 5] = [
         (
             "population.max_creatures",
             r#"{"population":{"max_creatures":32}}"#,
@@ -3584,14 +3582,6 @@ async fn patch_config_names_each_bound_constrained_field_patched_alone() {
         (
             "runtime.max_actions_per_turn",
             r#"{"runtime":{"max_actions_per_turn":0}}"#,
-        ),
-        (
-            "mutation.per_birth_mutation_events_min",
-            r#"{"mutation":{"per_birth_mutation_events_min":15}}"#,
-        ),
-        (
-            "mutation.per_birth_mutation_events_max",
-            r#"{"mutation":{"per_birth_mutation_events_max":0}}"#,
         ),
         ("action_log.capacity", r#"{"action_log":{"capacity":0}}"#),
     ];
@@ -3635,16 +3625,19 @@ async fn patch_config_reason_names_the_cross_field_path_it_would_move() {
         .await
         .unwrap();
 
-    let patch = r#"{"mutation":{"per_birth_mutation_events_min":15}}"#;
+    // Lowering the shared maximum density below the initial density moves
+    // the initial density with it (T11.F20 retired the min/max event pair
+    // this test used to read).
+    let patch = r#"{"world":{"food":{"shared":{"max_density":0.5}}}}"#;
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
 
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     let reason = error_field_errors(&body)[0]["reason"]
         .as_str()
         .expect("string reason");
-    assert!(reason.contains("15"), "reason: {reason}");
+    assert!(reason.contains("0.5"), "reason: {reason}");
     assert!(
-        reason.contains("mutation.per_birth_mutation_events_max"),
+        reason.contains("world.food.shared.initial_density"),
         "reason: {reason}"
     );
 }
@@ -3663,7 +3656,7 @@ async fn patch_config_rejects_mixed_patch_atomically_naming_only_the_offender() 
 
     let patch = r#"{
         "energy": { "costs": { "move_cost": 0.35 } },
-        "mutation": { "mutation_probability": 0.6 },
+        "mutation": { "mesh_layer_probability": 0.6 },
         "world": { "food": { "shared": { "growth_rate": 0.12 } } },
         "population": { "max_creatures": 32 }
     }"#;
@@ -3692,7 +3685,7 @@ async fn patch_config_applies_a_fully_valid_mixed_patch() {
 
     let patch = r#"{
         "energy": { "costs": { "move_cost": 0.35 } },
-        "mutation": { "mutation_probability": 0.6 },
+        "mutation": { "mesh_layer_probability": 0.6 },
         "world": { "food": { "shared": { "growth_rate": 0.12 } } }
     }"#;
     let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
@@ -3700,17 +3693,17 @@ async fn patch_config_applies_a_fully_valid_mixed_patch() {
 
     let (_, after) = do_request(a, get_req("/v3/simulation/config")).await;
     assert_json_f64_close(&after["config"]["energy"]["costs"]["move_cost"], 0.35);
-    assert_json_f64_close(&after["config"]["mutation"]["mutation_probability"], 0.6);
+    assert_json_f64_close(&after["config"]["mutation"]["mesh_layer_probability"], 0.6);
     assert_json_f64_close(
         &after["config"]["world"]["food"]["shared"]["growth_rate"],
         0.12,
     );
 }
 
-/// Both per-unit supply fields (T11.F19) are live-patchable and echoed back;
-/// the defaults are the production rule.
+/// The per-unit rate (T11.F19) is live-patchable and echoed back; the
+/// default is the production rate.
 #[tokio::test]
-async fn patch_config_applies_the_per_unit_supply_fields() {
+async fn patch_config_applies_the_per_unit_rate() {
     let a = app();
     a.clone()
         .oneshot(startup_req(r#"{"seed":1}"#))
@@ -3718,24 +3711,45 @@ async fn patch_config_applies_the_per_unit_supply_fields() {
         .unwrap();
 
     let (_, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
-    assert_eq!(
-        before["config"]["mutation"]["per_unit_supply_enabled"],
-        true
-    );
     assert_json_f64_close(&before["config"]["mutation"]["per_unit_rate"], 0.005);
 
-    let patch = r#"{"mutation":{"per_unit_supply_enabled":false,"per_unit_rate":0.02}}"#;
+    let patch = r#"{"mutation":{"per_unit_rate":0.02}}"#;
     let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert_eq!(body["config"]["mutation"]["per_unit_supply_enabled"], false);
     assert_json_f64_close(&body["config"]["mutation"]["per_unit_rate"], 0.02);
 
     let (_, after) = do_request(a, get_req("/v3/simulation/config")).await;
-    assert_eq!(
-        after["config"]["mutation"]["per_unit_supply_enabled"],
-        false
-    );
     assert_json_f64_close(&after["config"]["mutation"]["per_unit_rate"], 0.02);
+}
+
+/// T11.F20: a runtime patch carrying any retired per-birth supply key is
+/// rejected by strict deserialization and stores nothing.
+#[tokio::test]
+async fn patch_config_rejects_the_retired_per_birth_supply_keys() {
+    for patch in [
+        r#"{"mutation":{"mutation_probability":0.44}}"#,
+        r#"{"mutation":{"per_birth_mutation_events_min":1}}"#,
+        r#"{"mutation":{"per_birth_mutation_events_max":10}}"#,
+        r#"{"mutation":{"per_birth_mutation_event_continuation_probability":0.2}}"#,
+        r#"{"mutation":{"per_unit_supply_enabled":true}}"#,
+    ] {
+        let a = app();
+        a.clone()
+            .oneshot(startup_req(r#"{"seed":1}"#))
+            .await
+            .unwrap();
+        let (_, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+
+        let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+
+        assert_eq!(
+            status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{patch} body: {body}"
+        );
+        let (_, after) = do_request(a, get_req("/v3/simulation/config")).await;
+        assert_eq!(after["config"], before["config"], "{patch}");
+    }
 }
 
 #[tokio::test]

@@ -848,8 +848,7 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
             }],
         };
         let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
-        sim.config.mutation.per_unit_supply_enabled = false;
-        sim.config.mutation.mutation_probability = 0.0;
+        sim.config.mutation.per_unit_rate = 0.0;
         sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
         sim.creatures[parent].graph_runtime.eligibility_traces = vec![vec![Box::new([3.0])]];
         sim.creatures[parent].graph_runtime.plasticity_weights = vec![vec![Box::new([1.5])]];
@@ -884,8 +883,7 @@ const CAPPED_TRANSFER: f32 = 100.0;
 fn charged_reproduction(genome: CreatureGenome, rate: f32) -> (f32, f32, f32) {
     let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
     sim.config.energy.lifecycle.genome_replication_cost_per_unit = rate;
-    sim.config.mutation.per_unit_supply_enabled = false;
-    sim.config.mutation.mutation_probability = 0.0;
+    sim.config.mutation.per_unit_rate = 0.0;
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
     assert_eq!(

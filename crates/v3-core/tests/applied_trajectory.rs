@@ -3,7 +3,9 @@
 //!
 //! The digest below pins the current production-default trajectory after two
 //! runs agree. Intentional changes to production defaults must update it only
-//! after the new trajectory has been reproduced.
+//! after the new trajectory has been reproduced. T11.F20 re-pinned the
+//! first digest after two agreeing runs: its fixture moved from the retired
+//! two-to-four-event per-birth rule to `per_unit_rate = 0.03`.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -21,10 +23,9 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
         config.population.initial_creatures = 24;
         config.world.food.initial_coverage = 1.0;
         config.world.food.initial_density = 1.0;
-        config.mutation.per_unit_supply_enabled = false;
-        config.mutation.mutation_probability = 1.0;
-        config.mutation.per_birth_mutation_events_min = 2;
-        config.mutation.per_birth_mutation_events_max = 4;
+        // About three requested events per founder birth, the retired
+        // two-to-four-event fixture's exposure (T11.F20).
+        config.mutation.per_unit_rate = 0.03;
         let mut sim = seed_simulation(config, seed);
         for _ in 0..64 {
             run_tick(&mut sim, &mut None);
@@ -69,7 +70,7 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "14541daa2c01ba8b8a01ade8ced9efd2176d27f155f77a9c7aa64dc325307226"
+        "c04e289ea84f8aa255eadef8f3dfd45e94f79ac7c8235d6f8807933b36eafc95"
     );
 }
 
@@ -88,9 +89,6 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
         config.population.initial_creatures = 24;
         config.world.food.initial_coverage = 1.0;
         config.world.food.initial_density = 1.0;
-        config.mutation.mutation_probability = 1.0;
-        config.mutation.per_birth_mutation_events_min = 2;
-        config.mutation.per_birth_mutation_events_max = 4;
         let mut sim = seed_simulation(config, seed);
         for _ in 0..64 {
             run_tick(&mut sim, &mut None);

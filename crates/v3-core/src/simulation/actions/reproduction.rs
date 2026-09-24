@@ -461,7 +461,7 @@ mod tests {
     /// Newborns on both reproduction paths carry a genome size equal to a
     /// fresh `genome_size()`: the mutated path recomputes it, the no-mutation
     /// fast path copies the parent's.
-    fn assert_every_creature_caches_its_own_genome_size(mutation_probability: f64) {
+    fn assert_every_creature_caches_its_own_genome_size(per_unit_rate: f64) {
         use crate::config::SimulationConfig;
         use crate::simulation::{run_tick, seed_simulation};
 
@@ -469,8 +469,7 @@ mod tests {
         cfg.world.width = 48;
         cfg.world.height = 48;
         cfg.population.initial_creatures = 200;
-        cfg.mutation.per_unit_supply_enabled = false;
-        cfg.mutation.mutation_probability = mutation_probability;
+        cfg.mutation.per_unit_rate = per_unit_rate;
         let mut sim = seed_simulation(cfg, 2026);
         for _ in 0..40 {
             run_tick(&mut sim, &mut None);
@@ -555,7 +554,8 @@ mod tests {
 
     #[test]
     fn mutated_newborns_cache_their_own_genome_size() {
-        assert_every_creature_caches_its_own_genome_size(1.0);
+        // About five requested events per founder birth.
+        assert_every_creature_caches_its_own_genome_size(0.05);
     }
 
     #[test]
@@ -819,8 +819,7 @@ mod tests {
         use rand::SeedableRng;
         let mut cfg = SimulationConfig::default();
         cfg.population.initial_creatures = 1;
-        cfg.mutation.per_unit_supply_enabled = false;
-        cfg.mutation.mutation_probability = 0.0;
+        cfg.mutation.per_unit_rate = 0.0;
         let mut sim = seed_simulation(cfg, 83);
         let parent_id = sim.creatures.keys().next().unwrap();
         let genome = genome_with_cgp_compute_nodes(vec![ComputeNode {

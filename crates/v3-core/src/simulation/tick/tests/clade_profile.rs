@@ -181,7 +181,7 @@ fn a_mixed_sequence_keeps_the_by_type_sum_equal_to_the_attempt_count() {
 fn a_child_starts_at_zero_while_its_parent_keeps_its_counters() {
     use crate::simulation::actions::{apply_reproduce, ReproductionActionResult};
     let (mut sim, parent) = make_sim_with_one_creature(1000.0);
-    sim.config.mutation.mutation_probability = 0.0;
+    sim.config.mutation.per_unit_rate = 0.0;
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
     let pos = sim.creatures[parent].position;
     sim.world

@@ -177,6 +177,8 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
 
 /// These digests pin the fully resolved checked-in recipes. Intentional changes
 /// to inherited production defaults must update them after repeated resolution.
+/// T11.F20 re-pinned all three after two agreeing runs: the resolved
+/// `MutationConfig` carries five keys fewer.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let actual = GOAL_RECIPE_NAMES
@@ -184,9 +186,9 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
-            "sha256:eabc5096a9ed4812bdfc80e62bcea98ba299a478a33b9ad80536bd7fa6cd261f",
-            "sha256:f9d82656032177a0420fb2522a78f3326206e104a663bc42e5aac417c572c4a1",
-            "sha256:790b73ae7e1a3fa7cbd28bccaf95d8cb2a66d24fb8037aeb76aab33ecdf34436",
+            "sha256:0a8056385815650cf43da24435aaca43d95dde2829142427eca213602575a890",
+            "sha256:4edca49b17a6a16ce8e8cfbc9460c3076b70be99841a4ac1c7af974e71133cbc",
+            "sha256:09398394d4769af786833bc7e20c530b6511d3a1b07b5ce6aa6c50a345b341f6",
         ]
     );
 }
@@ -1103,7 +1105,7 @@ fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloa
             arm.lineages[0].horizons.len()
         );
     }
-    assert_eq!(compact["supply"], "legacy");
+    assert_eq!(compact["supply"], "founder_units");
     assert_eq!(total as u64, experiment.total_proposals);
     let compact_bytes = serde_json::to_vec(compact).unwrap();
     let text = String::from_utf8(compact_bytes).unwrap();

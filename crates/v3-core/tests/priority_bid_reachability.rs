@@ -25,8 +25,9 @@ struct ProbeCase {
 
 fn search_config() -> v3_core::config::MutationConfig {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
+    // About 1.25 requested events per founder birth, the retired rule's
+    // mean at trigger 1.0 (T11.F20).
+    config.per_unit_rate = 0.013;
     config
 }
 

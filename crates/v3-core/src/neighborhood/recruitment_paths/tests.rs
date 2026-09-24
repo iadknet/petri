@@ -403,8 +403,9 @@ fn recruitment_paths_every_observed_sibling_replays_the_unmodified_engine() {
             for record in pair {
                 let mut child = parent.clone();
                 let mut rng = SmallRng::seed_from_u64(record.seed);
-                let summary = MutationEngine::apply_mutations_with_food_type_count(
+                let summary = MutationEngine::apply_mutations_on_units(
                     &mut child,
+                    crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS,
                     &super::experiment::proposal_mutation_config(),
                     &reachable,
                     ParentExecuted::Indices(&executed),
@@ -1789,8 +1790,8 @@ fn recruitment_paths_task_reading_route_variation_separates_position_from_destin
 fn recruitment_paths_reduced_run_transitions_are_consistent() {
     use crate::neighborhood::recruitment::{payload_hash, CohortFact};
     let report = observe(Sizes::TEST);
-    assert_eq!(report.supply, Supply::Legacy);
-    assert_eq!(report.supply_rule, Supply::Legacy.rule());
+    assert_eq!(report.supply, Supply::FounderUnits);
+    assert_eq!(report.supply_rule, Supply::FounderUnits.rule());
     for arm in &report.arms {
         let transitions = &arm.summary.transitions;
         assert_eq!(transitions.lineages, arm.lineages.len() as u32);
@@ -1903,7 +1904,10 @@ fn recruitment_paths_legacy_panel_observation_is_deterministic() {
 
 #[test]
 fn recruitment_paths_panels_enforce_their_size_caps() {
-    assert_eq!(Panel::legacy(Sizes::PRODUCTION).supply, Supply::Legacy);
+    assert_eq!(
+        Panel::legacy(Sizes::PRODUCTION).supply,
+        Supply::FounderUnits
+    );
     assert_eq!(Panel::s0(Sizes::S0).supply, Supply::Production);
     assert_eq!(Panel::s0(Sizes::S0_PILOT).version(), S0_VERSION);
     assert_eq!(Panel::legacy(Sizes::TEST).version(), VERSION);
@@ -1932,8 +1936,18 @@ fn recruitment_paths_panels_enforce_their_size_caps() {
         assert!(std::panic::catch_unwind(move || Panel::s0(sizes)).is_err());
     }
     assert!(std::panic::catch_unwind(|| Panel::legacy(Sizes::S0)).is_err());
-    assert!(Supply::Production.mutation_config().per_unit_supply_enabled);
-    assert!(!Supply::Legacy.mutation_config().per_unit_supply_enabled);
+    // T11.F20: the legacy panel draws on the founder's units whatever the
+    // parent's size; the S0 panel draws on the parent's own size.
+    let grown = crate::creature::founder::vm_decision_founder_genome();
+    assert_ne!(
+        grown.genome_size(),
+        crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS
+    );
+    assert_eq!(
+        Supply::FounderUnits.units(&grown),
+        crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS
+    );
+    assert_eq!(Supply::Production.units(&grown), grown.genome_size());
 }
 
 /// The S0 panel path: the compact record replays to identical fingerprints
@@ -2408,8 +2422,11 @@ fn recruitment_paths_sizes_reject_every_zero_dimension_and_name_the_supply_rules
         ..Sizes::S0_PILOT
     }));
     assert_eq!(
-        Supply::Legacy.rule(),
-        "legacy per-birth supply (per_unit_supply_enabled forced false)"
+        Supply::FounderUnits.rule(),
+        format!(
+            "per-unit supply on the canonical V3Alpha1 founder's genome_size() {}",
+            crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS
+        )
     );
     assert_eq!(
         Supply::Production.rule(),

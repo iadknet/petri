@@ -17,12 +17,36 @@ fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)
 }
 
+/// Exactly `events` requested events: rate 1.0 on `events` units requests one
+/// event per unit and consumes no RNG for the draw, the same stream the retired
+/// min = max = N at trigger 1.0 consumed (T11.F20). `config.per_unit_rate`
+/// must be 1.0.
+fn apply_events(
+    genome: &mut CreatureGenome,
+    config: &MutationConfig,
+    parent_reachable_nodes: &[usize],
+    rng: &mut SmallRng,
+    events: u32,
+) -> MutationSummary {
+    assert_eq!(
+        config.per_unit_rate, 1.0,
+        "exact-count tests run at rate 1.0"
+    );
+    MutationEngine::apply_mutations_on_units(
+        genome,
+        events,
+        config,
+        parent_reachable_nodes,
+        ParentExecuted::NONE,
+        rng,
+        1,
+    )
+}
+
+/// One topology event per birth.
 fn forced_topology_config() -> crate::config::MutationConfig {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.mesh_layer_probability = 1.0;
     config
 }
@@ -33,7 +57,7 @@ proptest::proptest! {
         let mut config = forced_topology_config();
         config.large_copy_weight_percent = 0;
         let mut genome = v3alpha1_founder_genome();
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut rng(seed));
+        let summary = apply_events(&mut genome, &config, &[], &mut rng(seed), 1);
         for operator in [MutationOperator::TopologyCopyNode,
             MutationOperator::TopologyCopyMeshBackwardSlice,
             MutationOperator::TopologyCopyMeshForwardSlice] {
@@ -94,15 +118,12 @@ fn genome_has_non_default_food_input_ref(genome: &CreatureGenome) -> bool {
 #[test]
 fn engine_accounting_invariant_always_holds() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 5;
+    config.per_unit_rate = 1.0;
 
     for seed in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 5);
         assert_eq!(
             summary.attempted_events,
             summary.applied_events + summary.skipped_events,
@@ -115,8 +136,7 @@ fn engine_accounting_invariant_always_holds() {
 #[test]
 fn engine_with_probability_zero_returns_zero_summary() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 0.0;
+    config.per_unit_rate = 0.0;
     let mut genome = v3alpha1_founder_genome();
     let mut r = rng(42);
     let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
@@ -132,7 +152,7 @@ fn engine_records_added_input_classes_for_topology_add_node() {
     for seed in 0u64..2_000 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         if summary
             .applied_by_operator
             .contains_key(&MutationOperator::TopologyAddNode)
@@ -156,18 +176,16 @@ fn engine_records_added_input_classes_for_topology_add_node() {
 #[test]
 fn engine_with_food_type_count_can_introduce_non_default_food_input_refs() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.mesh_layer_probability = 0.0; // node-internal domains only
 
     let mut r = rng(0xF00D);
     let mut saw_non_default = false;
     for _ in 0..4_000 {
         let mut genome = v3alpha1_founder_genome();
-        let summary = MutationEngine::apply_mutations_with_food_type_count(
+        let summary = MutationEngine::apply_mutations_on_units(
             &mut genome,
+            1,
             &config,
             &[],
             ParentExecuted::NONE,
@@ -235,7 +253,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
     for seed in 0u64..2_000 {
         let mut genome = base_genome.clone();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         if summary
             .applied_by_operator
             .contains_key(&MutationOperator::TopologySpliceNode)
@@ -259,10 +277,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
 #[test]
 fn engine_records_added_input_classes_for_graph_add_internal_graph_node() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.mesh_layer_probability = 0.0;
 
     let expected = vec![
@@ -279,7 +294,7 @@ fn engine_records_added_input_classes_for_graph_add_internal_graph_node() {
     for seed in 0u64..5_000 {
         let mut genome = base_genome.clone();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         if summary
             .applied_by_operator
             .contains_key(&MutationOperator::GraphAddInternalGraphNode)
@@ -301,10 +316,7 @@ fn engine_records_added_input_classes_for_graph_add_internal_graph_node() {
 #[test]
 fn engine_records_added_world_inputs_for_graph_add_internal_graph_node() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.mesh_layer_probability = 0.0;
 
     let base_genome = single_graph_genome_with_inputs(vec![
@@ -317,7 +329,7 @@ fn engine_records_added_world_inputs_for_graph_add_internal_graph_node() {
     for seed in 0u64..5_000 {
         let mut genome = base_genome.clone();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         if summary
             .applied_by_operator
             .contains_key(&MutationOperator::GraphAddInternalGraphNode)
@@ -343,28 +355,22 @@ fn engine_records_added_world_inputs_for_graph_add_internal_graph_node() {
 #[test]
 fn engine_with_probability_one_applies_events() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 3;
-    config.per_birth_mutation_events_max = 3;
+    config.per_unit_rate = 1.0;
     let mut genome = v3alpha1_founder_genome();
     let mut r = rng(7);
-    let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+    let summary = apply_events(&mut genome, &config, &[], &mut r, 3);
     assert_eq!(summary.attempted_events, 3, "must attempt exactly 3 events");
 }
 
 #[test]
 fn engine_mutations_preserve_parseability() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 4;
+    config.per_unit_rate = 1.0;
 
     for seed in 0u64..50 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        apply_events(&mut genome, &config, &[], &mut r, 4);
         assert!(
             ParseabilityGate::validate(&genome).is_ok(),
             "parseability violated at seed {}",
@@ -376,15 +382,12 @@ fn engine_mutations_preserve_parseability() {
 #[test]
 fn engine_with_founder_genome_does_not_panic() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 4;
+    config.per_unit_rate = 1.0;
 
     let mut genome = v3alpha1_founder_genome();
     for seed in 0u64..1000 {
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 4);
         assert_eq!(
             summary.attempted_events,
             summary.applied_events + summary.skipped_events
@@ -396,17 +399,14 @@ fn engine_with_founder_genome_does_not_panic() {
 fn diversity_test_mutated_clones_differ_from_original() {
     // Mutate 100 founder clones, verify 80%+ differ from original.
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 3;
+    config.per_unit_rate = 1.0;
 
     let original = crate::creature::founder::vm_decision_founder_genome();
     let mut differ_count = 0;
     for seed in 0u64..100 {
         let mut genome = original.clone();
         let mut r = rng(seed);
-        MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        apply_events(&mut genome, &config, &[], &mut r, 3);
         if genome != original {
             differ_count += 1;
         }
@@ -423,15 +423,12 @@ fn vm_variety_test_non_noop_instructions_after_mutations() {
     use crate::creature::genome::{BackendDef, VmInstruction};
     // After 1000 mutation passes on the same genome, non-Noop instructions must exist.
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 3;
+    config.per_unit_rate = 1.0;
 
     let mut genome = v3alpha1_founder_genome();
     for seed in 0u64..1000 {
         let mut r = rng(seed);
-        MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        apply_events(&mut genome, &config, &[], &mut r, 3);
     }
     let has_non_noop = genome.nodes.iter().any(|n| {
         if let BackendDef::Vm(ref vm) = n.backend_def {
@@ -450,16 +447,13 @@ fn vm_variety_test_non_noop_instructions_after_mutations() {
 fn stress_parseability_10000_chained_mutations() {
     // 100 copies x 100 generations of mutation, all must pass parseability.
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 3;
+    config.per_unit_rate = 1.0;
 
     for copy in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
         for gen in 0u64..100 {
             let mut r = rng(copy * 1000 + gen);
-            MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+            apply_events(&mut genome, &config, &[], &mut r, 3);
         }
         assert!(
             ParseabilityGate::validate(&genome).is_ok(),
@@ -472,14 +466,11 @@ fn stress_parseability_10000_chained_mutations() {
 #[test]
 fn engine_domain_and_operator_counters_reconcile_to_global_totals() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 5;
-    config.per_birth_mutation_events_max = 5;
+    config.per_unit_rate = 1.0;
 
     let mut genome = v3alpha1_founder_genome();
     let mut rng = rng(123);
-    let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut rng);
+    let summary = apply_events(&mut genome, &config, &[], &mut rng, 5);
 
     let attempted_by_domain: u32 = summary.attempted_by_domain.values().sum();
     let applied_by_domain: u32 = summary.applied_by_domain.values().sum();
@@ -507,10 +498,7 @@ fn engine_domain_and_operator_counters_reconcile_to_global_totals() {
 #[test]
 fn engine_attempted_counters_cover_all_domains_and_hit_each_domain_operator_surface() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
 
     let mut domain_hits = std::collections::HashMap::<MutationDomain, u64>::new();
     let mut operator_hits = std::collections::HashMap::<MutationOperator, u64>::new();
@@ -518,7 +506,7 @@ fn engine_attempted_counters_cover_all_domains_and_hit_each_domain_operator_surf
     for seed in 0u64..20_000 {
         let mut genome = crate::creature::founder::vm_decision_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         for (domain, count) in summary.attempted_by_domain {
             *domain_hits.entry(domain).or_insert(0) += count as u64;
         }
@@ -551,13 +539,10 @@ fn engine_attempted_counters_cover_all_domains_and_hit_each_domain_operator_surf
 #[test]
 fn engine_live_operators_record_every_applied_event_in_the_operator_funnel() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     for seed in 0..100 {
         let mut genome = v3alpha1_founder_genome();
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut rng(seed));
+        let summary = apply_events(&mut genome, &config, &[], &mut rng(seed), 1);
         let funnel_applied: u64 = summary
             .operator_funnel_by_operator
             .values()
@@ -570,10 +555,7 @@ fn engine_live_operators_record_every_applied_event_in_the_operator_funnel() {
 #[test]
 fn engine_mesh_layer_fires_less_than_node_internal() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     // mesh_layer_probability defaults to 0.2
 
     let mut topology_attempts: u64 = 0;
@@ -581,7 +563,7 @@ fn engine_mesh_layer_fires_less_than_node_internal() {
     for seed in 0u64..20_000 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         topology_attempts += summary
             .attempted_by_domain
             .get(&MutationDomain::Topology)
@@ -605,16 +587,13 @@ fn engine_mesh_layer_fires_less_than_node_internal() {
 #[test]
 fn engine_mesh_layer_probability_zero_never_selects_topology() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.mesh_layer_probability = 0.0;
 
     for seed in 0u64..1000 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         assert_eq!(
             summary
                 .attempted_by_domain
@@ -631,16 +610,13 @@ fn engine_mesh_layer_probability_zero_never_selects_topology() {
 #[test]
 fn engine_mesh_layer_probability_one_always_selects_topology() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.mesh_layer_probability = 1.0;
 
     for seed in 0u64..1000 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         assert_eq!(
             summary
                 .attempted_by_domain
@@ -697,10 +673,7 @@ fn engine_pressure_disabled_does_not_restrict() {
     use crate::mutation::types::ComplexityEffect;
 
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.genome_size_pressure_enabled = false;
     config.genome_size_cap = 1; // absurdly low cap
 
@@ -709,7 +682,7 @@ fn engine_pressure_disabled_does_not_restrict() {
     for seed in 0u64..5000 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         for (op, &count) in &summary.attempted_by_operator {
             if count > 0 && op.complexity_effect() == ComplexityEffect::Increasing {
                 has_increasing = true;
@@ -730,17 +703,14 @@ fn engine_pressure_at_cap_selects_only_decreasing() {
     use crate::mutation::types::ComplexityEffect;
 
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.genome_size_pressure_enabled = true;
     config.genome_size_cap = 1; // founder genome is well above 1
 
     for seed in 0u64..2000 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         for (op, &count) in &summary.attempted_by_operator {
             if count > 0 {
                 assert_eq!(
@@ -759,10 +729,7 @@ fn engine_pressure_at_cap_selects_only_decreasing() {
 fn engine_restricted_vm_mutations_can_apply() {
     // Restricted VM events should be able to select and apply a Decreasing operator.
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.genome_size_pressure_enabled = true;
     config.genome_size_cap = 1;
     config.mesh_layer_probability = 0.0; // force node-internal only
@@ -772,7 +739,7 @@ fn engine_restricted_vm_mutations_can_apply() {
     for seed in 0u64..3000 {
         let mut genome = crate::creature::founder::vm_decision_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         vm_attempted += summary
             .attempted_by_domain
             .get(&MutationDomain::Vm)
@@ -797,16 +764,13 @@ fn engine_restricted_vm_mutations_can_apply() {
 #[test]
 fn engine_does_not_record_operator_no_applicable_skips() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
 
     let mut operator_no_applicable_skips: u64 = 0;
     for seed in 0u64..2_000 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         for by_reason in summary.skip_reasons_by_operator.values() {
             operator_no_applicable_skips += by_reason
                 .get(&MutationSkipReason::NoApplicableTarget)
@@ -826,17 +790,14 @@ fn engine_accounting_invariant_holds_with_decreasing_skips() {
     // When events are skipped due to no Decreasing operators (e.g. VM),
     // the accounting invariant must still hold.
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 5;
+    config.per_unit_rate = 1.0;
     config.genome_size_pressure_enabled = true;
     config.genome_size_cap = 1;
 
     for seed in 0u64..200 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 5);
         assert_eq!(
             summary.attempted_events,
             summary.applied_events + summary.skipped_events,
@@ -849,17 +810,14 @@ fn engine_accounting_invariant_holds_with_decreasing_skips() {
 #[test]
 fn engine_pressure_accounting_invariant_holds_when_restricted() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 5;
+    config.per_unit_rate = 1.0;
     config.genome_size_pressure_enabled = true;
     config.genome_size_cap = 1;
 
     for seed in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        let summary = apply_events(&mut genome, &config, &[], &mut r, 5);
         assert_eq!(
             summary.attempted_events,
             summary.applied_events + summary.skipped_events,
@@ -872,17 +830,14 @@ fn engine_pressure_accounting_invariant_holds_when_restricted() {
 #[test]
 fn engine_pressure_preserves_parseability_when_restricted() {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 4;
+    config.per_unit_rate = 1.0;
     config.genome_size_pressure_enabled = true;
     config.genome_size_cap = 1;
 
     for seed in 0u64..50 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        apply_events(&mut genome, &config, &[], &mut r, 4);
         assert!(
             ParseabilityGate::validate(&genome).is_ok(),
             "parseability violated at seed {} with pressure enabled",
@@ -944,10 +899,7 @@ fn engine_with_bias_1_targets_only_reachable_vm_nodes() {
     let reachable: &[usize] = &[0, 1];
 
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     // Force node-internal layer only (VM/Graph/InputRef).
     config.mesh_layer_probability = 0.0;
     // Set all biases to 1.0 — always pick reachable when available.
@@ -962,7 +914,7 @@ fn engine_with_bias_1_targets_only_reachable_vm_nodes() {
     for seed in 0u64..500 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut g, &config, reachable, &mut r);
+        let summary = apply_events(&mut g, &config, reachable, &mut r, 1);
         if summary.applied_events > 0 && g.nodes[2] != node2_original {
             node2_ever_changed = true;
             break;
@@ -1026,10 +978,7 @@ fn engine_pressure_restricted_deletions_bias_toward_unreachable_nodes() {
     let reachable: &[usize] = &[0, 1];
 
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.mesh_layer_probability = 0.0;
     config.genome_size_pressure_enabled = true;
     config.genome_size_cap = 1;
@@ -1040,7 +989,7 @@ fn engine_pressure_restricted_deletions_bias_toward_unreachable_nodes() {
     for seed in 0u64..3000 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut g, &config, reachable, &mut r);
+        let summary = apply_events(&mut g, &config, reachable, &mut r, 1);
         reachable_targets += summary.reachable_target_events as u64;
         unreachable_targets += summary.unreachable_target_events as u64;
     }
@@ -1057,79 +1006,10 @@ fn engine_pressure_restricted_deletions_bias_toward_unreachable_nodes() {
     );
 }
 
-/// The disabled legacy rule at its defaults, the drift walk's fixed-count control.
-#[test]
-fn legacy_supply_mean_and_single_event_share() {
-    let config = MutationConfig {
-        per_unit_supply_enabled: false,
-        ..MutationConfig::default()
-    };
-    let mut random = rng(20_260_905);
-    let mut events = 0u64;
-    let mut triggered = 0u32;
-    let mut singles = 0u32;
-    let births = 200_000u32;
-    for _ in 0..births {
-        let count = requested_event_count(&config, 111, &mut random);
-        events += u64::from(count);
-        triggered += u32::from(count > 0);
-        singles += u32::from(count == 1);
-    }
-    // Fixed seed and tolerances wider than six standard errors at this sample size.
-    assert!((f64::from(triggered) / f64::from(births) - 0.44).abs() < 0.01);
-    assert!((events as f64 / f64::from(births) - 0.54999994368).abs() < 0.015);
-    assert!((f64::from(singles) / f64::from(triggered) - 0.8).abs() < 0.015);
-}
-
-proptest::proptest! {
-    #[test]
-    fn bounded_supply_and_engine_accounting(
-        seed in proptest::prelude::any::<u64>(), min in 1u32..8, extra in 0u32..8,
-        continuation in 0.0f64..=1.0, trigger in 0.0f64..=1.0,
-    ) {
-        let config = MutationConfig {
-            per_unit_supply_enabled: false,
-            mutation_probability: trigger,
-            per_birth_mutation_events_min: min,
-            per_birth_mutation_events_max: min + extra,
-            per_birth_mutation_event_continuation_probability: continuation,
-            ..MutationConfig::default()
-        };
-        let requested = requested_event_count(&config, 111, &mut rng(seed));
-        proptest::prop_assert!(requested == 0 || (min..=min + extra).contains(&requested));
-        let summary = MutationEngine::apply_mutations(&mut v3alpha1_founder_genome(), &config, &[], &mut rng(seed));
-        proptest::prop_assert_eq!(summary.attempted_events, requested);
-        proptest::prop_assert_eq!(summary.attempted_events, summary.applied_events + summary.skipped_events);
-    }
-
-    #[test]
-    fn supply_probability_endpoints_and_equal_bounds(
-        seed in proptest::prelude::any::<u64>(), min in 1u32..100, extra in 0u32..100,
-    ) {
-        let mut config = MutationConfig {
-            per_unit_supply_enabled: false,
-            mutation_probability: 1.0,
-            per_birth_mutation_events_min: min,
-            per_birth_mutation_events_max: min + extra,
-            per_birth_mutation_event_continuation_probability: 0.0,
-            ..MutationConfig::default()
-        };
-        proptest::prop_assert_eq!(requested_event_count(&config, 111, &mut rng(seed)), min);
-        config.per_birth_mutation_event_continuation_probability = 1.0;
-        proptest::prop_assert_eq!(requested_event_count(&config, 111, &mut rng(seed)), min + extra);
-        config.per_birth_mutation_events_min = min + extra;
-        config.per_birth_mutation_event_continuation_probability = 0.2;
-        proptest::prop_assert_eq!(requested_event_count(&config, 111, &mut rng(seed)), min + extra);
-        config.mutation_probability = 0.0;
-        proptest::prop_assert_eq!(requested_event_count(&config, 111, &mut rng(seed)), 0);
-    }
-}
-
-// ── T11.F19: per-unit supply ─────────────────────────────────────────────
+// ── T11.F19 / T11.F20: the per-unit supply rule ─────────────────────────
 
 fn per_unit_config(rate: f64) -> MutationConfig {
     MutationConfig {
-        per_unit_supply_enabled: true,
         per_unit_rate: rate,
         ..MutationConfig::default()
     }
@@ -1140,7 +1020,6 @@ fn per_unit_config(rate: f64) -> MutationConfig {
 #[test]
 fn per_unit_supply_founder_mean_matches_rate_times_genome_size() {
     let config = MutationConfig::default();
-    assert!(config.per_unit_supply_enabled);
     let founder = v3alpha1_founder_genome();
     let expected = config.per_unit_rate * f64::from(founder.genome_size());
     let mut random = rng(20_260_914);
@@ -1171,49 +1050,18 @@ fn per_unit_supply_rate_zero_returns_zero_summary() {
     assert_eq!(genome, before);
 }
 
-/// The per-unit draw ignores the legacy fields entirely: with the trigger at
-/// zero and the bounds at their maximum, the count is still one per unit.
-#[test]
-fn per_unit_supply_ignores_the_legacy_fields() {
-    let mut config = per_unit_config(1.0);
-    config.mutation_probability = 0.0;
-    config.per_birth_mutation_events_min = 3;
-    config.per_birth_mutation_events_max = 3;
-    assert_eq!(requested_event_count(&config, 111, &mut rng(1)), 111);
-}
-
-/// With the switch off, the legacy draw consumes exactly the RNG stream it
-/// consumed before T11.F19: the per-unit fields are never read.
-#[test]
-fn legacy_supply_is_byte_identical_whatever_the_per_unit_fields_hold() {
-    let legacy = MutationConfig {
-        per_unit_supply_enabled: false,
-        ..MutationConfig::default()
-    };
-    for seed in 0u64..200 {
-        let mut with_rate = legacy.clone();
-        with_rate.per_unit_rate = 1.0;
-        let mut baseline = rng(seed);
-        let mut probe = rng(seed);
-        assert_eq!(
-            requested_event_count(&legacy, 111, &mut baseline),
-            requested_event_count(&with_rate, 5_791, &mut probe)
-        );
-        assert_eq!(baseline.gen::<u64>(), probe.gen::<u64>());
-    }
-}
-
 proptest::proptest! {
-    /// `0 <= requested <= genome_size()`, and the endpoints are exact.
+    /// `0 <= requested <= units` for the caller-supplied unit count, and the
+    /// endpoints are exact.
     #[test]
-    fn per_unit_supply_is_bounded_by_genome_size(
-        seed in proptest::prelude::any::<u64>(), size in 0u32..400, rate in 0.0f64..=1.0,
+    fn per_unit_supply_is_bounded_by_the_unit_count(
+        seed in proptest::prelude::any::<u64>(), units in 0u32..400, rate in 0.0f64..=1.0,
     ) {
         let config = per_unit_config(rate);
-        let requested = requested_event_count(&config, size, &mut rng(seed));
-        proptest::prop_assert!(requested <= size);
-        proptest::prop_assert_eq!(requested_event_count(&per_unit_config(0.0), size, &mut rng(seed)), 0);
-        proptest::prop_assert_eq!(requested_event_count(&per_unit_config(1.0), size, &mut rng(seed)), size);
+        let requested = requested_event_count(&config, units, &mut rng(seed));
+        proptest::prop_assert!(requested <= units);
+        proptest::prop_assert_eq!(requested_event_count(&per_unit_config(0.0), units, &mut rng(seed)), 0);
+        proptest::prop_assert_eq!(requested_event_count(&per_unit_config(1.0), units, &mut rng(seed)), units);
     }
 
     /// The engine attempts exactly the drawn count on the per-unit rule and
@@ -1229,19 +1077,67 @@ proptest::proptest! {
         proptest::prop_assert_eq!(summary.attempted_events, requested);
         proptest::prop_assert_eq!(summary.attempted_events, summary.applied_events + summary.skipped_events);
     }
+
+    /// The production entry point is the unit-count entry point on the
+    /// genome's own `genome_size()`: same summary, same child, same stream.
+    #[test]
+    fn production_supply_draws_on_the_genome_s_own_size(
+        seed in proptest::prelude::any::<u64>(), rate in 0.0f64..=0.05,
+    ) {
+        let config = per_unit_config(rate);
+        let founder = v3alpha1_founder_genome();
+        let (mut own, mut explicit) = (founder.clone(), founder.clone());
+        let (mut own_rng, mut explicit_rng) = (rng(seed), rng(seed));
+        let own_summary = MutationEngine::apply_mutations_with_food_type_count(
+            &mut own, &config, &[], ParentExecuted::NONE, &mut own_rng, 1,
+        );
+        let explicit_summary = MutationEngine::apply_mutations_on_units(
+            &mut explicit, founder.genome_size(), &config, &[], ParentExecuted::NONE, &mut explicit_rng, 1,
+        );
+        proptest::prop_assert_eq!(own_summary.attempted_events, explicit_summary.attempted_events);
+        proptest::prop_assert_eq!(own_summary.applied_events, explicit_summary.applied_events);
+        proptest::prop_assert_eq!(own_summary.events, explicit_summary.events);
+        proptest::prop_assert_eq!(own, explicit);
+        proptest::prop_assert_eq!(own_rng.gen::<u64>(), explicit_rng.gen::<u64>());
+    }
+
+    /// The requested count depends on the supplied units, the rate, and the
+    /// stream, never on the genome it mutates: the instruments' draw on a
+    /// fixed unit count is the same whatever the walked genome's size.
+    #[test]
+    fn a_supplied_unit_count_ignores_the_genome_size(
+        seed in proptest::prelude::any::<u64>(), units in 0u32..200, rate in 0.0f64..=0.05,
+    ) {
+        let config = per_unit_config(rate);
+        let expected = requested_event_count(&config, units, &mut rng(seed));
+        for mut genome in [v3alpha1_founder_genome(), core_and_junk_genome()] {
+            let summary = MutationEngine::apply_mutations_on_units(
+                &mut genome, units, &config, &[], ParentExecuted::NONE, &mut rng(seed), 1,
+            );
+            proptest::prop_assert_eq!(summary.attempted_events, expected);
+        }
+    }
 }
 
+/// Rate 1.0 on N units requests exactly N events, the retired min = max = N
+/// at trigger 1.0 (T11.F20).
 #[test]
-fn supply_upper_bound_does_not_overflow() {
-    let config = MutationConfig {
-        per_unit_supply_enabled: false,
-        mutation_probability: 1.0,
-        per_birth_mutation_events_min: u32::MAX - 1,
-        per_birth_mutation_events_max: u32::MAX,
-        per_birth_mutation_event_continuation_probability: 1.0,
-        ..MutationConfig::default()
-    };
-    assert_eq!(requested_event_count(&config, 111, &mut rng(1)), u32::MAX);
+fn rate_one_on_n_units_requests_exactly_n_events() {
+    let config = per_unit_config(1.0);
+    for events in [0u32, 1, 3, 6] {
+        let summary = apply_events(
+            &mut v3alpha1_founder_genome(),
+            &config,
+            &[],
+            &mut rng(u64::from(events)),
+            events,
+        );
+        assert_eq!(summary.attempted_events, events);
+        assert_eq!(
+            summary.attempted_events,
+            summary.applied_events + summary.skipped_events
+        );
+    }
 }
 
 // ── T11.F17: executed-biased targeting ───────────────────────────────────
@@ -1285,12 +1181,14 @@ fn core_and_junk_genome() -> CreatureGenome {
     }
 }
 
+/// Requested events per birth under [`node_internal_config`].
+const NODE_INTERNAL_EVENTS: u32 = 4;
+
+/// Node-internal events only, at rate 1.0 so [`NODE_INTERNAL_EVENTS`] units
+/// request exactly that many events.
 fn node_internal_config(executed_bias: f64) -> MutationConfig {
     MutationConfig {
-        per_unit_supply_enabled: false,
-        mutation_probability: 1.0,
-        per_birth_mutation_events_min: 4,
-        per_birth_mutation_events_max: 4,
+        per_unit_rate: 1.0,
         mesh_layer_probability: 0.0,
         executed_bias,
         ..SimulationConfig::default().mutation
@@ -1304,8 +1202,9 @@ fn full_executed_bias_leaves_junk_nodes_untouched_and_counts_every_target() {
     let mut mutated_core = 0;
     for seed in 0..60 {
         let mut genome = subject.clone();
-        let summary = MutationEngine::apply_mutations_with_food_type_count(
+        let summary = MutationEngine::apply_mutations_on_units(
             &mut genome,
+            NODE_INTERNAL_EVENTS,
             &config,
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
@@ -1338,8 +1237,9 @@ fn zero_executed_bias_reaches_junk_nodes_in_the_same_fixture() {
     let mut off_core_targets = 0;
     for seed in 0..60 {
         let mut genome = subject.clone();
-        let summary = MutationEngine::apply_mutations_with_food_type_count(
+        let summary = MutationEngine::apply_mutations_on_units(
             &mut genome,
+            NODE_INTERNAL_EVENTS,
             &config,
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
@@ -1380,14 +1280,13 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
     );
     let production = SimulationConfig::default().mutation;
     let single_event = MutationConfig {
-        per_unit_supply_enabled: false,
-        mutation_probability: 1.0,
-        per_birth_mutation_events_min: 1,
-        per_birth_mutation_events_max: 1,
+        per_unit_rate: 1.0,
         ..production.clone()
     };
 
-    for config in [&single_event, &production] {
+    // Rate 1.0 on one unit is exactly one event; production draws on the
+    // founder's own size.
+    for (config, units) in [(&single_event, 1), (&production, founder.genome_size())] {
         let plain = MutationConfig {
             executed_bias: 0.0,
             ..config.clone()
@@ -1396,8 +1295,9 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
         for seed in 0..3_000 {
             let mut with_layer = founder.clone();
             let mut layer_rng = rng(seed);
-            let summary = MutationEngine::apply_mutations_with_food_type_count(
+            let summary = MutationEngine::apply_mutations_on_units(
                 &mut with_layer,
+                units,
                 config,
                 &reachable,
                 ParentExecuted::Indices(&all_nodes),
@@ -1407,8 +1307,9 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
 
             let mut without_layer = founder.clone();
             let mut plain_rng = rng(seed);
-            MutationEngine::apply_mutations_with_food_type_count(
+            MutationEngine::apply_mutations_on_units(
                 &mut without_layer,
+                units,
                 &plain,
                 &reachable,
                 ParentExecuted::NONE,
@@ -1431,7 +1332,7 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
                 "seed {seed}: only a later event in a multi-event birth can diverge"
             );
         }
-        if config.per_birth_mutation_events_max == 1 {
+        if units == 1 {
             assert_eq!(divergent, 0, "single-event births never diverge");
         } else {
             assert!(
@@ -1462,8 +1363,9 @@ fn size_pressure_restriction_disables_the_executed_layer() {
     for seed in 0..40 {
         let mut restricted_child = subject.clone();
         let mut restricted_rng = rng(seed);
-        let summary = MutationEngine::apply_mutations_with_food_type_count(
+        let summary = MutationEngine::apply_mutations_on_units(
             &mut restricted_child,
+            NODE_INTERNAL_EVENTS,
             &restricted,
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
@@ -1472,8 +1374,9 @@ fn size_pressure_restriction_disables_the_executed_layer() {
         );
         let mut reference_child = subject.clone();
         let mut reference_rng = rng(seed);
-        let reference_summary = MutationEngine::apply_mutations_with_food_type_count(
+        let reference_summary = MutationEngine::apply_mutations_on_units(
             &mut reference_child,
+            NODE_INTERNAL_EVENTS,
             &reference,
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
@@ -1492,8 +1395,9 @@ fn size_pressure_restriction_disables_the_executed_layer() {
 
         // Without size pressure the same seed does take the executed layer.
         let mut unpressured = subject.clone();
-        MutationEngine::apply_mutations_with_food_type_count(
+        MutationEngine::apply_mutations_on_units(
             &mut unpressured,
+            NODE_INTERNAL_EVENTS,
             &node_internal_config(1.0),
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
@@ -1513,8 +1417,7 @@ fn a_zero_event_birth_never_resolves_the_parent_dispatch_record() {
     let mut record = crate::creature::state::DispatchRecord::default();
     record.record_dispatch(0);
     let config = MutationConfig {
-        per_unit_supply_enabled: false,
-        mutation_probability: 0.0,
+        per_unit_rate: 0.0,
         ..SimulationConfig::default().mutation
     };
     let mut genome = v3alpha1_founder_genome();
@@ -1544,10 +1447,7 @@ fn production_supply_keeps_all_operator_families_enabled() {
 /// A configuration that draws exactly one node-internal event per birth.
 fn single_node_internal_event_config() -> MutationConfig {
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 1;
-    config.per_birth_mutation_events_max = 1;
+    config.per_unit_rate = 1.0;
     config.mesh_layer_probability = 0.0;
     config
 }
@@ -1560,8 +1460,7 @@ fn first_event_in_domain(
     domain: MutationDomain,
 ) -> MutationSummary {
     for seed in 0u64..2_000 {
-        let summary =
-            MutationEngine::apply_mutations(&mut genome.clone(), config, &[0], &mut rng(seed));
+        let summary = apply_events(&mut genome.clone(), config, &[0], &mut rng(seed), 1);
         if summary
             .events
             .first()
@@ -1649,8 +1548,7 @@ fn an_edge_operator_selects_the_module_that_has_an_edge() {
     ];
     let mut applied = 0;
     for seed in 0u64..2_000 {
-        let summary =
-            MutationEngine::apply_mutations(&mut genome.clone(), &config, &[0], &mut rng(seed));
+        let summary = apply_events(&mut genome.clone(), &config, &[0], &mut rng(seed), 1);
         for event in &summary.events {
             let Some(operator) = event.operator else {
                 continue;
@@ -1721,8 +1619,7 @@ fn a_discarded_operator_stays_visible_when_a_later_operator_applied() {
     let mut seen = 0;
     let mut edge_operator_discarded = 0;
     for seed in 0u64..2_000 {
-        let summary =
-            MutationEngine::apply_mutations(&mut genome.clone(), &config, &[0], &mut rng(seed));
+        let summary = apply_events(&mut genome.clone(), &config, &[0], &mut rng(seed), 1);
         let Some(event) = summary.events.first() else {
             continue;
         };
@@ -1771,8 +1668,7 @@ fn an_applied_event_records_the_node_the_genome_carried_before_it() {
     let before: Vec<NodeId> = founder.nodes.iter().map(|node| node.node_id).collect();
     let mut applied = 0;
     for seed in 0u64..200 {
-        let summary =
-            MutationEngine::apply_mutations(&mut founder.clone(), &config, &[0], &mut rng(seed));
+        let summary = apply_events(&mut founder.clone(), &config, &[0], &mut rng(seed), 1);
         for event in &summary.events {
             if let Some(target) = event.target {
                 assert!(before.contains(&target), "{event:?}");
@@ -1792,24 +1688,20 @@ proptest::proptest! {
     #[test]
     fn event_records_agree_with_the_totals_and_the_operator_funnels(
         seed in proptest::prelude::any::<u64>(),
-        min in 1u32..6,
-        extra in 0u32..6,
+        events in 1u32..12,
         mesh_layer in 0.0f64..=1.0,
         restricted in proptest::prelude::any::<bool>(),
     ) {
         let base = SimulationConfig::default().mutation;
         let config = MutationConfig {
-            per_unit_supply_enabled: false,
-            mutation_probability: 1.0,
-            per_birth_mutation_events_min: min,
-            per_birth_mutation_events_max: min + extra,
+            per_unit_rate: 1.0,
             mesh_layer_probability: mesh_layer,
             genome_size_pressure_enabled: restricted,
             genome_size_cap: if restricted { 1 } else { base.genome_size_cap },
             ..base
         };
-        let summary = MutationEngine::apply_mutations(
-            &mut v3alpha1_founder_genome(), &config, &[0], &mut rng(seed));
+        let summary = apply_events(
+            &mut v3alpha1_founder_genome(), &config, &[0], &mut rng(seed), events);
 
         proptest::prop_assert_eq!(summary.events.len(), summary.attempted_events as usize);
         let applied = summary.events.iter().filter(|e| e.outcome.is_applied()).count();
@@ -1875,10 +1767,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         plasticity: None,
     });
     let mut config = SimulationConfig::default().mutation;
-    config.per_unit_supply_enabled = false;
-    config.mutation_probability = 1.0;
-    config.per_birth_mutation_events_min = 6;
-    config.per_birth_mutation_events_max = 6;
+    config.per_unit_rate = 1.0;
     for seed in 0..32 {
         let mut plain = original.clone();
         let mut tracked = original.clone();
@@ -1888,10 +1777,8 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         capture_birth_weights(def, &[Box::new([0.75])]);
         let mut plain_rng = rng(seed);
         let mut tracked_rng = rng(seed);
-        let plain_summary =
-            MutationEngine::apply_mutations(&mut plain, &config, &[0], &mut plain_rng);
-        let tracked_summary =
-            MutationEngine::apply_mutations(&mut tracked, &config, &[0], &mut tracked_rng);
+        let plain_summary = apply_events(&mut plain, &config, &[0], &mut plain_rng, 6);
+        let tracked_summary = apply_events(&mut tracked, &config, &[0], &mut tracked_rng, 6);
         assert_eq!(plain, tracked);
         assert_eq!(plain_summary.events, tracked_summary.events);
         assert_eq!(plain_summary.applied_events, tracked_summary.applied_events);
