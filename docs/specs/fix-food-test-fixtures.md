@@ -139,3 +139,4 @@ fixture line, which restores the old value.
 | --- | --- | --- |
 | PRD 1 | `task-mufzkw25-zvwis1` | not-ready: `creatures_can_eat_food` food erased by `Simulation::new` (accepted, confirmed by probe, row 15); advisory tuple re-pin wording (applied); advisory server mutation-activity precondition (rebutted: new requirement outside the fixture fix) |
 | PRD 2 | `task-mufzs34k-hcg0i5` | ready; advisory "unchanged" → "nearly unchanged" peak population (applied) |
+| Implementation 1 | `task-mug11k8z-gnogmm` | no findings; could not verify runtime results (test outcomes, digests, x86_64 CI) |
