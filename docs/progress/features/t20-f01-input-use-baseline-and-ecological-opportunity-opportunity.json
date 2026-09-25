@@ -3,11 +3,11 @@
   "version": "input-opportunity-v1",
   "feature": "t20-f01-input-use-baseline-and-ecological-opportunity",
   "pilot": false,
-  "source_revision": "f48a4c09472b99a5c510c687d51891b7a126a4f1",
-  "threads": 8,
-  "wall_secs": 7548.758327458,
-  "incomplete": true,
-  "stop_reason": "wall_cap",
+  "source_revision": "f6a07d7f18faf3a035e21c598382d3a5ba05c88c",
+  "threads": 3,
+  "wall_secs": 1692.015355209,
+  "incomplete": false,
+  "stop_reason": null,
   "horizon": 1000,
   "rules": [
     "arms: F founder; I incumbents; A_k authored controller and Z_k its zero-weight twin for k in ring, vector, scalar; the k-th seeded creature carries arm k mod 8 and every descendant its founder's arm by inherited lineage",
@@ -50,8 +50,8 @@
   ],
   "raw": {
     "path": "/Users/istefanek/projects/petri/.bench-artifacts/t20-f01-input-use-baseline-and-ecological-opportunity/input-opportunity.json",
-    "bytes": 30506,
-    "sha256": "c975374b7bc97e7733bd7536c6cded04085b96fa2238e3725d7eff5fe271cc07"
+    "bytes": 31833,
+    "sha256": "99ffb897102e320a05bc9ad11776022e723efd525f9574d53e6fca806190f2bd"
   },
   "worlds": [
     {
@@ -1767,6 +1767,207 @@
       "replicates_requested": 8,
       "replicates": [
         {
+          "replicate": 0,
+          "run_seed": 26001000,
+          "ticks": 1000,
+          "births_total": 123002,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 14647,
+              "living": [
+                7076,
+                203,
+                194,
+                28,
+                46,
+                22,
+                49,
+                68,
+                134,
+                217
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 14522,
+              "living": [
+                5670,
+                342,
+                893,
+                367,
+                70,
+                30,
+                15,
+                11,
+                11,
+                9
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 14771,
+              "living": [
+                7350,
+                129,
+                269,
+                92,
+                55,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 603,
+              "sampled": 161,
+              "exposed": 25,
+              "applied": 11
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 15040,
+              "living": [
+                6990,
+                212,
+                517,
+                422,
+                42,
+                9,
+                2,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 711,
+              "sampled": 171,
+              "exposed": 71,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 19254,
+              "living": [
+                7257,
+                477,
+                1072,
+                1005,
+                300,
+                59,
+                4,
+                5,
+                23,
+                112
+              ],
+              "extinction_tick": null,
+              "sampled": 256,
+              "exposed": 136,
+              "applied": 56
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 15667,
+              "living": [
+                7291,
+                215,
+                360,
+                152,
+                141,
+                36,
+                47,
+                38,
+                98,
+                276
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 169,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 13860,
+              "living": [
+                6894,
+                210,
+                198,
+                38,
+                16,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 584,
+              "sampled": 144,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 15241,
+              "living": [
+                7384,
+                250,
+                517,
+                167,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 565,
+              "sampled": 131,
+              "exposed": 0,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.991466",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.982114",
+              "a_over_f": "1.008466",
+              "a_over_i": "1.017146",
+              "z_over_f": "1.026831"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.228953",
+              "a_over_f": "1.314535",
+              "a_over_i": "1.325850",
+              "z_over_f": "1.069639"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "0.909389",
+              "a_over_f": "0.946269",
+              "a_over_i": "0.954414",
+              "z_over_f": "1.040554"
+            }
+          ]
+        },
+        {
           "replicate": 1,
           "run_seed": 26001001,
           "ticks": 1000,
@@ -3179,13 +3380,14 @@
           "family": "ring",
           "world": "Canyon country",
           "verdict": "inconclusive",
-          "sampled": 1342,
-          "exposed": 284,
-          "applied": 144,
-          "informative": 7,
+          "sampled": 1503,
+          "exposed": 309,
+          "applied": 155,
+          "informative": 8,
           "above_one": 6,
-          "below_line": 2,
+          "below_line": 3,
           "ratios": [
+            "0.982114",
             "1.086754",
             "1.006548",
             "0.897820",
@@ -3194,21 +3396,22 @@
             "1.104573",
             "1.141740"
           ],
-          "pooled": "1.051907",
+          "pooled": "1.043030",
           "p_above_one": "0.144531",
-          "p_below_line": "0.964844"
+          "p_below_line": "0.855469"
         },
         {
           "family": "vector",
           "world": "Canyon country",
           "verdict": "positive",
-          "sampled": 2234,
-          "exposed": 1118,
-          "applied": 478,
-          "informative": 7,
-          "above_one": 7,
+          "sampled": 2490,
+          "exposed": 1254,
+          "applied": 534,
+          "informative": 8,
+          "above_one": 8,
           "below_line": 0,
           "ratios": [
+            "1.228953",
             "1.455444",
             "1.484030",
             "1.378306",
@@ -3217,21 +3420,22 @@
             "1.462106",
             "1.392419"
           ],
-          "pooled": "1.444327",
-          "p_above_one": "0.035156",
+          "pooled": "1.415709",
+          "p_above_one": "0.003906",
           "p_below_line": "1.000000"
         },
         {
           "family": "scalar",
           "world": "Canyon country",
           "verdict": "not_applicable",
-          "sampled": 1153,
+          "sampled": 1297,
           "exposed": 0,
           "applied": 0,
-          "informative": 7,
+          "informative": 8,
           "above_one": 2,
-          "below_line": 7,
+          "below_line": 8,
           "ratios": [
+            "0.909389",
             "0.979058",
             "0.943247",
             "0.994387",
@@ -3240,9 +3444,9 @@
             "0.968152",
             "1.005509"
           ],
-          "pooled": "0.977582",
+          "pooled": "0.968758",
           "p_above_one": "0.964844",
-          "p_below_line": "0.035156"
+          "p_below_line": "0.003906"
         }
       ]
     },
