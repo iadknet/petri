@@ -102,7 +102,7 @@ proposals stay in denominators; no retry.
 | `drift` cohort | the 20 birth lineages at depth 2,000 of this world's walk |
 | `selected` cohort | `min(20, s)` of this world's `s` T14.F12 sample genomes, a uniform draw without replacement over sample positions with `SmallRng::seed_from_u64(24_000_000 + world_seed)`, ascending, so rows join the read's per-genome rows without favouring low creature ids |
 | Proposals | 100 per parent |
-| Seed | `20_000_000 + 1_000_000 × cohort (founder 0, drift 1, selected 2) + 1_000 × (parent_index + 1) + proposal_index` |
+| Seed | `20_000_000 + 1_000_000 × cohort (founder 0, drift 1, selected 2) + 1_000 × (parent_index + 1) + proposal_index`, where `parent_index` is the parent's zero-based ordinal within its cohort, not the stored `parents[].index` (a `selected` parent stores its sample position: Canyon's first selected parent stores index 6 and uses ordinal 0); the stored `proposal_seed_formula` string keeps the name `parent_index` |
 | Recorded per parent | index, generation or depth, genome size, total/reachable/executed/contributing nodes, all-NoOp flag, distinct queues, and the partition below |
 
 Each applied proposal is compared with its parent over all 80 battery
@@ -285,8 +285,8 @@ make bench PROFILE=goal FEATURE=t11-f26-mutation-effect-attribution-and-observat
 
 | Item | Measured |
 | --- | --- |
-| Gate | `make bench PROFILE=gate FEATURE=t11-f26-mutation-effect-attribution-and-observation-coverage` exit 0; `severe=false` against both T11.F25 (gate epoch) and T11.F27 (previous closure); every counter delta 0.000000 |
-| Goal | `make bench PROFILE=goal FEATURE=t11-f26-mutation-effect-attribution-and-observation-coverage` exit 0; `severe=false` against T11.F27 (previous closure and goal-worlds epoch); every counter delta 0.000000 |
+| Gate | `make bench PROFILE=gate FEATURE=t11-f26-mutation-effect-attribution-and-observation-coverage` exit 0; `severe=false` against both T11.F25 (gate epoch) and T11.F27 (previous closure); every defined counter delta 0.000000; `decided_passes` `percent_delta` is null (undefined, 0 → 0) against both references |
+| Goal | `make bench PROFILE=goal FEATURE=t11-f26-mutation-effect-attribution-and-observation-coverage` exit 0; `severe=false` against T11.F27 (previous closure and goal-worlds epoch); all nine counter deltas 0.000000, `decided_passes` included |
 | Deterministic counters, persistence, existing indicators | unchanged in both profiles: gate `deterministic` byte-for-byte identical to T11.F27's; goal `deterministic` identical to T11.F27's after `del(.cases[].mutation_effects)` (verified with `jq -S` diffs) |
 | Goal observation cost | `environment.mutation_effects_wall_clock_ms_total` = 7,864.65 ms (7.86 s), under the 20 s expectation and the 60 s cap, across 3 worlds |
 | Existing caps | drift walk 17,395.64 ms vs T11.F27's 18,242.30 ms (−4.6%, within 10%); read timer 1,622.90 ms vs T11.F27's 2,079.80 ms (**−22.0%, outside the declared ±10% band**, faster not slower); founder 324.96 ms (cap 10 s), evolved 5,288.63 ms total (cap 180 s), read 1,622.90 ms total (cap 10 s) — all hard caps met |
