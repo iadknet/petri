@@ -236,8 +236,10 @@ apportioned.
       historical (block absent), zero-denominator and short-sample fixtures,
       displayed counts and ratios checked against the fixture summary; a
       browser inspection of the served report with a screenshot path in
-      readings.
-- [x] `make check` exits 0 (see readings).
+      readings. The fixture tests pass and the block-absent view is
+      inspected; the measured view waits for the goal summary.
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` is clean and
+      `make check` exits 0 (see readings).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved as killed, equivalent, or deferred.
 - [ ] Gate and goal summaries stored at

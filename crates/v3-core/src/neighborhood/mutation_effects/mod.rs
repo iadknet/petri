@@ -330,6 +330,21 @@ impl Coverage {
         self.differ_any += u32::from(any);
         self.state_or_cost_only += u32::from(!any && state_differs);
     }
+
+    #[must_use]
+    fn merge(mut self, other: &Self) -> Self {
+        self.parents_evaluated += other.parents_evaluated;
+        self.pairs_requested += other.pairs_requested;
+        self.pairs_sampled += other.pairs_sampled;
+        for (total, count) in self.differ_by_group.iter_mut().zip(other.differ_by_group) {
+            *total += count;
+        }
+        self.differ_any += other.differ_any;
+        self.state_or_cost_only += other.state_or_cost_only;
+        self.all_noop_parents += other.all_noop_parents;
+        self.all_noop_parents_acting += other.all_noop_parents_acting;
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -490,7 +505,6 @@ struct ParentEvaluation {
     row: ParentRow,
     outcomes: Vec<ProposalOutcome>,
     pairs: Vec<CreatureGenome>,
-    all_noop: bool,
 }
 
 fn evaluate_parent(
@@ -572,7 +586,6 @@ fn evaluate_parent(
             }
         }
     }
-    let all_noop = trace.signature.all_noop();
     ParentEvaluation {
         row: ParentRow {
             index: parent.index,
@@ -582,13 +595,12 @@ fn evaluate_parent(
             reachable_nodes: sets.reading.reachable_node_count as u32,
             executed_nodes: sets.reading.executed_node_count as u32,
             contributing_nodes: sets.contributing.len() as u32,
-            all_noop,
+            all_noop: trace.signature.all_noop(),
             distinct_queues: trace.signature.distinct_queue_count() as u32,
             counts,
         },
         outcomes,
         pairs,
-        all_noop,
     }
 }
 
@@ -600,7 +612,7 @@ fn run_extension(
 ) -> Vec<PanelExecution> {
     run_panel_executions(
         genome,
-        &extension.singles(),
+        &extension.singles,
         &extension.sequences,
         context.runtime,
         context.shared_memory_decay_rate,
@@ -645,35 +657,14 @@ fn observe_cohort(
     context: &EvalContext,
     sizes: Sizes,
 ) -> CohortReading {
-    let evaluations: Vec<ParentEvaluation> = parents
+    let evaluations: Vec<(ParentEvaluation, Coverage)> = parents
         .par_iter()
         .enumerate()
         .map(|(position, parent)| {
-            evaluate_parent(cohort, position, parent, battery, one_event, context, sizes)
-        })
-        .collect();
-    let coverage_rows: Vec<Coverage> = parents
-        .par_iter()
-        .zip(&evaluations)
-        .map(|(parent, evaluation)| {
-            let base = run_extension(&parent.genome, extension, context);
-            let mut coverage = Coverage {
-                parents_evaluated: 1,
-                pairs_requested: sizes.pairs_per_parent,
-                pairs_sampled: evaluation.pairs.len() as u32,
-                all_noop_parents: u32::from(evaluation.all_noop),
-                all_noop_parents_acting: u32::from(evaluation.all_noop && acts(&base)),
-                ..Coverage::default()
-            };
-            for child in &evaluation.pairs {
-                let (differs, state) = compare_on_extension(
-                    &base,
-                    &run_extension(child, extension, context),
-                    extension,
-                );
-                coverage.record_pair(differs, state);
-            }
-            coverage
+            let evaluation =
+                evaluate_parent(cohort, position, parent, battery, one_event, context, sizes);
+            let coverage = parent_coverage(parent, &evaluation, extension, context, sizes);
+            (evaluation, coverage)
         })
         .collect();
 
@@ -686,7 +677,7 @@ fn observe_cohort(
         targets: [EffectCounts::default(); 5],
         coverage: Coverage::default(),
     };
-    for (evaluation, coverage) in evaluations.into_iter().zip(coverage_rows) {
+    for (evaluation, coverage) in evaluations {
         reading.totals = reading.totals.merge(&evaluation.row.counts);
         for outcome in &evaluation.outcomes {
             reading
@@ -696,24 +687,37 @@ fn observe_cohort(
                 .record(outcome.attribution);
             reading.targets[outcome.target.index()].record(outcome.attribution);
         }
-        reading.coverage = merge_coverage(reading.coverage, coverage);
+        reading.coverage = reading.coverage.merge(&coverage);
         reading.parents.push(evaluation.row);
     }
     reading
 }
 
-fn merge_coverage(mut total: Coverage, row: Coverage) -> Coverage {
-    total.parents_evaluated += row.parents_evaluated;
-    total.pairs_requested += row.pairs_requested;
-    total.pairs_sampled += row.pairs_sampled;
-    for (sum, count) in total.differ_by_group.iter_mut().zip(row.differ_by_group) {
-        *sum += count;
+/// One parent's coverage row: its all-`NoOp` capability on both panels and
+/// its sampled pairs re-read on the extension.
+fn parent_coverage(
+    parent: &CohortParent,
+    evaluation: &ParentEvaluation,
+    extension: &Extension,
+    context: &EvalContext,
+    sizes: Sizes,
+) -> Coverage {
+    let base = run_extension(&parent.genome, extension, context);
+    let all_noop = evaluation.row.all_noop;
+    let mut coverage = Coverage {
+        parents_evaluated: 1,
+        pairs_requested: sizes.pairs_per_parent,
+        pairs_sampled: evaluation.pairs.len() as u32,
+        all_noop_parents: u32::from(all_noop),
+        all_noop_parents_acting: u32::from(all_noop && acts(&base)),
+        ..Coverage::default()
+    };
+    for child in &evaluation.pairs {
+        let (differs, state) =
+            compare_on_extension(&base, &run_extension(child, extension, context), extension);
+        coverage.record_pair(differs, state);
     }
-    total.differ_any += row.differ_any;
-    total.state_or_cost_only += row.state_or_cost_only;
-    total.all_noop_parents += row.all_noop_parents;
-    total.all_noop_parents_acting += row.all_noop_parents_acting;
-    total
+    coverage
 }
 
 /// Run one control pair on `neighborhood-v1` and on the extension.
@@ -760,33 +764,36 @@ fn run_controls(
     battery: &Battery,
     context: &EvalContext,
 ) -> Vec<ControlOutcome> {
-    vec![
+    const DIFFERS: &str = "silent on neighborhood-v1, actions differ on the extension";
+    let control = |name, expectation, pair, expect_difference| {
         run_control(
+            name,
+            expectation,
+            pair,
+            expect_difference,
+            extension,
+            battery,
+            context,
+        )
+    };
+    vec![
+        control(
             "barrier_dependent_action_edit",
-            "silent on neighborhood-v1, actions differ on the extension",
+            DIFFERS,
             controls::barrier_pair(),
             true,
-            extension,
-            battery,
-            context,
         ),
-        run_control(
+        control(
             "slow_integrator_after_tick_4",
-            "silent on neighborhood-v1, actions differ on the extension",
+            DIFFERS,
             controls::integrator_pair(),
             true,
-            extension,
-            battery,
-            context,
         ),
-        run_control(
+        control(
             "same_genome",
             "no difference in any group",
             (founder.clone(), founder.clone()),
             false,
-            extension,
-            battery,
-            context,
         ),
     ]
 }
@@ -829,11 +836,6 @@ pub fn observe(
         Ok(recorded.len() as u32)
     };
     let extension = Extension::new(recorded, battery);
-    let sequence_source = if extension.recorded.len() < contexts::SEQUENCES {
-        "authored"
-    } else {
-        "recorded"
-    };
     let cohort = |cohort, parents: &[CohortParent], requested| {
         observe_cohort(
             cohort, parents, requested, &extension, battery, &one_event, context, sizes,
@@ -853,7 +855,7 @@ pub fn observe(
             .map_err(str::to_string),
         recorded_requested: sizes.recorded_contexts,
         recorded_contexts,
-        sequence_source,
+        sequence_source: extension.sequence_source(),
         controls: run_controls(inputs.founder, &extension, battery, context),
     }
 }

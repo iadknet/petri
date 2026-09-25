@@ -181,20 +181,12 @@ fn fold_exposure(base: &Signature, outcomes: &[(BirthOutcome, bool)]) -> BirthEx
         ..BirthExposure::default()
     };
     exposure.distinct_queues_histogram[queue_bucket(distinct)] = 1;
-    let side = if actionless {
-        &mut exposure.from_actionless
-    } else {
-        &mut exposure.from_acting
-    };
-    for (outcome, _) in outcomes {
+    let mut side = CapabilitySplit::default();
+    for (outcome, identical) in outcomes {
         side.silent += outcome.tally.silent;
         side.changed += outcome.tally.changed;
         side.dead += outcome.tally.dead;
-        if outcome.applied_events == 0 {
-            side.zero_applied += 1;
-        }
-    }
-    for (outcome, identical) in outcomes {
+        side.zero_applied += u32::from(outcome.applied_events == 0);
         exposure.requested_events_total += u64::from(outcome.requested_events);
         exposure.applied_events_total += u64::from(outcome.applied_events);
         if outcome.requested_events == 0 {
@@ -205,6 +197,11 @@ fn fold_exposure(base: &Signature, outcomes: &[(BirthOutcome, bool)]) -> BirthEx
             exposure.event_bearing += 1;
             exposure.genome_identical += u32::from(*identical);
         }
+    }
+    if actionless {
+        exposure.from_actionless = side;
+    } else {
+        exposure.from_acting = side;
     }
     exposure
 }
@@ -352,16 +349,16 @@ pub fn per_birth_reading_on_units(
         .collect();
 
     let exposure = fold_exposure(base, &outcomes);
-    let result = fold_outcomes(
-        births,
-        outcomes.into_iter().map(|(outcome, _)| outcome).collect(),
-    );
+    let result = fold_outcomes(births, outcomes.into_iter().map(|(outcome, _)| outcome));
     (result, exposure)
 }
 
 /// Fold one [`BirthOutcome`] per birth into pure integer accounting.
 /// Zero-applied births carry an empty tally and need no evaluation.
-fn fold_outcomes(births_total: u32, outcomes: Vec<BirthOutcome>) -> BirthResult {
+fn fold_outcomes(
+    births_total: u32,
+    outcomes: impl IntoIterator<Item = BirthOutcome>,
+) -> BirthResult {
     let mut result = BirthResult {
         births_total,
         ..BirthResult::default()
@@ -621,7 +618,7 @@ mod tests {
             };
             let base = Signature { snapshots: vec![vec![action]; 3], sequences: Vec::new() };
             let exposure = fold_exposure(&base, &paired);
-            let result = fold_outcomes(paired.len() as u32, paired.iter().map(|(o, _)| *o).collect());
+            let result = fold_outcomes(paired.len() as u32, paired.iter().map(|(o, _)| *o));
             prop_assert_eq!(exposure.zero_requested + exposure.requested_all_skipped + exposure.event_bearing, exposure.births_total);
             prop_assert_eq!(exposure.births_total, result.births_total);
             let split = exposure.from_actionless.merge(exposure.from_acting);

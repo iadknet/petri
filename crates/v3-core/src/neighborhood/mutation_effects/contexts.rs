@@ -198,36 +198,39 @@ impl Group {
 /// One world's complete extension panel.
 #[derive(Debug, Clone)]
 pub(in crate::neighborhood) struct Extension {
-    pub(in crate::neighborhood) recorded: Vec<Scenario>,
-    pub(in crate::neighborhood) authored: Vec<Scenario>,
+    /// The single-tick contexts, recorded then authored.
+    pub(in crate::neighborhood) singles: Vec<Scenario>,
     pub(in crate::neighborhood) sequences: Vec<Vec<Scenario>>,
+    recorded: usize,
 }
 
 impl Extension {
-    pub(in crate::neighborhood) fn new(recorded: Vec<Scenario>, battery: &Battery) -> Self {
+    pub(in crate::neighborhood) fn new(mut recorded: Vec<Scenario>, battery: &Battery) -> Self {
         let authored = authored_contexts(battery);
         let sequences = sequences(&recorded, &authored);
+        let recorded_count = recorded.len();
+        recorded.extend(authored);
         Self {
-            recorded,
-            authored,
+            singles: recorded,
             sequences,
+            recorded: recorded_count,
         }
     }
 
-    /// The single-tick contexts, recorded then authored.
-    pub(in crate::neighborhood) fn singles(&self) -> Vec<Scenario> {
-        self.recorded
-            .iter()
-            .chain(&self.authored)
-            .cloned()
-            .collect()
+    /// `"recorded"`, or `"authored"` when fewer than [`SEQUENCES`] contexts
+    /// were recorded: the source [`sequences`] draws from.
+    pub(in crate::neighborhood) fn sequence_source(&self) -> &'static str {
+        if self.recorded < SEQUENCES {
+            "authored"
+        } else {
+            "recorded"
+        }
     }
 
-    /// The group of execution `index` in `singles()`-then-sequences order.
+    /// The group of execution `index` in singles-then-sequences order.
     pub(in crate::neighborhood) fn group(&self, index: usize) -> Group {
-        let recorded = self.recorded.len();
-        let singles = recorded + self.authored.len();
-        if index < recorded {
+        let singles = self.singles.len();
+        if index < self.recorded {
             Group::Recorded
         } else if index < singles {
             Group::Authored
