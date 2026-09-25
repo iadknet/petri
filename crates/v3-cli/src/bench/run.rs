@@ -8,8 +8,9 @@ use super::indicators::{
     structure_size_distribution, temporal_memory_sensitivity, timed_drift_depth, DriftCohortInputs,
     GoalIndicatorInputs,
 };
-use super::mutation_effects::undefined_mutation_effects;
-use super::mutation_effects::{observe_world, MutationEffects, WorldObservation};
+use super::mutation_effects::{
+    observe_world, undefined_mutation_effects, MutationEffects, WorldObservation,
+};
 use super::profiles::{
     build_config, goal_case, goal_recipes_for, profile_block, GoalCase, GoalRecipe,
     NeighborhoodSizes, ProfileParams, GOAL_WORLD_SET, SCHEMA_VERSION,

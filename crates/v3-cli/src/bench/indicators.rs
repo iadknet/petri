@@ -303,13 +303,13 @@ fn compute_drift_depth(
             .collect(),
         parents: readings
             .final_birth_genomes
-            .iter()
+            .into_iter()
             .enumerate()
             .map(
                 |(lineage, genome)| neighborhood::mutation_effects::CohortParent {
                     index: lineage as u64,
                     depth_or_generation: last_depth,
-                    genome: genome.clone(),
+                    genome,
                 },
             )
             .collect(),
