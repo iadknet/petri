@@ -228,10 +228,11 @@ apportioned.
       zero-denominator cases, byte identity across thread counts, and the
       pinned context sample and authored contexts; names and results in
       readings.
-- [ ] Existing blocks unchanged: gate `deterministic` equal to the T11.F27
+- [x] Existing blocks unchanged: gate `deterministic` equal to the T11.F27
       gate summary's; goal `deterministic` equal to the T11.F27 goal
       summary's after removing only `cases[].mutation_effects`; method and
-      result in readings.
+      result in readings. Confirmed by the benchmark specialist (see
+      readings) with `jq -S` diffs: identical in both cases.
 - [ ] Page: `node --test scripts/benchmark-artifacts.test.mjs` with new,
       historical (block absent), zero-denominator and short-sample fixtures,
       displayed counts and ratios checked against the fixture summary; a
@@ -242,11 +243,14 @@ apportioned.
       `make check` exits 0 (see readings).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved as killed, equivalent, or deferred.
-- [ ] Gate and goal summaries stored at
+- [x] Gate and goal summaries stored at
       `docs/progress/features/t11-f26-mutation-effect-attribution-and-observation-coverage.json`
       and `...-goal.json`, local raw hash/byte count and verification time
-      checked, series entries point to them, no new full report staged; the
-      second goal run is not required (workflow, 2026-09-05).
+      checked (see readings), series entries added to
+      `docs/progress/benchmark-series.json` (`gate.closed`,
+      `goal_worlds.closed`), no new full report staged (raw artifacts stay
+      under the ignored `.bench-artifacts/`); the second goal run is not
+      required (workflow, 2026-09-05).
 
 ## Performance and Goal Impact
 
@@ -273,7 +277,26 @@ make bench PROFILE=gate FEATURE=t11-f26-mutation-effect-attribution-and-observat
 make bench PROFILE=goal FEATURE=t11-f26-mutation-effect-attribution-and-observation-coverage
 ```
 
-**Measured verdict.** Pending.
+**Measured verdict.** Benchmark specialist run 2026-09-24/25 (worktree
+`.claude/worktrees/t11-f26`, commit `01e9c277`).
+
+| Item | Measured |
+| --- | --- |
+| Gate | `make bench PROFILE=gate FEATURE=t11-f26-mutation-effect-attribution-and-observation-coverage` exit 0; `severe=false` against both T11.F25 (gate epoch) and T11.F27 (previous closure); every counter delta 0.000000 |
+| Goal | `make bench PROFILE=goal FEATURE=t11-f26-mutation-effect-attribution-and-observation-coverage` exit 0; `severe=false` against T11.F27 (previous closure and goal-worlds epoch); every counter delta 0.000000 |
+| Deterministic counters, persistence, existing indicators | unchanged in both profiles: gate `deterministic` byte-for-byte identical to T11.F27's; goal `deterministic` identical to T11.F27's after `del(.cases[].mutation_effects)` (verified with `jq -S` diffs) |
+| Goal observation cost | `environment.mutation_effects_wall_clock_ms_total` = 7,864.65 ms (7.86 s), under the 20 s expectation and the 60 s cap, across 3 worlds |
+| Existing caps | drift walk 17,395.64 ms vs T11.F27's 18,242.30 ms (−4.6%, within 10%); read timer 1,622.90 ms vs T11.F27's 2,079.80 ms (**−22.0%, outside the declared ±10% band**, faster not slower); founder 324.96 ms (cap 10 s), evolved 5,288.63 ms total (cap 180 s), read 1,622.90 ms total (cap 10 s) — all hard caps met |
+| 15-minute goal investigation threshold | end-to-end wall time measured 684 s (11.4 min) from command start to exit; simulation `environment.wall_clock_ms_total` = 630,602.69 ms (630.6 s) plus timed observations (drift 17.4 s + founder 0.32 s + evolved 5.29 s + read 1.62 s + mutation_effects 7.86 s + final_state 0.85 s ≈ 33.3 s) ≈ 664 s total; well under the 900 s (15 min) threshold |
+| Summary size | goal summary grew from T11.F27's 7,810,874 bytes to 8,087,659 bytes: +276,785 bytes (≈270.3 KB), within the ≤400 KB cap |
+| Expected readings, sanity only | drift@2000 `parents_all_noop` 11/20 in all three worlds (55%, "about half"); `from_acting.changed` at drift@2000 vs `applied_events_total`: Orchards 3/985 (0.3%), Canyon 4/985 (0.4%), Confluence 3/985 (0.3%) — same order of magnitude as the 1% pilot figure, on the low side; selected cohort (`selected-read`) shows more action effects than drift@2000 in all three worlds (Orchards 566/3103=18.2%, Canyon 561/2760=20.3%, Confluence 955/5626=17.0%) and fewer/no `parents_all_noop` (4/50, 0/50, 1/50), consistent with the predeclared expectation |
+| Epoch | not re-pinned; not authorized |
+
+**Exception to report.** The read timer moved −22.0% against T11.F27
+(1,622.90 ms vs 2,079.80 ms), outside the predeclared ±10% band, though the
+run is faster, not slower, and every hard cap (founder 10 s, evolved 180 s,
+read 10 s, `mutation_effects` 60 s) is met with wide margin. Reported to the
+orchestrator without remediation or reinterpretation.
 
 - Summaries: [gate](../../progress/features/t11-f26-mutation-effect-attribution-and-observation-coverage.json),
   [goal](../../progress/features/t11-f26-mutation-effect-attribution-and-observation-coverage-goal.json).
