@@ -1,6 +1,6 @@
 # T11.F26 — Mutation-Effect Attribution and Observation Coverage
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-24
 **Feature**: T11.F26
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -244,8 +244,8 @@ apportioned.
       (see readings).
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` is clean and
       `make check` exits 0 (see readings).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      every survivor resolved as killed, equivalent, or deferred.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: not applicable, skipped
+      by user decision (Exception in Notes).
 - [x] Gate and goal summaries stored at
       `docs/progress/features/t11-f26-mutation-effect-attribution-and-observation-coverage.json`
       and `...-goal.json`, local raw hash/byte count and verification time
@@ -310,17 +310,19 @@ cap is met with wide margin. The predeclaration stands unedited.
 
 ## Success Criteria
 
-- [ ] Each world's goal report carries exposure strata, attribution cohorts
+- [x] Each world's goal report carries exposure strata, attribution cohorts
       and the coverage panel, reconciled with the existing tallies, with every
       existing block unchanged.
-- [ ] The progress report renders them with denominators, identities and
+- [x] The progress report renders them with denominators, identities and
       missing-data states, original charts intact.
 - [x] The closure reading classifies every candidate bottleneck as supported,
       minor, not observed, or insufficient evidence, with the unresolved
       share stated.
-- [ ] Required checks, mutation evidence, independent review and closure
+- [x] Required checks, mutation evidence (waived by the user), independent review and closure
       records are complete; the row is checked and the spec Complete on main.
 
 ## Notes for AI Agents
 
-- Decision: run substitutions for this feature (orchestrator brief, 2026-09-24): no Fable 5.1 model is used; the spec owner runs on Opus with high-effort intent, persistent and resumed by `SendMessage`; the roadmap-implementer does not consult the advisor tool and instead runs a fresh read-only Codex Astra (`gpt-6-astra`) `xhigh` task through the workflow's Codex channel at each consult point, brief written outside the worktree, reporting each consult and its decisive guidance; the orchestrator skipped the clean-main start check because main carries the pre-existing untracked `docs/specs/large-file-cleanup-2026-09-24.md`, left untouched.
+- Decision: run substitutions (orchestrator brief, 2026-09-24): no Fable 5.1 model; the spec owner runs on Opus (high intent), persistent via `SendMessage`; the implementer replaces advisor consults with fresh read-only Codex Astra `xhigh` tasks through the Codex channel; clean-main check skipped for the untracked `docs/specs/large-file-cleanup-2026-09-24.md`, left untouched.
+- Exception: mutation gate skipped by user decision (2026-09-24); a partial run is in readings, not closure evidence.
+- Cost: `/usage` awaits the user; 5 implementer passes, Codex consults 1/1/1/1/0; 2 spec-owner resumes; 3 challenge rounds, final `ready`; reviewer P1 1, P2 1, P3 0.
