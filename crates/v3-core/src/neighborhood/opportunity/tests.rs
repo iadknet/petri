@@ -31,6 +31,64 @@ fn every_controller_is_adequate_and_competent() {
     }
 }
 
+/// Diagonal ring cells do not gate `A_vector`: with the cardinal ring empty
+/// and the nearest primary food on a diagonal ring cell, the gate opens and
+/// the authored controller leads with a move toward one of its two
+/// components in every diagonal, which its zero-weight twin does not.
+#[test]
+fn diagonal_ring_food_does_not_close_the_vector_gate() {
+    use super::fixtures::{run, Context, Local};
+    use crate::contracts::{Direction, WorldAction};
+    let config = SimulationConfig::default();
+    let (authored, _) = controller(&founder(), Family::Vector, false);
+    let (inert, _) = controller(&founder(), Family::Vector, true);
+    let mut changed = 0;
+    for diagonal in [1u8, 3, 5, 7] {
+        let scenario = Context {
+            local: Local::None,
+            ring_food: Some(diagonal),
+            eligible: false,
+            barrier: None,
+            diagonal_barriers: false,
+            far_food: None,
+        }
+        .scenario();
+        let [a, z] =
+            [&authored, &inert].map(|genome| run(genome, &scenario, &config.runtime).actions);
+        let toward = [diagonal - 1, (diagonal + 1) % 8]
+            .map(|cardinal| WorldAction::Move(Direction::ALL[usize::from(cardinal)]));
+        assert!(
+            a.first().is_some_and(|first| toward.contains(first)),
+            "diagonal {diagonal}: {a:?}"
+        );
+        changed += u32::from(a != z);
+    }
+    assert!(changed > 0);
+}
+
+/// The adequacy fixture's premise in production visibility: barriers on the
+/// four diagonal ring cells never hide a cardinal ring cell.
+#[test]
+fn diagonal_barriers_leave_every_cardinal_ring_cell_visible() {
+    use crate::contracts::{Direction, Position};
+    use crate::sensors::visibility::{compute_visible_cells, get_visibility_table};
+    let mut world = crate::kernel::WorldState::new(20, 20, crate::config::WorldEdgeMode::Wrap);
+    let origin = Position::new(10, 10);
+    for diagonal in [Direction::NE, Direction::SE, Direction::SW, Direction::NW] {
+        let (dx, dy) = diagonal.delta();
+        let cell = |offset: i32| u16::try_from(10 + offset).expect("inside the world");
+        world.set_barrier(Position::new(cell(dx), cell(dy)), true);
+    }
+    let visible = compute_visible_cells(origin, &world, get_visibility_table(5));
+    for cardinal in [Direction::N, Direction::E, Direction::S, Direction::W] {
+        let (dx, dy) = cardinal.delta();
+        assert!(
+            visible.iter().any(|cell| (cell.dx, cell.dy) == (dx, dy)),
+            "{cardinal:?}"
+        );
+    }
+}
+
 #[test]
 fn authored_and_inert_pairs_match_in_size_and_differ_only_in_weights() {
     for family in Family::ALL {

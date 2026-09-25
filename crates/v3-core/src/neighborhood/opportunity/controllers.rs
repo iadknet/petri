@@ -33,10 +33,10 @@ const PRIMARY_FOOD_HERE: GraphSource = GraphSource::ComputeNode(1);
 /// `A_ring`: the weight of `barrier[d]` into `Move(d)` for the four cardinal
 /// moves the founder votes (below the founder's largest move vote, 0.9).
 pub const RING_INHIBITION: f32 = -2.0;
-/// `A_vector`: `nearest_dist` above this is beyond the primary ring. At
-/// vision radius 5 the ring's cells lie at most `sqrt(2) / (5 sqrt(2)) = 0.2`
-/// away and the next cells at least `2 / (5 sqrt(2)) = 0.283`.
-pub const VECTOR_FAR_THRESHOLD: f32 = 0.24;
+/// `A_vector`: `nearest_dist` above this is off the four cardinal ring cells
+/// the founder reads. At vision radius 5 those lie `1 / (5 sqrt(2)) = 0.141`
+/// away and the diagonal ring cells, which do not gate, `0.2`.
+pub const VECTOR_FAR_THRESHOLD: f32 = 0.17;
 /// `A_vector`: the gate opens above this (far, not able to reproduce, no
 /// primary food here).
 pub const VECTOR_GATE_THRESHOLD: f32 = 0.5;

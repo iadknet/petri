@@ -48,37 +48,44 @@ impl Local {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Context {
     pub local: Local,
-    /// Primary (grass) food on the east ring cell.
-    pub ring_food: bool,
+    /// Primary (grass) food on this ring cell, as a direction index.
+    pub ring_food: Option<u8>,
     pub eligible: bool,
     /// A cardinal barrier, as a direction index.
     pub barrier: Option<u8>,
+    /// Barriers on the four diagonal ring cells.
+    pub diagonal_barriers: bool,
     /// Primary food two cells away in this cardinal direction index.
     pub far_food: Option<u8>,
 }
 
 impl Context {
     /// The single-tick scenario, with an area summary consistent with the
-    /// food placed: the nearest of the here cell, the east ring cell and the
-    /// far cell.
+    /// food placed: the nearest of the here cell, the ring cell and the far
+    /// cell.
     pub(super) fn scenario(self) -> Scenario {
         let lifecycle = EnergyLifecycleConfig::default();
         let grass = if self.local.grass() { 1.0 } else { 0.0 };
         let fruit = if self.local.fruit() { 1.0 } else { 0.0 };
         let mut ring = [0.0f32; 8];
-        if self.ring_food {
-            ring[Direction::E.to_index()] = 1.0;
+        if let Some(direction) = self.ring_food {
+            ring[usize::from(direction)] = 1.0;
         }
         let mut barriers = [0.0f32; 8];
         if let Some(direction) = self.barrier {
             barriers[usize::from(direction)] = 1.0;
         }
+        if self.diagonal_barriers {
+            for diagonal in [1, 3, 5, 7] {
+                barriers[diagonal] = 1.0;
+            }
+        }
         let mut food_cells: Vec<(i32, i32)> = Vec::new();
         if self.local.grass() {
             food_cells.push((0, 0));
         }
-        if self.ring_food {
-            food_cells.push(Direction::E.delta());
+        if let Some(direction) = self.ring_food {
+            food_cells.push(Direction::ALL[usize::from(direction)].delta());
         }
         if let Some(direction) = self.far_food {
             let (dx, dy) = Direction::ALL[usize::from(direction)].delta();
@@ -119,6 +126,11 @@ impl Context {
         }
     }
 
+    /// Primary food on a cardinal ring cell, one the founder reads.
+    const fn cardinal_ring_food(self) -> bool {
+        matches!(self.ring_food, Some(direction) if direction % 2 == 0)
+    }
+
     /// Whether any of `family`'s authored channels reads nonzero.
     fn signal(self, family: Family) -> bool {
         match family {
@@ -136,7 +148,11 @@ impl Context {
     }
 }
 
-fn run(genome: &CreatureGenome, scenario: &Scenario, runtime: &RuntimeConfig) -> MeshOutput {
+pub(super) fn run(
+    genome: &CreatureGenome,
+    scenario: &Scenario,
+    runtime: &RuntimeConfig,
+) -> MeshOutput {
     execute_scenario_tick(genome, scenario, runtime, UntracedMeshExecution)
 }
 
@@ -152,7 +168,7 @@ pub fn competence_contexts(family: Family) -> Vec<Context> {
     };
     let mut contexts = Vec::new();
     for local in Local::ALL {
-        for ring_food in [false, true] {
+        for ring_food in [None, Some(Direction::E.to_index() as u8)] {
             for eligible in [false, true] {
                 for &(barrier, far_food) in &variants {
                     contexts.push(Context {
@@ -160,6 +176,7 @@ pub fn competence_contexts(family: Family) -> Vec<Context> {
                         ring_food,
                         eligible,
                         barrier,
+                        diagonal_barriers: false,
                         far_food,
                     });
                 }
@@ -221,7 +238,7 @@ fn intended(
         }
         Family::Vector => {
             without_moves(founder) == without_moves(authored)
-                && !context.ring_food
+                && !context.cardinal_ring_food()
                 && !context.local.grass()
         }
         Family::Scalar => {
@@ -379,9 +396,10 @@ fn adequacy(
         Family::Vector => {
             let far = |direction: u8, local: Local| Context {
                 local,
-                ring_food: false,
+                ring_food: None,
                 eligible: false,
                 barrier: None,
+                diagonal_barriers: false,
                 far_food: Some(direction),
             };
             let mut authored_met = 0;
@@ -397,22 +415,26 @@ fn adequacy(
                 let fruit =
                     run(authored, &far(direction, Local::Fruit).scenario(), runtime).actions;
                 invariant &= fruit == a;
-                for context in [
-                    Context {
-                        ring_food: true,
+                // Food on any cardinal ring cell, also with barriers on the
+                // diagonals, or primary food here closes the gate.
+                let ring = [0u8, 2, 4, 6].into_iter().flat_map(|ring_food| {
+                    [false, true].map(|diagonal_barriers| Context {
+                        ring_food: Some(ring_food),
+                        diagonal_barriers,
                         ..far(direction, Local::None)
-                    },
-                    far(direction, Local::Grass),
-                ] {
+                    })
+                });
+                for context in ring.chain([far(direction, Local::Grass)]) {
                     let scenario = context.scenario();
                     invariant &= run(authored, &scenario, runtime).actions
                         == run(founder, &scenario, runtime).actions;
                 }
             }
             Adequacy {
-                rule: "empty ring, nearest food in each cardinal direction: leads toward it in \
-                       all four, the founder not; ring food or primary food here: the founder's \
-                       action; an empty and a fruit-only cell: the same action"
+                rule: "empty cardinal ring, nearest food in each cardinal direction: leads \
+                       toward it in all four, the founder not; food in any cardinal ring cell \
+                       (also with barriers on the diagonals) or primary food here: the \
+                       founder's action; an empty and a fruit-only cell: the same action"
                     .to_string(),
                 trials: 4,
                 authored_met,
@@ -423,9 +445,10 @@ fn adequacy(
         Family::Scalar => {
             let cell = |local: Local| Context {
                 local,
-                ring_food: false,
+                ring_food: None,
                 eligible: false,
                 barrier: None,
+                diagonal_barriers: false,
                 far_food: None,
             };
             let eat_fruit = WorldAction::eat(OrdinaryFoodTypeId::new(1));

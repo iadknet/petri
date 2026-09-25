@@ -8,8 +8,8 @@ pub const MIN_EXPOSED: f64 = 0.05;
 pub const MIN_APPLIED: f64 = 0.01;
 /// A replicate is informative with at least this many `a + z` births.
 pub const MIN_INFORMATIVE_BIRTHS: u64 = 20;
-/// Informative replicates required, and replicates whose ratio must agree.
-pub const MIN_INFORMATIVE: u32 = 7;
+/// Replicates, each informative and meeting the ratio condition, a verdict
+/// needs.
 pub const MIN_AGREEING: u32 = 7;
 /// The pooled-ratio line both rules use.
 pub const RATIO_LINE: f64 = 1.05;
@@ -86,45 +86,47 @@ pub struct WorldVerdict {
     pub verdict: Verdict,
     pub exposure: Exposure,
     pub informative: u32,
-    /// Replicates with `a / z > 1`, and with `a / z < 1.05`.
+    /// Informative replicates with `a / z > 1`, and with `a / z < 1.05`.
     pub above_one: u32,
     pub below_line: u32,
     /// Per-replicate ratios, `None` when both counts are zero.
     pub ratios: Vec<Option<f64>>,
     pub pooled: Option<f64>,
-    /// Sign-test p-values of `above_one` and `below_line` over every replicate.
+    /// Sign-test p-values of `above_one` and `below_line` with `n` = 8.
     pub p_above_one: f64,
     pub p_below_line: f64,
 }
 
 /// Apply the verdict rules to one family in one world. `pairs` holds each
-/// replicate's `(a, z)`; the "7 of 8" counts run over every replicate, with
-/// informativeness a separate requirement.
+/// replicate's `(a, z)`; a replicate counts toward "7 of 8" only when it is
+/// both informative and meets the ratio condition, and the sign test's `n`
+/// is the design's 8 replicates whatever `pairs` holds (a replicate the run
+/// never reached counts as not agreeing).
 #[must_use]
 pub fn world_verdict(applicable: bool, exposure: Exposure, pairs: &[(u64, u64)]) -> WorldVerdict {
     let ratios: Vec<Option<f64>> = pairs.iter().map(|&(a, z)| ratio(a, z)).collect();
-    let informative = pairs
+    let informative_ratios: Vec<f64> = pairs
         .iter()
-        .filter(|&&(a, z)| a + z >= MIN_INFORMATIVE_BIRTHS)
-        .count() as u32;
-    let above_one = ratios.iter().filter(|r| r.is_some_and(|r| r > 1.0)).count() as u32;
-    let below_line = ratios
-        .iter()
-        .filter(|r| r.is_some_and(|r| r < RATIO_LINE))
-        .count() as u32;
+        .zip(&ratios)
+        .filter(|&(&(a, z), _)| a + z >= MIN_INFORMATIVE_BIRTHS)
+        .filter_map(|(_, ratio)| *ratio)
+        .collect();
+    let informative = informative_ratios.len() as u32;
+    let count =
+        |pass: fn(f64) -> bool| informative_ratios.iter().filter(|&&r| pass(r)).count() as u32;
+    let above_one = count(|r| r > 1.0);
+    let below_line = count(|r| r < RATIO_LINE);
     let (sum_a, sum_z) = pairs
         .iter()
         .fold((0, 0), |(sa, sz), &(a, z)| (sa + a, sz + z));
     let pooled = ratio(sum_a, sum_z);
-    let replicates = pairs.len() as u32;
-    let enough = informative >= MIN_INFORMATIVE;
     let verdict = if !applicable {
         Verdict::NotApplicable
     } else if !exposure.gate_met() {
         Verdict::InconclusiveExposure
-    } else if enough && above_one >= MIN_AGREEING && pooled.is_some_and(|p| p >= RATIO_LINE) {
+    } else if above_one >= MIN_AGREEING && pooled.is_some_and(|p| p >= RATIO_LINE) {
         Verdict::Positive
-    } else if enough && below_line >= MIN_AGREEING && pooled.is_some_and(|p| p < RATIO_LINE) {
+    } else if below_line >= MIN_AGREEING && pooled.is_some_and(|p| p < RATIO_LINE) {
         Verdict::Negative
     } else {
         Verdict::Inconclusive
@@ -137,8 +139,8 @@ pub fn world_verdict(applicable: bool, exposure: Exposure, pairs: &[(u64, u64)])
         below_line,
         ratios,
         pooled,
-        p_above_one: sign_test_p(above_one, replicates),
-        p_below_line: sign_test_p(below_line, replicates),
+        p_above_one: sign_test_p(above_one, super::REPLICATES),
+        p_below_line: sign_test_p(below_line, super::REPLICATES),
     }
 }
 
@@ -238,6 +240,40 @@ mod tests {
     }
 
     #[test]
+    fn an_uninformative_replicate_never_counts_toward_a_verdict() {
+        // Seven replicates pass the ratio, but one of them is uninformative:
+        // six count, one short of seven.
+        let mut pairs = [(30, 20); 8];
+        pairs[0] = (10, 20);
+        pairs[1] = (15, 4);
+        let reading = world_verdict(true, GATE, &pairs);
+        assert_eq!(reading.informative, 7);
+        assert_eq!(reading.above_one, 6);
+        assert_eq!(reading.verdict, Verdict::Inconclusive);
+        assert!((reading.p_above_one - sign_test_p(6, 8)).abs() < 1e-12);
+        // The same on the negative side.
+        let mut pairs = [(20, 20); 8];
+        pairs[0] = (22, 20);
+        pairs[1] = (5, 5);
+        let reading = world_verdict(true, GATE, &pairs);
+        assert_eq!(reading.below_line, 6);
+        assert_eq!(reading.verdict, Verdict::Inconclusive);
+        // Once the seventh passing replicate is informative, it counts.
+        pairs[1] = (10, 10);
+        assert_eq!(world_verdict(true, GATE, &pairs).verdict, Verdict::Negative);
+    }
+
+    #[test]
+    fn the_sign_test_n_is_eight_whatever_the_run_reached() {
+        let short = world_verdict(true, GATE, &[(30, 20); 7]);
+        assert_eq!(short.above_one, 7);
+        assert!((short.p_above_one - sign_test_p(7, 8)).abs() < 1e-12);
+        let pilot = world_verdict(true, GATE, &[(30, 20)]);
+        assert!((pilot.p_above_one - sign_test_p(1, 8)).abs() < 1e-12);
+        assert_eq!(pilot.verdict, Verdict::Inconclusive);
+    }
+
+    #[test]
     fn not_applicable_pairs_keep_their_ratio_but_no_verdict() {
         let reading = world_verdict(false, GATE, &[(30, 20); 8]);
         assert_eq!(reading.verdict, Verdict::NotApplicable);
@@ -291,8 +327,19 @@ mod tests {
             let mut reversed = pairs.clone();
             reversed.reverse();
             prop_assert_eq!(world_verdict(true, GATE, &reversed).verdict, reading.verdict);
-            let positive_rule = reading.informative >= MIN_INFORMATIVE
-                && reading.above_one >= MIN_AGREEING
+            let agreeing = |pass: fn(f64) -> bool| {
+                pairs
+                    .iter()
+                    .filter(|&&(a, z)| {
+                        a + z >= MIN_INFORMATIVE_BIRTHS && ratio(a, z).is_some_and(pass)
+                    })
+                    .count() as u32
+            };
+            prop_assert_eq!(reading.above_one, agreeing(|r| r > 1.0));
+            prop_assert_eq!(reading.below_line, agreeing(|r| r < RATIO_LINE));
+            prop_assert!(reading.above_one <= reading.informative);
+            prop_assert!(reading.below_line <= reading.informative);
+            let positive_rule = reading.above_one >= MIN_AGREEING
                 && reading.pooled.is_some_and(|p| p >= RATIO_LINE);
             prop_assert_eq!(reading.verdict == Verdict::Positive, positive_rule);
         }
