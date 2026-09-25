@@ -65,17 +65,17 @@ pub struct PerSeed {
     pub plasticity_updates: u64,
     pub actions_applied: u64,
     pub births: u64,
-    /// Passes that reached the per-pass hop cap (T19.F02); a stored report
-    /// without the key reads as zero.
-    #[serde(default)]
-    pub pass_cap_hits: u64,
-    /// Mesh passes run (T19.F04); a stored report without the key reads as
-    /// zero.
-    #[serde(default)]
-    pub passes: u64,
-    /// Passes that ended `Decided` (T19.F04); absent reads as zero.
-    #[serde(default)]
-    pub decided_passes: u64,
+    /// Passes that reached the per-pass hop cap (T19.F02). A stored report
+    /// without the key is unmeasured in comparisons and zero in totals.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pass_cap_hits: Option<u64>,
+    /// Mesh passes run (T19.F04); absent reads as `pass_cap_hits` does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passes: Option<u64>,
+    /// Passes that ended `Decided` (T19.F04); absent reads as `pass_cap_hits`
+    /// does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decided_passes: Option<u64>,
     pub final_population: u64,
     pub extinction_tick: Option<u64>,
 }

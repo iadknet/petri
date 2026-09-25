@@ -613,3 +613,42 @@ fn an_undefined_reading_parses_as_unmeasured() {
     assert_eq!(parse_reading(UNDEFINED), None);
     assert_eq!(parse_reading(""), None);
 }
+
+/// A stored report from before T19.F02/F04 has no pass counters in its
+/// per-seed rows. Its per-case pass readings are unmeasured, as the same
+/// report's summary reads them, not a measured zero; a stored zero stays zero.
+#[test]
+fn per_case_pass_readings_are_unmeasured_when_the_stored_row_lacks_them() {
+    let mut report = small_world_set_report();
+    for row in &mut report.deterministic.per_seed {
+        row.creature_ticks = 10;
+    }
+    let mut historical = serde_json::to_value(&report).unwrap();
+    for row in historical["deterministic"]["per_seed"]
+        .as_array_mut()
+        .unwrap()
+    {
+        let row = row.as_object_mut().unwrap();
+        for counter in ADDITIVE_COUNTER_NAMES {
+            row.remove(counter);
+        }
+    }
+    let historical: Report = serde_json::from_value(historical).unwrap();
+    let case = &report.deterministic.profile.cases[0].name;
+    let value = |report: &Report, name: &str| {
+        case_readings(report, case)
+            .into_iter()
+            .find(|(reading, _)| reading == name)
+            .unwrap_or_else(|| panic!("{name} must be a compared reading"))
+            .1
+    };
+    for counter in ADDITIVE_COUNTER_NAMES {
+        let name = format!("{counter}_per_creature_tick");
+        assert_eq!(value(&historical, &name), None, "{name}");
+        assert!(value(&report, &name).is_some(), "{name}");
+    }
+    assert_eq!(
+        value(&historical, "mesh_hops_per_creature_tick"),
+        value(&report, "mesh_hops_per_creature_tick")
+    );
+}
