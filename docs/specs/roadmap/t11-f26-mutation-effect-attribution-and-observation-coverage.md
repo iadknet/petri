@@ -195,9 +195,11 @@ action change is not evidence of useful behavior.
       extension with its contexts and controls, all in `neighborhood`.
 - [x] Bench: `mutation_effects` per case, timing fields, summary projection.
 - [x] Progress report section and its fixtures.
-- [ ] Closure reading: the table below filled from the goal summary in
+- [x] Closure reading: the table below filled from the goal summary in
       `docs/progress/readings/t11-f26.md`, one row per candidate bottleneck
-      per world, each row naming its evidence and owner.
+      per world, each row naming its evidence and owner. Supported: drift
+      actionless parents (all worlds); unexecuted edits (Canyon drift,
+      Orchards selected); masking, state or cost (Canyon selected).
 
 | Candidate bottleneck | Denominator | Supported when (per cohort, drift and selected) | Owner if supported |
 | --- | --- | --- | --- |
@@ -233,12 +235,13 @@ apportioned.
       summary's after removing only `cases[].mutation_effects`; method and
       result in readings. Confirmed by the benchmark specialist (see
       readings) with `jq -S` diffs: identical in both cases.
-- [ ] Page: `node --test scripts/benchmark-artifacts.test.mjs` with new,
+- [x] Page: `node --test scripts/benchmark-artifacts.test.mjs` with new,
       historical (block absent), zero-denominator and short-sample fixtures,
       displayed counts and ratios checked against the fixture summary; a
       browser inspection of the served report with a screenshot path in
-      readings. The fixture tests pass and the block-absent view is
-      inspected; the measured view waits for the goal summary.
+      readings. The fixture tests pass; the block-absent and measured views
+      are inspected, the measured one spot-checked against the goal summary
+      (see readings).
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` is clean and
       `make check` exits 0 (see readings).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
@@ -289,7 +292,7 @@ make bench PROFILE=goal FEATURE=t11-f26-mutation-effect-attribution-and-observat
 | Existing caps | drift walk 17,395.64 ms vs T11.F27's 18,242.30 ms (−4.6%, within 10%); read timer 1,622.90 ms vs T11.F27's 2,079.80 ms (**−22.0%, outside the declared ±10% band**, faster not slower); founder 324.96 ms (cap 10 s), evolved 5,288.63 ms total (cap 180 s), read 1,622.90 ms total (cap 10 s) — all hard caps met |
 | 15-minute goal investigation threshold | end-to-end wall time measured 684 s (11.4 min) from command start to exit; simulation `environment.wall_clock_ms_total` = 630,602.69 ms (630.6 s) plus timed observations (drift 17.4 s + founder 0.32 s + evolved 5.29 s + read 1.62 s + mutation_effects 7.86 s + final_state 0.85 s ≈ 33.3 s) ≈ 664 s total; well under the 900 s (15 min) threshold |
 | Summary size | goal summary grew from T11.F27's 7,810,874 bytes to 8,087,659 bytes: +276,785 bytes (≈270.3 KB), within the ≤400 KB cap |
-| Expected readings, sanity only | drift@2000 `parents_all_noop` 11/20 in all three worlds (55%, "about half"); `from_acting.changed` at drift@2000 vs `applied_events_total`: Orchards 3/985 (0.3%), Canyon 4/985 (0.4%), Confluence 3/985 (0.3%) — same order of magnitude as the 1% pilot figure, on the low side; selected cohort (`selected-read`) shows more action effects than drift@2000 in all three worlds (Orchards 566/3103=18.2%, Canyon 561/2760=20.3%, Confluence 955/5626=17.0%) and fewer/no `parents_all_noop` (4/50, 0/50, 1/50), consistent with the predeclared expectation |
+| Expected readings, sanity only | attribution cohorts: drift 11/20 parents all-NoOp in every world ("about half"); drift `action_changed` 9, 5 and 9 of 2,000 applied proposals (0.45%, 0.25%, 0.45%; pilot 13/2,000, 0.65%), same order, on the low side; selected 2, 0 and 0 all-NoOp parents of 20 and `action_changed` 462/2,000, 433/1,755, 366/1,922 (19–25%), as expected. Exposure strata, over their own denominators: drift@2000 `from_acting.changed` 3, 4, 3 of 985 applied events; `selected-read` 18.2%, 20.3%, 17.0% |
 | Epoch | not re-pinned; not authorized |
 
 **Read-timer disposition (spec owner, 2026-09-25).** The read timer read
@@ -312,7 +315,7 @@ cap is met with wide margin. The predeclaration stands unedited.
       existing block unchanged.
 - [ ] The progress report renders them with denominators, identities and
       missing-data states, original charts intact.
-- [ ] The closure reading classifies every candidate bottleneck as supported,
+- [x] The closure reading classifies every candidate bottleneck as supported,
       minor, not observed, or insufficient evidence, with the unresolved
       share stated.
 - [ ] Required checks, mutation evidence, independent review and closure
