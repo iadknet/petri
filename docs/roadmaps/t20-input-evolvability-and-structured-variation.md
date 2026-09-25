@@ -1,7 +1,7 @@
 # T20 — Input Evolvability and Structured Variation
 
-**Status**: Planned
-**Last updated**: 2026-09-24
+**Status**: In Progress
+**Last updated**: 2026-09-25
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
