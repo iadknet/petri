@@ -202,9 +202,9 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
       constants, the funnel per world × cohort × family naming the first stage
       whose parent count falls below half the previous stage (or none), the
       opportunity and Graph-feasibility tables, the discovery baseline and the
-      VM concerns. The constants, focused tests, discovery baseline,
-      feasibility and VM concerns are recorded; the funnel and opportunity
-      tables wait for the goal run and the assay.
+      VM concerns. All are recorded. The funnel table is script-generated
+      from the goal summary; 25 multi-channel cells stay unresolved because
+      the block stores per-channel rows, not family parent unions.
 
 ## Verification
 
@@ -277,7 +277,10 @@ scripts/bench-wait cargo run --release -p v3-cli -- input-opportunity --feature 
 
 **Measured verdict (2026-09-25).** Gate and goal: both not severe against
 their epochs, all deterministic counters unchanged, all caps under budget,
-goal summary grew ≈99.1 KB (cap 300 KB). Founder families show causal use in
+goal summary grew ≈99.1 KB (cap 300 KB). Goal end-to-end time is at most
+≈518 s (benchmark log creation to last write, 11:45:16–11:53:54) against the
+15-minute threshold; `wall_clock_ms_total` (465.8 s) is simulation time
+only. Founder families show causal use in
 all three worlds as expected. **Assay: complete, under cap.** The first
 (8-thread) attempt overran the cap and was voided by the spec owner's ruling
 (pilot/full concurrency mismatch; see Verification). The 3-thread rerun

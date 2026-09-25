@@ -35,7 +35,7 @@ use v3_core::neighborhood::opportunity::{
 use v3_core::neighborhood::Battery;
 use v3_core::simulation::{run_tick, seed_simulation};
 
-use crate::bench::artifacts::{output_paths_with_suffix, write_json};
+use crate::bench::artifacts::{output_paths_with_suffix, write_json, OutputPaths};
 use crate::bench::GoalCase;
 use crate::recruitment::{io_error, thread_pool, HashingWriter};
 
@@ -375,25 +375,31 @@ fn incumbents(config: &SimulationConfig, goal_seed: u64, horizon: u64) -> Vec<Cr
     draw_incumbents(&sim, goal_seed)
 }
 
+/// The raw and summary paths: explicit paths win; otherwise both default
+/// names follow the run, so a pilot and a full run never share a file.
+fn output_paths(options: &Options) -> Result<OutputPaths, String> {
+    let (profile, suffix) = if options.pilot {
+        ("input-opportunity-pilot", "-opportunity-pilot")
+    } else {
+        ("input-opportunity", "-opportunity")
+    };
+    output_paths_with_suffix(
+        &options.cwd,
+        profile,
+        suffix,
+        Some(&options.feature),
+        options.raw.as_deref(),
+        options.summary.as_deref(),
+    )
+}
+
 /// Run the assay, write both artifacts, and report what was produced.
 ///
 /// # Errors
 /// When an output path cannot be resolved or written.
 pub fn run(options: &Options) -> Result<Outcome, String> {
     let sizes = options.sizes();
-    let suffix = if options.pilot {
-        "-opportunity-pilot"
-    } else {
-        "-opportunity"
-    };
-    let paths = output_paths_with_suffix(
-        &options.cwd,
-        "input-opportunity",
-        suffix,
-        Some(&options.feature),
-        options.raw.as_deref(),
-        options.summary.as_deref(),
-    )?;
+    let paths = output_paths(options)?;
     let pool = thread_pool(options.threads)?;
     let work = || execute(options, sizes, &paths.raw);
     let (execution, threads) = match &pool {
@@ -724,6 +730,44 @@ mod tests {
             .families
             .iter()
             .all(|family| family.competence.violations == 0));
+    }
+
+    /// A pilot must never overwrite the full run's raw record (or the
+    /// reverse): each default raw path is named after its own run.
+    #[test]
+    fn pilot_and_full_runs_resolve_to_distinct_raw_paths() {
+        let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let full = Options::new("t20-f01-x", checkout);
+        let pilot = Options {
+            pilot: true,
+            ..full.clone()
+        };
+        let full = output_paths(&full).unwrap();
+        let pilot = output_paths(&pilot).unwrap();
+        assert!(full
+            .raw
+            .ends_with(".bench-artifacts/t20-f01-x/input-opportunity.json"));
+        assert!(pilot
+            .raw
+            .ends_with(".bench-artifacts/t20-f01-x/input-opportunity-pilot.json"));
+        assert!(full
+            .summary
+            .ends_with("docs/progress/features/t20-f01-x-opportunity.json"));
+        assert!(pilot
+            .summary
+            .ends_with("docs/progress/features/t20-f01-x-opportunity-pilot.json"));
+    }
+
+    #[test]
+    fn an_explicit_raw_path_is_kept_for_a_pilot() {
+        let dir = Temp::new();
+        let options = Options {
+            pilot: true,
+            ..reduced(&dir.0, "explicit", 1)
+        };
+        let paths = output_paths(&options).unwrap();
+        assert!(paths.raw.ends_with("explicit-raw.jsonl"));
+        assert!(paths.summary.ends_with("explicit.json"));
     }
 
     #[test]
