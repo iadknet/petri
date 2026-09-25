@@ -218,9 +218,13 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
       identity for an unread and an all-zero channel on both backends,
       retention on a constructed pair, the stage invariant, zero-denominator
       and short samples, byte identity across thread counts; the three
-      adequacy fixtures and competence checks, equal `genome_size()` for each
-      `A_k`/`Z_k` pair, arm assignment and birth attribution on a small world,
-      the verdict rules on constructed tallies, two reduced assay runs
+      adequacy fixtures (`A_vector`: food on any cardinal ring cell, also
+      with diagonal barriers, keeps the founder's action; diagonal ring food
+      opens the gate) and competence checks, equal `genome_size()` for each
+      `A_k`/`Z_k` pair, arm assignment and birth attribution on a small world
+      with the per-replicate `births_total` identity, the verdict rules on
+      constructed tallies (an uninformative replicate never counts; sign-test
+      `n` 8), the row-string round trip as a proptest, two reduced assay runs
       byte-identical.
 - [ ] Existing blocks unchanged: gate `deterministic` equal to the T11.F26
       gate summary's; goal `deterministic` equal to the T11.F26 goal

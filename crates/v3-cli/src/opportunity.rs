@@ -9,7 +9,7 @@
 //! per-family verdicts, the F02–F05 gate, the controllers' competence and
 //! Graph feasibility, the discovery baseline and the VM concerns.
 
-use std::io::{BufWriter, Write};
+use std::io::Write;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -18,7 +18,6 @@ use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use v3_core::config::SimulationConfig;
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::creature::genome::CreatureGenome;
@@ -38,6 +37,7 @@ use v3_core::simulation::{run_tick, seed_simulation};
 
 use crate::bench::artifacts::{output_paths_with_suffix, write_json};
 use crate::bench::GoalCase;
+use crate::recruitment::{io_error, thread_pool, HashingWriter};
 
 /// The record kind the summary carries.
 pub const SUMMARY_KIND: &str = "petri-input-opportunity-summary";
@@ -152,6 +152,9 @@ pub struct ReplicateRow {
     pub replicate: u32,
     pub run_seed: u64,
     pub ticks: u64,
+    /// Every birth of the replicate: each arm's births plus
+    /// `unattributed_births`, newborns dying within their birth tick.
+    pub births_total: u64,
     pub unattributed_births: u64,
     pub arms: Vec<ArmRow>,
     pub i_over_f: Option<String>,
@@ -165,6 +168,7 @@ fn replicate_row(replicate: u32, run: &ReplicateRun, fallback: bool) -> Replicat
         replicate,
         run_seed: run.run_seed,
         ticks: run.ticks,
+        births_total: run.births_total,
         unattributed_births: run.unattributed_births,
         arms: Arm::ALL
             .into_iter()
@@ -319,9 +323,10 @@ fn rules() -> Vec<String> {
          when an authored channel reads nonzero; applied when ablating the authored channels \
          changes the committed actions of one execution from fresh cognition state",
         "verdict: gate exposed >= 5% and applied >= 1% of sampled A_k; informative a + z >= 20; \
-         positive with >= 7 informative replicates, a/z > 1 in >= 7 replicates and sum a / sum z \
-         >= 1.05; negative with >= 7 informative, a/z < 1.05 in >= 7 and the pooled ratio < 1.05; \
-         otherwise inconclusive; sign-test tails over every replicate",
+         positive when >= 7 of the 8 replicates are both informative and a/z > 1, and sum a / \
+         sum z >= 1.05; negative when >= 7 of the 8 are both informative and a/z < 1.05, and the \
+         pooled ratio < 1.05; an uninformative replicate never counts; otherwise inconclusive; \
+         sign-test tails with n = 8",
         "family: positive when any applicable world is, negative when all are; F02-F05 gate \
          favorable with two positive Graph-feasible families, one non-ring",
     ]
@@ -341,25 +346,6 @@ fn controller_constants() -> Vec<(String, f32)> {
     ]
     .map(|(name, value)| (name.to_string(), value))
     .to_vec()
-}
-
-/// Counts and hashes every byte on its way to the file.
-struct HashingWriter<W: Write> {
-    inner: W,
-    hasher: Sha256,
-    bytes: u64,
-}
-
-impl<W: Write> Write for HashingWriter<W> {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let written = self.inner.write(buf)?;
-        self.hasher.update(&buf[..written]);
-        self.bytes += written as u64;
-        Ok(written)
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.inner.flush()
-    }
 }
 
 /// The worlds the assay runs: the goal worlds, resized under test sizes.
@@ -408,15 +394,7 @@ pub fn run(options: &Options) -> Result<Outcome, String> {
         options.raw.as_deref(),
         options.summary.as_deref(),
     )?;
-    let pool = options
-        .threads
-        .map(|threads| {
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(threads.get())
-                .build()
-                .map_err(|e| format!("cannot build a {threads}-thread pool: {e}"))
-        })
-        .transpose()?;
+    let pool = thread_pool(options.threads)?;
     let work = || execute(options, sizes, &paths.raw);
     let (execution, threads) = match &pool {
         Some(pool) => pool.install(|| (work(), rayon::current_num_threads())),
@@ -480,32 +458,19 @@ struct Execution {
     wall_secs: f64,
 }
 
-fn io_error(path: &Path, e: &std::io::Error) -> String {
-    format!("failed to write {}: {e}", path.display())
-}
-
 /// Write `lines` to `raw`, one per line, and return its byte count and SHA-256.
 fn write_raw<'a>(
     raw: &Path,
     lines: impl Iterator<Item = &'a str>,
 ) -> Result<(u64, String), String> {
-    if let Some(parent) = raw.parent().filter(|p| !p.as_os_str().is_empty()) {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("failed to create {}: {e}", parent.display()))?;
-    }
-    let file = std::fs::File::create(raw).map_err(|e| io_error(raw, &e))?;
-    let mut out = HashingWriter {
-        inner: BufWriter::new(file),
-        hasher: Sha256::new(),
-        bytes: 0,
-    };
+    let mut out = HashingWriter::create(raw)?;
     for line in lines {
         out.write_all(line.as_bytes())
             .and_then(|()| out.write_all(b"\n"))
             .map_err(|e| io_error(raw, &e))?;
     }
     out.flush().map_err(|e| io_error(raw, &e))?;
-    Ok((out.bytes, format!("{:x}", out.hasher.finalize())))
+    Ok((out.bytes, out.sha256()))
 }
 
 fn execute(options: &Options, sizes: Sizes, raw: &Path) -> Result<Execution, String> {
@@ -570,11 +535,11 @@ fn execute(options: &Options, sizes: Sizes, raw: &Path) -> Result<Execution, Str
     let mut world_summaries = Vec::with_capacity(worlds.len());
     let mut verdicts_by_family: Vec<Vec<Verdict>> = vec![Vec::new(); Family::ALL.len()];
     for (index, ((case, config), genomes)) in worlds.iter().zip(&genomes).enumerate() {
-        let world_runs: Vec<ReplicateRun> = runs
+        let (replicate_indices, world_runs): (Vec<u32>, Vec<ReplicateRun>) = runs
             .iter()
             .filter(|(world, _, _)| *world == index)
-            .map(|(_, _, run)| run.clone())
-            .collect();
+            .map(|(_, replicate, run)| (*replicate, run.clone()))
+            .unzip();
         let verdicts = world_verdicts(index, &world_runs);
         for (family, reading) in Family::ALL.into_iter().zip(&verdicts) {
             verdicts_by_family[family.index() as usize].push(reading.verdict);
@@ -587,10 +552,10 @@ fn execute(options: &Options, sizes: Sizes, raw: &Path) -> Result<Execution, Str
             incumbents: genomes.incumbents.len() as u32,
             founder_fallback: fallback,
             replicates_requested: sizes.replicates,
-            replicates: runs
-                .iter()
-                .filter(|(world, _, _)| *world == index)
-                .map(|(_, replicate, run)| replicate_row(*replicate, run, fallback))
+            replicates: replicate_indices
+                .into_iter()
+                .zip(&world_runs)
+                .map(|(replicate, run)| replicate_row(replicate, run, fallback))
                 .collect(),
             verdicts: Family::ALL
                 .into_iter()
@@ -731,6 +696,13 @@ mod tests {
         assert_eq!(summary.families.len(), 3);
         for world in &summary.worlds {
             assert_eq!(world.replicates.len(), 2);
+            for replicate in &world.replicates {
+                let attributed: u64 = replicate.arms.iter().map(|arm| arm.births).sum();
+                assert_eq!(
+                    attributed + replicate.unattributed_births,
+                    replicate.births_total
+                );
+            }
             for row in &world.verdicts {
                 assert_ne!(
                     row.verdict,

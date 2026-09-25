@@ -136,6 +136,23 @@ fn row_strings_round_trip_and_reject_malformed_text() {
     assert_eq!(RowBlock::decode("x y 1 1 1 1 1 1 1 1 1"), None);
 }
 
+proptest::proptest! {
+    /// Every row the block can hold decodes back to itself.
+    #[test]
+    fn row_strings_decode_to_the_encoded_row(
+        family in "[A-Za-z]{1,20}(:[0-9]{1,2})?",
+        channel in proptest::num::u16::ANY,
+        beyond_draw_width in proptest::bool::ANY,
+        counts in proptest::collection::vec(
+            proptest::option::of(proptest::num::u32::ANY),
+            ROW_FIELDS.len(),
+        ),
+    ) {
+        let row = RowBlock { family, channel, beyond_draw_width, counts };
+        proptest::prop_assert_eq!(RowBlock::decode(&row.encode()), Some(row));
+    }
+}
+
 #[test]
 fn retained_share_is_undefined_without_a_retention_pair() {
     let reading = CohortUse {

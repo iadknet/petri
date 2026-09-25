@@ -187,10 +187,33 @@ pub struct Outcome {
 }
 
 /// Counts and hashes every byte on its way to the file.
-struct HashingWriter<W: Write> {
+pub(crate) struct HashingWriter<W: Write> {
     inner: W,
     hasher: Sha256,
-    bytes: u64,
+    pub(crate) bytes: u64,
+}
+
+impl HashingWriter<BufWriter<std::fs::File>> {
+    /// Create `raw` (and its parent directories) for hashed, buffered writes.
+    pub(crate) fn create(raw: &Path) -> Result<Self, String> {
+        if let Some(parent) = raw.parent().filter(|p| !p.as_os_str().is_empty()) {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("failed to create {}: {e}", parent.display()))?;
+        }
+        let file = std::fs::File::create(raw).map_err(|e| io_error(raw, &e))?;
+        Ok(Self {
+            inner: BufWriter::new(file),
+            hasher: Sha256::new(),
+            bytes: 0,
+        })
+    }
+}
+
+impl<W: Write> HashingWriter<W> {
+    /// The lowercase hex SHA-256 of every byte written.
+    pub(crate) fn sha256(self) -> String {
+        format!("{:x}", self.hasher.finalize())
+    }
 }
 
 impl<W: Write> Write for HashingWriter<W> {
@@ -240,7 +263,21 @@ impl Stream {
     }
 }
 
-fn io_error(path: &Path, e: &std::io::Error) -> String {
+/// A rayon pool of `threads` threads, or `None` for the global pool.
+pub(crate) fn thread_pool(
+    threads: Option<NonZeroUsize>,
+) -> Result<Option<rayon::ThreadPool>, String> {
+    threads
+        .map(|threads| {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(threads.get())
+                .build()
+                .map_err(|e| format!("cannot build a {threads}-thread pool: {e}"))
+        })
+        .transpose()
+}
+
+pub(crate) fn io_error(path: &Path, e: &std::io::Error) -> String {
     format!("failed to write {}: {e}", path.display())
 }
 
@@ -264,15 +301,7 @@ pub fn run(options: &Options) -> Result<Outcome, String> {
         options.raw.as_deref(),
         options.summary.as_deref(),
     )?;
-    let pool = options
-        .threads
-        .map(|threads| {
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(threads.get())
-                .build()
-                .map_err(|e| format!("cannot build a {threads}-thread pool: {e}"))
-        })
-        .transpose()?;
+    let pool = thread_pool(options.threads)?;
     let threads = pool.as_ref().map_or_else(
         rayon::current_num_threads,
         rayon::ThreadPool::current_num_threads,
@@ -358,16 +387,7 @@ pub fn run(options: &Options) -> Result<Outcome, String> {
 /// Create the raw file and write the record header up to the open
 /// `lineages` array.
 fn open_stream(raw: &Path, header: &RawRecord) -> Result<Stream, String> {
-    if let Some(parent) = raw.parent().filter(|p| !p.as_os_str().is_empty()) {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("failed to create {}: {e}", parent.display()))?;
-    }
-    let file = std::fs::File::create(raw).map_err(|e| io_error(raw, &e))?;
-    let mut writer = HashingWriter {
-        inner: BufWriter::new(file),
-        hasher: Sha256::new(),
-        bytes: 0,
-    };
+    let mut writer = HashingWriter::create(raw)?;
     // The header object minus its trailing fields, then the streamed array.
     let mut head = serde_json::to_value(header).map_err(|e| e.to_string())?;
     let object = head.as_object_mut().expect("record header is an object");
@@ -402,13 +422,7 @@ fn close_stream(
     footer_text.remove(0); // the opening brace
     writeln!(stream.writer, "\n],{footer_text}").map_err(|e| io_error(raw, &e))?;
     stream.writer.flush().map_err(|e| io_error(raw, &e))?;
-    let HashingWriter {
-        inner,
-        hasher,
-        bytes,
-    } = stream.writer;
-    drop(inner);
-    Ok((bytes, format!("{:x}", hasher.finalize())))
+    Ok((stream.writer.bytes, stream.writer.sha256()))
 }
 
 /// What the parallel loop leaves behind: the stream, the completed
