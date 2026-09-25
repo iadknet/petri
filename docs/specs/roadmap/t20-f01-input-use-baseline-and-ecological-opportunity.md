@@ -233,13 +233,17 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
       `make check` exits 0 (2026-09-25, results in readings).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved.
-- [ ] Gate and goal summaries at `docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json`
+- [x] Gate and goal summaries at `docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json`
       and `...-goal.json`, raw hash/byte count and verification time checked,
       series entries added, no full report staged; the second goal run is not
-      required (workflow, 2026-09-05).
+      required (workflow, 2026-09-05). Both not severe against their epochs;
+      details in readings (2026-09-25).
 - [ ] Assay pilot and full summaries at `...-opportunity-pilot.json` and
       `...-opportunity.json`, run through `scripts/bench-wait` after all
       code is final, alone on the host; verdict tables in readings.
+      **Exception, not resolved**: pilot projected under cap, full run
+      overran it (exit 3, incomplete, Canyon country 7/8 replicates); see
+      readings, escalated to the spec owner (2026-09-25).
 
 ## Performance and Goal Impact
 
@@ -269,7 +273,16 @@ scripts/bench-wait cargo run --release -p v3-cli -- input-opportunity --feature 
 scripts/bench-wait cargo run --release -p v3-cli -- input-opportunity --feature t20-f01-input-use-baseline-and-ecological-opportunity
 ```
 
-**Measured verdict.** Pending.
+**Measured verdict (2026-09-25).** Gate and goal: both not severe against
+their epochs, all deterministic counters unchanged, all caps under budget,
+goal summary grew ≈99.1 KB (cap 300 KB). Founder families show causal use in
+all three worlds as expected. **Assay: exceeded its cap.** Pilot projected
+≈3,091 s (under 7,200 s); the full run measured 7,548.76 s, over cap by
+348.8 s, CLI exit 3, incomplete (Canyon country 7/8 replicates). Family
+verdicts (23/24 replicates): `ring` inconclusive, `vector` positive,
+`scalar` positive, `gate_favorable: true`; unattributed births 0 in every
+world. Full detail and per-world tables in readings; the assay cap
+exception is escalated to the spec owner, unresolved.
 
 - Summaries: [gate](../../progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json),
   [goal](../../progress/features/t20-f01-input-use-baseline-and-ecological-opportunity-goal.json),
