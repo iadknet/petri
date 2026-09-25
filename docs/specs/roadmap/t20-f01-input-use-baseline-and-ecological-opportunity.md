@@ -65,8 +65,7 @@ T14.F12 genomes) cohorts, the single-event proposal seeds
 contexts. `simulation::seeding::seed_simulation` places founders on shuffled
 cells and `seed_simulation_with_perception_mix` replaces seeded genomes after
 seeding. `genome_size()` counts input references and edges. `v3-cli
-recruitment` (T13.F07) is the precedent for a bounded experiment subcommand
-with wall and byte caps and a committed summary. The Orchards recipe has no
+recruitment` (T13.F07) is the capped-experiment precedent. The Orchards recipe has no
 barriers and two food types (Grass 4, Fruit 15 energy); Canyon has barriers
 and one food type; Confluence has barriers and both types.
 
@@ -98,7 +97,7 @@ and `_total`, outside every existing timer.
 | `causal` | ablating the channel changes the committed action queue in at least one scene; `causal_original` counts the original scenes only; `causal_outside_live` counts causal parents with no structurally live consumer (the census's VM slice omits control dependencies such as `JumpIfZero`), a legitimate observation, not an error |
 | `retention` | retained causal influence, not retained behavior: for a parent with at least one causal channel, its first 10 applied, not genome-identical T11.F26 proposals in proposal order, regenerated from T11.F26's seed formula; `retention_pairs` (parent-causal channel × child) and `retained_causal_pairs` (still causal in the child on the same scenes) |
 | Ablation | one channel at a time, every read of it returns 0.0; nothing else is altered at its source, and execution proceeds under native semantics and charges, so downstream branches, steps, charges and live reads may change as consequences |
-| Row | per cohort × family × channel: parents at each stage, `causal_original`, `executed_outside_live`, `causal_outside_live`, `retention_pairs`, `retained_causal_pairs`; rows with no parent at any stage are omitted; rows may use a compact encoding whose format string is stored in the block and round-trip tested; per cohort: parents evaluated and `consistency_violations` (causal without executed; expected 0, reported not asserted) |
+| Row | per cohort × family × channel: parents at each stage, `causal_original`, `executed_outside_live`, `causal_outside_live`, `retention_pairs`, `retained_causal_pairs`; rows with no parent at any stage are omitted; per cohort × family (per food type; `UpstreamSlot` and each shared-memory bank as one family): `family_declared`, `family_connected`, `family_executed`, `family_causal`, `family_causal_original`, each the number of cohort parents for which the stage holds on at least one of the family's channels (a parent counts once however many channels qualify; `family_declared` is the family's `declared` count; shared memory has none), plus `out_of_width_consumers`; bounds: each union is at least the family's largest channel row and at most `min(channel-row sum, family_declared)`, and `family_declared ≥ family_connected`, `family_declared ≥ family_executed`, `family_causal ≥ family_causal_original`, and `family_executed ≥ family_causal` apart from parents in `consistency_violations`; the readings' stopping stage is read on these unions; rows may use a compact encoding whose format string is stored in the block and round-trip tested; per cohort: parents evaluated and `consistency_violations` (causal without executed; expected 0, reported not asserted) |
 
 Invariants per row: `declared ≥ connected`, `declared ≥ executed ≥ causal ≥
 causal_original` (shared memory has no `declared`); `connected` and `causal`
@@ -202,18 +201,17 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
       constants, the funnel per world × cohort × family naming the first stage
       whose parent count falls below half the previous stage (or none), the
       opportunity and Graph-feasibility tables, the discovery baseline and the
-      VM concerns. All are recorded. The funnel table is script-generated
-      from the goal summary; 25 multi-channel cells stay unresolved because
-      the block stores per-channel rows, not family parent unions.
+      VM concerns. The funnel table awaits the family unions from the goal
+      rerun; the rest is recorded.
 
 ## Verification
 
-- [x] Focused tests (names and results in readings): each stage on
+- [ ] Focused tests (names and results in readings): each stage on
       constructed genomes (declared only; connected in an unexecuted node;
       executed without effect; an executed read on a structurally dead
       consumer; a VM read used only as a branch condition that changes the
-      queue (`causal_outside_live`); causal on extended scenes only; causal on the original
-      battery), channel wrap, `ActionQueue` channels past 12, decision
+      queue (`causal_outside_live`); causal on extended scenes only; causal on
+      the original battery), channel wrap, `ActionQueue` channels past 12, decision
       out-of-width reads, ablation
       identity for an unread and an all-zero channel on both backends,
       retention on a constructed pair, the stage invariant, zero-denominator
@@ -225,7 +223,8 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
       with the per-replicate `births_total` identity, the verdict rules on
       constructed tallies (an uninformative replicate never counts; sign-test
       `n` 8), the row-string round trip as a proptest, two reduced assay runs
-      byte-identical.
+      byte-identical, and the family unions (bounds; a multi-channel family
+      whose union is below its channel sum).
 - [ ] Existing blocks unchanged: gate `deterministic` equal to the T11.F26
       gate summary's; goal `deterministic` equal to the T11.F26 goal
       summary's after removing only `cases[].input_use`; method in readings.
@@ -233,19 +232,15 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
       `make check` exits 0 (2026-09-25, results in readings).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved.
-- [x] Gate and goal summaries at `docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json`
+- [ ] Gate and goal summaries at `docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json`
       and `...-goal.json`, raw hash/byte count and verification time checked,
       series entries added, no full report staged; the second goal run is not
-      required (workflow, 2026-09-05). Both not severe against their epochs;
-      details in readings (2026-09-25).
+      required (workflow, 2026-09-05). Gate recorded; goal rerun pending for
+      the family unions.
 - [x] Assay pilot and full summaries at `...-opportunity-pilot.json` and
       `...-opportunity.json`, run through `scripts/bench-wait` after all
-      code is final, alone on the host; verdict tables in readings. The
-      first (8-thread) attempt's cap overrun was voided by the spec owner's
-      ruling (pilot/full concurrency mismatch); the 3-thread rerun
-      completed under cap with a matched-concurrency projection and a
-      determinism check against the void run's records; method, numbers and
-      verdict tables in readings (2026-09-25).
+      code is final, alone on the host; the complete 3-thread run and the
+      voided 8-thread attempt are in readings.
 
 ## Performance and Goal Impact
 
@@ -313,4 +308,4 @@ in readings.
 ## Notes for AI Agents
 
 - Decision: run substitutions (user, 2026-09-25): no Fable model anywhere in this run, so the spec owner runs on Opus; every advisor consult is replaced by a fresh read-only Codex Astra `high` task through the Codex channel.
-- Exception: closure blocked on user authorization (2026-09-25); see readings.
+- Decision: the user authorized a second post-review remediation pass (2026-09-25) to store exact per-family unions in `input_use`; only the goal profile is rerun.
