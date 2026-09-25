@@ -1,7 +1,7 @@
 # Large File Cleanup (2026-09-24)
 
-**Status**: Planned (Codex spec review: ready at PRD 5)
-**Last updated**: 2026-09-24
+**Status**: Complete
+**Last updated**: 2026-09-25
 **Scope**: Maintenance; no roadmap feature ID or benchmark run. Phase A is an
 ordinary commit to `main`. Phase B rewrites `main` history and needs its own
 explicit authorization. Measured at `a9f59893` (census counts are dated
@@ -144,7 +144,7 @@ files in its historical `status_at_audit` text, which is not a link.
 Work in `.worktrees/large-file-cleanup` from `main`. Run `npm ci` in
 `frontend/` first. Check `df` before copying anything into `.bench-artifacts/`.
 
-- [ ] **A1. Keep-list.** Put the v2 keep-list in `artifacts.rs` as one
+- [x] **A1. Keep-list.** Put the v2 keep-list in `artifacts.rs` as one
   explicit field projection over a v1 summary, and set `SUMMARY_VERSION` to 2.
   - Its source is the union of four sets: the full page trace (re-run and
     saved with the change), every field the summary loader validates, every
@@ -160,7 +160,7 @@ Work in `.worktrees/large-file-cleanup` from `main`. Run `npm ci` in
     - the loader rejects v1
     - every dropped top-level block appears in `omitted_details`
     - a v2 summary loads into comparison
-- [ ] **A2. Entry points.** `bench-summarize` and `make bench` produce v2 by
+- [x] **A2. Entry points.** `bench-summarize` and `make bench` produce v2 by
   running the existing full-report-to-v1 projection and then A1. A new
   `bench-summarize --from-summary-v1 <in> --out <out>` converts committed
   files.
@@ -253,7 +253,7 @@ Work in `.worktrees/large-file-cleanup` from `main`. Run `npm ci` in
     series index.
 
   A7 waits for this step.
-- [ ] **A7. Review and land.**
+- [x] **A7. Review and land.**
   - Codex implementation review, recorded under Review.
   - `make check` exits 0.
   - The scoped mutation run.
@@ -274,7 +274,7 @@ filter invocation:
 Matching blobs become explicit deletions, so an earlier unrelated version at a
 reused path cannot reappear.
 
-- [ ] **B1. Freeze and inventory.** The frozen source `F` is `main` after
+- [x] **B1. Freeze and inventory.** The frozen source `F` is `main` after
   Phase A. Inventory every blob/path association in `F`'s ancestry where the
   blob is over 1 MiB and the path is under `docs/progress/features/` or
   `docs/strategy/`, excluding `F`'s own tip blobs.
@@ -284,16 +284,16 @@ reused path cannot reappear.
     using the A6 tooling.
   - Make and verify `git bundle` backups of `F` and of every other local ref
     that reaches an inventoried blob.
-- [ ] **B2. Rewrite a disposable clone.** Clone
+- [x] **B2. Rewrite a disposable clone.** Clone
   `git clone --no-local --single-branch --no-tags --branch main` at `F`, filter
   only `refs/heads/main`, and copy `commit-map`, `ref-map` and `changed-refs`
   out immediately.
-- [ ] **B3. Prove it** in a separate fresh clone of the rewritten tip `R`:
+- [x] **B3. Prove it** in a separate fresh clone of the rewritten tip `R`:
   - `R`'s tree equals `F`'s tree.
   - No inventoried blob is reachable from `R`.
   - Every non-inventoried path matches in bytes and mode, commit by commit.
   - Record the packed size before and after.
-- [ ] **B4. Candidate, audit, approval.**
+- [x] **B4. Candidate, audit, approval.**
   - The candidate `C` is `R` plus one commit that adds three files:
     - `docs/progress/large-file-rewrite-manifest.json` (compact, under 1 MiB)
     - `docs/progress/large-file-rewrite-commit-map.txt`
@@ -323,7 +323,7 @@ reused path cannot reappear.
     receipt stays outside Git under `.bench-artifacts/large-file-rewrite/`. It
     records the push result, `main`/`origin/main` equality, a fresh-clone
     proof, and that other refs are unchanged.
-- [ ] **B5. Local prune (optional, separately authorized).** Run this after
+- [x] **B5. Local prune (optional, separately authorized).** Run this after
   the receipt passes and the bundles are verified.
   - Stop writers in every linked worktree first.
   - Run
@@ -444,16 +444,30 @@ reused path cannot reappear.
   caught`. No second fresh run was needed because production code, test
   selection, and configuration were unchanged.
 - B1–B4: the helper fixtures pass, the B3 proofs pass, and the receipt passes.
+- Cutover 2026-09-25 (user approved in chat): Phase A landed as `712695ac`
+  (fast-forward). Phase B replaced `main` with `C` = `8b03f5d2` (46 blobs,
+  232,761,030 bytes stripped; packed 20.3 → 13.3 MiB) by a leased push from
+  `4b88eee7`. The receipt passes: only `main`/`HEAD` changed on origin, a fresh
+  GitHub clone has HEAD `C`, `fsck` clean, 0 of 46 blobs, and `verify-history`
+  exit 0; locally only `main` and `origin/main` moved. Package, bundles and
+  receipt are in `.bench-artifacts/large-file-rewrite/2026-09-25/`.
+- B5 2026-09-25: `.git` was already 30 MB (the 1.33 GB pack had been pruned
+  by automatic gc). The prune ran as `gc --prune=1.hour.ago` with reflog and
+  worktree expiry disabled, which is safe against concurrent sessions: 30 MB →
+  28 MB, `fsck` connectivity clean. Pre-rewrite refs such as the
+  `large-file-cleanup` branch, `refs/stash` and the `claude/`, `codex/` and
+  `scratch/` branches still hold the old blobs; rebase or cherry-pick from
+  them, never merge.
 
 ## Success Criteria
 
-- [ ] Every committed benchmark summary is v2 and holds only the keep-list.
+- [x] Every committed benchmark summary is v2 and holds only the keep-list.
   Comparison output and the rendered progress page match v1 on every series
   entry, and each v1 file is preserved locally.
-- [ ] No tracked file on `main` exceeds 1 MiB outside the allowlist, and
+- [x] No tracked file on `main` exceeds 1 MiB outside the allowlist, and
   `make check-docs` enforces this.
-- [ ] Relocated files are local, hash-verified and cited.
-- [ ] After approval, `origin/main` equals `C`, no inventoried blob is
+- [x] Relocated files are local, hash-verified and cited.
+- [x] After approval, `origin/main` equals `C`, no inventoried blob is
   reachable from it, and `R`'s tree equals `F`'s tree.
 
 ## Notes for AI Agents
