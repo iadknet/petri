@@ -292,11 +292,14 @@ make bench PROFILE=goal FEATURE=t11-f26-mutation-effect-attribution-and-observat
 | Expected readings, sanity only | drift@2000 `parents_all_noop` 11/20 in all three worlds (55%, "about half"); `from_acting.changed` at drift@2000 vs `applied_events_total`: Orchards 3/985 (0.3%), Canyon 4/985 (0.4%), Confluence 3/985 (0.3%) — same order of magnitude as the 1% pilot figure, on the low side; selected cohort (`selected-read`) shows more action effects than drift@2000 in all three worlds (Orchards 566/3103=18.2%, Canyon 561/2760=20.3%, Confluence 955/5626=17.0%) and fewer/no `parents_all_noop` (4/50, 0/50, 1/50), consistent with the predeclared expectation |
 | Epoch | not re-pinned; not authorized |
 
-**Exception to report.** The read timer moved −22.0% against T11.F27
-(1,622.90 ms vs 2,079.80 ms), outside the predeclared ±10% band, though the
-run is faster, not slower, and every hard cap (founder 10 s, evolved 180 s,
-read 10 s, `mutation_effects` 60 s) is met with wide margin. Reported to the
-orchestrator without remediation or reinterpretation.
+**Read-timer disposition (spec owner, 2026-09-25).** The read timer read
+1,622.90 ms against T11.F27's 2,079.80 ms (−22.0%), outside the ±10% band.
+Accepted as wall-clock variance; no action. The band guards against the
+exposure strata adding cost to the drift and read timers that absorb them;
+this run is faster although the read now carries that work, and every
+deterministic counter is unchanged, so no observation or simulation work
+was removed. Wall time is a secondary signal on this host, and every hard
+cap is met with wide margin. The predeclaration stands unedited.
 
 - Summaries: [gate](../../progress/features/t11-f26-mutation-effect-attribution-and-observation-coverage.json),
   [goal](../../progress/features/t11-f26-mutation-effect-attribution-and-observation-coverage-goal.json).
