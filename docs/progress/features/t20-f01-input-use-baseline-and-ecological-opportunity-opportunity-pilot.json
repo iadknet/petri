@@ -1,0 +1,1108 @@
+{
+  "kind": "petri-input-opportunity-summary",
+  "version": "input-opportunity-v1",
+  "feature": "t20-f01-input-use-baseline-and-ecological-opportunity",
+  "pilot": true,
+  "source_revision": "f48a4c09472b99a5c510c687d51891b7a126a4f1",
+  "threads": 8,
+  "wall_secs": 386.406204084,
+  "incomplete": false,
+  "stop_reason": null,
+  "horizon": 1000,
+  "rules": [
+    "arms: F founder; I incumbents; A_k authored controller and Z_k its zero-weight twin for k in ring, vector, scalar; the k-th seeded creature carries arm k mod 8 and every descendant its founder's arm by inherited lineage",
+    "births: creatures alive at a tick's end and not at the previous tick's end, by their lineage's arm; newborns dying within their birth tick are unattributed_births",
+    "run seed 26_000_000 + 1_000 world_index + replicate; mutation per_unit_rate 0.0; every other setting at recipe and production values",
+    "incumbents: up to 20 living genomes of the goal config at its goal seed at the horizon, drawn from the id-sorted population with SmallRng::seed_from_u64(27_000_000 + goal_seed)",
+    "exposure: every 100th tick, up to 32 living creatures per A/Z arm drawn with SmallRng::seed_from_u64(29_000_000 + 16 (run_seed - 26_000_000) + tick / 100); exposed when an authored channel reads nonzero; applied when ablating the authored channels changes the committed actions of one execution from fresh cognition state",
+    "verdict: gate exposed >= 5% and applied >= 1% of sampled A_k; informative a + z >= 20; positive when >= 7 of the 8 replicates are both informative and a/z > 1, and sum a / sum z >= 1.05; negative when >= 7 of the 8 are both informative and a/z < 1.05, and the pooled ratio < 1.05; an uninformative replicate never counts; otherwise inconclusive; sign-test tails with n = 8",
+    "family: positive when any applicable world is, negative when all are; F02-F05 gate favorable with two positive Graph-feasible families, one non-ring"
+  ],
+  "controller_constants": [
+    [
+      "ring_inhibition",
+      -2.0
+    ],
+    [
+      "vector_far_threshold",
+      0.17
+    ],
+    [
+      "vector_gate_threshold",
+      0.5
+    ],
+    [
+      "vector_weight",
+      1.0
+    ],
+    [
+      "scalar_only_threshold",
+      0.5
+    ],
+    [
+      "scalar_eat_weight",
+      1.0
+    ],
+    [
+      "scalar_type_weight",
+      1.0
+    ]
+  ],
+  "raw": {
+    "path": "/Users/istefanek/projects/petri/.bench-artifacts/t20-f01-input-use-baseline-and-ecological-opportunity/input-opportunity.json",
+    "bytes": 3984,
+    "sha256": "564138487482ee9f290eb84a4ea4a481cddcac181da3e6874d1717a29f6970e4"
+  },
+  "worlds": [
+    {
+      "case": {
+        "name": "Orchards in grassland",
+        "seed": 11,
+        "recipe_path": "experiments/worlds/orchards-in-grassland.json",
+        "config_digest": "sha256:7f91cd5ccb476cc4013e8dc3fe5f050dcf159f39dce621be55a92fdc0aac47ff",
+        "food_type_count": 2
+      },
+      "replicate_config_digest": "sha256:4f1efa6718c5835a11c3acfdf44664830cf6d9d5f5a695f1c4ed96ef960318ad",
+      "incumbent_source_ticks": 1000,
+      "incumbents": 20,
+      "founder_fallback": false,
+      "replicates_requested": 1,
+      "replicates": [
+        {
+          "replicate": 0,
+          "run_seed": 26000000,
+          "ticks": 1000,
+          "births_total": 430014,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 17689,
+              "living": [
+                11407,
+                209,
+                2,
+                8,
+                8,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 615,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 13449,
+              "living": [
+                8226,
+                270,
+                12,
+                12,
+                11,
+                11,
+                8,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 777,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 17618,
+              "living": [
+                11375,
+                287,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 367,
+              "sampled": 67,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 17644,
+              "living": [
+                11400,
+                231,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 310,
+              "sampled": 65,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 22764,
+              "living": [
+                13616,
+                347,
+                8,
+                54,
+                300,
+                381,
+                129,
+                45,
+                26,
+                22
+              ],
+              "extinction_tick": null,
+              "sampled": 280,
+              "exposed": 164,
+              "applied": 81
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 20505,
+              "living": [
+                11289,
+                191,
+                4,
+                63,
+                191,
+                407,
+                570,
+                355,
+                55,
+                3
+              ],
+              "extinction_tick": null,
+              "sampled": 263,
+              "exposed": 104,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 302080,
+              "living": [
+                21071,
+                29994,
+                23697,
+                22400,
+                21672,
+                18040,
+                15332,
+                11046,
+                6944,
+                5147
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 59,
+              "applied": 33
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 18265,
+              "living": [
+                11616,
+                281,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 362,
+              "sampled": 65,
+              "exposed": 15,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.760303",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.998526",
+              "a_over_f": "0.995986",
+              "a_over_i": "1.309986",
+              "z_over_f": "0.997456"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.110168",
+              "a_over_f": "1.286901",
+              "a_over_i": "1.692617",
+              "z_over_f": "1.159195"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "16.538735",
+              "a_over_f": "17.077280",
+              "a_over_i": "22.461150",
+              "z_over_f": "1.032563"
+            }
+          ]
+        }
+      ],
+      "verdicts": [
+        {
+          "family": "ring",
+          "world": "Orchards in grassland",
+          "verdict": "not_applicable",
+          "sampled": 67,
+          "exposed": 0,
+          "applied": 0,
+          "informative": 1,
+          "above_one": 0,
+          "below_line": 1,
+          "ratios": [
+            "0.998526"
+          ],
+          "pooled": "0.998526",
+          "p_above_one": "1.000000",
+          "p_below_line": "0.996094"
+        },
+        {
+          "family": "vector",
+          "world": "Orchards in grassland",
+          "verdict": "inconclusive",
+          "sampled": 280,
+          "exposed": 164,
+          "applied": 81,
+          "informative": 1,
+          "above_one": 1,
+          "below_line": 0,
+          "ratios": [
+            "1.110168"
+          ],
+          "pooled": "1.110168",
+          "p_above_one": "0.996094",
+          "p_below_line": "1.000000"
+        },
+        {
+          "family": "scalar",
+          "world": "Orchards in grassland",
+          "verdict": "inconclusive",
+          "sampled": 320,
+          "exposed": 59,
+          "applied": 33,
+          "informative": 1,
+          "above_one": 1,
+          "below_line": 0,
+          "ratios": [
+            "16.538735"
+          ],
+          "pooled": "16.538735",
+          "p_above_one": "0.996094",
+          "p_below_line": "1.000000"
+        }
+      ]
+    },
+    {
+      "case": {
+        "name": "Canyon country",
+        "seed": 22,
+        "recipe_path": "experiments/worlds/canyon-country.json",
+        "config_digest": "sha256:88ef5abaec2d99ba5934e517dcdd045344b73a4c73149f90133f8fb4f692e7b4",
+        "food_type_count": 1
+      },
+      "replicate_config_digest": "sha256:0de449668421e459dc3c278d027838fcfed4fd8ca1dcd119d26eb6c9cd66f217",
+      "incumbent_source_ticks": 1000,
+      "incumbents": 20,
+      "founder_fallback": false,
+      "replicates_requested": 1,
+      "replicates": [
+        {
+          "replicate": 0,
+          "run_seed": 26001000,
+          "ticks": 1000,
+          "births_total": 123002,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 14647,
+              "living": [
+                7076,
+                203,
+                194,
+                28,
+                46,
+                22,
+                49,
+                68,
+                134,
+                217
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 14522,
+              "living": [
+                5670,
+                342,
+                893,
+                367,
+                70,
+                30,
+                15,
+                11,
+                11,
+                9
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 14771,
+              "living": [
+                7350,
+                129,
+                269,
+                92,
+                55,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 603,
+              "sampled": 161,
+              "exposed": 25,
+              "applied": 11
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 15040,
+              "living": [
+                6990,
+                212,
+                517,
+                422,
+                42,
+                9,
+                2,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 711,
+              "sampled": 171,
+              "exposed": 71,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 19254,
+              "living": [
+                7257,
+                477,
+                1072,
+                1005,
+                300,
+                59,
+                4,
+                5,
+                23,
+                112
+              ],
+              "extinction_tick": null,
+              "sampled": 256,
+              "exposed": 136,
+              "applied": 56
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 15667,
+              "living": [
+                7291,
+                215,
+                360,
+                152,
+                141,
+                36,
+                47,
+                38,
+                98,
+                276
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 169,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 13860,
+              "living": [
+                6894,
+                210,
+                198,
+                38,
+                16,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 584,
+              "sampled": 144,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 15241,
+              "living": [
+                7384,
+                250,
+                517,
+                167,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 565,
+              "sampled": 131,
+              "exposed": 0,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.991466",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.982114",
+              "a_over_f": "1.008466",
+              "a_over_i": "1.017146",
+              "z_over_f": "1.026831"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.228953",
+              "a_over_f": "1.314535",
+              "a_over_i": "1.325850",
+              "z_over_f": "1.069639"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "0.909389",
+              "a_over_f": "0.946269",
+              "a_over_i": "0.954414",
+              "z_over_f": "1.040554"
+            }
+          ]
+        }
+      ],
+      "verdicts": [
+        {
+          "family": "ring",
+          "world": "Canyon country",
+          "verdict": "inconclusive",
+          "sampled": 161,
+          "exposed": 25,
+          "applied": 11,
+          "informative": 1,
+          "above_one": 0,
+          "below_line": 1,
+          "ratios": [
+            "0.982114"
+          ],
+          "pooled": "0.982114",
+          "p_above_one": "1.000000",
+          "p_below_line": "0.996094"
+        },
+        {
+          "family": "vector",
+          "world": "Canyon country",
+          "verdict": "inconclusive",
+          "sampled": 256,
+          "exposed": 136,
+          "applied": 56,
+          "informative": 1,
+          "above_one": 1,
+          "below_line": 0,
+          "ratios": [
+            "1.228953"
+          ],
+          "pooled": "1.228953",
+          "p_above_one": "0.996094",
+          "p_below_line": "1.000000"
+        },
+        {
+          "family": "scalar",
+          "world": "Canyon country",
+          "verdict": "not_applicable",
+          "sampled": 144,
+          "exposed": 0,
+          "applied": 0,
+          "informative": 1,
+          "above_one": 0,
+          "below_line": 1,
+          "ratios": [
+            "0.909389"
+          ],
+          "pooled": "0.909389",
+          "p_above_one": "1.000000",
+          "p_below_line": "0.996094"
+        }
+      ]
+    },
+    {
+      "case": {
+        "name": "Confluence",
+        "seed": 33,
+        "recipe_path": "experiments/worlds/confluence.json",
+        "config_digest": "sha256:48722f834746b54ff6964afdb406dc69e321fa2946ebf4571d6977a609bba9b2",
+        "food_type_count": 2
+      },
+      "replicate_config_digest": "sha256:26abecfd6e41528da46229dd91a714d0fa223362b5d79dd9ce6f12f8a7e87ae9",
+      "incumbent_source_ticks": 1000,
+      "incumbents": 20,
+      "founder_fallback": false,
+      "replicates_requested": 1,
+      "replicates": [
+        {
+          "replicate": 0,
+          "run_seed": 26002000,
+          "ticks": 1000,
+          "births_total": 279279,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 18377,
+              "living": [
+                10443,
+                199,
+                59,
+                16,
+                204,
+                430,
+                422,
+                139,
+                4,
+                0
+              ],
+              "extinction_tick": 913,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 29450,
+              "living": [
+                14006,
+                212,
+                5,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 493,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 16369,
+              "living": [
+                10423,
+                144,
+                4,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 327,
+              "sampled": 68,
+              "exposed": 15,
+              "applied": 10
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 16767,
+              "living": [
+                10603,
+                193,
+                12,
+                92,
+                104,
+                50,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 692,
+              "sampled": 172,
+              "exposed": 41,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 26823,
+              "living": [
+                11953,
+                271,
+                19,
+                65,
+                431,
+                704,
+                773,
+                716,
+                874,
+                1642
+              ],
+              "extinction_tick": null,
+              "sampled": 307,
+              "exposed": 164,
+              "applied": 80
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 16690,
+              "living": [
+                10954,
+                178,
+                13,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 354,
+              "sampled": 77,
+              "exposed": 58,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 138494,
+              "living": [
+                15575,
+                9597,
+                9468,
+                11727,
+                12186,
+                10790,
+                8215,
+                5804,
+                4494,
+                3589
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 68,
+              "applied": 26
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 16309,
+              "living": [
+                10756,
+                163,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 341,
+              "sampled": 69,
+              "exposed": 11,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.602547",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.976263",
+              "a_over_f": "0.890733",
+              "a_over_i": "0.555823",
+              "z_over_f": "0.912390"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.607130",
+              "a_over_f": "1.459596",
+              "a_over_i": "0.910798",
+              "z_over_f": "0.908200"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "8.491876",
+              "a_over_f": "7.536268",
+              "a_over_i": "4.702683",
+              "z_over_f": "0.887468"
+            }
+          ]
+        }
+      ],
+      "verdicts": [
+        {
+          "family": "ring",
+          "world": "Confluence",
+          "verdict": "inconclusive",
+          "sampled": 68,
+          "exposed": 15,
+          "applied": 10,
+          "informative": 1,
+          "above_one": 0,
+          "below_line": 1,
+          "ratios": [
+            "0.976263"
+          ],
+          "pooled": "0.976263",
+          "p_above_one": "1.000000",
+          "p_below_line": "0.996094"
+        },
+        {
+          "family": "vector",
+          "world": "Confluence",
+          "verdict": "inconclusive",
+          "sampled": 307,
+          "exposed": 164,
+          "applied": 80,
+          "informative": 1,
+          "above_one": 1,
+          "below_line": 0,
+          "ratios": [
+            "1.607130"
+          ],
+          "pooled": "1.607130",
+          "p_above_one": "0.996094",
+          "p_below_line": "1.000000"
+        },
+        {
+          "family": "scalar",
+          "world": "Confluence",
+          "verdict": "inconclusive",
+          "sampled": 320,
+          "exposed": 68,
+          "applied": 26,
+          "informative": 1,
+          "above_one": 1,
+          "below_line": 0,
+          "ratios": [
+            "8.491876"
+          ],
+          "pooled": "8.491876",
+          "p_above_one": "0.996094",
+          "p_below_line": "1.000000"
+        }
+      ]
+    }
+  ],
+  "families": [
+    {
+      "family": "ring",
+      "reference": "World(NeighborBarrierRing)",
+      "authored_sub_indices": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "structure": {
+        "edges": 4,
+        "compute_nodes": 0
+      },
+      "verdict": "inconclusive",
+      "world_verdicts": [
+        "not_applicable",
+        "inconclusive",
+        "inconclusive"
+      ],
+      "competence": {
+        "battery_zero_signal": 80,
+        "battery_violations": 0,
+        "contexts": 64,
+        "signal_contexts": 64,
+        "signal_changed": 8,
+        "violations": 0,
+        "adequacy": {
+          "rule": "steering-v1 (b): avoids in every founder-leading scenario; the founder avoids none",
+          "trials": 40,
+          "authored_met": 40,
+          "founder_met": 0,
+          "passed": true
+        }
+      },
+      "feasibility": {
+        "structure": {
+          "edges": 4,
+          "compute_nodes": 0
+        },
+        "added_genome_units": 5,
+        "maintenance_per_tick": 0.0004999999873689376,
+        "extended_perception": false,
+        "founder_work": {
+          "executions": 64,
+          "mesh_hops": 288,
+          "graph_relax_iters": 288,
+          "vm_steps": 0,
+          "energy_spent": 0.0186767578125
+        },
+        "authored_work": {
+          "executions": 64,
+          "mesh_hops": 288,
+          "graph_relax_iters": 288,
+          "vm_steps": 0,
+          "energy_spent": 0.0186767578125
+        },
+        "feasible": true
+      },
+      "discovery": {
+        "declare": {
+          "proposals": 10000,
+          "hits": 9,
+          "beside": 13
+        },
+        "connect": {
+          "proposals": 10000,
+          "hits": 5,
+          "beside": 8
+        },
+        "events_per_birth": 0.485,
+        "implied_births": 6414.662084765178
+      },
+      "vm": {
+        "instructions": 13,
+        "charge_standalone": 1.5999999750987627e-6,
+        "after_steps": 48,
+        "charge_after_founder": 1.5999999750987627e-6,
+        "step_ramp_allowance": 100
+      }
+    },
+    {
+      "family": "vector",
+      "reference": "World(AreaFoodSummary { type_idx: OrdinaryFoodTypeId(0) })",
+      "authored_sub_indices": [
+        3,
+        4,
+        5
+      ],
+      "structure": {
+        "edges": 12,
+        "compute_nodes": 4
+      },
+      "verdict": "inconclusive",
+      "world_verdicts": [
+        "inconclusive",
+        "inconclusive",
+        "inconclusive"
+      ],
+      "competence": {
+        "battery_zero_signal": 80,
+        "battery_violations": 0,
+        "contexts": 64,
+        "signal_contexts": 32,
+        "signal_changed": 6,
+        "violations": 0,
+        "adequacy": {
+          "rule": "empty cardinal ring, nearest food in each cardinal direction: leads toward it in all four, the founder not; food in any cardinal ring cell (also with barriers on the diagonals) or primary food here: the founder's action; an empty and a fruit-only cell: the same action",
+          "trials": 4,
+          "authored_met": 4,
+          "founder_met": 1,
+          "passed": true
+        }
+      },
+      "feasibility": {
+        "structure": {
+          "edges": 12,
+          "compute_nodes": 4
+        },
+        "added_genome_units": 17,
+        "maintenance_per_tick": 0.0016999999570543878,
+        "extended_perception": true,
+        "founder_work": {
+          "executions": 64,
+          "mesh_hops": 288,
+          "graph_relax_iters": 288,
+          "vm_steps": 0,
+          "energy_spent": 0.0186767578125
+        },
+        "authored_work": {
+          "executions": 64,
+          "mesh_hops": 288,
+          "graph_relax_iters": 288,
+          "vm_steps": 0,
+          "energy_spent": 0.024322509765625
+        },
+        "feasible": true
+      },
+      "discovery": {
+        "declare": {
+          "proposals": 10000,
+          "hits": 4,
+          "beside": 3
+        },
+        "connect": {
+          "proposals": 10000,
+          "hits": 1,
+          "beside": 8
+        },
+        "events_per_birth": 0.485,
+        "implied_births": 25773.19587628866
+      },
+      "vm": {
+        "instructions": 17,
+        "charge_standalone": 1.9999999725987437e-6,
+        "after_steps": 48,
+        "charge_after_founder": 1.9999999725987437e-6,
+        "step_ramp_allowance": 100
+      }
+    },
+    {
+      "family": "scalar",
+      "reference": "World(FoodHere { type_idx: OrdinaryFoodTypeId(1) })",
+      "authored_sub_indices": [
+        0
+      ],
+      "structure": {
+        "edges": 5,
+        "compute_nodes": 2
+      },
+      "verdict": "inconclusive",
+      "world_verdicts": [
+        "inconclusive",
+        "not_applicable",
+        "inconclusive"
+      ],
+      "competence": {
+        "battery_zero_signal": 51,
+        "battery_violations": 0,
+        "contexts": 16,
+        "signal_contexts": 8,
+        "signal_changed": 4,
+        "violations": 0,
+        "adequacy": {
+          "rule": "fruit only and fruit with grass: leads with Eat(1); grass only: the founder's action",
+          "trials": 2,
+          "authored_met": 2,
+          "founder_met": 0,
+          "passed": true
+        }
+      },
+      "feasibility": {
+        "structure": {
+          "edges": 5,
+          "compute_nodes": 2
+        },
+        "added_genome_units": 9,
+        "maintenance_per_tick": 0.0008999999772640876,
+        "extended_perception": false,
+        "founder_work": {
+          "executions": 16,
+          "mesh_hops": 72,
+          "graph_relax_iters": 72,
+          "vm_steps": 0,
+          "energy_spent": 0.004669189453125
+        },
+        "authored_work": {
+          "executions": 16,
+          "mesh_hops": 76,
+          "graph_relax_iters": 76,
+          "vm_steps": 0,
+          "energy_spent": 0.005756378173828125
+        },
+        "feasible": true
+      },
+      "discovery": {
+        "declare": {
+          "proposals": 10000,
+          "hits": 4,
+          "beside": 241
+        },
+        "connect": {
+          "proposals": 10000,
+          "hits": 6,
+          "beside": 6
+        },
+        "events_per_birth": 0.485,
+        "implied_births": 8591.06529209622
+      },
+      "vm": {
+        "instructions": 8,
+        "charge_standalone": 9.199999845642015e-7,
+        "after_steps": 48,
+        "charge_after_founder": 9.199999845642015e-7,
+        "step_ramp_allowance": 100
+      }
+    }
+  ],
+  "gate_favorable": false,
+  "vm_notes": "counted, not run: each hand translation follows the founder vote node's straight-line VM translation; fresh VM input reads and payload draws (audit S1, M2) are F03's"
+}

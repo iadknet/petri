@@ -1,0 +1,5188 @@
+{
+  "kind": "petri-input-opportunity-summary",
+  "version": "input-opportunity-v1",
+  "feature": "t20-f01-input-use-baseline-and-ecological-opportunity",
+  "pilot": false,
+  "source_revision": "f48a4c09472b99a5c510c687d51891b7a126a4f1",
+  "threads": 8,
+  "wall_secs": 7548.758327458,
+  "incomplete": true,
+  "stop_reason": "wall_cap",
+  "horizon": 1000,
+  "rules": [
+    "arms: F founder; I incumbents; A_k authored controller and Z_k its zero-weight twin for k in ring, vector, scalar; the k-th seeded creature carries arm k mod 8 and every descendant its founder's arm by inherited lineage",
+    "births: creatures alive at a tick's end and not at the previous tick's end, by their lineage's arm; newborns dying within their birth tick are unattributed_births",
+    "run seed 26_000_000 + 1_000 world_index + replicate; mutation per_unit_rate 0.0; every other setting at recipe and production values",
+    "incumbents: up to 20 living genomes of the goal config at its goal seed at the horizon, drawn from the id-sorted population with SmallRng::seed_from_u64(27_000_000 + goal_seed)",
+    "exposure: every 100th tick, up to 32 living creatures per A/Z arm drawn with SmallRng::seed_from_u64(29_000_000 + 16 (run_seed - 26_000_000) + tick / 100); exposed when an authored channel reads nonzero; applied when ablating the authored channels changes the committed actions of one execution from fresh cognition state",
+    "verdict: gate exposed >= 5% and applied >= 1% of sampled A_k; informative a + z >= 20; positive when >= 7 of the 8 replicates are both informative and a/z > 1, and sum a / sum z >= 1.05; negative when >= 7 of the 8 are both informative and a/z < 1.05, and the pooled ratio < 1.05; an uninformative replicate never counts; otherwise inconclusive; sign-test tails with n = 8",
+    "family: positive when any applicable world is, negative when all are; F02-F05 gate favorable with two positive Graph-feasible families, one non-ring"
+  ],
+  "controller_constants": [
+    [
+      "ring_inhibition",
+      -2.0
+    ],
+    [
+      "vector_far_threshold",
+      0.17
+    ],
+    [
+      "vector_gate_threshold",
+      0.5
+    ],
+    [
+      "vector_weight",
+      1.0
+    ],
+    [
+      "scalar_only_threshold",
+      0.5
+    ],
+    [
+      "scalar_eat_weight",
+      1.0
+    ],
+    [
+      "scalar_type_weight",
+      1.0
+    ]
+  ],
+  "raw": {
+    "path": "/Users/istefanek/projects/petri/.bench-artifacts/t20-f01-input-use-baseline-and-ecological-opportunity/input-opportunity.json",
+    "bytes": 30506,
+    "sha256": "c975374b7bc97e7733bd7536c6cded04085b96fa2238e3725d7eff5fe271cc07"
+  },
+  "worlds": [
+    {
+      "case": {
+        "name": "Orchards in grassland",
+        "seed": 11,
+        "recipe_path": "experiments/worlds/orchards-in-grassland.json",
+        "config_digest": "sha256:7f91cd5ccb476cc4013e8dc3fe5f050dcf159f39dce621be55a92fdc0aac47ff",
+        "food_type_count": 2
+      },
+      "replicate_config_digest": "sha256:4f1efa6718c5835a11c3acfdf44664830cf6d9d5f5a695f1c4ed96ef960318ad",
+      "incumbent_source_ticks": 1000,
+      "incumbents": 20,
+      "founder_fallback": false,
+      "replicates_requested": 8,
+      "replicates": [
+        {
+          "replicate": 0,
+          "run_seed": 26000000,
+          "ticks": 1000,
+          "births_total": 430014,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 17689,
+              "living": [
+                11407,
+                209,
+                2,
+                8,
+                8,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 615,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 13449,
+              "living": [
+                8226,
+                270,
+                12,
+                12,
+                11,
+                11,
+                8,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 777,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 17618,
+              "living": [
+                11375,
+                287,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 367,
+              "sampled": 67,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 17644,
+              "living": [
+                11400,
+                231,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 310,
+              "sampled": 65,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 22764,
+              "living": [
+                13616,
+                347,
+                8,
+                54,
+                300,
+                381,
+                129,
+                45,
+                26,
+                22
+              ],
+              "extinction_tick": null,
+              "sampled": 280,
+              "exposed": 164,
+              "applied": 81
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 20505,
+              "living": [
+                11289,
+                191,
+                4,
+                63,
+                191,
+                407,
+                570,
+                355,
+                55,
+                3
+              ],
+              "extinction_tick": null,
+              "sampled": 263,
+              "exposed": 104,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 302080,
+              "living": [
+                21071,
+                29994,
+                23697,
+                22400,
+                21672,
+                18040,
+                15332,
+                11046,
+                6944,
+                5147
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 59,
+              "applied": 33
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 18265,
+              "living": [
+                11616,
+                281,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 362,
+              "sampled": 65,
+              "exposed": 15,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.760303",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.998526",
+              "a_over_f": "0.995986",
+              "a_over_i": "1.309986",
+              "z_over_f": "0.997456"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.110168",
+              "a_over_f": "1.286901",
+              "a_over_i": "1.692617",
+              "z_over_f": "1.159195"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "16.538735",
+              "a_over_f": "17.077280",
+              "a_over_i": "22.461150",
+              "z_over_f": "1.032563"
+            }
+          ]
+        },
+        {
+          "replicate": 1,
+          "run_seed": 26000001,
+          "ticks": 1000,
+          "births_total": 429755,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 18141,
+              "living": [
+                11259,
+                222,
+                3,
+                35,
+                34,
+                153,
+                229,
+                7,
+                0,
+                0
+              ],
+              "extinction_tick": 812,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 15145,
+              "living": [
+                8749,
+                283,
+                9,
+                38,
+                232,
+                149,
+                88,
+                7,
+                0,
+                0
+              ],
+              "extinction_tick": 825,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 17607,
+              "living": [
+                11369,
+                219,
+                2,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 453,
+              "sampled": 71,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 19007,
+              "living": [
+                12036,
+                288,
+                3,
+                29,
+                58,
+                100,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 696,
+              "sampled": 160,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 26268,
+              "living": [
+                13429,
+                279,
+                14,
+                230,
+                787,
+                1080,
+                750,
+                482,
+                4,
+                0
+              ],
+              "extinction_tick": 938,
+              "sampled": 242,
+              "exposed": 133,
+              "applied": 54
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 18007,
+              "living": [
+                11465,
+                227,
+                7,
+                31,
+                93,
+                12,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 653,
+              "sampled": 146,
+              "exposed": 84,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 297442,
+              "living": [
+                19948,
+                26719,
+                22011,
+                24331,
+                24628,
+                19581,
+                14271,
+                10259,
+                7305,
+                4534
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 66,
+              "applied": 32
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 18138,
+              "living": [
+                11745,
+                223,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 313,
+              "sampled": 65,
+              "exposed": 12,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.834849",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.926343",
+              "a_over_f": "0.970564",
+              "a_over_i": "1.162562",
+              "z_over_f": "1.047737"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.458766",
+              "a_over_f": "1.447991",
+              "a_over_i": "1.734434",
+              "z_over_f": "0.992613"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "16.398831",
+              "a_over_f": "16.396119",
+              "a_over_i": "19.639617",
+              "z_over_f": "0.999835"
+            }
+          ]
+        },
+        {
+          "replicate": 2,
+          "run_seed": 26000002,
+          "ticks": 1000,
+          "births_total": 433401,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 17512,
+              "living": [
+                11266,
+                214,
+                2,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 411,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 14067,
+              "living": [
+                8546,
+                348,
+                12,
+                6,
+                21,
+                9,
+                3,
+                1,
+                1,
+                0
+              ],
+              "extinction_tick": 927,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 18041,
+              "living": [
+                11632,
+                266,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 322,
+              "sampled": 65,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 17958,
+              "living": [
+                11603,
+                234,
+                1,
+                19,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 490,
+              "sampled": 84,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 21159,
+              "living": [
+                13124,
+                287,
+                2,
+                38,
+                238,
+                248,
+                28,
+                3,
+                0,
+                0
+              ],
+              "extinction_tick": 829,
+              "sampled": 193,
+              "exposed": 95,
+              "applied": 39
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 17639,
+              "living": [
+                11177,
+                296,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 318,
+              "sampled": 66,
+              "exposed": 41,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 308833,
+              "living": [
+                21111,
+                30764,
+                24359,
+                23339,
+                21414,
+                18982,
+                14630,
+                11068,
+                8113,
+                6026
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 61,
+              "applied": 39
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 18192,
+              "living": [
+                11541,
+                256,
+                7,
+                73,
+                62,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 591,
+              "sampled": 135,
+              "exposed": 14,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.803278",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.004622",
+              "a_over_f": "1.030208",
+              "a_over_i": "1.282505",
+              "z_over_f": "1.025468"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.199558",
+              "a_over_f": "1.208257",
+              "a_over_i": "1.504159",
+              "z_over_f": "1.007252"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "16.976308",
+              "a_over_f": "17.635507",
+              "a_over_i": "21.954432",
+              "z_over_f": "1.038831"
+            }
+          ]
+        },
+        {
+          "replicate": 3,
+          "run_seed": 26000003,
+          "ticks": 1000,
+          "births_total": 432234,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 18435,
+              "living": [
+                11329,
+                253,
+                4,
+                65,
+                118,
+                131,
+                37,
+                1,
+                0,
+                0
+              ],
+              "extinction_tick": 819,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 14195,
+              "living": [
+                8460,
+                286,
+                6,
+                4,
+                6,
+                41,
+                44,
+                14,
+                4,
+                0
+              ],
+              "extinction_tick": 921,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 17534,
+              "living": [
+                11349,
+                250,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 304,
+              "sampled": 65,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 17685,
+              "living": [
+                11488,
+                258,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 318,
+              "sampled": 65,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 20906,
+              "living": [
+                13085,
+                255,
+                4,
+                11,
+                59,
+                245,
+                304,
+                4,
+                0,
+                0
+              ],
+              "extinction_tick": 811,
+              "sampled": 179,
+              "exposed": 93,
+              "applied": 48
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 20263,
+              "living": [
+                11550,
+                219,
+                3,
+                40,
+                303,
+                351,
+                240,
+                210,
+                116,
+                9
+              ],
+              "extinction_tick": null,
+              "sampled": 268,
+              "exposed": 128,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 305537,
+              "living": [
+                21297,
+                30730,
+                22509,
+                23141,
+                23518,
+                19796,
+                14376,
+                9970,
+                6522,
+                4389
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 49,
+              "applied": 26
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 17679,
+              "living": [
+                11442,
+                203,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 322,
+              "sampled": 66,
+              "exposed": 14,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.770003",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.991462",
+              "a_over_f": "0.951126",
+              "a_over_i": "1.235224",
+              "z_over_f": "0.959317"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.031733",
+              "a_over_f": "1.134039",
+              "a_over_i": "1.472772",
+              "z_over_f": "1.099159"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "17.282482",
+              "a_over_f": "16.573746",
+              "a_over_i": "21.524269",
+              "z_over_f": "0.958991"
+            }
+          ]
+        },
+        {
+          "replicate": 4,
+          "run_seed": 26000004,
+          "ticks": 1000,
+          "births_total": 419079,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 18272,
+              "living": [
+                11781,
+                278,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 346,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 14500,
+              "living": [
+                8587,
+                305,
+                8,
+                2,
+                11,
+                26,
+                56,
+                62,
+                77,
+                130
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 17600,
+              "living": [
+                11312,
+                253,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 315,
+              "sampled": 66,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 17597,
+              "living": [
+                11205,
+                260,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 336,
+              "sampled": 66,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 21488,
+              "living": [
+                12753,
+                308,
+                2,
+                2,
+                37,
+                139,
+                384,
+                325,
+                266,
+                118
+              ],
+              "extinction_tick": null,
+              "sampled": 260,
+              "exposed": 155,
+              "applied": 82
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 23653,
+              "living": [
+                11069,
+                207,
+                8,
+                69,
+                416,
+                805,
+                1001,
+                904,
+                97,
+                2
+              ],
+              "extinction_tick": null,
+              "sampled": 266,
+              "exposed": 128,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 288275,
+              "living": [
+                21912,
+                29509,
+                22982,
+                20782,
+                20216,
+                16756,
+                12911,
+                10158,
+                6911,
+                5977
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 53,
+              "applied": 28
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 17694,
+              "living": [
+                11381,
+                311,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 339,
+              "sampled": 65,
+              "exposed": 9,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.793564",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.000170",
+              "a_over_f": "0.963222",
+              "a_over_i": "1.213793",
+              "z_over_f": "0.963058"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "0.908468",
+              "a_over_f": "1.176007",
+              "a_over_i": "1.481931",
+              "z_over_f": "1.294494"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "16.292246",
+              "a_over_f": "15.776872",
+              "a_over_i": "19.881034",
+              "z_over_f": "0.968367"
+            }
+          ]
+        },
+        {
+          "replicate": 5,
+          "run_seed": 26000005,
+          "ticks": 1000,
+          "births_total": 429862,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 19747,
+              "living": [
+                11734,
+                248,
+                4,
+                42,
+                187,
+                325,
+                305,
+                59,
+                0,
+                0
+              ],
+              "extinction_tick": 839,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 14422,
+              "living": [
+                8782,
+                310,
+                9,
+                5,
+                4,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 577,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 19410,
+              "living": [
+                11489,
+                228,
+                6,
+                64,
+                204,
+                312,
+                248,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 799,
+              "sampled": 198,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 17162,
+              "living": [
+                11093,
+                238,
+                5,
+                19,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 509,
+              "sampled": 90,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 19555,
+              "living": [
+                12963,
+                258,
+                3,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 489,
+              "sampled": 70,
+              "exposed": 44,
+              "applied": 13
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 19983,
+              "living": [
+                11599,
+                289,
+                2,
+                46,
+                194,
+                238,
+                223,
+                179,
+                37,
+                2
+              ],
+              "extinction_tick": null,
+              "sampled": 260,
+              "exposed": 134,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 301370,
+              "living": [
+                20682,
+                28785,
+                23451,
+                21526,
+                20857,
+                18137,
+                15253,
+                12961,
+                8139,
+                4450
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 52,
+              "applied": 29
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 18213,
+              "living": [
+                11658,
+                231,
+                2,
+                21,
+                17,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 556,
+              "sampled": 104,
+              "exposed": 22,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.730339",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.130987",
+              "a_over_f": "0.982934",
+              "a_over_i": "1.345860",
+              "z_over_f": "0.869094"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "0.978582",
+              "a_over_f": "0.990277",
+              "a_over_i": "1.355915",
+              "z_over_f": "1.011951"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "16.546972",
+              "a_over_f": "15.261559",
+              "a_over_i": "20.896547",
+              "z_over_f": "0.922317"
+            }
+          ]
+        },
+        {
+          "replicate": 6,
+          "run_seed": 26000006,
+          "ticks": 1000,
+          "births_total": 421847,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 17993,
+              "living": [
+                11452,
+                345,
+                6,
+                52,
+                9,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 523,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 13540,
+              "living": [
+                8088,
+                287,
+                7,
+                5,
+                17,
+                24,
+                15,
+                60,
+                91,
+                111
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 17452,
+              "living": [
+                11440,
+                260,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 289,
+              "sampled": 64,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 18217,
+              "living": [
+                11583,
+                317,
+                7,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 351,
+              "sampled": 71,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 20024,
+              "living": [
+                12932,
+                382,
+                15,
+                64,
+                14,
+                11,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 648,
+              "sampled": 136,
+              "exposed": 82,
+              "applied": 34
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 18260,
+              "living": [
+                11638,
+                306,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 367,
+              "sampled": 67,
+              "exposed": 43,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 297342,
+              "living": [
+                21682,
+                31025,
+                22415,
+                19875,
+                23453,
+                20243,
+                16054,
+                9147,
+                5240,
+                3575
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 50,
+              "applied": 26
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 19019,
+              "living": [
+                11185,
+                229,
+                5,
+                62,
+                113,
+                402,
+                263,
+                103,
+                0,
+                0
+              ],
+              "extinction_tick": 879,
+              "sampled": 229,
+              "exposed": 12,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.752515",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.958006",
+              "a_over_f": "0.969933",
+              "a_over_i": "1.288922",
+              "z_over_f": "1.012449"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.096605",
+              "a_over_f": "1.112877",
+              "a_over_i": "1.478877",
+              "z_over_f": "1.014839"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "15.633945",
+              "a_over_f": "16.525427",
+              "a_over_i": "21.960266",
+              "z_over_f": "1.057022"
+            }
+          ]
+        },
+        {
+          "replicate": 7,
+          "run_seed": 26000007,
+          "ticks": 1000,
+          "births_total": 438471,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 17556,
+              "living": [
+                11231,
+                305,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 377,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 14232,
+              "living": [
+                8597,
+                292,
+                8,
+                4,
+                11,
+                3,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 677,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 18026,
+              "living": [
+                11638,
+                276,
+                2,
+                7,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 460,
+              "sampled": 73,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 17906,
+              "living": [
+                11533,
+                276,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 359,
+              "sampled": 69,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 22506,
+              "living": [
+                12855,
+                246,
+                4,
+                11,
+                117,
+                288,
+                337,
+                355,
+                288,
+                354
+              ],
+              "extinction_tick": null,
+              "sampled": 271,
+              "exposed": 163,
+              "applied": 82
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 17298,
+              "living": [
+                11132,
+                246,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 294,
+              "sampled": 64,
+              "exposed": 49,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 313057,
+              "living": [
+                21654,
+                29690,
+                22960,
+                21858,
+                22741,
+                20003,
+                15997,
+                12043,
+                8063,
+                5494
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 47,
+              "applied": 29
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 17890,
+              "living": [
+                11360,
+                319,
+                4,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 375,
+              "sampled": 68,
+              "exposed": 17,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.810663",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.006702",
+              "a_over_f": "1.026771",
+              "a_over_i": "1.266582",
+              "z_over_f": "1.019936"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.301075",
+              "a_over_f": "1.281955",
+              "a_over_i": "1.581366",
+              "z_over_f": "0.985304"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "17.498994",
+              "a_over_f": "17.831909",
+              "a_over_i": "21.996698",
+              "z_over_f": "1.019025"
+            }
+          ]
+        }
+      ],
+      "verdicts": [
+        {
+          "family": "ring",
+          "world": "Orchards in grassland",
+          "verdict": "not_applicable",
+          "sampled": 669,
+          "exposed": 0,
+          "applied": 0,
+          "informative": 8,
+          "above_one": 4,
+          "below_line": 7,
+          "ratios": [
+            "0.998526",
+            "0.926343",
+            "1.004622",
+            "0.991462",
+            "1.000170",
+            "1.130987",
+            "0.958006",
+            "1.006702"
+          ],
+          "pooled": "1.000782",
+          "p_above_one": "0.636719",
+          "p_below_line": "0.035156"
+        },
+        {
+          "family": "vector",
+          "world": "Orchards in grassland",
+          "verdict": "inconclusive",
+          "sampled": 1631,
+          "exposed": 929,
+          "applied": 433,
+          "informative": 8,
+          "above_one": 6,
+          "below_line": 3,
+          "ratios": [
+            "1.110168",
+            "1.458766",
+            "1.199558",
+            "1.031733",
+            "0.908468",
+            "0.978582",
+            "1.096605",
+            "1.301075"
+          ],
+          "pooled": "1.122500",
+          "p_above_one": "0.144531",
+          "p_below_line": "0.855469"
+        },
+        {
+          "family": "scalar",
+          "world": "Orchards in grassland",
+          "verdict": "positive",
+          "sampled": 2560,
+          "exposed": 437,
+          "applied": 242,
+          "informative": 8,
+          "above_one": 8,
+          "below_line": 0,
+          "ratios": [
+            "16.538735",
+            "16.398831",
+            "16.976308",
+            "17.282482",
+            "16.292246",
+            "16.546972",
+            "15.633945",
+            "17.498994"
+          ],
+          "pooled": "16.637508",
+          "p_above_one": "0.003906",
+          "p_below_line": "1.000000"
+        }
+      ]
+    },
+    {
+      "case": {
+        "name": "Canyon country",
+        "seed": 22,
+        "recipe_path": "experiments/worlds/canyon-country.json",
+        "config_digest": "sha256:88ef5abaec2d99ba5934e517dcdd045344b73a4c73149f90133f8fb4f692e7b4",
+        "food_type_count": 1
+      },
+      "replicate_config_digest": "sha256:0de449668421e459dc3c278d027838fcfed4fd8ca1dcd119d26eb6c9cd66f217",
+      "incumbent_source_ticks": 1000,
+      "incumbents": 20,
+      "founder_fallback": false,
+      "replicates_requested": 8,
+      "replicates": [
+        {
+          "replicate": 1,
+          "run_seed": 26001001,
+          "ticks": 1000,
+          "births_total": 123685,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 13908,
+              "living": [
+                6951,
+                208,
+                332,
+                53,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 461,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 14558,
+              "living": [
+                5798,
+                295,
+                748,
+                412,
+                146,
+                42,
+                3,
+                11,
+                57,
+                137
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 15884,
+              "living": [
+                7371,
+                293,
+                541,
+                180,
+                36,
+                10,
+                2,
+                53,
+                65,
+                50
+              ],
+              "extinction_tick": null,
+              "sampled": 268,
+              "exposed": 56,
+              "applied": 27
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 14616,
+              "living": [
+                7164,
+                250,
+                356,
+                142,
+                33,
+                14,
+                1,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 752,
+              "sampled": 175,
+              "exposed": 45,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 21053,
+              "living": [
+                7346,
+                478,
+                971,
+                661,
+                436,
+                407,
+                203,
+                189,
+                420,
+                598
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 177,
+              "applied": 78
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 14465,
+              "living": [
+                6847,
+                202,
+                413,
+                180,
+                93,
+                2,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 628,
+              "sampled": 162,
+              "exposed": 94,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 14446,
+              "living": [
+                7081,
+                197,
+                393,
+                123,
+                53,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 612,
+              "sampled": 161,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 14755,
+              "living": [
+                7173,
+                347,
+                480,
+                54,
+                16,
+                13,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 658,
+              "sampled": 157,
+              "exposed": 0,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.046736",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.086754",
+              "a_over_f": "1.142077",
+              "a_over_i": "1.091084",
+              "z_over_f": "1.050906"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.455444",
+              "a_over_f": "1.513733",
+              "a_over_i": "1.446146",
+              "z_over_f": "1.040049"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "0.979058",
+              "a_over_f": "1.038683",
+              "a_over_i": "0.992307",
+              "z_over_f": "1.060900"
+            }
+          ]
+        },
+        {
+          "replicate": 2,
+          "run_seed": 26001002,
+          "ticks": 1000,
+          "births_total": 124460,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 13952,
+              "living": [
+                7188,
+                205,
+                146,
+                26,
+                4,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 625,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 14025,
+              "living": [
+                5650,
+                320,
+                578,
+                375,
+                55,
+                21,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 641,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 14603,
+              "living": [
+                7480,
+                130,
+                175,
+                4,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 437,
+              "sampled": 100,
+              "exposed": 21,
+              "applied": 11
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 14508,
+              "living": [
+                6894,
+                200,
+                394,
+                200,
+                57,
+                9,
+                1,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 726,
+              "sampled": 170,
+              "exposed": 53,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 22535,
+              "living": [
+                7279,
+                476,
+                1442,
+                1014,
+                353,
+                138,
+                74,
+                386,
+                351,
+                800
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 157,
+              "applied": 65
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 15185,
+              "living": [
+                7209,
+                348,
+                442,
+                118,
+                57,
+                5,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 638,
+              "sampled": 165,
+              "exposed": 108,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 14393,
+              "living": [
+                6927,
+                226,
+                368,
+                192,
+                35,
+                18,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 700,
+              "sampled": 178,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 15259,
+              "living": [
+                7104,
+                166,
+                166,
+                96,
+                85,
+                24,
+                11,
+                86,
+                270,
+                381
+              ],
+              "extinction_tick": null,
+              "sampled": 291,
+              "exposed": 0,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.005232",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.006548",
+              "a_over_f": "1.046660",
+              "a_over_i": "1.041212",
+              "z_over_f": "1.039851"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.484030",
+              "a_over_f": "1.615181",
+              "a_over_i": "1.606774",
+              "z_over_f": "1.088374"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "0.943247",
+              "a_over_f": "1.031608",
+              "a_over_i": "1.026239",
+              "z_over_f": "1.093678"
+            }
+          ]
+        },
+        {
+          "replicate": 3,
+          "run_seed": 26001003,
+          "ticks": 1000,
+          "births_total": 123973,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 14075,
+              "living": [
+                6980,
+                222,
+                232,
+                76,
+                38,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 582,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 13444,
+              "living": [
+                5900,
+                263,
+                372,
+                235,
+                5,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 658,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 14990,
+              "living": [
+                7227,
+                240,
+                267,
+                206,
+                104,
+                2,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 625,
+              "sampled": 162,
+              "exposed": 34,
+              "applied": 17
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 16696,
+              "living": [
+                7515,
+                236,
+                312,
+                149,
+                28,
+                19,
+                29,
+                349,
+                258,
+                421
+              ],
+              "extinction_tick": null,
+              "sampled": 300,
+              "exposed": 95,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 21474,
+              "living": [
+                7254,
+                390,
+                1365,
+                1478,
+                420,
+                45,
+                209,
+                172,
+                90,
+                103
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 156,
+              "applied": 64
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 15580,
+              "living": [
+                7033,
+                322,
+                648,
+                421,
+                88,
+                4,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 657,
+              "sampled": 164,
+              "exposed": 94,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 13818,
+              "living": [
+                7005,
+                177,
+                121,
+                59,
+                36,
+                37,
+                3,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 713,
+              "sampled": 195,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 13896,
+              "living": [
+                6958,
+                175,
+                245,
+                66,
+                12,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 579,
+              "sampled": 140,
+              "exposed": 0,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.955169",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.897820",
+              "a_over_f": "1.065009",
+              "a_over_i": "1.114996",
+              "z_over_f": "1.186217"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.378306",
+              "a_over_f": "1.525684",
+              "a_over_i": "1.597292",
+              "z_over_f": "1.106927"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "0.994387",
+              "a_over_f": "0.981741",
+              "a_over_i": "1.027819",
+              "z_over_f": "0.987282"
+            }
+          ]
+        },
+        {
+          "replicate": 4,
+          "run_seed": 26001004,
+          "ticks": 1000,
+          "births_total": 123170,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 14512,
+              "living": [
+                7158,
+                266,
+                283,
+                157,
+                28,
+                20,
+                1,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 727,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 14443,
+              "living": [
+                5720,
+                337,
+                548,
+                303,
+                230,
+                60,
+                3,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 721,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 15641,
+              "living": [
+                7259,
+                227,
+                574,
+                237,
+                36,
+                2,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 642,
+              "sampled": 162,
+              "exposed": 36,
+              "applied": 17
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 14241,
+              "living": [
+                6853,
+                167,
+                163,
+                65,
+                89,
+                50,
+                42,
+                30,
+                139,
+                56
+              ],
+              "extinction_tick": null,
+              "sampled": 318,
+              "exposed": 117,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 20274,
+              "living": [
+                7303,
+                424,
+                1273,
+                986,
+                178,
+                51,
+                112,
+                93,
+                264,
+                319
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 147,
+              "applied": 64
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 14429,
+              "living": [
+                7084,
+                188,
+                313,
+                118,
+                42,
+                28,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 694,
+              "sampled": 188,
+              "exposed": 111,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 14873,
+              "living": [
+                7037,
+                211,
+                409,
+                335,
+                57,
+                12,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 676,
+              "sampled": 172,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 14757,
+              "living": [
+                7356,
+                242,
+                222,
+                96,
+                69,
+                6,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 629,
+              "sampled": 166,
+              "exposed": 0,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.995245",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.098308",
+              "a_over_f": "1.077798",
+              "a_over_i": "1.082947",
+              "z_over_f": "0.981326"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.405087",
+              "a_over_f": "1.397051",
+              "a_over_i": "1.403725",
+              "z_over_f": "0.994281"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "1.007861",
+              "a_over_f": "1.024876",
+              "a_over_i": "1.029772",
+              "z_over_f": "1.016883"
+            }
+          ]
+        },
+        {
+          "replicate": 5,
+          "run_seed": 26001005,
+          "ticks": 1000,
+          "births_total": 122217,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 15818,
+              "living": [
+                7140,
+                286,
+                373,
+                262,
+                117,
+                56,
+                2,
+                16,
+                88,
+                247
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 12971,
+              "living": [
+                5480,
+                273,
+                247,
+                137,
+                87,
+                33,
+                20,
+                1,
+                0,
+                0
+              ],
+              "extinction_tick": 805,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 14763,
+              "living": [
+                7149,
+                247,
+                187,
+                63,
+                35,
+                7,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 651,
+              "sampled": 167,
+              "exposed": 29,
+              "applied": 18
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 14043,
+              "living": [
+                6854,
+                246,
+                345,
+                129,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 553,
+              "sampled": 133,
+              "exposed": 48,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 21717,
+              "living": [
+                7198,
+                441,
+                1529,
+                1196,
+                439,
+                168,
+                161,
+                97,
+                198,
+                517
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 148,
+              "applied": 73
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 14111,
+              "living": [
+                7252,
+                239,
+                144,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 404,
+              "sampled": 98,
+              "exposed": 67,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 14015,
+              "living": [
+                6911,
+                236,
+                250,
+                15,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 484,
+              "sampled": 111,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 14779,
+              "living": [
+                7291,
+                278,
+                317,
+                67,
+                37,
+                12,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 692,
+              "sampled": 172,
+              "exposed": 0,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.820015",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.051271",
+              "a_over_f": "0.933304",
+              "a_over_i": "1.138154",
+              "z_over_f": "0.887786"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.539012",
+              "a_over_f": "1.372930",
+              "a_over_i": "1.674273",
+              "z_over_f": "0.892085"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "0.948305",
+              "a_over_f": "0.886016",
+              "a_over_i": "1.080487",
+              "z_over_f": "0.934315"
+            }
+          ]
+        },
+        {
+          "replicate": 6,
+          "run_seed": 26001006,
+          "ticks": 1000,
+          "births_total": 122914,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 15048,
+              "living": [
+                7238,
+                268,
+                375,
+                207,
+                24,
+                1,
+                6,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 749,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 13247,
+              "living": [
+                5962,
+                246,
+                458,
+                94,
+                8,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 673,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 16182,
+              "living": [
+                7660,
+                259,
+                534,
+                198,
+                102,
+                20,
+                1,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 707,
+              "sampled": 181,
+              "exposed": 46,
+              "applied": 19
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 14650,
+              "living": [
+                7174,
+                213,
+                76,
+                6,
+                38,
+                45,
+                20,
+                38,
+                130,
+                274
+              ],
+              "extinction_tick": null,
+              "sampled": 282,
+              "exposed": 78,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 20411,
+              "living": [
+                7041,
+                393,
+                1413,
+                1090,
+                268,
+                191,
+                107,
+                45,
+                106,
+                330
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 144,
+              "applied": 65
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 13960,
+              "living": [
+                6837,
+                220,
+                287,
+                58,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 578,
+              "sampled": 130,
+              "exposed": 75,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 14470,
+              "living": [
+                7083,
+                344,
+                207,
+                151,
+                100,
+                3,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 635,
+              "sampled": 163,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 14946,
+              "living": [
+                6922,
+                207,
+                424,
+                227,
+                274,
+                39,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 660,
+              "sampled": 192,
+              "exposed": 0,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.880316",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.104573",
+              "a_over_f": "1.075359",
+              "a_over_i": "1.221560",
+              "z_over_f": "0.973551"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.462106",
+              "a_over_f": "1.356393",
+              "a_over_i": "1.540802",
+              "z_over_f": "0.927698"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "0.968152",
+              "a_over_f": "0.961590",
+              "a_over_i": "1.092323",
+              "z_over_f": "0.993222"
+            }
+          ]
+        },
+        {
+          "replicate": 7,
+          "run_seed": 26001007,
+          "ticks": 1000,
+          "births_total": 121762,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 14163,
+              "living": [
+                6715,
+                262,
+                227,
+                288,
+                83,
+                7,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 646,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 13545,
+              "living": [
+                5398,
+                236,
+                494,
+                422,
+                213,
+                58,
+                5,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 766,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 16497,
+              "living": [
+                7817,
+                281,
+                310,
+                125,
+                80,
+                55,
+                64,
+                14,
+                103,
+                202
+              ],
+              "extinction_tick": null,
+              "sampled": 302,
+              "exposed": 62,
+              "applied": 35
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 14449,
+              "living": [
+                7046,
+                229,
+                283,
+                192,
+                13,
+                6,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 671,
+              "sampled": 147,
+              "exposed": 62,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 20204,
+              "living": [
+                7339,
+                490,
+                1269,
+                1019,
+                355,
+                211,
+                89,
+                26,
+                34,
+                117
+              ],
+              "extinction_tick": null,
+              "sampled": 314,
+              "exposed": 189,
+              "applied": 69
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 14510,
+              "living": [
+                7071,
+                284,
+                321,
+                90,
+                13,
+                1,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 619,
+              "sampled": 142,
+              "exposed": 85,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 14236,
+              "living": [
+                7019,
+                284,
+                309,
+                69,
+                63,
+                13,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 641,
+              "sampled": 173,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 14158,
+              "living": [
+                7203,
+                222,
+                158,
+                27,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 486,
+              "sampled": 123,
+              "exposed": 0,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "0.956365",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.141740",
+              "a_over_f": "1.164796",
+              "a_over_i": "1.217940",
+              "z_over_f": "1.020193"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.392419",
+              "a_over_f": "1.426534",
+              "a_over_i": "1.491621",
+              "z_over_f": "1.024500"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "1.005509",
+              "a_over_f": "1.005154",
+              "a_over_i": "1.051015",
+              "z_over_f": "0.999647"
+            }
+          ]
+        }
+      ],
+      "verdicts": [
+        {
+          "family": "ring",
+          "world": "Canyon country",
+          "verdict": "inconclusive",
+          "sampled": 1342,
+          "exposed": 284,
+          "applied": 144,
+          "informative": 7,
+          "above_one": 6,
+          "below_line": 2,
+          "ratios": [
+            "1.086754",
+            "1.006548",
+            "0.897820",
+            "1.098308",
+            "1.051271",
+            "1.104573",
+            "1.141740"
+          ],
+          "pooled": "1.051907",
+          "p_above_one": "0.144531",
+          "p_below_line": "0.964844"
+        },
+        {
+          "family": "vector",
+          "world": "Canyon country",
+          "verdict": "positive",
+          "sampled": 2234,
+          "exposed": 1118,
+          "applied": 478,
+          "informative": 7,
+          "above_one": 7,
+          "below_line": 0,
+          "ratios": [
+            "1.455444",
+            "1.484030",
+            "1.378306",
+            "1.405087",
+            "1.539012",
+            "1.462106",
+            "1.392419"
+          ],
+          "pooled": "1.444327",
+          "p_above_one": "0.035156",
+          "p_below_line": "1.000000"
+        },
+        {
+          "family": "scalar",
+          "world": "Canyon country",
+          "verdict": "not_applicable",
+          "sampled": 1153,
+          "exposed": 0,
+          "applied": 0,
+          "informative": 7,
+          "above_one": 2,
+          "below_line": 7,
+          "ratios": [
+            "0.979058",
+            "0.943247",
+            "0.994387",
+            "1.007861",
+            "0.948305",
+            "0.968152",
+            "1.005509"
+          ],
+          "pooled": "0.977582",
+          "p_above_one": "0.964844",
+          "p_below_line": "0.035156"
+        }
+      ]
+    },
+    {
+      "case": {
+        "name": "Confluence",
+        "seed": 33,
+        "recipe_path": "experiments/worlds/confluence.json",
+        "config_digest": "sha256:48722f834746b54ff6964afdb406dc69e321fa2946ebf4571d6977a609bba9b2",
+        "food_type_count": 2
+      },
+      "replicate_config_digest": "sha256:26abecfd6e41528da46229dd91a714d0fa223362b5d79dd9ce6f12f8a7e87ae9",
+      "incumbent_source_ticks": 1000,
+      "incumbents": 20,
+      "founder_fallback": false,
+      "replicates_requested": 8,
+      "replicates": [
+        {
+          "replicate": 0,
+          "run_seed": 26002000,
+          "ticks": 1000,
+          "births_total": 279279,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 18377,
+              "living": [
+                10443,
+                199,
+                59,
+                16,
+                204,
+                430,
+                422,
+                139,
+                4,
+                0
+              ],
+              "extinction_tick": 913,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 29450,
+              "living": [
+                14006,
+                212,
+                5,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 493,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 16369,
+              "living": [
+                10423,
+                144,
+                4,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 327,
+              "sampled": 68,
+              "exposed": 15,
+              "applied": 10
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 16767,
+              "living": [
+                10603,
+                193,
+                12,
+                92,
+                104,
+                50,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 692,
+              "sampled": 172,
+              "exposed": 41,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 26823,
+              "living": [
+                11953,
+                271,
+                19,
+                65,
+                431,
+                704,
+                773,
+                716,
+                874,
+                1642
+              ],
+              "extinction_tick": null,
+              "sampled": 307,
+              "exposed": 164,
+              "applied": 80
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 16690,
+              "living": [
+                10954,
+                178,
+                13,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 354,
+              "sampled": 77,
+              "exposed": 58,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 138494,
+              "living": [
+                15575,
+                9597,
+                9468,
+                11727,
+                12186,
+                10790,
+                8215,
+                5804,
+                4494,
+                3589
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 68,
+              "applied": 26
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 16309,
+              "living": [
+                10756,
+                163,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 341,
+              "sampled": 69,
+              "exposed": 11,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.602547",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.976263",
+              "a_over_f": "0.890733",
+              "a_over_i": "0.555823",
+              "z_over_f": "0.912390"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.607130",
+              "a_over_f": "1.459596",
+              "a_over_i": "0.910798",
+              "z_over_f": "0.908200"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "8.491876",
+              "a_over_f": "7.536268",
+              "a_over_i": "4.702683",
+              "z_over_f": "0.887468"
+            }
+          ]
+        },
+        {
+          "replicate": 1,
+          "run_seed": 26002001,
+          "ticks": 1000,
+          "births_total": 268528,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 18995,
+              "living": [
+                11011,
+                165,
+                4,
+                10,
+                92,
+                328,
+                461,
+                301,
+                9,
+                0
+              ],
+              "extinction_tick": 932,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 29586,
+              "living": [
+                14602,
+                109,
+                6,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 478,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 18586,
+              "living": [
+                10936,
+                102,
+                35,
+                48,
+                42,
+                162,
+                203,
+                217,
+                221,
+                289
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 57,
+              "applied": 25
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 16150,
+              "living": [
+                10175,
+                160,
+                5,
+                37,
+                66,
+                60,
+                27,
+                31,
+                4,
+                0
+              ],
+              "extinction_tick": 938,
+              "sampled": 227,
+              "exposed": 54,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 24969,
+              "living": [
+                12042,
+                224,
+                35,
+                243,
+                1073,
+                1180,
+                667,
+                153,
+                134,
+                303
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 172,
+              "applied": 96
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 16534,
+              "living": [
+                10331,
+                134,
+                12,
+                35,
+                47,
+                18,
+                85,
+                138,
+                44,
+                21
+              ],
+              "extinction_tick": null,
+              "sampled": 275,
+              "exposed": 149,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 127074,
+              "living": [
+                15126,
+                9407,
+                9606,
+                11694,
+                10480,
+                9335,
+                7458,
+                4646,
+                3892,
+                2912
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 69,
+              "applied": 29
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 16634,
+              "living": [
+                10873,
+                191,
+                27,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 403,
+              "sampled": 92,
+              "exposed": 10,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.557568",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.150836",
+              "a_over_f": "0.978468",
+              "a_over_i": "0.628203",
+              "z_over_f": "0.850224"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.510161",
+              "a_over_f": "1.314504",
+              "a_over_i": "0.843946",
+              "z_over_f": "0.870440"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "7.639413",
+              "a_over_f": "6.689866",
+              "a_over_i": "4.295072",
+              "z_over_f": "0.875704"
+            }
+          ]
+        },
+        {
+          "replicate": 2,
+          "run_seed": 26002002,
+          "ticks": 1000,
+          "births_total": 271638,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 17639,
+              "living": [
+                10932,
+                182,
+                11,
+                2,
+                15,
+                126,
+                208,
+                178,
+                110,
+                7
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 29818,
+              "living": [
+                14484,
+                162,
+                12,
+                36,
+                30,
+                15,
+                36,
+                53,
+                70,
+                184
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 16526,
+              "living": [
+                10683,
+                159,
+                11,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 388,
+              "sampled": 75,
+              "exposed": 16,
+              "applied": 14
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 16094,
+              "living": [
+                10421,
+                186,
+                12,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 424,
+              "sampled": 81,
+              "exposed": 30,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 24805,
+              "living": [
+                12333,
+                207,
+                18,
+                141,
+                592,
+                1115,
+                683,
+                419,
+                203,
+                350
+              ],
+              "extinction_tick": null,
+              "sampled": 306,
+              "exposed": 162,
+              "applied": 68
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 16230,
+              "living": [
+                10460,
+                130,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 310,
+              "sampled": 66,
+              "exposed": 40,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 133317,
+              "living": [
+                15128,
+                8500,
+                8596,
+                11018,
+                12854,
+                9876,
+                8327,
+                6345,
+                4148,
+                3417
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 65,
+              "applied": 22
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 17209,
+              "living": [
+                10410,
+                150,
+                3,
+                59,
+                129,
+                240,
+                229,
+                53,
+                2,
+                0
+              ],
+              "extinction_tick": 927,
+              "sampled": 229,
+              "exposed": 17,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.690459",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.026842",
+              "a_over_f": "0.936901",
+              "a_over_i": "0.554229",
+              "z_over_f": "0.912410"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.528343",
+              "a_over_f": "1.406259",
+              "a_over_i": "0.831880",
+              "z_over_f": "0.920120"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "7.746935",
+              "a_over_f": "7.558082",
+              "a_over_i": "4.471024",
+              "z_over_f": "0.975622"
+            }
+          ]
+        },
+        {
+          "replicate": 3,
+          "run_seed": 26002003,
+          "ticks": 1000,
+          "births_total": 274304,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 15709,
+              "living": [
+                10237,
+                123,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 322,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 30943,
+              "living": [
+                15267,
+                128,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 329,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 16780,
+              "living": [
+                10921,
+                116,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 304,
+              "sampled": 65,
+              "exposed": 10,
+              "applied": 9
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 15465,
+              "living": [
+                10011,
+                119,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 363,
+              "sampled": 67,
+              "exposed": 23,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 20667,
+              "living": [
+                11756,
+                165,
+                15,
+                65,
+                490,
+                650,
+                231,
+                25,
+                12,
+                6
+              ],
+              "extinction_tick": null,
+              "sampled": 250,
+              "exposed": 127,
+              "applied": 76
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 19636,
+              "living": [
+                10671,
+                120,
+                13,
+                27,
+                52,
+                180,
+                336,
+                451,
+                446,
+                566
+              ],
+              "extinction_tick": null,
+              "sampled": 296,
+              "exposed": 173,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 138989,
+              "living": [
+                15337,
+                8041,
+                7691,
+                11603,
+                13224,
+                12174,
+                9209,
+                6080,
+                3854,
+                3846
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 62,
+              "applied": 29
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 16115,
+              "living": [
+                10169,
+                131,
+                2,
+                98,
+                118,
+                142,
+                66,
+                4,
+                0,
+                0
+              ],
+              "extinction_tick": 860,
+              "sampled": 198,
+              "exposed": 16,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.969763",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.085031",
+              "a_over_f": "1.068177",
+              "a_over_i": "0.542287",
+              "z_over_f": "0.984468"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.052506",
+              "a_over_f": "1.315615",
+              "a_over_i": "0.667906",
+              "z_over_f": "1.249984"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "8.624822",
+              "a_over_f": "8.847731",
+              "a_over_i": "4.491775",
+              "z_over_f": "1.025845"
+            }
+          ]
+        },
+        {
+          "replicate": 4,
+          "run_seed": 26002004,
+          "ticks": 1000,
+          "births_total": 278793,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 16295,
+              "living": [
+                10583,
+                152,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 389,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 29415,
+              "living": [
+                14473,
+                126,
+                9,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 357,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 16422,
+              "living": [
+                10587,
+                181,
+                3,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 340,
+              "sampled": 67,
+              "exposed": 20,
+              "applied": 13
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 16479,
+              "living": [
+                10585,
+                245,
+                22,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 446,
+              "sampled": 87,
+              "exposed": 32,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 26504,
+              "living": [
+                11803,
+                243,
+                31,
+                116,
+                439,
+                687,
+                995,
+                1004,
+                718,
+                754
+              ],
+              "extinction_tick": null,
+              "sampled": 319,
+              "exposed": 180,
+              "applied": 76
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 16027,
+              "living": [
+                10348,
+                168,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 304,
+              "sampled": 65,
+              "exposed": 43,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 138861,
+              "living": [
+                15131,
+                8704,
+                8227,
+                11045,
+                13321,
+                12011,
+                8542,
+                6218,
+                4581,
+                3658
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 57,
+              "applied": 20
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 18790,
+              "living": [
+                10721,
+                210,
+                9,
+                40,
+                334,
+                600,
+                189,
+                36,
+                0,
+                0
+              ],
+              "extinction_tick": 893,
+              "sampled": 233,
+              "exposed": 16,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.805155",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "0.996541",
+              "a_over_f": "1.007794",
+              "a_over_i": "0.558287",
+              "z_over_f": "1.011292"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.653709",
+              "a_over_f": "1.626511",
+              "a_over_i": "0.901037",
+              "z_over_f": "0.983553"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "7.390154",
+              "a_over_f": "8.521694",
+              "a_over_i": "4.720755",
+              "z_over_f": "1.153114"
+            }
+          ]
+        },
+        {
+          "replicate": 5,
+          "run_seed": 26002005,
+          "ticks": 1000,
+          "births_total": 278151,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 16387,
+              "living": [
+                10698,
+                176,
+                9,
+                45,
+                7,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 581,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 29780,
+              "living": [
+                14623,
+                161,
+                7,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 409,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 20206,
+              "living": [
+                11173,
+                149,
+                33,
+                61,
+                106,
+                115,
+                302,
+                415,
+                413,
+                306
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 34,
+              "applied": 13
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 16899,
+              "living": [
+                11073,
+                182,
+                2,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 363,
+              "sampled": 66,
+              "exposed": 19,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 32576,
+              "living": [
+                11889,
+                234,
+                57,
+                408,
+                2603,
+                1904,
+                971,
+                833,
+                613,
+                478
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 178,
+              "applied": 74
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 15178,
+              "living": [
+                9819,
+                195,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 381,
+              "sampled": 69,
+              "exposed": 48,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 131907,
+              "living": [
+                16262,
+                9636,
+                8695,
+                13002,
+                11216,
+                8876,
+                6856,
+                5494,
+                4515,
+                3438
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 61,
+              "applied": 27
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 15218,
+              "living": [
+                9953,
+                129,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 301,
+              "sampled": 65,
+              "exposed": 10,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.817294",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.195692",
+              "a_over_f": "1.233051",
+              "a_over_i": "0.678509",
+              "z_over_f": "1.031244"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "2.146264",
+              "a_over_f": "1.987917",
+              "a_over_i": "1.093889",
+              "z_over_f": "0.926222"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "8.667828",
+              "a_over_f": "8.049490",
+              "a_over_i": "4.429382",
+              "z_over_f": "0.928663"
+            }
+          ]
+        },
+        {
+          "replicate": 6,
+          "run_seed": 26002006,
+          "ticks": 1000,
+          "births_total": 269371,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 18732,
+              "living": [
+                10406,
+                168,
+                14,
+                31,
+                215,
+                499,
+                569,
+                153,
+                9,
+                0
+              ],
+              "extinction_tick": 960,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 31676,
+              "living": [
+                15374,
+                117,
+                8,
+                11,
+                138,
+                324,
+                196,
+                80,
+                42,
+                37
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 18530,
+              "living": [
+                10595,
+                146,
+                7,
+                4,
+                171,
+                443,
+                439,
+                113,
+                5,
+                0
+              ],
+              "extinction_tick": 933,
+              "sampled": 208,
+              "exposed": 42,
+              "applied": 24
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 15702,
+              "living": [
+                10326,
+                148,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 306,
+              "sampled": 65,
+              "exposed": 18,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 19608,
+              "living": [
+                11744,
+                293,
+                66,
+                100,
+                484,
+                92,
+                5,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 726,
+              "sampled": 197,
+              "exposed": 98,
+              "applied": 40
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 15902,
+              "living": [
+                10193,
+                164,
+                4,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 336,
+              "sampled": 68,
+              "exposed": 49,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 133132,
+              "living": [
+                15714,
+                9171,
+                8593,
+                12178,
+                12383,
+                11554,
+                7480,
+                4663,
+                3723,
+                2955
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 56,
+              "applied": 26
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 16089,
+              "living": [
+                10358,
+                213,
+                5,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 389,
+              "sampled": 69,
+              "exposed": 11,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.691010",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.180104",
+              "a_over_f": "0.989216",
+              "a_over_i": "0.584985",
+              "z_over_f": "0.838245"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.233052",
+              "a_over_f": "1.046765",
+              "a_over_i": "0.619018",
+              "z_over_f": "0.848922"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "8.274722",
+              "a_over_f": "7.107196",
+              "a_over_i": "4.202930",
+              "z_over_f": "0.858905"
+            }
+          ]
+        },
+        {
+          "replicate": 7,
+          "run_seed": 26002007,
+          "ticks": 1000,
+          "births_total": 275083,
+          "unattributed_births": 0,
+          "arms": [
+            {
+              "arm": "F",
+              "founders": 1250,
+              "births": 17535,
+              "living": [
+                11019,
+                190,
+                11,
+                4,
+                199,
+                95,
+                40,
+                39,
+                16,
+                25
+              ],
+              "extinction_tick": null,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "I",
+              "founders": 1250,
+              "births": 30130,
+              "living": [
+                14972,
+                122,
+                8,
+                4,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 436,
+              "sampled": 0,
+              "exposed": 0,
+              "applied": 0
+            },
+            {
+              "arm": "A_ring",
+              "founders": 1250,
+              "births": 16472,
+              "living": [
+                10535,
+                106,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 298,
+              "sampled": 64,
+              "exposed": 11,
+              "applied": 7
+            },
+            {
+              "arm": "Z_ring",
+              "founders": 1250,
+              "births": 16188,
+              "living": [
+                10376,
+                244,
+                9,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 368,
+              "sampled": 73,
+              "exposed": 28,
+              "applied": 0
+            },
+            {
+              "arm": "A_vector",
+              "founders": 1250,
+              "births": 20426,
+              "living": [
+                11595,
+                200,
+                33,
+                100,
+                562,
+                523,
+                67,
+                22,
+                14,
+                26
+              ],
+              "extinction_tick": null,
+              "sampled": 286,
+              "exposed": 157,
+              "applied": 72
+            },
+            {
+              "arm": "Z_vector",
+              "founders": 1250,
+              "births": 16133,
+              "living": [
+                10204,
+                142,
+                10,
+                93,
+                131,
+                23,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 682,
+              "sampled": 161,
+              "exposed": 90,
+              "applied": 0
+            },
+            {
+              "arm": "A_scalar",
+              "founders": 1250,
+              "births": 141776,
+              "living": [
+                15478,
+                9330,
+                8805,
+                11552,
+                12900,
+                11786,
+                8677,
+                6152,
+                4117,
+                4318
+              ],
+              "extinction_tick": null,
+              "sampled": 320,
+              "exposed": 59,
+              "applied": 27
+            },
+            {
+              "arm": "Z_scalar",
+              "founders": 1250,
+              "births": 16423,
+              "living": [
+                10439,
+                137,
+                6,
+                15,
+                140,
+                53,
+                0,
+                0,
+                0,
+                0
+              ],
+              "extinction_tick": 676,
+              "sampled": 149,
+              "exposed": 10,
+              "applied": 0
+            }
+          ],
+          "i_over_f": "1.718278",
+          "ratios": [
+            {
+              "family": "ring",
+              "a_over_z": "1.017544",
+              "a_over_f": "0.939378",
+              "a_over_i": "0.546698",
+              "z_over_f": "0.923182"
+            },
+            {
+              "family": "vector",
+              "a_over_z": "1.266101",
+              "a_over_f": "1.164870",
+              "a_over_i": "0.677929",
+              "z_over_f": "0.920046"
+            },
+            {
+              "family": "scalar",
+              "a_over_z": "8.632771",
+              "a_over_f": "8.085315",
+              "a_over_i": "4.705476",
+              "z_over_f": "0.936584"
+            }
+          ]
+        }
+      ],
+      "verdicts": [
+        {
+          "family": "ring",
+          "world": "Confluence",
+          "verdict": "inconclusive",
+          "sampled": 1187,
+          "exposed": 205,
+          "applied": 115,
+          "informative": 8,
+          "above_one": 6,
+          "below_line": 4,
+          "ratios": [
+            "0.976263",
+            "1.150836",
+            "1.026842",
+            "1.085031",
+            "0.996541",
+            "1.195692",
+            "1.180104",
+            "1.017544"
+          ],
+          "pooled": "1.078208",
+          "p_above_one": "0.144531",
+          "p_below_line": "0.636719"
+        },
+        {
+          "family": "vector",
+          "world": "Confluence",
+          "verdict": "positive",
+          "sampled": 2305,
+          "exposed": 1238,
+          "applied": 582,
+          "informative": 8,
+          "above_one": 8,
+          "below_line": 0,
+          "ratios": [
+            "1.607130",
+            "1.510161",
+            "1.528343",
+            "1.052506",
+            "1.653709",
+            "2.146264",
+            "1.233052",
+            "1.266101"
+          ],
+          "pooled": "1.484002",
+          "p_above_one": "0.003906",
+          "p_below_line": "1.000000"
+        },
+        {
+          "family": "scalar",
+          "world": "Confluence",
+          "verdict": "positive",
+          "sampled": 2560,
+          "exposed": 497,
+          "applied": 206,
+          "informative": 8,
+          "above_one": 8,
+          "below_line": 0,
+          "ratios": [
+            "8.491876",
+            "7.639413",
+            "7.746935",
+            "8.624822",
+            "7.390154",
+            "8.667828",
+            "8.274722",
+            "8.632771"
+          ],
+          "pooled": "8.160061",
+          "p_above_one": "0.003906",
+          "p_below_line": "1.000000"
+        }
+      ]
+    }
+  ],
+  "families": [
+    {
+      "family": "ring",
+      "reference": "World(NeighborBarrierRing)",
+      "authored_sub_indices": [
+        0,
+        2,
+        4,
+        6
+      ],
+      "structure": {
+        "edges": 4,
+        "compute_nodes": 0
+      },
+      "verdict": "inconclusive",
+      "world_verdicts": [
+        "not_applicable",
+        "inconclusive",
+        "inconclusive"
+      ],
+      "competence": {
+        "battery_zero_signal": 80,
+        "battery_violations": 0,
+        "contexts": 64,
+        "signal_contexts": 64,
+        "signal_changed": 8,
+        "violations": 0,
+        "adequacy": {
+          "rule": "steering-v1 (b): avoids in every founder-leading scenario; the founder avoids none",
+          "trials": 40,
+          "authored_met": 40,
+          "founder_met": 0,
+          "passed": true
+        }
+      },
+      "feasibility": {
+        "structure": {
+          "edges": 4,
+          "compute_nodes": 0
+        },
+        "added_genome_units": 5,
+        "maintenance_per_tick": 0.0004999999873689376,
+        "extended_perception": false,
+        "founder_work": {
+          "executions": 64,
+          "mesh_hops": 288,
+          "graph_relax_iters": 288,
+          "vm_steps": 0,
+          "energy_spent": 0.0186767578125
+        },
+        "authored_work": {
+          "executions": 64,
+          "mesh_hops": 288,
+          "graph_relax_iters": 288,
+          "vm_steps": 0,
+          "energy_spent": 0.0186767578125
+        },
+        "feasible": true
+      },
+      "discovery": {
+        "declare": {
+          "proposals": 10000,
+          "hits": 9,
+          "beside": 13
+        },
+        "connect": {
+          "proposals": 10000,
+          "hits": 5,
+          "beside": 8
+        },
+        "events_per_birth": 0.485,
+        "implied_births": 6414.662084765178
+      },
+      "vm": {
+        "instructions": 13,
+        "charge_standalone": 1.5999999750987627e-6,
+        "after_steps": 48,
+        "charge_after_founder": 1.5999999750987627e-6,
+        "step_ramp_allowance": 100
+      }
+    },
+    {
+      "family": "vector",
+      "reference": "World(AreaFoodSummary { type_idx: OrdinaryFoodTypeId(0) })",
+      "authored_sub_indices": [
+        3,
+        4,
+        5
+      ],
+      "structure": {
+        "edges": 12,
+        "compute_nodes": 4
+      },
+      "verdict": "positive",
+      "world_verdicts": [
+        "inconclusive",
+        "positive",
+        "positive"
+      ],
+      "competence": {
+        "battery_zero_signal": 80,
+        "battery_violations": 0,
+        "contexts": 64,
+        "signal_contexts": 32,
+        "signal_changed": 6,
+        "violations": 0,
+        "adequacy": {
+          "rule": "empty cardinal ring, nearest food in each cardinal direction: leads toward it in all four, the founder not; food in any cardinal ring cell (also with barriers on the diagonals) or primary food here: the founder's action; an empty and a fruit-only cell: the same action",
+          "trials": 4,
+          "authored_met": 4,
+          "founder_met": 1,
+          "passed": true
+        }
+      },
+      "feasibility": {
+        "structure": {
+          "edges": 12,
+          "compute_nodes": 4
+        },
+        "added_genome_units": 17,
+        "maintenance_per_tick": 0.0016999999570543878,
+        "extended_perception": true,
+        "founder_work": {
+          "executions": 64,
+          "mesh_hops": 288,
+          "graph_relax_iters": 288,
+          "vm_steps": 0,
+          "energy_spent": 0.0186767578125
+        },
+        "authored_work": {
+          "executions": 64,
+          "mesh_hops": 288,
+          "graph_relax_iters": 288,
+          "vm_steps": 0,
+          "energy_spent": 0.024322509765625
+        },
+        "feasible": true
+      },
+      "discovery": {
+        "declare": {
+          "proposals": 10000,
+          "hits": 4,
+          "beside": 3
+        },
+        "connect": {
+          "proposals": 10000,
+          "hits": 1,
+          "beside": 8
+        },
+        "events_per_birth": 0.485,
+        "implied_births": 25773.19587628866
+      },
+      "vm": {
+        "instructions": 17,
+        "charge_standalone": 1.9999999725987437e-6,
+        "after_steps": 48,
+        "charge_after_founder": 1.9999999725987437e-6,
+        "step_ramp_allowance": 100
+      }
+    },
+    {
+      "family": "scalar",
+      "reference": "World(FoodHere { type_idx: OrdinaryFoodTypeId(1) })",
+      "authored_sub_indices": [
+        0
+      ],
+      "structure": {
+        "edges": 5,
+        "compute_nodes": 2
+      },
+      "verdict": "positive",
+      "world_verdicts": [
+        "positive",
+        "not_applicable",
+        "positive"
+      ],
+      "competence": {
+        "battery_zero_signal": 51,
+        "battery_violations": 0,
+        "contexts": 16,
+        "signal_contexts": 8,
+        "signal_changed": 4,
+        "violations": 0,
+        "adequacy": {
+          "rule": "fruit only and fruit with grass: leads with Eat(1); grass only: the founder's action",
+          "trials": 2,
+          "authored_met": 2,
+          "founder_met": 0,
+          "passed": true
+        }
+      },
+      "feasibility": {
+        "structure": {
+          "edges": 5,
+          "compute_nodes": 2
+        },
+        "added_genome_units": 9,
+        "maintenance_per_tick": 0.0008999999772640876,
+        "extended_perception": false,
+        "founder_work": {
+          "executions": 16,
+          "mesh_hops": 72,
+          "graph_relax_iters": 72,
+          "vm_steps": 0,
+          "energy_spent": 0.004669189453125
+        },
+        "authored_work": {
+          "executions": 16,
+          "mesh_hops": 76,
+          "graph_relax_iters": 76,
+          "vm_steps": 0,
+          "energy_spent": 0.005756378173828125
+        },
+        "feasible": true
+      },
+      "discovery": {
+        "declare": {
+          "proposals": 10000,
+          "hits": 4,
+          "beside": 241
+        },
+        "connect": {
+          "proposals": 10000,
+          "hits": 6,
+          "beside": 6
+        },
+        "events_per_birth": 0.485,
+        "implied_births": 8591.06529209622
+      },
+      "vm": {
+        "instructions": 8,
+        "charge_standalone": 9.199999845642015e-7,
+        "after_steps": 48,
+        "charge_after_founder": 9.199999845642015e-7,
+        "step_ramp_allowance": 100
+      }
+    }
+  ],
+  "gate_favorable": true,
+  "vm_notes": "counted, not run: each hand translation follows the founder vote node's straight-line VM translation; fresh VM input reads and payload draws (audit S1, M2) are F03's"
+}
