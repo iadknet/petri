@@ -190,10 +190,10 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
 
 ## Implementation Tasks
 
-- [ ] Core: the input-use catalog, stages, ablation and one-step retention
+- [x] Core: the input-use catalog, stages, ablation and one-step retention
       over T11.F26's cohorts, contexts and proposals, in `neighborhood`.
-- [ ] Bench: `input_use` per case, timing fields, summary projection.
-- [ ] Core: authored controllers, ablation genomes, fixtures, arm seeding,
+- [x] Bench: `input_use` per case, timing fields, summary projection.
+- [x] Core: authored controllers, ablation genomes, fixtures, arm seeding,
       birth attribution, exposure samples, verdicts, discovery baseline and
       feasibility record; CLI `input-opportunity` with `--pilot`, wall and
       byte caps, and a committed summary.
@@ -201,11 +201,13 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
       constants, the funnel per world × cohort × family naming the first stage
       whose parent count falls below half the previous stage (or none), the
       opportunity and Graph-feasibility tables, the discovery baseline and the
-      VM concerns.
+      VM concerns. The constants, focused tests, discovery baseline,
+      feasibility and VM concerns are recorded; the funnel and opportunity
+      tables wait for the goal run and the assay.
 
 ## Verification
 
-- [ ] Focused tests (names and results in readings): each stage on
+- [x] Focused tests (names and results in readings): each stage on
       constructed genomes (declared only; connected in an unexecuted node;
       executed without effect; an executed read on a structurally dead
       consumer; a VM read used only as a branch condition that changes the
@@ -222,8 +224,8 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
 - [ ] Existing blocks unchanged: gate `deterministic` equal to the T11.F26
       gate summary's; goal `deterministic` equal to the T11.F26 goal
       summary's after removing only `cases[].input_use`; method in readings.
-- [ ] `cargo clippy --workspace --all-targets -- -D warnings` clean and
-      `make check` exits 0.
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` clean and
+      `make check` exits 0 (2026-09-25, results in readings).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved.
 - [ ] Gate and goal summaries at `docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json`

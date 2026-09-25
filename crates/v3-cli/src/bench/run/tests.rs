@@ -329,6 +329,7 @@ fn synthetic_timings(seed_wall_clock_ms: &[f64]) -> RunTimings {
         neighborhood_evolved_wall_clock_ms_per_seed: Vec::new(),
         neighborhood_read_wall_clock_ms_per_seed: Vec::new(),
         mutation_effects_wall_clock_ms_per_seed: Vec::new(),
+        input_use_wall_clock_ms_per_seed: Vec::new(),
     }
 }
 

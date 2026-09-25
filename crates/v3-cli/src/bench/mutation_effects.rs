@@ -418,6 +418,40 @@ pub(super) struct WorldObservation<'a> {
     pub sizes: effects::Sizes,
 }
 
+/// The selected cohort: `min(parents, s)` of the T14.F12 read's sample
+/// positions, each carrying its position as its index.
+pub(super) fn selected_cohort(
+    seed: u64,
+    sim: &v3_core::simulation::Simulation,
+    read_sample: u32,
+    sizes: effects::Sizes,
+) -> Vec<effects::CohortParent> {
+    let ids = super::indicators::sorted_creature_ids(sim);
+    let ranks = v3_core::neighborhood::read_sample_ranks(ids.len(), read_sample as usize, seed);
+    effects::selected_positions(ranks.len(), sizes.parents as usize, seed)
+        .into_iter()
+        .map(|position| {
+            let creature = &sim.creatures[ids[ranks[position]]];
+            effects::CohortParent {
+                index: position as u64,
+                depth_or_generation: creature.generation,
+                genome: creature.genome.clone(),
+            }
+        })
+        .collect()
+}
+
+/// The selected cohort as a world input: undefined when the world is extinct.
+pub(super) fn selected_inputs(
+    parents: &[effects::CohortParent],
+) -> Result<&[effects::CohortParent], &'static str> {
+    if parents.is_empty() {
+        Err("extinct: no living creature at the terminal tick")
+    } else {
+        Ok(parents)
+    }
+}
+
 /// One world's block: the selected cohort drawn over the T14.F12 read's
 /// sample positions, joined to the read's rows by position.
 pub(super) fn observe_world(
@@ -425,26 +459,7 @@ pub(super) fn observe_world(
     sim: &v3_core::simulation::Simulation,
     observation: WorldObservation<'_>,
 ) -> MutationEffects {
-    let ids = super::indicators::sorted_creature_ids(sim);
-    let ranks =
-        v3_core::neighborhood::read_sample_ranks(ids.len(), observation.read_sample as usize, seed);
-    let parents: Vec<effects::CohortParent> =
-        effects::selected_positions(ranks.len(), observation.sizes.parents as usize, seed)
-            .into_iter()
-            .map(|position| {
-                let creature = &sim.creatures[ids[ranks[position]]];
-                effects::CohortParent {
-                    index: position as u64,
-                    depth_or_generation: creature.generation,
-                    genome: creature.genome.clone(),
-                }
-            })
-            .collect();
-    let selected = if parents.is_empty() {
-        Err("extinct: no living creature at the terminal tick")
-    } else {
-        Ok(parents.as_slice())
-    };
+    let parents = selected_cohort(seed, sim, observation.read_sample, observation.sizes);
     let founder =
         v3_core::creature::founder::founder_genome(v3_core::config::FounderProfile::V3Alpha1);
     let context = v3_core::neighborhood::EvalContext::from_config(observation.config);
@@ -452,7 +467,7 @@ pub(super) fn observe_world(
         effects::WorldInputs {
             founder: &founder,
             drift: &observation.drift.parents,
-            selected,
+            selected: selected_inputs(&parents),
             sim,
             world_seed: seed,
         },

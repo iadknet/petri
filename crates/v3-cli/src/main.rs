@@ -26,6 +26,36 @@ enum Commands {
     /// docs/progress/features. Exit status 3 when a cap stopped the run and
     /// the record is marked incomplete.
     Recruitment(RecruitmentArgs),
+    /// The T20.F01 ecological opportunity assay: a raw replicate record
+    /// under the artifact root and a summary under docs/progress/features.
+    /// Exit status 3 when a cap stopped the run and the record is marked
+    /// incomplete.
+    InputOpportunity(InputOpportunityArgs),
+}
+
+#[derive(clap::Args)]
+struct InputOpportunityArgs {
+    #[arg(long)]
+    feature: String,
+    /// One replicate per world: the pilot that projects the full run.
+    #[arg(long)]
+    pilot: bool,
+    /// Private rayon pool of this many threads (>= 1). Omit it to use the
+    /// rayon global pool.
+    #[arg(long)]
+    threads: Option<NonZeroUsize>,
+    /// Stop between replicates once this many seconds have elapsed.
+    #[arg(long, default_value_t = v3_cli::opportunity::DEFAULT_WALL_CAP_SECS)]
+    wall_cap_secs: u64,
+    /// Stop between replicates once the raw record reaches this many bytes.
+    #[arg(long, default_value_t = v3_cli::opportunity::DEFAULT_BYTE_CAP)]
+    byte_cap: u64,
+    /// Raw record destination; the summary path is unaffected.
+    #[arg(long)]
+    out: Option<std::path::PathBuf>,
+    /// Summary destination; the raw path is unaffected.
+    #[arg(long)]
+    summary_out: Option<std::path::PathBuf>,
 }
 
 #[derive(clap::Args)]
@@ -234,6 +264,7 @@ fn main() {
             }
         }
         Commands::Recruitment(args) => run_recruitment(args),
+        Commands::InputOpportunity(args) => run_input_opportunity(args),
         Commands::World(args) => match args.command {
             WorldCommands::Inspect(args) => {
                 if let Err(message) = run_world_inspect(&args, &mut std::io::stdout()) {
@@ -419,6 +450,45 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
             }
             let feature = args.feature.clone().unwrap_or_else(|| "sweep".to_string());
             Ok((params, feature))
+        }
+    }
+}
+
+fn run_input_opportunity(args: InputOpportunityArgs) {
+    let cwd = match std::env::current_dir() {
+        Ok(cwd) => cwd,
+        Err(e) => {
+            eprintln!("error: cannot identify the working directory: {e}");
+            std::process::exit(1);
+        }
+    };
+    let options = v3_cli::opportunity::Options {
+        pilot: args.pilot,
+        threads: args.threads,
+        wall_cap: std::time::Duration::from_secs(args.wall_cap_secs),
+        byte_cap: args.byte_cap,
+        raw: args.out,
+        summary: args.summary_out,
+        source_revision: bench::detect_git_revision(),
+        ..v3_cli::opportunity::Options::new(&args.feature, cwd)
+    };
+    match v3_cli::opportunity::run(&options) {
+        Ok(outcome) => {
+            println!(
+                "wrote {} ({} bytes, {} replicates) and {}",
+                outcome.raw.display(),
+                outcome.bytes,
+                outcome.replicates,
+                outcome.summary.display()
+            );
+            if outcome.incomplete {
+                eprintln!("incomplete: a cap stopped the run between replicates");
+                std::process::exit(3);
+            }
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::exit(1);
         }
     }
 }
@@ -624,7 +694,8 @@ mod tests {
             Commands::Run(_)
             | Commands::World(_)
             | Commands::BenchSummarize(_)
-            | Commands::Recruitment(_) => {
+            | Commands::Recruitment(_)
+            | Commands::InputOpportunity(_) => {
                 panic!("expected the bench subcommand")
             }
         }
@@ -680,6 +751,46 @@ mod tests {
             Cli::try_parse_from(["v3-cli", "recruitment", "--feature", "x", "--threads", "0"])
                 .is_err()
         );
+    }
+
+    #[test]
+    fn input_opportunity_arguments_parse_with_their_defaults_and_flags() {
+        let parse = |args: &[&str]| match Cli::try_parse_from(args)
+            .expect("arguments must parse")
+            .command
+        {
+            Commands::InputOpportunity(args) => args,
+            _ => panic!("expected the input-opportunity subcommand"),
+        };
+        let args = parse(&["v3-cli", "input-opportunity", "--feature", "t20-f01"]);
+        assert!(!args.pilot);
+        assert_eq!(args.threads, None);
+        assert_eq!(
+            (args.wall_cap_secs, args.byte_cap),
+            (
+                v3_cli::opportunity::DEFAULT_WALL_CAP_SECS,
+                v3_cli::opportunity::DEFAULT_BYTE_CAP
+            )
+        );
+        let args = parse(&[
+            "v3-cli",
+            "input-opportunity",
+            "--feature",
+            "x",
+            "--pilot",
+            "--threads",
+            "2",
+            "--wall-cap-secs",
+            "5",
+            "--byte-cap",
+            "99",
+        ]);
+        assert!(args.pilot);
+        assert_eq!(
+            (args.threads, args.wall_cap_secs, args.byte_cap),
+            (NonZeroUsize::new(2), 5, 99)
+        );
+        assert!(Cli::try_parse_from(["v3-cli", "input-opportunity"]).is_err());
     }
 
     #[test]
