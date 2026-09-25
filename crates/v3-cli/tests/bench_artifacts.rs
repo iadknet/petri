@@ -243,9 +243,10 @@ fn assert_offline_reference_parity(
     let actual = bench::compare_against_path(current, summary_path);
     match (expected, actual) {
         (Ok(expected), Ok(actual)) => {
-            let expected = serde_json::to_value(expected).unwrap();
+            let mut expected = serde_json::to_value(expected).unwrap();
             let mut actual = serde_json::to_value(actual).unwrap();
             actual["path"] = expected["path"].clone();
+            keep_readings_both_sides_define(&mut expected, &mut actual, summary_path);
             assert_eq!(actual, expected, "reference {}", raw_path.display());
             true
         }
@@ -260,6 +261,44 @@ fn assert_offline_reference_parity(
             "full/summary behavior differs for {}: {expected:?} / {actual:?}",
             raw_path.display()
         ),
+    }
+}
+
+/// A stored summary keeps the case readings its converter defined, while a
+/// full report is re-derived by the current reader, which also yields readings
+/// added later from data the report already held (T14.F12 `*_per_mutated_births`).
+/// Per-case parity therefore covers only readings named in the summary's
+/// stored `comparison_inputs`; the summary side of each skipped reading must
+/// be unmeasured, and every compared case must keep at least one reading.
+fn keep_readings_both_sides_define(expected: &mut Value, actual: &mut Value, summary_path: &Path) {
+    let summary: Value = serde_json::from_slice(&std::fs::read(summary_path).unwrap()).unwrap();
+    let stored = &summary["comparison_inputs"]["case_readings"];
+    let Some(cases) = actual.get_mut("cases").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for case in cases {
+        let name = case["case"].as_str().unwrap().to_string();
+        let Some(rows) = stored.get(&name).and_then(Value::as_array) else {
+            continue;
+        };
+        let defined: Vec<&Value> = rows.iter().map(|row| &row[0]).collect();
+        let readings = case["readings"].as_array_mut().unwrap();
+        for skipped in readings.iter().filter(|r| !defined.contains(&&r["name"])) {
+            assert!(skipped["reference"].is_null(), "{name}: {skipped}");
+            assert!(skipped["percent_delta"].is_null(), "{name}: {skipped}");
+        }
+        readings.retain(|reading| defined.contains(&&reading["name"]));
+        assert!(!readings.is_empty(), "{name}: no shared readings");
+        let expected_case = expected["cases"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|other| other["case"] == name.as_str())
+            .unwrap();
+        expected_case["readings"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|reading| defined.contains(&&reading["name"]));
     }
 }
 
@@ -289,6 +328,69 @@ fn offline_pair_parity_preserves_compatible_incompatible_and_absent_references()
         &dir.0.join("absent-full.json"),
         &dir.0.join("absent-summary.json")
     ));
+}
+
+/// A world pair whose stored summary predates `reading`: the summary's
+/// `comparison_inputs` lack it while the full report still derives it.
+fn world_pair_without_stored_reading(
+    dir: &Temp,
+    reading: &str,
+) -> (bench::Report, PathBuf, PathBuf) {
+    let raw_path = dir.0.join("raw.json");
+    let summary_path = dir.0.join("summary.json");
+    let raw = serde_json::to_vec(&world_source()).unwrap();
+    std::fs::write(&raw_path, &raw).unwrap();
+    artifacts::convert(&raw_path, &summary_path, &provenance()).unwrap();
+    let mut summary: Value =
+        serde_json::from_slice(&std::fs::read(&summary_path).unwrap()).unwrap();
+    let stored = summary["comparison_inputs"]["case_readings"]["test world"]
+        .as_array_mut()
+        .unwrap();
+    let before = stored.len();
+    stored.retain(|row| row[0] != reading);
+    assert_eq!(
+        stored.len() + 1,
+        before,
+        "{reading} must be stored before removal"
+    );
+    std::fs::write(&summary_path, serde_json::to_vec(&summary).unwrap()).unwrap();
+    (
+        serde_json::from_slice(&raw).unwrap(),
+        raw_path,
+        summary_path,
+    )
+}
+
+#[test]
+fn offline_pair_parity_skips_readings_the_stored_summary_predates() {
+    let dir = Temp::new();
+    let (current, raw_path, summary_path) =
+        world_pair_without_stored_reading(&dir, "pass_cap_hits_per_creature_tick");
+    assert!(assert_offline_reference_parity(
+        &current,
+        &raw_path,
+        &summary_path
+    ));
+}
+
+#[test]
+#[should_panic(expected = "reference")]
+fn offline_pair_parity_still_fails_on_a_reading_both_sides_define() {
+    let dir = Temp::new();
+    let (current, raw_path, summary_path) =
+        world_pair_without_stored_reading(&dir, "pass_cap_hits_per_creature_tick");
+    let mut summary: Value =
+        serde_json::from_slice(&std::fs::read(&summary_path).unwrap()).unwrap();
+    let stored = summary["comparison_inputs"]["case_readings"]["test world"]
+        .as_array_mut()
+        .unwrap();
+    let births = stored
+        .iter_mut()
+        .find(|row| row[0] == "births_per_creature_tick")
+        .unwrap();
+    births[1] = json!("12345");
+    std::fs::write(&summary_path, serde_json::to_vec(&summary).unwrap()).unwrap();
+    assert_offline_reference_parity(&current, &raw_path, &summary_path);
 }
 
 /// Explicitly opt in with the saved migration manifest; only stored bytes and

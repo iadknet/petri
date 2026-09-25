@@ -200,9 +200,12 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
     let neighborhood = observation.mutational_neighborhood.defined();
     let evolved = neighborhood.and_then(|reading| reading.evolved.defined()?.per_seed.first());
     let neighborhood_read = observation.neighborhood_read.defined();
-    let per_creature_tick = |count: fn(&PerSeed) -> u64| {
+    // A counter the stored row never recorded is unmeasured, like a row
+    // with no creature-ticks, rather than a measured zero.
+    let per_creature_tick = |count: fn(&PerSeed) -> Option<u64>| {
         run.and_then(|row| {
-            (row.creature_ticks > 0).then(|| count(row) as f64 / row.creature_ticks as f64)
+            let count = count(row)?;
+            (row.creature_ticks > 0).then(|| count as f64 / row.creature_ticks as f64)
         })
     };
 
@@ -241,13 +244,13 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
     ];
     // The same counters the profile totals normalize, in the same order, so
     // a per-case row can never drift from the profile-level counter list.
-    let counts: [fn(&PerSeed) -> u64; COUNTER_NAMES.len()] = [
-        |row| row.mesh_hops,
-        |row| row.vm_steps,
-        |row| row.graph_relax_iters,
-        |row| row.plasticity_updates,
-        |row| row.actions_applied,
-        |row| row.births,
+    let counts: [fn(&PerSeed) -> Option<u64>; COUNTER_NAMES.len()] = [
+        |row| Some(row.mesh_hops),
+        |row| Some(row.vm_steps),
+        |row| Some(row.graph_relax_iters),
+        |row| Some(row.plasticity_updates),
+        |row| Some(row.actions_applied),
+        |row| Some(row.births),
         |row| row.pass_cap_hits,
         |row| row.passes,
         |row| row.decided_passes,

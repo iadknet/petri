@@ -266,9 +266,9 @@ pub(super) fn run_one_seed(
         plasticity_updates: sim.stats.plasticity_updates_total,
         actions_applied: sim.stats.actions_applied_total,
         births: sim.stats.reproduction_actions_spawned_total,
-        pass_cap_hits: sim.stats.pass_cap_hits_total,
-        passes: sim.stats.passes_total,
-        decided_passes: sim.stats.decided_passes_total,
+        pass_cap_hits: Some(sim.stats.pass_cap_hits_total),
+        passes: Some(sim.stats.passes_total),
+        decided_passes: Some(sim.stats.decided_passes_total),
         final_population: persistence.final_population,
         extinction_tick: persistence.extinction_tick,
     };
@@ -386,9 +386,9 @@ fn accumulate_totals(per_seed: &[PerSeed]) -> Totals {
         totals.plasticity_updates += row.plasticity_updates;
         totals.actions_applied += row.actions_applied;
         totals.births += row.births;
-        totals.pass_cap_hits += row.pass_cap_hits;
-        totals.passes += row.passes;
-        totals.decided_passes += row.decided_passes;
+        totals.pass_cap_hits += row.pass_cap_hits.unwrap_or(0);
+        totals.passes += row.passes.unwrap_or(0);
+        totals.decided_passes += row.decided_passes.unwrap_or(0);
         totals
     })
 }

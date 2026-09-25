@@ -638,9 +638,9 @@ proptest! {
                 plasticity_updates: a.5,
                 actions_applied: b.0,
                 births: b.1,
-                pass_cap_hits: b.2,
-                passes: b.3,
-                decided_passes: b.4,
+                pass_cap_hits: Some(b.2),
+                passes: Some(b.3),
+                decided_passes: Some(b.4),
                 final_population: 0,
                 extinction_tick: None,
             })
@@ -655,9 +655,9 @@ proptest! {
         prop_assert_eq!(totals.plasticity_updates, sum(|r| r.plasticity_updates));
         prop_assert_eq!(totals.actions_applied, sum(|r| r.actions_applied));
         prop_assert_eq!(totals.births, sum(|r| r.births));
-        prop_assert_eq!(totals.pass_cap_hits, sum(|r| r.pass_cap_hits));
-        prop_assert_eq!(totals.passes, sum(|r| r.passes));
-        prop_assert_eq!(totals.decided_passes, sum(|r| r.decided_passes));
+        prop_assert_eq!(totals.pass_cap_hits, sum(|r| r.pass_cap_hits.unwrap()));
+        prop_assert_eq!(totals.passes, sum(|r| r.passes.unwrap()));
+        prop_assert_eq!(totals.decided_passes, sum(|r| r.decided_passes.unwrap()));
     }
 }
 
