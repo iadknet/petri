@@ -294,11 +294,11 @@
   }
 
   const artifactNotice = (report) => report.kind === 'petri-benchmark-summary'
-    ? `Committed summary. Detailed ${report.omitted_details.join('; ')} unavailable here. Raw bytes were verified locally at ${report.raw.verified_at}; this is not a download or a current availability guarantee.`
+    ? `Committed summary. Detailed observations are omitted; see \`omitted_details\` in the summary. Raw bytes were verified locally at ${report.raw.verified_at}; this is not a download or a current availability guarantee.`
     : '';
 
   function validateArtifact(report) {
-    if (report.kind !== undefined && (report.kind !== 'petri-benchmark-summary' || report.summary_version !== 1)) {
+    if (report.kind !== undefined && (report.kind !== 'petri-benchmark-summary' || report.summary_version !== 2)) {
       throw new Error(`Unsupported benchmark summary version ${report.summary_version} (${report.kind})`);
     }
     if (!isObj(report.deterministic) || !isObj(report.environment)) throw new Error('Malformed benchmark artifact');
@@ -1150,7 +1150,9 @@
         const v = num(nr.changed_per_all_births);
         const floor = F12_FLOORS[w.short];
         const births = num(get(nr, 'births.births_total'));
-        const genomes = Array.isArray(nr.genomes) ? nr.genomes.length : num(nr.sample_size);
+        // Summaries store only the count; full reports keep the genome rows.
+        const genomes = Number.isFinite(num(nr.genome_count)) ? num(nr.genome_count)
+          : Array.isArray(nr.genomes) ? nr.genomes.length : num(nr.sample_size);
         return {
           world: w.short,
           value: Number.isFinite(v) ? pct(v) : NOT_MEASURED,

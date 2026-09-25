@@ -1,0 +1,46 @@
+#!/bin/sh
+# Fail when a tracked (indexed) file exceeds 1 MiB and is not allowlisted.
+# Large payloads belong in the ignored .bench-artifacts/ tree; a new reporting
+# need extends the summary keep-list instead of this allowlist
+# (docs/specs/large-file-cleanup-2026-09-24.md, Decision 3).
+set -eu
+
+limit=1048576
+
+fail() {
+  printf 'tracked-size-check: %s\n' "$*" >&2
+  exit 1
+}
+
+allowed() {
+  case $1 in
+    docs/assets/petri-creatures.gif | docs/progress/historical-benchmark-manifest.json) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+tab=$(printf '\t')
+listing=$(git ls-files -s) || fail 'git ls-files failed'
+sizes=$(printf '%s\n' "$listing" |
+  sed -n "/^160000 /d; s/^[0-9]* \\([0-9a-f]*\\) [0-9]*$tab/\\1 /p" |
+  git cat-file --batch-check='%(objectsize) %(rest)') || fail 'git cat-file failed'
+
+over=$(printf '%s\n' "$sizes" | awk -v limit="$limit" '$1 + 0 > limit')
+violations=''
+if [ -n "$over" ]; then
+  while IFS= read -r line; do
+    path=${line#* }
+    allowed "$path" && continue
+    violations="$violations
+  $line"
+  done <<EOF
+$over
+EOF
+fi
+
+if [ -n "$violations" ]; then
+  printf 'tracked-size-check: tracked files over %s bytes (bytes path):%s\n' "$limit" "$violations" >&2
+  fail 'move them to the ignored .bench-artifacts/ tree and cite them by path, SHA-256 and bytes'
+fi
+
+printf 'Tracked file size validation passed.\n'

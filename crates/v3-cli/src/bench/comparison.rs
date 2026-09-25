@@ -848,3 +848,6 @@ fn rand_version_from_lock(lockfile: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod parity;

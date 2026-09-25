@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import { inventory, selectReports, verifyRaw, verifyHistory, verifyPackage, exportSummaries } from './historical-benchmarks.mjs';
+import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { inventory, selectReports, verifyRaw, verifyHistory, verifyPackage, exportSummaries, largeBlobIds, blobInventory, convertReports } from './historical-benchmarks.mjs';
 
 const fixture = JSON.parse(readFileSync(new URL('../crates/v3-cli/tests/fixtures/synthetic-full-benchmark-v1.json', import.meta.url)));
 
@@ -257,4 +259,178 @@ test('unsupported raw-only reports need an explicit historical disposition', asy
   assert.deepEqual(result.removed_raw_paths, ['report.json']);
   assert.equal(readFileSync(manifest.blobs[0].raw.path, 'utf8').includes('999'), true);
   assert.equal(JSON.parse(readFileSync(join(h.repo, 'docs/progress/historical-benchmark-manifest.json'))).reports[0].raw_only_disposition.status, 'unsupported');
+});
+
+// A stand-in for `v3-cli bench-summarize --input RAW --out OUT --provenance
+// PROVENANCE` that writes the summary header the package checks read.
+function stubConverter(root, summaryVersion) {
+  const path = join(root, `stub-v3-cli-${summaryVersion}`);
+  writeFileSync(path, `#!${process.execPath}
+const { createHash } = require('node:crypto');
+const { mkdirSync, readFileSync, writeFileSync } = require('node:fs');
+const { dirname } = require('node:path');
+const arg = name => process.argv[process.argv.indexOf(name) + 1];
+const bytes = readFileSync(arg('--input'));
+const report = JSON.parse(bytes);
+mkdirSync(dirname(arg('--out')), { recursive: true });
+writeFileSync(arg('--out'), JSON.stringify({ kind: 'petri-benchmark-summary', summary_version: ${summaryVersion},
+  source_schema_version: report.schema_version, feature: report.feature,
+  deterministic: { profile: report.deterministic.profile }, environment: report.environment,
+  conversion: JSON.parse(readFileSync(arg('--provenance'))),
+  raw: { sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length, path: arg('--input') } }) + '\\n');
+`);
+  chmodSync(path, 0o755);
+  return path;
+}
+
+test('conversion, verification and export accept the v2 summaries the converter writes and reject v1', async (t) => {
+  for (const version of [2, 1]) {
+    const h = history(t);
+    h.report('docs/progress/features/run.json');
+    h.put('docs/progress/benchmark-series.json', JSON.stringify({ gate: { closed: ['docs/progress/features/run.json'] } }));
+    h.commit('stored full report');
+    const manifest = await h.scan();
+    const totals = convertReports(manifest, stubConverter(dirname(h.repo), version));
+    assert.equal(totals.summaries, 1);
+    if (version === 1) {
+      assert.throws(() => verifyPackage(manifest), /summary provenance or identity mismatch/);
+      continue;
+    }
+    assert.equal(verifyPackage(manifest).verified_summaries, 1);
+    h.git('checkout', '-qb', 'codex/export');
+    const result = exportSummaries(manifest);
+    assert.equal(result.exported_summaries, 1);
+    assert.equal(result.verified_series_references, 1);
+    const exported = JSON.parse(readFileSync(join(h.repo, 'docs/progress/features/run.json')));
+    assert.equal(exported.summary_version, 2);
+  }
+});
+
+// Replays `repo`'s history the way the Phase B filter does: every commit is
+// kept with its metadata and parents, and each filtered path/blob pair is
+// deleted, or replaced by `substitute[path]` to model a wrong filter.
+function rewrite(repo, root, pairs, substitute = {}) {
+  const drop = new Set(pairs.map(p => `${p.path}\0${p.git_blob}`));
+  const index = join(root, `rewrite-index-${Math.random()}`);
+  const run = (args, options = {}) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', ...options,
+    env: { ...process.env, GIT_INDEX_FILE: index, ...options.env } });
+  const map = new Map();
+  let tip;
+  for (const row of run(['log', '--format=%H %P', '--reverse', '--topo-order', 'HEAD']).trim().split('\n')) {
+    const [oid, ...parents] = row.split(' ').filter(Boolean);
+    const rows = run(['ls-tree', '-r', '-z', '--full-tree', oid]).split('\0').filter(Boolean).flatMap(entry => {
+      const tab = entry.indexOf('\t');
+      const [mode, type, blob] = entry.slice(0, tab).split(' ');
+      const path = entry.slice(tab + 1);
+      if (!drop.has(`${path}\0${blob}`)) return [entry];
+      return substitute[path] ? [`${mode} ${type} ${substitute[path]}\t${path}`] : [];
+    });
+    run(['read-tree', '--empty']);
+    run(['update-index', '-z', '--index-info'], { input: rows.map(r => `${r}\0`).join('') });
+    const tree = run(['write-tree']).trim();
+    const raw = run(['cat-file', 'commit', oid]);
+    const header = raw.slice(0, raw.indexOf('\n\n'));
+    const person = kind => header.match(new RegExp(`^${kind} (.*) <(.*)> (\\d+ [+-]\\d{4})$`, 'm'));
+    const [, an, ae, ad] = person('author');
+    const [, cn, ce, cd] = person('committer');
+    tip = run(['commit-tree', tree, ...parents.flatMap(p => ['-p', map.get(p)])], {
+      input: raw.slice(raw.indexOf('\n\n') + 2),
+      env: { GIT_AUTHOR_NAME: an, GIT_AUTHOR_EMAIL: ae, GIT_AUTHOR_DATE: `@${ad}`,
+        GIT_COMMITTER_NAME: cn, GIT_COMMITTER_EMAIL: ce, GIT_COMMITTER_DATE: `@${cd}` },
+    }).trim();
+    map.set(oid, tip);
+  }
+  const commitMap = join(root, `commit-map-${Math.random()}`);
+  writeFileSync(commitMap, `old new\n${[...map].map(([o, n]) => `${o} ${n}`).join('\n')}\n`);
+  return { tip, commitMap };
+}
+
+const PREFIXES = ['docs/progress/features/', 'docs/strategy/'];
+const blobId = bytes => createHash('sha1').update(`blob ${Buffer.byteLength(bytes)}\0`).update(bytes).digest('hex');
+
+test('a blob-ID inventory deletes reused paths in both directions and aliases, and a restored version fails', async (t) => {
+  const h = history(t);
+  const small = 'small first\n';
+  const big = 'x'.repeat(2000);
+  h.put('keep.txt', 'unrelated\n');
+  h.put('docs/progress/features/run.json', small);
+  h.put('docs/strategy/tip-large.bin', 'y'.repeat(3000));
+  h.put('assets/outside.bin', 'z'.repeat(3000));
+  h.commit('small version before the large one');
+  h.put('docs/progress/features/run.json', big);
+  h.put('docs/strategy/alias.bin', big);
+  h.put('assets/outside.bin', 'w'.repeat(3000));
+  const large = h.commit('large version and an alias');
+  h.put('docs/progress/features/run.json', 'small after\n');
+  h.git('rm', '-q', 'docs/strategy/alias.bin');
+  h.commit('small version after the large one');
+
+  const ids = largeBlobIds(h.repo, 'HEAD', { minBytes: 1000, prefixes: PREFIXES });
+  assert.deepEqual(ids, [blobId(big)]);
+  const root = dirname(h.repo);
+  assert.throws(() => blobInventory(h.repo, 'HEAD', join(root, 'tip'), [blobId('y'.repeat(3000))]), /frozen tip/);
+  assert.throws(() => blobInventory(h.repo, 'HEAD', join(root, 'absent'), ['0'.repeat(40)]), /not in the frozen ancestry/);
+  const manifest = blobInventory(h.repo, 'HEAD', join(root, 'large', 'package'), ids);
+
+  assert.deepEqual(JSON.parse(readFileSync(manifest.filter_inputs.path)), [
+    { path: 'docs/progress/features/run.json', git_blob: blobId(big) },
+    { path: 'docs/strategy/alias.bin', git_blob: blobId(big) },
+  ]);
+  assert.ok(manifest.blobs[0].occurrences.every(o => o.commits.length === 1 && o.commits[0] === large));
+  assert.equal(readFileSync(manifest.blobs[0].raw.path, 'utf8'), big);
+  assert.deepEqual(manifest.totals, { blobs: 1, bytes: 2000, filter_inputs: 2 });
+  verifyRaw(manifest);
+  assert.throws(() => verifyHistory(manifest, h.repo, h.git('rev-parse', 'HEAD')), /raw blob remains/);
+
+  const pairs = JSON.parse(readFileSync(manifest.filter_inputs.path));
+  const deleted = rewrite(h.repo, root, pairs);
+  assert.equal(verifyHistory(manifest, h.repo, deleted.tip, deleted.commitMap).mapped_trees_checked, true);
+  assert.equal(h.git('rev-parse', `${deleted.tip}^{tree}`), h.git('rev-parse', 'HEAD^{tree}'));
+  const restored = rewrite(h.repo, root, pairs, { 'docs/progress/features/run.json': blobId(small) });
+  assert.throws(() => verifyHistory(manifest, h.repo, restored.tip, restored.commitMap), /unrelated tree changed/);
+});
+
+test('a blob-ID rewrite keeps merges, executable modes and empty commits', async (t) => {
+  const h = history(t);
+  const big = 'x'.repeat(2000);
+  h.put('run.sh', '#!/bin/sh\n');
+  h.commit('base');
+  chmodSync(join(h.repo, 'run.sh'), 0o755);
+  h.commit('executable');
+  h.git('checkout', '-qb', 'side');
+  h.put('docs/strategy/large.bin', big);
+  h.commit('large file on a side branch');
+  h.git('checkout', '-q', 'main');
+  h.git('commit', '-q', '--allow-empty', '-m', 'empty commit');
+  h.git('merge', '--no-ff', '-qm', 'merge side', 'side');
+  h.git('rm', '-q', 'docs/strategy/large.bin');
+  h.commit('remove large file');
+
+  const root = dirname(h.repo);
+  const manifest = blobInventory(h.repo, 'HEAD', join(root, 'large', 'package'),
+    largeBlobIds(h.repo, 'HEAD', { minBytes: 1000, prefixes: PREFIXES }));
+  assert.equal(manifest.enumeration.commits, 6);
+  assert.equal(manifest.enumeration.merges, 1);
+  const { tip, commitMap } = rewrite(h.repo, root, JSON.parse(readFileSync(manifest.filter_inputs.path)));
+  // The side commit becomes empty and stays mapped: two distinct trees remain.
+  assert.deepEqual(verifyHistory(manifest, h.repo, tip, commitMap), {
+    commits: 6, trees: 2, raw_blobs_absent: 1, mapped_trees_checked: true,
+  });
+  assert.match(h.git('ls-tree', tip, 'run.sh'), /^100755 /);
+});
+
+test('the large-blobs CLI output feeds inventory-blobs directly', async (t) => {
+  const h = history(t);
+  const big = 'x'.repeat(1024 ** 2 + 1);
+  h.put('docs/strategy/large.bin', big);
+  h.commit('large file');
+  h.git('rm', '-q', 'docs/strategy/large.bin');
+  h.put('keep.txt', 'kept\n');
+  h.commit('remove large file');
+  const script = fileURLToPath(new URL('./historical-benchmarks.mjs', import.meta.url));
+  const cli = (...args) => execFileSync(process.execPath, [script, ...args], { cwd: h.repo, encoding: 'utf8' });
+  const ids = join(dirname(h.repo), 'large-blobs.json');
+  writeFileSync(ids, cli('large-blobs', 'HEAD', ...PREFIXES));
+  const totals = JSON.parse(cli('inventory-blobs', 'HEAD', join(dirname(h.repo), 'large', 'package'), ids));
+  assert.deepEqual(totals, { blobs: 1, bytes: big.length, filter_inputs: 1 });
 });

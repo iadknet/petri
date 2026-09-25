@@ -190,10 +190,13 @@ or to remove edge-deletion mutations.
   resource costs, not comparative performance measurements.
 - Project documentation validation: `make check-docs` passed.
 
-[Results and complete source snapshot](ring-adaptation-experiment-2026-09-23.results.json)
-contain all primary and diagnostic observations, input controllers, protocols,
-Cargo lockfile, analysis scripts, property-test regression seed, and hashes.
+The results and complete source snapshot (local only; see the Evidence line
+below) contain all primary and diagnostic observations, input controllers,
+protocols, Cargo lockfile, analysis scripts, property-test regression seed, and hashes.
 The working harness is under `.bench-artifacts/ring-adaptation-2026-09-23/`;
 run `sh .bench-artifacts/ring-adaptation-2026-09-23/reproduce.sh` from the repository.
 For reconstruction, restore each `source_snapshot` entry's `text` under that
 directory, using the recorded repository revision, then run the same command.
+
+Evidence (relocated 2026-09-24, local only): `.bench-artifacts/research/ring-adaptation-experiment-2026-09-23/ring-adaptation-experiment-2026-09-23.results.json`,
+sha256 `6118edbb0f685f3cc7fe0702516da79c5ed0e3d92e92ad65b9ec158bd921dd2d`, 7,758,320 bytes.

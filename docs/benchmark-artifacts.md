@@ -2,8 +2,14 @@
 
 `make bench` and direct `v3-cli bench` write a full local report and a separate
 versioned summary. Commit the summary and concise readings. Full reports,
-including small gate reports, stay out of Git. Existing historical summaries
-remain valid comparison inputs; historical migration belongs to T15.F02.
+including small gate reports, stay out of Git. A committed summary keeps only
+what reporting reads (the progress page and the closure comparison); the full
+report and the closure readings hold everything else. Every committed summary
+is version 2; the historical ones were converted in place on 2026-09-24
+([large file cleanup](specs/large-file-cleanup-2026-09-24.md)). No tracked file
+may exceed 1 MiB outside a two-file allowlist (`scripts/tracked-size-check`,
+run by `make policy-check`); larger evidence stays under the ignored
+`.bench-artifacts/` tree and is cited by path, SHA-256 and bytes.
 A full report embeds typed config, so one containing a since-retired config
 key no longer loads and is regenerated rather than migrated.
 
@@ -12,7 +18,7 @@ key no longer loads and is regenerated rather than migrated.
 | Gate | `.bench-artifacts/<feature>/gate.json` | `docs/progress/features/<feature>.json` |
 | Goal | `.bench-artifacts/<feature>/goal.json` | `docs/progress/features/<feature>-goal.json` |
 | Sweep | `.bench-artifacts/<feature>/sweep.json` | `docs/progress/features/<feature>-sweep.json` |
-| Recruitment S0 (`v3-cli recruitment`, `--pilot` adds `-pilot`) | `.bench-artifacts/<feature>/recruitment-s0.json` (`recruitment-s0-pilot.json`): compact per-lineage records streamed as they complete, `incomplete: true` when a cap stopped the run; exit status 3. The byte cap is checked after each record lands, so lineages already in flight on other threads still append: the raw file may exceed `--byte-cap` by up to `threads − 1` lineage records. | `docs/progress/features/<feature>-s0.json` (`-s0-pilot.json`): `petri-recruitment-s0-summary`, per-arm estimates, ladder and classification counts, raw bytes/sha256, thread count, optional replay check |
+| Recruitment S0 (`v3-cli recruitment`, `--pilot` adds `-pilot`) | `.bench-artifacts/<feature>/recruitment-s0.json` (`recruitment-s0-pilot.json`): compact per-lineage records streamed as they complete, `incomplete: true` when a cap stopped the run; exit status 3. The byte cap is checked after each record lands, so lineages already in flight on other threads still append: the raw file may exceed `--byte-cap` by up to `threads − 1` lineage records. | `docs/progress/features/<feature>-s0.json` (`-s0-pilot.json`): `petri-recruitment-s0-summary`, per-arm estimates, ladder and classification counts, raw bytes/sha256, thread count, optional replay check. The writer is unchanged, but an S0 summary over 1 MiB is not committed: it stays local-only beside its raw file under `.bench-artifacts/<feature>/`, and the committed reading carries its numbers plus its path, SHA-256 and bytes. |
 
 The first entry from `git worktree list --porcelain -z` identifies the main
 checkout, including when called from a linked worktree or a path containing
@@ -47,40 +53,63 @@ does not announce a completed pair. A completed severe run writes both artifacts
 and returns CLI status 3. An outer `make` or wrapper can return a different
 status, which must be recorded with its own source.
 
-## Summary version 1
+## Summary version 2
 
-Summaries carry `kind: "petri-benchmark-summary"` and `summary_version: 1`.
-They retain the existing `feature`, `deterministic`, `environment`, and
-`comparison` presentation paths. The original measured revision, generation
-time, counters and indicator-definition tokens are preserved. Unknown summary
-versions, unsupported source versions and inconsistent duplicated comparison
-metadata are errors. Neither comparison nor the
-progress page opens `raw.path`.
+Summaries carry `kind: "petri-benchmark-summary"` and `summary_version: 2`,
+written as compact JSON. A summary is a keep-list, not a cut-list: it contains
+only
 
-The projection retains per-seed counters, totals, six normalized counters,
-world/config/recipe identities, host/thread/timing evidence, complete stored
-comparisons and available reference identities. Goal readings include
-persistence, structure, lineage, memory and temporal memory, exposure, applied
-world totals/fractions, founder/evolved pooled neighborhood readings and drift
-checkpoint aggregates. Existing `Undefined`, missing fields and measured zero
-keep their meanings. Omitted detail is listed in `omitted_details`.
+- the provenance header: `kind`, `summary_version`, `source_schema_version`,
+  `feature`, `raw`, `conversion`, `claims` and `measurement_evidence`;
+- `environment`, `comparison` and `comparison_inputs`, whole;
+- inside `deterministic`, the fields the progress page or the summary loader
+  reads;
+- `omitted_details`, which lists what was dropped.
 
-Persistence retains at most 21 source checkpoints per seed: all when there are
-21 or fewer, otherwise source index `floor(i * (n - 1) / 20)` for `i=0..20`.
-The standard 2,000-tick profile retains every checkpoint, including the first
-and last. Evolved sampled-genome rows are replaced by per-seed `mesh_summary`
-totals; a missing mesh observation remains `null`, not zero.
+The page read set is the traced list of every path the progress page reads,
+saved as `crates/v3-cli/tests/fixtures/progress-page-read-set.txt` and pinned by
+a test. The loader deserializes `deterministic.profile` and
+`per_creature_tick`; comparison otherwise reads only `comparison_inputs`. The
+keep-list (`project_deterministic` in `crates/v3-cli/src/bench/artifacts.rs`)
+is the union of those sets. A new reporting need is met by adding its field to
+the keep-list, never by retaining a whole block or by a size-limit exception.
+Kept values are byte-identical to the v1 stage, and existing `Undefined`,
+missing fields and measured zero keep their meanings.
+`neighborhood_read.genomes` is replaced by its count, `genome_count`.
 
-Recruitment retains task/config/size/seed-formula identities and limitations,
-actual proposal totals, outcome and opportunity counts, arm and batch estimates
-including their original numerators, denominators and Wilson intervals,
-compact lineage discovery/retention outcomes and the original paired-lineage
-contrasts/divergence evidence. Constructed stages and starts retain task scalar
-summaries and identities. Each arm also pools selected-inapplicable counts by
-the recorded backend/operator and retains the unresolved-backend count; these
-cross-tabs do not add to the existing opportunity totals. Full genomes, deltas, per-proposal rows, scenes,
-signatures, routing/state traces and replay paths stay raw. Detail scales with
-cases, fixed checkpoints, arms, batches and lineages, not proposal or genome size.
+Summaries do not carry recruitment paths, per-genome neighborhood rows,
+per-operator mutation value totals, drift `opportunities` and `recruitment`
+detail, experiment proposal totals, outcomes, denominators, or batch and
+lineage uncertainty. From a world's `mutation_effects` block (T11.F26) they keep
+only what the page's view reads; its rule text, per-parent structure counts and
+control expectations stay in the full report. That detail stays in the full
+report and the closure readings. `omitted_details` keeps the v1 stage notes and then names every
+dropped `deterministic` path (arrays as `[]`).
+
+Projection runs in two stages. The unchanged full-report-to-v1 stage
+validates the report, retains at most 21 persistence checkpoints per seed (all
+when there are 21 or fewer, otherwise source index `floor(i * (n - 1) / 20)`
+for `i=0..20`) and replaces evolved sampled-genome rows with per-seed
+`mesh_summary` totals (a missing mesh observation stays `null`). The keep-list
+is then applied. The original measured revision, generation time, counters and
+indicator-definition tokens are preserved. Neither comparison nor the progress
+page opens `raw.path`.
+
+The summary loader and the progress page accept full reports and version 2
+summaries and reject version 1 and unknown versions. The Rust loader also
+rejects unsupported source versions and inconsistent duplicated comparison
+metadata; the page checks only kind, version and basic structure. Convert a committed
+v1 summary with:
+
+```sh
+cargo run -p v3-cli -- bench-summarize --from-summary-v1 <in> --out <out>
+```
+
+It keeps the input's own provenance, records `conversion.from_summary_v1`
+(the input's resolved path, SHA-256 and bytes), and leaves `raw` describing the
+original full report. Converting the same input again gives identical bytes.
+Whole-kept blocks are written as stored, so a field absent in v1 stays
+absent; a conversion whose typed check would change one is refused.
 
 `comparison_inputs` stores the existing comparison projection separately from
 presentation data. Per-case numeric inputs and wall time use round-trip decimal
@@ -90,14 +119,14 @@ floating-point readings as well as integer counters and fractional strings.
 Historical full reports and summaries use the same profile, case, severity,
 value-only-reading and host-matching rules. No synthetic full report is rebuilt.
 
-`claims` selects up to 16 fixed JSON pointers, omitting unavailable locations:
-creature-tick and birth totals; normalized VM work; severe verdict; the first
-seed's final/minimum population; the first world's first drift checkpoint
-lineage count; recruitment total/attempted proposals; the first arm's retained
-discovery numerator/denominator; its first proposal's Task A score and chosen
-flag; the first pair's matched-proposal count; the first constructed stage's
-useful flag; and total simulation wall time. Each extract is a scalar or count
-whose pointer resolves in the hashed raw JSON. No per-proposal trace is retained.
+`claims` selects up to 16 fixed JSON pointers into the raw report, omitting
+unavailable locations: creature-tick and birth totals; normalized VM work;
+severe verdict; the first seed's final/minimum population; the first world's
+first drift checkpoint lineage count; recruitment total/attempted proposals;
+the first arm's retained discovery numerator/denominator; its first proposal's
+Task A score and chosen flag; the first pair's matched-proposal count; the
+first constructed stage's useful flag; and total simulation wall time. Each
+extract is a scalar or count whose pointer resolves in the hashed raw JSON.
 
 ## Convert an existing full report
 

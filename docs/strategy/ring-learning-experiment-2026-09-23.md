@@ -267,12 +267,15 @@ restored costs. Replaying one complete paired seed block reproduced all
 12 search rows exactly, including held-out controls. Documentation validation
 uses `make check-docs`.
 
-The [machine-readable evidence](ring-learning-experiment-2026-09-23.results.json)
+The machine-readable evidence (local only; see the Evidence line below)
 contains seed-level summaries, paired bootstrap intervals, selected parameters,
 raw artifact hashes, and a portable source snapshot with the lockfile and
 predeclared protocols. Intervals resample independent search seeds, not the
 correlated trials within a life. They describe exploratory comparisons and
 are not multiplicity-adjusted confirmatory tests.
+
+Evidence (relocated 2026-09-24, local only): `.bench-artifacts/research/ring-learning-experiment-2026-09-23/ring-learning-experiment-2026-09-23.results.json`,
+sha256 `9f82c81842c82e178dd55665905fd753b2068a456129a9030efda4aef007f99a`, 2,470,094 bytes.
 
 Full local artifacts are under
 `.bench-artifacts/ring-learning-2026-09-23/`. At the recorded source commit,

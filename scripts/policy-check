@@ -10,6 +10,7 @@ fail() {
 
 scripts/dependency-policy-check
 scripts/skill-provenance-check
+scripts/tracked-size-check
 
 if find scripts -type f -exec grep -l '^#!.*zsh' {} + | grep -q .; then
   fail 'Zsh scripts are not supported; use POSIX shell instead'

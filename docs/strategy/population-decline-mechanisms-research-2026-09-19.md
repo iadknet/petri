@@ -6,7 +6,9 @@ Research date: 2026-09-19. Source snapshot: `45c8063722fa3aa509a32d523f5e477e9fc
 
 The original reported extinction near tick 15,000 remains unexplained at the level of a particular historical run: its simulation seed, live changes, and population state were not supplied. The earlier full-world control declined severely but still had 645 creatures and ongoing births at tick 15,000. These are different observations.
 
-[Machine-readable results](population-decline-mechanisms-research-2026-09-19.results.json) contain the new run trajectories, resolved configurations, seeds, assay summaries, uncertainty estimates, source identity, and artifact hashes. The local [research archive](../../.bench-artifacts/population-decline-2026-09-19/) contains frozen source, executable probes, input genomes, raw output, analysis, and replay scripts.
+Machine-readable results (local only; see the Evidence line below) contain the new run trajectories, resolved configurations, seeds, assay summaries, uncertainty estimates, source identity, and artifact hashes. The local [research archive](../../.bench-artifacts/population-decline-2026-09-19/) contains frozen source, executable probes, input genomes, raw output, analysis, and replay scripts.
+
+Evidence (relocated 2026-09-24, local only): `.bench-artifacts/research/population-decline-mechanisms-research-2026-09-19/population-decline-mechanisms-research-2026-09-19.results.json`, sha256 `c2ebd727265ecc98c1ed365b43536bea2a21917540f700a6c2fba676ab9c32b3`, 2,418,174 bytes.
 
 ![Reproductive capacity, ecological outcomes, and census are different measurements](../../.bench-artifacts/population-decline-2026-09-19/findings.png)
 

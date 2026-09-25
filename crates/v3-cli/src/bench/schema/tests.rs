@@ -153,16 +153,16 @@ fn new_reports_carry_indicator_version_tokens() {
     );
 }
 
-/// T12.F04 predates the version tokens. Its retained historical aggregates
-/// load and reserialize exactly as stored, with no `version` key; the artifact
-/// container is now a summary, while these aggregate types remain unchanged.
+/// T12.F04 predates the version tokens. Its historical aggregates, copied
+/// from its v1 summary into a fixture (summary v2 keeps only what reporting
+/// reads), load and reserialize exactly as stored, with no `version` key.
 #[test]
 fn historical_goal_aggregates_load_without_versions_and_reserialize_them_absent() {
-    let stored: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../../../docs/progress/features/t12-f04-baseline-world-set-goal.json"
+    let stored_indicators: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/t12-f04-historical-goal-aggregates.json"
     ))
     .unwrap();
-    let stored_indicators = &stored["deterministic"]["goal_indicators"];
+    let stored_indicators = &stored_indicators;
 
     let lineage: LineageDiversity =
         serde_json::from_value(stored_indicators["lineage_diversity"].clone()).unwrap();

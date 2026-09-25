@@ -37,9 +37,15 @@ run and 1 on an output error; neither occurred).
 | Run | Summary path (worktree) | Summary bytes | Summary sha256 | Raw path (main checkout `.bench-artifacts/`, local, not staged) | Raw bytes | Raw sha256 |
 | --- | --- | ---: | --- | --- | ---: | --- |
 | pilot | `docs/progress/features/t13-f07-current-policy-recruitment-transitions-s0-pilot.json` | 467,195 | `e01251f7ff6f512d63f91f03e0c67fbed3955648c8b3a107eeb806e37aa1c23c` | `.bench-artifacts/t13-f07-current-policy-recruitment-transitions/recruitment-s0-pilot.json` | 50,483,845 | `de977a6f3e612df54311f6bfb58630cc7f74732b64ff33224a8b78aa52ffa9e3` |
-| S0 | `docs/progress/features/t13-f07-current-policy-recruitment-transitions-s0.json` | 2,405,314 | `1dab13f5d3e42d2d7e0d83d528bdc860dc0b7ee09326de353c8ac3dc41dda589` | `.bench-artifacts/t13-f07-current-policy-recruitment-transitions/recruitment-s0.json` | 1,441,006,562 | `977ddfccc252a22a1fb7c12327b5600b2aca69bc9302f3bb4ff7c1746be2e302` |
+| S0 | `.bench-artifacts/research/t13-f07-current-policy-recruitment-transitions/t13-f07-current-policy-recruitment-transitions-s0.json` (relocated 2026-09-24, local only; see the Evidence line below) | 2,405,314 | `1dab13f5d3e42d2d7e0d83d528bdc860dc0b7ee09326de353c8ac3dc41dda589` | `.bench-artifacts/t13-f07-current-policy-recruitment-transitions/recruitment-s0.json` | 1,441,006,562 | `977ddfccc252a22a1fb7c12327b5600b2aca69bc9302f3bb4ff7c1746be2e302` |
 | gate | `docs/progress/features/t13-f07-current-policy-recruitment-transitions.json` | 97,724 | `3fd71b043e465244db945379a98bce5f81780800d5ca0858d6c2cfb9212109ac` | `.bench-artifacts/t13-f07-current-policy-recruitment-transitions/gate.json` | 94,864 | `763def13518997d1454c95df43f43fa75d3c64cbf44e2a8e73bda9a2c16b7244` |
 | goal | `docs/progress/features/t13-f07-current-policy-recruitment-transitions-goal.json` | 7,632,294 | `a825b33223bdb72044ddf60bda74969d1998c54d2e5a3084e1739e0f7ac22eb1` | `.bench-artifacts/t13-f07-current-policy-recruitment-transitions/goal.json` | 591,945,210 | `9e5c9180cc8d9c8d4e263c9fc3ed7a6f2cf055cc821f3cfe6ca2fadc370f43f6` |
+
+Evidence (relocated 2026-09-24, local only): the S0 summary moved out of Git to
+`.bench-artifacts/research/t13-f07-current-policy-recruitment-transitions/t13-f07-current-policy-recruitment-transitions-s0.json`,
+sha256 `1dab13f5d3e42d2d7e0d83d528bdc860dc0b7ee09326de353c8ac3dc41dda589`,
+2,405,314 bytes (byte-identical to the committed blob). This file's S0
+sections carry its numbers.
 
 Raw sha256 and byte counts re-checked with `shasum -a 256` and `ls -l`
 after all four runs; each matches its summary's `raw` block. Gate and goal

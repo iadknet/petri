@@ -174,7 +174,7 @@ Work in `.worktrees/large-file-cleanup` from `main`. Run `npm ci` in
     deserialization coverage moves to a dedicated fixture, and obsolete
     retention assertions are replaced. The keep-list is never enlarged to
     satisfy a test.
-- [ ] **A3. Convert every committed `petri-benchmark-summary` at once**, at
+- [x] **A3. Convert every committed `petri-benchmark-summary` at once**, at
   unchanged paths. Enumerate by `kind` at the starting revision, across
   `docs/progress/features/`, `features/historical/` and `docs/progress/sweeps/`.
   At `a9f59893` there were 147: 115 feature, 16 historical and 16 sweep
@@ -201,7 +201,7 @@ Work in `.worktrees/large-file-cleanup` from `main`. Run `npm ci` in
       against its epoch baseline and against its predecessor.
     - The outputs must be identical: normalized readings, deltas and verdicts.
     - Record the pair count and the exact commands.
-- [ ] **A4. Progress page parity.**
+- [x] **A4. Progress page parity.**
   - `validateArtifact` in `docs/progress/index.html` accepts
     `summary_version` 2 and rejects 1. Full reports still pass.
   - Serve the base revision's `index.html` over the v1 oracle, and the new
@@ -214,7 +214,7 @@ Work in `.worktrees/large-file-cleanup` from `main`. Run `npm ci` in
     `genome_count`. The page keeps its `.genomes.length`
     fallback for full reports. Reads that are already absent in v1, such as T12.F04 case
     `mortality`, stay absent.
-- [ ] **A5. Relocate the other large files.** Move each file in the table,
+- [x] **A5. Relocate the other large files.** Move each file in the table,
   byte-identically, to `<main>/.bench-artifacts/research/<note-or-feature>/`,
   then `git rm` it.
   - The SHA-256 of each moved file equals the SHA-256 of its Git blob's
@@ -223,7 +223,7 @@ Work in `.worktrees/large-file-cleanup` from `main`. Run `npm ci` in
     line with the local path, SHA-256 and bytes. That includes
     `docs/specs/roadmap/t13-f07-current-policy-recruitment-transitions.md:279`.
   - Historical provenance text, such as `status_at_audit`, stays unchanged.
-- [ ] **A6. Prevention.**
+- [x] **A6. Prevention.**
   - Add a POSIX `sh` tracked-size check under `scripts/`, called from
     `policy-check`. That target is shared by `make check`, `make check-docs`
     and CI (`.github/workflows/ci.yml:29`). It fails on any tracked file over
@@ -242,6 +242,17 @@ Work in `.worktrees/large-file-cleanup` from `main`. Run `npm ci` in
     `scripts/historical-benchmarks.mjs` to take an explicit blob-ID
     inventory; today it skips summaries and requires v1. Add fixtures for
     path reuse in both directions, aliases, modes, merges and empty commits.
+- [x] **A6b. Absorb T11.F26 (user direction 2026-09-24).** T11.F26 is in
+  progress. It edits `bench/artifacts.rs`, `docs/progress/index.html` (a new
+  `mutation_effects` block the page reads) and the bench tests, and its
+  closure commits v1 summaries. Once it is on `main`:
+  - Rebase this branch.
+  - Re-run the page trace so `mutation_effects` joins the keep-list.
+  - Convert T11.F26's summaries.
+  - Rerun the A3 and A4 parity with a refreshed oracle and a refreshed frozen
+    series index.
+
+  A7 waits for this step.
 - [ ] **A7. Review and land.**
   - Codex implementation review, recorded under Review.
   - `make check` exits 0.
@@ -327,10 +338,111 @@ reused path cannot reappear.
 - A3: re-conversion is byte-identical, and the parity test passes with a
   recorded pair count.
 - A4: the rendered page is identical, and the v2 trace finds no missing reads.
+- A3 evidence (2026-09-24, refreshed after A6b): 151 summaries (119 feature,
+  16 historical, 16 sweep), 223,471,710 → 9,290,520 bytes; largest v2 file
+  269,652 bytes (`t11-f26-…-goal.json`). Oracle and frozen index (from
+  `02d34d75`; the earlier copy is kept as `benchmark-series.a9f.json`) under
+  `<main>/.bench-artifacts/summary-v1/`. All 151 were re-converted from the
+  oracle twice (worktree and temp dir): byte-identical, each re-loaded; only
+  the two T11.F26 files differ from the pass-3 conversion. The harness
+  `bench/comparison/parity.rs` covers 202 pairs (gate 110, goal 30,
+  goal-worlds 62) plus the `ComparisonInputs` of all 151 files, 0 load errors
+  or profile mismatches; outputs are byte-identical (3,016,811 bytes, sha256
+  `7cf9eceb…`), saved as `summary-v1/parity/parity-v{1,2}-a6b.json`:
+
+  ```sh
+  PETRI_PARITY_ROOT=<root> PETRI_PARITY_SERIES=<main>/.bench-artifacts/summary-v1/benchmark-series.json \
+  PETRI_PARITY_OUT=<out> cargo test -p v3-cli --lib stored_artifact_comparison_parity -- --ignored
+  ```
+
+  run at `02d34d75` plus the same patch (own `CARGO_TARGET_DIR`) with root
+  `summary-v1/`, and here with the repo root.
+- A7 remediation evidence (2026-09-24): the v1 route now writes
+  `comparison_inputs` as stored JSON (the loader validates a typed copy) and
+  refuses a conversion whose typed model would change any whole-kept block;
+  pass 5 had added absent pass counters as `null` in 135 files. All 151 were
+  re-converted from the oracle twice: byte-identical, 223,471,710 → 9,282,909
+  bytes (largest still 269,652), and every whole-kept block is JSON-equal to
+  its v1 source (`conversion` less `from_summary_v1`); nothing outside
+  `comparison_inputs` changed from pass 5. Parity rerun on both sides (base in
+  a scratch worktree at `02d34d75` plus `summary-v1/parity/base-harness.patch`):
+  202 pairs over 151 files, 0 load errors, profile mismatches or panics;
+  `parity-v{1,2}-a7.json` byte-identical (3,016,811 bytes, sha256
+  `7cf9eceb…`, same as A6b). `historical-benchmarks.mjs` verify and export now
+  require summary version 2, and `inventory-blobs` reads the JSON array
+  `large-blobs` prints.
+- Rebase evidence (2026-09-24): rebased onto `28439051` without conflicts and
+  squashed to one commit (tree unchanged). All 151 re-converted from the oracle
+  twice are byte-identical to the committed files, so none were rewritten.
+  Parity at `28439051` plus `summary-v1/parity/base-harness-rebase.patch`
+  (the same harness, new hunk offset): 202 pairs, 151 files, 0 errors;
+  `parity-v{1,2}-rebase.json` byte-identical (sha256 `7cf9eceb…`, as A7).
+  The ignored `historical_corpus_preserves_claims_identity_and_all_reference_comparisons`
+  passes over the committed v2 summaries with
+  `summary-v1/parity/historical-manifest-v2.json` (the T15.F02 `final-v3`
+  manifest with summary paths moved to this worktree): 93 reports, 2,349
+  compatible and 6,300 incompatible pairs, as in T15.F02.
+- A4 evidence (2026-09-24, refreshed after A6b): `summary-v1/parity/parity-server.js`
+  served `02d34d75`'s page over v1 and this page over v2 with the frozen index
+  at 1280×900 (a `ResizeObserver` shim draws charts in the hidden pane).
+  Visible text before and after all 42 table toggles and 3 details, and 113
+  chart SVGs (2,317,679 bytes), are identical outside the artifact notice,
+  including the six T11.F26 `mutation_effects` tables (measured values, e.g.
+  Orchards drift@0 0.493 requested per birth). Traces: 11,174 v1 paths; the
+  only differences are T11.F26 goal `neighborhood_read.genomes{,.length}` →
+  `genome_count`, with equal counts in all 69 cases (23 files) that store
+  genomes. The v1 trace re-derived the read-set fixture: 76 `mutation_effects`
+  lines added, none removed (446 lines).
 - A5: the SHA-256 values match, and `git grep` finds no live link to a moved
   filename.
+- A5 evidence (2026-09-24): all seven files copied to
+  `<main>/.bench-artifacts/research/<note-or-feature>/`; for each, `git cat-file
+  -p <blob> | shasum -a 256` and `git cat-file -s` equal the copy's SHA-256 and
+  bytes (1,786,584 to 7,758,320 bytes; S0 `1dab13f5…` matches the T13.F07
+  reading). Evidence lines added to the five strategy notes,
+  `incremental-recruitment-research-2026-09-19.md`, the T13.F07 spec and its
+  reading; their numbers were already in those files. Residual `git grep` hits
+  are only this spec's census table and `status_at_audit`. Nothing else reads
+  the S0 summary (the parity harness filters on `petri-benchmark-summary`), and
+  the 467,195-byte `-s0-pilot.json` stays.
+- A6 evidence (2026-09-24): `scripts/tracked-size-check` (index-based, allowlist
+  by exact path) runs inside `scripts/policy-check`; `scripts/tracked-size-check-test`
+  (`make tracked-size-check-test`, part of `make policy-check`) plants a
+  1,153,024-byte tracked file in a temporary repo (fails), covers exactly 1 MiB,
+  allowlisted paths, untracked files and an allowlisted name at another path,
+  and passes on the real tree. `docs/benchmark-artifacts.md` and the T15
+  evidence criterion and note are rewritten. `scripts/historical-benchmarks.mjs`
+  adds `large-blobs SOURCE PREFIX...` (blob IDs over 1 MiB at the prefixes in
+  the ancestry, tip blobs excluded, printed as a JSON array) and
+  `inventory-blobs SOURCE PACKAGE BLOB_IDS` (reads that array; every path and commit, bytes, SHA-256, a copy in the sibling
+  `blobs/`, and one `filter-inputs.json` pair per path for the T15.F02
+  deletion callback; its manifest feeds `verify-history`). Two fixtures in
+  `historical-benchmarks.test.mjs` replay the history with deletions: path
+  reuse before and after, an alias, a merge, an executable mode, a commit left
+  empty, and a restored earlier version failing `verify-history`.
+- A6b evidence (2026-09-24): rebased onto `02d34d75`; the one conflict (both
+  sides' `bench_artifacts.rs` tests) kept both. The keep-list gains the page's
+  `mutation_effects` reads (A3, A4 above).
 - A6: the size-check test passes through `make policy-check`.
 - `make check` exits 0 on the final Phase A code.
+- Mutation gate evidence (Decision 4, 2026-09-24): the fresh
+  `MUTANTS_ITERATE=0 make rust-mutants` ran on `8a3d2afa` against `28439051`.
+  The in-diff scope produced mutants only in `bench/artifacts.rs` (39) and
+  `main.rs` (4). `comparison.rs` adds only module declarations, and
+  `comparison/parity.rs` is `#[cfg(test)]`. Summary: `43 mutants tested in 22m:
+  3 missed, 33 caught, 7 unviable`, 0 timeouts. Output is in
+  `~/.local/share/petri-tools/mutants/large-file-cleanup/mutants.out`; the
+  incremental pass below later overwrote it. Each survivor was **killed** by a
+  test in `crates/v3-cli/tests/bench_artifacts.rs`:
+  - `main.rs:214:17` deletes the `(None, Some(input), Some(provenance))` arm:
+    killed by `bench_summarize_converts_a_full_report_with_provenance`.
+  - `artifacts.rs:891:32` changes `||` to `&&` in `project_v2`: killed by
+    `project_v2_rejects_a_version_1_summary_of_another_kind`.
+  - `artifacts.rs:1199:9` changes `||` to `&&` in `convert_summary_v1`: killed
+    by `from_summary_v1_rejects_a_version_1_header_of_another_kind_before_parsing`.
+  The `MUTANTS_ITERATE=1` feedback pass reported `3 mutants tested in 5m: 3
+  caught`. No second fresh run was needed because production code, test
+  selection, and configuration were unchanged.
 - B1–B4: the helper fixtures pass, the B3 proofs pass, and the receipt passes.
 
 ## Success Criteria
@@ -361,3 +473,5 @@ reused path cannot reappear.
 | PRD 3 | `task-mug484hy-kaql0i` (after `task-mug34zy2-q6qxa2` stalled and was cancelled) | not-ready: 2 blocking, 3 should-fix; applied in PRD 4 (offline two-revision comparison harness, `genome_count` trace mapping, size check in `policy-check`, PR-ref audit, sweep summaries included: 147 at base) |
 | PRD 4 | `task-mug5533a-rc7rur` (after `task-mug4j1up-pxu5le` stalled and was cancelled) | not-ready: 1 blocking, 2 should-fix; applied in PRD 5 (in-module `#[cfg(test)]` parity harness at both revisions, `genomes` container exemption, S0 local-only contract and T13.F07 spec link) |
 | PRD 5 | `task-mug5hfvp-oolo8a` | ready; one advisory applied (one frozen `benchmark-series.json` shared by both parity environments) |
+| Implementation 1 | `task-mugg7lrc-wquymp` | changes-requested: 3 should-fix, 1 advisory; fixed in `92b3d8d8` (whole-kept blocks written as stored, v2 accepted by historical verify/export, `large-blobs` JSON fed to `inventory-blobs`, short artifact notice) |
+| Implementation 2 | `task-mugi1zpl-n6frrn` | approve; two advisories applied (loader-vs-page rejection wording in `docs/benchmark-artifacts.md`, parity harness now asserts full coverage and zero load errors) |

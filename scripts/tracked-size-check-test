@@ -1,0 +1,74 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
+checker=$script_dir/tracked-size-check
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-tracked-size-test.XXXXXX")
+trap 'rm -rf "$test_root"' EXIT HUP INT TERM
+
+fail() {
+  printf 'tracked-size-check-test: %s\n' "$*" >&2
+  exit 1
+}
+
+run_checker() {
+  (cd "$1" && "$checker") 2>&1
+}
+
+expect_pass() {
+  output=$(run_checker "$1") || { printf '%s\n' "$output" >&2; fail "$2: unexpectedly failed"; }
+}
+
+expect_failure() {
+  if output=$(run_checker "$1"); then
+    fail "$2: unexpectedly passed"
+  fi
+  printf '%s\n' "$output" | grep -F "$3" >/dev/null || {
+    printf '%s\n' "$output" >&2
+    fail "$2: missing expected diagnostic: $3"
+  }
+}
+
+# Writes $2 KiB of zeros to $1.
+plant() {
+  mkdir -p "$(dirname -- "$1")"
+  dd if=/dev/zero of="$1" bs=1024 count="$2" 2>/dev/null
+}
+
+fixture=$test_root/repo
+mkdir -p "$fixture"
+git -C "$fixture" init -q
+printf '%s\n' small >"$fixture/small.txt"
+git -C "$fixture" add small.txt
+expect_pass "$fixture" 'small tracked file'
+
+# Exactly 1 MiB is at the limit, not over it.
+plant "$fixture/docs/at-limit.bin" 1024
+git -C "$fixture" add docs/at-limit.bin
+expect_pass "$fixture" 'file of exactly 1 MiB'
+
+# Allowlisted paths may exceed the limit.
+plant "$fixture/docs/assets/petri-creatures.gif" 1126
+plant "$fixture/docs/progress/historical-benchmark-manifest.json" 1126
+git -C "$fixture" add docs/assets/petri-creatures.gif docs/progress/historical-benchmark-manifest.json
+expect_pass "$fixture" 'allowlisted large files'
+
+# An untracked large file is not checked.
+plant "$fixture/untracked.bin" 1126
+expect_pass "$fixture" 'untracked large file'
+
+# A planted 1.1 MiB tracked file fails with its size and path.
+plant "$fixture/docs/strategy/planted results.json" 1126
+git -C "$fixture" add 'docs/strategy/planted results.json'
+expect_failure "$fixture" 'planted 1.1 MiB tracked file' '1153024 docs/strategy/planted results.json'
+
+# An allowlist name at another path is not allowlisted.
+git -C "$fixture" rm -q --cached 'docs/strategy/planted results.json'
+plant "$fixture/other/petri-creatures.gif" 1126
+git -C "$fixture" add other/petri-creatures.gif
+expect_failure "$fixture" 'allowlisted name at another path' '1153024 other/petri-creatures.gif'
+
+expect_pass "$repo_root" 'real tree'
+
+printf 'Tracked file size regression tests passed.\n'
