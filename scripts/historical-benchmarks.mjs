@@ -15,6 +15,8 @@ const canonical = value => JSON.stringify(value, function (key, item) {
 const git = (root, ...args) => execFileSync('git', args, { cwd: root, maxBuffer: 1024 ** 3 });
 const textGit = (root, ...args) => git(root, ...args).toString('utf8').trim();
 const key = entry => `${entry.path}\0${entry.oid}`;
+// The committed summary version `v3-cli bench-summarize` writes and loads.
+const SUMMARY_VERSION = 2;
 
 function write(path, bytes, immutable = false) {
   mkdirSync(dirname(path), { recursive: true });
@@ -98,10 +100,8 @@ function ancestorTest(parents) {
   return (old, newer) => old === newer || ancestors(newer).has(old);
 }
 
-export async function inventory(repository, source, packagePath) {
-  repository = resolve(repository);
-  packagePath = resolve(packagePath);
-  if (existsSync(join(packagePath, 'manifest.json'))) throw new Error('package already contains an inventory');
+// The frozen source's full commit/tree census, shared by both inventories.
+function census(repository, source, packagePath) {
   if (textGit(repository, 'rev-parse', '--is-shallow-repository') !== 'false'
     || textGit(repository, 'for-each-ref', '--format=%(refname)', 'refs/replace')) throw new Error('complete history without replacement refs is required');
   source = textGit(repository, 'rev-parse', '--verify', `${source}^{commit}`);
@@ -141,6 +141,16 @@ export async function inventory(repository, source, packagePath) {
       census: receipt(censusPath), reachable_objects: receipt(objectsPath) },
     ancestry, blobs: [], reports: [], exclusions: [], unresolved: [],
   };
+  return { source, commits, ancestry, isAncestor, trees, associations, associationCount, manifest };
+}
+
+export async function inventory(repository, source, packagePath) {
+  repository = resolve(repository);
+  packagePath = resolve(packagePath);
+  if (existsSync(join(packagePath, 'manifest.json'))) throw new Error('package already contains an inventory');
+  const scan = census(repository, source, packagePath);
+  source = scan.source;
+  const { commits, isAncestor, trees, associations, manifest } = scan;
   const candidateNodes = new Map();
   // One Git batch preserves every byte without a separate process per blob.
   // The frozen corpus is bounded; exceeding the buffer fails, never truncates.
@@ -269,6 +279,67 @@ export async function inventory(repository, source, packagePath) {
   return manifest;
 }
 
+// Large-file cleanup Phase B (docs/specs/large-file-cleanup-2026-09-24.md):
+// the blob IDs over `minBytes` at `prefixes` anywhere in the ancestry of
+// `source`, except blobs present in its own tip tree.
+export function largeBlobIds(repository, source, { minBytes = 1024 ** 2, prefixes }) {
+  const commits = textGit(repository, 'log', '--format=%T', source).split('\n');
+  const tip = new Set(treeEntries(repository, commits[0]).map(e => e.oid));
+  const sized = new Map();
+  for (const tree of new Set(commits)) {
+    for (const row of git(repository, 'ls-tree', '-r', '-l', '-z', '--full-tree', tree).toString('utf8').split('\0').filter(Boolean)) {
+      const tab = row.indexOf('\t');
+      const [, type, oid, size] = row.slice(0, tab).split(/ +/);
+      const path = row.slice(tab + 1);
+      if (type === 'blob' && Number(size) > minBytes && prefixes.some(p => path.startsWith(p)) && !tip.has(oid)) sized.set(oid, true);
+    }
+  }
+  return [...sized.keys()].sort();
+}
+
+// An explicit blob-ID inventory: every path and commit of each listed blob,
+// its bytes and SHA-256, a byte-identical copy beside the package, and one
+// filter input per path so a filter callback turns each pair into a deletion.
+// The manifest has the shape `verifyRaw` and `verifyHistory` read.
+export function blobInventory(repository, source, packagePath, blobIds) {
+  repository = resolve(repository);
+  packagePath = resolve(packagePath);
+  if (existsSync(join(packagePath, 'manifest.json'))) throw new Error('package already contains an inventory');
+  const ids = [...new Set(blobIds)];
+  if (!ids.length || ids.length !== blobIds.length || ids.some(id => !/^[0-9a-f]{40}$/.test(id))) {
+    throw new Error('blob inventory needs distinct 40-hex blob IDs');
+  }
+  const scan = census(repository, source, packagePath);
+  const { commits, trees, associations, manifest } = scan;
+  const tip = new Set(trees.get(commits.find(c => c.oid === scan.source).tree).map(e => e.oid));
+  for (const id of ids) {
+    if (!associations.has(id)) throw new Error(`blob not in the frozen ancestry: ${id}`);
+    if (tip.has(id)) throw new Error(`blob present at the frozen tip: ${id}`);
+  }
+  const contents = execFileSync('git', ['cat-file', '--batch'], { cwd: repository, input: `${ids.join('\n')}\n`, maxBuffer: 1024 ** 3 });
+  let offset = 0;
+  for (const id of ids) {
+    const headerEnd = contents.indexOf(10, offset);
+    const [returnedId, type, size] = contents.toString('ascii', offset, headerEnd).split(' ');
+    const end = headerEnd + 1 + Number(size);
+    if (returnedId !== id || type !== 'blob' || contents[end] !== 10) throw new Error(`invalid Git blob batch at ${id}`);
+    const path = join(dirname(packagePath), 'blobs', id);
+    write(path, contents.subarray(headerEnd + 1, end), true);
+    offset = end + 1;
+    const paths = [...associations.get(id)].sort();
+    manifest.blobs.push({ git_blob: id, paths,
+      occurrences: paths.map(p => ({ path: p, commits: commits.filter(c => trees.get(c.tree).some(e => e.path === p && e.oid === id)).map(c => c.oid) })),
+      raw: { ...receipt(path), availability: 'verified_local', verified_at: manifest.verified_at } });
+  }
+  const filterPath = join(packagePath, 'filter-inputs.json');
+  write(filterPath, json(manifest.blobs.flatMap(b => b.paths.map(path => ({ path, git_blob: b.git_blob })))), true);
+  manifest.filter_inputs = receipt(filterPath);
+  manifest.totals = { blobs: manifest.blobs.length, bytes: manifest.blobs.reduce((sum, b) => sum + b.raw.bytes, 0),
+    filter_inputs: manifest.blobs.reduce((sum, b) => sum + b.paths.length, 0) };
+  write(join(packagePath, 'manifest.json'), json(manifest));
+  return manifest;
+}
+
 export function selectReports(manifest) {
   const isAncestor = ancestorTest(manifest.ancestry);
   manifest.unresolved = manifest.unresolved.filter(u => !u.logical_id);
@@ -303,7 +374,7 @@ export function verifyRaw(manifest) {
     }
   }
   for (const exported of [manifest.enumeration.census, manifest.enumeration.reachable_objects,
-    manifest.enumeration.report_occurrences, manifest.enumeration.report_references, manifest.filter_inputs]) {
+    manifest.enumeration.report_occurrences, manifest.enumeration.report_references, manifest.filter_inputs].filter(Boolean)) {
     const actual = receipt(exported.path);
     if (actual.sha256 !== exported.sha256 || actual.bytes !== exported.bytes) throw new Error(`export integrity failure: ${exported.path}`);
   }
@@ -329,7 +400,7 @@ export function verifyPackage(manifest) {
     paths.add(report.summary.repository_path);
     const blob = manifest.blobs.find(b => b.git_blob === report.selected_blob);
     const summary = JSON.parse(readFileSync(report.summary.path));
-    if (summary.kind !== 'petri-benchmark-summary' || summary.summary_version !== 1
+    if (summary.kind !== 'petri-benchmark-summary' || summary.summary_version !== SUMMARY_VERSION
       || summary.raw.sha256 !== blob.raw.sha256 || summary.raw.bytes !== blob.raw.bytes || summary.raw.path !== blob.raw.path
       || !report.summary.repeat_identical
       || canonical({ feature: summary.feature, generated_at: summary.environment.generated_at,
@@ -452,7 +523,7 @@ export function exportSummaries(manifest) {
         const bytes = outputs.has(path) ? outputs.get(path) : readFileSync(join(repository, path));
         if (!bytes) throw new Error(`series reference has no supported summary: ${path}`);
         const summary = JSON.parse(bytes);
-        if (summary.kind !== 'petri-benchmark-summary' || summary.summary_version !== 1) throw new Error(`series reference is not a supported summary: ${path}`);
+        if (summary.kind !== 'petri-benchmark-summary' || summary.summary_version !== SUMMARY_VERSION) throw new Error(`series reference is not a supported summary: ${path}`);
         seriesReferences += 1;
       }
     }
@@ -472,7 +543,14 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const [command, ...args] = process.argv.slice(2);
     let result;
-    if (command === 'inventory' && args.length === 2) {
+    if (command === 'large-blobs' && args.length >= 2) {
+      result = largeBlobIds(process.cwd(), args[0], { prefixes: args.slice(1) });
+    } else if (command === 'inventory-blobs' && args.length === 3) {
+      // BLOB_IDS is the JSON array `large-blobs` prints.
+      const ids = JSON.parse(readFileSync(args[2], 'utf8'));
+      if (!Array.isArray(ids)) throw new Error('BLOB_IDS must be the JSON array large-blobs prints');
+      result = blobInventory(process.cwd(), args[0], args[1], ids).totals;
+    } else if (command === 'inventory' && args.length === 2) {
       const manifest = await inventory(process.cwd(), args[0], args[1]);
       result = { enumeration: manifest.enumeration, candidate_blobs: manifest.blobs.length, reports: manifest.reports.length, unresolved: manifest.unresolved };
     } else if (['convert', 'verify', 'verify-history', 'export'].includes(command)) {
@@ -482,7 +560,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       else if (command === 'export' && args.length === 1) result = exportSummaries(manifest);
       else if (command === 'verify-history' && args.length >= 3 && args.length <= 4) result = verifyHistory(manifest, args[1], args[2], args[3]);
     }
-    if (!result) throw new Error('usage: historical-benchmarks.mjs inventory SOURCE PACKAGE | convert PACKAGE EXECUTABLE | verify PACKAGE | export PACKAGE | verify-history PACKAGE REPOSITORY TIP [COMMIT_MAP]');
+    if (!result) throw new Error('usage: historical-benchmarks.mjs inventory SOURCE PACKAGE | large-blobs SOURCE PREFIX... | inventory-blobs SOURCE PACKAGE BLOB_IDS | convert PACKAGE EXECUTABLE | verify PACKAGE | export PACKAGE | verify-history PACKAGE REPOSITORY TIP [COMMIT_MAP]');
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {
     console.error(`historical-benchmarks: ${error.message}`);

@@ -1,7 +1,7 @@
 # T15 — Benchmark Evidence Storage
 
 **Status**: Complete
-**Last updated**: 2026-09-13
+**Last updated**: 2026-09-24
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -23,9 +23,13 @@ truthful provenance and availability.
   readings without full genomes, per-proposal rows or traces.
 - [x] Each summary identifies the measured revision, exact command and exit
   evidence, profile/config/recipe identities and seeds, reference identities,
-  thresholds, severe/inherited flags and wall caps. Experiment totals preserve
-  proposals, outcomes, denominators, batch/lineage uncertainty and measured-zero
-  versus unmeasured distinctions; selected claim extracts permit spot-checks.
+  thresholds, severe/inherited flags and wall caps. Beyond that provenance,
+  `environment`, `comparison` and `comparison_inputs`, a summary keeps only the
+  fields the progress page or comparison reads, with measured-zero versus
+  unmeasured distinctions intact, and lists everything else in
+  `omitted_details`; experiment proposal totals, outcomes, denominators and
+  batch/lineage uncertainty stay in the raw reports and closure readings.
+  Selected claim extracts permit spot-checks.
 - [x] Raw provenance records SHA-256, byte count, local path and when
   availability was verified, without promising durable or portable storage.
   Summaries can be generated deterministically from existing artifacts without
@@ -117,3 +121,12 @@ truthful provenance and availability.
   records the old-to-new commit map and clone recovery instructions, pauses
   writes during cutover, and verifies all advertised refs it is authorized to
   change; durable external raw-artifact hosting remains out of scope.
+- Decision (2026-09-24, user direction): summaries are reporting-only. The
+  [large file cleanup](../specs/large-file-cleanup-2026-09-24.md) replaced
+  summary version 1 with version 2, a keep-list of the provenance header,
+  `environment`, `comparison`, `comparison_inputs` and the fields the progress
+  page or comparison reads; experiment totals, outcomes, denominators and
+  batch/lineage uncertainty leave summaries for the raw reports and closure
+  readings, and the evidence criterion above was rewritten to match. Every
+  committed summary was converted in place, and no tracked file may exceed
+  1 MiB outside a two-file allowlist (`scripts/tracked-size-check`).

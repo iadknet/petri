@@ -134,13 +134,21 @@ struct BenchArgs {
 
 #[derive(clap::Args)]
 struct SummarizeArgs {
-    #[arg(long)]
-    input: std::path::PathBuf,
+    /// A full benchmark report to project to a v2 summary.
+    #[arg(
+        long,
+        requires = "provenance",
+        required_unless_present = "from_summary_v1"
+    )]
+    input: Option<std::path::PathBuf>,
+    /// A committed v1 summary to convert to v2; its own provenance is kept.
+    #[arg(long, conflicts_with_all = ["input", "provenance"])]
+    from_summary_v1: Option<std::path::PathBuf>,
     #[arg(long)]
     out: std::path::PathBuf,
     /// Fixed converter identity and verification time; see docs/benchmark-artifacts.md.
     #[arg(long)]
-    provenance: std::path::PathBuf,
+    provenance: Option<std::path::PathBuf>,
 }
 
 #[derive(clap::Args)]
@@ -201,12 +209,17 @@ fn main() {
         }
         Commands::Bench(args) => run_bench(args),
         Commands::BenchSummarize(args) => {
-            let result = std::fs::read(&args.provenance)
-                .map_err(|e| format!("failed to read {}: {e}", args.provenance.display()))
-                .and_then(|bytes| {
-                    serde_json::from_slice(&bytes).map_err(|e| format!("invalid provenance: {e}"))
-                })
-                .and_then(|provenance| artifacts::convert(&args.input, &args.out, &provenance));
+            let result = match (&args.from_summary_v1, &args.input, &args.provenance) {
+                (Some(v1), _, _) => artifacts::convert_summary_v1(v1, &args.out),
+                (None, Some(input), Some(provenance)) => std::fs::read(provenance)
+                    .map_err(|e| format!("failed to read {}: {e}", provenance.display()))
+                    .and_then(|bytes| {
+                        serde_json::from_slice(&bytes)
+                            .map_err(|e| format!("invalid provenance: {e}"))
+                    })
+                    .and_then(|provenance| artifacts::convert(input, &args.out, &provenance)),
+                _ => Err("--input with --provenance, or --from-summary-v1, is required".into()),
+            };
             match result {
                 Ok(summary) => println!(
                     "wrote {} ({} raw bytes; sha256 {})",
@@ -543,6 +556,7 @@ fn run_bench_result(args: BenchArgs) -> Result<(), String> {
         verified_at: bench::rfc3339_now(),
         converter: invocation,
         supplied_evidence: None,
+        from_summary_v1: None,
     };
     artifacts::convert(&paths.raw, &paths.summary, &provenance)?;
 

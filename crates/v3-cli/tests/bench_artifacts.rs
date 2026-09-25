@@ -74,7 +74,7 @@ fn conversion_is_deterministic_hashes_exact_bytes_and_keeps_historical_unknowns(
     let source: Value = serde_json::from_slice(&raw).unwrap();
     let summary = serde_json::to_value(&first).unwrap();
     assert_eq!(summary["kind"], "petri-benchmark-summary");
-    assert_eq!(summary["summary_version"], 1);
+    assert_eq!(summary["summary_version"], 2);
     assert_eq!(summary["environment"], source["environment"]);
     assert_eq!(summary["comparison"], source["comparison"]);
     assert_eq!(summary["raw"]["bytes"], raw.len());
@@ -136,11 +136,14 @@ fn historical_absence_and_measured_zero_survive_projection() {
         0
     );
     assert!(summary.environment.get("threads").is_none());
-    assert!(
-        summary.deterministic["goal_indicators"]["reachable_structure_size_distribution"]
-            .get("version")
-            .is_none()
-    );
+    // The page reads only case-level structure quantiles; the report-level
+    // distribution is dropped and named.
+    assert!(summary.deterministic["goal_indicators"]
+        .get("reachable_structure_size_distribution")
+        .is_none());
+    assert!(summary.omitted_details.contains(
+        &"deterministic.goal_indicators.reachable_structure_size_distribution".to_string()
+    ));
 }
 
 #[test]
@@ -430,11 +433,19 @@ fn historical_corpus_preserves_claims_identity_and_all_reference_comparisons() {
         assert_eq!(summary["raw"]["bytes"], raw.len());
         assert_eq!(summary["feature"], source["feature"]);
         assert_eq!(summary["comparison"], source["comparison"]);
-        for field in ["profile", "per_seed", "totals", "per_creature_tick"] {
+        for field in ["profile", "per_seed", "per_creature_tick"] {
             assert_eq!(
                 summary["deterministic"][field],
                 source["deterministic"][field]
             );
+        }
+        // Summary v2 drops totals; the omission is declared, not silent.
+        if source["deterministic"].get("totals").is_some() {
+            assert!(summary["deterministic"].get("totals").is_none());
+            assert!(summary["omitted_details"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("deterministic.totals")));
         }
         for field in ["git_revision", "generated_at", "host", "threads"] {
             assert_eq!(summary["environment"][field], source["environment"][field]);
@@ -1083,8 +1094,11 @@ fn goal_reader_keeps_bare_strings_undefined() {
     assert_eq!(indicator, bench::Indicator::Undefined("Undefined".into()));
 }
 
+/// The v1 stage still pools recruitment rows exactly as summary version 1
+/// did, so full-report and v1-summary routes to v2 agree; v2 then drops the
+/// whole block (see `v2_omitted_details_names_every_dropped_path_and_keeps_v1_notes`).
 #[test]
-fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloads() {
+fn v1_stage_recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloads() {
     use v3_core::neighborhood::recruitment_paths as recruitment;
     let dir = Temp::new();
     let raw_path = dir.0.join("raw.json");
@@ -1109,7 +1123,7 @@ fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloa
         serde_json::to_value(&experiment).unwrap();
     let raw = serde_json::to_vec(&source).unwrap();
     std::fs::write(&raw_path, &raw).unwrap();
-    let summary = artifacts::summarize(&raw, &raw_path, &provenance()).unwrap();
+    let summary = artifacts::summarize_v1(&raw, &raw_path, &provenance()).unwrap();
     let compact = &summary.deterministic["goal_indicators"]["recruitment_paths"];
     let proposal_count = experiment.arms[0].lineages[0].proposals.len() as u64;
     assert_eq!(
@@ -1238,7 +1252,7 @@ fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloa
     }
     let expanded = serde_json::to_vec(&duplicated).unwrap();
     std::fs::write(&raw_path, &expanded).unwrap();
-    let expanded_summary = artifacts::summarize(&expanded, &raw_path, &provenance()).unwrap();
+    let expanded_summary = artifacts::summarize_v1(&expanded, &raw_path, &provenance()).unwrap();
     assert_eq!(summary.claims.len(), expanded_summary.claims.len());
     assert!(
         artifacts::summary_bytes(&expanded_summary).unwrap().len()
@@ -1246,10 +1260,11 @@ fn recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloa
     );
 }
 
-/// A world's `mutation_effects` block (T11.F26) is projected into the summary
-/// whole, and a source without it projects none.
+/// A world's `mutation_effects` block (T11.F26) rides the v1 stage whole; v2
+/// keeps what the progress page reads and names the rest in
+/// `omitted_details`. A source without it projects none.
 #[test]
-fn world_mutation_effects_is_projected_whole() {
+fn world_mutation_effects_keeps_page_reads() {
     use v3_core::neighborhood::mutation_effects as effects;
     let mut config = v3_core::config::SimulationConfig::default();
     config.world.width = 16;
@@ -1295,10 +1310,45 @@ fn world_mutation_effects_is_projected_whole() {
     source["deterministic"]["goal_indicators"]["cases"][0]["mutation_effects"] = block.clone();
     let raw = serde_json::to_vec(&source).unwrap();
     std::fs::write(&path, &raw).unwrap();
-    let summary = artifacts::summarize(&raw, &path, &provenance()).unwrap();
+    let v1 = artifacts::summarize_v1(&raw, &path, &provenance()).unwrap();
     assert_eq!(
-        summary.deterministic["goal_indicators"]["cases"][0]["mutation_effects"],
+        v1.deterministic["goal_indicators"]["cases"][0]["mutation_effects"],
         block
+    );
+    let summary = artifacts::summarize(&raw, &path, &provenance()).unwrap();
+    let kept = &summary.deterministic["goal_indicators"]["cases"][0]["mutation_effects"];
+    for key in ["version", "battery_version", "count_fields"] {
+        assert_eq!(kept[key], block[key], "{key}");
+    }
+    assert!(kept.get("proposal_rule").is_none());
+    assert_eq!(
+        kept["exposure"][0]["births_total"],
+        block["exposure"][0]["births_total"]
+    );
+    assert_eq!(
+        kept["exposure"][0]["from_acting"],
+        block["exposure"][0]["from_acting"]
+    );
+    assert!(kept["exposure"][0].get("from_actionless").is_none());
+    assert_eq!(kept["coverage"]["recorded"], block["coverage"]["recorded"]);
+    assert!(kept["coverage"].get("pair_rule").is_none());
+    let founder = &kept["cohorts"][0];
+    assert_eq!(founder["totals"], block["cohorts"][0]["totals"]);
+    assert_eq!(founder["operators"], block["cohorts"][0]["operators"]);
+    assert_eq!(
+        founder["parents"],
+        json!([{"depth_or_generation": 0, "genome_size": 97}])
+    );
+    assert!(founder["coverage"].get("parents_evaluated").is_none());
+    // An Undefined cohort stays its reason string.
+    assert_eq!(kept["cohorts"][2], block["cohorts"][2]);
+    assert!(kept["cohorts"][2].is_string());
+    assert!(
+        summary
+            .omitted_details
+            .iter()
+            .any(|path| path
+                == "deterministic.goal_indicators.cases[].mutation_effects.proposal_rule")
     );
 
     let historical = serde_json::to_vec(&world_source()).unwrap();
@@ -1309,21 +1359,56 @@ fn world_mutation_effects_is_projected_whole() {
         .is_none());
 }
 
-/// A world's `neighborhood_read` block (T14.F12) is projected into the
-/// summary whole, beside `drift_depth`, and a source without it projects
+/// A world's `neighborhood_read` block (T14.F12) keeps its rates, its birth
+/// counts and the count of its genome rows, and a source without it projects
 /// none rather than an empty or zero block.
 #[test]
-fn world_neighborhood_read_is_projected_whole() {
+fn world_neighborhood_read_keeps_rates_births_and_genome_count() {
     let dir = Temp::new();
     let path = dir.0.join("raw.json");
     let mut source = world_source();
+    let read = neighborhood_read_block();
+    source["deterministic"]["goal_indicators"]["cases"][0]["neighborhood_read"] = read.clone();
+    let raw = serde_json::to_vec(&source).unwrap();
+    std::fs::write(&path, &raw).unwrap();
+    let summary = artifacts::summarize(&raw, &path, &provenance()).unwrap();
+    assert_eq!(
+        summary.deterministic["goal_indicators"]["cases"][0]["neighborhood_read"],
+        json!({
+            "births": {"births_total": 6, "any_events": read["births"]["any_events"]},
+            "silent_per_all_births": "0.000000", "changed_per_all_births": "0.166667",
+            "dead_per_all_births": "0.000000", "genome_count": 2
+        })
+    );
+
+    let historical = serde_json::to_vec(&world_source()).unwrap();
+    std::fs::write(&path, &historical).unwrap();
+    let summary = artifacts::summarize(&historical, &path, &provenance()).unwrap();
+    assert!(summary.deterministic["goal_indicators"]["cases"][0]
+        .get("neighborhood_read")
+        .is_none());
+}
+
+/// A v1 summary as the committed files store it: pretty-printed with a
+/// trailing newline, produced by the unchanged full-report-to-v1 stage.
+fn write_v1_summary(raw: &[u8], raw_path: &Path, v1_path: &Path) -> Vec<u8> {
+    let v1 = artifacts::summarize_v1(raw, raw_path, &provenance()).unwrap();
+    assert_eq!(v1.summary_version, 1);
+    let mut bytes = serde_json::to_vec_pretty(&v1).unwrap();
+    bytes.push(b'\n');
+    std::fs::write(v1_path, &bytes).unwrap();
+    bytes
+}
+
+/// A world's T14.F12 `neighborhood_read` block, sampling two genomes.
+fn neighborhood_read_block() -> Value {
     let tally = json!({
         "trials": 1, "skipped": 0, "applied": 1, "silent": 0, "changed": 1, "dead": 0,
         "changed_only_in_sequences": 0, "silent_fraction": "0.000000",
         "changed_fraction": "1.000000", "dead_fraction": "0.000000",
         "mean_fraction_differing": "0.500000"
     });
-    let read = json!({
+    json!({
         "version": "neighborhood-read-v1", "battery_version": "neighborhood-v1",
         "sample_seed_formula": "8000000 + world_seed",
         "birth_seed_formula": "8000000 + 1000 * (sample_index + 1) + 9000 + birth_index",
@@ -1346,20 +1431,455 @@ fn world_neighborhood_read_is_projected_whole() {
              "genome_size": 111, "total_nodes": 10, "reachable_nodes": 7, "executed_nodes": 5,
              "births_total": 3, "zero_event_births": 3, "silent": 0, "changed": 0, "dead": 0}
         ]
-    });
-    source["deterministic"]["goal_indicators"]["cases"][0]["neighborhood_read"] = read.clone();
-    let raw = serde_json::to_vec(&source).unwrap();
-    std::fs::write(&path, &raw).unwrap();
-    let summary = artifacts::summarize(&raw, &path, &provenance()).unwrap();
-    assert_eq!(
-        summary.deterministic["goal_indicators"]["cases"][0]["neighborhood_read"],
-        read
-    );
+    })
+}
 
-    let historical = serde_json::to_vec(&world_source()).unwrap();
-    std::fs::write(&path, &historical).unwrap();
-    let summary = artifacts::summarize(&historical, &path, &provenance()).unwrap();
-    assert!(summary.deterministic["goal_indicators"]["cases"][0]
-        .get("neighborhood_read")
-        .is_none());
+/// A goal report carrying detail v2 drops: recruitment rows and the
+/// neighborhood genome rows.
+fn detailed_goal_source() -> Value {
+    use v3_core::neighborhood::recruitment_paths as recruitment;
+    let mut source = world_source();
+    source["deterministic"]["goal_indicators"]["cases"][0]["neighborhood_read"] =
+        neighborhood_read_block();
+    source["deterministic"]["goal_indicators"]["recruitment_paths"] =
+        serde_json::to_value(recruitment::observe(recruitment::Sizes::TEST)).unwrap();
+    source
+}
+
+/// Every `a.b[].c` path present in `v1` but absent from `v2`, walked
+/// independently of the production diff.
+fn dropped_paths(v1: &Value, v2: &Value, path: &str, out: &mut Vec<String>) {
+    match (v1, v2) {
+        (Value::Object(v1), Value::Object(v2)) => {
+            for (key, value) in v1 {
+                let child = format!("{path}.{key}");
+                match v2.get(key) {
+                    Some(kept) => dropped_paths(value, kept, &child, out),
+                    None => out.push(child),
+                }
+            }
+        }
+        (Value::Array(v1), Value::Array(v2)) => {
+            assert_eq!(v1.len(), v2.len(), "{path} keeps every row");
+            for (value, kept) in v1.iter().zip(v2) {
+                dropped_paths(value, kept, &format!("{path}[]"), out);
+            }
+        }
+        _ => assert_eq!(v1, v2, "{path} is kept byte-identical"),
+    }
+}
+
+#[test]
+fn v2_from_a_full_report_and_from_its_v1_summary_agree_and_repeat_exactly() {
+    let dir = Temp::new();
+    let raw_path = dir.0.join("raw.json");
+    let v1_path = dir.0.join("v1.json");
+    let raw = serde_json::to_vec_pretty(&detailed_goal_source()).unwrap();
+    std::fs::write(&raw_path, &raw).unwrap();
+    let v1_bytes = write_v1_summary(&raw, &raw_path, &v1_path);
+
+    let mut outputs = Vec::new();
+    for name in ["full-a.json", "full-b.json"] {
+        artifacts::convert(&raw_path, &dir.0.join(name), &provenance()).unwrap();
+        outputs.push(std::fs::read(dir.0.join(name)).unwrap());
+    }
+    for name in ["v1-a.json", "v1-b.json"] {
+        artifacts::convert_summary_v1(&v1_path, &dir.0.join(name)).unwrap();
+        outputs.push(std::fs::read(dir.0.join(name)).unwrap());
+    }
+    assert_eq!(
+        outputs[0], outputs[1],
+        "the full-report route repeats exactly"
+    );
+    assert_eq!(outputs[2], outputs[3], "the v1 route repeats exactly");
+    for bytes in &outputs {
+        assert_eq!(bytes.last(), Some(&b'\n'));
+        assert!(!bytes[..bytes.len() - 1].contains(&b'\n'), "compact JSON");
+    }
+
+    let from_full: Value = serde_json::from_slice(&outputs[0]).unwrap();
+    let mut from_v1: Value = serde_json::from_slice(&outputs[2]).unwrap();
+    assert_eq!(from_full["summary_version"], 2);
+    assert!(from_full["conversion"].get("from_summary_v1").is_none());
+    let source = from_v1["conversion"]
+        .as_object_mut()
+        .unwrap()
+        .remove("from_summary_v1")
+        .expect("the v1 route records its input");
+    assert_eq!(
+        source,
+        json!({"path": v1_path.canonicalize().unwrap(), "sha256": artifacts::sha256(&v1_bytes), "bytes": v1_bytes.len()})
+    );
+    assert_eq!(from_v1, from_full);
+
+    let v1: Value = serde_json::from_slice(&v1_bytes).unwrap();
+    assert_eq!(
+        from_full["raw"], v1["raw"],
+        "raw still names the full report"
+    );
+    for key in [
+        "environment",
+        "comparison",
+        "comparison_inputs",
+        "claims",
+        "measurement_evidence",
+    ] {
+        assert_eq!(from_full[key], v1[key], "{key}");
+    }
+    let mut dropped = Vec::new();
+    dropped_paths(
+        &v1["deterministic"],
+        &from_full["deterministic"],
+        "deterministic",
+        &mut dropped,
+    );
+    assert!(dropped.contains(&"deterministic.goal_indicators.recruitment_paths".to_string()));
+    assert!(dropped.contains(&"deterministic.totals".to_string()));
+    let read = &from_full["deterministic"]["goal_indicators"]["cases"][0]["neighborhood_read"];
+    assert_eq!(read["genome_count"], 2);
+    assert!(read.get("genomes").is_none());
+}
+
+#[test]
+fn v2_omitted_details_names_every_dropped_path_and_keeps_v1_notes() {
+    let dir = Temp::new();
+    let raw_path = dir.0.join("raw.json");
+    let raw = serde_json::to_vec(&detailed_goal_source()).unwrap();
+    std::fs::write(&raw_path, &raw).unwrap();
+    let mut v1 = artifacts::summarize_v1(&raw, &raw_path, &provenance()).unwrap();
+    // Detail stored by committed v1 summaries that the tiny report lacks.
+    let case = &mut v1.deterministic["goal_indicators"]["cases"][0];
+    case["drift_depth"] = json!({"version": "drift-depth-v4", "readings": [{
+        "depth": 2000, "changed_per_all_births": "0.004000",
+        "births": {"births_total": 2000, "any_events": {"changed": 8}, "by_events": []},
+        "opportunities": {"attempted": 9}, "recruitment": {"rows": [1, 2]}
+    }]});
+    case["mutation_value_totals_by_operator"] = json!({"VmConstantMutation": 3});
+    let v2 = serde_json::to_value(artifacts::project_v2(v1.clone()).unwrap()).unwrap();
+    let v1 = serde_json::to_value(v1).unwrap();
+    let omitted: Vec<_> = v2["omitted_details"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|detail| detail.as_str().unwrap().to_string())
+        .collect();
+    for note in v1["omitted_details"].as_array().unwrap() {
+        assert!(
+            omitted.contains(&note.as_str().unwrap().to_string()),
+            "{note}"
+        );
+    }
+    let mut dropped = Vec::new();
+    dropped_paths(
+        &v1["deterministic"],
+        &v2["deterministic"],
+        "deterministic",
+        &mut dropped,
+    );
+    for top in v1.as_object().unwrap().keys() {
+        if v2.get(top).is_none() {
+            dropped.push(top.clone());
+        }
+    }
+    assert!(!dropped.is_empty());
+    for path in &dropped {
+        assert!(omitted.contains(path), "{path} dropped but not named");
+    }
+    for expected in [
+        "deterministic.goal_indicators.recruitment_paths",
+        "deterministic.goal_indicators.cases[].neighborhood_read.genomes",
+        "deterministic.goal_indicators.cases[].drift_depth.readings[].opportunities",
+        "deterministic.goal_indicators.cases[].mutation_value_totals_by_operator",
+    ] {
+        assert!(omitted.contains(&expected.to_string()), "{expected}");
+    }
+}
+
+#[test]
+fn loader_rejects_v1_summaries_and_conversion_accepts_only_v1() {
+    let dir = Temp::new();
+    let raw_path = dir.0.join("raw.json");
+    let v1_path = dir.0.join("v1.json");
+    let v2_path = dir.0.join("v2.json");
+    let raw = synthetic_full_report();
+    std::fs::write(&raw_path, &raw).unwrap();
+    write_v1_summary(&raw, &raw_path, &v1_path);
+    let current: bench::Report = serde_json::from_slice(&raw).unwrap();
+    let error = bench::compare_against_path(&current, &v1_path).unwrap_err();
+    assert!(error.contains("summary version 1"), "{error}");
+    assert!(error.contains("--from-summary-v1"), "{error}");
+
+    artifacts::convert_summary_v1(&v1_path, &v2_path).unwrap();
+    assert!(bench::compare_against_path(&current, &v2_path).is_ok());
+    let again = dir.0.join("again.json");
+    assert!(artifacts::convert_summary_v1(&v2_path, &again)
+        .unwrap_err()
+        .contains("version 1"));
+    assert!(artifacts::convert_summary_v1(&raw_path, &again).is_err());
+    assert!(artifacts::convert_summary_v1(&v1_path, &v1_path).is_err());
+    assert!(!again.exists());
+}
+
+/// A committed v1 summary (the T10.F10 oracle copy) predates the pass
+/// counters: they are absent, not null. Its whole-kept blocks must come out of
+/// the v1 route JSON-equal to the stored ones, so an absent counter stays
+/// absent and an explicit `null` stays `null`. A block the typed model cannot
+/// carry unchanged is refused rather than rewritten.
+#[test]
+fn v1_route_keeps_stored_whole_blocks_as_found() {
+    const WHOLE: [&str; 9] = [
+        "kind",
+        "source_schema_version",
+        "feature",
+        "environment",
+        "comparison",
+        "comparison_inputs",
+        "measurement_evidence",
+        "raw",
+        "claims",
+    ];
+    let stored: Value =
+        serde_json::from_slice(include_bytes!("fixtures/stored-summary-v1.json")).unwrap();
+    let counters = &stored["comparison_inputs"]["per_creature_tick"];
+    assert!(counters.get("passes").is_none() && counters.get("decided_passes").is_none());
+    let mut explicit_null = stored.clone();
+    explicit_null["comparison_inputs"]["per_creature_tick"]["decided_passes"] = Value::Null;
+
+    let dir = Temp::new();
+    for (name, v1) in [("absent", &stored), ("null", &explicit_null)] {
+        let v1_path = dir.0.join(format!("{name}-v1.json"));
+        let v2_path = dir.0.join(format!("{name}-v2.json"));
+        std::fs::write(&v1_path, serde_json::to_vec_pretty(v1).unwrap()).unwrap();
+        artifacts::convert_summary_v1(&v1_path, &v2_path).unwrap();
+        let mut v2: Value = serde_json::from_slice(&std::fs::read(&v2_path).unwrap()).unwrap();
+        for key in WHOLE {
+            assert_eq!(v2[key], v1[key], "{name}: {key}");
+        }
+        v2["conversion"]
+            .as_object_mut()
+            .unwrap()
+            .remove("from_summary_v1")
+            .unwrap();
+        assert_eq!(v2["conversion"], v1["conversion"], "{name}: conversion");
+    }
+
+    // `SuppliedEvidence` would write its absent optional fields as `null`.
+    let mut partial = stored.clone();
+    partial["conversion"]["supplied_evidence"] = json!({"source": "fixture"});
+    let v1_path = dir.0.join("partial-v1.json");
+    let v2_path = dir.0.join("partial-v2.json");
+    std::fs::write(&v1_path, serde_json::to_vec(&partial).unwrap()).unwrap();
+    let error = artifacts::convert_summary_v1(&v1_path, &v2_path).unwrap_err();
+    assert!(error.contains("conversion"), "{error}");
+    assert!(!v2_path.exists());
+}
+
+/// The saved progress-page trace (A1) is the page's read set. A v1
+/// `deterministic` block holding exactly those paths, each leaf a unique
+/// sentinel, projects to a v2 block where every path still resolves to its
+/// sentinel; `neighborhood_read.genomes` alone becomes `genome_count`.
+#[test]
+fn v2_keeps_every_progress_page_read() {
+    let trace = include_str!("fixtures/progress-page-read-set.txt");
+    let paths: Vec<Vec<&str>> = trace
+        .lines()
+        .filter(|path| !path.ends_with(".length"))
+        .map(|path| path.strip_prefix("S.").unwrap().split('.').collect())
+        .collect();
+    let genomes = [
+        "deterministic",
+        "goal_indicators",
+        "cases[]",
+        "neighborhood_read",
+        "genomes",
+    ];
+    let is_leaf = |path: &[&str]| {
+        let path = path.join(".");
+        !trace.lines().any(|other| {
+            other[2..].starts_with(&format!("{path}."))
+                || other[2..].starts_with(&format!("{path}[]"))
+        })
+    };
+    fn slot<'a>(mut value: &'a mut Value, path: &[&str]) -> &'a mut Value {
+        for segment in path {
+            let (key, row) = match segment.strip_suffix("[]") {
+                Some(key) => (key, true),
+                None => (*segment, false),
+            };
+            if !key.is_empty() {
+                if !value.is_object() {
+                    *value = json!({});
+                }
+                value = value
+                    .as_object_mut()
+                    .unwrap()
+                    .entry(key)
+                    .or_insert(Value::Null);
+            }
+            if row {
+                if !value.is_array() {
+                    *value = json!([Value::Null]);
+                }
+                value = &mut value.as_array_mut().unwrap()[0];
+            }
+        }
+        value
+    }
+    let mut v1 = json!({});
+    for path in &paths {
+        if is_leaf(path) {
+            *slot(&mut v1, path) = json!(path.join("."));
+        }
+    }
+    *slot(&mut v1, &genomes) = json!([{"rank": 0}, {"rank": 1}, {"rank": 2}]);
+
+    let v2 = artifacts::project_deterministic(&v1["deterministic"]);
+    fn resolve<'a>(mut value: &'a Value, path: &[&str]) -> Option<&'a Value> {
+        for segment in path {
+            let (key, row) = match segment.strip_suffix("[]") {
+                Some(key) => (key, true),
+                None => (*segment, false),
+            };
+            if !key.is_empty() {
+                value = value.get(key)?;
+            }
+            if row {
+                value = value.get(0)?;
+            }
+        }
+        Some(value)
+    }
+    let dir = Temp::new();
+    let raw_path = dir.0.join("raw.json");
+    std::fs::write(&raw_path, synthetic_full_report()).unwrap();
+    let header = serde_json::to_value(
+        artifacts::summarize(&synthetic_full_report(), &raw_path, &provenance()).unwrap(),
+    )
+    .unwrap();
+    for path in &paths {
+        let label = path.join(".");
+        if path[0] != "deterministic" {
+            // Header blocks are kept whole; the synthetic report measures them.
+            assert!(
+                header.get(path[0].trim_end_matches("[]")).is_some(),
+                "{label}"
+            );
+            continue;
+        }
+        if path.starts_with(&genomes) {
+            let read = resolve(&v2, &genomes[1..4]).unwrap();
+            assert_eq!(read["genome_count"], 3);
+            assert!(read.get("genomes").is_none());
+            continue;
+        }
+        let resolved = resolve(&v2, &path[1..]).unwrap_or_else(|| panic!("{label} is dropped"));
+        if is_leaf(path) {
+            assert_eq!(resolved, &json!(label), "{label}");
+        }
+    }
+}
+
+#[test]
+fn bench_summarize_converts_a_v1_summary_without_provenance() {
+    let dir = Temp::new();
+    let raw_path = dir.0.join("raw.json");
+    let raw = synthetic_full_report();
+    std::fs::write(&raw_path, &raw).unwrap();
+    write_v1_summary(&raw, &raw_path, &dir.0.join("v1.json"));
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+            .current_dir(&dir.0)
+            .arg("bench-summarize")
+            .args(args)
+            .output()
+            .unwrap()
+    };
+    let converted = run(&["--from-summary-v1", "v1.json", "--out", "v2.json"]);
+    assert!(
+        converted.status.success(),
+        "{}",
+        String::from_utf8_lossy(&converted.stderr)
+    );
+    let v2: Value = serde_json::from_slice(&std::fs::read(dir.0.join("v2.json")).unwrap()).unwrap();
+    assert_eq!(v2["summary_version"], 2);
+    assert_eq!(v2["raw"]["sha256"], artifacts::sha256(&raw));
+    assert!(v2["conversion"]["from_summary_v1"]["sha256"].is_string());
+    // One source per conversion: a full report needs its provenance, and the
+    // two inputs never combine.
+    assert!(!run(&["--input", "raw.json", "--out", "x.json"])
+        .status
+        .success());
+    assert!(!run(&[
+        "--from-summary-v1",
+        "v1.json",
+        "--input",
+        "raw.json",
+        "--out",
+        "x.json"
+    ])
+    .status
+    .success());
+    assert!(!dir.0.join("x.json").exists());
+}
+
+#[test]
+fn bench_summarize_converts_a_full_report_with_provenance() {
+    let dir = Temp::new();
+    let raw = synthetic_full_report();
+    std::fs::write(dir.0.join("raw.json"), &raw).unwrap();
+    std::fs::write(
+        dir.0.join("provenance.json"),
+        serde_json::to_vec(&provenance()).unwrap(),
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+        .current_dir(&dir.0)
+        .args([
+            "bench-summarize",
+            "--input",
+            "raw.json",
+            "--out",
+            "summary.json",
+            "--provenance",
+            "provenance.json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let summary: Value =
+        serde_json::from_slice(&std::fs::read(dir.0.join("summary.json")).unwrap()).unwrap();
+    assert_eq!(summary["summary_version"], 2);
+    assert_eq!(summary["raw"]["sha256"], artifacts::sha256(&raw));
+}
+
+#[test]
+fn project_v2_rejects_a_version_1_summary_of_another_kind() {
+    let dir = Temp::new();
+    let raw_path = dir.0.join("raw.json");
+    let raw = synthetic_full_report();
+    std::fs::write(&raw_path, &raw).unwrap();
+    let mut v1 = artifacts::summarize_v1(&raw, &raw_path, &provenance()).unwrap();
+    v1.kind = "not-a-benchmark-summary".into();
+
+    let error = artifacts::project_v2(v1).unwrap_err();
+
+    assert!(error.contains("requires a summary version 1"), "{error}");
+}
+
+#[test]
+fn from_summary_v1_rejects_a_version_1_header_of_another_kind_before_parsing() {
+    let dir = Temp::new();
+    let input = dir.0.join("other.json");
+    std::fs::write(&input, br#"{"kind":"other","summary_version":1}"#).unwrap();
+
+    let error = artifacts::convert_summary_v1(&input, &dir.0.join("v2.json")).unwrap_err();
+
+    assert!(error.contains("--from-summary-v1 requires"), "{error}");
+    assert!(!dir.0.join("v2.json").exists());
 }

@@ -16,7 +16,7 @@ export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 # Trust the local aqua registry (cargo-mutants) without a per-user allow step.
 export AQUA_POLICY_CONFIG := $(CURDIR)/aqua-policy.yaml
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy rust-mutants frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy rust-mutants frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -128,8 +128,11 @@ compile-check-test: ## Run the roadmap-implementer compile-feedback hook regress
 dependency-policy-check-test: ## Run dependency-policy regression tests.
 	@scripts/dependency-policy-check-test
 
+tracked-size-check-test: ## Run tracked-file size limit regression tests.
+	@scripts/tracked-size-check-test
+
 policy-check: ## Validate roadmap, repository, provenance, and retirement policy.
-	@$(MAKE) roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test
+	@$(MAKE) roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test
 	@scripts/policy-check
 
 quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.

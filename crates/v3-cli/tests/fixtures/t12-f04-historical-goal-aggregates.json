@@ -1,0 +1,98 @@
+{
+  "_source": "docs/progress/features/t12-f04-baseline-world-set-goal.json (summary v1, deterministic.goal_indicators) at 4b3aadcd; historical aggregates predating version tokens",
+  "lineage_diversity": {
+    "per_seed": [
+      {
+        "seed": 11,
+        "shannon_entropy_nats": "2.360513",
+        "surviving_founder_clade_count": 22
+      },
+      {
+        "seed": 22,
+        "shannon_entropy_nats": "2.625223",
+        "surviving_founder_clade_count": 24
+      },
+      {
+        "seed": 33,
+        "shannon_entropy_nats": "0.882285",
+        "surviving_founder_clade_count": 14
+      }
+    ]
+  },
+  "memory_sensitivity": {
+    "per_seed": [
+      {
+        "different_from_either_count": 1,
+        "different_from_either_fraction": "0.000113",
+        "different_from_scrambled_count": 1,
+        "different_from_scrambled_fraction": "0.000113",
+        "different_from_zeroed_count": 1,
+        "different_from_zeroed_fraction": "0.000113",
+        "final_creature_count": 8818,
+        "seed": 11
+      },
+      {
+        "different_from_either_count": 4,
+        "different_from_either_fraction": "0.000518",
+        "different_from_scrambled_count": 2,
+        "different_from_scrambled_fraction": "0.000259",
+        "different_from_zeroed_count": 2,
+        "different_from_zeroed_fraction": "0.000259",
+        "final_creature_count": 7715,
+        "seed": 22
+      },
+      {
+        "different_from_either_count": 2,
+        "different_from_either_fraction": "0.000092",
+        "different_from_scrambled_count": 2,
+        "different_from_scrambled_fraction": "0.000092",
+        "different_from_zeroed_count": 1,
+        "different_from_zeroed_fraction": "0.000046",
+        "final_creature_count": 21818,
+        "seed": 33
+      }
+    ],
+    "scramble_algorithm": "rotate_left(1) across 16 shared-memory slots",
+    "snapshot_timing": "after the final executed tick, before any observation action"
+  },
+  "reachable_structure_size_distribution": {
+    "max": 478,
+    "mean": "101.397095",
+    "median": 87,
+    "min": 1,
+    "p25": 80,
+    "p75": 115
+  },
+  "cases": [
+    {
+      "reachable_structure_size_distribution": {
+        "max": 478,
+        "mean": "98.799501",
+        "median": 82,
+        "min": 11,
+        "p25": 73,
+        "p75": 115
+      }
+    },
+    {
+      "reachable_structure_size_distribution": {
+        "max": 357,
+        "mean": "104.475049",
+        "median": 90,
+        "min": 1,
+        "p25": 71,
+        "p75": 131
+      }
+    },
+    {
+      "reachable_structure_size_distribution": {
+        "max": 360,
+        "mean": "101.358557",
+        "median": 87,
+        "min": 1,
+        "p25": 84,
+        "p75": 106
+      }
+    }
+  ]
+}

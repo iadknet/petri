@@ -5,7 +5,10 @@ Exploratory experiments; no production or roadmap changes.
 [Prior pilot](drift-silence-experiment-2026-09-24.md),
 [research grounding](drift-silence-alife-research-2026-09-24.md),
 [structured results](drift-silence-followup-2026-09-24.results.json),
-[replay bundle](drift-silence-followup-2026-09-24.replay.tar.gz).
+replay bundle (local only; see the Evidence line below).
+
+Evidence (relocated 2026-09-24, local only): `.bench-artifacts/research/drift-silence-followup-2026-09-24/drift-silence-followup-2026-09-24.replay.tar.gz`,
+sha256 `52f67c4e87cb868b1ff8a278d809df4de13d5d8154e272a309046c61a201fa1e`, 1,786,584 bytes.
 
 ## What changed our understanding
 

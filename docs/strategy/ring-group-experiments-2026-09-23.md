@@ -282,8 +282,10 @@ Two complete seed blocks replayed: **40 tuning/result rows match exactly**,
 with only a subsequently added explicit zero-cost field normalized for the
 historical primary records. Documentation uses `make check-docs`.
 
-- [Summary, paired intervals, protocols and complete source](ring-group-experiments-2026-09-23.results.json)
-- [Complete raw observations: gzip-compressed JSON](ring-group-experiments-2026-09-23.observations.json.gz)
+- Summary, paired intervals, protocols and complete source (local only; see
+  the Evidence line below)
+- Complete raw observations: gzip-compressed JSON (local only; see the
+  Evidence line below)
 - [Figure](ring-group-experiments-2026-09-23.png)
 
 The working probe is `.bench-artifacts/ring-group-2026-09-23/`. Reproduce with
@@ -293,3 +295,8 @@ recorded repository revision. The experiment and analysis need Rust and Python's
 standard library; rendering the optional figure additionally needs Matplotlib.
 The artifact includes lockfile, source hashes, raw-file hashes and regression
 seeds. Production source, defaults, roadmap files and Git history are unchanged.
+
+Evidence (relocated 2026-09-24, local only): `.bench-artifacts/research/ring-group-experiments-2026-09-23/ring-group-experiments-2026-09-23.results.json`,
+sha256 `8e42067060af54378956693a1e245b07607d5b4776ca136a10d92c7ffaac6fce`, 1,182,471 bytes;
+`.bench-artifacts/research/ring-group-experiments-2026-09-23/ring-group-experiments-2026-09-23.observations.json.gz`,
+sha256 `7fec5ff3d668aa3a865f2ea24648e249208c316d19606702f5ee2bc305848e2d`, 1,178,226 bytes.

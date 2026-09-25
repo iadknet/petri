@@ -1,5 +1,5 @@
 //! Versioned committed evidence; full observation payloads remain local.
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufWriter, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -12,7 +12,9 @@ use super::{ComparisonInputs, Indicator, Report};
 use v3_core::neighborhood::recruitment_paths as recruitment;
 
 pub const SUMMARY_KIND: &str = "petri-benchmark-summary";
-pub const SUMMARY_VERSION: u32 = 1;
+pub const SUMMARY_VERSION: u32 = 2;
+/// The retired detailed summary, read only by `--from-summary-v1`.
+pub const SUMMARY_V1_VERSION: u32 = 1;
 pub const MAX_CLAIMS: usize = 16;
 pub const MAX_PERSISTENCE_CHECKPOINTS: usize = 21;
 
@@ -54,6 +56,18 @@ pub struct ConversionProvenance {
     pub verified_at: String,
     pub converter: Invocation,
     pub supplied_evidence: Option<SuppliedEvidence>,
+    /// The committed v1 summary a v2 summary was converted from; absent when
+    /// the full report was projected directly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_summary_v1: Option<SourceSummary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourceSummary {
+    pub path: PathBuf,
+    pub sha256: String,
+    pub bytes: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,7 +108,10 @@ pub struct Summary {
     pub deterministic: Value,
     pub environment: Value,
     pub comparison: Value,
-    pub comparison_inputs: ComparisonInputs,
+    /// Kept as stored JSON: `ComparisonInputs` gained optional counters that
+    /// older summaries lack, and a typed round trip would add them as `null`.
+    /// The loader validates a typed copy.
+    pub comparison_inputs: Value,
     pub measurement_evidence: Value,
     pub conversion: ConversionProvenance,
     pub raw: RawProvenance,
@@ -444,7 +461,9 @@ fn claims(source: &Value) -> Vec<Claim> {
             .map(|value| Claim { pointer:pointer.into(), value:value.clone() })).collect()
 }
 
-pub fn summarize(
+/// The full-report-to-v1 stage, unchanged from summary version 1. Its output
+/// is only an input to [`project_v2`]; nothing stores or loads it.
+pub fn summarize_v1(
     raw: &[u8],
     raw_path: &Path,
     provenance: &ConversionProvenance,
@@ -502,10 +521,11 @@ pub fn summarize(
     deterministic["goal_indicators"] =
         goal_indicators(&source["deterministic"]["goal_indicators"], &report)?;
     Ok(Summary {
-        kind: SUMMARY_KIND.into(), summary_version: SUMMARY_VERSION, source_schema_version: report.schema_version,
+        kind: SUMMARY_KIND.into(), summary_version: SUMMARY_V1_VERSION, source_schema_version: report.schema_version,
         feature: report.feature.clone(), deterministic,
         environment: aggregate_fields(&source["environment"], &report.environment)?,
-        comparison: source["comparison"].clone(), comparison_inputs: (&report).into(),
+        comparison: source["comparison"].clone(), comparison_inputs: serde_json::to_value(ComparisonInputs::from(&report))
+            .map_err(|e| format!("cannot serialize comparison inputs: {e}"))?,
         measurement_evidence: source.get("measurement_evidence").cloned().unwrap_or_else(|| json!({
             "command":null,"dirty":null,"cli_exit":null,"outer_exit":null,"thresholds":null,"wall_caps":null,"inheritance":null
         })),
@@ -519,9 +539,382 @@ pub fn summarize(
     })
 }
 
+/// Project a full report to a v2 summary through the v1 stage.
+pub fn summarize(
+    raw: &[u8],
+    raw_path: &Path,
+    provenance: &ConversionProvenance,
+) -> Result<Summary, String> {
+    if provenance.from_summary_v1.is_some() {
+        return Err("a full-report conversion has no v1 summary source".into());
+    }
+    project_v2(summarize_v1(raw, raw_path, provenance)?)
+}
+
+// v2 keep-list (docs/specs/large-file-cleanup-2026-09-24.md, Decision 1): the
+// provenance header, `environment`, `comparison` and `comparison_inputs` stay
+// whole in `Summary`; inside `deterministic` only what reporting reads stays.
+// Reporting is the progress page (its traced read set is saved in
+// tests/fixtures/progress-page-read-set.txt and pinned by a test) and the
+// summary loader below, which deserializes `profile` and `per_creature_tick`
+// whole. Comparison otherwise reads only `comparison_inputs`: its case
+// readings come from the current full report, never from a stored summary.
+// Every projection passes a non-object (an undefined indicator) through
+// unchanged and copies only keys the source has, so undefined, missing and
+// zero readings keep their meaning.
+
+/// Whole `deterministic` blocks: the loader deserializes `profile` and
+/// `per_creature_tick`; the page reads the `per_seed` rows.
+const KEPT_DETERMINISTIC: [&str; 3] = ["profile", "per_creature_tick", "per_seed"];
+/// Goal indicators the page reads only through their `per_seed` rows.
+const PER_SEED_INDICATORS: [&str; 4] = [
+    "lineage_diversity",
+    "memory_sensitivity",
+    "structural_companions",
+    "temporal_memory_sensitivity",
+];
+/// Persistence row fields the page reads; `samples` is projected separately.
+const KEPT_PERSISTENCE_FIELDS: [&str; 5] = [
+    "seed",
+    "final_population",
+    "minimum_population",
+    "plateau_population",
+    "mean_energy",
+];
+/// Persistence checkpoint fields the page reads, each kept whole.
+const KEPT_SAMPLE_FIELDS: [&str; 12] = [
+    "tick",
+    "population",
+    "mean_energy",
+    "mean_genome_size",
+    "mean_mesh_nodes",
+    "shannon_entropy_nats",
+    "surviving_founder_clade_count",
+    "food_density_total",
+    "grazed_cell_share",
+    "grazing_modifier_mean",
+    "occupancy_grid",
+    "sensor_census",
+];
+/// Case blocks the page reads, each kept whole.
+const KEPT_CASE_BLOCKS: [&str; 19] = [
+    "case",
+    "cognition",
+    "energy_flows",
+    "mortality",
+    "predation",
+    "reproductive_success_by_cognitive_class",
+    "surviving_clade_profiles",
+    "mutation_supply",
+    "mutation_outcome_summary",
+    "moves_attempted_total",
+    "moves_blocked_total_by_cause",
+    "blocked_move_fraction",
+    "move_attempts_with_barrier_neighbor_by_reader_state",
+    "barrier_blocked_fraction_by_reader_state",
+    "avoidable_blocked_share_of_all_moves_by_reader_state",
+    "food_density_total",
+    "typed_eats_total",
+    "typed_eat_share",
+    "reachable_structure_size_distribution",
+];
+
+/// Apply `project` to an object, passing anything else through unchanged.
+fn keep_object(source: &Value, project: impl FnOnce(&Value) -> Value) -> Value {
+    if source.is_object() {
+        project(source)
+    } else {
+        source.clone()
+    }
+}
+
+/// Apply `project` to every row of an array, passing a non-array through.
+fn keep_rows(source: &Value, project: impl Fn(&Value) -> Value) -> Value {
+    match source.as_array() {
+        Some(rows) => Value::Array(rows.iter().map(project).collect()),
+        None => source.clone(),
+    }
+}
+
+/// Set `out[key]` to the projection of `source[key]` when the source has it.
+fn keep_field(out: &mut Value, source: &Value, key: &str, project: impl FnOnce(&Value) -> Value) {
+    if let Some(value) = source.get(key) {
+        out[key] = project(value);
+    }
+}
+
+fn keep_births(source: &Value, fields: &[&str]) -> Value {
+    keep_object(source, |births| pick(births, fields))
+}
+
+fn keep_neighborhood(source: &Value) -> Value {
+    keep_object(source, |neighborhood| {
+        let mut out = json!({});
+        keep_field(&mut out, neighborhood, "founder", |founder| {
+            keep_object(founder, |founder| {
+                let mut out = json!({});
+                keep_field(&mut out, founder, "births", |births| {
+                    keep_births(births, &["any_events", "by_events"])
+                });
+                out
+            })
+        });
+        keep_field(&mut out, neighborhood, "evolved", |evolved| {
+            keep_object(evolved, |evolved| {
+                let mut out = json!({});
+                keep_field(&mut out, evolved, "per_seed", |rows| {
+                    keep_rows(rows, |row| {
+                        keep_object(row, |row| {
+                            let mut out = pick(row, &["seed", "mesh_summary"]);
+                            keep_field(&mut out, row, "pooled_births", |births| {
+                                keep_births(births, &["any_events"])
+                            });
+                            out
+                        })
+                    })
+                });
+                out
+            })
+        });
+        out
+    })
+}
+
+fn keep_persistence(source: &Value) -> Value {
+    let keep_row = |row: &Value| {
+        keep_object(row, |row| {
+            let mut out = pick(row, &KEPT_PERSISTENCE_FIELDS);
+            keep_field(&mut out, row, "samples", |samples| {
+                keep_rows(samples, |sample| {
+                    keep_object(sample, |sample| pick(sample, &KEPT_SAMPLE_FIELDS))
+                })
+            });
+            out
+        })
+    };
+    keep_object(source, |persistence| {
+        let mut out = json!({});
+        keep_field(&mut out, persistence, "per_seed", |rows| {
+            keep_rows(rows, keep_row)
+        });
+        out
+    })
+}
+
+/// Fields of an exposure row, a cohort and its coverage, and a control that
+/// the page's `mutation_effects` view (T11.F26) reads.
+const KEPT_EXPOSURE_FIELDS: [&str; 13] = [
+    "panel",
+    "supply",
+    "births_total",
+    "requested_events_total",
+    "applied_events_total",
+    "zero_requested",
+    "requested_all_skipped",
+    "genome_identical",
+    "event_bearing",
+    "parents",
+    "parents_all_noop",
+    "parents_one_queue",
+    "from_acting",
+];
+const KEPT_COHORT_FIELDS: [&str; 6] = [
+    "identity",
+    "parents_evaluated",
+    "parents_requested",
+    "totals",
+    "operators",
+    "targets",
+];
+const KEPT_COHORT_COVERAGE_FIELDS: [&str; 10] = [
+    "pairs_sampled",
+    "pairs_requested",
+    "differ_recorded",
+    "differ_authored",
+    "differ_sequence_ticks_1_4",
+    "differ_sequence_ticks_5_32",
+    "differ_any",
+    "state_or_cost_only",
+    "all_noop_parents",
+    "all_noop_parents_acting",
+];
+
+fn keep_mutation_effects(source: &Value) -> Value {
+    keep_object(source, |effects| {
+        let mut out = pick(effects, &["version", "battery_version", "count_fields"]);
+        keep_field(&mut out, effects, "exposure", |rows| {
+            keep_rows(rows, |row| {
+                keep_object(row, |row| pick(row, &KEPT_EXPOSURE_FIELDS))
+            })
+        });
+        keep_field(&mut out, effects, "cohorts", |cohorts| {
+            keep_rows(cohorts, |cohort| {
+                keep_object(cohort, |cohort| {
+                    let mut out = pick(cohort, &KEPT_COHORT_FIELDS);
+                    keep_field(&mut out, cohort, "parents", |rows| {
+                        keep_rows(rows, |row| {
+                            keep_object(row, |row| {
+                                pick(row, &["depth_or_generation", "genome_size"])
+                            })
+                        })
+                    });
+                    keep_field(&mut out, cohort, "coverage", |coverage| {
+                        keep_object(coverage, |coverage| {
+                            pick(coverage, &KEPT_COHORT_COVERAGE_FIELDS)
+                        })
+                    });
+                    out
+                })
+            })
+        });
+        keep_field(&mut out, effects, "coverage", |coverage| {
+            keep_object(coverage, |coverage| {
+                let mut out = pick(coverage, &["version", "recorded", "sequence_source"]);
+                keep_field(&mut out, coverage, "controls", |rows| {
+                    keep_rows(rows, |row| {
+                        keep_object(row, |row| {
+                            pick(row, &["name", "passed", "differing_groups"])
+                        })
+                    })
+                });
+                out
+            })
+        });
+        out
+    })
+}
+
+fn keep_case(source: &Value) -> Value {
+    keep_object(source, |case| {
+        let mut out = pick(case, &KEPT_CASE_BLOCKS);
+        keep_field(&mut out, case, "drift_depth", |drift| {
+            keep_object(drift, |drift| {
+                let mut out = json!({});
+                keep_field(&mut out, drift, "readings", |rows| {
+                    keep_rows(rows, |row| {
+                        keep_object(row, |row| {
+                            let mut out = pick(row, &["depth", "changed_per_all_births"]);
+                            keep_field(&mut out, row, "births", |births| {
+                                keep_births(births, &["births_total", "any_events"])
+                            });
+                            out
+                        })
+                    })
+                });
+                out
+            })
+        });
+        keep_field(&mut out, case, "neighborhood_read", |read| {
+            keep_object(read, |read| {
+                let mut out = pick(
+                    read,
+                    &[
+                        "changed_per_all_births",
+                        "silent_per_all_births",
+                        "dead_per_all_births",
+                    ],
+                );
+                keep_field(&mut out, read, "births", |births| {
+                    keep_births(births, &["births_total", "any_events"])
+                });
+                if let Some(genomes) = read.get("genomes").and_then(Value::as_array) {
+                    out["genome_count"] = json!(genomes.len());
+                }
+                out
+            })
+        });
+        keep_field(&mut out, case, "mutational_neighborhood", keep_neighborhood);
+        keep_field(&mut out, case, "mutation_effects", keep_mutation_effects);
+        out
+    })
+}
+
+/// The v2 keep-list over a v1 `deterministic` block.
+pub fn project_deterministic(source: &Value) -> Value {
+    let mut out = pick(source, &KEPT_DETERMINISTIC);
+    keep_field(&mut out, source, "goal_indicators", |indicators| {
+        keep_object(indicators, |indicators| {
+            let mut out = json!({});
+            for name in PER_SEED_INDICATORS {
+                keep_field(&mut out, indicators, name, |indicator| {
+                    keep_object(indicator, |indicator| pick(indicator, &["per_seed"]))
+                });
+            }
+            keep_field(
+                &mut out,
+                indicators,
+                "population_persistence",
+                keep_persistence,
+            );
+            keep_field(
+                &mut out,
+                indicators,
+                "mutational_neighborhood",
+                keep_neighborhood,
+            );
+            keep_field(&mut out, indicators, "cases", |cases| {
+                keep_rows(cases, keep_case)
+            });
+            out
+        })
+    });
+    out
+}
+
+/// Every `a.b[].c` path of `source` that `kept` lacks.
+fn dropped_paths(source: &Value, kept: &Value, path: &str, out: &mut BTreeSet<String>) {
+    match (source, kept) {
+        (Value::Object(source), Value::Object(kept)) => {
+            for (key, value) in source {
+                let child = format!("{path}.{key}");
+                match kept.get(key) {
+                    Some(kept) => dropped_paths(value, kept, &child, out),
+                    None => {
+                        out.insert(child);
+                    }
+                }
+            }
+        }
+        (Value::Array(source), Value::Array(kept)) => {
+            let path = format!("{path}[]");
+            for (value, kept) in source.iter().zip(kept) {
+                dropped_paths(value, kept, &path, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Project a v1 summary onto the v2 keep-list. `omitted_details` keeps the
+/// v1 notes and names every dropped path.
+pub fn project_v2(v1: Summary) -> Result<Summary, String> {
+    if v1.kind != SUMMARY_KIND || v1.summary_version != SUMMARY_V1_VERSION {
+        return Err(format!(
+            "v2 projection requires a summary version {SUMMARY_V1_VERSION}, not {} {}",
+            v1.kind, v1.summary_version
+        ));
+    }
+    let deterministic = project_deterministic(&v1.deterministic);
+    let mut dropped = BTreeSet::new();
+    dropped_paths(
+        &v1.deterministic,
+        &deterministic,
+        "deterministic",
+        &mut dropped,
+    );
+    let mut omitted_details = v1.omitted_details;
+    omitted_details.extend(dropped);
+    Ok(Summary {
+        summary_version: SUMMARY_VERSION,
+        deterministic,
+        omitted_details,
+        ..v1
+    })
+}
+
 pub fn summary_bytes(summary: &Summary) -> Result<Vec<u8>, String> {
     let mut bytes =
-        serde_json::to_vec_pretty(summary).map_err(|e| format!("cannot serialize summary: {e}"))?;
+        serde_json::to_vec(summary).map_err(|e| format!("cannot serialize summary: {e}"))?;
     bytes.push(b'\n');
     Ok(bytes)
 }
@@ -538,6 +931,12 @@ pub(crate) fn comparison_inputs_from_bytes(bytes: &[u8]) -> Result<ComparisonInp
         if kind != SUMMARY_KIND {
             return Err(format!("unsupported artifact kind {kind}"));
         }
+        if header.summary_version == Some(SUMMARY_V1_VERSION) {
+            return Err(format!(
+                "summary version {SUMMARY_V1_VERSION} is no longer loadable; convert it with \
+                 `v3-cli bench-summarize --from-summary-v1 <in> --out <out>`"
+            ));
+        }
         if header.summary_version != Some(SUMMARY_VERSION) {
             return Err(format!(
                 "unsupported summary version {:?}",
@@ -552,13 +951,13 @@ pub(crate) fn comparison_inputs_from_bytes(bytes: &[u8]) -> Result<ComparisonInp
                 summary.source_schema_version
             ));
         }
-        summary.comparison_inputs.validate()?;
+        let inputs: ComparisonInputs = serde_json::from_value(summary.comparison_inputs)
+            .map_err(|e| format!("invalid summary comparison inputs: {e}"))?;
+        inputs.validate()?;
         let profile: super::ProfileBlock =
             serde_json::from_value(summary.deterministic["profile"].clone())
                 .map_err(|e| format!("invalid summary profile: {e}"))?;
-        if profile != summary.comparison_inputs.profile
-            || summary.feature != summary.comparison_inputs.identity.feature
-        {
+        if profile != inputs.profile || summary.feature != inputs.identity.feature {
             return Err("summary identity and comparison inputs disagree".into());
         }
         let environment: super::Environment = serde_json::from_value(summary.environment)
@@ -566,7 +965,6 @@ pub(crate) fn comparison_inputs_from_bytes(bytes: &[u8]) -> Result<ComparisonInp
         let normalized: super::PerCreatureTick =
             serde_json::from_value(summary.deterministic["per_creature_tick"].clone())
                 .map_err(|e| format!("invalid summary normalized counters: {e}"))?;
-        let inputs = &summary.comparison_inputs;
         if environment.git_revision != inputs.identity.git_revision
             || environment.generated_at != inputs.identity.generated_at
             || environment.host != inputs.host
@@ -576,7 +974,7 @@ pub(crate) fn comparison_inputs_from_bytes(bytes: &[u8]) -> Result<ComparisonInp
         {
             return Err("summary measured metadata and comparison inputs disagree".into());
         }
-        Ok(summary.comparison_inputs)
+        Ok(inputs)
     } else {
         let report: Report = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
         if report.schema_version != super::SCHEMA_VERSION {
@@ -778,8 +1176,93 @@ pub fn convert(
         std::fs::read(input).map_err(|e| format!("failed to read {}: {e}", input.display()))?;
     let summary = summarize(&raw, input, provenance)?;
     drop(raw);
-    write_json(output, &summary)?;
+    write_summary(output, &summary)?;
     Ok(summary)
+}
+
+/// Convert a committed v1 summary to v2. `raw` still describes the original
+/// full report; `conversion.from_summary_v1` records the v1 input.
+pub fn convert_summary_v1(input: &Path, output: &Path) -> Result<Summary, String> {
+    if same_path(input, output)? {
+        return Err("conversion input and summary output must be distinct".into());
+    }
+    let bytes =
+        std::fs::read(input).map_err(|e| format!("failed to read {}: {e}", input.display()))?;
+    #[derive(Deserialize)]
+    struct Header {
+        kind: Option<String>,
+        summary_version: Option<u32>,
+    }
+    let header: Header =
+        serde_json::from_slice(&bytes).map_err(|e| format!("invalid v1 summary: {e}"))?;
+    if header.kind.as_deref() != Some(SUMMARY_KIND)
+        || header.summary_version != Some(SUMMARY_V1_VERSION)
+    {
+        return Err(format!(
+            "--from-summary-v1 requires a {SUMMARY_KIND} of summary version {SUMMARY_V1_VERSION}"
+        ));
+    }
+    let mut v1: Summary =
+        serde_json::from_slice(&bytes).map_err(|e| format!("invalid v1 summary: {e}"))?;
+    v1.conversion.from_summary_v1 = Some(SourceSummary {
+        path: input
+            .canonicalize()
+            .map_err(|e| format!("cannot resolve {}: {e}", input.display()))?,
+        sha256: sha256(&bytes),
+        bytes: bytes.len(),
+    });
+    let summary = project_v2(v1)?;
+    let stored: Value =
+        serde_json::from_slice(&bytes).map_err(|e| format!("invalid v1 summary: {e}"))?;
+    keeps_whole_blocks(&stored, &summary)?;
+    write_summary(output, &summary)?;
+    Ok(summary)
+}
+
+/// v1 blocks a v2 summary keeps whole (Decision 1). `conversion` is compared
+/// without the `from_summary_v1` it gains.
+const WHOLE_BLOCKS: [&str; 10] = [
+    "kind",
+    "source_schema_version",
+    "feature",
+    "environment",
+    "comparison",
+    "comparison_inputs",
+    "measurement_evidence",
+    "conversion",
+    "raw",
+    "claims",
+];
+
+/// Refuse a conversion whose typed model would change a whole-kept block,
+/// for example by writing an absent optional field as `null`.
+fn keeps_whole_blocks(stored: &Value, summary: &Summary) -> Result<(), String> {
+    let mut written =
+        serde_json::to_value(summary).map_err(|e| format!("cannot serialize summary: {e}"))?;
+    if let Some(conversion) = written["conversion"].as_object_mut() {
+        conversion.remove("from_summary_v1");
+    }
+    for block in WHOLE_BLOCKS {
+        if written.get(block) != stored.get(block) {
+            return Err(format!(
+                "v1 block `{block}` would not be kept as stored; refusing to convert"
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Write compact summary bytes only after they load as a comparison
+/// reference, so no conversion stores an unreadable summary.
+fn write_summary(output: &Path, summary: &Summary) -> Result<(), String> {
+    let bytes = summary_bytes(summary)?;
+    comparison_inputs_from_bytes(&bytes)
+        .map_err(|e| format!("converted summary does not load: {e}"))?;
+    if let Some(parent) = output.parent().filter(|path| !path.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("failed to create {}: {e}", parent.display()))?;
+    }
+    std::fs::write(output, bytes).map_err(|e| format!("failed to write {}: {e}", output.display()))
 }
 
 pub fn measurement_evidence(invocation: &Invocation, severe: bool) -> Value {

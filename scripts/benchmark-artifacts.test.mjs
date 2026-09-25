@@ -143,7 +143,7 @@ test('progress page reads mixed artifacts and retained mesh totals without openi
   };
   const summary = structuredClone(full);
   summary.kind = 'petri-benchmark-summary';
-  summary.summary_version = 1;
+  summary.summary_version = 2;
   summary.feature = 't01-f02';
   summary.raw = {path:'/never-fetch/local/raw.json', availability:'verified_local', verified_at:'2026-09-13T10:00:00Z'};
   summary.omitted_details = ['per-proposal rows', 'genomes'];
@@ -158,18 +158,22 @@ test('progress page reads mixed artifacts and retained mesh totals without openi
   assert.equal(JSON.stringify(api.meshSums(full)), JSON.stringify(api.meshSums(summary)));
   assert.equal(api.get(summary, 'deterministic.per_creature_tick.vm_steps'), '1.234567');
   assert.equal(api.num(api.get(summary, 'deterministic.goal_indicators.population_persistence.per_seed.0.final_population')), 0);
-  assert.match(api.artifactNotice(summary), /unavailable/i);
+  assert.match(api.artifactNotice(summary), /Detailed observations are omitted; see `omitted_details` in the summary\./);
+  assert.doesNotMatch(api.artifactNotice(summary), /per-proposal rows/, 'the notice does not list every omitted path');
+  assert.match(api.artifactNotice(summary), /not a download or a current availability guarantee/);
   assert.match(api.artifactNotice(summary), /2026-09-13T10:00:00Z/);
   summary.deterministic.goal_indicators.mutational_neighborhood.evolved.per_seed[0].mesh_summary = null;
   assert.equal(api.meshSums(summary), null);
 });
 
 test('progress page rejects unknown summary versions instead of treating them as missing reports', async () => {
-  const api = page({
-    'benchmark-series.json': {gate:{closed:['docs/progress/features/unknown.json']}},
-    'features/unknown.json': {kind:'petri-benchmark-summary', summary_version:999},
-  });
-  await assert.rejects(api.loadAll(), /summary version/);
+  for (const summary_version of [999, 1]) {
+    const api = page({
+      'benchmark-series.json': {gate:{closed:['docs/progress/features/unknown.json']}},
+      'features/unknown.json': {kind:'petri-benchmark-summary', summary_version, deterministic:{}, environment:{}},
+    });
+    await assert.rejects(api.loadAll(), /summary version/);
+  }
 });
 
 test('make forwards distinct optional paths with spaces through one existing preflight', () => {

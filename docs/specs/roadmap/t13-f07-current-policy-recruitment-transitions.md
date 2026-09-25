@@ -276,8 +276,12 @@ window, no F08 gate reached, paths in the readings file; the predeclaration's
 
 - Summaries: [gate](../../progress/features/t13-f07-current-policy-recruitment-transitions.json),
   [goal](../../progress/features/t13-f07-current-policy-recruitment-transitions-goal.json),
-  [S0](../../progress/features/t13-f07-current-policy-recruitment-transitions-s0.json).
+  S0 (local only; Evidence below).
 - Full readings: [`docs/progress/readings/t13-f07-current-policy-recruitment-transitions.md`](../../progress/readings/t13-f07-current-policy-recruitment-transitions.md).
+
+| Evidence (relocated 2026-09-24, local only) | SHA-256 | Bytes |
+| --- | --- | ---: |
+| S0 summary `.bench-artifacts/research/t13-f07-current-policy-recruitment-transitions/t13-f07-current-policy-recruitment-transitions-s0.json`; numbers in the readings | `1dab13f5d3e42d2d7e0d83d528bdc860dc0b7ee09326de353c8ac3dc41dda589` | 2,405,314 |
 
 ## Success Criteria
 
