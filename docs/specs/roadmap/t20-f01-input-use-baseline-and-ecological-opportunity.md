@@ -89,7 +89,7 @@ and `_total`, outside every existing timer.
 | Item | Definition |
 | --- | --- |
 | Catalog | the 19 named families (food families per configured type, plus any type a genome declares) and `UpstreamSlot` (channel = slot); shared memory (16 current, 16 previous slots) is a separate inventory with no declaration stage and no causal stage |
-| Channel | the value the resolver actually addresses: scalar 0; world compound `sub_idx mod width`; `ActionQueue` the raw `sub_idx` (slot `sub_idx / 3`), with channels at or past the mutation width 12 labelled `beyond_draw_width` and kept through every stage; decision compound `sub_idx` below its width, and reads at or past it (constant 0.0) counted per family in `out_of_width_consumers` |
+| Channel | the value the resolver actually addresses: scalar 0; world compound `sub_idx mod width`; `ActionQueue` the raw `sub_idx` (slot `sub_idx / 3`), with channels at or past the mutation width 12 labelled `beyond_draw_width` and kept through every stage; decision compound `sub_idx` below its width, and reads at or past it (constant 0.0) counted per family in `out_of_width_consumers`: consumers, not parents, on parent-reachable nodes, live or dead, summed over the cohort's parents |
 | Parents | T11.F26's three cohorts, same identities and order |
 | Scenes | `original`: the `neighborhood-v1` battery exactly as `Battery` runs it (48 fresh-state snapshots, 8 four-tick sequences carrying state under production bookkeeping); `extended`: T11.F26's `recorded` (up to 32) and `authored` (24) contexts from fresh state and its 4 × 32-tick `sequences`, run as T11.F26 defines them |
 | `declared` | a parent-reachable node's `input_refs` holds the family (per food type) |
@@ -98,7 +98,7 @@ and `_total`, outside every existing timer.
 | `causal` | ablating the channel changes the committed action queue in at least one scene; `causal_original` counts the original scenes only; `causal_outside_live` counts causal parents with no structurally live consumer (the census's VM slice omits control dependencies such as `JumpIfZero`), a legitimate observation, not an error |
 | `retention` | retained causal influence, not retained behavior: for a parent with at least one causal channel, its first 10 applied, not genome-identical T11.F26 proposals in proposal order, regenerated from T11.F26's seed formula; `retention_pairs` (parent-causal channel × child) and `retained_causal_pairs` (still causal in the child on the same scenes) |
 | Ablation | one channel at a time, every read of it returns 0.0; nothing else is altered at its source, and execution proceeds under native semantics and charges, so downstream branches, steps, charges and live reads may change as consequences |
-| Row | per cohort × family × channel: parents at each stage, `causal_original`, `executed_outside_live`, `causal_outside_live`, `retention_pairs`, `retained_causal_pairs`; rows with no parent at any stage are omitted; per cohort: parents evaluated and `consistency_violations` (causal without executed; expected 0, reported not asserted) |
+| Row | per cohort × family × channel: parents at each stage, `causal_original`, `executed_outside_live`, `causal_outside_live`, `retention_pairs`, `retained_causal_pairs`; rows with no parent at any stage are omitted; rows may use a compact encoding whose format string is stored in the block and round-trip tested; per cohort: parents evaluated and `consistency_violations` (causal without executed; expected 0, reported not asserted) |
 
 Invariants per row: `declared ≥ connected`, `declared ≥ executed ≥ causal ≥
 causal_original` (shared memory has no `declared`); `connected` and `causal`
@@ -119,7 +119,7 @@ store requested and actual counts; zero denominators are `Undefined`.
 | Horizon | 1,000 ticks |
 | Mutation | `per_unit_rate = 0.0`; every other setting (maintenance, ramped compute, replication, grazing, action costs) at recipe and production values |
 | Incumbents | per world, one run of the goal profile's config for that world at its goal seed (11, 22, 33) to tick 1,000; up to 20 living genomes drawn uniformly without replacement from the id-sorted population with `SmallRng::seed_from_u64(27_000_000 + goal_seed)`; `I` creatures cycle through them in draw order; with no survivors they carry the founder genome, labelled `I (founder fallback)`, and every `I` comparison is `Undefined` |
-| Per arm and replicate | founders, cumulative births whose parent belongs to the arm, living at every 100th tick, extinction tick |
+| Per arm and replicate | founders, cumulative births (a newborn alive at the end of its birth tick, credited to the arm it inherits from its founding creature, which with mutation off is its parent's arm), living at every 100th tick, extinction tick; per replicate `births_total` and `unattributed_births` (newborns that die within their birth tick), with per-arm births plus `unattributed_births` equal to `births_total` |
 | Exposure samples | at every 100th tick, up to 32 living creatures per `A`/`Z` arm drawn with `SmallRng::seed_from_u64(29_000_000 + 16 × (run_seed − 26_000_000) + tick / 100)`; snapshot from the production assemblers built unconditionally; `exposed` when any authored channel reads nonzero; `applied` when ablating the authored channels changes the committed actions of one execution from fresh cognition state |
 
 Arm identity passes to every descendant through inheritance, never by
@@ -138,7 +138,7 @@ with every authored edge weight set to 0.0: same references, nodes,
 | Arm | Family and shape | Authored use | Adequacy fixture |
 | --- | --- | --- | --- |
 | `A_ring` | `NeighborBarrierRing`, cyclic 8 | inhibit `Move(d)` when `barrier[d]` for the founder's four cardinal moves | `steering-v1` (b): avoids in every founder-leading scenario; the founder avoids none |
-| `A_vector` | `AreaFoodSummary(0)`, heterogeneous 7 | nearest-food dx/dy drive the cardinal `Move` votes when the primary ring is empty and no primary food is here | empty ring with nearest food in each cardinal direction: leads with a move toward it in all four, the founder does not; primary-ring food or primary food here: the founder's action; an empty cell and a fruit-only cell, otherwise identical: the same action |
+| `A_vector` | `AreaFoodSummary(0)`, heterogeneous 7 | nearest-food dx/dy drive the cardinal `Move` votes when the four cardinal primary-ring cells the founder reads are empty and no primary food is here | empty cardinal ring with nearest food in each cardinal direction: leads with a move toward it in all four, the founder does not; food in any cardinal ring cell (also with barriers on the diagonals) or primary food here: the founder's action; an empty cell and a fruit-only cell, otherwise identical: the same action |
 | `A_scalar` | `FoodHere(1)`, scalar | fruit here raises `Eat` and sets `EatFoodType` to 1 | fruit only and fruit with grass: `Eat(1)`; grass only: the founder's action |
 
 Competence checks, for every `A_k` and `Z_k`: on every `neighborhood-v1`
@@ -148,7 +148,8 @@ signal-present fixture contexts crossing local food (none, grass, fruit),
 primary-ring food (empty, present) and reproductive eligibility (eligible,
 not), `A_k`'s committed queue differs from the founder's only by its intended
 change: `A_ring` drops or replaces a move into a barrier; `A_vector` adds or
-redirects a move only with an empty ring and no primary food here; `A_scalar` sets the
+redirects a move only with an empty cardinal ring and no primary food here
+(diagonal ring cells, which the founder does not read, do not gate it); `A_scalar` sets the
 eaten type to fruit, or adds an `Eat` where fruit is the only food here. Every
 `Reproduce` and every other `Eat` the founder commits is kept.
 
@@ -163,9 +164,9 @@ cumulative births in one replicate:
 | --- | --- |
 | exposure gate | pooled over replicates and samples, `exposed ≥ 5%` and `applied ≥ 1%` of sampled `A_k` creatures; otherwise, or with no samples, `inconclusive (exposure)` |
 | informative replicate | `a + z ≥ 20`; ratio `a / z`, `+∞` when `z = 0 < a` |
-| positive | gate met, at least 7 informative replicates, `a / z > 1` in at least 7 of 8, and `Σa / Σz ≥ 1.05` |
-| negative | gate met, at least 7 informative replicates, `a / z < 1.05` in at least 7 of 8, and `Σa / Σz < 1.05` |
-| inconclusive | every other case, including fewer than 7 informative replicates |
+| positive | gate met, at least 7 of the 8 replicates both informative and `a / z > 1`, and `Σa / Σz ≥ 1.05` |
+| negative | gate met, at least 7 of the 8 replicates both informative and `a / z < 1.05`, and `Σa / Σz < 1.05` |
+| inconclusive | every other case, including fewer than 7 informative replicates; an uninformative replicate never counts toward a verdict and the sign-test n is 8 |
 | uncertainty | per-replicate ratios, the pooled ratio and the exact one-sided sign-test p-value of each count (7 of 8 is 0.035) are stored with every verdict |
 
 A family is positive when any applicable world is positive, negative when all
