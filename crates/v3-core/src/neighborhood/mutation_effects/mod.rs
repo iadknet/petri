@@ -41,7 +41,9 @@ use records::{run_panel_executions, PanelExecution, TracedBattery};
 pub const VERSION: &str = "mutation-effects-v1";
 pub const COVERAGE_VERSION: &str = "neighborhood-coverage-v1";
 /// Proposal seed: `PROPOSAL_SEED_BASE + COHORT_SEED_MULTIPLIER * cohort +
-/// PARENT_SEED_MULTIPLIER * (parent_index + 1) + proposal_index`.
+/// PARENT_SEED_MULTIPLIER * (parent_index + 1) + proposal_index`, where
+/// `parent_index` is the parent's zero-based ordinal within its cohort, not
+/// the stored `parents[].index` (for `selected`, the original sample position).
 pub const PROPOSAL_SEED_BASE: u64 = 20_000_000;
 pub const COHORT_SEED_MULTIPLIER: u64 = 1_000_000;
 pub const PARENT_SEED_MULTIPLIER: u64 = 1_000;

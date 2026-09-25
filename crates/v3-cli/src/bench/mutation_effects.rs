@@ -327,6 +327,9 @@ pub fn project(
                         and per_unit_rate 1.0, the production operator mix, and the parent's \
                         battery-executed set; skipped proposals stay in denominators, no retry"
             .to_string(),
+        // Stored verbatim in committed summaries, so the text stays fixed:
+        // `parent_index` here is the zero-based ordinal within the cohort,
+        // not `parents[].index` (see `effects::PROPOSAL_SEED_BASE`).
         proposal_seed_formula: format!(
             "{} + {} * cohort (founder 0, drift 1, selected 2) + {} * (parent_index + 1) + proposal_index",
             effects::PROPOSAL_SEED_BASE,
