@@ -30,8 +30,8 @@ a representation only where the neighborhood reading still shows a gap.
 - [ ] A new route branch is born pointing at working structure and carrying its own gate write, so it is silent when it fires and can become conditional in one event; retargeting draws a nearby destination; removing a node or a branch is not predominantly lethal; cycles and repeated visits remain legal under T19's budgets; and every topology operator sits in the growth-versus-connection taxonomy with a named owner.
 - [ ] Executed mesh node counts, route variation with input, hop-cap hits, and total and reachable node counts are recorded at every closure, and every mesh-layer claim states the generation depth it was read at.
 - [x] Action-parameter storage holds only decoded fields: no sink, VM slot, or inherited wiring addresses a parameter the action decoder never reads. (T11.F27)
-- [ ] Mutation-effect readings distinguish already-actionless parents, applied mutation exposure, state/cost effects and action effects on named observation panels, with supported attribution separated from unresolved silence on drift and selected-genome samples. (T11.F26)
-- [ ] The existing Petri progress report renders F26's observability from stored summaries, with visible denominators, cohort/panel identities and missing-data states, while preserving the original historical series. (T11.F26)
+- [x] Mutation-effect readings distinguish already-actionless parents, applied mutation exposure, state/cost effects and action effects on named observation panels, with supported attribution separated from unresolved silence on drift and selected-genome samples. (T11.F26)
+- [x] The existing Petri progress report renders F26's observability from stored summaries, with visible denominators, cohort/panel identities and missing-data states, while preserving the original historical series. (T11.F26)
 - [ ] The functional core's mutational exposure under selection is read at every closure through T14.F12's neighborhood read of surviving goal-population genomes, against its recorded baseline and applicable floors. The drift walk remains a per-world mutation-map regression instrument against the previous closed feature's reading, with regressions predeclared and justified in the feature spec; it has no absolute generation-1,000 or generation-2,000 closure floor and does not judge energy- or cost-only changes.
 - [ ] Every active floor above is met by the close of T11.F10, excluding the withdrawn absolute drift-depth floors. From T11.F01 onward no closed feature anywhere in the program lowers an applicable indicator component below the previous closed feature's reading unless its spec predeclared and justified the change; the drift comparison follows the mutation-map scope above.
 
@@ -93,7 +93,7 @@ a representation only where the neighborhood reading still shows a gap.
   - Goal: Variation reaches expressed action traits: new Graph and VM parameter connections target fields the body's current action decoder actually consumes.
 - [x] **T11.F27 — Compact Action-Parameter Storage** — Depends on: T11.F25
   - Goal: Like a motor neuron that can only synapse on muscle that contracts, a brain's action-parameter outputs exist only for the three parameters the body reads (Eat food type, Reproduce transfer fraction, StealEnergy amount), so no inherited wiring or VM write addresses the five undecoded fields.
-- [ ] **T11.F26 — Mutation-Effect Attribution and Observation Coverage** — Depends on: T11.F16, T11.F20, T11.F24, T11.F25, T11.F27, T14.F12, T19.F06
+- [x] **T11.F26 — Mutation-Effect Attribution and Observation Coverage** — Depends on: T11.F16, T11.F20, T11.F24, T11.F25, T11.F27, T14.F12, T19.F06
   - Goal: Show in the Petri progress report whether applied mutations change a creature's computation, state or actions, separating observed barriers to behavioral change from changes missed by the observation battery; observation only.
 
 ## Notes for AI Agents
