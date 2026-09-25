@@ -8,6 +8,7 @@
 pub mod artifacts;
 mod comparison;
 mod indicators;
+pub mod input_use;
 pub mod mutation_effects;
 mod profiles;
 mod run;
@@ -25,8 +26,9 @@ use comparison::{
     FLAG_PERCENT, SEVERE_PERCENT, WALL_CLOCK_FLAG_PERCENT, WALL_CLOCK_SEVERE_PERCENT,
 };
 pub use profiles::{
-    build_config, gate_profile_params, goal_profile_params, GoalCase, NeighborhoodSizes,
-    ProfileParams, Recipe, COUNTER_NAMES, GOAL_WORLD_SET, SAMPLE_EVERY_TICKS, SCHEMA_VERSION,
+    build_config, gate_profile_params, goal_profile_params, goal_world_configs, GoalCase,
+    NeighborhoodSizes, ProfileParams, Recipe, COUNTER_NAMES, GOAL_WORLD_SET, SAMPLE_EVERY_TICKS,
+    SCHEMA_VERSION,
 };
 pub use run::{
     build_report, build_report_with_threads, detect_git_revision, deterministic_block_json,

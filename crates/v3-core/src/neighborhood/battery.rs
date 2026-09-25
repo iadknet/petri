@@ -11,6 +11,8 @@
 //! sequence under the production per-tick bookkeeping
 //! ([`crate::simulation::advance_shared_memory`]).
 
+use std::ops::ControlFlow;
+
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
@@ -19,6 +21,7 @@ use crate::contracts::WorldAction;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, UntracedMeshExecution};
+use crate::runtime::MeshOutput;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::{age_fraction, StaticInputs};
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
@@ -136,6 +139,11 @@ impl Battery {
     /// The single-tick snapshot scenarios, in battery order.
     pub(super) fn snapshots(&self) -> &[Scenario] {
         &self.snapshots
+    }
+
+    /// The multi-tick sequences, in battery order.
+    pub(super) fn sequences(&self) -> &[Vec<Scenario>] {
+        &self.sequences
     }
 
     /// The length of each sequence, in battery order.
@@ -293,36 +301,108 @@ fn execute_sequence_reading<M: MeshExecutionMode, T>(
     mode: &mut impl FnMut() -> M,
     read: &mut impl FnMut(M::Output, PostState<'_>) -> T,
 ) -> Vec<T> {
+    let mut readings = Vec::with_capacity(sequence.len());
+    let flow: ControlFlow<()> = visit_sequence(
+        genome,
+        sequence,
+        runtime,
+        decay_rate,
+        mode,
+        &mut |output, state| {
+            readings.push(read(output, state));
+            ControlFlow::Continue(())
+        },
+    );
+    debug_assert!(flow.is_continue());
+    readings
+}
+
+/// Execute one sequence tick by tick under the production bookkeeping of
+/// [`execute_sequence_reading`], handing each output and the state it left to
+/// `visit`, and stop at the first tick `visit` breaks on.
+fn visit_sequence<M: MeshExecutionMode, B>(
+    genome: &CreatureGenome,
+    sequence: &[Scenario],
+    runtime: &RuntimeConfig,
+    decay_rate: f32,
+    mode: &mut impl FnMut() -> M,
+    visit: &mut impl FnMut(M::Output, PostState<'_>) -> ControlFlow<B>,
+) -> ControlFlow<B> {
     let mut shared_memory = [0.0f32; 16];
     let mut prev_shared_memory = [0.0f32; 16];
     let mut graph_runtime = GraphRuntimeState::new();
-    sequence
-        .iter()
-        .enumerate()
-        .map(|(tick, scenario)| {
-            graph_runtime.begin_tick(&genome.nodes, tick as u64);
-            advance_shared_memory(&mut shared_memory, &mut prev_shared_memory, decay_rate);
-            let mut energy = scenario.energy;
-            let output = execute_creature_mesh_impl(
-                genome,
-                &scenario.sensors,
-                &mut energy,
-                &mut shared_memory,
-                &prev_shared_memory,
-                &mut graph_runtime,
-                runtime,
-                mode(),
-            );
-            read(
-                output,
-                PostState {
-                    energy,
-                    shared_memory: &shared_memory,
-                    graph_runtime: &graph_runtime,
-                },
-            )
-        })
-        .collect()
+    for (tick, scenario) in sequence.iter().enumerate() {
+        graph_runtime.begin_tick(&genome.nodes, tick as u64);
+        advance_shared_memory(&mut shared_memory, &mut prev_shared_memory, decay_rate);
+        let mut energy = scenario.energy;
+        let output = execute_creature_mesh_impl(
+            genome,
+            &scenario.sensors,
+            &mut energy,
+            &mut shared_memory,
+            &prev_shared_memory,
+            &mut graph_runtime,
+            runtime,
+            mode(),
+        );
+        visit(
+            output,
+            PostState {
+                energy,
+                shared_memory: &shared_memory,
+                graph_runtime: &graph_runtime,
+            },
+        )?;
+    }
+    ControlFlow::Continue(())
+}
+
+/// The index of the first execution, in [`run_panel`] order, whose untraced
+/// action queue differs from `baseline`'s, running no execution past it.
+/// Sequences run from their first tick, so every compared tick carries the
+/// state its prefix left.
+pub(super) fn first_action_difference(
+    genome: &CreatureGenome,
+    singles: &[Scenario],
+    sequences: &[Vec<Scenario>],
+    runtime: &RuntimeConfig,
+    decay_rate: f32,
+    baseline: &[Vec<WorldAction>],
+) -> Option<usize> {
+    let mut index = 0;
+    let mut compare = |output: MeshOutput| {
+        let differs = baseline.get(index) != Some(&output.actions);
+        let at = index;
+        index += 1;
+        if differs {
+            ControlFlow::Break(at)
+        } else {
+            ControlFlow::Continue(())
+        }
+    };
+    for scenario in singles {
+        if let ControlFlow::Break(at) = compare(execute_scenario_tick(
+            genome,
+            scenario,
+            runtime,
+            UntracedMeshExecution,
+        )) {
+            return Some(at);
+        }
+    }
+    for sequence in sequences {
+        if let ControlFlow::Break(at) = visit_sequence(
+            genome,
+            sequence,
+            runtime,
+            decay_rate,
+            &mut || UntracedMeshExecution,
+            &mut |output, _| compare(output),
+        ) {
+            return Some(at);
+        }
+    }
+    None
 }
 
 /// One tick of `genome` against `scenario` from zeroed shared memory, zeroed

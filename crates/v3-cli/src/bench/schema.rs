@@ -1,6 +1,7 @@
 //! Serialised report types and their `undefined_*` constructors.
 
 use super::comparison::{Comparison, MeasuredIdentity};
+use super::input_use::{undefined_input_use, InputUse};
 use super::mutation_effects::{undefined_mutation_effects, MutationEffects};
 use super::profiles::GoalCase;
 use super::run::millis;
@@ -143,6 +144,9 @@ pub struct GoalCaseObservation {
     /// unmeasured in reports stored before it.
     #[serde(default = "undefined_mutation_effects")]
     pub mutation_effects: Indicator<MutationEffects>,
+    /// The input-use funnel (T20.F01); unmeasured in reports stored before it.
+    #[serde(default = "undefined_input_use")]
+    pub input_use: Indicator<InputUse>,
 }
 
 /// The rates [`WorldTracking`] implies, derived once so a total and its
@@ -1102,6 +1106,12 @@ pub struct Environment {
     pub mutation_effects_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
     #[serde(default)]
     pub mutation_effects_wall_clock_ms_total: f64,
+    /// Input-use wall time per seed (T20.F01, goal world set only), outside
+    /// every timer above.
+    #[serde(default)]
+    pub input_use_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
+    #[serde(default)]
+    pub input_use_wall_clock_ms_total: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

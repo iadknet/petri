@@ -28,7 +28,7 @@ use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::CreatureGenome;
 use crate::mutation::reachability::ParentExecuted;
-use crate::mutation::{MutationDomain, MutationEngine, MutationOperator};
+use crate::mutation::{MutationDomain, MutationEngine, MutationOperator, MutationSummary};
 use crate::simulation::Simulation;
 
 use super::classify::{classify, Class};
@@ -427,6 +427,48 @@ pub fn edited_node_ids(parent: &CreatureGenome, child: &CreatureGenome) -> BTree
     edited
 }
 
+/// The first proposal seed of the parent at zero-based `position` in
+/// `cohort`: [`PROPOSAL_SEED_BASE`]'s formula without the proposal index.
+#[must_use]
+pub(in crate::neighborhood) fn proposal_seed_base(cohort: Cohort, position: usize) -> u64 {
+    PROPOSAL_SEED_BASE
+        + COHORT_SEED_MULTIPLIER * cohort.index()
+        + PARENT_SEED_MULTIPLIER * (position as u64 + 1)
+}
+
+/// One parent's single-event diagnostic proposals: one requested event under
+/// `one_event` (units 1, rate 1.0), the parent's reachable nodes and
+/// battery-executed indices, proposal `i` seeded `seed_base + i`.
+pub(in crate::neighborhood) struct Proposals<'a> {
+    pub(in crate::neighborhood) genome: &'a CreatureGenome,
+    pub(in crate::neighborhood) reachable: &'a [usize],
+    pub(in crate::neighborhood) executed: &'a [usize],
+    pub(in crate::neighborhood) seed_base: u64,
+    pub(in crate::neighborhood) one_event: &'a MutationConfig,
+    pub(in crate::neighborhood) food_type_count: usize,
+}
+
+impl Proposals<'_> {
+    /// Proposal `proposal`'s child and its mutation summary.
+    pub(in crate::neighborhood) fn propose(
+        &self,
+        proposal: u32,
+    ) -> (CreatureGenome, MutationSummary) {
+        let mut child = self.genome.clone();
+        let mut rng = SmallRng::seed_from_u64(self.seed_base + u64::from(proposal));
+        let summary = MutationEngine::apply_mutations_on_units(
+            &mut child,
+            1,
+            self.one_event,
+            self.reachable,
+            ParentExecuted::Indices(self.executed),
+            &mut rng,
+            self.food_type_count,
+        );
+        (child, summary)
+    }
+}
+
 /// A parent read once for attribution.
 struct ParentTrace<'a> {
     genome: &'a CreatureGenome,
@@ -535,24 +577,19 @@ fn evaluate_parent(
         Some(id) if reachable_ids.contains(&id) => TargetClass::ReachableNotExecuted,
         Some(_) => TargetClass::Unreachable,
     };
-    let seed_base = PROPOSAL_SEED_BASE
-        + COHORT_SEED_MULTIPLIER * cohort.index()
-        + PARENT_SEED_MULTIPLIER * (position as u64 + 1);
+    let source = Proposals {
+        genome,
+        reachable: &reachable,
+        executed: &executed,
+        seed_base: proposal_seed_base(cohort, position),
+        one_event,
+        food_type_count: context.food_type_count,
+    };
 
     let proposals: Vec<(ProposalOutcome, Option<CreatureGenome>)> = (0..sizes.proposals)
         .into_par_iter()
         .map(|proposal| {
-            let mut child = genome.clone();
-            let mut rng = SmallRng::seed_from_u64(seed_base + u64::from(proposal));
-            let summary = MutationEngine::apply_mutations_on_units(
-                &mut child,
-                1,
-                one_event,
-                &reachable,
-                ParentExecuted::Indices(&executed),
-                &mut rng,
-                context.food_type_count,
-            );
+            let (child, summary) = source.propose(proposal);
             let event = summary
                 .events
                 .first()

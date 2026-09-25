@@ -277,6 +277,17 @@ pub(super) fn goal_case(
 
 /// The `profile.food_coverage` report string for a profile that leaves
 /// production food coverage untouched.
+/// Every goal world's case and resolved production config, in recipe order:
+/// the worlds the goal profile runs (T20.F01's assay reuses them).
+#[must_use]
+pub fn goal_world_configs() -> Vec<(GoalCase, SimulationConfig)> {
+    let params = goal_profile_params();
+    GOAL_RECIPES
+        .iter()
+        .map(|recipe| goal_case(&params, recipe))
+        .collect()
+}
+
 const DEFAULT_FOOD_COVERAGE: &str = "default";
 
 pub fn build_config(params: &ProfileParams) -> SimulationConfig {
