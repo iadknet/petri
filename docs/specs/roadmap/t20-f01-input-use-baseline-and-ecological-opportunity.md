@@ -313,3 +313,4 @@ in readings.
 ## Notes for AI Agents
 
 - Decision: run substitutions (user, 2026-09-25): no Fable model anywhere in this run, so the spec owner runs on Opus; every advisor consult is replaced by a fresh read-only Codex Astra `high` task through the Codex channel.
+- Exception: closure blocked on user authorization (2026-09-25); see readings.
