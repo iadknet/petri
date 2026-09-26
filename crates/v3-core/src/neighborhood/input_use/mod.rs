@@ -302,6 +302,23 @@ pub struct Row {
     pub retained_causal_pairs: Option<u32>,
 }
 
+/// One cohort × family row: parents with the stage on at least one of the
+/// family's channels (a parent counts once however many qualify). `declared`
+/// counts parents declaring the family on a reachable node; it and both causal
+/// counts are `None` for shared memory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FamilyRow {
+    pub family: Family,
+    pub declared: Option<u32>,
+    pub connected: u32,
+    pub executed: u32,
+    pub causal: Option<u32>,
+    pub causal_original: Option<u32>,
+    /// Static consumers on reachable nodes reading this decision compound at
+    /// or past its width (a constant 0.0, not a channel), summed over parents.
+    pub out_of_width_consumers: u32,
+}
+
 /// One cohort's funnel.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CohortUse {
@@ -311,9 +328,6 @@ pub struct CohortUse {
     /// (parent, channel) pairs causal without an executed read; expected 0,
     /// reported, not asserted.
     pub consistency_violations: u32,
-    /// Static consumers on reachable nodes reading a decision compound at or
-    /// past its width (a constant 0.0), summed over parents, by family.
-    pub out_of_width_consumers: BTreeMap<Family, u32>,
     /// Parents with at least one causal channel, and the retention children
     /// requested of (`RETENTION_CHILDREN` each) and sampled for them.
     pub retention_parents: u32,
@@ -321,6 +335,8 @@ pub struct CohortUse {
     pub retention_children_sampled: u32,
     /// Rows with some parent at some stage, in family then channel order.
     pub rows: Vec<Row>,
+    /// One row per family with a channel row, in family order.
+    pub families: Vec<FamilyRow>,
 }
 
 fn fold_cohort(
@@ -343,6 +359,7 @@ fn fold_cohort(
         .collect();
     let count =
         |test: &dyn Fn(&ParentUse) -> bool| parents.iter().filter(|p| test(p)).count() as u32;
+    let family_keys: BTreeSet<Family> = keys.iter().map(|channel| channel.family).collect();
     let rows = keys
         .into_iter()
         .map(|channel| {
@@ -376,12 +393,31 @@ fn fold_cohort(
             }
         })
         .collect();
-    let mut out_of_width_consumers = BTreeMap::new();
-    for parent in parents {
-        for (&family, &consumers) in &parent.out_of_width {
-            *out_of_width_consumers.entry(family).or_default() += consumers;
-        }
-    }
+    let families = family_keys
+        .into_iter()
+        .map(|family| {
+            let causal_only = |value: u32| (!family.is_shared_memory()).then_some(value);
+            let any = |stage: fn(&ParentUse) -> &BTreeSet<Channel>| {
+                count(&|p| stage(p).iter().any(|channel| channel.family == family))
+            };
+            FamilyRow {
+                family,
+                declared: causal_only(count(&|p| {
+                    p.declared
+                        .iter()
+                        .any(|declaration| declaration.family == family)
+                })),
+                connected: any(|p| &p.connected),
+                executed: any(|p| &p.executed),
+                causal: causal_only(any(|p| &p.causal)),
+                causal_original: causal_only(any(|p| &p.causal_original)),
+                out_of_width_consumers: parents
+                    .iter()
+                    .filter_map(|p| p.out_of_width.get(&family))
+                    .sum(),
+            }
+        })
+        .collect();
     let retention_parents = count(&|p| !p.causal.is_empty());
     CohortUse {
         cohort,
@@ -391,11 +427,11 @@ fn fold_cohort(
             .iter()
             .map(|p| p.causal.difference(&p.executed).count() as u32)
             .sum(),
-        out_of_width_consumers,
         retention_parents,
         retention_children_requested: retention_parents * retention_children,
         retention_children_sampled: parents.iter().map(|p| p.children_sampled).sum(),
         rows,
+        families,
     }
 }
 

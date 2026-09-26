@@ -30,6 +30,73 @@ fn assert_rows(cohort: &CohortBlock) {
             "{row:?}"
         );
     }
+    assert_family_rows(cohort);
+}
+
+/// One family row per channel-row family, each union between its largest
+/// channel row and `min(channel-row sum, family_declared)`, and the family
+/// funnel's order (executed ≥ causal apart from consistency violations).
+fn assert_family_rows(cohort: &CohortBlock) {
+    let rows: Vec<RowBlock> = cohort
+        .rows
+        .iter()
+        .map(|text| RowBlock::decode(text).expect("a row string"))
+        .collect();
+    let mut expected: Vec<&str> = rows.iter().map(|row| row.family.as_str()).collect();
+    expected.dedup();
+    let families: Vec<FamilyRowBlock> = cohort
+        .family_rows
+        .iter()
+        .map(|text| FamilyRowBlock::decode(text).expect("a family row string"))
+        .collect();
+    assert_eq!(
+        families
+            .iter()
+            .map(|f| f.family.as_str())
+            .collect::<Vec<_>>(),
+        expected
+    );
+    for (text, family) in cohort.family_rows.iter().zip(&families) {
+        assert_eq!(family.encode(), *text);
+        let union = |field: &str| {
+            family.counts[FAMILY_ROW_FIELDS
+                .iter()
+                .position(|f| *f == format!("family_{field}"))
+                .unwrap()]
+        };
+        let declared = union("declared");
+        let cap = declared.unwrap_or(cohort.parents_evaluated);
+        for field in [
+            "declared",
+            "connected",
+            "executed",
+            "causal",
+            "causal_original",
+        ] {
+            let Some(value) = union(field) else {
+                continue;
+            };
+            let position = ROW_FIELDS.iter().position(|f| *f == field).unwrap();
+            let channels: Vec<u32> = rows
+                .iter()
+                .filter(|row| row.family == family.family)
+                .filter_map(|row| row.counts[position])
+                .collect();
+            let largest = channels.iter().copied().max().unwrap_or(0);
+            let sum: u32 = channels.iter().sum();
+            assert!(
+                value >= largest && value <= sum.min(cap),
+                "{field} {family:?}"
+            );
+        }
+        if let (Some(causal), Some(original)) = (union("causal"), union("causal_original")) {
+            assert!(causal >= original, "{family:?}");
+            assert!(
+                union("executed").unwrap() + cohort.consistency_violations >= causal,
+                "{family:?}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -42,6 +109,7 @@ fn world_set_cases_carry_the_input_use_block_and_the_gate_does_not() {
         let block = case.input_use.defined().expect("defined on the world set");
         assert_eq!(block.version, "input-use-v1");
         assert_eq!(block.row_format, ROW_FORMAT);
+        assert_eq!(block.family_row_format, FAMILY_ROW_FORMAT);
         assert_eq!(block.scenes.original_executions, 80);
         assert_eq!(block.cohorts.len(), 3);
         let founder = block.cohorts[0].defined().expect("the founder cohort");
@@ -101,8 +169,14 @@ fn input_use_cost_probe() {
             .sum();
         let nested = serde_json::json!({"deterministic": {"goal_indicators": {"cases": [{"input_use": block}]}}});
         let bytes = serde_json::to_vec_pretty(&nested).unwrap().len();
+        let family_rows: usize = block
+            .cohorts
+            .iter()
+            .filter_map(Indicator::defined)
+            .map(|cohort| cohort.family_rows.len())
+            .sum();
         println!(
-            "{}: input_use {:.0} ms, rows {rows}, {bytes} bytes",
+            "{}: input_use {:.0} ms, rows {rows}, family rows {family_rows}, {bytes} bytes",
             case.case.name, timing.wall_clock_ms
         );
     }
@@ -151,6 +225,31 @@ proptest::proptest! {
         let row = RowBlock { family, channel, beyond_draw_width, counts };
         proptest::prop_assert_eq!(RowBlock::decode(&row.encode()), Some(row));
     }
+
+    /// Every family row the block can hold decodes back to itself.
+    #[test]
+    fn family_row_strings_decode_to_the_encoded_row(
+        family in "[A-Za-z]{1,20}(:[0-9]{1,2})?",
+        counts in proptest::collection::vec(
+            proptest::option::of(proptest::num::u32::ANY),
+            FAMILY_ROW_FIELDS.len(),
+        ),
+    ) {
+        let row = FamilyRowBlock { family, counts };
+        proptest::prop_assert_eq!(FamilyRowBlock::decode(&row.encode()), Some(row));
+    }
+}
+
+#[test]
+fn family_row_strings_round_trip_and_reject_malformed_text() {
+    let row = FamilyRowBlock {
+        family: "SharedMemory".to_string(),
+        counts: vec![None, Some(4), Some(2), None, None, Some(0)],
+    };
+    assert_eq!(row.encode(), "SharedMemory - 4 2 - - 0");
+    assert_eq!(FamilyRowBlock::decode(&row.encode()), Some(row));
+    assert_eq!(FamilyRowBlock::decode("FoodHere:0 1 1 1 1 1"), None);
+    assert_eq!(FamilyRowBlock::decode("FoodHere:0 1 1 1 1 1 x"), None);
 }
 
 #[test]
@@ -160,11 +259,11 @@ fn retained_share_is_undefined_without_a_retention_pair() {
         parents_requested: 0,
         parents_evaluated: 0,
         consistency_violations: 0,
-        out_of_width_consumers: Default::default(),
         retention_parents: 0,
         retention_children_requested: 0,
         retention_children_sampled: 0,
         rows: Vec::new(),
+        families: Vec::new(),
     };
     assert!(cohort_block(&reading).retained_share.defined().is_none());
 }

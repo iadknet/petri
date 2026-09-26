@@ -6,10 +6,12 @@
 //! summary stays inside its storage budget: the family, the channel (`*`
 //! marks an `ActionQueue` channel past the draw width), then the parents at
 //! each stage in `ROW_FIELDS` order, `-` for a stage the family does not have
-//! (shared memory has no declaration or causal stage).
+//! (shared memory has no declaration or causal stage). Each cohort also holds
+//! one `FAMILY_ROW_FORMAT` string per family: the parents with each stage on
+//! at least one of the family's channels.
 
 use serde::{Deserialize, Serialize};
-use v3_core::neighborhood::input_use::{self as funnel, CohortUse, Row};
+use v3_core::neighborhood::input_use::{self as funnel, CohortUse, FamilyRow, Row};
 use v3_core::neighborhood::mutation_effects::{self as effects, contexts};
 use v3_core::neighborhood::BATTERY_VERSION;
 
@@ -43,6 +45,50 @@ pub const ROW_FORMAT: &str =
                               executed_outside_live causal_outside_live retention_pairs \
                               retained_causal_pairs; * marks an ActionQueue channel past the \
                               draw width 12, - a stage the family does not have";
+
+/// The names of a family row's count positions, in order.
+pub const FAMILY_ROW_FIELDS: [&str; 6] = [
+    "family_declared",
+    "family_connected",
+    "family_executed",
+    "family_causal",
+    "family_causal_original",
+    "out_of_width_consumers",
+];
+
+/// The family row string's layout.
+pub const FAMILY_ROW_FORMAT: &str =
+    "family family_declared family_connected family_executed family_causal \
+     family_causal_original out_of_width_consumers; each stage counts the parents with the stage \
+     on at least one of the family's channels (single-channel ablations, no joint ablation), \
+     family_declared the parents declaring the family on a reachable node; - a stage the \
+     family does not have";
+
+/// Append ` count` per position, `-` for `None`.
+fn encode_counts(mut text: String, counts: &[Option<u32>]) -> String {
+    for count in counts {
+        text.push(' ');
+        match count {
+            Some(count) => text.push_str(&count.to_string()),
+            None => text.push('-'),
+        }
+    }
+    text
+}
+
+/// Exactly `len` counts, `-` read as `None`.
+fn decode_counts<'a>(
+    fields: impl Iterator<Item = &'a str>,
+    len: usize,
+) -> Option<Vec<Option<u32>>> {
+    let counts = fields
+        .map(|field| match field {
+            "-" => Some(None),
+            count => count.parse().ok().map(Some),
+        })
+        .collect::<Option<Vec<_>>>()?;
+    (counts.len() == len).then_some(counts)
+}
 
 /// One decoded row.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,20 +124,13 @@ impl RowBlock {
     /// The row string.
     #[must_use]
     pub fn encode(&self) -> String {
-        let mut text = format!(
+        let head = format!(
             "{} {}{}",
             self.family,
             self.channel,
             if self.beyond_draw_width { "*" } else { "" }
         );
-        for count in &self.counts {
-            text.push(' ');
-            match count {
-                Some(count) => text.push_str(&count.to_string()),
-                None => text.push('-'),
-            }
-        }
-        text
+        encode_counts(head, &self.counts)
     }
 
     /// Decode a row string; `None` when it is not one.
@@ -104,26 +143,53 @@ impl RowBlock {
             Some(channel) => (channel, true),
             None => (channel, false),
         };
-        let counts = fields
-            .map(|field| match field {
-                "-" => Some(None),
-                count => count.parse().ok().map(Some),
-            })
-            .collect::<Option<Vec<_>>>()?;
-        let channel = channel.parse().ok()?;
-        (counts.len() == ROW_FIELDS.len()).then_some(Self {
+        let counts = decode_counts(fields, ROW_FIELDS.len())?;
+        Some(Self {
             family,
-            channel,
+            channel: channel.parse().ok()?,
             beyond_draw_width,
             counts,
         })
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FamilyCount {
+/// One decoded family row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FamilyRowBlock {
     pub family: String,
-    pub consumers: u32,
+    /// Parents at each stage, in `FAMILY_ROW_FIELDS` order.
+    pub counts: Vec<Option<u32>>,
+}
+
+impl FamilyRowBlock {
+    fn of(row: &FamilyRow) -> Self {
+        Self {
+            family: row.family.label(),
+            counts: vec![
+                row.declared,
+                Some(row.connected),
+                Some(row.executed),
+                row.causal,
+                row.causal_original,
+                Some(row.out_of_width_consumers),
+            ],
+        }
+    }
+
+    /// The family row string.
+    #[must_use]
+    pub fn encode(&self) -> String {
+        encode_counts(self.family.clone(), &self.counts)
+    }
+
+    /// Decode a family row string; `None` when it is not one.
+    #[must_use]
+    pub fn decode(text: &str) -> Option<Self> {
+        let mut fields = text.split(' ');
+        let family = fields.next()?.to_string();
+        let counts = decode_counts(fields, FAMILY_ROW_FIELDS.len())?;
+        Some(Self { family, counts })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -133,8 +199,6 @@ pub struct CohortBlock {
     pub parents_evaluated: u32,
     /// (parent, channel) pairs causal without an executed read; expected 0.
     pub consistency_violations: u32,
-    /// Decision-compound consumers reading at or past the width (0.0).
-    pub out_of_width_consumers: Vec<FamilyCount>,
     pub retention_parents: u32,
     pub retention_children_requested: u32,
     pub retention_children_sampled: u32,
@@ -143,6 +207,8 @@ pub struct CohortBlock {
     pub retained_share: Indicator<RetainedShare>,
     /// Row strings in `ROW_FORMAT`, family then channel order.
     pub rows: Vec<String>,
+    /// Family row strings in `FAMILY_ROW_FORMAT`, family order.
+    pub family_rows: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -168,14 +234,6 @@ fn cohort_block(reading: &CohortUse) -> CohortBlock {
         parents_requested: reading.parents_requested,
         parents_evaluated: reading.parents_evaluated,
         consistency_violations: reading.consistency_violations,
-        out_of_width_consumers: reading
-            .out_of_width_consumers
-            .iter()
-            .map(|(family, &consumers)| FamilyCount {
-                family: family.label(),
-                consumers,
-            })
-            .collect(),
         retention_parents: reading.retention_parents,
         retention_children_requested: reading.retention_children_requested,
         retention_children_sampled: reading.retention_children_sampled,
@@ -192,6 +250,11 @@ fn cohort_block(reading: &CohortUse) -> CohortBlock {
             .rows
             .iter()
             .map(|row| RowBlock::of(row).encode())
+            .collect(),
+        family_rows: reading
+            .families
+            .iter()
+            .map(|row| FamilyRowBlock::of(row).encode())
             .collect(),
     }
 }
@@ -216,6 +279,7 @@ pub struct InputUse {
     pub ablation_rule: String,
     pub retention_rule: String,
     pub row_format: String,
+    pub family_row_format: String,
     pub scenes: Scenes,
     pub cohorts: Vec<Indicator<CohortBlock>>,
 }
@@ -245,6 +309,7 @@ pub fn project(reading: &funnel::Reading) -> InputUse {
             effects::PARENT_SEED_MULTIPLIER,
         ),
         row_format: ROW_FORMAT.to_string(),
+        family_row_format: FAMILY_ROW_FORMAT.to_string(),
         scenes: Scenes {
             original: BATTERY_VERSION.to_string(),
             original_executions: reading.original_executions,

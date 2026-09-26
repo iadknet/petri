@@ -206,7 +206,7 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
 
 ## Verification
 
-- [ ] Focused tests (names and results in readings): each stage on
+- [x] Focused tests (names and results in readings): each stage on
       constructed genomes (declared only; connected in an unexecuted node;
       executed without effect; an executed read on a structurally dead
       consumer; a VM read used only as a branch condition that changes the

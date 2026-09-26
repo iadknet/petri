@@ -303,10 +303,49 @@ fn decision_reads_past_their_width_count_as_out_of_width_consumers() {
     assert_eq!(parent.out_of_width.get(&Family::CommitCounts), Some(&1));
     assert!(parent.connected.is_empty() && parent.executed.is_empty());
     let cohort = fold_cohort(Cohort::Drift, 1, &[parent], RETENTION_CHILDREN);
-    assert_eq!(
-        cohort.out_of_width_consumers.get(&Family::CommitCounts),
-        Some(&1)
-    );
+    let family = cohort
+        .families
+        .iter()
+        .find(|row| row.family == Family::CommitCounts)
+        .expect("a declared decision compound keeps its family row");
+    assert_eq!(family.out_of_width_consumers, 1);
+    assert_eq!(family.declared, Some(1));
+    assert_eq!((family.connected, family.executed), (0, 0));
+}
+
+/// Two parents reading three channels of one family: each parent counts once
+/// in the family union, so the connected and executed unions (2) lie strictly
+/// between the largest channel row (1) and the channel-row sum (3).
+#[test]
+fn a_family_union_counts_each_parent_once() {
+    let fixture = Fixture::new();
+    let both = genome(vec![graph_node(
+        0,
+        vec![barriers()],
+        Vec::new(),
+        EAT,
+        vec![leaf(0, 0), leaf(0, 1)],
+    )]);
+    let parents = [fixture.read(&both), fixture.read(&eat_from(barriers(), 2))];
+    let cohort = fold_cohort(Cohort::Drift, 2, &parents, RETENTION_CHILDREN);
+    let rows: Vec<&Row> = cohort
+        .rows
+        .iter()
+        .filter(|row| row.channel.family == Family::NeighborBarrierRing && row.connected > 0)
+        .collect();
+    assert_eq!(rows.len(), 3);
+    assert!(rows
+        .iter()
+        .all(|row| row.connected == 1 && row.executed == 1));
+    let family = cohort
+        .families
+        .iter()
+        .find(|row| row.family == Family::NeighborBarrierRing)
+        .expect("a family row");
+    assert_eq!(family.declared, Some(2));
+    assert_eq!(family.connected, 2);
+    assert_eq!(family.executed, 2);
+    assert_family_bounds(&cohort);
 }
 
 /// Ablating a channel no consumer reads leaves the genome untouched, and
@@ -421,6 +460,50 @@ fn assert_stage_order(row: &Row) {
     );
 }
 
+/// A channel row's count at one stage.
+type RowStage = fn(&Row) -> Option<u32>;
+
+/// Every family with a channel row has exactly one family row, and each
+/// family union lies between its largest channel row and
+/// `min(channel-row sum, family declared)`, in the funnel's order.
+fn assert_family_bounds(cohort: &CohortUse) {
+    let families: Vec<Family> = cohort.families.iter().map(|row| row.family).collect();
+    let mut expected: Vec<Family> = cohort.rows.iter().map(|row| row.channel.family).collect();
+    expected.dedup();
+    assert_eq!(families, expected);
+    for family in &cohort.families {
+        let rows: Vec<&Row> = cohort
+            .rows
+            .iter()
+            .filter(|row| row.channel.family == family.family)
+            .collect();
+        let shared = family.family.is_shared_memory();
+        assert_eq!(family.declared.is_none(), shared, "{family:?}");
+        assert_eq!(family.causal.is_none(), shared, "{family:?}");
+        assert_eq!(family.causal_original.is_none(), shared, "{family:?}");
+        let cap = family.declared.unwrap_or(cohort.parents_evaluated);
+        let stages: [(Option<u32>, RowStage); 5] = [
+            (family.declared, |row| row.declared),
+            (Some(family.connected), |row| Some(row.connected)),
+            (Some(family.executed), |row| Some(row.executed)),
+            (family.causal, |row| row.causal),
+            (family.causal_original, |row| row.causal_original),
+        ];
+        for (union, stage) in stages {
+            let Some(union) = union else { continue };
+            let channels: Vec<u32> = rows.iter().filter_map(|row| stage(row)).collect();
+            let largest = channels.iter().copied().max().unwrap_or(0);
+            let sum: u32 = channels.iter().sum();
+            assert!(union >= largest, "{family:?} {rows:?}");
+            assert!(union <= sum.min(cap), "{family:?} {rows:?}");
+        }
+        if let (Some(causal), Some(original)) = (family.causal, family.causal_original) {
+            assert!(family.executed >= causal, "{family:?}");
+            assert!(causal >= original, "{family:?}");
+        }
+    }
+}
+
 /// An extinct world: the selected cohort and the recorded group are
 /// undefined with their reason, and the reading is identical across thread
 /// counts.
@@ -482,41 +565,57 @@ impl ParentUse {
     }
 }
 
+/// The founder after `events` production mutation events drawn from `seed`.
+fn mutated_founder(seed: u64, events: u32) -> CreatureGenome {
+    use rand::SeedableRng;
+    let config = SimulationConfig::default();
+    let mut genome = founder_genome(FounderProfile::V3Alpha1);
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+    let one_event = crate::config::MutationConfig {
+        per_unit_rate: 1.0,
+        ..config.mutation.clone()
+    };
+    for _ in 0..events {
+        let reachable = mesh_reachable_nodes(&genome);
+        crate::mutation::MutationEngine::apply_mutations_on_units(
+            &mut genome,
+            1,
+            &one_event,
+            &reachable,
+            crate::mutation::reachability::ParentExecuted::Indices(&reachable),
+            &mut rng,
+            config.world.food.types.len(),
+        );
+    }
+    genome
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(24))]
 
-    /// On any genome a few production mutation events away from the founder,
-    /// every row keeps the funnel's order, causal channels were executed,
-    /// and rows exist only for channels some parent reached.
+    /// On cohorts of genomes a few production mutation events away from the
+    /// founder, every row keeps the funnel's order, causal channels were
+    /// executed, rows exist only for channels some parent reached, and every
+    /// family union keeps its bounds.
     #[test]
-    fn mutated_founders_keep_the_stage_invariant(seed in any::<u64>(), events in 1u32..4) {
-        use rand::SeedableRng;
-        let config = SimulationConfig::default();
-        let mut genome = founder_genome(FounderProfile::V3Alpha1);
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-        let one_event = crate::config::MutationConfig {
-            per_unit_rate: 1.0,
-            ..config.mutation.clone()
-        };
-        for _ in 0..events {
-            let reachable = mesh_reachable_nodes(&genome);
-            crate::mutation::MutationEngine::apply_mutations_on_units(
-                &mut genome,
-                1,
-                &one_event,
-                &reachable,
-                crate::mutation::reachability::ParentExecuted::Indices(&reachable),
-                &mut rng,
-                config.world.food.types.len(),
-            );
+    fn mutated_founders_keep_the_stage_invariant(
+        seeds in proptest::collection::vec(any::<u64>(), 1..4),
+        events in 1u32..4,
+    ) {
+        let fixture = Fixture::new();
+        let parents: Vec<ParentUse> = seeds
+            .iter()
+            .map(|&seed| fixture.read(&mutated_founder(seed, events)))
+            .collect();
+        for parent in &parents {
+            prop_assert!(parent.causal.is_subset(&parent.executed));
         }
-        let parent = Fixture::new().read(&genome);
-        prop_assert!(parent.causal.is_subset(&parent.executed));
-        let cohort = fold_cohort(Cohort::Drift, 1, &[parent], RETENTION_CHILDREN);
+        let cohort = fold_cohort(Cohort::Drift, parents.len() as u32, &parents, RETENTION_CHILDREN);
         prop_assert_eq!(cohort.consistency_violations, 0);
         for row in &cohort.rows {
             assert_stage_order(row);
         }
+        assert_family_bounds(&cohort);
     }
 
     /// Ablation never changes a genome's size or its node structure, is
