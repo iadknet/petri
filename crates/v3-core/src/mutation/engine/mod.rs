@@ -264,7 +264,11 @@ impl MutationEngine {
                             .iter()
                             .copied()
                             .filter(|op| op.enabled(config))
-                            .filter(|op| !restricted || op.complexity_effect().is_decreasing())
+                            .filter(|op| {
+                                !restricted
+                                    || op.complexity_effect().is_decreasing()
+                                    || *op == GraphOperator::RefineHeritableStructure
+                            })
                             .collect();
                         let selected = loop {
                             if available.is_empty() {
@@ -756,6 +760,7 @@ pub(crate) fn graph_operator_key(op: GraphOperator) -> MutationOperator {
         GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
         GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
         GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
+        GraphOperator::RefineHeritableStructure => MutationOperator::GraphRefineHeritableStructure,
     }
 }
 
@@ -776,3 +781,6 @@ mod recruitment_tests;
 
 #[cfg(test)]
 mod membership_tests;
+
+#[cfg(test)]
+mod refinement_tests;

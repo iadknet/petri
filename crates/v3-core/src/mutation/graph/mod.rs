@@ -1,6 +1,7 @@
 pub mod hebbian;
 pub(crate) mod operators;
 pub(crate) mod recruitment;
+pub(crate) mod refinement;
 
 use rand::Rng;
 
@@ -36,10 +37,11 @@ pub enum GraphOperator {
     MutateRewardSource,
     MutateTraceDecay,
     RecruitNeutralInput,
+    RefineHeritableStructure,
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 22] = [
+    pub const ALL: [Self; 23] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -62,6 +64,7 @@ impl GraphOperator {
         Self::MutateRewardSource,
         Self::MutateTraceDecay,
         Self::RecruitNeutralInput,
+        Self::RefineHeritableStructure,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -91,18 +94,22 @@ impl GraphOperator {
             Self::MutateRewardSource => 2,
             Self::MutateTraceDecay => 4,
             Self::RecruitNeutralInput => 1,
+            Self::RefineHeritableStructure => 4,
         }
     }
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 22,
+            Self::ALL.len() == 23,
             "ALL must cover every GraphOperator variant"
         );
         let mut sum = 0u16;
         let mut i = 0;
         while i < Self::ALL.len() {
-            if !matches!(Self::ALL[i], Self::RecruitNeutralInput) {
+            if !matches!(
+                Self::ALL[i],
+                Self::RecruitNeutralInput | Self::RefineHeritableStructure
+            ) {
                 sum += Self::ALL[i].weight() as u16;
             }
             i += 1;
@@ -128,6 +135,7 @@ impl GraphOperator {
             | Self::DisableHebbian
             | Self::DisableRewardModulation => ComplexityEffect::Decreasing,
             Self::AlterGraphEdgeWeight
+            | Self::RefineHeritableStructure
             | Self::SwapGraphOperator
             | Self::MutateGraphOperatorParam
             | Self::RetargetGraphEdge
@@ -142,15 +150,23 @@ impl GraphOperator {
 
     /// Whether configuration admits this operator before any sampling.
     pub fn enabled(self, config: &MutationConfig) -> bool {
-        self != Self::RecruitNeutralInput
-            || config.neutral_input_recruitment != NeutralInputRecruitment::Off
+        match self {
+            Self::RecruitNeutralInput => {
+                config.neutral_input_recruitment != NeutralInputRecruitment::Off
+            }
+            Self::RefineHeritableStructure => config.structured_heritable_refinement,
+            _ => true,
+        }
     }
 
     /// Pick a default-arm graph operator weighted by impact tier.
     pub fn random(rng: &mut impl Rng) -> Self {
         let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);
         for &op in &Self::ALL {
-            if op == Self::RecruitNeutralInput {
+            if matches!(
+                op,
+                Self::RecruitNeutralInput | Self::RefineHeritableStructure
+            ) {
                 continue;
             }
             let w = op.weight() as u16;
@@ -164,7 +180,7 @@ impl GraphOperator {
 
     /// Whether this operator has a site to apply to on one Graph-backend
     /// node. Each arm delegates to the same enumeration the operator draws
-    /// its target from, so a node this accepts never skips at application.
+    /// its target from. Numeric proposal rejection can still skip atomically.
     fn applies_to(self, def: &CgpGraphBackendDef, input_refs: &[InputReference]) -> bool {
         match self {
             Self::AlterGraphEdgeWeight | Self::RetargetGraphEdge | Self::RemoveGraphEdge => {
@@ -177,6 +193,7 @@ impl GraphOperator {
             Self::AddInternalGraphNode => operators::can_add_compute_node(def),
             Self::AddGraphEdge => operators::can_add_edge(def),
             Self::RecruitNeutralInput => !recruitment::destinations(def).is_empty(),
+            Self::RefineHeritableStructure => refinement::has_group(def, input_refs),
             Self::GraphRawFieldMutation => operators::has_raw_field_site(def, input_refs),
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
@@ -267,6 +284,13 @@ impl GraphMutator {
         food_type_count: usize,
     ) -> Result<(), MutationSkipReason> {
         match op {
+            GraphOperator::RefineHeritableStructure => {
+                let node = genome
+                    .nodes
+                    .get_mut(node_idx)
+                    .ok_or(MutationSkipReason::NoApplicableTarget)?;
+                refinement::refine(node, rng)
+            }
             GraphOperator::RecruitNeutralInput => {
                 let node = genome
                     .nodes

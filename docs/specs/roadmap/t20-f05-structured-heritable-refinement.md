@@ -101,22 +101,22 @@ size-pressure admission and default-off RNG preservation.
 
 ## Implementation Tasks
 
-- [ ] Add the bounded semantic grouping and coordinated operator to existing
+- [x] Add the bounded semantic grouping and coordinated operator to existing
   Graph mutation, with off-by-default configuration and applied accounting.
-- [ ] Establish both layout contracts, sparse/ambiguous exclusions, vector
+- [x] Establish both layout contracts, sparse/ambiguous exclusions, vector
   bounds, independent exceptions, deletion and inherited lifecycle using TDD
   and property coverage; preserve default behavior and other mutation paths.
-- [ ] Complete the bounded comparison and document actual supported scope and
+- [x] Complete the bounded comparison and document actual supported scope and
   settings in the existing mutation/runtime references and readings.
 - [ ] Complete baseline evidence, final review, mutation gate and closure
   records; check the roadmap row only at completion.
 
 ## Verification
 
-- [ ] Focused TDD and proptest checks in existing Graph mutation, engine,
+- [x] Focused TDD and proptest checks in existing Graph mutation, engine,
   runtime and inheritance seams cover the contract; exact test names, commands,
   outcomes and any regression seeds are recorded in [readings](../../progress/readings/t20-f05.md).
-- [ ] The 1,536-proposal release comparison records both layout verdicts,
+- [x] The 1,536-proposal release comparison records both layout verdicts,
   scalar/additive/coordinated denominators, vector bounds, applied effects and
   costs in the same readings. This is engineering qualification only.
 - [ ] `cargo check --workspace --all-targets`, `make roadmap-check` and final
@@ -128,6 +128,11 @@ size-pressure admission and default-off RNG preservation.
   provenance/hash/byte counts and verification time checked, series entries
   point to summaries and no new full report is staged. A second goal
   determinism run is not applicable under the workflow's one-goal-run rule.
+
+**Implementation self-review (2026-09-26):** complete; no necessary source
+changes. Reuse, enum/serde/dependency choices and bounded work were checked;
+readings retain the review rationale and documentation-check results. This does
+not replace independent final review or the remaining closure gates.
 
 ## Performance and Goal Impact
 
