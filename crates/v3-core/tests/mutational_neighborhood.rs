@@ -87,9 +87,9 @@ fn specific_operators_are_fully_silent_on_the_founder_as_the_audit_recorded() {
     );
 }
 
-/// Every operator in the four `ALL` lists produces a row, whether or not it
-/// could apply to the founder (an inapplicable operator is a skip, not an
-/// absence).
+/// Every operator in the four `ALL` lists produces a row. Enabled operators
+/// record every trial, whether they apply or skip, while an operator disabled
+/// by configuration retains its catalog row with no attempted trials.
 #[test]
 fn every_operator_in_the_four_domains_produces_a_row() {
     let evaluation = founder_evaluation(1);
@@ -98,7 +98,14 @@ fn every_operator_in_the_four_domains_produces_a_row() {
         v3_core::neighborhood::operator_catalog().len()
     );
     for row in &evaluation.operator_rows {
-        assert_eq!(row.tally.trials, REDUCED_OPERATOR_TRIALS);
+        assert_eq!(
+            row.tally.trials,
+            if row.operator == "RecruitNeutralInput" {
+                0
+            } else {
+                REDUCED_OPERATOR_TRIALS
+            }
+        );
     }
 }
 

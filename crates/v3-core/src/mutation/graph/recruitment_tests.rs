@@ -32,6 +32,17 @@ fn graph_mut(node: &mut NodeGenome) -> &mut CgpGraphBackendDef {
 }
 
 #[test]
+fn recruitment_off_rejects_an_eligible_vote_sink_without_editing() {
+    let mut fixture = node();
+    let before = fixture.clone();
+
+    let result = recruit(&mut fixture, Arm::Off, 2, &mut SmallRng::seed_from_u64(0));
+
+    assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    assert_eq!(fixture, before);
+}
+
+#[test]
 fn every_legal_reference_and_memory_bank_has_canonical_access() {
     for reference in input_reference_universe(2) {
         let width = if reference == InputReference::ActionQueue {
