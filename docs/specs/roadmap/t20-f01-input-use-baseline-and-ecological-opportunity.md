@@ -1,6 +1,6 @@
 # T20.F01 — Input-Use Baseline and Ecological Opportunity
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-25
 **Feature**: T20.F01
 **Track**: [T20 — Input Evolvability and Structured Variation](../../roadmaps/t20-input-evolvability-and-structured-variation.md)
@@ -230,9 +230,10 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
       summary's after removing only `cases[].input_use`; both confirmed
       equal (2026-09-25 rerun); method in readings.
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` clean and
-      `make check` exits 0 (2026-09-25, results in readings).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      every survivor resolved.
+      `make check` exits 0 on the final code, tested commit e593aa26.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: not applicable, skipped
+      by user decision (2026-09-25); the started run was stopped before any
+      result and is not closure evidence.
 - [x] Gate and goal summaries at `docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json`
       and `...-goal.json`, raw hash/byte count and verification time checked,
       series entries added, no full report staged; the second goal run is not
@@ -272,26 +273,15 @@ scripts/bench-wait cargo run --release -p v3-cli -- input-opportunity --feature 
 scripts/bench-wait cargo run --release -p v3-cli -- input-opportunity --feature t20-f01-input-use-baseline-and-ecological-opportunity
 ```
 
-**Measured verdict (2026-09-25).** Gate and goal: both not severe against
-their epochs, deterministic counters unchanged, caps under budget. Goal
-rerun on the final code (family-union block, superseding `f6a07d7f`):
-`EXIT:0` (direct capture), 659 s end-to-end against the 900 s threshold;
-goal `deterministic` equals T11.F26's after removing `cases[].input_use`.
-Summary 327,437 bytes, grown ≈87.4 KB vs the T11.F27 reference (cap
-300 KB); `input_use_wall_clock_ms_total` 959.4 ms (cap 60 s);
-evolved-neighborhood 5,778.8 ms (cap 180 s). All 25 previously
-bounded/unresolved funnel cells now carry an exact stopping stage
-(readings). Founder families show causal use in all three worlds.
-**Assay: complete, under cap.** The first
-(8-thread) attempt overran the cap and was voided by the spec owner's ruling
-(pilot/full concurrency mismatch; see Verification). The 3-thread rerun
-completed: `wall_secs=1,692.015355` against the 7,200 s cap, `incomplete:
-false`, 24/24 replicates, CLI exit 0. Family verdicts unchanged from the
-void run: `ring` inconclusive, `vector` positive, `scalar` positive,
-`gate_favorable: true`; unattributed births 0 in every world. Determinism
-check: the void run's 23 raw records are identical to the rerun's
-corresponding records. Full detail, projection method and per-world tables
-in readings.
+**Measured verdict (2026-09-25).** Gate and goal not severe; deterministic
+counters unchanged (goal after removing `cases[].input_use`). Goal rerun on
+the final code: `EXIT:0`, 659 s end-to-end (threshold 900 s), summary growth
+≈87.4 KB (cap 300 KB), `input_use` 959.4 ms (cap 60 s), evolved-neighborhood
+5,778.8 ms (cap 180 s); every funnel cell names a stopping stage. Assay: the
+8-thread attempt overran the cap and was voided; the 3-thread rerun completed
+in 1,692 s (cap 7,200 s), 24/24 replicates, exit 0, its records identical to
+the void run's 23. Verdicts: `ring` inconclusive, `vector` positive, `scalar`
+positive, `gate_favorable: true`; unattributed births 0. Detail in readings.
 
 - Summaries: [gate](../../progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json),
   [goal](../../progress/features/t20-f01-input-use-baseline-and-ecological-opportunity-goal.json),
@@ -300,17 +290,19 @@ in readings.
 
 ## Success Criteria
 
-- [ ] Each world's goal report carries the input-use funnel by cohort, family
+- [x] Each world's goal report carries the input-use funnel by cohort, family
       and channel on original and extended scenes, with every existing block
       unchanged.
-- [ ] The readings name where input use stops per world, cohort and family.
-- [ ] The assay records, per family, a positive, negative or inconclusive
+- [x] The readings name where input use stops per world, cohort and family.
+- [x] The assay records, per family, a positive, negative or inconclusive
       opportunity verdict with exposure and adequacy, Graph feasibility, the
       two-step discovery baseline and VM concerns, and the F02–F05 gate.
-- [ ] Required checks, mutation evidence, independent review and closure
-      records are complete; the row is checked and the spec Complete on main.
+- [x] Required checks, mutation evidence, independent review and closure
+      records are complete (mutation skipped by user decision); the row is checked and the spec Complete on main.
 
 ## Notes for AI Agents
 
 - Decision: run substitutions (user, 2026-09-25): no Fable model anywhere in this run, so the spec owner runs on Opus; every advisor consult is replaced by a fresh read-only Codex Astra `high` task through the Codex channel.
 - Decision: the user authorized a second post-review remediation pass (2026-09-25) to store exact per-family unions in `input_use`; only the goal profile is rerun.
+- Exception: mutation gate skipped by user decision (2026-09-25).
+- Cost: /usage totals await the user; 4 implementer passes with 2 Codex consults each (no advisor); 5 spec-owner resumes after Plan; 3 Codex challenge rounds, final `ready`; final review 1 P1, 4 P2, 0 P3, follow-up review 3 P3.
