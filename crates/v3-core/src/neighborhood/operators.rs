@@ -283,7 +283,10 @@ mod tests {
         for row in &a {
             assert_eq!(
                 row.tally.trials,
-                if row.operator == "RecruitNeutralInput" {
+                if matches!(
+                    row.operator.as_str(),
+                    "RecruitNeutralInput" | "RefineHeritableStructure"
+                ) {
                     0
                 } else {
                     5

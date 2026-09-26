@@ -4,6 +4,7 @@ use crate::creature::genome::cgp::{GraphEdge, GraphSource, OutputSink, OutputSin
 use crate::creature::genome::vote::VoteSink;
 use crate::creature::genome::BackendDef;
 use proptest::prelude::*;
+use rand::rngs::mock::StepRng;
 use rand::{rngs::SmallRng, SeedableRng};
 
 fn node() -> NodeGenome {
@@ -432,6 +433,50 @@ fn normalized_step_at_both_endpoints_keeps_the_existing_local_exception() {
                 .sqrt();
             assert!((norm - 0.1).abs() < 1e-7, "m={count}: {norm}");
         }
+    }
+}
+
+#[test]
+fn native_sampler_accepts_the_exact_numeric_tolerance_boundary() {
+    let mut node = ring(
+        WorldInputKey::NeighborBarrierRing,
+        VoteKind::Move,
+        0,
+        0b0011_1111,
+    );
+    let weight_bits = [
+        0x4380_0000,
+        0xb06d_84ba,
+        0xb06d_84ba,
+        0xb06d_84ba,
+        0xb06d_84ba,
+        0xa504_0000,
+    ];
+    for (edge, bits) in graph_mut(&mut node)
+        .output_sinks
+        .iter_mut()
+        .flat_map(|sink| &mut sink.inputs)
+        .zip(weight_bits)
+    {
+        edge.weight = f32::from_bits(bits);
+    }
+    let before: Vec<_> = graph(&node).edges().map(|edge| edge.weight).collect();
+    let scalar = f32::from_bits(0x3dcc_cb75);
+    let increment = scalar / (before.len() as f32).sqrt();
+
+    refine(&mut node, &mut StepRng::new(0xffff_2600, 0)).unwrap();
+
+    let after: Vec<_> = graph(&node).edges().map(|edge| edge.weight).collect();
+    let norm = before
+        .iter()
+        .zip(&after)
+        .map(|(old, new)| (f64::from(*new) - f64::from(*old)).powi(2))
+        .sum::<f64>()
+        .sqrt();
+    assert_eq!(norm, 0.1 + 1e-6);
+    for ((old, new), bits) in before.iter().zip(&after).zip(weight_bits) {
+        assert_eq!(old.to_bits(), bits);
+        assert_eq!(*new, *old + increment);
     }
 }
 

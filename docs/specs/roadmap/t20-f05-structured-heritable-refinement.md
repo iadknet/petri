@@ -122,12 +122,23 @@ size-pressure admission and default-off RNG preservation.
 - [ ] `cargo check --workspace --all-targets`, `make roadmap-check` and final
   `make check` pass. If defaults, founders or tick mechanics change,
   `cargo test -p v3-core --test viability` runs first.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path
   and every survivor here as killed, equivalent or explicitly user-deferred.
-- [ ] Gate and one goal summary stored under `docs/progress/features/`; raw
+- [x] Gate and one goal summary stored under `docs/progress/features/`; raw
   provenance/hash/byte counts and verification time checked, series entries
   point to summaries and no new full report is staged. A second goal
   determinism run is not applicable under the workflow's one-goal-run rule.
+
+| Closure evidence | Result |
+| --- | --- |
+| Final review | Fresh `gpt-6-astra`, effort `high`: 0 P1, 0 P2, 1 P3. The P3 is a documentation-format advisory about chronological prose in the readings; it is deferred because it does not affect behavior or retained evidence. |
+| Mutation attempt 1 | Fresh mode, 82 candidates discovered; unmutated baseline failed `neighborhood::operators::tests::per_operator_rows_is_deterministic_and_covers_the_full_catalog` before any mutant ran. `outcomes.json` records `total_mutants=0`; missed and timed-out lists are empty. Full report: `/Users/istefanek/.local/share/petri-tools/mutants/t20-f05/mutants.out-attempt1-baseline-failed-20260926`. Advisor 4 approved the test-only default-off expectation correction. |
+| Mutation attempt 2 | Fresh mode, 82 candidates discovered; the corrected unit baseline passed, then the unmutated integration baseline failed `every_operator_in_the_four_domains_produces_a_row` before any mutant ran. `outcomes.json` again records `total_mutants=0`; missed and timed-out lists are empty. Full report: `/Users/istefanek/.local/share/petri-tools/mutants/t20-f05/mutants.out-attempt2-baseline-failed-20260926`. Advisor 5 approved the matching test-only correction. |
+| Prepared baseline | `cargo test --profile=mutants --package=v3-core@0.1.0` exits 0 after both test-only corrections: 1,840 library tests passed with 7 ignored; every integration test and doctest passed. Full log: `/tmp/t20-f05-mutants-baseline-after-fix.log`. Production content, mutation selection/configuration and thresholds are unchanged from `068c38dabdcd0244424f373340228e76efbd6e96`. |
+| User intervention | The user explicitly authorized one additional fresh invocation after attempts 1 and 2 ended during baseline validation. No fourth fresh invocation was run or requested. |
+| Mutation attempt 3 — closure evidence | Fresh mode; `82 mutants tested in 23m: 3 missed, 68 caught, 11 unviable`; 0 timed out. Full fresh report: `/Users/istefanek/.local/share/petri-tools/mutants/t20-f05/mutants.out-attempt3-fresh-20260926`. Production content and mutation selection/configuration remained unchanged. |
+| Survivor disposition | **Killed, test-only:** both `MutationSkipReason::as_key` replacement survivors (`""` and `"xyzzy"`) are caught by exact assertions for all three stable keys. **Killed, test-only:** `apply_step` changing `>` to `>=` is caught by a native six-member ring fixture whose sampled step has realized norm exactly `0.100001`; the fixture asserts success and exact writes. Advisor 6 supplied and reviewed the reachable numeric witness. No survivor is equivalent or deferred. |
+| Incremental confirmation | First permitted incremental pass: 3 tested, 2 caught, 1 missed. Final permitted incremental pass: 1 tested, 1 caught, no survivors; its `previously_caught.txt` retains 81 prior caught/unviable entries. Final report: `/Users/istefanek/.local/share/petri-tools/mutants/t20-f05/mutants.out-incremental-final-20260926`. These passes are remediation feedback; attempt 3 remains the fresh closure evidence because only tests changed afterward. |
 
 **Implementation self-review (2026-09-26):** complete; no necessary source
 changes. Reuse, enum/serde/dependency choices and bounded work were checked;
@@ -159,9 +170,24 @@ make bench PROFILE=gate FEATURE=t20-f05-structured-heritable-refinement
 make bench PROFILE=goal FEATURE=t20-f05-structured-heritable-refinement
 ```
 
-**Measured verdict.** Pending required gate and goal profiles. Record each CLI
-and observed outer-process exit status with its source, `severe`, crossed
-thresholds and epoch disposition at closure.
+**Measured verdict (2026-09-26).** The required gate and one goal profile ran
+once, serially, on `068c38dabdcd0244424f373340228e76efbd6e96`. Both generated
+summaries are version 2; both CLI exits and observed outer `make` exits are 0,
+and both comparisons have `severe=false`. All retained deterministic default
+readings equal F04. The gate effective-config digest and the three goal-case
+digests differ only for the new default-off
+`mutation.structured_heritable_refinement=false` schema identity; after
+removing config-digest identities, the goal deterministic projection is
+byte-identical to F04. No threshold, epoch, baseline, standard-world setting
+or environmental pressure changed. The gate F04 wall delta is +10.640048% and
+the goal F04 wall delta is +2.108760%, both `ok` below the 25% flag threshold.
+Raw provenance, hashes, byte counts, local-verification times, observation-cap
+readings and the one-goal-run disposition are in
+[readings](../../progress/readings/t20-f05.md).
+
+- Summaries: gate `docs/progress/features/t20-f05-structured-heritable-refinement.json`,
+  goal `docs/progress/features/t20-f05-structured-heritable-refinement-goal.json`.
+- Full readings: [T20.F05](../../progress/readings/t20-f05.md).
 
 ## Success Criteria
 
