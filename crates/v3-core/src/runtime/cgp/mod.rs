@@ -3,6 +3,8 @@ pub(crate) mod eval;
 pub(crate) mod execute;
 #[cfg(test)]
 mod f04_tests;
+#[cfg(test)]
+mod neutral_connection_tests;
 pub(crate) mod sources;
 pub(crate) mod traced;
 

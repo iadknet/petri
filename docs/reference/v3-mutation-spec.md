@@ -332,6 +332,13 @@ does not extend to energy exhaustion.
 
 ### Graph domain
 
+T20.F02 qualifies ordinary zero-weight edges to existing `ActionVote` sinks
+for F04 recruitment. The [graph consumer contract](v3-graph-backend-spec.md#qualified-zero-vote-connections-t20f02)
+owns eligible destinations, finite/context preconditions, independently mutable
+occurrences, prune/reindex and copy/serde behavior, address/admission limits,
+and native storage/work costs. Existing weight mutation and edge deletion apply
+to zero edges; this qualification adds no recruitment operator or creation API.
+
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
 (the 94 output sinks, vote and parameter sinks included) are never
 added/removed/retyped — only their edges are evolvable.
