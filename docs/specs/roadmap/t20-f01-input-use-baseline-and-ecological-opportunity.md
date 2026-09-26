@@ -197,12 +197,12 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
       birth attribution, exposure samples, verdicts, discovery baseline and
       feasibility record; CLI `input-opportunity` with `--pilot`, wall and
       byte caps, and a committed summary.
-- [ ] Readings in `docs/progress/readings/t20-f01.md`: the controller
+- [x] Readings in `docs/progress/readings/t20-f01.md`: the controller
       constants, the funnel per world × cohort × family naming the first stage
       whose parent count falls below half the previous stage (or none), the
       opportunity and Graph-feasibility tables, the discovery baseline and the
-      VM concerns. The funnel table awaits the family unions from the goal
-      rerun; the rest is recorded.
+      VM concerns. The funnel table is regenerated from the 2026-09-25 rerun's
+      exact family-union rows; every cell names a stage.
 
 ## Verification
 
@@ -225,18 +225,20 @@ not as verdicts: `A_k / Z_k` isolates the signal within the scaffold.
       `n` 8), the row-string round trip as a proptest, two reduced assay runs
       byte-identical, and the family unions (bounds; a multi-channel family
       whose union is below its channel sum).
-- [ ] Existing blocks unchanged: gate `deterministic` equal to the T11.F26
+- [x] Existing blocks unchanged: gate `deterministic` equal to the T11.F26
       gate summary's; goal `deterministic` equal to the T11.F26 goal
-      summary's after removing only `cases[].input_use`; method in readings.
+      summary's after removing only `cases[].input_use`; both confirmed
+      equal (2026-09-25 rerun); method in readings.
 - [x] `cargo clippy --workspace --all-targets -- -D warnings` clean and
       `make check` exits 0 (2026-09-25, results in readings).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved.
-- [ ] Gate and goal summaries at `docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json`
+- [x] Gate and goal summaries at `docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json`
       and `...-goal.json`, raw hash/byte count and verification time checked,
       series entries added, no full report staged; the second goal run is not
-      required (workflow, 2026-09-05). Gate recorded; goal rerun pending for
-      the family unions.
+      required (workflow, 2026-09-05). Gate recorded; goal rerun completed
+      2026-09-25 for the family unions (`severe=false`, caps under budget;
+      readings).
 - [x] Assay pilot and full summaries at `...-opportunity-pilot.json` and
       `...-opportunity.json`, run through `scripts/bench-wait` after all
       code is final, alone on the host; the complete 3-thread run and the
@@ -271,13 +273,16 @@ scripts/bench-wait cargo run --release -p v3-cli -- input-opportunity --feature 
 ```
 
 **Measured verdict (2026-09-25).** Gate and goal: both not severe against
-their epochs, all deterministic counters unchanged, all caps under budget,
-goal summary grew ≈99.1 KB (cap 300 KB). The goal run took ≈518 s through
-its final report output (benchmark log creation to last write,
-11:45:16–11:53:54, filesystem-derived, not a process-exit time) against the
-15-minute threshold; `wall_clock_ms_total` (465.8 s) is simulation time
-only. Founder families show causal use in
-all three worlds as expected. **Assay: complete, under cap.** The first
+their epochs, deterministic counters unchanged, caps under budget. Goal
+rerun on the final code (family-union block, superseding `f6a07d7f`):
+`EXIT:0` (direct capture), 659 s end-to-end against the 900 s threshold;
+goal `deterministic` equals T11.F26's after removing `cases[].input_use`.
+Summary 327,437 bytes, grown ≈87.4 KB vs the T11.F27 reference (cap
+300 KB); `input_use_wall_clock_ms_total` 959.4 ms (cap 60 s);
+evolved-neighborhood 5,778.8 ms (cap 180 s). All 25 previously
+bounded/unresolved funnel cells now carry an exact stopping stage
+(readings). Founder families show causal use in all three worlds.
+**Assay: complete, under cap.** The first
 (8-thread) attempt overran the cap and was voided by the spec owner's ruling
 (pilot/full concurrency mismatch; see Verification). The 3-thread rerun
 completed: `wall_secs=1,692.015355` against the 7,200 s cap, `incomplete:
