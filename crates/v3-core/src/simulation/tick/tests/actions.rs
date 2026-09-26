@@ -1175,3 +1175,49 @@ fn per_type_standing_density_matches_the_applied_growth_summary() {
         .collect();
     assert_eq!(sim.stats.last_tick_food_total_density_by_type, expected);
 }
+
+#[test]
+fn neutral_recruitment_costs_follow_applied_genome_growth() {
+    use crate::config::{NeutralInputRecruitment as Arm, OrdinaryFoodTypeId};
+    use crate::creature::genome::vote::VoteSink;
+    use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
+    use crate::simulation::tick::phase_0_energy_charge;
+    let config = crate::config::SimulationConfig::default();
+    let parent = v3alpha1_founder_genome();
+    let families = [
+        SourceFamily::Input(InputReference::World(WorldInputKey::area_food_summary(
+            OrdinaryFoodTypeId::new(0),
+        ))),
+        SourceFamily::Input(InputReference::World(WorldInputKey::food_here(
+            OrdinaryFoodTypeId::new(1),
+        ))),
+        SourceFamily::Input(InputReference::World(WorldInputKey::neighbor_food_ring(
+            OrdinaryFoodTypeId::new(0),
+        ))),
+        SourceFamily::Memory(false),
+        SourceFamily::Memory(true),
+    ];
+    for arm in [Arm::SingleChannel, Arm::WholeFamily] {
+        for family in &families {
+            let mut child = parent.clone();
+            recruit_source(&mut child.nodes[0], family, arm, 0, VoteSink::Eat).unwrap();
+            let growth = child.genome_size() - parent.genome_size();
+            assert!(growth > 0);
+            let lifecycle = &config.energy.lifecycle;
+            let carrying = phase_0_energy_charge(
+                0.0,
+                lifecycle.genome_carry_cost_per_unit,
+                child.genome_size(),
+            );
+            let base = base_reproduce_charge(&child);
+            let (_, transferred, charge) =
+                charged_reproduction(child.clone(), lifecycle.genome_replication_cost_per_unit);
+            assert_eq!(transferred, CAPPED_TRANSFER);
+            let nominal = base * (1.0 + lifecycle.genome_replication_cost_per_unit * growth as f32);
+            // Telemetry records the applied f32 debit at this fixture's 1000
+            // energy, including subtraction rounding, not the nominal charge.
+            assert_eq!(charge, 1000.0f32 - (1000.0f32 - nominal));
+            println!("RECRUIT_COST {arm:?} {family:?}: size={} growth={growth} carry={carrying:.6} reproduction_charge={charge:.6} base={base:.6} next_supply={:.6}", child.genome_size(), config.mutation.per_unit_rate * f64::from(child.genome_size()));
+        }
+    }
+}

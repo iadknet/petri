@@ -263,6 +263,7 @@ impl MutationEngine {
                         let mut available: Vec<GraphOperator> = GraphOperator::ALL
                             .iter()
                             .copied()
+                            .filter(|op| op.enabled(config))
                             .filter(|op| !restricted || op.complexity_effect().is_decreasing())
                             .collect();
                         let selected = loop {
@@ -274,13 +275,22 @@ impl MutationEngine {
                             let op = available[idx];
                             let operator = graph_operator_key(op);
                             let tracked_before =
-                                if operator_requires_added_node_input_tracking(operator) {
+                                if operator_requires_added_node_input_tracking(operator)
+                                    || (cfg!(test) && op == GraphOperator::RecruitNeutralInput)
+                                {
                                     Some(genome.clone())
                                 } else {
                                     None
                                 };
                             let mut targets = selector(rb.graph);
-                            let result = apply_graph_event(genome, op, &mut targets, rng, config);
+                            let result = apply_graph_event(
+                                genome,
+                                op,
+                                &mut targets,
+                                rng,
+                                config,
+                                food_type_count,
+                            );
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                                 discarded.push((
                                     operator,
@@ -387,6 +397,12 @@ impl MutationEngine {
                 Ok(reachability) => {
                     summary.record_applied(domain, operator);
                     if let Some(before) = tracked_before.as_ref() {
+                        #[cfg(test)]
+                        if operator == MutationOperator::GraphRecruitNeutralInput {
+                            summary
+                                .recruitment_deltas
+                                .push((before.clone(), genome.clone()));
+                        }
                         if let Some(classes) =
                             collect_added_node_input_classes(before, genome, operator)
                         {
@@ -615,9 +631,17 @@ fn apply_graph_event(
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
+    food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match GraphMutator::apply(genome, op, targets, rng, config) {
+    match GraphMutator::apply_with_food_type_count(
+        genome,
+        op,
+        targets,
+        rng,
+        config,
+        food_type_count,
+    ) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(reachability)
@@ -731,6 +755,7 @@ pub(crate) fn graph_operator_key(op: GraphOperator) -> MutationOperator {
         GraphOperator::DisableRewardModulation => MutationOperator::GraphDisableRewardModulation,
         GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
         GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
+        GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
     }
 }
 
@@ -745,6 +770,9 @@ pub(crate) fn input_ref_operator_key(op: InputRefOperator) -> MutationOperator {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod recruitment_tests;
 
 #[cfg(test)]
 mod membership_tests;

@@ -40,7 +40,7 @@ pub fn input_ref_kind(reference: &InputReference) -> InputRefKind {
 /// Every `InputReference` a genome can carry in a world with
 /// `food_type_count` ordinary food types: the sampling pool of
 /// `sampling::random_input_reference_for_food_types`, enumerated.
-fn input_reference_universe(food_type_count: usize) -> Vec<InputReference> {
+pub(crate) fn input_reference_universe(food_type_count: usize) -> Vec<InputReference> {
     let capped = food_type_count.clamp(1, usize::from(u16::MAX) + 1);
     let food_types = (0..capped).map(|idx| OrdinaryFoodTypeId::new(idx as u16));
     world_input_key_universe(food_types)

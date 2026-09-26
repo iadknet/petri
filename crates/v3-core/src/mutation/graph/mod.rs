@@ -1,9 +1,10 @@
 pub mod hebbian;
 pub(crate) mod operators;
+pub(crate) mod recruitment;
 
 use rand::Rng;
 
-use crate::config::MutationConfig;
+use crate::config::{MutationConfig, NeutralInputRecruitment};
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::CgpGraphBackendDef;
 use crate::creature::genome::{BackendDef, CreatureGenome};
@@ -34,10 +35,11 @@ pub enum GraphOperator {
     DisableRewardModulation,
     MutateRewardSource,
     MutateTraceDecay,
+    RecruitNeutralInput,
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 22] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -59,6 +61,7 @@ impl GraphOperator {
         Self::DisableRewardModulation,
         Self::MutateRewardSource,
         Self::MutateTraceDecay,
+        Self::RecruitNeutralInput,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -87,18 +90,21 @@ impl GraphOperator {
             Self::DisableRewardModulation => 1,
             Self::MutateRewardSource => 2,
             Self::MutateTraceDecay => 4,
+            Self::RecruitNeutralInput => 1,
         }
     }
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 21,
+            Self::ALL.len() == 22,
             "ALL must cover every GraphOperator variant"
         );
         let mut sum = 0u16;
         let mut i = 0;
         while i < Self::ALL.len() {
-            sum += Self::ALL[i].weight() as u16;
+            if !matches!(Self::ALL[i], Self::RecruitNeutralInput) {
+                sum += Self::ALL[i].weight() as u16;
+            }
             i += 1;
         }
         sum
@@ -115,7 +121,8 @@ impl GraphOperator {
             | Self::CopySubgraph
             | Self::CopyEdgeBundle
             | Self::EnableHebbian
-            | Self::EnableRewardModulation => ComplexityEffect::Increasing,
+            | Self::EnableRewardModulation
+            | Self::RecruitNeutralInput => ComplexityEffect::Increasing,
             Self::RemoveInternalGraphNode
             | Self::RemoveGraphEdge
             | Self::DisableHebbian
@@ -133,10 +140,19 @@ impl GraphOperator {
         }
     }
 
-    /// Pick a random graph operator weighted by impact tier.
+    /// Whether configuration admits this operator before any sampling.
+    pub fn enabled(self, config: &MutationConfig) -> bool {
+        self != Self::RecruitNeutralInput
+            || config.neutral_input_recruitment != NeutralInputRecruitment::Off
+    }
+
+    /// Pick a default-arm graph operator weighted by impact tier.
     pub fn random(rng: &mut impl Rng) -> Self {
         let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);
         for &op in &Self::ALL {
+            if op == Self::RecruitNeutralInput {
+                continue;
+            }
             let w = op.weight() as u16;
             if r < w {
                 return op;
@@ -160,6 +176,7 @@ impl GraphOperator {
             Self::MutateGraphOperatorParam => operators::has_parameterized_compute_node(def),
             Self::AddInternalGraphNode => operators::can_add_compute_node(def),
             Self::AddGraphEdge => operators::can_add_edge(def),
+            Self::RecruitNeutralInput => !recruitment::destinations(def).is_empty(),
             Self::GraphRawFieldMutation => operators::has_raw_field_site(def, input_refs),
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
@@ -212,8 +229,22 @@ impl GraphMutator {
         op: GraphOperator,
         targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
-        _config: &MutationConfig,
+        config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
+        Self::apply_with_food_type_count(genome, op, targets, rng, config, 1)
+    }
+
+    pub fn apply_with_food_type_count(
+        genome: &mut CreatureGenome,
+        op: GraphOperator,
+        targets: &mut TargetSelector<'_>,
+        rng: &mut impl Rng,
+        config: &MutationConfig,
+        food_type_count: usize,
+    ) -> Result<TargetReachability, MutationSkipReason> {
+        if !op.enabled(config) {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
         let applicable = Self::applicable_indices(genome, op);
         if applicable.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
@@ -222,7 +253,8 @@ impl GraphMutator {
         let (node_idx, reachability) = targets
             .select(&applicable, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        Self::apply_to_node(genome, op, node_idx, rng).map(|()| reachability)
+        Self::apply_to_node(genome, op, node_idx, rng, config, food_type_count)
+            .map(|()| reachability)
     }
 
     /// Dispatch `op` onto one already-selected node.
@@ -231,8 +263,17 @@ impl GraphMutator {
         op: GraphOperator,
         node_idx: usize,
         rng: &mut impl Rng,
+        config: &MutationConfig,
+        food_type_count: usize,
     ) -> Result<(), MutationSkipReason> {
         match op {
+            GraphOperator::RecruitNeutralInput => {
+                let node = genome
+                    .nodes
+                    .get_mut(node_idx)
+                    .ok_or(MutationSkipReason::NoApplicableTarget)?;
+                recruitment::recruit(node, config.neutral_input_recruitment, food_type_count, rng)
+            }
             GraphOperator::AlterGraphEdgeWeight => {
                 operators::alter_edge_weight(genome, node_idx, rng)
             }

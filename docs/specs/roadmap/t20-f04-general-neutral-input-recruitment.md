@@ -98,21 +98,21 @@ have no separate physiological per-edge price; disclose that fact.
 
 ## Implementation Tasks
 
-- [ ] Add candidate admission and the two bounded recruitment arms through the
+- [x] Add candidate admission and the two bounded recruitment arms through the
   existing Graph mutation path, with off-by-default configuration and accounting.
-- [ ] Cover atomicity, full legal access, neutrality boundaries, independent
+- [x] Cover atomicity, full legal access, neutrality boundaries, independent
   refinement and lifecycle, preserving separate growth and default trajectories.
-- [ ] Run the bounded exposure/cost reading and update the mutation/runtime
+- [x] Run the bounded exposure/cost reading and update the mutation/runtime
   reference documentation with actual arm settings and supported scope.
 - [ ] Complete required baseline evidence, final review, mutation gate and
   closure records; check the owning row only when the feature is complete.
 
 ## Verification
 
-- [ ] Focused TDD and property checks in existing mutation/Graph/runtime test
+- [x] Focused TDD and property checks in existing mutation/Graph/runtime test
   seams cover the contract table, including engine opt-in/default RNG behavior;
   exact commands and outcomes go in [readings](../../progress/readings/t20-f04.md).
-- [ ] Native runtime lifecycle/refinement and cost fixtures plus the 6,144-birth
+- [x] Native runtime lifecycle/refinement and cost fixtures plus the 6,144-birth
   engineering reading establish applied access, bounds, denominators and costs;
   results are recorded in the same readings.
 - [ ] `cargo check --workspace --all-targets`, `make roadmap-check` and final
@@ -124,6 +124,22 @@ have no separate physiological per-edge price; disclose that fact.
   raw provenance/hash/bytes and verification time checked, series entries point
   to summaries and no new full report is staged. A second goal determinism run
   is not applicable under the workflow's one-goal-run rule.
+
+**Implementation evidence (2026-09-26).** Viability ran first (28 passed).
+The full core unit suite passed (1,820 passed, 6 ignored); workspace/all-targets
+checking and Clippy passed. Default native birth genomes, ordered mutation
+events and next RNG values match the pre-feature 256-birth digest. The one
+6,144-birth release panel completed in 0.049283375 s with 9,178 bytes of retained
+output: each enabled arm applied 6 recruitment events, with 6/55 edges for
+SingleChannel/WholeFamily and zero observed recruitment in 2,042/2,048 births
+per enabled arm. All commands, failures, sparse coverage, default/diagnostic
+native costs and source/sink readings are in the linked readings.
+
+The explicit reuse/simplicity/efficiency self-review found no required
+production change; it restored default config in three unrelated existing
+fixtures. Standard default-profile trajectory comparison, gate/goal summaries,
+fresh final review, mutation gate and final `make check` remain pending. The
+feature status and roadmap row therefore remain open.
 
 ## Performance and Goal Impact
 
@@ -159,9 +175,9 @@ decision has been made.
 
 ## Success Criteria
 
-- [ ] A single bounded native Graph mutation declares and neutrally connects
+- [x] A single bounded native Graph mutation declares and neutrally connects
   every legal family/channel in the stated arm scope, without incumbent overwrite.
-- [ ] Atomic failures, finite-family bundles, independent later refinement,
+- [x] Atomic failures, finite-family bundles, independent later refinement,
   inherited identity, pruning and existing separate growth paths are verified.
 - [ ] Candidate configuration is off by default with identical default RNG and
   trajectories; measured exposure/growth/cost evidence makes no discovery claim.
