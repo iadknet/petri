@@ -17,7 +17,7 @@ and rollout gates, not a prerequisite for inherited improvements.
 
 - [ ] Existing observations distinguish declaration, connection, executed reads,
   causal action influence and retained usefulness by input family and channel.
-- [ ] Early native-cost ecological checks establish usable opportunities for
+- [x] Early native-cost ecological checks establish usable opportunities for
   input-dependent behavior on at least two differently shaped families, including
   a non-ring family; negative and inconclusive cases are reported separately.
 - [ ] Graph recruitment can declare and neutrally connect any supported input
@@ -41,7 +41,7 @@ and rollout gates, not a prerequisite for inherited improvements.
 
 ## Executable Features
 
-- [ ] **T20.F01 — Input-Use Baseline and Ecological Opportunity** — Depends on: T19.F06, T11.F20, T11.F22, T11.F24, T11.F25, T11.F26, T12.F04
+- [x] **T20.F01 — Input-Use Baseline and Ecological Opportunity** — Depends on: T19.F06, T11.F20, T11.F22, T11.F24, T11.F25, T11.F26, T12.F04
   - Goal: Measure where input use stops between declaration and retained behavior, and whether competent use of differently shaped inputs can improve reproduction in the existing worlds at native costs.
 - [ ] **T20.F02 — Graph Neutral-Connection Contract** — Depends on: T20.F01
   - Goal: Initially silent afferents: a Graph node can acquire a refinable input connection without changing its incumbent signal or overwriting state, using existing edges wherever they suffice.
