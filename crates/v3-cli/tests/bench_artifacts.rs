@@ -185,14 +185,49 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
 /// re-pinned all three: `world.food.shared` no longer carries
 /// `initial_density`, `initial_coverage`, `fertility`, or `annealing`, and
 /// re-adding those synced values reproduces the previous digests.
-/// T20.F04 adds `mutation.neutral_input_recruitment: Off`; removing only that
-/// key must recover the previous digests, preserving the precision guard.
+/// T20.F05 adds `mutation.structured_heritable_refinement: false`; removing only
+/// that key must recover F04's digests. Then removing F04's
+/// `mutation.neutral_input_recruitment: Off` must recover the pre-F04 digests,
+/// preserving both historical precision guards.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
     let actual = configs.each_ref().map(v3_core::config::config_digest);
+    let resolved_again = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
     assert_eq!(
         actual,
+        resolved_again
+            .each_ref()
+            .map(v3_core::config::config_digest),
+        "checked-in recipe identities must agree across repeated resolution"
+    );
+    assert_eq!(
+        actual,
+        [
+            "sha256:916c9ffd3dfd0de0577217711c993f40846262ea0e189320706d307d3874693d",
+            "sha256:2dac898152631d05ad357c4c3dca29ab8dcdcdd37a332cb6d9d95e42d4a85204",
+            "sha256:813a1bc206d1d1f8b04935607d38f6c63a0a87d97133cbc7583fa0e5ff34432e",
+        ]
+    );
+
+    let f04_values = configs.map(|config| {
+        let mut value = serde_json::to_value(config).unwrap();
+        assert_eq!(
+            value["mutation"]
+                .as_object_mut()
+                .unwrap()
+                .remove("structured_heritable_refinement"),
+            Some(json!(false))
+        );
+        value
+    });
+    let f04 = f04_values.each_ref().map(|value| {
+        let canonical =
+            serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value.clone())).unwrap();
+        format!("sha256:{}", artifacts::sha256(&canonical))
+    });
+    assert_eq!(
+        f04,
         [
             "sha256:8cb8f2c380cf15e9fba49ed516049e95aaf07550934ba23bc4852fa972db1d71",
             "sha256:8d38b0ff8e5d89815acbb140a2c3e5b7d9b375df30e00fc8c582a6e8b8aabb2b",
@@ -200,8 +235,7 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
         ]
     );
 
-    let historical = configs.map(|config| {
-        let mut value = serde_json::to_value(config).unwrap();
+    let historical = f04_values.map(|mut value| {
         assert_eq!(
             value["mutation"]
                 .as_object_mut()
