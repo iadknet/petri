@@ -337,7 +337,7 @@ for F04 recruitment. The [graph consumer contract](v3-graph-backend-spec.md#qual
 owns eligible destinations, finite/context preconditions, independently mutable
 occurrences, prune/reindex and copy/serde behavior, address/admission limits,
 and native storage/work costs. Existing weight mutation and edge deletion apply
-to zero edges; this qualification adds no recruitment operator or creation API.
+to zero edges. T20.F04 adds the opt-in `RecruitNeutralInput` operator below.
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
 (the 94 output sinks, vote and parameter sinks included) are never
@@ -448,6 +448,48 @@ added/removed/retyped — only their edges are evolvable.
 - `DisableRewardModulation` (remove reward modulation from a modulated node)
 - `MutateRewardSource` (change the `OutcomeChannel` a modulated node listens to)
 - `MutateTraceDecay` (perturb the `trace_decay` rate on a modulated node)
+- `RecruitNeutralInput` (T20.F04, structural weight 1) — enabled only by
+  `mutation.neutral_input_recruitment = "SingleChannel"` or `"WholeFamily"`.
+  Select one Graph node through the existing applicable-node and target-bias
+  rules, then one admissible source family and one present valid `ActionVote`
+  sink occurrence, empty or wired. SingleChannel appends one ordinary edge of
+  weight `0.0`; WholeFamily appends each canonical finite channel once to that
+  one sink. Only missing input declarations are appended. Existing coefficients,
+  duplicate occurrences, references, compute nodes, routes and backend kinds
+  are preserved.
+
+  Sources cover the existing input-reference universe, every configured food
+  identity, all 24 upstream slots and both 16-slot shared-memory banks. Fixed
+  compounds use their actual widths and scalars use channel 0. SingleChannel
+  samples ActionQueue across all `u16` channels; WholeFamily excludes it because
+  it has no small complete fixed-width family. WholeFamily groups upstream into
+  24 channels/declarations and each memory bank into 16 channels with no
+  declaration. The event appends at most 27 edges and 24 declarations, to one
+  sink, and counts as one mutation event. Typed families name one food type.
+
+  Source admission reuses the first representable matching declaration, or
+  preflights every append before sampling. Appends cannot bind any incumbent
+  dangling InputLeaf, and new indices must fit `u16`; there is no truncation,
+  overwrite or partial bundle. A full declaration table still admits existing
+  sources and shared memory, so a node with a valid vote sink always has a
+  feasible source. VM-only nodes and absent or invalid vote sinks are excluded.
+  Direct unavailable constructions leave the genome unchanged.
+
+  Off (also the omitted default) removes recruitment before sampling and keeps
+  existing operator order, weights and RNG draws. Size-pressure restriction
+  excludes recruitment as growth. The existing operator funnel and selected
+  node record use `Graph.RecruitNeutralInput`; observation draws no RNG. The
+  neighborhood schema includes a zero-valued row when Off. Ordinary
+  `InputRef.Add`, `AddGraphEdge`, retargeting and VM paths remain separate, and
+  the old ActionQueue source draw remains 12 channels. Independent weight
+  mutation, pruning and copy/serialization operate on the ordinary new edges.
+
+  Exact finite-source vote neutrality requires the F02 execution/input context
+  and adequate budget. New declarations may activate sensor assembly; added
+  units increase maintenance, replication and later size-derived mutation
+  supply. An already active graph has no separate physiological per-edge price;
+  a dormant graph's first edge adds its minimum charged visit. Silent signaling
+  does not imply physiological neutrality or discovered usefulness.
 
 ### InputRef domain
 

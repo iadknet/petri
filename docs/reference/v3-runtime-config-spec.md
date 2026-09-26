@@ -94,6 +94,7 @@ Type posture:
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
 | `mutation.per_unit_rate` | `f64` | `0.005` | The only mutation-count setting (T11.F19, T11.F20): chance that one genome unit requests a mutation event. Missing field defaults to `0.005`; finite values clamp to `[0.0, 1.0]`, NaN/infinite normalize to `0.005`. Sized so the 97-unit V3Alpha1 founder expects about 0.485 events per birth. The five keys of the retired per-birth rule (T11.F20) are rejected as unknown fields. |
+| `mutation.neutral_input_recruitment` | enum | `"Off"` | Experimental Graph recruitment arm (T20.F04): `"Off"`, `"SingleChannel"`, or `"WholeFamily"`. Omission means Off; other values are rejected. Enabled arms admit `Graph.RecruitNeutralInput` at structural weight 1; Off excludes it before sampling and consumes no extra RNG. Restricted size pressure excludes this growth operator. |
 | `mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
 | `mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |

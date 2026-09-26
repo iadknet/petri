@@ -10,9 +10,10 @@ pub(crate) use simulation::MAX_GRAZING_RECOVERY_TICKS;
 pub use simulation::{
     AnnealingConfig, EnergyConfig, EnergyCostsConfig, EnergyLifecycleConfig, FertilityAlgorithm,
     FertilityConfig, FertilityLayer, FertilityLayerTarget, FoodConfig, FoodResourceConfig,
-    FoodTypeConfig, FounderProfile, GrazingConfig, MutationConfig, OccupancyDepletionConfig,
-    PhenotypeConfig, PopulationConfig, PredationConfig, ReachableBiasConfig, RuntimeConfig,
-    SimulationConfig, TerrainLayer, VmRuntimeConfig, WorldConfig, WorldEdgeMode,
+    FoodTypeConfig, FounderProfile, GrazingConfig, MutationConfig, NeutralInputRecruitment,
+    OccupancyDepletionConfig, PhenotypeConfig, PopulationConfig, PredationConfig,
+    ReachableBiasConfig, RuntimeConfig, SimulationConfig, TerrainLayer, VmRuntimeConfig,
+    WorldConfig, WorldEdgeMode,
 };
 
 #[cfg(test)]
