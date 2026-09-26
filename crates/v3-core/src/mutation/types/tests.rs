@@ -232,7 +232,8 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphDisableRewardModulation
             | MutationOperator::GraphMutateRewardSource
             | MutationOperator::GraphMutateTraceDecay
-            | MutationOperator::GraphRecruitNeutralInput => {
+            | MutationOperator::GraphRecruitNeutralInput
+            | MutationOperator::GraphRefineHeritableStructure => {
                 assert_eq!(operator.domain(), MutationDomain::Graph)
             }
             MutationOperator::InputRefAdd
@@ -342,6 +343,9 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
             GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
             GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
+            GraphOperator::RefineHeritableStructure => {
+                MutationOperator::GraphRefineHeritableStructure
+            }
         };
         assert_eq!(
             mo.complexity_effect(),

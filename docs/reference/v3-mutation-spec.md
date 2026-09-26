@@ -448,6 +448,50 @@ added/removed/retyped — only their edges are evolvable.
 - `DisableRewardModulation` (remove reward modulation from a modulated node)
 - `MutateRewardSource` (change the `OutcomeChannel` a modulated node listens to)
 - `MutateTraceDecay` (perturb the `trace_decay` rate on a modulated node)
+- `RefineHeritableStructure` (T20.F05, refinement weight 4) — enabled only by
+  `mutation.structured_heritable_refinement = true` (omitted means false).
+  Select an eligible Graph node with the existing target selector, then one
+  semantic group uniformly. The groups contain only existing direct
+  `InputLeaf` edges to valid `ActionVote` sinks:
+
+  - Ring: one concrete NeighborFoodRing food identity, NeighborBarrierRing or
+    NeighborOccupiedRing; one directed vote kind (Move, Reproduce or
+    StealEnergy); one relative offset `(sink_direction - source_direction) mod 8`.
+    Every offset and directed kind has support. Canonical directions are 0–7.
+  - Slots: one nearby-creature bank and field, across four ranked slots, within
+    one sink occurrence. Core has width 4, Vitals 2 and Identity 3 per slot.
+    Every field and all 27 valid vote identities have support. Rank is not a
+    direction; no cyclic rotation or cross-field/bank correspondence is inferred.
+
+  Groups need at least two distinct homologous positions, with at most eight
+  ring or four slot members. A duplicate semantic position excludes its whole
+  group, including repeated sink identities in ring groups. Duplicate input
+  declarations alone do not exclude a unique semantic edge. Nonfinite weights
+  exclude their group. Dangling references, invalid channels/directions,
+  compute-node inputs, non-vote sinks and unsupported input meanings are
+  excluded; other valid groups in that node remain available.
+
+  Draw one `d` uniformly from `[-0.1, 0.1]` and add `d / sqrt(m)` to every
+  selected weight. Preflight all resulting f32 values and the actual coefficient
+  vector norm (at most `0.1 + 1e-6`) before any write. A failed proposal records
+  `NumericProposalRejected` and ends that event without retry; rounded-to-zero
+  changes may still be an applied event. The selected node and distinct
+  `Graph.RefineHeritableStructure` identity use existing event/funnel records;
+  selected versus changed coefficients, requested/actual norms and native costs
+  are reported in the [bounded F05 reading](../progress/readings/t20-f05.md).
+
+  Coefficients retain their local differences up to f32 rounding. Independent
+  scalar mutation, edge removal and declaration pruning remain available, and
+  deleted members are never recreated. No declarations, edges, nodes, routes,
+  backend kinds, compute/plasticity/birth state or genomic units are added or
+  rewritten. Native copies, offspring and serde retain independent coefficients.
+  Enabled refinement is a neutral-complexity exception to restricted pressure's
+  decreasing-only admission; it retains the existing pressure-adjusted target
+  bias. Other operator admission, weights and event supply stay unchanged.
+  Off removes the candidate before sampling without additional RNG draws.
+  The two supported engineering layouts do not establish inherited discovery
+  or general biological usefulness; T20.F09 owns that qualification.
+
 - `RecruitNeutralInput` (T20.F04, structural weight 1) — enabled only by
   `mutation.neutral_input_recruitment = "SingleChannel"` or `"WholeFamily"`.
   Select one Graph node through the existing applicable-node and target-bias
@@ -647,7 +691,8 @@ Selection randomization rules (internal to `MutationEngine`):
 Complexity pressure gate:
 - When `genome_size_pressure_enabled` is true and the genome's total structural
   size (`genome_size()`) exceeds `genome_size_cap`, the engine restricts mutation
-  domains to decreasing-only operators.
+  domains to decreasing-only operators, except enabled T20.F05 structured
+  refinement, which adds no genomic units.
 - The pressure gate uses `genome_size()` (total structural size including
   unreachable/dead code), not `complexity()` (functional reachability-aware).
   This prevents runaway structural bloat even when junk DNA does not affect

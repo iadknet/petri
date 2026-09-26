@@ -808,6 +808,9 @@ pub enum NeutralInputRecruitment {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MutationConfig {
+    /// Bounded semantic input-to-vote refinement; omitted configuration stays off.
+    #[serde(default)]
+    pub structured_heritable_refinement: bool,
     /// Initially silent input-to-vote growth; omitted configuration stays Off.
     #[serde(default)]
     pub neutral_input_recruitment: NeutralInputRecruitment,
@@ -865,6 +868,7 @@ fn default_executed_window_ticks() -> u64 {
 impl Default for MutationConfig {
     fn default() -> Self {
         Self {
+            structured_heritable_refinement: false,
             neutral_input_recruitment: NeutralInputRecruitment::Off,
             per_unit_rate: default_per_unit_rate(),
             mesh_layer_probability: 0.2,

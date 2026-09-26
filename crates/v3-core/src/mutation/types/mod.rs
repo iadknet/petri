@@ -24,6 +24,7 @@ impl ComplexityEffect {
 )]
 pub enum MutationSkipReason {
     ParseabilityViolation,
+    NumericProposalRejected,
     NoApplicableTarget,
 }
 
@@ -33,6 +34,7 @@ impl MutationSkipReason {
     pub const fn as_key(self) -> &'static str {
         match self {
             Self::ParseabilityViolation => "ParseabilityViolation",
+            Self::NumericProposalRejected => "NumericProposalRejected",
             Self::NoApplicableTarget => "NoApplicableTarget",
         }
     }
@@ -187,6 +189,7 @@ pub enum MutationOperator {
     GraphMutateRewardSource,
     GraphMutateTraceDecay,
     GraphRecruitNeutralInput,
+    GraphRefineHeritableStructure,
     // InputRef
     InputRefAdd,
     InputRefPrune,
@@ -248,6 +251,7 @@ impl MutationOperator {
             Self::GraphMutateRewardSource => "Graph.MutateRewardSource",
             Self::GraphMutateTraceDecay => "Graph.MutateTraceDecay",
             Self::GraphRecruitNeutralInput => "Graph.RecruitNeutralInput",
+            Self::GraphRefineHeritableStructure => "Graph.RefineHeritableStructure",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefPrune => "InputRef.Prune",
             Self::InputRefSwap => "InputRef.Swap",
@@ -287,6 +291,7 @@ impl MutationOperator {
             | Self::VmMutateSlotAddress
             | Self::VmMutatePairedSlotAddress => MutationDomain::Vm,
             Self::GraphAlterGraphEdgeWeight
+            | Self::GraphRefineHeritableStructure
             | Self::GraphSwapGraphOperator
             | Self::GraphMutateGraphOperatorParam
             | Self::GraphAddInternalGraphNode
@@ -368,6 +373,7 @@ impl MutationOperator {
             | Self::GraphDisableRewardModulation => ComplexityEffect::Decreasing,
             // Graph: rewiring / neutral
             Self::GraphAlterGraphEdgeWeight
+            | Self::GraphRefineHeritableStructure
             | Self::GraphSwapGraphOperator
             | Self::GraphMutateGraphOperatorParam
             | Self::GraphRetargetGraphEdge
@@ -385,7 +391,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 54] {
+    pub const fn all() -> [Self; 55] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -437,6 +443,7 @@ impl MutationOperator {
             Self::GraphMutateRewardSource,
             Self::GraphMutateTraceDecay,
             Self::GraphRecruitNeutralInput,
+            Self::GraphRefineHeritableStructure,
             Self::InputRefAdd,
             Self::InputRefPrune,
             Self::InputRefSwap,

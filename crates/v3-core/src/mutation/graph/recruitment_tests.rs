@@ -351,7 +351,7 @@ proptest! {
         use super::super::GraphOperator;
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut replay = rng.clone();
-        let old: Vec<_> = GraphOperator::ALL.into_iter().filter(|op| *op != GraphOperator::RecruitNeutralInput).collect();
+        let old: Vec<_> = GraphOperator::ALL.into_iter().filter(|op| !matches!(op, GraphOperator::RecruitNeutralInput | GraphOperator::RefineHeritableStructure)).collect();
         let total: u16 = old.iter().map(|op| u16::from(op.weight())).sum();
         let mut roll = replay.gen_range(0..total);
         let expected = old.into_iter().find(|op| {
