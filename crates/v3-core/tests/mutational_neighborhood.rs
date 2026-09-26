@@ -100,7 +100,10 @@ fn every_operator_in_the_four_domains_produces_a_row() {
     for row in &evaluation.operator_rows {
         assert_eq!(
             row.tally.trials,
-            if row.operator == "RecruitNeutralInput" {
+            if matches!(
+                row.operator.as_str(),
+                "RecruitNeutralInput" | "RefineHeritableStructure"
+            ) {
                 0
             } else {
                 REDUCED_OPERATOR_TRIALS
