@@ -185,12 +185,36 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
 /// re-pinned all three: `world.food.shared` no longer carries
 /// `initial_density`, `initial_coverage`, `fertility`, or `annealing`, and
 /// re-adding those synced values reproduces the previous digests.
+/// T20.F04 adds `mutation.neutral_input_recruitment: Off`; removing only that
+/// key must recover the previous digests, preserving the precision guard.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
-    let actual = GOAL_RECIPE_NAMES
-        .map(|name| v3_core::config::config_digest(&resolve_checked_in_recipe(name)));
+    let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
+    let actual = configs.each_ref().map(v3_core::config::config_digest);
     assert_eq!(
         actual,
+        [
+            "sha256:8cb8f2c380cf15e9fba49ed516049e95aaf07550934ba23bc4852fa972db1d71",
+            "sha256:8d38b0ff8e5d89815acbb140a2c3e5b7d9b375df30e00fc8c582a6e8b8aabb2b",
+            "sha256:34b545451858645292182698ad2f116192ef08f0b03bd5c783842da4fe1f3b1d",
+        ]
+    );
+
+    let historical = configs.map(|config| {
+        let mut value = serde_json::to_value(config).unwrap();
+        assert_eq!(
+            value["mutation"]
+                .as_object_mut()
+                .unwrap()
+                .remove("neutral_input_recruitment"),
+            Some(json!("Off"))
+        );
+        let canonical =
+            serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value)).unwrap();
+        format!("sha256:{}", artifacts::sha256(&canonical))
+    });
+    assert_eq!(
+        historical,
         [
             "sha256:7f91cd5ccb476cc4013e8dc3fe5f050dcf159f39dce621be55a92fdc0aac47ff",
             "sha256:88ef5abaec2d99ba5934e517dcdd045344b73a4c73149f90133f8fb4f692e7b4",
