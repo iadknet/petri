@@ -1,6 +1,6 @@
 # T20.F04 — General Neutral Input Recruitment
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-26
 **Feature**: T20.F04
 **Track**: [T20 — Input Evolvability and Structured Variation](../../roadmaps/t20-input-evolvability-and-structured-variation.md)
@@ -104,7 +104,7 @@ have no separate physiological per-edge price; disclose that fact.
   refinement and lifecycle, preserving separate growth and default trajectories.
 - [x] Run the bounded exposure/cost reading and update the mutation/runtime
   reference documentation with actual arm settings and supported scope.
-- [ ] Complete required baseline evidence, final review, mutation gate and
+- [x] Complete required baseline evidence, final review, mutation gate and
   closure records; check the owning row only when the feature is complete.
 
 ## Verification
@@ -115,7 +115,7 @@ have no separate physiological per-edge price; disclose that fact.
 - [x] Native runtime lifecycle/refinement and cost fixtures plus the 6,144-birth
   engineering reading establish applied access, bounds, denominators and costs;
   results are recorded in the same readings.
-- [ ] `cargo check --workspace --all-targets`, `make roadmap-check` and final
+- [x] `cargo check --workspace --all-targets`, `make roadmap-check` and final
   `make check` pass. If production defaults, founder behavior or tick mechanics
   change, `cargo test -p v3-core --test viability` runs first as required.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path
@@ -139,8 +139,10 @@ The explicit reuse/simplicity/efficiency self-review found no required
 production change; it restored default config in three unrelated existing
 fixtures. Default-profile trajectory comparison and gate/goal summaries now
 pass, and fresh final review completed with no P1 finding. The mutation gate
-is complete; final `make check` remains pending. The feature status and roadmap row
-therefore remain open.
+is complete. Final `make check` exited 0 on tested commit
+`fb6f9fefc11e1ba01e708b16f985bfb1ec8866f8`; its full log is
+`/tmp/t20-f04-final-make-check-remediated.log`. Closure changes are documentation
+only and are verified with `make check-docs`.
 
 The first final-check attempt reached a stale CLI recipe-identity assertion.
 The test-only correction pins the three intentional default-Off schema
@@ -173,8 +175,8 @@ Every fresh survivor is resolved:
   mutant caught while the equivalent survivor remained missed.
 
 There are no deferred survivors, mutation exclusions or skip annotations.
-The feature remains In Progress only because final `make check` and closure
-work belong to the orchestrator.
+The final feature content has passed `make check`; the owning roadmap row is
+checked and this spec is Complete.
 
 ## Performance and Goal Impact
 
@@ -220,9 +222,9 @@ are in [readings](../../progress/readings/t20-f04.md).
   every legal family/channel in the stated arm scope, without incumbent overwrite.
 - [x] Atomic failures, finite-family bundles, independent later refinement,
   inherited identity, pruning and existing separate growth paths are verified.
-- [ ] Candidate configuration is off by default with identical default RNG and
+- [x] Candidate configuration is off by default with identical default RNG and
   trajectories; measured exposure/growth/cost evidence makes no discovery claim.
-- [ ] Required verification and evidence are complete, spec status is Complete
+- [x] Required verification and evidence are complete, spec status is Complete
   and T20.F04 is checked in the owning roadmap.
 
 ## Notes for AI Agents
@@ -238,6 +240,11 @@ are in [readings](../../progress/readings/t20-f04.md).
   toward the workflow limit; the user explicitly authorized one additional
   fresh invocation on 2026-09-26. It completed with two survivors, both
   resolved above. No further fresh invocation is authorized or required.
-- Cost: Pending closure; total usage is unavailable unless session/tool evidence
-  supplies it. Planning, consultations, corrections and interventions are
-  recorded in [readings](../../progress/readings/t20-f04.md).
+- Cost: Six advisor consultations and resumes after planning; one build pass,
+  one self-review pass, and one test-only final-check remediation pass; zero
+  production remediation passes. Fresh review: 0 P1, 1 P2 and 1 P3, both
+  advisory findings resolved in documentation. Zero Codex challenge rounds
+  under the adapter. Total usage unavailable: the goal tool reports 1,101,414
+  tokens through the blocked checkpoint but excludes resumed work. Exact
+  model/effort settings, mutation passes and user interventions are in
+  [readings](../../progress/readings/t20-f04.md).
