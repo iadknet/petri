@@ -118,9 +118,9 @@ have no separate physiological per-edge price; disclose that fact.
 - [ ] `cargo check --workspace --all-targets`, `make roadmap-check` and final
   `make check` pass. If production defaults, founder behavior or tick mechanics
   change, `cargo test -p v3-core --test viability` runs first as required.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path
   and every survivor here as killed, equivalent or explicitly user-deferred.
-- [ ] Gate and single goal summaries stored under `docs/progress/features/`;
+- [x] Gate and single goal summaries stored under `docs/progress/features/`;
   raw provenance/hash/bytes and verification time checked, series entries point
   to summaries and no new full report is staged. A second goal determinism run
   is not applicable under the workflow's one-goal-run rule.
@@ -137,9 +137,38 @@ native costs and source/sink readings are in the linked readings.
 
 The explicit reuse/simplicity/efficiency self-review found no required
 production change; it restored default config in three unrelated existing
-fixtures. Standard default-profile trajectory comparison, gate/goal summaries,
-fresh final review, mutation gate and final `make check` remain pending. The
-feature status and roadmap row therefore remain open.
+fixtures. Default-profile trajectory comparison and gate/goal summaries now
+pass, and fresh final review completed with no P1 finding. The mutation gate
+is complete; final `make check` remains pending. The feature status and roadmap row
+therefore remain open.
+
+**Mutation-gate result (2026-09-26).** After the two baseline-only attempts
+documented in the linked readings, the user authorized one additional fresh
+invocation. `MUTANTS_ITERATE=0 make rust-mutants` exited 0 and reported
+`71 mutants tested in 23m: 2 missed, 52 caught, 17 unviable`; there were no
+timeouts. Output was written under
+`/Users/istefanek/.local/share/petri-tools/mutants/t20-f04/mutants.out`, and
+the exact fresh log is `/tmp/t20-f04-mutants-fresh-authorized.log`.
+
+Every fresh survivor is resolved:
+
+- Equivalent — `crates/v3-core/src/mutation/engine/mod.rs:279:52: replace &&
+  with || in MutationEngine::apply_mutations_on_units`. The replacement only
+  broadens creation of an internal pre-mutation clone. Each downstream reader
+  is still keyed by operator: the test-only recruitment delta reads the clone
+  only for `GraphRecruitNeutralInput`, and both production collectors return
+  `None` for every operator newly cloned by the replacement. Genome, mutation
+  records, summary, RNG and runtime-facing state are therefore identical.
+- Killed — `crates/v3-core/src/mutation/graph/recruitment.rs:197:24: replace ||
+  with && in recruit`. The added test
+  `recruitment_off_rejects_an_eligible_vote_sink_without_editing` requires an
+  eligible node under the Off arm to return `NoApplicableTarget` unchanged.
+  Its focused run passed, and the permitted incremental pass reported this
+  mutant caught while the equivalent survivor remained missed.
+
+There are no deferred survivors, mutation exclusions or skip annotations.
+The feature remains In Progress only because final `make check` and closure
+work belong to the orchestrator.
 
 ## Performance and Goal Impact
 
@@ -166,8 +195,14 @@ make bench PROFILE=gate FEATURE=t20-f04-general-neutral-input-recruitment
 make bench PROFILE=goal FEATURE=t20-f04-general-neutral-input-recruitment
 ```
 
-**Measured verdict.** Pending gate and goal measurements; no threshold or epoch
-decision has been made.
+**Measured verdict (2026-09-26).** Gate and the one required goal run completed
+on `9a563be25dd5bbc2b095bd1b42e04c1d8a0be47a`: both summaries are version 2,
+both CLI exits and observed outer `make` exits are 0, and both comparisons have
+`severe=false`. All retained deterministic default readings equal F02; the
+goal case effective-config digests differ only for the additive candidate
+schema. No threshold or epoch changed. Raw provenance, hashes, byte counts,
+verification times, observation-cap readings and the one-goal-run disposition
+are in [readings](../../progress/readings/t20-f04.md).
 
 - Summaries: gate `docs/progress/features/t20-f04-general-neutral-input-recruitment.json`,
   goal `docs/progress/features/t20-f04-general-neutral-input-recruitment-goal.json`.
@@ -193,6 +228,10 @@ decision has been made.
 - Decision: Full legal access is provided by SingleChannel. WholeFamily is
   bounded to finite canonical families and excludes ActionQueue; no truncated
   queue window is presented as a complete family.
+- Decision: Advisor consultation 5 counted two baseline-only fresh invocations
+  toward the workflow limit; the user explicitly authorized one additional
+  fresh invocation on 2026-09-26. It completed with two survivors, both
+  resolved above. No further fresh invocation is authorized or required.
 - Cost: Pending closure; total usage is unavailable unless session/tool evidence
   supplies it. Planning, consultations, corrections and interventions are
   recorded in [readings](../../progress/readings/t20-f04.md).
