@@ -1,6 +1,6 @@
 # T20.F05 — Structured Heritable Refinement
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-26
 **Feature**: T20.F05
 **Track**: [T20 — Input Evolvability and Structured Variation](../../roadmaps/t20-input-evolvability-and-structured-variation.md)
@@ -108,7 +108,7 @@ size-pressure admission and default-off RNG preservation.
   and property coverage; preserve default behavior and other mutation paths.
 - [x] Complete the bounded comparison and document actual supported scope and
   settings in the existing mutation/runtime references and readings.
-- [ ] Complete baseline evidence, final review, mutation gate and closure
+- [x] Complete baseline evidence, final review, mutation gate and closure
   records; check the roadmap row only at completion.
 
 ## Verification
@@ -119,7 +119,7 @@ size-pressure admission and default-off RNG preservation.
 - [x] The 1,536-proposal release comparison records both layout verdicts,
   scalar/additive/coordinated denominators, vector bounds, applied effects and
   costs in the same readings. This is engineering qualification only.
-- [ ] `cargo check --workspace --all-targets`, `make roadmap-check` and final
+- [x] `cargo check --workspace --all-targets`, `make roadmap-check` and final
   `make check` pass. If defaults, founders or tick mechanics change,
   `cargo test -p v3-core --test viability` runs first.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary, output path
@@ -131,6 +131,8 @@ size-pressure admission and default-off RNG preservation.
 
 | Closure evidence | Result |
 | --- | --- |
+| Full project gate | `make check` exited 0 on `1cccab185358fb0ff72820b315fdaad266c61551`; `/tmp/t20-f05-make-check-final.log`, exit record `/tmp/t20-f05-make-check-final.exit`. Closure changes after that result are documentation only. |
+| Closure documentation | `make check-docs` exited 0; `/tmp/t20-f05-closure-check-docs.log`, exit record `/tmp/t20-f05-closure-check-docs.exit`. The closure commit receives a final full check before integration so main can equal the exact tested commit; its identity/result are retained in `/tmp/t20-f05-exact-head-check.commit`, `/tmp/t20-f05-exact-head-check.log` and `/tmp/t20-f05-exact-head-check.exit`. |
 | Final review | Fresh `gpt-6-astra`, effort `high`: 0 P1, 0 P2, 1 P3. The P3 is a documentation-format advisory about chronological prose in the readings; it is deferred because it does not affect behavior or retained evidence. |
 | Mutation attempt 1 | Fresh mode, 82 candidates discovered; unmutated baseline failed `neighborhood::operators::tests::per_operator_rows_is_deterministic_and_covers_the_full_catalog` before any mutant ran. `outcomes.json` records `total_mutants=0`; missed and timed-out lists are empty. Full report: `/Users/istefanek/.local/share/petri-tools/mutants/t20-f05/mutants.out-attempt1-baseline-failed-20260926`. Advisor 4 approved the test-only default-off expectation correction. |
 | Mutation attempt 2 | Fresh mode, 82 candidates discovered; the corrected unit baseline passed, then the unmutated integration baseline failed `every_operator_in_the_four_domains_produces_a_row` before any mutant ran. `outcomes.json` again records `total_mutants=0`; missed and timed-out lists are empty. Full report: `/Users/istefanek/.local/share/petri-tools/mutants/t20-f05/mutants.out-attempt2-baseline-failed-20260926`. Advisor 5 approved the matching test-only correction. |
@@ -192,11 +194,11 @@ readings and the one-goal-run disposition are in
 
 ## Success Criteria
 
-- [ ] One opt-in native event refines existing semantic groups in both ring and
+- [x] One opt-in native event refines existing semantic groups in both ring and
   nearby-slot layouts with bounded additive steps and truthful accounting.
-- [ ] Local exceptions and deletion persist; unsupported shapes remain outside
+- [x] Local exceptions and deletion persist; unsupported shapes remain outside
   coordination; ordinary access/refinement and default trajectories are intact.
-- [ ] The bounded comparison and all closure gates pass, with engineering
+- [x] The bounded comparison and all closure gates pass, with engineering
   scope separated from F09's unresolved discovery/usefulness verdict.
 
 ## Notes for AI Agents
@@ -204,3 +206,21 @@ readings and the one-goal-run disposition are in
 - Decision: Structured refinement remains opt-in pending the subsequent T20
   qualification and availability gates; these two engineering-supported layouts
   do not establish a general ecological coordination benefit.
+
+- Deferred: Final review raised one P3 about chronological prose in readings;
+  no P1 or P2 findings. The advisory does not affect behavior or evidence.
+- Decision: User authorized the third fresh mutation invocation after two
+  baseline-only failures; no fourth invocation occurred. All three survivors
+  were killed with stronger tests and permitted incremental feedback.
+- Cost: Orchestrator `gpt-6-sol` medium; persistent spec owner/advisor
+  `gpt-6-astra` high (explicit user override); persistent implementer
+  `gpt-6-astra` xhigh; benchmark specialist `gpt-5.6-terra` high; fresh reviewer
+  `gpt-6-astra` high; mutation specialist `gpt-5.6-sol` medium. Eight advisor
+  consultations/resumes after planning, all guidance accepted; one readiness
+  self-review, zero challenge rounds per adapter; one build pass, one self-review
+  pass, zero production remediation passes, four test-only remediation changes
+  (two baseline expectations, survivor coverage, recipe identity checks).
+  No requirement correction or scope expansion. User interventions: spec-owner
+  high override and one additional fresh mutation run authorization. Final
+  aggregate usage unavailable; native goal checkpoint reported 772,333 tokens
+  before the approved resume, which is not the completed task total.
