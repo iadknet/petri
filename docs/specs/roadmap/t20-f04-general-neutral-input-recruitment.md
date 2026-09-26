@@ -142,6 +142,12 @@ pass, and fresh final review completed with no P1 finding. The mutation gate
 is complete; final `make check` remains pending. The feature status and roadmap row
 therefore remain open.
 
+The first final-check attempt reached a stale CLI recipe-identity assertion.
+The test-only correction pins the three intentional default-Off schema
+identities and verifies that removing only `neutral_input_recruitment: Off`
+recovers all three historical canonical hashes. Focused identity verification
+passes; the complete final check still requires the orchestrator's retry.
+
 **Mutation-gate result (2026-09-26).** After the two baseline-only attempts
 documented in the linked readings, the user authorized one additional fresh
 invocation. `MUTANTS_ITERATE=0 make rust-mutants` exited 0 and reported
