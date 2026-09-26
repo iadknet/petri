@@ -220,6 +220,58 @@ A graph selects actions through its `ActionVote` and `ActionParam` sinks
   is positive, or when the queue is non-empty and `Terminate` is positive.
   Neither commits.
 
+### Qualified zero vote connections (T20.F02)
+
+F04 may append an ordinary `GraphEdge { source, weight: 0.0 }` to a
+**present** `ActionVote` sink. All 27 identities qualify: Eat, the eight
+Move, Reproduce and StealEnergy directions, Terminate and Decide. Both empty
+and wired vote sinks qualify; their position in `output_sinks` is irrelevant.
+Preserve the incumbent edge order and coefficients, compute nodes, input
+references and sink identities.
+
+The source is a declared `InputLeaf { ref_idx, sub_idx }` or a current/previous
+`SharedMemory { slot, previous }` slot. For **finite resolved source values**
+and equal native execution context, the appended zero preserves the complete
+visit vote contribution, incumbent output slots, route scores, parameters,
+shared memory, and carried temporal and plasticity state. Equality is exact
+numeric equality, allowing signed zero; no tolerance conceals changed votes.
+Sink weights remain inherited coefficients outside compute-node plasticity.
+
+An already active graph with unchanged compute nodes pays the same native
+charge. At adequate budgets its committed actions and carried state agree
+through repeated visits and ticks, including nonzero incumbent state and
+plasticity. A previously dormant graph (no compute nodes and no wired sink)
+starts paying one minimum visit when its first zero vote edge is appended.
+Its vote remains zero, but this debit can change a later live energy read or
+exhaust the creature. Whole-mesh physiology/action neutrality does not cover
+that activation. Unaffordable visits retain the native exhaustion behavior in
+Section 12 and commit no graph effects.
+
+| Boundary | Consumer obligation or observed limitation |
+| --- | --- |
+| Destinations outside this qualification | `ClearSlot`, `WriteSlot`, `CustomOutput`, `ActionParam`, `RouterGate`, and every compute input. An empty clear/store/output/parameter sink can clear or overwrite nonzero incumbent data when wired with zero. A zero input changes `Multiply` and `Min`. Exclusion does not imply every excluded append is unsafe in every context. |
+| Nonfinite sources | NaN or infinity multiplied by zero can poison a previously nonzero weighted sum before sanitization. There is no neutral guarantee and no special zero-edge sanitization. |
+| Refinement | Each occurrence owns its coefficient, even duplicate source/sink pairs. Changing one zero weight to nonzero can change its named vote under an excited source without changing other coefficients. Existing `AlterGraphEdgeWeight` reaches zero edges. |
+| Removal and references | `RemoveGraphEdge` deletes one occurrence and does not recreate it. A declaration with even a zero-weight consumer cannot be pruned. Once its last consumer is removed it may be pruned. Pruning an earlier unused declaration reindexes surviving consumers while preserving source meaning/channel. |
+| Copy and persistence | Native node copying, genome cloning and serde preserve source meaning, channel, sink identity and independent weights. Mutation/deletion in a copy leaves its original intact. Occurrences have no persistent edge ID. |
+| Addressing | `ref_idx` and `sub_idx` are `u16`; declared index 65535 is representable, proposed index 65536 is not. Shared-memory slots are 0–15. Preserve world-compound wrapping, scalar index ignoring, and decision-compound out-of-width zero behavior. `ActionQueue` reads use their raw index, including readable channels beyond mutation draw width 12. Missing/out-of-width data yielding zero is not evidence of useful refinement. |
+| Admission | An absent destination or unrepresentable proposed reference is ineligible. F02 introduces no creation API or new capacity limit. F04 owns atomic admission/failure and any source declaration; truncation and incumbent overwrite cannot satisfy this contract. |
+
+| Added structure | Added `genome_size()` units |
+| --- | ---: |
+| One edge on an already wired sink | 1 |
+| First edge on an empty sink | 2 (sink plus edge) |
+| Separate input declaration | 1 more |
+
+These units feed existing maintenance, replication and size-dependent mutation
+supply accounting. Resolving and summing each new source adds host work even
+though effect edges have no separate physiological per-edge charge. An extended
+input declaration may also trigger perception assembly. This contract promises
+neither free storage/work/reproduction nor unchanged fitness.
+
+The runtime and property fixtures, commands and cost observations are indexed
+in [T20.F02 readings](../progress/readings/t20-f02.md).
+
 ---
 
 ## 7. Pass Ends

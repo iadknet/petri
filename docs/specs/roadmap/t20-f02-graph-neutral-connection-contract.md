@@ -1,7 +1,7 @@
 # T20.F02 — Graph Neutral-Connection Contract
 
-**Status**: In Progress
-**Last updated**: 2026-09-25
+**Status**: Complete
+**Last updated**: 2026-09-26
 **Feature**: T20.F02
 **Track**: [T20 — Input Evolvability and Structured Variation](../../roadmaps/t20-input-evolvability-and-structured-variation.md)
 
@@ -76,32 +76,38 @@ experiment; there is no lineage/horizon campaign or fitted acceptance margin.
 
 ## Implementation Tasks
 
-- [ ] Add authored and property fixtures for the consumer contract using existing
+- [x] Add authored and property fixtures for the consumer contract using existing
       Graph execution, source resolution and mutation/copy/serde seams.
-- [ ] Document the qualified destinations, finite-value/context preconditions,
+- [x] Document the qualified destinations, finite-value/context preconditions,
       stable-reference and independent-coefficient lifecycle, unsafe examples,
       address limits and native costs in `docs/reference/v3-graph-backend-spec.md`;
       link the F04 handoff from the existing mutation reference where relevant.
-- [ ] Record focused evidence and cost/accounting observations in
+- [x] Record focused evidence and cost/accounting observations in
       `docs/progress/readings/t20-f02.md`; complete required closure records.
 
 ## Verification
 
-- [ ] Focused tests identify all 27 destinations, broad family/channel access,
+- [x] Focused tests identify all 27 destinations, broad family/channel access,
       exact signal/state neutrality, repeat visits/ticks, independent refinement,
       duplicate occurrences, prune/reindex, copy/serde, finite-domain boundary,
       unsafe writes, dormant activation and exhaustion. Names, commands and
       results live in [readings](../../progress/readings/t20-f02.md).
-- [ ] Pure invariants have proptest coverage whose assertions hold for every
+- [x] Pure invariants have proptest coverage whose assertions hold for every
       generated case; persist any regression seeds. Existing contract tests may
       pass immediately; a discovered behavioral defect requires a failing test
       before remediation and spec-owner resolution before widening this scope.
-- [ ] `make check` and `make roadmap-check` pass; results in readings.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: record summary/output path and
-      every survivor here as killed, equivalent or explicitly deferred. Test-only
-      changes may produce no eligible production diff; record the actual result,
-      never infer an exemption.
-- [ ] Gate and goal summaries stored at
+- [x] `make check` and `make roadmap-check` pass; results in readings.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` exited 0. The wrapper recorded
+      `fresh` with no prior results reused in
+      `/Users/istefanek/.local/share/petri-tools/mutants/t20-f02/run-mode.txt`.
+      The wrapper announced
+      `/Users/istefanek/.local/share/petri-tools/mutants/t20-f02/mutants.out`,
+      but cargo-mutants reported `No mutants to filter` and did not create that
+      directory. The evidence root contains `run-mode.txt` and `in-diff.patch`;
+      `missed.txt` and `timeout.txt` are absent because no mutants were generated.
+      The wrapper reported `no survivors`; full survivor list: none, so no
+      killed, equivalent or deferred disposition was required.
+- [x] Gate and goal summaries stored at
       `docs/progress/features/t20-f02-graph-neutral-connection-contract.json` and
       `...-goal.json`; raw provenance/hash/bytes verified, series entries point to
       summaries and no full report is staged. Existing deterministic blocks
@@ -131,8 +137,26 @@ make bench PROFILE=gate FEATURE=t20-f02-graph-neutral-connection-contract
 make bench PROFILE=goal FEATURE=t20-f02-graph-neutral-connection-contract
 ```
 
-**Measured verdict.** Pending. Record each profile's CLI and observed outer
-exit statuses with sources, severe flag, threshold crossings and epoch verdict.
+**Measured verdict.** Gate and single goal runs completed with exit 0 on
+2026-09-26; report comparisons and individual observation caps passed. Both CLI
+statuses are 0 from each raw report's `measurement_evidence.cli_exit`; both
+observed outer `make bench` statuses are 0 from the foreground terminal
+session. Each report has `comparison.severe=false`, every normalized-work and
+wall-clock comparison is `ok`, and the stored deterministic blocks are exactly
+equal to F01's for the corresponding profile (canonical SHA-256: gate
+`1679016b0e5bc6c636426ee3ef7ba0b660284cc5ba00a876ed75ce4abc9d338a`,
+goal `8c4201701f6cf5bafb636e67ef43a6e01f89f0875105d6a108527a41874211ef`).
+The gate compares to T11.F25 and F01; the goal profile compares to T11.F27 and
+F01. All report comparison thresholds and individual observation caps pass. The
+end-to-end 900 s goal investigation trigger is conservatively treated as
+activated because the foreground session retained no elapsed-time record.
+The investigation finds 446,582.434 ms of recorded simulation time, passing
+individual observation caps and comparisons, unchanged deterministic blocks,
+and no production changes. Total command duration and unmeasured overhead
+remain unknown: neither an elapsed-time pass nor a performance regression is
+established. The [readings](../../progress/readings/t20-f02.md) retain this
+bounded investigation and evidence gap; no rerun, threshold change or epoch
+re-pin is warranted by these observations.
 
 - Summaries: [gate](../../progress/features/t20-f02-graph-neutral-connection-contract.json),
   [goal](../../progress/features/t20-f02-graph-neutral-connection-contract-goal.json).
@@ -140,14 +164,28 @@ exit statuses with sources, severe flag, threshold crossings and epoch verdict.
 
 ## Success Criteria
 
-- [ ] F04 has a tested ordinary-edge contract for initially silent, independently
+- [x] F04 has a tested ordinary-edge contract for initially silent, independently
       refinable Graph input connections across action kinds and input shapes.
-- [ ] Reference/copy/delete/serde behavior, unsafe consumers and budget/cost
+- [x] Reference/copy/delete/serde behavior, unsafe consumers and budget/cost
       boundaries are explicit and verified without introducing a representation.
-- [ ] Required checks, benchmark evidence, independent review, mutation record
+- [x] Required checks, benchmark evidence, independent review, mutation record
       and closure bookkeeping are complete; the feature is integrated on main.
 
 ## Notes for AI Agents
 
 - Decision: The user selects Astra `high` for the persistent spec owner in this
   run, overriding the Codex adapter's `xhigh` role default.
+- Cost: Requested roles were Sol `gpt-5.6-sol` medium orchestrator, Astra
+  `gpt-6-astra` high spec owner/advisor, Astra `gpt-6-astra` xhigh implementer,
+  Terra `gpt-5.6-terra` high benchmark specialist, Astra `gpt-6-astra` high
+  reviewer, and Sol `gpt-5.6-sol` medium mutation specialist. Active orchestrator
+  model metadata and task-specific total usage were unavailable. The single
+  implementer pass had three advisor consultations (approach, pre-completion,
+  timing-evidence exception), with no production remediation. The spec owner
+  resumed four times after planning, including the timing-record correction.
+  No Codex challenge round applies under the Codex adapter; readiness self-review
+  was ready. Final review found one P1, zero P2/P3; the P1 evidence correction
+  was confirmed, leaving zero open findings. One post-review documentation
+  remediation pass and one mutation-record audit correction occurred. No
+  requirement change was made. The user directed the spec-owner effort override
+  and authorized local integration at launch; no later intervention was needed.

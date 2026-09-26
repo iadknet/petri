@@ -59,7 +59,8 @@
       "docs/progress/features/t11-f25-meaningful-action-parameter-targets.json",
       "docs/progress/features/t11-f27-compact-action-parameter-storage.json",
       "docs/progress/features/t11-f26-mutation-effect-attribution-and-observation-coverage.json",
-      "docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json"
+      "docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json",
+      "docs/progress/features/t20-f02-graph-neutral-connection-contract.json"
     ]
   },
   "goal": {
@@ -138,7 +139,8 @@
       "docs/progress/features/t11-f25-meaningful-action-parameter-targets-goal.json",
       "docs/progress/features/t11-f27-compact-action-parameter-storage-goal.json",
       "docs/progress/features/t11-f26-mutation-effect-attribution-and-observation-coverage-goal.json",
-      "docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity-goal.json"
+      "docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity-goal.json",
+      "docs/progress/features/t20-f02-graph-neutral-connection-contract-goal.json"
     ]
   }
 }

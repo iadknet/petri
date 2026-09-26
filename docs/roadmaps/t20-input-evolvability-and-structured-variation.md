@@ -1,7 +1,7 @@
 # T20 — Input Evolvability and Structured Variation
 
 **Status**: In Progress
-**Last updated**: 2026-09-25
+**Last updated**: 2026-09-26
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -43,7 +43,7 @@ and rollout gates, not a prerequisite for inherited improvements.
 
 - [x] **T20.F01 — Input-Use Baseline and Ecological Opportunity** — Depends on: T19.F06, T11.F20, T11.F22, T11.F24, T11.F25, T11.F26, T12.F04
   - Goal: Measure where input use stops between declaration and retained behavior, and whether competent use of differently shaped inputs can improve reproduction in the existing worlds at native costs.
-- [ ] **T20.F02 — Graph Neutral-Connection Contract** — Depends on: T20.F01
+- [x] **T20.F02 — Graph Neutral-Connection Contract** — Depends on: T20.F01
   - Goal: Initially silent afferents: a Graph node can acquire a refinable input connection without changing its incumbent signal or overwriting state, using existing edges wherever they suffice.
 - [ ] **T20.F03 — VM Input Recruitment and Refinement** — Depends on: T20.F09, T11.F25
   - Goal: Sensory circuit growth and repeated motifs: VM nodes can acquire and refine the qualified inherited input connections through native instructions with full channel access and measured costs.
