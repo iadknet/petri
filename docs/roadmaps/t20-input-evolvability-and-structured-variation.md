@@ -49,7 +49,7 @@ and rollout gates, not a prerequisite for inherited improvements.
   - Goal: Sensory circuit growth and repeated motifs: VM nodes can acquire and refine the qualified inherited input connections through native instructions with full channel access and measured costs.
 - [x] **T20.F04 — General Neutral Input Recruitment** — Depends on: T20.F02, T13.F05
   - Goal: Afferent circuit growth: one bounded Graph mutation can declare an input and connect it neutrally to an eligible consumer while preserving existing coefficients and ordinary separate growth paths.
-- [ ] **T20.F05 — Structured Heritable Refinement** — Depends on: T20.F04
+- [x] **T20.F05 — Structured Heritable Refinement** — Depends on: T20.F04
   - Goal: Repeated circuit motifs: inherited variation can change homologous relationships across directions or repeated entity slots while independent mutations preserve local exceptions.
 - [ ] **T20.F06 — Applied Action Credit (Conditional)** — Depends on: T20.F13, T19.F05
   - Goal: Efference copies and eligibility traces: Graph input contributions can receive credit for actions the body actually performs and outcomes it experiences, without assuming a directional input layout.
