@@ -47,7 +47,7 @@ and rollout gates, not a prerequisite for inherited improvements.
   - Goal: Initially silent afferents: a Graph node can acquire a refinable input connection without changing its incumbent signal or overwriting state, using existing edges wherever they suffice.
 - [ ] **T20.F03 — VM Input Recruitment and Refinement** — Depends on: T20.F09, T11.F25
   - Goal: Sensory circuit growth and repeated motifs: VM nodes can acquire and refine the qualified inherited input connections through native instructions with full channel access and measured costs.
-- [ ] **T20.F04 — General Neutral Input Recruitment** — Depends on: T20.F02, T13.F05
+- [x] **T20.F04 — General Neutral Input Recruitment** — Depends on: T20.F02, T13.F05
   - Goal: Afferent circuit growth: one bounded Graph mutation can declare an input and connect it neutrally to an eligible consumer while preserving existing coefficients and ordinary separate growth paths.
 - [ ] **T20.F05 — Structured Heritable Refinement** — Depends on: T20.F04
   - Goal: Repeated circuit motifs: inherited variation can change homologous relationships across directions or repeated entity slots while independent mutations preserve local exceptions.
