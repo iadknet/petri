@@ -1,7 +1,7 @@
 # T20.F09 — Inherited Discovery Qualification
 
 **Status**: In Progress
-**Last updated**: 2026-09-26
+**Last updated**: 2026-09-27
 **Feature**: T20.F09
 **Track**: [T20 — Input Evolvability and Structured Variation](../../roadmaps/t20-input-evolvability-and-structured-variation.md)
 
@@ -165,10 +165,126 @@ cap, weaken evidence or run new qualification proposals for this preflight.
   counts, qualified scope and raw hash/bytes verified in readings.
 - [ ] Final `make check` exits 0; `make roadmap-check` validates honest closure,
   downstream blocks and priority changes. No second goal run for determinism.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary/output path and every
-  survivor resolved here as killed, equivalent or user-authorized deferred.
-- [ ] Gate/goal summaries stored, raw hash/bytes/time checked, series entries
-  point to summaries, and no new full report is staged.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary/output path and every
+  survivor resolved here as killed or equivalent; no timeout or deferred survivor.
+
+  Mutation gate record (2026-09-27):
+
+  - Fresh attempt 1 exited outer `make` 2 / `cargo-mutants` 4: its copied source
+    was not a Git checkout; 219 candidates found, zero tested. Preserved at
+    `/Users/istefanek/.local/share/petri-tools/mutants/t20-f09/fresh-attempt-1-baseline-failed/`.
+  - Advisor 16 approved attempt 2 of 2 because attempt 1 supplied no evidence.
+    The isolated test checkout retains the default path assertions. Attempt 2
+    exited 0: 219 tested in 49m, 121 caught, 27 unviable, 71 missed, 0 timeout,
+    run mode `fresh`. Preserved at
+    `/Users/istefanek/.local/share/petri-tools/mutants/t20-f09/fresh-attempt-2-complete/`;
+    final remediation output is `incremental` at
+    `/Users/istefanek/.local/share/petri-tools/mutants/t20-f09/mutants.out`.
+  - Four test-only remediation passes/runs were 71/43 caught/28 missed,
+    28/16/12, 12/4/8 and 8/2/6; all had zero timeout. Closure uses the fresh run
+    plus the dispositions below.
+  - One intervening run was stopped at exit 130 and is **invalid**: a broad edit
+    accidentally changed `Panel::new` before `#[cfg(test)]`. The line was restored;
+    root audited production/build/configuration/test-selection bytes against
+    `8829257d`, and advisor 18 required and approved restoring the valid cache.
+    Invalid output is isolated at
+    `/Users/istefanek/.local/share/petri-tools/mutants/t20-f09/invalid-incremental-3-interrupted/`
+    and contributes no result.
+
+  Fresh-attempt-2 survivor dispositions (all 71):
+
+| # | Mutant identity | Disposition |
+| ---: | --- | --- |
+| 1 | `crates/v3-cli/src/input_discovery.rs:5:38: replace * with /` | killed by test-only remediation |
+| 2 | `crates/v3-cli/src/input_discovery.rs:5:38: replace * with +` | killed by test-only remediation |
+| 3 | `crates/v3-cli/src/input_discovery.rs:5:31: replace * with +` | killed by test-only remediation |
+| 4 | `crates/v3-cli/src/input_discovery.rs:5:31: replace * with /` | killed by test-only remediation |
+| 5 | `crates/v3-core/src/mutation/graph/mod.rs:100:17: replace < with ==` | killed by test-only remediation |
+| 6 | `crates/v3-core/src/mutation/graph/mod.rs:100:17: replace < with >` | killed by test-only remediation |
+| 7 | `crates/v3-core/src/mutation/graph/mod.rs:101:17: replace += with *=` | killed by test-only remediation |
+| 8 | `crates/v3-core/src/mutation/types/mod.rs:34:9: replace MutationSkipReason::as_key -> &'static str with ""` | killed by test-only remediation |
+| 9 | `crates/v3-core/src/mutation/types/mod.rs:34:9: replace MutationSkipReason::as_key -> &'static str with "xyzzy"` | killed by test-only remediation |
+| 10 | `crates/v3-core/src/neighborhood/input_use/mod.rs:46:5: replace connected_channels -> BTreeSet<Channel> with BTreeSet::new()` | killed by test-only remediation |
+| 11 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:128:26: replace &= with |= in Panel::read` | killed by test-only remediation |
+| 12 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:144:29: replace && with || in Panel::read` | killed by test-only remediation |
+| 13 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:143:88: replace == with != in Panel::read` | killed by test-only remediation |
+| 14 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:154:25: replace && with || in Panel::read` | killed by test-only remediation |
+| 15 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:153:25: replace && with || in Panel::read` | killed by test-only remediation |
+| 16 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:171:5: replace nonmoves -> Vec<WorldAction> with vec![]` | killed by test-only remediation |
+| 17 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:193:31: replace * with + in directed_progress` | killed by test-only remediation |
+| 18 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:199:21: replace > with >= in directed_progress` | killed by test-only remediation |
+| 19 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:237:9: replace Reading::acceptable -> bool with true` | killed by test-only remediation |
+| 20 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:237:20: replace && with || in Reading::acceptable` | killed by test-only remediation |
+| 21 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:245:9: replace && with || in qualifies_score` | killed by test-only remediation |
+| 22 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:242:27: replace > with >= in qualifies_score` | equivalent (proof below) |
+| 23 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:245:31: replace - with + in qualifies_score` | killed by test-only remediation |
+| 24 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:245:31: replace - with / in qualifies_score` | killed by test-only remediation |
+| 25 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:321:33: replace && with || in checkpoint` | killed by test-only remediation |
+| 26 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:324:63: replace == with != in checkpoint` | killed by test-only remediation |
+| 27 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:326:82: replace == with != in checkpoint` | killed by test-only remediation |
+| 28 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:339:29: replace && with || in checkpoint` | killed by test-only remediation |
+| 29 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:341:33: replace || with && in checkpoint` | killed by test-only remediation |
+| 30 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:340:33: replace || with && in checkpoint` | killed by test-only remediation |
+| 31 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:339:48: replace != with == in checkpoint` | killed by test-only remediation |
+| 32 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:341:55: replace != with == in checkpoint` | killed by test-only remediation |
+| 33 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:340:52: replace != with == in checkpoint` | killed by test-only remediation |
+| 34 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:344:48: replace - with + in checkpoint` | killed by test-only remediation |
+| 35 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:344:48: replace - with / in checkpoint` | killed by test-only remediation |
+| 36 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:361:9: replace && with || in checkpoint` | killed by test-only remediation |
+| 37 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:358:71: replace > with >= in checkpoint` | killed by test-only remediation |
+| 38 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:360:9: replace && with || in checkpoint` | killed by test-only remediation |
+| 39 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:361:31: replace - with + in checkpoint` | killed by test-only remediation |
+| 40 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:361:31: replace - with / in checkpoint` | killed by test-only remediation |
+| 41 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:362:41: replace - with + in checkpoint` | killed by test-only remediation |
+| 42 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:362:41: replace - with / in checkpoint` | killed by test-only remediation |
+| 43 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:363:38: replace - with + in checkpoint` | killed by test-only remediation |
+| 44 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:363:38: replace - with / in checkpoint` | killed by test-only remediation |
+| 45 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:369:33: replace && with || in checkpoint` | killed by test-only remediation |
+| 46 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:370:30: replace && with || in checkpoint` | killed by test-only remediation |
+| 47 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:370:41: replace >= with < in checkpoint` | killed by test-only remediation |
+| 48 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:371:40: replace && with || in checkpoint` | killed by test-only remediation |
+| 49 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:371:34: replace > with == in checkpoint` | killed by test-only remediation |
+| 50 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:371:34: replace > with < in checkpoint` | killed by test-only remediation |
+| 51 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:371:34: replace > with >= in checkpoint` | killed by test-only remediation |
+| 52 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:371:51: replace > with < in checkpoint` | killed by test-only remediation |
+| 53 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:371:51: replace > with == in checkpoint` | killed by test-only remediation |
+| 54 | `crates/v3-core/src/neighborhood/input_discovery/evaluation.rs:371:51: replace > with >= in checkpoint` | killed by test-only remediation |
+| 55 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:126:62: replace - with + in Scene::world` | killed by test-only remediation |
+| 56 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:128:62: replace - with + in Scene::world` | killed by test-only remediation |
+| 57 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:190:53: replace + with - in Scene::run` | equivalent (proof below) |
+| 58 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:190:53: replace + with * in Scene::run` | equivalent (proof below) |
+| 59 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:191:68: replace > with >= in Scene::run` | equivalent (proof below) |
+| 60 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:208:17: replace + with - in Scene::run` | equivalent (proof below) |
+| 61 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:207:17: replace + with - in Scene::run` | killed by test-only remediation |
+| 62 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:208:17: replace + with * in Scene::run` | killed by test-only remediation |
+| 63 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:206:17: replace + with - in Scene::run` | killed by test-only remediation |
+| 64 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:207:17: replace + with * in Scene::run` | killed by test-only remediation |
+| 65 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:205:17: replace + with - in Scene::run` | killed by test-only remediation |
+| 66 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:206:17: replace + with * in Scene::run` | killed by test-only remediation |
+| 67 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:205:17: replace + with * in Scene::run` | killed by test-only remediation |
+| 68 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:204:17: replace + with - in Scene::run` | equivalent (proof below) |
+| 69 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:204:17: replace + with * in Scene::run` | killed by test-only remediation |
+| 70 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:254:20: delete ! in executed_reads` | killed by test-only remediation |
+| 71 | `crates/v3-core/src/neighborhood/input_discovery/scenes.rs:262:42: replace > with >= in executed_reads` | killed by test-only remediation |
+
+  Equivalent proofs for the six final misses:
+
+  - `evaluation.rs:242:27 > -> >=`: when opportunities are zero,
+    `fraction()` is 0, so the later `fraction >= 0.75` is false; for positive
+    opportunities both guards are true.
+  - `scenes.rs:190:53 + -> -` and `+ -> *`: `Scene::run` first applies
+    `learning_off`; end assertions pin both learning flows to zero, and every
+    mutated expression remains 0.
+  - `scenes.rs:191:68 > -> >=`: phase 0 removes every creature with energy
+    `<= 0`; phase 2 repeats removal after each action (with NoOp fallback).
+    Masked reward learning prevents a later debit, so retained energy is `> 0`.
+  - `scenes.rs:208:17 + -> -`: the fixed scene runs at tick 0, where the native
+    startup ramp pins `failed_action_penalty` to 0; add and subtract are equal.
+  - `scenes.rs:204:17 + -> -`: the native fixed scene configuration has
+    `eat_cost == 0`, so its charge is zero; add and subtract are equal.
+- [x] Gate/goal summaries stored, raw hash/bytes/time checked, series entries
+  point to summaries, and no new full report is staged; the final records and
+  the allowed digest-only disposal difference are in the readings.
 
 ## Performance and Goal Impact
 
@@ -205,8 +321,17 @@ config/operators and the candidate-only diagnostic/executor are retired; the
 historical measured source preserves reproducibility. F10/F03/F11/F12 are blocked;
 F13 retains the valid complete comparisons with the recorded limits.
 
-Pending final gate and goal runs; record CLI/outer exit status,
-`severe`, threshold crossings and epoch decision separately for each.
+**Final baseline verdict.** Gate and goal each ran once, serially, on final
+source `8829257df8da0dde9df44d6b512ed3103a56badc`. Both CLI and observed outer
+`make` exits were 0, both comparisons are `severe=false`, and no threshold
+crossed. The gate remains on T11.F25 and the goal worlds remain on T11.F27;
+neither epoch nor any threshold changed. Every retained F05 counter and goal
+case reading is equal. The only recorded identity changes are the allowed
+removal of `neutral_input_recruitment: Off` and
+`structured_heritable_refinement: false`, their two zero-valued Graph
+operator-funnel/neighborhood entries, and the resulting config/recipe digests.
+Raw and summary paths, hashes, sizes, timings, caps, and source provenance are
+in the readings.
 
 - Summaries: [gate](../../progress/features/t20-f09-inherited-discovery-qualification.json),
   [goal](../../progress/features/t20-f09-inherited-discovery-qualification-goal.json).
@@ -233,3 +358,24 @@ Pending final gate and goal runs; record CLI/outer exit status,
   The one corrective unchanged-panel execution explicitly approved on 2026-09-26
   completed successfully; its valid final verdict now triggers disposal. No
   further campaign or retry is authorized.
+
+- Exception: The first mutation attempt failed its unmutated baseline; advisor
+  16 approved the second fresh attempt within the two-attempt cap. An accidental
+  transient production edit invalidated one incremental run; exact restoration
+  and uncontaminated cache recovery were audited under advisor 18. No gate,
+  threshold, exclusion or production behavior was waived.
+- Decision: Advisor 17 rejected causal-count equivalence inferred only from
+  authored controls; direct regression tests now kill both disputed mutants.
+- Cost: Orchestrator `gpt-6-sol medium`; persistent spec owner/advisor
+  `gpt-6-astra high` (user override); persistent implementer `gpt-6-astra xhigh`;
+  benchmark `gpt-5.6-terra high`; fresh reviewer `gpt-6-astra high`; mutation
+  `gpt-5.6-sol medium`. Eighteen substantive advisor consultations, excluding
+  initial planning/readiness; one readiness review/revision, zero independent
+  spec challenges. Review P1/P2/P3: 0/0/0; zero post-review production remediation
+  passes. Implementation covered the assay, compact-record correction and
+  required disposal; mutation required four valid test-remediation passes plus
+  one baseline-fixture repair. Three prospective contract corrections covered
+  ring direction coverage, native-realizable ring scenes/incumbent, and compact
+  evidence; no success criterion was relaxed. User interventions: initial main
+  committed clean, excessive-recording objection, one corrective-run approval.
+  Total task-specific usage unavailable. Detailed evidence is in the readings.

@@ -138,6 +138,16 @@ fn a_declared_reference_without_consumers_is_declared_only() {
 }
 
 #[test]
+fn connected_channels_returns_the_exact_live_consumer_set() {
+    let reference = food_here();
+    let genome = eat_from(reference.clone(), 0);
+    assert_eq!(
+        connected_channels(&genome),
+        BTreeSet::from([channel(&reference, 0)])
+    );
+}
+
+#[test]
 fn a_connected_consumer_in_an_undispatched_node_is_not_executed() {
     let runtime = RuntimeConfig {
         max_mesh_hops: 1,
