@@ -259,6 +259,18 @@ impl GraphMutator {
         config: &MutationConfig,
         food_type_count: usize,
     ) -> Result<TargetReachability, MutationSkipReason> {
+        Self::apply_observed(genome, op, targets, rng, config, food_type_count, None)
+    }
+
+    pub(crate) fn apply_observed(
+        genome: &mut CreatureGenome,
+        op: GraphOperator,
+        targets: &mut TargetSelector<'_>,
+        rng: &mut impl Rng,
+        config: &MutationConfig,
+        food_type_count: usize,
+        diagnostic: Option<&mut refinement::RefinementDiagnostic>,
+    ) -> Result<TargetReachability, MutationSkipReason> {
         if !op.enabled(config) {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -270,8 +282,13 @@ impl GraphMutator {
         let (node_idx, reachability) = targets
             .select(&applicable, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        Self::apply_to_node(genome, op, node_idx, rng, config, food_type_count)
-            .map(|()| reachability)
+        if op == GraphOperator::RefineHeritableStructure && diagnostic.is_some() {
+            refinement::refine_observed(&mut genome.nodes[node_idx], rng, diagnostic)
+                .map(|()| reachability)
+        } else {
+            Self::apply_to_node(genome, op, node_idx, rng, config, food_type_count)
+                .map(|()| reachability)
+        }
     }
 
     /// Dispatch `op` onto one already-selected node.

@@ -7,6 +7,37 @@ use proptest::prelude::*;
 use rand::rngs::mock::StepRng;
 use rand::{rngs::SmallRng, SeedableRng};
 
+proptest! {
+    #[test]
+    fn observed_and_matched_refinement_preserve_native_draws_and_bound_actual_norm(seed in any::<u64>()) {
+        use rand::RngCore;
+        let original = ring(WorldInputKey::NeighborBarrierRing, VoteKind::Move, 0, 0x55);
+        let mut native = original.clone();
+        let mut observed = original.clone();
+        let mut matched = original;
+        let mut native_rng = SmallRng::seed_from_u64(seed);
+        let mut observed_rng = native_rng.clone();
+        let mut matched_rng = native_rng.clone();
+        let mut observation = RefinementDiagnostic::new(false, seed ^ 7);
+        let mut intervention = RefinementDiagnostic::new(true, seed ^ 13);
+        let native_result = refine(&mut native, &mut native_rng);
+        let observed_result = refine_observed(&mut observed, &mut observed_rng, Some(&mut observation));
+        let matched_result = refine_observed(&mut matched, &mut matched_rng, Some(&mut intervention));
+        prop_assert_eq!(native_result, observed_result);
+        prop_assert_eq!(native_result, matched_result);
+        prop_assert_eq!(native, observed);
+        prop_assert_eq!(native_rng.next_u64(), observed_rng.next_u64());
+        prop_assert_eq!(native_rng.next_u64(), { matched_rng.next_u64(); matched_rng.next_u64() });
+        for diagnostic in [&observation, &intervention] {
+            prop_assert_eq!(diagnostic.steps.len(), 1);
+            let step = &diagnostic.steps[0];
+            prop_assert_eq!(step.coefficients.len(), 4);
+            prop_assert!(step.actual_norm <= 0.1 + 1e-6);
+            prop_assert!(step.coefficients.iter().all(|coefficient| coefficient.after.is_finite()));
+        }
+    }
+}
+
 fn node() -> NodeGenome {
     NodeGenome {
         node_id: NodeId::new(7),

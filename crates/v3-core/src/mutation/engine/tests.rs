@@ -1815,7 +1815,8 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
             &mut TargetSelector::reachable_only(&[0], 1.0),
             &mut rng(9),
             &config,
-            1
+            1,
+            None
         ),
         Err(MutationSkipReason::ParseabilityViolation)
     );
