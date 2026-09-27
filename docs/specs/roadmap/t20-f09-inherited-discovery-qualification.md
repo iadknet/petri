@@ -1,0 +1,197 @@
+# T20.F09 — Inherited Discovery Qualification
+
+**Status**: In Progress
+**Last updated**: 2026-09-26
+**Feature**: T20.F09
+**Track**: [T20 — Input Evolvability and Structured Variation](../../roadmaps/t20-input-evolvability-and-structured-variation.md)
+
+## Goal
+
+Measure whether native inherited variation discovers useful new Graph input
+contributions with lifetime learning off. Qualify general access separately
+from a ring-specialized coordinated-refinement candidate, preserve negative and
+inconclusive results, and freeze only the scope supported by the measurements.
+
+## Non-Goals
+
+- Reproductive retention, free ecological transfer, VM qualification, learning,
+  new ecology, production availability, founder changes, or mutation-rate tuning.
+- General coordination across repeated layouts: this bounded panel tests a
+  ring only; repeated nearby-creature slots remain empirically unqualified.
+- A new experiment framework, benchmark profile, dependency, or goal indicator.
+
+## Inputs and Invariants
+
+The owning row and F09, general-access, and evidence-gate Notes in the
+[T20 roadmap](../../roadmaps/t20-input-evolvability-and-structured-variation.md)
+govern. [F05](t20-f05-structured-heritable-refinement.md) supplies opt-in
+structured steps with independent coefficients; its two-layout engineering
+success is not discovery or ecological evidence.
+[T13.F07](t13-f07-current-policy-recruitment-transitions.md) supplies native
+per-parent supply, target-local exposure, ancestry and causal-control patterns.
+Use current source, not F07's historical default settings or proposal counts.
+
+**Evidence and choice (2026-09-26).** Existing `neighborhood/opportunity`
+contains founder-relative family fixtures and authored controls;
+`neighborhood/recruitment_paths` contains native sibling proposals, compact
+records and lineage Wilson intervals; `input_use` contains semantic channel
+inventory and causal observations. Extend these seams with a bounded
+`neighborhood/input_discovery` assay and `v3-cli input-discovery` command,
+following the existing opportunity/recruitment artifact paths. A fourth bench
+profile would mix task selection with ecological baselines; a separate search
+framework would duplicate native mutation and recording. Neither is needed.
+[Offset-HybrID](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0174635)
+provides a credible indirect-encoding alternative and shows problem-dependent
+benefits from regularity plus exceptions; F05 already represents the bounded
+candidate in ordinary edges, so no encoding replacement is justified here.
+
+[F01's family verdicts](../../progress/readings/t20-f01.md) are positive for
+`FoodHere(1)` and `AreaFoodSummary(0)`, and inconclusive for
+`NeighborBarrierRing`. Accordingly, scalar and heterogeneous-vector families
+are the two primary access shapes. The ring is a separate secondary refinement
+case; a positive ring discovery result cannot upgrade its ecological opportunity
+verdict. The roadmap explicitly permits a specialized ring add-on. Choosing
+that scope prospectively avoids inventing an unscreened nearby-creature task
+and makes no general coordination claim. No F05 fixture counts as a lineage.
+
+**Frozen experiment.** All tables below are prospective. Record the exact
+configuration, initial genome, ordered scene manifest and their digests before
+the first measured proposal; implementation may encode these tables, not tune
+them against outcomes. An invalid instrument is a blocker, not a negative result.
+
+| Item | Contract |
+| --- | --- |
+| Starts | One current canonical V3Alpha1 founder genotype per family, copied into fresh independent lineages. Each focal family is absent initially. Verify this; do not silently edit the founder if it ceases to hold. Preserve incumbent computation, no supplied focal declaration, zero-edge scaffold, source/sink mapping or useful focal payload. No warm start from F01 authored controllers or F05 fixtures. |
+| Five arms, fixed order | B: current separate declaration/connection, recruitment Off and coordination false. S: SingleChannel access, coordination false. W: WholeFamily access, coordination false. C: WholeFamily plus structured refinement. M: WholeFamily plus diagnostic matched additive refinement. All other production mutation settings and operator/domain weights are unchanged. Run every arm on each of the three families. |
+| Native proposals | Each generation draws two siblings through the native mutation engine on the parent's own `genome_size()`, using its default per-unit rate, food-type count 2, recomputed reachability and executed-node set. All supported sources, sinks, backends, operator choices, deletions and target biases remain available. Never select a source, sink, node or correspondence using the task answer. Mixed-backend descendants are retained and attributed. |
+| Matched control | M differs from C only at a selected structured event: same native eligible target/group selection and amplitude distribution, but independent signs with magnitude `abs(d)/sqrt(m)` per member. Bound actual f32 vector norm by `0.1 + 1e-6`, apply atomically before any later mutation event, and record requested/actual steps and touches. Sign draws use a separate diagnostic stream. This is an observation-only intervention, not a production config/operator; production C remains the native F05 operation. Ordinary scalar mutation stays available in every arm. |
+| Learning off | Mutate the stored genotype normally. Evaluate fresh copies with every Graph compute-node plasticity option removed and fresh cognition state; never write that mask back into the inherited genotype or mutation stream. Record the mask and assert zero plasticity/reward updates. This controls lifetime learning without changing the mutation opportunity pool. VM has no newly implemented learner. |
+| Independent units and seeds | Family order scalar/vector/ring; arm order above. Discovery panel: 32 lineages per family/arm. Validation: 16 new lineages per family/arm, never used to tune selection, tasks or thresholds. Generations 0–255, siblings 0–1; seed = `20_090_000_000 + panel*1_000_000_000 + family*100_000_000 + arm*1_000_000 + lineage*10_000 + generation*2 + sibling`. Panel 0 discovery, 1 validation. Distinct arms have distinct seeds. 368,640 proposals maximum; siblings/generations are not independent replicates. |
+| Selection | Evaluate parent and both children on training scenes. Reject children that die or violate any incumbent-preservation predicate. Choose highest fraction of focal task scenes satisfied; ties prefer sibling 0 over sibling 1 over parent, allowing neutral additions to persist. Costs are reported, not a tie-breaker; this is T13 Selection rather than CostSelection. Retain parent when neither child is acceptable. No ablation result, held-out score, declaration/connection count or future outcome enters selection. |
+| Task semantics | Scalar: consume actually present type-1 food when type-0 food is absent, preserve incumbent eating/reproduction otherwise. Vector: when not reproducing, with no local or cardinal-neighbor type-0 food, move toward visible distant type-0 food; preserve incumbent behavior otherwise. Ring: avoid moving into a present barrier while preserving incumbent non-move actions and ordinary movement in barrier-free cases. Focal score denominators contain only the family’s opportunity scenes: fruit-only/non-reproducing for scalar; distant-food/no local or cardinal food/non-reproducing for vector; founder moves into the focal barrier for ring. All remaining contexts are incumbent-preservation checks. Record both denominator sets. These are task scores, not reproductive fitness. Observe final applied action and world consequence through native ticks, not a weight or pre-application vote proxy. |
+| Training scenes | Reuse F01's `competence_contexts` Cartesian factors: four local-food states × no/E cardinal ring food × low/high reproduction eligibility, crossed with four cardinal far-food positions for vector, four cardinal barrier positions for ring, and no extra factor for scalar. Reconstruct in native 12×12 worlds with subject at (6,6), age 50, energy 20/80, two food types, vision 5, far food at distance 2, no food growth/recovery and no initial random food. Add barrier-free ring counterparts. All other costs/budgets stay native. Compute predicates from world facts; authored controller outputs are not the oracle. |
+| Held-out scenes | Same factors with cardinal ring food N/S/W instead of E, far food distances 3 and 4 instead of 2, subject translation to (5,5), energy 25/90 instead of 20/80, and ring cases both with and without an extra diagonal barrier. These scene combinations never influence selection. Primary discovery is the first chosen candidate passing all training qualification predicates; test that candidate once on held-out scenes and count at most one success per lineage. Endpoints are reported separately and cannot rescue a failed primary validation. Freeze both before held-out evaluation. |
+| Causal discovery | A chosen candidate must improve focal task fraction by at least 1/8 over its start, satisfy at least 3/4 of focal scenes, preserve every incumbent predicate and remain alive on training and held-out scenes. Semantic focal-input ablation in all backends must lose at least 1/8 on both sets; Graph-only focal ablation must also lose at least 1/8 to count as Graph discovery. Mask semantic reads using the existing out-of-range reference ablation while preserving declarations, structure, genome size and native cost settings; report changed realized work/charges caused by changed behavior. Report VM-only and jointly carried effects separately; copied old computation or mere declarations do not qualify. |
+| Channel coverage and mixed scenes | Report declared/connected/executed/causal focal channels and denominators. Scalar requires channel 0; vector requires causal direction use on both dx and dy axes; ring requires causal coverage across all four cardinal directions. A lineage satisfying the score only in one direction fails qualification. Preservation is checked with competing local-food, ring-food and reproduction cues, including focal zero-signal scenes. Other channels/directions remain reported, not presumed qualified. |
+| Exposure and censoring | Per lineage record requested/applied/skipped events, operator/target/backend, focal declarations/connections, structured-eligible groups and selected/changed coefficients, causal stages, first qualifying generation, size/native work/charges, and terminal reason. Report proposal discoveries separately from chosen-chain discoveries. No discovery by 256 is right-censored, not an observed discovery time. Missing rows, cap stops, no eligibility, no selected event, no causal benefit and lost competence are distinct. |
+
+**Verdicts and frozen scope.** Use the existing lineage-level Wilson 95%
+interval implementation. A conservative contrast interval is
+`[candidate.lower-control.upper, candidate.upper-control.lower]`; independent
+lineage counts, not proposal counts, determine it. Report absolute rates and
+contrasts separately on discovery and validation panels; no pooled rescue.
+
+| Decision | Rule fixed before outcomes |
+| --- | --- |
+| A family/arm positive | Complete valid panel; Graph discovery rate at least 25%; lower contrast bound against B greater than 0; observed gain at least 0.10; conditions hold separately in the 32-lineage discovery and 16-lineage validation panels. These are conservative engineering screening margins, not confirmatory population claims. |
+| Access S and W | Judge each access-only arm independently on scalar and vector. One same arm must be positive on both to qualify general access. Preserve narrower per-family readings without labelling them general qualification. If both qualify, freeze both; no post-hoc winner selection. |
+| Coordinated variation | Judge C on the ring separately against W and M using the same 25%, positive lower-bound and 0.10 margins in both panels. Require qualifying lineages to have an applied focal ring structured event and report C versus B. This yields at most a ring-specialized discovery verdict. No scalar/vector result is evidence of their semantic coordination, and no nearby-slot benefit is implied. |
+| Negative versus inconclusive | A complete valid comparison is negative for the declared improvement margin when its contrast upper bound is below 0.10 in either panel with adequate exposure. Adequate exposure means at least 3/4 of lineages had a selected focal access event (S/W), or an applied focal structured event (C/M); report each denominator. Otherwise a non-positive comparison is inconclusive, including inadequate exposure, broad uncertainty or a resource stop. Neither means the input is inherently useless. |
+| Artifacts to freeze | Save each first qualifying chosen candidate and endpoint with genotype digest, lineage/seed/generation, mutation config, scene version, learning mask, backend attribution, costs and causal results. Freeze the positively qualified operator settings and family/channel scope in the summary. Keep failed candidates and authored controls labelled separately. F13 also receives the valid inherited comparisons and their limits when every discovery verdict is unfavorable. |
+| Downstream | F10 and F03 require favorable general access on both primary shapes; either may proceed with access alone if coordination fails. F11/F12 inherit only that supported scope through F10/F11. A positive ring coordination result may be carried as a specialized candidate only alongside favorable W general access, because C uses WholeFamily; it does not replace primary access or qualify ecological transfer. F13 requires valid comparisons, not a positive discovery verdict. |
+| Blocking update | If no access arm qualifies both primary families, mark F10, F03, F11 and F12 rows **Blocked — [evidence link]**, keep boxes unchecked and remove those IDs from the master priority list. Mark F13 blocked and remove it only if the inherited comparison itself is invalid/unavailable. A coordination failure alone blocks no access-only successor; record its unavailable scope in track Notes. Conditional learning rows stay unscheduled. F09 may close with valid unfavorable/inconclusive evidence. |
+| Disposal | At final negative/inconclusive stopping verdict, remove unqualified F04/F05 candidate production dispatch/configuration and corresponding references, preserving ordinary growth, F02 correctness and useful observation fixtures. S/W remain available only when that arm qualifies both primary families; C remains available only when its ring verdict and W general access qualify. A retained ring-only refinement result cannot leave repeated-slot refinement available. Per-family partial access success remains evidence, not retained experimental availability. A measured candidate's source revision and raw evidence preserve historical reproducibility; do not fake a removed arm in later builds. An assay command may explicitly reject retired arms. Any exception to disposal requires the user's explicit decision. No candidate becomes a default here. |
+
+**Resource bound.** First run the first two discovery lineages of every
+family/arm as a feasibility prefix; they remain part of the full panel. Stop
+without extending the search if projected full execution exceeds two host-hours.
+The combined measured prefix/full run has a two-host-hour release wall cap and
+512 MiB raw on-disk cap, with bounded checks between generations and records;
+write completed evidence and an explicit partial-lineage/cap reason. Summary
+cap is 4 MiB. No seed replacement, retry-until-success or cap extension. Run
+through `scripts/bench-wait`, alone on the host. Build time is separate.
+
+## Telemetry
+
+Reuse native mutation event summaries, input-use semantics, execution traces
+and applied tick work/energy flows. The assay records every proposal compactly
+(seed, selected parent/child, event counts, digest, task outcome), with full
+genomes only at start, first discovery and endpoint. Correlate by source
+revision/config/scene digest, family, arm, panel, lineage, generation, sibling,
+node/backend and tick. Record effective recruitment mode, coordination mode,
+learning mask and actual mechanism exposure directly, not just hashes.
+
+Store actual applied actions, per-channel causal readings and before/after
+costs at candidate checkpoints. Missing, inapplicable and censored observations
+have explicit fields; no missing value becomes zero. Stream bounded local raw
+records with byte counts/hash and no delivery queue; interrupted or truncated
+output cannot yield a positive verdict. Collection/evaluation uses clones and
+separate RNG, never advances the production mutation stream. Its cost belongs
+to the assay cap. No always-on simulation telemetry or T21 dependency is added;
+these correlated records can later map to T21 execution/context export.
+
+## Implementation Tasks
+
+- [ ] Add the bounded native discovery assay, fixed tasks/arms, causal and
+  learning-off checks, lineage summaries and diagnostic additive control.
+- [ ] Add the CLI/artifact path and freeze the prospective scene/config/start
+  manifest; run the feasibility prefix and capped discovery/validation panels.
+- [ ] Record separate access and coordination verdicts and frozen candidates;
+  dispose of unqualified candidate scope and apply downstream roadmap blocks.
+
+## Verification
+
+- [ ] Focused TDD checks cover applied scene predicates, no authored solution,
+  native supply/targeting, learning mask, matched event order/vector bounds,
+  Graph/VM causal attribution, coverage, incumbent preservation, uncertainty,
+  cap/partial records and artifact provenance; commands/results in
+  [readings](../../progress/readings/t20-f09.md). Pure invariants use proptest.
+- [ ] Reduced deterministic replay verifies seed/lineage independence,
+  observation-on/off mutation fingerprints and unchanged default trajectories;
+  authored positive/ablated controls validate the instrument separately.
+- [ ] `v3-cli input-discovery --feature t20-f09-inherited-discovery-qualification`
+  through `scripts/bench-wait` produces a complete or explicitly capped raw
+  record and `docs/progress/features/t20-f09-inherited-discovery-qualification-discovery.json`;
+  counts, qualified scope and raw hash/bytes verified in readings.
+- [ ] Final `make check` exits 0; `make roadmap-check` validates honest closure,
+  downstream blocks and priority changes. No second goal run for determinism.
+- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary/output path and every
+  survivor resolved here as killed, equivalent or user-authorized deferred.
+- [ ] Gate/goal summaries stored, raw hash/bytes/time checked, series entries
+  point to summaries, and no new full report is staged.
+
+## Performance and Goal Impact
+
+**Predeclaration — written before the run.** Measurement only; no new natural
+mechanism or environmental pressure. Candidate removal retires unsuccessful
+experimental availability without changing default behavior. The inherited
+mechanisms under observation model sensory circuit growth and repeated circuit
+variation, reaching creatures through native inherited inputs and motor votes.
+
+| Item | Expected direction and acceptance |
+| --- | --- |
+| References | F05 gate/goal closure; gate epoch T11.F25 and goal-worlds epoch T11.F27 in `docs/progress/benchmark-series.json`. |
+| Default deterministic behavior | All existing simulation, persistence, diversity, cognition, neighborhood, mutation-effect and input-use values equal F05. If disposal removes disabled candidate config fields/operator-zero entries, list only those schema/digest differences explicitly; they do not excuse changed trajectories or unrelated measurements. No favorable indicator movement sought. |
+| Default compute | No expected increase or justified severe regression. Existing +10%/+50% normalized-work and +25%/+100% wall flags remain; no floor relaxation or epoch re-pin. |
+| Candidate costs | Report genome size, requested event supply, mutation time, native mesh/Graph/VM work, perception, carrying and action charges. Direct Graph vote edges have zero separate per-edge physiological price; disclose this. Fresh one-tick tasks pay their native costs but are not births or ecological lifetimes. No direction for discovery, reproduction or ecological benefit is assumed. |
+| Observation caps | Founder neighborhood 10 s; evolved neighborhood 180 s summed across worlds; read 10 s; mutation effects 60 s; input use 60 s; goal investigation threshold 900 s. Discovery: two host-hours release / 512 MiB raw / 4 MiB summary. |
+| Artifacts | Gate/goal summaries and bounded discovery summary; raw files under the main checkout's ignored `.bench-artifacts/t20-f09-inherited-discovery-qualification/`; concise tables in readings. Candidate source revision is preserved if disposal follows measurement. |
+
+Run after disposal and all benchmark-affecting edits are final, sequentially
+without competing builds, tests, servers or measurements:
+
+```sh
+make bench PROFILE=gate FEATURE=t20-f09-inherited-discovery-qualification
+make bench PROFILE=goal FEATURE=t20-f09-inherited-discovery-qualification
+```
+
+**Measured verdict.** Pending gate and goal runs; record CLI/outer exit status,
+`severe`, threshold crossings and epoch decision separately for each.
+
+- Summaries: [gate](../../progress/features/t20-f09-inherited-discovery-qualification.json),
+  [goal](../../progress/features/t20-f09-inherited-discovery-qualification-goal.json).
+- Full readings: [t20-f09](../../progress/readings/t20-f09.md).
+
+## Success Criteria
+
+- [ ] Valid bounded native observations distinguish access-only and coordinated
+  refinement results with learning off, causal Graph attribution, two primary
+  family shapes, mixed-scene competence and honest uncertainty/censoring.
+- [ ] Supported settings/candidates are frozen; unfavorable findings remain
+  visible; rejected scope is disposed and downstream gates match the verdicts.
+- [ ] Required checks, review, mutation and benchmark evidence are complete.
+
+## Notes for AI Agents
+
+- Decision: Ring-specialized coordination scope is fixed before measurement;
+  this feature does not qualify repeated-slot coordination or production defaults.
