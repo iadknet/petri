@@ -74,7 +74,7 @@ them against outcomes. An invalid instrument is a blocker, not a negative result
 | Instrument validity and controls | Before any measured proposal, native ticks must demonstrate the ring start’s visible distant-food cue and blocked moves in all four directions separately on training and held-out sets. Use exactly the existing F01 four-edge cardinal ring inhibition overlay (weight −2.0) as the ring positive instrument control, changing only reference indices to compose with the area-food incumbent; label/digest it `f09-ring-area-incumbent-inhibition-control-v1`. Its all-four focal causal coverage, survival, mixed-scene preservation and matched focal ablation must pass the unchanged qualification predicates. Record the start and control separately: only the former enters discovery. Control output never defines the task oracle, guides mutation or counts as discovery. Other instrument controls remain labelled separately. If this one existing-controller construction fails native visibility or behavioral validity, stop ring-dependent measurement as an invalid instrument and escalate; do not tune constants, change the controller, weaken coverage or relabel the failure as a candidate verdict. |
 | Causal discovery | A chosen candidate must improve focal task fraction by at least 1/8 over its start, satisfy at least 3/4 of focal scenes, preserve every incumbent predicate and remain alive on training and held-out scenes. Semantic focal-input ablation in all backends must lose at least 1/8 on both sets; Graph-only focal ablation must also lose at least 1/8 to count as Graph discovery. Mask semantic reads using the existing out-of-range reference ablation while preserving declarations, structure, genome size and native cost settings; report changed realized work/charges caused by changed behavior. Report VM-only and jointly carried effects separately; copied old computation or mere declarations do not qualify. |
 | Channel coverage and mixed scenes | Report declared/connected/executed/causal focal channels and denominators. Scalar requires channel 0; vector requires causal direction use on both dx and dy axes; ring requires causal coverage across all four cardinal directions separately on training and held-out scenes. A lineage satisfying the score only in one direction fails qualification. Preservation is checked with competing local-food, ring-food and reproduction cues, including focal zero-signal scenes. Other channels/directions remain reported, not presumed qualified. |
-| Exposure and censoring | Per lineage record requested/applied/skipped events, operator/target/backend, focal declarations/connections, structured-eligible groups and selected/changed coefficients, causal stages, first qualifying generation, size/native work/charges, and terminal reason. Report proposal discoveries separately from chosen-chain discoveries. No discovery by 256 is right-censored, not an observed discovery time. Missing rows, cap stops, no eligibility, no selected event, no causal benefit and lost competence are distinct. |
+| Exposure and censoring | Per lineage aggregate requested/applied/skipped events by operator, selected target and backend; focal declarations/connections; structured-eligible groups, selected/changed coefficients and step-norm bounds; causal stages; first qualifying generation; size/native work/charges; and terminal reason. Keep all-proposal and chosen-ancestry exposure separate without persisting every event. Report proposal discoveries separately from chosen-chain discoveries. No discovery by 256 is right-censored, not an observed discovery time. Missing rows, cap stops, no eligibility, no selected event, no causal benefit and lost competence are distinct. |
 
 **Verdicts and frozen scope.** Use the existing lineage-level Wilson 95%
 interval implementation. A conservative contrast interval is
@@ -88,12 +88,14 @@ contrasts separately on discovery and validation panels; no pooled rescue.
 | Access S and W | Judge each access-only arm independently on scalar and vector. One same arm must be positive on both to qualify general access. Preserve narrower per-family readings without labelling them general qualification. If both qualify, freeze both; no post-hoc winner selection. |
 | Coordinated variation | Judge C on the ring separately against W and M using the same 25%, positive lower-bound and 0.10 margins in both panels. Require qualifying lineages to have an applied focal ring structured event and report C versus B. This yields at most a ring-specialized discovery verdict. No scalar/vector result is evidence of their semantic coordination, and no nearby-slot benefit is implied. |
 | Negative versus inconclusive | A complete valid comparison is negative for the declared improvement margin when its contrast upper bound is below 0.10 in either panel with adequate exposure. Adequate exposure means at least 3/4 of lineages had a selected focal access event (S/W), or an applied focal structured event (C/M); report each denominator. Otherwise a non-positive comparison is inconclusive, including inadequate exposure, broad uncertainty or a resource stop. Neither means the input is inherently useless. |
-| Artifacts to freeze | Save each first qualifying chosen candidate and endpoint with genotype digest, lineage/seed/generation, mutation config, scene version, learning mask, backend attribution, costs and causal results. Freeze the positively qualified operator settings and family/channel scope in the summary. Keep failed candidates and authored controls labelled separately. F13 also receives the valid inherited comparisons and their limits when every discovery verdict is unfavorable. |
+| Artifacts to freeze | Freeze every first qualifying chosen candidate and endpoint by genotype digest, exact source revision, family/arm/panel/lineage/generation seed locator and shared start/config/scene manifest, with compact training/held-out causal, cost and backend facts. Deterministic replay must reconstruct the genome and match its digest. Persist full genomes only for downstream candidate representatives after favorable qualification: the lowest successful lineage identity per qualified family/arm scope (at most five: S/W × scalar/vector, and C × ring), labelled separately from controls; all other frozen identities remain exactly replayable. Do not dump every null endpoint genotype. Freeze positively qualified settings and family/channel scope in the summary. F13 receives valid inherited comparisons and their limits, even when unfavorable. |
 | Downstream | F10 and F03 require favorable general access on both primary shapes; either may proceed with access alone if coordination fails. F11/F12 inherit only that supported scope through F10/F11. A positive ring coordination result may be carried as a specialized candidate only alongside favorable W general access, because C uses WholeFamily; it does not replace primary access or qualify ecological transfer. F13 requires valid comparisons, not a positive discovery verdict. |
 | Blocking update | If no access arm qualifies both primary families, mark F10, F03, F11 and F12 rows **Blocked — [evidence link]**, keep boxes unchecked and remove those IDs from the master priority list. Mark F13 blocked and remove it only if the inherited comparison itself is invalid/unavailable. A coordination failure alone blocks no access-only successor; record its unavailable scope in track Notes. Conditional learning rows stay unscheduled. F09 may close with valid unfavorable/inconclusive evidence. |
 | Disposal | At final negative/inconclusive stopping verdict, remove unqualified F04/F05 candidate production dispatch/configuration and corresponding references, preserving ordinary growth, F02 correctness and useful observation fixtures. S/W remain available only when that arm qualifies both primary families; C remains available only when its ring verdict and W general access qualify. A retained ring-only refinement result cannot leave repeated-slot refinement available. Per-family partial access success remains evidence, not retained experimental availability. A measured candidate's source revision and raw evidence preserve historical reproducibility; do not fake a removed arm in later builds. An assay command may explicitly reject retired arms. Any exception to disposal requires the user's explicit decision. No candidate becomes a default here. |
 
-**Resource bound.** First run the first two discovery lineages of every
+**Resource bound.** The recording-design failure documented in [readings](../../progress/readings/t20-f09.md) supplies partial observations only; it does not trigger the final disposal or downstream-blocking rules above. Those actions remain suspended. One corrective execution of the unchanged fixed panel requires explicit user approval, currently pending; do not start it or treat this amendment as approval. Any approved execution uses the original seeds, scenes, selection, margins, panel sizes and caps, and supersedes the defective-output attempt rather than adding independent samples. No repeated retry is authorized.
+
+First run the first two discovery lineages of every
 family/arm as a feasibility prefix; they remain part of the full panel. Stop
 without extending the search if projected full execution exceeds two host-hours.
 The combined measured prefix/full run has a two-host-hour release wall cap and
@@ -104,29 +106,42 @@ through `scripts/bench-wait`, alone on the host. Build time is separate.
 
 ## Telemetry
 
-Reuse native mutation event summaries, input-use semantics, execution traces
-and applied tick work/energy flows. The assay records every proposal compactly
-(seed, selected parent/child, event counts, digest, task outcome), with full
-genomes only at start, first discovery and endpoint. Correlate by source
-revision/config/scene digest, family, arm, panel, lineage, generation, sibling,
-node/backend and tick. Record effective recruitment mode, coordination mode,
-learning mask and actual mechanism exposure directly, not just hashes.
+Reuse native mutation summaries, input-use semantics, execution observations and
+applied tick work/energy flows. Detailed scene readings may exist temporarily
+for evaluation; persisted evidence is a compact projection, never serialization
+of the internal `Qualification`, `Reading` or proposal objects.
 
-Store actual applied actions, per-channel causal readings and before/after
-costs at candidate checkpoints. Missing, inapplicable and censored observations
-have explicit fields; no missing value becomes zero. Stream bounded local raw
-records with byte counts/hash and no delivery queue; interrupted or truncated
-output cannot yield a positive verdict. Collection/evaluation uses clones and
-separate RNG, never advances the production mutation stream. Its cost belongs
-to the assay cap. No always-on simulation telemetry or T21 dependency is added;
-these correlated records can later map to T21 execution/context export.
+| Record | Sufficient persisted evidence |
+| --- | --- |
+| Shared manifest, once | Source revision, schema/seed rule, exact config and family start genomes, compact ordered scene descriptions/IDs, authored control identities, their digests and effective learning/candidate settings. Baseline and control results use compact facts below; do not repeat their full scene traces. |
+| One row per lineage | Identity, seeds/generation locator, completion and censoring, first eligible primary, endpoint/candidate digests and sizes; exact score/opportunity and preserved/incumbent numerators/denominators, survival, learning-mask/update facts; intact/all-/Graph-/VM-ablation scores; per-channel declared/connected/executed/causal counts and score losses; separate training and held-out qualification/backend flags; exposure aggregates; requested/actual refinement-norm bounds and changed-coefficient totals; native work and action/perception/carrying/learning charges at the frozen primary/endpoint and instrument checkpoints, and total elapsed mutation time across proposals. Sum the existing checkpoint scene values; additional all-proposal physiological-cost collection is not required. Missing/unrun values remain absent explicitly. Keep primary and endpoint roles separate; no checkpoint scene arrays. |
+| Deterministic transcript digest | Incremental SHA-256 per lineage over newline-delimited canonical JSON of deterministic proposal facts in generation/sibling order: seed, parent/child digest, chosen flag, post-mutation RNG observation, units, event outcomes/targets, access/refinement facts and task outcome. Use a fixed field projection and canonical key ordering. Exclude wall times, host paths, timing-based stop decisions and other nondeterminism. Hash online and discard the projected proposal; persist only the final digest and record count. Replay regenerates the same digest and frozen genotype digests. |
+| Bounded audit examples | Only generation 0, siblings 0 and 1, lineage 0 of each family/arm/panel: at most 60 compact proposal witnesses, selected by identity rather than success. Each is at most 16 KiB, for a total at most 960 KiB; no genotype or full scene/ablation vectors. Any omitted/truncated detail is explicit and recoverable by replay. Examples never determine verdicts or replace complete aggregate facts. No endpoint genomes are retained merely because their lineage is selected for audit. |
+
+Use the existing CLI writer, hashing and replay seams; add no experiment,
+resume or storage framework. Observations and aggregation consume no mutation
+RNG. Collection cost remains under the original assay cap; no always-on
+telemetry or T21 dependency is added. The correlated compact records can later
+map to T21 export.
+
+Before requesting corrective-execution approval, verify compact projections
+against the already-recorded partial observations and focused fixtures: all
+scientific counts, causal losses, coverage, costs and verdict inputs agree;
+reduced deterministic replay matches transcript and genotype digests; and an
+explicit full-panel byte estimate from measured record sizes covers all 720
+lineages, shared context, bounded examples and selected candidate genomes.
+Report those components separately. The intended evidence is a few MiB plus
+necessary selected genomes, not a file allowed to grow toward the 512 MiB
+emergency limit. Fix an excessive estimate before execution; do not enlarge the
+cap, weaken evidence or run new qualification proposals for this preflight.
 
 ## Implementation Tasks
 
 - [ ] Add the bounded native discovery assay, fixed tasks/arms, causal and
   learning-off checks, lineage summaries and diagnostic additive control.
-- [ ] Add the CLI/artifact path and freeze the prospective scene/config/start
-  manifest; run the feasibility prefix and capped discovery/validation panels.
+- [ ] Correct the evidence writer, verify compact facts/replay/byte estimate,
+  and obtain explicit approval before one corrective fixed-panel execution;
+  preserve the original scene/config/start manifest and experiment parameters.
 - [ ] Record separate access and coordination verdicts and frozen candidates;
   dispose of unqualified candidate scope and apply downstream roadmap blocks.
 
@@ -137,7 +152,9 @@ these correlated records can later map to T21 execution/context export.
   Graph/VM causal attribution, coverage, incumbent preservation, uncertainty,
   cap/partial records and artifact provenance; commands/results in
   [readings](../../progress/readings/t20-f09.md). Pure invariants use proptest.
-- [ ] Reduced deterministic replay verifies seed/lineage independence,
+- [ ] Compact projection and full-panel byte preflight preserve every verdict
+  input without exhaustive proposal/scene persistence. Reduced deterministic
+  replay verifies transcript/endpoint digests, seed/lineage independence,
   observation-on/off mutation fingerprints and unchanged default trajectories;
   authored positive/ablated controls validate the instrument separately.
 - [ ] `v3-cli input-discovery --feature t20-f09-inherited-discovery-qualification`
@@ -176,7 +193,9 @@ make bench PROFILE=gate FEATURE=t20-f09-inherited-discovery-qualification
 make bench PROFILE=goal FEATURE=t20-f09-inherited-discovery-qualification
 ```
 
-**Measured verdict.** Pending gate and goal runs; record CLI/outer exit status,
+**Measured verdict.** The discovery attempt stopped on an excessive-recording
+error and remains partial evidence, with no final candidate disposition;
+corrective execution awaits user approval. Pending gate and goal runs; record CLI/outer exit status,
 `severe`, threshold crossings and epoch decision separately for each.
 
 - Summaries: [gate](../../progress/features/t20-f09-inherited-discovery-qualification.json),
@@ -198,3 +217,7 @@ make bench PROFILE=goal FEATURE=t20-f09-inherited-discovery-qualification
   fixture are fixed before measurement; the supplied competence contains no
   focal barrier input. This feature does not qualify repeated-slot coordination
   or production defaults.
+
+- Decision: The user rejected the excessive evidence design. Candidate disposal
+  and downstream blocking based on that storage-induced stop are suspended;
+  one corrective unchanged-panel execution requires explicit user approval.
