@@ -58,7 +58,7 @@ and rollout gates, not a prerequisite for inherited improvements.
   - Goal: Outcome-dependent synaptic adjustment: a creature can refine eligible Graph input contributions within its lifetime using experienced outcomes, with bounded acquired state and a heritable learning-off option.
 - [ ] **T20.F08 — Shared Learning with Independent Exceptions (Conditional)** — Depends on: T20.F07
   - Goal: Generalization across repeated circuits: lifetime updates can transfer between semantically corresponding contributions with adjustable sharing and independently refinable exceptions.
-- [ ] **T20.F09 — Inherited Discovery Qualification** — Depends on: T20.F05, T13.F07
+- [x] **T20.F09 — Inherited Discovery Qualification** — Depends on: T20.F05, T13.F07
   - Goal: Measure whether ordinary variation discovers useful Graph input contributions across different family shapes with lifetime learning disabled, separating access from coordinated refinement.
 - [ ] **T20.F10 — Inherited Retention Qualification** — Depends on: T20.F09
   - **Blocked — [complete F09 qualification evidence](../progress/readings/t20-f09.md#corrected-campaign-result)**: no qualified inherited candidate; required favorable discovery is absent.
