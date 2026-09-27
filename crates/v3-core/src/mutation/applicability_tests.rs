@@ -250,7 +250,7 @@ proptest! {
                     let mut genome = base.clone();
                     let mut rng = SmallRng::seed_from_u64(seed ^ apply_seed);
                     let result =
-                        GraphMutator::apply_to_node(&mut genome, op, node_idx, &mut rng, &MutationConfig { structured_heritable_refinement: true, neutral_input_recruitment: crate::config::NeutralInputRecruitment::SingleChannel, ..MutationConfig::default() }, 2);
+                        GraphMutator::apply_to_node(&mut genome, op, node_idx, &mut rng);
                     prop_assert!(
                         result.is_ok(),
                         "{op:?} accepted node {node_idx} but skipped: {result:?}"
@@ -319,7 +319,7 @@ proptest! {
         seed in any::<u64>(),
         sizes in prop::collection::vec(module_size(), 1..4),
     ) {
-        let config = MutationConfig { structured_heritable_refinement: true, neutral_input_recruitment: crate::config::NeutralInputRecruitment::WholeFamily, ..MutationConfig::default() };
+        let config = MutationConfig::default();
         let base = genome(seed, &sizes);
         for &op in &GraphOperator::ALL {
             let applicable = GraphMutator::applicable_indices(&base, op);
@@ -389,7 +389,7 @@ proptest! {
         seed in any::<u64>(),
         sizes in prop::collection::vec(module_size(), 1..5),
     ) {
-        let config = MutationConfig { structured_heritable_refinement: true, neutral_input_recruitment: crate::config::NeutralInputRecruitment::WholeFamily, ..MutationConfig::default() };
+        let config = MutationConfig::default();
         let base = genome(seed, &sizes);
         // Every other node index, ascending, as `TargetSelector` requires.
         let reachable: Vec<usize> = (0..base.nodes.len()).step_by(2).collect();
@@ -464,7 +464,7 @@ proptest! {
         sizes in prop::collection::vec(module_size(), 1..4),
         padding in 1usize..4,
     ) {
-        let config = MutationConfig { structured_heritable_refinement: true, neutral_input_recruitment: crate::config::NeutralInputRecruitment::WholeFamily, ..MutationConfig::default() };
+        let config = MutationConfig::default();
         let base = genome(seed, &sizes);
         let mut padded = base.clone();
         for i in 0..padding {

@@ -93,7 +93,9 @@ contrasts separately on discovery and validation panels; no pooled rescue.
 | Blocking update | If no access arm qualifies both primary families, mark F10, F03, F11 and F12 rows **Blocked — [evidence link]**, keep boxes unchecked and remove those IDs from the master priority list. Mark F13 blocked and remove it only if the inherited comparison itself is invalid/unavailable. A coordination failure alone blocks no access-only successor; record its unavailable scope in track Notes. Conditional learning rows stay unscheduled. F09 may close with valid unfavorable/inconclusive evidence. |
 | Disposal | At final negative/inconclusive stopping verdict, remove unqualified F04/F05 candidate production dispatch/configuration and corresponding references, preserving ordinary growth, F02 correctness and useful observation fixtures. S/W remain available only when that arm qualifies both primary families; C remains available only when its ring verdict and W general access qualify. A retained ring-only refinement result cannot leave repeated-slot refinement available. Per-family partial access success remains evidence, not retained experimental availability. A measured candidate's source revision and raw evidence preserve historical reproducibility; do not fake a removed arm in later builds. An assay command may explicitly reject retired arms. Any exception to disposal requires the user's explicit decision. No candidate becomes a default here. |
 
-**Resource bound.** The recording-design failure documented in [readings](../../progress/readings/t20-f09.md) supplies partial observations only; it does not trigger the final disposal or downstream-blocking rules above. Those actions remain suspended. The user explicitly approved one corrective execution of the unchanged fixed panel on 2026-09-26 ("Approved"). Any approved execution uses the original seeds, scenes, selection, margins, panel sizes and caps, and supersedes the defective-output attempt rather than adding independent samples. No repeated retry is authorized.
+**Resource bound.** The recording-design failure documented in [readings](../../progress/readings/t20-f09.md) supplies partial observations only; it does not trigger the final disposal or downstream-blocking rules above. That suspension applied only to the defective recording. The approved corrective
+execution subsequently completed all 720 lineages and now supplies the final
+disposal and downstream-blocking evidence. The user explicitly approved one corrective execution of the unchanged fixed panel on 2026-09-26 ("Approved"). Any approved execution uses the original seeds, scenes, selection, margins, panel sizes and caps, and supersedes the defective-output attempt rather than adding independent samples. No repeated retry is authorized.
 
 First run the first two discovery lineages of every
 family/arm as a feasibility prefix; they remain part of the full panel. Stop
@@ -137,27 +139,27 @@ cap, weaken evidence or run new qualification proposals for this preflight.
 
 ## Implementation Tasks
 
-- [ ] Add the bounded native discovery assay, fixed tasks/arms, causal and
+- [x] Add the bounded native discovery assay, fixed tasks/arms, causal and
   learning-off checks, lineage summaries and diagnostic additive control.
-- [ ] Correct the evidence writer, verify compact facts/replay/byte estimate,
+- [x] Correct the evidence writer, verify compact facts/replay/byte estimate,
   and obtain explicit approval before one corrective fixed-panel execution;
   preserve the original scene/config/start manifest and experiment parameters.
-- [ ] Record separate access and coordination verdicts and frozen candidates;
+- [x] Record separate access and coordination verdicts and frozen candidates;
   dispose of unqualified candidate scope and apply downstream roadmap blocks.
 
 ## Verification
 
-- [ ] Focused TDD checks cover applied scene predicates, no authored solution,
+- [x] Focused TDD checks cover applied scene predicates, no authored solution,
   native supply/targeting, learning mask, matched event order/vector bounds,
   Graph/VM causal attribution, coverage, incumbent preservation, uncertainty,
   cap/partial records and artifact provenance; commands/results in
   [readings](../../progress/readings/t20-f09.md). Pure invariants use proptest.
-- [ ] Compact projection and full-panel byte preflight preserve every verdict
+- [x] Compact projection and full-panel byte preflight preserve every verdict
   input without exhaustive proposal/scene persistence. Reduced deterministic
   replay verifies transcript/endpoint digests, seed/lineage independence,
   observation-on/off mutation fingerprints and unchanged default trajectories;
   authored positive/ablated controls validate the instrument separately.
-- [ ] `v3-cli input-discovery --feature t20-f09-inherited-discovery-qualification`
+- [x] `v3-cli input-discovery --feature t20-f09-inherited-discovery-qualification`
   through `scripts/bench-wait` produces a complete or explicitly capped raw
   record and `docs/progress/features/t20-f09-inherited-discovery-qualification-discovery.json`;
   counts, qualified scope and raw hash/bytes verified in readings.
@@ -193,9 +195,17 @@ make bench PROFILE=gate FEATURE=t20-f09-inherited-discovery-qualification
 make bench PROFILE=goal FEATURE=t20-f09-inherited-discovery-qualification
 ```
 
-**Measured verdict.** The discovery attempt stopped on an excessive-recording
-error and remains partial evidence, with no final candidate disposition;
-one corrective execution is user-approved and awaits measurement. Pending gate and goal runs; record CLI/outer exit status,
+**Measured verdict.** The one approved corrective campaign completed all 720
+lineages at source `cb254ca9f89d158a1da6a9a3e62b3ac4994dba67`, CLI/outer exit 0,
+valid instrument, no cap, in 2,487.943 s. S general access, W general access and
+ring coordination are separately **inconclusive**, with zero Graph/VM discoveries
+and empty qualified scope. Raw evidence is 6,721,562 bytes, summary 679,821 bytes;
+provenance, exposure and costs are in readings. Unqualified F04/F05 production
+config/operators and the candidate-only diagnostic/executor are retired; the
+historical measured source preserves reproducibility. F10/F03/F11/F12 are blocked;
+F13 retains the valid complete comparisons with the recorded limits.
+
+Pending final gate and goal runs; record CLI/outer exit status,
 `severe`, threshold crossings and epoch decision separately for each.
 
 - Summaries: [gate](../../progress/features/t20-f09-inherited-discovery-qualification.json),
@@ -204,10 +214,10 @@ one corrective execution is user-approved and awaits measurement. Pending gate a
 
 ## Success Criteria
 
-- [ ] Valid bounded native observations distinguish access-only and coordinated
+- [x] Valid bounded native observations distinguish access-only and coordinated
   refinement results with learning off, causal Graph attribution, two primary
   family shapes, mixed-scene competence and honest uncertainty/censoring.
-- [ ] Supported settings/candidates are frozen; unfavorable findings remain
+- [x] Supported settings/candidates are frozen; unfavorable findings remain
   visible; rejected scope is disposed and downstream gates match the verdicts.
 - [ ] Required checks, review, mutation and benchmark evidence are complete.
 
@@ -219,5 +229,7 @@ one corrective execution is user-approved and awaits measurement. Pending gate a
   or production defaults.
 
 - Decision: The user rejected the excessive evidence design. Candidate disposal
-  and downstream blocking based on that storage-induced stop are suspended;
-  one corrective unchanged-panel execution was explicitly approved by the user on 2026-09-26; no further retry is authorized.
+  and downstream blocking based on that storage-induced stop were suspended.
+  The one corrective unchanged-panel execution explicitly approved on 2026-09-26
+  completed successfully; its valid final verdict now triggers disposal. No
+  further campaign or retry is authorized.

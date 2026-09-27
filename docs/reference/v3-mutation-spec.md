@@ -333,11 +333,13 @@ does not extend to energy exhaustion.
 ### Graph domain
 
 T20.F02 qualifies ordinary zero-weight edges to existing `ActionVote` sinks
-for F04 recruitment. The [graph consumer contract](v3-graph-backend-spec.md#qualified-zero-vote-connections-t20f02)
+for initially silent connections. The [graph consumer contract](v3-graph-backend-spec.md#qualified-zero-vote-connections-t20f02)
 owns eligible destinations, finite/context preconditions, independently mutable
 occurrences, prune/reindex and copy/serde behavior, address/admission limits,
 and native storage/work costs. Existing weight mutation and edge deletion apply
-to zero edges. T20.F04 adds the opt-in `RecruitNeutralInput` operator below.
+to zero edges. The unqualified F04/F05 experimental recruitment and structured
+refinement operators were retired by [T20.F09](../progress/readings/t20-f09.md);
+ordinary separate declaration, wiring and scalar refinement remain available.
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
 (the 94 output sinks, vote and parameter sinks included) are never
@@ -448,92 +450,6 @@ added/removed/retyped — only their edges are evolvable.
 - `DisableRewardModulation` (remove reward modulation from a modulated node)
 - `MutateRewardSource` (change the `OutcomeChannel` a modulated node listens to)
 - `MutateTraceDecay` (perturb the `trace_decay` rate on a modulated node)
-- `RefineHeritableStructure` (T20.F05, refinement weight 4) — enabled only by
-  `mutation.structured_heritable_refinement = true` (omitted means false).
-  Select an eligible Graph node with the existing target selector, then one
-  semantic group uniformly. The groups contain only existing direct
-  `InputLeaf` edges to valid `ActionVote` sinks:
-
-  - Ring: one concrete NeighborFoodRing food identity, NeighborBarrierRing or
-    NeighborOccupiedRing; one directed vote kind (Move, Reproduce or
-    StealEnergy); one relative offset `(sink_direction - source_direction) mod 8`.
-    Every offset and directed kind has support. Canonical directions are 0–7.
-  - Slots: one nearby-creature bank and field, across four ranked slots, within
-    one sink occurrence. Core has width 4, Vitals 2 and Identity 3 per slot.
-    Every field and all 27 valid vote identities have support. Rank is not a
-    direction; no cyclic rotation or cross-field/bank correspondence is inferred.
-
-  Groups need at least two distinct homologous positions, with at most eight
-  ring or four slot members. A duplicate semantic position excludes its whole
-  group, including repeated sink identities in ring groups. Duplicate input
-  declarations alone do not exclude a unique semantic edge. Nonfinite weights
-  exclude their group. Dangling references, invalid channels/directions,
-  compute-node inputs, non-vote sinks and unsupported input meanings are
-  excluded; other valid groups in that node remain available.
-
-  Draw one `d` uniformly from `[-0.1, 0.1]` and add `d / sqrt(m)` to every
-  selected weight. Preflight all resulting f32 values and the actual coefficient
-  vector norm (at most `0.1 + 1e-6`) before any write. A failed proposal records
-  `NumericProposalRejected` and ends that event without retry; rounded-to-zero
-  changes may still be an applied event. The selected node and distinct
-  `Graph.RefineHeritableStructure` identity use existing event/funnel records;
-  selected versus changed coefficients, requested/actual norms and native costs
-  are reported in the [bounded F05 reading](../progress/readings/t20-f05.md).
-
-  Coefficients retain their local differences up to f32 rounding. Independent
-  scalar mutation, edge removal and declaration pruning remain available, and
-  deleted members are never recreated. No declarations, edges, nodes, routes,
-  backend kinds, compute/plasticity/birth state or genomic units are added or
-  rewritten. Native copies, offspring and serde retain independent coefficients.
-  Enabled refinement is a neutral-complexity exception to restricted pressure's
-  decreasing-only admission; it retains the existing pressure-adjusted target
-  bias. Other operator admission, weights and event supply stay unchanged.
-  Off removes the candidate before sampling without additional RNG draws.
-  The two supported engineering layouts do not establish inherited discovery
-  or general biological usefulness; T20.F09 owns that qualification.
-
-- `RecruitNeutralInput` (T20.F04, structural weight 1) — enabled only by
-  `mutation.neutral_input_recruitment = "SingleChannel"` or `"WholeFamily"`.
-  Select one Graph node through the existing applicable-node and target-bias
-  rules, then one admissible source family and one present valid `ActionVote`
-  sink occurrence, empty or wired. SingleChannel appends one ordinary edge of
-  weight `0.0`; WholeFamily appends each canonical finite channel once to that
-  one sink. Only missing input declarations are appended. Existing coefficients,
-  duplicate occurrences, references, compute nodes, routes and backend kinds
-  are preserved.
-
-  Sources cover the existing input-reference universe, every configured food
-  identity, all 24 upstream slots and both 16-slot shared-memory banks. Fixed
-  compounds use their actual widths and scalars use channel 0. SingleChannel
-  samples ActionQueue across all `u16` channels; WholeFamily excludes it because
-  it has no small complete fixed-width family. WholeFamily groups upstream into
-  24 channels/declarations and each memory bank into 16 channels with no
-  declaration. The event appends at most 27 edges and 24 declarations, to one
-  sink, and counts as one mutation event. Typed families name one food type.
-
-  Source admission reuses the first representable matching declaration, or
-  preflights every append before sampling. Appends cannot bind any incumbent
-  dangling InputLeaf, and new indices must fit `u16`; there is no truncation,
-  overwrite or partial bundle. A full declaration table still admits existing
-  sources and shared memory, so a node with a valid vote sink always has a
-  feasible source. VM-only nodes and absent or invalid vote sinks are excluded.
-  Direct unavailable constructions leave the genome unchanged.
-
-  Off (also the omitted default) removes recruitment before sampling and keeps
-  existing operator order, weights and RNG draws. Size-pressure restriction
-  excludes recruitment as growth. The existing operator funnel and selected
-  node record use `Graph.RecruitNeutralInput`; observation draws no RNG. The
-  neighborhood schema includes a zero-valued row when Off. Ordinary
-  `InputRef.Add`, `AddGraphEdge`, retargeting and VM paths remain separate, and
-  the old ActionQueue source draw remains 12 channels. Independent weight
-  mutation, pruning and copy/serialization operate on the ordinary new edges.
-
-  Exact finite-source vote neutrality requires the F02 execution/input context
-  and adequate budget. New declarations may activate sensor assembly; added
-  units increase maintenance, replication and later size-derived mutation
-  supply. An already active graph has no separate physiological per-edge price;
-  a dormant graph's first edge adds its minimum charged visit. Silent signaling
-  does not imply physiological neutrality or discovered usefulness.
 
 ### InputRef domain
 
@@ -691,8 +607,7 @@ Selection randomization rules (internal to `MutationEngine`):
 Complexity pressure gate:
 - When `genome_size_pressure_enabled` is true and the genome's total structural
   size (`genome_size()`) exceeds `genome_size_cap`, the engine restricts mutation
-  domains to decreasing-only operators, except enabled T20.F05 structured
-  refinement, which adds no genomic units.
+  domains to decreasing-only operators.
 - The pressure gate uses `genome_size()` (total structural size including
   unreachable/dead code), not `complexity()` (functional reachability-aware).
   This prevents runaway structural bloat even when junk DNA does not affect

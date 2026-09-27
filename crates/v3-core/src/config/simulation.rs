@@ -795,25 +795,10 @@ impl Default for ReachableBiasConfig {
     }
 }
 
-/// Experimental native Graph input-recruitment arm (T20.F04).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum NeutralInputRecruitment {
-    #[default]
-    Off,
-    SingleChannel,
-    WholeFamily,
-}
-
 /// Mutation tuning config. Canonical owner: v3-runtime-config-spec.md Section 3.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MutationConfig {
-    /// Bounded semantic input-to-vote refinement; omitted configuration stays off.
-    #[serde(default)]
-    pub structured_heritable_refinement: bool,
-    /// Initially silent input-to-vote growth; omitted configuration stays Off.
-    #[serde(default)]
-    pub neutral_input_recruitment: NeutralInputRecruitment,
     /// Chance that one genome unit requests a mutation event at birth: the
     /// only supply rule (T11.F19, T11.F20). A birth draws one Bernoulli trial
     /// per unit, so the requested event count is `Binomial(units, per_unit_rate)`
@@ -868,8 +853,6 @@ fn default_executed_window_ticks() -> u64 {
 impl Default for MutationConfig {
     fn default() -> Self {
         Self {
-            structured_heritable_refinement: false,
-            neutral_input_recruitment: NeutralInputRecruitment::Off,
             per_unit_rate: default_per_unit_rate(),
             mesh_layer_probability: 0.2,
             large_copy_weight_percent: default_large_copy_weight_percent(),

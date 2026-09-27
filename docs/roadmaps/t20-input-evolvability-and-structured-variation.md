@@ -46,6 +46,7 @@ and rollout gates, not a prerequisite for inherited improvements.
 - [x] **T20.F02 — Graph Neutral-Connection Contract** — Depends on: T20.F01
   - Goal: Initially silent afferents: a Graph node can acquire a refinable input connection without changing its incumbent signal or overwriting state, using existing edges wherever they suffice.
 - [ ] **T20.F03 — VM Input Recruitment and Refinement** — Depends on: T20.F09, T11.F25
+  - **Blocked — [complete F09 qualification evidence](../progress/readings/t20-f09.md#corrected-campaign-result)**: no qualified inherited candidate; required favorable discovery is absent.
   - Goal: Sensory circuit growth and repeated motifs: VM nodes can acquire and refine the qualified inherited input connections through native instructions with full channel access and measured costs.
 - [x] **T20.F04 — General Neutral Input Recruitment** — Depends on: T20.F02, T13.F05
   - Goal: Afferent circuit growth: one bounded Graph mutation can declare an input and connect it neutrally to an eligible consumer while preserving existing coefficients and ordinary separate growth paths.
@@ -60,10 +61,13 @@ and rollout gates, not a prerequisite for inherited improvements.
 - [ ] **T20.F09 — Inherited Discovery Qualification** — Depends on: T20.F05, T13.F07
   - Goal: Measure whether ordinary variation discovers useful Graph input contributions across different family shapes with lifetime learning disabled, separating access from coordinated refinement.
 - [ ] **T20.F10 — Inherited Retention Qualification** — Depends on: T20.F09
+  - **Blocked — [complete F09 qualification evidence](../progress/readings/t20-f09.md#corrected-campaign-result)**: no qualified inherited candidate; required favorable discovery is absent.
   - Goal: Measure whether newly useful input contributions improve reproduction and remain useful across descendants without sacrificing established abilities.
 - [ ] **T20.F11 — Inherited Ecological Transfer** — Depends on: T20.F10, T12.F04
+  - **Blocked — [complete F09 qualification evidence](../progress/readings/t20-f09.md#corrected-campaign-result)**: no qualified inherited candidate; required favorable discovery is absent.
   - Goal: Measure whether the qualified inherited Graph abilities persist in freely foraging, reproducing populations across the standard landscapes at native costs.
 - [ ] **T20.F12 — Qualified Graph Availability** — Depends on: T20.F11
+  - **Blocked — [complete F09 qualification evidence](../progress/readings/t20-f09.md#corrected-campaign-result)**: no qualified inherited candidate; required favorable discovery is absent.
   - Goal: Adaptive circuit development: ordinarily born creatures can acquire the qualified inherited Graph mechanisms through evolution, retaining sparse, independently refined and pruned alternatives.
 - [ ] **T20.F13 — Lifetime-Learning Need and Comparator** — Depends on: T20.F09
   - Goal: Determine whether an ecologically realizable within-life problem remains after inherited refinement, and whether a supplied learner offers enough added benefit to justify native learning work.
@@ -74,6 +78,26 @@ and rollout gates, not a prerequisite for inherited improvements.
 
 ## Notes for AI Agents
 
+**F09 completed measurement, 2026-09-26.** The corrected fixed panel completed
+all 720 lineages and both independent panels. S general access, W general access
+and ring coordination are separately inconclusive; no Graph or VM discovery
+qualified, and no focal structured eligibility/event occurred. All unqualified
+F04/F05 candidate configuration/operators are retired; their historical feature
+checkboxes record completed engineering work, not current production availability.
+F10/F03/F11/F12 remain unchecked and blocked and leave the master priority list.
+
+F13 is unblocked by the valid complete inherited comparisons, subject to F09's
+remaining closure gates. Its handoff is the actual frozen starts/endpoints and
+comparisons with their source/manifest identities, not a strongest qualified
+improvement. Zero discoveries do not prove inherited impossibility or a learning
+advantage. The ring start supplies authored area-food competence; these one-tick
+engineering scenes prove neither reproductive retention nor ecological transfer.
+F13 must prospectively validate matched incumbent competence, coordinated
+inheritance and ecological within-life need/cost if those comparators are needed.
+It may not reopen F09, retain retired production operators or add a native learner.
+Conditional learning features remain unscheduled.
+
+
 **Revision after adversarial review, 2026-09-23.** The purpose is general input
 evolvability, with Graph qualification first and one later VM feature. Keep T20
 as one track: general access is the core; topology-aware refinement and learning
@@ -81,7 +105,8 @@ have narrower claims and distinct gates. The original draft overgeneralized
 ring experiments and coupled inherited qualification to learning. Pending IDs
 are retained, with F03 moved out of the Graph chain, F09–F12 made inherited-only,
 and F13–F15 added for the conditional learning decision and qualification.
-No feature in this track has been executed.
+This paragraph records the pre-execution revision; current completion and blocks
+are recorded above.
 
 **Evidence and alternatives.** The [ALife review](../strategy/alife-sensorimotor-learning-research-2026-09-23.md)
 and four exploratory reports motivate candidates, not defaults:
