@@ -1,6 +1,6 @@
 # T20.F09 — Inherited Discovery Qualification
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-27
 **Feature**: T20.F09
 **Track**: [T20 — Input Evolvability and Structured Variation](../../roadmaps/t20-input-evolvability-and-structured-variation.md)
@@ -163,7 +163,7 @@ cap, weaken evidence or run new qualification proposals for this preflight.
   through `scripts/bench-wait` produces a complete or explicitly capped raw
   record and `docs/progress/features/t20-f09-inherited-discovery-qualification-discovery.json`;
   counts, qualified scope and raw hash/bytes verified in readings.
-- [ ] Final `make check` exits 0; `make roadmap-check` validates honest closure,
+- [x] Final `make check` exits 0; `make roadmap-check` validates honest closure,
   downstream blocks and priority changes. No second goal run for determinism.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary/output path and every
   survivor resolved here as killed or equivalent; no timeout or deferred survivor.
@@ -331,7 +331,7 @@ in the readings.
   family shapes, mixed-scene competence and honest uncertainty/censoring.
 - [x] Supported settings/candidates are frozen; unfavorable findings remain
   visible; rejected scope is disposed and downstream gates match the verdicts.
-- [ ] Required checks, review, mutation and benchmark evidence are complete.
+- [x] Required checks, review, mutation and benchmark evidence are complete.
 
 ## Notes for AI Agents
 
