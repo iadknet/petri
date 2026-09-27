@@ -93,7 +93,7 @@ contrasts separately on discovery and validation panels; no pooled rescue.
 | Blocking update | If no access arm qualifies both primary families, mark F10, F03, F11 and F12 rows **Blocked — [evidence link]**, keep boxes unchecked and remove those IDs from the master priority list. Mark F13 blocked and remove it only if the inherited comparison itself is invalid/unavailable. A coordination failure alone blocks no access-only successor; record its unavailable scope in track Notes. Conditional learning rows stay unscheduled. F09 may close with valid unfavorable/inconclusive evidence. |
 | Disposal | At final negative/inconclusive stopping verdict, remove unqualified F04/F05 candidate production dispatch/configuration and corresponding references, preserving ordinary growth, F02 correctness and useful observation fixtures. S/W remain available only when that arm qualifies both primary families; C remains available only when its ring verdict and W general access qualify. A retained ring-only refinement result cannot leave repeated-slot refinement available. Per-family partial access success remains evidence, not retained experimental availability. A measured candidate's source revision and raw evidence preserve historical reproducibility; do not fake a removed arm in later builds. An assay command may explicitly reject retired arms. Any exception to disposal requires the user's explicit decision. No candidate becomes a default here. |
 
-**Resource bound.** The recording-design failure documented in [readings](../../progress/readings/t20-f09.md) supplies partial observations only; it does not trigger the final disposal or downstream-blocking rules above. Those actions remain suspended. One corrective execution of the unchanged fixed panel requires explicit user approval, currently pending; do not start it or treat this amendment as approval. Any approved execution uses the original seeds, scenes, selection, margins, panel sizes and caps, and supersedes the defective-output attempt rather than adding independent samples. No repeated retry is authorized.
+**Resource bound.** The recording-design failure documented in [readings](../../progress/readings/t20-f09.md) supplies partial observations only; it does not trigger the final disposal or downstream-blocking rules above. Those actions remain suspended. The user explicitly approved one corrective execution of the unchanged fixed panel on 2026-09-26 ("Approved"). Any approved execution uses the original seeds, scenes, selection, margins, panel sizes and caps, and supersedes the defective-output attempt rather than adding independent samples. No repeated retry is authorized.
 
 First run the first two discovery lineages of every
 family/arm as a feasibility prefix; they remain part of the full panel. Stop
@@ -195,7 +195,7 @@ make bench PROFILE=goal FEATURE=t20-f09-inherited-discovery-qualification
 
 **Measured verdict.** The discovery attempt stopped on an excessive-recording
 error and remains partial evidence, with no final candidate disposition;
-corrective execution awaits user approval. Pending gate and goal runs; record CLI/outer exit status,
+one corrective execution is user-approved and awaits measurement. Pending gate and goal runs; record CLI/outer exit status,
 `severe`, threshold crossings and epoch decision separately for each.
 
 - Summaries: [gate](../../progress/features/t20-f09-inherited-discovery-qualification.json),
@@ -220,4 +220,4 @@ corrective execution awaits user approval. Pending gate and goal runs; record CL
 
 - Decision: The user rejected the excessive evidence design. Candidate disposal
   and downstream blocking based on that storage-induced stop are suspended;
-  one corrective unchanged-panel execution requires explicit user approval.
+  one corrective unchanged-panel execution was explicitly approved by the user on 2026-09-26; no further retry is authorized.
