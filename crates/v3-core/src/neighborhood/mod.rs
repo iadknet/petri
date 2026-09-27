@@ -21,6 +21,7 @@ pub mod census;
 pub mod classify;
 pub mod companions;
 pub mod drift;
+pub mod input_discovery;
 pub mod input_use;
 pub mod mesh_execution;
 pub mod mutation_effects;

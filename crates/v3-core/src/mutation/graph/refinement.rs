@@ -1,5 +1,7 @@
 //! Bounded additive refinement of existing semantic input-to-vote groups.
 use rand::Rng;
+use rand::{rngs::SmallRng, SeedableRng};
+use serde::Serialize;
 use std::collections::HashMap;
 
 use crate::contracts::{Direction, InputReference, WorldInputKey};
@@ -138,6 +140,86 @@ pub(super) fn has_group(def: &CgpGraphBackendDef, references: &[InputReference])
 }
 
 pub(crate) fn refine(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
+    refine_observed(node, rng, None)
+}
+
+/// Assay-only event observer/intervention. Not a production mutation setting.
+pub(crate) struct RefinementDiagnostic {
+    matched: bool,
+    signs: SmallRng,
+    pub(crate) steps: Vec<RefinementStep>,
+    pub(crate) access: Vec<AccessStep>,
+    pub(crate) event: u32,
+}
+
+impl RefinementDiagnostic {
+    pub(crate) fn new(matched: bool, seed: u64) -> Self {
+        Self {
+            matched,
+            signs: SmallRng::seed_from_u64(seed),
+            steps: Vec::new(),
+            access: Vec::new(),
+            event: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AccessStep {
+    pub event: u32,
+    pub node: crate::contracts::NodeId,
+    pub channels: Vec<(InputReference, u16)>,
+}
+
+pub(crate) fn eligible_focal_groups(
+    genome: &crate::creature::genome::CreatureGenome,
+    focal: WorldInputKey,
+) -> usize {
+    genome
+        .nodes
+        .iter()
+        .map(|node| match &node.backend_def {
+            BackendDef::Graph(graph) => groups(graph, &node.input_refs)
+                .iter()
+                .filter(|group| match group.key {
+                    GroupKey::Ring { family, .. } | GroupKey::Slots { family, .. } => {
+                        family == focal
+                    }
+                })
+                .count(),
+            BackendDef::Vm(_) => 0,
+        })
+        .sum()
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RefinementCoefficient {
+    pub channel: u16,
+    pub sink: usize,
+    pub edge: usize,
+    pub before: f32,
+    pub requested: f32,
+    pub after: f32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RefinementStep {
+    pub event: u32,
+    pub node: crate::contracts::NodeId,
+    pub family: WorldInputKey,
+    pub eligible_groups: usize,
+    pub matched: bool,
+    pub scalar: f32,
+    pub coefficients: Vec<RefinementCoefficient>,
+    pub actual_norm: f64,
+    pub applied: bool,
+}
+
+pub(crate) fn refine_observed(
+    node: &mut NodeGenome,
+    rng: &mut impl Rng,
+    diagnostic: Option<&mut RefinementDiagnostic>,
+) -> Result<(), MutationSkipReason> {
     let BackendDef::Graph(def) = &mut node.backend_def else {
         return Err(MutationSkipReason::NoApplicableTarget);
     };
@@ -146,7 +228,75 @@ pub(crate) fn refine(node: &mut NodeGenome, rng: &mut impl Rng) -> Result<(), Mu
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let selected = &groups[rng.gen_range(0..groups.len())];
-    apply_step(def, selected, rng.gen_range(-0.1f32..=0.1))
+    let scalar = rng.gen_range(-0.1f32..=0.1);
+    let Some(diagnostic) = diagnostic else {
+        return apply_step(def, selected, scalar);
+    };
+    let increment = scalar / (selected.members.len() as f32).sqrt();
+    let coefficients: Vec<_> = selected
+        .members
+        .iter()
+        .map(|member| {
+            let before = def.output_sinks[member.sink].inputs[member.edge].weight;
+            let requested = if diagnostic.matched {
+                increment.abs()
+                    * if diagnostic.signs.gen_bool(0.5) {
+                        1.0
+                    } else {
+                        -1.0
+                    }
+            } else {
+                increment
+            };
+            RefinementCoefficient {
+                channel: member.position,
+                sink: member.sink,
+                edge: member.edge,
+                before,
+                requested,
+                after: before + requested,
+            }
+        })
+        .collect();
+    let actual_norm = coefficients
+        .iter()
+        .map(|coefficient| (f64::from(coefficient.after) - f64::from(coefficient.before)).powi(2))
+        .sum::<f64>()
+        .sqrt();
+    let valid = coefficients
+        .iter()
+        .all(|coefficient| coefficient.after.is_finite())
+        && actual_norm <= 0.1 + 1e-6;
+    let family = match selected.key {
+        GroupKey::Ring { family, .. } | GroupKey::Slots { family, .. } => family,
+    };
+    let mut step = RefinementStep {
+        event: diagnostic.event,
+        node: node.node_id,
+        family,
+        eligible_groups: groups.len(),
+        matched: diagnostic.matched,
+        scalar,
+        coefficients,
+        actual_norm,
+        applied: valid,
+    };
+    if valid {
+        for coefficient in &step.coefficients {
+            def.output_sinks[coefficient.sink].inputs[coefficient.edge].weight = coefficient.after;
+        }
+    } else {
+        for coefficient in &mut step.coefficients {
+            coefficient.after = coefficient.before;
+        }
+        step.actual_norm = 0.0;
+    }
+    diagnostic.steps.push(step);
+    if valid {
+        Ok(())
+    } else {
+        Err(MutationSkipReason::NumericProposalRejected)
+    }
 }
 
 fn apply_step(
