@@ -1,4 +1,5 @@
 //! Fixed T20.F09 campaign, with a streaming bounded artifact and no retries.
+mod evidence;
 use crate::{
     bench::artifacts::{output_paths_with_suffix, write_json},
     recruitment::HashingWriter,
@@ -38,6 +39,7 @@ pub struct Options {
 pub struct Summary {
     pub kind: String,
     pub version: String,
+    pub evidence_schema: String,
     pub feature: String,
     pub source_revision: String,
     pub manifest_digest: String,
@@ -161,12 +163,15 @@ fn execute(options: &Options, sizes: Sizes) -> Result<Outcome, String> {
             )
         })
         .collect();
-    let controls: Vec<_> = FAMILIES.iter().zip(&starts).map(|(family, start)| {
-        let positive = assay::instrument_control(start, *family, false);
-        let zero = assay::instrument_control(start, *family, true);
-        json!({"family": family.as_key(), "role": "authored_instrument_only", "positive_digest": assay::digest(&positive), "zero_digest": assay::digest(&zero), "positive_genotype": positive, "zero_genotype": zero, "scalar_repair": "EatFoodType reads existing fruit_only; F01 fixture unchanged"})
-    }).collect();
-    let manifest = json!({"kind":"manifest", "version":assay::VERSION, "source_revision": options.source_revision, "config": config, "config_digest": v3_core::config::config_digest(&config), "mutation_configs": Arm::ALL.map(|arm| (arm, arm.config())), "mutation_configs_digest": assay::digest(&Arm::ALL.map(|arm| (arm, arm.config()))), "founder_digest":assay::digest(&founder), "founder":founder, "family_starts": FAMILIES.iter().zip(&starts).map(|(family, genome)| json!({"family":family.as_key(),"digest":assay::digest(genome),"genome_size":genome.genome_size(),"genotype":genome})).collect::<Vec<_>>(), "ring_start_version":"f09-ring-area-incumbent-v1", "ring_control_version":"f09-ring-area-incumbent-inhibition-control-v1", "panels":panels, "scene_digest":assay::digest(&panels), "controls":controls, "learning_mask":"remove Graph compute plasticity on fresh expression clones only", "seed_rule":"20090000000 + panel*1000000000 + family*100000000 + arm*1000000 + lineage*10000 + generation*2 + sibling", "sizes":{"discovery":sizes.discovery,"validation":sizes.validation,"generations":sizes.generations,"siblings":2,"prefix":sizes.prefix}, "caps":{"wall_secs":wall_cap.as_secs_f64(),"raw_bytes":stream.cap,"summary_bytes":SUMMARY_CAP}, "physiology":"native charges; direct Graph vote edges and perception assembly have no separate energy debit"});
+    let manifest = manifest(
+        options,
+        sizes,
+        &config,
+        &founder,
+        &starts,
+        &panels,
+        (wall_cap, stream.cap),
+    );
     let manifest_digest = assay::digest(&manifest);
     let mut reason = (!stream.emit(&manifest, true)).then(|| "raw_cap_manifest".to_string());
     let instrument = if reason.is_none() {
@@ -178,6 +183,7 @@ fn execute(options: &Options, sizes: Sizes) -> Result<Outcome, String> {
     let (schedule, prefix_count) = schedule(sizes);
     let requested = schedule.len();
     let mut rows = Vec::new();
+    let mut representatives = evidence::Representatives::default();
     let mut prefix_secs = None;
     let mut projected_secs = None;
     for identity in schedule {
@@ -189,13 +195,24 @@ fn execute(options: &Options, sizes: Sizes) -> Result<Outcome, String> {
             break;
         }
         let (training, held_out) = &panels[identity.family];
+        let mut facts = evidence::LineageEvidence::default();
         let row = assay::lineage(
             &starts[identity.family],
             training,
             held_out,
             identity,
             sizes.generations,
-            &mut |record| stream.emit(&record, true),
+            &mut |record| match record {
+                Record::Proposal(proposal) => facts
+                    .observe(&proposal)
+                    .is_none_or(|witness| stream.emit(&witness, true)),
+                Record::Frozen(frozen) => {
+                    facts.freeze(&frozen);
+                    representatives.observe(&frozen);
+                    true
+                }
+                Record::Lineage(_) => unreachable!("lineage result is returned separately"),
+            },
             &|| start.elapsed() >= wall_cap,
         );
         if !row.complete {
@@ -208,7 +225,7 @@ fn execute(options: &Options, sizes: Sizes) -> Result<Outcome, String> {
                 .into(),
             );
         }
-        if !stream.emit(&Record::Lineage(row.clone()), reason.is_none()) {
+        if !stream.emit(&facts.record(&row), reason.is_none()) {
             reason = Some("raw_cap_lineage_record".into());
         }
         rows.push(row);
@@ -227,6 +244,8 @@ fn execute(options: &Options, sizes: Sizes) -> Result<Outcome, String> {
     }
     let complete =
         reason.is_none() && rows.len() == requested && rows.iter().all(|row| row.complete);
+    let (complete, scope) =
+        write_representatives(&representatives, &mut stream, &mut reason, &rows, complete);
     stream.emit(&json!({"kind":"termination", "complete":complete,"reason":reason,"lineages":rows.len(),"lineages_requested":requested}), false);
     if let Some(error) = stream.error.take() {
         return Err(error);
@@ -234,10 +253,10 @@ fn execute(options: &Options, sizes: Sizes) -> Result<Outcome, String> {
     stream.writer.flush().map_err(|error| error.to_string())?;
     let bytes = stream.writer.bytes;
     let sha256 = stream.writer.sha256();
-    let scope = scopes(&rows, complete);
     let summary = Summary {
         kind: "petri-input-discovery-summary".into(),
         version: assay::VERSION.into(),
+        evidence_schema: evidence::SCHEMA.into(),
         feature: options.feature.clone(),
         source_revision: options.source_revision.clone(),
         manifest_digest,
@@ -259,7 +278,17 @@ fn execute(options: &Options, sizes: Sizes) -> Result<Outcome, String> {
         qualified_scope: scope.qualified_scope,
         candidate_source_revision: options.source_revision.clone(),
     };
-    if serde_json::to_vec_pretty(&summary)
+    write_summary(&paths.summary, &summary)?;
+    Ok(Outcome {
+        raw: paths.raw,
+        summary: paths.summary,
+        complete: summary.complete,
+        bytes,
+    })
+}
+
+fn write_summary(path: &std::path::Path, summary: &Summary) -> Result<(), String> {
+    if serde_json::to_vec_pretty(summary)
         .map_err(|error| error.to_string())?
         .len()
         > SUMMARY_CAP
@@ -268,13 +297,56 @@ fn execute(options: &Options, sizes: Sizes) -> Result<Outcome, String> {
             "summary cap exceeded; raw record preserved, no positive verdict authorized".into(),
         );
     }
-    write_json(&paths.summary, &summary)?;
-    Ok(Outcome {
-        raw: paths.raw,
-        summary: paths.summary,
-        complete: summary.complete,
-        bytes,
-    })
+    write_json(path, summary)
+}
+
+fn manifest(
+    options: &Options,
+    sizes: Sizes,
+    config: &v3_core::config::SimulationConfig,
+    founder: &v3_core::creature::genome::CreatureGenome,
+    starts: &[v3_core::creature::genome::CreatureGenome],
+    panels: &[(Panel, Panel)],
+    caps: (Duration, u64),
+) -> serde_json::Value {
+    let controls: Vec<_> = FAMILIES.iter().zip(starts).map(|(family, start)| {
+        let positive = assay::instrument_control(start, *family, false);
+        let zero = assay::instrument_control(start, *family, true);
+        json!({"family": family.as_key(), "role": "authored_instrument_only", "positive_digest": assay::digest(&positive), "zero_digest": assay::digest(&zero), "scalar_repair": "EatFoodType reads existing fruit_only; F01 fixture unchanged"})
+    }).collect();
+    let panel_manifest: Vec<_> = panels
+        .iter()
+        .map(|(training, held_out)| (evidence::panel(training), evidence::panel(held_out)))
+        .collect();
+    let scene_manifest: Vec<_> = panels.iter().flat_map(|(training, held_out)| [training, held_out])
+        .map(|panel| json!({"family":panel.family,"held_out":panel.held_out,"scenes":panel.scenes,"focal":panel.focal})).collect();
+    json!({"kind":"manifest", "version":assay::VERSION, "evidence_schema":evidence::SCHEMA, "source_revision": options.source_revision, "config": config, "config_digest": v3_core::config::config_digest(config), "mutation_configs": Arm::ALL.map(|arm| (arm, arm.config())), "mutation_configs_digest": assay::digest(&Arm::ALL.map(|arm| (arm, arm.config()))), "founder_digest":assay::digest(founder), "family_starts": FAMILIES.iter().zip(starts).map(|(family, genome)| json!({"family":family.as_key(),"digest":assay::digest(genome),"genome_size":genome.genome_size(),"genotype":genome})).collect::<Vec<_>>(), "ring_start_version":"f09-ring-area-incumbent-v1", "ring_control_version":"f09-ring-area-incumbent-inhibition-control-v1", "panels":panel_manifest, "scene_digest":assay::digest(&scene_manifest), "controls":controls, "learning_mask":"remove Graph compute plasticity on fresh expression clones only", "seed_rule":"20090000000 + panel*1000000000 + family*100000000 + arm*1000000 + lineage*10000 + generation*2 + sibling", "sizes":{"discovery":sizes.discovery,"validation":sizes.validation,"generations":sizes.generations,"siblings":2,"prefix":sizes.prefix}, "caps":{"wall_secs":caps.0.as_secs_f64(),"raw_bytes":caps.1,"summary_bytes":SUMMARY_CAP}, "physiology":"native charges; direct Graph vote edges and perception assembly have no separate energy debit"})
+}
+
+fn write_representatives(
+    representatives: &evidence::Representatives,
+    stream: &mut Stream,
+    reason: &mut Option<String>,
+    rows: &[Lineage],
+    mut complete: bool,
+) -> (bool, Scope) {
+    let mut scope = scopes(rows, complete);
+    for candidate in representatives.qualified(
+        scope.general_access_s == Verdict::Positive,
+        scope.general_access_w == Verdict::Positive,
+        scope.ring_coordination == Verdict::Positive,
+    ) {
+        if !stream.emit(
+            &json!({"kind":"qualified_representative","candidate":candidate}),
+            true,
+        ) {
+            *reason = Some("raw_cap_qualified_representative".into());
+            complete = false;
+            scope = scopes(rows, false);
+            break;
+        }
+    }
+    (complete, scope)
 }
 
 fn validate_instrument(
@@ -295,7 +367,7 @@ fn validate_instrument(
             let zero_reading = panel.evaluate(&zero);
             let valid =
                 positive.graph_discovery && !assay::qualifies_score(&zero_reading, &panel.baseline);
-            let record = json!({"kind":"instrument_validation", "family":family.as_key(), "held_out":panel.held_out, "valid":valid, "positive":positive,"zero":zero_reading});
+            let record = json!({"kind":"instrument_validation", "family":family.as_key(), "held_out":panel.held_out, "valid":valid, "positive":evidence::qualification(&positive),"zero":evidence::reading(&zero_reading)});
             if !stream.emit(&record, true) {
                 return Some("raw_cap_instrument".into());
             }
@@ -435,6 +507,87 @@ fn scopes(rows: &[Lineage], complete: bool) -> Scope {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reduced_writer_emits_compact_lineages_and_only_fixed_audit_examples() {
+        let directory =
+            std::env::temp_dir().join(format!("petri-f09-compact-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let options = Options {
+            feature: "t20-f09-compact-fixture".into(),
+            cwd: directory.clone(),
+            source_revision: "test".into(),
+            raw: Some(directory.join("raw.jsonl")),
+            summary: Some(directory.join("summary.json")),
+            wall_cap: Duration::from_secs(120),
+            byte_cap: 2 * 1024 * 1024,
+        };
+        let outcome = execute(
+            &options,
+            Sizes {
+                discovery: 1,
+                validation: 1,
+                generations: 1,
+                prefix: 1,
+            },
+        )
+        .unwrap();
+        assert!(outcome.complete);
+        assert!(outcome.bytes < 2 * 1024 * 1024);
+        let raw = std::fs::read_to_string(&outcome.raw).unwrap();
+        let mut lineage_count = 0;
+        let mut audit_count = 0;
+        let mut audit_bytes = 0;
+        let mut shared_bytes = 0;
+        let mut largest = [0usize; 3];
+        let mut primary_checkpoint = [0usize; 3];
+        for line in raw.lines() {
+            let row: serde_json::Value = serde_json::from_str(line).unwrap();
+            match row["kind"].as_str().unwrap() {
+                "audit_proposal" => {
+                    audit_count += 1;
+                    audit_bytes += line.len() + 1;
+                    assert!(line.len() < evidence::AUDIT_BYTES);
+                    assert_eq!(row["proposal"]["generation"], 0);
+                    assert_eq!(row["proposal"]["identity"]["lineage"], 0);
+                }
+                "lineage" => {
+                    lineage_count += 1;
+                    let family = row["result"]["identity"]["family"].as_u64().unwrap() as usize;
+                    largest[family] = largest[family].max(line.len() + 1);
+                    primary_checkpoint[family] = primary_checkpoint[family]
+                        .max(serde_json::to_vec(&row["endpoint"]).unwrap().len());
+                    assert_eq!(row["transcript"]["proposals"], 2);
+                    assert!(row["endpoint"].get("genotype").is_none());
+                    assert!(row["endpoint"]["training"]["intact"]
+                        .get("scenes")
+                        .is_none());
+                    assert!(row["endpoint"]["held_out"]["intact"]
+                        .get("scenes")
+                        .is_none());
+                }
+                "manifest" | "instrument_validation" | "termination" => {
+                    shared_bytes += line.len() + 1
+                }
+                kind => panic!("unexpected record {kind}"),
+            }
+        }
+        assert_eq!(lineage_count, 30);
+        assert_eq!(audit_count, 60);
+        assert!(audit_bytes <= 960 * 1024);
+        let summary: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&outcome.summary).unwrap()).unwrap();
+        assert_eq!(summary["qualified_scope"], json!([]));
+        // Size projection only: both primary and endpoint at each lineage, with
+        // production operator histories/representatives covered by the offline audit.
+        let projected = shared_bytes
+            + (largest.iter().sum::<usize>() + primary_checkpoint.iter().sum::<usize>()) * 240
+            + 960 * 1024;
+        println!("COMPACT_WRITER_FIXTURE raw_bytes={} shared_bytes={shared_bytes} audit_count={audit_count} audit_bytes={audit_bytes} max_lineage_bytes={largest:?} full_panel_two_checkpoint_projection={projected}",outcome.bytes);
+        assert!(projected < 32 * 1024 * 1024);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn byte_cap_never_writes_partial_json_and_records_explicit_stop() {
         let directory = std::env::temp_dir().join(format!("petri-f09-cap-{}", std::process::id()));

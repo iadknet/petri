@@ -4,7 +4,7 @@ mod evaluation;
 mod experiment;
 mod scenes;
 pub mod verdict;
-pub use experiment::{digest, lineage, seed, Arm, Frozen, Identity, Lineage, Record};
+pub use experiment::{digest, lineage, seed, Arm, Frozen, Identity, Lineage, Proposal, Record};
 
 pub use super::opportunity::controllers::Family;
 pub use evaluation::{checkpoint, qualifies_score, Panel, Qualification, Reading};
