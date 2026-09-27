@@ -34,6 +34,39 @@ List source-of-truth inputs, decision-relevant research evidence, exact
 dependency outputs, and invariants. The owning roadmap row is the source of
 truth for feature dependencies.
 
+## Telemetry
+
+Name the applied behavior this feature needs to make observable and the existing
+counter, report, event or execution sample that supplies it. Reuse existing
+observations; add signals only for a concrete missing question. State
+`Not applicable: <reason>` when the feature has no telemetry impact.
+
+For added or changed signals, specify meaning and units, run/trace correlation,
+bounded dimensions, collection/export cadence or sampling policy, capture and
+queue limits, and how absence, truncation or delivery loss is represented.
+Record the expected collection cost and how observation preserves simulation
+state and RNG. Put the actual delivery/behavior checks in Verification and any
+cost measurement in Performance and Goal Impact.
+
+**Span context.** For each operation traced, name the feature state, effective
+configuration values and execution state needed to explain what happened.
+Distinguish available, enabled and actually exercised mechanisms. Specify typed
+attributes for relevant parameters and before/after values, events for ordered
+changes, and correlation to run/build, tick/phase and creature identity where
+applicable. Important values belong directly on spans; a config/genome hash
+alone is insufficient. Large repeated snapshots may live in versioned context
+records navigable from the trace, with missing/truncated context explicit.
+Bind values to capture time and propagate correlation across parallel work.
+Budget the real rich payload and prefer reducing sample frequency to removing
+interpretation-critical context. Verification covers effective config changes,
+context correctness and the declared payload limits where affected.
+
+Use T21's export facilities when available. Before they exist, use current
+report or execution-sample surfaces and identify the later export mapping;
+this section creates no dependency on unfinished T21 work or requirement to
+build telemetry infrastructure in another track. Apply to new and materially
+revised specs; do not backfill completed specs merely for template conformity.
+
 ## Implementation Tasks
 
 - [ ] Implement the feature.
@@ -46,7 +79,8 @@ implementer chooses the design and records what it actually ran.
 
 - [ ] Focused tests or checks: `<command>` -> `<result>`.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred. The full
+      every survivor resolved as killed, equivalent, or deferred; or
+      `Not applicable: <authorized workflow exception>`. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
 - [ ] Benchmark summary stored at `docs/progress/features/<id>.json`, local raw
       hash/byte count and verification time checked, series entry points to the
@@ -85,7 +119,12 @@ exception, or re-pins a baseline stays in this section verbatim: it is a
 contract, not evidence.
 
 The benchmark Verification item above is `Not applicable` only for a feature that
-closes before T10.F10 is checked or that cannot change simulation cost.
+closes before T10.F10 is checked, cannot change simulation cost, or carries an
+explicit exception in the shared workflow. For
+[T21](../../workflow.md#t21-verification-and-concurrency), record the exception
+instead of gate/goal summaries and use this section for the short overhead
+check's predeclared workload, repetition, time cap and measured verdict. Do not
+invent benchmark-series readings for an exempt feature.
 
 ## Success Criteria
 

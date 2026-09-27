@@ -5,6 +5,17 @@ Historical and non-executable. The live contract is
 [Codex adapter](workflow-codex.md); where this file and those disagree, they
 win.
 
+## T21 observability exception, 2026-09-26
+
+The user requested a local, best-effort telemetry stack with a maximum 5%
+performance cost, independent concurrent progress alongside T20, and exemption
+from expensive benchmark and mutation testing. The shared workflow records the
+bounded T21.F01–F05 exception; ordinary checks and short telemetry overhead
+measurements remain. The active feature template now asks for telemetry needs,
+existing observation sources and collection budgets without blocking mechanism
+tracks on unfinished T21 infrastructure. No runtime feature was implemented by
+this documentation change.
+
 ## Why this shape
 
 Codex adaptation research, 2026-09-04; local CLI `0.153.0` and the current

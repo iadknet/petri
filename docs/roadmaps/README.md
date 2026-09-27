@@ -6,6 +6,12 @@ file under this directory. Executable features belong to exactly one track and
 use `TNN.FNN` IDs. Create a flat feature spec just in time during feature
 planning at `docs/specs/roadmap/tNN-fNN-<kebab-slug>.md`.
 
+That flat feature template is the active PRD equivalent. Its Telemetry section
+requires new or materially revised specs to identify needed applied observations
+and their collection cost, or explain why no telemetry change is needed. Reuse
+existing sources and adopt T21 delivery when available; this adds no dependency
+on unfinished observability work and requires no completed-spec backfill.
+
 The files beginning with `_` are templates and never represent live execution
 state. Copy a template, replace its placeholders, and keep IDs, links,
 dependencies, statuses, and checkbox state truthful. Feature dependencies live

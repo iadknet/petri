@@ -108,7 +108,12 @@ Recheck the target at execution start. Keep Claude work in
 `.claude/worktrees/` and Codex work in `.worktrees/`, with their distinct
 branch names. Never edit, remove, or take over another session's worktree.
 Integration is sequential: if another session advances `main`, the later
-session follows the existing stop-and-report rule before any reconciliation.
+session follows Close and integrate (or the Codex adapter) to rebase and
+re-verify; unresolved conflicts or failed checks are reported there.
+
+A request for the next **T21** feature selects the first dependency-ready,
+unclaimed T21 row in track order. T21 is an independently selectable track and
+does not alter the master priority order for an unqualified next-feature request.
 
 ## Goal command template
 
@@ -132,6 +137,50 @@ a mutation run just to filter its output differently.
 Normative. The orchestrator reads this at goal start and follows it, applying
 the explicit substitutions in [`docs/workflow-codex.md`](workflow-codex.md)
 when running in Codex.
+
+### T21 verification and concurrency
+
+User-authorized exception, 2026-09-26, for **T21.F01–F05** only. It overrides
+the benchmark/mutation requirements below, their specialist delegation, the
+generic goal-command wording, and the corresponding Codex adapter instructions:
+
+- Do not run the gate/goal/sweep benchmark campaigns, evolved-neighborhood or
+  ecological qualification campaigns, or `make rust-mutants` for T21 closure.
+  Do not launch benchmark or mutation specialists for these waived gates.
+- Keep planning, implementation, independent review, focused behavior tests and
+  ordinary completion checks. Application/runtime/build changes still require
+  `make check`; documentation-only changes require `make check-docs`. The normal
+  suite's existing tests remain intact. Rust/TDD rules and viability-first for
+  tick-loop edits still apply.
+- The implementer performs only short, targeted telemetry overhead checks when
+  instrumentation or defaults change; F05 qualifies the combined configuration.
+  Predeclare fixed workloads, paired enabled/disabled repetitions and a short
+  total measurement cap. Include local stack contention and collection failure;
+  the track's 5% ceiling remains an acceptance requirement. Do not turn an
+  inconclusive short check into an unbounded campaign or report it as passing.
+- Each spec records `Exception: T21 verification and concurrency, user decision
+  2026-09-26` in Notes, and marks the waived Verification items `Not applicable`
+  with this link. Store concise focused-check and timing evidence in its existing
+  readings file. Do not create gate/goal reports, benchmark-series entries,
+  indicator readings or epoch changes for waived measurements. Any progress row
+  labels those fields not applicable and links the telemetry evidence.
+- Final review and closure audit the applicable checks and exception record;
+  they do not demand missing benchmark artifacts or mutation-survivor records.
+
+T21 and T20 may be implemented concurrently in separate feature worktrees.
+Neither track waits for the other track's unfinished features. Keep shared core
+edits narrow, and reconcile against current `main` before sequential integration;
+follow the existing rebase, re-verification and authorization rules. Do not add
+a scheduler, alternate workflow or implicit authority to commit or merge.
+
+Concurrency applies to implementation, not competing measurements on one host.
+Before a T21 timing check, establish a quiet measurement window using the
+existing `scripts/bench-wait` preflight and coordination with any active session;
+do not stop another session's processes. Keep only the telemetry stack under
+measurement running. T21's local stack and smoke-test servers must also be stopped
+for T20's benchmark measurements, in coordination with their owner: the process
+preflight alone does not detect all Docker resource contention. Editing and
+planning can continue during these brief measurement windows.
 
 ### Start
 
@@ -238,7 +287,8 @@ implementer; see `docs/workflow-codex.md`.)
 
 **Brief 1 — build.** Give it the feature ID, the spec path, the change requested,
 and the exact spec sections this pass needs — normally Goal, Inputs and
-Invariants, Implementation Tasks, and the Verification checklist. Its scope is
+Invariants, Telemetry when present, Implementation Tasks, and the Verification
+checklist. Its scope is
 implementation, tests (TDD, property tests for pure invariants), the viability
 gate first where it applies, and a clean `cargo check --workspace --all-targets`.
 It carries the detailed rules ($rust-skills, `make roadmap-check` on document
@@ -335,7 +385,8 @@ unresolved survivor is a blocker to report, not a number to hide.
 
 Run the final diff review as a fresh Codex Astra `high` job through the Codex
 channel. Its brief gives the worktree path, the feature ID, the spec path, and
-the spec sections the review needs: Goal, Inputs and Invariants, Verification,
+the spec sections the review needs: Goal, Inputs and Invariants, Telemetry when
+present, Verification,
 and Performance and Goal Impact when the feature is subject to it. It tells
 Codex to read the Review section of this file and
 `.claude/agents/roadmap-reviewer.md` as its checklist, ignoring that file's
