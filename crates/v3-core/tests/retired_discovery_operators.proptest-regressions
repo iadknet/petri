@@ -4,4 +4,4 @@
 #
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
-cc eea801b268c1ea0e7b822f10999a38a9f3ba706b09eb6b4044358fdde06a419e # shrinks to mask = 3, offset = 0, seed = 0
+cc d067c2eba363dfca3185bc22542df061db818f1a72c56bf38e0bf26a3c9b9764 # shrinks to rate = 0.0

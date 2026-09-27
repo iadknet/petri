@@ -185,10 +185,8 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
 /// re-pinned all three: `world.food.shared` no longer carries
 /// `initial_density`, `initial_coverage`, `fertility`, or `annealing`, and
 /// re-adding those synced values reproduces the previous digests.
-/// T20.F05 adds `mutation.structured_heritable_refinement: false`; removing only
-/// that key must recover F04's digests. Then removing F04's
-/// `mutation.neutral_input_recruitment: Off` must recover the pre-F04 digests,
-/// preserving both historical precision guards.
+/// T20.F09 retires both disabled candidate fields. Re-adding only those fields
+/// must reproduce F04/F05 recipe identities; all other resolved values stay fixed.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -198,61 +196,53 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
         actual,
         resolved_again
             .each_ref()
-            .map(v3_core::config::config_digest),
-        "checked-in recipe identities must agree across repeated resolution"
+            .map(v3_core::config::config_digest)
     );
     assert_eq!(
         actual,
         [
-            "sha256:916c9ffd3dfd0de0577217711c993f40846262ea0e189320706d307d3874693d",
-            "sha256:2dac898152631d05ad357c4c3dca29ab8dcdcdd37a332cb6d9d95e42d4a85204",
-            "sha256:813a1bc206d1d1f8b04935607d38f6c63a0a87d97133cbc7583fa0e5ff34432e",
+            "sha256:7f91cd5ccb476cc4013e8dc3fe5f050dcf159f39dce621be55a92fdc0aac47ff",
+            "sha256:88ef5abaec2d99ba5934e517dcdd045344b73a4c73149f90133f8fb4f692e7b4",
+            "sha256:48722f834746b54ff6964afdb406dc69e321fa2946ebf4571d6977a609bba9b2",
         ]
     );
-
-    let f04_values = configs.map(|config| {
-        let mut value = serde_json::to_value(config).unwrap();
-        assert_eq!(
-            value["mutation"]
-                .as_object_mut()
-                .unwrap()
-                .remove("structured_heritable_refinement"),
-            Some(json!(false))
-        );
-        value
-    });
-    let f04 = f04_values.each_ref().map(|value| {
-        let canonical =
-            serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value.clone())).unwrap();
-        format!("sha256:{}", artifacts::sha256(&canonical))
-    });
+    let mut historical = configs.map(|config| serde_json::to_value(config).unwrap());
+    for value in &mut historical {
+        let mutation = value["mutation"].as_object_mut().unwrap();
+        assert!(mutation
+            .insert("neutral_input_recruitment".into(), json!("Off"))
+            .is_none());
+        assert!(!mutation.contains_key("structured_heritable_refinement"));
+    }
+    let digests = |values: &[serde_json::Value; 3]| {
+        values.each_ref().map(|value| {
+            let canonical =
+                serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value.clone()))
+                    .unwrap();
+            format!("sha256:{}", artifacts::sha256(&canonical))
+        })
+    };
     assert_eq!(
-        f04,
+        digests(&historical),
         [
             "sha256:8cb8f2c380cf15e9fba49ed516049e95aaf07550934ba23bc4852fa972db1d71",
             "sha256:8d38b0ff8e5d89815acbb140a2c3e5b7d9b375df30e00fc8c582a6e8b8aabb2b",
             "sha256:34b545451858645292182698ad2f116192ef08f0b03bd5c783842da4fe1f3b1d",
         ]
     );
-
-    let historical = f04_values.map(|mut value| {
-        assert_eq!(
-            value["mutation"]
-                .as_object_mut()
-                .unwrap()
-                .remove("neutral_input_recruitment"),
-            Some(json!("Off"))
-        );
-        let canonical =
-            serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value)).unwrap();
-        format!("sha256:{}", artifacts::sha256(&canonical))
-    });
+    for value in &mut historical {
+        assert!(value["mutation"]
+            .as_object_mut()
+            .unwrap()
+            .insert("structured_heritable_refinement".into(), json!(false))
+            .is_none());
+    }
     assert_eq!(
-        historical,
+        digests(&historical),
         [
-            "sha256:7f91cd5ccb476cc4013e8dc3fe5f050dcf159f39dce621be55a92fdc0aac47ff",
-            "sha256:88ef5abaec2d99ba5934e517dcdd045344b73a4c73149f90133f8fb4f692e7b4",
-            "sha256:48722f834746b54ff6964afdb406dc69e321fa2946ebf4571d6977a609bba9b2",
+            "sha256:916c9ffd3dfd0de0577217711c993f40846262ea0e189320706d307d3874693d",
+            "sha256:2dac898152631d05ad357c4c3dca29ab8dcdcdd37a332cb6d9d95e42d4a85204",
+            "sha256:813a1bc206d1d1f8b04935607d38f6c63a0a87d97133cbc7583fa0e5ff34432e",
         ]
     );
 }

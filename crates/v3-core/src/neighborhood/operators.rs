@@ -110,14 +110,7 @@ impl OperatorKind {
         );
         match self {
             Self::Vm(op) => VmMutator::apply(genome, op, &mut targets, rng, mutation_config),
-            Self::Graph(op) => GraphMutator::apply_with_food_type_count(
-                genome,
-                op,
-                &mut targets,
-                rng,
-                mutation_config,
-                food_type_count,
-            ),
+            Self::Graph(op) => GraphMutator::apply(genome, op, &mut targets, rng, mutation_config),
             Self::Topology(op) => TopologyMutator::apply_with_food_type_count(
                 genome,
                 op,
@@ -178,7 +171,6 @@ pub fn per_operator_rows(
     let ops = OperatorKind::all();
 
     let jobs: Vec<(usize, u32)> = (0..ops.len())
-        .filter(|&op_idx| !matches!(ops[op_idx], OperatorKind::Graph(op) if !op.enabled(mutation_config)))
         .flat_map(|op_idx| (0..trials).map(move |trial| (op_idx, trial)))
         .collect();
 
@@ -281,17 +273,7 @@ mod tests {
         );
         assert_eq!(a.len(), operator_catalog().len());
         for row in &a {
-            assert_eq!(
-                row.tally.trials,
-                if matches!(
-                    row.operator.as_str(),
-                    "RecruitNeutralInput" | "RefineHeritableStructure"
-                ) {
-                    0
-                } else {
-                    5
-                }
-            );
+            assert_eq!(row.tally.trials, 5);
         }
     }
 
@@ -444,10 +426,6 @@ mod tests {
         }
 
         for op in GraphOperator::ALL {
-            if !op.enabled(&config.mutation) {
-                expected.push(("graph", format!("{op:?}"), Tally::default()));
-                continue;
-            }
             let tally = fixture.tally(trials, seed_offset, GRAPH_SEED_BASE, |genome, rng| {
                 GraphMutator::apply(
                     genome,

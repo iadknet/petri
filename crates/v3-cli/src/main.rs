@@ -31,7 +31,7 @@ enum Commands {
     /// Exit status 3 when a cap stopped the run and the record is marked
     /// incomplete.
     InputOpportunity(InputOpportunityArgs),
-    /// Bounded T20.F09 inherited input-discovery qualification.
+    /// Retired T20.F09 assay; reports the historical measured source.
     InputDiscovery(InputDiscoveryArgs),
 }
 
@@ -471,33 +471,9 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
     }
 }
 
-fn run_input_discovery(args: InputDiscoveryArgs) {
-    let options = v3_cli::input_discovery::Options {
-        feature: args.feature,
-        cwd: std::env::current_dir().expect("working directory"),
-        source_revision: bench::detect_git_revision(),
-        raw: args.out,
-        summary: args.summary_out,
-        wall_cap: std::time::Duration::from_secs(args.wall_cap_secs),
-        byte_cap: args.byte_cap,
-    };
-    match v3_cli::input_discovery::run(&options) {
-        Ok(outcome) => {
-            println!(
-                "wrote {} ({} bytes) and {}",
-                outcome.raw.display(),
-                outcome.bytes,
-                outcome.summary.display()
-            );
-            if !outcome.complete {
-                std::process::exit(3);
-            }
-        }
-        Err(error) => {
-            eprintln!("error: {error}");
-            std::process::exit(1);
-        }
-    }
+fn run_input_discovery(_args: InputDiscoveryArgs) {
+    eprintln!("error: {}", v3_cli::input_discovery::RETIRED_REASON);
+    std::process::exit(1);
 }
 
 fn run_input_opportunity(args: InputOpportunityArgs) {

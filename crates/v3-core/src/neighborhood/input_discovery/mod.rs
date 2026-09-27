@@ -1,10 +1,7 @@
-//! Bounded native inherited input discovery (T20.F09). Observation only.
+//! Native T20.F09 observation fixtures. Candidate operators retired unqualified.
 
 mod evaluation;
-mod experiment;
 mod scenes;
-pub mod verdict;
-pub use experiment::{digest, lineage, seed, Arm, Frozen, Identity, Lineage, Proposal, Record};
 
 pub use super::opportunity::controllers::Family;
 pub use evaluation::{checkpoint, qualifies_score, Panel, Qualification, Reading};

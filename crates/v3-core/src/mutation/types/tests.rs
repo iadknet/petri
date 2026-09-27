@@ -33,22 +33,6 @@ fn added_node_input_class_keys_are_stable() {
 }
 
 #[test]
-fn mutation_skip_reason_keys_are_stable() {
-    assert_eq!(
-        MutationSkipReason::ParseabilityViolation.as_key(),
-        "ParseabilityViolation"
-    );
-    assert_eq!(
-        MutationSkipReason::NumericProposalRejected.as_key(),
-        "NumericProposalRejected"
-    );
-    assert_eq!(
-        MutationSkipReason::NoApplicableTarget.as_key(),
-        "NoApplicableTarget"
-    );
-}
-
-#[test]
 fn world_input_key_keys_are_stable() {
     assert_eq!(
         crate::contracts::WorldInputKey::FoodHere {
@@ -247,9 +231,7 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::GraphEnableRewardModulation
             | MutationOperator::GraphDisableRewardModulation
             | MutationOperator::GraphMutateRewardSource
-            | MutationOperator::GraphMutateTraceDecay
-            | MutationOperator::GraphRecruitNeutralInput
-            | MutationOperator::GraphRefineHeritableStructure => {
+            | MutationOperator::GraphMutateTraceDecay => {
                 assert_eq!(operator.domain(), MutationDomain::Graph)
             }
             MutationOperator::InputRefAdd
@@ -358,10 +340,6 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             }
             GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
             GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
-            GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
-            GraphOperator::RefineHeritableStructure => {
-                MutationOperator::GraphRefineHeritableStructure
-            }
         };
         assert_eq!(
             mo.complexity_effect(),

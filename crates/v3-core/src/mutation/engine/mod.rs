@@ -104,6 +104,11 @@ impl MutationEngine {
     /// indices. Every target draw sees them through [`BirthMembership`]: a
     /// child node counts as a member only when the parent carried it, however
     /// earlier events of this birth removed or added nodes (T11.F24).
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one match arm per mutation event kind; splitting it would spread \
+                  the operator dispatch table across several functions"
+    )]
     pub fn apply_mutations_on_units(
         genome: &mut CreatureGenome,
         units: u32,
@@ -112,30 +117,6 @@ impl MutationEngine {
         parent_executed: ParentExecuted<'_>,
         rng: &mut impl Rng,
         food_type_count: usize,
-    ) -> MutationSummary {
-        Self::apply_mutations_observed(
-            genome,
-            units,
-            config,
-            parent_reachable_nodes,
-            parent_executed,
-            rng,
-            food_type_count,
-            None,
-        )
-    }
-
-    /// Assay-only per-event observation; a matched intervention is applied before the next event.
-    #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
-    pub(crate) fn apply_mutations_observed(
-        genome: &mut CreatureGenome,
-        units: u32,
-        config: &MutationConfig,
-        parent_reachable_nodes: &[usize],
-        parent_executed: ParentExecuted<'_>,
-        rng: &mut impl Rng,
-        food_type_count: usize,
-        mut diagnostic: Option<&mut crate::mutation::graph::refinement::RefinementDiagnostic>,
     ) -> MutationSummary {
         let event_count = requested_event_count(config, units, rng);
         if event_count == 0 {
@@ -170,10 +151,7 @@ impl MutationEngine {
         // so a selected index can be recorded as the node it named (T13.F01)
         // and membership can follow the event.
         let mut node_ids: Vec<NodeId> = Vec::with_capacity(genome.nodes.len());
-        for event in 0..event_count {
-            if let Some(diagnostic) = diagnostic.as_deref_mut() {
-                diagnostic.event = event;
-            }
+        for _ in 0..event_count {
             node_ids.clear();
             node_ids.extend(genome.nodes.iter().map(|node| node.node_id));
             let sets = membership.sets();
@@ -285,12 +263,7 @@ impl MutationEngine {
                         let mut available: Vec<GraphOperator> = GraphOperator::ALL
                             .iter()
                             .copied()
-                            .filter(|op| op.enabled(config))
-                            .filter(|op| {
-                                !restricted
-                                    || op.complexity_effect().is_decreasing()
-                                    || *op == GraphOperator::RefineHeritableStructure
-                            })
+                            .filter(|op| !restricted || op.complexity_effect().is_decreasing())
                             .collect();
                         let selected = loop {
                             if available.is_empty() {
@@ -301,23 +274,13 @@ impl MutationEngine {
                             let op = available[idx];
                             let operator = graph_operator_key(op);
                             let tracked_before =
-                                if operator_requires_added_node_input_tracking(operator)
-                                    || (cfg!(test) && op == GraphOperator::RecruitNeutralInput)
-                                {
+                                if operator_requires_added_node_input_tracking(operator) {
                                     Some(genome.clone())
                                 } else {
                                     None
                                 };
                             let mut targets = selector(rb.graph);
-                            let result = apply_graph_event(
-                                genome,
-                                op,
-                                &mut targets,
-                                rng,
-                                config,
-                                food_type_count,
-                                diagnostic.as_deref_mut(),
-                            );
+                            let result = apply_graph_event(genome, op, &mut targets, rng, config);
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                                 discarded.push((
                                     operator,
@@ -424,12 +387,6 @@ impl MutationEngine {
                 Ok(reachability) => {
                     summary.record_applied(domain, operator);
                     if let Some(before) = tracked_before.as_ref() {
-                        #[cfg(test)]
-                        if operator == MutationOperator::GraphRecruitNeutralInput {
-                            summary
-                                .recruitment_deltas
-                                .push((before.clone(), genome.clone()));
-                        }
                         if let Some(classes) =
                             collect_added_node_input_classes(before, genome, operator)
                         {
@@ -652,64 +609,17 @@ fn apply_vm_event(
 }
 
 /// Apply one graph mutation event with parseability gate.
-#[allow(clippy::too_many_arguments)]
 fn apply_graph_event(
     genome: &mut CreatureGenome,
     op: GraphOperator,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
-    food_type_count: usize,
-    mut diagnostic: Option<&mut crate::mutation::graph::refinement::RefinementDiagnostic>,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match GraphMutator::apply_observed(
-        genome,
-        op,
-        targets,
-        rng,
-        config,
-        food_type_count,
-        diagnostic.as_deref_mut(),
-    ) {
+    match GraphMutator::apply(genome, op, targets, rng, config) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
-                if op == GraphOperator::RecruitNeutralInput {
-                    if let Some(diagnostic) = diagnostic {
-                        for (before, after) in snapshot.nodes.iter().zip(&genome.nodes) {
-                            if let (BackendDef::Graph(old), BackendDef::Graph(new)) =
-                                (&before.backend_def, &after.backend_def)
-                            {
-                                let channels: Vec<_> = old
-                                    .output_sinks
-                                    .iter()
-                                    .zip(&new.output_sinks)
-                                    .flat_map(|(old, new)| new.inputs.iter().skip(old.inputs.len()))
-                                    .filter_map(|edge| match edge.source {
-                                        crate::creature::genome::cgp::GraphSource::InputLeaf {
-                                            ref_idx,
-                                            sub_idx,
-                                        } => after
-                                            .input_refs
-                                            .get(usize::from(ref_idx))
-                                            .cloned()
-                                            .map(|reference| (reference, sub_idx)),
-                                        _ => None,
-                                    })
-                                    .collect();
-                                if !channels.is_empty() {
-                                    diagnostic.access.push(
-                                        crate::mutation::graph::refinement::AccessStep {
-                                            event: diagnostic.event,
-                                            node: after.node_id,
-                                            channels,
-                                        },
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
                 Ok(reachability)
             } else {
                 *genome = snapshot;
@@ -821,8 +731,6 @@ pub(crate) fn graph_operator_key(op: GraphOperator) -> MutationOperator {
         GraphOperator::DisableRewardModulation => MutationOperator::GraphDisableRewardModulation,
         GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
         GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
-        GraphOperator::RecruitNeutralInput => MutationOperator::GraphRecruitNeutralInput,
-        GraphOperator::RefineHeritableStructure => MutationOperator::GraphRefineHeritableStructure,
     }
 }
 
@@ -839,10 +747,4 @@ pub(crate) fn input_ref_operator_key(op: InputRefOperator) -> MutationOperator {
 mod tests;
 
 #[cfg(test)]
-mod recruitment_tests;
-
-#[cfg(test)]
 mod membership_tests;
-
-#[cfg(test)]
-mod refinement_tests;
