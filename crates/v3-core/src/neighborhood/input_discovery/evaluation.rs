@@ -381,7 +381,9 @@ pub fn checkpoint(genome: &CreatureGenome, panel: &Panel, reading: Reading) -> Q
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::OrdinaryFoodTypeId;
     use crate::creature::action_log::ActionLogEntry;
+    use crate::creature::founder::founder_genome_with_age_gate;
 
     fn move_entry(direction: u8, result: ActionResult) -> ActionLogEntry {
         ActionLogEntry {
@@ -436,5 +438,425 @@ mod tests {
                 }
             ));
         }
+    }
+
+    #[test]
+    fn nonmoves_keeps_every_nonmovement_action_in_order() {
+        let eat = WorldAction::eat(OrdinaryFoodTypeId::new(1));
+        let reproduce = WorldAction::Reproduce {
+            direction: Direction::S,
+            energy_transfer_fraction: 0.25,
+        };
+        assert_eq!(
+            nonmoves(&[
+                WorldAction::NoOp,
+                WorldAction::Move(Direction::N),
+                eat,
+                reproduce,
+            ]),
+            vec![eat, reproduce]
+        );
+    }
+
+    #[test]
+    fn directed_progress_covers_every_direction_and_rejects_zero_distance() {
+        for (direction, _) in Direction::ALL.iter().enumerate() {
+            let scene = Scene::new(Local::None, None, false, None, Some(direction as u8), true);
+            assert!(directed_progress(
+                &scene,
+                &SceneReading {
+                    applied: vec![move_entry(direction as u8, ActionResult::Success)],
+                    position: Some(scene.offset(direction as u8, 1)),
+                    ..SceneReading::default()
+                }
+            ));
+            assert!(!directed_progress(
+                &scene,
+                &SceneReading {
+                    applied: vec![move_entry(direction as u8, ActionResult::Success)],
+                    position: Some(scene.position),
+                    ..SceneReading::default()
+                }
+            ));
+        }
+    }
+
+    fn panel(family_kind: Family, scene: Scene, focal: bool, baseline: Reading) -> Panel {
+        Panel {
+            family: family_kind.as_key().into(),
+            held_out: false,
+            scenes: vec![scene],
+            focal: vec![focal],
+            baseline,
+            family_kind,
+        }
+    }
+
+    #[test]
+    fn panel_read_requires_liveness_and_preserves_the_alive_fold() {
+        let scene = Scene::new(Local::Fruit, None, false, None, None, false);
+        let panel = panel(Family::Scalar, scene, true, Reading::default());
+        let result = panel.read(
+            vec![SceneReading {
+                food_intake: vec![0.0, 1.0],
+                alive: false,
+                ..SceneReading::default()
+            }],
+            None,
+        );
+        assert!(!result.alive);
+        assert_eq!(result.correct, 0);
+        assert_eq!(result.opportunities, 1);
+    }
+
+    #[test]
+    fn vector_panel_requires_progress_and_incumbent_nonmoves() {
+        let scene = Scene::new(Local::None, None, false, None, Some(2), false);
+        let eat = WorldAction::eat(OrdinaryFoodTypeId::new(0));
+        let baseline = Reading {
+            scenes: vec![SceneReading {
+                actions: vec![eat],
+                ..SceneReading::default()
+            }],
+            ..Reading::default()
+        };
+        let panel = panel(Family::Vector, scene.clone(), true, baseline.clone());
+        let reading = |actions| SceneReading {
+            actions,
+            applied: vec![move_entry(2, ActionResult::Success)],
+            position: Some(scene.offset(2, 1)),
+            alive: true,
+            ..SceneReading::default()
+        };
+        assert_eq!(
+            panel
+                .read(vec![reading(vec![eat])], Some(&baseline))
+                .correct,
+            1
+        );
+        assert_eq!(
+            panel
+                .read(vec![reading(vec![WorldAction::NoOp])], Some(&baseline))
+                .correct,
+            0
+        );
+    }
+
+    #[test]
+    fn ring_panel_rejects_failed_moves_and_moves_into_the_barrier() {
+        let scene = Scene::new(Local::None, None, false, Some(2), None, false);
+        let eat = WorldAction::eat(OrdinaryFoodTypeId::new(0));
+        let baseline = Reading {
+            scenes: vec![SceneReading {
+                actions: vec![eat],
+                ..SceneReading::default()
+            }],
+            ..Reading::default()
+        };
+        let panel = panel(Family::Ring, scene, true, baseline.clone());
+        let reading = |actions, applied| SceneReading {
+            actions,
+            applied,
+            alive: true,
+            ..SceneReading::default()
+        };
+        assert_eq!(
+            panel
+                .read(
+                    vec![reading(
+                        vec![eat],
+                        vec![move_entry(0, ActionResult::Success)]
+                    )],
+                    Some(&baseline)
+                )
+                .correct,
+            1
+        );
+        assert_eq!(
+            panel
+                .read(
+                    vec![reading(
+                        vec![eat],
+                        vec![move_entry(0, ActionResult::Blocked)]
+                    )],
+                    Some(&baseline)
+                )
+                .correct,
+            0
+        );
+        assert_eq!(
+            panel
+                .read(
+                    vec![reading(
+                        vec![eat, WorldAction::Move(Direction::E)],
+                        vec![move_entry(0, ActionResult::Success)]
+                    )],
+                    Some(&baseline)
+                )
+                .correct,
+            0
+        );
+    }
+
+    #[test]
+    fn incumbent_preservation_requires_actions_position_and_applied_identity() {
+        let scene = Scene::new(Local::None, None, false, None, None, false);
+        let expected = SceneReading {
+            actions: vec![WorldAction::NoOp],
+            applied: vec![move_entry(0, ActionResult::Success)],
+            position: Some(scene.position),
+            alive: true,
+            ..SceneReading::default()
+        };
+        let baseline = Reading {
+            scenes: vec![expected.clone()],
+            ..Reading::default()
+        };
+        let panel = panel(Family::Scalar, scene.clone(), false, baseline.clone());
+        assert_eq!(
+            panel
+                .read(vec![expected.clone()], Some(&baseline))
+                .incumbent_preserved,
+            1
+        );
+        let mut changed_actions = expected.clone();
+        changed_actions.actions.clear();
+        let mut changed_position = expected.clone();
+        changed_position.position = Some(scene.offset(2, 1));
+        let mut changed_applied = expected;
+        changed_applied.applied[0].result = ActionResult::Blocked;
+        for changed in [changed_actions, changed_position, changed_applied] {
+            assert_eq!(
+                panel
+                    .read(vec![changed], Some(&baseline))
+                    .incumbent_preserved,
+                0
+            );
+        }
+    }
+
+    fn reading(correct: u32, opportunities: u32) -> Reading {
+        Reading {
+            correct,
+            opportunities,
+            incumbent_scenes: 2,
+            incumbent_preserved: 2,
+            alive: true,
+            ..Reading::default()
+        }
+    }
+
+    fn founder() -> CreatureGenome {
+        let config = super::super::scene_config();
+        founder_genome_with_age_gate(config.population.founder_profile, &config.energy.lifecycle)
+    }
+
+    fn single_scene_panel(family: Family, scene: Scene) -> Panel {
+        Panel {
+            family: family.as_key().into(),
+            held_out: false,
+            scenes: vec![scene],
+            focal: vec![true],
+            baseline: Reading {
+                scenes: vec![SceneReading::default()],
+                ..Reading::default()
+            },
+            family_kind: family,
+        }
+    }
+
+    #[test]
+    fn causal_channel_detection_accepts_each_independent_observable_difference() {
+        let family = Family::Scalar;
+        let start = founder();
+        let control = super::super::instrument_control(&start, family, false);
+        let panel = single_scene_panel(
+            family,
+            Scene::new(Local::Fruit, None, false, None, None, false),
+        );
+        let actual = checkpoint(&control, &panel, panel.evaluate(&control));
+        let ablated = actual.all_backend_ablated.scenes[0].clone();
+
+        let mut action_only = ablated.clone();
+        action_only.actions = vec![WorldAction::Reproduce {
+            direction: Direction::N,
+            energy_transfer_fraction: 0.5,
+        }];
+        let action_only = checkpoint(
+            &control,
+            &panel,
+            Reading {
+                scenes: vec![action_only],
+                alive: true,
+                ..Reading::default()
+            },
+        );
+        assert_eq!(action_only.channels[0].causal_focal_scenes, 1);
+
+        let mut position_only = ablated;
+        position_only.position = Some(panel.scenes[0].offset(2, 1));
+        let position_only = checkpoint(
+            &control,
+            &panel,
+            Reading {
+                scenes: vec![position_only],
+                alive: true,
+                ..Reading::default()
+            },
+        );
+        assert_eq!(position_only.channels[0].causal_focal_scenes, 1);
+    }
+
+    #[test]
+    fn backend_loss_below_the_qualification_delta_does_not_discover() {
+        use crate::contracts::RouteTarget;
+        use crate::creature::genome::{vote::VoteSink, NodeGenome, VmBackendDef, VmInstruction};
+
+        let family = Family::Vector;
+        let start = super::super::family_start(&founder(), family);
+        let control = super::super::instrument_control(&start, family, false);
+        let full = Panel::new(family, false, &start);
+        let reference = family.reference();
+        let width = match &reference {
+            crate::contracts::InputReference::World(key) => key.compound_width(),
+            _ => unreachable!(),
+        };
+        let channels: Vec<_> = (0..width)
+            .map(|sub| match addressed(&reference, sub) {
+                Addressed::Channel(channel) => channel,
+                _ => unreachable!(),
+            })
+            .collect();
+        let all = ablated(&control, |candidate| channels.contains(&candidate));
+        let required = [
+            crate::sensors::perception::food_idx::NEAREST_DX as u16,
+            crate::sensors::perception::food_idx::NEAREST_DY as u16,
+        ]
+        .map(|sub| match addressed(&reference, sub) {
+            Addressed::Channel(channel) => channel,
+            _ => unreachable!(),
+        });
+        let each: Vec<_> = required
+            .iter()
+            .map(|channel| ablated(&control, |candidate| candidate == *channel))
+            .collect();
+
+        let mut shared = Vec::new();
+        let mut losses = vec![None; required.len()];
+        for scene in &full.scenes {
+            let panel = single_scene_panel(family, scene.clone());
+            let control_correct = panel.evaluate(&control).correct == 1;
+            let all_correct = panel.evaluate(&all).correct == 1;
+            if control_correct && all_correct {
+                shared.push(scene.clone());
+            }
+            for (index, one) in each.iter().enumerate() {
+                if losses[index].is_none() && control_correct && panel.evaluate(one).correct == 0 {
+                    losses[index] = Some(scene.clone());
+                }
+            }
+        }
+        assert!(!shared.is_empty());
+        let mut scenes: Vec<_> = shared.iter().cycle().take(16).cloned().collect();
+        scenes.extend(
+            losses
+                .into_iter()
+                .map(|scene| scene.expect("each vector channel has a fixed causal scene")),
+        );
+        let scene_count = scenes.len();
+        let panel = Panel {
+            family: family.as_key().into(),
+            held_out: false,
+            focal: vec![true; scenes.len()],
+            scenes,
+            baseline: Reading {
+                scenes: vec![SceneReading::default(); scene_count],
+                ..Reading::default()
+            },
+            family_kind: family,
+        };
+        let reading = panel.evaluate(&control);
+        let mut hybrid = control.clone();
+        let vm_id = NodeId::new(2);
+        let decision_id = hybrid.nodes[0].targets[0].target_id;
+        hybrid.nodes[0].targets[0].target_id = vm_id;
+        hybrid.nodes.push(NodeGenome {
+            node_id: vm_id,
+            input_refs: vec![reference],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 2,
+                constants: vec![1.0],
+                program: vec![
+                    VmInstruction::ReadInput {
+                        dst: 0,
+                        ref_idx: 0,
+                        sub_idx: crate::sensors::perception::food_idx::NEAREST_DIST as u16,
+                    },
+                    VmInstruction::AddVote {
+                        sink: VoteSink::Move(1).index() as u8,
+                        src: 0,
+                    },
+                    VmInstruction::LoadConst {
+                        dst: 1,
+                        const_idx: 0,
+                    },
+                    VmInstruction::AddVote {
+                        sink: VoteSink::Decide.index() as u8,
+                        src: 1,
+                    },
+                    VmInstruction::Halt,
+                ],
+            }),
+            targets: vec![RouteTarget {
+                target_id: decision_id,
+                slot: 0,
+                gate_bias: 0.0,
+            }],
+        });
+        let result = checkpoint(&hybrid, &panel, reading);
+        let loss = result.reading.fraction() - result.all_backend_ablated.fraction();
+        assert!(qualifies_score(&result.reading, &panel.baseline));
+        assert!(result.coverage);
+        assert!(loss > 0.0 && loss < 0.125);
+        assert!(result.reading.fraction() - result.graph_ablated.fraction() >= 0.125);
+        assert!(!result.graph_discovery);
+    }
+
+    #[test]
+    fn acceptable_requires_both_liveness_and_complete_incumbent_preservation() {
+        assert!(reading(0, 0).acceptable());
+        assert!(!Reading {
+            alive: false,
+            ..reading(0, 0)
+        }
+        .acceptable());
+        assert!(!Reading {
+            incumbent_preserved: 1,
+            ..reading(0, 0)
+        }
+        .acceptable());
+    }
+
+    #[test]
+    fn score_qualification_enforces_each_boundary_and_the_score_delta() {
+        let start = reading(5, 8);
+        assert!(qualifies_score(&reading(6, 8), &start));
+        assert!(!qualifies_score(&reading(0, 0), &Reading::default()));
+        assert!(!qualifies_score(&reading(5, 8), &Reading::default()));
+        assert!(!qualifies_score(&reading(6, 8), &reading(6, 8)));
+        assert!(!qualifies_score(
+            &Reading {
+                alive: false,
+                ..reading(6, 8)
+            },
+            &start
+        ));
+        assert!(!qualifies_score(
+            &Reading {
+                incumbent_preserved: 1,
+                ..reading(6, 8)
+            },
+            &start
+        ));
     }
 }

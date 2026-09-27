@@ -22,6 +22,18 @@ fn mutation_summary_zero_has_zero_counts() {
 }
 
 #[test]
+fn mutation_skip_reason_keys_are_stable() {
+    assert_eq!(
+        MutationSkipReason::ParseabilityViolation.as_key(),
+        "ParseabilityViolation"
+    );
+    assert_eq!(
+        MutationSkipReason::NoApplicableTarget.as_key(),
+        "NoApplicableTarget"
+    );
+}
+
+#[test]
 fn added_node_input_class_keys_are_stable() {
     assert_eq!(MutationAddedNodeInputClass::None.as_key(), "none");
     assert_eq!(MutationAddedNodeInputClass::Food.as_key(), "food");

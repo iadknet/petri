@@ -22,3 +22,8 @@ fn complexity_effect_consistent_with_types() {
         );
     }
 }
+
+#[test]
+fn graph_operator_weight_total_matches_the_frozen_catalog() {
+    assert_eq!(GraphOperator::TOTAL_WEIGHT, 44);
+}
