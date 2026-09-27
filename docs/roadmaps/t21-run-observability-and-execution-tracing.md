@@ -41,8 +41,8 @@ workload, and collection failures never hold up the simulation.
   elapsed-time overhead in every declared workload, including local stack
   contention, heavy cognition and unavailable/overloaded collection; targeted
   enabled/disabled comparisons verify unchanged simulation results.
-- [ ] Future feature specs declare their telemetry needs or explain why existing
-  observations suffice, without making other tracks wait for this stack.
+- [ ] After OpenTelemetry is implemented and qualified, the spec template
+  guides future features in adding context and spans through that infrastructure.
 
 ## Executable Features
 
@@ -56,14 +56,16 @@ workload, and collection failures never hold up the simulation.
   - Goal: A sampled creature's consecutive decisions can be followed through its inputs, internal state, effective feature settings and executed cognition to actions and their applied outcomes.
 - [ ] **T21.F05 — Qualified Defaults and Operator Guide** — Depends on: T21.F04
   - Goal: Ordinary runs retain useful metrics and execution examples under the 5% overhead ceiling, with documented sampling, retention and failure behavior.
+- [ ] **T21.F06 — OpenTelemetry Spec Template Guidance** — Depends on: T21.F05
+  - Goal: Future feature specs describe relevant OpenTelemetry context and spans using the implemented, qualified infrastructure; the guidance lives only in the spec template.
 
 ## Notes for AI Agents
 
 - **Decisions, 2026-09-26.** Local collection is sufficient; outages and lost
   telemetry are acceptable. The user accepts at most 5% performance overhead and
-  exempts this track from expensive benchmark and mutation testing. The exact
-  verification exception and concurrent execution rules live in the
-  [shared workflow](../workflow.md#t21-verification-and-concurrency).
+  exempts this track from expensive benchmark and mutation testing. Retain
+  ordinary repository checks and short, targeted telemetry overhead checks.
+  T21 and T20 may proceed independently; serialize measurements on the same host.
   Feature specs are written just in time; this draft starts no implementation.
 - **Ownership and T20 independence.** T21 owns delivery, run correlation,
   dashboards and sampled execution observation. T14 retains report integrity and
@@ -193,8 +195,12 @@ workload, and collection failures never hold up the simulation.
   evidence applies only to the declared workloads. Target margin below 5% and
   keep the disabled path cheap. This is a bounded overhead check, not an
   ecological, neighborhood or evolutionary qualification campaign.
-- **Template adoption.** The active PRD equivalent is
-  [the flat feature template](../specs/roadmap/_feature-template.md). Its Telemetry
-  section is added with this track draft. New or materially revised specs name
-  applied signals, existing sources, correlation, collection cost and validation,
-  or give a concrete not-applicable reason. Completed specs need no backfill.
+- **F06 contract.** Only after F05 is complete, update
+  [the flat feature template](../specs/roadmap/_feature-template.md) to describe
+  adding relevant OpenTelemetry spans and context through the implemented
+  infrastructure. Keep this guidance solely in the template, not in workflows
+  or agent instructions. It must not require substitute logs, artifact dumps,
+  new observation systems, extra experiments or recording before OpenTelemetry
+  exists. Leave unrelated feature evidence requirements unchanged; no completed
+  spec backfill. This roadmap entry does not activate the guidance or modify
+  the template now.

@@ -11,13 +11,6 @@ Use the shared Plan, Implement, Review, and Close contract above with these
 substitutions. This adapter uses native subagents and Git; it adds no runner,
 plugin, separate roadmap, or global model settings.
 
-The shared [T21 verification exception](workflow.md#t21-verification-and-concurrency)
-overrides this adapter's benchmark/mutation delegation, goal-prompt wording and
-closure artifact requirements for T21.F01–F05. Keep the spec owner, implementer
-and fresh reviewer; omit the two specialists for waived gates. The implementer
-owns short telemetry overhead checks and their evidence. Apply the shared
-concurrency rules, including quiet timing windows and local Docker contention.
-
 Select `gpt-5.6-sol` with `medium` reasoning effort when launching any feature.
 Verify the active session model and effort; this workflow does not set them.
 
