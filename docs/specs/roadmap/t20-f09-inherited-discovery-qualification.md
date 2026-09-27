@@ -168,28 +168,15 @@ cap, weaken evidence or run new qualification proposals for this preflight.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary/output path and every
   survivor resolved here as killed or equivalent; no timeout or deferred survivor.
 
-  Mutation gate record (2026-09-27):
+  Mutation output root: `/Users/istefanek/.local/share/petri-tools/mutants/t20-f09/`.
+  Closure evidence is the valid fresh run plus the individual dispositions below.
 
-  - Fresh attempt 1 exited outer `make` 2 / `cargo-mutants` 4: its copied source
-    was not a Git checkout; 219 candidates found, zero tested. Preserved at
-    `/Users/istefanek/.local/share/petri-tools/mutants/t20-f09/fresh-attempt-1-baseline-failed/`.
-  - Advisor 16 approved attempt 2 of 2 because attempt 1 supplied no evidence.
-    The isolated test checkout retains the default path assertions. Attempt 2
-    exited 0: 219 tested in 49m, 121 caught, 27 unviable, 71 missed, 0 timeout,
-    run mode `fresh`. Preserved at
-    `/Users/istefanek/.local/share/petri-tools/mutants/t20-f09/fresh-attempt-2-complete/`;
-    final remediation output is `incremental` at
-    `/Users/istefanek/.local/share/petri-tools/mutants/t20-f09/mutants.out`.
-  - Four test-only remediation passes/runs were 71/43 caught/28 missed,
-    28/16/12, 12/4/8 and 8/2/6; all had zero timeout. Closure uses the fresh run
-    plus the dispositions below.
-  - One intervening run was stopped at exit 130 and is **invalid**: a broad edit
-    accidentally changed `Panel::new` before `#[cfg(test)]`. The line was restored;
-    root audited production/build/configuration/test-selection bytes against
-    `8829257d`, and advisor 18 required and approved restoring the valid cache.
-    Invalid output is isolated at
-    `/Users/istefanek/.local/share/petri-tools/mutants/t20-f09/invalid-incremental-3-interrupted/`
-    and contributes no result.
+| Run | Result | Preserved output under root |
+| --- | --- | --- |
+| Fresh 1 | Outer 2 / cargo-mutants 4; Git-less test fixture failed baseline; 219 found, zero tested. | `fresh-attempt-1-baseline-failed/` |
+| Fresh 2 | Exit 0; 219 tested in 49m: 121 caught, 27 unviable, 71 missed, zero timeout. Mode `fresh`. | `fresh-attempt-2-complete/` |
+| Four valid incremental passes | Tested/caught/missed: 71/43/28, 28/16/12, 12/4/8, 8/2/6; zero timeouts. | Final `mutants.out/`, mode `incremental` |
+| Invalid interrupted pass | Exit 130; accidental production edit restored exactly and valid cache recovered under advisor 18; contributes no results. | `invalid-incremental-3-interrupted/` |
 
   Fresh-attempt-2 survivor dispositions (all 71):
 
