@@ -98,8 +98,9 @@ scalar is the mean of `s` over the generation's training scenes.
 | `moves_attempted`, `moves_blocked`, `penalty_charged` | Counter differences |
 | `energy_end`, `death_tick` | Last living energy; tick of removal, null if alive |
 
-**Instruments and controls.** Every run carries the arms below. Scripted
-instruments run on a lab stepper that builds the actor's `CreatureState` from
+**Instruments and controls.** Every run carries the arms below; the two
+sensitivity instruments run in calibration only. Scripted actors die at
+energy ≤ 0 like a genome and run on a lab stepper that builds the actor's `CreatureState` from
 the founder genome and applies `apply_typed_eat` when food is under it, else
 `apply_move`, then subtracts `energy_decay_per_tick`; they pay no brain
 compute, carrying or penalty charge, so their `energy_end` is labelled
@@ -122,17 +123,20 @@ An overlay is an RFC 7396 merge patch over the arena config's JSON, applied
 in the order production defaults → arena → overlay, then deserialized (an
 unknown key is an error), normalized, and only then given the lab
 invariants: `min_reproduce_energy = resolved max_energy + 1.0`,
-`initial_creatures = 1`, growth and recovery zero, size and terrain as the
-arena; an overlay naming one of those keys is refused, and a resolved config
+`initial_creatures = 1`, growth and recovery zero, size, terrain and
+`edge_mode` (`Wrap`: distances are toroidal) as the arena; an overlay naming
+one of those keys is refused, and a resolved config
 is an error unless that threshold is finite and strictly greater than
 `max_energy` in `f32` (the sum rounds to `max_energy` at 2²⁴) and
 `start_energy ≤ max_energy`. Every arm carries two labels: `role` ∈ {`reference`, `control`,
 `instrument`, `user`} and `policy` ∈ {`native`, `policy-deviation`}, the
 latter whenever the resolved `mutation` block differs from the reference's;
 `mutation-off` is `control` + `policy-deviation`. Both labels appear in
-every row, summary entry and report line, and reachability is reported only
-for `policy: native` arms. A forced-event or ×k supply arm is a
-`policy-deviation` diagnostic.
+every row, summary entry and report line. The reach test runs for every
+evolving arm; the reached fraction and interval are native reachability only
+for `policy: native` arms, and a `policy-deviation` arm's reach fields are
+printed under a `diagnostic` label. A forced-event or ×k supply arm is such
+a diagnostic.
 
 **Calibration gate.** Before any campaign, on the grid
 `calibration_fractions` × `calibration_lifetimes` (defaults {0.02, 0.04,
@@ -161,7 +165,9 @@ replacement from the survivors. Elites are re-scored every generation on the
 new scenes. Reach threshold default: floor + 0.5 × (comparator − floor), both
 means on the validation scenes at the selected point; `--reach-threshold`
 overrides and is recorded. The validation candidate is the single top-ranked
-individual of a generation; a replicate reaches at the first generation whose
+individual of a generation by the true scalar in every arm (in
+`shuffled-score` the permuted scalars drive truncation only); a replicate
+reaches at the first generation whose
 candidate has training scalar ≥ threshold and, evaluated only then on a
 separate `Simulation` that never feeds reproduction, validation mean ≥
 threshold. A replicate that completes the horizon unreached is `censored:
@@ -197,7 +203,7 @@ The summary's `timing` block is the only non-deterministic content.
 | Stream | Seed |
 | --- | --- |
 | Replicate `i` | `r_i = hash(seed, i)` |
-| `scenes`, `mutation`, `selection`, `observation` (per replicate, `SmallRng`) | `hash(r_i, tag)` |
+| `scenes`, `mutation`, `selection` (per replicate, `SmallRng`, shared by every arm of the replicate; `observation` is reserved for T22.F03) | `hash(r_i, tag)` |
 | Child engine RNG | `hash(mutation_seed, generation, child_index)` |
 | Scene `Simulation` seed | One `scenes` draw |
 | Scripted actor | `hash(r_i, "scripted", arm, scene)` |
@@ -249,9 +255,6 @@ generation-to-threshold among reached, censored counts, fidelity line.
 | `--reach-threshold`, `--arm`, `--genome`, `--comparator` | calibrated; none; founder; built-in area-food controller (a file replaces it, still `instrument`) |
 | `--threads`, `--byte-cap`, `--out`, `--calibrate-only` | available parallelism; 64 MiB; run directory; off |
 
-The `--quick` sizes are fixed by the size pilot in the
-[readings](../../progress/readings/t22-f01.md).
-
 ## Implementation Tasks
 
 - [x] Register `crates/v3-lab` (library + `v3-lab` binary) in the workspace
@@ -269,10 +272,11 @@ The `--quick` sizes are fixed by the size pilot in the
 - [x] Calibration gate with the grid-selection rule and the `uncalibrated`
       exit; `--calibrate-only`.
 - [x] NDJSON and summary writers under the byte cap; provenance; `report`.
-- [ ] End-to-end pilot at campaign sizes: record wall, creature-ticks and
-      per-creature-tick cost in the readings, fix the `--quick` sizes so a
-      quick run finishes under 60 s on the development host, update the CLI
-      table.
+- [ ] End-to-end pilot: record wall, creature-ticks and per-creature-tick
+      cost of the measured quick-size runs in the readings, with the campaign
+      projection derived from that cost labelled as a projection; fix the
+      `--quick` sizes so a quick run finishes under 60 s on the development
+      host; update the CLI table.
 
 ## Verification
 
@@ -329,8 +333,3 @@ scope claim against the diff.
 - Decision: lab exemption (user, 2026-09-28) — no gate or goal profile, no
   benchmark specialist; the mutation gate, the Codex review and `make check`
   apply.
-- Decision: scripted actors die at energy ≤ 0 (production rule); reach
-  candidate is the top true scalar in every arm; `half-seeker` and
-  `oracle-seeker` run only in calibration; `policy-deviation` arms get no
-  reach test; all arms share a replicate's `selection` and `mutation` seeds;
-  `observation` is not drawn; arm configs must keep `edge_mode = Wrap`.
