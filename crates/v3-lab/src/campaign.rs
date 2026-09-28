@@ -511,11 +511,15 @@ fn advance(
     let mut validation_mean = None;
     if arm.reach_tested() && best.scalar >= step.plan.threshold {
         if let Some(genome) = &candidate.genome {
-            let values: Vec<f64> = step
+            let (values, ticks): (Vec<f64>, Vec<u64>) = step
                 .validation
                 .par_iter()
-                .map(|scene| evaluate_genome(&arm.setup, genome, scene).0.score)
-                .collect();
+                .map(|scene| {
+                    let score = evaluate_genome(&arm.setup, genome, scene).0;
+                    (score.score, u64::from(score.ticks))
+                })
+                .unzip();
+            totals.creature_ticks += ticks.iter().sum::<u64>();
             validation_mean = crate::stats::mean(&values);
             if validation_mean.is_some_and(|m| m >= step.plan.threshold) {
                 lineage.reached = Some(step.generation);

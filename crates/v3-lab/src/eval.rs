@@ -569,11 +569,38 @@ mod tests {
         assert_eq!(alive.energy_end, score.energy_end);
         assert!(
             score.food_eaten >= alive.food_eaten,
-            "death-tick bites count"
+            "bites never decrease; a_bite_in_the_death_tick_counts_exactly pins the death-tick bite"
         );
         assert!(!ParentExecuted::Record(&frozen.record, frozen.age)
             .resolve(100)
             .is_empty());
+    }
+
+    #[test]
+    fn a_bite_in_the_death_tick_counts_exactly() {
+        // One bite on the start cell worth 1e-3 energy: at 0.6 start energy
+        // the founder eats on tick 1 and still dies in that tick (below
+        // about 0.5 it dies before acting; from 0.75 it survives).
+        const REWARD: f32 = 1e-3;
+        let mut dying = setup(5, 0.6);
+        dying.config.world.food.types[0].energy_per_unit = Some(REWARD);
+        let scene = Scene {
+            seed: 4,
+            food: vec![centre(48)],
+            redraws: 0,
+        };
+        let (score, frozen) = evaluate_genome(&dying, &founder(&dying), &scene);
+        assert_eq!(score.death_tick, Some(1));
+        assert_eq!(score.ticks, 1);
+        assert_eq!(frozen, Frozen::default());
+        assert_eq!(score.food_eaten, 1, "the death-tick bite counts once");
+        assert_eq!(score.ticks_to_first_food, Some(1));
+        let bite = f64::from(dying.config.world.food.shared.max_density * REWARD);
+        assert!(
+            (score.intake - bite).abs() < 1e-7,
+            "intake {} is one bite {bite}",
+            score.intake
+        );
     }
 
     #[test]

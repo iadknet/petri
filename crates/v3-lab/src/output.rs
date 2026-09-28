@@ -55,6 +55,12 @@ impl Budget {
     }
 }
 
+const ROWS: &str = "rows.ndjson";
+const SUMMARY: &str = "summary.json";
+const ELITES: &str = "elites";
+/// What a run writes; a directory holding any of these is not reused.
+const RUN_OUTPUTS: [&str; 3] = [ROWS, SUMMARY, ELITES];
+
 /// An open run directory.
 #[derive(Debug)]
 pub struct RunDir {
@@ -83,10 +89,17 @@ impl RunDir {
     ///
     /// # Errors
     ///
-    /// I/O failures, or [`LabError::Output`] if existing content already
-    /// exceeds the budget.
+    /// I/O failures, or [`LabError::Output`] if `path` already holds a
+    /// run's outputs (checked before anything is written) or existing
+    /// content already exceeds the budget.
     pub fn create(path: PathBuf, mut budget: Budget) -> Result<Self, LabError> {
-        fs::create_dir_all(path.join("elites"))?;
+        if let Some(prior) = RUN_OUTPUTS.iter().find(|name| path.join(name).exists()) {
+            return Err(LabError::Output(format!(
+                "{} already holds a run's {prior}; choose a fresh --out",
+                path.display()
+            )));
+        }
+        fs::create_dir_all(path.join(ELITES))?;
         if !budget.admit(dir_size(&path)?) {
             return Err(LabError::Output(format!(
                 "{} already exceeds the byte cap",
@@ -96,7 +109,7 @@ impl RunDir {
         let rows = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(path.join("rows.ndjson"))?;
+            .open(path.join(ROWS))?;
         Ok(Self { path, budget, rows })
     }
 
@@ -125,10 +138,7 @@ impl RunDir {
         if !self.budget.admit(content.len() as u64) {
             return Ok(false);
         }
-        fs::write(
-            self.path.join("elites").join(format!("{name}.json")),
-            content,
-        )?;
+        fs::write(self.path.join(ELITES).join(format!("{name}.json")), content)?;
         Ok(true)
     }
 
@@ -147,7 +157,7 @@ impl RunDir {
             )));
         }
         self.rows.flush()?;
-        fs::write(self.path.join("summary.json"), content)?;
+        fs::write(self.path.join(SUMMARY), content)?;
         Ok(())
     }
 }
@@ -284,6 +294,29 @@ mod tests {
         assert!(inside.ends_with(".bench-artifacts/lab/t"));
         let default = resolve_out(&root, None, "food-seeking-1-x").unwrap();
         assert!(default.ends_with(".bench-artifacts/lab/food-seeking-1-x"));
+    }
+
+    #[test]
+    fn a_directory_holding_prior_run_outputs_is_refused_before_any_write() {
+        let path = checkout_root()
+            .unwrap()
+            .join(".bench-artifacts/lab")
+            .join(format!("test-reuse-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&path);
+        let budget = || Budget::new(64 << 20, SUMMARY_RESERVE).unwrap();
+        let mut first = RunDir::create(path.clone(), budget()).unwrap();
+        assert!(first.write_row("{\"row\":1}").unwrap());
+        first.write_summary(b"{}").unwrap();
+        drop(first);
+        let before = fs::read(path.join("rows.ndjson")).unwrap();
+        assert!(RunDir::create(path.clone(), budget()).is_err());
+        assert_eq!(fs::read(path.join("rows.ndjson")).unwrap(), before);
+        assert_eq!(fs::read(path.join("summary.json")).unwrap(), b"{}");
+        // An existing directory without run outputs is still accepted.
+        let empty = path.join("empty");
+        fs::create_dir_all(&empty).unwrap();
+        assert!(RunDir::create(empty, budget()).is_ok());
+        fs::remove_dir_all(&path).unwrap();
     }
 
     #[test]
