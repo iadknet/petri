@@ -25,7 +25,7 @@ Nothing in `crates/v3-lab` is reachable from a production crate.
 - Lexicase or any second selector; cohort (non-solo) evaluation; lifetime
   learning attribution; a production default, founder, recipe or mutation
   policy; any change to `v3-core`, `v3-cli`, `v3-server` or the frontend.
-- A benchmark profile or series entry (lab exemption), and any per-tick trace.
+- A benchmark profile or series entry, and any per-tick trace.
 
 ## Inputs and Invariants
 
@@ -132,10 +132,11 @@ is an error unless that threshold is finite and strictly greater than
 `instrument`, `user`} and `policy` ∈ {`native`, `policy-deviation`}, the
 latter whenever the resolved `mutation` block differs from the reference's;
 `mutation-off` is `control` + `policy-deviation`. Both labels appear in
-every row, summary entry and report line. The reach test runs for every
-evolving arm; the reached fraction and interval are native reachability only
-for `policy: native` arms, and a `policy-deviation` arm's reach fields are
-printed under a `diagnostic` label. A forced-event or ×k supply arm is such
+every row, summary entry and report line. The reach test runs for each
+`reference`, `control` and `user` arm, never for an instrument; the reached
+fraction and interval are native reachability only for `policy: native`
+arms, and a `policy-deviation` arm's reach fields are printed under a
+`diagnostic` label. A forced-event or ×k supply arm is such
 a diagnostic.
 
 **Calibration gate.** Before any campaign, on the grid
@@ -236,7 +237,7 @@ campaign of three evolving arms × 8 × 100 rows ≈ 20 MB.
 | --- | --- |
 | `provenance`: `git_revision`, `dirty`, `config_digest` (SHA-256 of the resolved reference config JSON), `overlays` (name, content, order), `genomes` (name, SHA-256, `genome_format: 1`, `v3_core_version`), `arena` (spec and SHA-256), `seeds`, `threads`, `sizes` | report, research notes |
 | `calibration`: grid points with founder, floor, half, oracle, comparator means, checks, redraws; `selected`, `verdict`, `reach_threshold` | report |
-| `arms[]`: `name`, `role`, `policy`, per replicate `reached`, `generation_to_threshold`, `censored`, `incomplete`, final best scalar; `reached_fraction` with `wilson_95` (null with `incomplete_replicates` when any replicate is incomplete) | report, research-note tables |
+| `arms[]`: `name`, `role`, `policy`, `reach_reported` (true only when the arm's reach counts as native reachability: tested and `policy: native`; a tested `policy-deviation` arm is false), per replicate `reached`, `generation_to_threshold`, `censored`, `incomplete`, final best scalar; `reached_fraction` with `wilson_95` (null with `incomplete_replicates` when any replicate is incomplete) | report, research-note tables |
 | `fidelity` (reference arm): `per_unit_rate`, `executed_bias`, `executed_window_ticks`, event totals by operator, `identical_offspring_fraction`, `phenotype_mutation: false`, `learned_weight_capture: false` | report |
 | `incomplete` (null or reason), `exit_code`, `timing` (wall, creature-ticks, per-creature-tick ms) | report, readings |
 
