@@ -9,8 +9,10 @@ fi
 [ "$#" -eq 0 ] || { printf 'Usage: scripts/quality-check [--require-tools]\n' >&2; exit 2; }
 
 if git rev-parse --git-dir >/dev/null 2>&1; then
-  git diff --check
-  git diff --cached --check
+  # --no-pager: in a TTY (the pre-commit hook run from a terminal) git would
+  # otherwise open less and wait for a keypress.
+  git --no-pager diff --check
+  git --no-pager diff --cached --check
 fi
 
 actionlint=${AQUA_ROOT_DIR:-.tools/aqua}/bin/actionlint

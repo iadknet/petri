@@ -13,6 +13,14 @@ run by `make policy-check`); larger evidence stays under the ignored
 A full report embeds typed config, so one containing a since-retired config
 key no longer loads and is regenerated rather than migrated.
 
+The same rule covers every telemetry-producing command, including `v3-lab`
+assays under `.bench-artifacts/lab/` (user decision, 2026-09-28; the
+[workflow's telemetry commit rule](workflow.md#benchmark-gate)): commit the
+minimum summary that regenerates the report (a versioned keep-list keyed to
+named consumers), cap the raw archive at the producing command, and write no
+per-tick traces unless a spec predeclares them with a projected size; T22
+forbids them outright.
+
 | Profile | Full report in the main checkout | Summary in the calling checkout |
 | --- | --- | --- |
 | Gate | `.bench-artifacts/<feature>/gate.json` | `docs/progress/features/<feature>.json` |

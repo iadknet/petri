@@ -1,7 +1,7 @@
 # T20 — Input Evolvability and Structured Variation
 
 **Status**: In Progress
-**Last updated**: 2026-09-26
+**Last updated**: 2026-09-28
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -57,7 +57,7 @@ and rollout gates, not a prerequisite for inherited improvements.
   - Goal: Outcome-dependent synaptic adjustment: a creature can refine eligible Graph input contributions within its lifetime using experienced outcomes, with bounded acquired state and a heritable learning-off option.
 - [ ] **T20.F08 — Shared Learning with Independent Exceptions (Conditional)** — Depends on: T20.F07
   - Goal: Generalization across repeated circuits: lifetime updates can transfer between semantically corresponding contributions with adjustable sharing and independently refinable exceptions.
-- [ ] **T20.F09 — Inherited Discovery Qualification** — Depends on: T20.F05, T13.F07
+- [ ] **T20.F09 — Inherited Discovery Qualification** — Depends on: T20.F05, T13.F07, T22.F01
   - Goal: Measure whether ordinary variation discovers useful Graph input contributions across different family shapes with lifetime learning disabled, separating access from coordinated refinement.
 - [ ] **T20.F10 — Inherited Retention Qualification** — Depends on: T20.F09
   - Goal: Measure whether newly useful input contributions improve reproduction and remain useful across descendants without sacrificing established abilities.
@@ -73,6 +73,8 @@ and rollout gates, not a prerequisite for inherited improvements.
   - Goal: Experience-dependent adaptation: ordinary Graph lineages can acquire only the positively qualified learning mechanisms while retaining learning-off and independent alternatives.
 
 ## Notes for AI Agents
+
+**F09 restart on the lab, 2026-09-28 (user decision).** The first F09 execution was reverted on 2026-09-27 (`a26c1cf0`); its readings, one-tick binary scenes and 0/32 results in every arm including the baseline are historical and not pooled. The restart depends on T22.F01 and runs its discovery question on the [capability lab](t22-capability-assays-and-evolvability-lab.md): many-tick graded scenes, the lab's calibration gate, native-variation fidelity checklist and controls, with the F09 row's scientific contract (native mutator, fresh lineages, learning off, access versus coordination arms, two family shapes, one non-ring) unchanged. No new assay module is added inside `v3-core`, and the recording follows the telemetry commit rule. Under the T22 rule of the same date, F09's verdict may block or unblock F10, the other measurement rows and F03 (an opt-in mechanism row that stays unqualified until F09 favors it) and may retire opt-in, unqualified candidate code as this track's disposal rule already says; it never sets a default, founder, mutation policy or closure threshold, and F12's production availability still rests on F10/F11 goal-world evidence recorded in F12's own spec.
 
 **Revision after adversarial review, 2026-09-23.** The purpose is general input
 evolvability, with Graph qualification first and one later VM feature. Keep T20

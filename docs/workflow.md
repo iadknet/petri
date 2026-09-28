@@ -7,6 +7,9 @@ Claude and Codex share the per-feature contract below. Codex uses the
 Claude uses the original instructions. Do not mix their session controls.
 Both may run concurrently on different eligible features. Claude's agent
 definitions, hooks, settings, and goal command remain active.
+Lab experiments on the T22 harness (exploration and why-not diagnosis) are not
+roadmap features and do not use this contract; the T22 track's exploration
+contract governs them.
 
 ## Roles
 
@@ -401,6 +404,23 @@ spec's Performance and Goal Impact section. A severe compute regression without
 a predeclared, justified cost is a P1. Never weaken a threshold or edit a stored
 baseline to make a feature pass.
 
+**Lab features skip the profiles (user decision, 2026-09-28).** A feature whose
+diff is confined to `crates/v3-lab`, the workspace manifest and lock entries
+that register it, the `Makefile` entries that build, test and run it, its
+tests and documentation changes no simulation trajectory and does not run the
+gate or goal profile. Its spec's Performance and Goal Impact section records
+`Not applicable: lab feature` with the diff scope, no benchmark specialist is
+spawned, and the reviewer checks the scope claim against the diff. The mutation
+gate, the Codex review and `make check` still apply. A lab feature that also
+touches `v3-core`, `v3-cli`, `v3-server` or the frontend loses the exemption
+for that closure, and so does one whose manifest or lock change does more than
+register the crate: existing dependency versions, features and shared build
+settings stay unchanged, and the reviewer verifies that with the scope claim.
+The exemption covers T22 features only; a feature in another track that uses
+the lab still runs its profiles. An exempt closure adds no benchmark summary
+and no series entry, so later comparisons reference the last measured closure,
+and the ordinary benchmark tests inside `make check` still run.
+
 From T15.F01 onward, each run writes a full local report under the main
 checkout's ignored `.bench-artifacts/<feature>/<profile>.json` and a committed
 summary under the calling checkout's `docs/progress/features/`. Gate uses
@@ -411,6 +431,21 @@ series entries pointing to summaries; do not stage new full reports, even gate
 reports. Existing historical reports remain valid references. The versioned
 projection, provenance and deterministic conversion command are documented in
 [`docs/benchmark-artifacts.md`](benchmark-artifacts.md).
+
+**Telemetry commit rule (user decision, 2026-09-28).** This covers every
+output a feature, assay or experiment produces, not only benchmark profiles:
+commit the bare minimum summary needed to regenerate the report; keep richer
+telemetry in the ignored `.bench-artifacts/` tree beneath a byte cap the
+producing command enforces; never write per-tick traces or exhaustive
+per-proposal records unless the spec predeclares them with a projected size.
+A raw archive is evidence to cite by path, hash and bytes, not a second copy of
+the summary, and a command that would exceed its cap stops and marks its
+record incomplete rather than growing. Regenerating a report means rendering
+its named consumers (the progress page, the closure comparison, an assay's
+report), not reconstructing raw telemetry, so each producing command declares
+a versioned keep-list for its summary, as the benchmark summary does. Writers
+that exist on 2026-09-28 keep their behavior until they are next touched; the
+rule binds every new command and every rewrite.
 
 After the implementer has finished benchmark-affecting work and before final
 review, delegate the spec's required gate and goal profiles to a fresh
@@ -522,7 +557,8 @@ the full suite was just run on the same code), and commit. Then:
    file, its original measured identity and verification time, and its preserved
    comparison verdicts. Availability is local and time-stamped, not a download
    guarantee. Confirm series entries point to summaries and no new full
-   benchmark artifact is staged; historical migration is a separate feature.
+   benchmark artifact or raw telemetry of any kind is staged; historical
+   migration is a separate feature.
 1. `ExitWorktree` with `action: "keep"` — the session returns to the main
    checkout. While inside a worktree, Claude Code blocks every git command
    aimed at the main checkout, so the merge cannot happen before this step.
