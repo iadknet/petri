@@ -22,8 +22,8 @@ pub struct Summary {
     pub arms: Vec<ArmSummary>,
     /// Reference arm only; null when no campaign ran.
     pub fidelity: Option<Fidelity>,
-    /// Null, `"byte_cap"` or `"uncalibrated"`.
-    pub incomplete: Option<String>,
+    /// Null for a complete run.
+    pub incomplete: Option<Incomplete>,
     pub exit_code: u8,
     /// The only non-deterministic block.
     pub timing: Timing,
@@ -141,8 +141,23 @@ pub struct Calibration {
     pub selected: Option<Selected>,
     pub verdict: Verdict,
     pub reach_threshold: Option<f64>,
-    /// `"calibrated"` or `"override"`.
-    pub reach_threshold_source: Option<String>,
+    pub reach_threshold_source: Option<ThresholdSource>,
+}
+
+/// Where the reach threshold came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThresholdSource {
+    Calibrated,
+    Override,
+}
+
+/// Why a run stopped short.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Incomplete {
+    Uncalibrated,
+    ByteCap,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -325,8 +340,7 @@ pub fn render_report(summary: &Summary) -> String {
         summary.exit_code,
         summary
             .incomplete
-            .as_deref()
-            .map_or(String::new(), |why| format!(", incomplete: {why}")),
+            .map_or(String::new(), |why| format!(", incomplete: {}", label(why))),
     );
     let _ = writeln!(out, "\n## Calibration: {:?}\n", calibration.verdict);
     let _ = writeln!(
@@ -364,7 +378,7 @@ pub fn render_report(summary: &Summary) -> String {
             selected.food_fraction,
             selected.lifetime,
             fmt_opt(calibration.reach_threshold),
-            calibration.reach_threshold_source.as_deref().unwrap_or("-"),
+            calibration.reach_threshold_source.map_or("-".into(), label),
         );
     }
     let (native, diagnostic): (Vec<&ArmSummary>, Vec<&ArmSummary>) = summary

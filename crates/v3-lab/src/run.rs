@@ -21,8 +21,8 @@ use crate::output::{
 };
 use crate::rng::{replicate_seed, tagged};
 use crate::summary::{
-    ArenaRecord, GenomeRecord, OverlayRecord, Provenance, Seeds, Sizes, Summary, Timing, Verdict,
-    GENOME_FORMAT, SUMMARY_KIND, SUMMARY_VERSION,
+    ArenaRecord, GenomeRecord, Incomplete, OverlayRecord, Provenance, Seeds, Sizes, Summary,
+    Timing, Verdict, GENOME_FORMAT, SUMMARY_KIND, SUMMARY_VERSION,
 };
 use crate::{sha256_hex, GenomeFile, LabError};
 
@@ -90,6 +90,19 @@ pub struct RunOutcome {
     pub summary: Summary,
 }
 
+impl RunParams {
+    /// The calibration grid: an explicit `--food-fraction` or `--lifetime`
+    /// replaces its axis with that single value.
+    fn grid(&self) -> (Vec<f64>, Vec<u32>) {
+        (
+            self.food_fraction
+                .map_or_else(|| self.calibration_fractions.clone(), |f| vec![f]),
+            self.lifetime
+                .map_or_else(|| self.calibration_lifetimes.clone(), |l| vec![l]),
+        )
+    }
+}
+
 fn check(ok: bool, message: &str) -> Result<(), LabError> {
     if ok {
         Ok(())
@@ -116,16 +129,11 @@ fn validate_params(params: &RunParams) -> Result<(), LabError> {
         (48..=64).contains(&params.arena_size),
         "--arena-size must be in 48..=64",
     )?;
-    let fractions = params
-        .food_fraction
-        .map_or(params.calibration_fractions.clone(), |f| vec![f]);
+    let (fractions, lifetimes) = params.grid();
     check(
         !fractions.is_empty() && fractions.iter().all(|f| *f > 0.0 && *f < 1.0),
         "food fractions must be in (0, 1)",
     )?;
-    let lifetimes = params
-        .lifetime
-        .map_or(params.calibration_lifetimes.clone(), |l| vec![l]);
     check(
         !lifetimes.is_empty() && lifetimes.iter().all(|l| *l >= 1),
         "lifetimes must be at least 1",
@@ -211,14 +219,20 @@ fn load_genomes(params: &RunParams, reference: &SimulationConfig) -> Result<Geno
 struct Overlay {
     name: String,
     content: Value,
+    /// The arm config resolved from `content`.
+    config: SimulationConfig,
     genome: Option<CreatureGenome>,
     bytes: u64,
 }
 
 fn load_overlays(params: &RunParams) -> Result<Vec<Overlay>, LabError> {
+    let resolve =
+        |content: &Value| resolve_arm(Some(content), params.arena_size, params.start_energy);
+    let content = json!({"mutation": {"per_unit_rate": 0.0}});
     let mut overlays = vec![Overlay {
         name: "mutation-off".into(),
-        content: json!({"mutation": {"per_unit_rate": 0.0}}),
+        config: resolve(&content)?,
+        content,
         genome: None,
         bytes: 0,
     }];
@@ -229,6 +243,7 @@ fn load_overlays(params: &RunParams) -> Result<Vec<Overlay>, LabError> {
             .map_err(|error| LabError::Config(format!("{}: {error}", arm.overlay.display())))?;
         overlays.push(Overlay {
             name: arm.name.clone(),
+            config: resolve(&content)?,
             content,
             genome: arm.genome.as_deref().map(GenomeFile::load).transpose()?,
             bytes: text.len() as u64,
@@ -244,10 +259,6 @@ fn run_in_pool(params: &RunParams) -> Result<RunOutcome, LabError> {
     let reference = resolve_arm(None, size, params.start_energy)?;
     let genomes = load_genomes(params, &reference)?;
     let overlays = load_overlays(params)?;
-    let overlay_configs: Vec<SimulationConfig> = overlays
-        .iter()
-        .map(|o| resolve_arm(Some(&o.content), size, params.start_energy))
-        .collect::<Result<_, _>>()?;
 
     let root = checkout_root()?;
     let default_name = format!("{ASSAY}-{}-{}", params.seed, utc_stamp());
@@ -257,17 +268,14 @@ fn run_in_pool(params: &RunParams) -> Result<RunOutcome, LabError> {
 
     let calibration_seed = tagged(params.seed, "calibration");
     let validation_seed = tagged(params.seed, "validation");
+    let (fractions, lifetimes) = params.grid();
     let gate = run_gate(
         &reference,
         &genomes.start,
         &genomes.comparator,
         &GridInput {
-            fractions: params
-                .food_fraction
-                .map_or_else(|| params.calibration_fractions.clone(), |f| vec![f]),
-            lifetimes: params
-                .lifetime
-                .map_or_else(|| params.calibration_lifetimes.clone(), |l| vec![l]),
+            fractions,
+            lifetimes,
             scenes: params.calibration_scenes,
             validation_scenes: params.validation_scenes,
             margin: params.calibration_margin,
@@ -285,7 +293,7 @@ fn run_in_pool(params: &RunParams) -> Result<RunOutcome, LabError> {
                 let setup = |config: &SimulationConfig| {
                     Setup::new(config.clone(), params.start_energy, selected.lifetime)
                 };
-                let arms = build_arms(&reference, &genomes, &overlays, &overlay_configs, &setup);
+                let arms = build_arms(&reference, &genomes, &overlays, &setup);
                 let plan = Plan {
                     seed: params.seed,
                     replicates: params.replicates,
@@ -309,9 +317,9 @@ fn run_in_pool(params: &RunParams) -> Result<RunOutcome, LabError> {
         };
 
     let (incomplete, exit_code) = if gate.calibration.verdict == Verdict::Uncalibrated {
-        (Some("uncalibrated".to_owned()), EXIT_UNCALIBRATED)
+        (Some(Incomplete::Uncalibrated), EXIT_UNCALIBRATED)
     } else if byte_cap_hit {
-        (Some("byte_cap".to_owned()), EXIT_BYTE_CAP)
+        (Some(Incomplete::ByteCap), EXIT_BYTE_CAP)
     } else {
         (None, 0)
     };
@@ -388,7 +396,6 @@ fn build_arms(
     reference: &SimulationConfig,
     genomes: &Genomes,
     overlays: &[Overlay],
-    overlay_configs: &[SimulationConfig],
     setup: &dyn Fn(&SimulationConfig) -> Setup,
 ) -> Vec<Arm> {
     let arm = |name: &str, role: Role, config: &SimulationConfig, kind: ArmKind| Arm {
@@ -414,7 +421,7 @@ fn build_arms(
         arm(
             "mutation-off",
             Role::Control,
-            &overlay_configs[0],
+            &overlays[0].config,
             evolving(false),
         ),
         arm("shuffled-score", Role::Control, reference, evolving(true)),
@@ -434,12 +441,12 @@ fn build_arms(
             },
         ),
     ];
-    for (overlay, config) in overlays.iter().zip(overlay_configs).skip(1) {
+    for overlay in &overlays[1..] {
         let user_start = overlay.genome.clone().unwrap_or_else(|| start.clone());
         arms.push(arm(
             &overlay.name,
             Role::User,
-            config,
+            &overlay.config,
             ArmKind::Evolving {
                 start: user_start,
                 shuffled: false,

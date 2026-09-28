@@ -280,10 +280,10 @@ generation-to-threshold among reached, censored counts, fidelity line.
 
 ## Verification
 
-- [x] `cargo test -p v3-lab` (inside `make check` via `rust-test-lab`, tiny
-      sizes, under 10 s; the determinism, frozen-record, death, exposure,
-      overlay, byte-cap, `uncalibrated`, blocked-move, Wilson and keep-list
-      cases) -> [readings](../../progress/readings/t22-f01.md).
+- [x] `cargo test -p v3-lab` (in `make check` via `rust-test-lab`, tiny
+      sizes, under 10 s), `cargo clippy -p v3-lab --all-targets -- -D
+      warnings`, `cargo check --workspace --all-targets` -> clean; cases
+      in the [readings](../../progress/readings/t22-f01.md).
 - [x] `make check` -> exit 0; `git diff --stat main` confined to the diff
       scope above -> recorded in the readings.
 - [x] Quick run: `make lab` -> wall under 60 s, calibration verdict, founder
