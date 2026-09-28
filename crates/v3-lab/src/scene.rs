@@ -167,6 +167,18 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_count_of_zero_or_above_the_eligible_cells_fails_without_drawing() {
+        // An 8² arena has 64 − 9 = 55 cells at distance ≥ 2 from the centre.
+        let cells = 64.0;
+        let draw = |fraction: f64| draw_scene(&mut SmallRng::seed_from_u64(1), 8, fraction, 5);
+        assert_eq!(draw(0.0), Err(Infeasible { redraws: 0 }));
+        assert_eq!(draw(56.0 / cells), Err(Infeasible { redraws: 0 }));
+        let full = draw(55.0 / cells).expect("every eligible cell holds food");
+        assert_eq!(full.food.len(), 55);
+        assert_eq!(full.redraws, 0);
+    }
+
     proptest! {
         #[test]
         fn distance_is_a_bounded_symmetric_metric(

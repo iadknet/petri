@@ -755,6 +755,321 @@ mod tests {
         assert_eq!(plan(5, 1.0).survivors(), 5);
     }
 
+    fn plan(population: u32, elite_fraction: f64, generations: u32, threshold: f64) -> Plan {
+        Plan {
+            seed: 3,
+            replicates: 1,
+            generations,
+            population,
+            elite_fraction,
+            scenes: 1,
+            food_fraction: 0.06,
+            threshold,
+        }
+    }
+
+    /// A run directory under the system temp directory; removed on drop.
+    struct Scratch(std::path::PathBuf);
+
+    impl Scratch {
+        fn new(name: &str) -> (Self, RunDir) {
+            let path = std::env::temp_dir()
+                .join(format!("petri-lab-campaign-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&path);
+            let budget = crate::output::Budget::new(64 << 20, 1 << 20).unwrap();
+            let dir = RunDir::create(path.clone(), budget).unwrap();
+            (Self(path), dir)
+        }
+
+        fn rows(&self, arm: &str) -> Vec<serde_json::Value> {
+            std::fs::read_to_string(self.0.join("rows.ndjson"))
+                .unwrap()
+                .lines()
+                .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+                .filter(|row| row["arm"] == arm)
+                .collect()
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn fixed(arm: &Arm, name: &str, role: Role) -> Arm {
+        let ArmKind::Evolving { start, .. } = &arm.kind else {
+            unreachable!()
+        };
+        Arm {
+            name: name.into(),
+            role,
+            policy: Policy::Native,
+            setup: arm.setup.clone(),
+            kind: ArmKind::Fixed(start.clone()),
+        }
+    }
+
+    fn operator_total(map: &BTreeMap<String, u64>) -> u64 {
+        map.values().sum()
+    }
+
+    #[test]
+    fn the_reference_arm_alone_accumulates_births_carry_overs_and_events() {
+        let mut native = founder_arm(100.0, 40);
+        // About one event per birth: some children identical, some not.
+        native.setup.config.mutation.per_unit_rate = 0.01;
+        let arms = vec![
+            native.clone(),
+            fixed(&native, "founder-only", Role::Control),
+        ];
+        // 5 members, 1 survivor: 4 births in each of generations 1..=3.
+        let plan = plan(5, 0.2, 4, 1e9);
+        let (scratch, mut dir) = Scratch::new("births");
+        let (summaries, totals) = run_campaign(&arms, &plan, &[], &mut dir).unwrap();
+        let events = &totals.reference_events;
+        assert_eq!(events.offspring, 12);
+        assert_eq!(totals.reference_carried, 3);
+        assert_eq!(summaries[0].replicates[0].generations_run, 4);
+        assert!(events.requested > 0 && events.applied > 0 && events.skipped > 0);
+        assert!(operator_total(&events.requested_by_operator) > 0);
+        assert!(operator_total(&events.applied_by_operator) > 0);
+        let identical = events.identical_offspring;
+        assert!(
+            identical > 0 && identical < 12 && identical * 2 != 12,
+            "{identical}"
+        );
+
+        let rows = scratch.rows("native");
+        assert_eq!(rows.len(), 4);
+        let mut flagged = 0;
+        for row in &rows {
+            let members = row["individuals"].as_array().unwrap();
+            let mut ids: Vec<u64> = members.iter().map(|m| m[0].as_u64().unwrap()).collect();
+            ids.sort_unstable();
+            ids.dedup();
+            assert_eq!(ids.len(), 5, "ids are unique within a generation");
+            for member in members {
+                let (applied, identical) = (member[3].as_u64().unwrap(), member[4] == true);
+                assert!(applied > 0 || identical || member[1].is_null() || member[5] == true);
+                flagged += u64::from(identical);
+            }
+        }
+        assert_eq!(
+            flagged, identical,
+            "row flags agree with the fidelity count"
+        );
+    }
+
+    #[test]
+    fn a_reached_arm_stops_while_instruments_run_to_the_horizon() {
+        let native = founder_arm(100.0, 40);
+        let arms = vec![
+            native.clone(),
+            fixed(&native, "comparator", Role::Instrument),
+        ];
+        let validation = draw_scenes(11, 2, 48, 0.06, 5).unwrap();
+        let (scratch, mut dir) = Scratch::new("reach");
+        let (summaries, _) =
+            run_campaign(&arms, &plan(2, 0.5, 3, 0.0), &validation, &mut dir).unwrap();
+        let reached = &summaries[0].replicates[0];
+        assert_eq!(reached.reached, Some(true));
+        assert_eq!(reached.generation_to_threshold, Some(0));
+        assert_eq!(reached.stopped_by, StoppedBy::Reached);
+        assert_eq!(reached.generations_run, 1);
+        assert_eq!(scratch.rows("native").len(), 1);
+        assert_eq!(scratch.rows("comparator").len(), 3);
+        assert_eq!(summaries[1].replicates[0].stopped_by, StoppedBy::Horizon);
+    }
+
+    #[test]
+    fn scripted_actors_seed_each_scene_by_its_campaign_index() {
+        let native = founder_arm(100.0, 30);
+        let ArmKind::Evolving { start, .. } = &native.kind else {
+            unreachable!()
+        };
+        let scripted = Arm {
+            name: "random-walk".into(),
+            role: Role::Instrument,
+            policy: Policy::Native,
+            setup: native.setup.clone(),
+            kind: ArmKind::Scripted {
+                policy: Scripted::RandomWalk,
+                body: start.clone(),
+            },
+        };
+        let arms = vec![
+            fixed(&native, "founder-only", Role::Control),
+            scripted.clone(),
+        ];
+        let mut plan = plan(2, 0.5, 2, 1e9);
+        plan.scenes = 2;
+        let (scratch, mut dir) = Scratch::new("scripted");
+        run_campaign(&arms, &plan, &[], &mut dir).unwrap();
+
+        let r_seed = replicate_seed(plan.seed, 0);
+        let mut scene_rng = stream(&[Part::U(tagged(r_seed, "scenes"))]);
+        let scenes: Vec<Scene> = (0..4)
+            .map(|_| draw_scene(&mut scene_rng, 48, plan.food_fraction, 5).unwrap())
+            .collect();
+        let score = |scene: usize, index: usize| {
+            serde_json::to_value(evaluate_scripted(
+                &scripted.setup,
+                start,
+                Scripted::RandomWalk,
+                &scenes[scene],
+                scripted_seed(r_seed, Scripted::RandomWalk, index),
+            ))
+            .unwrap()
+        };
+        let rows = scratch.rows("random-walk");
+        assert_eq!(rows.len(), 2);
+        for (scene, row) in [(0, &rows[0]), (1, &rows[0]), (2, &rows[1]), (3, &rows[1])] {
+            assert_eq!(
+                row["best_scenes"][scene % 2],
+                score(scene, scene),
+                "scene {scene}"
+            );
+        }
+        // The check separates the campaign index from nearby wrong indices.
+        assert_ne!(score(1, 1), score(1, 0));
+        assert_ne!(score(2, 2), score(2, 0));
+        assert_ne!(score(2, 2), score(2, 3));
+        assert_ne!(score(3, 3), score(3, 1));
+    }
+
+    #[test]
+    fn breeding_carries_survivors_and_mutates_children_under_the_documented_seed() {
+        let mut arm = founder_arm(100.0, 40);
+        // A high rate makes every child differ from its parent.
+        arm.setup.config.mutation.per_unit_rate = 0.2;
+        let ArmKind::Evolving { start, .. } = arm.kind.clone() else {
+            unreachable!()
+        };
+        let plan = plan(3, 0.4, 2, 1e9);
+        let r_seed = replicate_seed(plan.seed, 0);
+        let mut lineage = Lineage::new(0, &arm, plan.population, r_seed);
+        lineage.population[1].birth = Some(Events {
+            offspring: 1,
+            ..Events::default()
+        });
+        let scene = draw_scenes(5, 1, 48, 0.04, 5).unwrap().remove(0);
+        let frozen = evaluate_genome(&arm.setup, &start, &scene).1;
+        let members: Vec<Scored> = [1.0, 3.0, 2.0]
+            .into_iter()
+            .map(|scalar| Scored {
+                scalar,
+                scenes: Vec::new(),
+                frozen: frozen.clone(),
+                creature_ticks: 0,
+            })
+            .collect();
+        let step = Step {
+            plan: &plan,
+            validation: &[],
+            scenes: &[],
+            replicate: 0,
+            generation: 0,
+        };
+        breed(&arm, &mut lineage, &members, &[1, 2, 0], &step);
+
+        let population = &lineage.population;
+        assert_eq!(population.len(), 3);
+        let carried = &population[0];
+        assert_eq!((carried.id, carried.carried), (1, true));
+        assert!(carried.birth.is_none());
+        let reachable = mesh_reachable_nodes(&start);
+        let child = |generation: u64, slot: u64| {
+            let mut genome = start.clone();
+            let mut rng = SmallRng::seed_from_u64(hash(&[
+                Part::U(lineage.mutation_seed),
+                Part::U(generation),
+                Part::U(slot),
+            ]));
+            let summary = MutationEngine::apply_mutations_with_food_type_count(
+                &mut genome,
+                &arm.setup.config.mutation,
+                &reachable,
+                ParentExecuted::Record(&frozen.record, frozen.age),
+                &mut rng,
+                arm.setup.config.world.food.types.len(),
+            );
+            (genome, summary)
+        };
+        for (offset, member) in population[1..].iter().enumerate() {
+            let (genome, summary) = child(1, 1 + offset as u64);
+            assert_eq!(member.id, 3 + offset as u64);
+            assert_eq!((member.parent, member.carried), (Some(1), false));
+            assert_eq!(member.genome.as_ref(), Some(&genome));
+            let birth = member.birth.as_ref().unwrap();
+            assert_eq!(birth.requested, u64::from(summary.attempted_events));
+            assert_eq!(birth.applied, u64::from(summary.applied_events));
+            assert_eq!(birth.skipped, u64::from(summary.skipped_events));
+            let keyed = |from: &HashMap<_, u32>| -> BTreeMap<String, u64> {
+                from.iter()
+                    .map(|(operator, count)| {
+                        let key = serde_json::to_value(operator).unwrap();
+                        (key.as_str().unwrap().to_owned(), u64::from(*count))
+                    })
+                    .collect()
+            };
+            assert_eq!(
+                birth.requested_by_operator,
+                keyed(&summary.attempted_by_operator)
+            );
+            assert_eq!(
+                birth.applied_by_operator,
+                keyed(&summary.applied_by_operator)
+            );
+            assert_eq!(
+                birth.skipped_by_operator,
+                keyed(&summary.skipped_by_operator)
+            );
+            assert_eq!(birth.offspring, 1);
+            assert_eq!(birth.identical_offspring, u64::from(genome == start));
+            assert!(genome != start && birth.applied > 0 && birth.skipped > 0);
+            // Neighbouring seeds give different children.
+            for (generation, slot) in [
+                (0, 1 + offset as u64),
+                (1, offset as u64),
+                (1, 2 + offset as u64),
+            ] {
+                assert_ne!(child(generation, slot).0, genome, "{generation} {slot}");
+            }
+        }
+    }
+
+    #[test]
+    fn reach_fractions_need_complete_tested_replicates() {
+        let native = founder_arm(100.0, 1);
+        let replicate = |reached: bool, incomplete: bool| ReplicateResult {
+            replicate: 0,
+            reached: Some(reached),
+            generation_to_threshold: reached.then_some(1),
+            censored: Some(!reached),
+            incomplete,
+            stopped_by: StoppedBy::Horizon,
+            generations_run: 1,
+            final_best: None,
+        };
+        let three = || {
+            vec![
+                replicate(true, false),
+                replicate(true, false),
+                replicate(false, false),
+            ]
+        };
+        let summary = arm_summary(&native, three());
+        assert_eq!(summary.reached_fraction, Some(2.0 / 3.0));
+        assert_eq!(summary.wilson_95, crate::stats::wilson_95(2, 3));
+        let instrument = fixed(&native, "comparator", Role::Instrument);
+        assert_eq!(arm_summary(&instrument, three()).reached_fraction, None);
+        let mut partial = three();
+        partial.push(replicate(false, true));
+        assert_eq!(arm_summary(&native, partial).reached_fraction, None);
+        assert_eq!(arm_summary(&native, Vec::new()).reached_fraction, None);
+    }
+
     #[test]
     fn rank_orders_by_scalar_then_tie_key() {
         assert_eq!(rank(&[1.0, 3.0, 3.0, 2.0], &[0, 9, 4, 1]), vec![2, 1, 3, 0]);

@@ -469,3 +469,91 @@ fn build_arms(
     }
     arms
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn params() -> RunParams {
+        RunParams {
+            seed: 1,
+            replicates: 1,
+            generations: 1,
+            population: 2,
+            elite_fraction: 0.5,
+            scenes: 1,
+            validation_scenes: 1,
+            lifetime: None,
+            arena_size: 48,
+            food_fraction: None,
+            start_energy: 100.0,
+            calibration_fractions: vec![0.04],
+            calibration_lifetimes: vec![100],
+            calibration_scenes: 1,
+            calibration_margin: 1.0,
+            reach_threshold: None,
+            arms: Vec::new(),
+            genome: None,
+            comparator: None,
+            threads: 1,
+            byte_cap: 64 << 20,
+            out: None,
+            calibrate_only: false,
+            quick: false,
+        }
+    }
+
+    fn arm(name: &str) -> UserArm {
+        UserArm {
+            name: name.into(),
+            overlay: PathBuf::from("o.json"),
+            genome: None,
+        }
+    }
+
+    fn refused(change: impl Fn(&mut RunParams)) -> bool {
+        let mut p = params();
+        change(&mut p);
+        validate_params(&p).is_err()
+    }
+
+    #[test]
+    fn valid_params_and_arm_names_pass() {
+        assert!(validate_params(&params()).is_ok());
+        let mut p = params();
+        p.elite_fraction = 1.0;
+        p.arms = vec![arm("a-b_C9"), arm("hot")];
+        assert!(validate_params(&p).is_ok());
+    }
+
+    #[test]
+    fn each_count_of_zero_is_refused_alone() {
+        assert!(refused(|p| p.replicates = 0));
+        assert!(refused(|p| p.generations = 0));
+        assert!(refused(|p| p.scenes = 0));
+        assert!(refused(|p| p.validation_scenes = 0));
+        assert!(refused(|p| p.calibration_scenes = 0));
+    }
+
+    #[test]
+    fn elite_fraction_and_grid_bounds_are_open_where_documented() {
+        assert!(refused(|p| p.elite_fraction = 0.0));
+        assert!(refused(|p| p.elite_fraction = 1.5));
+        assert!(refused(|p| p.calibration_fractions = Vec::new()));
+        for fraction in [0.0, 1.0, 1.5, -0.5] {
+            assert!(
+                refused(|p| p.calibration_fractions = vec![fraction]),
+                "{fraction}"
+            );
+        }
+        assert!(refused(|p| p.calibration_lifetimes = Vec::new()));
+    }
+
+    #[test]
+    fn arm_names_must_be_well_formed_unique_and_not_built_in() {
+        assert!(refused(|p| p.arms = vec![arm("")]));
+        assert!(refused(|p| p.arms = vec![arm("bad name")]));
+        assert!(refused(|p| p.arms = vec![arm("native")]));
+        assert!(refused(|p| p.arms = vec![arm("hot"), arm("hot")]));
+    }
+}

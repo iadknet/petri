@@ -661,6 +661,192 @@ mod tests {
     }
 
     #[test]
+    fn scripted_names_are_their_serialized_labels() {
+        for policy in [
+            Scripted::RandomWalk,
+            Scripted::HalfSeeker,
+            Scripted::OracleSeeker,
+        ] {
+            assert_eq!(serde_json::to_value(policy).unwrap(), policy.name());
+        }
+    }
+
+    /// A scripted actor boxed in by barriers pays the aged move cost and
+    /// decay every tick, and no eat charge off food (even when eating costs).
+    #[test]
+    fn a_boxed_scripted_actor_pays_the_age_scaled_move_cost_only() {
+        const LIFETIME: u32 = 150;
+        let mut setup = setup(LIFETIME, 200.0);
+        setup.config.energy.costs.eat_cost = 0.7;
+        let size = setup.config.world.width;
+        let start = centre(size);
+        let mut world = WorldState::new(size, size, setup.config.world.edge_mode);
+        world.reconfigure_food(setup.config.world.food.clone());
+        for direction in Direction::ALL {
+            let cell = world.resolve_neighbor(start, direction).unwrap();
+            world.set_barrier(cell, true);
+        }
+        let far = Position::new(start.x + 10, start.y);
+        world.set_food_type(far, FOOD, 1.0);
+        let founder = founder(&setup);
+        let score = run_scripted(&setup, &founder, Scripted::OracleSeeker, world, &[far], 9);
+        assert_eq!(score.death_tick, None);
+        let complexity = setup
+            .creature(CreatureId::default(), founder, 9)
+            .cached_complexity;
+        let energy_config = &setup.config.energy;
+        let mut expected = 200.0_f32;
+        for age in 0..u64::from(LIFETIME) {
+            expected -=
+                energy_config.adjusted_action_cost(energy_config.costs.move_cost, complexity, age);
+            expected -= energy_config.lifecycle.energy_decay_per_tick;
+        }
+        let energy = score.energy_end.value();
+        assert!((energy - expected).abs() < 1e-3, "{energy} vs {expected}");
+    }
+
+    #[test]
+    fn scripted_intake_is_each_bite_once() {
+        let setup = setup(9, 100.0);
+        let size = setup.config.world.width;
+        let start = centre(size);
+        let mut world = WorldState::new(size, size, setup.config.world.edge_mode);
+        world.reconfigure_food(setup.config.world.food.clone());
+        let cells: Vec<Position> = (0..3)
+            .map(|i| Position::new(start.x + i, start.y))
+            .collect();
+        for (cell, density) in cells.iter().zip([1.0, 0.5, 0.25]) {
+            world.set_food_type(*cell, FOOD, density);
+        }
+        let reward = setup.config.energy.costs.eat_reward_per_food;
+        let score = run_scripted(
+            &setup,
+            &founder(&setup),
+            Scripted::OracleSeeker,
+            world,
+            &cells,
+            3,
+        );
+        assert_eq!(score.food_eaten, 3);
+        assert_eq!(score.ticks_to_first_food, Some(1));
+        let expected = f64::from(1.75 * reward);
+        assert!((score.intake - expected).abs() < 1e-5, "{}", score.intake);
+    }
+
+    /// Tallies read from the run's cumulative counters, the first-bite tick
+    /// and the boundary progress, replayed beside `evaluate_genome`.
+    fn replay(setup: &Setup, genome: &CreatureGenome, scene: &Scene) -> SceneScore {
+        let size = setup.config.world.width;
+        let start = centre(size);
+        let world = WorldState::new(size, size, setup.config.world.edge_mode);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let id = creatures.insert_with_key(|id| setup.creature(id, genome.clone(), scene.seed));
+        let mut sim = Simulation::new(
+            world,
+            creatures,
+            setup.start_tick,
+            setup.config.clone(),
+            scene.seed,
+        );
+        sim.world.place_creature(start, id);
+        let density = sim.config.world.food.shared.max_density;
+        for &cell in &scene.food {
+            sim.world.set_food_type(cell, FOOD, density);
+        }
+        let initial = Counters::read(&sim.stats);
+        let mut before = initial.eaten;
+        let mut progress = Progress::new(&scene.food, size, start);
+        let mut first = None;
+        let mut ticks = 0;
+        let mut death = None;
+        for tick in 1..=setup.lifetime {
+            run_tick(&mut sim, &mut None);
+            ticks = tick;
+            let eaten = Counters::read(&sim.stats).eaten;
+            let bit = eaten > before;
+            before = eaten;
+            if bit && first.is_none() {
+                first = Some(tick);
+            }
+            let Some(creature) = sim.creatures.get(id) else {
+                death = Some(tick);
+                break;
+            };
+            if bit {
+                let world = &sim.world;
+                progress.open(creature.position, |cell| {
+                    world.food_at_type(cell, FOOD) > 0.0
+                });
+            } else {
+                progress.observe(creature.position);
+            }
+        }
+        let end = Counters::read(&sim.stats);
+        Tally {
+            food_eaten: u32::try_from(end.eaten - initial.eaten).unwrap(),
+            intake: end.intake - initial.intake,
+            first,
+            moves: end.moves - initial.moves,
+            blocked: end.blocked - initial.blocked,
+            penalty: end.penalty - initial.penalty,
+        }
+        .finish(&progress, EnergyEnd::Living(0.0), death, ticks)
+    }
+
+    #[test]
+    fn genome_tallies_match_the_runs_cumulative_counters() {
+        let setup = setup(200, 100.0);
+        let founder = founder(&setup);
+        let (mut bites, mut penalty, mut partial) = (0, 0.0, false);
+        for seed in 0..4 {
+            let scene = scene(seed);
+            let (score, _) = evaluate_genome(&setup, &founder, &scene);
+            let expected = replay(&setup, &founder, &scene);
+            let close = |a: f64, b: f64| (a - b).abs() < 1e-6;
+            assert_eq!(score.food_eaten, expected.food_eaten, "seed {seed}");
+            assert!(close(score.intake, expected.intake), "seed {seed}");
+            assert_eq!(score.ticks_to_first_food, expected.ticks_to_first_food);
+            assert_eq!(score.moves_attempted, expected.moves_attempted);
+            assert_eq!(score.moves_blocked, expected.moves_blocked);
+            assert!(close(score.penalty_charged, expected.penalty_charged));
+            assert_eq!(score.progress, expected.progress, "seed {seed}");
+            assert_eq!(score.death_tick, expected.death_tick);
+            bites += score.food_eaten;
+            penalty += score.penalty_charged;
+            partial |= score.progress > 0.0 && score.progress < 1.0;
+        }
+        assert!(
+            bites > 1 && penalty > 0.0 && partial,
+            "{bites} {penalty} {partial}"
+        );
+    }
+
+    /// Off the lab arena (a bounded 8² world) the founder walks into the
+    /// edge; blocked moves are tallied like the other counters.
+    #[test]
+    fn blocked_moves_match_the_runs_cumulative_counter() {
+        let mut config = arena_config(8);
+        config.world.edge_mode = v3_core::config::WorldEdgeMode::Bounded;
+        let setup = Setup::new(config, 100.0, 200);
+        let founder = founder(&setup);
+        let mut blocked = 0;
+        for seed in 0..4 {
+            let scene = Scene {
+                seed,
+                food: vec![Position::new(0, 0)],
+                redraws: 0,
+            };
+            let (score, _) = evaluate_genome(&setup, &founder, &scene);
+            assert_eq!(
+                score.moves_blocked,
+                replay(&setup, &founder, &scene).moves_blocked
+            );
+            blocked += score.moves_blocked;
+        }
+        assert!(blocked > 0, "no blocked move");
+    }
+
+    #[test]
     fn the_oracle_outscores_the_random_walk() {
         let setup = setup(200, 100.0);
         let founder = founder(&setup);

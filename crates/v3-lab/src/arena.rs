@@ -229,6 +229,21 @@ mod tests {
     }
 
     #[test]
+    fn a_reproduction_threshold_equal_to_max_energy_is_refused() {
+        let mut config = arena_config(48);
+        config.energy.lifecycle.min_reproduce_energy = config.energy.lifecycle.max_energy;
+        let error = validate(&config, 100.0).unwrap_err();
+        assert!(error.to_string().contains("strictly above"), "{error}");
+    }
+
+    #[test]
+    fn start_energy_must_be_positive() {
+        let config = arena_config(48);
+        assert!(validate(&config, f32::MIN_POSITIVE).is_ok());
+        assert!(validate(&config, 0.0).is_err());
+    }
+
+    #[test]
     fn overlay_naming_a_lab_key_is_refused() {
         for overlay in [
             json!({"population": {"initial_creatures": 4}}),
