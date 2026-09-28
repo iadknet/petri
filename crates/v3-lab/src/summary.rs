@@ -157,7 +157,7 @@ pub enum StoppedBy {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReplicateResult {
     pub replicate: u32,
-    /// Null for arms whose reachability is not reported.
+    /// Null for instrument arms, whose reach is not tested.
     pub reached: Option<bool>,
     pub generation_to_threshold: Option<u32>,
     pub censored: Option<bool>,
@@ -172,11 +172,13 @@ pub struct ArmSummary {
     pub name: String,
     pub role: Role,
     pub policy: Policy,
-    /// Whether reachability is reported (a `native`, non-instrument arm).
+    /// Whether the reach fields are native reachability (a `native`,
+    /// non-instrument arm); a tested `policy-deviation` arm's are a
+    /// diagnostic.
     pub reach_reported: bool,
     pub replicates: Vec<ReplicateResult>,
     /// Over completed replicates; null when any replicate is incomplete or
-    /// reachability is not reported.
+    /// the arm is an instrument.
     pub reached_fraction: Option<f64>,
     pub wilson_95: Option<[f64; 2]>,
     pub incomplete_replicates: u32,
@@ -253,7 +255,55 @@ fn fmt_opt(value: Option<f64>) -> String {
     value.map_or_else(|| "-".to_owned(), |v| format!("{v:.3}"))
 }
 
-/// Render the assay report from a summary alone.
+fn label<T: Serialize>(value: T) -> String {
+    serde_json::to_value(value)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_else(|| "-".to_owned())
+}
+
+/// One reach table; instruments, whose reach is not tested, print `n/a`.
+fn arm_table(out: &mut String, arms: &[&ArmSummary]) {
+    let _ = writeln!(
+        out,
+        "| arm | role | policy | reached k/n | Wilson 95% | median gen to threshold | censored | incomplete |"
+    );
+    let _ = writeln!(out, "| --- | --- | --- | --- | --- | --- | --- | --- |");
+    for arm in arms {
+        let completed: Vec<&ReplicateResult> =
+            arm.replicates.iter().filter(|r| !r.incomplete).collect();
+        let reached: Vec<f64> = completed
+            .iter()
+            .filter_map(|r| r.generation_to_threshold.map(f64::from))
+            .collect();
+        let censored = completed
+            .iter()
+            .filter(|r| r.censored == Some(true))
+            .count();
+        let (kn, interval, generation, censored) = if arm.role == Role::Instrument {
+            ("n/a".into(), "n/a".into(), "n/a".into(), "n/a".into())
+        } else {
+            (
+                format!("{}/{}", reached.len(), completed.len()),
+                arm.wilson_95
+                    .map_or("-".into(), |[lo, hi]| format!("[{lo:.3}, {hi:.3}]")),
+                fmt_opt(crate::stats::median(&reached)),
+                censored.to_string(),
+            )
+        };
+        let _ = writeln!(
+            out,
+            "| {} | {} | {} | {kn} | {interval} | {generation} | {censored} | {} |",
+            arm.name,
+            label(arm.role),
+            label(arm.policy),
+            arm.incomplete_replicates,
+        );
+    }
+}
+
+/// Render the assay report from a summary alone. `policy-deviation` arms'
+/// reach prints in a separate diagnostic table.
 #[must_use]
 pub fn render_report(summary: &Summary) -> String {
     let mut out = String::new();
@@ -317,50 +367,20 @@ pub fn render_report(summary: &Summary) -> String {
             calibration.reach_threshold_source.as_deref().unwrap_or("-"),
         );
     }
-    if !summary.arms.is_empty() {
+    let (native, diagnostic): (Vec<&ArmSummary>, Vec<&ArmSummary>) = summary
+        .arms
+        .iter()
+        .partition(|arm| arm.policy == Policy::Native);
+    if !native.is_empty() {
         let _ = writeln!(out, "\n## Arms\n");
+        arm_table(&mut out, &native);
+    }
+    if !diagnostic.is_empty() {
         let _ = writeln!(
             out,
-            "| arm | role | policy | reached k/n | Wilson 95% | median gen to threshold | censored | incomplete |"
+            "\n## Diagnostic reach (policy-deviation, not native reachability)\n"
         );
-        let _ = writeln!(out, "| --- | --- | --- | --- | --- | --- | --- | --- |");
-        for arm in &summary.arms {
-            let completed: Vec<&ReplicateResult> =
-                arm.replicates.iter().filter(|r| !r.incomplete).collect();
-            let reached: Vec<f64> = completed
-                .iter()
-                .filter_map(|r| r.generation_to_threshold.map(f64::from))
-                .collect();
-            let censored = completed
-                .iter()
-                .filter(|r| r.censored == Some(true))
-                .count();
-            let (kn, interval, generation, censored) = if arm.reach_reported {
-                (
-                    format!("{}/{}", reached.len(), completed.len()),
-                    arm.wilson_95
-                        .map_or("-".into(), |[lo, hi]| format!("[{lo:.3}, {hi:.3}]")),
-                    fmt_opt(crate::stats::median(&reached)),
-                    censored.to_string(),
-                )
-            } else {
-                ("n/a".into(), "n/a".into(), "n/a".into(), "n/a".into())
-            };
-            let _ = writeln!(
-                out,
-                "| {} | {} | {} | {kn} | {interval} | {generation} | {censored} | {} |",
-                arm.name,
-                serde_json::to_value(arm.role)
-                    .unwrap_or_default()
-                    .as_str()
-                    .unwrap_or("-"),
-                serde_json::to_value(arm.policy)
-                    .unwrap_or_default()
-                    .as_str()
-                    .unwrap_or("-"),
-                arm.incomplete_replicates,
-            );
-        }
+        arm_table(&mut out, &diagnostic);
     }
     if let Some(fidelity) = &summary.fidelity {
         let _ = writeln!(

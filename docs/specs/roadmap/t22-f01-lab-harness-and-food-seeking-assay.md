@@ -272,7 +272,7 @@ generation-to-threshold among reached, censored counts, fidelity line.
 - [x] Calibration gate with the grid-selection rule and the `uncalibrated`
       exit; `--calibrate-only`.
 - [x] NDJSON and summary writers under the byte cap; provenance; `report`.
-- [ ] End-to-end pilot: record wall, creature-ticks and per-creature-tick
+- [x] End-to-end pilot: record wall, creature-ticks and per-creature-tick
       cost of the measured quick-size runs in the readings, with the campaign
       projection derived from that cost labelled as a projection; fix the
       `--quick` sizes so a quick run finishes under 60 s on the development

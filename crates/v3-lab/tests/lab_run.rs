@@ -134,14 +134,15 @@ fn same_seed_rows_are_byte_identical_across_threads_and_processes() {
     );
 
     // Labels: the user arm raised the mutation rate, so it is a policy
-    // deviation with no reachability, like mutation-off.
+    // deviation like mutation-off: its reach is tested but not reported as
+    // native reachability.
     let summary = read_summary(&scratch.0.join("two/summary.json")).unwrap();
     let hot = summary.arms.iter().find(|a| a.name == "hot").unwrap();
     assert_eq!(
         (hot.role, hot.policy),
         (Role::User, Policy::PolicyDeviation)
     );
-    assert!(!hot.reach_reported && hot.reached_fraction.is_none());
+    assert!(!hot.reach_reported && hot.reached_fraction.is_some());
     let off = summary
         .arms
         .iter()
@@ -151,16 +152,33 @@ fn same_seed_rows_are_byte_identical_across_threads_and_processes() {
         (off.role, off.policy),
         (Role::Control, Policy::PolicyDeviation)
     );
+    assert!(!off.reach_reported && off.wilson_95.is_some());
     let native = summary.arms.iter().find(|a| a.name == "native").unwrap();
+    assert!(native.reach_reported);
     assert!(native.reached_fraction.is_some() && native.wilson_95.is_some());
     for arm in &summary.arms {
+        let tested = arm.role != Role::Instrument;
         for replicate in &arm.replicates {
             assert!(!replicate.incomplete);
-            if arm.reach_reported {
+            assert_eq!(replicate.reached.is_some(), tested, "{}", arm.name);
+            if tested {
                 assert_eq!(replicate.censored, Some(replicate.reached == Some(false)));
             }
         }
     }
+
+    // The report prints deviation arms' reach under a diagnostic label, apart
+    // from the native reachability table.
+    let report = render_report(&summary);
+    let (native_part, diagnostic_part) = report
+        .split_once("## Diagnostic reach")
+        .expect("diagnostic block");
+    for name in ["hot", "mutation-off"] {
+        let line = format!("| {name} |");
+        assert!(!native_part.contains(&line), "{name} in the native table");
+        assert!(diagnostic_part.contains(&line), "{name} not diagnostic");
+    }
+    assert!(native_part.contains("| native |"));
     let rows = String::from_utf8(one).unwrap();
     assert!(rows
         .lines()
