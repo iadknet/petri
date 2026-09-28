@@ -434,3 +434,115 @@ pub fn render_report(summary: &Summary) -> String {
     );
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn events(scale: u64, operator: &str) -> Events {
+        let map = |n: u64| BTreeMap::from([(operator.to_owned(), n)]);
+        Events {
+            requested: 3 * scale,
+            applied: 2 * scale,
+            skipped: scale,
+            requested_by_operator: map(3 * scale),
+            applied_by_operator: map(2 * scale),
+            skipped_by_operator: map(scale),
+            offspring: 4 * scale,
+            identical_offspring: scale,
+        }
+    }
+
+    #[test]
+    fn events_add_sums_every_count_and_merges_operator_keys() {
+        let mut total = events(1, "a");
+        total.add(&events(2, "a"));
+        total.add(&events(5, "b"));
+        let map = |a: u64, b: u64| BTreeMap::from([("a".to_owned(), a), ("b".to_owned(), b)]);
+        assert_eq!(
+            total,
+            Events {
+                requested: 24,
+                applied: 16,
+                skipped: 8,
+                requested_by_operator: map(9, 15),
+                applied_by_operator: map(6, 10),
+                skipped_by_operator: map(3, 5),
+                offspring: 32,
+                identical_offspring: 8,
+            }
+        );
+    }
+
+    #[test]
+    fn identical_offspring_fraction_is_a_share_of_offspring_or_null() {
+        assert_eq!(Events::default().identical_offspring_fraction(), None);
+        let mut some = Events {
+            offspring: 4,
+            identical_offspring: 1,
+            ..Events::default()
+        };
+        assert_eq!(some.identical_offspring_fraction(), Some(0.25));
+        some.identical_offspring = 0;
+        assert_eq!(some.identical_offspring_fraction(), Some(0.0));
+    }
+
+    #[test]
+    fn report_cells_format_numbers_and_labels() {
+        assert_eq!(fmt_opt(Some(1.23456)), "1.235");
+        assert_eq!(fmt_opt(None), "-");
+        assert_eq!(label(Role::Reference), "reference");
+        assert_eq!(label(Policy::PolicyDeviation), "policy-deviation");
+    }
+
+    fn replicate(generation: Option<u32>, incomplete: bool) -> ReplicateResult {
+        ReplicateResult {
+            replicate: 0,
+            reached: (!incomplete).then_some(generation.is_some()),
+            generation_to_threshold: generation,
+            censored: (!incomplete).then_some(generation.is_none()),
+            incomplete,
+            stopped_by: if incomplete {
+                StoppedBy::ByteCap
+            } else {
+                StoppedBy::Horizon
+            },
+            generations_run: 3,
+            final_best: None,
+        }
+    }
+
+    fn arm(name: &str, role: Role) -> ArmSummary {
+        ArmSummary {
+            name: name.into(),
+            role,
+            policy: Policy::Native,
+            reach_reported: role != Role::Instrument,
+            replicates: vec![
+                replicate(Some(2), false),
+                replicate(Some(4), false),
+                replicate(None, false),
+                replicate(Some(9), true),
+            ],
+            reached_fraction: None,
+            wilson_95: None,
+            incomplete_replicates: 1,
+        }
+    }
+
+    #[test]
+    fn arm_table_counts_completed_replicates_and_prints_n_a_for_instruments() {
+        let tested = arm("native", Role::Reference);
+        let instrument = arm("comparator", Role::Instrument);
+        let mut out = String::new();
+        arm_table(&mut out, &[&tested, &instrument]);
+        let rows: Vec<&str> = out.lines().skip(2).collect();
+        assert_eq!(
+            rows,
+            [
+                "| native | reference | native | 2/3 | - | 3.000 | 1 | 1 |",
+                "| comparator | instrument | native | n/a | n/a | n/a | n/a | 1 |",
+            ]
+        );
+    }
+}

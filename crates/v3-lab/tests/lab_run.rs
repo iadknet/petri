@@ -10,7 +10,7 @@ use v3_lab::calibration::draw_scenes;
 use v3_lab::campaign::{run_campaign, Arm, ArmKind, Plan};
 use v3_lab::cli::read_summary;
 use v3_lab::eval::{evaluate_genome, Setup};
-use v3_lab::output::{Budget, GitProvenance, LabRoot, RunDir};
+use v3_lab::output::{Budget, GitProvenance, LabRoot, RunDir, SUMMARY_RESERVE};
 use v3_lab::run::{run, RunOutcome, RunParams, UserArm, EXIT_UNCALIBRATED};
 use v3_lab::summary::{
     render_report, Incomplete, StoppedBy, GENOME_FORMAT, SUMMARY_KIND, SUMMARY_VERSION,
@@ -240,6 +240,104 @@ fn the_summary_carries_the_versioned_keep_list_and_reports_alone() {
     }
     let report = render_report(&read_summary(&outcome.dir.join("summary.json")).unwrap());
     assert!(report.contains("Calibration") && report.contains("| 0.08 | 100 |"));
+
+    // `--calibrate-only` stops after a passing gate: no arms, rows or fidelity.
+    assert_eq!(outcome.exit_code, 0);
+    assert!(outcome.summary.calibration.selected.is_some());
+    assert!(outcome.summary.arms.is_empty() && outcome.summary.fidelity.is_none());
+    assert!(std::fs::read(outcome.dir.join("rows.ndjson"))
+        .unwrap()
+        .is_empty());
+
+    // A foreign kind or version alone is refused.
+    for (key, foreign) in [
+        ("kind", serde_json::json!("other-summary")),
+        ("summary_version", serde_json::json!(SUMMARY_VERSION + 1)),
+    ] {
+        let mut changed = value.clone();
+        changed[key] = foreign;
+        let path = scratch.lab.join(format!("foreign-{key}.json"));
+        std::fs::write(&path, serde_json::to_vec(&changed).unwrap()).unwrap();
+        assert!(read_summary(&path).is_err(), "foreign {key} accepted");
+    }
+}
+
+#[test]
+fn timing_counts_gate_and_campaign_creature_ticks() {
+    let scratch = Scratch::new("timing");
+    let mut gate_only = tiny(&scratch.lab.join("gate"));
+    gate_only.calibrate_only = true;
+    let gate = scratch.run(&gate_only).unwrap().summary.timing;
+    let full = scratch
+        .run(&tiny(&scratch.lab.join("full")))
+        .unwrap()
+        .summary
+        .timing;
+    for timing in [&gate, &full] {
+        let ms = timing.per_creature_tick_ms.expect("ticks ran");
+        let expected = timing.wall_seconds * 1_000.0 / timing.creature_ticks as f64;
+        assert!(
+            (ms - expected).abs() <= 1e-9 * expected,
+            "{ms} vs {expected}"
+        );
+    }
+    // The campaign adds at most every evaluation's full lifetime: 5 genome
+    // arms × population × scenes per generation, plus one validation pass
+    // per reach-tested arm and generation.
+    let p = tiny(&scratch.lab.join("unused"));
+    let lifetime = u64::from(p.lifetime.unwrap());
+    let generations = u64::from(p.replicates * p.generations);
+    let bound = lifetime
+        * generations
+        * (5 * u64::from(p.population * p.scenes) + 4 * u64::from(p.validation_scenes));
+    assert!(full.creature_ticks > gate.creature_ticks);
+    assert!(
+        full.creature_ticks <= gate.creature_ticks + bound,
+        "{} > {} + {bound}",
+        full.creature_ticks,
+        gate.creature_ticks
+    );
+}
+
+#[test]
+fn an_infeasible_grid_scores_nothing_and_reports_no_per_tick_cost() {
+    let scratch = Scratch::new("infeasible");
+    let mut params = tiny(&scratch.lab.join("run"));
+    // round(0.999 × 48²) cells exceed the cells at distance ≥ 2.
+    params.food_fraction = Some(0.999);
+    let outcome = scratch.run(&params).unwrap();
+    assert_eq!(outcome.exit_code, EXIT_UNCALIBRATED);
+    assert!(outcome
+        .summary
+        .calibration
+        .points
+        .iter()
+        .all(|p| !p.exposure));
+    assert_eq!(outcome.summary.timing.creature_ticks, 0);
+    assert_eq!(outcome.summary.timing.per_creature_tick_ms, None);
+}
+
+#[test]
+fn overlay_bytes_join_the_summary_reserve() {
+    let scratch = Scratch::new("reserve");
+    let overlay = scratch.lab.join("hot.json");
+    let text = r#"{"mutation": {"per_unit_rate": 0.02}}"#;
+    std::fs::write(&overlay, text).unwrap();
+    let reserve = SUMMARY_RESERVE + text.len() as u64;
+    for (name, byte_cap, accepted) in [("below", 2 * reserve - 1, false), ("at", 2 * reserve, true)]
+    {
+        let out = scratch.lab.join(name);
+        let mut params = tiny(&out);
+        params.calibrate_only = true;
+        params.byte_cap = byte_cap;
+        params.arms = vec![UserArm {
+            name: "hot".into(),
+            overlay: overlay.clone(),
+            genome: None,
+        }];
+        assert_eq!(scratch.run(&params).is_ok(), accepted, "cap {byte_cap}");
+        assert_eq!(out.exists(), accepted);
+    }
 }
 
 #[test]
@@ -353,6 +451,7 @@ fn validation_evaluations_count_toward_creature_ticks() {
         .map(|scene| u64::from(evaluate_genome(&setup, &founder, scene).0.ticks))
         .sum();
     assert!(validation_ticks > 0);
+    assert!(untested.creature_ticks > 0, "training ticks are counted");
     assert_eq!(
         tested.creature_ticks,
         untested.creature_ticks + validation_ticks

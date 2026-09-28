@@ -337,6 +337,125 @@ mod tests {
     }
 
     #[test]
+    fn the_default_cap_leaves_room_beyond_the_summary_reserve() {
+        let mut budget = Budget::new(DEFAULT_BYTE_CAP, SUMMARY_RESERVE).unwrap();
+        assert!(budget.admit(SUMMARY_RESERVE));
+    }
+
+    #[test]
+    fn existing_bytes_and_each_row_newline_count_against_the_budget() {
+        let path = temp_root("existing-bytes");
+        fs::create_dir_all(path.join("notes/deeper")).unwrap();
+        fs::write(path.join("notes/a.txt"), [0u8; 30]).unwrap();
+        fs::write(path.join("notes/deeper/b.txt"), [0u8; 20]).unwrap();
+        // 100 bytes for rows and elites; 50 already used by the notes.
+        let mut dir = RunDir::create(path.clone(), Budget::new(200, 100).unwrap()).unwrap();
+        // A 49-byte line plus its newline fills the remaining 50 exactly.
+        assert!(dir.write_row(&"x".repeat(49)).unwrap());
+        assert!(
+            !dir.write_row("").unwrap(),
+            "an empty row still costs 1 byte"
+        );
+        assert_eq!(fs::read(path.join("rows.ndjson")).unwrap().len(), 50);
+        fs::remove_dir_all(&path).unwrap();
+
+        let full = temp_root("existing-bytes-full");
+        fs::write(full.join("big.bin"), [0u8; 101]).unwrap();
+        assert!(RunDir::create(full.clone(), Budget::new(200, 100).unwrap()).is_err());
+        fs::remove_dir_all(&full).unwrap();
+    }
+
+    #[test]
+    fn an_elite_over_the_budget_is_refused_and_not_written() {
+        let path = temp_root("elite-cap");
+        let mut dir = RunDir::create(path.clone(), Budget::new(200, 100).unwrap()).unwrap();
+        assert!(!dir.write_elite("big", &[b'x'; 101]).unwrap());
+        assert!(!path.join("elites/big.json").exists());
+        assert!(dir.write_elite("fits", &[b'x'; 100]).unwrap());
+        assert!(path.join("elites/fits.json").exists());
+        fs::remove_dir_all(&path).unwrap();
+    }
+
+    #[test]
+    fn a_summary_may_fill_the_reserve_exactly() {
+        let path = temp_root("summary-reserve");
+        let mut dir = RunDir::create(path.clone(), Budget::new(200, 100).unwrap()).unwrap();
+        assert!(dir.write_summary(&[b' '; 101]).is_err());
+        assert!(!path.join("summary.json").exists());
+        dir.write_summary(&[b' '; 100]).unwrap();
+        assert_eq!(fs::read(path.join("summary.json")).unwrap().len(), 100);
+        fs::remove_dir_all(&path).unwrap();
+    }
+
+    /// Independent civil calendar: whole days walked forward from 1970.
+    fn reference_stamp(secs: u64) -> String {
+        let leap =
+            |y: u64| (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400);
+        let mut days = secs / 86_400;
+        let rem = secs % 86_400;
+        let mut year = 1970;
+        while days >= if leap(year) { 366 } else { 365 } {
+            days -= if leap(year) { 366 } else { 365 };
+            year += 1;
+        }
+        let lengths = [
+            31,
+            if leap(year) { 29 } else { 28 },
+            31,
+            30,
+            31,
+            30,
+            31,
+            31,
+            30,
+            31,
+            30,
+            31,
+        ];
+        let mut month = 1;
+        for length in lengths {
+            if days < length {
+                break;
+            }
+            days -= length;
+            month += 1;
+        }
+        format!(
+            "{year:04}{month:02}{:02}T{:02}{:02}{:02}Z",
+            days + 1,
+            rem / 3_600,
+            rem % 3_600 / 60,
+            rem % 60
+        )
+    }
+
+    #[test]
+    fn the_reference_calendar_matches_known_dates() {
+        assert_eq!(reference_stamp(0), "19700101T000000Z");
+        assert_eq!(reference_stamp(951_782_400), "20000229T000000Z");
+        assert_eq!(reference_stamp(1_709_251_199), "20240229T235959Z");
+    }
+
+    #[test]
+    fn utc_stamp_is_the_current_utc_second() {
+        let now = || {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        };
+        let before = now();
+        let stamp = utc_stamp();
+        let after = now();
+        assert!(
+            (before..=after).any(|secs| reference_stamp(secs) == stamp),
+            "{stamp} not within [{}, {}]",
+            reference_stamp(before),
+            reference_stamp(after)
+        );
+    }
+
+    #[test]
     fn git_provenance_maps_to_the_summary_fields() {
         let checkout = GitProvenance::Checkout {
             revision: "abc".into(),

@@ -303,6 +303,119 @@ mod tests {
         }
     }
 
+    use crate::arena::arena_config;
+    use v3_core::creature::founder::founder_genome_with_age_gate;
+    use v3_core::neighborhood::opportunity::controllers::controller;
+    use v3_core::neighborhood::opportunity::Family;
+
+    fn actors(config: &SimulationConfig) -> (CreatureGenome, CreatureGenome) {
+        let founder = founder_genome_with_age_gate(
+            config.population.founder_profile,
+            &config.energy.lifecycle,
+        );
+        let comparator = controller(&founder, Family::Vector, false).0;
+        (founder, comparator)
+    }
+
+    #[test]
+    fn scripted_seeds_separate_parent_policy_and_scene() {
+        let base = scripted_seed(7, Scripted::RandomWalk, 0);
+        for other in [
+            scripted_seed(8, Scripted::RandomWalk, 0),
+            scripted_seed(7, Scripted::HalfSeeker, 0),
+            scripted_seed(7, Scripted::OracleSeeker, 0),
+            scripted_seed(7, Scripted::RandomWalk, 1),
+        ] {
+            assert_ne!(base, other);
+        }
+        assert!(base > 1);
+    }
+
+    #[test]
+    fn foodless_scenes_score_no_wins_and_count_both_genomes_ticks() {
+        let config = arena_config(48);
+        let (founder, comparator) = actors(&config);
+        let setup = Setup::new(config, 100.0, 5);
+        let empty = |seed| Scene {
+            seed,
+            food: Vec::new(),
+            redraws: 0,
+        };
+        let scored = score_point(&setup, &founder, &comparator, &[empty(1), empty(2)], 3);
+        // Every actor scores 0: a comparator tie with the floor is no win.
+        assert_eq!(scored.means.comparator, scored.means.floor);
+        assert_eq!(scored.means.comparator_wins, 0);
+        assert_eq!(scored.creature_ticks, 2 * 2 * 5);
+    }
+
+    fn input(margin: f64) -> GridInput {
+        GridInput {
+            fractions: vec![0.08],
+            lifetimes: vec![100],
+            scenes: 4,
+            validation_scenes: 4,
+            margin,
+            calibration_seed: 11,
+            validation_seed: 12,
+            start_energy: 100.0,
+            reach_threshold: None,
+        }
+    }
+
+    fn genome_ticks(
+        setup: &Setup,
+        genomes: [&CreatureGenome; 2],
+        seed: u64,
+        n: u32,
+        fraction: f64,
+    ) -> u64 {
+        let size = setup.config.world.width;
+        let vision = setup.config.runtime.perception.vision_radius;
+        draw_scenes(seed, n, size, fraction, vision)
+            .unwrap()
+            .iter()
+            .flat_map(|scene| {
+                genomes.map(|genome| u64::from(evaluate_genome(setup, genome, scene).0.ticks))
+            })
+            .sum()
+    }
+
+    #[test]
+    fn a_calibrated_gate_counts_every_genome_tick_and_sets_the_midpoint_threshold() {
+        let config = arena_config(48);
+        let (founder, comparator) = actors(&config);
+        let input = input(1.0);
+        let gate = run_gate(&config, &founder, &comparator, &input);
+        let selected = gate
+            .calibration
+            .selected
+            .as_ref()
+            .expect("tiny grid passes");
+        let point = &gate.calibration.points[0];
+        let v = point.validation.as_ref().expect("validated");
+        assert_eq!(
+            gate.calibration.reach_threshold,
+            Some(v.floor + 0.5 * (v.comparator - v.floor))
+        );
+        let setup = Setup::new(config.clone(), input.start_energy, selected.lifetime);
+        let both = [&founder, &comparator];
+        let expected =
+            genome_ticks(&setup, both, 11, 4, 0.08) + genome_ticks(&setup, both, 12, 4, 0.08);
+        assert_eq!(gate.creature_ticks, expected);
+    }
+
+    #[test]
+    fn points_failing_competence_are_never_validated() {
+        let config = arena_config(48);
+        let (founder, comparator) = actors(&config);
+        let gate = run_gate(&config, &founder, &comparator, &input(1e9));
+        let point = &gate.calibration.points[0];
+        assert!(point.exposure && point.sensitivity && !point.competence);
+        assert_eq!(point.validation_competence, None);
+        assert_eq!(point.validation, None);
+        assert!(gate.validation.is_empty());
+    }
+
     #[test]
     fn competence_needs_the_margin_and_three_quarters_of_scenes() {
         assert!(competent(&means(0.5, 1.0, 2.0, 1.5, 12), 16, 1.0));

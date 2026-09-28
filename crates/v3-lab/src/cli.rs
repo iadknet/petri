@@ -243,6 +243,84 @@ mod tests {
         assert_eq!(arm.genome, Some(PathBuf::from("g.json")));
         assert_eq!(parse_arm("x=o.json").unwrap().genome, None);
         assert!(parse_arm("o.json").is_err());
+        assert!(parse_arm("=o.json").is_err(), "empty name");
+        assert!(parse_arm("x=").is_err(), "empty overlay");
+    }
+
+    /// A per-test directory under the system temp directory; removed on drop.
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            let path =
+                std::env::temp_dir().join(format!("petri-lab-cli-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&path);
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// Run `git -C dir …` with a child-only identity; the test process's
+    /// environment and working directory are untouched.
+    fn git_in(dir: &Path, args: &[&str]) -> String {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args([
+                "-c",
+                "user.name=lab",
+                "-c",
+                "user.email=lab@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+            ])
+            .args(args)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .output()
+            .expect("git runs");
+        assert!(
+            output.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8(output.stdout).unwrap().trim().to_owned()
+    }
+
+    #[test]
+    fn a_checkout_resolves_to_its_root_revision_and_dirty_state() {
+        let repo = TempDir::new("checkout");
+        git_in(&repo.0, &["init", "-q"]);
+        git_in(&repo.0, &["commit", "-q", "--allow-empty", "-m", "init"]);
+        let revision = git_in(&repo.0, &["rev-parse", "HEAD"]);
+        let nested = repo.0.join("nested");
+        std::fs::create_dir_all(&nested).unwrap();
+
+        let clean = resolve_checkout(&nested).unwrap();
+        assert_eq!(clean.path, repo.0.canonicalize().unwrap());
+        assert_eq!(
+            clean.git,
+            GitProvenance::Checkout {
+                revision: revision.clone(),
+                dirty: false
+            }
+        );
+
+        std::fs::write(repo.0.join("untracked.txt"), "x").unwrap();
+        let dirty = resolve_checkout(&repo.0).unwrap();
+        assert_eq!(
+            dirty.git,
+            GitProvenance::Checkout {
+                revision,
+                dirty: true
+            }
+        );
     }
 
     #[test]

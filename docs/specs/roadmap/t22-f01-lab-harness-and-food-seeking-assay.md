@@ -282,17 +282,16 @@ generation-to-threshold among reached, censored counts, fidelity.
 
 ## Verification
 
-- [x] `cargo test -p v3-lab` (tiny sizes, under 10 s; also passes in a
-      copy without `.git`), `cargo clippy -p v3-lab --all-targets -- -D
-      warnings`, `cargo check --workspace --all-targets` -> clean; cases
-      in the [readings](../../progress/readings/t22-f01.md).
-- [x] `make check` -> exit 0; `git diff --stat main` confined to the diff
-      scope above -> recorded in the readings.
-- [x] Quick run: `make lab` -> wall under 60 s, calibration verdict, founder
-      position, per-arm reached fractions, `sha256` of two same-seed
-      `rows.ndjson` files equal -> readings.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      every survivor resolved as killed, equivalent, or deferred.
+- [x] `cargo test -p v3-lab`, `cargo clippy -p v3-lab --all-targets -- -D
+      warnings`, `cargo check --workspace --all-targets` -> clean; cases in
+      the [readings](../../progress/readings/t22-f01.md).
+- [x] `make check` -> exit 0; `git diff --stat main` in the diff scope.
+- [x] Quick run: `make lab` -> wall under 60 s, same-seed `rows.ndjson`
+      `sha256` equal -> readings.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` at 1e888ec6: `624 mutants
+      tested in 13m: 182 missed, 390 caught, 52 unviable`, output
+      `~/.local/share/petri-tools/mutants/t22-f01/mutants.out`; 166 killed,
+      5 equivalent, 11 deferred -> readings.
 - [x] Benchmark summary: `Not applicable: lab feature` (diff scope above).
 
 ## Performance and Goal Impact
@@ -335,3 +334,4 @@ scope claim against the diff.
 - Decision: lab exemption (user, 2026-09-28) — no gate or goal profile, no
   benchmark specialist; the mutation gate, the Codex review and `make check`
   apply.
+- Deferred: 11 `utc_stamp` mutants (readings): no injectable clock.
