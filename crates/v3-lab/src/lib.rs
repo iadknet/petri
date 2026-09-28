@@ -6,12 +6,77 @@
 //! nothing here is reachable from `v3-core`, `v3-cli` or `v3-server`.
 
 pub mod arena;
+pub mod calibration;
+pub mod campaign;
 pub mod cli;
 pub mod eval;
+pub mod output;
 pub mod rng;
+pub mod run;
 pub mod scene;
+pub mod stats;
+pub mod summary;
 
 use std::fmt;
+use std::path::Path;
+
+use sha2::{Digest, Sha256};
+use v3_core::creature::genome::CreatureGenome;
+
+/// The lab's genome file (`--genome`, `--comparator`, `--arm …:genome.json`
+/// and `elites/*.json`). `v3_core_version` is the workspace version the
+/// genome was written under (every crate shares it).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GenomeFile {
+    pub genome_format: u32,
+    pub v3_core_version: String,
+    pub genome: CreatureGenome,
+}
+
+impl GenomeFile {
+    #[must_use]
+    pub fn new(genome: CreatureGenome) -> Self {
+        Self {
+            genome_format: summary::GENOME_FORMAT,
+            v3_core_version: env!("CARGO_PKG_VERSION").to_owned(),
+            genome,
+        }
+    }
+
+    /// Read a genome file.
+    ///
+    /// # Errors
+    ///
+    /// I/O failures, malformed JSON, or an unknown `genome_format`.
+    pub fn load(path: &Path) -> Result<CreatureGenome, LabError> {
+        let text = std::fs::read_to_string(path)
+            .map_err(|error| LabError::Io(format!("{}: {error}", path.display())))?;
+        let file: Self = serde_json::from_str(&text)
+            .map_err(|error| LabError::Config(format!("{}: {error}", path.display())))?;
+        if file.genome_format != summary::GENOME_FORMAT {
+            return Err(LabError::Config(format!(
+                "{}: genome_format {} is not {}",
+                path.display(),
+                file.genome_format,
+                summary::GENOME_FORMAT
+            )));
+        }
+        Ok(file.genome)
+    }
+}
+
+/// Lower-case hex SHA-256 of `bytes`.
+#[must_use]
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .fold(String::with_capacity(64), |mut hex, byte| {
+            use std::fmt::Write as _;
+            let _ = write!(hex, "{byte:02x}");
+            hex
+        })
+}
 
 /// Every recoverable lab failure. The binary maps it to exit code 1.
 #[derive(Debug)]

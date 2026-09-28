@@ -1,15 +1,226 @@
-//! Command-line interface (stub; filled in below).
+//! Command-line interface: `v3-lab run` and `v3-lab report`.
 
+use std::path::PathBuf;
+
+use clap::{Args, Parser, Subcommand, ValueEnum};
+
+use crate::output::DEFAULT_BYTE_CAP;
+use crate::run::{run, RunParams, UserArm};
+use crate::summary::{render_report, Summary, SUMMARY_KIND, SUMMARY_VERSION};
 use crate::LabError;
 
-#[derive(clap::Parser, Debug)]
-pub struct Cli {}
+/// `(replicates, generations, population)` for a campaign run.
+pub const CAMPAIGN_SIZES: (u32, u32, u32) = (8, 100, 64);
+/// `(replicates, generations, population)` for `--quick`.
+pub const QUICK_SIZES: (u32, u32, u32) = (4, 40, 16);
+
+#[derive(Parser, Debug)]
+#[command(name = "v3-lab", about = "Petri capability-assay lab (T22)")]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Command {
+    /// Calibrate and run an assay; output under `.bench-artifacts/lab/`.
+    Run(Box<RunArgs>),
+    /// Render the assay report from a `summary.json` alone.
+    Report {
+        /// Path to a run's `summary.json`.
+        summary: PathBuf,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum Assay {
+    FoodSeeking,
+}
+
+#[derive(Args, Debug)]
+pub struct RunArgs {
+    #[arg(long, value_enum, default_value = "food-seeking")]
+    pub assay: Assay,
+    #[arg(long, default_value_t = 1)]
+    pub seed: u64,
+    /// Quick sizes for a smoke run.
+    #[arg(long)]
+    pub quick: bool,
+    #[arg(long)]
+    pub replicates: Option<u32>,
+    #[arg(long)]
+    pub generations: Option<u32>,
+    #[arg(long)]
+    pub population: Option<u32>,
+    #[arg(long, default_value_t = 0.25)]
+    pub elite_fraction: f64,
+    #[arg(long, default_value_t = 4)]
+    pub scenes: u32,
+    #[arg(long, default_value_t = 8)]
+    pub validation_scenes: u32,
+    /// Skips the lifetime grid (default: selected by calibration).
+    #[arg(long)]
+    pub lifetime: Option<u32>,
+    #[arg(long, default_value_t = 64)]
+    pub arena_size: u16,
+    /// Skips the fraction grid (default: selected by calibration).
+    #[arg(long)]
+    pub food_fraction: Option<f64>,
+    #[arg(long, default_value_t = 100.0)]
+    pub start_energy: f32,
+    #[arg(long, value_delimiter = ',', default_values_t = [0.02, 0.04, 0.08])]
+    pub calibration_fractions: Vec<f64>,
+    #[arg(long, value_delimiter = ',', default_values_t = [200, 400])]
+    pub calibration_lifetimes: Vec<u32>,
+    #[arg(long, default_value_t = 16)]
+    pub calibration_scenes: u32,
+    #[arg(long, default_value_t = 1.0)]
+    pub calibration_margin: f64,
+    /// Overrides the calibrated threshold (recorded).
+    #[arg(long)]
+    pub reach_threshold: Option<f64>,
+    /// `name=overlay.json[:genome.json]`, repeatable.
+    #[arg(long = "arm", value_parser = parse_arm)]
+    pub arms: Vec<UserArm>,
+    /// Start genome file (default: the production founder).
+    #[arg(long)]
+    pub genome: Option<PathBuf>,
+    /// Comparator genome file (default: the built-in area-food controller).
+    #[arg(long)]
+    pub comparator: Option<PathBuf>,
+    /// Default: available parallelism.
+    #[arg(long)]
+    pub threads: Option<usize>,
+    #[arg(long, default_value_t = DEFAULT_BYTE_CAP)]
+    pub byte_cap: u64,
+    /// Run directory; must resolve inside the checkout's `.bench-artifacts/`.
+    #[arg(long)]
+    pub out: Option<PathBuf>,
+    /// Stop after the calibration gate.
+    #[arg(long)]
+    pub calibrate_only: bool,
+}
+
+fn parse_arm(text: &str) -> Result<UserArm, String> {
+    let (name, rest) = text
+        .split_once('=')
+        .ok_or_else(|| "expected name=overlay.json[:genome.json]".to_owned())?;
+    let (overlay, genome) = match rest.split_once(':') {
+        Some((overlay, genome)) => (overlay, Some(PathBuf::from(genome))),
+        None => (rest, None),
+    };
+    if name.is_empty() || overlay.is_empty() {
+        return Err("expected name=overlay.json[:genome.json]".into());
+    }
+    Ok(UserArm {
+        name: name.to_owned(),
+        overlay: PathBuf::from(overlay),
+        genome,
+    })
+}
+
+impl RunArgs {
+    /// Apply the campaign or `--quick` size defaults.
+    #[must_use]
+    pub fn params(&self) -> RunParams {
+        let (replicates, generations, population) = if self.quick {
+            QUICK_SIZES
+        } else {
+            CAMPAIGN_SIZES
+        };
+        RunParams {
+            seed: self.seed,
+            replicates: self.replicates.unwrap_or(replicates),
+            generations: self.generations.unwrap_or(generations),
+            population: self.population.unwrap_or(population),
+            elite_fraction: self.elite_fraction,
+            scenes: self.scenes,
+            validation_scenes: self.validation_scenes,
+            lifetime: self.lifetime,
+            arena_size: self.arena_size,
+            food_fraction: self.food_fraction,
+            start_energy: self.start_energy,
+            calibration_fractions: self.calibration_fractions.clone(),
+            calibration_lifetimes: self.calibration_lifetimes.clone(),
+            calibration_scenes: self.calibration_scenes,
+            calibration_margin: self.calibration_margin,
+            reach_threshold: self.reach_threshold,
+            arms: self.arms.clone(),
+            genome: self.genome.clone(),
+            comparator: self.comparator.clone(),
+            threads: self.threads.unwrap_or_else(|| {
+                std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
+            }),
+            byte_cap: self.byte_cap,
+            out: self.out.clone(),
+            calibrate_only: self.calibrate_only,
+            quick: self.quick,
+        }
+    }
+}
+
+/// Read and check a summary file.
+///
+/// # Errors
+///
+/// I/O, malformed JSON, or a foreign `kind` / `summary_version`.
+pub fn read_summary(path: &std::path::Path) -> Result<Summary, LabError> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| LabError::Io(format!("{}: {error}", path.display())))?;
+    let summary: Summary = serde_json::from_str(&text)
+        .map_err(|error| LabError::Config(format!("{}: {error}", path.display())))?;
+    if summary.kind != SUMMARY_KIND || summary.summary_version != SUMMARY_VERSION {
+        return Err(LabError::Config(format!(
+            "{}: not a {SUMMARY_KIND} v{SUMMARY_VERSION}",
+            path.display()
+        )));
+    }
+    Ok(summary)
+}
 
 /// Run the parsed command and return the process exit code.
 ///
 /// # Errors
 ///
 /// Any [`LabError`].
-pub fn execute(_cli: Cli) -> Result<u8, LabError> {
-    Ok(0)
+pub fn execute(cli: Cli) -> Result<u8, LabError> {
+    match cli.command {
+        Command::Run(args) => {
+            let outcome = run(&args.params())?;
+            print!("{}", render_report(&outcome.summary));
+            println!("\nrun directory: {}", outcome.dir.display());
+            Ok(outcome.exit_code)
+        }
+        Command::Report { summary } => {
+            print!("{}", render_report(&read_summary(&summary)?));
+            Ok(0)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn arm_specs_parse_with_and_without_a_genome() {
+        let arm = parse_arm("hot=o.json:g.json").unwrap();
+        assert_eq!(arm.name, "hot");
+        assert_eq!(arm.overlay, PathBuf::from("o.json"));
+        assert_eq!(arm.genome, Some(PathBuf::from("g.json")));
+        assert_eq!(parse_arm("x=o.json").unwrap().genome, None);
+        assert!(parse_arm("o.json").is_err());
+    }
+
+    #[test]
+    fn quick_and_campaign_defaults_differ_and_explicit_sizes_win() {
+        let cli = Cli::parse_from(["v3-lab", "run", "--quick", "--population", "5"]);
+        let Command::Run(args) = cli.command else {
+            panic!("run");
+        };
+        let params = args.params();
+        assert_eq!(params.population, 5);
+        assert_eq!(params.replicates, QUICK_SIZES.0);
+        assert_eq!(params.calibration_fractions, vec![0.02, 0.04, 0.08]);
+    }
 }
