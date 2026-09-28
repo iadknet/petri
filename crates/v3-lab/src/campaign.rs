@@ -55,11 +55,17 @@ pub struct Arm {
 }
 
 impl Arm {
-    /// Reachability is tested and reported only for `native`, non-instrument
-    /// arms.
+    /// The reach test runs for every non-instrument arm.
     #[must_use]
     pub fn reach_tested(&self) -> bool {
-        self.policy == Policy::Native && self.role != Role::Instrument
+        self.role != Role::Instrument
+    }
+
+    /// Its reach counts as native reachability only on a `native` policy; a
+    /// `policy-deviation` arm's reach is a diagnostic.
+    #[must_use]
+    pub fn reach_reported(&self) -> bool {
+        self.reach_tested() && self.policy == Policy::Native
     }
 }
 
@@ -453,7 +459,7 @@ fn arm_summary(arm: &Arm, replicates: Vec<ReplicateResult>) -> ArmSummary {
         name: arm.name.clone(),
         role: arm.role,
         policy: arm.policy,
-        reach_reported: arm.reach_tested(),
+        reach_reported: arm.reach_reported(),
         replicates,
         reached_fraction: reportable.then(|| f64::from(reached) / f64::from(completed)),
         wilson_95: crate::stats::wilson_95(reached, completed).filter(|_| reportable),
