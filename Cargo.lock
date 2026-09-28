@@ -1741,6 +1741,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "v3-lab"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "proptest",
+ "rand 0.8.6",
+ "rayon",
+ "serde",
+ "serde_json",
+ "sha2",
+ "slotmap",
+ "v3-core",
+]
+
+[[package]]
 name = "v3-server"
 version = "0.1.0"
 dependencies = [
