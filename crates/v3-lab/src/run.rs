@@ -16,9 +16,7 @@ use crate::arena::{arena_config, classify, resolve_arm, Role, ARENA_ID};
 use crate::calibration::{run_gate, GridInput};
 use crate::campaign::{fidelity, run_campaign, Arm, ArmKind, Plan};
 use crate::eval::{Scripted, Setup};
-use crate::output::{
-    checkout_root, git_state, resolve_out, utc_stamp, Budget, RunDir, SUMMARY_RESERVE,
-};
+use crate::output::{resolve_out, utc_stamp, Budget, LabRoot, RunDir, SUMMARY_RESERVE};
 use crate::rng::{replicate_seed, tagged};
 use crate::summary::{
     ArenaRecord, GenomeRecord, Incomplete, OverlayRecord, Provenance, Seeds, Sizes, Summary,
@@ -165,18 +163,19 @@ fn validate_params(params: &RunParams) -> Result<(), LabError> {
     Ok(())
 }
 
-/// Run one assay end to end.
+/// Run one assay end to end, writing under `lab_root.path`'s
+/// `.bench-artifacts/` and recording `lab_root.git` as provenance.
 ///
 /// # Errors
 ///
 /// Invalid parameters, overlay or genome files, output path, or I/O.
-pub fn run(params: &RunParams) -> Result<RunOutcome, LabError> {
+pub fn run(params: &RunParams, lab_root: &LabRoot) -> Result<RunOutcome, LabError> {
     validate_params(params)?;
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(params.threads)
         .build()
         .map_err(|error| LabError::Config(format!("thread pool: {error}")))?;
-    pool.install(|| run_in_pool(params))
+    pool.install(|| run_in_pool(params, lab_root))
 }
 
 struct Genomes {
@@ -268,16 +267,15 @@ fn load_overlays(params: &RunParams) -> Result<Vec<Overlay>, LabError> {
 }
 
 #[allow(clippy::too_many_lines)]
-fn run_in_pool(params: &RunParams) -> Result<RunOutcome, LabError> {
+fn run_in_pool(params: &RunParams, lab_root: &LabRoot) -> Result<RunOutcome, LabError> {
     let started = Instant::now();
     let size = params.arena_size;
     let reference = resolve_arm(None, size, params.start_energy)?;
     let genomes = load_genomes(params, &reference)?;
     let overlays = load_overlays(params)?;
 
-    let root = checkout_root()?;
     let default_name = format!("{ASSAY}-{}-{}", params.seed, utc_stamp());
-    let path = resolve_out(&root, params.out.as_deref(), &default_name)?;
+    let path = resolve_out(&lab_root.path, params.out.as_deref(), &default_name)?;
     let reserve = SUMMARY_RESERVE + overlays.iter().map(|o| o.bytes).sum::<u64>();
     let mut dir = RunDir::create(path, Budget::new(params.byte_cap, reserve)?)?;
 
@@ -338,7 +336,7 @@ fn run_in_pool(params: &RunParams) -> Result<RunOutcome, LabError> {
     } else {
         (None, 0)
     };
-    let (git_revision, dirty) = git_state();
+    let (git_revision, dirty, git) = lab_root.git.fields();
     let arena = arena_config(size);
     let wall_seconds = started.elapsed().as_secs_f64();
     let summary = Summary {
@@ -348,6 +346,7 @@ fn run_in_pool(params: &RunParams) -> Result<RunOutcome, LabError> {
         provenance: Provenance {
             git_revision,
             dirty,
+            git,
             config_digest: sha256_hex(&serde_json::to_vec(&reference).expect("config serializes")),
             overlays: overlays
                 .iter()

@@ -33,6 +33,10 @@ pub struct Summary {
 pub struct Provenance {
     pub git_revision: Option<String>,
     pub dirty: Option<bool>,
+    /// Present only when a library caller injected a root that is not a
+    /// checkout; `git_revision` and `dirty` are then null.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git: Option<GitMarker>,
     /// SHA-256 of the resolved reference config JSON.
     pub config_digest: String,
     pub overlays: Vec<OverlayRecord>,
@@ -41,6 +45,12 @@ pub struct Provenance {
     pub seeds: Seeds,
     pub threads: usize,
     pub sizes: Sizes,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GitMarker {
+    Unavailable,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

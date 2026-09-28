@@ -282,8 +282,8 @@ generation-to-threshold among reached, censored counts, fidelity.
 
 ## Verification
 
-- [x] `cargo test -p v3-lab` (in `make check` via `rust-test-lab`, tiny
-      sizes, under 10 s), `cargo clippy -p v3-lab --all-targets -- -D
+- [x] `cargo test -p v3-lab` (tiny sizes, under 10 s; also passes in a
+      copy without `.git`), `cargo clippy -p v3-lab --all-targets -- -D
       warnings`, `cargo check --workspace --all-targets` -> clean; cases
       in the [readings](../../progress/readings/t22-f01.md).
 - [x] `make check` -> exit 0; `git diff --stat main` confined to the diff
