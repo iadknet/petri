@@ -22,7 +22,7 @@ Nothing in `crates/v3-lab` is reachable from a production crate.
 - Barrier arenas, layout files and the ring comparator (T22.F02); per-elite
   brain and sensor readings and the mutant signature (T22.F03); the why-not
   ladder (T22.F04).
-- Lexicase or any second selector; cohort (non-solo) evaluation; lifetime
+- Lexicase; cohort (non-solo) evaluation; lifetime
   learning attribution; a production default, founder, recipe or mutation
   policy; any change to `v3-core`, `v3-cli`, `v3-server` or the frontend.
 - A benchmark profile or series entry, and any per-tick trace.
@@ -30,8 +30,8 @@ Nothing in `crates/v3-lab` is reachable from a production crate.
 ## Inputs and Invariants
 
 **Contract.** The T22.F01 row and the track's "F01 contract" and
-"Answered from source" notes are the source of truth; this spec fixes the
-values they leave to the spec. The design, the options rejected and the
+"Answered from source" notes are the source of truth; this spec fixes what
+they leave open. The design, the options rejected and the
 ring-probe precedent are in the
 [capability assay research note](../../strategy/capability-assay-research-2026-09-28.md).
 
@@ -78,8 +78,7 @@ density infeasible for the calibration verdict.
 
 **Evaluation.** Each individual is evaluated alone, per scene, from a fresh
 `Simulation` started at world tick `target_tick`, with `start_energy`
-(default 100.0, half of `max_energy`; at production `initial_energy` 20 a
-founder starves in about 30 ticks)
+(default 100.0, half of `max_energy`)
 for `lifetime` ticks or until death. Observation is at tick boundaries:
 after each `run_tick` the harness differences the cumulative counters (so
 every action of the tick, including a bite in the death tick, is counted)
@@ -211,8 +210,10 @@ The summary's `timing` block is the only non-deterministic content.
 | `calibration`, `validation` | `hash(seed, tag)` |
 
 **Outputs.** Run directory `.bench-artifacts/lab/<assay>-<seed>-<utc>/`
-under the calling checkout's root; `--out` must resolve inside that
-checkout's `.bench-artifacts/` or is refused. It holds `rows.ndjson`,
+under a root the caller injects: the CLI resolves it with `git rev-parse
+--show-toplevel` and refuses to run without a checkout; tests pass a
+temporary root. `--out` must resolve inside `<root>/.bench-artifacts/` or is
+refused. It holds `rows.ndjson`,
 `summary.json`, and `elites/<arm>-<replicate>.json` written at the end only.
 A byte cap (`--byte-cap`, default 64 MiB per run directory) is checked before
 every write against the directory's size plus the pending bytes. A summary
@@ -235,7 +236,7 @@ campaign of three evolving arms × 8 × 100 rows ≈ 20 MB.
 
 | Summary keep-list (`kind: petri-lab-summary`, `summary_version: 1`) | Consumer |
 | --- | --- |
-| `provenance`: `git_revision`, `dirty`, `config_digest` (SHA-256 of the resolved reference config JSON), `overlays` (name, content, order), `genomes` (name, SHA-256, `genome_format: 1`, `v3_core_version`), `arena` (spec and SHA-256), `seeds`, `threads`, `sizes` | report, research notes |
+| `provenance`: `git_revision`, `dirty` (both `null` with `git: "unavailable"` only when a library caller injects a root without a checkout, as tests do; a CLI run never records that), `config_digest` (SHA-256 of the resolved reference config JSON), `overlays` (name, content, order), `genomes` (name, SHA-256, `genome_format: 1`, `v3_core_version`), `arena` (spec and SHA-256), `seeds`, `threads`, `sizes` | report, research notes |
 | `calibration`: grid points with founder, floor, half, oracle, comparator means, checks, redraws; `selected`, `verdict`, `reach_threshold` | report |
 | `arms[]`: `name`, `role`, `policy`, `reach_reported` (true only when the arm's reach counts as native reachability: tested and `policy: native`; a tested `policy-deviation` arm is false), per replicate `reached`, `generation_to_threshold`, `censored`, `incomplete`, final best scalar; `reached_fraction` with `wilson_95` (null with `incomplete_replicates` when any replicate is incomplete) | report, research-note tables |
 | `fidelity` (reference arm): `per_unit_rate`, `executed_bias`, `executed_window_ticks`, event totals by operator, `identical_offspring_fraction`, `phenotype_mutation: false`, `learned_weight_capture: false` | report |
@@ -243,7 +244,7 @@ campaign of three evolving arms × 8 × 100 rows ≈ 20 MB.
 
 `v3-lab report <summary.json>` renders the assay report from the summary
 alone: calibration table, per-arm reached k/n with the interval, median
-generation-to-threshold among reached, censored counts, fidelity line.
+generation-to-threshold among reached, censored counts, fidelity.
 
 | CLI parameter | Default (campaign / `--quick`) |
 | --- | --- |
