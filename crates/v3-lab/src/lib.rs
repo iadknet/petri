@@ -50,10 +50,7 @@ impl GenomeFile {
     ///
     /// I/O failures, malformed JSON, or an unknown `genome_format`.
     pub fn load(path: &Path) -> Result<CreatureGenome, LabError> {
-        let text = std::fs::read_to_string(path)
-            .map_err(|error| LabError::Io(format!("{}: {error}", path.display())))?;
-        let file: Self = serde_json::from_str(&text)
-            .map_err(|error| LabError::Config(format!("{}: {error}", path.display())))?;
+        let file: Self = read_json(path)?;
         if file.genome_format != summary::GENOME_FORMAT {
             return Err(LabError::Config(format!(
                 "{}: genome_format {} is not {}",
@@ -64,6 +61,18 @@ impl GenomeFile {
         }
         Ok(file.genome)
     }
+}
+
+/// Read and parse a JSON file, naming `path` in the error.
+///
+/// # Errors
+///
+/// [`LabError::Io`] when unreadable, [`LabError::Config`] when malformed.
+pub fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, LabError> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| LabError::Io(format!("{}: {error}", path.display())))?;
+    serde_json::from_str(&text)
+        .map_err(|error| LabError::Config(format!("{}: {error}", path.display())))
 }
 
 /// Lower-case hex SHA-256 of `bytes`.

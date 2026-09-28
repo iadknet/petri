@@ -11,7 +11,9 @@ use v3_core::creature::genome::CreatureGenome;
 use crate::eval::{evaluate_genome, evaluate_scripted, SceneScore, Scripted, Setup};
 use crate::rng::{hash, stream, Part};
 use crate::scene::{draw_scene, Scene};
-use crate::summary::{Calibration, CalibrationPoint, PointMeans, Selected, Verdict};
+use crate::summary::{
+    Calibration, CalibrationPoint, PointMeans, Selected, ThresholdSource, Verdict,
+};
 
 /// Minimum mean-score gap between successive sensitivity instruments.
 pub const SENSITIVITY_GAP: f64 = 0.1;
@@ -84,8 +86,16 @@ struct Scored {
     creature_ticks: u64,
 }
 
-fn mean_of(scores: &[SceneScore], field: impl Fn(&SceneScore) -> f64) -> f64 {
-    let values: Vec<f64> = scores.iter().map(field).collect();
+/// Per-scene actor order in [`score_point`].
+const FOUNDER: usize = 0;
+const COMPARATOR: usize = 1;
+const FLOOR: usize = 2;
+const HALF: usize = 3;
+const ORACLE: usize = 4;
+
+/// Mean over scenes of `field` of actor `actor`.
+fn mean_of(rows: &[[SceneScore; 5]], actor: usize, field: impl Fn(&SceneScore) -> f64) -> f64 {
+    let values: Vec<f64> = rows.iter().map(|row| field(&row[actor])).collect();
     crate::stats::mean(&values).unwrap_or(0.0)
 }
 
@@ -118,27 +128,25 @@ fn score_point(
             ]
         })
         .collect();
-    let column =
-        |i: usize| -> Vec<SceneScore> { per_scene.iter().map(|row| row[i].clone()).collect() };
-    let (founder_s, comparator_s, floor_s, half_s, oracle_s) =
-        (column(0), column(1), column(2), column(3), column(4));
-    let comparator: Vec<f64> = comparator_s.iter().map(|s| s.score).collect();
-    let floor: Vec<f64> = floor_s.iter().map(|s| s.score).collect();
-    let wins = comparator.iter().zip(&floor).filter(|(c, f)| c > f).count();
-    let creature_ticks = founder_s
+    let wins = per_scene
         .iter()
-        .chain(&comparator_s)
-        .map(|s| u64::from(s.ticks))
+        .filter(|row| row[COMPARATOR].score > row[FLOOR].score)
+        .count();
+    let creature_ticks = per_scene
+        .iter()
+        .map(|row| u64::from(row[FOUNDER].ticks) + u64::from(row[COMPARATOR].ticks))
         .sum();
+    let score = |s: &SceneScore| s.score;
+    let progress = |s: &SceneScore| s.progress;
     Scored {
         means: PointMeans {
-            founder: mean_of(&founder_s, |s| s.score),
-            floor: mean_of(&floor_s, |s| s.score),
-            half: mean_of(&half_s, |s| s.score),
-            oracle: mean_of(&oracle_s, |s| s.score),
-            comparator: mean_of(&comparator_s, |s| s.score),
-            floor_progress: mean_of(&floor_s, |s| s.progress),
-            comparator_progress: mean_of(&comparator_s, |s| s.progress),
+            founder: mean_of(&per_scene, FOUNDER, score),
+            floor: mean_of(&per_scene, FLOOR, score),
+            half: mean_of(&per_scene, HALF, score),
+            oracle: mean_of(&per_scene, ORACLE, score),
+            comparator: mean_of(&per_scene, COMPARATOR, score),
+            floor_progress: mean_of(&per_scene, FLOOR, progress),
+            comparator_progress: mean_of(&per_scene, COMPARATOR, progress),
             comparator_wins: u32::try_from(wins).unwrap_or(u32::MAX),
         },
         creature_ticks,
@@ -235,32 +243,34 @@ pub fn run_gate(
         creature_ticks += scored.creature_ticks;
         let passed = competent(&scored.means, input.validation_scenes, input.margin);
         point.validation_competence = Some(passed);
+        // Floor + 0.5 × (comparator − floor) on the validation means.
+        let calibrated = scored.means.floor + 0.5 * (scored.means.comparator - scored.means.floor);
         point.validation = Some(scored.means);
         if passed {
-            selected = Some(Selected {
+            let chosen = Selected {
                 food_fraction: point.food_fraction,
                 lifetime: point.lifetime,
-            });
+            };
+            selected = Some((chosen, calibrated));
             validation_scenes = scenes;
             break;
         }
     }
 
-    let (verdict, reach_threshold, source) = match (&selected, input.reach_threshold) {
-        (None, _) => (Verdict::Uncalibrated, None, None),
-        (Some(_), Some(threshold)) => (Verdict::Calibrated, Some(threshold), Some("override")),
-        (Some(chosen), None) => {
-            let means = points
-                .iter()
-                .find(|p| p.food_fraction == chosen.food_fraction && p.lifetime == chosen.lifetime)
-                .and_then(|p| p.validation.as_ref())
-                .expect("the selected point carries validation means");
-            (
-                Verdict::Calibrated,
-                Some(means.floor + 0.5 * (means.comparator - means.floor)),
-                Some("calibrated"),
-            )
-        }
+    let (verdict, reach_threshold, source, selected) = match (selected, input.reach_threshold) {
+        (None, _) => (Verdict::Uncalibrated, None, None, None),
+        (Some((chosen, _)), Some(threshold)) => (
+            Verdict::Calibrated,
+            Some(threshold),
+            Some(ThresholdSource::Override),
+            Some(chosen),
+        ),
+        (Some((chosen, calibrated)), None) => (
+            Verdict::Calibrated,
+            Some(calibrated),
+            Some(ThresholdSource::Calibrated),
+            Some(chosen),
+        ),
     };
     Gate {
         calibration: Calibration {
@@ -269,7 +279,7 @@ pub fn run_gate(
             selected,
             verdict,
             reach_threshold,
-            reach_threshold_source: source.map(str::to_owned),
+            reach_threshold_source: source,
         },
         validation: validation_scenes,
         creature_ticks,

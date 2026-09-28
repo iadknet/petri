@@ -12,7 +12,7 @@ use v3_lab::cli::read_summary;
 use v3_lab::eval::Setup;
 use v3_lab::output::{checkout_root, Budget, RunDir};
 use v3_lab::run::{run, RunParams, UserArm, EXIT_UNCALIBRATED};
-use v3_lab::summary::{render_report, StoppedBy, SUMMARY_KIND, SUMMARY_VERSION};
+use v3_lab::summary::{render_report, Incomplete, StoppedBy, SUMMARY_KIND, SUMMARY_VERSION};
 
 /// A scratch directory under the checkout's `.bench-artifacts/lab/`,
 /// removed on drop.
@@ -193,7 +193,7 @@ fn an_unmet_gate_is_uncalibrated_with_exit_2_and_no_campaign() {
     let outcome = run(&params).unwrap();
     assert_eq!(outcome.exit_code, EXIT_UNCALIBRATED);
     let summary = read_summary(&outcome.dir.join("summary.json")).unwrap();
-    assert_eq!(summary.incomplete.as_deref(), Some("uncalibrated"));
+    assert_eq!(summary.incomplete, Some(Incomplete::Uncalibrated));
     assert!(summary.calibration.selected.is_none());
     assert!(summary.arms.is_empty());
     assert!(summary.calibration.points.iter().all(|p| p.means.is_some()));

@@ -388,8 +388,8 @@ fn run_replicate(
         }
     }
     for lineage in &mut lineages {
-        let stopped = *lineage.stopped.get_or_insert(StoppedBy::Horizon);
-        if stopped == StoppedBy::ByteCap || totals.byte_cap_hit {
+        lineage.stopped.get_or_insert(StoppedBy::Horizon);
+        if totals.byte_cap_hit {
             lineage.stopped = Some(StoppedBy::ByteCap);
             continue;
         }
@@ -620,6 +620,13 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
     let config = &arm.setup.config;
     let mutation_seed = lineage.mutation_seed;
     let parents = &population;
+    // Survivors are drawn repeatedly; compute each one's reachable set once.
+    let reachable: Vec<_> = parents
+        .iter()
+        .map(|parent| {
+            mesh_reachable_nodes(parent.genome.as_ref().expect("evolving arms carry genomes"))
+        })
+        .collect();
     let children: Vec<Individual> = picks
         .par_iter()
         .enumerate()
@@ -636,7 +643,7 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
             let summary = MutationEngine::apply_mutations_with_food_type_count(
                 &mut child,
                 &config.mutation,
-                &mesh_reachable_nodes(parent_genome),
+                &reachable[pick],
                 ParentExecuted::Record(&frozen.record, frozen.age),
                 &mut rng,
                 config.world.food.types.len(),

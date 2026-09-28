@@ -165,10 +165,7 @@ impl RunArgs {
 ///
 /// I/O, malformed JSON, or a foreign `kind` / `summary_version`.
 pub fn read_summary(path: &std::path::Path) -> Result<Summary, LabError> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|error| LabError::Io(format!("{}: {error}", path.display())))?;
-    let summary: Summary = serde_json::from_str(&text)
-        .map_err(|error| LabError::Config(format!("{}: {error}", path.display())))?;
+    let summary: Summary = crate::read_json(path)?;
     if summary.kind != SUMMARY_KIND || summary.summary_version != SUMMARY_VERSION {
         return Err(LabError::Config(format!(
             "{}: not a {SUMMARY_KIND} v{SUMMARY_VERSION}",
