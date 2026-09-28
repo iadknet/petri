@@ -143,6 +143,10 @@ fn validate_params(params: &RunParams) -> Result<(), LabError> {
         params.calibration_margin.is_finite(),
         "--calibration-margin must be finite",
     )?;
+    check(
+        params.reach_threshold.is_none_or(f64::is_finite),
+        "--reach-threshold must be finite",
+    )?;
     for (index, arm) in params.arms.iter().enumerate() {
         check(
             !arm.name.is_empty()
@@ -179,7 +183,6 @@ struct Genomes {
     production_founder: CreatureGenome,
     start: CreatureGenome,
     comparator: CreatureGenome,
-    records: Vec<GenomeRecord>,
 }
 
 fn genome_record(name: &str, genome: &CreatureGenome) -> GenomeRecord {
@@ -204,16 +207,28 @@ fn load_genomes(params: &RunParams, reference: &SimulationConfig) -> Result<Geno
         Some(path) => GenomeFile::load(path)?,
         None => controller(&production_founder, Family::Vector, false).0,
     };
-    let records = vec![
-        genome_record("start", &start),
-        genome_record("comparator", &comparator),
-    ];
     Ok(Genomes {
         production_founder,
         start,
         comparator,
-        records,
     })
+}
+
+/// Provenance for every genome a run evaluates: `start`, `comparator`, and
+/// `arm:<name>` for each genome supplied through `--arm` (`:` cannot occur
+/// in an arm name, so the names never collide).
+fn genome_records(genomes: &Genomes, overlays: &[Overlay]) -> Vec<GenomeRecord> {
+    let arms = overlays.iter().filter_map(|overlay| {
+        let genome = overlay.genome.as_ref()?;
+        Some(genome_record(&format!("arm:{}", overlay.name), genome))
+    });
+    [
+        genome_record("start", &genomes.start),
+        genome_record("comparator", &genomes.comparator),
+    ]
+    .into_iter()
+    .chain(arms)
+    .collect()
 }
 
 struct Overlay {
@@ -343,7 +358,7 @@ fn run_in_pool(params: &RunParams) -> Result<RunOutcome, LabError> {
                     order,
                 })
                 .collect(),
-            genomes: genomes.records.clone(),
+            genomes: genome_records(&genomes, &overlays),
             arena: ArenaRecord {
                 spec: json!({"id": ARENA_ID, "size": size, "start": "centre", "food_type": 0}),
                 sha256: sha256_hex(&serde_json::to_vec(&arena).expect("config serializes")),

@@ -9,10 +9,13 @@ use v3_lab::arena::{resolve_arm, Policy, Role};
 use v3_lab::calibration::draw_scenes;
 use v3_lab::campaign::{run_campaign, Arm, ArmKind, Plan};
 use v3_lab::cli::read_summary;
-use v3_lab::eval::Setup;
+use v3_lab::eval::{evaluate_genome, Setup};
 use v3_lab::output::{checkout_root, Budget, RunDir};
 use v3_lab::run::{run, RunParams, UserArm, EXIT_UNCALIBRATED};
-use v3_lab::summary::{render_report, Incomplete, StoppedBy, SUMMARY_KIND, SUMMARY_VERSION};
+use v3_lab::summary::{
+    render_report, Incomplete, StoppedBy, GENOME_FORMAT, SUMMARY_KIND, SUMMARY_VERSION,
+};
+use v3_lab::{sha256_hex, GenomeFile};
 
 /// A scratch directory under the checkout's `.bench-artifacts/lab/`,
 /// removed on drop.
@@ -307,4 +310,121 @@ fn the_byte_cap_stops_the_run_and_marks_replicates_incomplete() {
             StoppedBy::ByteCap | StoppedBy::NotStarted
         ));
     }
+}
+
+#[test]
+fn validation_evaluations_count_toward_creature_ticks() {
+    let scratch = Scratch::new("validation-ticks");
+    let reference = resolve_arm(None, 48, 100.0).unwrap();
+    let founder = v3_core::creature::founder::founder_genome_with_age_gate(
+        reference.population.founder_profile,
+        &reference.energy.lifecycle,
+    );
+    let setup = Setup::new(reference, 100.0, 60);
+    let arms = vec![Arm {
+        name: "founder-only".into(),
+        role: Role::Control,
+        policy: Policy::Native,
+        setup: setup.clone(),
+        kind: ArmKind::Fixed(founder.clone()),
+    }];
+    let validation = draw_scenes(11, 3, 48, 0.06, 5).unwrap();
+    let campaign = |threshold: f64, name: &str| {
+        let plan = Plan {
+            seed: 3,
+            replicates: 1,
+            generations: 1,
+            population: 2,
+            elite_fraction: 0.5,
+            scenes: 2,
+            food_fraction: 0.06,
+            threshold,
+        };
+        let mut dir = RunDir::create(
+            scratch.0.join(name),
+            Budget::new(64 << 20, 1 << 20).unwrap(),
+        )
+        .unwrap();
+        run_campaign(&arms, &plan, &validation, &mut dir).unwrap().1
+    };
+    // Threshold 0 tests reach once (one generation, one reach-tested arm);
+    // an unreachable threshold never runs the validation scenes.
+    let tested = campaign(0.0, "tested");
+    let untested = campaign(1e9, "untested");
+    let validation_ticks: u64 = validation
+        .iter()
+        .map(|scene| u64::from(evaluate_genome(&setup, &founder, scene).0.ticks))
+        .sum();
+    assert!(validation_ticks > 0);
+    assert_eq!(
+        tested.creature_ticks,
+        untested.creature_ticks + validation_ticks
+    );
+}
+
+#[test]
+fn a_non_finite_reach_threshold_is_refused_before_any_output() {
+    let scratch = Scratch::new("reach-threshold");
+    for (index, value) in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY]
+        .into_iter()
+        .enumerate()
+    {
+        let out = scratch.0.join(format!("run-{index}"));
+        let mut params = tiny(&out);
+        params.reach_threshold = Some(value);
+        let error = run(&params).expect_err("non-finite threshold accepted");
+        assert!(error.to_string().contains("--reach-threshold"), "{error}");
+        assert!(!out.exists(), "{value} created {}", out.display());
+    }
+}
+
+#[test]
+fn every_arm_genome_is_recorded_with_its_hash_and_format() {
+    let scratch = Scratch::new("arm-genome");
+    let overlay = scratch.0.join("hot.json");
+    std::fs::write(&overlay, r#"{"mutation": {"per_unit_rate": 0.02}}"#).unwrap();
+    let reference = resolve_arm(None, 48, 100.0).unwrap();
+    let founder = v3_core::creature::founder::founder_genome_with_age_gate(
+        reference.population.founder_profile,
+        &reference.energy.lifecycle,
+    );
+    let (genome, _) = v3_core::neighborhood::opportunity::controllers::controller(
+        &founder,
+        v3_core::neighborhood::opportunity::Family::Vector,
+        false,
+    );
+    let genome_path = scratch.0.join("hot-genome.json");
+    std::fs::write(
+        &genome_path,
+        serde_json::to_vec(&GenomeFile::new(genome.clone())).unwrap(),
+    )
+    .unwrap();
+    let mut params = tiny(&scratch.0.join("run"));
+    params.calibrate_only = true;
+    params.arms = vec![
+        UserArm {
+            name: "hot".into(),
+            overlay: overlay.clone(),
+            genome: Some(genome_path),
+        },
+        UserArm {
+            name: "plain".into(),
+            overlay,
+            genome: None,
+        },
+    ];
+    let outcome = run(&params).unwrap();
+    let genomes = &outcome.summary.provenance.genomes;
+    let record = genomes
+        .iter()
+        .find(|g| g.name == "arm:hot")
+        .expect("the arm genome is recorded under its arm");
+    assert_eq!(
+        record.sha256,
+        sha256_hex(&serde_json::to_vec(&genome).unwrap())
+    );
+    assert_eq!(record.genome_format, GENOME_FORMAT);
+    assert_eq!(record.v3_core_version, env!("CARGO_PKG_VERSION"));
+    let names: Vec<&str> = genomes.iter().map(|g| g.name.as_str()).collect();
+    assert_eq!(names, ["start", "comparator", "arm:hot"]);
 }
