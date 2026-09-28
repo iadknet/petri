@@ -1,10 +1,10 @@
 //! Command-line interface: `v3-lab run` and `v3-lab report`.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::output::DEFAULT_BYTE_CAP;
+use crate::output::{GitProvenance, LabRoot, DEFAULT_BYTE_CAP};
 use crate::run::{run, RunParams, UserArm};
 use crate::summary::{render_report, Summary, SUMMARY_KIND, SUMMARY_VERSION};
 use crate::LabError;
@@ -93,7 +93,7 @@ pub struct RunArgs {
     pub threads: Option<usize>,
     #[arg(long, default_value_t = DEFAULT_BYTE_CAP)]
     pub byte_cap: u64,
-    /// Run directory; must resolve inside the checkout's `.bench-artifacts/`.
+    /// Run directory; must resolve inside the checkout root's `.bench-artifacts/`.
     #[arg(long)]
     pub out: Option<PathBuf>,
     /// Stop after the calibration gate.
@@ -175,6 +175,41 @@ pub fn read_summary(path: &std::path::Path) -> Result<Summary, LabError> {
     Ok(summary)
 }
 
+fn git(cwd: &Path, args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+}
+
+/// The checkout containing `cwd`: its root (`git rev-parse
+/// --show-toplevel`), revision and dirty state. A CLI run never records
+/// unknown provenance.
+///
+/// # Errors
+///
+/// [`LabError::Io`] outside a git checkout or when its state is unreadable.
+pub fn resolve_checkout(cwd: &Path) -> Result<LabRoot, LabError> {
+    let root = git(cwd, &["rev-parse", "--show-toplevel"])
+        .ok_or_else(|| LabError::Io("not inside a git checkout".into()))?;
+    let revision = git(cwd, &["rev-parse", "HEAD"])
+        .ok_or_else(|| LabError::Io("checkout has no HEAD".into()))?;
+    let status = git(cwd, &["status", "--porcelain"])
+        .ok_or_else(|| LabError::Io("git status failed".into()))?;
+    Ok(LabRoot {
+        path: PathBuf::from(root),
+        git: GitProvenance::Checkout {
+            revision,
+            dirty: !status.is_empty(),
+        },
+    })
+}
+
 /// Run the parsed command and return the process exit code.
 ///
 /// # Errors
@@ -183,7 +218,8 @@ pub fn read_summary(path: &std::path::Path) -> Result<Summary, LabError> {
 pub fn execute(cli: Cli) -> Result<u8, LabError> {
     match cli.command {
         Command::Run(args) => {
-            let outcome = run(&args.params())?;
+            let lab_root = resolve_checkout(&std::env::current_dir()?)?;
+            let outcome = run(&args.params(), &lab_root)?;
             print!("{}", render_report(&outcome.summary));
             println!("\nrun directory: {}", outcome.dir.display());
             Ok(outcome.exit_code)

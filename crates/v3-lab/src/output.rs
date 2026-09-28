@@ -1,12 +1,12 @@
-//! Run directory under the calling checkout's ignored `.bench-artifacts/`,
+//! Run directory under the injected root's ignored `.bench-artifacts/`,
 //! with a byte cap checked before every write. Nothing here is committed.
 
 use std::fs::{self, File, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::summary::GitMarker;
 use crate::LabError;
 
 /// Bytes set aside for the summary, before overlay bytes.
@@ -84,7 +84,7 @@ fn dir_size(path: &Path) -> std::io::Result<u64> {
 }
 
 impl RunDir {
-    /// Create `path` (inside the checkout's `.bench-artifacts/`) and open
+    /// Create `path` (inside the root's `.bench-artifacts/`) and open
     /// `rows.ndjson`; existing bytes in the directory count against `budget`.
     ///
     /// # Errors
@@ -162,32 +162,43 @@ impl RunDir {
     }
 }
 
-fn git(args: &[&str]) -> Option<String> {
-    let output = Command::new("git").args(args).output().ok()?;
-    output
-        .status
-        .success()
-        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+/// Git state of the injected root, as resolved by the caller.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GitProvenance {
+    /// The CLI's case: the root is a checkout at `revision`.
+    Checkout { revision: String, dirty: bool },
+    /// A library caller injected a root that is not a checkout.
+    Unavailable,
 }
 
-/// The calling checkout's root (`git rev-parse --show-toplevel`).
-///
-/// # Errors
-///
-/// [`LabError::Io`] outside a git checkout.
-pub fn checkout_root() -> Result<PathBuf, LabError> {
-    git(&["rev-parse", "--show-toplevel"])
-        .map(PathBuf::from)
-        .ok_or_else(|| LabError::Io("not inside a git checkout".into()))
+impl GitProvenance {
+    /// The summary's `(git_revision, dirty, git)` provenance fields.
+    #[must_use]
+    pub fn fields(&self) -> (Option<String>, Option<bool>, Option<GitMarker>) {
+        match self {
+            Self::Checkout { revision, dirty } => (Some(revision.clone()), Some(*dirty), None),
+            Self::Unavailable => (None, None, Some(GitMarker::Unavailable)),
+        }
+    }
 }
 
-/// `(git_revision, dirty)` of the calling checkout, `None` when unknown.
-#[must_use]
-pub fn git_state() -> (Option<String>, Option<bool>) {
-    (
-        git(&["rev-parse", "HEAD"]),
-        git(&["status", "--porcelain"]).map(|status| !status.is_empty()),
-    )
+/// The root a run writes under (`<root>/.bench-artifacts/`) and its git
+/// state. The library never resolves either; the caller injects them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LabRoot {
+    pub path: PathBuf,
+    pub git: GitProvenance,
+}
+
+impl LabRoot {
+    /// A root that is not a git checkout (tests, a mutation-testing copy).
+    #[must_use]
+    pub fn without_git(path: PathBuf) -> Self {
+        Self {
+            path,
+            git: GitProvenance::Unavailable,
+        }
+    }
 }
 
 /// Resolve the run directory: `out` when given, which must resolve inside
@@ -279,9 +290,18 @@ mod tests {
         assert!(!budget.admit(1));
     }
 
+    /// A per-test root under the system temp directory, not a checkout.
+    fn temp_root(name: &str) -> PathBuf {
+        let root =
+            std::env::temp_dir().join(format!("petri-lab-unit-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
     #[test]
     fn out_must_stay_inside_bench_artifacts() {
-        let root = checkout_root().unwrap();
+        let root = temp_root("resolve-out");
         assert!(resolve_out(&root, Some(&root.join("docs/lab")), "x").is_err());
         assert!(resolve_out(&root, Some(&root.join(".bench-artifacts")), "x").is_err());
         assert!(resolve_out(
@@ -294,15 +314,12 @@ mod tests {
         assert!(inside.ends_with(".bench-artifacts/lab/t"));
         let default = resolve_out(&root, None, "food-seeking-1-x").unwrap();
         assert!(default.ends_with(".bench-artifacts/lab/food-seeking-1-x"));
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
     fn a_directory_holding_prior_run_outputs_is_refused_before_any_write() {
-        let path = checkout_root()
-            .unwrap()
-            .join(".bench-artifacts/lab")
-            .join(format!("test-reuse-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&path);
+        let path = temp_root("reuse");
         let budget = || Budget::new(64 << 20, SUMMARY_RESERVE).unwrap();
         let mut first = RunDir::create(path.clone(), budget()).unwrap();
         assert!(first.write_row("{\"row\":1}").unwrap());
@@ -317,6 +334,19 @@ mod tests {
         fs::create_dir_all(&empty).unwrap();
         assert!(RunDir::create(empty, budget()).is_ok());
         fs::remove_dir_all(&path).unwrap();
+    }
+
+    #[test]
+    fn git_provenance_maps_to_the_summary_fields() {
+        let checkout = GitProvenance::Checkout {
+            revision: "abc".into(),
+            dirty: true,
+        };
+        assert_eq!(checkout.fields(), (Some("abc".into()), Some(true), None));
+        assert_eq!(
+            GitProvenance::Unavailable.fields(),
+            (None, None, Some(GitMarker::Unavailable))
+        );
     }
 
     #[test]

@@ -10,32 +10,39 @@ use v3_lab::calibration::draw_scenes;
 use v3_lab::campaign::{run_campaign, Arm, ArmKind, Plan};
 use v3_lab::cli::read_summary;
 use v3_lab::eval::{evaluate_genome, Setup};
-use v3_lab::output::{checkout_root, Budget, RunDir};
-use v3_lab::run::{run, RunParams, UserArm, EXIT_UNCALIBRATED};
+use v3_lab::output::{Budget, GitProvenance, LabRoot, RunDir};
+use v3_lab::run::{run, RunOutcome, RunParams, UserArm, EXIT_UNCALIBRATED};
 use v3_lab::summary::{
     render_report, Incomplete, StoppedBy, GENOME_FORMAT, SUMMARY_KIND, SUMMARY_VERSION,
 };
-use v3_lab::{sha256_hex, GenomeFile};
+use v3_lab::{sha256_hex, GenomeFile, LabError};
 
-/// A scratch directory under the checkout's `.bench-artifacts/lab/`,
-/// removed on drop.
-struct Scratch(PathBuf);
+/// A temporary lab root outside any checkout, with `lab` =
+/// `<root>/.bench-artifacts/lab`; removed on drop.
+struct Scratch {
+    root: PathBuf,
+    lab: PathBuf,
+}
 
 impl Scratch {
     fn new(name: &str) -> Self {
-        let path = checkout_root()
-            .unwrap()
-            .join(".bench-artifacts/lab")
-            .join(format!("test-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&path);
-        std::fs::create_dir_all(&path).unwrap();
-        Self(path)
+        let root =
+            std::env::temp_dir().join(format!("petri-lab-test-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let lab = root.join(".bench-artifacts/lab");
+        std::fs::create_dir_all(&lab).unwrap();
+        Self { root, lab }
+    }
+
+    /// A library run on the injected root, which is not a git checkout.
+    fn run(&self, params: &RunParams) -> Result<RunOutcome, LabError> {
+        run(params, &LabRoot::without_git(self.root.clone()))
     }
 }
 
 impl Drop for Scratch {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        let _ = std::fs::remove_dir_all(&self.root);
     }
 }
 
@@ -68,68 +75,57 @@ fn tiny(out: &Path) -> RunParams {
     }
 }
 
+const CHILD_ROOT: &str = "PETRI_LAB_TEST_CHILD_ROOT";
+const CHILD_OVERLAY: &str = "PETRI_LAB_TEST_CHILD_OVERLAY";
+
+/// Child half of the determinism test: `tiny` with the `hot` arm at 2
+/// threads into `<root>/.bench-artifacts/lab/two`.
+#[test]
+#[ignore = "spawned by same_seed_rows_are_byte_identical_across_threads_and_processes"]
+fn child_run_for_the_determinism_test() {
+    let root = PathBuf::from(std::env::var_os(CHILD_ROOT).expect("child root"));
+    let overlay = PathBuf::from(std::env::var_os(CHILD_OVERLAY).expect("child overlay"));
+    let mut params = tiny(&root.join(".bench-artifacts/lab/two"));
+    params.threads = 2;
+    params.arms = vec![UserArm {
+        name: "hot".into(),
+        overlay,
+        genome: None,
+    }];
+    let outcome = run(&params, &LabRoot::without_git(root)).unwrap();
+    assert_eq!(outcome.exit_code, 0);
+}
+
 #[test]
 fn same_seed_rows_are_byte_identical_across_threads_and_processes() {
     let scratch = Scratch::new("determinism");
-    let overlay = scratch.0.join("hot.json");
+    let overlay = scratch.lab.join("hot.json");
     std::fs::write(&overlay, r#"{"mutation": {"per_unit_rate": 0.02}}"#).unwrap();
-    let mut params = tiny(&scratch.0.join("one"));
+    let mut params = tiny(&scratch.lab.join("one"));
     params.arms = vec![UserArm {
         name: "hot".into(),
         overlay: overlay.clone(),
         genome: None,
     }];
-    let outcome = run(&params).unwrap();
+    let outcome = scratch.run(&params).unwrap();
     assert_eq!(outcome.exit_code, 0, "{}", render_report(&outcome.summary));
 
-    let status = Command::new(env!("CARGO_BIN_EXE_v3-lab"))
-        .args([
-            "run",
-            "--seed",
-            "7",
-            "--replicates",
-            "1",
-            "--generations",
-            "2",
-        ])
-        .args([
-            "--population",
-            "2",
-            "--elite-fraction",
-            "0.5",
-            "--scenes",
-            "1",
-        ])
-        .args([
-            "--validation-scenes",
-            "4",
-            "--lifetime",
-            "100",
-            "--arena-size",
-            "48",
-        ])
-        .args([
-            "--food-fraction",
-            "0.08",
-            "--calibration-scenes",
-            "4",
-            "--threads",
-            "2",
-        ])
-        .arg("--arm")
-        .arg(format!("hot={}", overlay.display()))
-        .arg("--out")
-        .arg(scratch.0.join("two"))
+    // The same run in a child process at 2 threads. The CLI refuses outside
+    // a checkout, so the child is this test binary's ignored helper.
+    let status = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "child_run_for_the_determinism_test", "--ignored"])
+        .env(CHILD_ROOT, &scratch.root)
+        .env(CHILD_OVERLAY, &overlay)
         .output()
         .unwrap();
     assert!(
         status.status.success(),
         "{}",
-        String::from_utf8_lossy(&status.stderr)
+        String::from_utf8_lossy(&status.stdout)
     );
 
-    let one = std::fs::read(scratch.0.join("one/rows.ndjson")).unwrap();
-    let two = std::fs::read(scratch.0.join("two/rows.ndjson")).unwrap();
+    let one = std::fs::read(scratch.lab.join("one/rows.ndjson")).unwrap();
+    let two = std::fs::read(scratch.lab.join("two/rows.ndjson")).unwrap();
     assert!(!one.is_empty());
     assert_eq!(
         one, two,
@@ -139,7 +135,7 @@ fn same_seed_rows_are_byte_identical_across_threads_and_processes() {
     // Labels: the user arm raised the mutation rate, so it is a policy
     // deviation like mutation-off: its reach is tested but not reported as
     // native reachability.
-    let summary = read_summary(&scratch.0.join("two/summary.json")).unwrap();
+    let summary = read_summary(&scratch.lab.join("two/summary.json")).unwrap();
     let hot = summary.arms.iter().find(|a| a.name == "hot").unwrap();
     assert_eq!(
         (hot.role, hot.policy),
@@ -191,9 +187,9 @@ fn same_seed_rows_are_byte_identical_across_threads_and_processes() {
 #[test]
 fn an_unmet_gate_is_uncalibrated_with_exit_2_and_no_campaign() {
     let scratch = Scratch::new("uncalibrated");
-    let mut params = tiny(&scratch.0.join("run"));
+    let mut params = tiny(&scratch.lab.join("run"));
     params.calibration_margin = 1e9;
-    let outcome = run(&params).unwrap();
+    let outcome = scratch.run(&params).unwrap();
     assert_eq!(outcome.exit_code, EXIT_UNCALIBRATED);
     let summary = read_summary(&outcome.dir.join("summary.json")).unwrap();
     assert_eq!(summary.incomplete, Some(Incomplete::Uncalibrated));
@@ -208,9 +204,9 @@ fn an_unmet_gate_is_uncalibrated_with_exit_2_and_no_campaign() {
 #[test]
 fn the_summary_carries_the_versioned_keep_list_and_reports_alone() {
     let scratch = Scratch::new("keep-list");
-    let mut params = tiny(&scratch.0.join("run"));
+    let mut params = tiny(&scratch.lab.join("run"));
     params.calibrate_only = true;
-    let outcome = run(&params).unwrap();
+    let outcome = scratch.run(&params).unwrap();
     let text = std::fs::read_to_string(outcome.dir.join("summary.json")).unwrap();
     let value: serde_json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(value["kind"], SUMMARY_KIND);
@@ -248,9 +244,10 @@ fn the_summary_carries_the_versioned_keep_list_and_reports_alone() {
 
 #[test]
 fn out_outside_bench_artifacts_is_refused() {
-    let mut params = tiny(Path::new("/tmp/petri-lab-outside"));
+    let scratch = Scratch::new("outside");
+    let mut params = tiny(&scratch.root.join("elsewhere"));
     params.calibrate_only = true;
-    assert!(run(&params).is_err());
+    assert!(scratch.run(&params).is_err());
 }
 
 #[test]
@@ -294,10 +291,10 @@ fn the_byte_cap_stops_the_run_and_marks_replicates_incomplete() {
     let validation = draw_scenes(11, 2, 48, 0.06, 5).unwrap();
     // Room for a few rows only: rows and elites get cap − reserve bytes.
     let mut dir =
-        RunDir::create(scratch.0.join("run"), Budget::new(12_000, 4_000).unwrap()).unwrap();
+        RunDir::create(scratch.lab.join("run"), Budget::new(12_000, 4_000).unwrap()).unwrap();
     let (arms, totals) = run_campaign(&arms, &plan, &validation, &mut dir).unwrap();
     assert!(totals.byte_cap_hit);
-    let rows = std::fs::read(scratch.0.join("run/rows.ndjson")).unwrap();
+    let rows = std::fs::read(scratch.lab.join("run/rows.ndjson")).unwrap();
     assert!(!rows.is_empty() && rows.len() <= 8_000);
     for arm in &arms {
         assert!(arm.incomplete_replicates > 0);
@@ -341,7 +338,7 @@ fn validation_evaluations_count_toward_creature_ticks() {
             threshold,
         };
         let mut dir = RunDir::create(
-            scratch.0.join(name),
+            scratch.lab.join(name),
             Budget::new(64 << 20, 1 << 20).unwrap(),
         )
         .unwrap();
@@ -369,10 +366,12 @@ fn a_non_finite_reach_threshold_is_refused_before_any_output() {
         .into_iter()
         .enumerate()
     {
-        let out = scratch.0.join(format!("run-{index}"));
+        let out = scratch.lab.join(format!("run-{index}"));
         let mut params = tiny(&out);
         params.reach_threshold = Some(value);
-        let error = run(&params).expect_err("non-finite threshold accepted");
+        let error = scratch
+            .run(&params)
+            .expect_err("non-finite threshold accepted");
         assert!(error.to_string().contains("--reach-threshold"), "{error}");
         assert!(!out.exists(), "{value} created {}", out.display());
     }
@@ -381,7 +380,7 @@ fn a_non_finite_reach_threshold_is_refused_before_any_output() {
 #[test]
 fn every_arm_genome_is_recorded_with_its_hash_and_format() {
     let scratch = Scratch::new("arm-genome");
-    let overlay = scratch.0.join("hot.json");
+    let overlay = scratch.lab.join("hot.json");
     std::fs::write(&overlay, r#"{"mutation": {"per_unit_rate": 0.02}}"#).unwrap();
     let reference = resolve_arm(None, 48, 100.0).unwrap();
     let founder = v3_core::creature::founder::founder_genome_with_age_gate(
@@ -393,13 +392,13 @@ fn every_arm_genome_is_recorded_with_its_hash_and_format() {
         v3_core::neighborhood::opportunity::Family::Vector,
         false,
     );
-    let genome_path = scratch.0.join("hot-genome.json");
+    let genome_path = scratch.lab.join("hot-genome.json");
     std::fs::write(
         &genome_path,
         serde_json::to_vec(&GenomeFile::new(genome.clone())).unwrap(),
     )
     .unwrap();
-    let mut params = tiny(&scratch.0.join("run"));
+    let mut params = tiny(&scratch.lab.join("run"));
     params.calibrate_only = true;
     params.arms = vec![
         UserArm {
@@ -413,7 +412,7 @@ fn every_arm_genome_is_recorded_with_its_hash_and_format() {
             genome: None,
         },
     ];
-    let outcome = run(&params).unwrap();
+    let outcome = scratch.run(&params).unwrap();
     let genomes = &outcome.summary.provenance.genomes;
     let record = genomes
         .iter()
@@ -427,4 +426,46 @@ fn every_arm_genome_is_recorded_with_its_hash_and_format() {
     assert_eq!(record.v3_core_version, env!("CARGO_PKG_VERSION"));
     let names: Vec<&str> = genomes.iter().map(|g| g.name.as_str()).collect();
     assert_eq!(names, ["start", "comparator", "arm:hot"]);
+}
+
+#[test]
+fn an_injected_root_without_a_checkout_records_git_unavailable() {
+    let scratch = Scratch::new("git-unavailable");
+    let mut params = tiny(&scratch.lab.join("run"));
+    params.calibrate_only = true;
+    let outcome = scratch.run(&params).unwrap();
+    let text = std::fs::read_to_string(outcome.dir.join("summary.json")).unwrap();
+    let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+    let provenance = &value["provenance"];
+    assert_eq!(provenance["git"], "unavailable");
+    assert!(provenance["git_revision"].is_null() && provenance["dirty"].is_null());
+    // A checkout's provenance (the CLI's case) carries no `git` key.
+    let mut summary = read_summary(&outcome.dir.join("summary.json")).unwrap();
+    (
+        summary.provenance.git_revision,
+        summary.provenance.dirty,
+        summary.provenance.git,
+    ) = GitProvenance::Checkout {
+        revision: "abc".into(),
+        dirty: false,
+    }
+    .fields();
+    let value = serde_json::to_value(&summary).unwrap();
+    assert!(value["provenance"].get("git").is_none());
+    assert_eq!(value["provenance"]["git_revision"], "abc");
+}
+
+#[test]
+fn the_cli_refuses_to_run_outside_a_checkout() {
+    let scratch = Scratch::new("cli-no-checkout");
+    let output = Command::new(env!("CARGO_BIN_EXE_v3-lab"))
+        .args(["run", "--quick", "--calibrate-only"])
+        .current_dir(&scratch.root)
+        // Stop git's discovery at the temp directory even if it sits in a repo.
+        .env("GIT_CEILING_DIRECTORIES", std::env::temp_dir())
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("not inside a git checkout"));
+    assert_eq!(std::fs::read_dir(&scratch.lab).unwrap().count(), 0);
 }
