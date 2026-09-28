@@ -1,0 +1,29 @@
+[package]
+name = "v3-lab"
+edition.workspace = true
+rust-version.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Capability assay lab (T22): lab selection and tasks never enter production."
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "v3-lab"
+path = "src/main.rs"
+
+[dependencies]
+v3-core = { path = "../v3-core" }
+clap = { workspace = true }
+rand = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+# Stored numeric readings must round-trip without changing their last bit.
+serde_json = { workspace = true, features = ["float_roundtrip"] }
+sha2 = { workspace = true }
+slotmap = { workspace = true }
+
+[dev-dependencies]
+proptest = "1.11"

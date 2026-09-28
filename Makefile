@@ -16,7 +16,7 @@ export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 # Trust the local aqua registry (cargo-mutants) without a per-user allow step.
 export AQUA_POLICY_CONFIG := $(CURDIR)/aqua-policy.yaml
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy rust-mutants frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-lab rust-test-doc rust-clippy rust-mutants frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench lab
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -47,7 +47,7 @@ rust-format-check: ## Check Rust formatting.
 rust-viability: ## Run the Rust viability merge gate.
 	@cargo test -p v3-core --test viability
 
-rust-test-all: rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc ## Run every Rust test subset except the separately ordered viability gate.
+rust-test-all: rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-lab rust-test-doc ## Run every Rust test subset except the separately ordered viability gate.
 
 rust-test-core-unit: ## Run v3-core unit tests.
 	@cargo test -p v3-core --lib
@@ -91,6 +91,13 @@ bench: ## Run gate/goal/sweep. FEATURE labels the run; OUT overrides local raw o
 
 rust-test-server: ## Run v3-server tests.
 	@cargo test -p v3-server
+
+rust-test-lab: ## Run v3-lab capability-lab tests (T22).
+	@cargo test -p v3-lab
+
+LAB_ARGS ?= run --assay food-seeking --quick
+lab: ## Run a capability-lab assay (T22). LAB_ARGS defaults to the quick food-seeking run.
+	@cargo run --release -p v3-lab -- $(LAB_ARGS)
 
 rust-test-doc: ## Run Rust documentation tests.
 	@cargo test --workspace --doc
