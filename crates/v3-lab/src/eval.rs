@@ -388,7 +388,7 @@ impl Scripted {
     ) -> Direction {
         let oracle = match self {
             Self::RandomWalk => false,
-            Self::HalfSeeker => tick % 2 == 0,
+            Self::HalfSeeker => tick.is_multiple_of(2),
             Self::OracleSeeker => true,
         };
         match target {
