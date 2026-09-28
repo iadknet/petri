@@ -47,6 +47,9 @@ pub struct Provenance {
 pub struct OverlayRecord {
     pub name: String,
     pub content: serde_json::Value,
+    /// Index in the run's overlay list: the built-in `mutation-off` overlay
+    /// is 0, user `--arm` overlays follow in command-line order. Each is
+    /// applied alone over the arena config.
     pub order: usize,
 }
 
