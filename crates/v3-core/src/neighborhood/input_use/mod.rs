@@ -42,9 +42,6 @@ use super::mutation_effects::{
 use super::{Battery, EvalContext};
 use catalog::{addressed, shared_memory, Addressed, Channel, Declaration, Family};
 pub(in crate::neighborhood) use consumers::ablated;
-pub(in crate::neighborhood) fn connected_channels(genome: &CreatureGenome) -> BTreeSet<Channel> {
-    consumers::Inventory::new(genome, &mesh_reachable_nodes(genome)).connected()
-}
 use consumers::{declarations, fixed_channel, Inventory, Target};
 use reads::{ReadEvent, ReadRecording};
 

@@ -62,8 +62,7 @@
       "docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity.json",
       "docs/progress/features/t20-f02-graph-neutral-connection-contract.json",
       "docs/progress/features/t20-f04-general-neutral-input-recruitment.json",
-      "docs/progress/features/t20-f05-structured-heritable-refinement.json",
-      "docs/progress/features/t20-f09-inherited-discovery-qualification.json"
+      "docs/progress/features/t20-f05-structured-heritable-refinement.json"
     ]
   },
   "goal": {
@@ -145,8 +144,7 @@
       "docs/progress/features/t20-f01-input-use-baseline-and-ecological-opportunity-goal.json",
       "docs/progress/features/t20-f02-graph-neutral-connection-contract-goal.json",
       "docs/progress/features/t20-f04-general-neutral-input-recruitment-goal.json",
-      "docs/progress/features/t20-f05-structured-heritable-refinement-goal.json",
-      "docs/progress/features/t20-f09-inherited-discovery-qualification-goal.json"
+      "docs/progress/features/t20-f05-structured-heritable-refinement-goal.json"
     ]
   }
 }

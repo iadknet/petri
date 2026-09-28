@@ -44,13 +44,13 @@ fn full_assembly_matches_production_for_a_genome_reading_every_input() {
 }
 
 #[test]
-fn silent_input_declarations_trigger_native_sensor_assembly() {
+fn neutral_recruitment_triggers_native_declaration_driven_sensor_assembly() {
+    use crate::config::NeutralInputRecruitment as Arm;
     use crate::contracts::NodeId;
-    use crate::creature::genome::cgp::{
-        CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind,
-    };
+    use crate::creature::genome::cgp::CgpGraphBackendDef;
     use crate::creature::genome::vote::VoteSink;
     use crate::creature::genome::{BackendDef, NodeGenome};
+    use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
     let parent = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -78,21 +78,14 @@ fn silent_input_declarations_trigger_native_sensor_assembly() {
         ),
     ] {
         let mut child = parent.clone();
-        child.nodes[0].input_refs.push(InputReference::World(key));
-        let BackendDef::Graph(graph) = &mut child.nodes[0].backend_def else {
-            unreachable!()
-        };
-        graph
-            .sink_mut(OutputSinkKind::ActionVote(VoteSink::Eat))
-            .unwrap()
-            .inputs
-            .push(GraphEdge {
-                source: GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx: 0,
-                },
-                weight: 0.0,
-            });
+        recruit_source(
+            &mut child.nodes[0],
+            &SourceFamily::Input(InputReference::World(key)),
+            Arm::WholeFamily,
+            0,
+            VoteSink::Eat,
+        )
+        .unwrap();
         assert_eq!(genome_uses_extended_perception(&child), extended);
         assert_eq!(genome_uses_typed_local_food(&child), typed);
         let donors = world_with(&parent);
@@ -123,6 +116,6 @@ fn silent_input_declarations_trigger_native_sensor_assembly() {
                 .zip(&before)
                 .any(|(a, b)| a.1.typed_local_food != b.1.typed_local_food));
         }
-        println!("DECLARATION_ASSEMBLY {key:?}: creatures={} extended_assemblies={} typed_local_assemblies={}", ids.len(), usize::from(extended)*ids.len(), usize::from(typed)*ids.len());
+        println!("RECRUIT_ASSEMBLY {key:?}: creatures={} extended_assemblies={} typed_local_assemblies={}", ids.len(), usize::from(extended)*ids.len(), usize::from(typed)*ids.len());
     }
 }

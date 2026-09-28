@@ -28,6 +28,8 @@ use proptest::prelude::*;
 
 mod boundaries;
 mod lifecycle;
+mod recruitment;
+mod refinement;
 
 const BASE_COST: f32 = 0.25;
 
@@ -406,16 +408,24 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
     });
     let mut silent = original.clone();
     for vote in VoteSink::all() {
-        wire(
-            graph_mut(&mut silent),
-            OutputSinkKind::ActionVote(vote),
-            edge(leaf(0, 3), 0.0),
-        );
-        wire(
-            graph_mut(&mut silent),
-            OutputSinkKind::ActionVote(vote),
-            edge(memory(15, true), 0.0),
-        );
+        use crate::config::NeutralInputRecruitment::WholeFamily;
+        use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
+        recruit_source(
+            &mut silent,
+            &SourceFamily::Input(InputReference::World(WorldInputKey::NearbyCreatureCore)),
+            WholeFamily,
+            0,
+            vote,
+        )
+        .unwrap();
+        recruit_source(
+            &mut silent,
+            &SourceFamily::Memory(true),
+            WholeFamily,
+            0,
+            vote,
+        )
+        .unwrap();
     }
     let genomes = [original, silent].map(|node| CreatureGenome {
         entry_node_id: node.node_id,

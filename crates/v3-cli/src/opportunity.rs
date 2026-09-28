@@ -653,38 +653,6 @@ mod tests {
         }
     }
 
-    /// A throwaway Git checkout for exercising default artifact paths without
-    /// relying on test execution from the source checkout.
-    fn git_checkout(dir: &Temp) -> &Path {
-        let git = |args: &[&str]| {
-            let output = std::process::Command::new("git")
-                .current_dir(&dir.0)
-                .args(args)
-                .output()
-                .unwrap();
-            assert!(
-                output.status.success(),
-                "{}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        };
-        git(&["init", "--quiet"]);
-        git(&[
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "-c",
-            "core.hooksPath=/dev/null",
-            "commit",
-            "--quiet",
-            "--allow-empty",
-            "-m",
-            "fixture",
-        ]);
-        &dir.0
-    }
-
     const REDUCED: Sizes = Sizes {
         replicates: 2,
         horizon: 110,
@@ -768,8 +736,7 @@ mod tests {
     /// reverse): each default raw path is named after its own run.
     #[test]
     fn pilot_and_full_runs_resolve_to_distinct_raw_paths() {
-        let dir = Temp::new();
-        let checkout = git_checkout(&dir).to_path_buf();
+        let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let full = Options::new("t20-f01-x", checkout);
         let pilot = Options {
             pilot: true,

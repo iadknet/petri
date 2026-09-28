@@ -31,22 +31,6 @@ enum Commands {
     /// Exit status 3 when a cap stopped the run and the record is marked
     /// incomplete.
     InputOpportunity(InputOpportunityArgs),
-    /// Retired T20.F09 assay; reports the historical measured source.
-    InputDiscovery(InputDiscoveryArgs),
-}
-
-#[derive(clap::Args)]
-struct InputDiscoveryArgs {
-    #[arg(long)]
-    feature: String,
-    #[arg(long, default_value_t = v3_cli::input_discovery::WALL_CAP_SECS)]
-    wall_cap_secs: u64,
-    #[arg(long, default_value_t = v3_cli::input_discovery::BYTE_CAP)]
-    byte_cap: u64,
-    #[arg(long)]
-    out: Option<std::path::PathBuf>,
-    #[arg(long)]
-    summary_out: Option<std::path::PathBuf>,
 }
 
 #[derive(clap::Args)]
@@ -281,7 +265,6 @@ fn main() {
         }
         Commands::Recruitment(args) => run_recruitment(args),
         Commands::InputOpportunity(args) => run_input_opportunity(args),
-        Commands::InputDiscovery(args) => run_input_discovery(args),
         Commands::World(args) => match args.command {
             WorldCommands::Inspect(args) => {
                 if let Err(message) = run_world_inspect(&args, &mut std::io::stdout()) {
@@ -469,11 +452,6 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
             Ok((params, feature))
         }
     }
-}
-
-fn run_input_discovery(_args: InputDiscoveryArgs) {
-    eprintln!("error: {}", v3_cli::input_discovery::RETIRED_REASON);
-    std::process::exit(1);
 }
 
 fn run_input_opportunity(args: InputOpportunityArgs) {
@@ -717,8 +695,7 @@ mod tests {
             | Commands::World(_)
             | Commands::BenchSummarize(_)
             | Commands::Recruitment(_)
-            | Commands::InputOpportunity(_)
-            | Commands::InputDiscovery(_) => {
+            | Commands::InputOpportunity(_) => {
                 panic!("expected the bench subcommand")
             }
         }

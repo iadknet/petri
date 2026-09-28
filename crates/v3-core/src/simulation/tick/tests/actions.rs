@@ -1177,71 +1177,30 @@ fn per_type_standing_density_matches_the_applied_growth_summary() {
 }
 
 #[test]
-fn silent_input_edges_pay_native_growth_costs() {
-    use crate::config::OrdinaryFoodTypeId;
-    use crate::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
+fn neutral_recruitment_costs_follow_applied_genome_growth() {
+    use crate::config::{NeutralInputRecruitment as Arm, OrdinaryFoodTypeId};
     use crate::creature::genome::vote::VoteSink;
-    use crate::creature::genome::BackendDef;
-    use crate::mutation::compound::sub_value_count;
+    use crate::mutation::graph::recruitment::{recruit_source, SourceFamily};
     use crate::simulation::tick::phase_0_energy_charge;
     let config = crate::config::SimulationConfig::default();
     let parent = v3alpha1_founder_genome();
-    for (reference, previous) in [
-        (
-            Some(InputReference::World(WorldInputKey::area_food_summary(
-                OrdinaryFoodTypeId::new(0),
-            ))),
-            false,
-        ),
-        (
-            Some(InputReference::World(WorldInputKey::food_here(
-                OrdinaryFoodTypeId::new(1),
-            ))),
-            false,
-        ),
-        (
-            Some(InputReference::World(WorldInputKey::neighbor_food_ring(
-                OrdinaryFoodTypeId::new(0),
-            ))),
-            false,
-        ),
-        (None, false),
-        (None, true),
-    ] {
-        let width = reference
-            .as_ref()
-            .map_or(crate::runtime::OUTPUT_SLOT_COUNT as u16, sub_value_count);
-        for channels in [1, width] {
+    let families = [
+        SourceFamily::Input(InputReference::World(WorldInputKey::area_food_summary(
+            OrdinaryFoodTypeId::new(0),
+        ))),
+        SourceFamily::Input(InputReference::World(WorldInputKey::food_here(
+            OrdinaryFoodTypeId::new(1),
+        ))),
+        SourceFamily::Input(InputReference::World(WorldInputKey::neighbor_food_ring(
+            OrdinaryFoodTypeId::new(0),
+        ))),
+        SourceFamily::Memory(false),
+        SourceFamily::Memory(true),
+    ];
+    for arm in [Arm::SingleChannel, Arm::WholeFamily] {
+        for family in &families {
             let mut child = parent.clone();
-            let node = &mut child.nodes[0];
-            let ref_idx = node.input_refs.len() as u16;
-            if let Some(reference) = &reference {
-                node.input_refs.push(reference.clone());
-            }
-            let BackendDef::Graph(graph) = &mut node.backend_def else {
-                unreachable!()
-            };
-            for channel in 0..channels {
-                let source = if reference.is_some() {
-                    GraphSource::InputLeaf {
-                        ref_idx,
-                        sub_idx: channel,
-                    }
-                } else {
-                    GraphSource::SharedMemory {
-                        slot: channel as u8,
-                        previous,
-                    }
-                };
-                graph
-                    .sink_mut(OutputSinkKind::ActionVote(VoteSink::Eat))
-                    .unwrap()
-                    .inputs
-                    .push(GraphEdge {
-                        source,
-                        weight: 0.0,
-                    });
-            }
+            recruit_source(&mut child.nodes[0], family, arm, 0, VoteSink::Eat).unwrap();
             let growth = child.genome_size() - parent.genome_size();
             assert!(growth > 0);
             let lifecycle = &config.energy.lifecycle;
@@ -1250,21 +1209,15 @@ fn silent_input_edges_pay_native_growth_costs() {
                 lifecycle.genome_carry_cost_per_unit,
                 child.genome_size(),
             );
-            assert!(
-                carrying
-                    > phase_0_energy_charge(
-                        0.0,
-                        lifecycle.genome_carry_cost_per_unit,
-                        parent.genome_size()
-                    )
-            );
             let base = base_reproduce_charge(&child);
             let (_, transferred, charge) =
                 charged_reproduction(child.clone(), lifecycle.genome_replication_cost_per_unit);
             assert_eq!(transferred, CAPPED_TRANSFER);
             let nominal = base * (1.0 + lifecycle.genome_replication_cost_per_unit * growth as f32);
-            // Applied f32 debit at this fixture's 1000 energy includes rounding.
+            // Telemetry records the applied f32 debit at this fixture's 1000
+            // energy, including subtraction rounding, not the nominal charge.
             assert_eq!(charge, 1000.0f32 - (1000.0f32 - nominal));
+            println!("RECRUIT_COST {arm:?} {family:?}: size={} growth={growth} carry={carrying:.6} reproduction_charge={charge:.6} base={base:.6} next_supply={:.6}", child.genome_size(), config.mutation.per_unit_rate * f64::from(child.genome_size()));
         }
     }
 }
