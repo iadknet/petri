@@ -1,6 +1,6 @@
 # T22 — Capability Assays and Evolvability Lab
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-09-28
 **Master**: [Program Roadmap](../roadmap.md)
 
