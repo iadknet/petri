@@ -179,7 +179,10 @@ are required workflow checks, not an automatic SubagentStop gate.
 
 ### Benchmark specialist
 
-After the implementer has finished benchmark-affecting work and before final
+A lab feature under the shared contract's exemption ("Lab features skip the
+profiles" in the Benchmark gate section) spawns no benchmark specialist; its
+spec records `Not applicable: lab feature` with the diff scope. Otherwise,
+after the implementer has finished benchmark-affecting work and before final
 review, spawn `roadmap_benchmark_specialist` with `model: gpt-5.6-terra`,
 `reasoning_effort: high`, and `fork_turns: none`. Give it the absolute worktree
 and spec paths, feature ID and slug, the exact gate and goal commands required by

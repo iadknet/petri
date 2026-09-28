@@ -203,6 +203,22 @@ On 2026-09-24, the user moved every Codex review from Astra `xhigh` to Astra
 Codex adapter's fresh-context reviewer. The Codex adapter's spec owner and
 implementer stay at `xhigh`; they write and remediate rather than review.
 
+On 2026-09-28, after reverting the first T20.F09 execution and the T21 draft
+(`a26c1cf0`), the user added T22, a capability lab that evolves real genomes on
+small fixed arenas under the production mutation engine with lab selection
+([research note](strategy/capability-assay-research-2026-09-28.md)), and made
+three contract decisions. Lab features skip the gate and goal benchmark
+profiles when their diff is confined to `crates/v3-lab`, the manifest, lock
+and `Makefile` entries that register it, its tests and documentation: the profiles measure simulation trajectories the lab does not
+touch, and the goal profile alone costs eleven minutes per closure. The lab is
+the framework of record for capability, discovery and reachability questions,
+so the restarted T20.F09 depends on T22.F01 and no new one-off assay module is
+added inside `v3-core`. And a telemetry commit rule now covers every output:
+the first T20.F09 recording wrote a 534 MB raw file by serializing internal
+evaluation structures, so commands commit only the minimum summary that
+regenerates their report, cap their raw archives themselves, and never write
+per-tick traces without a predeclared size projection.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the

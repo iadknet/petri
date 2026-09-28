@@ -85,7 +85,9 @@ exception, or re-pins a baseline stays in this section verbatim: it is a
 contract, not evidence.
 
 The benchmark Verification item above is `Not applicable` only for a feature that
-closes before T10.F10 is checked or that cannot change simulation cost.
+closes before T10.F10 is checked or that cannot change simulation cost, including
+a lab feature under the workflow's Benchmark gate exemption (record
+`Not applicable: lab feature` with the diff scope).
 
 ## Success Criteria
 
