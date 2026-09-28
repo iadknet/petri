@@ -17,6 +17,9 @@ mod records;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod recruitment_reading;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use rand::rngs::SmallRng;

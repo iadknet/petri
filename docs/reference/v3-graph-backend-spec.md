@@ -222,7 +222,7 @@ A graph selects actions through its `ActionVote` and `ActionParam` sinks
 
 ### Qualified zero vote connections (T20.F02)
 
-An ordinary `GraphEdge { source, weight: 0.0 }` may be appended to a
+F04 may append an ordinary `GraphEdge { source, weight: 0.0 }` to a
 **present** `ActionVote` sink. All 27 identities qualify: Eat, the eight
 Move, Reproduce and StealEnergy directions, Terminate and Decide. Both empty
 and wired vote sinks qualify; their position in `output_sinks` is irrelevant.
@@ -255,7 +255,7 @@ Section 12 and commit no graph effects.
 | Removal and references | `RemoveGraphEdge` deletes one occurrence and does not recreate it. A declaration with even a zero-weight consumer cannot be pruned. Once its last consumer is removed it may be pruned. Pruning an earlier unused declaration reindexes surviving consumers while preserving source meaning/channel. |
 | Copy and persistence | Native node copying, genome cloning and serde preserve source meaning, channel, sink identity and independent weights. Mutation/deletion in a copy leaves its original intact. Occurrences have no persistent edge ID. |
 | Addressing | `ref_idx` and `sub_idx` are `u16`; declared index 65535 is representable, proposed index 65536 is not. Shared-memory slots are 0–15. Preserve world-compound wrapping, scalar index ignoring, and decision-compound out-of-width zero behavior. `ActionQueue` reads use their raw index, including readable channels beyond mutation draw width 12. Missing/out-of-width data yielding zero is not evidence of useful refinement. |
-| Admission | An absent destination or unrepresentable proposed reference is ineligible. F02 introduces no creation API or new capacity limit. Any future growth operation owns atomic admission/failure and source declaration; truncation and incumbent overwrite cannot satisfy this contract. |
+| Admission | An absent destination or unrepresentable proposed reference is ineligible. F02 introduces no creation API or new capacity limit. F04 owns atomic admission/failure and any source declaration; truncation and incumbent overwrite cannot satisfy this contract. |
 
 | Added structure | Added `genome_size()` units |
 | --- | ---: |

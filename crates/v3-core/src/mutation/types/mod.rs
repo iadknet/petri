@@ -24,6 +24,7 @@ impl ComplexityEffect {
 )]
 pub enum MutationSkipReason {
     ParseabilityViolation,
+    NumericProposalRejected,
     NoApplicableTarget,
 }
 
@@ -33,6 +34,7 @@ impl MutationSkipReason {
     pub const fn as_key(self) -> &'static str {
         match self {
             Self::ParseabilityViolation => "ParseabilityViolation",
+            Self::NumericProposalRejected => "NumericProposalRejected",
             Self::NoApplicableTarget => "NoApplicableTarget",
         }
     }
@@ -186,6 +188,8 @@ pub enum MutationOperator {
     GraphDisableRewardModulation,
     GraphMutateRewardSource,
     GraphMutateTraceDecay,
+    GraphRecruitNeutralInput,
+    GraphRefineHeritableStructure,
     // InputRef
     InputRefAdd,
     InputRefPrune,
@@ -246,6 +250,8 @@ impl MutationOperator {
             Self::GraphDisableRewardModulation => "Graph.DisableRewardModulation",
             Self::GraphMutateRewardSource => "Graph.MutateRewardSource",
             Self::GraphMutateTraceDecay => "Graph.MutateTraceDecay",
+            Self::GraphRecruitNeutralInput => "Graph.RecruitNeutralInput",
+            Self::GraphRefineHeritableStructure => "Graph.RefineHeritableStructure",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefPrune => "InputRef.Prune",
             Self::InputRefSwap => "InputRef.Swap",
@@ -285,6 +291,7 @@ impl MutationOperator {
             | Self::VmMutateSlotAddress
             | Self::VmMutatePairedSlotAddress => MutationDomain::Vm,
             Self::GraphAlterGraphEdgeWeight
+            | Self::GraphRefineHeritableStructure
             | Self::GraphSwapGraphOperator
             | Self::GraphMutateGraphOperatorParam
             | Self::GraphAddInternalGraphNode
@@ -304,7 +311,8 @@ impl MutationOperator {
             | Self::GraphEnableRewardModulation
             | Self::GraphDisableRewardModulation
             | Self::GraphMutateRewardSource
-            | Self::GraphMutateTraceDecay => MutationDomain::Graph,
+            | Self::GraphMutateTraceDecay
+            | Self::GraphRecruitNeutralInput => MutationDomain::Graph,
             Self::InputRefAdd
             | Self::InputRefPrune
             | Self::InputRefSwap
@@ -356,7 +364,8 @@ impl MutationOperator {
             | Self::GraphCopySubgraph
             | Self::GraphCopyEdgeBundle
             | Self::GraphEnableHebbian
-            | Self::GraphEnableRewardModulation => ComplexityEffect::Increasing,
+            | Self::GraphEnableRewardModulation
+            | Self::GraphRecruitNeutralInput => ComplexityEffect::Increasing,
             // Graph: structural removals
             Self::GraphRemoveInternalGraphNode
             | Self::GraphRemoveGraphEdge
@@ -364,6 +373,7 @@ impl MutationOperator {
             | Self::GraphDisableRewardModulation => ComplexityEffect::Decreasing,
             // Graph: rewiring / neutral
             Self::GraphAlterGraphEdgeWeight
+            | Self::GraphRefineHeritableStructure
             | Self::GraphSwapGraphOperator
             | Self::GraphMutateGraphOperatorParam
             | Self::GraphRetargetGraphEdge
@@ -381,7 +391,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 53] {
+    pub const fn all() -> [Self; 55] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -432,6 +442,8 @@ impl MutationOperator {
             Self::GraphDisableRewardModulation,
             Self::GraphMutateRewardSource,
             Self::GraphMutateTraceDecay,
+            Self::GraphRecruitNeutralInput,
+            Self::GraphRefineHeritableStructure,
             Self::InputRefAdd,
             Self::InputRefPrune,
             Self::InputRefSwap,
@@ -508,6 +520,13 @@ pub struct MutationOperatorFunnel {
 /// Accounting invariant: `attempted_events == applied_events + skipped_events`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MutationSummary {
+    /// Applied native event snapshots for the bounded engineering test panel.
+    /// Absent from production builds and transports; recording draws no RNG.
+    #[cfg(test)]
+    pub(crate) recruitment_deltas: Vec<(
+        crate::creature::genome::CreatureGenome,
+        crate::creature::genome::CreatureGenome,
+    )>,
     pub attempted_events: u32,
     pub applied_events: u32,
     pub skipped_events: u32,
@@ -538,6 +557,8 @@ impl MutationSummary {
     /// Return a summary with all counts zero and an empty skip-reason map.
     pub fn zero() -> Self {
         Self {
+            #[cfg(test)]
+            recruitment_deltas: Vec::new(),
             attempted_events: 0,
             applied_events: 0,
             skipped_events: 0,
