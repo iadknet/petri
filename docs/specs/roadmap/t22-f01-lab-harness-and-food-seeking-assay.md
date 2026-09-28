@@ -1,6 +1,6 @@
 # T22.F01 — Lab Harness and Food-Seeking Assay
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-28
 **Feature**: T22.F01
 **Track**: [T22 — Capability Assays and Evolvability Lab](../../roadmaps/t22-capability-assays-and-evolvability-lab.md)
@@ -303,29 +303,27 @@ Makefile targets, this spec, the readings file and the track checkbox; no
 simulation trajectory, default, founder, recipe or mutation policy changes,
 so no gate or goal profile runs and no series entry is added. Measurement
 tooling: the natural-analog and environmental-pressure rules do not apply.
-Lab wall time is a reading in the readings file, not a gate.
 
-**Measured verdict.** Not applicable: lab feature; the reviewer checks the
-scope claim against the diff.
+**Measured verdict.** Not applicable: lab feature; scope checked in review.
 
 - Full readings: [`docs/progress/readings/t22-f01.md`](../../progress/readings/t22-f01.md).
 
 ## Success Criteria
 
-- [ ] `make lab` runs the food-seeking assay end to end on the development
+- [x] `make lab` runs the food-seeking assay end to end on the development
       host in under 60 s at the fixed quick sizes and two same-seed runs
       produce byte-identical `rows.ndjson`.
-- [ ] The calibration gate reports exposure, competence and sensitivity per
+- [x] The calibration gate reports exposure, competence and sensitivity per
       grid point, selects a point by the predeclared rule or exits
       `uncalibrated`, and records the founder's position at every point.
-- [ ] Every run carries the `native` reference arm with the fidelity block and
+- [x] Every run carries the `native` reference arm with the fidelity block and
       the five controls; a user arm whose overlay changes `mutation` is
       labelled `policy-deviation` everywhere it is reported.
-- [ ] The summary reports, per replicate, reached, generation to threshold
+- [x] The summary reports, per replicate, reached, generation to threshold
       with censoring and `stopped_by`, and a Wilson interval on the reached
       fraction; `v3-lab report` renders the assay report from the summary
       alone.
-- [ ] Output stays under the byte cap, is never committed, and contains no
+- [x] Output stays under the byte cap, is never committed, and contains no
       per-tick trace; `make check` passes with the diff confined to the scope
       above.
 
@@ -334,4 +332,6 @@ scope claim against the diff.
 - Decision: lab exemption (user, 2026-09-28) — no gate or goal profile, no
   benchmark specialist; the mutation gate, the Codex review and `make check`
   apply.
-- Deferred: 11 `utc_stamp` mutants (readings): no injectable clock.
+- Deferred: 11 `utc_stamp` mutants (readings); user agreed 2026-09-28.
+- Cost: `/usage` pending; 4 passes (advisor 3/2/2/2); 4 resumes; 3
+  challenge rounds, ready; review 4 P1 1 P2.
