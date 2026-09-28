@@ -242,33 +242,33 @@ generation-to-threshold among reached, censored counts, fidelity line.
 | --- | --- |
 | `--assay` | `food-seeking` (only value in F01) |
 | `--seed`, `--replicates` | 1; 8 / 4 |
-| `--generations`, `--population`, `--elite-fraction` | 100 / 50; 64 / 32; 0.25 |
+| `--generations`, `--population`, `--elite-fraction` | 100 / 40; 64 / 16; 0.25 |
 | `--scenes`, `--validation-scenes`, `--lifetime` | 4; 8; selected by calibration |
 | `--arena-size`, `--food-fraction`, `--start-energy` | 64; selected by calibration; 100.0 |
 | `--calibration-fractions`, `--calibration-lifetimes`, `--calibration-scenes`, `--calibration-margin` | 0.02,0.04,0.08; 200,400; 16; 1.0 |
 | `--reach-threshold`, `--arm`, `--genome`, `--comparator` | calibrated; none; founder; built-in area-food controller (a file replaces it, still `instrument`) |
 | `--threads`, `--byte-cap`, `--out`, `--calibrate-only` | available parallelism; 64 MiB; run directory; off |
 
-The `--quick` sizes are provisional until the pilot below fixes them; the
-fixed values replace this table at closure.
+The `--quick` sizes are fixed by the size pilot in the
+[readings](../../progress/readings/t22-f01.md).
 
 ## Implementation Tasks
 
-- [ ] Register `crates/v3-lab` (library + `v3-lab` binary) in the workspace
+- [x] Register `crates/v3-lab` (library + `v3-lab` binary) in the workspace
       with workspace dependencies only; add `rust-test-lab` to `rust-test-all`
       and a `lab` target (`LAB_ARGS`, default `run --assay food-seeking --quick`).
-- [ ] Arena, scene generator with the exposure predicate and redraw record,
+- [x] Arena, scene generator with the exposure predicate and redraw record,
       solo evaluator with per-tick counter differencing, dispatch-record
       snapshot and death tick.
-- [ ] Scripted stepper (random-walk, half-seeker, oracle-seeker) on the
+- [x] Scripted stepper (random-walk, half-seeker, oracle-seeker) on the
       production appliers; comparator genome from `controllers::controller`.
-- [ ] Overlay merge, lab-invariant refusal, `policy-deviation` classification.
-- [ ] Variation (engine call, frozen record, identity and event bookkeeping),
+- [x] Overlay merge, lab-invariant refusal, `policy-deviation` classification.
+- [x] Variation (engine call, frozen record, identity and event bookkeeping),
       truncation selection with elites, shuffled-score control, reach test on
       validation scenes, Wilson interval.
-- [ ] Calibration gate with the grid-selection rule and the `uncalibrated`
+- [x] Calibration gate with the grid-selection rule and the `uncalibrated`
       exit; `--calibrate-only`.
-- [ ] NDJSON and summary writers under the byte cap; provenance; `report`.
+- [x] NDJSON and summary writers under the byte cap; provenance; `report`.
 - [ ] End-to-end pilot at campaign sizes: record wall, creature-ticks and
       per-creature-tick cost in the readings, fix the `--quick` sizes so a
       quick run finishes under 60 s on the development host, update the CLI
@@ -276,23 +276,18 @@ fixed values replace this table at closure.
 
 ## Verification
 
-- [ ] `cargo test -p v3-lab` (inside `make check` via `rust-test-lab`, tiny
-      sizes, under 10 s): determinism (same seed, `--threads 1` vs `2`,
-      identical NDJSON bytes), frozen executed-record rule including death
-      inside the last scene, per-tick score path including death, exposure
-      predicate and redraw record, overlay refusal and classification,
-      byte-cap stop with `incomplete`, `uncalibrated` exit, scripted stepper
-      charges the production blocked-move cost, Wilson interval on known
-      counts, summary keep-list version -> result in
-      [readings](../../progress/readings/t22-f01.md).
-- [ ] `make check` -> exit 0; `git diff --stat main` confined to the diff
+- [x] `cargo test -p v3-lab` (inside `make check` via `rust-test-lab`, tiny
+      sizes, under 10 s; the determinism, frozen-record, death, exposure,
+      overlay, byte-cap, `uncalibrated`, blocked-move, Wilson and keep-list
+      cases) -> [readings](../../progress/readings/t22-f01.md).
+- [x] `make check` -> exit 0; `git diff --stat main` confined to the diff
       scope above -> recorded in the readings.
-- [ ] Quick run: `make lab` -> wall under 60 s, calibration verdict, founder
+- [x] Quick run: `make lab` -> wall under 60 s, calibration verdict, founder
       position, per-arm reached fractions, `sha256` of two same-seed
       `rows.ndjson` files equal -> readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved as killed, equivalent, or deferred.
-- [ ] Benchmark summary: `Not applicable: lab feature` (diff scope above).
+- [x] Benchmark summary: `Not applicable: lab feature` (diff scope above).
 
 ## Performance and Goal Impact
 
@@ -334,3 +329,8 @@ scope claim against the diff.
 - Decision: lab exemption (user, 2026-09-28) — no gate or goal profile, no
   benchmark specialist; the mutation gate, the Codex review and `make check`
   apply.
+- Decision: scripted actors die at energy ≤ 0 (production rule); reach
+  candidate is the top true scalar in every arm; `half-seeker` and
+  `oracle-seeker` run only in calibration; `policy-deviation` arms get no
+  reach test; all arms share a replicate's `selection` and `mutation` seeds;
+  `observation` is not drawn; arm configs must keep `edge_mode = Wrap`.
