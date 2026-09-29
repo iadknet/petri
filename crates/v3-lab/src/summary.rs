@@ -649,6 +649,10 @@ fn readings_section(out: &mut String, arms: &[ArmSummary]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::readings::{
+        Causal, FamilyReading, FirstProjection, LastProjection, ShapeProjection,
+        SignatureAggregates,
+    };
 
     fn events(scale: u64, operator: &str) -> Events {
         let map = |n: u64| BTreeMap::from([(operator.to_owned(), n)]);
@@ -763,5 +767,96 @@ mod tests {
                 "| comparator | instrument | native | n/a | n/a | n/a | n/a | 1 |",
             ]
         );
+    }
+
+    #[test]
+    fn readings_cells_print_changes_ratios_and_nulls() {
+        assert_eq!(with_delta(5u32, 3u32), "5 (+2)");
+        assert_eq!(with_delta(3i64, 5i64), "3 (-2)");
+        assert_eq!(ratio(3, 2), "3/2 = 1.500");
+        assert_eq!(ratio(0, 0), "null");
+        assert_eq!(opt_bool(Some(true)), "true");
+        assert_eq!(opt_bool(None), "null");
+        assert_eq!(usize_i64(7), 7);
+        assert_eq!(usize_i64(usize::MAX), i64::MAX);
+    }
+
+    fn family(name: &str, live: Option<bool>) -> FamilyReading {
+        FamilyReading {
+            family: name.into(),
+            structural: true,
+            executed_node: true,
+            live,
+        }
+    }
+
+    #[test]
+    fn readings_section_prints_the_last_elite_and_each_family_its_own_causal_reading() {
+        let first = FirstProjection {
+            genome_size: 90,
+            functional_complexity: 12,
+            nodes: 5,
+            reachable: 4,
+            executed: 3,
+            deaths: 0,
+            births: 1,
+            requested: 2,
+            applied: 1,
+        };
+        let shape = ShapeProjection {
+            genome_size: 97,
+            functional_complexity: 10,
+            nodes: 7,
+            reachable: 6,
+            executed: 2,
+            deaths: 1,
+            births: 4,
+            applied: 3,
+            families: vec![family("A", Some(true)), family("B", None)],
+            moves: 4,
+            exact_hits: 1,
+            avoidance_trials: 0,
+            avoided: 0,
+        };
+        let causal = |name: &str, causal: bool, score_delta: f64| Causal {
+            family: name.into(),
+            causal,
+            score_delta,
+        };
+        let signature = SignatureAggregates {
+            causal: Some(vec![causal("A", true, 0.5), causal("B", false, 0.0)]),
+            unsupported: None,
+            n: 2,
+            identical: 1,
+            silent: 1,
+            changed: 1,
+            dead: 0,
+            improved: 0,
+            equal: 1,
+            worse: 1,
+            score_min: 0.25,
+            score_median: 0.5,
+            score_max: 0.75,
+            mean_delta: -0.125,
+        };
+        let mut native = arm("native", Role::Reference);
+        native.replicates.truncate(1);
+        native.replicates[0].readings = ReplicateReadings {
+            first: Some(first),
+            last: Some(LastProjection {
+                shape,
+                signature: Some(signature),
+            }),
+        };
+        let mut out = String::new();
+        readings_section(&mut out, &[native]);
+        let lines: Vec<&str> = out.lines().collect();
+        let has = |line: &str| lines.contains(&line);
+        assert!(
+            has("| native | 0 | 97 (+7) | 10 (-2) | 7 (+2) | 6 (+2) | 2 (-1) | 1 | 4 | 3 | 1/4 = 0.250 | null |"),
+            "{out}"
+        );
+        assert!(has("| A | true | true | true | true | 0.500 |"), "{out}");
+        assert!(has("| B | true | true | null | false | 0.000 |"), "{out}");
     }
 }
