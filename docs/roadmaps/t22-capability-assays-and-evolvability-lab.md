@@ -34,7 +34,7 @@ evolving.
   - Goal: Measurement tooling. The same harness scores whether lineages come to reach food behind barrier walls and rings without wasting moves, against an authored ring-inhibition comparator, the random-walk floor and the founder's barrier-blind start.
 - [x] **T22.F03 — Brain and Sensor Change Readings** — Depends on: T22.F01
   - Goal: Measurement tooling. Every lab run records what changed in each generation's elite: genome size, reachable and executed nodes, operator counts since the founder, sensor use by family, steering, and the score spread of its mutants.
-- [ ] **T22.F04 — Why-Not Diagnostic Ladder** — Depends on: T22.F01, T22.F03
+- [x] **T22.F04 — Why-Not Diagnostic Ladder** — Depends on: T22.F01, T22.F03
   - Goal: Measurement tooling. One command takes a capability and a start and reports the first rung at which evolution stalls, exposure, supply, viability, benefit or retention, with the counts behind it, so "branching is not evolving" becomes a routed finding instead of a guess.
 
 ## Notes for AI Agents
