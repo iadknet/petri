@@ -121,7 +121,7 @@ completion conditions. Generating either template does not execute it.
 Substitute `<TNN.FNN>` and the lowercase `<tnn-fnn>` worktree name.
 
 ```
-/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, the gate and goal baseline runs and their records to roadmap-benchmark-specialist, and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the final diff review as a fresh read-only Codex Astra high job through the Codex channel; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
+/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, and, unless the workflow's Benchmark gate exempts this feature from them, the gate and goal baseline runs and their records to roadmap-benchmark-specialist and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the final diff review as a fresh read-only Codex Astra high job through the Codex channel; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
 ```
 
 The `/goal` evaluator reads only this conversation and runs no commands, so
@@ -241,7 +241,9 @@ implementer; see `docs/workflow-codex.md`.)
 
 **Brief 1 — build.** Give it the feature ID, the spec path, the change requested,
 and the exact spec sections this pass needs — normally Goal, Inputs and
-Invariants, Implementation Tasks, and the Verification checklist. Its scope is
+Invariants, Telemetry, Implementation Tasks, and the Verification checklist.
+A spec whose Plan step ran before 2026-09-29 has no Telemetry section and
+carries no telemetry obligation. Its scope is
 implementation, tests (TDD, property tests for pure invariants), the viability
 gate first where it applies, and a clean `cargo check --workspace --all-targets`.
 It carries the detailed rules ($rust-skills, `make roadmap-check` on document
@@ -292,7 +294,8 @@ second full run; that ordering cost about two fresh runs per feature and up to
 six on one of them. Delegate it to a fresh `roadmap-mutation-specialist` whose
 only scope is this gate, its test-only triage, and the spec's Verification
 record. Give it the worktree and spec paths, feature ID, final-review result,
-and only the spec's Verification and Notes for AI Agents sections.
+and only the spec's Verification and Notes for AI Agents sections. A T21
+feature under the Benchmark gate's observability exemption skips this gate.
 
 The gate is a fresh `make rust-mutants` (`MUTANTS_ITERATE=0`, the default).
 The target diffs the worktree (committed, uncommitted, and untracked) against
@@ -338,8 +341,9 @@ unresolved survivor is a blocker to report, not a number to hide.
 
 Run the final diff review as a fresh Codex Astra `high` job through the Codex
 channel. Its brief gives the worktree path, the feature ID, the spec path, and
-the spec sections the review needs: Goal, Inputs and Invariants, Verification,
-and Performance and Goal Impact when the feature is subject to it. It tells
+the spec sections the review needs: Goal, Inputs and Invariants, Telemetry,
+Verification, and Performance and Goal Impact when the feature is subject to
+it. It tells
 Codex to read the Review section of this file and
 `.claude/agents/roadmap-reviewer.md` as its checklist, ignoring that file's
 front matter, and to report one finding per line starting `P1:`, `P2:`, or
@@ -373,6 +377,13 @@ A verification item names what is checked and where the result lives; it does no
 prescribe test design in prose. Command transcripts and raw output go to
 `docs/progress/readings/<id>.md`, which holds tables and transcripts, not
 narrative.
+
+**Telemetry section.** The reviewer checks that the spec's Telemetry section
+is filled in or carries a `Not applicable` reason, that a counter or other
+observation the diff adds is listed as a signal, and that a mechanism switch
+or config value the diff adds is listed as recorded configuration. A spec whose
+Plan step ran before 2026-09-29 has no Telemetry section, and the reviewer
+does not require one.
 
 **Spec claim spot-check.** The reviewer picks at least three claims from the
 spec's Verification and Performance sections — a command result, a stored-report
@@ -421,6 +432,64 @@ the lab still runs its profiles. An exempt closure adds no benchmark summary
 and no series entry, so later comparisons reference the last measured closure,
 and the ordinary benchmark tests inside `make check` still run.
 
+**Observability features skip the profiles and the mutation gate (user
+decision, 2026-09-26, recorded 2026-09-29).** A T21 feature does not run the
+gate or goal profile and does not run the mutation gate. No benchmark or
+mutation specialist is spawned, and the goal command's delegation clauses for
+them do not apply. The exemption is keyed to the track, not to a diff scope,
+because T21 wires export into `v3-cli`, `v3-server` and observation seams in
+`v3-core`. It holds only while the feature changes no simulation behavior: no
+simulation default, no `SimulationConfig` or `RuntimeConfig` field, no
+production RNG draw, no stored summary content and no deterministic output.
+The process-level telemetry default that T21.F05 flips is not a simulation
+default. The reviewer checks that claim against the diff, and a T21 feature
+that fails it loses both exemptions for that closure. An exempt closure adds
+no benchmark summary and no series entry. `make check`, the spec challenge
+loop and the Codex review still apply.
+
+Three track checks stand in for the skipped gates; the T21 track notes state
+who delivers each and what it must show.
+
+1. The telemetry-neutrality test runs inside `make check` from T21.F01 on.
+2. The parent comparison runs when the diff touches `v3-core` or code that
+   runs inside the tick loop or a timed region. Build the feature's merge
+   base with `main` in a scratch worktree, run the same short seeded workload
+   on both builds with telemetry off, and require byte-identical output. It
+   checks behavior only and takes seconds.
+3. The overhead check runs when the feature adds work to a run, whether or
+   not telemetry is on.
+
+**One ceiling, one reference.** The ceiling in force is 25% until T21.F05
+closes and the ceiling T21.F05 recorded after that. It applies to one ratio:
+the changed build with telemetry on against the reference build of the same
+commit, in which everything T21 added is compiled out. Both sides hold the
+same simulation code, so a change another track makes to simulation cost
+moves both. Ratios recorded at earlier closures are attribution only and are
+never multiplied into a current reading. The reviewer checks that every T21
+addition to `v3-core` and to the binaries' run loops sits behind the build
+switch the reference turns off.
+
+**Method and time cap.** Timed runs are interleaved pairs on a short
+workload and the reading is the median ratio. The spec predeclares the method
+before any run: the workload, the pair count chosen from a short measurement
+of the workload's run-to-run spread, and the result that counts as
+inconclusive. The routine check is cheap by rule: all timed runs for one
+closure, including the spread measurement, every stack state and one
+permitted rerun, fit inside 5 minutes of measured time. T21.F05's qualifying
+measurement is the one longer allowance, 60 minutes, taken once. When a cap
+is reached the result is inconclusive. An inconclusive result is reported to
+the user and is never rounded to a pass or extended with more runs. Wrap
+every timed run in `scripts/bench-wait`, and never run these checks alongside
+another session's benchmark profile, mutation run or overhead check. The
+orchestrator delegates them to the implementer's verification pass.
+
+**Record.** The spec's Performance and Goal Impact section records
+`Not applicable: observability feature` for the profiles, then each check
+that ran with its method, the measured time used, the ratio against the
+reference in each stack state and telemetry's self-timed cost per tick, or
+`<check> not applicable: <reason>`. Its Verification section records
+`Not applicable: observability feature` for the mutation item.
+
 From T15.F01 onward, each run writes a full local report under the main
 checkout's ignored `.bench-artifacts/<feature>/<profile>.json` and a committed
 summary under the calling checkout's `docs/progress/features/`. Gate uses
@@ -445,7 +514,12 @@ its named consumers (the progress page, the closure comparison, an assay's
 report), not reconstructing raw telemetry, so each producing command declares
 a versioned keep-list for its summary, as the benchmark summary does. Writers
 that exist on 2026-09-28 keep their behavior until they are next touched; the
-rule binds every new command and every rewrite.
+rule binds every new command and every rewrite. Telemetry exported to the T21
+local stack is never committed and never written into the repository tree: it
+lives in the stack's Docker volumes until the user retires it with the track's
+cleanup command, and a T21 spec that adds a trace predeclares its projected
+size per run and its per-run cap. The stack's Compose file, configuration,
+dashboard definitions and cleanup script are source.
 
 After the implementer has finished benchmark-affecting work and before final
 review, delegate the spec's required gate and goal profiles to a fresh
@@ -547,7 +621,13 @@ feature row, update the track and master rollups only if their own criteria are
 now satisfied, run `make check-docs` (the closure edits are documentation, and
 the full suite was just run on the same code), and commit. Then:
 
-0. Confirm the mutation gate ran on the final code and audit its record: the
+0. For a T21 feature under the observability exemption, confirm instead that
+   the spec records both `Not applicable: observability feature` items, the
+   reviewer accepted the no-behavior-change claim, and the parent comparison
+   and the overhead check are each recorded with a result or a
+   `not applicable` reason; then skip to the staging check at the end of this
+   step. Otherwise,
+   confirm the mutation gate ran on the final code and audit its record: the
    summary line and output path in the spec's Verification section, every
    survivor resolved as killed, equivalent, or deferred, and `missed.txt` /
    `timeout.txt` at the recorded path agreeing with the list. A `#[mutants::skip]`
