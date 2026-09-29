@@ -673,6 +673,21 @@ mod tests {
     }
 
     #[test]
+    fn arena_descriptor_carries_the_axis_only_for_a_selected_or_only_point() {
+        let one = ArenaPlan {
+            size: 48,
+            points: vec![Geometry::Wall { scale: 2 }],
+        };
+        assert_eq!(one.descriptor(None)["scale"], 2);
+        let two = ArenaPlan {
+            size: 48,
+            points: vec![Geometry::Wall { scale: 1 }, Geometry::Wall { scale: 3 }],
+        };
+        assert!(two.descriptor(None)["scale"].is_null());
+        assert_eq!(two.descriptor(Some(&two.points[1]))["scale"], 3);
+    }
+
+    #[test]
     fn valid_params_and_arm_names_pass() {
         assert!(validate_params(&params()).is_ok());
         let mut p = params();

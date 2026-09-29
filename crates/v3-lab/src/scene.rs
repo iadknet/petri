@@ -476,6 +476,17 @@ mod tests {
     }
 
     #[test]
+    fn assay_name_is_its_serialized_kebab_case_value() {
+        for (assay, name) in [
+            (Assay::FoodSeeking, "food-seeking"),
+            (Assay::BarrierNavigation, "barrier-navigation"),
+        ] {
+            assert_eq!(assay.name(), name);
+            assert_eq!(serde_json::to_value(assay).unwrap(), name);
+        }
+    }
+
+    #[test]
     fn distance_wraps_on_both_axes() {
         let size = 10;
         assert_eq!(

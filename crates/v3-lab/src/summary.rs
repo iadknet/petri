@@ -554,6 +554,13 @@ mod tests {
         assert_eq!(label(Policy::PolicyDeviation), "policy-deviation");
     }
 
+    #[test]
+    fn axis_cell_prints_the_fraction_else_the_scale_else_layout() {
+        assert_eq!(axis_cell(Some(0.04), None), "0.04");
+        assert_eq!(axis_cell(None, Some(2)), "2");
+        assert_eq!(axis_cell(None, None), "layout");
+    }
+
     fn replicate(generation: Option<u32>, incomplete: bool) -> ReplicateResult {
         ReplicateResult {
             replicate: 0,
