@@ -1,6 +1,6 @@
 # T21 — Run Observability and Execution Tracing
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-09-29
 **Master**: [Program Roadmap](../roadmap.md)
 
