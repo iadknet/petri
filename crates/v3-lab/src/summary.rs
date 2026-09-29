@@ -103,6 +103,7 @@ pub struct Sizes {
     pub scale: Option<u8>,
     pub lifetime: Option<u32>,
     pub blocked_weight: f64,
+    pub efficiency_weight: f64,
     pub quick: bool,
 }
 
@@ -118,6 +119,10 @@ pub struct PointMeans {
     pub comparator_progress: f64,
     pub floor_blocked_fraction: f64,
     pub comparator_blocked_fraction: f64,
+    pub floor_efficiency: f64,
+    pub half_efficiency: f64,
+    pub oracle_efficiency: f64,
+    pub comparator_efficiency: f64,
     /// Scenes on which the comparator scored above the floor.
     pub comparator_wins: u32,
 }
@@ -154,6 +159,8 @@ pub struct Selected {
     pub food_fraction: Option<f64>,
     pub scale: Option<u8>,
     pub lifetime: u32,
+    /// The selected point's validation means.
+    pub means: PointMeans,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -384,12 +391,13 @@ pub fn render_report(summary: &Summary) -> String {
     let sizes = &summary.provenance.sizes;
     let _ = writeln!(
         out,
-        "arena {}, size {}, blocked weight {}",
+        "arena {}, size {}, blocked weight {}, efficiency weight {}",
         summary.provenance.arena.spec["id"]
             .as_str()
             .unwrap_or("unknown"),
         sizes.arena_size,
         sizes.blocked_weight,
+        sizes.efficiency_weight,
     );
     let _ = writeln!(out, "\n## Calibration: {:?}\n", calibration.verdict);
     let axis = match calibration.points.first() {
@@ -399,17 +407,17 @@ pub fn render_report(summary: &Summary) -> String {
     };
     let _ = writeln!(
         out,
-        "| {axis} | lifetime | exposure | competence | sensitivity | validation | founder | floor | half | oracle | comparator | floor blocked | comparator blocked |"
+        "| {axis} | lifetime | exposure | competence | sensitivity | validation | founder | floor | half | oracle | comparator | floor blocked | comparator blocked | floor efficiency | half efficiency | oracle efficiency | comparator efficiency |"
     );
     let _ = writeln!(
         out,
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
     );
     for point in &calibration.points {
         let means = point.means.as_ref();
         let _ = writeln!(
             out,
-            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
             axis_cell(point.food_fraction, point.scale),
             point.lifetime,
             point.exposure,
@@ -425,6 +433,10 @@ pub fn render_report(summary: &Summary) -> String {
             fmt_opt(means.map(|m| m.comparator)),
             fmt_opt(means.map(|m| m.floor_blocked_fraction)),
             fmt_opt(means.map(|m| m.comparator_blocked_fraction)),
+            fmt_opt(means.map(|m| m.floor_efficiency)),
+            fmt_opt(means.map(|m| m.half_efficiency)),
+            fmt_opt(means.map(|m| m.oracle_efficiency)),
+            fmt_opt(means.map(|m| m.comparator_efficiency)),
         );
     }
     if let Some(selected) = &calibration.selected {

@@ -149,7 +149,8 @@ mod tests {
         let scene = spec
             .draw(&mut rand::rngs::SmallRng::seed_from_u64(4))
             .unwrap();
-        let setup = Setup::new(arena_config(64), 100.0, 100).with_blocked_weight(1.0);
+        let setup = Setup::new(arena_config(64), 100.0, 100)
+            .with_scoring(Assay::BarrierNavigation.scoring());
         let (score, _) = evaluate_genome(&setup, &barrier_comparator(&founder), &scene);
         assert_eq!(score.ticks, 100);
         assert!(score.moves_attempted > 0);

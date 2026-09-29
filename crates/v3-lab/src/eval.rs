@@ -76,8 +76,36 @@ pub struct Setup {
     /// endpoint, so the penalty is at its production value.
     pub start_tick: u64,
     pub phenotype: Phenotype,
-    /// Weight of the blocked-move fraction subtracted from the scene score.
+    pub scoring: Scoring,
+}
+
+/// What an interval opened after a bite scores once no reachable food
+/// remains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Exhausted {
+    /// F01's rule: no reachable food is no progress.
+    Zero,
+    /// The task is complete: the interval scores 1.
+    Complete,
+}
+
+/// The per-assay scene-score weights and exhausted-interval rule.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Scoring {
+    /// Weight of the blocked-move fraction subtracted from the score.
     pub blocked_weight: f64,
+    /// Weight of the first-bite efficiency added to the score.
+    pub efficiency_weight: f64,
+    pub exhausted: Exhausted,
+}
+
+impl Scoring {
+    /// F01's food-seeking scene score: bites plus progress.
+    pub const BITES_AND_PROGRESS: Self = Self {
+        blocked_weight: 0.0,
+        efficiency_weight: 0.0,
+        exhausted: Exhausted::Zero,
+    };
 }
 
 impl Setup {
@@ -91,14 +119,14 @@ impl Setup {
             lifetime,
             start_tick,
             phenotype,
-            blocked_weight: 0.0,
+            scoring: Scoring::BITES_AND_PROGRESS,
         }
     }
 
-    /// The same setup scoring blocked moves at `weight`.
+    /// The same setup scored by `scoring`.
     #[must_use]
-    pub fn with_blocked_weight(mut self, weight: f64) -> Self {
-        self.blocked_weight = weight;
+    pub fn with_scoring(mut self, scoring: Scoring) -> Self {
+        self.scoring = scoring;
         self
     }
 
@@ -154,13 +182,18 @@ impl serde::Serialize for EnergyEnd {
 /// One scene's reading.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct SceneScore {
-    /// `food_eaten + progress − blocked_weight × blocked_fraction`.
+    /// `food_eaten + progress + efficiency_weight × efficiency −
+    /// blocked_weight × blocked_fraction`.
     pub score: f64,
     pub food_eaten: u32,
     pub intake: f64,
     /// Scene-relative tick (1-based) of the first bite.
     pub ticks_to_first_food: Option<u32>,
     pub progress: f64,
+    /// `min(1, d_start / ticks_to_first_food)`, 0 with no bite. Not a row
+    /// field (`row_version` 1).
+    #[serde(skip)]
+    pub efficiency: f64,
     pub moves_attempted: u64,
     pub moves_blocked: u64,
     pub penalty_charged: f64,
@@ -178,6 +211,17 @@ impl SceneScore {
     #[must_use]
     pub fn blocked_fraction(&self) -> f64 {
         blocked_fraction(self.moves_blocked, self.moves_attempted)
+    }
+}
+
+/// `min(1, d_start / first)` for a first bite on scene tick `first`
+/// (1-based) with `d_start` the start's geodesic distance to food; 0 with
+/// no bite. The shortest path bites on tick `d_start + 1`.
+#[must_use]
+pub fn efficiency(d_start: Option<u32>, first: Option<u32>) -> f64 {
+    match (d_start, first) {
+        (Some(d_start), Some(first)) => (f64::from(d_start) / f64::from(first)).min(1.0),
+        _ => 0.0,
     }
 }
 
@@ -223,6 +267,16 @@ pub struct Progress {
     /// `None` when the nearest remaining food is unreachable.
     d0: Option<u32>,
     best: u32,
+    /// The first interval's `d0`.
+    d_start: Option<u32>,
+    opened: Opened,
+}
+
+/// When the open interval began.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Opened {
+    AtStart,
+    AfterBite,
 }
 
 impl Progress {
@@ -237,7 +291,15 @@ impl Progress {
             field,
             d0,
             best: d0.unwrap_or(0),
+            d_start: d0,
+            opened: Opened::AtStart,
         }
+    }
+
+    /// The scene start's geodesic distance to the nearest food.
+    #[must_use]
+    pub fn d_start(&self) -> Option<u32> {
+        self.d_start
     }
 
     /// Open a new interval at `at` after a tick in which food was eaten;
@@ -247,6 +309,7 @@ impl Progress {
         self.field = Field::new(&self.terrain, &self.remaining);
         self.d0 = self.field.at(at);
         self.best = self.d0.unwrap_or(0);
+        self.opened = Opened::AfterBite;
     }
 
     /// Observe a later boundary at `at`.
@@ -257,10 +320,12 @@ impl Progress {
     }
 
     /// The open interval's value: `1 − min(d_t)/d0` in [0, 1], 1 when
-    /// `d0 = 0`, 0 when no food remains or the nearest is unreachable.
+    /// `d0 = 0`. With no reachable food left it is 0, except that an
+    /// interval opened after a bite scores 1 under [`Exhausted::Complete`].
     #[must_use]
-    pub fn value(&self) -> f64 {
+    pub fn value(&self, exhausted: Exhausted) -> f64 {
         match self.d0 {
+            None if self.opened == Opened::AfterBite && exhausted == Exhausted::Complete => 1.0,
             None => 0.0,
             Some(0) => 1.0,
             Some(d0) => (1.0 - f64::from(self.best) / f64::from(d0)).clamp(0.0, 1.0),
@@ -334,19 +399,22 @@ impl Tally {
     fn finish(
         self,
         progress: &Progress,
-        blocked_weight: f64,
+        scoring: Scoring,
         energy_end: EnergyEnd,
         death: Option<u32>,
         ticks: u32,
     ) -> SceneScore {
-        let progress = progress.value();
+        let efficiency = efficiency(progress.d_start(), self.first);
+        let progress = progress.value(scoring.exhausted);
         let blocked = blocked_fraction(self.blocked, self.moves);
         SceneScore {
-            score: f64::from(self.food_eaten) + progress - blocked_weight * blocked,
+            score: f64::from(self.food_eaten) + progress + scoring.efficiency_weight * efficiency
+                - scoring.blocked_weight * blocked,
             food_eaten: self.food_eaten,
             intake: self.intake,
             ticks_to_first_food: self.first,
             progress,
+            efficiency,
             moves_attempted: self.moves,
             moves_blocked: self.blocked,
             penalty_charged: self.penalty,
@@ -445,7 +513,7 @@ pub fn evaluate_genome(
     (
         tally.finish(
             &progress,
-            setup.blocked_weight,
+            setup.scoring,
             EnergyEnd::Living(energy),
             death,
             ticks,
@@ -584,7 +652,7 @@ pub fn run_scripted(
     }
     tally.finish(
         &progress,
-        setup.blocked_weight,
+        setup.scoring,
         EnergyEnd::Scripted(energy),
         death,
         ticks,
@@ -891,7 +959,13 @@ mod tests {
             blocked: end.blocked - initial.blocked,
             penalty: end.penalty - initial.penalty,
         }
-        .finish(&progress, 0.0, EnergyEnd::Living(0.0), death, ticks)
+        .finish(
+            &progress,
+            Scoring::BITES_AND_PROGRESS,
+            EnergyEnd::Living(0.0),
+            death,
+            ticks,
+        )
     }
 
     #[test]
@@ -975,16 +1049,16 @@ mod tests {
         let start = Position::new(16, 16);
         let food = [Position::new(20, 16)];
         let mut progress = Progress::new(&food, Terrain::from_cells(size, &[]), start);
-        assert_eq!(progress.value(), 0.0);
+        assert_eq!(progress.value(Exhausted::Zero), 0.0);
         progress.observe(Position::new(18, 16));
-        assert!((progress.value() - 0.5).abs() < 1e-12);
+        assert!((progress.value(Exhausted::Zero) - 0.5).abs() < 1e-12);
         progress.observe(Position::new(10, 16));
         assert!(
-            (progress.value() - 0.5).abs() < 1e-12,
+            (progress.value(Exhausted::Zero) - 0.5).abs() < 1e-12,
             "min distance is kept"
         );
         progress.open(Position::new(20, 16), |_| false);
-        assert_eq!(progress.value(), 0.0, "no food remains");
+        assert_eq!(progress.value(Exhausted::Zero), 0.0, "no food remains");
     }
 
     /// Walk the oracle from `start`: every step descends the field by one
@@ -1081,7 +1155,10 @@ mod tests {
         let start = centre(size);
         let far = Position::new(start.x + 10, start.y);
         let boxed = |weight, seed| {
-            let setup = base.clone().with_blocked_weight(weight);
+            let setup = base.clone().with_scoring(Scoring {
+                blocked_weight: weight,
+                ..Scoring::BITES_AND_PROGRESS
+            });
             let mut world = WorldState::new(size, size, setup.config.world.edge_mode);
             world.reconfigure_food(setup.config.world.food.clone());
             for direction in Direction::ALL {
@@ -1114,6 +1191,196 @@ mod tests {
         assert_eq!(free.blocked_fraction(), fraction);
         assert_eq!(free.score, f64::from(free.food_eaten) + free.progress);
         assert_eq!(weighted.score, free.score - 2.5 * fraction);
+    }
+
+    const BARRIER: Scoring = Scoring {
+        blocked_weight: 1.0,
+        efficiency_weight: 1.0,
+        exhausted: Exhausted::Complete,
+    };
+
+    #[test]
+    fn barrier_navigation_scores_exhausted_blocks_and_efficiency() {
+        assert_eq!(crate::scene::Assay::BarrierNavigation.scoring(), BARRIER);
+        assert_eq!(
+            crate::scene::Assay::FoodSeeking.scoring(),
+            Scoring::BITES_AND_PROGRESS
+        );
+    }
+
+    /// The oracle eats the only food cell at `start + 10` on tick 11; the
+    /// rest of the lifetime has no reachable food.
+    fn exhausted_block(scoring: Scoring) -> SceneScore {
+        let setup = setup(30, 100.0).with_scoring(scoring);
+        let size = setup.config.world.width;
+        let start = centre(size);
+        let food = Position::new(start.x + 10, start.y);
+        let mut world = WorldState::new(size, size, setup.config.world.edge_mode);
+        world.reconfigure_food(setup.config.world.food.clone());
+        world.set_food_type(food, FOOD, 1.0);
+        run_scripted(
+            &setup,
+            &founder(&setup),
+            Scripted::OracleSeeker,
+            world,
+            start,
+            &[food],
+            7,
+        )
+    }
+
+    #[test]
+    fn an_exhausted_block_is_complete_under_barrier_navigation_only() {
+        let barrier = exhausted_block(BARRIER);
+        let food_seeking = exhausted_block(Scoring::BITES_AND_PROGRESS);
+        for score in [&barrier, &food_seeking] {
+            assert_eq!(score.food_eaten, 1);
+            assert_eq!(score.ticks_to_first_food, Some(11));
+            assert_eq!(score.death_tick, None);
+        }
+        assert_eq!(barrier.progress, 1.0);
+        assert_eq!(food_seeking.progress, 0.0);
+    }
+
+    #[test]
+    fn the_oracle_scores_d_start_over_d_start_plus_one() {
+        let score = exhausted_block(BARRIER);
+        assert_eq!(score.efficiency, 10.0 / 11.0);
+        assert_eq!(
+            score.score,
+            1.0 + 1.0 + 10.0 / 11.0 - score.blocked_fraction()
+        );
+        assert_eq!(score.blocked_fraction(), 0.0);
+        // Food seeking weighs efficiency at 0 but still reports it.
+        let food_seeking = exhausted_block(Scoring::BITES_AND_PROGRESS);
+        assert_eq!(food_seeking.efficiency, 10.0 / 11.0);
+        assert_eq!(food_seeking.score, 1.0);
+        let row = serde_json::to_value(&food_seeking).unwrap();
+        assert!(row.get("efficiency").is_none(), "not a row field");
+    }
+
+    #[test]
+    fn progress_unreachable_from_the_start_stays_zero_even_when_complete() {
+        let food = [Position::new(5, 5)];
+        let ring: Vec<Position> = Direction::ALL
+            .into_iter()
+            .map(|d| {
+                let (dx, dy) = d.delta();
+                Position::new(
+                    u16::try_from(5 + dx).unwrap(),
+                    u16::try_from(5 + dy).unwrap(),
+                )
+            })
+            .collect();
+        let mut progress =
+            Progress::new(&food, Terrain::from_cells(16, &ring), Position::new(12, 12));
+        assert_eq!(progress.d_start(), None);
+        assert_eq!(progress.value(Exhausted::Complete), 0.0);
+        progress.observe(Position::new(10, 10));
+        assert_eq!(progress.value(Exhausted::Complete), 0.0);
+        // A bite that leaves only unreachable food completes the task.
+        let reachable = [Position::new(12, 13), Position::new(5, 5)];
+        let mut progress = Progress::new(
+            &reachable,
+            Terrain::from_cells(16, &ring),
+            Position::new(12, 12),
+        );
+        assert_eq!(progress.d_start(), Some(1));
+        progress.open(Position::new(12, 13), |cell| cell == Position::new(5, 5));
+        assert_eq!(progress.value(Exhausted::Complete), 1.0);
+        assert_eq!(progress.value(Exhausted::Zero), 0.0);
+    }
+
+    #[test]
+    fn efficiency_is_zero_without_a_bite_and_capped_at_one() {
+        assert_eq!(efficiency(Some(5), None), 0.0);
+        assert_eq!(efficiency(None, None), 0.0);
+        assert_eq!(efficiency(Some(5), Some(3)), 1.0, "faster than d_start");
+        assert_eq!(efficiency(Some(5), Some(5)), 1.0);
+        assert_eq!(efficiency(Some(5), Some(6)), 5.0 / 6.0);
+        assert_eq!(efficiency(Some(0), Some(1)), 0.0);
+        // A boxed actor never bites.
+        let setup = setup(5, 100.0).with_scoring(BARRIER);
+        let size = setup.config.world.width;
+        let start = centre(size);
+        let mut world = WorldState::new(size, size, setup.config.world.edge_mode);
+        world.reconfigure_food(setup.config.world.food.clone());
+        for direction in Direction::ALL {
+            world.set_barrier(world.resolve_neighbor(start, direction).unwrap(), true);
+        }
+        let far = Position::new(start.x + 10, start.y);
+        world.set_food_type(far, FOOD, 1.0);
+        let score = run_scripted(
+            &setup,
+            &founder(&setup),
+            Scripted::OracleSeeker,
+            world,
+            start,
+            &[far],
+            9,
+        );
+        assert_eq!((score.food_eaten, score.efficiency), (0, 0.0));
+        assert_eq!(score.score, -1.0, "every move blocked, nothing else");
+    }
+
+    /// The oracle walks `D` steps on just enough energy and bites on tick
+    /// `D + 1`, the tick it dies in.
+    #[test]
+    fn a_death_tick_first_bite_counts_toward_efficiency() {
+        const D: u16 = 6;
+        let mut probe = setup(40, 100.0).with_scoring(BARRIER);
+        probe.config.world.food.types[0].energy_per_unit = Some(1e-6);
+        let founder = founder(&probe);
+        let size = probe.config.world.width;
+        let start = centre(size);
+        let food = Position::new(start.x + D, start.y);
+        let complexity = probe
+            .creature(CreatureId::default(), founder.clone(), 3, start)
+            .cached_complexity;
+        let energy = &probe.config.energy;
+        let walk: f32 = (0..u64::from(D))
+            .map(|age| {
+                energy.adjusted_action_cost(energy.costs.move_cost, complexity, age)
+                    + energy.lifecycle.energy_decay_per_tick
+            })
+            .sum();
+        let decay = energy.lifecycle.energy_decay_per_tick;
+        probe.start_energy = walk + 0.25 * decay;
+        let mut world = WorldState::new(size, size, probe.config.world.edge_mode);
+        world.reconfigure_food(probe.config.world.food.clone());
+        world.set_food_type(food, FOOD, 1.0);
+        let score = run_scripted(
+            &probe,
+            &founder,
+            Scripted::OracleSeeker,
+            world,
+            start,
+            &[food],
+            3,
+        );
+        let bite = u32::from(D) + 1;
+        assert_eq!(score.death_tick, Some(bite));
+        assert_eq!(score.food_eaten, 1);
+        assert_eq!(score.ticks_to_first_food, Some(bite));
+        assert_eq!(score.efficiency, f64::from(D) / f64::from(bite));
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn efficiency_is_a_unit_ratio_reaching_one_at_the_shortest_path(
+            d_start in proptest::option::of(0u32..10_000),
+            first in proptest::option::of(1u32..10_000),
+        ) {
+            let value = efficiency(d_start, first);
+            proptest::prop_assert!((0.0..=1.0).contains(&value));
+            match (d_start, first) {
+                (Some(d), Some(t)) if d > 0 => {
+                    proptest::prop_assert_eq!(value == 1.0, t <= d);
+                    proptest::prop_assert!(value > 0.0);
+                }
+                _ => proptest::prop_assert_eq!(value, 0.0),
+            }
+        }
     }
 
     fn plastic(genome: &CreatureGenome) -> CreatureGenome {

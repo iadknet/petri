@@ -95,6 +95,10 @@ pub struct RunArgs {
     /// for barrier-navigation, 0 for food-seeking).
     #[arg(long)]
     pub blocked_weight: Option<f64>,
+    /// Weight of the first-bite efficiency in the scene score (default 1.0
+    /// for barrier-navigation, 0 for food-seeking).
+    #[arg(long)]
+    pub efficiency_weight: Option<f64>,
     /// `name=overlay.json[:genome.json]`, repeatable.
     #[arg(long = "arm", value_parser = parse_arm)]
     pub arms: Vec<UserArm>,
@@ -164,6 +168,7 @@ impl RunArgs {
             calibration_scales: self.calibration_scales.clone(),
             calibration_lifetimes: self.calibration_lifetimes.clone(),
             blocked_weight: self.blocked_weight,
+            efficiency_weight: self.efficiency_weight,
             calibration_scenes: self.calibration_scenes,
             calibration_margin: self.calibration_margin,
             reach_threshold: self.reach_threshold,
@@ -377,6 +382,8 @@ mod tests {
             "1,3",
             "--blocked-weight",
             "0.5",
+            "--efficiency-weight",
+            "0.25",
         ]);
         let Command::Run(args) = cli.command else {
             panic!("run");
@@ -385,6 +392,7 @@ mod tests {
         assert_eq!(params.arena, Some(ArenaId::RingV1));
         assert_eq!(params.calibration_scales, Some(vec![1, 3]));
         assert_eq!(params.blocked_weight, Some(0.5));
+        assert_eq!(params.efficiency_weight, Some(0.25));
         let plan = crate::run::resolve_arena(&params).unwrap();
         assert_eq!(
             plan.points,

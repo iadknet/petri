@@ -9,6 +9,7 @@ use rand::rngs::SmallRng;
 use rand::Rng;
 use v3_core::contracts::{Direction, Position};
 
+use crate::eval::{Exhausted, Scoring};
 use crate::geodesic::{offset, step_toward, Field, Terrain};
 use crate::layout::Layout;
 
@@ -54,13 +55,19 @@ impl Assay {
         }
     }
 
-    /// `--blocked-weight` default: 1.0 for barrier navigation (a lineage
-    /// wasting every move forfeits one bite), 0 for food seeking.
+    /// The default scene score. Food seeking keeps F01's bites plus
+    /// progress. Barrier navigation weighs blocked moves and first-bite
+    /// efficiency at 1.0 (wasting every move forfeits one bite, the
+    /// shortest path earns one) and scores an exhausted block as complete.
     #[must_use]
-    pub fn default_blocked_weight(self) -> f64 {
+    pub fn scoring(self) -> Scoring {
         match self {
-            Self::FoodSeeking => 0.0,
-            Self::BarrierNavigation => 1.0,
+            Self::FoodSeeking => Scoring::BITES_AND_PROGRESS,
+            Self::BarrierNavigation => Scoring {
+                blocked_weight: 1.0,
+                efficiency_weight: 1.0,
+                exhausted: Exhausted::Complete,
+            },
         }
     }
 }
