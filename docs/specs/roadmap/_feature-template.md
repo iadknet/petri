@@ -34,6 +34,33 @@ List source-of-truth inputs, decision-relevant research evidence, exact
 dependency outputs, and invariants. The owning roadmap row is the source of
 truth for feature dependencies.
 
+## Telemetry
+
+State what a person looking at a run of this feature can see, or
+`Not applicable: <reason>` when the feature changes nothing a run does. Use
+one table; tables are free under the prose budget.
+
+| Signal | Kind | Source | Context carried |
+| --- | --- | --- | --- |
+| `<name>` | counter, gauge, span, span event or log record | the applied behavior it derives from | the config values and mechanism switches that govern it |
+
+Rules, from the [T21 track](../../roadmaps/t21-run-observability-and-execution-tracing.md):
+
+- A counter or other observation this feature adds is listed above as a
+  signal. A mechanism switch or config value it adds appears in the run's
+  recorded configuration, and on the spans it governs.
+- Counts are complete; only expensive observations are sampled, and a sampled
+  signal states its cap and its projected size per run.
+- Signals derive from applied behavior, consume no production RNG and change
+  no execution. A value that was not captured is absent, never zero.
+- Creature IDs, ticks, lineage IDs and genome hashes go on spans and log
+  records, never on metric attributes.
+- Nothing here is closure evidence. Indicators and stored readings stay in
+  Performance and Goal Impact.
+
+Until T21.F02 closes there is no export to wire: list the signals this
+feature exposes and where they are read, so T21 can map them.
+
 ## Implementation Tasks
 
 - [ ] Implement the feature.
@@ -48,6 +75,8 @@ implementer chooses the design and records what it actually ran.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
+      A T21 feature under the workflow's observability exemption records
+      `Not applicable: observability feature`.
 - [ ] Benchmark summary stored at `docs/progress/features/<id>.json`, local raw
       hash/byte count and verification time checked, series entry points to the
       summary, and no new full report staged; or
@@ -87,7 +116,11 @@ contract, not evidence.
 The benchmark Verification item above is `Not applicable` only for a feature that
 closes before T10.F10 is checked or that cannot change simulation cost, including
 a lab feature under the workflow's Benchmark gate exemption (record
-`Not applicable: lab feature` with the diff scope).
+`Not applicable: lab feature` with the diff scope). A T21 feature under the
+observability exemption records `Not applicable: observability feature`, then
+its parent comparison and overhead check: the predeclared method, the
+measured ratio in each stack state against the ceiling in force, telemetry's
+self-timed cost per tick, and the reviewed no-behavior-change claim.
 
 ## Success Criteria
 

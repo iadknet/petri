@@ -89,7 +89,7 @@ intent as well as the spec and diff; do not reuse the spec owner for that review
    token budget. Use the native tool's rules for goal status and blockers.
 
 ```text
-Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and docs/workflow-codex.md, and follow the shared per-feature contract with the adapter's substitutions. Use Sol (gpt-5.6-sol, medium) as orchestrator. Delegate spec writing, readiness review, and implementation advice to one separate persistent Astra (gpt-6-astra, xhigh) spec owner and advisor. Return to that same agent at the workflow's advisor checkpoints and for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior; do not spawn a separate advisor. Use one persistent Astra (gpt-6-astra, xhigh) subagent for feature implementation and production-code remediation, a separate Terra (gpt-5.6-terra, high) benchmark specialist for the gate and goal baseline runs and their records, a fresh Astra (gpt-6-astra, high) subagent for final review, and a separate Sol (gpt-5.6-sol, medium) mutation specialist for the mutation gate, test-only survivor remediation, and its record. Run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
+Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and docs/workflow-codex.md, and follow the shared per-feature contract with the adapter's substitutions. Use Sol (gpt-5.6-sol, medium) as orchestrator. Delegate spec writing, readiness review, and implementation advice to one separate persistent Astra (gpt-6-astra, xhigh) spec owner and advisor. Return to that same agent at the workflow's advisor checkpoints and for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior; do not spawn a separate advisor. Use one persistent Astra (gpt-6-astra, xhigh) subagent for feature implementation and production-code remediation, a separate Terra (gpt-5.6-terra, high) benchmark specialist for the gate and goal baseline runs and their records, a fresh Astra (gpt-6-astra, high) subagent for final review, and a separate Sol (gpt-5.6-sol, medium) mutation specialist for the mutation gate, test-only survivor remediation, and its record; spawn neither specialist for a gate the shared contract's Benchmark gate exempts this feature from. Run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
 ```
 
 ### Start and worktree
@@ -181,8 +181,13 @@ are required workflow checks, not an automatic SubagentStop gate.
 
 A lab feature under the shared contract's exemption ("Lab features skip the
 profiles" in the Benchmark gate section) spawns no benchmark specialist; its
-spec records `Not applicable: lab feature` with the diff scope. Otherwise,
-after the implementer has finished benchmark-affecting work and before final
+spec records `Not applicable: lab feature` with the diff scope. A T21 feature
+under the shared contract's observability exemption ("Observability features
+skip the profiles and the mutation gate" in the same section) spawns neither
+the benchmark specialist nor the mutation specialist; the persistent
+implementer runs the track's parent comparison and overhead check in its
+verification pass.
+Otherwise, after the implementer has finished benchmark-affecting work and before final
 review, spawn `roadmap_benchmark_specialist` with `model: gpt-5.6-terra`,
 `reasoning_effort: high`, and `fork_turns: none`. Give it the absolute worktree
 and spec paths, feature ID and slug, the exact gate and goal commands required by
@@ -221,7 +226,10 @@ the existing severity rules and route remediation to the same implementer agent.
 
 ### Mutation specialist
 
-After final review and any post-review remediation, spawn
+A T21 feature under the shared contract's observability exemption spawns no
+mutation specialist; its spec records
+`Not applicable: observability feature`. Otherwise, after final review and any
+post-review remediation, spawn
 `roadmap_mutation_specialist` with `model: gpt-5.6-sol`,
 `reasoning_effort: medium`, and `fork_turns: none`. Give it the absolute
 worktree and spec paths, feature ID, the final-review result, and only the spec's

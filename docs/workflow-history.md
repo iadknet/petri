@@ -219,6 +219,33 @@ evaluation structures, so commands commit only the minimum summary that
 regenerates their report, cap their raw archives themselves, and never write
 per-tick traces without a predeclared size projection.
 
+On 2026-09-29 the T21 observability track was redrafted from the user's
+requirements and the code
+([research note](strategy/run-observability-research-2026-09-29.md)) after the
+2026-09-27 revert removed the first draft. The user's decision of 2026-09-26
+stands: the track skips the benchmark profiles and the mutation gate, because
+it adds no mechanism and the goal profile and a mutation run together cost
+more than the features they would guard. Unlike the lab exemption this one
+cannot be keyed to a diff scope, since export is wired into the production
+binaries, so it is keyed to the track and conditioned on a reviewed
+no-behavior-change claim. Three cheap checks replace the gates: a
+telemetry-neutrality test inside `make check`, a comparison with a build of
+the parent commit when the diff touches the simulation's hot path, and a
+paired overhead check against a reference build of the same commit with
+T21's work compiled out. The parent comparison and the reference build were
+added after a Codex Astra review the same day pointed out that comparing
+telemetry off and on in one binary cannot see a cost that lands on both
+paths, and that ratios recorded at earlier closures stop being true when
+another track changes simulation cost. Routine checks are capped at 5 minutes
+of measured time. Proving the user's 5%
+ceiling costs many paired runs, so the user relaxed it the same day: every
+T21 closure before T21.F05 closes is held to a 25% interim ceiling, and
+T21.F05 sets the default configuration's ceiling from measured cost, with 5%
+as the target. The goal command templates now make the benchmark and mutation
+delegations conditional on the Benchmark gate's exemptions.
+The feature spec template gained a Telemetry section the same day, accepting
+`Not applicable`, so a mechanism or counter ships with its exported signals.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the
