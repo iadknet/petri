@@ -1,8 +1,9 @@
 #!/bin/sh
-# Retire local telemetry older than a cutoff date (T21.F01).
+# Retire local telemetry older than a cutoff (T21.F01).
 #
 # Usage: scripts/telemetry-cleanup CUTOFF [--proceed]
-#   CUTOFF     YYYY-MM-DD; everything before CUTOFF 00:00 UTC is retired.
+#   CUTOFF     YYYY-MM-DD (00:00 UTC) or an RFC3339 timestamp, in the past;
+#              everything before it is retired.
 #   --proceed  delete; without it, print each store's disk use, the deletion
 #              interval and the exact targets, and delete nothing.
 #
@@ -10,28 +11,56 @@
 # compose run`, against a running stack (`make telemetry-up`).
 #
 # Environment:
-#   PETRI_TELEMETRY_PROJECT  Compose project (petri-telemetry); scripts/telemetry-verify
-#                            points it at its scratch project.
+#   PETRI_TELEMETRY_PROJECT  Compose project (petri-telemetry) and
+#   PETRI_TELEMETRY_VOLUME   its volume; scripts/telemetry-verify points both
+#                            at its scratch stack.
 set -eu
 
 usage() {
-  printf 'Usage: scripts/telemetry-cleanup YYYY-MM-DD [--proceed]\n' >&2
+  printf 'Usage: scripts/telemetry-cleanup CUTOFF [--proceed]\n' >&2
+  printf '  CUTOFF: YYYY-MM-DD (00:00 UTC) or RFC3339, in the past\n' >&2
   exit 2
 }
 
 [ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage
-cutoff_date=$1
+cutoff_arg=$1
 proceed=0
 if [ "$#" -eq 2 ]; then
   [ "$2" = --proceed ] || usage
   proceed=1
 fi
-case "$cutoff_date" in
-  [0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]) ;;
-  *) usage ;;
-esac
 
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+aqua_root=${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}
+export AQUA_POLICY_CONFIG="${AQUA_POLICY_CONFIG:-$root/aqua-policy.yaml}"
+
+# Prints `<RFC3339 UTC> <epoch ms>` for a valid cutoff in the past and refuses
+# anything else before any store is touched.
+# shellcheck disable=SC2016 # JavaScript source.
+parsed=$("$aqua_root/bin/node" -e '
+  const arg = process.argv[1];
+  const refuse = (why) => {
+    process.stderr.write(`telemetry-cleanup: ${why}: ${arg}\n`);
+    process.exit(2);
+  };
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?([Zz]|[+-]\d{2}:\d{2}))?$/.exec(arg);
+  if (!m) refuse("CUTOFF is neither YYYY-MM-DD nor RFC3339");
+  const [y, mo, d] = [m[1], m[2], m[3]].map(Number);
+  const day = new Date(Date.UTC(y, mo - 1, d));
+  if (day.getUTCFullYear() !== y || day.getUTCMonth() !== mo - 1 || day.getUTCDate() !== d) {
+    refuse("no such date");
+  }
+  if (m[4] !== undefined && (Number(m[4]) > 23 || Number(m[5]) > 59 || Number(m[6]) > 59)) {
+    refuse("no such time");
+  }
+  const ms = m[4] === undefined ? day.getTime() : Date.parse(arg.toUpperCase());
+  if (Number.isNaN(ms)) refuse("unreadable timestamp");
+  if (ms >= Date.now()) refuse("CUTOFF must be in the past");
+  console.log(new Date(ms).toISOString().replace(".000Z", "Z"), ms);
+' "$cutoff_arg") || exit 2
+cutoff=${parsed% *}
+cutoff_ms=${parsed#* }
+
 project=${PETRI_TELEMETRY_PROJECT:-petri-telemetry}
 
 compose() {
@@ -47,13 +76,6 @@ if [ -z "$(compose ps -q --status running lgtm 2>/dev/null)" ]; then
   exit 1
 fi
 
-cutoff=${cutoff_date}T00:00:00Z
-# Validates the date (GNU date inside the image rejects 2026-02-31).
-cutoff_epoch=$(in_stack date -u -d "$cutoff" +%s) || {
-  printf 'telemetry-cleanup: invalid date %s\n' "$cutoff_date" >&2
-  exit 2
-}
-
 # A store API call inside the container; a failed call (with the store's
 # message) stops the script.
 api() {
@@ -68,6 +90,8 @@ prometheus=http://127.0.0.1:9090
 loki=http://127.0.0.1:3100
 series_match='{__name__=~".+"}'
 stream_match='{service_name=~".+"}'
+# Loki needs an explicit start; the stack disables its query-length limit.
+loki_start=2000-01-01T00:00:00Z
 
 # One JSON object per line from a `"data":[{...},{...}]` or bare `[{...}]`
 # response.
@@ -86,7 +110,8 @@ split_data() {
 }
 
 # Tempo blocks as `class dir start end bytes`, class being delete (ends before
-# the cutoff), keep (starts at or after it) or straddle (kept whole).
+# the cutoff), keep (starts at or after it) or straddle (kept whole); times are
+# compared in milliseconds with the image's GNU date.
 tempo_blocks() {
   # shellcheck disable=SC2016 # expands inside the container.
   in_stack sh -c '
@@ -98,23 +123,23 @@ tempo_blocks() {
       start=$(printf "%s" "$json" | sed -n "s/.*\"startTime\":\"\([^\"]*\)\".*/\1/p")
       end=$(printf "%s" "$json" | sed -n "s/.*\"endTime\":\"\([^\"]*\)\".*/\1/p")
       bytes=$(du -sb "$dir" | cut -f1)
-      start_epoch=$(date -u -d "$start" +%s)
-      end_epoch=$(date -u -d "$end" +%s)
-      if [ "$end_epoch" -lt "$cutoff" ]; then
+      start_ms=$(date -u -d "$start" +%s%3N)
+      end_ms=$(date -u -d "$end" +%s%3N)
+      if [ "$end_ms" -lt "$cutoff" ]; then
         class=delete
-      elif [ "$start_epoch" -ge "$cutoff" ]; then
+      elif [ "$start_ms" -ge "$cutoff" ]; then
         class=keep
       else
         class=straddle
       fi
       printf "%s %s %s %s %s\n" "$class" "$dir" "$start" "$end" "$bytes"
     done
-  ' sh "$cutoff_epoch"
+  ' sh "$cutoff_ms"
 }
 
 printf 'Disk use (KiB):\n'
 in_stack du -s /data/prometheus /data/tempo /data/loki
-printf '\nDeletion interval: everything before %s (%s)\n' "$cutoff" "$cutoff_epoch"
+printf '\nDeletion interval: everything before %s\n' "$cutoff"
 
 prom_raw=$(api -G "$prometheus/api/v1/series" \
   --data-urlencode "match[]=$series_match" --data-urlencode "end=$cutoff")
@@ -124,7 +149,7 @@ printf '\nPrometheus: %s series with samples before the cutoff\n' "$prom_count"
 [ -z "$prom_series" ] || printf '%s\n' "$prom_series"
 
 loki_raw=$(api -G "$loki/loki/api/v1/series" \
-  --data-urlencode "match[]=$stream_match" --data-urlencode 'start=1' \
+  --data-urlencode "match[]=$stream_match" --data-urlencode "start=$loki_start" \
   --data-urlencode "end=$cutoff")
 loki_streams=$(printf '%s\n' "$loki_raw" | split_data)
 loki_count=$(printf '%s' "$loki_streams" | grep -c . || true)
@@ -138,7 +163,7 @@ printf 'Tempo: blocks straddling the cutoff (kept whole; block granularity):\n'
 printf '%s\n' "$blocks" | awk '$1 == "straddle" { print "  " $2, $3, $4, $5 }'
 
 if [ "$proceed" -eq 0 ]; then
-  printf '\nPreview only; rerun with --proceed (make telemetry-clean CUTOFF=%s PROCEED=1) to delete.\n' "$cutoff_date"
+  printf '\nPreview only; rerun with --proceed (make telemetry-clean CUTOFF=%s PROCEED=1) to delete.\n' "$cutoff_arg"
   exit 0
 fi
 
@@ -149,10 +174,17 @@ api -X POST "$prometheus/api/v1/admin/tsdb/clean_tombstones"
 
 printf 'Loki: requesting deletion before the cutoff\n'
 api -X POST -G "$loki/loki/api/v1/delete" \
-  --data-urlencode "query=$stream_match" --data-urlencode 'start=1' \
-  --data-urlencode "end=$cutoff_epoch"
+  --data-urlencode "query=$stream_match" --data-urlencode "start=$loki_start" \
+  --data-urlencode "end=$cutoff"
 printf 'Loki delete requests (status endpoint %s/loki/api/v1/delete):\n' "$loki"
-requests=$(api "$loki/loki/api/v1/delete")
+# The new request is listed a few seconds after it is accepted.
+waited=0
+until requests=$(api "$loki/loki/api/v1/delete") &&
+  case "$requests" in *"\"end_time\":${cutoff_ms%???}"[,.]*) true ;; *) false ;; esac; do
+  waited=$((waited + 1))
+  [ "$waited" -lt 30 ] || break
+  sleep 1
+done
 printf '%s\n' "$requests" | split_data
 printf 'Loki applies the deletion after its cancel period and compaction interval.\n'
 
