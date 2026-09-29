@@ -1133,6 +1133,22 @@ mod tests {
             flagged, identical,
             "row flags agree with the fidelity count"
         );
+        // The ladder counts this generation's births only (never a carried
+        // survivor's), and its children exclude the identical ones.
+        let ladder_sum = |path: &[&str]| -> u64 {
+            rows.iter()
+                .map(|row| {
+                    path.iter()
+                        .fold(&row["ladder"], |value, key| &value[*key])
+                        .as_u64()
+                        .unwrap()
+                })
+                .sum()
+        };
+        assert_eq!(ladder_sum(&["supply", "births"]), 12);
+        let children = ladder_sum(&["children", "touching", "children"])
+            + ladder_sum(&["children", "other", "children"]);
+        assert_eq!(children, 12 - identical);
     }
 
     #[test]
@@ -1450,6 +1466,57 @@ mod tests {
             next_draws.push(lineage.selection.gen::<u64>());
         }
         assert_eq!(next_draws[0], next_draws[1]);
+    }
+
+    /// The next selection draw of a native and a shuffled-score lineage on
+    /// one replicate seed after an admitted row at `generation`.
+    fn next_draws_after_an_admitted_row(generation: u32) -> [u64; 2] {
+        let native = founder_arm(100.0, 60);
+        let ArmKind::Evolving { start, .. } = &native.kind else {
+            unreachable!()
+        };
+        let shuffled = Arm {
+            name: "shuffled-score".into(),
+            role: Role::Control,
+            kind: ArmKind::Evolving {
+                start: start.clone(),
+                shuffled: true,
+            },
+            ..native.clone()
+        };
+        let plan = plan(4, 0.5, 3, 1e9);
+        let scenes = draw_scenes(5, 1, &plan.spec).unwrap();
+        let batteries = [Batteries::new(&native.setup.config)];
+        let step = Step {
+            plan: &plan,
+            validation: &scenes,
+            scenes: &scenes,
+            replicate: 0,
+            generation,
+            batteries: &batteries,
+            observation: 7,
+        };
+        let (_scratch, mut dir) = Scratch::new(&format!("admitted-shuffle-{generation}"));
+        let mut totals = Totals::default();
+        [&native, &shuffled].map(|arm| {
+            let mut lineage = Lineage::new(0, arm, &plan, 9);
+            let members = lineage
+                .population
+                .iter()
+                .map(|individual| score_individual(arm, individual, &scenes, 1, 0))
+                .collect();
+            let admitted = advance(arm, &mut lineage, members, &step, &mut dir, &mut totals);
+            assert!(admitted.unwrap(), "{}: the row is admitted", arm.name);
+            lineage.selection.gen::<u64>()
+        })
+    }
+
+    #[test]
+    fn a_shuffled_score_arm_draws_a_permutation_only_when_a_generation_is_bred() {
+        let [native, shuffled] = next_draws_after_an_admitted_row(0);
+        assert_ne!(native, shuffled, "a bred generation permutes the scores");
+        let [native, shuffled] = next_draws_after_an_admitted_row(2);
+        assert_eq!(native, shuffled, "the last generation breeds nothing");
     }
 
     #[test]
