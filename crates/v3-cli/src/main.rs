@@ -18,15 +18,6 @@ struct Cli {
     command: Commands,
 }
 
-/// The flag beats `PETRI_TELEMETRY` (`env`), which beats the default `off`.
-#[cfg(feature = "telemetry")]
-fn telemetry_switch(cli: &Cli, env: Option<&str>) -> v3_telemetry::Switch {
-    v3_telemetry::resolve_switch(cli.telemetry, env).unwrap_or_else(|message| {
-        eprintln!("error: {message}");
-        std::process::exit(1);
-    })
-}
-
 #[derive(clap::Subcommand)]
 enum Commands {
     Run(RunArgs),
@@ -213,10 +204,10 @@ struct RunArgs {
 fn main() {
     let cli = Cli::parse();
     #[cfg(feature = "telemetry")]
-    let switch = telemetry_switch(
-        &cli,
-        std::env::var(v3_telemetry::SWITCH_ENV).ok().as_deref(),
-    );
+    let switch = v3_telemetry::switch_from_env(cli.telemetry).unwrap_or_else(|message| {
+        eprintln!("error: {message}");
+        std::process::exit(1);
+    });
     match cli.command {
         Commands::Run(args) => {
             if args.ticks < 1 {
@@ -693,10 +684,8 @@ mod tests {
 
     #[cfg(feature = "telemetry")]
     fn switch_for(argv: &[&str], env: Option<&str>) -> v3_telemetry::Switch {
-        telemetry_switch(
-            &Cli::try_parse_from(argv).expect("arguments must parse"),
-            env,
-        )
+        let cli = Cli::try_parse_from(argv).expect("arguments must parse");
+        v3_telemetry::resolve_switch(cli.telemetry, env).expect("the switch must resolve")
     }
 
     #[cfg(feature = "telemetry")]

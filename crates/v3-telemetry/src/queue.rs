@@ -137,21 +137,19 @@ impl Shared {
                 .attributes_iter()
                 .map(|(key, value)| key.as_str().len() as u64 + value_bytes(value))
                 .sum::<u64>();
-        let mut state = self.lock();
-        let Some(entry) = state.runs.get(&run) else {
-            return;
-        };
-        let id = entry.id.clone();
         let over_cap = body_bytes > self.limits.max_body_bytes;
+        let mut state = self.lock();
         let full = state.closed
             || state.queue.len() >= self.limits.max_queue_records
             || state.queued_bytes + bytes > self.limits.max_queue_bytes;
+        let Some(entry) = state.runs.get_mut(&run) else {
+            return;
+        };
         if over_cap || full {
-            if let Some(entry) = state.runs.get_mut(&run) {
-                entry.counts.dropped += 1;
-            }
+            entry.counts.dropped += 1;
+            let gap = over_cap.then(|| entry.id.clone());
             drop(state);
-            if over_cap {
+            if let Some(id) = gap {
                 self.sink.write(&format!(
                     "telemetry: gap run={id} record={} body_bytes={body_bytes} cap={} dropped whole",
                     record.event_name().unwrap_or("unnamed"),
@@ -160,9 +158,7 @@ impl Shared {
             }
             return;
         }
-        if let Some(entry) = state.runs.get_mut(&run) {
-            entry.counts.accepted += 1;
-        }
+        entry.counts.accepted += 1;
         state.queued_bytes += bytes;
         state.queue.push_back(Entry {
             run,

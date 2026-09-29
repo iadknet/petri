@@ -4,23 +4,27 @@
 # Usage: scripts/telemetry-verify
 #
 # Runs on the scratch Compose project and volume petri-telemetry-verify, never
-# on petri-telemetry, with the production stack files unchanged, and removes
-# the scratch stack and volume on exit. Refuses while petri-telemetry is up
-# (same host ports). Takes about ten minutes, most of it Loki's delete delay.
+# on petri-telemetry, and removes the scratch stack and volume on exit.
+# Refuses while petri-telemetry is up (same host ports). Layers
+# telemetry/verify/compose.yaml over the production file to mount
+# telemetry/verify/tempo-config.yaml, the production Tempo file with a 1m
+# compaction window, so blocks from different minutes are never merged.
+# Takes about fifteen minutes, most of it Loki's delete delay.
 #
-#  1. Under 0.33.1 it writes a "before" span, log line and gauge sample, waits
-#     for Tempo's 30 s live-store window to close and the block to appear,
-#     writes a span, takes an RFC3339 cutoff, writes a second span in the same
-#     window, then writes the "after" samples in a later window: one block
-#     ends before the cutoff, one straddles it, one starts after it.
+#  1. Under 0.33.1 it writes the "before" span, log line and gauge sample in
+#     one minute; in a later minute a straddling pair of spans with an RFC3339
+#     cutoff taken between them; the "after" samples in a later minute still;
+#     then waits until compaction has merged the pair into one block.
 #  2. It flushes Loki, replaces the container with 0.34.0 on the same volume,
 #     and checks every sample and the retention settings (Prometheus
 #     /api/v1/status/flags, Tempo /status/config, Loki /config); again after
 #     `docker compose restart`.
 #  3. It runs scripts/telemetry-cleanup at the cutoff, preview then
-#     --proceed, and checks per store that the sample before the cutoff is
-#     gone and the one after it kept, the straddling Tempo block kept whole,
-#     and how long Loki took to apply the deletion.
+#     --proceed. The preview must name exactly the uncompacted blocks ending
+#     before the cutoff and report the straddling block with the window in
+#     force; afterwards the "before" trace is gone while the straddling and
+#     "after" traces answer, and per store the sample before the cutoff is
+#     gone and the one after it kept, with Loki's delay measured.
 #
 # Prints one PASS or FAIL line per check and exits 1 when any check fails.
 #
@@ -48,7 +52,8 @@ if [ -n "$(docker compose -p petri-telemetry -f "$compose_file" ps -q --status r
 fi
 
 compose() {
-  docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" "$@"
+  docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" \
+    -f "$root/telemetry/verify/compose.yaml" "$@"
 }
 in_stack() {
   compose exec -T lgtm "$@"
@@ -124,12 +129,12 @@ write_gauge() {
   otlp_post metrics "{\"resourceMetrics\":[{$resource,\"scopeMetrics\":[{\"metrics\":[{\"name\":\"petri_verify_probe\",\"gauge\":{\"dataPoints\":[{\"timeUnixNano\":\"$(now_ns)\",\"asDouble\":$1}]}}]}]}]}"
 }
 
-# Tempo blocks as `dir start_s end_s`, from each meta.json.
+# Uncompacted Tempo blocks as `dir start_s end_s`, from each meta.json.
 tempo_blocks() {
   # shellcheck disable=SC2016 # expands inside the container.
   in_stack sh -c '
     for meta in /data/tempo/blocks/*/*/meta.json; do
-      [ -f "$meta" ] || continue
+      [ -f "$meta" ] && [ ! -f "${meta%/meta.json}/meta.compacted.json" ] || continue
       json=$(cat "$meta")
       start=$(printf "%s" "$json" | sed -n "s/.*\"startTime\":\"\([^\"]*\)\".*/\1/p")
       end=$(printf "%s" "$json" | sed -n "s/.*\"endTime\":\"\([^\"]*\)\".*/\1/p")
@@ -148,9 +153,20 @@ wait_block_after() {
   done
 }
 
+# Waits until the wall-clock minute is past minute $1 and its second is 5..40,
+# so two spans written a few seconds apart share a minute.
+wait_next_minute() {
+  while now=$(date -u +%s) && { [ $((now / 60)) -le "$1" ] || [ $((now % 60)) -lt 5 ] ||
+    [ $((now % 60)) -gt 40 ]; }; do
+    sleep 1
+  done
+}
+
+# The v2 API answers an unknown ID with 200 and an empty trace, so a trace
+# counts as found only when the body holds its spans.
 trace_found() {
-  code=$(in_stack curl -s -o /dev/null -w '%{http_code}' "$tempo/api/v2/traces/$1") || code=000
-  [ "$code" = 200 ]
+  body=$(in_stack curl -sS "$tempo/api/v2/traces/$1") || return 1
+  case "$body" in *'"resourceSpans"'* | *'"batches"'*) return 0 ;; *) return 1 ;; esac
 }
 
 loki_count() {
@@ -188,19 +204,8 @@ samples_readable() {
 
 # `path value` for every block_retention key in Tempo's running config.
 tempo_retention_paths() {
-  in_stack curl -sS "$tempo/status/config" | awk '{
-    match($0, /^ */); ind = RLENGTH
-    line = substr($0, ind + 1)
-    if (line == "" || line ~ /^-/) next
-    k = line; sub(/:.*/, "", k)
-    v = line; if (!sub(/^[^:]*: */, "", v)) v = ""
-    while (depth > 0 && ind <= indent[depth]) depth--
-    depth++; indent[depth] = ind; key[depth] = k
-    if (k == "block_retention") {
-      p = key[1]; for (i = 2; i <= depth; i++) p = p "." key[i]
-      print p, v
-    }
-  }'
+  in_stack curl -sS "$tempo/status/config" | "$root/scripts/telemetry-yaml-paths" |
+    awk '$1 ~ /\.block_retention$/'
 }
 
 settings_hold() {
@@ -240,23 +245,32 @@ up "$old_image"
 write_span "$trace_before"
 write_log "$log_before"
 write_gauge 1
-before_s=$(date -u +%s)
-wait_block_after "$before_s"
+wait_next_minute "$(($(date -u +%s) / 60))"
+s1_s=$(date -u +%s)
 write_span "$trace_s1"
 sleep 2
-cutoff=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-cutoff_s=$(date -u +%s)
+stamp=$(date -u '+%s %Y-%m-%dT%H:%M:%SZ')
+cutoff_s=${stamp% *}
+cutoff=${stamp#* }
 sleep 2
-write_span "$trace_s2"
 s2_s=$(date -u +%s)
+write_span "$trace_s2"
 note "cutoff $cutoff"
-wait_block_after "$s2_s"
-sleep 2
+[ $((s1_s / 60)) -eq $((s2_s / 60)) ] || { note 'the straddling pair crossed a minute'; exit 1; }
+wait_next_minute $((s2_s / 60))
 write_span "$trace_after"
 write_log "$log_after"
 write_gauge 2
 after_s=$(date -u +%s)
 wait_block_after "$after_s"
+note 'waiting for compaction to merge the straddling pair'
+waited=0
+until straddler=$(tempo_blocks | awk -v c="$cutoff_s" '$2 < c && $3 >= c { print $1 }') &&
+  [ -n "$straddler" ]; do
+  waited=$((waited + 5))
+  [ "$waited" -lt 600 ] || { note 'no block holds both straddling spans after 600 s'; tempo_blocks; exit 1; }
+  sleep 5
+done
 in_stack curl -sf -X POST "$loki/flush" >/dev/null
 
 note "phase 2: image change to $new_image, then restart"
@@ -272,15 +286,19 @@ settings_hold "retention settings after docker compose restart"
 note 'phase 3: cleanup rehearsal'
 blocks_before=$(tempo_blocks)
 printf 'Tempo blocks (dir start end, epoch s):\n%s\n' "$blocks_before"
-classes=$(printf '%s\n' "$blocks_before" | awk -v c="$cutoff_s" '
-  $3 < c { d++; next } $2 >= c { k++; next } $1 != "" { s++ }
-  END { printf "%d %d %d", d, s, k }')
-# shellcheck disable=SC2086 # three counts, split on purpose.
-set -- $classes
+expected=$(printf '%s\n' "$blocks_before" | awk -v c="$cutoff_s" '$1 != "" && $3 < c { print $1 }' | sort)
+kept=$(printf '%s\n' "$blocks_before" | awk -v c="$cutoff_s" '$2 >= c { print $1 }')
+preview=$(PETRI_LGTM_IMAGE=$new_image "$root/scripts/telemetry-cleanup" "$cutoff")
+printf '%s\n' "$preview"
+named=$(printf '%s\n' "$preview" | awk '/^Tempo: blocks ending/ { on = 1; next } /^Tempo: / { on = 0 } on { print $1 }' | sort)
+straddle_named=$(printf '%s\n' "$preview" | awk '/^Tempo: blocks straddling/ { on = 1; next } /^$/ { on = 0 } on { print $1 }')
+window=$(printf '%s\n' "$preview" | sed -n 's/^Tempo: blocks straddling.*, \([^ ]*\) in force):$/\1/p')
 status=0
-[ "$1" -ge 1 ] && [ "$2" -ge 1 ] && [ "$3" -ge 1 ] || status=1
-check 'Tempo block layout' "$status" "$1 block(s) end before the cutoff, $2 straddle it, $3 start after it"
-PETRI_LGTM_IMAGE=$new_image "$root/scripts/telemetry-cleanup" "$cutoff"
+[ -n "$expected" ] && [ -n "$kept" ] && [ "$named" = "$expected" ] || status=1
+check 'Tempo preview (targets)' "$status" "names exactly the $(printf '%s\n' "$expected" | grep -c .) uncompacted block(s) ending before the cutoff; $(printf '%s\n' "$kept" | grep -c .) start after it"
+status=0
+[ "$straddle_named" = "$straddler" ] && [ "$window" = 1m0s ] || status=1
+check 'Tempo preview (straddling block)' "$status" "straddling block $straddler kept whole, window in force ${window:-unreported}"
 request_s=$(date -u +%s)
 PETRI_LGTM_IMAGE=$new_image "$root/scripts/telemetry-cleanup" "$cutoff" --proceed
 wait_ready
@@ -297,10 +315,12 @@ done
 status=0
 [ -z "$lost$left" ] || status=1
 check 'Tempo cleanup (block granularity)' "$status" "blocks ending before the cutoff removed, straddling and later blocks kept whole${left:+; left$left}${lost:+; lost$lost}"
+wrong=
+trace_found "$trace_before" && wrong="$wrong before:answers"
+for id in $trace_s1 $trace_s2 $trace_after; do trace_found "$id" || wrong="$wrong $id:missing"; done
 status=0
-trace_found "$trace_before" && status=1
-for id in $trace_s1 $trace_s2 $trace_after; do trace_found "$id" || status=1; done
-check 'Tempo cleanup (traces)' "$status" 'the span before the cutoff is gone; both straddling spans and the later span are readable'
+[ -z "$wrong" ] || status=1
+check 'Tempo cleanup (traces)' "$status" "the span before the cutoff is gone; both straddling spans and the later span answer${wrong:+;$wrong}"
 
 gauges=$(gauge_seconds)
 status=0

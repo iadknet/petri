@@ -18,8 +18,8 @@
 # of measured run time; a run that would pass it is refused and the rest is
 # inconclusive. Every timed run goes through scripts/bench-wait.
 #
-# Uses the petri-telemetry stack (make telemetry-up first) and leaves it
-# stopped. T comes from TELEMETRY_TICKS or the `- Workload ticks T: N` line of
+# Uses the petri-telemetry stack (make telemetry-up first; the compose file's
+# PETRI_TELEMETRY_PROJECT selects another) and leaves it stopped. T comes from TELEMETRY_TICKS or the `- Workload ticks T: N` line of
 # docs/progress/readings/t21-f01.md; without either it is calibrated with
 # three reference runs to about 4 s per run, and the script prints the line
 # to record.
@@ -39,12 +39,14 @@ scratch=$(mktemp -d "${TMPDIR:-/tmp}/petri-overhead.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT
 trap 'exit 130' INT TERM
 
+# The project is the compose file's: PETRI_TELEMETRY_PROJECT, default
+# petri-telemetry.
 compose() {
-  docker compose -p petri-telemetry -f "$root/telemetry/compose.yaml" "$@"
+  docker compose -f "$root/telemetry/compose.yaml" "$@"
 }
 
 if [ -z "$(compose ps -a -q lgtm 2>/dev/null)" ]; then
-  printf 'telemetry-overhead: no petri-telemetry stack; run make telemetry-up first\n' >&2
+  printf 'telemetry-overhead: no %s stack; run make telemetry-up first\n' "${PETRI_TELEMETRY_PROJECT:-petri-telemetry}" >&2
   exit 1
 fi
 
@@ -118,17 +120,25 @@ fi
 
 stack_stop
 if [ -z "$ticks" ]; then
-  trial=100
-  : >"$scratch/calibration"
+  # Three reference runs, each at the T the previous one scales to 4 s; a
+  # fixed startup cost makes a short trial undershoot, so the first trial is
+  # long enough for it to be minor. T is the third run's, which must itself
+  # take 3 to 5 s.
+  next=1000
   for _ in 1 2 3; do
+    trial=$next
     timed reference "$trial" || break
-    printf '%s\n' "$run_ms" >>"$scratch/calibration"
+    printf 'Calibration: %s ticks in %s ms\n' "$trial" "$run_ms"
+    next=$(awk -v t="$trial" -v ms="$run_ms" 'BEGIN { printf "%d", t * 4000 / ms + 0.5 }')
   done
-  trial_ms=$(median <"$scratch/calibration")
-  ticks=$(awk -v t="$trial" -v ms="$trial_ms" 'BEGIN { printf "%d", t * 4000 / ms + 0.5 }')
+  if [ "$run_ms" -lt 3000 ] || [ "$run_ms" -gt 5000 ]; then
+    printf 'telemetry-overhead: calibration ended on a %s ms run at %s ticks, outside 3 to 5 s; T not set\n' \
+      "$run_ms" "$trial" >&2
+    exit 1
+  fi
+  ticks=$trial
   estimate_ms=0
-  printf 'Calibrated T=%s from %s ticks in %s ms (median of 3); record:\n- Workload ticks T: %s\n' \
-    "$ticks" "$trial" "$trial_ms" "$ticks"
+  printf 'Calibrated T=%s (%s ms); record:\n- Workload ticks T: %s\n' "$ticks" "$run_ms" "$ticks"
 fi
 case "$ticks" in
   ''|*[!0-9]*|0) printf 'telemetry-overhead: invalid T %s\n' "$ticks" >&2; exit 2 ;;

@@ -1,0 +1,21 @@
+#!/bin/sh
+# Prints `dotted.path value` for every scalar key of the block-style YAML on
+# stdin (Tempo's /status/config); list items are skipped. Used by
+# scripts/telemetry-cleanup and scripts/telemetry-verify (T21.F01).
+set -eu
+
+[ "$#" -eq 0 ] || { printf 'Usage: scripts/telemetry-yaml-paths < config.yaml\n' >&2; exit 2; }
+
+awk '{
+  match($0, /^ */); ind = RLENGTH
+  line = substr($0, ind + 1)
+  if (line == "" || line ~ /^-/ || line ~ /^#/) next
+  k = line; sub(/:.*/, "", k)
+  v = line; if (!sub(/^[^:]*: */, "", v)) v = ""
+  while (depth > 0 && ind <= indent[depth]) depth--
+  depth++; indent[depth] = ind; key[depth] = k
+  if (v != "") {
+    p = key[1]; for (i = 2; i <= depth; i++) p = p "." key[i]
+    print p, v
+  }
+}'

@@ -1,0 +1,6 @@
+# Layered over ../compose.yaml by scripts/telemetry-verify only: mounts the
+# Tempo config with a 1m compaction window in place of the production file.
+services:
+  lgtm:
+    volumes:
+      - ./verify/tempo-config.yaml:/otel-lgtm/tempo-config.yaml:ro

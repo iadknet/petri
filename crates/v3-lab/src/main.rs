@@ -10,9 +10,7 @@ fn main() -> ExitCode {
     // Resolved so an invalid value is reported; the lab exports nothing until
     // T21.F06.
     #[cfg(feature = "telemetry")]
-    if let Err(message) =
-        cli.telemetry_switch(std::env::var(v3_telemetry::SWITCH_ENV).ok().as_deref())
-    {
+    if let Err(message) = v3_telemetry::switch_from_env(cli.telemetry) {
         eprintln!("error: {message}");
         return ExitCode::from(1);
     }
