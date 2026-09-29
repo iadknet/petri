@@ -9,23 +9,29 @@ use serde_json::{json, Value};
 use v3_core::config::SimulationConfig;
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::creature::genome::CreatureGenome;
-use v3_core::neighborhood::opportunity::controllers::controller;
-use v3_core::neighborhood::opportunity::Family;
 
-use crate::arena::{arena_config, classify, resolve_arm, Role, ARENA_ID};
+use crate::arena::{classify, resolve_arm, Role};
 use crate::calibration::{run_gate, GridInput};
 use crate::campaign::{fidelity, run_campaign, Arm, ArmKind, Plan};
 use crate::eval::{Scripted, Setup};
+use crate::layout::Layout;
 use crate::output::{resolve_out, utc_stamp, Budget, LabRoot, RunDir, SUMMARY_RESERVE};
 use crate::rng::{replicate_seed, tagged};
+use crate::scene::{ArenaId, Assay, Geometry, SCALES};
 use crate::summary::{
     ArenaRecord, GenomeRecord, Incomplete, OverlayRecord, Provenance, Seeds, Sizes, Summary,
     Timing, Verdict, GENOME_FORMAT, SUMMARY_KIND, SUMMARY_VERSION,
 };
 use crate::{sha256_hex, GenomeFile, LabError};
 
-/// The only assay in F01.
-pub const ASSAY: &str = "food-seeking";
+/// Built-in arena size when `--arena-size` is not given.
+pub const DEFAULT_ARENA_SIZE: u16 = 64;
+/// Built-in arena sizes.
+pub const ARENA_SIZES: std::ops::RangeInclusive<u16> = 48..=64;
+/// `--calibration-fractions` default.
+pub const CALIBRATION_FRACTIONS: [f64; 3] = [0.02, 0.04, 0.08];
+/// `--calibration-scales` default.
+pub const CALIBRATION_SCALES: [u8; 3] = [1, 2, 3];
 /// Built-in arm names; a user arm may not reuse one.
 pub const BUILT_IN_ARMS: [&str; 8] = [
     "native",
@@ -54,6 +60,11 @@ pub struct UserArm {
 /// Everything a run needs, after CLI defaults are applied.
 #[derive(Debug, Clone)]
 pub struct RunParams {
+    pub assay: Assay,
+    /// Default: the assay's built-in arena.
+    pub arena: Option<ArenaId>,
+    /// A JSON layout file; replaces `arena`.
+    pub layout: Option<PathBuf>,
     pub seed: u64,
     pub replicates: u32,
     pub generations: u32,
@@ -62,11 +73,18 @@ pub struct RunParams {
     pub scenes: u32,
     pub validation_scenes: u32,
     pub lifetime: Option<u32>,
-    pub arena_size: u16,
+    /// Built-in arenas only; default [`DEFAULT_ARENA_SIZE`].
+    pub arena_size: Option<u16>,
     pub food_fraction: Option<f64>,
+    pub scale: Option<u8>,
     pub start_energy: f32,
-    pub calibration_fractions: Vec<f64>,
+    /// Default [`CALIBRATION_FRACTIONS`].
+    pub calibration_fractions: Option<Vec<f64>>,
+    /// Default [`CALIBRATION_SCALES`].
+    pub calibration_scales: Option<Vec<u8>>,
     pub calibration_lifetimes: Vec<u32>,
+    /// Default: the assay's.
+    pub blocked_weight: Option<f64>,
     pub calibration_scenes: u32,
     pub calibration_margin: f64,
     pub reach_threshold: Option<f64>,
@@ -89,16 +107,123 @@ pub struct RunOutcome {
 }
 
 impl RunParams {
-    /// The calibration grid: an explicit `--food-fraction` or `--lifetime`
-    /// replaces its axis with that single value.
-    fn grid(&self) -> (Vec<f64>, Vec<u32>) {
-        (
-            self.food_fraction
-                .map_or_else(|| self.calibration_fractions.clone(), |f| vec![f]),
-            self.lifetime
-                .map_or_else(|| self.calibration_lifetimes.clone(), |l| vec![l]),
-        )
+    /// The lifetime axis: an explicit `--lifetime` replaces it.
+    fn lifetimes(&self) -> Vec<u32> {
+        self.lifetime
+            .map_or_else(|| self.calibration_lifetimes.clone(), |l| vec![l])
     }
+
+    fn blocked_weight(&self) -> f64 {
+        self.blocked_weight
+            .unwrap_or_else(|| self.assay.default_blocked_weight())
+    }
+}
+
+/// The resolved arena: its size and its axis points.
+#[derive(Debug, Clone)]
+pub struct ArenaPlan {
+    pub size: u16,
+    pub points: Vec<Geometry>,
+}
+
+impl ArenaPlan {
+    /// The canonical descriptor, with the axis value of `selected` (or of
+    /// the only point).
+    fn descriptor(&self, selected: Option<&Geometry>) -> Value {
+        let only = (self.points.len() == 1).then(|| &self.points[0]);
+        match selected.or(only) {
+            Some(point) => point.descriptor(self.size, true),
+            None => self.points[0].descriptor(self.size, false),
+        }
+    }
+}
+
+/// Resolve the arena: `--layout` or `--arena` (the assay's default), its
+/// size and its axis. An axis flag the arena does not use is an error; an
+/// explicit `--food-fraction` or `--scale` replaces its axis with that
+/// value.
+///
+/// # Errors
+///
+/// [`LabError::Config`] for a conflicting or out-of-range flag or an
+/// invalid layout file; I/O failures reading it.
+pub fn resolve_arena(params: &RunParams) -> Result<ArenaPlan, LabError> {
+    let fraction_flags = params.food_fraction.is_some() || params.calibration_fractions.is_some();
+    let scale_flags = params.scale.is_some() || params.calibration_scales.is_some();
+    if let Some(path) = &params.layout {
+        check(params.arena.is_none(), "--layout replaces --arena")?;
+        check(
+            params.arena_size.is_none(),
+            "a layout's size is its row count: --arena-size is refused with --layout",
+        )?;
+        check(
+            !fraction_flags && !scale_flags,
+            "a layout has no axis: fraction and scale flags are refused",
+        )?;
+        let layout = Layout::load(path)?;
+        return Ok(ArenaPlan {
+            size: layout.size(),
+            points: vec![Geometry::Layout(layout)],
+        });
+    }
+    let size = params.arena_size.unwrap_or(DEFAULT_ARENA_SIZE);
+    check(
+        ARENA_SIZES.contains(&size),
+        "--arena-size must be in 48..=64",
+    )?;
+    let arena = params.arena.unwrap_or_else(|| params.assay.default_arena());
+    let points = match arena {
+        ArenaId::SparseFoodV1 => {
+            check(!scale_flags, "sparse-food-v1 has no scale axis")?;
+            let fractions = params.food_fraction.map_or_else(
+                || {
+                    params
+                        .calibration_fractions
+                        .clone()
+                        .unwrap_or_else(|| CALIBRATION_FRACTIONS.to_vec())
+                },
+                |f| vec![f],
+            );
+            check(
+                !fractions.is_empty() && fractions.iter().all(|f| *f > 0.0 && *f < 1.0),
+                "food fractions must be in (0, 1)",
+            )?;
+            fractions
+                .into_iter()
+                .map(|fraction| Geometry::SparseFood { fraction })
+                .collect()
+        }
+        ArenaId::WallV1 | ArenaId::RingV1 => {
+            check(
+                !fraction_flags,
+                "wall-v1 and ring-v1 have no food-fraction axis",
+            )?;
+            let scales = params.scale.map_or_else(
+                || {
+                    params
+                        .calibration_scales
+                        .clone()
+                        .unwrap_or_else(|| CALIBRATION_SCALES.to_vec())
+                },
+                |k| vec![k],
+            );
+            check(
+                !scales.is_empty() && scales.iter().all(|k| SCALES.contains(k)),
+                "scales must be in 1..=3",
+            )?;
+            scales
+                .into_iter()
+                .map(|scale| {
+                    if arena == ArenaId::WallV1 {
+                        Geometry::Wall { scale }
+                    } else {
+                        Geometry::Ring { scale }
+                    }
+                })
+                .collect()
+        }
+    };
+    Ok(ArenaPlan { size, points })
 }
 
 fn check(ok: bool, message: &str) -> Result<(), LabError> {
@@ -109,7 +234,7 @@ fn check(ok: bool, message: &str) -> Result<(), LabError> {
     }
 }
 
-fn validate_params(params: &RunParams) -> Result<(), LabError> {
+fn validate_params(params: &RunParams) -> Result<ArenaPlan, LabError> {
     check(params.population >= 2, "--population must be at least 2")?;
     check(
         params.replicates >= 1 && params.generations >= 1,
@@ -123,18 +248,15 @@ fn validate_params(params: &RunParams) -> Result<(), LabError> {
         params.elite_fraction > 0.0 && params.elite_fraction <= 1.0,
         "--elite-fraction must be in (0, 1]",
     )?;
-    check(
-        (48..=64).contains(&params.arena_size),
-        "--arena-size must be in 48..=64",
-    )?;
-    let (fractions, lifetimes) = params.grid();
-    check(
-        !fractions.is_empty() && fractions.iter().all(|f| *f > 0.0 && *f < 1.0),
-        "food fractions must be in (0, 1)",
-    )?;
+    let lifetimes = params.lifetimes();
     check(
         !lifetimes.is_empty() && lifetimes.iter().all(|l| *l >= 1),
         "lifetimes must be at least 1",
+    )?;
+    let weight = params.blocked_weight();
+    check(
+        weight.is_finite() && weight >= 0.0,
+        "--blocked-weight must be finite and at least 0",
     )?;
     check(params.threads >= 1, "--threads must be at least 1")?;
     check(
@@ -160,7 +282,7 @@ fn validate_params(params: &RunParams) -> Result<(), LabError> {
             "--arm names must be unique and not a built-in arm",
         )?;
     }
-    Ok(())
+    resolve_arena(params)
 }
 
 /// Run one assay end to end, writing under `lab_root.path`'s
@@ -170,12 +292,12 @@ fn validate_params(params: &RunParams) -> Result<(), LabError> {
 ///
 /// Invalid parameters, overlay or genome files, output path, or I/O.
 pub fn run(params: &RunParams, lab_root: &LabRoot) -> Result<RunOutcome, LabError> {
-    validate_params(params)?;
+    let arena = validate_params(params)?;
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(params.threads)
         .build()
         .map_err(|error| LabError::Config(format!("thread pool: {error}")))?;
-    pool.install(|| run_in_pool(params, lab_root))
+    pool.install(|| run_in_pool(params, &arena, lab_root))
 }
 
 struct Genomes {
@@ -204,7 +326,7 @@ fn load_genomes(params: &RunParams, reference: &SimulationConfig) -> Result<Geno
     };
     let comparator = match &params.comparator {
         Some(path) => GenomeFile::load(path)?,
-        None => controller(&production_founder, Family::Vector, false).0,
+        None => crate::comparator::built_in(params.assay, &production_founder),
     };
     Ok(Genomes {
         production_founder,
@@ -239,9 +361,8 @@ struct Overlay {
     bytes: u64,
 }
 
-fn load_overlays(params: &RunParams) -> Result<Vec<Overlay>, LabError> {
-    let resolve =
-        |content: &Value| resolve_arm(Some(content), params.arena_size, params.start_energy);
+fn load_overlays(params: &RunParams, size: u16) -> Result<Vec<Overlay>, LabError> {
+    let resolve = |content: &Value| resolve_arm(Some(content), size, params.start_energy);
     let content = json!({"mutation": {"per_unit_rate": 0.0}});
     let mut overlays = vec![Overlay {
         name: "mutation-off".into(),
@@ -267,28 +388,34 @@ fn load_overlays(params: &RunParams) -> Result<Vec<Overlay>, LabError> {
 }
 
 #[allow(clippy::too_many_lines)]
-fn run_in_pool(params: &RunParams, lab_root: &LabRoot) -> Result<RunOutcome, LabError> {
+fn run_in_pool(
+    params: &RunParams,
+    arena: &ArenaPlan,
+    lab_root: &LabRoot,
+) -> Result<RunOutcome, LabError> {
     let started = Instant::now();
-    let size = params.arena_size;
+    let size = arena.size;
+    let blocked_weight = params.blocked_weight();
     let reference = resolve_arm(None, size, params.start_energy)?;
     let genomes = load_genomes(params, &reference)?;
-    let overlays = load_overlays(params)?;
+    let overlays = load_overlays(params, size)?;
 
-    let default_name = format!("{ASSAY}-{}-{}", params.seed, utc_stamp());
+    let default_name = format!("{}-{}-{}", params.assay.name(), params.seed, utc_stamp());
     let path = resolve_out(&lab_root.path, params.out.as_deref(), &default_name)?;
     let reserve = SUMMARY_RESERVE + overlays.iter().map(|o| o.bytes).sum::<u64>();
     let mut dir = RunDir::create(path, Budget::new(params.byte_cap, reserve)?)?;
 
     let calibration_seed = tagged(params.seed, "calibration");
     let validation_seed = tagged(params.seed, "validation");
-    let (fractions, lifetimes) = params.grid();
     let gate = run_gate(
         &reference,
         &genomes.start,
         &genomes.comparator,
         &GridInput {
-            fractions,
-            lifetimes,
+            points: arena.points.clone(),
+            lifetimes: params.lifetimes(),
+            assay: params.assay,
+            blocked_weight,
             scenes: params.calibration_scenes,
             validation_scenes: params.validation_scenes,
             margin: params.calibration_margin,
@@ -300,34 +427,38 @@ fn run_in_pool(params: &RunParams, lab_root: &LabRoot) -> Result<RunOutcome, Lab
     );
     let mut creature_ticks = gate.creature_ticks;
 
-    let (arms_summary, fidelity_block, byte_cap_hit, selected) =
-        match (&gate.calibration.selected, gate.calibration.reach_threshold) {
-            (Some(selected), Some(threshold)) if !params.calibrate_only => {
-                let setup = |config: &SimulationConfig| {
-                    Setup::new(config.clone(), params.start_energy, selected.lifetime)
-                };
-                let arms = build_arms(&reference, &genomes, &overlays, &setup);
-                let plan = Plan {
-                    seed: params.seed,
-                    replicates: params.replicates,
-                    generations: params.generations,
-                    population: params.population,
-                    elite_fraction: params.elite_fraction,
-                    scenes: params.scenes,
-                    food_fraction: selected.food_fraction,
-                    threshold,
-                };
-                let (summaries, totals) = run_campaign(&arms, &plan, &gate.validation, &mut dir)?;
-                creature_ticks += totals.creature_ticks;
-                (
-                    summaries,
-                    Some(fidelity(&arms[0], &totals)),
-                    totals.byte_cap_hit,
-                    Some(selected.clone()),
-                )
-            }
-            (selected, _) => (Vec::new(), None, false, selected.clone()),
-        };
+    let (arms_summary, fidelity_block, byte_cap_hit, selected) = match (
+        &gate.calibration.selected,
+        &gate.spec,
+        gate.calibration.reach_threshold,
+    ) {
+        (Some(selected), Some(spec), Some(threshold)) if !params.calibrate_only => {
+            let setup = |config: &SimulationConfig| {
+                Setup::new(config.clone(), params.start_energy, selected.lifetime)
+                    .with_blocked_weight(blocked_weight)
+            };
+            let arms = build_arms(&reference, &genomes, &overlays, &setup);
+            let plan = Plan {
+                seed: params.seed,
+                replicates: params.replicates,
+                generations: params.generations,
+                population: params.population,
+                elite_fraction: params.elite_fraction,
+                scenes: params.scenes,
+                spec: spec.clone(),
+                threshold,
+            };
+            let (summaries, totals) = run_campaign(&arms, &plan, &gate.validation, &mut dir)?;
+            creature_ticks += totals.creature_ticks;
+            (
+                summaries,
+                Some(fidelity(&arms[0], &totals)),
+                totals.byte_cap_hit,
+                Some(selected.clone()),
+            )
+        }
+        (selected, _, _) => (Vec::new(), None, false, selected.clone()),
+    };
 
     let (incomplete, exit_code) = if gate.calibration.verdict == Verdict::Uncalibrated {
         (Some(Incomplete::Uncalibrated), EXIT_UNCALIBRATED)
@@ -337,12 +468,12 @@ fn run_in_pool(params: &RunParams, lab_root: &LabRoot) -> Result<RunOutcome, Lab
         (None, 0)
     };
     let (git_revision, dirty, git) = lab_root.git.fields();
-    let arena = arena_config(size);
+    let arena_spec = arena.descriptor(gate.spec.as_ref().map(|spec| &spec.geometry));
     let wall_seconds = started.elapsed().as_secs_f64();
     let summary = Summary {
         kind: SUMMARY_KIND.to_owned(),
         summary_version: SUMMARY_VERSION,
-        assay: ASSAY.to_owned(),
+        assay: params.assay,
         provenance: Provenance {
             git_revision,
             dirty,
@@ -359,8 +490,11 @@ fn run_in_pool(params: &RunParams, lab_root: &LabRoot) -> Result<RunOutcome, Lab
                 .collect(),
             genomes: genome_records(&genomes, &overlays),
             arena: ArenaRecord {
-                spec: json!({"id": ARENA_ID, "size": size, "start": "centre", "food_type": 0}),
-                sha256: sha256_hex(&serde_json::to_vec(&arena).expect("config serializes")),
+                // `serde_json` maps keep keys sorted: the bytes are canonical.
+                sha256: sha256_hex(
+                    &serde_json::to_vec(&arena_spec).expect("descriptor serializes"),
+                ),
+                spec: arena_spec,
             },
             seeds: Seeds {
                 seed: params.seed,
@@ -380,8 +514,10 @@ fn run_in_pool(params: &RunParams, lab_root: &LabRoot) -> Result<RunOutcome, Lab
                 validation_scenes: params.validation_scenes,
                 arena_size: size,
                 start_energy: params.start_energy,
-                food_fraction: selected.as_ref().map(|s| s.food_fraction),
+                food_fraction: selected.as_ref().and_then(|s| s.food_fraction),
+                scale: selected.as_ref().and_then(|s| s.scale),
                 lifetime: selected.as_ref().map(|s| s.lifetime),
+                blocked_weight,
                 quick: params.quick,
             },
         },
@@ -476,6 +612,9 @@ mod tests {
 
     fn params() -> RunParams {
         RunParams {
+            assay: Assay::FoodSeeking,
+            arena: None,
+            layout: None,
             seed: 1,
             replicates: 1,
             generations: 1,
@@ -484,11 +623,14 @@ mod tests {
             scenes: 1,
             validation_scenes: 1,
             lifetime: None,
-            arena_size: 48,
+            arena_size: Some(48),
             food_fraction: None,
+            scale: None,
             start_energy: 100.0,
-            calibration_fractions: vec![0.04],
+            calibration_fractions: Some(vec![0.04]),
+            calibration_scales: None,
             calibration_lifetimes: vec![100],
+            blocked_weight: None,
             calibration_scenes: 1,
             calibration_margin: 1.0,
             reach_threshold: None,
@@ -539,14 +681,103 @@ mod tests {
     fn elite_fraction_and_grid_bounds_are_open_where_documented() {
         assert!(refused(|p| p.elite_fraction = 0.0));
         assert!(refused(|p| p.elite_fraction = 1.5));
-        assert!(refused(|p| p.calibration_fractions = Vec::new()));
+        assert!(refused(|p| p.calibration_fractions = Some(Vec::new())));
         for fraction in [0.0, 1.0, 1.5, -0.5] {
             assert!(
-                refused(|p| p.calibration_fractions = vec![fraction]),
+                refused(|p| p.calibration_fractions = Some(vec![fraction])),
                 "{fraction}"
             );
         }
         assert!(refused(|p| p.calibration_lifetimes = Vec::new()));
+    }
+
+    /// `params` on a built-in barrier arena with no axis flag.
+    fn barrier(arena: ArenaId) -> impl Fn(&mut RunParams) {
+        move |p| {
+            p.assay = Assay::BarrierNavigation;
+            p.arena = Some(arena);
+            p.calibration_fractions = None;
+        }
+    }
+
+    #[test]
+    fn an_axis_flag_the_arena_does_not_use_is_refused() {
+        let wall = barrier(ArenaId::WallV1);
+        let with = |base: &dyn Fn(&mut RunParams), change: &dyn Fn(&mut RunParams)| {
+            refused(|p| {
+                base(p);
+                change(p);
+            })
+        };
+        assert!(!with(&wall, &|_| {}));
+        assert!(with(&wall, &|p| p.food_fraction = Some(0.04)));
+        assert!(with(&wall, &|p| p.calibration_fractions = Some(vec![0.04])));
+        assert!(
+            refused(|p| p.scale = Some(1)),
+            "sparse-food-v1 has no scale"
+        );
+        assert!(refused(|p| p.calibration_scales = Some(vec![1])));
+        for scale in [0, 4] {
+            assert!(with(&wall, &|p| p.scale = Some(scale)), "{scale}");
+            assert!(with(&wall, &|p| p.calibration_scales = Some(vec![scale])));
+        }
+        assert!(with(&wall, &|p| p.calibration_scales = Some(Vec::new())));
+        assert!(refused(|p| p.arena_size = Some(47)));
+        assert!(refused(|p| p.arena_size = Some(65)));
+        // The ring shares the wall's axis.
+        let ring = barrier(ArenaId::RingV1);
+        assert!(!with(&ring, &|p| p.scale = Some(3)));
+        assert!(with(&ring, &|p| p.food_fraction = Some(0.04)));
+    }
+
+    #[test]
+    fn a_layout_refuses_arena_size_and_axis_flags() {
+        let path =
+            std::env::temp_dir().join(format!("petri-lab-layout-{}.json", std::process::id()));
+        let rows = crate::layout::tests::rows(16, &[(1, 1, 'S'), (5, 5, 'F')]);
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&json!({"arena_format": 1, "rows": rows})).unwrap(),
+        )
+        .unwrap();
+        let layout = |p: &mut RunParams| {
+            p.layout = Some(path.clone());
+            p.arena_size = None;
+            p.calibration_fractions = None;
+        };
+        let with = |change: &dyn Fn(&mut RunParams)| {
+            refused(|p| {
+                layout(p);
+                change(p);
+            })
+        };
+        assert!(!with(&|_| {}));
+        let plan = {
+            let mut p = params();
+            layout(&mut p);
+            resolve_arena(&p).unwrap()
+        };
+        assert_eq!(plan.size, 16);
+        assert!(with(&|p| p.arena_size = Some(48)));
+        assert!(with(&|p| p.arena = Some(ArenaId::WallV1)));
+        assert!(with(&|p| p.scale = Some(1)));
+        assert!(with(&|p| p.food_fraction = Some(0.04)));
+        assert!(with(&|p| p.calibration_fractions = Some(vec![0.04])));
+        assert!(with(&|p| p.calibration_scales = Some(vec![1])));
+        std::fs::remove_file(&path).unwrap();
+        assert!(with(&|_| {}), "a missing layout file");
+    }
+
+    #[test]
+    fn the_blocked_weight_is_finite_and_non_negative_with_an_assay_default() {
+        assert_eq!(params().blocked_weight(), 0.0);
+        let mut p = params();
+        barrier(ArenaId::WallV1)(&mut p);
+        assert_eq!(p.blocked_weight(), 1.0);
+        for weight in [-0.5, f64::NAN, f64::INFINITY] {
+            assert!(refused(|p| p.blocked_weight = Some(weight)), "{weight}");
+        }
+        assert!(!refused(|p| p.blocked_weight = Some(0.0)));
     }
 
     #[test]

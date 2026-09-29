@@ -19,8 +19,8 @@ use crate::calibration::scripted_seed;
 use crate::eval::{evaluate_genome, evaluate_scripted, Frozen, SceneScore, Scripted, Setup};
 use crate::output::RunDir;
 use crate::rng::{hash, replicate_seed, stream, tagged, Part};
-use crate::scene::{draw_scene, Scene};
-use crate::summary::{ArmSummary, Events, Fidelity, ReplicateResult, StoppedBy};
+use crate::scene::{Scene, SceneSpec};
+use crate::summary::{ArmSummary, Events, Fidelity, LifetimeLearning, ReplicateResult, StoppedBy};
 use crate::{GenomeFile, LabError};
 
 /// NDJSON row schema version.
@@ -70,7 +70,7 @@ impl Arm {
 }
 
 /// Campaign sizes.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Plan {
     pub seed: u64,
     pub replicates: u32,
@@ -78,7 +78,8 @@ pub struct Plan {
     pub population: u32,
     pub elite_fraction: f64,
     pub scenes: u32,
-    pub food_fraction: f64,
+    /// The selected point's scene draw.
+    pub spec: SceneSpec,
     pub threshold: f64,
 }
 
@@ -329,9 +330,6 @@ fn run_replicate(
     totals: &mut Totals,
 ) -> Result<Vec<Lineage>, LabError> {
     let r_seed = replicate_seed(plan.seed, replicate);
-    let reference = &arms[0].setup.config;
-    let size = reference.world.width;
-    let vision = reference.runtime.perception.vision_radius;
     let scene_count = plan.scenes as usize;
     let mut scene_rng = stream(&[Part::U(tagged(r_seed, "scenes"))]);
     let mut lineages: Vec<Lineage> = arms
@@ -344,7 +342,7 @@ fn run_replicate(
             break;
         }
         let scenes: Vec<Scene> = (0..scene_count)
-            .map(|_| draw_scene(&mut scene_rng, size, plan.food_fraction, vision))
+            .map(|_| plan.spec.draw(&mut scene_rng))
             .collect::<Result<_, _>>()
             .map_err(|_| {
                 LabError::Config("a campaign scene failed the exposure predicate 100 times".into())
@@ -683,6 +681,7 @@ pub fn fidelity(reference: &Arm, totals: &Totals) -> Fidelity {
         elite_carry_overs: totals.reference_carried,
         phenotype_mutation: false,
         learned_weight_capture: false,
+        lifetime_learning: LifetimeLearning::Masked,
     }
 }
 
@@ -724,7 +723,7 @@ mod tests {
             birth: None,
             carried: false,
         };
-        let scenes = draw_scenes(5, 3, 48, 0.04, 5).unwrap();
+        let scenes = draw_scenes(5, 3, &SceneSpec::sparse(48, 0.04, 5)).unwrap();
         let scored = score_individual(&arm, &individual, &scenes, 1, 0);
         let (last_score, last_frozen) = evaluate_genome(&arm.setup, start, &scenes[2]);
         let death = last_score
@@ -746,7 +745,7 @@ mod tests {
             population,
             elite_fraction,
             scenes: 1,
-            food_fraction: 0.04,
+            spec: SceneSpec::sparse(48, 0.04, 5),
             threshold: 0.0,
         };
         assert_eq!(plan(64, 0.25).survivors(), 16);
@@ -763,7 +762,7 @@ mod tests {
             population,
             elite_fraction,
             scenes: 1,
-            food_fraction: 0.06,
+            spec: SceneSpec::sparse(48, 0.06, 5),
             threshold,
         }
     }
@@ -868,7 +867,7 @@ mod tests {
             native.clone(),
             fixed(&native, "comparator", Role::Instrument),
         ];
-        let validation = draw_scenes(11, 2, 48, 0.06, 5).unwrap();
+        let validation = draw_scenes(11, 2, &SceneSpec::sparse(48, 0.06, 5)).unwrap();
         let (scratch, mut dir) = Scratch::new("reach");
         let (summaries, _) =
             run_campaign(&arms, &plan(2, 0.5, 3, 0.0), &validation, &mut dir).unwrap();
@@ -910,7 +909,7 @@ mod tests {
         let r_seed = replicate_seed(plan.seed, 0);
         let mut scene_rng = stream(&[Part::U(tagged(r_seed, "scenes"))]);
         let scenes: Vec<Scene> = (0..4)
-            .map(|_| draw_scene(&mut scene_rng, 48, plan.food_fraction, 5).unwrap())
+            .map(|_| plan.spec.draw(&mut scene_rng).unwrap())
             .collect();
         let score = |scene: usize, index: usize| {
             serde_json::to_value(evaluate_scripted(
@@ -953,7 +952,9 @@ mod tests {
             offspring: 1,
             ..Events::default()
         });
-        let scene = draw_scenes(5, 1, 48, 0.04, 5).unwrap().remove(0);
+        let scene = draw_scenes(5, 1, &SceneSpec::sparse(48, 0.04, 5))
+            .unwrap()
+            .remove(0);
         let frozen = evaluate_genome(&arm.setup, &start, &scene).1;
         let members: Vec<Scored> = [1.0, 3.0, 2.0]
             .into_iter()

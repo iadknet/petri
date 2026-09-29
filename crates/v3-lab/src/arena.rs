@@ -9,9 +9,6 @@ use v3_core::config::{resolve_config, SimulationConfig, WorldEdgeMode};
 
 use crate::LabError;
 
-/// Arena identifier recorded in provenance.
-pub const ARENA_ID: &str = "sparse-food-v1";
-
 /// Overlay key paths the lab owns; an overlay naming one is refused.
 const REFUSED_PATHS: &[&[&str]] = &[
     &["world", "width"],
