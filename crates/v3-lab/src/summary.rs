@@ -86,6 +86,16 @@ pub struct GenomeRecord {
     pub file: Option<String>,
 }
 
+impl GenomeRecord {
+    /// The record name of a genome supplied through `--arm <name>` (`:`
+    /// cannot occur in an arm name, so it never collides with `start` or
+    /// `comparator`).
+    #[must_use]
+    pub fn arm_name(arm: &str) -> String {
+        format!("arm:{arm}")
+    }
+}
+
 /// A recorded genome's origin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

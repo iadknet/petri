@@ -5,6 +5,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use v3_core::creature::genome::CreatureGenome;
 use v3_lab::arena::{resolve_arm, Policy, Role};
 use v3_lab::calibration::draw_scenes;
 use v3_lab::campaign::{run_campaign, Arm, ArmKind, Plan};
@@ -650,9 +651,9 @@ fn a_non_finite_reach_threshold_is_refused_before_any_output() {
     }
 }
 
-#[test]
-fn every_arm_genome_is_recorded_with_its_hash_and_format() {
-    let scratch = Scratch::new("arm-genome");
+/// A `hot` arm overlay and a non-founder genome file `hot-genome.json` in
+/// the scratch lab: `(overlay, genome file, genome)`.
+fn hot_arm_files(scratch: &Scratch) -> (PathBuf, PathBuf, CreatureGenome) {
     let overlay = scratch.lab.join("hot.json");
     std::fs::write(&overlay, r#"{"mutation": {"per_unit_rate": 0.02}}"#).unwrap();
     let reference = resolve_arm(None, 48, 100.0).unwrap();
@@ -671,6 +672,13 @@ fn every_arm_genome_is_recorded_with_its_hash_and_format() {
         serde_json::to_vec(&GenomeFile::new(genome.clone())).unwrap(),
     )
     .unwrap();
+    (overlay, genome_path, genome)
+}
+
+#[test]
+fn every_arm_genome_is_recorded_with_its_hash_and_format() {
+    let scratch = Scratch::new("arm-genome");
+    let (overlay, genome_path, genome) = hot_arm_files(&scratch);
     let mut params = tiny(&scratch.lab.join("run"));
     params.calibrate_only = true;
     params.arms = vec![
@@ -729,6 +737,46 @@ fn every_arm_genome_is_recorded_with_its_hash_and_format() {
             "start hot-genome.json (sha256 {})",
             genomes[0].sha256
         )),
+        "{report}"
+    );
+}
+
+#[test]
+fn an_arm_with_its_own_genome_file_labels_its_verdict_with_that_start() {
+    let scratch = Scratch::new("arm-verdict-start");
+    let (overlay, genome_path, _) = hot_arm_files(&scratch);
+    let mut params = tiny(&scratch.lab.join("run"));
+    params.arms = vec![UserArm {
+        name: "hot".into(),
+        overlay,
+        genome: Some(genome_path),
+    }];
+    let outcome = scratch.run(&params).unwrap();
+    let sha = |name: &str| {
+        let genomes = &outcome.summary.provenance.genomes;
+        genomes
+            .iter()
+            .find(|g| g.name == name)
+            .unwrap()
+            .sha256
+            .clone()
+    };
+    let (start, hot) = (sha("start"), sha("arm:hot"));
+    assert_ne!(start, hot);
+    let report = render_report(&outcome.summary);
+    let verdict = |arm: &str| {
+        report
+            .lines()
+            .find(|line| line.starts_with("verdict: ") && line.contains(&format!(", arm {arm},")))
+            .unwrap_or_else(|| panic!("{arm} verdict in {report}"))
+            .to_owned()
+    };
+    assert!(
+        verdict("hot").contains(&format!("start hot-genome.json (sha256 {hot}), arm hot,")),
+        "{report}"
+    );
+    assert!(
+        verdict("native").contains(&format!("start founder (sha256 {start}), arm native,")),
         "{report}"
     );
 }

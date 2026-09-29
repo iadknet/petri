@@ -670,15 +670,17 @@ fn advance(
         }
     }
 
-    // The order breeding carries, drawn before the row from the same draws
-    // in the same order (the permutation only when a generation is bred).
+    // The order breeding carries, computed before the row (the permutation
+    // only when a generation is bred) on a copy of the selection stream that
+    // is committed only with the row, so a refused row draws no permutation.
     let breeding = matches!(arm.kind, ArmKind::Evolving { .. })
         && lineage.reached.is_none()
         && step.generation + 1 < step.plan.generations;
+    let mut selection = lineage.selection.clone();
     let order = breeding.then(|| match arm.kind {
         ArmKind::Evolving { shuffled: true, .. } => {
             let mut permuted = scalars.clone();
-            permuted.shuffle(&mut lineage.selection);
+            permuted.shuffle(&mut selection);
             rank(&permuted, &keys)
         }
         _ => true_order,
@@ -765,6 +767,7 @@ fn advance(
         lineage.reached = None;
         return Ok(false);
     }
+    lineage.selection = selection;
     if let Some(readings) = &row.readings {
         lineage.readings.record(readings);
     }
@@ -1040,10 +1043,14 @@ mod tests {
 
     impl Scratch {
         fn new(name: &str) -> (Self, RunDir) {
+            Self::with_budget(name, (64 << 20, 1 << 20))
+        }
+
+        fn with_budget(name: &str, (cap, reserve): (u64, u64)) -> (Self, RunDir) {
             let path = std::env::temp_dir()
                 .join(format!("petri-lab-campaign-{name}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&path);
-            let budget = crate::output::Budget::new(64 << 20, 1 << 20).unwrap();
+            let budget = crate::output::Budget::new(cap, reserve).unwrap();
             let dir = RunDir::create(path.clone(), budget).unwrap();
             (Self(path), dir)
         }
@@ -1397,6 +1404,52 @@ mod tests {
             .map(|r| r["ladder"]["supply"]["births"].as_u64().unwrap())
             .sum();
         assert_eq!(births, 6);
+    }
+
+    #[test]
+    fn a_refused_row_draws_no_shuffled_score_permutation() {
+        // Two lineages on one replicate seed, one shuffled: a refused row
+        // leaves both selection streams after the tie keys alone.
+        let native = founder_arm(100.0, 60);
+        let ArmKind::Evolving { start, .. } = &native.kind else {
+            unreachable!()
+        };
+        let shuffled = Arm {
+            name: "shuffled-score".into(),
+            role: Role::Control,
+            kind: ArmKind::Evolving {
+                start: start.clone(),
+                shuffled: true,
+            },
+            ..native.clone()
+        };
+        let plan = plan(4, 0.5, 3, 1e9);
+        let scenes = draw_scenes(5, 1, &plan.spec).unwrap();
+        let batteries = [Batteries::new(&native.setup.config)];
+        let step = Step {
+            plan: &plan,
+            validation: &scenes,
+            scenes: &scenes,
+            replicate: 0,
+            generation: 0,
+            batteries: &batteries,
+            observation: 7,
+        };
+        let (_scratch, mut dir) = Scratch::with_budget("refused-shuffle", (2, 1));
+        let mut totals = Totals::default();
+        let mut next_draws = Vec::new();
+        for arm in [&native, &shuffled] {
+            let mut lineage = Lineage::new(0, arm, &plan, 9);
+            let members = lineage
+                .population
+                .iter()
+                .map(|individual| score_individual(arm, individual, &scenes, 1, 0))
+                .collect();
+            let admitted = advance(arm, &mut lineage, members, &step, &mut dir, &mut totals);
+            assert!(!admitted.unwrap(), "{}: the cap refuses the row", arm.name);
+            next_draws.push(lineage.selection.gen::<u64>());
+        }
+        assert_eq!(next_draws[0], next_draws[1]);
     }
 
     #[test]
