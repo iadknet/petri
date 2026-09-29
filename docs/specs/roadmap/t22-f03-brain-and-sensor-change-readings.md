@@ -1,6 +1,6 @@
 # T22.F03 — Brain and Sensor Change Readings
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-29
 **Feature**: T22.F03
 **Track**: [T22 — Capability Assays and Evolvability Lab](../../roadmaps/t22-capability-assays-and-evolvability-lab.md)
@@ -262,15 +262,15 @@ within the predeclared scope (the track checkbox lands at closure).
 
 ## Success Criteria
 
-- [ ] Every genome arm's rows carry `readings.shape`, the `changing` arms'
+- [x] Every genome arm's rows carry `readings.shape`, the `changing` arms'
       rows carry `readings.signature`, the summary carries the first and
       last projections per arm and replicate, and `v3-lab report` renders
       the readings section from the summary alone.
-- [ ] The seed-1 quick food-seeking and wall runs reproduce T22.F02's
+- [x] The seed-1 quick food-seeking and wall runs reproduce T22.F02's
       calibration, reach and fidelity numbers exactly and the food-seeking
       run finishes under 60 s.
-- [ ] Same-seed rows are byte-identical across thread counts and processes.
-- [ ] Nothing outside `crates/v3-lab` and the documentation changes.
+- [x] Same-seed rows are byte-identical across thread counts and processes.
+- [x] Nothing outside `crates/v3-lab` and the documentation changes.
 
 ## Notes for AI Agents
 
@@ -289,3 +289,7 @@ within the predeclared scope (the track checkbox lands at closure).
   summary to what the report renders); a research note that needs them from
   the committed summary adds them to the keep-list with their consumer, at
   the earliest in T22.F04's summary change.
+- Cost: `/usage` totals at closure await the user; implementer passes 3
+  (build, self-review, review remediation) with advisor consults 3, 2, 2;
+  spec-owner resumes after Plan 2; Codex challenge rounds 2, final verdict
+  `ready`; Codex reviewer findings P1 0, P2 2 (both remediated), P3 0.
