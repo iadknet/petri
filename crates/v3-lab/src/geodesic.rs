@@ -47,7 +47,7 @@ impl Terrain {
     }
 
     fn index(&self, cell: Position) -> usize {
-        usize::from(cell.y) * usize::from(self.size) + usize::from(cell.x)
+        cell_index(cell, self.size)
     }
 
     #[must_use]
@@ -60,6 +60,11 @@ impl Terrain {
     pub fn neighbor(&self, cell: Position, direction: Direction) -> Position {
         offset(cell, direction.delta(), self.size)
     }
+}
+
+/// The row-major index of `cell` on a `size × size` arena.
+fn cell_index(cell: Position, size: u16) -> usize {
+    usize::from(cell.y) * usize::from(size) + usize::from(cell.x)
 }
 
 /// `cell + (dx, dy)`, wrapped on a `size × size` torus.
@@ -138,7 +143,7 @@ impl Field {
     /// The distance at `cell`; `None` when no source is reachable.
     #[must_use]
     pub fn at(&self, cell: Position) -> Option<u32> {
-        self.dist[usize::from(cell.y) * usize::from(self.size) + usize::from(cell.x)]
+        self.dist[cell_index(cell, self.size)]
     }
 }
 

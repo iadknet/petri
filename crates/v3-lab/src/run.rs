@@ -145,6 +145,12 @@ impl ArenaPlan {
     }
 }
 
+/// An axis's values: the explicit single value, else the explicit list,
+/// else the default.
+fn axis<T: Copy>(single: Option<T>, list: Option<&[T]>, default: &[T]) -> Vec<T> {
+    single.map_or_else(|| list.unwrap_or(default).to_vec(), |value| vec![value])
+}
+
 /// Resolve the arena: `--layout` or `--arena` (the assay's default), its
 /// size and its axis. An axis flag the arena does not use is an error; an
 /// explicit `--food-fraction` or `--scale` replaces its axis with that
@@ -182,14 +188,10 @@ pub fn resolve_arena(params: &RunParams) -> Result<ArenaPlan, LabError> {
     let points = match arena {
         ArenaId::SparseFoodV1 => {
             check(!scale_flags, "sparse-food-v1 has no scale axis")?;
-            let fractions = params.food_fraction.map_or_else(
-                || {
-                    params
-                        .calibration_fractions
-                        .clone()
-                        .unwrap_or_else(|| CALIBRATION_FRACTIONS.to_vec())
-                },
-                |f| vec![f],
+            let fractions = axis(
+                params.food_fraction,
+                params.calibration_fractions.as_deref(),
+                &CALIBRATION_FRACTIONS,
             );
             check(
                 !fractions.is_empty() && fractions.iter().all(|f| *f > 0.0 && *f < 1.0),
@@ -205,14 +207,10 @@ pub fn resolve_arena(params: &RunParams) -> Result<ArenaPlan, LabError> {
                 !fraction_flags,
                 "wall-v1 and ring-v1 have no food-fraction axis",
             )?;
-            let scales = params.scale.map_or_else(
-                || {
-                    params
-                        .calibration_scales
-                        .clone()
-                        .unwrap_or_else(|| CALIBRATION_SCALES.to_vec())
-                },
-                |k| vec![k],
+            let scales = axis(
+                params.scale,
+                params.calibration_scales.as_deref(),
+                &CALIBRATION_SCALES,
             );
             check(
                 !scales.is_empty() && scales.iter().all(|k| SCALES.contains(k)),
