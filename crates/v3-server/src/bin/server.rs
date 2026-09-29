@@ -18,12 +18,6 @@ struct Args {
     telemetry: Option<v3_telemetry::Switch>,
 }
 
-/// The flag beats `PETRI_TELEMETRY` (`env`), which beats the default `off`.
-#[cfg(feature = "telemetry")]
-fn telemetry_switch(args: &Args, env: Option<&str>) -> Result<v3_telemetry::Switch, String> {
-    v3_telemetry::resolve_switch(args.telemetry, env)
-}
-
 /// Resolves when the process receives SIGINT or (on Unix) SIGTERM.
 #[cfg(feature = "telemetry")]
 async fn termination_signal() {
@@ -56,12 +50,7 @@ async fn main() {
     #[cfg(feature = "telemetry")]
     let switch = {
         use clap::Parser as _;
-        let args = Args::parse();
-        telemetry_switch(
-            &args,
-            std::env::var(v3_telemetry::SWITCH_ENV).ok().as_deref(),
-        )
-        .unwrap_or_else(|message| {
+        v3_telemetry::switch_from_env(Args::parse().telemetry).unwrap_or_else(|message| {
             eprintln!("error: {message}");
             std::process::exit(1);
         })
@@ -98,10 +87,12 @@ mod tests {
     #[cfg(feature = "telemetry")]
     #[test]
     fn telemetry_flag_beats_environment_which_beats_default_off() {
-        use super::{telemetry_switch, Args};
+        use super::Args;
         use clap::Parser as _;
         use v3_telemetry::Switch;
         let parse = |argv: &[&str]| Args::try_parse_from(argv).expect("arguments must parse");
+        let telemetry_switch =
+            |args: &Args, env: Option<&str>| v3_telemetry::resolve_switch(args.telemetry, env);
         let plain = parse(&["v3-server"]);
         assert_eq!(telemetry_switch(&plain, None), Ok(Switch::Off));
         assert_eq!(telemetry_switch(&plain, Some("on")), Ok(Switch::On));

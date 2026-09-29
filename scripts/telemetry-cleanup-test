@@ -17,6 +17,7 @@ cat >"$test_root/bin/docker" <<'STUB'
 printf '%s\n' "$*" >>"$CLEANUP_TEST_FIXTURE/docker-calls"
 case "$*" in
   *' ps -q '*) printf 'stub-container\n' ;;
+  */status/config*) printf 'backend_scheduler:\n    provider:\n        compaction:\n            compaction:\n                compaction_window: 1h0m0s\nbackend_worker:\n    compaction:\n        compaction_window: 9m0s\n' ;;
   *' curl '*) printf '{"status":"success","data":[]}\n' ;;
   *' du -s '*) printf '0\t/data/prometheus\n' ;;
 esac
@@ -52,6 +53,9 @@ expect_interval 2020-01-02T03:04:05Z 2020-01-02T03:04:05Z
 expect_interval 2020-01-02T03:04:05.250Z 2020-01-02T03:04:05.250Z
 expect_interval 2020-01-02T03:04:05+02:00 2020-01-02T01:04:05Z
 grep -q 'start=2000-01-01T00:00:00Z' "$test_root/docker-calls" || fail 'Loki series preview lacks its start'
+# The preview names the scheduler's compaction window, the straddling-block bound.
+grep -q '^Tempo: blocks straddling the cutoff (kept whole; each spans at most one compaction window, 1h0m0s in force)' "$test_root/output" ||
+  { cat "$test_root/output" >&2; fail 'preview lacks the compaction window in force'; }
 
 # Cutoffs in the future or at a moment that is not yet past are refused.
 expect_refused 2999-01-01

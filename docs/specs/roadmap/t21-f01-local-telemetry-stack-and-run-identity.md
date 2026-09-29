@@ -212,27 +212,27 @@ no recorded configuration.
       OTLP receiver on an ephemeral port, and server tests for run identity
       across `startup`, three-state neutrality under `step`, and shutdown
       with pending records.
-- [ ] `scripts/telemetry-cleanup`, `scripts/telemetry-verify`,
+- [x] `scripts/telemetry-cleanup`, `scripts/telemetry-verify`,
       `scripts/telemetry-parent-compare`, `scripts/telemetry-overhead`.
-- [ ] Run the verifications and both checks on this host; record them in
+- [x] Run the verifications and both checks on this host; record them in
       `docs/progress/readings/t21-f01.md`.
 
 ## Verification
 
-- [ ] Telemetry-neutrality test: `cargo test -p v3-cli` (inside `make check`,
+- [x] Telemetry-neutrality test: `cargo test -p v3-cli` (inside `make check`,
       no Docker) -> one seeded run's canonical NDJSON is identical with
       telemetry off, on with an in-test OTLP receiver that saw `run.started`
       and `run.ended` for the run ID, and on with a closed port.
-- [ ] Bounds: `cargo test -p v3-telemetry` -> a queue driven past 2,048
+- [x] Bounds: `cargo test -p v3-telemetry` -> a queue driven past 2,048
       records or 8 MiB reports the exact dropped count; a receiver that
       accepts the connection and never answers leaves the CLI run's flush
       within 10 s with `abandoned` equal to the records still pending; a
       body above 4 MiB is dropped whole, counted and named on stderr; the
       workload run's config body size is measured and recorded.
-- [ ] Flag precedence: parser tests in `v3-cli`, `v3-server` and `v3-lab`
+- [x] Flag precedence: parser tests in `v3-cli`, `v3-server` and `v3-lab`
       -> nothing set is off; `PETRI_TELEMETRY=on` is on; `--telemetry off`
       beats `PETRI_TELEMETRY=on`; `--telemetry on` is on.
-- [ ] Server tests: `cargo test -p v3-server` -> the initial run and two
+- [x] Server tests: `cargo test -p v3-server` -> the initial run and two
       `startup` requests yield three distinct run IDs, `run.ended` with
       `reset` for each replaced run, `run.state` per transition, `run.config`
       after a patch, and shutdown with pending records completes within
@@ -240,12 +240,12 @@ no recorded configuration.
       `startup` followed by N `step` calls yields identical canonical
       status, snapshot and creature payloads (minus `perf`) with telemetry
       off, on with the in-test receiver, and on with a closed port.
-- [ ] Reference build: `cargo build --release -p v3-cli -p v3-server -p v3-lab
+- [x] Reference build: `cargo build --release -p v3-cli -p v3-server -p v3-lab
       --no-default-features` compiles, `cargo tree -e features` on that build
       shows neither `v3-telemetry` nor `v3-core/telemetry-seams`, and
       `cargo clippy --workspace --all-targets -- -D warnings` passes with and
       without the feature.
-- [ ] Stack verifications (Docker, outside `make check`):
+- [x] Stack verifications (Docker, outside `make check`):
       `scripts/telemetry-verify` -> retention settings read back from
       Prometheus `/api/v1/status/flags`, Tempo `/status/config` and Loki
       `/config` and survive `docker compose restart`; a sample of each
@@ -257,19 +257,28 @@ no recorded configuration.
       granularity; data written under `0.33.1` (`PETRI_LGTM_IMAGE`) is
       readable under `0.34.0`. Transcript in
       [`docs/progress/readings/t21-f01.md`](../../progress/readings/t21-f01.md).
-- [ ] Bytes per run: the `bytes=` figure and the measured config body size
+- [x] Bytes per run: the `bytes=` figure and the measured config body size
       of the workload run, and the growth of each store's disk use across ten
       workload runs, in the readings file.
-- [ ] Parent comparison: `scripts/telemetry-parent-compare ae97765f` (the
+- [x] Parent comparison: `scripts/telemetry-parent-compare ae97765f` (the
       merge base with `main`, F01's parent) -> identical canonical output,
       result in the readings file; the server is covered by its three-state
       neutrality test (no `v3-core` source and no tick-path code changes).
-- [ ] Overhead check: `scripts/telemetry-overhead` -> the table in the
+- [x] Overhead check: `scripts/telemetry-overhead` -> the table in the
       readings file, verdict in Performance and Goal Impact.
-- [ ] `make check` -> exit 0.
+- [x] `make check` -> exit 0.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
 - [ ] Benchmark summary: `Not applicable: observability feature`.
+
+| Item (2026-09-29) | Result |
+| --- | --- |
+| Neutrality, bounds, flag precedence, server tests | pass inside `make check`: `canonical_output_is_identical_off_on_and_on_with_a_closed_port`, 13 `v3-telemetry` tests, three `telemetry_flag_beats_environment_which_beats_default_off`, `each_seeding_is_a_run_and_each_reset_ends_the_previous_one`, `simulation_payloads_are_identical_off_on_and_on_with_a_closed_port`, `shutdown_with_pending_records_ends_within_10_s_with_exact_counts` |
+| Reference build | compiles; `cargo tree -e features` shows 0 `v3-telemetry`/`telemetry-seams` lines; clippy `-D warnings` passes with and without the feature |
+| `scripts/telemetry-verify` | exit 0, all 10 checks PASS; Loki delete processed after 318 s; straddling block kept whole under the `1m0s` window |
+| Bytes per run | `bytes=3377`; stored `run.started` body 2,777 B; ten runs: Loki +16 KiB, Tempo 0, Prometheus +36 KiB (+164 KiB idle over the same time) |
+| `scripts/telemetry-parent-compare ae97765f` | identical, 3 canonical lines, T = 6908 |
+| `make check` | exit 0 |
 
 ## Performance and Goal Impact
 
@@ -302,7 +311,16 @@ Overhead check, method fixed before any run:
 | Inconclusive | reported to the user as such, never rounded to a pass or extended with more runs |
 | Expected | (a) and (b) within noise of 1.0: F01 adds two records and one stderr line per run |
 
-**Measured verdict.** Not yet measured.
+**Measured verdict.**
+
+| Record | Value |
+| --- | --- |
+| Profiles | `Not applicable: observability feature` |
+| Parent comparison | method above, `BASE` `ae97765f`, T = 6908: identical canonical output |
+| Overhead check | method above, n = 8 (spread 5.40%), T = 6908; measured time 190.3 s of 300 s over four attempts (158.2 s for the record run) |
+| (a) on, stack healthy | median ratio 0.996, 8/8 pairs ≤ 1.25, pass; self time 0.102 µs per tick |
+| (b) on, stack stopped | median ratio 1.010, 8/8 pairs ≤ 1.25, pass; self time 0.018 µs per tick |
+| (c) idle-stack cost | 1.003 |
 
 - Readings: [`docs/progress/readings/t21-f01.md`](../../progress/readings/t21-f01.md).
 

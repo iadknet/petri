@@ -33,18 +33,6 @@ pub struct Cli {
     pub command: Command,
 }
 
-#[cfg(feature = "telemetry")]
-impl Cli {
-    /// The flag beats `PETRI_TELEMETRY` (`env`), which beats the default `off`.
-    ///
-    /// # Errors
-    ///
-    /// An `env` value other than `on` or `off`.
-    pub fn telemetry_switch(&self, env: Option<&str>) -> Result<v3_telemetry::Switch, String> {
-        v3_telemetry::resolve_switch(self.telemetry, env)
-    }
-}
-
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Calibrate and run an assay; output under `.bench-artifacts/lab/`.
@@ -329,15 +317,19 @@ mod tests {
     #[cfg(feature = "telemetry")]
     #[test]
     fn telemetry_flag_beats_environment_which_beats_default_off() {
-        use v3_telemetry::Switch;
-        let parse = |argv: &[&str]| Cli::try_parse_from(argv).expect("arguments must parse");
-        let plain = parse(&["v3-lab", "report", "x.json"]);
-        assert_eq!(plain.telemetry_switch(None), Ok(Switch::Off));
-        assert_eq!(plain.telemetry_switch(Some("on")), Ok(Switch::On));
-        let off = parse(&["v3-lab", "--telemetry", "off", "report", "x.json"]);
-        assert_eq!(off.telemetry_switch(Some("on")), Ok(Switch::Off));
-        let on = parse(&["v3-lab", "--telemetry", "on", "report", "x.json"]);
-        assert_eq!(on.telemetry_switch(None), Ok(Switch::On));
+        use v3_telemetry::{resolve_switch, Switch};
+        let flag = |argv: &[&str]| {
+            Cli::try_parse_from(argv)
+                .expect("arguments must parse")
+                .telemetry
+        };
+        let plain = flag(&["v3-lab", "report", "x.json"]);
+        assert_eq!(resolve_switch(plain, None), Ok(Switch::Off));
+        assert_eq!(resolve_switch(plain, Some("on")), Ok(Switch::On));
+        let off = flag(&["v3-lab", "--telemetry", "off", "report", "x.json"]);
+        assert_eq!(resolve_switch(off, Some("on")), Ok(Switch::Off));
+        let on = flag(&["v3-lab", "--telemetry", "on", "report", "x.json"]);
+        assert_eq!(resolve_switch(on, None), Ok(Switch::On));
     }
 
     #[test]

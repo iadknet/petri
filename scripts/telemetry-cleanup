@@ -88,6 +88,7 @@ api() {
 
 prometheus=http://127.0.0.1:9090
 loki=http://127.0.0.1:3100
+tempo=http://127.0.0.1:3200
 series_match='{__name__=~".+"}'
 stream_match='{service_name=~".+"}'
 # Loki needs an explicit start; the stack disables its query-length limit.
@@ -111,14 +112,16 @@ split_data() {
 
 # Tempo blocks as `class dir start end bytes`, class being delete (ends before
 # the cutoff), keep (starts at or after it) or straddle (kept whole); times are
-# compared in milliseconds with the image's GNU date.
+# compared in milliseconds with the image's GNU date. A block marked
+# meta.compacted.json is already merged into another and Tempo retires it, so
+# it is never a target.
 tempo_blocks() {
   # shellcheck disable=SC2016 # expands inside the container.
   in_stack sh -c '
     cutoff=$1
     for meta in /data/tempo/blocks/*/*/meta.json; do
-      [ -f "$meta" ] || continue
       dir=${meta%/meta.json}
+      [ -f "$meta" ] && [ ! -f "$dir/meta.compacted.json" ] || continue
       json=$(cat "$meta")
       start=$(printf "%s" "$json" | sed -n "s/.*\"startTime\":\"\([^\"]*\)\".*/\1/p")
       end=$(printf "%s" "$json" | sed -n "s/.*\"endTime\":\"\([^\"]*\)\".*/\1/p")
@@ -157,9 +160,13 @@ printf '\nLoki: %s streams with entries before the cutoff\n' "$loki_count"
 [ -z "$loki_streams" ] || printf '%s\n' "$loki_streams"
 
 blocks=$(tempo_blocks)
+# The backend worker merges blocks within one compaction window, so a kept
+# straddling block spans at most one window.
+window=$(api "$tempo/status/config" | "$root/scripts/telemetry-yaml-paths" |
+  awk '$1 == "backend_scheduler.provider.compaction.compaction.compaction_window" { print $2 }')
 printf '\nTempo: blocks ending before the cutoff (removed), start end bytes:\n'
 printf '%s\n' "$blocks" | awk '$1 == "delete" { print "  " $2, $3, $4, $5 }'
-printf 'Tempo: blocks straddling the cutoff (kept whole; block granularity):\n'
+printf 'Tempo: blocks straddling the cutoff (kept whole; each spans at most one compaction window, %s in force):\n' "${window:-unknown}"
 printf '%s\n' "$blocks" | awk '$1 == "straddle" { print "  " $2, $3, $4, $5 }'
 
 if [ "$proceed" -eq 0 ]; then
