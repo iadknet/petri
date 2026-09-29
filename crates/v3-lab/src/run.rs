@@ -396,7 +396,7 @@ fn genome_records(
             .find(|arm| arm.name == overlay.name)
             .and_then(|arm| arm.genome.as_deref());
         Some(genome_record(
-            &format!("arm:{}", overlay.name),
+            &GenomeRecord::arm_name(&overlay.name),
             genome,
             GenomeSource::File,
             file,

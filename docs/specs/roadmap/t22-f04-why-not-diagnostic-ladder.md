@@ -65,7 +65,7 @@ scope loses the exemption.
 | Provenance | `run.rs::genome_records` names genomes `start` and `arm:<name>`; `summary::GenomeRecord` has `name`, SHA-256, `genome_format`, `v3_core_version` and no origin |
 | Class and scene difference | `Batteries` per arm, `readings::signature`, `classify(&parent, &child).class`; `Scored::{scenes, sequences}` of every member are kept until ranking (F03) |
 | Ancestry | `Individual::{id, parent, birth, carried, ancestry}`; `Ancestry::{births, applied}` sum along the path (`readings.rs:82`: every applied event counts, identity aside); `breed` has the `MutationSummary` of every birth |
-| Survivors | `advance` ranks by the true order and draws the tie keys; `breed` carries `order[..survivors]`, drawing the `shuffled-score` permutation only when a next generation is bred (not at reach, the last generation or a refused row) |
+| Survivors | `advance` ranks by the true order and draws the tie keys; `breed` carries `order[..survivors]`, drawing the `shuffled-score` permutation only when a next generation is bred, on a copy of the selection stream committed with the row (so not at reach, the last generation or a refused row) |
 | Interval | `stats::wilson_95(successes, trials) -> Option<[f64; 2]>` (successes ≤ trials) |
 | No campaign | `run.rs:449–482`: an uncalibrated or `--calibrate-only` run writes a summary with empty `arms` |
 
@@ -180,7 +180,7 @@ records no counts and no resolution, and its open changes are censored.
 | `row_version: 3` | `ladder` beside `readings` (null for scripted and fixed arms): `supply` (`births`, `touching_births`, `sites`, `reachable`, `uniform_reference`, `targeted` requested/applied/skipped by operator and skipped by reason, `discarded`, `created`, `removed`); `children` (`touching` and `other` blocks with the per-generation counts above; classes in `touching` only); `retention` (`selected`, `selected_touching`, per depth `[retained, deleted, lineage_loss]` resolved in this generation, and `depths_touching` for the touching subset) |
 | `summary_version: 4` | Top-level `ladder`: `exposure` from the calibration block alone (verdict, the selected point or the failing checks with their counts: exposure scenes, comparator wins, sensitivity gaps), so an uncalibrated or `--calibrate-only` summary still renders the instrument finding; per evolving arm, per replicate (pooled counts, `censored` and `censored_touching` per depth, per-rung status, verdict) and per arm (per-rung tallies with the `fail` interval, each replicate's status, the tally verdict, pooled `s / n` and context counts, `incomplete_replicates`); `uniform_reference` is null for a row and for the replicate once any parent in it has zero reachable nodes |
 | Provenance | `sizes` gains `stall_rates`, `retention_depth`, `relevant_families`; each `genomes` entry gains `source` (`founder`, `file` or `builtin-comparator`) and a file's basename, so the start label is reproducible from the summary |
-| `report` | Renders v2–v4 (v1 stays refused); from a v4 summary the ladder section: exposure, then per evolving arm one line per rung with status, counts and tally, and the verdict line (assay, arena, start — `founder` or the file's basename, each with its SHA-256 — arm, role, policy, verdict, route) |
+| `report` | Renders v2–v4 (v1 stays refused); from a v4 summary the ladder section: exposure, then per evolving arm one line per rung with status, counts and tally, and the verdict line (assay, arena, start — the arm's own genome file (`arm:<name>`), else `founder` or the run's file basename, each with its SHA-256 — arm, role, policy, verdict, route) |
 | `why-not` | Prints the ladder section and the run directory; exits as `run` does (0; 2 uncalibrated; 3 byte cap: a stall is not an error). `run` prints the report as before |
 | Committed summaries | `docs/progress/lab/t22-f02-*.json` regenerated at v4 |
 | Sizes | By-operator maps hold only the keys that fired: `ladder` ≈ 1 KB per row in the scenario of ≤ 5 touching events per generation, ≤ 6 KB at the bound of all 55 `MutationOperator::all()` keys in three maps plus three skip reasons and `D ≤ 8`; rows ≤ 12 KB / ≤ 17 KB at population 64; campaign ≈ 29 MB / ≤ 41 MB under the 64 MiB cap; summary: the pooled maps at the bound (three maps × 55 names plus reasons and tallies) are ≤ 8 KB per evolving arm and replicate and ≤ 8 KB per arm, so a campaign summary (3 evolving arms × 8 replicates) grows ≤ 220 KB over F03's ≤ 200 KB, inside the 1 MiB reserve whose exit-1 oversize disposition is unchanged |
@@ -237,7 +237,7 @@ per quick run) is in the Timing item.
 
 ## Verification
 
-- [x] Focused tests: `cargo test -p v3-lab` -> 173 unit and 19
+- [x] Focused tests: `cargo test -p v3-lab` -> 174 unit and 20
       integration tests pass (1 ignored child helper); names in
       [`docs/progress/readings/t22-f04.md`](../../progress/readings/t22-f04.md).
 - [x] `cargo clippy -p v3-lab --all-targets -- -D warnings` and `cargo

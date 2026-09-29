@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 use serde::{Deserialize, Serialize};
 
 use crate::arena::{Policy, Role};
-use crate::summary::{label, Calibration, GenomeSource, Summary, Verdict};
+use crate::summary::{label, Calibration, GenomeRecord, GenomeSource, Summary, Verdict};
 
 pub mod track;
 
@@ -1011,12 +1011,14 @@ fn rung_context(pooled: &Pooled, rung: Rung) -> String {
 }
 
 /// The start genome's label: `founder`, or a file's basename and SHA-256.
-fn start_label(summary: &Summary) -> String {
-    let Some(start) = summary
-        .provenance
-        .genomes
-        .iter()
-        .find(|g| g.name == "start")
+/// An arm's own genome file (`arm:<name>`) labels that arm; otherwise the
+/// run's `start`.
+fn start_label(summary: &Summary, arm: Option<&str>) -> String {
+    let genomes = &summary.provenance.genomes;
+    let named = |name: &str| genomes.iter().find(|g| g.name == name);
+    let Some(start) = arm
+        .and_then(|arm| named(&GenomeRecord::arm_name(arm)))
+        .or_else(|| named("start"))
     else {
         return "unknown".to_owned();
     };
@@ -1041,7 +1043,7 @@ pub fn render(summary: &Summary) -> String {
         .as_str()
         .unwrap_or("unknown")
         .to_owned();
-    let start = start_label(summary);
+    let start = start_label(summary, None);
     let _ = writeln!(out, "\n## Why-not ladder\n");
     exposure_lines(&mut out, &ladder.exposure);
     if ladder.exposure.status != Status::Pass {
@@ -1101,7 +1103,8 @@ pub fn render(summary: &Summary) -> String {
         }
         let _ = writeln!(
             out,
-            "\nverdict: {assay}, arena {arena}, start {start}, arm {}, role {}, policy {}{}: {} -> route: {}",
+            "\nverdict: {assay}, arena {arena}, start {}, arm {}, role {}, policy {}{}: {} -> route: {}",
+            start_label(summary, Some(&arm.name)),
             arm.name,
             label(arm.role),
             label(arm.policy),
