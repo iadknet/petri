@@ -28,8 +28,7 @@ use v3_core::simulation::actions::{apply_move, apply_typed_eat};
 use v3_core::simulation::energy_accounting::EnergyFlows;
 use v3_core::simulation::{run_tick, seed_simulation, SimStats, Simulation};
 
-pub use crate::geodesic::step_toward;
-use crate::geodesic::{Field, Terrain};
+use crate::geodesic::{step_toward, Field, Terrain};
 use crate::scene::{nearest, Scene};
 
 const FOOD: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
@@ -105,6 +104,15 @@ impl Scoring {
         blocked_weight: 0.0,
         efficiency_weight: 0.0,
         exhausted: Exhausted::Zero,
+    };
+
+    /// Barrier navigation: blocked moves and first-bite efficiency weighed
+    /// at 1.0 (wasting every move forfeits one bite, the shortest path earns
+    /// one), an exhausted block scored as complete.
+    pub const BARRIER_NAVIGATION: Self = Self {
+        blocked_weight: 1.0,
+        efficiency_weight: 1.0,
+        exhausted: Exhausted::Complete,
     };
 }
 

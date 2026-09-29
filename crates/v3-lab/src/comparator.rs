@@ -1,7 +1,6 @@
 //! Built-in comparators: competence witnesses composed from the existing
 //! `input-opportunity-v1` controllers, never tuned on assay outcomes.
 
-use v3_core::contracts::InputReference;
 use v3_core::creature::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
 use v3_core::creature::genome::{BackendDef, CreatureGenome, VoteSink};
 use v3_core::neighborhood::opportunity::controllers::{
@@ -70,12 +69,6 @@ pub fn built_in(assay: Assay, founder: &CreatureGenome) -> CreatureGenome {
     }
 }
 
-/// The reference the comparator reads at `index` on the vote node.
-#[must_use]
-pub fn vote_reference(genome: &CreatureGenome, index: usize) -> Option<&InputReference> {
-    genome.nodes.get(VOTE_NODE)?.input_refs.get(index)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,7 +76,13 @@ mod tests {
     use crate::eval::{evaluate_genome, Setup};
     use crate::scene::{Geometry, SceneSpec};
     use rand::SeedableRng;
+    use v3_core::contracts::InputReference;
     use v3_core::creature::founder::founder_genome_with_age_gate;
+
+    /// The reference the comparator reads at `index` on the vote node.
+    fn vote_reference(genome: &CreatureGenome, index: usize) -> Option<&InputReference> {
+        genome.nodes.get(VOTE_NODE)?.input_refs.get(index)
+    }
 
     fn founder() -> CreatureGenome {
         let config = arena_config(64);

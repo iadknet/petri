@@ -223,40 +223,41 @@ seeded streams, so F01's same-seed, any-thread byte identity of
 
 ## Verification
 
-- [x] `cargo test -p v3-lab` -> all green; `make check` -> exit 0.
-      At c675651b: 109 unit + 17 integration tests, clippy clean;
-      `make check` exit 0 at 68ac188f.
+- [x] `cargo test -p v3-lab` -> 109 unit + 17 integration tests green;
+      `cargo clippy -p v3-lab --all-targets -- -D warnings` clean;
+      `cargo check --workspace --all-targets` clean; `make check` exit 0
+      at 68ac188f.
 - [x] Food-seeking regression: `make lab` (seed 1, `--quick`, release)
       reproduces F01's calibration table (founder 5.13 / 9.73 / 20.84,
       comparator 19.26 / 27.59 / 37.33–38.42, floor 2.67 / 3.60 / 6.31,
       selected 0.04 × 200, reach threshold 15.956), reconfirmed on the base
-      commit; the run's `rows.ndjson` sha256 and row count are the new
-      baseline (the mask may move plasticity-carrying mutants).
-      Reproduced at 78545c85, 68ac188f and c675651b; baseline
-      `cd2a2c5e…45dcbf`, 948 rows, unchanged at c675651b (readings file).
+      commit 78545c85. The expression mask makes the run's `rows.ndjson`
+      the new baseline: sha256 `cd2a2c5e…45dcbf`, 948 rows, identical at
+      68ac188f, c675651b and the self-review commit.
 - [x] `make lab LAB_ARGS="run --assay barrier-navigation --quick"` and the
-      same with `--arena ring-v1`: the calibration table, reached fractions
-      per native arm, timing and the rows hash in
+      same with `--arena ring-v1`: `wall-v1` `calibrated`, scale 2 × 200,
+      reach threshold 5.419, rows sha256 `c9a5c866…5a5e8e` (identical at
+      the self-review commit); `ring-v1` `uncalibrated` on competence at
+      every scale, exit 2 — accepted by the user decision below. Tables,
+      reached fractions, timing and hashes:
       [`docs/progress/readings/t22-f02.md`](../../progress/readings/t22-f02.md).
-      At c675651b: `wall-v1` `calibrated`, scale 2 × 200, reach threshold
-      5.419; `ring-v1` `uncalibrated` on competence at every scale,
-      exit 2 — accepted by the user decision below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output
       path, and every survivor resolved as killed, equivalent, or deferred.
-- [ ] Benchmark summary: `Not applicable: lab feature`.
+- [x] Benchmark summary: `Not applicable: lab feature`.
 
 ## Performance and Goal Impact
 
 **Predeclaration — written before the run.** Not applicable: lab feature.
-The diff is confined to `crates/v3-lab` and docs; `Cargo.toml`,
-`Cargo.lock` and the `Makefile` are untouched; no trajectory, default,
-founder, recipe or mutation policy changes, so no profile runs and no
-series entry. The natural-analog and environmental-pressure rules do not
-apply. Lab cost, as complexity only: one BFS over the arena
-(≤ 16,384 cells) per interval, at most one per bite, and an O(1) read per
-tick; the quick-run wall time is measured, not predicted.
+No trajectory, default, founder, recipe or mutation policy changes, so no
+profile runs and no series entry. The natural-analog and
+environmental-pressure rules do not apply. Lab cost, as complexity only:
+one BFS over the arena (≤ 16,384 cells) per interval, at most one per
+bite, and an O(1) read per tick.
 
-**Measured verdict.** Not applicable: lab feature; scope checked in review.
+**Measured verdict.** Not applicable: lab feature. The diff against
+78545c85 is confined to `crates/v3-lab/**` and docs:
+`git diff --stat 78545c85 -- . ':!crates/v3-lab' ':!docs'` is empty, so
+`Cargo.toml`, `Cargo.lock` and the `Makefile` are unchanged.
 
 - Full readings: [`docs/progress/readings/t22-f02.md`](../../progress/readings/t22-f02.md).
 
