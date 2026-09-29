@@ -1,9 +1,9 @@
 {
   "kind": "petri-lab-summary",
-  "summary_version": 3,
+  "summary_version": 4,
   "assay": "barrier-navigation",
   "provenance": {
-    "git_revision": "2dd9aa2057c956595f5af9a46c701d2282e2b4f1",
+    "git_revision": "809a7b485d7d8e9e3e962920331ee1e22811483e",
     "dirty": false,
     "config_digest": "2d997590cf6632743d6b604ba611256dc13aaa7455002e37bc56efe9a9dd580f",
     "overlays": [
@@ -22,13 +22,15 @@
         "name": "start",
         "sha256": "e24ef162d4848e40963cf00b75c62cb898b5d2decbc5674d3d33975c79eefc3f",
         "genome_format": 1,
-        "v3_core_version": "0.1.0"
+        "v3_core_version": "0.1.0",
+        "source": "founder"
       },
       {
         "name": "comparator",
         "sha256": "fd36fc82e4db027183eb2a36c0806c06082479bfa9c766965c0d1116ea021a57",
         "genome_format": 1,
-        "v3_core_version": "0.1.0"
+        "v3_core_version": "0.1.0",
+        "source": "builtin-comparator"
       }
     ],
     "arena": {
@@ -78,7 +80,21 @@
       "efficiency_weight": 1.0,
       "quick": true,
       "mutants": 8,
-      "signature_arms": "changing"
+      "signature_arms": "changing",
+      "stall_rates": {
+        "supply": 0.01,
+        "viability": 0.05,
+        "benefit": 0.05,
+        "retention": 0.2
+      },
+      "retention_depth": 2,
+      "relevant_families": [
+        "FoodHere(*)",
+        "NeighborFoodRing(*)",
+        "AreaFoodSummary(*)",
+        "NeighborBarrierRing",
+        "AreaBarrierSummary"
+      ]
     }
   },
   "calibration": {
@@ -365,9 +381,135 @@
   "incomplete": "uncalibrated",
   "exit_code": 2,
   "timing": {
-    "wall_seconds": 0.188220875,
+    "wall_seconds": 0.202039167,
     "creature_ticks": 18760,
-    "per_creature_tick_ms": 0.010033095682302772,
+    "per_creature_tick_ms": 0.010769678411513859,
     "readings_creature_ticks": 0
+  },
+  "ladder": {
+    "exposure": {
+      "status": "fail",
+      "verdict": "uncalibrated",
+      "campaign": false,
+      "selected": null,
+      "failing": [
+        {
+          "food_fraction": null,
+          "scale": 3,
+          "lifetime": 200,
+          "scenes": 16,
+          "exposure_scenes": 16,
+          "exposure": true,
+          "competence": false,
+          "comparator_wins": 9,
+          "wins_needed": 12,
+          "comparator_gap": 0.14715641987887917,
+          "sensitivity": true,
+          "sensitivity_gaps": [
+            9.511253205026604,
+            0.4710324271617541,
+            0.06390051834130783
+          ],
+          "validation_competence": null
+        },
+        {
+          "food_fraction": null,
+          "scale": 3,
+          "lifetime": 400,
+          "scenes": 16,
+          "exposure_scenes": 16,
+          "exposure": true,
+          "competence": false,
+          "comparator_wins": 9,
+          "wins_needed": 12,
+          "comparator_gap": 0.14715641987887917,
+          "sensitivity": true,
+          "sensitivity_gaps": [
+            9.511253205026604,
+            0.4710324271617541,
+            0.06390051834130783
+          ],
+          "validation_competence": null
+        },
+        {
+          "food_fraction": null,
+          "scale": 2,
+          "lifetime": 200,
+          "scenes": 16,
+          "exposure_scenes": 16,
+          "exposure": true,
+          "competence": false,
+          "comparator_wins": 10,
+          "wins_needed": 12,
+          "comparator_gap": 1.999816731666213,
+          "sensitivity": true,
+          "sensitivity_gaps": [
+            10.079227429426773,
+            0.4070647507431904,
+            0.1786458333333334
+          ],
+          "validation_competence": null
+        },
+        {
+          "food_fraction": null,
+          "scale": 2,
+          "lifetime": 400,
+          "scenes": 16,
+          "exposure_scenes": 16,
+          "exposure": true,
+          "competence": false,
+          "comparator_wins": 10,
+          "wins_needed": 12,
+          "comparator_gap": 1.999816731666213,
+          "sensitivity": true,
+          "sensitivity_gaps": [
+            10.079227429426773,
+            0.4070647507431904,
+            0.1786458333333334
+          ],
+          "validation_competence": null
+        },
+        {
+          "food_fraction": null,
+          "scale": 1,
+          "lifetime": 200,
+          "scenes": 16,
+          "exposure_scenes": 16,
+          "exposure": true,
+          "competence": false,
+          "comparator_wins": 5,
+          "wins_needed": 12,
+          "comparator_gap": 2.528052235959987,
+          "sensitivity": true,
+          "sensitivity_gaps": [
+            9.282373862927546,
+            0.5402784323755512,
+            0.03808170995671001
+          ],
+          "validation_competence": null
+        },
+        {
+          "food_fraction": null,
+          "scale": 1,
+          "lifetime": 400,
+          "scenes": 16,
+          "exposure_scenes": 16,
+          "exposure": true,
+          "competence": false,
+          "comparator_wins": 5,
+          "wins_needed": 12,
+          "comparator_gap": 2.528052235959987,
+          "sensitivity": true,
+          "sensitivity_gaps": [
+            9.282373862927546,
+            0.5402784323755512,
+            0.03808170995671001
+          ],
+          "validation_competence": null
+        }
+      ],
+      "margin": 1.0
+    },
+    "arms": []
   }
 }
