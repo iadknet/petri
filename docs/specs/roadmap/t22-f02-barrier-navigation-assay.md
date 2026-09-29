@@ -78,8 +78,8 @@ coordinate wraps. `scale` is an integer in 1..=3 for both built-in arenas
 | `ring-v1` | `scale` k ∈ {1, 2, 3} | Barriers: the cells at Chebyshev distance exactly k + 1 from `start + 5·D` (a square ring of side 2k + 3 enclosing `F`), minus one gap cell drawn uniformly (one stream draw) from the ring's non-corner cells enumerated in row-major world order; a draw whose gap lets the greedy walk through (predicate (c) below) redraws `D` and the gap together from the same stream, the `Simulation` seed unchanged, with F01's redraw limit and per-scene record; seeded fixtures pin one accepted and one rejected draw |
 | `layout` (`--layout file.json`) | none (one point × lifetimes) | `{"arena_format": 1, "rows": [...]}`: square, 16–128 rows of equal length, characters `.` empty, `#` barrier, `F` food (at least one), `S` start (exactly one); the row count is the arena size and `--arena-size` given alongside is a config error; every scene is the file's cells with a fresh `Simulation` seed; usable with either assay, the assay's exposure predicate applies, and an infeasible layout is `exposure: false` for the point (no redraw exists) |
 
-**Exposure predicate (barrier-navigation).** (a) F01's rule: at least one
-food cell within `vision_radius` of the start and none within distance 1;
+**Exposure predicate (barrier-navigation).** (a) F01's rule (food within
+`vision_radius` of the start, none within distance 1);
 (b) the geodesic distance from the start to a food cell is finite; (c) the
 barrier-blind greedy walk — repeat F01's `step_toward` step toward F01's
 target (the Chebyshev-nearest remaining food, first in draw order on ties)
@@ -170,6 +170,9 @@ blocked-fraction means and the floor, half, oracle and comparator
 efficiency means; `v3-lab report` renders the axis, both weights and those
 means, and refuses a v1 summary (backward compatibility is not a goal).
 A 128-row layout adds ≤ 17 KB to the summary against the 1 MiB reserve.
+The CLI commits nothing; a spec or note citing a run commits its
+`summary.json` as `docs/progress/lab/<id>-<label>.json` (the `v3-lab
+report` input); rows and elites stay ignored.
 
 | CLI parameter | Default |
 | --- | --- |
@@ -224,23 +227,22 @@ seeded streams, so F01's same-seed, any-thread byte identity of
 ## Verification
 
 - [x] `cargo test -p v3-lab` -> 109 unit + 17 integration tests green;
-      `cargo clippy -p v3-lab --all-targets -- -D warnings` clean;
-      `cargo check --workspace --all-targets` clean; `make check` exit 0
-      at 68ac188f.
+      `make check` exit 0 at 68ac188f.
 - [x] Food-seeking regression: `make lab` (seed 1, `--quick`, release)
       reproduces F01's calibration table (founder 5.13 / 9.73 / 20.84,
       comparator 19.26 / 27.59 / 37.33–38.42, floor 2.67 / 3.60 / 6.31,
-      selected 0.04 × 200, reach threshold 15.956), reconfirmed on the base
-      commit 78545c85. The expression mask makes the run's `rows.ndjson`
-      the new baseline: sha256 `cd2a2c5e…45dcbf`, 948 rows, identical at
-      68ac188f, c675651b and the self-review commit.
+      selected 0.04 × 200, reach threshold 15.956), reconfirmed at
+      78545c85; rows baseline sha256 `cd2a2c5e…45dcbf`, 948 rows,
+      identical through the self-review commit; summary committed as
+      `docs/progress/lab/t22-f02-food-seeking.json`.
 - [x] `make lab LAB_ARGS="run --assay barrier-navigation --quick"` and the
       same with `--arena ring-v1`: `wall-v1` `calibrated`, scale 2 × 200,
-      reach threshold 5.419, rows sha256 `c9a5c866…5a5e8e` (identical at
-      the self-review commit); `ring-v1` `uncalibrated` on competence at
+      reach threshold 5.419, rows sha256 `c9a5c866…5a5e8e`; `ring-v1`
+      `uncalibrated` on competence at
       every scale, exit 2 — accepted by the user decision below. Tables,
       reached fractions, timing and hashes:
-      [`docs/progress/readings/t22-f02.md`](../../progress/readings/t22-f02.md).
+      [`docs/progress/readings/t22-f02.md`](../../progress/readings/t22-f02.md);
+      summaries committed as `docs/progress/lab/t22-f02-{wall,ring}.json`.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output
       path, and every survivor resolved as killed, equivalent, or deferred.
 - [x] Benchmark summary: `Not applicable: lab feature`.
@@ -286,7 +288,6 @@ bite, and an O(1) read per tick.
   false` reading stand unchanged.
 - Decision: (user, 2026-09-28) T22.F02 closes with `wall-v1` as the
   calibrated barrier arena. `ring-v1` stays available but `uncalibrated`:
-  the composed area-food + ring-inhibition comparator wins 9/10/5 of 16
-  scenes at scales 1/2/3 (12 needed), a comparator limitation recorded as
-  a track finding; the comparator, margin, gaps and ring geometry are not
-  tuned to pass.
+  the composed area-food + ring-inhibition comparator wins 5/10/9 of 16
+  scenes at scales 1/2/3 (12 needed), recorded as a track finding;
+  comparator, margin, gaps and geometry untuned.
