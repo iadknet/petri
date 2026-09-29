@@ -580,10 +580,10 @@ fn readings_section(out: &mut String, arms: &[ArmSummary]) {
                 with_delta(usize_i64(shape.reachable), usize_i64(first.reachable)),
                 with_delta(usize_i64(shape.executed), usize_i64(first.executed)),
                 shape.deaths,
-                shape.ancestry.births,
-                shape.ancestry.applied,
-                ratio(shape.steering.exact_hits, shape.steering.moves),
-                ratio(shape.steering.avoided, shape.steering.avoidance_trials),
+                shape.births,
+                shape.applied,
+                ratio(shape.exact_hits, shape.moves),
+                ratio(shape.avoided, shape.avoidance_trials),
             );
         }
     }

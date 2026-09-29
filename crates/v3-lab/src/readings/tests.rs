@@ -409,7 +409,7 @@ fn projections_keep_the_first_shape_scalars_and_the_last_aggregates() {
     projections.record(&signed);
     assert_eq!(projections.first, Some(FirstProjection::of(&plain.shape)));
     let last = projections.last.unwrap();
-    assert_eq!(last.shape, signed.shape);
+    assert_eq!(last.shape, ShapeProjection::of(&signed.shape));
     let aggregates = last.signature.unwrap();
     let mutants = &signed.signature.as_ref().unwrap().mutants;
     assert_eq!(aggregates.n, 3);
@@ -503,5 +503,113 @@ proptest! {
         prop_assert_eq!(ancestry.requested, births.iter().map(|b| b.0).sum::<u64>());
         prop_assert_eq!(ancestry.applied, births.iter().map(|b| b.1).sum::<u64>());
         prop_assert_eq!(ancestry.applied_by_operator.values().sum::<u64>(), ancestry.applied);
+    }
+}
+
+/// Pre-occupied out-of-range indices the ablation must step around.
+const OCCUPIED: [u16; 3] = [ABLATED_REF, ABLATED_REF - 1, ABLATED_REF - 2];
+
+/// The founder with node 0 rewired: `input_refs` drawn (by position) from
+/// the founder's own references, and one live read of each index in `idxs`
+/// (a Graph edge on a wired sink, or a VM `ReadInput` feeding an `AddVote`).
+fn with_reads(picks: &[usize], idxs: &[u16], vm: bool) -> CreatureGenome {
+    let mut genome = founder(&setup(1, 100.0));
+    let node = &mut genome.nodes[0];
+    let pool = node.input_refs.clone();
+    node.input_refs = picks.iter().map(|&p| pool[p % pool.len()].clone()).collect();
+    node.backend_def = if vm {
+        BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: Vec::new(),
+            program: idxs
+                .iter()
+                .flat_map(|&ref_idx| {
+                    [
+                        VmInstruction::ReadInput {
+                            dst: 0,
+                            ref_idx,
+                            sub_idx: 0,
+                        },
+                        VmInstruction::AddVote { sink: 0, src: 0 },
+                    ]
+                })
+                .collect(),
+        })
+    } else {
+        let BackendDef::Graph(mut graph) = node.backend_def.clone() else {
+            panic!("the founder's node 0 is a graph node");
+        };
+        graph.compute_nodes.clear();
+        for sink in &mut graph.output_sinks {
+            sink.inputs.clear();
+        }
+        graph.output_sinks[0].inputs = idxs
+            .iter()
+            .map(|&ref_idx| GraphEdge {
+                source: GraphSource::InputLeaf { ref_idx, sub_idx: 0 },
+                weight: 1.0,
+            })
+            .collect();
+        BackendDef::Graph(graph)
+    };
+    genome
+}
+
+/// Node 0's reference indices in visit order.
+fn ref_idxs(genome: &CreatureGenome) -> Vec<u16> {
+    let mut backend = genome.nodes[0].backend_def.clone();
+    let mut idxs = Vec::new();
+    for_each_ref_idx(&mut backend, |ref_idx| idxs.push(*ref_idx));
+    idxs
+}
+
+proptest! {
+    #[test]
+    fn ablation_gives_each_distinct_target_its_own_free_sentinel(
+        picks in prop::collection::vec(0usize..8, 1..=12),
+        raw in prop::collection::vec((any::<bool>(), 0usize..64), 1..=16),
+        family_pick in 0usize..12,
+        vm in any::<bool>(),
+    ) {
+        let len = picks.len();
+        // Repeated in-range indices and already-occupied sentinels.
+        let idxs: Vec<u16> = raw
+            .iter()
+            .map(|&(occupied, i)| {
+                if occupied {
+                    OCCUPIED[i % OCCUPIED.len()]
+                } else {
+                    u16::try_from(i % len).unwrap()
+                }
+            })
+            .collect();
+        let genome = with_reads(&picks, &idxs, vm);
+        let refs = &genome.nodes[0].input_refs;
+        let family = Family::of(&refs[family_pick % len]);
+        let ablated = ablate(&genome, family);
+        prop_assert!(ablated.is_some(), "ample headroom");
+        let ablated = ablated.unwrap();
+        prop_assert_eq!(ablated.genome_size(), genome.genome_size());
+        prop_assert_eq!(ablated.complexity(), genome.complexity());
+        prop_assert!(!consumers(&ablated).contains_key(&family));
+
+        let before = ref_idxs(&genome);
+        let after = ref_idxs(&ablated);
+        prop_assert_eq!(before.len(), after.len());
+        let used: BTreeSet<u16> = before.iter().copied().collect();
+        let is_target =
+            |idx: u16| refs.get(usize::from(idx)).is_some_and(|r| Family::of(r) == family);
+        let mut sentinels = BTreeMap::new();
+        for (&old, &new) in before.iter().zip(&after) {
+            if is_target(old) {
+                prop_assert!(usize::from(new) >= len);
+                prop_assert!(!used.contains(&new), "{} collides", new);
+                prop_assert_eq!(*sentinels.entry(old).or_insert(new), new);
+            } else {
+                prop_assert_eq!(old, new);
+            }
+        }
+        let distinct: BTreeSet<u16> = sentinels.values().copied().collect();
+        prop_assert_eq!(distinct.len(), sentinels.len());
     }
 }
