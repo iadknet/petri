@@ -11,7 +11,7 @@ use v3_lab::campaign::{run_campaign, Arm, ArmKind, Plan};
 use v3_lab::cli::read_summary;
 use v3_lab::eval::{evaluate_genome, Setup};
 use v3_lab::output::{Budget, GitProvenance, LabRoot, RunDir, SUMMARY_RESERVE};
-use v3_lab::readings::SignatureArms;
+use v3_lab::readings::{Shape, ShapeProjection, SignatureArms};
 use v3_lab::run::{run, RunOutcome, RunParams, UserArm, EXIT_UNCALIBRATED};
 use v3_lab::scene::{ArenaId, Assay, SceneSpec};
 use v3_lab::summary::{
@@ -483,7 +483,12 @@ fn the_byte_cap_stops_the_run_and_marks_replicates_incomplete() {
                     let shape = &first["readings"]["shape"];
                     assert_eq!(projections["first"]["genome_size"], shape["genome_size"]);
                     assert_eq!(projections["first"]["births"], shape["ancestry"]["births"]);
-                    assert_eq!(projections["last"]["shape"], last["readings"]["shape"]);
+                    let last: Shape =
+                        serde_json::from_value(last["readings"]["shape"].clone()).unwrap();
+                    assert_eq!(
+                        projections["last"]["shape"],
+                        serde_json::to_value(ShapeProjection::of(&last)).unwrap()
+                    );
                 }
                 _ => {
                     nulls += 1;

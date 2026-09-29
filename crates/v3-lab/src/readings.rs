@@ -202,11 +202,31 @@ pub struct SignatureAggregates {
     pub mean_delta: f64,
 }
 
-/// The summary's `last` projection: the full shape and, when computed, the
-/// signature aggregates.
+/// The summary's `last` shape: exactly what the report renders. The rest of
+/// the shape (`stateful_node`, `ancestry.requested` and the per-operator
+/// counts, the other steering counters) stays in the rows.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShapeProjection {
+    pub genome_size: u32,
+    pub functional_complexity: u32,
+    pub nodes: usize,
+    pub reachable: usize,
+    pub executed: usize,
+    pub deaths: u32,
+    pub births: u64,
+    pub applied: u64,
+    pub families: Vec<FamilyReading>,
+    pub moves: u64,
+    pub exact_hits: u64,
+    pub avoidance_trials: u64,
+    pub avoided: u64,
+}
+
+/// The summary's `last` projection: the rendered shape and, when computed,
+/// the signature aggregates.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LastProjection {
-    pub shape: Shape,
+    pub shape: ShapeProjection,
     pub signature: Option<SignatureAggregates>,
 }
 
@@ -224,7 +244,7 @@ impl ReplicateReadings {
             self.first = Some(FirstProjection::of(&readings.shape));
         }
         self.last = Some(LastProjection {
-            shape: readings.shape.clone(),
+            shape: ShapeProjection::of(&readings.shape),
             signature: readings.signature.as_ref().map(SignatureAggregates::of),
         });
     }
@@ -243,6 +263,27 @@ impl FirstProjection {
             births: shape.ancestry.births,
             requested: shape.ancestry.requested,
             applied: shape.ancestry.applied,
+        }
+    }
+}
+
+impl ShapeProjection {
+    #[must_use]
+    pub fn of(shape: &Shape) -> Self {
+        Self {
+            genome_size: shape.genome_size,
+            functional_complexity: shape.functional_complexity,
+            nodes: shape.nodes,
+            reachable: shape.reachable,
+            executed: shape.executed,
+            deaths: shape.deaths,
+            births: shape.ancestry.births,
+            applied: shape.ancestry.applied,
+            families: shape.families.clone(),
+            moves: shape.steering.moves,
+            exact_hits: shape.steering.exact_hits,
+            avoidance_trials: shape.steering.avoidance_trials,
+            avoided: shape.steering.avoided,
         }
     }
 }
