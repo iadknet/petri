@@ -3,8 +3,8 @@
   "summary_version": 3,
   "assay": "barrier-navigation",
   "provenance": {
-    "git_revision": "9b6dcbd8ac07c7a12781206df5373b25f58a31c3",
-    "dirty": true,
+    "git_revision": "47a707940d3d3bcf5d3a3717f4382024311e4ba9",
+    "dirty": false,
     "config_digest": "2d997590cf6632743d6b604ba611256dc13aaa7455002e37bc56efe9a9dd580f",
     "overlays": [
       {
@@ -365,9 +365,9 @@
   "incomplete": "uncalibrated",
   "exit_code": 2,
   "timing": {
-    "wall_seconds": 0.184661417,
+    "wall_seconds": 0.184984584,
     "creature_ticks": 18760,
-    "per_creature_tick_ms": 0.009843359115138593,
+    "per_creature_tick_ms": 0.009860585501066098,
     "readings_creature_ticks": 0
   }
 }

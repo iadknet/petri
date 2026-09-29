@@ -3,8 +3,8 @@
   "summary_version": 3,
   "assay": "food-seeking",
   "provenance": {
-    "git_revision": "9b6dcbd8ac07c7a12781206df5373b25f58a31c3",
-    "dirty": true,
+    "git_revision": "47a707940d3d3bcf5d3a3717f4382024311e4ba9",
+    "dirty": false,
     "config_digest": "2d997590cf6632743d6b604ba611256dc13aaa7455002e37bc56efe9a9dd580f",
     "overlays": [
       {
@@ -2835,9 +2835,9 @@
   "incomplete": null,
   "exit_code": 0,
   "timing": {
-    "wall_seconds": 59.020819333,
+    "wall_seconds": 58.802795458,
     "creature_ticks": 6550360,
-    "per_creature_tick_ms": 0.00901031688838476,
+    "per_creature_tick_ms": 0.008977032629962323,
     "readings_creature_ticks": 1606228
   }
 }
