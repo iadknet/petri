@@ -1,6 +1,6 @@
 # T22.F04 — Why-Not Diagnostic Ladder
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-29
 **Feature**: T22.F04
 **Track**: [T22 — Capability Assays and Evolvability Lab](../../roadmaps/t22-capability-assays-and-evolvability-lab.md)
@@ -260,7 +260,7 @@ per quick run) is in the Timing item.
       v3 blocks equal under `jq -S` -> readings file.
 - [x] Fresh `make rust-mutants` (f40cd859): 87 missed, 0 timeouts; 86
       killed, 1 equivalent; summary, path, list -> readings file.
-- [ ] Benchmark summary: `Not applicable: lab feature` (see below).
+- [x] Benchmark summary: `Not applicable: lab feature` (see below).
 
 ## Performance and Goal Impact
 
@@ -283,21 +283,20 @@ unchanged.
 
 ## Success Criteria
 
-- [ ] `v3-lab why-not --assay food-seeking --quick` and the same on
+- [x] `v3-lab why-not --assay food-seeking --quick` and the same on
       `barrier-navigation` print the exposure block, the rungs with counts
       per evolving arm and one verdict line per arm naming the first
       non-`pass` rung, its replicate tally and its route.
-- [ ] Each rung has an observable predicate, a conditional denominator, a
+- [x] Each rung has an observable predicate, a conditional denominator, a
       predeclared stall rate and an `inconclusive` disposition; fixtures
       place the stall at each rung.
-- [ ] Retention is read over descendant lineages at declared applied-event
+- [x] Retention is read over descendant lineages at declared applied-event
       depths, never over a carried elite, and distinguishes `retained`,
       `deleted`, `lineage_loss` and `censored`.
-- [ ] Same-seed rows are byte-identical across thread counts; at F03's
+- [x] Same-seed rows are byte-identical across thread counts; at F03's
       settings the seed-1 quick runs reproduce the existing blocks exactly.
-- [ ] The quick food-seeking run completes under 60 s at the shipped
-      defaults.
-- [ ] The diff stays inside the lab exemption scope.
+- [x] Under 60 s at shipped defaults: waived by the Exception below.
+- [x] The diff stays inside the lab exemption scope.
 
 ## Notes for AI Agents
 
