@@ -1,0 +1,370 @@
+{
+  "kind": "petri-lab-summary",
+  "summary_version": 2,
+  "assay": "barrier-navigation",
+  "provenance": {
+    "git_revision": "993fb1576538cf6d5b8984567cba7577880c2ade",
+    "dirty": false,
+    "config_digest": "2d997590cf6632743d6b604ba611256dc13aaa7455002e37bc56efe9a9dd580f",
+    "overlays": [
+      {
+        "name": "mutation-off",
+        "content": {
+          "mutation": {
+            "per_unit_rate": 0.0
+          }
+        },
+        "order": 0
+      }
+    ],
+    "genomes": [
+      {
+        "name": "start",
+        "sha256": "e24ef162d4848e40963cf00b75c62cb898b5d2decbc5674d3d33975c79eefc3f",
+        "genome_format": 1,
+        "v3_core_version": "0.1.0"
+      },
+      {
+        "name": "comparator",
+        "sha256": "fd36fc82e4db027183eb2a36c0806c06082479bfa9c766965c0d1116ea021a57",
+        "genome_format": 1,
+        "v3_core_version": "0.1.0"
+      }
+    ],
+    "arena": {
+      "spec": {
+        "arena_version": 1,
+        "food_fraction": null,
+        "food_type": 0,
+        "id": "ring-v1",
+        "rules": {
+          "barriers": "the cells at Chebyshev distance scale + 1 from start + 5 D minus one gap",
+          "direction": "D uniform over N, E, S, W from the scenes stream after the Simulation seed",
+          "food": "the 3 x 3 cells centred at start + 5 D, row-major",
+          "gap": "one draw uniform over the ring's non-corner cells in row-major order; D and the gap redraw together",
+          "redraw": "a draw failing the exposure predicate redraws the placement from the scenes stream, the Simulation seed kept, up to 100 draws"
+        },
+        "scale": null,
+        "size": 64,
+        "start": "centre"
+      },
+      "sha256": "2932008f1c6abf009098697dd61f6260bc725be10ed836395a6565d31c48ae00"
+    },
+    "seeds": {
+      "seed": 1,
+      "replicates": [
+        9592401307076638084,
+        2101470194572887548,
+        2130699096827115503,
+        2461035418371614844
+      ],
+      "calibration": 13916701290424016740,
+      "validation": 4900670764520329497
+    },
+    "threads": 8,
+    "sizes": {
+      "replicates": 4,
+      "generations": 40,
+      "population": 16,
+      "elite_fraction": 0.25,
+      "scenes": 4,
+      "validation_scenes": 8,
+      "arena_size": 64,
+      "start_energy": 100.0,
+      "food_fraction": null,
+      "scale": null,
+      "lifetime": null,
+      "blocked_weight": 1.0,
+      "efficiency_weight": 1.0,
+      "quick": true
+    }
+  },
+  "calibration": {
+    "margin": 1.0,
+    "points": [
+      {
+        "food_fraction": null,
+        "scale": 3,
+        "lifetime": 200,
+        "scenes": 16,
+        "redraws": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "exposure": true,
+        "means": {
+          "founder": -0.17967080056462997,
+          "floor": 0.7957403580507935,
+          "half": 10.306993563077397,
+          "oracle": 10.77802599023915,
+          "comparator": 0.9428967779296726,
+          "floor_progress": 0.2718534024455077,
+          "comparator_progress": 0.33575392078681554,
+          "floor_blocked_fraction": 0.05139713530380514,
+          "comparator_blocked_fraction": 0.0,
+          "floor_efficiency": 0.01278409090909091,
+          "half_efficiency": 0.4621140450051071,
+          "oracle_efficiency": 0.9180862312030076,
+          "comparator_efficiency": 0.044642857142857144,
+          "comparator_wins": 9
+        },
+        "competence": false,
+        "sensitivity": true,
+        "validation_competence": null,
+        "validation": null
+      },
+      {
+        "food_fraction": null,
+        "scale": 3,
+        "lifetime": 400,
+        "scenes": 16,
+        "redraws": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "exposure": true,
+        "means": {
+          "founder": -0.17967080056462997,
+          "floor": 0.7957403580507935,
+          "half": 10.306993563077397,
+          "oracle": 10.77802599023915,
+          "comparator": 0.9428967779296726,
+          "floor_progress": 0.2718534024455077,
+          "comparator_progress": 0.33575392078681554,
+          "floor_blocked_fraction": 0.05139713530380514,
+          "comparator_blocked_fraction": 0.0,
+          "floor_efficiency": 0.01278409090909091,
+          "half_efficiency": 0.4621140450051071,
+          "oracle_efficiency": 0.9180862312030076,
+          "comparator_efficiency": 0.044642857142857144,
+          "comparator_wins": 9
+        },
+        "competence": false,
+        "sensitivity": true,
+        "validation_competence": null,
+        "validation": null
+      },
+      {
+        "food_fraction": null,
+        "scale": 2,
+        "lifetime": 200,
+        "scenes": 16,
+        "redraws": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "exposure": true,
+        "means": {
+          "founder": 0.41081499250823517,
+          "floor": 0.21496236452396522,
+          "half": 10.294189793950737,
+          "oracle": 10.701254544693928,
+          "comparator": 2.214779096190178,
+          "floor_progress": 0.24239042207792205,
+          "comparator_progress": 0.42103625541125544,
+          "floor_blocked_fraction": 0.02742805755395683,
+          "comparator_blocked_fraction": 0.000992063492063492,
+          "floor_efficiency": 0.0,
+          "half_efficiency": 0.4508162999748341,
+          "oracle_efficiency": 0.8861190025252526,
+          "comparator_efficiency": 0.10723490427098674,
+          "comparator_wins": 10
+        },
+        "competence": false,
+        "sensitivity": true,
+        "validation_competence": null,
+        "validation": null
+      },
+      {
+        "food_fraction": null,
+        "scale": 2,
+        "lifetime": 400,
+        "scenes": 16,
+        "redraws": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "exposure": true,
+        "means": {
+          "founder": 0.41081499250823517,
+          "floor": 0.21496236452396522,
+          "half": 10.294189793950737,
+          "oracle": 10.701254544693928,
+          "comparator": 2.214779096190178,
+          "floor_progress": 0.24239042207792205,
+          "comparator_progress": 0.42103625541125544,
+          "floor_blocked_fraction": 0.02742805755395683,
+          "comparator_blocked_fraction": 0.000992063492063492,
+          "floor_efficiency": 0.0,
+          "half_efficiency": 0.4508162999748341,
+          "oracle_efficiency": 0.8861190025252526,
+          "comparator_efficiency": 0.10723490427098674,
+          "comparator_wins": 10
+        },
+        "competence": false,
+        "sensitivity": true,
+        "validation_competence": null,
+        "validation": null
+      },
+      {
+        "food_fraction": null,
+        "scale": 1,
+        "lifetime": 200,
+        "scenes": 16,
+        "redraws": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "exposure": true,
+        "means": {
+          "founder": -0.27730263157894736,
+          "floor": 0.8966243241617784,
+          "half": 10.178998187089324,
+          "oracle": 10.719276619464875,
+          "comparator": 3.4246765601217652,
+          "floor_progress": 0.35566829004329004,
+          "comparator_progress": 0.39375000000000004,
+          "floor_blocked_fraction": 0.03130959088151166,
+          "comparator_blocked_fraction": 0.0017123287671232876,
+          "floor_efficiency": 0.009765625,
+          "half_efficiency": 0.3774168617881188,
+          "oracle_efficiency": 0.8619724025974027,
+          "comparator_efficiency": 0.22013888888888888,
+          "comparator_wins": 5
+        },
+        "competence": false,
+        "sensitivity": true,
+        "validation_competence": null,
+        "validation": null
+      },
+      {
+        "food_fraction": null,
+        "scale": 1,
+        "lifetime": 400,
+        "scenes": 16,
+        "redraws": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "exposure": true,
+        "means": {
+          "founder": -0.27730263157894736,
+          "floor": 0.8966243241617784,
+          "half": 10.178998187089324,
+          "oracle": 10.719276619464875,
+          "comparator": 3.4246765601217652,
+          "floor_progress": 0.35566829004329004,
+          "comparator_progress": 0.39375000000000004,
+          "floor_blocked_fraction": 0.03130959088151166,
+          "comparator_blocked_fraction": 0.0017123287671232876,
+          "floor_efficiency": 0.009765625,
+          "half_efficiency": 0.3774168617881188,
+          "oracle_efficiency": 0.8619724025974027,
+          "comparator_efficiency": 0.22013888888888888,
+          "comparator_wins": 5
+        },
+        "competence": false,
+        "sensitivity": true,
+        "validation_competence": null,
+        "validation": null
+      }
+    ],
+    "selected": null,
+    "verdict": "uncalibrated",
+    "reach_threshold": null,
+    "reach_threshold_source": null
+  },
+  "arms": [],
+  "fidelity": null,
+  "incomplete": "uncalibrated",
+  "exit_code": 2,
+  "timing": {
+    "wall_seconds": 0.27675525,
+    "creature_ticks": 18760,
+    "per_creature_tick_ms": 0.014752412046908315
+  }
+}
