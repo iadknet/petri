@@ -236,7 +236,7 @@ per quick run) is in the Timing item.
 
 ## Verification
 
-- [x] Focused tests: `cargo test -p v3-lab` -> 174 unit and 20
+- [x] Focused tests: `cargo test -p v3-lab` -> 186 unit and 20
       integration tests pass (1 ignored child helper); names in
       [`docs/progress/readings/t22-f04.md`](../../progress/readings/t22-f04.md).
 - [x] `cargo clippy -p v3-lab --all-targets -- -D warnings` and `cargo
@@ -258,8 +258,8 @@ per quick run) is in the Timing item.
 - [x] Quick runs (seed 1, food-seeking, wall-v1, ring-v1): ladder verdicts
       and the regenerated `docs/progress/lab/t22-f02-*.json` at v4, their
       v3 blocks equal under `jq -S` -> readings file.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred.
+- [x] Fresh `make rust-mutants` (f40cd859): 87 missed, 0 timeouts; 86
+      killed, 1 equivalent; summary, path, list -> readings file.
 - [ ] Benchmark summary: `Not applicable: lab feature` (see below).
 
 ## Performance and Goal Impact

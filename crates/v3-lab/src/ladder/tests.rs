@@ -302,9 +302,10 @@ fn outcomes_count_improved_worse_and_the_largest_improvement() {
         (1.0, 1.0, false),
         (0.5, 1.0, true),
         (4.0, 1.5, false),
+        (0.25, 1.0, false),
     ]);
-    assert_eq!((o.improved, o.worse, o.progress_improved), (2, 1, 2));
-    assert_eq!(o.delta_sum, 1.0 + 0.0 - 0.5 + 2.5);
+    assert_eq!((o.improved, o.worse, o.progress_improved), (2, 2, 2));
+    assert_eq!(o.delta_sum, 1.0 + 0.0 - 0.5 + 2.5 - 0.75);
     assert_eq!(o.delta_max, Some(2.5));
     assert_eq!(outcomes_of(&[(0.0, 1.0, false)]).delta_max, None);
 }
@@ -520,4 +521,244 @@ fn routes_name_the_owning_track_of_each_rung() {
     assert_eq!(Rung::Supply.route(), "T11 / T13");
     assert_eq!(Rung::Viability.route(), "T11 / T17");
     assert_eq!(Rung::Retention.route(), "T13 / T14");
+}
+
+#[test]
+fn a_status_name_is_its_serialized_label() {
+    for status in [Status::Pass, Status::Fail, Status::Inconclusive] {
+        let serialized = serde_json::to_value(status).unwrap();
+        assert_eq!(serialized.as_str(), Some(status.name()));
+    }
+    assert_eq!(Status::Pass.name(), "pass");
+}
+
+fn keyed(pairs: &[(&str, u64)]) -> Keyed {
+    pairs.iter().map(|&(k, v)| (k.to_owned(), v)).collect()
+}
+
+fn supply_block(base: u64) -> Supply {
+    Supply {
+        births: base,
+        touching_births: base + 1,
+        sites: base + 2,
+        reachable: base + 3,
+        uniform_reference: Some(1.0),
+        targeted: Targeted {
+            requested: keyed(&[("a", base)]),
+            applied: keyed(&[("a", base + 1)]),
+            skipped: keyed(&[("a", base + 2)]),
+            skipped_by_reason: keyed(&[("r", base + 3)]),
+        },
+        discarded: base + 4,
+        created: base + 5,
+        removed: base + 6,
+    }
+}
+
+#[test]
+fn supply_pooling_sums_every_count_and_adds_keyed_counts_by_key() {
+    // Arrange: distinct counts, and a key only the second block fired.
+    let mut pooled = supply_block(2);
+    let mut other = supply_block(3);
+    other.targeted.requested.insert("new".into(), 4);
+
+    // Act
+    pooled.add(&other);
+
+    // Assert
+    let expected = Supply {
+        births: 5,
+        touching_births: 7,
+        sites: 9,
+        reachable: 11,
+        uniform_reference: Some(2.0),
+        targeted: Targeted {
+            requested: keyed(&[("a", 5), ("new", 4)]),
+            applied: keyed(&[("a", 7)]),
+            skipped: keyed(&[("a", 9)]),
+            skipped_by_reason: keyed(&[("r", 11)]),
+        },
+        discarded: 13,
+        created: 15,
+        removed: 17,
+    };
+    assert_eq!(pooled, expected);
+}
+
+fn children_block(base: u64) -> Children {
+    Children {
+        touching: TouchingChildren {
+            children: base,
+            scene_changed: base + 1,
+            silent: base + 2,
+            changed: base + 3,
+            dead: base + 4,
+            viable: base + 5,
+            outcomes: outcomes_of(&[(2.0, 1.0, true)]),
+        },
+        other: OtherChildren {
+            children: base + 6,
+            scene_changed: base + 7,
+            outcomes: outcomes_of(&[(0.5, 1.0, false)]),
+        },
+    }
+}
+
+#[test]
+fn children_pooling_sums_every_class_count_and_merges_the_outcomes() {
+    let mut pooled = children_block(2);
+
+    pooled.add(&children_block(3));
+
+    let t = &pooled.touching;
+    assert_eq!(
+        [
+            t.children,
+            t.scene_changed,
+            t.silent,
+            t.changed,
+            t.dead,
+            t.viable
+        ],
+        [5, 7, 9, 11, 13, 15]
+    );
+    assert_eq!((t.outcomes.improved, t.outcomes.delta_sum), (2, 2.0));
+    let o = &pooled.other;
+    assert_eq!([o.children, o.scene_changed], [17, 19]);
+    assert_eq!((o.outcomes.worse, o.outcomes.delta_sum), (2, -1.0));
+}
+
+fn ladder_row(base: u64) -> LadderRow {
+    LadderRow {
+        supply: supply_block(base),
+        children: children_block(base),
+        retention: RetentionRow {
+            selected: base,
+            selected_touching: base + 1,
+            depths: vec![[base, base + 1, base + 2], [base + 3, base + 4, base + 5]],
+            depths_touching: vec![[base + 6, base + 7, base + 8], [base + 9, 0, 1]],
+        },
+    }
+}
+
+#[test]
+fn pooling_rows_then_replicates_sums_supply_children_and_retention() {
+    // Arrange: two replicates of one written row each.
+    let mut first = Pooled::new(2);
+    first.add(&ladder_row(2));
+    first.retention.censored = vec![2, 3];
+    first.retention.censored_touching = vec![4, 5];
+    let mut second = Pooled::new(2);
+    second.add(&ladder_row(3));
+    second.retention.censored = vec![3, 4];
+    second.retention.censored_touching = vec![5, 6];
+
+    // Act
+    let mut pooled = Pooled::new(2);
+    pooled.merge(&first);
+    pooled.merge(&second);
+    pooled.add(&ladder_row(4));
+
+    // Assert
+    assert_eq!((pooled.supply.births, pooled.supply.removed), (9, 27));
+    assert_eq!(pooled.children.touching.viable, 7 + 8 + 9);
+    let r = &pooled.retention;
+    assert_eq!((r.selected, r.selected_touching), (9, 12));
+    assert_eq!(r.depths, vec![[9, 12, 15], [18, 21, 24]]);
+    assert_eq!(r.depths_touching, vec![[27, 30, 33], [36, 0, 3]]);
+    assert_eq!(
+        (r.censored.as_slice(), r.censored_touching.as_slice()),
+        (&[5, 7][..], &[9, 11][..])
+    );
+}
+
+#[test]
+fn rung_context_prints_each_rungs_pooled_counts_means_and_shares() {
+    let mut pooled = Pooled::new(2);
+    pooled.add(&ladder_row(2));
+    pooled.children.other.outcomes.improved = 2;
+    pooled.retention.censored = vec![1, 0];
+
+    assert_eq!(rung_context(&pooled, Rung::Exposure), "");
+    assert_eq!(
+        rung_context(&pooled, Rung::Supply),
+        "targeted requested {a 2}, applied {a 3}, skipped {a 4}, skipped by reason {r 5}; \
+         discarded 6, created 7, removed 8; mean sites 2.000, mean reachable 2.500; \
+         uniform reference 1.000"
+    );
+    assert_eq!(
+        rung_context(&pooled, Rung::Viability),
+        "silent 4, changed 5, dead 6, scene_changed 3"
+    );
+    assert_eq!(
+        rung_context(&pooled, Rung::Benefit),
+        "progress_improved 1, worse 0, delta_mean 0.143, delta_max 1.000; \
+         non-touching improved 2/8 = 0.250"
+    );
+    assert_eq!(
+        rung_context(&pooled, Rung::Retention),
+        "selected 2 (3 touching); \
+         all: d1 retained 2 deleted 3 lineage_loss 4 censored 1; \
+         d2 retained 5 deleted 6 lineage_loss 7 censored 0; \
+         touching: d1 retained 8 deleted 9 lineage_loss 10 censored 0; \
+         d2 retained 11 deleted 0 lineage_loss 1 censored 0"
+    );
+}
+
+#[test]
+fn rung_context_prints_null_means_and_shares_with_no_births_or_children() {
+    let empty = Pooled::new(1);
+
+    let supply = rung_context(&empty, Rung::Supply);
+    let benefit = rung_context(&empty, Rung::Benefit);
+
+    assert!(
+        supply.starts_with("targeted requested {}, applied {}"),
+        "{supply}"
+    );
+    assert!(
+        supply.ends_with("mean sites null, mean reachable null; uniform reference null"),
+        "{supply}"
+    );
+    assert!(
+        benefit.contains("delta_mean null, delta_max null"),
+        "{benefit}"
+    );
+    assert!(
+        benefit.ends_with("non-touching improved 0/0 = null"),
+        "{benefit}"
+    );
+}
+
+#[test]
+fn an_axis_names_the_food_fraction_then_the_scale_then_a_layout() {
+    assert_eq!(axis(Some(0.04), Some(2)), "fraction 0.04");
+    assert_eq!(axis(None, Some(2)), "scale 2");
+    assert_eq!(axis(None, None), "layout");
+}
+
+#[test]
+fn an_uncalibrated_point_lists_only_the_checks_it_failed() {
+    let mut calibration = calibration(Verdict::Uncalibrated);
+    calibration.points[1].validation_competence = Some(false);
+    let exposure = Exposure::of(&calibration, false);
+    let gaps = exposure.failing[1].sensitivity_gaps.unwrap();
+    assert!((gaps[2] - 0.2).abs() < 1e-12, "{gaps:?}");
+
+    let mut out = String::new();
+    exposure_lines(&mut out, &exposure);
+
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(
+        lines[..2],
+        [
+            "- exposure: fail (uncalibrated)",
+            "  - fraction 0.04 lifetime 200: exposure (2/16 scenes drawn)",
+        ],
+        "an unexposed point fails exposure alone"
+    );
+    assert!(
+        lines[2].ends_with("progress 0.200); validation competence"),
+        "{out}"
+    );
 }

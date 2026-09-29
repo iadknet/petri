@@ -698,3 +698,137 @@ fn touching_children_are_classed_on_the_battery_and_viable_needs_a_behavior_chan
         Status::Inconclusive
     );
 }
+
+#[test]
+fn a_birth_adds_applied_times_sites_over_reachable_as_its_uniform_reference() {
+    let birth = |reachable| Birth {
+        applied: 3,
+        sites: 4,
+        reachable,
+        ..Birth::default()
+    };
+    let mut supply = Supply::default();
+    supply.add_birth(&birth(6));
+    assert_eq!(supply.uniform_reference, Some(2.0));
+    supply.add_birth(&birth(0));
+    assert_eq!((supply.births, supply.uniform_reference), (2, None));
+}
+
+fn scene(progress: f64) -> SceneScore {
+    SceneScore {
+        score: 0.0,
+        food_eaten: 0,
+        intake: 0.0,
+        ticks_to_first_food: None,
+        progress,
+        efficiency: 0.0,
+        moves_attempted: 0,
+        moves_blocked: 0,
+        penalty_charged: 0.0,
+        energy_end: crate::eval::EnergyEnd::Living(0.0),
+        death_tick: None,
+        ticks: 0,
+    }
+}
+
+#[test]
+fn non_touching_children_count_progress_and_scene_changes_but_not_identical_births() {
+    // Arrange: parent 0 (mean progress 0.5); children 1 and 5 raise it, 2
+    // matches the parent's scenes, 3 is an identical birth.
+    let l = Lineages::new();
+    let parent_scenes = [scene(0.5), scene(0.5)];
+    let raised = [scene(0.5), scene(1.0)];
+    let member = |id, scalar, birth, identical, scenes| Member {
+        id,
+        parent: (id > 0).then_some(0),
+        carried: id == 0,
+        genome: &l.base,
+        applied: u64::from(id > 0),
+        birth,
+        identical,
+        scalar,
+        scenes,
+        sequences: &[],
+    };
+    let birth = Some(&l.births[3]);
+    let view = [
+        member(0, 1.0, None, false, &parent_scenes[..]),
+        member(1, 1.0, birth, false, &raised[..]),
+        member(2, 0.5, birth, false, &parent_scenes[..]),
+        member(3, 5.0, birth, true, &raised[..]),
+        member(5, 0.5, birth, false, &raised[..]),
+    ];
+
+    // Act: the equal-scalar child 1 survives.
+    let row = Tracker::new(2)
+        .step(&view, Some(&[1, 0]), &no_battery)
+        .row()
+        .clone();
+
+    // Assert
+    let o = &row.children.other;
+    assert_eq!((o.children, o.scene_changed), (3, 2));
+    assert_eq!((o.outcomes.progress_improved, o.outcomes.improved), (2, 0));
+    assert_eq!(
+        row.retention.selected, 0,
+        "an equal scalar is no improvement"
+    );
+    assert_eq!(row.supply.births, 4, "supply counts identical births too");
+}
+
+/// Generation 1 with synthetic batteries: carried parent 0 (`base`),
+/// touching child 1 (`changed`, a behavior change) that improves and
+/// survives, and touching child 2 (`other`, silent).
+fn touching_selected(l: &Lineages) -> Tracker {
+    use v3_core::contracts::{Direction, WorldAction};
+    let signature = |genome: &CreatureGenome| BatterySignature {
+        snapshots: vec![vec![if *genome == l.changed {
+            WorldAction::Move(Direction::N)
+        } else {
+            WorldAction::NoOp
+        }]],
+        sequences: Vec::new(),
+    };
+    let touching = |child: &CreatureGenome| Birth {
+        touching: true,
+        change: Arc::new(Change::between(&l.base, child)),
+        ..Birth::default()
+    };
+    let births = [touching(&l.changed), touching(&l.other)];
+    let view = [
+        (0, None, true, &l.base, 0, None, 1.0),
+        (1, Some(0), false, &l.changed, 1, Some(&births[0]), 2.0),
+        (2, Some(0), false, &l.other, 1, Some(&births[1]), 0.5),
+    ];
+    let mut tracker = Tracker::new(2);
+    let pending = tracker.step(&members(&view), Some(&[1, 0]), &signature);
+    let row = pending.row().clone();
+    tracker.commit(pending);
+    let t = &row.children.touching;
+    assert_eq!((t.children, t.changed, t.silent, t.viable), (2, 1, 1, 1));
+    assert_eq!(
+        (row.retention.selected, row.retention.selected_touching),
+        (1, 1)
+    );
+    tracker
+}
+
+#[test]
+fn a_touching_selection_is_censored_or_resolved_in_the_touching_counts() {
+    let l = Lineages::new();
+    let mut censored = touching_selected(&l);
+    censored.censor();
+    assert_eq!(censored.pooled.retention.censored_touching, [1, 1]);
+
+    // Child 1's lineage is absent from the next population.
+    let mut lost = touching_selected(&l);
+    let row = step(
+        &mut lost,
+        &[
+            (0, None, true, &l.base, 0, None, 1.0),
+            (9, Some(0), false, &l.other, 1, Some(&l.births[3]), 0.5),
+        ],
+        Some(&[9]),
+    );
+    assert_eq!(row.retention.depths_touching, [[0, 0, 1], [0, 0, 1]]);
+}
