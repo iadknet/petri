@@ -11,6 +11,7 @@ use v3_lab::campaign::{run_campaign, Arm, ArmKind, Plan};
 use v3_lab::cli::read_summary;
 use v3_lab::eval::{evaluate_genome, Setup};
 use v3_lab::output::{Budget, GitProvenance, LabRoot, RunDir, SUMMARY_RESERVE};
+use v3_lab::readings::SignatureArms;
 use v3_lab::run::{run, RunOutcome, RunParams, UserArm, EXIT_UNCALIBRATED};
 use v3_lab::scene::{ArenaId, Assay, SceneSpec};
 use v3_lab::summary::{
@@ -81,6 +82,8 @@ fn tiny(out: &Path) -> RunParams {
         out: Some(out.to_path_buf()),
         calibrate_only: false,
         quick: false,
+        mutants: 2,
+        signature_arms: SignatureArms::Changing,
     }
 }
 
@@ -96,6 +99,8 @@ fn child_run_for_the_determinism_test() {
     let overlay = PathBuf::from(std::env::var_os(CHILD_OVERLAY).expect("child overlay"));
     let mut params = tiny(&root.join(".bench-artifacts/lab/two"));
     params.threads = 2;
+    params.mutants = 4;
+    params.signature_arms = SignatureArms::All;
     params.arms = vec![UserArm {
         name: "hot".into(),
         overlay,
@@ -111,6 +116,8 @@ fn same_seed_rows_are_byte_identical_across_threads_and_processes() {
     let overlay = scratch.lab.join("hot.json");
     std::fs::write(&overlay, r#"{"mutation": {"per_unit_rate": 0.02}}"#).unwrap();
     let mut params = tiny(&scratch.lab.join("one"));
+    params.mutants = 4;
+    params.signature_arms = SignatureArms::All;
     params.arms = vec![UserArm {
         name: "hot".into(),
         overlay: overlay.clone(),
@@ -191,6 +198,24 @@ fn same_seed_rows_are_byte_identical_across_threads_and_processes() {
     assert!(rows
         .lines()
         .any(|l| l.contains(r#""arm":"hot","role":"user","policy":"policy-deviation""#)));
+
+    // Under `all`, every genome arm's rows carry four mutants; scripted
+    // arms carry no readings.
+    for line in rows.lines() {
+        let row: serde_json::Value = serde_json::from_str(line).unwrap();
+        assert_eq!(row["row_version"], 2);
+        if row["arm"] == "random-walk" {
+            assert!(row["readings"].is_null());
+        } else {
+            assert!(row["readings"]["shape"].is_object(), "{}", row["arm"]);
+            assert_eq!(row["readings"]["signature"]["mutants"]["n"], 4);
+        }
+    }
+    assert_eq!(summary.provenance.sizes.mutants, Some(4));
+    assert_eq!(
+        summary.provenance.sizes.signature_arms,
+        Some(SignatureArms::All)
+    );
 }
 
 #[test]
@@ -231,6 +256,13 @@ fn the_summary_carries_the_versioned_keep_list_and_reports_alone() {
     ] {
         assert!(value.get(key).is_some(), "missing {key}");
     }
+    for key in ["mutants", "signature_arms"] {
+        assert!(
+            !value["provenance"]["sizes"][key].is_null(),
+            "sizes.{key} in every summary"
+        );
+    }
+    assert_eq!(value["timing"]["readings_creature_ticks"], 0);
     for key in [
         "git_revision",
         "dirty",
@@ -259,7 +291,8 @@ fn the_summary_carries_the_versioned_keep_list_and_reports_alone() {
         .unwrap()
         .is_empty());
 
-    // A foreign kind or version alone is refused, F01's v1 included.
+    // A foreign kind or version alone is refused, F01's v1 included; v2
+    // (F02) is read.
     for (key, foreign) in [
         ("kind", serde_json::json!("other-summary")),
         ("summary_version", serde_json::json!(1)),
@@ -294,19 +327,27 @@ fn timing_counts_gate_and_campaign_creature_ticks() {
     }
     // The campaign adds at most every evaluation's full lifetime: 5 genome
     // arms × population × scenes per generation, plus one validation pass
-    // per reach-tested arm and generation.
+    // per reach-tested arm and generation. Readings add, per generation and
+    // `changing` arm (native, shuffled-score), at most one scene pass per
+    // ablated family (fewer than 22) and mutant.
     let p = tiny(&scratch.lab.join("unused"));
     let lifetime = u64::from(p.lifetime.unwrap());
     let generations = u64::from(p.replicates * p.generations);
     let bound = lifetime
         * generations
         * (5 * u64::from(p.population * p.scenes) + 4 * u64::from(p.validation_scenes));
-    assert!(full.creature_ticks > gate.creature_ticks);
+    let readings_bound =
+        lifetime * generations * 2 * (22 + u64::from(p.mutants)) * u64::from(p.scenes);
+    assert_eq!(gate.readings_creature_ticks, 0);
+    assert!(full.readings_creature_ticks > 0);
+    assert!(full.readings_creature_ticks <= readings_bound);
+    assert!(full.creature_ticks > gate.creature_ticks + full.readings_creature_ticks);
     assert!(
-        full.creature_ticks <= gate.creature_ticks + bound,
-        "{} > {} + {bound}",
+        full.creature_ticks <= gate.creature_ticks + full.readings_creature_ticks + bound,
+        "{} > {} + {} + {bound}",
         full.creature_ticks,
-        gate.creature_ticks
+        gate.creature_ticks,
+        full.readings_creature_ticks
     );
 }
 
@@ -396,6 +437,8 @@ fn the_byte_cap_stops_the_run_and_marks_replicates_incomplete() {
         scenes: 2,
         spec: SceneSpec::sparse(48, 0.06, 5),
         threshold: 1e9,
+        mutants: 2,
+        signature_arms: SignatureArms::Changing,
     };
     let validation = draw_scenes(11, 2, &SceneSpec::sparse(48, 0.06, 5)).unwrap();
     // Room for a few rows only: rows and elites get cap − reserve bytes.
@@ -416,6 +459,40 @@ fn the_byte_cap_stops_the_run_and_marks_replicates_incomplete() {
             StoppedBy::ByteCap | StoppedBy::NotStarted
         ));
     }
+
+    // Projections come from written rows only: each replicate's `first` and
+    // `last` are its first and last written rows' readings, a replicate
+    // with none written (the refused row's included) has null.
+    let rows: Vec<serde_json::Value> = String::from_utf8(rows)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let mut nulls = 0;
+    for arm in &arms {
+        for replicate in &arm.replicates {
+            let written: Vec<&serde_json::Value> = rows
+                .iter()
+                .filter(|row| {
+                    row["arm"] == arm.name.as_str() && row["replicate"] == replicate.replicate
+                })
+                .collect();
+            let projections = serde_json::to_value(&replicate.readings).unwrap();
+            match (written.first(), written.last()) {
+                (Some(first), Some(last)) => {
+                    let shape = &first["readings"]["shape"];
+                    assert_eq!(projections["first"]["genome_size"], shape["genome_size"]);
+                    assert_eq!(projections["first"]["births"], shape["ancestry"]["births"]);
+                    assert_eq!(projections["last"]["shape"], last["readings"]["shape"]);
+                }
+                _ => {
+                    nulls += 1;
+                    assert!(projections["first"].is_null() && projections["last"].is_null());
+                }
+            }
+        }
+    }
+    assert!(nulls > 0, "some arm and replicate wrote no row");
 }
 
 #[test]
@@ -445,6 +522,8 @@ fn validation_evaluations_count_toward_creature_ticks() {
             scenes: 2,
             spec: SceneSpec::sparse(48, 0.06, 5),
             threshold,
+            mutants: 2,
+            signature_arms: SignatureArms::Changing,
         };
         let mut dir = RunDir::create(
             scratch.lab.join(name),
@@ -597,7 +676,7 @@ fn tiny_barrier(out: &Path, arena: ArenaId) -> RunParams {
 /// The summary fields every barrier-navigation run carries.
 fn assert_barrier_summary(outcome: &RunOutcome, arena: &str) {
     let summary = &outcome.summary;
-    assert_eq!(summary.summary_version, 2);
+    assert_eq!(summary.summary_version, SUMMARY_VERSION);
     assert_eq!(summary.assay, Assay::BarrierNavigation);
     assert_eq!(summary.provenance.sizes.blocked_weight, 1.0);
     assert_eq!(summary.provenance.sizes.efficiency_weight, 1.0);
@@ -738,4 +817,28 @@ fn a_layout_with_unreachable_food_is_not_exposed() {
     assert_eq!(points[0].redraws, [0], "a layout has no redraw");
     assert!(outcome.summary.arms.is_empty());
     assert_eq!(outcome.summary.timing.creature_ticks, 0);
+}
+
+#[test]
+fn a_v2_summary_renders_without_readings_and_a_v3_summary_renders_them() {
+    // The T22.F02 wall summary as committed at df2ddbe3 (summary_version 2).
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/summary-v2-wall.json");
+    let v2 = read_summary(&fixture).unwrap();
+    assert_eq!(v2.summary_version, 2);
+    let report = render_report(&v2);
+    assert!(report.contains("## Arms") && !report.contains("## Readings"));
+
+    let scratch = Scratch::new("v3-report");
+    let outcome = scratch.run(&tiny(&scratch.lab.join("run"))).unwrap();
+    let v3 = read_summary(&outcome.dir.join("summary.json")).unwrap();
+    assert_eq!(v3.summary_version, SUMMARY_VERSION);
+    let report = render_report(&v3);
+    assert!(report.contains("## Readings"), "{report}");
+    assert!(report.contains("### native replicate 0"));
+    assert!(report.contains("| FoodHere:0 |"));
+    assert!(report.contains("signature: 2 mutants"));
+    // founder-only is outside `changing`; random-walk has no readings.
+    let founder_only = report.split("### founder-only replicate 0").nth(1).unwrap();
+    assert!(founder_only.contains("signature: not computed"));
+    assert!(report.contains("| random-walk | 0 | - |"));
 }

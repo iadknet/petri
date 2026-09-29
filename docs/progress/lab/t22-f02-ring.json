@@ -1,10 +1,10 @@
 {
   "kind": "petri-lab-summary",
-  "summary_version": 2,
+  "summary_version": 3,
   "assay": "barrier-navigation",
   "provenance": {
-    "git_revision": "993fb1576538cf6d5b8984567cba7577880c2ade",
-    "dirty": false,
+    "git_revision": "9b6dcbd8ac07c7a12781206df5373b25f58a31c3",
+    "dirty": true,
     "config_digest": "2d997590cf6632743d6b604ba611256dc13aaa7455002e37bc56efe9a9dd580f",
     "overlays": [
       {
@@ -76,7 +76,9 @@
       "lifetime": null,
       "blocked_weight": 1.0,
       "efficiency_weight": 1.0,
-      "quick": true
+      "quick": true,
+      "mutants": 8,
+      "signature_arms": "changing"
     }
   },
   "calibration": {
@@ -363,8 +365,9 @@
   "incomplete": "uncalibrated",
   "exit_code": 2,
   "timing": {
-    "wall_seconds": 0.27675525,
+    "wall_seconds": 0.184661417,
     "creature_ticks": 18760,
-    "per_creature_tick_ms": 0.014752412046908315
+    "per_creature_tick_ms": 0.009843359115138593,
+    "readings_creature_ticks": 0
   }
 }

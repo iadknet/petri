@@ -1,5 +1,6 @@
-//! The summary keep-list (`kind: petri-lab-summary`, `summary_version: 2`)
-//! and the report rendered from it alone. A v1 summary is refused.
+//! The summary keep-list (`kind: petri-lab-summary`, `summary_version: 3`)
+//! and the report rendered from it alone. v2 summaries (before T22.F03's
+//! readings) still render, without the readings section; v1 is refused.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -7,10 +8,13 @@ use std::fmt::Write as _;
 use serde::{Deserialize, Serialize};
 
 use crate::arena::{Policy, Role};
+use crate::readings::{ReplicateReadings, SignatureArms};
 use crate::scene::Assay;
 
 pub const SUMMARY_KIND: &str = "petri-lab-summary";
-pub const SUMMARY_VERSION: u32 = 2;
+pub const SUMMARY_VERSION: u32 = 3;
+/// The oldest summary version `report` still renders.
+pub const SUMMARY_VERSION_MIN: u32 = 2;
 pub const GENOME_FORMAT: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -105,6 +109,12 @@ pub struct Sizes {
     pub blocked_weight: f64,
     pub efficiency_weight: f64,
     pub quick: bool,
+    /// Resolved `--mutants`; absent from v2 summaries.
+    #[serde(default)]
+    pub mutants: Option<u32>,
+    /// Resolved `--signature-arms`; absent from v2 summaries.
+    #[serde(default)]
+    pub signature_arms: Option<SignatureArms>,
 }
 
 /// Mean scores of the calibrated actors at one grid point.
@@ -209,6 +219,10 @@ pub struct ReplicateResult {
     pub stopped_by: StoppedBy,
     pub generations_run: u32,
     pub final_best: Option<f64>,
+    /// Projections of the first and last written rows' readings; absent
+    /// from v2 summaries.
+    #[serde(default)]
+    pub readings: ReplicateReadings,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -301,6 +315,10 @@ pub struct Timing {
     /// instruments excluded).
     pub creature_ticks: u64,
     pub per_creature_tick_ms: Option<f64>,
+    /// Production creature-ticks on ablated copies and mutants (also in
+    /// `creature_ticks`); absent from v2 summaries.
+    #[serde(default)]
+    pub readings_creature_ticks: u64,
 }
 
 fn fmt_opt(value: Option<f64>) -> String {
@@ -481,17 +499,151 @@ pub fn render_report(summary: &Summary) -> String {
             label(fidelity.lifetime_learning),
         );
     }
+    if summary.summary_version >= 3 && !summary.arms.is_empty() {
+        readings_section(&mut out, &summary.arms);
+    }
     let _ = writeln!(
         out,
-        "\nTiming: {:.1} s wall, {} creature-ticks, {} ms per creature-tick.",
+        "\nTiming: {:.1} s wall, {} creature-ticks ({} on readings), {} ms per creature-tick.",
         summary.timing.wall_seconds,
         summary.timing.creature_ticks,
+        summary.timing.readings_creature_ticks,
         summary
             .timing
             .per_creature_tick_ms
             .map_or("-".into(), |ms| format!("{ms:.5}")),
     );
     out
+}
+
+/// `last (±delta)`.
+fn with_delta<T: Into<i64> + Copy>(last: T, first: T) -> String {
+    let (last, first) = (last.into(), first.into());
+    format!("{last} ({:+})", last - first)
+}
+
+/// `num/den = ratio`, `null` at a zero denominator.
+fn ratio(num: u64, den: u64) -> String {
+    if den == 0 {
+        "null".to_owned()
+    } else {
+        #[allow(clippy::cast_precision_loss)]
+        let value = num as f64 / den as f64;
+        format!("{num}/{den} = {value:.3}")
+    }
+}
+
+fn opt_bool(value: Option<bool>) -> String {
+    value.map_or_else(|| "null".to_owned(), |v| v.to_string())
+}
+
+fn usize_i64(value: usize) -> i64 {
+    i64::try_from(value).unwrap_or(i64::MAX)
+}
+
+/// The readings section (v3): one row per arm and replicate with the last
+/// written row's elite and its change since the first, then each one's
+/// family table and signature aggregates.
+fn readings_section(out: &mut String, arms: &[ArmSummary]) {
+    let _ = writeln!(
+        out,
+        "\n## Readings (elite: last written row, change since the first)\n"
+    );
+    let _ = writeln!(
+        out,
+        "| arm | replicate | genome size | functional complexity | nodes | reachable | executed | deaths | births | applied | steering exact/moves | avoided/trials |"
+    );
+    let _ = writeln!(
+        out,
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+    );
+    for arm in arms {
+        for replicate in &arm.replicates {
+            let readings = &replicate.readings;
+            let (Some(first), Some(last)) = (&readings.first, &readings.last) else {
+                let _ = writeln!(
+                    out,
+                    "| {} | {} | - | - | - | - | - | - | - | - | - | - |",
+                    arm.name, replicate.replicate
+                );
+                continue;
+            };
+            let shape = &last.shape;
+            let _ = writeln!(
+                out,
+                "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+                arm.name,
+                replicate.replicate,
+                with_delta(shape.genome_size, first.genome_size),
+                with_delta(shape.functional_complexity, first.functional_complexity),
+                with_delta(usize_i64(shape.nodes), usize_i64(first.nodes)),
+                with_delta(usize_i64(shape.reachable), usize_i64(first.reachable)),
+                with_delta(usize_i64(shape.executed), usize_i64(first.executed)),
+                shape.deaths,
+                shape.ancestry.births,
+                shape.ancestry.applied,
+                ratio(shape.steering.exact_hits, shape.steering.moves),
+                ratio(shape.steering.avoided, shape.steering.avoidance_trials),
+            );
+        }
+    }
+    for arm in arms {
+        for replicate in &arm.replicates {
+            let Some(last) = &replicate.readings.last else {
+                continue;
+            };
+            let _ = writeln!(
+                out,
+                "\n### {} replicate {}\n",
+                arm.name, replicate.replicate
+            );
+            let _ = writeln!(
+                out,
+                "| family | structural | executed_node | live | causal | score_delta |"
+            );
+            let _ = writeln!(out, "| --- | --- | --- | --- | --- | --- |");
+            let causal = last
+                .signature
+                .as_ref()
+                .and_then(|signature| signature.causal.as_ref());
+            for family in &last.shape.families {
+                let reading =
+                    causal.and_then(|causal| causal.iter().find(|c| c.family == family.family));
+                let _ = writeln!(
+                    out,
+                    "| {} | {} | {} | {} | {} | {} |",
+                    family.family,
+                    family.structural,
+                    family.executed_node,
+                    opt_bool(family.live),
+                    reading.map_or("-".into(), |c| c.causal.to_string()),
+                    reading.map_or("-".into(), |c| format!("{:.3}", c.score_delta)),
+                );
+            }
+            let _ = match &last.signature {
+                None => writeln!(out, "\nsignature: not computed"),
+                Some(s) => writeln!(
+                    out,
+                    "\nsignature: {} mutants, {} identical; silent {}, changed {}, dead {}; improved {}, equal {}, worse {}; scores min {:.3} median {:.3} max {:.3}; mean delta {:.3}{}",
+                    s.n,
+                    s.identical,
+                    s.silent,
+                    s.changed,
+                    s.dead,
+                    s.improved,
+                    s.equal,
+                    s.worse,
+                    s.score_min,
+                    s.score_median,
+                    s.score_max,
+                    s.mean_delta,
+                    s.unsupported
+                        .as_ref()
+                        .map_or(String::new(), |why| format!("; causal unsupported: {why}")),
+                ),
+            };
+        }
+    }
 }
 
 #[cfg(test)]
@@ -575,6 +727,7 @@ mod tests {
             },
             generations_run: 3,
             final_best: None,
+            readings: ReplicateReadings::default(),
         }
     }
 
