@@ -214,7 +214,7 @@ seeded streams, so F01's same-seed, any-thread byte identity of
       reporting `exposure: false`, cross-thread byte identity).
 - [x] Quick runs of both built-in arenas and the food-seeking regression,
       recorded in the readings file.
-- [ ] Scorer revision: the per-assay completed-interval rule, `efficiency`
+- [x] Scorer revision: the per-assay completed-interval rule, `efficiency`
       and `--efficiency-weight`, with fixtures for an exhausted block
       (progress 1 under barrier-navigation, 0 under food-seeking), the
       oracle's `d_start / (d_start + 1)`, a no-bite scene (0), a reach
@@ -225,15 +225,16 @@ seeded streams, so F01's same-seed, any-thread byte identity of
 ## Verification
 
 - [x] `cargo test -p v3-lab` -> all green; `make check` -> exit 0.
-      At 68ac188f: 102 unit + 17 integration tests; `make check` exit 0.
+      At c675651b: 109 unit + 17 integration tests, clippy clean;
+      `make check` exit 0 at 68ac188f.
 - [x] Food-seeking regression: `make lab` (seed 1, `--quick`, release)
       reproduces F01's calibration table (founder 5.13 / 9.73 / 20.84,
       comparator 19.26 / 27.59 / 37.33–38.42, floor 2.67 / 3.60 / 6.31,
       selected 0.04 × 200, reach threshold 15.956), reconfirmed on the base
       commit; the run's `rows.ndjson` sha256 and row count are the new
       baseline (the mask may move plasticity-carrying mutants).
-      Reproduced at 78545c85 and 68ac188f; baseline `cd2a2c5e…45dcbf`,
-      948 rows (readings file).
+      Reproduced at 78545c85, 68ac188f and c675651b; baseline
+      `cd2a2c5e…45dcbf`, 948 rows, unchanged at c675651b (readings file).
 - [x] `make lab LAB_ARGS="run --assay barrier-navigation --quick"` and the
       same with `--arena ring-v1`: the calibration table (verdict, selected
       point, per-point means incl. blocked fractions, failing checks),
@@ -241,9 +242,9 @@ seeded streams, so F01's same-seed, any-thread byte identity of
       row count, in
       [`docs/progress/readings/t22-f02.md`](../../progress/readings/t22-f02.md);
       an `uncalibrated` built-in arena is recorded as a blocker.
-      At 68ac188f both arenas were `uncalibrated` (the scorer ceiling
-      fixed above; competence on the ring and wall scale 3); re-run
-      pending.
+      At c675651b: `wall-v1` `calibrated`, scale 2 × 200, reach threshold
+      5.419; `ring-v1` `uncalibrated` on competence at every scale,
+      exit 2 — the open blocker on the first success criterion.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output
       path, and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Benchmark summary: `Not applicable: lab feature`.
