@@ -1,6 +1,7 @@
-//! The summary keep-list (`kind: petri-lab-summary`, `summary_version: 3`)
+//! The summary keep-list (`kind: petri-lab-summary`, `summary_version: 4`)
 //! and the report rendered from it alone. v2 summaries (before T22.F03's
-//! readings) still render, without the readings section; v1 is refused.
+//! readings) render without the readings section, v3 summaries (before
+//! T22.F04's ladder) without the ladder section; v1 is refused.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -12,7 +13,7 @@ use crate::readings::{ReplicateReadings, SignatureArms};
 use crate::scene::Assay;
 
 pub const SUMMARY_KIND: &str = "petri-lab-summary";
-pub const SUMMARY_VERSION: u32 = 3;
+pub const SUMMARY_VERSION: u32 = 4;
 /// The oldest summary version `report` still renders.
 pub const SUMMARY_VERSION_MIN: u32 = 2;
 pub const GENOME_FORMAT: u32 = 1;
@@ -32,6 +33,9 @@ pub struct Summary {
     pub exit_code: u8,
     /// The only non-deterministic block.
     pub timing: Timing,
+    /// The why-not ladder; absent before v4.
+    #[serde(default)]
+    pub ladder: Option<crate::ladder::Ladder>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -74,6 +78,21 @@ pub struct GenomeRecord {
     pub sha256: String,
     pub genome_format: u32,
     pub v3_core_version: String,
+    /// Where the genome came from; absent before v4.
+    #[serde(default)]
+    pub source: Option<GenomeSource>,
+    /// A file genome's basename.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
+}
+
+/// A recorded genome's origin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum GenomeSource {
+    Founder,
+    File,
+    BuiltinComparator,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -115,6 +134,15 @@ pub struct Sizes {
     /// Resolved `--signature-arms`; absent from v2 summaries.
     #[serde(default)]
     pub signature_arms: Option<SignatureArms>,
+    /// Resolved `--stall-rates`; absent before v4.
+    #[serde(default)]
+    pub stall_rates: Option<crate::ladder::StallRates>,
+    /// Resolved `--retention-depth`; absent before v4.
+    #[serde(default)]
+    pub retention_depth: Option<u32>,
+    /// The assay's relevant families; absent before v4.
+    #[serde(default)]
+    pub relevant_families: Option<Vec<String>>,
 }
 
 /// Mean scores of the calibrated actors at one grid point.
@@ -502,6 +530,7 @@ pub fn render_report(summary: &Summary) -> String {
     if summary.summary_version >= 3 && !summary.arms.is_empty() {
         readings_section(&mut out, &summary.arms);
     }
+    out.push_str(&crate::ladder::render(summary));
     let _ = writeln!(
         out,
         "\nTiming: {:.1} s wall, {} creature-ticks ({} on readings), {} ms per creature-tick.",

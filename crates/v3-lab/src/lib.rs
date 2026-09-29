@@ -12,6 +12,7 @@ pub mod cli;
 pub mod comparator;
 pub mod eval;
 pub mod geodesic;
+pub mod ladder;
 pub mod layout;
 pub mod output;
 pub mod readings;

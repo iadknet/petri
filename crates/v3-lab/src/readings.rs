@@ -328,6 +328,21 @@ impl Batteries {
             steering: SteeringBattery::generate(food_types),
         }
     }
+
+    /// `genome`'s `neighborhood-v1` signature, masked as the scoring pass
+    /// executes it.
+    #[must_use]
+    pub fn signature(
+        &self,
+        config: &SimulationConfig,
+        genome: &CreatureGenome,
+    ) -> BatterySignature {
+        self.battery.signature(
+            &expressed(genome),
+            &config.runtime,
+            config.shared_memory.decay_rate,
+        )
+    }
 }
 
 /// What the scoring pass observed of the elite on the training scenes.
@@ -781,13 +796,7 @@ fn mutants(
         .zip(&identical)
         .filter_map(|(genome, &same)| (!same).then_some(genome))
         .collect();
-    let signature = |genome: &CreatureGenome| -> BatterySignature {
-        batteries.battery.signature(
-            &expressed(genome),
-            &config.runtime,
-            config.shared_memory.decay_rate,
-        )
-    };
+    let signature = |genome: &CreatureGenome| batteries.signature(config, genome);
     let (classes, runs) = if novel.is_empty() {
         (Vec::new(), Vec::new())
     } else {

@@ -20,17 +20,21 @@ use crate::eval::{
     evaluate_genome, evaluate_genome_observed, evaluate_scripted, Boundary, Frozen, SceneScore,
     Scripted, Setup,
 };
+use crate::ladder::{
+    ArmLadder, Birth, LadderRow, Member, Pending, Pooled, ReplicateLadder, Sites, StallRates,
+    Tracker,
+};
 use crate::output::RunDir;
 use crate::readings::{
     Ancestry, Batteries, MutantSeed, Observed, Readings, ReplicateReadings, SignatureArms,
 };
 use crate::rng::{hash, replicate_seed, stream, tagged, Part};
-use crate::scene::{Scene, SceneSpec};
+use crate::scene::{Assay, Scene, SceneSpec};
 use crate::summary::{ArmSummary, Events, Fidelity, LifetimeLearning, ReplicateResult, StoppedBy};
 use crate::{GenomeFile, LabError};
 
 /// NDJSON row schema version.
-pub const ROW_VERSION: u32 = 2;
+pub const ROW_VERSION: u32 = 3;
 
 /// How an arm produces its individuals.
 #[derive(Debug, Clone)]
@@ -105,6 +109,11 @@ pub struct Plan {
     /// Fresh mutants per signature reading.
     pub mutants: u32,
     pub signature_arms: SignatureArms,
+    /// Names the relevant families of the ladder's sites.
+    pub assay: Assay,
+    /// Applied events after a selected improvement the retention rung reads.
+    pub retention_depth: u32,
+    pub stall_rates: StallRates,
 }
 
 impl Plan {
@@ -160,6 +169,8 @@ struct Individual {
     genome: Option<CreatureGenome>,
     /// `None` for founders and carried elites.
     birth: Option<Events>,
+    /// The birth's ladder bookkeeping (evolving arms; `None` with `birth`).
+    ladder: Option<Birth>,
     carried: bool,
     ancestry: Ancestry,
 }
@@ -239,10 +250,13 @@ struct Lineage {
     elite: Option<CreatureGenome>,
     /// Projections of the first and last written rows' readings.
     readings: ReplicateReadings,
+    /// The why-not bookkeeping (evolving arms only).
+    tracker: Option<Tracker>,
 }
 
 impl Lineage {
-    fn new(arm_index: usize, arm: &Arm, population: u32, replicate: u64) -> Self {
+    fn new(arm_index: usize, arm: &Arm, plan: &Plan, replicate: u64) -> Self {
+        let population = plan.population;
         let (members, genome) = match &arm.kind {
             ArmKind::Evolving { start, .. } => (population, Some(start)),
             ArmKind::Fixed(genome) => (1, Some(genome)),
@@ -254,6 +268,7 @@ impl Lineage {
                 parent: None,
                 genome: genome.cloned(),
                 birth: None,
+                ladder: None,
                 carried: false,
                 ancestry: Ancestry::default(),
             })
@@ -272,6 +287,8 @@ impl Lineage {
             final_best: None,
             elite: None,
             readings: ReplicateReadings::default(),
+            tracker: matches!(arm.kind, ArmKind::Evolving { .. })
+                .then(|| Tracker::new(plan.retention_depth)),
         }
     }
 
@@ -318,6 +335,8 @@ struct Row<'a> {
     validation_mean: Option<f64>,
     /// Null for scripted arms.
     readings: Option<Readings>,
+    /// Null for scripted and fixed arms.
+    ladder: Option<&'a LadderRow>,
 }
 
 /// Campaign totals the summary needs.
@@ -331,6 +350,8 @@ pub struct Totals {
     /// Production creature-ticks on ablated copies and mutants (also in
     /// `creature_ticks`).
     pub readings_creature_ticks: u64,
+    /// Per evolving arm, in arm order.
+    pub ladders: Vec<ArmLadder>,
 }
 
 /// Run every replicate, writing rows under the byte cap. `arms[0]` is the
@@ -348,6 +369,8 @@ pub fn run_campaign(
 ) -> Result<(Vec<ArmSummary>, Totals), LabError> {
     let mut totals = Totals::default();
     let mut results: Vec<Vec<ReplicateResult>> = vec![Vec::new(); arms.len()];
+    let mut ladders: Vec<Vec<ReplicateLadder>> = vec![Vec::new(); arms.len()];
+    let depth = plan.retention_depth as usize;
     let batteries: Vec<Batteries> = arms
         .iter()
         .map(|arm| Batteries::new(&arm.setup.config))
@@ -369,13 +392,48 @@ pub fn run_campaign(
                     ReplicateReadings::default(),
                 ));
             }
+            for ladder in &mut ladders {
+                ladder.push(ReplicateLadder::new(
+                    replicate,
+                    true,
+                    Pooled::new(depth),
+                    &plan.stall_rates,
+                ));
+            }
             continue;
         }
         let lineages = run_replicate(&context, replicate, dir, &mut totals)?;
-        for lineage in &lineages {
-            results[lineage.arm].push(replicate_result(&arms[lineage.arm], lineage, replicate));
+        for lineage in lineages {
+            let result = replicate_result(&arms[lineage.arm], &lineage, replicate);
+            if let Some(mut tracker) = lineage.tracker {
+                tracker.censor();
+                ladders[lineage.arm].push(ReplicateLadder::new(
+                    replicate,
+                    result.incomplete,
+                    tracker.pooled,
+                    &plan.stall_rates,
+                ));
+            }
+            results[lineage.arm].push(result);
         }
     }
+    totals.ladders = arms
+        .iter()
+        .zip(ladders)
+        .zip(&results)
+        .filter(|((arm, _), _)| matches!(arm.kind, ArmKind::Evolving { .. }))
+        .map(|((arm, replicates), results)| {
+            let reached: Vec<Option<bool>> = results.iter().map(|r| r.reached).collect();
+            ArmLadder::new(
+                arm.name.clone(),
+                arm.role,
+                arm.policy,
+                replicates,
+                &reached,
+                depth,
+            )
+        })
+        .collect();
     let summaries = arms
         .iter()
         .zip(results)
@@ -412,7 +470,7 @@ fn run_replicate(
     let mut lineages: Vec<Lineage> = arms
         .iter()
         .enumerate()
-        .map(|(index, arm)| Lineage::new(index, arm, plan.population, r_seed))
+        .map(|(index, arm)| Lineage::new(index, arm, plan, r_seed))
         .collect();
     for generation in 0..plan.generations {
         if lineages.iter().all(|l| !l.active()) {
@@ -612,6 +670,21 @@ fn advance(
         }
     }
 
+    // The order breeding carries, drawn before the row from the same draws
+    // in the same order (the permutation only when a generation is bred).
+    let breeding = matches!(arm.kind, ArmKind::Evolving { .. })
+        && lineage.reached.is_none()
+        && step.generation + 1 < step.plan.generations;
+    let order = breeding.then(|| match arm.kind {
+        ArmKind::Evolving { shuffled: true, .. } => {
+            let mut permuted = scalars.clone();
+            permuted.shuffle(&mut lineage.selection);
+            rank(&permuted, &keys)
+        }
+        _ => true_order.clone(),
+    });
+    let pending = ladder_step(arm, lineage, &members, order.as_deref(), step);
+
     let mut events = Events::default();
     for birth in lineage.population.iter().filter_map(|i| i.birth.as_ref()) {
         events.add(birth);
@@ -685,6 +758,7 @@ fn advance(
         }),
         validation_mean,
         readings,
+        ladder: pending.as_ref().map(Pending::row),
     };
     let line = serde_json::to_string(&row).expect("row serializes");
     if !dir.write_row(&line)? {
@@ -693,6 +767,9 @@ fn advance(
     }
     if let Some(readings) = &row.readings {
         lineage.readings.record(readings);
+    }
+    if let (Some(tracker), Some(pending)) = (&mut lineage.tracker, pending) {
+        tracker.commit(pending);
     }
     if lineage.arm == 0 {
         totals.reference_events.add(&events);
@@ -705,19 +782,58 @@ fn advance(
         lineage.stopped = Some(StoppedBy::Reached);
         return Ok(true);
     }
-    if let ArmKind::Evolving { shuffled, .. } = arm.kind {
-        if step.generation + 1 < step.plan.generations {
-            let order = if shuffled {
-                let mut permuted = scalars;
-                permuted.shuffle(&mut lineage.selection);
-                rank(&permuted, &keys)
-            } else {
-                true_order
-            };
-            breed(arm, lineage, &members, &order, step);
-        }
+    if let Some(order) = order {
+        breed(arm, lineage, &members, &order, step);
     }
     Ok(true)
+}
+
+/// The generation's ladder bookkeeping (evolving arms), after ranking and
+/// before the row; `order` is the order breeding carries, when it breeds.
+fn ladder_step(
+    arm: &Arm,
+    lineage: &Lineage,
+    members: &[Scored],
+    order: Option<&[usize]>,
+    step: &Step<'_>,
+) -> Option<Pending> {
+    lineage.tracker.as_ref().map(|tracker| {
+        let survivors: Option<Vec<u64>> = order.map(|order| {
+            let count = step.plan.survivors().min(members.len());
+            order[..count]
+                .iter()
+                .map(|&index| lineage.population[index].id)
+                .collect()
+        });
+        let view: Vec<Member<'_>> = lineage
+            .population
+            .iter()
+            .zip(members)
+            .map(|(individual, scored)| Member {
+                id: individual.id,
+                parent: individual.parent,
+                carried: individual.carried,
+                genome: individual
+                    .genome
+                    .as_ref()
+                    .expect("evolving arms carry genomes"),
+                applied: individual.ancestry.applied,
+                birth: individual.ladder.as_ref(),
+                identical: individual
+                    .birth
+                    .as_ref()
+                    .is_some_and(|b| b.identical_offspring > 0),
+                scalar: scored.scalar,
+                scenes: &scored.scenes,
+                sequences: &scored.sequences,
+            })
+            .collect();
+        let batteries = &step.batteries[lineage.arm];
+        let config = &arm.setup.config;
+        tracker.step(&view, survivors.as_deref(), &|genome| {
+            batteries.signature(config, genome)
+        })
+    })
 }
 
 /// Truncation with elites: the first `survivors` of `order` carry over
@@ -730,6 +846,7 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
         .iter()
         .map(|&index| Individual {
             birth: None,
+            ladder: None,
             carried: true,
             ..lineage.population[index].clone()
         })
@@ -742,11 +859,20 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
     let config = &arm.setup.config;
     let mutation_seed = lineage.mutation_seed;
     let parents = &population;
-    // Survivors are drawn repeatedly; compute each one's reachable set once.
+    // Survivors are drawn repeatedly; compute each one's reachable set and
+    // relevant sites once.
     let reachable: Vec<_> = parents
         .iter()
         .map(|parent| {
             mesh_reachable_nodes(parent.genome.as_ref().expect("evolving arms carry genomes"))
+        })
+        .collect();
+    let sites: Vec<Sites> = parents
+        .iter()
+        .zip(&reachable)
+        .map(|(parent, reachable)| {
+            let genome = parent.genome.as_ref().expect("evolving arms carry genomes");
+            Sites::with_reachable(step.plan.assay, genome, reachable)
         })
         .collect();
     let children: Vec<Individual> = picks
@@ -772,12 +898,20 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
             );
             let identical = child == *parent_genome;
             let birth = birth_events(&summary, identical);
+            let ladder = Birth::of(
+                step.plan.assay,
+                parent_genome,
+                &sites[pick],
+                &child,
+                &summary,
+            );
             Individual {
                 id: 0,
                 parent: Some(parent.id),
                 genome: Some(child),
                 ancestry: parent.ancestry.child(&birth),
                 birth: Some(birth),
+                ladder: Some(ladder),
                 carried: false,
             }
         })
@@ -843,6 +977,7 @@ mod tests {
             parent: None,
             genome: Some(start.clone()),
             birth: None,
+            ladder: None,
             carried: false,
             ancestry: Ancestry::default(),
         };
@@ -872,6 +1007,9 @@ mod tests {
             threshold: 0.0,
             mutants: 1,
             signature_arms: SignatureArms::Changing,
+            assay: Assay::FoodSeeking,
+            retention_depth: 2,
+            stall_rates: StallRates::default(),
         };
         assert_eq!(plan(64, 0.25).survivors(), 16);
         assert_eq!(plan(7, 0.25).survivors(), 1);
@@ -891,6 +1029,9 @@ mod tests {
             threshold,
             mutants: 1,
             signature_arms: SignatureArms::Changing,
+            assay: Assay::FoodSeeking,
+            retention_depth: 2,
+            stall_rates: StallRates::default(),
         }
     }
 
@@ -1074,7 +1215,7 @@ mod tests {
         };
         let plan = plan(3, 0.4, 2, 1e9);
         let r_seed = replicate_seed(plan.seed, 0);
-        let mut lineage = Lineage::new(0, &arm, plan.population, r_seed);
+        let mut lineage = Lineage::new(0, &arm, &plan, r_seed);
         lineage.population[1].birth = Some(Events {
             offspring: 1,
             ..Events::default()
@@ -1210,6 +1351,52 @@ mod tests {
         partial.push(replicate(false, true));
         assert_eq!(arm_summary(&native, partial).reached_fraction, None);
         assert_eq!(arm_summary(&native, Vec::new()).reached_fraction, None);
+    }
+
+    #[test]
+    fn a_mutation_off_arm_stalls_at_supply_under_a_raised_supply_rate() {
+        let mut off = founder_arm(100.0, 40);
+        off.name = "mutation-off".into();
+        off.role = Role::Control;
+        off.policy = Policy::PolicyDeviation;
+        off.setup.config.mutation.per_unit_rate = 0.0;
+        let arms = vec![off.clone(), fixed(&off, "founder-only", Role::Control)];
+        // 4 members, 1 survivor: 3 births in each of generations 1 and 2;
+        // ρ = 0.5 needs ⌈3 / 0.5⌉ = 6 births.
+        let mut plan = plan(4, 0.25, 3, 1e9);
+        plan.stall_rates.supply = 0.5;
+        let (scratch, mut dir) = Scratch::new("supply-stall");
+        let (_, totals) = run_campaign(&arms, &plan, &[], &mut dir).unwrap();
+        assert_eq!(totals.ladders.len(), 1, "the fixed arm has no ladder");
+        let ladder = &totals.ladders[0];
+        assert!(ladder.diagnostic);
+        let replicate = &ladder.replicates[0];
+        assert_eq!(replicate.pooled.supply.births, 6);
+        assert_eq!(replicate.pooled.supply.touching_births, 0);
+        assert_eq!(replicate.first_not_pass, Some(crate::ladder::Rung::Supply));
+        assert_eq!(replicate.statuses[0].status, crate::ladder::Status::Fail);
+        assert_eq!(
+            ladder.verdict.text(),
+            "stalls at supply: fail 1 / inconclusive 0 of 1"
+        );
+        // At the default ρ = 0.01 the same births are inconclusive.
+        plan.stall_rates.supply = 0.01;
+        let (_, totals) = run_campaign(&arms, &plan, &[], &mut dir).unwrap();
+        assert_eq!(
+            totals.ladders[0].verdict.text(),
+            "inconclusive at supply: fail 0 / inconclusive 1 of 1"
+        );
+        // Fixed arms' rows carry a null ladder; evolving rows a block whose
+        // births sum to the pooled count.
+        assert!(scratch
+            .rows("founder-only")
+            .iter()
+            .all(|r| r["ladder"].is_null()));
+        let births: u64 = scratch.rows("mutation-off")[..3]
+            .iter()
+            .map(|r| r["ladder"]["supply"]["births"].as_u64().unwrap())
+            .sum();
+        assert_eq!(births, 6);
     }
 
     #[test]
