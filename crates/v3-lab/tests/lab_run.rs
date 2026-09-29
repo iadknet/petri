@@ -249,6 +249,7 @@ fn the_summary_carries_the_versioned_keep_list_and_reports_alone() {
     }
     let report = render_report(&read_summary(&outcome.dir.join("summary.json")).unwrap());
     assert!(report.contains("Calibration") && report.contains("| 0.08 | 100 |"));
+    assert!(report.contains("| fraction | lifetime |"), "{report}");
 
     // `--calibrate-only` stops after a passing gate: no arms, rows or fidelity.
     assert_eq!(outcome.exit_code, 0);

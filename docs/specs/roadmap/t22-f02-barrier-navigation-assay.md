@@ -226,8 +226,8 @@ seeded streams, so F01's same-seed, any-thread byte identity of
 
 ## Verification
 
-- [x] `cargo test -p v3-lab` -> 109 unit + 17 integration tests green;
-      `make check` exit 0 at 68ac188f.
+- [x] `cargo test -p v3-lab` -> 112 unit + 17 integration green;
+      `make check` exit 0.
 - [x] Food-seeking regression: `make lab` (seed 1, `--quick`, release)
       reproduces F01's calibration table (founder 5.13 / 9.73 / 20.84,
       comparator 19.26 / 27.59 / 37.33–38.42, floor 2.67 / 3.60 / 6.31,
@@ -243,9 +243,21 @@ seeded streams, so F01's same-seed, any-thread byte identity of
       reached fractions, timing and hashes:
       [`docs/progress/readings/t22-f02.md`](../../progress/readings/t22-f02.md);
       summaries committed as `docs/progress/lab/t22-f02-{wall,ring}.json`.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output
-      path, and every survivor resolved as killed, equivalent, or deferred.
 - [x] Benchmark summary: `Not applicable: lab feature`.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `248 mutants tested
+      in 8m: 8 missed, 194 caught, 46 unviable` in
+      `~/.local/share/petri-tools/mutants/t22-f02/mutants.out`.
+
+| Survivor | Resolution |
+| --- | --- |
+| `run.rs:140` `==`→`!=` (`ArenaPlan::descriptor`) | killed: `arena_descriptor_carries_the_axis_only_for_a_selected_or_only_point` |
+| `scene.rs:43` `Assay::name` → `""` | killed: `assay_name_is_its_serialized_kebab_case_value` |
+| `scene.rs:43` `Assay::name` → `"xyzzy"` | killed: same |
+| `scene.rs:275` delete `-` (`draw_barrier`) | equivalent: flips lateral sign; lateral is 0 or symmetric `-k..=k`, cells row-major sorted |
+| `scene.rs:279:35` `+`→`-` (`draw_barrier`) | equivalent: same symmetry |
+| `scene.rs:279:64` `+`→`-` (`draw_barrier`) | equivalent: same symmetry |
+| `summary.rs:361` delete arm `(_, Some(scale))` (`axis_cell`) | killed: `axis_cell_prints_the_fraction_else_the_scale_else_layout` |
+| `summary.rs:405` guard → `true` (`render_report`) | killed: keep-list test asserts the `fraction` header |
 
 ## Performance and Goal Impact
 
