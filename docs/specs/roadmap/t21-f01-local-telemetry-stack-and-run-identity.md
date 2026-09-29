@@ -27,9 +27,9 @@ the parent comparison and the overhead check.
 - Any change to `v3-core` source: F01 reads seed, tick, status and config
   from the binaries and adds no observation seam; it only declares the empty
   `telemetry-seams` feature in `crates/v3-core/Cargo.toml` that later
-  seams sit behind. `crates/v3-core/src/bin/profile_ticks.rs`
-  is a profiling harness compiled inside `v3-core`, which the track's
-  Boundary note keeps free of any telemetry dependency, so it takes no flag.
+  seams sit behind. `crates/v3-core/src/bin/profile_ticks.rs`,
+  a harness compiled inside `v3-core` (telemetry-free under the track's
+  Boundary note), takes no flag.
 - Retiring one run by ID; the cleanup command takes a cutoff date only.
 - Retries inside the exporter, disk buffering, and any frontend change.
 
@@ -50,9 +50,7 @@ the parent comparison and the overhead check.
 | Image | `grafana/otel-lgtm:0.34.0` (Docker Hub, pushed 2026-09-25; previous tag 0.33.1) | Data under `/data`; `PROMETHEUS_EXTRA_ARGS`, `LOKI_EXTRA_ARGS`, `TEMPO_EXTRA_ARGS`; config mounts at `/otel-lgtm/{loki,tempo}-config.yaml`; container ports 3000, 4317, 4318; the collector forwards logs to Loki at `/otlp`, metrics to Prometheus, traces to Tempo. |
 | Rust SDK | `opentelemetry`, `opentelemetry_sdk`, `opentelemetry-otlp` 0.33.0 (crates.io, 2026-09-29) | `http-proto` + `reqwest-blocking-client` + `logs`; no tokio requirement. |
 
-Options weighed are listed in the readings file.
-
-Invariants:
+Invariants (options weighed are in the readings file):
 
 1. No `SimulationConfig` or `RuntimeConfig` field, no production RNG draw,
    no simulation default and no stored summary content changes. The config
@@ -103,7 +101,7 @@ Invariants:
 | Ports | `127.0.0.1:3300` to Grafana 3000; `127.0.0.1:4317` and `127.0.0.1:4318` to the collector |
 | Volume | named volume `${PETRI_TELEMETRY_VOLUME:-petri-telemetry}` at `/data`; with `PETRI_LGTM_IMAGE` and `PETRI_TELEMETRY_PROJECT` (Compose project name, default `petri-telemetry`) these variables exist for `scripts/telemetry-verify` only |
 | Prometheus | `PROMETHEUS_EXTRA_ARGS=--storage.tsdb.retention.time=100y --storage.tsdb.retention.size=0 --web.enable-admin-api` |
-| Tempo | mounted `telemetry/tempo-config.yaml`: the image's file for 0.34.0 (extracted from the image; Tempo v3.0.3 on both pinned tags, no `compactor` section) with `block_retention: 876000h` under both `backend_scheduler.provider.compaction.compaction` and `backend_worker.compaction`; `/status/config` must show both; `live_store` block settings stay at the image's defaults (`max_block_duration` 30s) |
+| Tempo | mounted `telemetry/tempo-config.yaml`: the image's file for 0.34.0 (extracted from the image; Tempo v3.0.3 on both pinned tags, no `compactor` section) with `block_retention: 876000h` under both `backend_scheduler.provider.compaction.compaction` and `backend_worker.compaction`; `/status/config` must show both; `live_store` block settings and `compaction_window` (1h) stay at the image's defaults: the backend worker merges level-0 blocks inside one window within seconds, so a cutoff retires whole compacted blocks of up to one window, the whole-block granularity the track accepts, and the cleanup preview prints the window in force |
 | Loki | `LOKI_EXTRA_ARGS=-compactor.retention-enabled=true -compactor.delete-request-store=filesystem -compactor.delete-request-cancel-period=1m -compactor.retention-delete-delay=1m -compactor.compaction-interval=5m -distributor.max-line-size=4MB -store.max-query-length=0`; `retention_period` stays at its default `0s`, so nothing expires by age |
 | Grafana | defaults of the image; login `admin`/`admin` |
 
@@ -176,7 +174,7 @@ timed run in `scripts/bench-wait`.
 | --- | --- |
 | `scripts/telemetry-parent-compare BASE` | `BASE` is mandatory and has no default, because in this single-worktree track the parent of a feature after F01 is the previous feature's closing commit, not the fork point; each T21 spec names the commit it compared against. Adds a scratch worktree at `BASE` outside the calling checkout, builds both `v3-cli` release binaries into separate target directories, runs the workload below on both with `--telemetry off`, omitting the flag only when the parent's `run --help` does not list it (a pre-F01 parent), compares the canonical form of both outputs, removes the worktree, and exits non-zero on a difference. |
 | `scripts/telemetry-overhead` | Builds the telemetry build and the reference build (`--no-default-features`, separate target directory); calibrates `T` when the readings file has none; measures the spread; runs the pairs of each state below, stopping and starting the stack with `docker compose stop` and `start` and waiting for Grafana `/api/health` plus 5 s before a timed run that follows a start; prints one table with the per-state median ratio, the verdict, the pair count, the self-timed cost per tick from the stderr line, and the measured time used. It refuses a run that would pass 300 s of measured time and reports `inconclusive`. |
-| `scripts/telemetry-verify` | Runs the three stack verifications and the cleanup rehearsal under Compose project `petri-telemetry-verify` on the scratch volume `petri-telemetry-verify`, never on `petri-telemetry`; refuses to start while the `petri-telemetry` project is up (same host ports); uses the production stack files unchanged and an RFC3339 cutoff taken during the run: it writes the "before" samples, waits for Tempo's 30 s live-store window to close and the block to appear under `/data/tempo/blocks`, writes the first half of the straddling samples, takes the cutoff, writes the second half inside the same window, then writes the "after" samples in a later window, so one run yields a block ending before the cutoff, one straddling it and one after it, and the Loki and Prometheus before/after pairs; prints one pass/fail line per check and removes the scratch volume at the end. |
+| `scripts/telemetry-verify` | Runs the three stack verifications and the cleanup rehearsal under Compose project `petri-telemetry-verify` on the scratch volume `petri-telemetry-verify`, never on `petri-telemetry`; refuses to start while the `petri-telemetry` project is up (same host ports); mounts `telemetry/verify/tempo-config.yaml`, the production Tempo file with `compaction_window: 1m` under `backend_scheduler.provider.compaction.compaction`, so the backend worker merges level-0 blocks only inside the same minute (the production 1 h window would merge the whole rehearsal into one straddling block); takes an RFC3339 cutoff during the run: the "before" samples in one minute, the straddling pair in a later minute with the cutoff taken between its halves, the "after" samples in a minute after that, then waits for compaction to settle; the Tempo check asserts the contract itself: the preview names exactly the whole blocks whose `endTime` is before the cutoff (a block carrying `meta.compacted.json` is never a target; Tempo retires it), the straddling block is kept whole and reported with the window in force, and after cleanup the "before" trace is gone while the straddling and "after" traces still answer; Loki and Prometheus get before/after pairs the same way; prints one pass/fail line per check and removes the scratch volume at the end. |
 
 Workload for both checks: `v3-cli run --seed 7 --ticks T --sample-every T
 --config telemetry/overhead-world.json`, the gate profile's world (128x128,
@@ -201,7 +199,7 @@ no recorded configuration.
 ## Implementation Tasks
 
 - [x] `telemetry/compose.yaml`, `telemetry/tempo-config.yaml`,
-      `telemetry/overhead-world.json`;
+      `telemetry/verify/tempo-config.yaml`, `telemetry/overhead-world.json`;
       `make telemetry-up`, `telemetry-down`, `telemetry-clean`.
 - [x] `crates/v3-telemetry`: identity, `build.rs` revision, the four
       records, bounded exporter with exact per-run counts, stderr
