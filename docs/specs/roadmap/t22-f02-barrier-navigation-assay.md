@@ -27,8 +27,7 @@ assay's calibration numbers for a seed are T22.F01's.
 - No new sensor, no arm that enables lifetime learning (the mask applies
   to every arm), no per-elite brain readings (T22.F03) and no why-not
   ladder (T22.F04).
-- No mixed-arena run, no seeded variation inside a layout file, and no
-  tuning of the comparator's constants on assay outcomes.
+- No mixed-arena run and no seeded variation inside a layout file.
 
 ## Inputs and Invariants
 
@@ -146,19 +145,19 @@ mask.
 **Calibration gate.** F01's gate over the arena's axis × lifetimes:
 `sparse-food-v1` keeps `calibration_fractions`; `wall-v1` and `ring-v1` use
 `calibration_scales` (default {1, 2, 3}) and select the passing point with
-the **largest** scale, then the shortest lifetime (the hardest calibrated
-detour); a layout has one point per lifetime. Exposure, competence (margin default 1.0, wins ≥
+the **largest** scale, then the shortest lifetime; a layout has one point
+per lifetime. Exposure, competence (margin default 1.0, wins ≥
 `ceil(0.75 × scenes)`), sensitivity (floor < half < oracle by ≥ 0.1, and the
 comparator's mean `progress` above the floor's) and the validation rule are
 unchanged; each point also records the floor's and comparator's mean
-`blocked_fraction`. `uncalibrated` stops before any campaign (exit 2) and,
-for a built-in arena, is a recorded blocker naming the failing check per
-point: the comparator's incompetence on an arena is a finding for the track,
-never a reason to lower the margin. `--scale` restricts its axis as
+`blocked_fraction`. `uncalibrated` stops before any campaign (exit 2); on
+a built-in arena it is a recorded finding for the track with the failing
+check per point, never a reason to lower the margin. `--scale` restricts its axis as
 `--food-fraction` does in F01; the gate still runs on the remaining
 points. An axis flag the selected arena does not use is a config error.
 
-**Outputs.** `row_version` stays 1: no row field changes. The summary is
+**Outputs.** `row_version` stays 1: no row field changes (`efficiency`
+is not a row field; `s` carries it). The summary is
 `summary_version: 2`: `provenance.arena.spec` is a canonical descriptor
 (`arena_version: 1`, id, size, start, food type, axis value, geometry and
 sampling rules, or a layout's `arena_format`, path and rows) and
@@ -236,15 +235,12 @@ seeded streams, so F01's same-seed, any-thread byte identity of
       Reproduced at 78545c85, 68ac188f and c675651b; baseline
       `cd2a2c5e…45dcbf`, 948 rows, unchanged at c675651b (readings file).
 - [x] `make lab LAB_ARGS="run --assay barrier-navigation --quick"` and the
-      same with `--arena ring-v1`: the calibration table (verdict, selected
-      point, per-point means incl. blocked fractions, failing checks),
-      reached fractions per native arm, timing, `rows.ndjson` sha256 and
-      row count, in
-      [`docs/progress/readings/t22-f02.md`](../../progress/readings/t22-f02.md);
-      an `uncalibrated` built-in arena is recorded as a blocker.
+      same with `--arena ring-v1`: the calibration table, reached fractions
+      per native arm, timing and the rows hash in
+      [`docs/progress/readings/t22-f02.md`](../../progress/readings/t22-f02.md).
       At c675651b: `wall-v1` `calibrated`, scale 2 × 200, reach threshold
       5.419; `ring-v1` `uncalibrated` on competence at every scale,
-      exit 2 — the open blocker on the first success criterion.
+      exit 2 — accepted by the user decision below.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output
       path, and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Benchmark summary: `Not applicable: lab feature`.
@@ -252,12 +248,11 @@ seeded streams, so F01's same-seed, any-thread byte identity of
 ## Performance and Goal Impact
 
 **Predeclaration — written before the run.** Not applicable: lab feature.
-The diff is confined to `crates/v3-lab`, this spec, the readings file and
-the track checkbox; `Cargo.toml`, `Cargo.lock` and the `Makefile` are
-untouched; no simulation trajectory, default, founder, recipe or mutation
-policy changes, so no gate or goal profile runs and no series entry is
-added. Measurement tooling: the natural-analog and environmental-pressure
-rules do not apply. Lab cost, as complexity only: one BFS over the arena
+The diff is confined to `crates/v3-lab` and docs; `Cargo.toml`,
+`Cargo.lock` and the `Makefile` are untouched; no trajectory, default,
+founder, recipe or mutation policy changes, so no profile runs and no
+series entry. The natural-analog and environmental-pressure rules do not
+apply. Lab cost, as complexity only: one BFS over the arena
 (≤ 16,384 cells) per interval, at most one per bite, and an O(1) read per
 tick; the quick-run wall time is measured, not predicted.
 
@@ -267,12 +262,12 @@ tick; the quick-run wall time is measured, not predicted.
 
 ## Success Criteria
 
-- [ ] `v3-lab run --assay barrier-navigation` calibrates on `wall-v1` and
-      on `ring-v1`, runs every F01 arm on each, and reports per replicate
-      reach, generation to threshold (censored otherwise) and the comparator
-      and floor blocked-fraction means. An `uncalibrated` built-in arena is
-      a recorded blocker leaving the feature incomplete until the user
-      decides.
+- [x] `v3-lab run --assay barrier-navigation` calibrates on `wall-v1`
+      (scale 2 × 200 at seed 1), runs every F01 arm, and reports per
+      replicate reach, generation to threshold (censored otherwise) and the
+      comparator and floor blocked-fraction means; `ring-v1` stays
+      available but uncalibrated on comparator competence (user decision
+      below).
 - [x] A JSON layout file runs as an arena without any Rust change, and an
       infeasible layout is reported as `exposure: false`.
 - [x] Every evaluation is expression-masked and the food-seeking quick run
@@ -288,3 +283,9 @@ tick; the quick-run wall time is measured, not predicted.
   lab as the evaluation-time plasticity mask above (no `v3-core` construct
   exists for it); F01's fresh-state rule and its `learned_weight_capture:
   false` reading stand unchanged.
+- Decision: (user, 2026-09-28) T22.F02 closes with `wall-v1` as the
+  calibrated barrier arena. `ring-v1` stays available but `uncalibrated`:
+  the composed area-food + ring-inhibition comparator wins 9/10/5 of 16
+  scenes at scales 1/2/3 (12 needed), a comparator limitation recorded as
+  a track finding; the comparator, margin, gaps and ring geometry are not
+  tuned to pass.
