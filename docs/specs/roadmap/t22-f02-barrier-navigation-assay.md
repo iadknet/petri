@@ -1,6 +1,6 @@
 # T22.F02 — Barrier-Navigation Assay
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-28
 **Feature**: T22.F02
 **Track**: [T22 — Capability Assays and Evolvability Lab](../../roadmaps/t22-capability-assays-and-evolvability-lab.md)
