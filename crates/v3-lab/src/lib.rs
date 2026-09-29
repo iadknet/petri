@@ -14,6 +14,7 @@ pub mod eval;
 pub mod geodesic;
 pub mod layout;
 pub mod output;
+pub mod readings;
 pub mod rng;
 pub mod run;
 pub mod scene;
@@ -51,7 +52,9 @@ impl GenomeFile {
     ///
     /// # Errors
     ///
-    /// I/O failures, malformed JSON, or an unknown `genome_format`.
+    /// I/O failures, malformed JSON, an unknown `genome_format`, or a node
+    /// with [`readings::ABLATED_REF`] references or more (the ablation
+    /// sentinel would be in range).
     pub fn load(path: &Path) -> Result<CreatureGenome, LabError> {
         let file: Self = read_json(path)?;
         if file.genome_format != summary::GENOME_FORMAT {
@@ -60,6 +63,13 @@ impl GenomeFile {
                 path.display(),
                 file.genome_format,
                 summary::GENOME_FORMAT
+            )));
+        }
+        if !readings::ablation_supported(&file.genome) {
+            return Err(LabError::Config(format!(
+                "{}: a node has {} input_refs or more",
+                path.display(),
+                readings::ABLATED_REF
             )));
         }
         Ok(file.genome)

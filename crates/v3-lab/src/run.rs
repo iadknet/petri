@@ -16,6 +16,7 @@ use crate::campaign::{fidelity, run_campaign, Arm, ArmKind, Plan};
 use crate::eval::{Scoring, Scripted, Setup};
 use crate::layout::Layout;
 use crate::output::{resolve_out, utc_stamp, Budget, LabRoot, RunDir, SUMMARY_RESERVE};
+use crate::readings::SignatureArms;
 use crate::rng::{replicate_seed, tagged};
 use crate::scene::{ArenaId, Assay, Geometry, SCALES};
 use crate::summary::{
@@ -98,6 +99,9 @@ pub struct RunParams {
     pub out: Option<PathBuf>,
     pub calibrate_only: bool,
     pub quick: bool,
+    /// Fresh mutants per signature reading, in [`crate::readings::MUTANTS`].
+    pub mutants: u32,
+    pub signature_arms: SignatureArms,
 }
 
 /// A finished run.
@@ -270,6 +274,10 @@ fn validate_params(params: &RunParams) -> Result<ArenaPlan, LabError> {
     )?;
     check(params.threads >= 1, "--threads must be at least 1")?;
     check(
+        crate::readings::MUTANTS.contains(&params.mutants),
+        "--mutants must be in 1..=64",
+    )?;
+    check(
         params.calibration_margin.is_finite(),
         "--calibration-margin must be finite",
     )?;
@@ -436,6 +444,7 @@ fn run_in_pool(
         },
     );
     let mut creature_ticks = gate.creature_ticks;
+    let mut readings_creature_ticks = 0;
 
     let (arms_summary, fidelity_block, byte_cap_hit, selected) = match (
         &gate.calibration.selected,
@@ -457,9 +466,12 @@ fn run_in_pool(
                 scenes: params.scenes,
                 spec: spec.clone(),
                 threshold,
+                mutants: params.mutants,
+                signature_arms: params.signature_arms,
             };
             let (summaries, totals) = run_campaign(&arms, &plan, &gate.validation, &mut dir)?;
             creature_ticks += totals.creature_ticks;
+            readings_creature_ticks = totals.readings_creature_ticks;
             (
                 summaries,
                 Some(fidelity(&arms[0], &totals)),
@@ -530,6 +542,8 @@ fn run_in_pool(
                 blocked_weight: scoring.blocked_weight,
                 efficiency_weight: scoring.efficiency_weight,
                 quick: params.quick,
+                mutants: Some(params.mutants),
+                signature_arms: Some(params.signature_arms),
             },
         },
         calibration: gate.calibration,
@@ -542,6 +556,7 @@ fn run_in_pool(
             creature_ticks,
             per_creature_tick_ms: (creature_ticks > 0)
                 .then(|| wall_seconds * 1_000.0 / creature_ticks as f64),
+            readings_creature_ticks,
         },
     };
     let bytes = serde_json::to_vec_pretty(&summary).expect("summary serializes");
@@ -655,6 +670,8 @@ mod tests {
             out: None,
             calibrate_only: false,
             quick: false,
+            mutants: 8,
+            signature_arms: SignatureArms::Changing,
         }
     }
 
@@ -717,6 +734,10 @@ mod tests {
             );
         }
         assert!(refused(|p| p.calibration_lifetimes = Vec::new()));
+        assert!(refused(|p| p.mutants = 0));
+        assert!(refused(|p| p.mutants = 65));
+        assert!(!refused(|p| p.mutants = 1));
+        assert!(!refused(|p| p.mutants = 64));
     }
 
     /// `params` on a built-in barrier arena with no axis flag.

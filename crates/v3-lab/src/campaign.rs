@@ -16,15 +16,21 @@ use v3_core::mutation::{MutationEngine, MutationSummary};
 
 use crate::arena::{Policy, Role};
 use crate::calibration::scripted_seed;
-use crate::eval::{evaluate_genome, evaluate_scripted, Frozen, SceneScore, Scripted, Setup};
+use crate::eval::{
+    evaluate_genome, evaluate_genome_observed, evaluate_scripted, Boundary, Frozen, SceneScore,
+    Scripted, Setup,
+};
 use crate::output::RunDir;
+use crate::readings::{
+    Ancestry, Batteries, MutantSeed, Observed, Readings, ReplicateReadings, SignatureArms,
+};
 use crate::rng::{hash, replicate_seed, stream, tagged, Part};
 use crate::scene::{Scene, SceneSpec};
 use crate::summary::{ArmSummary, Events, Fidelity, LifetimeLearning, ReplicateResult, StoppedBy};
 use crate::{GenomeFile, LabError};
 
 /// NDJSON row schema version.
-pub const ROW_VERSION: u32 = 1;
+pub const ROW_VERSION: u32 = 2;
 
 /// How an arm produces its individuals.
 #[derive(Debug, Clone)]
@@ -67,6 +73,21 @@ impl Arm {
     pub fn reach_reported(&self) -> bool {
         self.reach_tested() && self.policy == Policy::Native
     }
+
+    /// Whether `set` reads this arm's signature: `changing` is the arms
+    /// whose elite can change (reference, user, `shuffled-score`),
+    /// `native` the reference and user arms, `all` every genome arm.
+    #[must_use]
+    pub fn signature_read(&self, set: SignatureArms) -> bool {
+        let native = matches!(self.role, Role::Reference | Role::User);
+        match (&self.kind, set) {
+            (ArmKind::Scripted { .. }, _) => false,
+            (_, SignatureArms::All) => true,
+            (_, SignatureArms::Native) => native,
+            (ArmKind::Evolving { shuffled, .. }, SignatureArms::Changing) => native || *shuffled,
+            (ArmKind::Fixed(_), SignatureArms::Changing) => native,
+        }
+    }
 }
 
 /// Campaign sizes.
@@ -81,6 +102,9 @@ pub struct Plan {
     /// The selected point's scene draw.
     pub spec: SceneSpec,
     pub threshold: f64,
+    /// Fresh mutants per signature reading.
+    pub mutants: u32,
+    pub signature_arms: SignatureArms,
 }
 
 impl Plan {
@@ -137,6 +161,7 @@ struct Individual {
     /// `None` for founders and carried elites.
     birth: Option<Events>,
     carried: bool,
+    ancestry: Ancestry,
 }
 
 #[derive(Debug, Clone)]
@@ -145,6 +170,10 @@ struct Scored {
     scenes: Vec<SceneScore>,
     /// Frozen from the last training scene.
     frozen: Frozen,
+    /// Per training scene (genome arms): the frozen record and the
+    /// `(position, energy)` sequence, kept until ranking for the readings.
+    frozens: Vec<Frozen>,
+    sequences: Vec<Vec<Boundary>>,
     creature_ticks: u64,
 }
 
@@ -159,7 +188,8 @@ fn score_individual(
     first_scene: usize,
 ) -> Scored {
     let mut results = Vec::with_capacity(scenes.len());
-    let mut frozen = Frozen::default();
+    let mut frozens = Vec::new();
+    let mut sequences = Vec::new();
     let mut creature_ticks = 0;
     for (offset, scene) in scenes.iter().enumerate() {
         if let ArmKind::Scripted { policy, body } = &arm.kind {
@@ -170,9 +200,10 @@ fn score_individual(
                 .genome
                 .as_ref()
                 .expect("genome arms carry genomes");
-            let (score, last) = evaluate_genome(&arm.setup, genome, scene);
+            let (score, last, sequence) = evaluate_genome_observed(&arm.setup, genome, scene);
             creature_ticks += u64::from(score.ticks);
-            frozen = last;
+            frozens.push(last);
+            sequences.push(sequence);
             results.push(score);
         }
     }
@@ -180,7 +211,9 @@ fn score_individual(
     Scored {
         scalar: crate::stats::mean(&values).unwrap_or(0.0),
         scenes: results,
-        frozen,
+        frozen: frozens.last().cloned().unwrap_or_default(),
+        frozens,
+        sequences,
         creature_ticks,
     }
 }
@@ -199,6 +232,8 @@ struct Lineage {
     final_best: Option<f64>,
     /// Best individual of the last evaluated generation (genome arms).
     elite: Option<CreatureGenome>,
+    /// Projections of the first and last written rows' readings.
+    readings: ReplicateReadings,
 }
 
 impl Lineage {
@@ -215,6 +250,7 @@ impl Lineage {
                 genome: genome.cloned(),
                 birth: None,
                 carried: false,
+                ancestry: Ancestry::default(),
             })
             .collect();
         // Every arm draws the replicate's `selection` and `mutation` streams
@@ -230,6 +266,7 @@ impl Lineage {
             stopped: None,
             final_best: None,
             elite: None,
+            readings: ReplicateReadings::default(),
         }
     }
 
@@ -274,6 +311,8 @@ struct Row<'a> {
     individuals: Vec<MemberRow>,
     elite: Option<EliteShape>,
     validation_mean: Option<f64>,
+    /// Null for scripted arms.
+    readings: Option<Readings>,
 }
 
 /// Campaign totals the summary needs.
@@ -284,6 +323,9 @@ pub struct Totals {
     /// Reference-arm births over the campaign.
     pub reference_events: Events,
     pub reference_carried: u64,
+    /// Production creature-ticks on ablated copies and mutants (also in
+    /// `creature_ticks`).
+    pub readings_creature_ticks: u64,
 }
 
 /// Run every replicate, writing rows under the byte cap. `arms[0]` is the
@@ -301,14 +343,30 @@ pub fn run_campaign(
 ) -> Result<(Vec<ArmSummary>, Totals), LabError> {
     let mut totals = Totals::default();
     let mut results: Vec<Vec<ReplicateResult>> = vec![Vec::new(); arms.len()];
+    let batteries: Vec<Batteries> = arms
+        .iter()
+        .map(|arm| Batteries::new(&arm.setup.config))
+        .collect();
+    let context = Context {
+        arms,
+        plan,
+        validation,
+        batteries: &batteries,
+    };
     for replicate in 0..plan.replicates {
         if totals.byte_cap_hit {
             for arm_results in &mut results {
-                arm_results.push(incomplete(replicate, StoppedBy::NotStarted, 0, None));
+                arm_results.push(incomplete(
+                    replicate,
+                    StoppedBy::NotStarted,
+                    0,
+                    None,
+                    ReplicateReadings::default(),
+                ));
             }
             continue;
         }
-        let lineages = run_replicate(arms, plan, validation, replicate, dir, &mut totals)?;
+        let lineages = run_replicate(&context, replicate, dir, &mut totals)?;
         for lineage in &lineages {
             results[lineage.arm].push(replicate_result(&arms[lineage.arm], lineage, replicate));
         }
@@ -321,14 +379,28 @@ pub fn run_campaign(
     Ok((summaries, totals))
 }
 
+/// What every replicate of a campaign shares.
+#[derive(Clone, Copy)]
+struct Context<'a> {
+    arms: &'a [Arm],
+    plan: &'a Plan,
+    validation: &'a [Scene],
+    /// Per arm.
+    batteries: &'a [Batteries],
+}
+
 fn run_replicate(
-    arms: &[Arm],
-    plan: &Plan,
-    validation: &[Scene],
+    context: &Context<'_>,
     replicate: u32,
     dir: &mut RunDir,
     totals: &mut Totals,
 ) -> Result<Vec<Lineage>, LabError> {
+    let Context {
+        arms,
+        plan,
+        validation,
+        batteries,
+    } = *context;
     let r_seed = replicate_seed(plan.seed, replicate);
     let scene_count = plan.scenes as usize;
     let mut scene_rng = stream(&[Part::U(tagged(r_seed, "scenes"))]);
@@ -370,6 +442,8 @@ fn run_replicate(
             scenes: &scenes,
             replicate,
             generation,
+            batteries,
+            observation: tagged(r_seed, "observation"),
         };
         for lineage in lineages.iter_mut().filter(|l| l.active()) {
             let members: Vec<Scored> = scored.by_ref().take(lineage.population.len()).collect();
@@ -409,6 +483,7 @@ fn incomplete(
     stopped_by: StoppedBy,
     generations_run: u32,
     final_best: Option<f64>,
+    readings: ReplicateReadings,
 ) -> ReplicateResult {
     ReplicateResult {
         replicate,
@@ -419,6 +494,7 @@ fn incomplete(
         stopped_by,
         generations_run,
         final_best,
+        readings,
     }
 }
 
@@ -430,6 +506,7 @@ fn replicate_result(arm: &Arm, lineage: &Lineage, replicate: u32) -> ReplicateRe
             stopped_by,
             lineage.generations_run,
             lineage.final_best,
+            lineage.readings.clone(),
         );
     }
     let reach = arm.reach_tested();
@@ -442,6 +519,7 @@ fn replicate_result(arm: &Arm, lineage: &Lineage, replicate: u32) -> ReplicateRe
         stopped_by,
         generations_run: lineage.generations_run,
         final_best: lineage.final_best,
+        readings: lineage.readings.clone(),
     }
 }
 
@@ -483,6 +561,10 @@ struct Step<'a> {
     scenes: &'a [Scene],
     replicate: u32,
     generation: u32,
+    /// Per arm.
+    batteries: &'a [Batteries],
+    /// `hash(r_i, "observation")`.
+    observation: u64,
 }
 
 /// Rank, test reach, write the row and build the next generation. Returns
@@ -530,6 +612,35 @@ fn advance(
         events.add(birth);
     }
     let carried_over = lineage.population.iter().filter(|i| i.carried).count();
+    // Readings: after ranking, before the row; they never feed the population.
+    let readings = candidate.genome.as_ref().map(|genome| {
+        let observed = Observed {
+            genome,
+            ancestry: &candidate.ancestry,
+            scenes: step.scenes,
+            scores: &best.scenes,
+            frozens: &best.frozens,
+            sequences: &best.sequences,
+            scalar: best.scalar,
+        };
+        let signature = arm.signature_read(step.plan.signature_arms).then_some((
+            step.plan.mutants,
+            MutantSeed {
+                observation: step.observation,
+                arm: &arm.name,
+                generation: step.generation,
+            },
+        ));
+        let (readings, ticks) = crate::readings::read(
+            &arm.setup,
+            &step.batteries[lineage.arm],
+            &observed,
+            signature,
+        );
+        totals.creature_ticks += ticks;
+        totals.readings_creature_ticks += ticks;
+        readings
+    });
     let row = Row {
         row_version: ROW_VERSION,
         arm: &arm.name,
@@ -568,11 +679,15 @@ fn advance(
                 .len(),
         }),
         validation_mean,
+        readings,
     };
     let line = serde_json::to_string(&row).expect("row serializes");
     if !dir.write_row(&line)? {
         lineage.reached = None;
         return Ok(false);
+    }
+    if let Some(readings) = &row.readings {
+        lineage.readings.record(readings);
     }
     if lineage.arm == 0 {
         totals.reference_events.add(&events);
@@ -651,11 +766,13 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
                 config.world.food.types.len(),
             );
             let identical = child == *parent_genome;
+            let birth = birth_events(&summary, identical);
             Individual {
                 id: 0,
                 parent: Some(parent.id),
                 genome: Some(child),
-                birth: Some(birth_events(&summary, identical)),
+                ancestry: parent.ancestry.child(&birth),
+                birth: Some(birth),
                 carried: false,
             }
         })
@@ -722,6 +839,7 @@ mod tests {
             genome: Some(start.clone()),
             birth: None,
             carried: false,
+            ancestry: Ancestry::default(),
         };
         let scenes = draw_scenes(5, 3, &SceneSpec::sparse(48, 0.04, 5)).unwrap();
         let scored = score_individual(&arm, &individual, &scenes, 1, 0);
@@ -747,6 +865,8 @@ mod tests {
             scenes: 1,
             spec: SceneSpec::sparse(48, 0.04, 5),
             threshold: 0.0,
+            mutants: 1,
+            signature_arms: SignatureArms::Changing,
         };
         assert_eq!(plan(64, 0.25).survivors(), 16);
         assert_eq!(plan(7, 0.25).survivors(), 1);
@@ -764,6 +884,8 @@ mod tests {
             scenes: 1,
             spec: SceneSpec::sparse(48, 0.06, 5),
             threshold,
+            mutants: 1,
+            signature_arms: SignatureArms::Changing,
         }
     }
 
@@ -952,6 +1074,13 @@ mod tests {
             offspring: 1,
             ..Events::default()
         });
+        let inherited = Ancestry::default().child(&Events {
+            requested: 5,
+            applied: 2,
+            applied_by_operator: BTreeMap::from([("x".to_owned(), 2)]),
+            ..Events::default()
+        });
+        lineage.population[1].ancestry = inherited.clone();
         let scene = draw_scenes(5, 1, &SceneSpec::sparse(48, 0.04, 5))
             .unwrap()
             .remove(0);
@@ -962,6 +1091,8 @@ mod tests {
                 scalar,
                 scenes: Vec::new(),
                 frozen: frozen.clone(),
+                frozens: vec![frozen.clone()],
+                sequences: Vec::new(),
                 creature_ticks: 0,
             })
             .collect();
@@ -971,6 +1102,8 @@ mod tests {
             scenes: &[],
             replicate: 0,
             generation: 0,
+            batteries: &[],
+            observation: 0,
         };
         breed(&arm, &mut lineage, &members, &[1, 2, 0], &step);
 
@@ -979,6 +1112,7 @@ mod tests {
         let carried = &population[0];
         assert_eq!((carried.id, carried.carried), (1, true));
         assert!(carried.birth.is_none());
+        assert_eq!(carried.ancestry, inherited, "a carried elite keeps its own");
         let reachable = mesh_reachable_nodes(&start);
         let child = |generation: u64, slot: u64| {
             let mut genome = start.clone();
@@ -1003,6 +1137,8 @@ mod tests {
             assert_eq!((member.parent, member.carried), (Some(1), false));
             assert_eq!(member.genome.as_ref(), Some(&genome));
             let birth = member.birth.as_ref().unwrap();
+            assert_eq!(member.ancestry, inherited.child(birth));
+            assert_eq!(member.ancestry.births, 2);
             assert_eq!(birth.requested, u64::from(summary.attempted_events));
             assert_eq!(birth.applied, u64::from(summary.applied_events));
             assert_eq!(birth.skipped, u64::from(summary.skipped_events));
@@ -1052,6 +1188,7 @@ mod tests {
             stopped_by: StoppedBy::Horizon,
             generations_run: 1,
             final_best: None,
+            readings: ReplicateReadings::default(),
         };
         let three = || {
             vec![

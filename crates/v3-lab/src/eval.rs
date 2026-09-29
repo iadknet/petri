@@ -455,6 +455,35 @@ pub fn evaluate_genome(
     genome: &CreatureGenome,
     scene: &Scene,
 ) -> (SceneScore, Frozen) {
+    let (score, frozen, _) = evaluate_observed(setup, genome, scene, false);
+    (score, frozen)
+}
+
+/// One living tick boundary: the creature's position and energy.
+pub type Boundary = (Position, f32);
+
+/// [`evaluate_genome`] that also returns the `(position, energy)` sequence
+/// at every living tick boundary (a death tick has none). Compared in
+/// memory only; never written.
+///
+/// # Panics
+///
+/// If the masked copy records a plasticity update.
+#[must_use]
+pub fn evaluate_genome_observed(
+    setup: &Setup,
+    genome: &CreatureGenome,
+    scene: &Scene,
+) -> (SceneScore, Frozen, Vec<Boundary>) {
+    evaluate_observed(setup, genome, scene, true)
+}
+
+fn evaluate_observed(
+    setup: &Setup,
+    genome: &CreatureGenome,
+    scene: &Scene,
+    observe: bool,
+) -> (SceneScore, Frozen, Vec<Boundary>) {
     let size = setup.config.world.width;
     let start = scene.start;
     let world = scene_world(setup, scene);
@@ -482,6 +511,7 @@ pub fn evaluate_genome(
     let mut frozen = Frozen::default();
     let mut death = None;
     let mut ticks = 0;
+    let mut sequence = Vec::with_capacity(if observe { setup.lifetime as usize } else { 0 });
     for tick in 1..=setup.lifetime {
         run_tick(&mut sim, &mut None);
         ticks = tick;
@@ -501,6 +531,9 @@ pub fn evaluate_genome(
             break;
         };
         energy = creature.energy;
+        if observe {
+            sequence.push((creature.position, creature.energy));
+        }
         frozen = Frozen {
             record: creature.graph_runtime.dispatch_record.clone(),
             age: creature.age,
@@ -527,6 +560,7 @@ pub fn evaluate_genome(
             ticks,
         ),
         frozen,
+        sequence,
     )
 }
 

@@ -5,15 +5,20 @@ use std::path::{Path, PathBuf};
 use clap::{Args, Parser, Subcommand};
 
 use crate::output::{GitProvenance, LabRoot, DEFAULT_BYTE_CAP};
+use crate::readings::SignatureArms;
 use crate::run::{run, RunParams, UserArm};
 use crate::scene::{ArenaId, Assay};
-use crate::summary::{render_report, Summary, SUMMARY_KIND, SUMMARY_VERSION};
+use crate::summary::{render_report, Summary, SUMMARY_KIND, SUMMARY_VERSION, SUMMARY_VERSION_MIN};
 use crate::LabError;
 
 /// `(replicates, generations, population)` for a campaign run.
 pub const CAMPAIGN_SIZES: (u32, u32, u32) = (8, 100, 64);
 /// `(replicates, generations, population)` for `--quick`.
 pub const QUICK_SIZES: (u32, u32, u32) = (4, 40, 16);
+/// `--mutants` for a campaign run.
+pub const CAMPAIGN_MUTANTS: u32 = 8;
+/// `--mutants` for `--quick`.
+pub const QUICK_MUTANTS: u32 = 8;
 
 #[derive(Parser, Debug)]
 #[command(name = "v3-lab", about = "Petri capability-assay lab (T22)")]
@@ -119,6 +124,13 @@ pub struct RunArgs {
     /// Stop after the calibration gate.
     #[arg(long)]
     pub calibrate_only: bool,
+    /// Fresh mutants per signature reading, 1..=64 (default 8; `--quick`
+    /// [`QUICK_MUTANTS`]).
+    #[arg(long, value_parser = clap::value_parser!(u32).range(1..=64))]
+    pub mutants: Option<u32>,
+    /// Arms whose rows carry the signature block.
+    #[arg(long, value_enum, default_value = "changing")]
+    pub signature_arms: SignatureArms,
 }
 
 fn parse_arm(text: &str) -> Result<UserArm, String> {
@@ -143,10 +155,10 @@ impl RunArgs {
     /// Apply the campaign or `--quick` size defaults.
     #[must_use]
     pub fn params(&self) -> RunParams {
-        let (replicates, generations, population) = if self.quick {
-            QUICK_SIZES
+        let ((replicates, generations, population), mutants) = if self.quick {
+            (QUICK_SIZES, QUICK_MUTANTS)
         } else {
-            CAMPAIGN_SIZES
+            (CAMPAIGN_SIZES, CAMPAIGN_MUTANTS)
         };
         RunParams {
             assay: self.assay,
@@ -182,6 +194,8 @@ impl RunArgs {
             out: self.out.clone(),
             calibrate_only: self.calibrate_only,
             quick: self.quick,
+            mutants: self.mutants.unwrap_or(mutants),
+            signature_arms: self.signature_arms,
         }
     }
 }
@@ -190,12 +204,15 @@ impl RunArgs {
 ///
 /// # Errors
 ///
-/// I/O, malformed JSON, or a foreign `kind` / `summary_version`.
+/// I/O, malformed JSON, or a foreign `kind` / `summary_version` (v2 and
+/// v3 are read).
 pub fn read_summary(path: &std::path::Path) -> Result<Summary, LabError> {
     let summary: Summary = crate::read_json(path)?;
-    if summary.kind != SUMMARY_KIND || summary.summary_version != SUMMARY_VERSION {
+    if summary.kind != SUMMARY_KIND
+        || !(SUMMARY_VERSION_MIN..=SUMMARY_VERSION).contains(&summary.summary_version)
+    {
         return Err(LabError::Config(format!(
-            "{}: not a {SUMMARY_KIND} v{SUMMARY_VERSION}",
+            "{}: not a {SUMMARY_KIND} v{SUMMARY_VERSION_MIN}..=v{SUMMARY_VERSION}",
             path.display()
         )));
     }
@@ -364,6 +381,8 @@ mod tests {
             "the arena supplies the default"
         );
         assert_eq!(params.assay, Assay::FoodSeeking);
+        assert_eq!(params.mutants, QUICK_MUTANTS);
+        assert_eq!(params.signature_arms, SignatureArms::Changing);
         let plan = crate::run::resolve_arena(&params).unwrap();
         assert_eq!(plan.size, 64);
         assert_eq!(plan.points.len(), 3);

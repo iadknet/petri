@@ -46,7 +46,7 @@ unchanged.
 | --- | --- | --- |
 | Executed input use | (a) node level: a consumer of the family on a node the elite dispatched on its own scenes (`DispatchRecord`, public); (b) read level: `input_use::reads::ReadRecording` (`pub(super)`; the world tick executes untraced and `ActiveTrace` hops carry node ids, not reads); (c) `Battery::executed_node_ids` (public, battery scenarios, not the assay's scenes) | (a), named `executed_node` so the granularity is explicit; (b) is the recorded T20 finding; (c) reads the wrong scenes |
 | Family inventory | (a) `creature_sensor_census` alone (live walk, world and decision keys only; the founder's `EnergyCurrent` and `AgeTicks` reads would be invisible); (b) a lab walk over every `InputLeaf` edge, `ReadInput` instruction, `SharedMemory` source and `LoadSlot*` instruction on public genome types, keyed by `catalog::Family::of` (all 22 families), without the crate-private liveness filter | (b) for the inventory, with the census's live verdict added where it applies |
-| Causal influence | (a) family-level ablation rewrite in the lab: every Graph `InputLeaf` edge and VM `ReadInput` whose `input_refs[ref_idx]` is of the family gets `ref_idx = u16::MAX`, which both backends resolve to 0.0 (`runtime/cgp/sources.rs:24`, `runtime/vm.rs:382`) with `genome_size()` and every charge unchanged — the rule `consumers::ablated` applies per channel; (b) export `ablated` (loses the exemption); (c) skip causal (contradicts the note) | (a), ~40 lines. Behaviour change is read on the observables F01 already records, never an action trace (F01: "the action log is never read") |
+| Causal influence | (a) family-level ablation rewrite in the lab: every Graph `InputLeaf` edge and VM `ReadInput` whose `input_refs[ref_idx]` is of the family gets an out-of-range `ref_idx`, which both backends resolve to 0.0 (`runtime/cgp/sources.rs:24`, `runtime/vm.rs:382`); each distinct ablated index of a node gets its own sentinel, counting down from `u16::MAX` past indices the node already uses, because `functional_complexity` counts distinct consumed indices per node (`cgp_analysis::collect_consumed_input_refs`, a `HashSet<u16>`; the VM branch likewise) and feeds `cached_complexity` and the action cost — the single-sentinel rule of `consumers::ablated` would collapse the founder's six `UpstreamSlot` reads and change its charges. `genome_size()` and complexity stay equal, pinned by test; (b) export `ablated` (loses the exemption); (c) skip causal (contradicts the note) | (a), ~40 lines. Behaviour change is read on the observables F01 already records, never an action trace (F01: "the action log is never read") |
 | Silent / changed / dead | (a) `neighborhood-v1` signature and `neighborhood::classify` (public, T11.F01 semantics, what the F04 note calls "on the battery"); (b) per-tick action comparison on the scenes (needs an action trace) | (a); score spread on the scenes, class on the battery, kept distinct |
 | Steering | `neighborhood::steering::SteeringBattery::{generate, read}` (public, T11.F21) | Adopted unchanged; `executed` is the elite's scene-executed node ids |
 | Mutant signature (Tarapore and Mouret 2015, research note) | `n` fresh mutants on the `observation` stream F01 reserved vs. reusing the children | Fresh: the children's count varies with the population and their scalars drive selection; a fixed-`n` sample is comparable across generations and arms |
@@ -71,7 +71,8 @@ candidate, the top-ranked individual by true scalar. Every genome arm's row
 `--signature-arms` set; scripted arms carry `readings: null`. Readings are
 computed after ranking and before the row is written, for every written row
 including the reach generation; a row the byte cap refuses contributes no
-reading anywhere. They never read the `scenes`, `mutation` or `selection`
+reading anywhere, though the creature-ticks it spent still count in
+`timing`. They never read the `scenes`, `mutation` or `selection`
 streams and never feed the population.
 
 **`shape` block.**
@@ -80,7 +81,7 @@ streams and never feed the population.
 | --- | --- |
 | `genome_size`, `functional_complexity`, `nodes`, `reachable` | `genome_size()`, `functional_complexity()`, `nodes.len()`, `mesh_reachable_nodes().len()` of the elite |
 | `executed`, `deaths` | Count of the union over the generation's training scenes of the nodes dispatched through each scene's last living boundary (a death tick's dispatches are unobservable, as F01 records); `deaths` = scenes the elite died in, so the censoring is visible. The row's existing `elite.executed_nodes` (production window at the frozen point) is unchanged |
-| `ancestry` | `births` (mutated births on the path from the arm's start genome), `requested`, `applied` totals and `applied_by_operator` (sorted keys) summed along the path: a start has zeros, a child has its parent's plus its own birth events, a carried elite keeps its own |
+| `ancestry` | `births` (engine passes on the path from the arm's start genome, applied events or not, so a `mutation-off` elite shows births with zero applied), `requested`, `applied` totals and `applied_by_operator` (sorted keys) summed along the path: a start has zeros, a child has its parent's plus its own birth events, a carried elite keeps its own |
 | `families[]` | One entry per catalog family with a consumer on a reachable node, in catalog order: `family` (label), `structural` (true by construction), `executed_node` (a consumer on a node in the executed union), `live` (the census's verdict for world and decision families; `null` for the others, which it does not cover). A consumer is an `InputLeaf` edge or `ReadInput` instruction whose in-range `ref_idx` names a reference of the family; `SharedMemory` sources and `LoadSlot*` instructions are consumers of the two shared-memory families |
 | `stateful_node` | The census's `holds_stateful_node` |
 | `steering` | `SteeringReading` of the masked elite with the executed node ids |
@@ -89,7 +90,7 @@ streams and never feed the population.
 
 | Field | Definition |
 | --- | --- |
-| `causal[]` | One entry per `families[]` entry except the shared-memory families (no reference to rewrite): `family`, `causal`, `score_delta`. The ablated copy is evaluated on the generation's training scenes; `causal` is true when, on some scene, any `SceneScore` field or the per-tick `(position, energy)` sequence differs from the elite's, so a score change implies `causal`; `score_delta` is its scalar minus the elite's. The scoring pass keeps every individual's per-tick sequence until ranking (≤ scenes × lifetime × 16 B each), so the elite is not re-run. A node with `input_refs.len() ≥ u16::MAX` makes the rewrite unsound: a genome file with one is refused at load and an evolved elite with one gets `causal: null` with `unsupported: "input_refs"` |
+| `causal[]` | One entry per `families[]` entry except the shared-memory families (no reference to rewrite): `family`, `causal`, `score_delta`. The ablated copy is evaluated on the generation's training scenes; `causal` is true when, on some scene, any `SceneScore` field or the per-tick `(position, energy)` sequence differs from the elite's, so a score change implies `causal`; `score_delta` is its scalar minus the elite's. The scoring pass keeps every individual's per-tick sequence until ranking (≤ scenes × lifetime × 16 B each), so the elite is not re-run. The rewrite needs, per node, one unused out-of-range index per distinct ablated index: a genome file with a node of ≥ 65,535 references is refused at load, and an evolved elite whose node lacks that headroom gets `causal: null` with `unsupported: "input_refs"` |
 | `mutants` | `n`; for `k` in `0..n` the elite's clone passed once through the engine with the arm's `MutationConfig`, `mesh_reachable_nodes(elite)`, `ParentExecuted::Record` of the elite's frozen record and age (as breeding uses them), RNG `hash(observation, arm, generation, k)` with `observation = hash(r_i, "observation")`, and the arm's food-type count. Per mutant: `identical` (genome `==`); class on `neighborhood-v1` against the masked elite's signature (`silent` without execution when identical); scalar over the training scenes (the elite's by copy when identical: solo evaluation is deterministic) |
 | `mutants` fields | `n`, `identical`, `silent`, `changed`, `dead` (the three sum to `n`), `scores` (the `n` scalars sorted ascending), `improved`, `equal`, `worse` against the elite's scalar, `mean_delta` |
 
@@ -126,40 +127,43 @@ Projected sizes: `shape` ≤ 1.5 KB (22 families with the lab's one food
 type; three families gain an entry per further represented type), `signature` ≤
 1.5 KB at `n = 8`, so a row stays ≤ 11 KB at population 64 and a campaign
 of three evolving arms × 8 × 100 rows ≈ 27 MB under the 64 MiB cap; the
-summary gains ≤ 3 KB × arms × replicates (≤ 170 KB at campaign sizes)
-inside the 1 MiB reserve, whose oversize disposition (exit 1, no growth) is
+summary gains ≈ 3.3 KB per genome arm and replicate (≤ 200 KB at campaign
+sizes) inside the 1 MiB reserve, whose oversize disposition (exit 1, no growth) is
 unchanged. Nothing per tick is written: sequences are compared in memory
 and discarded.
 
 | CLI parameter | Default (campaign / `--quick`) |
 | --- | --- |
-| `--mutants` | 8 / 8 (1..=64); the pilot lowers the `--quick` value, never below 2, if the quick food-seeking run exceeds 60 s, and records it here |
+| `--mutants` | 8 / 8 (1..=64); the pilot lowers the `--quick` value, never below 2, if the quick food-seeking run exceeds 60 s, and records it here. Pilot: 8 kept (59.0 s, repeat 57.6 s) |
 | `--signature-arms` | `changing` (reference, user, `shuffled-score`) / same; `native` (reference and user only, the pilot's second step if 60 s is still exceeded at `--mutants 2`); `all` (every genome arm, comparator included). A quick run over 60 s at `native` and 2 mutants is a user decision |
 
 ## Implementation Tasks
 
-- [ ] `readings` module: ancestry bookkeeping on `Individual`, per-scene
+- [x] `readings` module: ancestry bookkeeping on `Individual`, per-scene
       frozen records and per-tick sequences kept by `score_individual`, the
       family walk, the `shape` block, the family-level ablation rewrite with
       its precondition, the `signature` block on the `observation` stream,
       and the row and summary fields (`row_version: 2`, `summary_version:
       3`, `readings_creature_ticks`).
-- [ ] `report` renders v2 and v3 summaries; the readings section.
-- [ ] CLI: `--mutants`, `--signature-arms`; `--quick` sizes carry `mutants`.
-- [ ] Pilot: seed-1 `--quick` food-seeking and wall runs; fix the `--quick`
+- [x] `report` renders v2 and v3 summaries; the readings section.
+- [x] CLI: `--mutants`, `--signature-arms`; `--quick` sizes carry `mutants`.
+- [x] Pilot: seed-1 `--quick` food-seeking and wall runs; fix the `--quick`
       values; regenerate the three committed F02 summaries.
 
 ## Verification
 
-- [ ] `cargo test -p v3-lab`: founder shape (families include
-      `AreaFoodSummary:0`, `EnergyCurrent` and `AgeTicks`, executed union ⊆
-      reachable, ancestry zeros); a child's ancestry is its parent's plus its
+- [x] `cargo test -p v3-lab`: founder shape (families are `FoodHere:0`,
+      `NeighborFoodRing:0`, `AgeTicks`, `EnergyCurrent`, `ActionQueue` and
+      `UpstreamSlot`; executed union ⊆ reachable; ancestry zeros); the
+      ablated founder keeps its `genome_size` and `functional_complexity`
+      for every family; a child's ancestry is its parent's plus its
       birth and a carried elite's is unchanged; first-tick death gives an
       empty executed union and `deaths` counts it; an unread family ablates
       to `causal: false`, `score_delta: 0`; a family with `score_delta ≠ 0`
-      is `causal: true`; the founder's food family on a scene it eats in is
-      `causal: true`; a node with 65,535 references is refused at load and
-      yields `causal: null` on an evolved elite, for a Graph and a VM node; a
+      is `causal: true`; the founder's `NeighborFoodRing:0` on a scene it
+      eats in is `causal: true`; a node with 65,535 references is refused at
+      load and a node without sentinel headroom yields `causal: null` on an
+      evolved elite, for a Graph and a VM node; a
       `mutation-off` elite under `--signature-arms all` yields `n` identical
       mutants classed `silent` and scored by copy; classes sum to `n`,
       scores sorted; same-seed rows byte-identical across threads and
@@ -167,13 +171,15 @@ and discarded.
       no `first`/`last` and an arm with no written row has `null`; the
       committed v2 summaries render and a v3 summary renders the readings
       section; `readings_creature_ticks` counted -> results in the readings
-      file.
-- [ ] Seed-1 `--quick` food-seeking and wall runs: calibration tables,
+      file. 125 unit and 18 integration tests pass; `AreaFoodSummary:0` is
+      the comparator's, pinned there.
+- [x] Seed-1 `--quick` food-seeking and wall runs: calibration tables,
       per-arm reach results and fidelity blocks equal the
       `docs/progress/lab/t22-f02-{food-seeking,wall}.json` values committed
       at df2ddbe3 (the comparison target, since the files are regenerated in
       place); wall time, creature-ticks and `readings_creature_ticks`
-      recorded in the readings file.
+      recorded in the readings file. Equal for all three arenas (ring
+      included); creature-ticks less `readings_creature_ticks` equal F02's.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
@@ -192,10 +198,11 @@ pays `(novel + F) × scenes × lifetime` production creature-ticks, where
 `novel` is the non-identical mutants (≈ 0.35 × `n` at F02's identical
 fraction 0.62–0.69) and `F` the elite's ablated families, plus 80 battery
 executions for the elite and 80 per non-identical mutant. At quick sizes
-(4 × 40 generations, `changing` = 2 signature arms, `n = 8`, founder `F`
-≈ 5) this is ≈ 2 × 128k × 7.8 ≈ 2.0M creature-ticks, about 40% of F02's
-4.94M, so the quick food-seeking run is projected at ≈ 46 × 1.4 ≈ 65 s at 8
-threads against F01's 60 s criterion; the pilot lowers `--quick` `--mutants`
+(4 × 40 generations, `changing` = 2 signature arms, `n = 8`, founder `F` =
+6: `FoodHere:0`, `NeighborFoodRing:0`, `AgeTicks`, `EnergyCurrent`,
+`ActionQueue`, `UpstreamSlot`) this is ≈ 2 × 128k × 8.8 ≈ 2.25M
+creature-ticks, about 46% of F02's 4.94M, so the quick food-seeking run is
+projected at ≈ 46 × 1.46 ≈ 67 s at 8 threads against F01's 60 s criterion; the pilot lowers `--quick` `--mutants`
 (to 4: ≈ 55 s), then the arm set, as the CLI table says. At campaign sizes
 (population 64) the addition is ≈ 2 × 7.8 evaluations per generation over
 3 × 64 + 2, about 8% of the creature-ticks before the battery and steering

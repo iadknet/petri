@@ -1,10 +1,10 @@
 {
   "kind": "petri-lab-summary",
-  "summary_version": 2,
+  "summary_version": 3,
   "assay": "barrier-navigation",
   "provenance": {
-    "git_revision": "993fb1576538cf6d5b8984567cba7577880c2ade",
-    "dirty": false,
+    "git_revision": "9b6dcbd8ac07c7a12781206df5373b25f58a31c3",
+    "dirty": true,
     "config_digest": "2d997590cf6632743d6b604ba611256dc13aaa7455002e37bc56efe9a9dd580f",
     "overlays": [
       {
@@ -75,7 +75,9 @@
       "lifetime": 200,
       "blocked_weight": 1.0,
       "efficiency_weight": 1.0,
-      "quick": true
+      "quick": true,
+      "mutants": 8,
+      "signature_arms": "changing"
     }
   },
   "calibration": {
@@ -407,7 +409,129 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 4.74059571115771
+          "final_best": 4.74059571115771,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 116,
+                "functional_complexity": 66,
+                "nodes": 4,
+                "reachable": 4,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 27,
+                  "requested": 12,
+                  "applied": 10,
+                  "applied_by_operator": {
+                    "GraphAddGraphEdge": 1,
+                    "GraphCopySubgraph": 1,
+                    "GraphMutateGraphOperatorParam": 1,
+                    "GraphSwapGraphOperator": 1,
+                    "InputRefAdd": 1,
+                    "InputRefPrune": 1,
+                    "InputRefSwap": 2,
+                    "TopologyAddNode": 1,
+                    "TopologySwapNodeBackend": 1
+                  }
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 32,
+                  "exact_hits": 16,
+                  "within_45": 24,
+                  "avoidance_trials": 32,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": {
+                "causal": [
+                  {
+                    "family": "FoodHere:0",
+                    "causal": true,
+                    "score_delta": -4.477437816420868
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "causal": true,
+                    "score_delta": -3.4735264735264746
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "causal": true,
+                    "score_delta": -0.16072282980177732
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "causal": true,
+                    "score_delta": -4.477437816420868
+                  }
+                ],
+                "n": 8,
+                "identical": 5,
+                "silent": 8,
+                "changed": 0,
+                "dead": 0,
+                "improved": 0,
+                "equal": 8,
+                "worse": 0,
+                "score_min": 4.74059571115771,
+                "score_median": 4.74059571115771,
+                "score_max": 4.74059571115771,
+                "mean_delta": 0.0
+              }
+            }
+          }
         },
         {
           "replicate": 1,
@@ -417,7 +541,140 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 7.405844695710011
+          "final_best": 7.405844695710011,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 205,
+                "functional_complexity": 104,
+                "nodes": 5,
+                "reachable": 3,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 25,
+                  "requested": 16,
+                  "applied": 13,
+                  "applied_by_operator": {
+                    "GraphCopyInternalNode": 1,
+                    "GraphRawFieldMutation": 2,
+                    "InputRefAdd": 1,
+                    "InputRefPrune": 2,
+                    "InputRefRawFieldMutation": 3,
+                    "TopologyAddRouteTarget": 1,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "VmConstantMutation": 1,
+                    "VmCopyInstructionBlockRemapped": 1
+                  }
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 12,
+                  "within_45": 24,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": {
+                "causal": [
+                  {
+                    "family": "FoodHere:0",
+                    "causal": true,
+                    "score_delta": -6.655844695710011
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "causal": true,
+                    "score_delta": -5.279785373676113
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "causal": true,
+                    "score_delta": -0.13702749140893644
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "causal": true,
+                    "score_delta": -0.13702749140893644
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "causal": true,
+                    "score_delta": -0.006075110456554178
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "causal": true,
+                    "score_delta": -6.921973727968075
+                  }
+                ],
+                "n": 8,
+                "identical": 4,
+                "silent": 6,
+                "changed": 2,
+                "dead": 0,
+                "improved": 0,
+                "equal": 6,
+                "worse": 2,
+                "score_min": 0.75,
+                "score_median": 7.405844695710011,
+                "score_max": 7.405844695710011,
+                "mean_delta": -1.1131383516965212
+              }
+            }
+          }
         },
         {
           "replicate": 2,
@@ -427,7 +684,139 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 2.435868980360506
+          "final_best": 2.435868980360506,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 99,
+                "functional_complexity": 61,
+                "nodes": 3,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 26,
+                  "requested": 14,
+                  "applied": 9,
+                  "applied_by_operator": {
+                    "GraphRawFieldMutation": 1,
+                    "GraphSwapGraphOperator": 1,
+                    "InputRefPrune": 1,
+                    "InputRefRawFieldMutation": 2,
+                    "InputRefSwap": 1,
+                    "TopologyMutateGateBias": 1,
+                    "TopologyRetargetNodeTarget": 1,
+                    "TopologySpliceNode": 1
+                  }
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 18,
+                  "within_45": 30,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": {
+                "causal": [
+                  {
+                    "family": "FoodHere:0",
+                    "causal": true,
+                    "score_delta": -2.185868980360506
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "causal": true,
+                    "score_delta": -1.7590221623240492
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "causal": true,
+                    "score_delta": -2.2762945122753995
+                  }
+                ],
+                "n": 8,
+                "identical": 7,
+                "silent": 8,
+                "changed": 0,
+                "dead": 0,
+                "improved": 0,
+                "equal": 8,
+                "worse": 0,
+                "score_min": 2.435868980360506,
+                "score_median": 2.435868980360506,
+                "score_max": 2.435868980360506,
+                "mean_delta": 0.0
+              }
+            }
+          }
         },
         {
           "replicate": 3,
@@ -437,7 +826,120 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 4.961122881355933
+          "final_best": 4.961122881355933,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 103,
+                "functional_complexity": 63,
+                "nodes": 3,
+                "reachable": 3,
+                "executed": 3,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 29,
+                  "requested": 14,
+                  "applied": 12,
+                  "applied_by_operator": {
+                    "GraphAddInternalGraphNode": 1,
+                    "GraphAlterGraphEdgeWeight": 1,
+                    "GraphCopyEdgeBundle": 1,
+                    "GraphCopySubgraph": 1,
+                    "GraphMutateGraphOperatorParam": 1,
+                    "GraphRawFieldMutation": 1,
+                    "InputRefPrune": 2,
+                    "InputRefRawFieldMutation": 1,
+                    "InputRefSwap": 1,
+                    "TopologyAddNode": 1,
+                    "TopologyMutateGateBias": 1
+                  }
+                },
+                "families": [
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 24,
+                  "exact_hits": 12,
+                  "within_45": 18,
+                  "avoidance_trials": 24,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": {
+                "causal": [
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "causal": true,
+                    "score_delta": -3.464204545454546
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "causal": true,
+                    "score_delta": -4.461122881355933
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "causal": true,
+                    "score_delta": -4.64197394518572
+                  }
+                ],
+                "n": 8,
+                "identical": 6,
+                "silent": 6,
+                "changed": 2,
+                "dead": 0,
+                "improved": 0,
+                "equal": 7,
+                "worse": 1,
+                "score_min": 4.955953128269512,
+                "score_median": 4.961122881355933,
+                "score_max": 4.961122881355933,
+                "mean_delta": -0.0006462191358025393
+              }
+            }
+          }
         }
       ],
       "reached_fraction": 0.0,
@@ -461,7 +963,85 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 2.6907082521117607
+          "final_best": 2.6907082521117607,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 97,
+                "functional_complexity": 61,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 0,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         },
         {
           "replicate": 1,
@@ -471,7 +1051,85 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 4.391325536062378
+          "final_best": 4.391325536062378,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 97,
+                "functional_complexity": 61,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 0,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         },
         {
           "replicate": 2,
@@ -481,7 +1139,85 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 1.4637751786874593
+          "final_best": 1.4637751786874593,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 97,
+                "functional_complexity": 61,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 0,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         },
         {
           "replicate": 3,
@@ -491,7 +1227,85 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 2.9275503573749186
+          "final_best": 2.9275503573749186,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 97,
+                "functional_complexity": 61,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 0,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         }
       ],
       "reached_fraction": 0.0,
@@ -515,7 +1329,85 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 2.6907082521117607
+          "final_best": 2.6907082521117607,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 97,
+                "functional_complexity": 61,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 30,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         },
         {
           "replicate": 1,
@@ -525,7 +1417,85 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 4.391325536062378
+          "final_best": 4.391325536062378,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 97,
+                "functional_complexity": 61,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 27,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         },
         {
           "replicate": 2,
@@ -535,7 +1505,85 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 1.4637751786874593
+          "final_best": 1.4637751786874593,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 97,
+                "functional_complexity": 61,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 31,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         },
         {
           "replicate": 3,
@@ -545,7 +1593,85 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 2.9275503573749186
+          "final_best": 2.9275503573749186,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 97,
+                "functional_complexity": 61,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 31,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         }
       ],
       "reached_fraction": 0.0,
@@ -569,7 +1695,129 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 0.2590909090909091
+          "final_best": 0.2590909090909091,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 167,
+                "functional_complexity": 102,
+                "nodes": 3,
+                "reachable": 3,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 31,
+                  "requested": 22,
+                  "applied": 15,
+                  "applied_by_operator": {
+                    "GraphAlterGraphEdgeWeight": 1,
+                    "GraphCopyEdgeBundle": 3,
+                    "GraphEnableHebbian": 1,
+                    "GraphMutateGraphOperatorParam": 2,
+                    "GraphRemoveInternalGraphNode": 1,
+                    "InputRefPrune": 2,
+                    "InputRefRawFieldMutation": 3,
+                    "InputRefSwap": 1,
+                    "TopologyCopyNode": 1
+                  }
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 32,
+                  "exact_hits": 12,
+                  "within_45": 20,
+                  "avoidance_trials": 32,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": {
+                "causal": [
+                  {
+                    "family": "FoodHere:0",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "causal": true,
+                    "score_delta": -0.10526315789473684
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "causal": true,
+                    "score_delta": -0.0007575757575757902
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "causal": true,
+                    "score_delta": -0.17817693059628545
+                  }
+                ],
+                "n": 8,
+                "identical": 4,
+                "silent": 6,
+                "changed": 2,
+                "dead": 0,
+                "improved": 0,
+                "equal": 6,
+                "worse": 2,
+                "score_min": 0.15382775119617226,
+                "score_median": 0.2590909090909091,
+                "score_max": 0.2590909090909091,
+                "mean_delta": -0.013252591706539078
+              }
+            }
+          }
         },
         {
           "replicate": 1,
@@ -579,7 +1827,144 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 0.0
+          "final_best": 0.0,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 141,
+                "functional_complexity": 86,
+                "nodes": 4,
+                "reachable": 4,
+                "executed": 4,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 27,
+                  "requested": 19,
+                  "applied": 16,
+                  "applied_by_operator": {
+                    "GraphCopyEdgeBundle": 1,
+                    "GraphCopySubgraph": 1,
+                    "GraphRawFieldMutation": 2,
+                    "GraphRetargetGraphEdge": 1,
+                    "InputRefAdd": 2,
+                    "InputRefPrune": 1,
+                    "InputRefRawFieldMutation": 2,
+                    "InputRefSwap": 1,
+                    "TopologyAddRouteTarget": 1,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyRetargetNodeTarget": 1,
+                    "VmConstantMutation": 1,
+                    "VmInstructionMutation": 1
+                  }
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 6,
+                  "within_45": 18,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": {
+                "causal": [
+                  {
+                    "family": "FoodHere:0",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "causal": true,
+                    "score_delta": 0.8135593220338984
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "causal": true,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "causal": true,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "causal": true,
+                    "score_delta": 0.6164383561643836
+                  }
+                ],
+                "n": 8,
+                "identical": 1,
+                "silent": 5,
+                "changed": 3,
+                "dead": 0,
+                "improved": 0,
+                "equal": 8,
+                "worse": 0,
+                "score_min": 0.0,
+                "score_median": 0.0,
+                "score_max": 0.0,
+                "mean_delta": 0.0
+              }
+            }
+          }
         },
         {
           "replicate": 2,
@@ -589,7 +1974,143 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 0.25
+          "final_best": 0.25,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 110,
+                "functional_complexity": 66,
+                "nodes": 4,
+                "reachable": 3,
+                "executed": 3,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 27,
+                  "requested": 14,
+                  "applied": 14,
+                  "applied_by_operator": {
+                    "GraphAddGraphEdge": 1,
+                    "GraphAlterGraphEdgeWeight": 1,
+                    "GraphMutateGraphOperatorParam": 1,
+                    "GraphSwapGraphOperator": 1,
+                    "InputRefRawFieldMutation": 1,
+                    "InputRefSwap": 3,
+                    "TopologyAddNode": 1,
+                    "TopologyAddRouteTarget": 1,
+                    "TopologyRetargetNodeTarget": 1,
+                    "VmConstantMutation": 1,
+                    "VmDeleteInstruction": 1,
+                    "VmInsertLoadCompareMotif": 1
+                  }
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 18,
+                  "within_45": 30,
+                  "avoidance_trials": 48,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": {
+                "causal": [
+                  {
+                    "family": "FoodHere:0",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "causal": true,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "causal": false,
+                    "score_delta": 0.0
+                  }
+                ],
+                "n": 8,
+                "identical": 6,
+                "silent": 7,
+                "changed": 1,
+                "dead": 0,
+                "improved": 0,
+                "equal": 7,
+                "worse": 1,
+                "score_min": 0.2,
+                "score_median": 0.25,
+                "score_max": 0.25,
+                "mean_delta": -0.006249999999999999
+              }
+            }
+          }
         },
         {
           "replicate": 3,
@@ -599,7 +2120,147 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 0.2
+          "final_best": 0.2,
+          "readings": {
+            "first": {
+              "genome_size": 97,
+              "functional_complexity": 61,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 242,
+                "functional_complexity": 134,
+                "nodes": 10,
+                "reachable": 10,
+                "executed": 5,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 25,
+                  "requested": 21,
+                  "applied": 21,
+                  "applied_by_operator": {
+                    "GraphAddGraphEdge": 1,
+                    "GraphMutateGraphOperatorParam": 1,
+                    "GraphRemoveInternalGraphNode": 1,
+                    "GraphRetargetGraphEdge": 1,
+                    "GraphSwapGraphOperator": 1,
+                    "InputRefPrune": 1,
+                    "InputRefRawFieldMutation": 1,
+                    "InputRefSwap": 4,
+                    "TopologyAddRouteTarget": 1,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyRemoveRouteTarget": 1,
+                    "TopologySwapNodeBackend": 2,
+                    "TopologySwapRouteTargets": 1,
+                    "VmCopyInstructionBlock": 1,
+                    "VmDeleteInstruction": 1,
+                    "VmRegisterCountMutation": 2
+                  }
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyConsumedThisTick",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 32,
+                  "exact_hits": 12,
+                  "within_45": 20,
+                  "avoidance_trials": 32,
+                  "avoided": 0,
+                  "move_voted": true
+                }
+              },
+              "signature": {
+                "causal": [
+                  {
+                    "family": "FoodHere:0",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "causal": true,
+                    "score_delta": 0.6493035744252391
+                  },
+                  {
+                    "family": "EnergyConsumedThisTick",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "causal": false,
+                    "score_delta": 0.0
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "causal": true,
+                    "score_delta": 0.1225806451612903
+                  }
+                ],
+                "n": 8,
+                "identical": 1,
+                "silent": 7,
+                "changed": 1,
+                "dead": 0,
+                "improved": 0,
+                "equal": 8,
+                "worse": 0,
+                "score_min": 0.2,
+                "score_median": 0.2,
+                "score_max": 0.2,
+                "mean_delta": 0.0
+              }
+            }
+          }
         }
       ],
       "reached_fraction": 0.0,
@@ -623,7 +2284,97 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 10.27940697295536
+          "final_best": 10.27940697295536,
+          "readings": {
+            "first": {
+              "genome_size": 119,
+              "functional_complexity": 75,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 119,
+                "functional_complexity": 75,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 0,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborBarrierRing",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "AreaFoodSummary:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 48,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         },
         {
           "replicate": 1,
@@ -633,7 +2384,97 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 10.153958944281525
+          "final_best": 10.153958944281525,
+          "readings": {
+            "first": {
+              "genome_size": 119,
+              "functional_complexity": 75,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 119,
+                "functional_complexity": 75,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 0,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborBarrierRing",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "AreaFoodSummary:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 48,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         },
         {
           "replicate": 2,
@@ -643,7 +2484,97 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 10.354349951124146
+          "final_best": 10.354349951124146,
+          "readings": {
+            "first": {
+              "genome_size": 119,
+              "functional_complexity": 75,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 119,
+                "functional_complexity": 75,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 0,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborBarrierRing",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "AreaFoodSummary:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 48,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         },
         {
           "replicate": 3,
@@ -653,7 +2584,97 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 10.254154447702835
+          "final_best": 10.254154447702835,
+          "readings": {
+            "first": {
+              "genome_size": 119,
+              "functional_complexity": 75,
+              "nodes": 2,
+              "reachable": 2,
+              "executed": 2,
+              "deaths": 4,
+              "births": 0,
+              "requested": 0,
+              "applied": 0
+            },
+            "last": {
+              "shape": {
+                "genome_size": 119,
+                "functional_complexity": 75,
+                "nodes": 2,
+                "reachable": 2,
+                "executed": 2,
+                "deaths": 4,
+                "ancestry": {
+                  "births": 0,
+                  "requested": 0,
+                  "applied": 0,
+                  "applied_by_operator": {}
+                },
+                "families": [
+                  {
+                    "family": "FoodHere:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborFoodRing:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "NeighborBarrierRing",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "AgeTicks",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "EnergyCurrent",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "ActionQueue",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  },
+                  {
+                    "family": "AreaFoodSummary:0",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": true
+                  },
+                  {
+                    "family": "UpstreamSlot",
+                    "structural": true,
+                    "executed_node": true,
+                    "live": null
+                  }
+                ],
+                "stateful_node": false,
+                "steering": {
+                  "scenarios": 48,
+                  "moves": 48,
+                  "exact_hits": 24,
+                  "within_45": 36,
+                  "avoidance_trials": 48,
+                  "avoided": 48,
+                  "move_voted": true
+                }
+              },
+              "signature": null
+            }
+          }
         }
       ],
       "reached_fraction": null,
@@ -674,7 +2695,11 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 0.5302158273381294
+          "final_best": 0.5302158273381294,
+          "readings": {
+            "first": null,
+            "last": null
+          }
         },
         {
           "replicate": 1,
@@ -684,7 +2709,11 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 2.672314963428543
+          "final_best": 2.672314963428543,
+          "readings": {
+            "first": null,
+            "last": null
+          }
         },
         {
           "replicate": 2,
@@ -694,7 +2723,11 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 0.8625
+          "final_best": 0.8625,
+          "readings": {
+            "first": null,
+            "last": null
+          }
         },
         {
           "replicate": 3,
@@ -704,7 +2737,11 @@
           "incomplete": false,
           "stopped_by": "horizon",
           "generations_run": 40,
-          "final_best": 0.5820143884892086
+          "final_best": 0.5820143884892086,
+          "readings": {
+            "first": null,
+            "last": null
+          }
         }
       ],
       "reached_fraction": null,
@@ -817,8 +2854,9 @@
   "incomplete": null,
   "exit_code": 0,
   "timing": {
-    "wall_seconds": 25.537767083,
-    "creature_ticks": 2990046,
-    "per_creature_tick_ms": 0.008540927826193978
+    "wall_seconds": 33.03743675,
+    "creature_ticks": 4013668,
+    "per_creature_tick_ms": 0.008231233064119903,
+    "readings_creature_ticks": 1023622
   }
 }
