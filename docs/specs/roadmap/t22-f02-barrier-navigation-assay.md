@@ -187,47 +187,50 @@ seeded streams, so F01's same-seed, any-thread byte identity of
 
 ## Implementation Tasks
 
-- [ ] Geodesic `Progress` (multi-source BFS distance field) and the
+- [x] Geodesic `Progress` (multi-source BFS distance field) and the
       path-aware oracle step; property tests that on a barrier-free torus
       the field is the Chebyshev distance and the step is `step_toward`;
       exact-distance fixtures for a wall detour, a wrapped path and a
       diagonal corner passage with the oracle descending by one per step;
       a direct `run_scripted` fixture with only unreachable food showing
       the fallback direction and one random-walk draw per tick.
-- [ ] `Scene` gains `start` and `barriers`; both evaluators place barriers
+- [x] `Scene` gains `start` and `barriers`; both evaluators place barriers
       before the creature; `blocked_fraction` and `blocked_weight` enter
       the scene score.
-- [ ] Arena generators `wall-v1` and `ring-v1` with the three-part exposure
+- [x] Arena generators `wall-v1` and `ring-v1` with the three-part exposure
       predicate and redraw record; the `arena_format: 1` layout loader.
-- [ ] `barrier_comparator` composition with a structural fixture: nine
+- [x] `barrier_comparator` composition with a structural fixture: nine
       references on the vote node (the founder's seven, `AreaFoodSummary`
       at index 7, `NeighborBarrierRing` at index 8), the four
       `RING_INHIBITION` edges into `Move(0, 2, 4, 6)`, and the genome
       evaluating on a barrier scene (competence itself is the gate's job).
-- [ ] The expression mask on every evaluation, with a fixture showing a
+- [x] The expression mask on every evaluation, with a fixture showing a
       plasticity-carrying genome evaluates with zero plasticity updates
       while its stored genotype keeps the plasticity.
-- [ ] Calibration grid over the arena's axis, the largest-scale selection
+- [x] Calibration grid over the arena's axis, the largest-scale selection
       rule, blocked-fraction means; `--assay barrier-navigation`, `--arena`,
       `--layout`, `--scale`, `--calibration-scales`, `--blocked-weight`;
       summary v2 and report.
-- [ ] Tiny barrier-navigation fixture inside `cargo test -p v3-lab`
+- [x] Tiny barrier-navigation fixture inside `cargo test -p v3-lab`
       (both arenas, a layout file, a layout whose food is unreachable
       reporting `exposure: false`, cross-thread byte identity).
-- [ ] Quick runs of both built-in arenas and the food-seeking regression,
+- [x] Quick runs of both built-in arenas and the food-seeking regression,
       recorded in the readings file.
 
 ## Verification
 
-- [ ] `cargo test -p v3-lab` -> all green; `make check` -> exit 0.
-- [ ] Food-seeking regression: `make lab` (seed 1, `--quick`, release)
+- [x] `cargo test -p v3-lab` -> all green; `make check` -> exit 0.
+      At 68ac188f: 102 unit + 17 integration tests; `make check` exit 0.
+- [x] Food-seeking regression: `make lab` (seed 1, `--quick`, release)
       reproduces F01's calibration table (founder 5.13 / 9.73 / 20.84,
       comparator 19.26 / 27.59 / 37.33–38.42, floor 2.67 / 3.60 / 6.31,
       selected 0.04 × 200, reach threshold 15.956), reconfirmed on the base
       commit before any change; the run's `rows.ndjson` sha256 and row
       count are recorded as the new baseline (the mask may move mutants
       that carry plasticity, so F01's hash is not a claim).
-- [ ] `make lab LAB_ARGS="run --assay barrier-navigation --quick"` and the
+      Table reproduced exactly at 78545c85 and at 68ac188f; new baseline
+      `cd2a2c5e…45dcbf`, 948 rows (readings file).
+- [x] `make lab LAB_ARGS="run --assay barrier-navigation --quick"` and the
       same with `--arena ring-v1`: calibration verdict and selected point,
       per-point founder, floor, half, oracle and comparator means with the
       blocked-fraction means, reached fractions per native arm, wall time,
@@ -235,6 +238,9 @@ seeded streams, so F01's same-seed, any-thread byte identity of
       [`docs/progress/readings/t22-f02.md`](../../progress/readings/t22-f02.md).
       An `uncalibrated` verdict on a built-in arena is recorded as a blocker
       with the failing check per point.
+      Recorded: both arenas `uncalibrated` at every point (sensitivity
+      everywhere; competence on the ring and wall scale 3): a blocker for
+      the user (readings file).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output
       path, and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Benchmark summary: `Not applicable: lab feature`.
@@ -265,11 +271,11 @@ measured and recorded, not predicted.
       otherwise), and the blocked-fraction means of comparator and floor.
       An `uncalibrated` verdict on either built-in arena is a recorded
       blocker that leaves the feature incomplete until the user decides.
-- [ ] A JSON layout file runs as an arena without any Rust change, and an
+- [x] A JSON layout file runs as an arena without any Rust change, and an
       infeasible layout is reported as `exposure: false`.
-- [ ] Every evaluation is expression-masked and the food-seeking quick run
+- [x] Every evaluation is expression-masked and the food-seeking quick run
       for seed 1 reproduces F01's calibration table.
-- [ ] Nothing outside `crates/v3-lab` and the documentation changes.
+- [x] Nothing outside `crates/v3-lab` and the documentation changes.
 
 ## Notes for AI Agents
 
