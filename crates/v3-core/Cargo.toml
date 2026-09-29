@@ -21,6 +21,9 @@ noise = "0.9"
 
 [features]
 dhat-heap = ["dep:dhat"]
+# Empty at T21.F01: the observation seams later T21 features add sit behind it,
+# and only the binaries' `telemetry` feature enables it.
+telemetry-seams = []
 
 [dependencies.dhat]
 version = "0.3"

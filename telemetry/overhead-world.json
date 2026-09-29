@@ -1,0 +1,24 @@
+{
+  "world": {
+    "width": 128,
+    "height": 128,
+    "food": {
+      "types": [
+        {
+          "name": "Primary Food",
+          "color": "#22c55e",
+          "initial_density": 1,
+          "initial_coverage": 1,
+          "growth_inhibitor": 0.2,
+          "energy_per_unit": null,
+          "growth_rate": null,
+          "recovery_spawn_rate": null,
+          "initial_fertility_only": false
+        }
+      ]
+    }
+  },
+  "population": {
+    "initial_creatures": 256
+  }
+}

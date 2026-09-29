@@ -9,8 +9,22 @@ use v3_core::config::SimulationConfig;
 #[derive(Parser)]
 #[command(name = "v3-cli")]
 struct Cli {
+    /// Export run telemetry over OTLP (`on` or `off`); beats PETRI_TELEMETRY,
+    /// default off. Only `run` exports records at T21.F01.
+    #[cfg(feature = "telemetry")]
+    #[arg(long, global = true, value_name = "on|off")]
+    telemetry: Option<v3_telemetry::Switch>,
     #[command(subcommand)]
     command: Commands,
+}
+
+/// The flag beats `PETRI_TELEMETRY` (`env`), which beats the default `off`.
+#[cfg(feature = "telemetry")]
+fn telemetry_switch(cli: &Cli, env: Option<&str>) -> v3_telemetry::Switch {
+    v3_telemetry::resolve_switch(cli.telemetry, env).unwrap_or_else(|message| {
+        eprintln!("error: {message}");
+        std::process::exit(1);
+    })
 }
 
 #[derive(clap::Subcommand)]
@@ -198,6 +212,11 @@ struct RunArgs {
 
 fn main() {
     let cli = Cli::parse();
+    #[cfg(feature = "telemetry")]
+    let switch = telemetry_switch(
+        &cli,
+        std::env::var(v3_telemetry::SWITCH_ENV).ok().as_deref(),
+    );
     match cli.command {
         Commands::Run(args) => {
             if args.ticks < 1 {
@@ -222,6 +241,12 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+
+            #[cfg(feature = "telemetry")]
+            v3_cli::telemetry::install(
+                v3_telemetry::Telemetry::start(v3_telemetry::Service::Cli, switch),
+                args.config.as_ref().map(|path| path.display().to_string()),
+            );
 
             let mut out = std::io::stdout();
             match v3_cli::run_simulation(config, args.seed, args.ticks, args.sample_every, &mut out)
@@ -665,6 +690,60 @@ fn run_bench_result(args: BenchArgs) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "telemetry")]
+    fn switch_for(argv: &[&str], env: Option<&str>) -> v3_telemetry::Switch {
+        telemetry_switch(
+            &Cli::try_parse_from(argv).expect("arguments must parse"),
+            env,
+        )
+    }
+
+    #[cfg(feature = "telemetry")]
+    #[test]
+    fn telemetry_flag_beats_environment_which_beats_default_off() {
+        use v3_telemetry::Switch;
+        let run = ["v3-cli", "run", "--ticks", "1", "--seed", "1"];
+        assert_eq!(switch_for(&run, None), Switch::Off);
+        assert_eq!(switch_for(&run, Some("on")), Switch::On);
+        let off = [
+            "v3-cli",
+            "--telemetry",
+            "off",
+            "run",
+            "--ticks",
+            "1",
+            "--seed",
+            "1",
+        ];
+        assert_eq!(switch_for(&off, Some("on")), Switch::Off);
+        let on = [
+            "v3-cli",
+            "--telemetry",
+            "on",
+            "run",
+            "--ticks",
+            "1",
+            "--seed",
+            "1",
+        ];
+        assert_eq!(switch_for(&on, None), Switch::On);
+        // Global: accepted after the subcommand and by every subcommand.
+        let after = [
+            "v3-cli",
+            "run",
+            "--ticks",
+            "1",
+            "--seed",
+            "1",
+            "--telemetry",
+            "on",
+        ];
+        assert_eq!(switch_for(&after, None), Switch::On);
+        let bench = ["v3-cli", "--telemetry", "on", "bench", "--profile", "gate"];
+        assert_eq!(switch_for(&bench, None), Switch::On);
+        assert!(Cli::try_parse_from(["v3-cli", "--telemetry", "maybe", "run"]).is_err());
+    }
 
     fn bench_args(profile: BenchProfile) -> BenchArgs {
         BenchArgs {

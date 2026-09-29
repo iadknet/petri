@@ -14,8 +14,15 @@ workspace = true
 name = "v3-lab"
 path = "src/main.rs"
 
+[features]
+default = ["telemetry"]
+# T21 run telemetry; `--no-default-features` is the reference build without it.
+# The lab accepts the flag and exports nothing until T21.F06.
+telemetry = ["dep:v3-telemetry", "v3-core/telemetry-seams"]
+
 [dependencies]
 v3-core = { path = "../v3-core" }
+v3-telemetry = { path = "../v3-telemetry", optional = true }
 clap = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }

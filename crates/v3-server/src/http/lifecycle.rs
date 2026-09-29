@@ -54,6 +54,9 @@ pub async fn startup(
         crate::query::cache::build_primary_food_fertility_u8(new_sim.world.food());
 
     let mut handle = app.sim.lock().await;
+    #[cfg(feature = "telemetry")]
+    app.telemetry
+        .reset(handle.sim.tick, handle.status, &new_sim.config, seed);
     handle.status = SimulationStatus::Idle;
     handle.sim = new_sim;
     handle.active_trace = None;
@@ -86,6 +89,8 @@ pub async fn start(State(app): State<AppState>) -> Result<impl IntoResponse, App
         handle.status = SimulationStatus::Running;
         let frame = build_ws_frame(&handle);
         let tick = handle.sim.tick;
+        #[cfg(feature = "telemetry")]
+        app.telemetry.transition(SimulationStatus::Running, tick);
         drop(handle);
         app.publish_ws_frame(frame);
         tick
@@ -109,9 +114,15 @@ pub async fn pause_sim(State(app): State<AppState>) -> Result<impl IntoResponse,
             current: "idle".into(),
         });
     }
+    #[cfg(feature = "telemetry")]
+    let changed = handle.status != SimulationStatus::Paused;
     handle.status = SimulationStatus::Paused;
     let frame = build_ws_frame(&handle);
     let tick = handle.sim.tick;
+    #[cfg(feature = "telemetry")]
+    if changed {
+        app.telemetry.transition(SimulationStatus::Paused, tick);
+    }
     drop(handle);
     app.publish_ws_frame(frame);
     Ok(Json(serde_json::json!({

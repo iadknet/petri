@@ -389,3 +389,21 @@ fn recruitment_cli_passes_every_option_into_the_written_summary() {
     assert_eq!(byte["replay_check"]["matched"], 1024);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+/// The T21 overhead and parent-comparison workload recipe resolves to the gate
+/// profile's world (128x128, 256 founders, food coverage 1.0).
+#[test]
+fn telemetry_overhead_world_is_the_gate_profile_world() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../telemetry/overhead-world.json"
+    );
+    let recipe: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let resolved = v3_core::config::resolve_config(&SimulationConfig::default(), recipe).unwrap();
+    let gate = v3_cli::bench::build_config(&v3_cli::bench::gate_profile_params());
+    assert_eq!(
+        v3_core::config::config_digest(&resolved),
+        v3_core::config::config_digest(&gate)
+    );
+}

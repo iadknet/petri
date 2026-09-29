@@ -37,7 +37,33 @@ impl AppState {
             sim: Arc::new(Mutex::new(handle)),
             ws_tx,
             startup_defaults,
+            #[cfg(feature = "telemetry")]
+            telemetry: crate::telemetry::ServerTelemetry::default(),
         }
+    }
+
+    /// [`AppState::from_config`] with run telemetry; emits `run.started` for
+    /// the initial run.
+    #[cfg(feature = "telemetry")]
+    pub fn from_config_with_telemetry(
+        config: SimulationConfig,
+        seed: u64,
+        telemetry: v3_telemetry::Telemetry,
+    ) -> Self {
+        let mut state = Self::from_config(config, seed);
+        state.telemetry = crate::telemetry::ServerTelemetry::new(telemetry);
+        state.telemetry.begin(&state.startup_defaults, seed);
+        state
+    }
+
+    /// Ends the current run as `shutdown` and flushes, abandoning what is
+    /// still pending after the flush bound. Blocks on a worker thread, not on
+    /// the runtime.
+    #[cfg(feature = "telemetry")]
+    pub async fn shutdown_telemetry(&self) {
+        let tick = self.sim.lock().await.sim.tick;
+        let telemetry = self.telemetry.clone();
+        let _ = tokio::task::spawn_blocking(move || telemetry.shutdown(tick)).await;
     }
 
     pub fn publish_ws_frame(&self, frame: WsFrame) {

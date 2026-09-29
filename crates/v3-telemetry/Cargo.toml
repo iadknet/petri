@@ -1,0 +1,25 @@
+[package]
+name = "v3-telemetry"
+edition.workspace = true
+rust-version.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Run identity and bounded OTLP log export for the Petri binaries (T21)."
+build = "build.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+v3-core = { path = "../v3-core" }
+rand = { workspace = true }
+serde_json = { workspace = true }
+futures-executor = "=0.3.32"
+opentelemetry = { version = "=0.33.0", default-features = false, features = ["logs"] }
+opentelemetry_sdk = { version = "=0.33.0", default-features = false, features = ["logs"] }
+opentelemetry-otlp = { version = "=0.33.0", default-features = false, features = ["logs", "http-proto", "reqwest-blocking-client"] }
+# The in-test OTLP receiver (`testing`) decodes what the exporter sent; both
+# crates are already in the exporter's dependency tree.
+opentelemetry-proto = { version = "=0.33.0", default-features = false, features = ["gen-tonic-messages", "logs"] }
+prost = "=0.14.4"

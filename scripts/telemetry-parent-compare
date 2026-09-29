@@ -1,0 +1,106 @@
+#!/bin/sh
+# Parent comparison (T21): the telemetry-off canonical NDJSON of this checkout
+# against BASE on the T21 workload.
+#
+# Usage: scripts/telemetry-parent-compare BASE
+#   BASE  the commit to compare against; mandatory, since in the single T21
+#         worktree a later feature's parent is the previous feature's closing
+#         commit, not the fork point.
+#
+# Adds a scratch worktree at BASE outside this checkout, builds both v3-cli
+# release binaries into separate target directories, runs
+#   v3-cli run --seed 7 --ticks T --sample-every T --config telemetry/overhead-world.json
+# on both with --telemetry off (omitted for a parent whose `run --help` does
+# not list it), compares the canonical form (each line parsed and
+# re-serialized with keys sorted), removes the worktree, and exits 1 on a
+# difference.
+#
+# Environment:
+#   TELEMETRY_TICKS  the workload's T; default the `- Workload ticks T: N`
+#                    line in docs/progress/readings/t21-f01.md
+set -eu
+
+[ "$#" -eq 1 ] || { printf 'Usage: scripts/telemetry-parent-compare BASE\n' >&2; exit 2; }
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+aqua_root=${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}
+node=$aqua_root/bin/node
+export AQUA_POLICY_CONFIG="${AQUA_POLICY_CONFIG:-$root/aqua-policy.yaml}"
+readings=$root/docs/progress/readings/t21-f01.md
+recipe=$root/telemetry/overhead-world.json
+
+base=$(git -C "$root" rev-parse --verify --quiet "$1^{commit}") || {
+  printf 'telemetry-parent-compare: %s is not a commit\n' "$1" >&2
+  exit 2
+}
+
+ticks=${TELEMETRY_TICKS:-}
+if [ -z "$ticks" ] && [ -f "$readings" ]; then
+  ticks=$(sed -n 's/^- Workload ticks T: \([0-9][0-9]*\).*$/\1/p' "$readings" | head -n 1)
+fi
+case "$ticks" in
+  ''|*[!0-9]*|0)
+    printf 'telemetry-parent-compare: no workload T; set TELEMETRY_TICKS or calibrate with scripts/telemetry-overhead\n' >&2
+    exit 2
+    ;;
+esac
+
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/petri-parent-compare.XXXXXX")
+tree=$scratch/tree
+cleanup() {
+  if [ -d "$tree" ]; then
+    git -C "$root" worktree remove --force "$tree" || true
+  fi
+  rm -rf "$scratch"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+git -C "$root" worktree add --detach --quiet "$tree" "$base"
+
+printf 'Building this checkout and %s\n' "$base"
+cargo build --release --quiet -p v3-cli --manifest-path "$root/Cargo.toml" \
+  --target-dir "$root/target"
+cargo build --release --quiet -p v3-cli --manifest-path "$tree/Cargo.toml" \
+  --target-dir "$scratch/target"
+current_bin=$root/target/release/v3-cli
+parent_bin=$scratch/target/release/v3-cli
+
+# Runs one binary on the workload under bench-wait, stdout to $2.
+run_workload() {
+  bin=$1
+  out=$2
+  if "$bin" run --help | grep -q -- '--telemetry'; then
+    set -- --telemetry off
+  else
+    set --
+  fi
+  "$root/scripts/bench-wait" "$bin" "$@" run --seed 7 --ticks "$ticks" \
+    --sample-every "$ticks" --config "$recipe" >"$out"
+}
+
+canonical() {
+  "$node" -e '
+    const fs = require("fs");
+    const sort = (v) => Array.isArray(v) ? v.map(sort)
+      : v && typeof v === "object"
+        ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sort(v[k])]))
+        : v;
+    const lines = fs.readFileSync(process.argv[1], "utf8").split("\n").filter(Boolean);
+    process.stdout.write(lines.map((l) => JSON.stringify(sort(JSON.parse(l)))).join("\n") + "\n");
+  ' "$1"
+}
+
+run_workload "$parent_bin" "$scratch/parent.ndjson"
+run_workload "$current_bin" "$scratch/current.ndjson"
+canonical "$scratch/parent.ndjson" >"$scratch/parent.canonical"
+canonical "$scratch/current.ndjson" >"$scratch/current.canonical"
+
+lines=$(wc -l <"$scratch/current.canonical" | tr -d ' ')
+if cmp -s "$scratch/parent.canonical" "$scratch/current.canonical"; then
+  printf 'identical: %s canonical lines, T=%s, base %s\n' "$lines" "$ticks" "$base"
+else
+  printf 'DIFFERENT: canonical output differs from base %s (T=%s)\n' "$base" "$ticks"
+  diff "$scratch/parent.canonical" "$scratch/current.canonical" | head -n 20 || true
+  exit 1
+fi

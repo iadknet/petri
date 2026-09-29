@@ -1,0 +1,39 @@
+# Petri's local telemetry stack (T21.F01): one grafana/otel-lgtm container.
+# Grafana on http://127.0.0.1:3300 (admin/admin); OTLP on 127.0.0.1:4317
+# (gRPC) and 127.0.0.1:4318 (HTTP). Data lives in a named volume and nothing
+# expires by age; retire it with `make telemetry-clean CUTOFF=YYYY-MM-DD`.
+# PETRI_LGTM_IMAGE and PETRI_TELEMETRY_VOLUME exist for scripts/telemetry-verify
+# only; PETRI_TEMPO_CONFIG likewise swaps in telemetry/verify/tempo-config.yaml.
+name: petri-telemetry
+
+services:
+  lgtm:
+    image: ${PETRI_LGTM_IMAGE:-grafana/otel-lgtm:0.34.0}
+    ports:
+      - "127.0.0.1:3300:3000"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    environment:
+      PROMETHEUS_EXTRA_ARGS: >-
+        --storage.tsdb.retention.time=100y
+        --storage.tsdb.retention.size=0
+        --web.enable-admin-api
+      LOKI_EXTRA_ARGS: >-
+        -compactor.retention-enabled=true
+        -compactor.delete-request-store=filesystem
+        -compactor.delete-request-cancel-period=1m
+        -compactor.retention-delete-delay=1m
+        -compactor.compaction-interval=5m
+        -distributor.max-line-size=4MB
+    volumes:
+      - data:/data
+      - ${PETRI_TEMPO_CONFIG:-./tempo-config.yaml}:/otel-lgtm/tempo-config.yaml:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2g
+
+volumes:
+  data:
+    name: ${PETRI_TELEMETRY_VOLUME:-petri-telemetry}

@@ -24,8 +24,25 @@ pub const QUICK_MUTANTS: u32 = 8;
 #[derive(Parser, Debug)]
 #[command(name = "v3-lab", about = "Petri capability-assay lab (T22)")]
 pub struct Cli {
+    /// Run telemetry (`on` or `off`); beats PETRI_TELEMETRY, default off. The
+    /// lab exports nothing until T21.F06.
+    #[cfg(feature = "telemetry")]
+    #[arg(long, global = true, value_name = "on|off")]
+    pub telemetry: Option<v3_telemetry::Switch>,
     #[command(subcommand)]
     pub command: Command,
+}
+
+#[cfg(feature = "telemetry")]
+impl Cli {
+    /// The flag beats `PETRI_TELEMETRY` (`env`), which beats the default `off`.
+    ///
+    /// # Errors
+    ///
+    /// An `env` value other than `on` or `off`.
+    pub fn telemetry_switch(&self, env: Option<&str>) -> Result<v3_telemetry::Switch, String> {
+        v3_telemetry::resolve_switch(self.telemetry, env)
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -308,6 +325,20 @@ pub fn execute(cli: Cli) -> Result<u8, LabError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "telemetry")]
+    #[test]
+    fn telemetry_flag_beats_environment_which_beats_default_off() {
+        use v3_telemetry::Switch;
+        let parse = |argv: &[&str]| Cli::try_parse_from(argv).expect("arguments must parse");
+        let plain = parse(&["v3-lab", "report", "x.json"]);
+        assert_eq!(plain.telemetry_switch(None), Ok(Switch::Off));
+        assert_eq!(plain.telemetry_switch(Some("on")), Ok(Switch::On));
+        let off = parse(&["v3-lab", "--telemetry", "off", "report", "x.json"]);
+        assert_eq!(off.telemetry_switch(Some("on")), Ok(Switch::Off));
+        let on = parse(&["v3-lab", "--telemetry", "on", "report", "x.json"]);
+        assert_eq!(on.telemetry_switch(None), Ok(Switch::On));
+    }
 
     #[test]
     fn arm_specs_parse_with_and_without_a_genome() {

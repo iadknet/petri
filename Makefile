@@ -16,7 +16,7 @@ export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 # Trust the local aqua registry (cargo-mutants) without a per-user allow step.
 export AQUA_POLICY_CONFIG := $(CURDIR)/aqua-policy.yaml
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-lab rust-test-doc rust-clippy rust-mutants frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench lab
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-lab rust-test-telemetry rust-test-doc rust-clippy rust-mutants frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test compile-check-test dependency-policy-check-test tracked-size-check-test policy-check quality-check dependency-audit skill-check check check-docs audit precommit project-precommit format clean bench lab telemetry-up telemetry-down telemetry-clean
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -47,7 +47,7 @@ rust-format-check: ## Check Rust formatting.
 rust-viability: ## Run the Rust viability merge gate.
 	@cargo test -p v3-core --test viability
 
-rust-test-all: rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-lab rust-test-doc ## Run every Rust test subset except the separately ordered viability gate.
+rust-test-all: rust-test-core-unit rust-test-creature-workflow rust-test-temporal-fixtures rust-test-priority-bid rust-test-terrain rust-test-baseline-worlds rust-test-reproducibility rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-lab rust-test-telemetry rust-test-doc ## Run every Rust test subset except the separately ordered viability gate.
 
 rust-test-core-unit: ## Run v3-core unit tests.
 	@cargo test -p v3-core --lib
@@ -94,6 +94,9 @@ rust-test-server: ## Run v3-server tests.
 
 rust-test-lab: ## Run v3-lab capability-lab tests (T22).
 	@cargo test -p v3-lab
+
+rust-test-telemetry: ## Run v3-telemetry run-identity and exporter-bound tests (T21).
+	@cargo test -p v3-telemetry
 
 LAB_ARGS ?= run --assay food-seeking --quick
 lab: ## Run a capability-lab assay (T22). LAB_ARGS defaults to the quick food-seeking run.
@@ -170,6 +173,22 @@ precommit: ## Run staged roadmap, policy, quality, dependency, skill, and secret
 
 project-precommit: ## Run the project-validation pre-commit entry point.
 	@scripts/project-precommit
+
+TELEMETRY_COMPOSE = docker compose -f telemetry/compose.yaml
+telemetry-up: ## Start the local telemetry stack (Grafana on 127.0.0.1:3300, OTLP on 4317/4318) and print each store's disk use.
+	@$(TELEMETRY_COMPOSE) up -d
+	@waited=0; until $(TELEMETRY_COMPOSE) exec -T lgtm du -s /data/prometheus /data/tempo /data/loki 2>/dev/null; do \
+		waited=$$((waited + 1)); \
+		if [ "$$waited" -ge 60 ]; then echo 'telemetry-up: stores not ready after 60 s' >&2; exit 1; fi; \
+		sleep 1; \
+	done
+
+telemetry-down: ## Stop the local telemetry stack; its data volume stays.
+	@$(TELEMETRY_COMPOSE) down
+
+telemetry-clean: ## Preview retiring telemetry before CUTOFF=YYYY-MM-DD (00:00 UTC); PROCEED=1 deletes.
+	@if [ -z "$(CUTOFF)" ]; then echo 'error: set CUTOFF=YYYY-MM-DD' >&2; exit 2; fi
+	@scripts/telemetry-cleanup "$(CUTOFF)" $(if $(PROCEED),--proceed)
 
 format: ## Apply safe Rust and frontend formatting.
 	@cargo fmt --all
