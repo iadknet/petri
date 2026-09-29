@@ -5,6 +5,8 @@ pub mod error;
 mod http;
 pub mod query;
 pub mod state;
+#[cfg(feature = "telemetry")]
+pub mod telemetry;
 pub mod transport;
 pub mod types;
 pub mod ws;

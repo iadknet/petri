@@ -1,0 +1,169 @@
+#!/bin/sh
+# Retire local telemetry older than a cutoff date (T21.F01).
+#
+# Usage: scripts/telemetry-cleanup CUTOFF [--proceed]
+#   CUTOFF     YYYY-MM-DD; everything before CUTOFF 00:00 UTC is retired.
+#   --proceed  delete; without it, print each store's disk use, the deletion
+#              interval and the exact targets, and delete nothing.
+#
+# Uses only the pinned image, through `docker compose exec` and `docker
+# compose run`, against a running stack (`make telemetry-up`).
+#
+# Environment:
+#   PETRI_TELEMETRY_PROJECT  Compose project (petri-telemetry); scripts/telemetry-verify
+#                            points it at its scratch project.
+set -eu
+
+usage() {
+  printf 'Usage: scripts/telemetry-cleanup YYYY-MM-DD [--proceed]\n' >&2
+  exit 2
+}
+
+[ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage
+cutoff_date=$1
+proceed=0
+if [ "$#" -eq 2 ]; then
+  [ "$2" = --proceed ] || usage
+  proceed=1
+fi
+case "$cutoff_date" in
+  [0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]) ;;
+  *) usage ;;
+esac
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+project=${PETRI_TELEMETRY_PROJECT:-petri-telemetry}
+
+compose() {
+  docker compose -p "$project" -f "$root/telemetry/compose.yaml" "$@"
+}
+
+in_stack() {
+  compose exec -T lgtm "$@"
+}
+
+if [ -z "$(compose ps -q --status running lgtm 2>/dev/null)" ]; then
+  printf 'telemetry-cleanup: the %s stack is not running; start it with make telemetry-up\n' "$project" >&2
+  exit 1
+fi
+
+cutoff=${cutoff_date}T00:00:00Z
+# Validates the date (GNU date inside the image rejects 2026-02-31).
+cutoff_epoch=$(in_stack date -u -d "$cutoff" +%s) || {
+  printf 'telemetry-cleanup: invalid date %s\n' "$cutoff_date" >&2
+  exit 2
+}
+
+# A store API call inside the container; a failed call (with the store's
+# message) stops the script.
+api() {
+  if ! body=$(in_stack curl -sS --fail-with-body "$@"); then
+    printf 'telemetry-cleanup: %s\n' "$body" >&2
+    return 1
+  fi
+  printf '%s\n' "$body"
+}
+
+prometheus=http://127.0.0.1:9090
+loki=http://127.0.0.1:3100
+series_match='{__name__=~".+"}'
+stream_match='{service_name=~".+"}'
+
+# One JSON object per line from a `"data":[{...},{...}]` or bare `[{...}]`
+# response.
+split_data() {
+  awk '{
+    sub(/^.*"data":\[/, ""); sub(/^\[/, ""); sub(/\][^]]*$/, "")
+    n = split($0, parts, /\},\{/)
+    for (i = 1; i <= n; i++) {
+      part = parts[i]
+      if (part == "") continue
+      if (substr(part, 1, 1) != "{") part = "{" part
+      if (substr(part, length(part), 1) != "}") part = part "}"
+      print part
+    }
+  }'
+}
+
+# Tempo blocks as `class dir start end bytes`, class being delete (ends before
+# the cutoff), keep (starts at or after it) or straddle (kept whole).
+tempo_blocks() {
+  # shellcheck disable=SC2016 # expands inside the container.
+  in_stack sh -c '
+    cutoff=$1
+    for meta in /data/tempo/blocks/*/*/meta.json; do
+      [ -f "$meta" ] || continue
+      dir=${meta%/meta.json}
+      json=$(cat "$meta")
+      start=$(printf "%s" "$json" | sed -n "s/.*\"startTime\":\"\([^\"]*\)\".*/\1/p")
+      end=$(printf "%s" "$json" | sed -n "s/.*\"endTime\":\"\([^\"]*\)\".*/\1/p")
+      bytes=$(du -sb "$dir" | cut -f1)
+      start_epoch=$(date -u -d "$start" +%s)
+      end_epoch=$(date -u -d "$end" +%s)
+      if [ "$end_epoch" -lt "$cutoff" ]; then
+        class=delete
+      elif [ "$start_epoch" -ge "$cutoff" ]; then
+        class=keep
+      else
+        class=straddle
+      fi
+      printf "%s %s %s %s %s\n" "$class" "$dir" "$start" "$end" "$bytes"
+    done
+  ' sh "$cutoff_epoch"
+}
+
+printf 'Disk use (KiB):\n'
+in_stack du -s /data/prometheus /data/tempo /data/loki
+printf '\nDeletion interval: everything before %s (%s)\n' "$cutoff" "$cutoff_epoch"
+
+prom_raw=$(api -G "$prometheus/api/v1/series" \
+  --data-urlencode "match[]=$series_match" --data-urlencode "end=$cutoff")
+prom_series=$(printf '%s\n' "$prom_raw" | split_data)
+prom_count=$(printf '%s' "$prom_series" | grep -c . || true)
+printf '\nPrometheus: %s series with samples before the cutoff\n' "$prom_count"
+[ -z "$prom_series" ] || printf '%s\n' "$prom_series"
+
+loki_raw=$(api -G "$loki/loki/api/v1/series" \
+  --data-urlencode "match[]=$stream_match" --data-urlencode 'start=1' \
+  --data-urlencode "end=$cutoff")
+loki_streams=$(printf '%s\n' "$loki_raw" | split_data)
+loki_count=$(printf '%s' "$loki_streams" | grep -c . || true)
+printf '\nLoki: %s streams with entries before the cutoff\n' "$loki_count"
+[ -z "$loki_streams" ] || printf '%s\n' "$loki_streams"
+
+blocks=$(tempo_blocks)
+printf '\nTempo: blocks ending before the cutoff (removed), start end bytes:\n'
+printf '%s\n' "$blocks" | awk '$1 == "delete" { print "  " $2, $3, $4, $5 }'
+printf 'Tempo: blocks straddling the cutoff (kept whole; block granularity):\n'
+printf '%s\n' "$blocks" | awk '$1 == "straddle" { print "  " $2, $3, $4, $5 }'
+
+if [ "$proceed" -eq 0 ]; then
+  printf '\nPreview only; rerun with --proceed (make telemetry-clean CUTOFF=%s PROCEED=1) to delete.\n' "$cutoff_date"
+  exit 0
+fi
+
+printf '\nPrometheus: deleting series samples before the cutoff\n'
+api -X POST -G "$prometheus/api/v1/admin/tsdb/delete_series" \
+  --data-urlencode "match[]=$series_match" --data-urlencode "end=$cutoff"
+api -X POST "$prometheus/api/v1/admin/tsdb/clean_tombstones"
+
+printf 'Loki: requesting deletion before the cutoff\n'
+api -X POST -G "$loki/loki/api/v1/delete" \
+  --data-urlencode "query=$stream_match" --data-urlencode 'start=1' \
+  --data-urlencode "end=$cutoff_epoch"
+printf 'Loki delete requests (status endpoint %s/loki/api/v1/delete):\n' "$loki"
+requests=$(api "$loki/loki/api/v1/delete")
+printf '%s\n' "$requests" | split_data
+printf 'Loki applies the deletion after its cancel period and compaction interval.\n'
+
+targets=$(printf '%s\n' "$blocks" | awk '$1 == "delete" { print $2 }')
+if [ -n "$targets" ]; then
+  printf 'Tempo: stopping the stack to remove %s block(s)\n' "$(printf '%s\n' "$targets" | grep -c .)"
+  compose stop lgtm
+  # shellcheck disable=SC2086 # block directories contain no whitespace.
+  compose run --rm --no-deps -T --entrypoint rm lgtm -rf $targets
+  compose start lgtm
+else
+  printf 'Tempo: no block ends before the cutoff\n'
+fi
+printf 'Done.\n'

@@ -1,0 +1,256 @@
+#!/bin/sh
+# Telemetry overhead check (T21): the telemetry build against the reference
+# build of the same commit (`--no-default-features`) on the T21 workload
+#   v3-cli run --seed 7 --ticks T --sample-every T --config telemetry/overhead-world.json
+#
+# States (docs/specs/roadmap/t21-f01-local-telemetry-stack-and-run-identity.md):
+#   a  telemetry on, stack healthy: pairs of one telemetry run with the stack
+#      started and one reference run with it stopped
+#   b  telemetry on, stack stopped: pairs, the reference also stopped
+#   c  idle-stack cost: three reference runs with the stack started against
+#      the reference runs of b (block comparison, no ceiling)
+# Pair order alternates. The spread of three reference runs sets n (5 at
+# <= 5%, 8 at <= 10%, else inconclusive before any pair). A state passes when
+# its median ratio <= 1.25 and at least ceil(0.75 n) pairs are <= 1.25, fails
+# when the median > 1.25 and at least ceil(0.75 n) pairs are > 1.25, and is
+# otherwise inconclusive; one inconclusive state is rerun once when it fits.
+# Calibration, spread, pairs, the c block and the rerun share a cap of 300 s
+# of measured run time; a run that would pass it is refused and the rest is
+# inconclusive. Every timed run goes through scripts/bench-wait.
+#
+# Uses the petri-telemetry stack (make telemetry-up first) and leaves it
+# stopped. T comes from TELEMETRY_TICKS or the `- Workload ticks T: N` line of
+# docs/progress/readings/t21-f01.md; without either it is calibrated with
+# three reference runs to about 4 s per run, and the script prints the line
+# to record.
+set -eu
+
+[ "$#" -eq 0 ] || { printf 'Usage: scripts/telemetry-overhead\n' >&2; exit 2; }
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+aqua_root=${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}
+node=$aqua_root/bin/node
+export AQUA_POLICY_CONFIG="${AQUA_POLICY_CONFIG:-$root/aqua-policy.yaml}"
+readings=$root/docs/progress/readings/t21-f01.md
+recipe=$root/telemetry/overhead-world.json
+cap_ms=300000
+ceiling=1.25
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/petri-overhead.XXXXXX")
+trap 'rm -rf "$scratch"' EXIT
+trap 'exit 130' INT TERM
+
+compose() {
+  docker compose -p petri-telemetry -f "$root/telemetry/compose.yaml" "$@"
+}
+
+if [ -z "$(compose ps -a -q lgtm 2>/dev/null)" ]; then
+  printf 'telemetry-overhead: no petri-telemetry stack; run make telemetry-up first\n' >&2
+  exit 1
+fi
+
+stack_stop() {
+  compose stop lgtm >/dev/null 2>&1
+}
+
+stack_start() {
+  compose start lgtm >/dev/null 2>&1
+  waited=0
+  until compose exec -T lgtm curl -sf http://127.0.0.1:3000/api/health >/dev/null 2>&1; do
+    waited=$((waited + 1))
+    [ "$waited" -lt 120 ] || { printf 'telemetry-overhead: Grafana not healthy after 120 s\n' >&2; exit 1; }
+    sleep 1
+  done
+  sleep 5
+}
+
+printf 'Building the telemetry and reference builds\n'
+cargo build --release --quiet -p v3-cli --manifest-path "$root/Cargo.toml" \
+  --target-dir "$root/target"
+cargo build --release --quiet -p v3-cli --no-default-features \
+  --manifest-path "$root/Cargo.toml" --target-dir "$root/target/reference"
+telemetry_bin=$root/target/release/v3-cli
+reference_bin=$root/target/reference/release/v3-cli
+
+used_ms=0
+estimate_ms=0
+refused=0
+
+# timed KIND TICKS: runs one workload run under bench-wait and sets run_ms
+# and run_self (self_time_us); returns 1, running nothing, when the run would
+# pass the cap. Call it outside subshells so the measured total accumulates.
+timed() {
+  kind=$1
+  run_ticks=$2
+  if [ $((used_ms + estimate_ms)) -gt "$cap_ms" ]; then
+    refused=1
+    return 1
+  fi
+  if [ "$kind" = telemetry ]; then
+    set -- "$telemetry_bin" --telemetry on
+  else
+    set -- "$reference_bin"
+  fi
+  # shellcheck disable=SC2016 # JavaScript, not shell.
+  "$root/scripts/bench-wait" "$node" -e '
+    const { spawnSync } = require("child_process");
+    const [bin, ...args] = process.argv.slice(1);
+    const began = process.hrtime.bigint();
+    const run = spawnSync(bin, args, { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+    const ms = Number(process.hrtime.bigint() - began) / 1e6;
+    if (run.status !== 0) { process.stderr.write(run.stderr || ""); process.exit(1); }
+    const self = /self_time_us=(\d+)/.exec(run.stderr || "");
+    console.log(`${Math.round(ms)} ${self ? self[1] : 0}`);
+  ' "$@" run --seed 7 --ticks "$run_ticks" --sample-every "$run_ticks" --config "$recipe" \
+    >"$scratch/run"
+  read -r run_ms run_self <"$scratch/run"
+  used_ms=$((used_ms + run_ms))
+  if [ "$run_ms" -gt "$estimate_ms" ]; then estimate_ms=$run_ms; fi
+}
+
+median() {
+  sort -n | awk '{ v[NR] = $1 } END { if (NR == 0) exit; print (NR % 2) ? v[(NR + 1) / 2] : (v[NR / 2] + v[NR / 2 + 1]) / 2 }'
+}
+
+ticks=${TELEMETRY_TICKS:-}
+if [ -z "$ticks" ] && [ -f "$readings" ]; then
+  ticks=$(sed -n 's/^- Workload ticks T: \([0-9][0-9]*\).*$/\1/p' "$readings" | head -n 1)
+fi
+
+stack_stop
+if [ -z "$ticks" ]; then
+  trial=100
+  : >"$scratch/calibration"
+  for _ in 1 2 3; do
+    timed reference "$trial" || break
+    printf '%s\n' "$run_ms" >>"$scratch/calibration"
+  done
+  trial_ms=$(median <"$scratch/calibration")
+  ticks=$(awk -v t="$trial" -v ms="$trial_ms" 'BEGIN { printf "%d", t * 4000 / ms + 0.5 }')
+  estimate_ms=0
+  printf 'Calibrated T=%s from %s ticks in %s ms (median of 3); record:\n- Workload ticks T: %s\n' \
+    "$ticks" "$trial" "$trial_ms" "$ticks"
+fi
+case "$ticks" in
+  ''|*[!0-9]*|0) printf 'telemetry-overhead: invalid T %s\n' "$ticks" >&2; exit 2 ;;
+esac
+
+: >"$scratch/spread"
+for _ in 1 2 3; do
+  timed reference "$ticks" || break
+  printf '%s\n' "$run_ms" >>"$scratch/spread"
+done
+spread=$(sort -n "$scratch/spread" | awk '{ v[NR] = $1 } END { if (NR < 3) { print "none"; exit } printf "%.4f", (v[3] - v[1]) / v[2] }')
+pairs=$(awk -v s="$spread" 'BEGIN { if (s == "none") print 0; else if (s <= 0.05) print 5; else if (s <= 0.10) print 8; else print 0 }')
+need=$(awk -v n="$pairs" 'BEGIN { x = 0.75 * n; printf "%d", (x == int(x)) ? x : int(x) + 1 }')
+
+# pairs_for STATE N: N alternating pairs; ratios to $scratch/STATE.ratio,
+# reference times to $scratch/STATE.ref, self times to $scratch/STATE.self.
+pairs_for() {
+  state=$1
+  n=$2
+  : >"$scratch/$state.ratio"
+  : >"$scratch/$state.ref"
+  : >"$scratch/$state.self"
+  i=0
+  while [ "$i" -lt "$n" ]; do
+    if [ $((i % 2)) -eq 0 ]; then order='telemetry reference'; else order='reference telemetry'; fi
+    tel_ms=''
+    ref_ms=''
+    for kind in $order; do
+      if [ "$state" = a ]; then
+        if [ "$kind" = telemetry ]; then stack_start; else stack_stop; fi
+      fi
+      if ! timed "$kind" "$ticks"; then
+        stack_stop
+        return 0
+      fi
+      if [ "$kind" = telemetry ]; then
+        tel_ms=$run_ms
+        printf '%s\n' "$run_self" >>"$scratch/$state.self"
+      else
+        ref_ms=$run_ms
+        printf '%s\n' "$ref_ms" >>"$scratch/$state.ref"
+      fi
+    done
+    awk -v t="$tel_ms" -v r="$ref_ms" 'BEGIN { printf "%.4f\n", t / r }' >>"$scratch/$state.ratio"
+    i=$((i + 1))
+  done
+  stack_stop
+}
+
+# verdict STATE: pass, fail or inconclusive.
+verdict() {
+  got=$(grep -c . "$scratch/$1.ratio" || true)
+  if [ "$got" -lt "$pairs" ] || [ "$pairs" -eq 0 ]; then
+    printf 'inconclusive\n'
+    return
+  fi
+  med=$(median <"$scratch/$1.ratio")
+  awk -v m="$med" -v c="$ceiling" -v need="$need" '
+    { if ($1 <= c) under++; else over++ }
+    END {
+      if (m <= c && under >= need) print "pass"
+      else if (m > c && over >= need) print "fail"
+      else print "inconclusive"
+    }' "$scratch/$1.ratio"
+}
+
+row() {
+  state=$1
+  label=$2
+  if [ -s "$scratch/$state.ratio" ]; then
+    med=$(median <"$scratch/$state.ratio")
+    self=$(median <"$scratch/$state.self")
+    per_tick=$(awk -v s="$self" -v t="$ticks" 'BEGIN { printf "%.3f", s / t }')
+    got=$(grep -c . "$scratch/$state.ratio")
+  else
+    med=-
+    per_tick=-
+    got=0
+  fi
+  printf '| %s | %s | %s | %s | %s |\n' "$label" "$med" "$(verdict "$state")" "$got/$pairs" "$per_tick"
+}
+
+if [ "$pairs" -gt 0 ]; then
+  pairs_for b "$pairs"
+  pairs_for a "$pairs"
+  : >"$scratch/c.started"
+  stack_start
+  for _ in 1 2 3; do
+    timed reference "$ticks" || break
+    printf '%s\n' "$run_ms" >>"$scratch/c.started"
+  done
+  stack_stop
+  rerun=''
+  for state in a b; do
+    if [ "$(verdict "$state")" = inconclusive ] && [ "$refused" -eq 0 ] &&
+      [ $((used_ms + 2 * pairs * estimate_ms)) -le "$cap_ms" ]; then
+      for file in ratio ref self; do
+        [ -f "$scratch/$state.$file" ] && cp "$scratch/$state.$file" "$scratch/${state}0.$file"
+      done
+      pairs_for "$state" "$pairs"
+      rerun=$state
+      break
+    fi
+  done
+fi
+
+printf '\nT=%s  spread=%s  pairs n=%s (pass needs %s)\n\n' "$ticks" "$spread" "$pairs" "$need"
+printf '| State | Median ratio | Verdict | Pairs | self_time_us per tick |\n'
+printf '| --- | --- | --- | --- | --- |\n'
+if [ -n "${rerun:-}" ]; then
+  row "${rerun}0" "$rerun (first run)"
+fi
+row a 'a: on, stack healthy'
+row b 'b: on, stack stopped'
+if [ -s "$scratch/c.started" ] && [ -s "$scratch/b.ref" ]; then
+  idle=$(awk -v s="$(median <"$scratch/c.started")" -v r="$(median <"$scratch/b.ref")" 'BEGIN { printf "%.4f", s / r }')
+else
+  idle=-
+fi
+printf '| c: idle-stack cost | %s | recorded | 3 vs b | - |\n' "$idle"
+printf '\nMeasured time used: %s s of %s s' "$(awk -v u="$used_ms" 'BEGIN { printf "%.1f", u / 1000 }')" $((cap_ms / 1000))
+if [ "$refused" -eq 1 ]; then
+  printf ' (cap reached: remaining runs refused, inconclusive)'
+fi
+printf '\n'

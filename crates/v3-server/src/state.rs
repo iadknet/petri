@@ -241,6 +241,8 @@ pub struct AppState {
     pub sessions: Arc<RwLock<SessionRegistry>>,
     pub ws_tx: broadcast::Sender<ProjectionNotice>,
     pub(crate) startup_defaults: Arc<SimulationConfig>,
+    #[cfg(feature = "telemetry")]
+    pub(crate) telemetry: crate::telemetry::ServerTelemetry,
 }
 
 #[derive(Clone, Debug, Default)]

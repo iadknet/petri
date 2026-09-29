@@ -200,14 +200,14 @@ no recorded configuration.
 - [ ] `telemetry/compose.yaml`, `telemetry/tempo-config.yaml`,
       `telemetry/verify/tempo-config.yaml`, `telemetry/overhead-world.json`;
       `make telemetry-up`, `telemetry-down`, `telemetry-clean`.
-- [ ] `crates/v3-telemetry`: identity, `build.rs` revision, the four
+- [x] `crates/v3-telemetry`: identity, `build.rs` revision, the four
       records, bounded exporter with exact per-run counts, stderr
       self-report, unit tests for saturation and the flush bound.
-- [ ] `v3-cli`: global `--telemetry`, feature `telemetry`, hooks in
+- [x] `v3-cli`: global `--telemetry`, feature `telemetry`, hooks in
       `run_simulation`; `v3-server`: `--telemetry`, feature, hooks in
       `AppState` construction, `startup`, `start`, `pause_sim`,
       `patch_config`, signal shutdown; `v3-lab`: flag and feature, inert.
-- [ ] Telemetry-neutrality test in `cargo test -p v3-cli` with an in-test
+- [x] Telemetry-neutrality test in `cargo test -p v3-cli` with an in-test
       OTLP receiver on an ephemeral port, and server tests for run identity
       across `startup`, three-state neutrality under `step`, and shutdown
       with pending records.

@@ -1,0 +1,525 @@
+//! Run identity and bounded, best-effort OTLP log export for the Petri
+//! binaries (T21.F01).
+//!
+//! A [`Telemetry`] is either off (every call is a no-op) or on, in which case
+//! it owns an OpenTelemetry logger whose records go through a bounded queue to
+//! one exporter thread speaking OTLP/HTTP with the blocking client. Nothing
+//! here writes to stdout, draws from a simulation RNG or changes a run: IDs
+//! come from OS entropy and the flag enters no recorded configuration.
+//!
+//! When on, the binary writes one stderr line when its first run starts
+//! (`telemetry: on endpoint=… invocation=… run=…`) and one per run once each of
+//! the run's records has been exported, failed, dropped or abandoned
+//! (`telemetry: run=… exported=… failed=… dropped=… abandoned=… bytes=…
+//! self_time_us=… flush_ms=…`).
+
+mod queue;
+pub mod testing;
+
+use std::fmt;
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime};
+
+use opentelemetry::logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity};
+use opentelemetry::KeyValue;
+use opentelemetry_otlp::{Protocol, RetryPolicy, WithExportConfig, WithHttpConfig};
+use opentelemetry_sdk::logs::{LogExporter, SdkLogger, SdkLoggerProvider};
+use opentelemetry_sdk::Resource;
+use rand::RngCore;
+use v3_core::config::SimulationConfig;
+
+use crate::queue::{QueueProcessor, RunKey, Shared};
+
+/// The environment variable that switches telemetry when no flag is given.
+pub const SWITCH_ENV: &str = "PETRI_TELEMETRY";
+/// The OTLP base endpoint variable; `/v1/logs` is appended for logs.
+pub const ENDPOINT_ENV: &str = "OTEL_EXPORTER_OTLP_ENDPOINT";
+/// The endpoint used when [`ENDPOINT_ENV`] is unset or empty.
+pub const DEFAULT_ENDPOINT: &str = "http://127.0.0.1:4318";
+/// The commit this crate was built from (see `build.rs`).
+pub const BUILD_REVISION: &str = env!("PETRI_BUILD_REVISION_RESOLVED");
+
+pub(crate) const RUN_ID_KEY: &str = "petri.run_id";
+
+/// Whether a process exports telemetry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Switch {
+    On,
+    #[default]
+    Off,
+}
+
+impl FromStr for Switch {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "on" => Ok(Self::On),
+            "off" => Ok(Self::Off),
+            other => Err(format!("expected `on` or `off`, found `{other}`")),
+        }
+    }
+}
+
+impl fmt::Display for Switch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::On => "on",
+            Self::Off => "off",
+        })
+    }
+}
+
+/// The flag beats [`SWITCH_ENV`], which beats the default `off`. An unset or
+/// empty variable counts as absent; any other value must be `on` or `off`.
+pub fn resolve_switch(flag: Option<Switch>, env: Option<&str>) -> Result<Switch, String> {
+    if let Some(flag) = flag {
+        return Ok(flag);
+    }
+    match env.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) => value
+            .parse()
+            .map_err(|error| format!("invalid {SWITCH_ENV}: {error}")),
+        None => Ok(Switch::Off),
+    }
+}
+
+/// [`resolve_switch`] against the process environment.
+pub fn switch_from_env(flag: Option<Switch>) -> Result<Switch, String> {
+    resolve_switch(flag, std::env::var(SWITCH_ENV).ok().as_deref())
+}
+
+/// The binary a record came from; its `service.name`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Service {
+    Cli,
+    Server,
+    Lab,
+}
+
+impl Service {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Cli => "v3-cli",
+            Self::Server => "v3-server",
+            Self::Lab => "v3-lab",
+        }
+    }
+}
+
+/// The exporter's bounds. [`Limits::default`] is the contract; tests shorten
+/// the timeouts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    pub max_queue_records: usize,
+    pub max_queue_bytes: u64,
+    pub max_body_bytes: u64,
+    pub batch_records: usize,
+    pub request_timeout: Duration,
+    pub flush_timeout: Duration,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_queue_records: 2_048,
+            max_queue_bytes: 8 * 1024 * 1024,
+            max_body_bytes: 4 * 1024 * 1024,
+            batch_records: 512,
+            request_timeout: Duration::from_secs(5),
+            flush_timeout: Duration::from_secs(10),
+        }
+    }
+}
+
+/// Where the self-report lines go: stderr, or a buffer a test reads.
+#[derive(Debug, Clone, Default)]
+pub enum ReportSink {
+    #[default]
+    Stderr,
+    Capture(Arc<Mutex<Vec<String>>>),
+}
+
+impl ReportSink {
+    pub fn capture() -> Self {
+        Self::Capture(Arc::default())
+    }
+
+    /// The captured lines so far; empty for [`ReportSink::Stderr`].
+    pub fn lines(&self) -> Vec<String> {
+        match self {
+            Self::Stderr => Vec::new(),
+            Self::Capture(lines) => lines
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone(),
+        }
+    }
+
+    fn write(&self, line: &str) {
+        match self {
+            Self::Stderr => eprintln!("{line}"),
+            Self::Capture(lines) => lines
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(line.to_owned()),
+        }
+    }
+}
+
+/// How an enabled [`Telemetry`] is set up.
+#[derive(Debug, Clone)]
+pub struct Options {
+    pub service: Service,
+    /// OTLP base endpoint, without the `/v1/logs` path.
+    pub endpoint: String,
+    pub limits: Limits,
+    pub reports: ReportSink,
+}
+
+impl Options {
+    /// Stderr reports, contract limits and the endpoint from [`ENDPOINT_ENV`].
+    pub fn from_env(service: Service) -> Self {
+        let endpoint = std::env::var(ENDPOINT_ENV)
+            .ok()
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| DEFAULT_ENDPOINT.to_owned());
+        Self {
+            service,
+            endpoint,
+            limits: Limits::default(),
+            reports: ReportSink::Stderr,
+        }
+    }
+}
+
+/// How a run ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EndStatus {
+    Completed,
+    Reset,
+    Shutdown,
+}
+
+impl EndStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Completed => "completed",
+            Self::Reset => "reset",
+            Self::Shutdown => "shutdown",
+        }
+    }
+}
+
+/// Whether ending a run waits for its records (the CLI's end-of-run flush) or
+/// returns at once and lets the line follow (a server reset).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Flush {
+    Wait,
+    Background,
+}
+
+/// A server run's status, as `run.state` reports it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunState {
+    Idle,
+    Running,
+    Paused,
+}
+
+impl RunState {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Idle => "idle",
+            Self::Running => "running",
+            Self::Paused => "paused",
+        }
+    }
+}
+
+/// What `run.started` records about a freshly seeded run.
+#[derive(Debug, Clone, Copy)]
+pub struct RunStart<'a> {
+    pub seed: u64,
+    pub config: &'a SimulationConfig,
+    /// The `--config` path, when one was given.
+    pub recipe: Option<&'a str>,
+    pub tick: u64,
+    pub ticks_requested: Option<u64>,
+    pub sample_every: Option<u64>,
+}
+
+/// The identity every record of one run carries.
+#[derive(Debug, Clone)]
+pub struct RunHandle {
+    key: RunKey,
+    id: String,
+    seed: u64,
+    world: String,
+    recipe: Option<String>,
+    config_digest: String,
+    started: Instant,
+}
+
+impl RunHandle {
+    /// The run ID: 32 lowercase hex digits.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+}
+
+/// Telemetry for one process; cheap to clone, a no-op when off.
+#[derive(Debug, Clone, Default)]
+pub struct Telemetry {
+    active: Option<Arc<Active>>,
+}
+
+struct Active {
+    // Kept so the logger's provider outlives every emit.
+    _provider: SdkLoggerProvider,
+    logger: SdkLogger,
+    shared: Arc<Shared>,
+    endpoint: String,
+    invocation_id: String,
+    announced: AtomicBool,
+}
+
+impl fmt::Debug for Active {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Active")
+            .field("endpoint", &self.endpoint)
+            .field("invocation_id", &self.invocation_id)
+            .finish_non_exhaustive()
+    }
+}
+
+/// 128 bits of OS entropy as 32 lowercase hex digits.
+fn entropy_id() -> (u128, String) {
+    let mut bytes = [0_u8; 16];
+    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    let value = u128::from_be_bytes(bytes);
+    (value, format!("{value:032x}"))
+}
+
+/// An integer attribute, or its decimal string when it exceeds `i64`.
+fn u64_value(value: u64) -> AnyValue {
+    i64::try_from(value).map_or_else(|_| AnyValue::from(value.to_string()), AnyValue::Int)
+}
+
+impl Telemetry {
+    /// Telemetry that does nothing.
+    pub fn off() -> Self {
+        Self::default()
+    }
+
+    /// Off for [`Switch::Off`]; otherwise exports to the environment's
+    /// endpoint and reports on stderr.
+    pub fn start(service: Service, switch: Switch) -> Self {
+        match switch {
+            Switch::Off => Self::off(),
+            Switch::On => Self::start_with(Options::from_env(service)),
+        }
+    }
+
+    /// Enabled telemetry with explicit options. When the exporter cannot be
+    /// built, it says so on the report sink and returns telemetry that is off.
+    pub fn start_with(options: Options) -> Self {
+        let url = format!("{}/v1/logs", options.endpoint.trim_end_matches('/'));
+        let exporter = opentelemetry_otlp::LogExporter::builder()
+            .with_http()
+            .with_protocol(Protocol::HttpBinary)
+            .with_endpoint(url)
+            .with_timeout(options.limits.request_timeout)
+            .with_retry_policy(RetryPolicy::disabled())
+            .build();
+        match exporter {
+            Ok(exporter) => Self::with_exporter(options, exporter, false),
+            Err(error) => {
+                options
+                    .reports
+                    .write(&format!("telemetry: off (exporter not built: {error})"));
+                Self::off()
+            }
+        }
+    }
+
+    fn with_exporter<E>(options: Options, mut exporter: E, held: bool) -> Self
+    where
+        E: LogExporter + 'static,
+    {
+        let (_, invocation_id) = entropy_id();
+        let resource = Resource::builder_empty()
+            .with_attributes([
+                KeyValue::new("service.name", options.service.name()),
+                KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
+                KeyValue::new("process.pid", i64::from(std::process::id())),
+                KeyValue::new("petri.invocation_id", invocation_id.clone()),
+                KeyValue::new("petri.build_revision", BUILD_REVISION),
+            ])
+            .build();
+        exporter.set_resource(&resource);
+        let shared = Shared::new(options.limits, options.reports, held);
+        let worker_shared = Arc::clone(&shared);
+        let spawned = std::thread::Builder::new()
+            .name("petri-telemetry".to_owned())
+            .spawn(move || queue::run_worker(&worker_shared, exporter));
+        if let Err(error) = spawned {
+            shared
+                .sink()
+                .write(&format!("telemetry: off (worker not started: {error})"));
+            return Self::off();
+        }
+        let provider = SdkLoggerProvider::builder()
+            .with_resource(resource)
+            .with_log_processor(QueueProcessor {
+                shared: Arc::clone(&shared),
+            })
+            .build();
+        let logger = provider.logger("petri");
+        Self {
+            active: Some(Arc::new(Active {
+                _provider: provider,
+                logger,
+                shared,
+                endpoint: options.endpoint,
+                invocation_id,
+                announced: AtomicBool::new(false),
+            })),
+        }
+    }
+
+    pub fn is_on(&self) -> bool {
+        self.active.is_some()
+    }
+
+    /// Draws a run ID and emits `run.started`; `None` when off. The first run
+    /// also writes the process's `telemetry: on` line.
+    pub fn begin_run(&self, start: RunStart<'_>) -> Option<RunHandle> {
+        let active = self.active.as_ref()?;
+        let began = Instant::now();
+        let (key, id) = entropy_id();
+        let run = RunHandle {
+            key,
+            id,
+            seed: start.seed,
+            world: format!("{}x{}", start.config.world.width, start.config.world.height),
+            recipe: start.recipe.map(str::to_owned),
+            config_digest: v3_core::config::config_digest(start.config),
+            started: began,
+        };
+        active.shared.register_run(key, run.id.clone());
+        if !active.announced.swap(true, Ordering::Relaxed) {
+            active.shared.sink().write(&format!(
+                "telemetry: on endpoint={} invocation={} run={}",
+                active.endpoint, active.invocation_id, run.id
+            ));
+        }
+        let mut extra = Vec::new();
+        if let Some(ticks) = start.ticks_requested {
+            extra.push(("petri.ticks_requested", u64_value(ticks)));
+        }
+        if let Some(every) = start.sample_every {
+            extra.push(("petri.sample_every", u64_value(every)));
+        }
+        let body = serde_json::to_string(start.config).expect("config must serialize");
+        active.emit(&run, "run.started", start.tick, extra, Some(body));
+        active.shared.add_self_time(key, began.elapsed());
+        Some(run)
+    }
+
+    /// Emits `run.state` for a status transition.
+    pub fn run_state(&self, run: &RunHandle, state: RunState, tick: u64) {
+        if let Some(active) = &self.active {
+            let began = Instant::now();
+            let extra = vec![("petri.state", AnyValue::from(state.as_str()))];
+            active.emit(run, "run.state", tick, extra, None);
+            active.shared.add_self_time(run.key, began.elapsed());
+        }
+    }
+
+    /// Emits `run.config` for an accepted config change; later records carry
+    /// the new digest.
+    pub fn run_config(&self, run: &mut RunHandle, config: &SimulationConfig, tick: u64) {
+        if let Some(active) = &self.active {
+            let began = Instant::now();
+            run.config_digest = v3_core::config::config_digest(config);
+            let body = serde_json::to_string(config).expect("config must serialize");
+            active.emit(run, "run.config", tick, Vec::new(), Some(body));
+            active.shared.add_self_time(run.key, began.elapsed());
+        }
+    }
+
+    /// Emits `run.ended`. With [`Flush::Wait`] it returns once the run's line
+    /// is written, abandoning what is still pending after the flush bound.
+    pub fn end_run(&self, run: RunHandle, status: EndStatus, tick: u64, flush: Flush) {
+        let Some(active) = &self.active else {
+            return;
+        };
+        let began = Instant::now();
+        let extra = vec![
+            ("petri.status", AnyValue::from(status.as_str())),
+            (
+                "petri.wall_seconds",
+                AnyValue::Double(run.started.elapsed().as_secs_f64()),
+            ),
+        ];
+        active.emit(&run, "run.ended", tick, extra, None);
+        active.shared.add_self_time(run.key, began.elapsed());
+        active.shared.mark_ended(run.key);
+        if flush == Flush::Wait {
+            active.shared.flush_run(run.key);
+        }
+    }
+
+    /// The process-shutdown flush: waits for every pending record up to the
+    /// flush bound, abandons the rest, writes every outstanding run line and
+    /// stops the exporter thread.
+    pub fn shutdown(&self) {
+        if let Some(active) = &self.active {
+            active.shared.shutdown();
+        }
+    }
+}
+
+impl Active {
+    fn emit(
+        &self,
+        run: &RunHandle,
+        event: &'static str,
+        tick: u64,
+        extra: Vec<(&'static str, AnyValue)>,
+        body: Option<String>,
+    ) {
+        let mut record = self.logger.create_log_record();
+        let now = SystemTime::now();
+        record.set_event_name(event);
+        record.set_timestamp(now);
+        record.set_observed_timestamp(now);
+        record.set_severity_number(Severity::Info);
+        record.set_severity_text("INFO");
+        // Loki 3.7 drops the OTLP `event_name` field; the attribute keeps the
+        // record's name queryable there as `event_name`.
+        record.add_attribute("event.name", event);
+        record.add_attribute(RUN_ID_KEY, run.id.clone());
+        record.add_attribute("petri.seed", u64_value(run.seed));
+        record.add_attribute("petri.world", run.world.clone());
+        if let Some(recipe) = &run.recipe {
+            record.add_attribute("petri.recipe", recipe.clone());
+        }
+        record.add_attribute("petri.config_digest", run.config_digest.clone());
+        record.add_attribute("petri.tick", u64_value(tick));
+        for (key, value) in extra {
+            record.add_attribute(key, value);
+        }
+        if let Some(body) = body {
+            record.set_body(AnyValue::from(body));
+        }
+        self.logger.emit(record);
+    }
+}
+
+#[cfg(test)]
+mod tests;

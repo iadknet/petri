@@ -112,6 +112,8 @@ pub fn run_simulation<W: std::io::Write>(
     out: &mut W,
 ) -> Result<(), RunError> {
     let mut sim = seed_simulation(config, seed);
+    #[cfg(feature = "telemetry")]
+    let telemetry_run = telemetry::begin_run(&sim.config, seed, ticks, sample_every);
 
     let started = RunStartedEvent {
         protocol_version: PROTOCOL_VERSION,
@@ -153,6 +155,8 @@ pub fn run_simulation<W: std::io::Write>(
         final_mean_energy: sim.mean_energy(),
     };
     emit(out, &completed)?;
+    #[cfg(feature = "telemetry")]
+    telemetry::end_run(telemetry_run, sim.tick);
 
     Ok(())
 }
@@ -237,6 +241,8 @@ pub mod bench;
 pub mod inspect;
 pub mod opportunity;
 pub mod recruitment;
+#[cfg(feature = "telemetry")]
+pub mod telemetry;
 
 #[cfg(test)]
 mod tests {
