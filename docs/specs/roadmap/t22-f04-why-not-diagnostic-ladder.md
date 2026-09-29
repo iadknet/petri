@@ -240,6 +240,8 @@ per quick run) is in the Timing item.
 - [x] Focused tests: `cargo test -p v3-lab` -> 173 unit and 19
       integration tests pass (1 ignored child helper); names in
       [`docs/progress/readings/t22-f04.md`](../../progress/readings/t22-f04.md).
+- [x] `cargo clippy -p v3-lab --all-targets -- -D warnings` and `cargo
+      check --workspace --all-targets` are clean.
 - [x] Determinism: the same-seed byte-identity test (1 thread in-process, 2
       threads in a child) passes on v3 rows -> readings file.
 - [x] Compatibility: at T22.F03's settings (`--quick --mutants 8
@@ -274,7 +276,9 @@ default, founder, recipe or mutation policy changes, so no profile runs and
 no series entry. The natural-analog and environmental-pressure rules do not
 apply. Lab cost is in the Cost paragraph above.
 
-**Measured verdict.** Not applicable: lab feature; scope checked in review.
+**Measured verdict.** Not applicable: lab feature. The diff touches only
+`crates/v3-lab/**` and `docs/**`; Cargo files and the `Makefile` are
+unchanged.
 
 - Full readings: [`docs/progress/readings/t22-f04.md`](../../progress/readings/t22-f04.md).
 

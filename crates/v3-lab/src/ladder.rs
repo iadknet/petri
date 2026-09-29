@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 use serde::{Deserialize, Serialize};
 
 use crate::arena::{Policy, Role};
-use crate::summary::{Calibration, GenomeSource, Summary, Verdict};
+use crate::summary::{label, Calibration, GenomeSource, Summary, Verdict};
 
 pub mod track;
 
@@ -1060,12 +1060,12 @@ pub fn render(summary: &Summary) -> String {
         return out;
     }
     for arm in &ladder.arms {
-        let label = if arm.diagnostic {
+        let note = if arm.diagnostic {
             " (diagnostic: policy-deviation, not the capability's verdict)"
         } else {
             ""
         };
-        let _ = writeln!(out, "\n### {}{label}\n", arm.name);
+        let _ = writeln!(out, "\n### {}{note}\n", arm.name);
         let _ = writeln!(out, "- exposure: pass");
         for tally in &arm.tallies {
             let rung = tally.rung;
@@ -1103,21 +1103,14 @@ pub fn render(summary: &Summary) -> String {
             out,
             "\nverdict: {assay}, arena {arena}, start {start}, arm {}, role {}, policy {}{}: {} -> route: {}",
             arm.name,
-            label_of(arm.role),
-            label_of(arm.policy),
+            label(arm.role),
+            label(arm.policy),
             if arm.diagnostic { " (diagnostic)" } else { "" },
             arm.verdict.text(),
             arm.verdict.route().unwrap_or("none"),
         );
     }
     out
-}
-
-fn label_of<T: Serialize>(value: T) -> String {
-    serde_json::to_value(value)
-        .ok()
-        .and_then(|v| v.as_str().map(str::to_owned))
-        .unwrap_or_else(|| "-".to_owned())
 }
 
 #[cfg(test)]

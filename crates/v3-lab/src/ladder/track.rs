@@ -239,24 +239,20 @@ impl Birth {
 impl Supply {
     /// Fold one birth in.
     pub fn add_birth(&mut self, birth: &Birth) {
-        let term = (birth.reachable > 0).then(|| {
-            #[allow(clippy::cast_precision_loss)]
-            let term = birth.applied as f64 * birth.sites as f64 / birth.reachable as f64;
-            term
+        #[allow(clippy::cast_precision_loss)]
+        let uniform_reference = (birth.reachable > 0)
+            .then(|| birth.applied as f64 * birth.sites as f64 / birth.reachable as f64);
+        self.add(&Self {
+            births: 1,
+            touching_births: u64::from(birth.touching),
+            sites: birth.sites,
+            reachable: birth.reachable,
+            uniform_reference,
+            targeted: birth.targeted.clone(),
+            discarded: birth.discarded,
+            created: birth.created,
+            removed: birth.removed,
         });
-        self.uniform_reference = if self.births == 0 {
-            term
-        } else {
-            self.uniform_reference.zip(term).map(|(a, b)| a + b)
-        };
-        self.births += 1;
-        self.touching_births += u64::from(birth.touching);
-        self.sites += birth.sites;
-        self.reachable += birth.reachable;
-        self.targeted.add(&birth.targeted);
-        self.discarded += birth.discarded;
-        self.created += birth.created;
-        self.removed += birth.removed;
     }
 }
 
@@ -391,30 +387,22 @@ impl Tracker {
             .filter(|(_, m)| m.novel_child() && m.birth.is_some_and(|b| b.touching))
             .filter_map(|(i, m)| parent_of(m).map(|p| (i, p)))
             .collect();
-        let mut signatures: HashMap<u64, BatterySignature> = HashMap::new();
-        let parents: BTreeSet<usize> = touching.iter().map(|&(_, p)| p).collect();
-        let missing: Vec<usize> = parents
+        // Parents not cached by an earlier generation are computed here.
+        let missing: BTreeSet<usize> = touching
             .iter()
-            .copied()
+            .map(|&(_, p)| p)
             .filter(|&p| !self.signatures.contains_key(&members[p].id))
             .collect();
-        let computed: Vec<BatterySignature> = missing
+        let signatures: HashMap<u64, BatterySignature> = missing
             .par_iter()
-            .map(|&p| signature(members[p].genome))
+            .map(|&p| (members[p].id, signature(members[p].genome)))
             .collect();
-        for (&p, computed) in missing.iter().zip(computed) {
-            signatures.insert(members[p].id, computed);
-        }
-        for &p in &parents {
-            let id = members[p].id;
-            if let Some(cached) = self.signatures.get(&id) {
-                signatures.insert(id, cached.clone());
-            }
-        }
+        let lookup = |id: &u64| signatures.get(id).or_else(|| self.signatures.get(id));
         let classes: Vec<Class> = touching
             .par_iter()
             .map(|&(c, p)| {
-                classify(&signatures[&members[p].id], &signature(members[c].genome)).class
+                let parent = lookup(&members[p].id).expect("every parent has a signature");
+                classify(parent, &signature(members[c].genome)).class
             })
             .collect();
 
@@ -460,16 +448,21 @@ impl Tracker {
         let mut retention = RetentionRow::new(self.depth);
         let mut open = Vec::with_capacity(self.open.len());
         for change in &self.open {
-            let mut next = change.clone();
-            next.lineage = members
-                .iter()
-                .filter(|m| {
-                    change.lineage.contains(&m.id)
-                        || m.parent
-                            .is_some_and(|p| change.lineage.contains(&p) && !m.carried)
-                })
-                .map(|m| m.id)
-                .collect();
+            let mut next = OpenChange {
+                root_applied: change.root_applied,
+                touching: change.touching,
+                change: Arc::clone(&change.change),
+                lineage: members
+                    .iter()
+                    .filter(|m| {
+                        change.lineage.contains(&m.id)
+                            || m.parent
+                                .is_some_and(|p| change.lineage.contains(&p) && !m.carried)
+                    })
+                    .map(|m| m.id)
+                    .collect(),
+                open: change.open.clone(),
+            };
             let descendants: Vec<(&Member<'_>, u64, bool)> = members
                 .iter()
                 .filter(|m| next.lineage.contains(&m.id))
@@ -526,7 +519,7 @@ impl Tracker {
         // Keep the signatures of the members breeding carries.
         let mut kept: HashMap<u64, BatterySignature> = HashMap::new();
         for id in &survivor_set {
-            if let Some(found) = signatures.get(id).or_else(|| self.signatures.get(id)) {
+            if let Some(found) = lookup(id) {
                 kept.insert(*id, found.clone());
             }
         }

@@ -353,7 +353,8 @@ fn fmt_opt(value: Option<f64>) -> String {
     value.map_or_else(|| "-".to_owned(), |v| format!("{v:.3}"))
 }
 
-fn label<T: Serialize>(value: T) -> String {
+/// An enum's serde name, `-` when it has none.
+pub(crate) fn label<T: Serialize>(value: T) -> String {
     serde_json::to_value(value)
         .ok()
         .and_then(|v| v.as_str().map(str::to_owned))

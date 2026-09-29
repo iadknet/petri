@@ -681,7 +681,7 @@ fn advance(
             permuted.shuffle(&mut lineage.selection);
             rank(&permuted, &keys)
         }
-        _ => true_order.clone(),
+        _ => true_order,
     });
     let pending = ladder_step(arm, lineage, &members, order.as_deref(), step);
 
