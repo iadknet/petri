@@ -107,11 +107,15 @@ written rows for that arm, `null` when none was written — and
 `timing.readings_creature_ticks` (production ticks on ablated copies and
 mutants, also in the total); `provenance.sizes` gains the resolved
 `mutants` and `signature_arms`, present in every summary, rows written or
-not. The projection is the report's consumer
-key-list and nothing more: `first` holds the shape scalars (`genome_size`,
-`functional_complexity`, `nodes`, `reachable`, `executed`, `deaths`,
-`ancestry` totals); `last` holds the full `shape` and, when computed, the
-signature aggregates: `causal[]`, `n`, `identical`, `silent`, `changed`,
+not. The projection is keyed to its two named consumers and carries
+nothing else: `first` holds the shape scalars (`genome_size`,
+`functional_complexity`, `nodes`, `reachable`, `executed`, which the report
+deltas, plus `deaths`, `births`, `requested`, `applied`, which only a
+research-note delta reads); `last` holds the shape fields the report renders
+(the `first` scalars less `requested`, the `families` table, steering
+`moves`, `exact_hits`, `avoidance_trials`, `avoided`; `stateful_node`,
+`requested`, per-operator counts and the other steering counters stay in
+the rows) and, when computed, the signature aggregates: `causal[]`, `n`, `identical`, `silent`, `changed`,
 `dead`, `improved`, `equal`, `worse`, `score_min`, `score_median`,
 `score_max`, `mean_delta`. The sorted score vectors stay in the ignored
 NDJSON. `report` renders v2 and v3 summaries (v2 without the readings
@@ -121,13 +125,14 @@ replicate: last shape with the delta from first, the family table
 steering `exact_hits / moves` and `avoided / avoidance_trials` (`null` at a
 zero denominator), and the signature aggregates or `signature: not
 computed`. The committed `docs/progress/lab/t22-f02-*.json` summaries are
-regenerated at `summary_version: 3`.
+regenerated at `summary_version: 3`; v3 first reaches `main` with this
+feature, so its `last` shape needs no further version.
 
 Projected sizes: `shape` ≤ 1.5 KB (22 families with the lab's one food
 type; three families gain an entry per further represented type), `signature` ≤
 1.5 KB at `n = 8`, so a row stays ≤ 11 KB at population 64 and a campaign
 of three evolving arms × 8 × 100 rows ≈ 27 MB under the 64 MiB cap; the
-summary gains ≈ 3.3 KB per genome arm and replicate (≤ 200 KB at campaign
+summary gains ≈ 2.75 KB per genome arm and replicate as stored (≤ 200 KB at campaign
 sizes) inside the 1 MiB reserve, whose oversize disposition (exit 1, no growth) is
 unchanged. Nothing per tick is written: sequences are compared in memory
 and discarded.
@@ -156,7 +161,10 @@ and discarded.
       `NeighborFoodRing:0`, `AgeTicks`, `EnergyCurrent`, `ActionQueue` and
       `UpstreamSlot`; executed union ⊆ reachable; ancestry zeros); the
       ablated founder keeps its `genome_size` and `functional_complexity`
-      for every family; a child's ancestry is its parent's plus its
+      for every family, and a Graph and VM proptest with repeated indices
+      and already-occupied sentinels gives each distinct target its own
+      free out-of-range sentinel, keeps every other index, `genome_size`
+      and `functional_complexity`; a child's ancestry is its parent's plus its
       birth and a carried elite's is unchanged; first-tick death gives an
       empty executed union and `deaths` counts it; an unread family ablates
       to `causal: false`, `score_delta: 0`; a family with `score_delta ≠ 0`
@@ -171,26 +179,31 @@ and discarded.
       no `first`/`last` and an arm with no written row has `null`; the
       committed v2 summaries render and a v3 summary renders the readings
       section; `readings_creature_ticks` counted -> results in the readings
-      file. 125 unit and 18 integration tests pass; `AreaFoodSummary:0` is
+      file. 126 unit and 18 integration tests pass; `AreaFoodSummary:0` is
       the comparator's, pinned there.
 - [x] Seed-1 `--quick` food-seeking and wall runs: calibration tables,
       per-arm reach results and fidelity blocks equal the
       `docs/progress/lab/t22-f02-{food-seeking,wall}.json` values committed
       at df2ddbe3 (the comparison target, since the files are regenerated in
       place); wall time, creature-ticks and `readings_creature_ticks`
-      recorded in the readings file. Run from the clean tree at 47a70794
+      recorded in the readings file. Run from the clean tree at 2dd9aa20
       (summaries `dirty: false`): equal for all three arenas (ring
       included); creature-ticks less `readings_creature_ticks` equal F02's;
-      food-seeking 58.8 s, wall 32.7 s, ring 0.2 s (exit 2) -> readings
+      rows sha256 food `c46e4af9…`, wall `408ab735…`, unchanged;
+      food-seeking 57.5 s committed (five same-row runs at 57.5–60.5 s, one
+      over the bound by 0.5 s; the ladder's pilot trigger did not fire and
+      the rows are identical, so the excess is host load, not cost — ruling
+      in the readings file), wall 32.7 s, ring
+      0.2 s (exit 2); summaries 77,502 / 77,634 / 10,028 B -> readings
       file, Quick runs.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
 - [x] Benchmark: `Not applicable: lab feature` (below).
-- [x] `cargo test -p v3-lab` (125 unit, 18 integration pass), `cargo
+- [x] `cargo test -p v3-lab` (126 unit, 18 integration pass), `cargo
       clippy -p v3-lab --all-targets` (0 warnings), `cargo check
       --workspace --all-targets` and `make roadmap-check` clean at
-      47a70794 plus the regenerated summaries and documents.
+      2dd9aa20 plus the regenerated summaries and documents.
 
 ## Performance and Goal Impact
 
@@ -248,3 +261,9 @@ within the predeclared scope (the track checkbox lands at closure).
   mesh untraced); F03 reads executed use at node level (`executed_node`)
   and ablates by family. A `v3-core` export is a T20 finding, not a lab
   patch.
+- Deferred: the elite's `applied_by_operator` since the start, `requested`,
+  `stateful_node` and the steering `scenarios`, `within_45`, `move_voted`
+  counters live in the ignored rows only (review P2 #1 remediation kept the
+  summary to what the report renders); a research note that needs them from
+  the committed summary adds them to the keep-list with their consumer, at
+  the earliest in T22.F04's summary change.

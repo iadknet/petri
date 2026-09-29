@@ -3,7 +3,7 @@
   "summary_version": 3,
   "assay": "barrier-navigation",
   "provenance": {
-    "git_revision": "47a707940d3d3bcf5d3a3717f4382024311e4ba9",
+    "git_revision": "2dd9aa2057c956595f5af9a46c701d2282e2b4f1",
     "dirty": false,
     "config_digest": "2d997590cf6632743d6b604ba611256dc13aaa7455002e37bc56efe9a9dd580f",
     "overlays": [
@@ -430,22 +430,8 @@
                 "reachable": 4,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 27,
-                  "requested": 12,
-                  "applied": 10,
-                  "applied_by_operator": {
-                    "GraphAddGraphEdge": 1,
-                    "GraphCopySubgraph": 1,
-                    "GraphMutateGraphOperatorParam": 1,
-                    "GraphSwapGraphOperator": 1,
-                    "InputRefAdd": 1,
-                    "InputRefPrune": 1,
-                    "InputRefSwap": 2,
-                    "TopologyAddNode": 1,
-                    "TopologySwapNodeBackend": 1
-                  }
-                },
+                "births": 27,
+                "applied": 10,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -478,16 +464,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 32,
-                  "exact_hits": 16,
-                  "within_45": 24,
-                  "avoidance_trials": 32,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 32,
+                "exact_hits": 16,
+                "avoidance_trials": 32,
+                "avoided": 0
               },
               "signature": {
                 "causal": [
@@ -562,22 +542,8 @@
                 "reachable": 3,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 25,
-                  "requested": 16,
-                  "applied": 13,
-                  "applied_by_operator": {
-                    "GraphCopyInternalNode": 1,
-                    "GraphRawFieldMutation": 2,
-                    "InputRefAdd": 1,
-                    "InputRefPrune": 2,
-                    "InputRefRawFieldMutation": 3,
-                    "TopologyAddRouteTarget": 1,
-                    "TopologyCopyMeshForwardSlice": 1,
-                    "VmConstantMutation": 1,
-                    "VmCopyInstructionBlockRemapped": 1
-                  }
-                },
+                "births": 25,
+                "applied": 13,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -616,16 +582,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 12,
-                  "within_45": 24,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 12,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": {
                 "causal": [
@@ -705,21 +665,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 26,
-                  "requested": 14,
-                  "applied": 9,
-                  "applied_by_operator": {
-                    "GraphRawFieldMutation": 1,
-                    "GraphSwapGraphOperator": 1,
-                    "InputRefPrune": 1,
-                    "InputRefRawFieldMutation": 2,
-                    "InputRefSwap": 1,
-                    "TopologyMutateGateBias": 1,
-                    "TopologyRetargetNodeTarget": 1,
-                    "TopologySpliceNode": 1
-                  }
-                },
+                "births": 26,
+                "applied": 9,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -758,16 +705,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 18,
-                  "within_45": 30,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 18,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": {
                 "causal": [
@@ -847,24 +788,8 @@
                 "reachable": 3,
                 "executed": 3,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 29,
-                  "requested": 14,
-                  "applied": 12,
-                  "applied_by_operator": {
-                    "GraphAddInternalGraphNode": 1,
-                    "GraphAlterGraphEdgeWeight": 1,
-                    "GraphCopyEdgeBundle": 1,
-                    "GraphCopySubgraph": 1,
-                    "GraphMutateGraphOperatorParam": 1,
-                    "GraphRawFieldMutation": 1,
-                    "InputRefPrune": 2,
-                    "InputRefRawFieldMutation": 1,
-                    "InputRefSwap": 1,
-                    "TopologyAddNode": 1,
-                    "TopologyMutateGateBias": 1
-                  }
-                },
+                "births": 29,
+                "applied": 12,
                 "families": [
                   {
                     "family": "NeighborFoodRing:0",
@@ -891,16 +816,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 24,
-                  "exact_hits": 12,
-                  "within_45": 18,
-                  "avoidance_trials": 24,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 24,
+                "exact_hits": 12,
+                "avoidance_trials": 24,
+                "avoided": 0
               },
               "signature": {
                 "causal": [
@@ -984,12 +903,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 0,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 0,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -1028,16 +943,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": null
             }
@@ -1072,12 +981,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 0,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 0,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -1116,16 +1021,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": null
             }
@@ -1160,12 +1059,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 0,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 0,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -1204,16 +1099,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": null
             }
@@ -1248,12 +1137,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 0,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 0,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -1292,16 +1177,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": null
             }
@@ -1350,12 +1229,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 30,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 30,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -1394,16 +1269,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": null
             }
@@ -1438,12 +1307,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 27,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 27,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -1482,16 +1347,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": null
             }
@@ -1526,12 +1385,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 31,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 31,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -1570,16 +1425,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": null
             }
@@ -1614,12 +1463,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 31,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 31,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -1658,16 +1503,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": null
             }
@@ -1716,22 +1555,8 @@
                 "reachable": 3,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 31,
-                  "requested": 22,
-                  "applied": 15,
-                  "applied_by_operator": {
-                    "GraphAlterGraphEdgeWeight": 1,
-                    "GraphCopyEdgeBundle": 3,
-                    "GraphEnableHebbian": 1,
-                    "GraphMutateGraphOperatorParam": 2,
-                    "GraphRemoveInternalGraphNode": 1,
-                    "InputRefPrune": 2,
-                    "InputRefRawFieldMutation": 3,
-                    "InputRefSwap": 1,
-                    "TopologyCopyNode": 1
-                  }
-                },
+                "births": 31,
+                "applied": 15,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -1764,16 +1589,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 32,
-                  "exact_hits": 12,
-                  "within_45": 20,
-                  "avoidance_trials": 32,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 32,
+                "exact_hits": 12,
+                "avoidance_trials": 32,
+                "avoided": 0
               },
               "signature": {
                 "causal": [
@@ -1848,26 +1667,8 @@
                 "reachable": 4,
                 "executed": 4,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 27,
-                  "requested": 19,
-                  "applied": 16,
-                  "applied_by_operator": {
-                    "GraphCopyEdgeBundle": 1,
-                    "GraphCopySubgraph": 1,
-                    "GraphRawFieldMutation": 2,
-                    "GraphRetargetGraphEdge": 1,
-                    "InputRefAdd": 2,
-                    "InputRefPrune": 1,
-                    "InputRefRawFieldMutation": 2,
-                    "InputRefSwap": 1,
-                    "TopologyAddRouteTarget": 1,
-                    "TopologyCopyMeshBackwardSlice": 1,
-                    "TopologyRetargetNodeTarget": 1,
-                    "VmConstantMutation": 1,
-                    "VmInstructionMutation": 1
-                  }
-                },
+                "births": 27,
+                "applied": 16,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -1906,16 +1707,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 6,
-                  "within_45": 18,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 6,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": {
                 "causal": [
@@ -1995,25 +1790,8 @@
                 "reachable": 3,
                 "executed": 3,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 27,
-                  "requested": 14,
-                  "applied": 14,
-                  "applied_by_operator": {
-                    "GraphAddGraphEdge": 1,
-                    "GraphAlterGraphEdgeWeight": 1,
-                    "GraphMutateGraphOperatorParam": 1,
-                    "GraphSwapGraphOperator": 1,
-                    "InputRefRawFieldMutation": 1,
-                    "InputRefSwap": 3,
-                    "TopologyAddNode": 1,
-                    "TopologyAddRouteTarget": 1,
-                    "TopologyRetargetNodeTarget": 1,
-                    "VmConstantMutation": 1,
-                    "VmDeleteInstruction": 1,
-                    "VmInsertLoadCompareMotif": 1
-                  }
-                },
+                "births": 27,
+                "applied": 14,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -2052,16 +1830,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 18,
-                  "within_45": 30,
-                  "avoidance_trials": 48,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 18,
+                "avoidance_trials": 48,
+                "avoided": 0
               },
               "signature": {
                 "causal": [
@@ -2141,29 +1913,8 @@
                 "reachable": 10,
                 "executed": 5,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 25,
-                  "requested": 21,
-                  "applied": 21,
-                  "applied_by_operator": {
-                    "GraphAddGraphEdge": 1,
-                    "GraphMutateGraphOperatorParam": 1,
-                    "GraphRemoveInternalGraphNode": 1,
-                    "GraphRetargetGraphEdge": 1,
-                    "GraphSwapGraphOperator": 1,
-                    "InputRefPrune": 1,
-                    "InputRefRawFieldMutation": 1,
-                    "InputRefSwap": 4,
-                    "TopologyAddRouteTarget": 1,
-                    "TopologyCopyMeshForwardSlice": 1,
-                    "TopologyRemoveRouteTarget": 1,
-                    "TopologySwapNodeBackend": 2,
-                    "TopologySwapRouteTargets": 1,
-                    "VmCopyInstructionBlock": 1,
-                    "VmDeleteInstruction": 1,
-                    "VmRegisterCountMutation": 2
-                  }
-                },
+                "births": 25,
+                "applied": 21,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -2202,16 +1953,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 32,
-                  "exact_hits": 12,
-                  "within_45": 20,
-                  "avoidance_trials": 32,
-                  "avoided": 0,
-                  "move_voted": true
-                }
+                "moves": 32,
+                "exact_hits": 12,
+                "avoidance_trials": 32,
+                "avoided": 0
               },
               "signature": {
                 "causal": [
@@ -2305,12 +2050,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 0,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 0,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -2361,16 +2102,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 48,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 48
               },
               "signature": null
             }
@@ -2405,12 +2140,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 0,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 0,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -2461,16 +2192,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 48,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 48
               },
               "signature": null
             }
@@ -2505,12 +2230,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 0,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 0,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -2561,16 +2282,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 48,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 48
               },
               "signature": null
             }
@@ -2605,12 +2320,8 @@
                 "reachable": 2,
                 "executed": 2,
                 "deaths": 4,
-                "ancestry": {
-                  "births": 0,
-                  "requested": 0,
-                  "applied": 0,
-                  "applied_by_operator": {}
-                },
+                "births": 0,
+                "applied": 0,
                 "families": [
                   {
                     "family": "FoodHere:0",
@@ -2661,16 +2372,10 @@
                     "live": null
                   }
                 ],
-                "stateful_node": false,
-                "steering": {
-                  "scenarios": 48,
-                  "moves": 48,
-                  "exact_hits": 24,
-                  "within_45": 36,
-                  "avoidance_trials": 48,
-                  "avoided": 48,
-                  "move_voted": true
-                }
+                "moves": 48,
+                "exact_hits": 24,
+                "avoidance_trials": 48,
+                "avoided": 48
               },
               "signature": null
             }
@@ -2854,9 +2559,9 @@
   "incomplete": null,
   "exit_code": 0,
   "timing": {
-    "wall_seconds": 32.734633792,
+    "wall_seconds": 32.730162083,
     "creature_ticks": 4013668,
-    "per_creature_tick_ms": 0.008155790113183252,
+    "per_creature_tick_ms": 0.008154675992882322,
     "readings_creature_ticks": 1023622
   }
 }
