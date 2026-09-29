@@ -1,0 +1,78 @@
+#!/bin/sh
+# Docker-free tests of scripts/telemetry-cleanup's argument handling: a stub
+# `docker` on PATH records every call and answers as a running, empty stack.
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+cleanup=$script_dir/telemetry-cleanup
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-telemetry-cleanup-test.XXXXXX")
+trap 'rm -rf "$test_root"' 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+export CLEANUP_TEST_FIXTURE="$test_root"
+mkdir "$test_root/bin"
+
+cat >"$test_root/bin/docker" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$*" >>"$CLEANUP_TEST_FIXTURE/docker-calls"
+case "$*" in
+  *' ps -q '*) printf 'stub-container\n' ;;
+  *' curl '*) printf '{"status":"success","data":[]}\n' ;;
+  *' du -s '*) printf '0\t/data/prometheus\n' ;;
+esac
+STUB
+chmod +x "$test_root/bin/docker"
+
+fail() { printf 'telemetry-cleanup-test: %s\n' "$*" >&2; exit 1; }
+run_cleanup() {
+  rm -f "$test_root/docker-calls"
+  status=0
+  PATH="$test_root/bin:$PATH" sh "$cleanup" "$@" >"$test_root/output" 2>&1 || status=$?
+}
+expect_refused() {
+  run_cleanup "$@"
+  [ "$status" -eq 2 ] || { cat "$test_root/output" >&2; fail "accepted $* (status $status)"; }
+  [ ! -f "$test_root/docker-calls" ] || fail "touched docker before refusing $*"
+}
+expect_interval() {
+  cutoff=$1
+  expected=$2
+  run_cleanup "$cutoff"
+  [ "$status" -eq 0 ] || { cat "$test_root/output" >&2; fail "refused $cutoff (status $status)"; }
+  grep -q "^Deletion interval: everything before $expected\$" "$test_root/output" ||
+    { cat "$test_root/output" >&2; fail "$cutoff did not read as $expected"; }
+  if grep -q 'delete_series\|/loki/api/v1/delete\|--entrypoint rm' "$test_root/docker-calls"; then
+    fail "preview of $cutoff deleted"
+  fi
+}
+
+# Both cutoff forms, normalized to UTC.
+expect_interval 2020-01-02 2020-01-02T00:00:00Z
+expect_interval 2020-01-02T03:04:05Z 2020-01-02T03:04:05Z
+expect_interval 2020-01-02T03:04:05.250Z 2020-01-02T03:04:05.250Z
+expect_interval 2020-01-02T03:04:05+02:00 2020-01-02T01:04:05Z
+grep -q 'start=2000-01-01T00:00:00Z' "$test_root/docker-calls" || fail 'Loki series preview lacks its start'
+
+# Cutoffs in the future or at a moment that is not yet past are refused.
+expect_refused 2999-01-01
+expect_refused 2999-01-01T00:00:00Z
+future=$(($(date -u +%Y) + 1))-01-01
+expect_refused "$future"
+
+# Malformed or impossible cutoffs are refused.
+expect_refused 2026-02-31
+expect_refused 2026-13-01
+expect_refused 2020-01-02T24:00:00Z
+expect_refused 2020-01-02T03:04:05
+expect_refused 2020-1-2
+expect_refused yesterday
+expect_refused ''
+expect_refused 2020-01-02 --force
+
+# Usage errors.
+run_cleanup
+[ "$status" -eq 2 ] || fail "no argument accepted (status $status)"
+run_cleanup 2020-01-02 --proceed extra
+[ "$status" -eq 2 ] || fail "extra argument accepted (status $status)"
+
+printf 'telemetry-cleanup-test: ok\n'

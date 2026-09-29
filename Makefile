@@ -152,6 +152,7 @@ quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
 	@sh scripts/rust-mutants-test
 	@sh scripts/dev-sh-test
 	@sh scripts/skill-check-test
+	@sh scripts/telemetry-cleanup-test
 
 dependency-audit: ## Scan Cargo and npm dependency locks with OSV.
 	@scripts/dependency-audit
@@ -186,8 +187,8 @@ telemetry-up: ## Start the local telemetry stack (Grafana on 127.0.0.1:3300, OTL
 telemetry-down: ## Stop the local telemetry stack; its data volume stays.
 	@$(TELEMETRY_COMPOSE) down
 
-telemetry-clean: ## Preview retiring telemetry before CUTOFF=YYYY-MM-DD (00:00 UTC); PROCEED=1 deletes.
-	@if [ -z "$(CUTOFF)" ]; then echo 'error: set CUTOFF=YYYY-MM-DD' >&2; exit 2; fi
+telemetry-clean: ## Preview retiring telemetry before CUTOFF=YYYY-MM-DD (00:00 UTC) or RFC3339; PROCEED=1 deletes.
+	@if [ -z "$(CUTOFF)" ]; then echo 'error: set CUTOFF=YYYY-MM-DD or RFC3339' >&2; exit 2; fi
 	@scripts/telemetry-cleanup "$(CUTOFF)" $(if $(PROCEED),--proceed)
 
 format: ## Apply safe Rust and frontend formatting.

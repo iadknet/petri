@@ -200,7 +200,7 @@ no recorded configuration.
 
 ## Implementation Tasks
 
-- [ ] `telemetry/compose.yaml`, `telemetry/tempo-config.yaml`,
+- [x] `telemetry/compose.yaml`, `telemetry/tempo-config.yaml`,
       `telemetry/overhead-world.json`;
       `make telemetry-up`, `telemetry-down`, `telemetry-clean`.
 - [x] `crates/v3-telemetry`: identity, `build.rs` revision, the four

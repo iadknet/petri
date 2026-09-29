@@ -44,3 +44,15 @@ overrides:
   defaults:
     metrics_generator:
       processors: [service-graphs, span-metrics]
+
+# Petri (T21.F01): keep every block indefinitely; data is retired only by
+# scripts/telemetry-cleanup. Everything above is the image's file (0.34.0).
+backend_scheduler:
+  provider:
+    compaction:
+      compaction:
+        block_retention: 876000h
+
+backend_worker:
+  compaction:
+    block_retention: 876000h

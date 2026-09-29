@@ -1,0 +1,339 @@
+#!/bin/sh
+# Stack verifications for the bundled grafana/otel-lgtm layout (T21.F01).
+#
+# Usage: scripts/telemetry-verify
+#
+# Runs on the scratch Compose project and volume petri-telemetry-verify, never
+# on petri-telemetry, with the production stack files unchanged, and removes
+# the scratch stack and volume on exit. Refuses while petri-telemetry is up
+# (same host ports). Takes about ten minutes, most of it Loki's delete delay.
+#
+#  1. Under 0.33.1 it writes a "before" span, log line and gauge sample, waits
+#     for Tempo's 30 s live-store window to close and the block to appear,
+#     writes a span, takes an RFC3339 cutoff, writes a second span in the same
+#     window, then writes the "after" samples in a later window: one block
+#     ends before the cutoff, one straddles it, one starts after it.
+#  2. It flushes Loki, replaces the container with 0.34.0 on the same volume,
+#     and checks every sample and the retention settings (Prometheus
+#     /api/v1/status/flags, Tempo /status/config, Loki /config); again after
+#     `docker compose restart`.
+#  3. It runs scripts/telemetry-cleanup at the cutoff, preview then
+#     --proceed, and checks per store that the sample before the cutoff is
+#     gone and the one after it kept, the straddling Tempo block kept whole,
+#     and how long Loki took to apply the deletion.
+#
+# Prints one PASS or FAIL line per check and exits 1 when any check fails.
+#
+# Environment:
+#   TELEMETRY_VERIFY_OLD_IMAGE  image written first (grafana/otel-lgtm:0.33.1)
+#   TELEMETRY_VERIFY_NEW_IMAGE  image read after the change (grafana/otel-lgtm:0.34.0)
+#   TELEMETRY_VERIFY_LOKI_WAIT  seconds to wait for Loki's deletion (900)
+set -eu
+
+[ "$#" -eq 0 ] || { printf 'Usage: scripts/telemetry-verify\n' >&2; exit 2; }
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+compose_file=$root/telemetry/compose.yaml
+old_image=${TELEMETRY_VERIFY_OLD_IMAGE:-grafana/otel-lgtm:0.33.1}
+new_image=${TELEMETRY_VERIFY_NEW_IMAGE:-grafana/otel-lgtm:0.34.0}
+loki_wait=${TELEMETRY_VERIFY_LOKI_WAIT:-900}
+# Exported so scripts/telemetry-cleanup and every compose call below act on
+# the scratch stack and its volume only.
+export PETRI_TELEMETRY_PROJECT=petri-telemetry-verify
+export PETRI_TELEMETRY_VOLUME=petri-telemetry-verify
+
+if [ -n "$(docker compose -p petri-telemetry -f "$compose_file" ps -q --status running lgtm 2>/dev/null)" ]; then
+  printf 'telemetry-verify: the petri-telemetry stack is up and holds the same ports; stop it with make telemetry-down\n' >&2
+  exit 1
+fi
+
+compose() {
+  docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" "$@"
+}
+in_stack() {
+  compose exec -T lgtm "$@"
+}
+note() { printf 'telemetry-verify: %s\n' "$*"; }
+
+cleanup_stack() {
+  compose down -v --remove-orphans >/dev/null 2>&1 || true
+}
+trap cleanup_stack 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+
+failures=0
+check() {
+  # check NAME CONDITION-STATUS DETAIL
+  if [ "$2" -eq 0 ]; then
+    printf 'PASS %s: %s\n' "$1" "$3"
+  else
+    printf 'FAIL %s: %s\n' "$1" "$3"
+    failures=$((failures + 1))
+  fi
+}
+
+prometheus=http://127.0.0.1:9090
+loki=http://127.0.0.1:3100
+tempo=http://127.0.0.1:3200
+otlp=http://127.0.0.1:4318
+
+wait_ready() {
+  waited=0
+  until in_stack curl -sf "$tempo/ready" >/dev/null 2>&1 &&
+    in_stack curl -sf "$loki/ready" >/dev/null 2>&1 &&
+    in_stack curl -sf "$prometheus/-/ready" >/dev/null 2>&1 &&
+    in_stack curl -sf http://127.0.0.1:3000/api/health >/dev/null 2>&1; do
+    waited=$((waited + 2))
+    [ "$waited" -lt 240 ] || { note 'stores not ready after 240 s'; exit 1; }
+    sleep 2
+  done
+}
+
+up() {
+  PETRI_LGTM_IMAGE=$1 compose up -d --quiet-pull >/dev/null 2>&1
+  wait_ready
+}
+
+now_ns() { printf '%s000000000' "$(date -u +%s)"; }
+
+otlp_post() {
+  # otlp_post SIGNAL JSON; retried because the collector starts last.
+  tries=0
+  until in_stack curl -sf -X POST -H 'Content-Type: application/json' \
+    "$otlp/v1/$1" -d "$2" >/dev/null 2>&1; do
+    tries=$((tries + 1))
+    [ "$tries" -lt 30 ] || { note "OTLP $1 write failed"; exit 1; }
+    sleep 1
+  done
+}
+
+resource='"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"petri-verify"}}]}'
+
+write_span() {
+  # write_span TRACE_ID; the span's start and end are the current second.
+  t=$(now_ns)
+  otlp_post traces "{\"resourceSpans\":[{$resource,\"scopeSpans\":[{\"spans\":[{\"traceId\":\"$1\",\"spanId\":\"${1#????????????????}\",\"name\":\"probe\",\"kind\":1,\"startTimeUnixNano\":\"$t\",\"endTimeUnixNano\":\"$t\"}]}]}]}"
+}
+
+write_log() {
+  otlp_post logs "{\"resourceLogs\":[{$resource,\"scopeLogs\":[{\"logRecords\":[{\"timeUnixNano\":\"$(now_ns)\",\"body\":{\"stringValue\":\"$1\"}}]}]}]}"
+}
+
+write_gauge() {
+  otlp_post metrics "{\"resourceMetrics\":[{$resource,\"scopeMetrics\":[{\"metrics\":[{\"name\":\"petri_verify_probe\",\"gauge\":{\"dataPoints\":[{\"timeUnixNano\":\"$(now_ns)\",\"asDouble\":$1}]}}]}]}]}"
+}
+
+# Tempo blocks as `dir start_s end_s`, from each meta.json.
+tempo_blocks() {
+  # shellcheck disable=SC2016 # expands inside the container.
+  in_stack sh -c '
+    for meta in /data/tempo/blocks/*/*/meta.json; do
+      [ -f "$meta" ] || continue
+      json=$(cat "$meta")
+      start=$(printf "%s" "$json" | sed -n "s/.*\"startTime\":\"\([^\"]*\)\".*/\1/p")
+      end=$(printf "%s" "$json" | sed -n "s/.*\"endTime\":\"\([^\"]*\)\".*/\1/p")
+      printf "%s %s %s\n" "${meta%/meta.json}" "$(date -u -d "$start" +%s)" "$(date -u -d "$end" +%s)"
+    done
+  '
+}
+
+# Waits until a Tempo block ends at or after second $1.
+wait_block_after() {
+  waited=0
+  until tempo_blocks | awk -v t="$1" '$3 >= t { found = 1 } END { exit !found }'; do
+    waited=$((waited + 3))
+    [ "$waited" -lt 180 ] || { note "no Tempo block reached $1 after 180 s"; exit 1; }
+    sleep 3
+  done
+}
+
+trace_found() {
+  code=$(in_stack curl -s -o /dev/null -w '%{http_code}' "$tempo/api/v2/traces/$1") || code=000
+  [ "$code" = 200 ]
+}
+
+loki_count() {
+  # Lines equal to $1 in the last two hours.
+  in_stack curl -sS -G "$loki/loki/api/v1/query_range" \
+    --data-urlencode 'query={service_name="petri-verify"}' \
+    --data-urlencode "start=$((cutoff_s - 3600))" --data-urlencode limit=1000 |
+    grep -o "\"$1\"\\]" | grep -c . || true
+}
+
+# Gauge sample timestamps (whole seconds) of petri_verify_probe.
+gauge_seconds() {
+  in_stack curl -sS -G "$prometheus/api/v1/query" \
+    --data-urlencode 'query=petri_verify_probe[2h]' |
+    grep -o '\[[0-9][0-9.]*,"' | sed 's/^\[\([0-9]*\).*/\1/' || true
+}
+
+samples_readable() {
+  # samples_readable LABEL: every sample written in phase 1 is readable.
+  missing=
+  for id in $trace_before $trace_s1 $trace_s2 $trace_after; do
+    trace_found "$id" || missing="$missing trace:$id"
+  done
+  [ "$(loki_count "$log_before")" -ge 1 ] || missing="$missing log:before"
+  [ "$(loki_count "$log_after")" -ge 1 ] || missing="$missing log:after"
+  gauges=$(gauge_seconds)
+  printf '%s\n' "$gauges" | awk -v c="$cutoff_s" '$1 != "" && $1 < c { f = 1 } END { exit !f }' ||
+    missing="$missing gauge:before"
+  printf '%s\n' "$gauges" | awk -v c="$cutoff_s" '$1 != "" && $1 >= c { f = 1 } END { exit !f }' ||
+    missing="$missing gauge:after"
+  status=0
+  [ -z "$missing" ] || status=1
+  check "$1" "$status" "4 spans, 2 log lines, 2 gauge samples readable${missing:+; missing$missing}"
+}
+
+# `path value` for every block_retention key in Tempo's running config.
+tempo_retention_paths() {
+  in_stack curl -sS "$tempo/status/config" | awk '{
+    match($0, /^ */); ind = RLENGTH
+    line = substr($0, ind + 1)
+    if (line == "" || line ~ /^-/) next
+    k = line; sub(/:.*/, "", k)
+    v = line; if (!sub(/^[^:]*: */, "", v)) v = ""
+    while (depth > 0 && ind <= indent[depth]) depth--
+    depth++; indent[depth] = ind; key[depth] = k
+    if (k == "block_retention") {
+      p = key[1]; for (i = 2; i <= depth; i++) p = p "." key[i]
+      print p, v
+    }
+  }'
+}
+
+settings_hold() {
+  # settings_hold LABEL
+  missing=
+  flags=$(in_stack curl -sS "$prometheus/api/v1/status/flags")
+  for want in '"storage.tsdb.retention.time":"100y"' '"storage.tsdb.retention.size":"0B"' \
+    '"web.enable-admin-api":"true"'; do
+    case "$flags" in *"$want"*) ;; *) missing="$missing prometheus:$want" ;; esac
+  done
+  paths=$(tempo_retention_paths)
+  for want in 'backend_scheduler.provider.compaction.compaction.block_retention 876000h0m0s' \
+    'backend_worker.compaction.block_retention 876000h0m0s'; do
+    printf '%s\n' "$paths" | grep -qx "$want" || missing="$missing tempo:${want% *}"
+  done
+  config=$(in_stack curl -sS "$loki/config")
+  for want in 'retention_period: 0s' 'retention_enabled: true' 'max_line_size: 4MB' \
+    'max_query_length: 0s' 'delete_request_cancel_period: 1m0s'; do
+    printf '%s\n' "$config" | grep -q "^ *$want\$" || missing="$missing loki:$want"
+  done
+  status=0
+  [ -z "$missing" ] || status=1
+  check "$1" "$status" "Prometheus retention 100y/0B and admin API, Tempo block_retention 876000h in both compaction sections, Loki retention 0s, line limit 4MB, query length unlimited${missing:+; missing$missing}"
+}
+
+run_id=$(date -u +%s)
+trace_before=$(printf '%08x%024x' "$run_id" 1)
+trace_s1=$(printf '%08x%024x' "$run_id" 2)
+trace_s2=$(printf '%08x%024x' "$run_id" 3)
+trace_after=$(printf '%08x%024x' "$run_id" 4)
+log_before=petri-verify-before-$run_id
+log_after=petri-verify-after-$run_id
+
+cleanup_stack
+note "phase 1: samples under $old_image"
+up "$old_image"
+write_span "$trace_before"
+write_log "$log_before"
+write_gauge 1
+before_s=$(date -u +%s)
+wait_block_after "$before_s"
+write_span "$trace_s1"
+sleep 2
+cutoff=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+cutoff_s=$(date -u +%s)
+sleep 2
+write_span "$trace_s2"
+s2_s=$(date -u +%s)
+note "cutoff $cutoff"
+wait_block_after "$s2_s"
+sleep 2
+write_span "$trace_after"
+write_log "$log_after"
+write_gauge 2
+after_s=$(date -u +%s)
+wait_block_after "$after_s"
+in_stack curl -sf -X POST "$loki/flush" >/dev/null
+
+note "phase 2: image change to $new_image, then restart"
+compose down >/dev/null 2>&1
+up "$new_image"
+samples_readable "image change $old_image -> $new_image"
+settings_hold "retention settings after the image change"
+compose restart >/dev/null 2>&1
+wait_ready
+samples_readable "stop and start (docker compose restart)"
+settings_hold "retention settings after docker compose restart"
+
+note 'phase 3: cleanup rehearsal'
+blocks_before=$(tempo_blocks)
+printf 'Tempo blocks (dir start end, epoch s):\n%s\n' "$blocks_before"
+classes=$(printf '%s\n' "$blocks_before" | awk -v c="$cutoff_s" '
+  $3 < c { d++; next } $2 >= c { k++; next } $1 != "" { s++ }
+  END { printf "%d %d %d", d, s, k }')
+# shellcheck disable=SC2086 # three counts, split on purpose.
+set -- $classes
+status=0
+[ "$1" -ge 1 ] && [ "$2" -ge 1 ] && [ "$3" -ge 1 ] || status=1
+check 'Tempo block layout' "$status" "$1 block(s) end before the cutoff, $2 straddle it, $3 start after it"
+PETRI_LGTM_IMAGE=$new_image "$root/scripts/telemetry-cleanup" "$cutoff"
+request_s=$(date -u +%s)
+PETRI_LGTM_IMAGE=$new_image "$root/scripts/telemetry-cleanup" "$cutoff" --proceed
+wait_ready
+
+blocks_after=$(tempo_blocks)
+lost=
+for dir in $(printf '%s\n' "$blocks_before" | awk -v c="$cutoff_s" '$3 >= c { print $1 }'); do
+  printf '%s\n' "$blocks_after" | grep -q "^$dir " || lost="$lost $dir"
+done
+left=
+for dir in $(printf '%s\n' "$blocks_before" | awk -v c="$cutoff_s" '$3 < c { print $1 }'); do
+  printf '%s\n' "$blocks_after" | grep -q "^$dir " && left="$left $dir"
+done
+status=0
+[ -z "$lost$left" ] || status=1
+check 'Tempo cleanup (block granularity)' "$status" "blocks ending before the cutoff removed, straddling and later blocks kept whole${left:+; left$left}${lost:+; lost$lost}"
+status=0
+trace_found "$trace_before" && status=1
+for id in $trace_s1 $trace_s2 $trace_after; do trace_found "$id" || status=1; done
+check 'Tempo cleanup (traces)' "$status" 'the span before the cutoff is gone; both straddling spans and the later span are readable'
+
+gauges=$(gauge_seconds)
+status=0
+printf '%s\n' "$gauges" | awk -v c="$cutoff_s" '$1 != "" && $1 < c { f = 1 } END { exit !f }' && status=1
+printf '%s\n' "$gauges" | awk -v c="$cutoff_s" '$1 != "" && $1 >= c { f = 1 } END { exit !f }' || status=1
+check 'Prometheus cleanup' "$status" 'the sample before the cutoff is gone and the one after it kept'
+
+filtered_s=
+processed_s=
+while :; do
+  elapsed=$(($(date -u +%s) - request_s))
+  if [ -z "$filtered_s" ] && [ "$(loki_count "$log_before")" -eq 0 ]; then
+    filtered_s=$elapsed
+  fi
+  if [ -z "$processed_s" ]; then
+    requests=$(in_stack curl -sS "$loki/loki/api/v1/delete")
+    case "$requests" in
+      *'"status":"processed"'*) case "$requests" in *'"status":"received"'*) ;; *) processed_s=$elapsed ;; esac ;;
+    esac
+  fi
+  [ -z "$filtered_s" ] || [ -z "$processed_s" ] || break
+  [ "$elapsed" -lt "$loki_wait" ] || break
+  sleep 15
+done
+status=0
+[ -n "$filtered_s" ] && [ -n "$processed_s" ] || status=1
+[ "$(loki_count "$log_after")" -ge 1 ] || status=1
+check 'Loki cleanup' "$status" "the line before the cutoff is gone after ${filtered_s:-more than $loki_wait} s, the request processed after ${processed_s:-more than $loki_wait} s, and the line after it kept"
+in_stack du -s /data/prometheus /data/tempo /data/loki
+
+if [ "$failures" -eq 0 ]; then
+  note 'all checks passed'
+else
+  note "$failures check(s) failed"
+  exit 1
+fi
