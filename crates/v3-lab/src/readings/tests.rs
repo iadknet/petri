@@ -484,6 +484,12 @@ proptest! {
         let mut expected: Vec<f64> = results.iter().map(|r| r.1).collect();
         expected.sort_by(f64::total_cmp);
         prop_assert_eq!(&folded.scores, &expected);
+        let mean_delta = if results.is_empty() {
+            0.0
+        } else {
+            results.iter().map(|r| r.1 - elite).sum::<f64>() / f64::from(n)
+        };
+        prop_assert!((folded.mean_delta - mean_delta).abs() <= 1e-9);
     }
 
     #[test]
@@ -516,7 +522,10 @@ fn with_reads(picks: &[usize], idxs: &[u16], vm: bool) -> CreatureGenome {
     let mut genome = founder(&setup(1, 100.0));
     let node = &mut genome.nodes[0];
     let pool = node.input_refs.clone();
-    node.input_refs = picks.iter().map(|&p| pool[p % pool.len()].clone()).collect();
+    node.input_refs = picks
+        .iter()
+        .map(|&p| pool[p % pool.len()].clone())
+        .collect();
     node.backend_def = if vm {
         BackendDef::Vm(VmBackendDef {
             register_count: 1,
@@ -546,7 +555,10 @@ fn with_reads(picks: &[usize], idxs: &[u16], vm: bool) -> CreatureGenome {
         graph.output_sinks[0].inputs = idxs
             .iter()
             .map(|&ref_idx| GraphEdge {
-                source: GraphSource::InputLeaf { ref_idx, sub_idx: 0 },
+                source: GraphSource::InputLeaf {
+                    ref_idx,
+                    sub_idx: 0,
+                },
                 weight: 1.0,
             })
             .collect();
@@ -612,4 +624,168 @@ proptest! {
         let distinct: BTreeSet<u16> = sentinels.values().copied().collect();
         prop_assert_eq!(distinct.len(), sentinels.len());
     }
+}
+
+#[test]
+fn breeding_uses_the_last_training_scene_record() {
+    let setup = setup(60, 100.0);
+    let genome = founder(&setup);
+    let scenes = scenes(2);
+    let run = observe(&setup, &genome, &scenes);
+    let ancestry = Ancestry::default();
+    let elite = observed(&genome, &ancestry, &scenes, &run);
+    assert_eq!(elite.breeding_frozen(), run.frozens.last().unwrap());
+    assert_ne!(*elite.breeding_frozen(), Frozen::default());
+}
+
+#[test]
+fn a_vm_node_consumes_its_read_input_and_shared_memory_families() {
+    let mut genome = with_reads(&[0], &[], true);
+    let node = &mut genome.nodes[0];
+    let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
+    node.input_refs.push(InputReference::ActionVotes);
+    let BackendDef::Vm(vm) = &mut node.backend_def else {
+        panic!("with_reads builds a VM node");
+    };
+    vm.program = vec![
+        VmInstruction::ReadInput {
+            dst: 0,
+            ref_idx,
+            sub_idx: 0,
+        },
+        VmInstruction::LoadSlotPrev {
+            dst: 0,
+            slot_idx: 1,
+        },
+    ];
+    let with_prev = consumers(&genome);
+    assert!(with_prev[&Family::ActionVotes].contains(&0));
+    assert!(with_prev[&Family::SharedMemoryPrevious].contains(&0));
+    assert!(!with_prev.contains_key(&Family::SharedMemory));
+
+    for load in [
+        VmInstruction::LoadSlot {
+            dst: 0,
+            slot_reg: 0,
+        },
+        VmInstruction::LoadSlotImm {
+            dst: 0,
+            slot_idx: 1,
+        },
+    ] {
+        let BackendDef::Vm(vm) = &mut genome.nodes[0].backend_def else {
+            unreachable!("still a VM node");
+        };
+        vm.program[1] = load;
+        let families = consumers(&genome);
+        assert!(families[&Family::SharedMemory].contains(&0));
+        assert!(!families.contains_key(&Family::SharedMemoryPrevious));
+    }
+}
+
+#[test]
+fn a_dead_world_read_is_structural_but_not_live() {
+    let setup = setup(40, 100.0);
+    let genome = with_unread_family(&founder(&setup));
+    let scenes = scenes(1);
+    let run = observe(&setup, &genome, &scenes);
+    let ancestry = Ancestry::default();
+    let elite = observed(&genome, &ancestry, &scenes, &run);
+    let shape = shape_of(&setup, &Batteries::new(&setup.config), &elite);
+    let unread = shape
+        .families
+        .iter()
+        .find(|f| f.family == "NearbyCreatureIdentity")
+        .unwrap();
+    assert_eq!((unread.structural, unread.live), (true, Some(false)));
+}
+
+#[test]
+fn a_wired_decision_read_is_live() {
+    let setup = setup(40, 100.0);
+    let mut genome = founder(&setup);
+    let node = &mut genome.nodes[0];
+    let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
+    node.input_refs.push(InputReference::ActionVotes);
+    let BackendDef::Graph(graph) = &mut node.backend_def else {
+        panic!("the founder's node 0 is a graph node");
+    };
+    // Wire it onto a surface that already reads reference 0.
+    let sink = graph
+        .output_sinks
+        .iter_mut()
+        .find(|sink| {
+            sink.inputs
+                .iter()
+                .any(|edge| matches!(edge.source, GraphSource::InputLeaf { ref_idx: 0, .. }))
+        })
+        .unwrap();
+    sink.inputs.push(GraphEdge {
+        source: GraphSource::InputLeaf {
+            ref_idx,
+            sub_idx: 0,
+        },
+        weight: 1.0,
+    });
+    let scenes = scenes(1);
+    let run = observe(&setup, &genome, &scenes);
+    let ancestry = Ancestry::default();
+    let elite = observed(&genome, &ancestry, &scenes, &run);
+    let shape = shape_of(&setup, &Batteries::new(&setup.config), &elite);
+    let votes = shape
+        .families
+        .iter()
+        .find(|f| f.family == "ActionVotes")
+        .unwrap();
+    assert_eq!(votes.live, Some(true));
+}
+
+#[test]
+fn a_copy_differs_when_either_its_score_or_its_sequence_differs() {
+    let setup = setup(40, 100.0);
+    let genome = founder(&setup);
+    let scenes = scenes(1);
+    let run = observe(&setup, &genome, &scenes);
+    let ancestry = Ancestry::default();
+    let differs = |scores: &[SceneScore], sequences: &[Vec<Boundary>]| {
+        let elite = Observed {
+            scores,
+            sequences,
+            ..observed(&genome, &ancestry, &scenes, &run)
+        };
+        let runs = run_copies(&setup, &elite, &[&genome]);
+        assert_eq!(runs.len(), 1);
+        runs[0].differs
+    };
+    let mut other_score = run.scores.clone();
+    other_score[0].score += 1.0;
+    let other_sequence = vec![Vec::new()];
+    assert!(!differs(&run.scores, &run.sequences), "an exact copy");
+    assert!(differs(&run.scores, &other_sequence), "sequence only");
+    assert!(differs(&other_score, &run.sequences), "score only");
+}
+
+#[test]
+fn folded_mutants_average_their_deltas() {
+    let results = [(Class::Silent, 2.0, false), (Class::Changed, 4.0, false)];
+    assert_eq!(fold_mutants(1.0, &results).mean_delta, 2.0);
+    assert_eq!(fold_mutants(1.0, &[]).mean_delta, 0.0);
+}
+
+#[test]
+fn read_charges_the_ablated_copies_and_the_mutants() {
+    let mut setup = setup(60, 100.0);
+    setup.config.mutation.per_unit_rate = 0.05;
+    let genome = founder(&setup);
+    let scenes = scenes(1);
+    let run = observe(&setup, &genome, &scenes);
+    let ancestry = Ancestry::default();
+    let elite = observed(&genome, &ancestry, &scenes, &run);
+    let batteries = Batteries::new(&setup.config);
+    let wiring = Wiring::of(&genome);
+    let (_, causal_ticks) = causal(&setup, &elite, &wiring.families);
+    let (_, mutant_ticks) = mutants(&setup, &batteries, &elite, &wiring.reachable, 3, &seed());
+    assert!(causal_ticks > 0 && mutant_ticks > 0);
+    let (_, ticks) = read(&setup, &batteries, &elite, Some((3, seed())));
+    assert_eq!(ticks, causal_ticks + mutant_ticks);
 }

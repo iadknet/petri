@@ -179,7 +179,8 @@ and discarded.
       no `first`/`last` and an arm with no written row has `null`; the
       committed v2 summaries render and a v3 summary renders the readings
       section; `readings_creature_ticks` counted -> results in the readings
-      file. 126 unit and 18 integration tests pass; `AreaFoodSummary:0` is
+      file. 126 unit (135 after the mutation gate) and 18 integration
+      tests pass; `AreaFoodSummary:0` is
       the comparator's, pinned there.
 - [x] Seed-1 `--quick` food-seeking and wall runs: calibration tables,
       per-arm reach results and fidelity blocks equal the
@@ -196,9 +197,30 @@ and discarded.
       in the readings file), wall 32.7 s, ring
       0.2 s (exit 2); summaries 77,502 / 77,634 / 10,028 B -> readings
       file, Quick runs.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred. The full
-      survivor list stays here; `docs/workflow.md` requires it in the spec.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` at 88d66a0d (feature code
+      2dd9aa20; diff base df2ddbe3; run mode `fresh`): `136 mutants
+      tested in 6m: 23 missed, 78 caught, 35 unviable`, 0 timeouts; output
+      `~/.local/share/petri-tools/mutants/t22-f03/mutants.out`. All 23
+      killed by tests only (table below), so one fresh run; a
+      `MUTANTS_ITERATE=1` pass in the same directory caught all 23
+      (feedback only). 135 unit, 18
+      integration tests pass.
+
+| Survivor (all killed) | Test |
+| --- | --- |
+| `readings.rs:350` `breeding_frozen` → `Default` | `breeding_uses_the_last_training_scene_record` |
+| `readings.rs:420/425/428` delete VM arms `ReadInput`, `LoadSlot \| LoadSlotImm`, `LoadSlotPrev` in `consumers` | `a_vm_node_consumes_its_read_input_and_shared_memory_families` |
+| `readings.rs:522` `==` → `!=` (world `live`) | `a_dead_world_read_is_structural_but_not_live` |
+| `readings.rs:526` `==` → `!=` (decision `live`) | `a_wired_decision_read_is_live` |
+| `readings.rs:673` `\|\|` → `&&` in `run_copies` | `a_copy_differs_when_either_its_score_or_its_sequence_differs` |
+| `readings.rs:740` `/` → `*`, `/` → `%` in `fold_mutants` | `folded_mutants_average_their_deltas`; `mean_delta` in the fold proptest |
+| `readings.rs:850` `+` → `-` in `read` | `read_charges_the_ablated_copies_and_the_mutants` |
+| `summary.rs:521` `with_delta` → `String::new()`, `"xyzzy"` | `readings_cells_print_changes_ratios_and_nulls` |
+| `summary.rs:527` `ratio` → `String::new()`, `"xyzzy"`; `==` → `!=`; `:531` `/` → `%`, `*` | same |
+| `summary.rs:537` `opt_bool` → `String::new()`, `"xyzzy"` | same |
+| `summary.rs:541` `usize_i64` → `0`, `1`, `-1` | same |
+| `summary.rs:611` `==` → `!=` (causal lookup) | `readings_section_prints_the_last_elite_and_each_family_its_own_causal_reading` |
+
 - [x] Benchmark: `Not applicable: lab feature` (below).
 - [x] `cargo test -p v3-lab` (126 unit, 18 integration pass), `cargo
       clippy -p v3-lab --all-targets` (0 warnings), `cargo check
