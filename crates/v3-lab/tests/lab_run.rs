@@ -10,13 +10,14 @@ use v3_lab::calibration::draw_scenes;
 use v3_lab::campaign::{run_campaign, Arm, ArmKind, Plan};
 use v3_lab::cli::read_summary;
 use v3_lab::eval::{evaluate_genome, Setup};
+use v3_lab::ladder::{LadderRow, Pooled, StallRates, Status};
 use v3_lab::output::{Budget, GitProvenance, LabRoot, RunDir, SUMMARY_RESERVE};
 use v3_lab::readings::{Shape, ShapeProjection, SignatureArms};
 use v3_lab::run::{run, RunOutcome, RunParams, UserArm, EXIT_UNCALIBRATED};
 use v3_lab::scene::{ArenaId, Assay, SceneSpec};
 use v3_lab::summary::{
-    render_report, Incomplete, LifetimeLearning, StoppedBy, GENOME_FORMAT, SUMMARY_KIND,
-    SUMMARY_VERSION,
+    render_report, GenomeRecord, GenomeSource, Incomplete, LifetimeLearning, StoppedBy,
+    GENOME_FORMAT, SUMMARY_KIND, SUMMARY_VERSION,
 };
 use v3_lab::{sha256_hex, GenomeFile, LabError};
 
@@ -84,6 +85,8 @@ fn tiny(out: &Path) -> RunParams {
         quick: false,
         mutants: 2,
         signature_arms: SignatureArms::Changing,
+        retention_depth: 2,
+        stall_rates: StallRates::default(),
     }
 }
 
@@ -203,7 +206,10 @@ fn same_seed_rows_are_byte_identical_across_threads_and_processes() {
     // arms carry no readings.
     for line in rows.lines() {
         let row: serde_json::Value = serde_json::from_str(line).unwrap();
-        assert_eq!(row["row_version"], 2);
+        assert_eq!(row["row_version"], 3);
+        let evolving = ["native", "mutation-off", "shuffled-score", "hot"]
+            .contains(&row["arm"].as_str().unwrap());
+        assert_eq!(row["ladder"].is_object(), evolving, "{}", row["arm"]);
         if row["arm"] == "random-walk" {
             assert!(row["readings"].is_null());
         } else {
@@ -233,6 +239,26 @@ fn an_unmet_gate_is_uncalibrated_with_exit_2_and_no_campaign() {
     assert!(std::fs::read(outcome.dir.join("rows.ndjson"))
         .unwrap()
         .is_empty());
+
+    // The exposure rung reads the calibration block alone: it stops the
+    // ladder with the failing checks and their counts.
+    let ladder = summary.ladder.as_ref().expect("a v4 summary has a ladder");
+    assert_eq!(ladder.exposure.status, Status::Fail);
+    assert!(ladder.arms.is_empty() && !ladder.exposure.campaign);
+    let point = &ladder.exposure.failing[0];
+    assert!(point.exposure && !point.competence);
+    assert_eq!(point.wins_needed, 3);
+    assert!(point.comparator_wins.is_some() && point.comparator_gap.is_some());
+    let report = render_report(&summary);
+    assert!(
+        report.contains("- exposure: fail (uncalibrated)"),
+        "{report}"
+    );
+    assert!(report.contains("competence (comparator wins"), "{report}");
+    assert!(
+        report.contains("stalls at exposure (uncalibrated) -> route: the assay (T22): instrument"),
+        "{report}"
+    );
 }
 
 #[test]
@@ -256,7 +282,14 @@ fn the_summary_carries_the_versioned_keep_list_and_reports_alone() {
     ] {
         assert!(value.get(key).is_some(), "missing {key}");
     }
-    for key in ["mutants", "signature_arms"] {
+    assert!(value.get("ladder").is_some(), "missing ladder");
+    for key in [
+        "mutants",
+        "signature_arms",
+        "stall_rates",
+        "retention_depth",
+        "relevant_families",
+    ] {
         assert!(
             !value["provenance"]["sizes"][key].is_null(),
             "sizes.{key} in every summary"
@@ -282,6 +315,20 @@ fn the_summary_carries_the_versioned_keep_list_and_reports_alone() {
     let report = render_report(&read_summary(&outcome.dir.join("summary.json")).unwrap());
     assert!(report.contains("Calibration") && report.contains("| 0.08 | 100 |"));
     assert!(report.contains("| fraction | lifetime |"), "{report}");
+    assert!(
+        report.contains("- exposure: pass (calibrated at fraction 0.08 lifetime 100); no campaign"),
+        "{report}"
+    );
+    assert!(report.contains(": no campaign"), "{report}");
+    assert_eq!(
+        value["provenance"]["sizes"]["relevant_families"],
+        serde_json::json!(["FoodHere(*)", "NeighborFoodRing(*)", "AreaFoodSummary(*)"])
+    );
+    assert_eq!(value["provenance"]["sizes"]["retention_depth"], 2);
+    assert_eq!(
+        value["provenance"]["sizes"]["stall_rates"]["retention"],
+        0.2
+    );
 
     // `--calibrate-only` stops after a passing gate: no arms, rows or fidelity.
     assert_eq!(outcome.exit_code, 0);
@@ -439,6 +486,9 @@ fn the_byte_cap_stops_the_run_and_marks_replicates_incomplete() {
         threshold: 1e9,
         mutants: 2,
         signature_arms: SignatureArms::Changing,
+        assay: Assay::FoodSeeking,
+        retention_depth: 2,
+        stall_rates: StallRates::default(),
     };
     let validation = draw_scenes(11, 2, &SceneSpec::sparse(48, 0.06, 5)).unwrap();
     // Room for a few rows only: rows and elites get cap − reserve bytes.
@@ -498,6 +548,32 @@ fn the_byte_cap_stops_the_run_and_marks_replicates_incomplete() {
         }
     }
     assert!(nulls > 0, "some arm and replicate wrote no row");
+
+    // The ladder is transactional with the row: each replicate's pooled
+    // counts are exactly its written rows' ladder blocks; a refused row
+    // records nothing and its open changes are censored.
+    assert_eq!(totals.ladders.len(), 1, "evolving arms only");
+    let native = &totals.ladders[0];
+    assert_eq!(native.name, "native");
+    assert_eq!(native.verdict.completed, 0);
+    assert!(native.verdict.text().starts_with("inconclusive, partial"));
+    for replicate in &native.replicates {
+        assert!(replicate.incomplete);
+        let mut pooled = Pooled::new(2);
+        for row in rows
+            .iter()
+            .filter(|row| row["arm"] == "native" && row["replicate"] == replicate.replicate)
+        {
+            pooled.add(&serde_json::from_value::<LadderRow>(row["ladder"].clone()).unwrap());
+        }
+        pooled.retention.censored = replicate.pooled.retention.censored.clone();
+        pooled.retention.censored_touching = replicate.pooled.retention.censored_touching.clone();
+        assert_eq!(
+            pooled, replicate.pooled,
+            "replicate {}",
+            replicate.replicate
+        );
+    }
 }
 
 #[test]
@@ -529,6 +605,9 @@ fn validation_evaluations_count_toward_creature_ticks() {
             threshold,
             mutants: 2,
             signature_arms: SignatureArms::Changing,
+            assay: Assay::FoodSeeking,
+            retention_depth: 2,
+            stall_rates: StallRates::default(),
         };
         let mut dir = RunDir::create(
             scratch.lab.join(name),
@@ -620,6 +699,38 @@ fn every_arm_genome_is_recorded_with_its_hash_and_format() {
     assert_eq!(record.v3_core_version, env!("CARGO_PKG_VERSION"));
     let names: Vec<&str> = genomes.iter().map(|g| g.name.as_str()).collect();
     assert_eq!(names, ["start", "comparator", "arm:hot"]);
+    let origin = |g: &GenomeRecord| (g.source, g.file.clone());
+    assert_eq!(origin(&genomes[0]), (Some(GenomeSource::Founder), None));
+    assert_eq!(
+        origin(&genomes[1]),
+        (Some(GenomeSource::BuiltinComparator), None)
+    );
+    assert_eq!(
+        origin(record),
+        (Some(GenomeSource::File), Some("hot-genome.json".into()))
+    );
+
+    // A file start is labelled by its basename and SHA-256 in the ladder.
+    let mut params = tiny(&scratch.lab.join("run-file"));
+    params.calibrate_only = true;
+    params.genome = Some(scratch.lab.join("hot-genome.json"));
+    params.comparator = Some(scratch.lab.join("hot-genome.json"));
+    let outcome = scratch.run(&params).unwrap();
+    let genomes = &outcome.summary.provenance.genomes;
+    for record in &genomes[..2] {
+        assert_eq!(
+            origin(record),
+            (Some(GenomeSource::File), Some("hot-genome.json".into()))
+        );
+    }
+    let report = render_report(&outcome.summary);
+    assert!(
+        report.contains(&format!(
+            "start hot-genome.json (sha256 {})",
+            genomes[0].sha256
+        )),
+        "{report}"
+    );
 }
 
 #[test]
@@ -825,7 +936,18 @@ fn a_layout_with_unreachable_food_is_not_exposed() {
 }
 
 #[test]
-fn a_v2_summary_renders_without_readings_and_a_v3_summary_renders_them() {
+fn a_v3_summary_renders_without_the_ladder() {
+    // The T22.F03 ring summary as committed at 88d66a0d (summary_version 3).
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/summary-v3-ring.json");
+    let v3 = read_summary(&fixture).unwrap();
+    assert_eq!(v3.summary_version, 3);
+    assert!(v3.ladder.is_none());
+    let report = render_report(&v3);
+    assert!(report.contains("## Calibration") && !report.contains("## Why-not ladder"));
+}
+
+#[test]
+fn a_v2_summary_renders_without_readings_and_a_v4_summary_renders_readings_and_the_ladder() {
     // The T22.F02 wall summary as committed at df2ddbe3 (summary_version 2).
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/summary-v2-wall.json");
     let v2 = read_summary(&fixture).unwrap();
@@ -833,11 +955,11 @@ fn a_v2_summary_renders_without_readings_and_a_v3_summary_renders_them() {
     let report = render_report(&v2);
     assert!(report.contains("## Arms") && !report.contains("## Readings"));
 
-    let scratch = Scratch::new("v3-report");
+    let scratch = Scratch::new("v4-report");
     let outcome = scratch.run(&tiny(&scratch.lab.join("run"))).unwrap();
-    let v3 = read_summary(&outcome.dir.join("summary.json")).unwrap();
-    assert_eq!(v3.summary_version, SUMMARY_VERSION);
-    let report = render_report(&v3);
+    let v4 = read_summary(&outcome.dir.join("summary.json")).unwrap();
+    assert_eq!(v4.summary_version, SUMMARY_VERSION);
+    let report = render_report(&v4);
     assert!(report.contains("## Readings"), "{report}");
     assert!(report.contains("### native replicate 0"));
     assert!(report.contains("| FoodHere:0 |"));
@@ -846,4 +968,13 @@ fn a_v2_summary_renders_without_readings_and_a_v3_summary_renders_them() {
     let founder_only = report.split("### founder-only replicate 0").nth(1).unwrap();
     assert!(founder_only.contains("signature: not computed"));
     assert!(report.contains("| random-walk | 0 | - |"));
+    // v4: the ladder for the evolving arms only, policy-deviation labelled.
+    let (_, ladder) = report.split_once("## Why-not ladder").expect("{report}");
+    assert!(ladder.contains("### native\n"));
+    assert!(ladder
+        .contains("### mutation-off (diagnostic: policy-deviation, not the capability's verdict)"));
+    for name in ["founder-only", "comparator", "random-walk"] {
+        assert!(!ladder.contains(&format!("### {name}")), "{name}");
+    }
+    assert!(ladder.contains("verdict: food-seeking, arena sparse-food-v1, start founder"));
 }

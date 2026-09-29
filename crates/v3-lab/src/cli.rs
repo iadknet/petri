@@ -1,9 +1,10 @@
-//! Command-line interface: `v3-lab run` and `v3-lab report`.
+//! Command-line interface: `v3-lab run`, `v3-lab why-not` and `v3-lab report`.
 
 use std::path::{Path, PathBuf};
 
 use clap::{Args, Parser, Subcommand};
 
+use crate::ladder::{StallRates, RETENTION_DEPTH};
 use crate::output::{GitProvenance, LabRoot, DEFAULT_BYTE_CAP};
 use crate::readings::SignatureArms;
 use crate::run::{run, RunParams, UserArm};
@@ -31,6 +32,9 @@ pub struct Cli {
 pub enum Command {
     /// Calibrate and run an assay; output under `.bench-artifacts/lab/`.
     Run(Box<RunArgs>),
+    /// Calibrate and run an assay as `run` does, then print the why-not
+    /// ladder: the first rung that is not `pass` and the track owning it.
+    WhyNot(Box<RunArgs>),
     /// Render the assay report from a `summary.json` alone.
     Report {
         /// Path to a run's `summary.json`.
@@ -131,6 +135,23 @@ pub struct RunArgs {
     /// Arms whose rows carry the signature block.
     #[arg(long, value_enum, default_value = "changing")]
     pub signature_arms: SignatureArms,
+    /// Applied events after a selected improvement the retention rung reads,
+    /// 1..=8.
+    #[arg(long, default_value_t = RETENTION_DEPTH, value_parser = clap::value_parser!(u32).range(1..=8))]
+    pub retention_depth: u32,
+    /// `supply,viability,benefit,retention` stall rates, each in (0, 1)
+    /// (default 0.01,0.05,0.05,0.20).
+    #[arg(long, value_parser = parse_stall_rates)]
+    pub stall_rates: Option<StallRates>,
+}
+
+fn parse_stall_rates(text: &str) -> Result<StallRates, String> {
+    let rates: Vec<f64> = text
+        .split(',')
+        .map(|rate| rate.trim().parse::<f64>().map_err(|e| e.to_string()))
+        .collect::<Result<_, _>>()?;
+    StallRates::from_slice(&rates)
+        .ok_or_else(|| "expected supply,viability,benefit,retention, each in (0, 1)".to_owned())
 }
 
 fn parse_arm(text: &str) -> Result<UserArm, String> {
@@ -196,6 +217,8 @@ impl RunArgs {
             quick: self.quick,
             mutants: self.mutants.unwrap_or(mutants),
             signature_arms: self.signature_arms,
+            retention_depth: self.retention_depth,
+            stall_rates: self.stall_rates.unwrap_or_default(),
         }
     }
 }
@@ -265,6 +288,13 @@ pub fn execute(cli: Cli) -> Result<u8, LabError> {
             let lab_root = resolve_checkout(&std::env::current_dir()?)?;
             let outcome = run(&args.params(), &lab_root)?;
             print!("{}", render_report(&outcome.summary));
+            println!("\nrun directory: {}", outcome.dir.display());
+            Ok(outcome.exit_code)
+        }
+        Command::WhyNot(args) => {
+            let lab_root = resolve_checkout(&std::env::current_dir()?)?;
+            let outcome = run(&args.params(), &lab_root)?;
+            print!("{}", crate::ladder::render(&outcome.summary));
             println!("\nrun directory: {}", outcome.dir.display());
             Ok(outcome.exit_code)
         }
@@ -383,9 +413,50 @@ mod tests {
         assert_eq!(params.assay, Assay::FoodSeeking);
         assert_eq!(params.mutants, QUICK_MUTANTS);
         assert_eq!(params.signature_arms, SignatureArms::Changing);
+        assert_eq!(params.retention_depth, RETENTION_DEPTH);
+        assert_eq!(params.stall_rates, StallRates::default());
         let plan = crate::run::resolve_arena(&params).unwrap();
         assert_eq!(plan.size, 64);
         assert_eq!(plan.points.len(), 3);
+    }
+
+    #[test]
+    fn why_not_shares_the_run_flags_and_parses_the_ladder_flags() {
+        let cli = Cli::parse_from([
+            "v3-lab",
+            "why-not",
+            "--quick",
+            "--retention-depth",
+            "3",
+            "--stall-rates",
+            "0.5,0.1,0.2,0.3",
+        ]);
+        let Command::WhyNot(args) = cli.command else {
+            panic!("why-not");
+        };
+        let params = args.params();
+        assert_eq!(params.retention_depth, 3);
+        assert_eq!(
+            params.stall_rates,
+            StallRates {
+                supply: 0.5,
+                viability: 0.1,
+                benefit: 0.2,
+                retention: 0.3
+            }
+        );
+        assert_eq!(params.replicates, QUICK_SIZES.0);
+        for bad in [
+            ["--retention-depth", "0"],
+            ["--retention-depth", "9"],
+            ["--stall-rates", "0.1,0.1,0.1"],
+            ["--stall-rates", "0.1,0.1,0.1,1.0"],
+            ["--stall-rates", "0,0.1,0.1,0.1"],
+            ["--stall-rates", "a,0.1,0.1,0.1"],
+        ] {
+            let parsed = Cli::try_parse_from(["v3-lab", "run", bad[0], bad[1]]);
+            assert!(parsed.is_err(), "{bad:?}");
+        }
     }
 
     #[test]

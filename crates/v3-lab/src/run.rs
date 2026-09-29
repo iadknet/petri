@@ -14,14 +14,15 @@ use crate::arena::{classify, resolve_arm, Role};
 use crate::calibration::{run_gate, GridInput};
 use crate::campaign::{fidelity, run_campaign, Arm, ArmKind, Plan};
 use crate::eval::{Scoring, Scripted, Setup};
+use crate::ladder::{relevant_family_labels, Exposure, Ladder, StallRates};
 use crate::layout::Layout;
 use crate::output::{resolve_out, utc_stamp, Budget, LabRoot, RunDir, SUMMARY_RESERVE};
 use crate::readings::SignatureArms;
 use crate::rng::{replicate_seed, tagged};
 use crate::scene::{ArenaId, Assay, Geometry, SCALES};
 use crate::summary::{
-    ArenaRecord, GenomeRecord, Incomplete, OverlayRecord, Provenance, Seeds, Sizes, Summary,
-    Timing, Verdict, GENOME_FORMAT, SUMMARY_KIND, SUMMARY_VERSION,
+    ArenaRecord, GenomeRecord, GenomeSource, Incomplete, OverlayRecord, Provenance, Seeds, Sizes,
+    Summary, Timing, Verdict, GENOME_FORMAT, SUMMARY_KIND, SUMMARY_VERSION,
 };
 use crate::{sha256_hex, GenomeFile, LabError};
 
@@ -102,6 +103,9 @@ pub struct RunParams {
     /// Fresh mutants per signature reading, in [`crate::readings::MUTANTS`].
     pub mutants: u32,
     pub signature_arms: SignatureArms,
+    /// In [`crate::ladder::RETENTION_DEPTHS`].
+    pub retention_depth: u32,
+    pub stall_rates: StallRates,
 }
 
 /// A finished run.
@@ -278,6 +282,14 @@ fn validate_params(params: &RunParams) -> Result<ArenaPlan, LabError> {
         "--mutants must be in 1..=64",
     )?;
     check(
+        crate::ladder::RETENTION_DEPTHS.contains(&params.retention_depth),
+        "--retention-depth must be in 1..=8",
+    )?;
+    check(
+        params.stall_rates.valid(),
+        "--stall-rates must each be in (0, 1)",
+    )?;
+    check(
         params.calibration_margin.is_finite(),
         "--calibration-margin must be finite",
     )?;
@@ -324,12 +336,27 @@ struct Genomes {
     comparator: CreatureGenome,
 }
 
-fn genome_record(name: &str, genome: &CreatureGenome) -> GenomeRecord {
+/// A genome's provenance; `file` names a file genome, whose basename is
+/// recorded.
+fn genome_record(
+    name: &str,
+    genome: &CreatureGenome,
+    source: GenomeSource,
+    file: Option<&std::path::Path>,
+) -> GenomeRecord {
     GenomeRecord {
         name: name.to_owned(),
         sha256: sha256_hex(&serde_json::to_vec(genome).expect("genome serializes")),
         genome_format: GENOME_FORMAT,
         v3_core_version: env!("CARGO_PKG_VERSION").to_owned(),
+        source: Some(if file.is_some() {
+            GenomeSource::File
+        } else {
+            source
+        }),
+        file: file
+            .and_then(std::path::Path::file_name)
+            .map(|name| name.to_string_lossy().into_owned()),
     }
 }
 
@@ -356,14 +383,38 @@ fn load_genomes(params: &RunParams, reference: &SimulationConfig) -> Result<Geno
 /// Provenance for every genome a run evaluates: `start`, `comparator`, and
 /// `arm:<name>` for each genome supplied through `--arm` (`:` cannot occur
 /// in an arm name, so the names never collide).
-fn genome_records(genomes: &Genomes, overlays: &[Overlay]) -> Vec<GenomeRecord> {
+fn genome_records(
+    params: &RunParams,
+    genomes: &Genomes,
+    overlays: &[Overlay],
+) -> Vec<GenomeRecord> {
     let arms = overlays.iter().filter_map(|overlay| {
         let genome = overlay.genome.as_ref()?;
-        Some(genome_record(&format!("arm:{}", overlay.name), genome))
+        let file = params
+            .arms
+            .iter()
+            .find(|arm| arm.name == overlay.name)
+            .and_then(|arm| arm.genome.as_deref());
+        Some(genome_record(
+            &format!("arm:{}", overlay.name),
+            genome,
+            GenomeSource::File,
+            file,
+        ))
     });
     [
-        genome_record("start", &genomes.start),
-        genome_record("comparator", &genomes.comparator),
+        genome_record(
+            "start",
+            &genomes.start,
+            GenomeSource::Founder,
+            params.genome.as_deref(),
+        ),
+        genome_record(
+            "comparator",
+            &genomes.comparator,
+            GenomeSource::BuiltinComparator,
+            params.comparator.as_deref(),
+        ),
     ]
     .into_iter()
     .chain(arms)
@@ -446,7 +497,7 @@ fn run_in_pool(
     let mut creature_ticks = gate.creature_ticks;
     let mut readings_creature_ticks = 0;
 
-    let (arms_summary, fidelity_block, byte_cap_hit, selected) = match (
+    let (arms_summary, fidelity_block, byte_cap_hit, selected, arm_ladders) = match (
         &gate.calibration.selected,
         &gate.spec,
         gate.calibration.reach_threshold,
@@ -468,6 +519,9 @@ fn run_in_pool(
                 threshold,
                 mutants: params.mutants,
                 signature_arms: params.signature_arms,
+                assay: params.assay,
+                retention_depth: params.retention_depth,
+                stall_rates: params.stall_rates,
             };
             let (summaries, totals) = run_campaign(&arms, &plan, &gate.validation, &mut dir)?;
             creature_ticks += totals.creature_ticks;
@@ -477,9 +531,14 @@ fn run_in_pool(
                 Some(fidelity(&arms[0], &totals)),
                 totals.byte_cap_hit,
                 Some(selected.clone()),
+                Some(totals.ladders),
             )
         }
-        (selected, _, _) => (Vec::new(), None, false, selected.clone()),
+        (selected, _, _) => (Vec::new(), None, false, selected.clone(), None),
+    };
+    let ladder = Ladder {
+        exposure: Exposure::of(&gate.calibration, arm_ladders.is_some()),
+        arms: arm_ladders.unwrap_or_default(),
     };
 
     let (incomplete, exit_code) = if gate.calibration.verdict == Verdict::Uncalibrated {
@@ -510,7 +569,7 @@ fn run_in_pool(
                     order,
                 })
                 .collect(),
-            genomes: genome_records(&genomes, &overlays),
+            genomes: genome_records(params, &genomes, &overlays),
             arena: ArenaRecord {
                 // `serde_json` maps keep keys sorted: the bytes are canonical.
                 sha256: sha256_hex(
@@ -544,6 +603,9 @@ fn run_in_pool(
                 quick: params.quick,
                 mutants: Some(params.mutants),
                 signature_arms: Some(params.signature_arms),
+                stall_rates: Some(params.stall_rates),
+                retention_depth: Some(params.retention_depth),
+                relevant_families: Some(relevant_family_labels(params.assay)),
             },
         },
         calibration: gate.calibration,
@@ -558,6 +620,7 @@ fn run_in_pool(
                 .then(|| wall_seconds * 1_000.0 / creature_ticks as f64),
             readings_creature_ticks,
         },
+        ladder: Some(ladder),
     };
     let bytes = serde_json::to_vec_pretty(&summary).expect("summary serializes");
     dir.write_summary(&bytes)?;
@@ -672,6 +735,8 @@ mod tests {
             quick: false,
             mutants: 8,
             signature_arms: SignatureArms::Changing,
+            retention_depth: 2,
+            stall_rates: StallRates::default(),
         }
     }
 
@@ -738,6 +803,13 @@ mod tests {
         assert!(refused(|p| p.mutants = 65));
         assert!(!refused(|p| p.mutants = 1));
         assert!(!refused(|p| p.mutants = 64));
+        assert!(refused(|p| p.retention_depth = 0));
+        assert!(refused(|p| p.retention_depth = 9));
+        assert!(!refused(|p| p.retention_depth = 1));
+        assert!(!refused(|p| p.retention_depth = 8));
+        for rate in [0.0, 1.0, -0.1, f64::NAN] {
+            assert!(refused(|p| p.stall_rates.benefit = rate), "{rate}");
+        }
     }
 
     /// `params` on a built-in barrier arena with no axis flag.

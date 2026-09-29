@@ -125,7 +125,11 @@ present but none carrying the change resolves `deleted`; otherwise the
 depth stays open (a non-carrying branch at depth ≥ `d` beside a carrying
 branch below `d` decides nothing). An open depth at the arm's stop
 (`horizon`, `reached`, `byte_cap`, or a generation without survivors) is
-`censored`. The rung reads depth `D`. A later applied event on a changed
+`censored`; a generation without survivors can still resolve `deleted` or
+`lineage_loss` from the evaluated population, never `retained`. The rung
+reads depth `D`; at `--quick` sizes it is expected `inconclusive` (4–6
+selected improvements per replicate against the minimum of 15), and
+campaign sizes are where it reads. A later applied event on a changed
 node reads as `deleted`; the depth-1 counts show whether re-targeting
 dominates.
 
@@ -151,7 +155,8 @@ inconclusive c` over completed replicates, with `wilson_95(b, a + b + c)`
 on the `fail` share (the replicate is the interval sample, as in F01). The
 arm verdict: with no completed replicate, `inconclusive, partial` and no
 stall claim; otherwise the verdict rung is the modal first non-`pass` rung
-over completed replicates (ties to the earliest rung), and among the
+over the completed replicates that have one (a replicate passing all five
+casts no vote; ties to the earliest rung), and among the
 replicates naming it the verdict reads `stalls at <rung>` only when more
 than half are `fail`, else `inconclusive at <rung>`, always with the tally
 (`fail b / inconclusive c` of those replicates, e.g. `stalls at benefit:
@@ -172,10 +177,10 @@ records no counts and no resolution, and its open changes are censored.
 
 | Artifact | Content |
 | --- | --- |
-| `row_version: 3` | `ladder` beside `readings` (null for scripted and fixed arms): `supply` (`births`, `touching_births`, `sites`, `reachable`, `uniform_reference`, `targeted` requested/applied/skipped by operator and skipped by reason, `discarded`, `created`, `removed`); `children` (`touching` and `other` blocks with the per-generation counts above; classes in `touching` only); `retention` (`selected`, `selected_touching`, per depth `[retained, deleted, lineage_loss]` resolved in this generation) |
-| `summary_version: 4` | Top-level `ladder`: `exposure` from the calibration block alone (verdict, the selected point or the failing checks with their counts: exposure scenes, comparator wins, sensitivity gaps), so an uncalibrated or `--calibrate-only` summary still renders the instrument finding; per evolving arm, per replicate (pooled counts, `censored` per depth, per-rung status, verdict) and per arm (per-rung tallies with the `fail` interval, the tally verdict, pooled counts, `incomplete_replicates`) |
+| `row_version: 3` | `ladder` beside `readings` (null for scripted and fixed arms): `supply` (`births`, `touching_births`, `sites`, `reachable`, `uniform_reference`, `targeted` requested/applied/skipped by operator and skipped by reason, `discarded`, `created`, `removed`); `children` (`touching` and `other` blocks with the per-generation counts above; classes in `touching` only); `retention` (`selected`, `selected_touching`, per depth `[retained, deleted, lineage_loss]` resolved in this generation, and `depths_touching` for the touching subset) |
+| `summary_version: 4` | Top-level `ladder`: `exposure` from the calibration block alone (verdict, the selected point or the failing checks with their counts: exposure scenes, comparator wins, sensitivity gaps), so an uncalibrated or `--calibrate-only` summary still renders the instrument finding; per evolving arm, per replicate (pooled counts, `censored` and `censored_touching` per depth, per-rung status, verdict) and per arm (per-rung tallies with the `fail` interval, each replicate's status, the tally verdict, pooled `s / n` and context counts, `incomplete_replicates`); `uniform_reference` is null for a row and for the replicate once any parent in it has zero reachable nodes |
 | Provenance | `sizes` gains `stall_rates`, `retention_depth`, `relevant_families`; each `genomes` entry gains `source` (`founder`, `file` or `builtin-comparator`) and a file's basename, so the start label is reproducible from the summary |
-| `report` | Renders v2–v4 (v1 stays refused); from a v4 summary the ladder section: exposure, then per evolving arm one line per rung with status, counts and tally, and the verdict line (assay, arena, start — `founder` or the file's basename and SHA-256 — arm, role, policy, verdict, route) |
+| `report` | Renders v2–v4 (v1 stays refused); from a v4 summary the ladder section: exposure, then per evolving arm one line per rung with status, counts and tally, and the verdict line (assay, arena, start — `founder` or the file's basename, each with its SHA-256 — arm, role, policy, verdict, route) |
 | `why-not` | Prints the ladder section and the run directory; exits as `run` does (0; 2 uncalibrated; 3 byte cap: a stall is not an error). `run` prints the report as before |
 | Committed summaries | `docs/progress/lab/t22-f02-*.json` regenerated at v4 |
 | Sizes | By-operator maps hold only the keys that fired: `ladder` ≈ 1 KB per row in the scenario of ≤ 5 touching events per generation, ≤ 6 KB at the bound of all 55 `MutationOperator::all()` keys in three maps plus three skip reasons and `D ≤ 8`; rows ≤ 12 KB / ≤ 17 KB at population 64; campaign ≈ 29 MB / ≤ 41 MB under the 64 MiB cap; summary: the pooled maps at the bound (three maps × 55 names plus reasons and tallies) are ≤ 8 KB per evolving arm and replicate and ≤ 8 KB per arm, so a campaign summary (3 evolving arms × 8 replicates) grows ≤ 220 KB over F03's ≤ 200 KB, inside the 1 MiB reserve whose exit-1 oversize disposition is unchanged |
@@ -186,8 +191,11 @@ records no counts and no resolution, and its open changes are censored.
 | `--stall-rates supply,viability,benefit,retention` | 0.01,0.05,0.05,0.20, each in (0, 1) |
 | `--mutants` under `--quick` (F03) | 8; the pilot lowers it to 4, then 2, then `--signature-arms native`, only if the quick food-seeking run exceeds 60 s, and records the value here |
 
-**Cost.** Assumed touching share 20–40 % of non-identical births, validated
-in the pilot; the pilot measures the quick run.
+**Cost.** Touching share of non-identical births: assumed 20–40 %, measured
+85 % (food-seeking) and 84 % (wall-v1) from the founder start, whose nodes
+are all relevant sites, so the touching filter separates little for that
+start and more for a larger `--genome`; the measured ladder cost (≈ 0.4 s
+per quick run) is in the Timing item.
 
 | Item | Quick (population 16, 4 survivors) | Campaign (64, 16 survivors) |
 | --- | --- | --- |
@@ -198,23 +206,23 @@ in the pilot; the pilot measures the quick run.
 
 ## Implementation Tasks
 
-- [ ] Relevant sites and touching: per-assay family set, sensor and motor
+- [x] Relevant sites and touching: per-assay family set, sensor and motor
       sites of a genome (connected graph sinks and VM `AddVote`), targeted
       / discarded / created / removed classification of a birth; founder,
       zero-site-start and unconnected-sink fixtures.
-- [ ] Birth bookkeeping in `breed`: touching counts, site and reachable
+- [x] Birth bookkeeping in `breed`: touching counts, site and reachable
       counts, change signature on the individual; carry-test fixtures
       including a removed highest id reused by an unrelated node.
-- [ ] Generation bookkeeping in `advance`: survivors computed before the
+- [x] Generation bookkeeping in `advance`: survivors computed before the
       row from the same draws; scene difference, improvement and deltas for
       every non-identical child; battery class and `viable` for touching
       ones.
-- [ ] Retention: selected improvements, descendant walk, depth, resolution
+- [x] Retention: selected improvements, descendant walk, depth, resolution
       per depth, censoring at stop, refused row and no-survivor generation.
-- [ ] Row v3 and summary v4 blocks (exposure independent of arms),
+- [x] Row v3 and summary v4 blocks (exposure independent of arms),
       per-replicate statuses, arm tally verdict, `report` rendering, the
       `why-not` subcommand, `provenance.sizes`.
-- [ ] Fixtures that separate adjacent rungs: synthetic counts placing the
+- [x] Fixtures that separate adjacent rungs: synthetic counts placing the
       stall at each rung and at `inconclusive`; an uncalibrated run
       stopping at exposure with a rendered exposure block; a `mutation-off`
       arm stalling at supply under a raised supply rate whose adequacy
@@ -222,23 +230,30 @@ in the pilot; the pilot measures the quick run.
       `fail`/`inconclusive` replicate tallies; retention lineages
       resolving `retained`, `deleted`, `lineage_loss` and `censored`,
       including the mixed carrying/non-carrying sibling case.
-- [ ] Regenerate the three committed summaries at v4; pilot the quick run
-      time and the touching share; record both in the readings file.
+- [ ] Regenerate the three committed summaries at v4 from a clean tree
+      after review remediation, as F03 did (provenance `dirty: false`);
+      pilot the quick run time and the touching share; record both in the
+      readings file.
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-lab` -> counts and names in
+- [x] Focused tests: `cargo test -p v3-lab` -> 173 unit and 19
+      integration tests pass (1 ignored child helper); names in
       [`docs/progress/readings/t22-f04.md`](../../progress/readings/t22-f04.md).
-- [ ] Determinism: the same-seed byte-identity test (1 thread in-process, 2
+- [x] Determinism: the same-seed byte-identity test (1 thread in-process, 2
       threads in a child) passes on v3 rows -> readings file.
-- [ ] Compatibility: at T22.F03's settings (`--quick --mutants 8
+- [x] Compatibility: at T22.F03's settings (`--quick --mutants 8
       --signature-arms changing`, seed 1) the food-seeking, wall-v1 and
       ring-v1 runs reproduce the committed v3 summaries' calibration,
       reach, fidelity and readings blocks exactly -> readings file.
-- [ ] Timing: the quick food-seeking run at the shipped `--quick` defaults
-      completes under 60 s on the development host; the fallback value, if
-      any, is in the CLI table -> readings file. A run still over 60 s at
-      `native` and 2 mutants is a blocker for the user, not a closure.
+- [x] Timing: measured 2026-09-29 on a host running other work: the
+      unchanged 02aa7851 reference binary 63.5–72.4 s (T22.F03 recorded
+      57.5–59.0 s); paired runs this build vs reference 65.8/65.3,
+      70.5/68.6, 62.8/63.5 s, so the ladder adds −0.7 to +1.9 s
+      (instrumented ≈ 0.4 s), within the predeclaration. No fallback
+      ships and `QUICK_MUTANTS` stays 8; the 60 s bound is waived for this
+      closure by the Exception below. Fallback data (`--mutants` 4:
+      67.7 s, 2: 62.6 s, 2 + `native`: 54.3 s) -> readings file.
 - [ ] Quick runs (seed 1, food-seeking, wall-v1, ring-v1): ladder verdicts
       and the regenerated `docs/progress/lab/t22-f02-*.json` at v4 ->
       readings file.
@@ -290,3 +305,8 @@ apply. Lab cost is in the Cost paragraph above.
   round beyond the workflow's three-round cap (2026-09-29), limited to the
   two items left open after round 3; recorded as round 4 in the readings
   file.
+- Exception: 60 s quick food-seeking bound (user, 2026-09-29) — ignored
+  for this closure because other work was running on the host: the
+  unchanged 02aa7851 reference took 63.5–72.4 s there, and paired runs
+  show the ladder adds −0.7 to +1.9 s against it (65.8/65.3, 70.5/68.6,
+  62.8/63.5 s). No fallback ships; `QUICK_MUTANTS` stays 8.
