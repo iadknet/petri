@@ -1,6 +1,6 @@
 //! End-to-end runs at tiny sizes: determinism across thread counts and
-//! processes, the `uncalibrated` exit, the byte-cap stop, and the summary
-//! keep-list.
+//! processes, the `uncalibrated` exit, the byte-cap stop, the summary
+//! keep-list, and barrier navigation on both built-in arenas and layouts.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -12,8 +12,10 @@ use v3_lab::cli::read_summary;
 use v3_lab::eval::{evaluate_genome, Setup};
 use v3_lab::output::{Budget, GitProvenance, LabRoot, RunDir, SUMMARY_RESERVE};
 use v3_lab::run::{run, RunOutcome, RunParams, UserArm, EXIT_UNCALIBRATED};
+use v3_lab::scene::{ArenaId, Assay, SceneSpec};
 use v3_lab::summary::{
-    render_report, Incomplete, StoppedBy, GENOME_FORMAT, SUMMARY_KIND, SUMMARY_VERSION,
+    render_report, Incomplete, LifetimeLearning, StoppedBy, GENOME_FORMAT, SUMMARY_KIND,
+    SUMMARY_VERSION,
 };
 use v3_lab::{sha256_hex, GenomeFile, LabError};
 
@@ -48,6 +50,9 @@ impl Drop for Scratch {
 
 fn tiny(out: &Path) -> RunParams {
     RunParams {
+        assay: Assay::FoodSeeking,
+        arena: None,
+        layout: None,
         seed: 7,
         replicates: 1,
         generations: 2,
@@ -56,11 +61,14 @@ fn tiny(out: &Path) -> RunParams {
         scenes: 1,
         validation_scenes: 4,
         lifetime: Some(100),
-        arena_size: 48,
+        arena_size: Some(48),
         food_fraction: Some(0.08),
+        scale: None,
         start_energy: 100.0,
-        calibration_fractions: vec![0.08],
+        calibration_fractions: None,
+        calibration_scales: None,
         calibration_lifetimes: vec![100],
+        blocked_weight: None,
         calibration_scenes: 4,
         calibration_margin: 1.0,
         reach_threshold: None,
@@ -249,9 +257,10 @@ fn the_summary_carries_the_versioned_keep_list_and_reports_alone() {
         .unwrap()
         .is_empty());
 
-    // A foreign kind or version alone is refused.
+    // A foreign kind or version alone is refused, F01's v1 included.
     for (key, foreign) in [
         ("kind", serde_json::json!("other-summary")),
+        ("summary_version", serde_json::json!(1)),
         ("summary_version", serde_json::json!(SUMMARY_VERSION + 1)),
     ] {
         let mut changed = value.clone();
@@ -383,10 +392,10 @@ fn the_byte_cap_stops_the_run_and_marks_replicates_incomplete() {
         population: 4,
         elite_fraction: 0.5,
         scenes: 2,
-        food_fraction: 0.06,
+        spec: SceneSpec::sparse(48, 0.06, 5),
         threshold: 1e9,
     };
-    let validation = draw_scenes(11, 2, 48, 0.06, 5).unwrap();
+    let validation = draw_scenes(11, 2, &SceneSpec::sparse(48, 0.06, 5)).unwrap();
     // Room for a few rows only: rows and elites get cap − reserve bytes.
     let mut dir =
         RunDir::create(scratch.lab.join("run"), Budget::new(12_000, 4_000).unwrap()).unwrap();
@@ -423,7 +432,7 @@ fn validation_evaluations_count_toward_creature_ticks() {
         setup: setup.clone(),
         kind: ArmKind::Fixed(founder.clone()),
     }];
-    let validation = draw_scenes(11, 3, 48, 0.06, 5).unwrap();
+    let validation = draw_scenes(11, 3, &SceneSpec::sparse(48, 0.06, 5)).unwrap();
     let campaign = |threshold: f64, name: &str| {
         let plan = Plan {
             seed: 3,
@@ -432,7 +441,7 @@ fn validation_evaluations_count_toward_creature_ticks() {
             population: 2,
             elite_fraction: 0.5,
             scenes: 2,
-            food_fraction: 0.06,
+            spec: SceneSpec::sparse(48, 0.06, 5),
             threshold,
         };
         let mut dir = RunDir::create(
@@ -567,4 +576,158 @@ fn the_cli_refuses_to_run_outside_a_checkout() {
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("not inside a git checkout"));
     assert_eq!(std::fs::read_dir(&scratch.lab).unwrap().count(), 0);
+}
+
+/// `tiny` on a built-in barrier arena at scale 1.
+fn tiny_barrier(out: &Path, arena: ArenaId) -> RunParams {
+    RunParams {
+        assay: Assay::BarrierNavigation,
+        arena: Some(arena),
+        food_fraction: None,
+        scale: Some(1),
+        // Short enough that the half-seeker trails the oracle on the 3 × 3
+        // food block (both exhaust it by about 60 ticks).
+        lifetime: Some(15),
+        ..tiny(out)
+    }
+}
+
+/// The summary fields every barrier-navigation run carries.
+fn assert_barrier_summary(outcome: &RunOutcome, arena: &str) {
+    let summary = &outcome.summary;
+    assert_eq!(summary.summary_version, 2);
+    assert_eq!(summary.assay, Assay::BarrierNavigation);
+    assert_eq!(summary.provenance.sizes.blocked_weight, 1.0);
+    assert_eq!(summary.provenance.arena.spec["id"], arena);
+    assert_eq!(summary.provenance.arena.spec["arena_version"], 1);
+    let report = render_report(&read_summary(&outcome.dir.join("summary.json")).unwrap());
+    assert!(report.contains("blocked weight 1"), "{report}");
+    assert!(report.contains("| floor blocked | comparator blocked |"));
+}
+
+#[test]
+fn a_wall_run_calibrates_evolves_and_is_byte_identical_across_threads() {
+    let scratch = Scratch::new("barrier-wall");
+    let one = scratch
+        .run(&tiny_barrier(&scratch.lab.join("one"), ArenaId::WallV1))
+        .unwrap();
+    assert_eq!(one.exit_code, 0, "{}", render_report(&one.summary));
+    assert_barrier_summary(&one, "wall-v1");
+    let summary = &one.summary;
+    let selected = summary.calibration.selected.as_ref().unwrap();
+    assert_eq!((selected.food_fraction, selected.scale), (None, Some(1)));
+    let sizes = &summary.provenance.sizes;
+    assert_eq!((sizes.scale, sizes.food_fraction), (Some(1), None));
+    assert_eq!(summary.provenance.arena.spec["scale"], 1);
+    assert_eq!(
+        summary.fidelity.as_ref().unwrap().lifetime_learning,
+        LifetimeLearning::Masked
+    );
+    assert!(render_report(summary).contains("| scale | lifetime |"));
+
+    let mut params = tiny_barrier(&scratch.lab.join("three"), ArenaId::WallV1);
+    params.threads = 3;
+    let three = scratch.run(&params).unwrap();
+    let rows = |outcome: &RunOutcome| std::fs::read(outcome.dir.join("rows.ndjson")).unwrap();
+    assert!(!rows(&one).is_empty());
+    assert_eq!(
+        rows(&one),
+        rows(&three),
+        "rows differ between 1 and 3 threads"
+    );
+}
+
+#[test]
+fn a_ring_run_records_its_gate_on_the_scale_axis() {
+    let scratch = Scratch::new("barrier-ring");
+    let mut params = tiny_barrier(&scratch.lab.join("run"), ArenaId::RingV1);
+    params.calibrate_only = true;
+    let outcome = scratch.run(&params).unwrap();
+    // The composed comparator's competence on the ring is the gate's
+    // finding, not the fixture's: either verdict is a complete run.
+    assert!([0, EXIT_UNCALIBRATED].contains(&outcome.exit_code));
+    assert_barrier_summary(&outcome, "ring-v1");
+    let [point] = &outcome.summary.calibration.points[..] else {
+        panic!("one scale × one lifetime");
+    };
+    assert_eq!((point.food_fraction, point.scale), (None, Some(1)));
+    assert!(point.exposure && point.means.is_some());
+}
+
+/// Write a 16-row layout of `.` with `cells` (x, y, char) set.
+fn write_layout(path: &Path, cells: &[(usize, usize, char)]) {
+    let mut grid = vec![vec!['.'; 16]; 16];
+    for &(x, y, c) in cells {
+        grid[y][x] = c;
+    }
+    let rows: Vec<String> = grid.into_iter().map(String::from_iter).collect();
+    let file = serde_json::json!({"arena_format": 1, "rows": rows});
+    std::fs::write(path, serde_json::to_vec(&file).unwrap()).unwrap();
+}
+
+fn layout_params(out: &Path, layout: &Path) -> RunParams {
+    RunParams {
+        layout: Some(layout.to_path_buf()),
+        arena: None,
+        arena_size: None,
+        scale: None,
+        ..tiny_barrier(out, ArenaId::WallV1)
+    }
+}
+
+#[test]
+fn a_layout_file_is_the_arena_and_its_descriptor() {
+    let scratch = Scratch::new("barrier-layout");
+    let path = scratch.lab.join("wall.json");
+    // A wall at x = 6 between the start (4, 8) and food (8, 8).
+    let cells: Vec<(usize, usize, char)> = (5..=11)
+        .map(|y| (6, y, '#'))
+        .chain([(4, 8, 'S'), (8, 8, 'F'), (8, 9, 'F')])
+        .collect();
+    write_layout(&path, &cells);
+    let mut params = layout_params(&scratch.lab.join("run"), &path);
+    params.calibrate_only = true;
+    let outcome = scratch.run(&params).unwrap();
+    assert!([0, EXIT_UNCALIBRATED].contains(&outcome.exit_code));
+    assert_barrier_summary(&outcome, "layout");
+    let spec = &outcome.summary.provenance.arena.spec;
+    assert_eq!(spec["arena_format"], 1);
+    assert_eq!(spec["size"], 16);
+    assert_eq!(spec["path"], path.display().to_string());
+    assert_eq!(spec["rows"][8], "....S.#.F.......");
+    assert_eq!(outcome.summary.provenance.sizes.arena_size, 16);
+    let [point] = &outcome.summary.calibration.points[..] else {
+        panic!("one layout point × one lifetime");
+    };
+    assert_eq!((point.food_fraction, point.scale), (None, None));
+    assert!(point.exposure && point.means.is_some());
+    assert!(render_report(&outcome.summary).contains("| point | lifetime |"));
+
+    // `--arena-size` with a layout is a config error.
+    params.arena_size = Some(48);
+    assert!(matches!(scratch.run(&params), Err(LabError::Config(_))));
+}
+
+#[test]
+fn a_layout_with_unreachable_food_is_not_exposed() {
+    let scratch = Scratch::new("barrier-enclosed");
+    let path = scratch.lab.join("enclosed.json");
+    // Food at (8, 8) inside a closed ring of barriers.
+    let cells: Vec<(usize, usize, char)> = (7..=9)
+        .flat_map(|y| (7..=9).map(move |x| (x, y)))
+        .filter(|&(x, y)| (x, y) != (8, 8))
+        .map(|(x, y)| (x, y, '#'))
+        .chain([(4, 8, 'S'), (8, 8, 'F')])
+        .collect();
+    write_layout(&path, &cells);
+    let outcome = scratch
+        .run(&layout_params(&scratch.lab.join("run"), &path))
+        .unwrap();
+    assert_eq!(outcome.exit_code, EXIT_UNCALIBRATED);
+    let points = &outcome.summary.calibration.points;
+    assert!(!points.is_empty());
+    assert!(points.iter().all(|p| !p.exposure && p.means.is_none()));
+    assert_eq!(points[0].redraws, [0], "a layout has no redraw");
+    assert!(outcome.summary.arms.is_empty());
+    assert_eq!(outcome.summary.timing.creature_ticks, 0);
 }

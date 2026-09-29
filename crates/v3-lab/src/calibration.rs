@@ -1,8 +1,8 @@
-//! The calibration gate: on the grid fractions × lifetimes, score the
-//! founder, the comparator and the three scripted instruments on the
-//! calibration scenes; select the passing point with the lowest fraction,
-//! then the shortest lifetime, that also passes competence on the
-//! validation scenes.
+//! The calibration gate: on the grid axis × lifetimes, score the founder,
+//! the comparator and the three scripted instruments on the calibration
+//! scenes; select the first passing point in selection order — the lowest
+//! food fraction or the largest scale, then the shortest lifetime — that
+//! also passes competence on the validation scenes.
 
 use rayon::prelude::*;
 use v3_core::config::SimulationConfig;
@@ -10,7 +10,7 @@ use v3_core::creature::genome::CreatureGenome;
 
 use crate::eval::{evaluate_genome, evaluate_scripted, SceneScore, Scripted, Setup};
 use crate::rng::{hash, stream, Part};
-use crate::scene::{draw_scene, Scene};
+use crate::scene::{Assay, Geometry, Scene, SceneSpec};
 use crate::summary::{
     Calibration, CalibrationPoint, PointMeans, Selected, ThresholdSource, Verdict,
 };
@@ -21,8 +21,11 @@ pub const SENSITIVITY_GAP: f64 = 0.1;
 /// The gate's inputs.
 #[derive(Debug, Clone)]
 pub struct GridInput {
-    pub fractions: Vec<f64>,
+    /// The arena's axis points, in any order.
+    pub points: Vec<Geometry>,
     pub lifetimes: Vec<u32>,
+    pub assay: Assay,
+    pub blocked_weight: f64,
     pub scenes: u32,
     pub validation_scenes: u32,
     pub margin: f64,
@@ -39,6 +42,8 @@ pub struct Gate {
     pub calibration: Calibration,
     /// Validation scenes at the selected point (empty when uncalibrated).
     pub validation: Vec<Scene>,
+    /// The selected point's scene draw (none when uncalibrated).
+    pub spec: Option<SceneSpec>,
     pub creature_ticks: u64,
 }
 
@@ -48,17 +53,11 @@ pub struct Gate {
 /// # Errors
 ///
 /// The redraw record when a draw is infeasible.
-pub fn draw_scenes(
-    seed: u64,
-    n: u32,
-    size: u16,
-    fraction: f64,
-    vision_radius: u8,
-) -> Result<Vec<Scene>, Vec<u32>> {
+pub fn draw_scenes(seed: u64, n: u32, spec: &SceneSpec) -> Result<Vec<Scene>, Vec<u32>> {
     let mut rng = stream(&[Part::U(seed)]);
     let mut scenes = Vec::new();
     for _ in 0..n {
-        match draw_scene(&mut rng, size, fraction, vision_radius) {
+        match spec.draw(&mut rng) {
             Ok(scene) => scenes.push(scene),
             Err(infeasible) => {
                 let mut redraws: Vec<u32> = scenes.iter().map(|s| s.redraws).collect();
@@ -138,6 +137,7 @@ fn score_point(
         .sum();
     let score = |s: &SceneScore| s.score;
     let progress = |s: &SceneScore| s.progress;
+    let blocked = SceneScore::blocked_fraction;
     Scored {
         means: PointMeans {
             founder: mean_of(&per_scene, FOUNDER, score),
@@ -147,6 +147,8 @@ fn score_point(
             comparator: mean_of(&per_scene, COMPARATOR, score),
             floor_progress: mean_of(&per_scene, FLOOR, progress),
             comparator_progress: mean_of(&per_scene, COMPARATOR, progress),
+            floor_blocked_fraction: mean_of(&per_scene, FLOOR, blocked),
+            comparator_blocked_fraction: mean_of(&per_scene, COMPARATOR, blocked),
             comparator_wins: u32::try_from(wins).unwrap_or(u32::MAX),
         },
         creature_ticks,
@@ -169,6 +171,19 @@ pub fn sensitive(means: &PointMeans) -> bool {
         && means.comparator_progress > means.floor_progress
 }
 
+/// Selection order: food fractions ascending, scales descending (the
+/// hardest calibrated detour); duplicates dropped.
+fn selection_order(points: &[Geometry]) -> Vec<Geometry> {
+    let mut points = points.to_vec();
+    points.sort_by(|a, b| match (a.axis(), b.axis()) {
+        ((Some(a), _), (Some(b), _)) => a.total_cmp(&b),
+        ((_, Some(a)), (_, Some(b))) => b.cmp(&a),
+        _ => std::cmp::Ordering::Equal,
+    });
+    points.dedup();
+    points
+}
+
 /// Run the gate. `reference` is the resolved reference arm config.
 #[must_use]
 #[allow(clippy::too_many_lines)]
@@ -178,22 +193,30 @@ pub fn run_gate(
     comparator: &CreatureGenome,
     input: &GridInput,
 ) -> Gate {
-    let size = reference.world.width;
-    let vision = reference.runtime.perception.vision_radius;
-    let mut fractions = input.fractions.clone();
-    fractions.sort_by(f64::total_cmp);
-    fractions.dedup();
+    let spec = |geometry: &Geometry| SceneSpec {
+        geometry: geometry.clone(),
+        size: reference.world.width,
+        vision_radius: reference.runtime.perception.vision_radius,
+        assay: input.assay,
+    };
+    let setup = |lifetime| {
+        Setup::new(reference.clone(), input.start_energy, lifetime)
+            .with_blocked_weight(input.blocked_weight)
+    };
     let mut lifetimes = input.lifetimes.clone();
     lifetimes.sort_unstable();
     lifetimes.dedup();
 
     let mut creature_ticks = 0;
     let mut points = Vec::new();
-    for &fraction in &fractions {
-        let drawn = draw_scenes(input.calibration_seed, input.scenes, size, fraction, vision);
+    let geometries = selection_order(&input.points);
+    for geometry in &geometries {
+        let drawn = draw_scenes(input.calibration_seed, input.scenes, &spec(geometry));
+        let (food_fraction, scale) = geometry.axis();
         for &lifetime in &lifetimes {
             let mut point = CalibrationPoint {
-                food_fraction: fraction,
+                food_fraction,
+                scale,
                 lifetime,
                 scenes: input.scenes,
                 redraws: Vec::new(),
@@ -209,37 +232,45 @@ pub fn run_gate(
                 Ok(scenes) => {
                     point.redraws = scenes.iter().map(|s| s.redraws).collect();
                     point.exposure = true;
-                    let setup = Setup::new(reference.clone(), input.start_energy, lifetime);
-                    let scored =
-                        score_point(&setup, founder, comparator, scenes, input.calibration_seed);
+                    let scored = score_point(
+                        &setup(lifetime),
+                        founder,
+                        comparator,
+                        scenes,
+                        input.calibration_seed,
+                    );
                     creature_ticks += scored.creature_ticks;
                     point.competence = competent(&scored.means, input.scenes, input.margin);
                     point.sensitivity = sensitive(&scored.means);
                     point.means = Some(scored.means);
                 }
             }
-            points.push(point);
+            points.push((point, geometry));
         }
     }
 
     let mut selected = None;
     let mut validation_scenes = Vec::new();
-    for point in &mut points {
+    let mut selected_spec = None;
+    for (point, geometry) in &mut points {
         if !(point.exposure && point.competence && point.sensitivity) {
             continue;
         }
         let Ok(scenes) = draw_scenes(
             input.validation_seed,
             input.validation_scenes,
-            size,
-            point.food_fraction,
-            vision,
+            &spec(geometry),
         ) else {
             point.validation_competence = Some(false);
             continue;
         };
-        let setup = Setup::new(reference.clone(), input.start_energy, point.lifetime);
-        let scored = score_point(&setup, founder, comparator, &scenes, input.validation_seed);
+        let scored = score_point(
+            &setup(point.lifetime),
+            founder,
+            comparator,
+            &scenes,
+            input.validation_seed,
+        );
         creature_ticks += scored.creature_ticks;
         let passed = competent(&scored.means, input.validation_scenes, input.margin);
         point.validation_competence = Some(passed);
@@ -249,10 +280,12 @@ pub fn run_gate(
         if passed {
             let chosen = Selected {
                 food_fraction: point.food_fraction,
+                scale: point.scale,
                 lifetime: point.lifetime,
             };
             selected = Some((chosen, calibrated));
             validation_scenes = scenes;
+            selected_spec = Some(spec(geometry));
             break;
         }
     }
@@ -275,13 +308,14 @@ pub fn run_gate(
     Gate {
         calibration: Calibration {
             margin: input.margin,
-            points,
+            points: points.into_iter().map(|(point, _)| point).collect(),
             selected,
             verdict,
             reach_threshold,
             reach_threshold_source: source,
         },
         validation: validation_scenes,
+        spec: selected_spec,
         creature_ticks,
     }
 }
@@ -299,6 +333,8 @@ mod tests {
             comparator,
             floor_progress: 0.1,
             comparator_progress: 0.2,
+            floor_blocked_fraction: 0.0,
+            comparator_blocked_fraction: 0.0,
             comparator_wins: wins,
         }
     }
@@ -336,11 +372,7 @@ mod tests {
         let config = arena_config(48);
         let (founder, comparator) = actors(&config);
         let setup = Setup::new(config, 100.0, 5);
-        let empty = |seed| Scene {
-            seed,
-            food: Vec::new(),
-            redraws: 0,
-        };
+        let empty = |seed| Scene::open(seed, 48, Vec::new());
         let scored = score_point(&setup, &founder, &comparator, &[empty(1), empty(2)], 3);
         // Every actor scores 0: a comparator tie with the floor is no win.
         assert_eq!(scored.means.comparator, scored.means.floor);
@@ -350,8 +382,10 @@ mod tests {
 
     fn input(margin: f64) -> GridInput {
         GridInput {
-            fractions: vec![0.08],
+            points: vec![Geometry::SparseFood { fraction: 0.08 }],
             lifetimes: vec![100],
+            assay: Assay::FoodSeeking,
+            blocked_weight: 0.0,
             scenes: 4,
             validation_scenes: 4,
             margin,
@@ -371,13 +405,27 @@ mod tests {
     ) -> u64 {
         let size = setup.config.world.width;
         let vision = setup.config.runtime.perception.vision_radius;
-        draw_scenes(seed, n, size, fraction, vision)
+        draw_scenes(seed, n, &SceneSpec::sparse(size, fraction, vision))
             .unwrap()
             .iter()
             .flat_map(|scene| {
                 genomes.map(|genome| u64::from(evaluate_genome(setup, genome, scene).0.ticks))
             })
             .sum()
+    }
+
+    #[test]
+    fn selection_takes_the_lowest_fraction_or_the_largest_scale_first() {
+        let fractions = [0.08, 0.02, 0.04, 0.02].map(|fraction| Geometry::SparseFood { fraction });
+        assert_eq!(
+            selection_order(&fractions),
+            [0.02, 0.04, 0.08].map(|fraction| Geometry::SparseFood { fraction })
+        );
+        let scales = [1, 3, 2, 3].map(|scale| Geometry::Ring { scale });
+        assert_eq!(
+            selection_order(&scales),
+            [3, 2, 1].map(|scale| Geometry::Ring { scale })
+        );
     }
 
     #[test]

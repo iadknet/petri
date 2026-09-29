@@ -2,10 +2,11 @@
 
 use std::path::{Path, PathBuf};
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand};
 
 use crate::output::{GitProvenance, LabRoot, DEFAULT_BYTE_CAP};
 use crate::run::{run, RunParams, UserArm};
+use crate::scene::{ArenaId, Assay};
 use crate::summary::{render_report, Summary, SUMMARY_KIND, SUMMARY_VERSION};
 use crate::LabError;
 
@@ -32,15 +33,17 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum Assay {
-    FoodSeeking,
-}
-
 #[derive(Args, Debug)]
 pub struct RunArgs {
     #[arg(long, value_enum, default_value = "food-seeking")]
     pub assay: Assay,
+    /// Built-in arena (default: sparse-food-v1 for food-seeking, wall-v1 for
+    /// barrier-navigation).
+    #[arg(long, value_enum)]
+    pub arena: Option<ArenaId>,
+    /// JSON layout file (`arena_format: 1`); replaces `--arena`.
+    #[arg(long)]
+    pub layout: Option<PathBuf>,
     #[arg(long, default_value_t = 1)]
     pub seed: u64,
     /// Quick sizes for a smoke run.
@@ -61,15 +64,24 @@ pub struct RunArgs {
     /// Skips the lifetime grid (default: selected by calibration).
     #[arg(long)]
     pub lifetime: Option<u32>,
-    #[arg(long, default_value_t = 64)]
-    pub arena_size: u16,
-    /// Skips the fraction grid (default: selected by calibration).
+    /// Built-in arena size, 48..=64 (default 64); a layout's is its row count.
+    #[arg(long)]
+    pub arena_size: Option<u16>,
+    /// Restricts the fraction axis (default: selected by calibration).
     #[arg(long)]
     pub food_fraction: Option<f64>,
+    /// Restricts the scale axis of wall-v1 and ring-v1, 1..=3 (default:
+    /// selected by calibration).
+    #[arg(long)]
+    pub scale: Option<u8>,
     #[arg(long, default_value_t = 100.0)]
     pub start_energy: f32,
-    #[arg(long, value_delimiter = ',', default_values_t = [0.02, 0.04, 0.08])]
-    pub calibration_fractions: Vec<f64>,
+    /// sparse-food-v1 only (default 0.02,0.04,0.08).
+    #[arg(long, value_delimiter = ',')]
+    pub calibration_fractions: Option<Vec<f64>>,
+    /// wall-v1 and ring-v1 only (default 1,2,3).
+    #[arg(long, value_delimiter = ',')]
+    pub calibration_scales: Option<Vec<u8>>,
     #[arg(long, value_delimiter = ',', default_values_t = [200, 400])]
     pub calibration_lifetimes: Vec<u32>,
     #[arg(long, default_value_t = 16)]
@@ -79,6 +91,10 @@ pub struct RunArgs {
     /// Overrides the calibrated threshold (recorded).
     #[arg(long)]
     pub reach_threshold: Option<f64>,
+    /// Weight of the blocked-move fraction in the scene score (default 1.0
+    /// for barrier-navigation, 0 for food-seeking).
+    #[arg(long)]
+    pub blocked_weight: Option<f64>,
     /// `name=overlay.json[:genome.json]`, repeatable.
     #[arg(long = "arm", value_parser = parse_arm)]
     pub arms: Vec<UserArm>,
@@ -129,6 +145,9 @@ impl RunArgs {
             CAMPAIGN_SIZES
         };
         RunParams {
+            assay: self.assay,
+            arena: self.arena,
+            layout: self.layout.clone(),
             seed: self.seed,
             replicates: self.replicates.unwrap_or(replicates),
             generations: self.generations.unwrap_or(generations),
@@ -139,9 +158,12 @@ impl RunArgs {
             lifetime: self.lifetime,
             arena_size: self.arena_size,
             food_fraction: self.food_fraction,
+            scale: self.scale,
             start_energy: self.start_energy,
             calibration_fractions: self.calibration_fractions.clone(),
+            calibration_scales: self.calibration_scales.clone(),
             calibration_lifetimes: self.calibration_lifetimes.clone(),
+            blocked_weight: self.blocked_weight,
             calibration_scenes: self.calibration_scenes,
             calibration_margin: self.calibration_margin,
             reach_threshold: self.reach_threshold,
@@ -332,6 +354,44 @@ mod tests {
         let params = args.params();
         assert_eq!(params.population, 5);
         assert_eq!(params.replicates, QUICK_SIZES.0);
-        assert_eq!(params.calibration_fractions, vec![0.02, 0.04, 0.08]);
+        assert_eq!(
+            params.calibration_fractions, None,
+            "the arena supplies the default"
+        );
+        assert_eq!(params.assay, Assay::FoodSeeking);
+        let plan = crate::run::resolve_arena(&params).unwrap();
+        assert_eq!(plan.size, 64);
+        assert_eq!(plan.points.len(), 3);
+    }
+
+    #[test]
+    fn barrier_flags_parse_into_the_barrier_arena() {
+        let cli = Cli::parse_from([
+            "v3-lab",
+            "run",
+            "--assay",
+            "barrier-navigation",
+            "--arena",
+            "ring-v1",
+            "--calibration-scales",
+            "1,3",
+            "--blocked-weight",
+            "0.5",
+        ]);
+        let Command::Run(args) = cli.command else {
+            panic!("run");
+        };
+        let params = args.params();
+        assert_eq!(params.arena, Some(ArenaId::RingV1));
+        assert_eq!(params.calibration_scales, Some(vec![1, 3]));
+        assert_eq!(params.blocked_weight, Some(0.5));
+        let plan = crate::run::resolve_arena(&params).unwrap();
+        assert_eq!(
+            plan.points,
+            [
+                crate::scene::Geometry::Ring { scale: 1 },
+                crate::scene::Geometry::Ring { scale: 3 }
+            ]
+        );
     }
 }

@@ -10,13 +10,17 @@
 //! Scripted instruments run on a lab stepper over the production appliers
 //! (`apply_typed_eat`, `apply_move`) plus `energy_decay_per_tick`; they pay
 //! no brain compute, carrying or penalty charge.
+//!
+//! Every genome evaluation runs an expression-masked copy ([`expressed`]):
+//! lifetime learning is off, so improvement across generations is inherited
+//! change.
 
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use slotmap::SlotMap;
 use v3_core::config::{OrdinaryFoodTypeId, SimulationConfig};
 use v3_core::contracts::{CreatureId, Direction, Position};
-use v3_core::creature::genome::CreatureGenome;
+use v3_core::creature::genome::{BackendDef, CreatureGenome};
 use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::creature::state::{CreatureState, DispatchRecord, SHARED_MEMORY_SLOTS};
 use v3_core::kernel::WorldState;
@@ -24,7 +28,9 @@ use v3_core::simulation::actions::{apply_move, apply_typed_eat};
 use v3_core::simulation::energy_accounting::EnergyFlows;
 use v3_core::simulation::{run_tick, seed_simulation, SimStats, Simulation};
 
-use crate::scene::{centre, torus_distance, Scene};
+pub use crate::geodesic::step_toward;
+use crate::geodesic::{Field, Terrain};
+use crate::scene::{nearest, Scene};
 
 const FOOD: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
 
@@ -70,6 +76,8 @@ pub struct Setup {
     /// endpoint, so the penalty is at its production value.
     pub start_tick: u64,
     pub phenotype: Phenotype,
+    /// Weight of the blocked-move fraction subtracted from the scene score.
+    pub blocked_weight: f64,
 }
 
 impl Setup {
@@ -83,14 +91,28 @@ impl Setup {
             lifetime,
             start_tick,
             phenotype,
+            blocked_weight: 0.0,
         }
     }
 
-    fn creature(&self, id: CreatureId, genome: CreatureGenome, seed: u64) -> CreatureState {
+    /// The same setup scoring blocked moves at `weight`.
+    #[must_use]
+    pub fn with_blocked_weight(mut self, weight: f64) -> Self {
+        self.blocked_weight = weight;
+        self
+    }
+
+    fn creature(
+        &self,
+        id: CreatureId,
+        genome: CreatureGenome,
+        seed: u64,
+        position: Position,
+    ) -> CreatureState {
         CreatureState::new(
             id,
             genome,
-            centre(self.config.world.width),
+            position,
             self.start_energy,
             0,
             self.phenotype.channels,
@@ -132,7 +154,7 @@ impl serde::Serialize for EnergyEnd {
 /// One scene's reading.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct SceneScore {
-    /// `food_eaten + progress`.
+    /// `food_eaten + progress − blocked_weight × blocked_fraction`.
     pub score: f64,
     pub food_eaten: u32,
     pub intake: f64,
@@ -151,6 +173,38 @@ pub struct SceneScore {
     pub ticks: u32,
 }
 
+impl SceneScore {
+    /// `moves_blocked / moves_attempted`, 0 when no move was attempted.
+    #[must_use]
+    pub fn blocked_fraction(&self) -> f64 {
+        blocked_fraction(self.moves_blocked, self.moves_attempted)
+    }
+}
+
+#[allow(clippy::cast_precision_loss)]
+fn blocked_fraction(blocked: u64, attempted: u64) -> f64 {
+    if attempted == 0 {
+        0.0
+    } else {
+        blocked as f64 / attempted as f64
+    }
+}
+
+/// `genome` with lifetime learning masked: every Graph compute node's
+/// `plasticity` set to `None` (the only lifetime-learning mechanism).
+#[must_use]
+pub fn expressed(genome: &CreatureGenome) -> CreatureGenome {
+    let mut masked = genome.clone();
+    for node in &mut masked.nodes {
+        if let BackendDef::Graph(graph) = &mut node.backend_def {
+            for compute in &mut graph.compute_nodes {
+                compute.plasticity = None;
+            }
+        }
+    }
+    masked
+}
+
 /// The parent's last living dispatch record and age, frozen for variation.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Frozen {
@@ -158,73 +212,89 @@ pub struct Frozen {
     pub age: u64,
 }
 
-/// Interval progress toward the nearest remaining food, observed at tick
-/// boundaries only.
+/// Interval progress toward the nearest remaining food along the shortest
+/// passable path, observed at tick boundaries only. The distance field is
+/// recomputed when an interval opens and read once per tick.
 #[derive(Debug, Clone)]
 pub struct Progress {
     remaining: Vec<Position>,
-    size: u16,
-    d0: u16,
-    best: u16,
+    terrain: Terrain,
+    field: Field,
+    /// `None` when the nearest remaining food is unreachable.
+    d0: Option<u32>,
+    best: u32,
 }
 
 impl Progress {
     /// Open the first interval at `start`.
     #[must_use]
-    pub fn new(food: &[Position], size: u16, start: Position) -> Self {
-        let mut progress = Self {
+    pub fn new(food: &[Position], terrain: Terrain, start: Position) -> Self {
+        let field = Field::new(&terrain, food);
+        let d0 = field.at(start);
+        Self {
             remaining: food.to_vec(),
-            size,
-            d0: 0,
-            best: 0,
-        };
-        progress.open(start, |_| true);
-        progress
-    }
-
-    fn nearest(&self, at: Position) -> Option<u16> {
-        self.remaining
-            .iter()
-            .map(|&cell| torus_distance(cell, at, self.size))
-            .min()
+            terrain,
+            field,
+            d0,
+            best: d0.unwrap_or(0),
+        }
     }
 
     /// Open a new interval at `at` after a tick in which food was eaten;
     /// `has_food` drops consumed cells.
     pub fn open(&mut self, at: Position, has_food: impl Fn(Position) -> bool) {
         self.remaining.retain(|&cell| has_food(cell));
-        let d = self.nearest(at).unwrap_or(0);
-        self.d0 = d;
-        self.best = d;
+        self.field = Field::new(&self.terrain, &self.remaining);
+        self.d0 = self.field.at(at);
+        self.best = self.d0.unwrap_or(0);
     }
 
     /// Observe a later boundary at `at`.
     pub fn observe(&mut self, at: Position) {
-        if let Some(d) = self.nearest(at) {
+        if let Some(d) = self.field.at(at) {
             self.best = self.best.min(d);
         }
     }
 
     /// The open interval's value: `1 − min(d_t)/d0` in [0, 1], 1 when
-    /// `d0 = 0`, 0 when no food remains.
+    /// `d0 = 0`, 0 when no food remains or the nearest is unreachable.
     #[must_use]
     pub fn value(&self) -> f64 {
-        if self.remaining.is_empty() {
-            0.0
-        } else if self.d0 == 0 {
-            1.0
-        } else {
-            (1.0 - f64::from(self.best) / f64::from(self.d0)).clamp(0.0, 1.0)
+        match self.d0 {
+            None => 0.0,
+            Some(0) => 1.0,
+            Some(d0) => (1.0 - f64::from(self.best) / f64::from(d0)).clamp(0.0, 1.0),
         }
     }
 
-    /// Nearest remaining food cell from `at` (first in draw order on ties).
+    /// Nearest remaining food cell from `at` by Chebyshev distance (first in
+    /// draw order on ties): F01's target.
     #[must_use]
     pub fn target(&self, at: Position) -> Option<Position> {
-        self.remaining
-            .iter()
-            .copied()
-            .min_by_key(|&cell| torus_distance(cell, at, self.size))
+        nearest(&self.remaining, at, self.terrain.size())
+    }
+
+    /// The path-aware oracle step from `at`: to a neighbour one step nearer
+    /// along the shortest passable path, `step_toward` the target when that
+    /// neighbour qualifies, else the first qualifying direction in
+    /// `Direction::ALL` order. `None` when no food remains or none is
+    /// reachable.
+    #[must_use]
+    pub fn oracle_step(&self, at: Position) -> Option<Direction> {
+        let d = self.field.at(at)?;
+        let toward = step_toward(at, self.target(at)?, self.terrain.size());
+        if d == 0 {
+            return Some(toward);
+        }
+        let descends = |direction: Direction| {
+            self.field.at(self.terrain.neighbor(at, direction)) == Some(d - 1)
+        };
+        if descends(toward) {
+            return Some(toward);
+        }
+        Direction::ALL
+            .into_iter()
+            .find(|&direction| descends(direction))
     }
 }
 
@@ -264,13 +334,15 @@ impl Tally {
     fn finish(
         self,
         progress: &Progress,
+        blocked_weight: f64,
         energy_end: EnergyEnd,
         death: Option<u32>,
         ticks: u32,
     ) -> SceneScore {
         let progress = progress.value();
+        let blocked = blocked_fraction(self.blocked, self.moves);
         SceneScore {
-            score: f64::from(self.food_eaten) + progress,
+            score: f64::from(self.food_eaten) + progress - blocked_weight * blocked,
             food_eaten: self.food_eaten,
             intake: self.intake,
             ticks_to_first_food: self.first,
@@ -285,7 +357,22 @@ impl Tally {
     }
 }
 
-/// Evaluate `genome` alone on `scene` with the full production tick.
+/// A world of the setup's size holding `scene`'s barriers.
+fn scene_world(setup: &Setup, scene: &Scene) -> WorldState {
+    let size = setup.config.world.width;
+    let mut world = WorldState::new(size, size, setup.config.world.edge_mode);
+    for &cell in &scene.barriers {
+        world.set_barrier(cell, true);
+    }
+    world
+}
+
+/// Evaluate the expression-masked copy of `genome` alone on `scene` with the
+/// full production tick.
+///
+/// # Panics
+///
+/// If the masked copy records a plasticity update.
 #[must_use]
 pub fn evaluate_genome(
     setup: &Setup,
@@ -293,10 +380,12 @@ pub fn evaluate_genome(
     scene: &Scene,
 ) -> (SceneScore, Frozen) {
     let size = setup.config.world.width;
-    let start = centre(size);
-    let world = WorldState::new(size, size, setup.config.world.edge_mode);
+    let start = scene.start;
+    let world = scene_world(setup, scene);
+    let terrain = Terrain::from_cells(size, &scene.barriers);
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
-    let id = creatures.insert_with_key(|id| setup.creature(id, genome.clone(), scene.seed));
+    let id =
+        creatures.insert_with_key(|id| setup.creature(id, expressed(genome), scene.seed, start));
     let mut sim = Simulation::new(
         world,
         creatures,
@@ -310,7 +399,7 @@ pub fn evaluate_genome(
         sim.world.set_food_type(cell, FOOD, density);
     }
 
-    let mut progress = Progress::new(&scene.food, size, start);
+    let mut progress = Progress::new(&scene.food, terrain, start);
     let mut tally = Tally::default();
     let mut counters = Counters::read(&sim.stats);
     let mut energy = setup.start_energy;
@@ -349,8 +438,18 @@ pub fn evaluate_genome(
             progress.observe(creature.position);
         }
     }
+    assert_eq!(
+        sim.stats.plasticity_updates_total, 0,
+        "an expression-masked genome learned"
+    );
     (
-        tally.finish(&progress, EnergyEnd::Living(energy), death, ticks),
+        tally.finish(
+            &progress,
+            setup.blocked_weight,
+            EnergyEnd::Living(energy),
+            death,
+            ticks,
+        ),
         frozen,
     )
 }
@@ -363,8 +462,8 @@ pub enum Scripted {
     RandomWalk,
     /// Oracle step on even ticks, random-walk step on odd.
     HalfSeeker,
-    /// One step along the toroidal Chebyshev-shortest direction to the
-    /// nearest remaining food.
+    /// One step along the shortest passable path to the nearest remaining
+    /// reachable food (F01's Chebyshev step on a barrier-free arena).
     OracleSeeker,
 }
 
@@ -378,12 +477,13 @@ impl Scripted {
         }
     }
 
+    /// The oracle step on oracle ticks while reachable food remains, else
+    /// one random-walk draw.
     fn direction(
         self,
         tick: u32,
         from: Position,
-        target: Option<Position>,
-        size: u16,
+        progress: &Progress,
         rng: &mut SmallRng,
     ) -> Direction {
         let oracle = match self {
@@ -391,35 +491,11 @@ impl Scripted {
             Self::HalfSeeker => tick.is_multiple_of(2),
             Self::OracleSeeker => true,
         };
-        match target {
-            Some(target) if oracle => step_toward(from, target, size),
-            _ => Direction::ALL[rng.gen_range(0..Direction::ALL.len())],
-        }
+        oracle
+            .then(|| progress.oracle_step(from))
+            .flatten()
+            .unwrap_or_else(|| Direction::ALL[rng.gen_range(0..Direction::ALL.len())])
     }
-}
-
-fn wrapped_sign(from: u16, to: u16, size: u16) -> i32 {
-    let forward = (i32::from(to) - i32::from(from)).rem_euclid(i32::from(size));
-    if forward == 0 {
-        0
-    } else if forward <= i32::from(size) / 2 {
-        1
-    } else {
-        -1
-    }
-}
-
-/// The king step that shortens the toroidal Chebyshev distance to `to`.
-#[must_use]
-pub fn step_toward(from: Position, to: Position, size: u16) -> Direction {
-    let delta = (
-        wrapped_sign(from.x, to.x, size),
-        wrapped_sign(from.y, to.y, size),
-    );
-    Direction::ALL
-        .into_iter()
-        .find(|direction| direction.delta() == delta)
-        .unwrap_or(Direction::N)
 }
 
 /// Evaluate a scripted instrument on `scene`, the actor built from
@@ -432,38 +508,47 @@ pub fn evaluate_scripted(
     scene: &Scene,
     actor_seed: u64,
 ) -> SceneScore {
-    let size = setup.config.world.width;
-    let mut world = WorldState::new(size, size, setup.config.world.edge_mode);
+    let mut world = scene_world(setup, scene);
     world.reconfigure_food(setup.config.world.food.clone());
     let density = setup.config.world.food.shared.max_density;
     for &cell in &scene.food {
         world.set_food_type(cell, FOOD, density);
     }
-    run_scripted(setup, founder, policy, world, &scene.food, actor_seed)
+    run_scripted(
+        setup,
+        founder,
+        policy,
+        world,
+        scene.start,
+        &scene.food,
+        actor_seed,
+    )
 }
 
-/// The scripted stepper on a prepared `world` (tests place barriers here).
+/// The scripted stepper on a prepared `world` whose barriers are set,
+/// starting at `start`.
 #[must_use]
 pub fn run_scripted(
     setup: &Setup,
     founder: &CreatureGenome,
     policy: Scripted,
     mut world: WorldState,
+    start: Position,
     food: &[Position],
     actor_seed: u64,
 ) -> SceneScore {
     let config = &setup.config;
-    let size = config.world.width;
     let mut ids: SlotMap<CreatureId, ()> = SlotMap::with_key();
     let id = ids.insert(());
-    let mut actor = setup.creature(id, founder.clone(), actor_seed);
+    let mut actor = setup.creature(id, founder.clone(), actor_seed, start);
+    let terrain = Terrain::from_world(&world);
     world.place_creature(actor.position, id);
     let mut flows = EnergyFlows {
         food_intake_by_type: vec![0.0; config.world.food.types.len()],
         ..EnergyFlows::default()
     };
     let mut rng = SmallRng::seed_from_u64(actor_seed);
-    let mut progress = Progress::new(food, size, actor.position);
+    let mut progress = Progress::new(food, terrain, actor.position);
     let mut tally = Tally::default();
     let mut energy = actor.energy;
     let mut death = None;
@@ -478,13 +563,7 @@ pub fn run_scripted(
             tally.first.get_or_insert(tick);
             tally.intake += flows.food_intake_by_type.iter().sum::<f64>() - intake_before;
         } else {
-            let direction = policy.direction(
-                tick,
-                actor.position,
-                progress.target(actor.position),
-                size,
-                &mut rng,
-            );
+            let direction = policy.direction(tick, actor.position, &progress, &mut rng);
             tally.moves += 1;
             if !apply_move(id, &mut actor, &mut world, direction, config, &mut flows) {
                 tally.blocked += 1;
@@ -503,14 +582,20 @@ pub fn run_scripted(
             progress.observe(actor.position);
         }
     }
-    tally.finish(&progress, EnergyEnd::Scripted(energy), death, ticks)
+    tally.finish(
+        &progress,
+        setup.blocked_weight,
+        EnergyEnd::Scripted(energy),
+        death,
+        ticks,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::arena::arena_config;
-    use crate::scene::draw_scene;
+    use crate::scene::{centre, SceneSpec};
     use v3_core::creature::founder::founder_genome_with_age_gate;
     use v3_core::mutation::reachability::ParentExecuted;
 
@@ -526,7 +611,9 @@ mod tests {
     }
 
     fn scene(seed: u64) -> Scene {
-        draw_scene(&mut SmallRng::seed_from_u64(seed), 48, 0.04, 5).unwrap()
+        SceneSpec::sparse(48, 0.04, 5)
+            .draw(&mut SmallRng::seed_from_u64(seed))
+            .unwrap()
     }
 
     #[test]
@@ -584,11 +671,7 @@ mod tests {
         const REWARD: f32 = 1e-3;
         let mut dying = setup(5, 0.6);
         dying.config.world.food.types[0].energy_per_unit = Some(REWARD);
-        let scene = Scene {
-            seed: 4,
-            food: vec![centre(48)],
-            redraws: 0,
-        };
+        let scene = Scene::open(4, 48, vec![centre(48)]);
         let (score, frozen) = evaluate_genome(&dying, &founder(&dying), &scene);
         assert_eq!(score.death_tick, Some(1));
         assert_eq!(score.ticks, 1);
@@ -640,10 +723,18 @@ mod tests {
         let far = Position::new(start.x + 10, start.y);
         world.set_food_type(far, FOOD, 1.0);
         let founder = founder(&setup);
-        let score = run_scripted(&setup, &founder, Scripted::OracleSeeker, world, &[far], 9);
+        let score = run_scripted(
+            &setup,
+            &founder,
+            Scripted::OracleSeeker,
+            world,
+            start,
+            &[far],
+            9,
+        );
         assert_eq!(score.moves_attempted, 5);
         assert_eq!(score.moves_blocked, 5);
-        let actor = setup.creature(CreatureId::default(), founder, 9);
+        let actor = setup.creature(CreatureId::default(), founder, 9, start);
         let lifecycle = &setup.config.energy.lifecycle;
         let per_tick = setup.config.energy.adjusted_action_cost(
             setup.config.energy.costs.move_cost,
@@ -689,10 +780,18 @@ mod tests {
         let far = Position::new(start.x + 10, start.y);
         world.set_food_type(far, FOOD, 1.0);
         let founder = founder(&setup);
-        let score = run_scripted(&setup, &founder, Scripted::OracleSeeker, world, &[far], 9);
+        let score = run_scripted(
+            &setup,
+            &founder,
+            Scripted::OracleSeeker,
+            world,
+            start,
+            &[far],
+            9,
+        );
         assert_eq!(score.death_tick, None);
         let complexity = setup
-            .creature(CreatureId::default(), founder, 9)
+            .creature(CreatureId::default(), founder, 9, start)
             .cached_complexity;
         let energy_config = &setup.config.energy;
         let mut expected = 200.0_f32;
@@ -724,6 +823,7 @@ mod tests {
             &founder(&setup),
             Scripted::OracleSeeker,
             world,
+            start,
             &cells,
             3,
         );
@@ -737,10 +837,11 @@ mod tests {
     /// and the boundary progress, replayed beside `evaluate_genome`.
     fn replay(setup: &Setup, genome: &CreatureGenome, scene: &Scene) -> SceneScore {
         let size = setup.config.world.width;
-        let start = centre(size);
+        let start = scene.start;
         let world = WorldState::new(size, size, setup.config.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
-        let id = creatures.insert_with_key(|id| setup.creature(id, genome.clone(), scene.seed));
+        let id =
+            creatures.insert_with_key(|id| setup.creature(id, genome.clone(), scene.seed, start));
         let mut sim = Simulation::new(
             world,
             creatures,
@@ -755,7 +856,7 @@ mod tests {
         }
         let initial = Counters::read(&sim.stats);
         let mut before = initial.eaten;
-        let mut progress = Progress::new(&scene.food, size, start);
+        let mut progress = Progress::new(&scene.food, Terrain::from_cells(size, &[]), start);
         let mut first = None;
         let mut ticks = 0;
         let mut death = None;
@@ -790,7 +891,7 @@ mod tests {
             blocked: end.blocked - initial.blocked,
             penalty: end.penalty - initial.penalty,
         }
-        .finish(&progress, EnergyEnd::Living(0.0), death, ticks)
+        .finish(&progress, 0.0, EnergyEnd::Living(0.0), death, ticks)
     }
 
     #[test]
@@ -831,11 +932,7 @@ mod tests {
         let founder = founder(&setup);
         let mut blocked = 0;
         for seed in 0..4 {
-            let scene = Scene {
-                seed,
-                food: vec![Position::new(0, 0)],
-                redraws: 0,
-            };
+            let scene = Scene::open(seed, 8, vec![Position::new(0, 0)]);
             let (score, _) = evaluate_genome(&setup, &founder, &scene);
             assert_eq!(
                 score.moves_blocked,
@@ -877,7 +974,7 @@ mod tests {
         let size = 32;
         let start = Position::new(16, 16);
         let food = [Position::new(20, 16)];
-        let mut progress = Progress::new(&food, size, start);
+        let mut progress = Progress::new(&food, Terrain::from_cells(size, &[]), start);
         assert_eq!(progress.value(), 0.0);
         progress.observe(Position::new(18, 16));
         assert!((progress.value() - 0.5).abs() < 1e-12);
@@ -888,5 +985,245 @@ mod tests {
         );
         progress.open(Position::new(20, 16), |_| false);
         assert_eq!(progress.value(), 0.0, "no food remains");
+    }
+
+    /// Walk the oracle from `start`: every step descends the field by one
+    /// and the walk stands on food after exactly `dist(start)` steps.
+    fn oracle_descends(
+        food: &[Position],
+        barriers: &[Position],
+        start: Position,
+        size: u16,
+    ) -> u32 {
+        let terrain = Terrain::from_cells(size, barriers);
+        let progress = Progress::new(food, terrain.clone(), start);
+        let field = Field::new(&terrain, food);
+        let total = field.at(start).expect("reachable");
+        let mut at = start;
+        for step in 0..total {
+            let next = terrain.neighbor(at, progress.oracle_step(at).expect("food reachable"));
+            assert_eq!(
+                field.at(next),
+                Some(total - step - 1),
+                "step {step} from {at:?}"
+            );
+            at = next;
+        }
+        assert!(food.contains(&at));
+        total
+    }
+
+    #[test]
+    fn the_oracle_detours_around_a_wall_by_one_per_step() {
+        let wall: Vec<Position> = (5..=15).map(|y| Position::new(10, y)).collect();
+        let food = [Position::new(12, 10)];
+        assert_eq!(oracle_descends(&food, &wall, Position::new(8, 10), 32), 12);
+    }
+
+    #[test]
+    fn the_oracle_takes_the_wrapped_path() {
+        let wall: Vec<Position> = (0..16).map(|y| Position::new(1, y)).collect();
+        let food = [Position::new(0, 0)];
+        assert_eq!(oracle_descends(&food, &wall, Position::new(2, 0), 16), 14);
+    }
+
+    #[test]
+    fn the_oracle_passes_diagonally_between_corner_barriers() {
+        let barriers = [Position::new(5, 4), Position::new(4, 5)];
+        let food = [Position::new(6, 6)];
+        assert_eq!(
+            oracle_descends(&food, &barriers, Position::new(3, 3), 16),
+            3
+        );
+        let progress = Progress::new(
+            &food,
+            Terrain::from_cells(16, &barriers),
+            Position::new(4, 4),
+        );
+        assert_eq!(
+            progress.oracle_step(Position::new(4, 4)),
+            Some(Direction::SE)
+        );
+    }
+
+    /// With only unreachable food the oracle and the half-seeker take the
+    /// random-walk step with its one draw every tick.
+    #[test]
+    fn unreachable_food_falls_back_to_the_random_walk() {
+        let setup = setup(60, 100.0);
+        let size = setup.config.world.width;
+        let start = centre(size);
+        let food = Position::new(start.x + 10, start.y);
+        let world = || {
+            let mut world = WorldState::new(size, size, setup.config.world.edge_mode);
+            world.reconfigure_food(setup.config.world.food.clone());
+            for direction in Direction::ALL {
+                world.set_barrier(world.resolve_neighbor(food, direction).unwrap(), true);
+            }
+            world.set_food_type(food, FOOD, 1.0);
+            world
+        };
+        let founder = founder(&setup);
+        let run = |policy| run_scripted(&setup, &founder, policy, world(), start, &[food], 5);
+        let random = run(Scripted::RandomWalk);
+        assert!(random.moves_attempted == 60 && random.progress == 0.0);
+        assert_eq!(run(Scripted::OracleSeeker), random);
+        assert_eq!(run(Scripted::HalfSeeker), random);
+        let progress = Progress::new(&[food], Terrain::from_world(&world()), start);
+        assert_eq!(progress.target(start), Some(food));
+        assert_eq!(progress.oracle_step(start), None);
+    }
+
+    #[test]
+    fn blocked_moves_cost_their_weighted_fraction() {
+        let base = setup(5, 100.0);
+        let size = base.config.world.width;
+        let start = centre(size);
+        let far = Position::new(start.x + 10, start.y);
+        let boxed = |weight, seed| {
+            let setup = base.clone().with_blocked_weight(weight);
+            let mut world = WorldState::new(size, size, setup.config.world.edge_mode);
+            world.reconfigure_food(setup.config.world.food.clone());
+            for direction in Direction::ALL {
+                if direction != Direction::E {
+                    world.set_barrier(world.resolve_neighbor(start, direction).unwrap(), true);
+                }
+            }
+            world.set_food_type(far, FOOD, 1.0);
+            let founder = founder(&setup);
+            run_scripted(
+                &setup,
+                &founder,
+                Scripted::RandomWalk,
+                world,
+                start,
+                &[far],
+                seed,
+            )
+        };
+        // A seed whose walk is blocked on some moves but not all.
+        let seed = (0..64)
+            .find(|&seed| {
+                let score = boxed(0.0, seed);
+                score.moves_blocked > 0 && score.moves_blocked < score.moves_attempted
+            })
+            .expect("a partly blocked walk");
+        let free = boxed(0.0, seed);
+        let weighted = boxed(2.5, seed);
+        let fraction = free.moves_blocked as f64 / free.moves_attempted as f64;
+        assert_eq!(free.blocked_fraction(), fraction);
+        assert_eq!(free.score, f64::from(free.food_eaten) + free.progress);
+        assert_eq!(weighted.score, free.score - 2.5 * fraction);
+    }
+
+    fn plastic(genome: &CreatureGenome) -> CreatureGenome {
+        let mut plastic = genome.clone();
+        for node in &mut plastic.nodes {
+            if let BackendDef::Graph(graph) = &mut node.backend_def {
+                for compute in &mut graph.compute_nodes {
+                    compute.plasticity = Some(v3_core::creature::genome::PlasticityConfig {
+                        rule: v3_core::creature::genome::HebbianRule::Classic,
+                        learning_rate: 0.5,
+                        weight_clamp: 5.0,
+                        lamarckian: false,
+                        modulation: None,
+                    });
+                }
+            }
+        }
+        plastic
+    }
+
+    /// Plasticity updates of `genome` run unmasked for the setup's lifetime.
+    fn unmasked_updates(setup: &Setup, genome: &CreatureGenome, scene: &Scene) -> u64 {
+        let size = setup.config.world.width;
+        let world = WorldState::new(size, size, setup.config.world.edge_mode);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let id = creatures
+            .insert_with_key(|id| setup.creature(id, genome.clone(), scene.seed, scene.start));
+        let mut sim = Simulation::new(
+            world,
+            creatures,
+            setup.start_tick,
+            setup.config.clone(),
+            scene.seed,
+        );
+        sim.world.place_creature(scene.start, id);
+        let density = sim.config.world.food.shared.max_density;
+        for &cell in &scene.food {
+            sim.world.set_food_type(cell, FOOD, density);
+        }
+        for _ in 0..setup.lifetime {
+            run_tick(&mut sim, &mut None);
+        }
+        sim.stats.plasticity_updates_total
+    }
+
+    #[test]
+    fn a_plastic_genome_evaluates_masked_and_keeps_its_plasticity() {
+        let setup = setup(50, 100.0);
+        let genome = plastic(&founder(&setup));
+        let scene = scene(1);
+        assert!(
+            unmasked_updates(&setup, &genome, &scene) > 0,
+            "unmasked, the genome learns"
+        );
+        let stored = genome.clone();
+        // Would panic on a plasticity update; scores as its masked copy.
+        let (score, _) = evaluate_genome(&setup, &genome, &scene);
+        assert_eq!(
+            score,
+            evaluate_genome(&setup, &expressed(&genome), &scene).0
+        );
+        assert_eq!(genome, stored);
+        assert_ne!(expressed(&genome), genome);
+        assert_eq!(expressed(&genome), founder(&setup));
+    }
+
+    #[test]
+    fn a_barrier_scene_starts_at_its_start_among_its_barriers() {
+        let setup = setup(1, 100.0);
+        let start = Position::new(10, 10);
+        let scene = Scene {
+            seed: 1,
+            start,
+            food: vec![Position::new(14, 10)],
+            barriers: vec![Position::new(12, 10)],
+            redraws: 0,
+        };
+        let world = scene_world(&setup, &scene);
+        assert!(world.is_barrier(Position::new(12, 10)));
+        let (score, _) = evaluate_genome(&setup, &founder(&setup), &scene);
+        assert_eq!(score.ticks, 1);
+        // One barrier on the straight line costs no step: a king path
+        // bends diagonally past it.
+        let progress = Progress::new(&scene.food, Terrain::from_world(&world), start);
+        assert_eq!(progress.field.at(start), Some(4));
+        assert_eq!(progress.oracle_step(start), Some(Direction::E));
+        assert_eq!(
+            progress.oracle_step(Position::new(11, 10)),
+            Some(Direction::NE)
+        );
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn a_barrier_free_oracle_step_is_step_toward(
+            size in 3u16..40,
+            food in proptest::collection::vec((0u16..40, 0u16..40), 1..5),
+            at in (0u16..40, 0u16..40),
+        ) {
+            let food: Vec<Position> = food
+                .into_iter()
+                .map(|(x, y)| Position::new(x % size, y % size))
+                .collect();
+            let at = Position::new(at.0 % size, at.1 % size);
+            let progress = Progress::new(&food, Terrain::from_cells(size, &[]), at);
+            let target = progress.target(at).unwrap();
+            proptest::prop_assert_eq!(
+                progress.oracle_step(at),
+                Some(step_toward(at, target, size))
+            );
+        }
     }
 }

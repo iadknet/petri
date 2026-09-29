@@ -1,5 +1,5 @@
-//! The summary keep-list (`kind: petri-lab-summary`, `summary_version: 1`)
-//! and the report rendered from it alone.
+//! The summary keep-list (`kind: petri-lab-summary`, `summary_version: 2`)
+//! and the report rendered from it alone. A v1 summary is refused.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -7,16 +7,17 @@ use std::fmt::Write as _;
 use serde::{Deserialize, Serialize};
 
 use crate::arena::{Policy, Role};
+use crate::scene::Assay;
 
 pub const SUMMARY_KIND: &str = "petri-lab-summary";
-pub const SUMMARY_VERSION: u32 = 1;
+pub const SUMMARY_VERSION: u32 = 2;
 pub const GENOME_FORMAT: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Summary {
     pub kind: String,
     pub summary_version: u32,
-    pub assay: String,
+    pub assay: Assay,
     pub provenance: Provenance,
     pub calibration: Calibration,
     pub arms: Vec<ArmSummary>,
@@ -73,7 +74,10 @@ pub struct GenomeRecord {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArenaRecord {
+    /// Canonical descriptor: `arena_version`, id, size, start, food type,
+    /// axis value, geometry and sampling rules (a layout's rows).
     pub spec: serde_json::Value,
+    /// SHA-256 of `spec` serialized with sorted keys.
     pub sha256: String,
 }
 
@@ -96,7 +100,9 @@ pub struct Sizes {
     pub arena_size: u16,
     pub start_energy: f32,
     pub food_fraction: Option<f64>,
+    pub scale: Option<u8>,
     pub lifetime: Option<u32>,
+    pub blocked_weight: f64,
     pub quick: bool,
 }
 
@@ -110,13 +116,18 @@ pub struct PointMeans {
     pub comparator: f64,
     pub floor_progress: f64,
     pub comparator_progress: f64,
+    pub floor_blocked_fraction: f64,
+    pub comparator_blocked_fraction: f64,
     /// Scenes on which the comparator scored above the floor.
     pub comparator_wins: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CalibrationPoint {
-    pub food_fraction: f64,
+    /// The axis value: `food_fraction` or `scale`, the other null (both
+    /// null on a layout).
+    pub food_fraction: Option<f64>,
+    pub scale: Option<u8>,
     pub lifetime: u32,
     pub scenes: u32,
     /// Redraws per scene (up to the failing draw when exposure failed).
@@ -140,7 +151,8 @@ pub enum Verdict {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Selected {
-    pub food_fraction: f64,
+    pub food_fraction: Option<f64>,
+    pub scale: Option<u8>,
     pub lifetime: u32,
 }
 
@@ -265,6 +277,14 @@ pub struct Fidelity {
     pub elite_carry_overs: u64,
     pub phenotype_mutation: bool,
     pub learned_weight_capture: bool,
+    pub lifetime_learning: LifetimeLearning,
+}
+
+/// Lifetime learning during evaluation: masked in every arm (T22.F02).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LifetimeLearning {
+    Masked,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -327,13 +347,22 @@ fn arm_table(out: &mut String, arms: &[&ArmSummary]) {
     }
 }
 
+/// A point's axis cell: its fraction or scale, `layout` for a layout.
+fn axis_cell(food_fraction: Option<f64>, scale: Option<u8>) -> String {
+    match (food_fraction, scale) {
+        (Some(fraction), _) => fraction.to_string(),
+        (_, Some(scale)) => scale.to_string(),
+        _ => "layout".to_owned(),
+    }
+}
+
 /// Render the assay report from a summary alone. `policy-deviation` arms'
 /// reach prints in a separate diagnostic table.
 #[must_use]
 pub fn render_report(summary: &Summary) -> String {
     let mut out = String::new();
     let calibration = &summary.calibration;
-    let _ = writeln!(out, "# {} assay report", summary.assay);
+    let _ = writeln!(out, "# {} assay report", summary.assay.name());
     let _ = writeln!(
         out,
         "\nrevision {} (dirty: {}), seed {}, exit {}{}",
@@ -352,21 +381,36 @@ pub fn render_report(summary: &Summary) -> String {
             .incomplete
             .map_or(String::new(), |why| format!(", incomplete: {}", label(why))),
     );
-    let _ = writeln!(out, "\n## Calibration: {:?}\n", calibration.verdict);
+    let sizes = &summary.provenance.sizes;
     let _ = writeln!(
         out,
-        "| fraction | lifetime | exposure | competence | sensitivity | validation | founder | floor | half | oracle | comparator |"
+        "arena {}, size {}, blocked weight {}",
+        summary.provenance.arena.spec["id"]
+            .as_str()
+            .unwrap_or("unknown"),
+        sizes.arena_size,
+        sizes.blocked_weight,
+    );
+    let _ = writeln!(out, "\n## Calibration: {:?}\n", calibration.verdict);
+    let axis = match calibration.points.first() {
+        Some(point) if point.scale.is_some() => "scale",
+        Some(point) if point.food_fraction.is_none() => "point",
+        _ => "fraction",
+    };
+    let _ = writeln!(
+        out,
+        "| {axis} | lifetime | exposure | competence | sensitivity | validation | founder | floor | half | oracle | comparator | floor blocked | comparator blocked |"
     );
     let _ = writeln!(
         out,
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"
     );
     for point in &calibration.points {
         let means = point.means.as_ref();
         let _ = writeln!(
             out,
-            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
-            point.food_fraction,
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
+            axis_cell(point.food_fraction, point.scale),
             point.lifetime,
             point.exposure,
             point.competence,
@@ -379,13 +423,15 @@ pub fn render_report(summary: &Summary) -> String {
             fmt_opt(means.map(|m| m.half)),
             fmt_opt(means.map(|m| m.oracle)),
             fmt_opt(means.map(|m| m.comparator)),
+            fmt_opt(means.map(|m| m.floor_blocked_fraction)),
+            fmt_opt(means.map(|m| m.comparator_blocked_fraction)),
         );
     }
     if let Some(selected) = &calibration.selected {
         let _ = writeln!(
             out,
-            "\nSelected fraction {} lifetime {}; reach threshold {} ({}).",
-            selected.food_fraction,
+            "\nSelected {axis} {} lifetime {}; reach threshold {} ({}).",
+            axis_cell(selected.food_fraction, selected.scale),
             selected.lifetime,
             fmt_opt(calibration.reach_threshold),
             calibration.reach_threshold_source.map_or("-".into(), label),
@@ -409,7 +455,7 @@ pub fn render_report(summary: &Summary) -> String {
     if let Some(fidelity) = &summary.fidelity {
         let _ = writeln!(
             out,
-            "\nFidelity (reference): per_unit_rate {}, executed_bias {}, window {} ticks; events requested {}, applied {}, skipped {}; identical offspring {}; elite carry-overs {}; phenotype mutation {}, learned-weight capture {}.",
+            "\nFidelity (reference): per_unit_rate {}, executed_bias {}, window {} ticks; events requested {}, applied {}, skipped {}; identical offspring {}; elite carry-overs {}; phenotype mutation {}, learned-weight capture {}, lifetime learning {}.",
             fidelity.per_unit_rate,
             fidelity.executed_bias,
             fidelity.executed_window_ticks,
@@ -420,6 +466,7 @@ pub fn render_report(summary: &Summary) -> String {
             fidelity.elite_carry_overs,
             fidelity.phenotype_mutation,
             fidelity.learned_weight_capture,
+            label(fidelity.lifetime_learning),
         );
     }
     let _ = writeln!(
