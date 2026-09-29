@@ -8,7 +8,7 @@ use rayon::prelude::*;
 use v3_core::config::SimulationConfig;
 use v3_core::creature::genome::CreatureGenome;
 
-use crate::eval::{evaluate_genome, evaluate_scripted, SceneScore, Scripted, Setup};
+use crate::eval::{evaluate_genome, evaluate_scripted, SceneScore, Scoring, Scripted, Setup};
 use crate::rng::{hash, stream, Part};
 use crate::scene::{Assay, Geometry, Scene, SceneSpec};
 use crate::summary::{
@@ -25,7 +25,7 @@ pub struct GridInput {
     pub points: Vec<Geometry>,
     pub lifetimes: Vec<u32>,
     pub assay: Assay,
-    pub blocked_weight: f64,
+    pub scoring: Scoring,
     pub scenes: u32,
     pub validation_scenes: u32,
     pub margin: f64,
@@ -138,6 +138,7 @@ fn score_point(
     let score = |s: &SceneScore| s.score;
     let progress = |s: &SceneScore| s.progress;
     let blocked = SceneScore::blocked_fraction;
+    let efficiency = |s: &SceneScore| s.efficiency;
     Scored {
         means: PointMeans {
             founder: mean_of(&per_scene, FOUNDER, score),
@@ -149,6 +150,10 @@ fn score_point(
             comparator_progress: mean_of(&per_scene, COMPARATOR, progress),
             floor_blocked_fraction: mean_of(&per_scene, FLOOR, blocked),
             comparator_blocked_fraction: mean_of(&per_scene, COMPARATOR, blocked),
+            floor_efficiency: mean_of(&per_scene, FLOOR, efficiency),
+            half_efficiency: mean_of(&per_scene, HALF, efficiency),
+            oracle_efficiency: mean_of(&per_scene, ORACLE, efficiency),
+            comparator_efficiency: mean_of(&per_scene, COMPARATOR, efficiency),
             comparator_wins: u32::try_from(wins).unwrap_or(u32::MAX),
         },
         creature_ticks,
@@ -200,8 +205,7 @@ pub fn run_gate(
         assay: input.assay,
     };
     let setup = |lifetime| {
-        Setup::new(reference.clone(), input.start_energy, lifetime)
-            .with_blocked_weight(input.blocked_weight)
+        Setup::new(reference.clone(), input.start_energy, lifetime).with_scoring(input.scoring)
     };
     let mut lifetimes = input.lifetimes.clone();
     lifetimes.sort_unstable();
@@ -276,12 +280,13 @@ pub fn run_gate(
         point.validation_competence = Some(passed);
         // Floor + 0.5 × (comparator − floor) on the validation means.
         let calibrated = scored.means.floor + 0.5 * (scored.means.comparator - scored.means.floor);
-        point.validation = Some(scored.means);
+        point.validation = Some(scored.means.clone());
         if passed {
             let chosen = Selected {
                 food_fraction: point.food_fraction,
                 scale: point.scale,
                 lifetime: point.lifetime,
+                means: scored.means,
             };
             selected = Some((chosen, calibrated));
             validation_scenes = scenes;
@@ -335,6 +340,10 @@ mod tests {
             comparator_progress: 0.2,
             floor_blocked_fraction: 0.0,
             comparator_blocked_fraction: 0.0,
+            floor_efficiency: 0.0,
+            half_efficiency: 0.0,
+            oracle_efficiency: 0.0,
+            comparator_efficiency: 0.0,
             comparator_wins: wins,
         }
     }
@@ -385,7 +394,7 @@ mod tests {
             points: vec![Geometry::SparseFood { fraction: 0.08 }],
             lifetimes: vec![100],
             assay: Assay::FoodSeeking,
-            blocked_weight: 0.0,
+            scoring: Scoring::BITES_AND_PROGRESS,
             scenes: 4,
             validation_scenes: 4,
             margin,

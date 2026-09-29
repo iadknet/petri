@@ -13,7 +13,7 @@ use v3_core::creature::genome::CreatureGenome;
 use crate::arena::{classify, resolve_arm, Role};
 use crate::calibration::{run_gate, GridInput};
 use crate::campaign::{fidelity, run_campaign, Arm, ArmKind, Plan};
-use crate::eval::{Scripted, Setup};
+use crate::eval::{Scoring, Scripted, Setup};
 use crate::layout::Layout;
 use crate::output::{resolve_out, utc_stamp, Budget, LabRoot, RunDir, SUMMARY_RESERVE};
 use crate::rng::{replicate_seed, tagged};
@@ -85,6 +85,8 @@ pub struct RunParams {
     pub calibration_lifetimes: Vec<u32>,
     /// Default: the assay's.
     pub blocked_weight: Option<f64>,
+    /// Default: the assay's.
+    pub efficiency_weight: Option<f64>,
     pub calibration_scenes: u32,
     pub calibration_margin: f64,
     pub reach_threshold: Option<f64>,
@@ -113,9 +115,14 @@ impl RunParams {
             .map_or_else(|| self.calibration_lifetimes.clone(), |l| vec![l])
     }
 
-    fn blocked_weight(&self) -> f64 {
-        self.blocked_weight
-            .unwrap_or_else(|| self.assay.default_blocked_weight())
+    /// The assay's scoring with the explicit weights applied.
+    fn scoring(&self) -> Scoring {
+        let default = self.assay.scoring();
+        Scoring {
+            blocked_weight: self.blocked_weight.unwrap_or(default.blocked_weight),
+            efficiency_weight: self.efficiency_weight.unwrap_or(default.efficiency_weight),
+            exhausted: default.exhausted,
+        }
     }
 }
 
@@ -253,10 +260,15 @@ fn validate_params(params: &RunParams) -> Result<ArenaPlan, LabError> {
         !lifetimes.is_empty() && lifetimes.iter().all(|l| *l >= 1),
         "lifetimes must be at least 1",
     )?;
-    let weight = params.blocked_weight();
+    let weight = |weight: f64| weight.is_finite() && weight >= 0.0;
+    let scoring = params.scoring();
     check(
-        weight.is_finite() && weight >= 0.0,
+        weight(scoring.blocked_weight),
         "--blocked-weight must be finite and at least 0",
+    )?;
+    check(
+        weight(scoring.efficiency_weight),
+        "--efficiency-weight must be finite and at least 0",
     )?;
     check(params.threads >= 1, "--threads must be at least 1")?;
     check(
@@ -395,7 +407,7 @@ fn run_in_pool(
 ) -> Result<RunOutcome, LabError> {
     let started = Instant::now();
     let size = arena.size;
-    let blocked_weight = params.blocked_weight();
+    let scoring = params.scoring();
     let reference = resolve_arm(None, size, params.start_energy)?;
     let genomes = load_genomes(params, &reference)?;
     let overlays = load_overlays(params, size)?;
@@ -415,7 +427,7 @@ fn run_in_pool(
             points: arena.points.clone(),
             lifetimes: params.lifetimes(),
             assay: params.assay,
-            blocked_weight,
+            scoring,
             scenes: params.calibration_scenes,
             validation_scenes: params.validation_scenes,
             margin: params.calibration_margin,
@@ -435,7 +447,7 @@ fn run_in_pool(
         (Some(selected), Some(spec), Some(threshold)) if !params.calibrate_only => {
             let setup = |config: &SimulationConfig| {
                 Setup::new(config.clone(), params.start_energy, selected.lifetime)
-                    .with_blocked_weight(blocked_weight)
+                    .with_scoring(scoring)
             };
             let arms = build_arms(&reference, &genomes, &overlays, &setup);
             let plan = Plan {
@@ -517,7 +529,8 @@ fn run_in_pool(
                 food_fraction: selected.as_ref().and_then(|s| s.food_fraction),
                 scale: selected.as_ref().and_then(|s| s.scale),
                 lifetime: selected.as_ref().map(|s| s.lifetime),
-                blocked_weight,
+                blocked_weight: scoring.blocked_weight,
+                efficiency_weight: scoring.efficiency_weight,
                 quick: params.quick,
             },
         },
@@ -609,6 +622,7 @@ fn build_arms(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::eval::Exhausted;
 
     fn params() -> RunParams {
         RunParams {
@@ -631,6 +645,7 @@ mod tests {
             calibration_scales: None,
             calibration_lifetimes: vec![100],
             blocked_weight: None,
+            efficiency_weight: None,
             calibration_scenes: 1,
             calibration_margin: 1.0,
             reach_threshold: None,
@@ -769,15 +784,31 @@ mod tests {
     }
 
     #[test]
-    fn the_blocked_weight_is_finite_and_non_negative_with_an_assay_default() {
-        assert_eq!(params().blocked_weight(), 0.0);
+    fn the_weights_are_finite_and_non_negative_with_assay_defaults() {
+        assert_eq!(params().scoring(), Scoring::BITES_AND_PROGRESS);
         let mut p = params();
         barrier(ArenaId::WallV1)(&mut p);
-        assert_eq!(p.blocked_weight(), 1.0);
+        assert_eq!(p.scoring(), Assay::BarrierNavigation.scoring());
+        assert_eq!(
+            (p.scoring().blocked_weight, p.scoring().efficiency_weight),
+            (1.0, 1.0)
+        );
+        p.blocked_weight = Some(0.25);
+        p.efficiency_weight = Some(0.5);
+        assert_eq!(
+            p.scoring(),
+            Scoring {
+                blocked_weight: 0.25,
+                efficiency_weight: 0.5,
+                exhausted: Exhausted::Complete,
+            }
+        );
         for weight in [-0.5, f64::NAN, f64::INFINITY] {
             assert!(refused(|p| p.blocked_weight = Some(weight)), "{weight}");
+            assert!(refused(|p| p.efficiency_weight = Some(weight)), "{weight}");
         }
         assert!(!refused(|p| p.blocked_weight = Some(0.0)));
+        assert!(!refused(|p| p.efficiency_weight = Some(0.0)));
     }
 
     #[test]

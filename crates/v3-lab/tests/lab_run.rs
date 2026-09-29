@@ -69,6 +69,7 @@ fn tiny(out: &Path) -> RunParams {
         calibration_scales: None,
         calibration_lifetimes: vec![100],
         blocked_weight: None,
+        efficiency_weight: None,
         calibration_scenes: 4,
         calibration_margin: 1.0,
         reach_threshold: None,
@@ -598,11 +599,17 @@ fn assert_barrier_summary(outcome: &RunOutcome, arena: &str) {
     assert_eq!(summary.summary_version, 2);
     assert_eq!(summary.assay, Assay::BarrierNavigation);
     assert_eq!(summary.provenance.sizes.blocked_weight, 1.0);
+    assert_eq!(summary.provenance.sizes.efficiency_weight, 1.0);
     assert_eq!(summary.provenance.arena.spec["id"], arena);
     assert_eq!(summary.provenance.arena.spec["arena_version"], 1);
     let report = render_report(&read_summary(&outcome.dir.join("summary.json")).unwrap());
-    assert!(report.contains("blocked weight 1"), "{report}");
-    assert!(report.contains("| floor blocked | comparator blocked |"));
+    assert!(
+        report.contains("blocked weight 1, efficiency weight 1"),
+        "{report}"
+    );
+    assert!(report.contains(
+        "| floor blocked | comparator blocked | floor efficiency | half efficiency | oracle efficiency | comparator efficiency |"
+    ));
 }
 
 #[test]
