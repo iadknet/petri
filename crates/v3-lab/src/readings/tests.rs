@@ -65,6 +65,10 @@ fn scenes(count: u32) -> Vec<Scene> {
     draw_scenes(5, count, &SceneSpec::sparse(48, 0.06, 5)).unwrap()
 }
 
+fn shape_of(setup: &Setup, batteries: &Batteries, elite: &Observed<'_>) -> Shape {
+    read(setup, batteries, elite, None).0.shape
+}
+
 fn labels(shape: &Shape) -> Vec<&str> {
     shape.families.iter().map(|f| f.family.as_str()).collect()
 }
@@ -77,7 +81,7 @@ fn the_founder_shape_reads_its_food_energy_and_age_inputs() {
     let run = observe(&setup, &genome, &scenes);
     let ancestry = Ancestry::default();
     let elite = observed(&genome, &ancestry, &scenes, &run);
-    let shape = shape(&setup, &Batteries::new(&setup.config), &elite);
+    let shape = shape_of(&setup, &Batteries::new(&setup.config), &elite);
 
     // The founder's food inputs are the local ones; `AreaFoodSummary:0` is
     // the built-in comparator's (below). Its declared `NeighborOccupiedRing`
@@ -95,7 +99,7 @@ fn the_founder_shape_reads_its_food_energy_and_age_inputs() {
     );
     let comparator = crate::comparator::built_in(crate::scene::Assay::FoodSeeking, &genome);
     let comparator_run = observe(&setup, &comparator, &scenes);
-    let comparator_shape = super::shape(
+    let comparator_shape = shape_of(
         &setup,
         &Batteries::new(&setup.config),
         &observed(&comparator, &ancestry, &scenes, &comparator_run),
@@ -146,7 +150,7 @@ fn a_first_tick_death_leaves_an_empty_executed_union_and_counts_the_death() {
     let run = observe(&setup, &genome, &scenes);
     assert!(run.sequences.iter().all(Vec::is_empty));
     let ancestry = Ancestry::default();
-    let shape = shape(
+    let shape = shape_of(
         &setup,
         &Batteries::new(&setup.config),
         &observed(&genome, &ancestry, &scenes, &run),
@@ -218,7 +222,7 @@ fn ablation_separates_read_from_unread_families() {
     assert!(run.scores.iter().any(|s| s.food_eaten > 0), "it eats");
     let ancestry = Ancestry::default();
     let elite = observed(&genome, &ancestry, &scenes, &run);
-    let families = reachable_families(&genome, &mesh_reachable_nodes(&genome));
+    let families = Wiring::of(&genome).families;
     let (Some(causal), ticks) = causal(&setup, &elite, &families) else {
         panic!("supported");
     };
@@ -342,7 +346,14 @@ fn mutation_off_mutants_are_identical_silent_and_scored_by_copy() {
     let run = observe(&setup, &genome, &scenes);
     let ancestry = Ancestry::default();
     let elite = observed(&genome, &ancestry, &scenes, &run);
-    let (mutants, ticks) = mutants(&setup, &Batteries::new(&setup.config), &elite, 5, &seed());
+    let (mutants, ticks) = mutants(
+        &setup,
+        &Batteries::new(&setup.config),
+        &elite,
+        &mesh_reachable_nodes(&genome),
+        5,
+        &seed(),
+    );
     assert_eq!(ticks, 0, "nothing evaluated");
     assert_eq!(
         (mutants.n, mutants.identical, mutants.silent, mutants.equal),
@@ -362,17 +373,24 @@ fn mutants_follow_their_seed_and_classes_sum_to_n() {
     let ancestry = Ancestry::default();
     let elite = observed(&genome, &ancestry, &scenes, &run);
     let batteries = Batteries::new(&setup.config);
-    let (a, ticks) = mutants(&setup, &batteries, &elite, 6, &seed());
+    let reachable = mesh_reachable_nodes(&genome);
+    let (a, ticks) = mutants(&setup, &batteries, &elite, &reachable, 6, &seed());
     assert!(ticks > 0 && a.identical < 6);
     assert_eq!(a.silent + a.changed + a.dead, 6);
     assert_eq!(a.improved + a.equal + a.worse, 6);
     assert!(a.scores.windows(2).all(|w| w[0] <= w[1]));
-    assert_eq!(a, mutants(&setup, &batteries, &elite, 6, &seed()).0);
+    assert_eq!(
+        a,
+        mutants(&setup, &batteries, &elite, &reachable, 6, &seed()).0
+    );
     let other = MutantSeed {
         generation: 4,
         ..seed()
     };
-    assert_ne!(a, mutants(&setup, &batteries, &elite, 6, &other).0);
+    assert_ne!(
+        a,
+        mutants(&setup, &batteries, &elite, &reachable, 6, &other).0
+    );
 }
 
 #[test]

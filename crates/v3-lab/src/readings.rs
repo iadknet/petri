@@ -305,8 +305,8 @@ pub struct Observed<'a> {
 
 impl Observed<'_> {
     /// The frozen record breeding uses: the last training scene's.
-    fn breeding_frozen(&self) -> Frozen {
-        self.frozens.last().cloned().unwrap_or_default()
+    fn breeding_frozen(&self) -> &Frozen {
+        self.frozens.last().expect("at least one training scene")
     }
 }
 
@@ -437,29 +437,43 @@ pub fn executed_union(frozens: &[Frozen]) -> BTreeSet<usize> {
         .collect()
 }
 
-/// The families with a consumer on a reachable node, in catalog order.
-fn reachable_families(genome: &CreatureGenome, reachable: &[usize]) -> Vec<Family> {
-    let reachable: BTreeSet<usize> = reachable.iter().copied().collect();
-    consumers(genome)
-        .into_iter()
-        .filter_map(|(family, nodes)| {
-            let on_reachable = nodes.iter().any(|node| reachable.contains(node));
-            on_reachable.then_some(family)
-        })
-        .collect()
+/// The elite's static wiring, computed once per reading.
+struct Wiring {
+    reachable: Vec<usize>,
+    /// Every family with a consumer, and the node indices holding one.
+    consumers: BTreeMap<Family, BTreeSet<usize>>,
+    /// The families with a consumer on a reachable node, in catalog order.
+    families: Vec<Family>,
+}
+
+impl Wiring {
+    fn of(genome: &CreatureGenome) -> Self {
+        let reachable = mesh_reachable_nodes(genome);
+        let consumers = consumers(genome);
+        let on_reachable: BTreeSet<usize> = reachable.iter().copied().collect();
+        let families = consumers
+            .iter()
+            .filter(|(_, nodes)| nodes.iter().any(|node| on_reachable.contains(node)))
+            .map(|(&family, _)| family)
+            .collect();
+        Self {
+            reachable,
+            consumers,
+            families,
+        }
+    }
 }
 
 /// The elite's `shape` block.
-#[must_use]
-pub fn shape(setup: &Setup, batteries: &Batteries, elite: &Observed<'_>) -> Shape {
+fn shape(setup: &Setup, batteries: &Batteries, elite: &Observed<'_>, wiring: &Wiring) -> Shape {
     let genome = elite.genome;
-    let reachable = mesh_reachable_nodes(genome);
+    let reachable = &wiring.reachable;
     let executed = executed_union(elite.frozens);
-    let census = creature_sensor_census(genome, &reachable);
-    let all = consumers(genome);
-    let families = reachable_families(genome, &reachable)
-        .into_iter()
-        .map(|family| {
+    let census = creature_sensor_census(genome, reachable);
+    let families = wiring
+        .families
+        .iter()
+        .map(|&family| {
             let live = census_covers(family).then(|| {
                 census
                     .world_inputs
@@ -473,7 +487,9 @@ pub fn shape(setup: &Setup, batteries: &Batteries, elite: &Observed<'_>) -> Shap
             FamilyReading {
                 family: family.label(),
                 structural: true,
-                executed_node: all[&family].iter().any(|node| executed.contains(node)),
+                executed_node: wiring.consumers[&family]
+                    .iter()
+                    .any(|node| executed.contains(node)),
                 live,
             }
         })
@@ -603,7 +619,7 @@ struct CopyRun {
 
 /// Evaluate `copies` on the elite's scenes, one job per copy and scene,
 /// collected in index order.
-fn run_copies(setup: &Setup, elite: &Observed<'_>, copies: &[CreatureGenome]) -> Vec<CopyRun> {
+fn run_copies(setup: &Setup, elite: &Observed<'_>, copies: &[&CreatureGenome]) -> Vec<CopyRun> {
     let scenes = elite.scenes.len();
     let jobs: Vec<(usize, usize)> = (0..copies.len())
         .flat_map(|copy| (0..scenes).map(move |scene| (copy, scene)))
@@ -612,7 +628,7 @@ fn run_copies(setup: &Setup, elite: &Observed<'_>, copies: &[CreatureGenome]) ->
         .par_iter()
         .map(|&(copy, scene)| {
             let (score, _, sequence) =
-                evaluate_genome_observed(setup, &copies[copy], &elite.scenes[scene]);
+                evaluate_genome_observed(setup, copies[copy], &elite.scenes[scene]);
             let differs = score != elite.scores[scene] || sequence != elite.sequences[scene];
             (score, differs)
         })
@@ -645,7 +661,7 @@ fn causal(setup: &Setup, elite: &Observed<'_>, families: &[Family]) -> (Option<V
     else {
         return (None, 0);
     };
-    let runs = run_copies(setup, elite, &copies);
+    let runs = run_copies(setup, elite, &copies.iter().collect::<Vec<_>>());
     let ticks = runs.iter().map(|run| run.ticks).sum();
     let readings = families
         .iter()
@@ -694,11 +710,11 @@ fn mutants(
     setup: &Setup,
     batteries: &Batteries,
     elite: &Observed<'_>,
+    reachable: &[usize],
     n: u32,
     seed: &MutantSeed<'_>,
 ) -> (Mutants, u64) {
     let config = &setup.config;
-    let reachable = mesh_reachable_nodes(elite.genome);
     let frozen = elite.breeding_frozen();
     let genomes: Vec<CreatureGenome> = (0..n)
         .into_par_iter()
@@ -707,7 +723,7 @@ fn mutants(
             MutationEngine::apply_mutations_with_food_type_count(
                 &mut child,
                 &config.mutation,
-                &reachable,
+                reachable,
                 ParentExecuted::Record(&frozen.record, frozen.age),
                 &mut seed.rng(k),
                 config.world.food.types.len(),
@@ -715,10 +731,14 @@ fn mutants(
             child
         })
         .collect();
-    let novel: Vec<CreatureGenome> = genomes
+    let identical: Vec<bool> = genomes
         .iter()
-        .filter(|genome| *genome != elite.genome)
-        .cloned()
+        .map(|genome| genome == elite.genome)
+        .collect();
+    let novel: Vec<&CreatureGenome> = genomes
+        .iter()
+        .zip(&identical)
+        .filter_map(|(genome, &same)| (!same).then_some(genome))
         .collect();
     let signature = |genome: &CreatureGenome| -> BatterySignature {
         batteries.battery.signature(
@@ -733,16 +753,16 @@ fn mutants(
         let base = signature(elite.genome);
         let classes: Vec<Class> = novel
             .par_iter()
-            .map(|genome| classify(&base, &signature(genome)).class)
+            .map(|&genome| classify(&base, &signature(genome)).class)
             .collect();
         (classes, run_copies(setup, elite, &novel))
     };
     let ticks = runs.iter().map(|run| run.ticks).sum();
     let mut novel_results = classes.into_iter().zip(runs);
-    let results: Vec<(Class, f64, bool)> = genomes
+    let results: Vec<(Class, f64, bool)> = identical
         .iter()
-        .map(|genome| {
-            if genome == elite.genome {
+        .map(|&same| {
+            if same {
                 (Class::Silent, elite.scalar, true)
             } else {
                 let (class, run) = novel_results.next().expect("one run per novel mutant");
@@ -763,7 +783,8 @@ pub fn read(
     elite: &Observed<'_>,
     signature: Option<(u32, MutantSeed<'_>)>,
 ) -> (Readings, u64) {
-    let shape = shape(setup, batteries, elite);
+    let wiring = Wiring::of(elite.genome);
+    let shape = shape(setup, batteries, elite, &wiring);
     let Some((n, seed)) = signature else {
         return (
             Readings {
@@ -773,10 +794,8 @@ pub fn read(
             0,
         );
     };
-    let reachable = mesh_reachable_nodes(elite.genome);
-    let families = reachable_families(elite.genome, &reachable);
-    let (causal, causal_ticks) = causal(setup, elite, &families);
-    let (mutants, mutant_ticks) = mutants(setup, batteries, elite, n, &seed);
+    let (causal, causal_ticks) = causal(setup, elite, &wiring.families);
+    let (mutants, mutant_ticks) = mutants(setup, batteries, elite, &wiring.reachable, n, &seed);
     let unsupported = causal.is_none().then(|| UNSUPPORTED_INPUT_REFS.to_owned());
     (
         Readings {

@@ -168,13 +168,19 @@ struct Individual {
 struct Scored {
     scalar: f64,
     scenes: Vec<SceneScore>,
-    /// Frozen from the last training scene.
-    frozen: Frozen,
     /// Per training scene (genome arms): the frozen record and the
     /// `(position, energy)` sequence, kept until ranking for the readings.
     frozens: Vec<Frozen>,
     sequences: Vec<Vec<Boundary>>,
     creature_ticks: u64,
+}
+
+impl Scored {
+    /// The frozen record breeding uses: the last training scene's (genome
+    /// arms only).
+    fn frozen(&self) -> &Frozen {
+        self.frozens.last().expect("at least one training scene")
+    }
 }
 
 /// Evaluate one individual on the training scenes. The frozen record is the
@@ -211,7 +217,6 @@ fn score_individual(
     Scored {
         scalar: crate::stats::mean(&values).unwrap_or(0.0),
         scenes: results,
-        frozen: frozens.last().cloned().unwrap_or_default(),
         frozens,
         sequences,
         creature_ticks,
@@ -674,7 +679,7 @@ fn advance(
         elite: candidate.genome.as_ref().map(|genome| EliteShape {
             genome_size: genome.genome_size(),
             reachable_nodes: mesh_reachable_nodes(genome).len(),
-            executed_nodes: ParentExecuted::Record(&best.frozen.record, best.frozen.age)
+            executed_nodes: ParentExecuted::Record(&best.frozen().record, best.frozen().age)
                 .resolve(arm.setup.config.mutation.executed_window_ticks)
                 .len(),
         }),
@@ -749,7 +754,7 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
         .enumerate()
         .map(|(offset, &pick)| {
             let parent = &parents[pick];
-            let frozen = &members[order[pick]].frozen;
+            let frozen = members[order[pick]].frozen();
             let parent_genome = parent.genome.as_ref().expect("evolving arms carry genomes");
             let mut child = parent_genome.clone();
             let mut rng = SmallRng::seed_from_u64(hash(&[
@@ -847,8 +852,8 @@ mod tests {
         let death = last_score
             .death_tick
             .expect("3 energy dies inside the last scene");
-        assert_eq!(scored.frozen, last_frozen);
-        assert_eq!(scored.frozen.age, u64::from(death - 1));
+        assert_eq!(scored.frozen(), &last_frozen);
+        assert_eq!(scored.frozen().age, u64::from(death - 1));
         assert_eq!(scored.scenes.len(), 3);
         let mean = scored.scenes.iter().map(|s| s.score).sum::<f64>() / 3.0;
         assert!((scored.scalar - mean).abs() < 1e-12);
@@ -1090,7 +1095,6 @@ mod tests {
             .map(|scalar| Scored {
                 scalar,
                 scenes: Vec::new(),
-                frozen: frozen.clone(),
                 frozens: vec![frozen.clone()],
                 sequences: Vec::new(),
                 creature_ticks: 0,
