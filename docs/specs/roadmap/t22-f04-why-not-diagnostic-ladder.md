@@ -230,10 +230,9 @@ per quick run) is in the Timing item.
       `fail`/`inconclusive` replicate tallies; retention lineages
       resolving `retained`, `deleted`, `lineage_loss` and `censored`,
       including the mixed carrying/non-carrying sibling case.
-- [ ] Regenerate the three committed summaries at v4 from a clean tree
-      after review remediation, as F03 did (provenance `dirty: false`);
-      pilot the quick run time and the touching share; record both in the
-      readings file.
+- [x] The three committed summaries are regenerated at v4 from the clean
+      tree at 809a7b48 (`dirty: false`); quick run time and touching
+      share are in the readings file.
 
 ## Verification
 
@@ -256,9 +255,9 @@ per quick run) is in the Timing item.
       ships and `QUICK_MUTANTS` stays 8; the 60 s bound is waived for this
       closure by the Exception below. Fallback data (`--mutants` 4:
       67.7 s, 2: 62.6 s, 2 + `native`: 54.3 s) -> readings file.
-- [ ] Quick runs (seed 1, food-seeking, wall-v1, ring-v1): ladder verdicts
-      and the regenerated `docs/progress/lab/t22-f02-*.json` at v4 ->
-      readings file.
+- [x] Quick runs (seed 1, food-seeking, wall-v1, ring-v1): ladder verdicts
+      and the regenerated `docs/progress/lab/t22-f02-*.json` at v4, their
+      v3 blocks equal under `jq -S` -> readings file.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Benchmark summary: `Not applicable: lab feature` (see below).

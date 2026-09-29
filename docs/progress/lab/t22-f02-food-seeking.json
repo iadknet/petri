@@ -1,9 +1,9 @@
 {
   "kind": "petri-lab-summary",
-  "summary_version": 3,
+  "summary_version": 4,
   "assay": "food-seeking",
   "provenance": {
-    "git_revision": "2dd9aa2057c956595f5af9a46c701d2282e2b4f1",
+    "git_revision": "809a7b485d7d8e9e3e962920331ee1e22811483e",
     "dirty": false,
     "config_digest": "2d997590cf6632743d6b604ba611256dc13aaa7455002e37bc56efe9a9dd580f",
     "overlays": [
@@ -22,13 +22,15 @@
         "name": "start",
         "sha256": "e24ef162d4848e40963cf00b75c62cb898b5d2decbc5674d3d33975c79eefc3f",
         "genome_format": 1,
-        "v3_core_version": "0.1.0"
+        "v3_core_version": "0.1.0",
+        "source": "founder"
       },
       {
         "name": "comparator",
         "sha256": "a081391f475158b296effec51185322f3517b4378cff1ed978c03c0bed14b011",
         "genome_format": 1,
-        "v3_core_version": "0.1.0"
+        "v3_core_version": "0.1.0",
+        "source": "builtin-comparator"
       }
     ],
     "arena": {
@@ -75,7 +77,19 @@
       "efficiency_weight": 0.0,
       "quick": true,
       "mutants": 8,
-      "signature_arms": "changing"
+      "signature_arms": "changing",
+      "stall_rates": {
+        "supply": 0.01,
+        "viability": 0.05,
+        "benefit": 0.05,
+        "retention": 0.2
+      },
+      "retention_depth": 2,
+      "relevant_families": [
+        "FoodHere(*)",
+        "NeighborFoodRing(*)",
+        "AreaFoodSummary(*)"
+      ]
     }
   },
   "calibration": {
@@ -2563,9 +2577,2262 @@
   "incomplete": null,
   "exit_code": 0,
   "timing": {
-    "wall_seconds": 57.492707834,
+    "wall_seconds": 60.583516334,
     "creature_ticks": 6550360,
-    "per_creature_tick_ms": 0.008777030244749908,
+    "per_creature_tick_ms": 0.009248883471137464,
     "readings_creature_ticks": 1606228
+  },
+  "ladder": {
+    "exposure": {
+      "status": "pass",
+      "verdict": "calibrated",
+      "campaign": true,
+      "selected": {
+        "food_fraction": 0.04,
+        "scale": null,
+        "lifetime": 200
+      },
+      "failing": [],
+      "margin": 1.0
+    },
+    "arms": [
+      {
+        "name": "native",
+        "role": "reference",
+        "policy": "native",
+        "diagnostic": false,
+        "replicates": [
+          {
+            "replicate": 0,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 121,
+                "sites": 936,
+                "reachable": 1286,
+                "uniform_reference": 128.00000000000003,
+                "targeted": {
+                  "requested": {
+                    "GraphAddGraphEdge": 2,
+                    "GraphAlterGraphEdgeWeight": 10,
+                    "GraphCopyEdgeBundle": 4,
+                    "GraphCopyInternalNode": 4,
+                    "GraphCopySubgraph": 4,
+                    "GraphEnableHebbian": 3,
+                    "GraphMutateGraphOperatorParam": 13,
+                    "GraphRawFieldMutation": 10,
+                    "GraphRemoveGraphEdge": 8,
+                    "GraphRemoveInternalGraphNode": 5,
+                    "GraphRetargetGraphEdge": 7,
+                    "GraphSwapGraphOperator": 4,
+                    "InputRefAdd": 9,
+                    "InputRefPrune": 6,
+                    "InputRefSwap": 22,
+                    "TopologyAddNode": 1,
+                    "TopologyAddRouteTarget": 3,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyCopyNode": 1,
+                    "TopologyMutateGateBias": 10,
+                    "TopologyRetargetNodeTarget": 3,
+                    "TopologySpliceNode": 3
+                  },
+                  "applied": {
+                    "GraphAddGraphEdge": 2,
+                    "GraphAlterGraphEdgeWeight": 10,
+                    "GraphCopyEdgeBundle": 4,
+                    "GraphCopyInternalNode": 4,
+                    "GraphCopySubgraph": 4,
+                    "GraphEnableHebbian": 3,
+                    "GraphMutateGraphOperatorParam": 13,
+                    "GraphRawFieldMutation": 10,
+                    "GraphRemoveGraphEdge": 8,
+                    "GraphRemoveInternalGraphNode": 5,
+                    "GraphRetargetGraphEdge": 7,
+                    "GraphSwapGraphOperator": 4,
+                    "InputRefAdd": 9,
+                    "InputRefPrune": 6,
+                    "InputRefSwap": 22,
+                    "TopologyAddNode": 1,
+                    "TopologyAddRouteTarget": 3,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyCopyNode": 1,
+                    "TopologyMutateGateBias": 10,
+                    "TopologyRetargetNodeTarget": 3,
+                    "TopologySpliceNode": 3
+                  },
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 3,
+                "removed": 0
+              },
+              "children": {
+                "touching": {
+                  "children": 121,
+                  "scene_changed": 73,
+                  "silent": 86,
+                  "changed": 35,
+                  "dead": 0,
+                  "viable": 78,
+                  "improved": 5,
+                  "progress_improved": 20,
+                  "worse": 23,
+                  "delta_sum": -143.0949404761905,
+                  "delta_max": 10.070833333333333
+                },
+                "other": {
+                  "children": 30,
+                  "scene_changed": 21,
+                  "improved": 0,
+                  "progress_improved": 4,
+                  "worse": 7,
+                  "delta_sum": -52.797916666666666,
+                  "delta_max": null
+                }
+              },
+              "retention": {
+                "selected": 4,
+                "selected_touching": 4,
+                "depths": [
+                  [
+                    1,
+                    1,
+                    2
+                  ],
+                  [
+                    1,
+                    1,
+                    2
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    1,
+                    1,
+                    2
+                  ],
+                  [
+                    1,
+                    1,
+                    2
+                  ]
+                ],
+                "censored": [
+                  0,
+                  0
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "pass",
+                "successes": 121,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "pass",
+                "successes": 78,
+                "trials": 121
+              },
+              {
+                "rung": "benefit",
+                "status": "pass",
+                "successes": 5,
+                "trials": 78
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 1,
+                "trials": 4
+              }
+            ],
+            "first_not_pass": "retention"
+          },
+          {
+            "replicate": 1,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 114,
+                "sites": 936,
+                "reachable": 942,
+                "uniform_reference": 147.33333333333334,
+                "targeted": {
+                  "requested": {
+                    "GraphAddGraphEdge": 3,
+                    "GraphAddInternalGraphNode": 1,
+                    "GraphAlterGraphEdgeWeight": 8,
+                    "GraphCopyEdgeBundle": 5,
+                    "GraphCopyInternalNode": 2,
+                    "GraphCopySubgraph": 3,
+                    "GraphEnableHebbian": 1,
+                    "GraphMutateGraphOperatorParam": 9,
+                    "GraphRawFieldMutation": 3,
+                    "GraphRemoveGraphEdge": 12,
+                    "GraphRemoveInternalGraphNode": 1,
+                    "GraphRetargetGraphEdge": 3,
+                    "GraphSwapGraphOperator": 3,
+                    "InputRefAdd": 8,
+                    "InputRefPrune": 6,
+                    "InputRefSwap": 20,
+                    "TopologyAddNode": 3,
+                    "TopologyAddRouteTarget": 5,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyMutateGateBias": 14,
+                    "TopologySpliceNode": 9,
+                    "TopologySwapNodeBackend": 4,
+                    "TopologySwapRouteTargets": 1
+                  },
+                  "applied": {
+                    "GraphAddGraphEdge": 3,
+                    "GraphAddInternalGraphNode": 1,
+                    "GraphAlterGraphEdgeWeight": 8,
+                    "GraphCopyEdgeBundle": 5,
+                    "GraphCopyInternalNode": 2,
+                    "GraphCopySubgraph": 3,
+                    "GraphEnableHebbian": 1,
+                    "GraphMutateGraphOperatorParam": 9,
+                    "GraphRawFieldMutation": 3,
+                    "GraphRemoveGraphEdge": 12,
+                    "GraphRemoveInternalGraphNode": 1,
+                    "GraphRetargetGraphEdge": 3,
+                    "GraphSwapGraphOperator": 3,
+                    "InputRefAdd": 8,
+                    "InputRefPrune": 6,
+                    "InputRefSwap": 20,
+                    "TopologyAddNode": 3,
+                    "TopologyAddRouteTarget": 5,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyMutateGateBias": 14,
+                    "TopologySpliceNode": 9,
+                    "TopologySwapNodeBackend": 4,
+                    "TopologySwapRouteTargets": 1
+                  },
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 2,
+                "removed": 1
+              },
+              "children": {
+                "touching": {
+                  "children": 114,
+                  "scene_changed": 73,
+                  "silent": 91,
+                  "changed": 23,
+                  "dead": 0,
+                  "viable": 77,
+                  "improved": 4,
+                  "progress_improved": 15,
+                  "worse": 16,
+                  "delta_sum": -106.2577380952381,
+                  "delta_max": 5.916666666666666
+                },
+                "other": {
+                  "children": 11,
+                  "scene_changed": 7,
+                  "improved": 1,
+                  "progress_improved": 6,
+                  "worse": 5,
+                  "delta_sum": -45.89404761904761,
+                  "delta_max": 1.0595238095238102
+                }
+              },
+              "retention": {
+                "selected": 5,
+                "selected_touching": 4,
+                "depths": [
+                  [
+                    1,
+                    1,
+                    3
+                  ],
+                  [
+                    1,
+                    1,
+                    3
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    1,
+                    1,
+                    2
+                  ],
+                  [
+                    1,
+                    1,
+                    2
+                  ]
+                ],
+                "censored": [
+                  0,
+                  0
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "pass",
+                "successes": 114,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "pass",
+                "successes": 77,
+                "trials": 114
+              },
+              {
+                "rung": "benefit",
+                "status": "pass",
+                "successes": 4,
+                "trials": 77
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 1,
+                "trials": 5
+              }
+            ],
+            "first_not_pass": "retention"
+          },
+          {
+            "replicate": 2,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 132,
+                "sites": 941,
+                "reachable": 1289,
+                "uniform_reference": 142.25,
+                "targeted": {
+                  "requested": {
+                    "GraphAddGraphEdge": 6,
+                    "GraphAddInternalGraphNode": 4,
+                    "GraphAlterGraphEdgeWeight": 5,
+                    "GraphCopyEdgeBundle": 4,
+                    "GraphCopyInternalNode": 2,
+                    "GraphCopySubgraph": 2,
+                    "GraphEnableHebbian": 2,
+                    "GraphMutateGraphOperatorParam": 13,
+                    "GraphRawFieldMutation": 10,
+                    "GraphRemoveGraphEdge": 2,
+                    "GraphRemoveInternalGraphNode": 3,
+                    "GraphRetargetGraphEdge": 3,
+                    "GraphSwapGraphOperator": 9,
+                    "InputRefAdd": 13,
+                    "InputRefPrune": 11,
+                    "InputRefSwap": 26,
+                    "TopologyAddNode": 2,
+                    "TopologyAddRouteTarget": 7,
+                    "TopologyCopyNode": 2,
+                    "TopologyMutateGateBias": 5,
+                    "TopologyRemoveRouteTarget": 6,
+                    "TopologyRetargetNodeTarget": 3,
+                    "TopologySpliceNode": 2,
+                    "TopologySwapNodeBackend": 3,
+                    "TopologySwapRouteTargets": 6
+                  },
+                  "applied": {
+                    "GraphAddGraphEdge": 6,
+                    "GraphAddInternalGraphNode": 4,
+                    "GraphAlterGraphEdgeWeight": 5,
+                    "GraphCopyEdgeBundle": 4,
+                    "GraphCopyInternalNode": 2,
+                    "GraphCopySubgraph": 2,
+                    "GraphEnableHebbian": 2,
+                    "GraphMutateGraphOperatorParam": 13,
+                    "GraphRawFieldMutation": 10,
+                    "GraphRemoveGraphEdge": 2,
+                    "GraphRemoveInternalGraphNode": 3,
+                    "GraphRetargetGraphEdge": 3,
+                    "GraphSwapGraphOperator": 9,
+                    "InputRefAdd": 13,
+                    "InputRefPrune": 11,
+                    "InputRefSwap": 26,
+                    "TopologyAddNode": 2,
+                    "TopologyAddRouteTarget": 7,
+                    "TopologyCopyNode": 2,
+                    "TopologyMutateGateBias": 5,
+                    "TopologyRemoveRouteTarget": 6,
+                    "TopologyRetargetNodeTarget": 3,
+                    "TopologySpliceNode": 2,
+                    "TopologySwapNodeBackend": 3,
+                    "TopologySwapRouteTargets": 6
+                  },
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 2,
+                "removed": 0
+              },
+              "children": {
+                "touching": {
+                  "children": 130,
+                  "scene_changed": 84,
+                  "silent": 104,
+                  "changed": 26,
+                  "dead": 0,
+                  "viable": 86,
+                  "improved": 2,
+                  "progress_improved": 16,
+                  "worse": 22,
+                  "delta_sum": -158.30833333333337,
+                  "delta_max": 1.7333333333333334
+                },
+                "other": {
+                  "children": 29,
+                  "scene_changed": 24,
+                  "improved": 2,
+                  "progress_improved": 5,
+                  "worse": 4,
+                  "delta_sum": -24.025,
+                  "delta_max": 3.333333333333332
+                }
+              },
+              "retention": {
+                "selected": 3,
+                "selected_touching": 1,
+                "depths": [
+                  [
+                    2,
+                    0,
+                    1
+                  ],
+                  [
+                    2,
+                    0,
+                    1
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    1,
+                    0,
+                    0
+                  ],
+                  [
+                    1,
+                    0,
+                    0
+                  ]
+                ],
+                "censored": [
+                  0,
+                  0
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "pass",
+                "successes": 132,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "pass",
+                "successes": 86,
+                "trials": 130
+              },
+              {
+                "rung": "benefit",
+                "status": "fail",
+                "successes": 2,
+                "trials": 86
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 2,
+                "trials": 3
+              }
+            ],
+            "first_not_pass": "benefit"
+          },
+          {
+            "replicate": 3,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 130,
+                "sites": 936,
+                "reachable": 1089,
+                "uniform_reference": 155.16666666666666,
+                "targeted": {
+                  "requested": {
+                    "GraphAddGraphEdge": 3,
+                    "GraphAddInternalGraphNode": 3,
+                    "GraphAlterGraphEdgeWeight": 9,
+                    "GraphCopyEdgeBundle": 7,
+                    "GraphCopyInternalNode": 2,
+                    "GraphCopySubgraph": 3,
+                    "GraphEnableHebbian": 2,
+                    "GraphMutateGraphOperatorParam": 7,
+                    "GraphRawFieldMutation": 9,
+                    "GraphRemoveGraphEdge": 5,
+                    "GraphRemoveInternalGraphNode": 3,
+                    "GraphRetargetGraphEdge": 6,
+                    "GraphSwapGraphOperator": 3,
+                    "InputRefAdd": 6,
+                    "InputRefPrune": 7,
+                    "InputRefSwap": 19,
+                    "TopologyAddNode": 3,
+                    "TopologyAddRouteTarget": 8,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyCopyNode": 1,
+                    "TopologyMutateGateBias": 20,
+                    "TopologyRetargetNodeTarget": 1,
+                    "TopologySpliceNode": 6,
+                    "TopologySwapNodeBackend": 5
+                  },
+                  "applied": {
+                    "GraphAddGraphEdge": 3,
+                    "GraphAddInternalGraphNode": 3,
+                    "GraphAlterGraphEdgeWeight": 9,
+                    "GraphCopyEdgeBundle": 7,
+                    "GraphCopyInternalNode": 2,
+                    "GraphCopySubgraph": 3,
+                    "GraphEnableHebbian": 2,
+                    "GraphMutateGraphOperatorParam": 7,
+                    "GraphRawFieldMutation": 9,
+                    "GraphRemoveGraphEdge": 5,
+                    "GraphRemoveInternalGraphNode": 3,
+                    "GraphRetargetGraphEdge": 6,
+                    "GraphSwapGraphOperator": 3,
+                    "InputRefAdd": 6,
+                    "InputRefPrune": 7,
+                    "InputRefSwap": 19,
+                    "TopologyAddNode": 3,
+                    "TopologyAddRouteTarget": 8,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyCopyNode": 1,
+                    "TopologyMutateGateBias": 20,
+                    "TopologyRetargetNodeTarget": 1,
+                    "TopologySpliceNode": 6,
+                    "TopologySwapNodeBackend": 5
+                  },
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 4,
+                "removed": 1
+              },
+              "children": {
+                "touching": {
+                  "children": 130,
+                  "scene_changed": 79,
+                  "silent": 105,
+                  "changed": 25,
+                  "dead": 0,
+                  "viable": 80,
+                  "improved": 2,
+                  "progress_improved": 14,
+                  "worse": 22,
+                  "delta_sum": -151.6511904761905,
+                  "delta_max": 0.10000000000000142
+                },
+                "other": {
+                  "children": 17,
+                  "scene_changed": 15,
+                  "improved": 3,
+                  "progress_improved": 4,
+                  "worse": 7,
+                  "delta_sum": -48.80416666666666,
+                  "delta_max": 6.5625
+                }
+              },
+              "retention": {
+                "selected": 5,
+                "selected_touching": 2,
+                "depths": [
+                  [
+                    2,
+                    0,
+                    3
+                  ],
+                  [
+                    1,
+                    1,
+                    3
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    1,
+                    0,
+                    1
+                  ],
+                  [
+                    0,
+                    1,
+                    1
+                  ]
+                ],
+                "censored": [
+                  0,
+                  0
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "pass",
+                "successes": 130,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "pass",
+                "successes": 80,
+                "trials": 130
+              },
+              {
+                "rung": "benefit",
+                "status": "fail",
+                "successes": 2,
+                "trials": 80
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 1,
+                "trials": 5
+              }
+            ],
+            "first_not_pass": "benefit"
+          }
+        ],
+        "tallies": [
+          {
+            "rung": "supply",
+            "pass": 4,
+            "fail": 0,
+            "inconclusive": 0,
+            "fail_wilson_95": [
+              0.0,
+              0.4898908364545973
+            ]
+          },
+          {
+            "rung": "viability",
+            "pass": 4,
+            "fail": 0,
+            "inconclusive": 0,
+            "fail_wilson_95": [
+              0.0,
+              0.4898908364545973
+            ]
+          },
+          {
+            "rung": "benefit",
+            "pass": 2,
+            "fail": 2,
+            "inconclusive": 0,
+            "fail_wilson_95": [
+              0.15003898915214947,
+              0.8499610108478506
+            ]
+          },
+          {
+            "rung": "retention",
+            "pass": 0,
+            "fail": 0,
+            "inconclusive": 4,
+            "fail_wilson_95": [
+              0.0,
+              0.4898908364545973
+            ]
+          }
+        ],
+        "verdict": {
+          "kind": "stalls",
+          "rung": "benefit",
+          "fail": 2,
+          "inconclusive": 0,
+          "of": 2,
+          "reached": null,
+          "completed": 4,
+          "incomplete": 0
+        },
+        "pooled": {
+          "supply": {
+            "births": 1872,
+            "touching_births": 497,
+            "sites": 3749,
+            "reachable": 4606,
+            "uniform_reference": 572.75,
+            "targeted": {
+              "requested": {
+                "GraphAddGraphEdge": 14,
+                "GraphAddInternalGraphNode": 8,
+                "GraphAlterGraphEdgeWeight": 32,
+                "GraphCopyEdgeBundle": 20,
+                "GraphCopyInternalNode": 10,
+                "GraphCopySubgraph": 12,
+                "GraphEnableHebbian": 8,
+                "GraphMutateGraphOperatorParam": 42,
+                "GraphRawFieldMutation": 32,
+                "GraphRemoveGraphEdge": 27,
+                "GraphRemoveInternalGraphNode": 12,
+                "GraphRetargetGraphEdge": 19,
+                "GraphSwapGraphOperator": 19,
+                "InputRefAdd": 36,
+                "InputRefPrune": 30,
+                "InputRefSwap": 87,
+                "TopologyAddNode": 9,
+                "TopologyAddRouteTarget": 23,
+                "TopologyCopyMeshBackwardSlice": 3,
+                "TopologyCopyMeshForwardSlice": 3,
+                "TopologyCopyNode": 4,
+                "TopologyMutateGateBias": 49,
+                "TopologyRemoveRouteTarget": 6,
+                "TopologyRetargetNodeTarget": 7,
+                "TopologySpliceNode": 20,
+                "TopologySwapNodeBackend": 12,
+                "TopologySwapRouteTargets": 7
+              },
+              "applied": {
+                "GraphAddGraphEdge": 14,
+                "GraphAddInternalGraphNode": 8,
+                "GraphAlterGraphEdgeWeight": 32,
+                "GraphCopyEdgeBundle": 20,
+                "GraphCopyInternalNode": 10,
+                "GraphCopySubgraph": 12,
+                "GraphEnableHebbian": 8,
+                "GraphMutateGraphOperatorParam": 42,
+                "GraphRawFieldMutation": 32,
+                "GraphRemoveGraphEdge": 27,
+                "GraphRemoveInternalGraphNode": 12,
+                "GraphRetargetGraphEdge": 19,
+                "GraphSwapGraphOperator": 19,
+                "InputRefAdd": 36,
+                "InputRefPrune": 30,
+                "InputRefSwap": 87,
+                "TopologyAddNode": 9,
+                "TopologyAddRouteTarget": 23,
+                "TopologyCopyMeshBackwardSlice": 3,
+                "TopologyCopyMeshForwardSlice": 3,
+                "TopologyCopyNode": 4,
+                "TopologyMutateGateBias": 49,
+                "TopologyRemoveRouteTarget": 6,
+                "TopologyRetargetNodeTarget": 7,
+                "TopologySpliceNode": 20,
+                "TopologySwapNodeBackend": 12,
+                "TopologySwapRouteTargets": 7
+              },
+              "skipped": {},
+              "skipped_by_reason": {}
+            },
+            "discarded": 0,
+            "created": 11,
+            "removed": 2
+          },
+          "children": {
+            "touching": {
+              "children": 495,
+              "scene_changed": 309,
+              "silent": 386,
+              "changed": 109,
+              "dead": 0,
+              "viable": 321,
+              "improved": 13,
+              "progress_improved": 65,
+              "worse": 83,
+              "delta_sum": -559.3122023809524,
+              "delta_max": 10.070833333333333
+            },
+            "other": {
+              "children": 87,
+              "scene_changed": 67,
+              "improved": 6,
+              "progress_improved": 19,
+              "worse": 23,
+              "delta_sum": -171.52113095238093,
+              "delta_max": 6.5625
+            }
+          },
+          "retention": {
+            "selected": 17,
+            "selected_touching": 11,
+            "depths": [
+              [
+                6,
+                2,
+                9
+              ],
+              [
+                5,
+                3,
+                9
+              ]
+            ],
+            "depths_touching": [
+              [
+                4,
+                2,
+                5
+              ],
+              [
+                3,
+                3,
+                5
+              ]
+            ],
+            "censored": [
+              0,
+              0
+            ],
+            "censored_touching": [
+              0,
+              0
+            ]
+          }
+        },
+        "incomplete_replicates": 0
+      },
+      {
+        "name": "mutation-off",
+        "role": "control",
+        "policy": "policy-deviation",
+        "diagnostic": true,
+        "replicates": [
+          {
+            "replicate": 0,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 0,
+                "sites": 936,
+                "reachable": 936,
+                "uniform_reference": 0.0,
+                "targeted": {
+                  "requested": {},
+                  "applied": {},
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 0,
+                "removed": 0
+              },
+              "children": {
+                "touching": {
+                  "children": 0,
+                  "scene_changed": 0,
+                  "silent": 0,
+                  "changed": 0,
+                  "dead": 0,
+                  "viable": 0,
+                  "improved": 0,
+                  "progress_improved": 0,
+                  "worse": 0,
+                  "delta_sum": 0.0,
+                  "delta_max": null
+                },
+                "other": {
+                  "children": 0,
+                  "scene_changed": 0,
+                  "improved": 0,
+                  "progress_improved": 0,
+                  "worse": 0,
+                  "delta_sum": 0.0,
+                  "delta_max": null
+                }
+              },
+              "retention": {
+                "selected": 0,
+                "selected_touching": 0,
+                "depths": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "censored": [
+                  0,
+                  0
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "fail",
+                "successes": 0,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              },
+              {
+                "rung": "benefit",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              }
+            ],
+            "first_not_pass": "supply"
+          },
+          {
+            "replicate": 1,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 0,
+                "sites": 936,
+                "reachable": 936,
+                "uniform_reference": 0.0,
+                "targeted": {
+                  "requested": {},
+                  "applied": {},
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 0,
+                "removed": 0
+              },
+              "children": {
+                "touching": {
+                  "children": 0,
+                  "scene_changed": 0,
+                  "silent": 0,
+                  "changed": 0,
+                  "dead": 0,
+                  "viable": 0,
+                  "improved": 0,
+                  "progress_improved": 0,
+                  "worse": 0,
+                  "delta_sum": 0.0,
+                  "delta_max": null
+                },
+                "other": {
+                  "children": 0,
+                  "scene_changed": 0,
+                  "improved": 0,
+                  "progress_improved": 0,
+                  "worse": 0,
+                  "delta_sum": 0.0,
+                  "delta_max": null
+                }
+              },
+              "retention": {
+                "selected": 0,
+                "selected_touching": 0,
+                "depths": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "censored": [
+                  0,
+                  0
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "fail",
+                "successes": 0,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              },
+              {
+                "rung": "benefit",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              }
+            ],
+            "first_not_pass": "supply"
+          },
+          {
+            "replicate": 2,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 0,
+                "sites": 936,
+                "reachable": 936,
+                "uniform_reference": 0.0,
+                "targeted": {
+                  "requested": {},
+                  "applied": {},
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 0,
+                "removed": 0
+              },
+              "children": {
+                "touching": {
+                  "children": 0,
+                  "scene_changed": 0,
+                  "silent": 0,
+                  "changed": 0,
+                  "dead": 0,
+                  "viable": 0,
+                  "improved": 0,
+                  "progress_improved": 0,
+                  "worse": 0,
+                  "delta_sum": 0.0,
+                  "delta_max": null
+                },
+                "other": {
+                  "children": 0,
+                  "scene_changed": 0,
+                  "improved": 0,
+                  "progress_improved": 0,
+                  "worse": 0,
+                  "delta_sum": 0.0,
+                  "delta_max": null
+                }
+              },
+              "retention": {
+                "selected": 0,
+                "selected_touching": 0,
+                "depths": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "censored": [
+                  0,
+                  0
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "fail",
+                "successes": 0,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              },
+              {
+                "rung": "benefit",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              }
+            ],
+            "first_not_pass": "supply"
+          },
+          {
+            "replicate": 3,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 0,
+                "sites": 936,
+                "reachable": 936,
+                "uniform_reference": 0.0,
+                "targeted": {
+                  "requested": {},
+                  "applied": {},
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 0,
+                "removed": 0
+              },
+              "children": {
+                "touching": {
+                  "children": 0,
+                  "scene_changed": 0,
+                  "silent": 0,
+                  "changed": 0,
+                  "dead": 0,
+                  "viable": 0,
+                  "improved": 0,
+                  "progress_improved": 0,
+                  "worse": 0,
+                  "delta_sum": 0.0,
+                  "delta_max": null
+                },
+                "other": {
+                  "children": 0,
+                  "scene_changed": 0,
+                  "improved": 0,
+                  "progress_improved": 0,
+                  "worse": 0,
+                  "delta_sum": 0.0,
+                  "delta_max": null
+                }
+              },
+              "retention": {
+                "selected": 0,
+                "selected_touching": 0,
+                "depths": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    0,
+                    0,
+                    0
+                  ],
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                "censored": [
+                  0,
+                  0
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "fail",
+                "successes": 0,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              },
+              {
+                "rung": "benefit",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 0
+              }
+            ],
+            "first_not_pass": "supply"
+          }
+        ],
+        "tallies": [
+          {
+            "rung": "supply",
+            "pass": 0,
+            "fail": 4,
+            "inconclusive": 0,
+            "fail_wilson_95": [
+              0.5101091635454027,
+              1.0
+            ]
+          },
+          {
+            "rung": "viability",
+            "pass": 0,
+            "fail": 0,
+            "inconclusive": 4,
+            "fail_wilson_95": [
+              0.0,
+              0.4898908364545973
+            ]
+          },
+          {
+            "rung": "benefit",
+            "pass": 0,
+            "fail": 0,
+            "inconclusive": 4,
+            "fail_wilson_95": [
+              0.0,
+              0.4898908364545973
+            ]
+          },
+          {
+            "rung": "retention",
+            "pass": 0,
+            "fail": 0,
+            "inconclusive": 4,
+            "fail_wilson_95": [
+              0.0,
+              0.4898908364545973
+            ]
+          }
+        ],
+        "verdict": {
+          "kind": "stalls",
+          "rung": "supply",
+          "fail": 4,
+          "inconclusive": 0,
+          "of": 4,
+          "reached": null,
+          "completed": 4,
+          "incomplete": 0
+        },
+        "pooled": {
+          "supply": {
+            "births": 1872,
+            "touching_births": 0,
+            "sites": 3744,
+            "reachable": 3744,
+            "uniform_reference": 0.0,
+            "targeted": {
+              "requested": {},
+              "applied": {},
+              "skipped": {},
+              "skipped_by_reason": {}
+            },
+            "discarded": 0,
+            "created": 0,
+            "removed": 0
+          },
+          "children": {
+            "touching": {
+              "children": 0,
+              "scene_changed": 0,
+              "silent": 0,
+              "changed": 0,
+              "dead": 0,
+              "viable": 0,
+              "improved": 0,
+              "progress_improved": 0,
+              "worse": 0,
+              "delta_sum": 0.0,
+              "delta_max": null
+            },
+            "other": {
+              "children": 0,
+              "scene_changed": 0,
+              "improved": 0,
+              "progress_improved": 0,
+              "worse": 0,
+              "delta_sum": 0.0,
+              "delta_max": null
+            }
+          },
+          "retention": {
+            "selected": 0,
+            "selected_touching": 0,
+            "depths": [
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ]
+            ],
+            "depths_touching": [
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ]
+            ],
+            "censored": [
+              0,
+              0
+            ],
+            "censored_touching": [
+              0,
+              0
+            ]
+          }
+        },
+        "incomplete_replicates": 0
+      },
+      {
+        "name": "shuffled-score",
+        "role": "control",
+        "policy": "native",
+        "diagnostic": false,
+        "replicates": [
+          {
+            "replicate": 0,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 324,
+                "touching_births": 87,
+                "sites": 661,
+                "reachable": 786,
+                "uniform_reference": 101.74999999999999,
+                "targeted": {
+                  "requested": {
+                    "GraphAddGraphEdge": 1,
+                    "GraphAlterGraphEdgeWeight": 6,
+                    "GraphCopyEdgeBundle": 5,
+                    "GraphCopyInternalNode": 4,
+                    "GraphCopySubgraph": 3,
+                    "GraphEnableHebbian": 1,
+                    "GraphMutateGraphOperatorParam": 8,
+                    "GraphRawFieldMutation": 6,
+                    "GraphRemoveGraphEdge": 2,
+                    "GraphRemoveInternalGraphNode": 2,
+                    "GraphRetargetGraphEdge": 4,
+                    "GraphSwapGraphOperator": 4,
+                    "InputRefAdd": 6,
+                    "InputRefPrune": 6,
+                    "InputRefSwap": 17,
+                    "TopologyAddRouteTarget": 7,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyMutateGateBias": 6,
+                    "TopologyRemoveRouteTarget": 1,
+                    "TopologyRetargetNodeTarget": 2,
+                    "TopologySpliceNode": 3,
+                    "TopologySwapRouteTargets": 5
+                  },
+                  "applied": {
+                    "GraphAddGraphEdge": 1,
+                    "GraphAlterGraphEdgeWeight": 6,
+                    "GraphCopyEdgeBundle": 5,
+                    "GraphCopyInternalNode": 4,
+                    "GraphCopySubgraph": 3,
+                    "GraphEnableHebbian": 1,
+                    "GraphMutateGraphOperatorParam": 8,
+                    "GraphRawFieldMutation": 6,
+                    "GraphRemoveGraphEdge": 2,
+                    "GraphRemoveInternalGraphNode": 2,
+                    "GraphRetargetGraphEdge": 4,
+                    "GraphSwapGraphOperator": 4,
+                    "InputRefAdd": 6,
+                    "InputRefPrune": 6,
+                    "InputRefSwap": 17,
+                    "TopologyAddRouteTarget": 7,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyMutateGateBias": 6,
+                    "TopologyRemoveRouteTarget": 1,
+                    "TopologyRetargetNodeTarget": 2,
+                    "TopologySpliceNode": 3,
+                    "TopologySwapRouteTargets": 5
+                  },
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 1,
+                "removed": 0
+              },
+              "children": {
+                "touching": {
+                  "children": 87,
+                  "scene_changed": 60,
+                  "silent": 45,
+                  "changed": 42,
+                  "dead": 0,
+                  "viable": 65,
+                  "improved": 9,
+                  "progress_improved": 20,
+                  "worse": 23,
+                  "delta_sum": -84.0940476190476,
+                  "delta_max": 5.300000000000001
+                },
+                "other": {
+                  "children": 12,
+                  "scene_changed": 11,
+                  "improved": 4,
+                  "progress_improved": 5,
+                  "worse": 4,
+                  "delta_sum": -27.31190476190477,
+                  "delta_max": 7.7125
+                }
+              },
+              "retention": {
+                "selected": 6,
+                "selected_touching": 4,
+                "depths": [
+                  [
+                    2,
+                    0,
+                    3
+                  ],
+                  [
+                    0,
+                    1,
+                    3
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    2,
+                    0,
+                    2
+                  ],
+                  [
+                    0,
+                    1,
+                    2
+                  ]
+                ],
+                "censored": [
+                  1,
+                  2
+                ],
+                "censored_touching": [
+                  0,
+                  1
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "pass",
+                "successes": 87,
+                "trials": 324
+              },
+              {
+                "rung": "viability",
+                "status": "pass",
+                "successes": 65,
+                "trials": 87
+              },
+              {
+                "rung": "benefit",
+                "status": "pass",
+                "successes": 9,
+                "trials": 65
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 0,
+                "trials": 4
+              }
+            ],
+            "first_not_pass": "retention"
+          },
+          {
+            "replicate": 1,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 111,
+                "sites": 936,
+                "reachable": 1332,
+                "uniform_reference": 147.66666666666666,
+                "targeted": {
+                  "requested": {
+                    "GraphAddGraphEdge": 2,
+                    "GraphAddInternalGraphNode": 2,
+                    "GraphAlterGraphEdgeWeight": 5,
+                    "GraphCopyEdgeBundle": 3,
+                    "GraphCopyInternalNode": 3,
+                    "GraphCopySubgraph": 4,
+                    "GraphDisableHebbian": 1,
+                    "GraphEnableHebbian": 1,
+                    "GraphMutateGraphOperatorParam": 8,
+                    "GraphRawFieldMutation": 4,
+                    "GraphRemoveGraphEdge": 5,
+                    "GraphRemoveInternalGraphNode": 2,
+                    "GraphSwapGraphOperator": 4,
+                    "InputRefAdd": 10,
+                    "InputRefPrune": 8,
+                    "InputRefSwap": 26,
+                    "TopologyAddNode": 1,
+                    "TopologyAddRouteTarget": 2,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyMutateGateBias": 9,
+                    "TopologyRemoveRouteTarget": 3,
+                    "TopologyRetargetNodeTarget": 3,
+                    "TopologySpliceNode": 3,
+                    "TopologySwapNodeBackend": 1,
+                    "TopologySwapRouteTargets": 8
+                  },
+                  "applied": {
+                    "GraphAddGraphEdge": 2,
+                    "GraphAddInternalGraphNode": 2,
+                    "GraphAlterGraphEdgeWeight": 5,
+                    "GraphCopyEdgeBundle": 3,
+                    "GraphCopyInternalNode": 3,
+                    "GraphCopySubgraph": 4,
+                    "GraphDisableHebbian": 1,
+                    "GraphEnableHebbian": 1,
+                    "GraphMutateGraphOperatorParam": 8,
+                    "GraphRawFieldMutation": 4,
+                    "GraphRemoveGraphEdge": 5,
+                    "GraphRemoveInternalGraphNode": 2,
+                    "GraphSwapGraphOperator": 4,
+                    "InputRefAdd": 10,
+                    "InputRefPrune": 8,
+                    "InputRefSwap": 26,
+                    "TopologyAddNode": 1,
+                    "TopologyAddRouteTarget": 2,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyMutateGateBias": 9,
+                    "TopologyRemoveRouteTarget": 3,
+                    "TopologyRetargetNodeTarget": 3,
+                    "TopologySpliceNode": 3,
+                    "TopologySwapNodeBackend": 1,
+                    "TopologySwapRouteTargets": 8
+                  },
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 1,
+                "removed": 0
+              },
+              "children": {
+                "touching": {
+                  "children": 110,
+                  "scene_changed": 86,
+                  "silent": 62,
+                  "changed": 48,
+                  "dead": 0,
+                  "viable": 92,
+                  "improved": 16,
+                  "progress_improved": 22,
+                  "worse": 24,
+                  "delta_sum": -38.570238095238096,
+                  "delta_max": 7.874999999999998
+                },
+                "other": {
+                  "children": 55,
+                  "scene_changed": 39,
+                  "improved": 8,
+                  "progress_improved": 4,
+                  "worse": 3,
+                  "delta_sum": -2.9315476190476204,
+                  "delta_max": 4.166666666666666
+                }
+              },
+              "retention": {
+                "selected": 7,
+                "selected_touching": 3,
+                "depths": [
+                  [
+                    3,
+                    1,
+                    3
+                  ],
+                  [
+                    1,
+                    1,
+                    3
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    0,
+                    1,
+                    2
+                  ],
+                  [
+                    0,
+                    1,
+                    2
+                  ]
+                ],
+                "censored": [
+                  0,
+                  2
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "pass",
+                "successes": 111,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "pass",
+                "successes": 92,
+                "trials": 110
+              },
+              {
+                "rung": "benefit",
+                "status": "pass",
+                "successes": 16,
+                "trials": 92
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 1,
+                "trials": 5
+              }
+            ],
+            "first_not_pass": "retention"
+          },
+          {
+            "replicate": 2,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 122,
+                "sites": 936,
+                "reachable": 1341,
+                "uniform_reference": 176.0,
+                "targeted": {
+                  "requested": {
+                    "GraphAddGraphEdge": 7,
+                    "GraphAddInternalGraphNode": 2,
+                    "GraphAlterGraphEdgeWeight": 9,
+                    "GraphCopyEdgeBundle": 5,
+                    "GraphCopyInternalNode": 3,
+                    "GraphCopySubgraph": 1,
+                    "GraphEnableHebbian": 5,
+                    "GraphMutateGraphOperatorParam": 11,
+                    "GraphRawFieldMutation": 8,
+                    "GraphRemoveGraphEdge": 2,
+                    "GraphRemoveInternalGraphNode": 3,
+                    "GraphRetargetGraphEdge": 6,
+                    "GraphSwapGraphOperator": 8,
+                    "InputRefAdd": 5,
+                    "InputRefPrune": 10,
+                    "InputRefSwap": 15,
+                    "TopologyAddNode": 3,
+                    "TopologyAddRouteTarget": 3,
+                    "TopologyCopyNode": 1,
+                    "TopologyMutateGateBias": 12,
+                    "TopologyRetargetNodeTarget": 6,
+                    "TopologySpliceNode": 7,
+                    "TopologySwapNodeBackend": 6
+                  },
+                  "applied": {
+                    "GraphAddGraphEdge": 7,
+                    "GraphAddInternalGraphNode": 2,
+                    "GraphAlterGraphEdgeWeight": 9,
+                    "GraphCopyEdgeBundle": 5,
+                    "GraphCopyInternalNode": 3,
+                    "GraphCopySubgraph": 1,
+                    "GraphEnableHebbian": 5,
+                    "GraphMutateGraphOperatorParam": 11,
+                    "GraphRawFieldMutation": 8,
+                    "GraphRemoveGraphEdge": 2,
+                    "GraphRemoveInternalGraphNode": 3,
+                    "GraphRetargetGraphEdge": 6,
+                    "GraphSwapGraphOperator": 8,
+                    "InputRefAdd": 5,
+                    "InputRefPrune": 10,
+                    "InputRefSwap": 15,
+                    "TopologyAddNode": 3,
+                    "TopologyAddRouteTarget": 3,
+                    "TopologyCopyNode": 1,
+                    "TopologyMutateGateBias": 12,
+                    "TopologyRetargetNodeTarget": 6,
+                    "TopologySpliceNode": 7,
+                    "TopologySwapNodeBackend": 6
+                  },
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 2,
+                "removed": 0
+              },
+              "children": {
+                "touching": {
+                  "children": 121,
+                  "scene_changed": 80,
+                  "silent": 91,
+                  "changed": 30,
+                  "dead": 0,
+                  "viable": 83,
+                  "improved": 7,
+                  "progress_improved": 15,
+                  "worse": 21,
+                  "delta_sum": -121.32142857142856,
+                  "delta_max": 3.9880952380952372
+                },
+                "other": {
+                  "children": 78,
+                  "scene_changed": 51,
+                  "improved": 4,
+                  "progress_improved": 7,
+                  "worse": 5,
+                  "delta_sum": -18.72500000000001,
+                  "delta_max": 5.183333333333332
+                }
+              },
+              "retention": {
+                "selected": 6,
+                "selected_touching": 5,
+                "depths": [
+                  [
+                    4,
+                    0,
+                    2
+                  ],
+                  [
+                    2,
+                    2,
+                    2
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    3,
+                    0,
+                    2
+                  ],
+                  [
+                    1,
+                    2,
+                    2
+                  ]
+                ],
+                "censored": [
+                  0,
+                  0
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "pass",
+                "successes": 122,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "pass",
+                "successes": 83,
+                "trials": 121
+              },
+              {
+                "rung": "benefit",
+                "status": "pass",
+                "successes": 7,
+                "trials": 83
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 2,
+                "trials": 6
+              }
+            ],
+            "first_not_pass": "retention"
+          },
+          {
+            "replicate": 3,
+            "incomplete": false,
+            "pooled": {
+              "supply": {
+                "births": 468,
+                "touching_births": 132,
+                "sites": 936,
+                "reachable": 1275,
+                "uniform_reference": 165.49999999999997,
+                "targeted": {
+                  "requested": {
+                    "GraphAddGraphEdge": 5,
+                    "GraphAddInternalGraphNode": 2,
+                    "GraphAlterGraphEdgeWeight": 11,
+                    "GraphCopyEdgeBundle": 4,
+                    "GraphCopyInternalNode": 5,
+                    "GraphEnableHebbian": 1,
+                    "GraphMutateGraphOperatorParam": 16,
+                    "GraphRawFieldMutation": 11,
+                    "GraphRemoveGraphEdge": 6,
+                    "GraphRemoveInternalGraphNode": 5,
+                    "GraphRetargetGraphEdge": 6,
+                    "GraphSwapGraphOperator": 6,
+                    "InputRefAdd": 7,
+                    "InputRefPrune": 7,
+                    "InputRefSwap": 22,
+                    "TopologyAddRouteTarget": 3,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyMutateGateBias": 11,
+                    "TopologyRemoveRouteTarget": 2,
+                    "TopologyRetargetNodeTarget": 2,
+                    "TopologySpliceNode": 5,
+                    "TopologySwapNodeBackend": 3,
+                    "TopologySwapRouteTargets": 8
+                  },
+                  "applied": {
+                    "GraphAddGraphEdge": 5,
+                    "GraphAddInternalGraphNode": 2,
+                    "GraphAlterGraphEdgeWeight": 11,
+                    "GraphCopyEdgeBundle": 4,
+                    "GraphCopyInternalNode": 5,
+                    "GraphEnableHebbian": 1,
+                    "GraphMutateGraphOperatorParam": 16,
+                    "GraphRawFieldMutation": 11,
+                    "GraphRemoveGraphEdge": 6,
+                    "GraphRemoveInternalGraphNode": 5,
+                    "GraphRetargetGraphEdge": 6,
+                    "GraphSwapGraphOperator": 6,
+                    "InputRefAdd": 7,
+                    "InputRefPrune": 7,
+                    "InputRefSwap": 22,
+                    "TopologyAddRouteTarget": 3,
+                    "TopologyCopyMeshBackwardSlice": 1,
+                    "TopologyCopyMeshForwardSlice": 1,
+                    "TopologyMutateGateBias": 11,
+                    "TopologyRemoveRouteTarget": 2,
+                    "TopologyRetargetNodeTarget": 2,
+                    "TopologySpliceNode": 5,
+                    "TopologySwapNodeBackend": 3,
+                    "TopologySwapRouteTargets": 8
+                  },
+                  "skipped": {},
+                  "skipped_by_reason": {}
+                },
+                "discarded": 0,
+                "created": 2,
+                "removed": 1
+              },
+              "children": {
+                "touching": {
+                  "children": 132,
+                  "scene_changed": 86,
+                  "silent": 79,
+                  "changed": 53,
+                  "dead": 0,
+                  "viable": 92,
+                  "improved": 11,
+                  "progress_improved": 22,
+                  "worse": 28,
+                  "delta_sum": -44.81111111111112,
+                  "delta_max": 8.083333333333336
+                },
+                "other": {
+                  "children": 46,
+                  "scene_changed": 33,
+                  "improved": 3,
+                  "progress_improved": 8,
+                  "worse": 8,
+                  "delta_sum": -12.657738095238098,
+                  "delta_max": 6.5625
+                }
+              },
+              "retention": {
+                "selected": 4,
+                "selected_touching": 3,
+                "depths": [
+                  [
+                    1,
+                    0,
+                    3
+                  ],
+                  [
+                    1,
+                    0,
+                    3
+                  ]
+                ],
+                "depths_touching": [
+                  [
+                    1,
+                    0,
+                    2
+                  ],
+                  [
+                    1,
+                    0,
+                    2
+                  ]
+                ],
+                "censored": [
+                  0,
+                  0
+                ],
+                "censored_touching": [
+                  0,
+                  0
+                ]
+              }
+            },
+            "statuses": [
+              {
+                "rung": "supply",
+                "status": "pass",
+                "successes": 132,
+                "trials": 468
+              },
+              {
+                "rung": "viability",
+                "status": "pass",
+                "successes": 92,
+                "trials": 132
+              },
+              {
+                "rung": "benefit",
+                "status": "pass",
+                "successes": 11,
+                "trials": 92
+              },
+              {
+                "rung": "retention",
+                "status": "inconclusive",
+                "successes": 1,
+                "trials": 4
+              }
+            ],
+            "first_not_pass": "retention"
+          }
+        ],
+        "tallies": [
+          {
+            "rung": "supply",
+            "pass": 4,
+            "fail": 0,
+            "inconclusive": 0,
+            "fail_wilson_95": [
+              0.0,
+              0.4898908364545973
+            ]
+          },
+          {
+            "rung": "viability",
+            "pass": 4,
+            "fail": 0,
+            "inconclusive": 0,
+            "fail_wilson_95": [
+              0.0,
+              0.4898908364545973
+            ]
+          },
+          {
+            "rung": "benefit",
+            "pass": 4,
+            "fail": 0,
+            "inconclusive": 0,
+            "fail_wilson_95": [
+              0.0,
+              0.4898908364545973
+            ]
+          },
+          {
+            "rung": "retention",
+            "pass": 0,
+            "fail": 0,
+            "inconclusive": 4,
+            "fail_wilson_95": [
+              0.0,
+              0.4898908364545973
+            ]
+          }
+        ],
+        "verdict": {
+          "kind": "inconclusive",
+          "rung": "retention",
+          "fail": 0,
+          "inconclusive": 4,
+          "of": 4,
+          "reached": null,
+          "completed": 4,
+          "incomplete": 0
+        },
+        "pooled": {
+          "supply": {
+            "births": 1728,
+            "touching_births": 452,
+            "sites": 3469,
+            "reachable": 4734,
+            "uniform_reference": 590.9166666666666,
+            "targeted": {
+              "requested": {
+                "GraphAddGraphEdge": 15,
+                "GraphAddInternalGraphNode": 6,
+                "GraphAlterGraphEdgeWeight": 31,
+                "GraphCopyEdgeBundle": 17,
+                "GraphCopyInternalNode": 15,
+                "GraphCopySubgraph": 8,
+                "GraphDisableHebbian": 1,
+                "GraphEnableHebbian": 8,
+                "GraphMutateGraphOperatorParam": 43,
+                "GraphRawFieldMutation": 29,
+                "GraphRemoveGraphEdge": 15,
+                "GraphRemoveInternalGraphNode": 12,
+                "GraphRetargetGraphEdge": 16,
+                "GraphSwapGraphOperator": 22,
+                "InputRefAdd": 28,
+                "InputRefPrune": 31,
+                "InputRefSwap": 80,
+                "TopologyAddNode": 4,
+                "TopologyAddRouteTarget": 15,
+                "TopologyCopyMeshBackwardSlice": 2,
+                "TopologyCopyMeshForwardSlice": 2,
+                "TopologyCopyNode": 1,
+                "TopologyMutateGateBias": 38,
+                "TopologyRemoveRouteTarget": 6,
+                "TopologyRetargetNodeTarget": 13,
+                "TopologySpliceNode": 18,
+                "TopologySwapNodeBackend": 10,
+                "TopologySwapRouteTargets": 21
+              },
+              "applied": {
+                "GraphAddGraphEdge": 15,
+                "GraphAddInternalGraphNode": 6,
+                "GraphAlterGraphEdgeWeight": 31,
+                "GraphCopyEdgeBundle": 17,
+                "GraphCopyInternalNode": 15,
+                "GraphCopySubgraph": 8,
+                "GraphDisableHebbian": 1,
+                "GraphEnableHebbian": 8,
+                "GraphMutateGraphOperatorParam": 43,
+                "GraphRawFieldMutation": 29,
+                "GraphRemoveGraphEdge": 15,
+                "GraphRemoveInternalGraphNode": 12,
+                "GraphRetargetGraphEdge": 16,
+                "GraphSwapGraphOperator": 22,
+                "InputRefAdd": 28,
+                "InputRefPrune": 31,
+                "InputRefSwap": 80,
+                "TopologyAddNode": 4,
+                "TopologyAddRouteTarget": 15,
+                "TopologyCopyMeshBackwardSlice": 2,
+                "TopologyCopyMeshForwardSlice": 2,
+                "TopologyCopyNode": 1,
+                "TopologyMutateGateBias": 38,
+                "TopologyRemoveRouteTarget": 6,
+                "TopologyRetargetNodeTarget": 13,
+                "TopologySpliceNode": 18,
+                "TopologySwapNodeBackend": 10,
+                "TopologySwapRouteTargets": 21
+              },
+              "skipped": {},
+              "skipped_by_reason": {}
+            },
+            "discarded": 0,
+            "created": 6,
+            "removed": 1
+          },
+          "children": {
+            "touching": {
+              "children": 450,
+              "scene_changed": 312,
+              "silent": 277,
+              "changed": 173,
+              "dead": 0,
+              "viable": 332,
+              "improved": 43,
+              "progress_improved": 79,
+              "worse": 96,
+              "delta_sum": -288.7968253968254,
+              "delta_max": 8.083333333333336
+            },
+            "other": {
+              "children": 191,
+              "scene_changed": 134,
+              "improved": 19,
+              "progress_improved": 24,
+              "worse": 20,
+              "delta_sum": -61.6261904761905,
+              "delta_max": 7.7125
+            }
+          },
+          "retention": {
+            "selected": 23,
+            "selected_touching": 15,
+            "depths": [
+              [
+                10,
+                1,
+                11
+              ],
+              [
+                4,
+                4,
+                11
+              ]
+            ],
+            "depths_touching": [
+              [
+                6,
+                1,
+                8
+              ],
+              [
+                2,
+                4,
+                8
+              ]
+            ],
+            "censored": [
+              1,
+              4
+            ],
+            "censored_touching": [
+              0,
+              1
+            ]
+          }
+        },
+        "incomplete_replicates": 0
+      }
+    ]
   }
 }
