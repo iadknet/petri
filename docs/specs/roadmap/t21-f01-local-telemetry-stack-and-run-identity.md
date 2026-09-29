@@ -101,10 +101,10 @@ Invariants:
 | --- | --- |
 | Service | `lgtm`, image `${PETRI_LGTM_IMAGE:-grafana/otel-lgtm:0.34.0}`, `deploy.resources.limits` cpus `2`, memory `2g` |
 | Ports | `127.0.0.1:3300` to Grafana 3000; `127.0.0.1:4317` and `127.0.0.1:4318` to the collector |
-| Volume | named volume `${PETRI_TELEMETRY_VOLUME:-petri-telemetry}` at `/data`; the two variables exist for `scripts/telemetry-verify` only |
+| Volume | named volume `${PETRI_TELEMETRY_VOLUME:-petri-telemetry}` at `/data`; with `PETRI_LGTM_IMAGE` and `PETRI_TELEMETRY_PROJECT` (Compose project name, default `petri-telemetry`) these variables exist for `scripts/telemetry-verify` only |
 | Prometheus | `PROMETHEUS_EXTRA_ARGS=--storage.tsdb.retention.time=100y --storage.tsdb.retention.size=0 --web.enable-admin-api` |
-| Tempo | mounted `telemetry/tempo-config.yaml`: the image's file for 0.34.0 (extracted from the image) plus `compactor.compaction.block_retention: 876000h` |
-| Loki | `LOKI_EXTRA_ARGS=-compactor.retention-enabled=true -compactor.delete-request-store=filesystem -compactor.delete-request-cancel-period=1m -compactor.retention-delete-delay=1m -compactor.compaction-interval=5m -distributor.max-line-size=4MB`; `retention_period` stays at its default `0s`, so nothing expires by age |
+| Tempo | mounted `telemetry/tempo-config.yaml`: the image's file for 0.34.0 (extracted from the image; Tempo v3.0.3 on both pinned tags, no `compactor` section) with `block_retention: 876000h` under both `backend_scheduler.provider.compaction.compaction` and `backend_worker.compaction`; `/status/config` must show both; `live_store` block settings stay at the image's defaults (`max_block_duration` 30s) |
+| Loki | `LOKI_EXTRA_ARGS=-compactor.retention-enabled=true -compactor.delete-request-store=filesystem -compactor.delete-request-cancel-period=1m -compactor.retention-delete-delay=1m -compactor.compaction-interval=5m -distributor.max-line-size=4MB -store.max-query-length=0`; `retention_period` stays at its default `0s`, so nothing expires by age |
 | Grafana | defaults of the image; login `admin`/`admin` |
 
 `make telemetry-up` runs `docker compose up -d` and then prints each store's
@@ -112,16 +112,17 @@ disk use (`du -s` of `/data/prometheus`, `/data/tempo`, `/data/loki` inside
 the container); `make telemetry-down` stops the stack and keeps the volume.
 
 **Cleanup.** `scripts/telemetry-cleanup CUTOFF [--proceed]`, behind
-`make telemetry-clean CUTOFF=YYYY-MM-DD [PROCEED=1]`, uses only the pinned
-image (through `docker compose exec` and `docker compose run`). Without
-`--proceed` it prints each store's disk use, the deletion interval
-(everything before `CUTOFF` 00:00 UTC) and the exact targets, then exits
-without deleting.
+`make telemetry-clean CUTOFF=<cutoff> [PROCEED=1]`, uses only the pinned
+image. `CUTOFF`
+is a date `YYYY-MM-DD`, read as 00:00 UTC, or an RFC3339 timestamp; it
+must be in the past or the script refuses. Without `--proceed` it prints
+each store's disk use, the deletion interval (everything before the cutoff)
+and the exact targets, then exits without deleting.
 
 | Store | Preview | Deletion |
 | --- | --- | --- |
 | Prometheus | the series label sets returned by `GET /api/v1/series?match[]={__name__=~".+"}&end=<cutoff>`, with their count | `POST /api/v1/admin/tsdb/delete_series?match[]={__name__=~".+"}&end=<cutoff>`, then `POST /api/v1/admin/tsdb/clean_tombstones` |
-| Loki | the streams returned by `GET /loki/api/v1/series?match[]={service_name=~".+"}&start=1&end=<cutoff>`, with their count | `POST /loki/api/v1/delete` with `query={service_name=~".+"}`, `start=1`, `end=<cutoff>`; the script prints the request ID and the status endpoint |
+| Loki | the streams returned by `GET /loki/api/v1/series?match[]={service_name=~".+"}&start=2000-01-01T00:00:00Z&end=<cutoff>` (the query-length limit is disabled in the stack), with their count | `POST /loki/api/v1/delete` with `query={service_name=~".+"}`, `start=2000-01-01T00:00:00Z`, `end=<cutoff>`; the script prints the request ID and the status endpoint |
 | Tempo | block IDs under `/data/tempo/blocks/*/*/meta.json` whose `endTime` is before the cutoff, each with its start, end and byte size, plus the IDs of straddling blocks it keeps whole | the script stops the stack, removes the listed block directories through `docker compose run --rm` on the same image, and starts the stack again |
 
 **Run identity and records.** `crates/v3-telemetry` owns the SDK, the
@@ -140,6 +141,7 @@ identity, the records and the exporter; the binaries call it.
 | `petri.recipe` | record | the `--config` path when one was given; absent otherwise |
 | `petri.config_digest` | record | `config_digest(&config)` |
 | `petri.tick` | record | the tick at capture |
+| `event.name` | record | the record kind (`run.started` and so on), because Loki 3.7 drops the OTLP `event_name` field |
 
 | Record | Emitted | Attributes and body |
 | --- | --- | --- |
@@ -161,8 +163,9 @@ binary prints one stderr line at start
 Every record is attributed to its run when enqueued; the run's line prints
 once the run has ended and each of its records has been exported, failed,
 dropped by the full queue, or abandoned by the shutdown flush, so a server
-reset never blocks on the previous run's flush. Every count is exact,
-whichever processor the implementer chooses. `self_time_us` is the time
+reset never blocks on the previous run's flush. `bytes` counts body plus
+attribute key and value bytes of the exported records. Every count is
+exact. `self_time_us` is the time
 inside telemetry calls on the simulation thread and `flush_ms` the time the
 end-of-run or shutdown flush took.
 
@@ -173,13 +176,13 @@ timed run in `scripts/bench-wait`.
 | --- | --- |
 | `scripts/telemetry-parent-compare BASE` | `BASE` is mandatory and has no default, because in this single-worktree track the parent of a feature after F01 is the previous feature's closing commit, not the fork point; each T21 spec names the commit it compared against. Adds a scratch worktree at `BASE` outside the calling checkout, builds both `v3-cli` release binaries into separate target directories, runs the workload below on both with `--telemetry off`, omitting the flag only when the parent's `run --help` does not list it (a pre-F01 parent), compares the canonical form of both outputs, removes the worktree, and exits non-zero on a difference. |
 | `scripts/telemetry-overhead` | Builds the telemetry build and the reference build (`--no-default-features`, separate target directory); calibrates `T` when the readings file has none; measures the spread; runs the pairs of each state below, stopping and starting the stack with `docker compose stop` and `start` and waiting for Grafana `/api/health` plus 5 s before a timed run that follows a start; prints one table with the per-state median ratio, the verdict, the pair count, the self-timed cost per tick from the stderr line, and the measured time used. It refuses a run that would pass 300 s of measured time and reports `inconclusive`. |
-| `scripts/telemetry-verify` | Runs the three stack verifications and the cleanup rehearsal under Compose project `petri-telemetry-verify` on the scratch volume `petri-telemetry-verify`, never on `petri-telemetry`; refuses to start while the `petri-telemetry` project is up (same host ports); mounts `telemetry/verify/tempo-config.yaml`, the production file with a short `ingester.max_block_duration`, so block boundaries fall within minutes; prints one pass/fail line per check and removes the scratch volume at the end. |
+| `scripts/telemetry-verify` | Runs the three stack verifications and the cleanup rehearsal under Compose project `petri-telemetry-verify` on the scratch volume `petri-telemetry-verify`, never on `petri-telemetry`; refuses to start while the `petri-telemetry` project is up (same host ports); uses the production stack files unchanged and an RFC3339 cutoff taken during the run: it writes the "before" samples, waits for Tempo's 30 s live-store window to close and the block to appear under `/data/tempo/blocks`, writes the first half of the straddling samples, takes the cutoff, writes the second half inside the same window, then writes the "after" samples in a later window, so one run yields a block ending before the cutoff, one straddling it and one after it, and the Loki and Prometheus before/after pairs; prints one pass/fail line per check and removes the scratch volume at the end. |
 
 Workload for both checks: `v3-cli run --seed 7 --ticks T --sample-every T
---config telemetry/overhead-world.json`, where the recipe is the gate
-profile's world (128x128, 256 founders, food coverage 1.0) and `T` is
-calibrated once with three reference runs so that one run takes 3 to 5 s on
-this host, recorded in the readings file and fixed for later closures.
+--config telemetry/overhead-world.json`, the gate profile's world (128x128,
+256 founders, food coverage 1.0); `T` is calibrated once with three
+reference runs to a 3 to 5 s run, recorded in the readings file and fixed
+for later closures.
 
 ## Telemetry
 
@@ -198,7 +201,7 @@ no recorded configuration.
 ## Implementation Tasks
 
 - [ ] `telemetry/compose.yaml`, `telemetry/tempo-config.yaml`,
-      `telemetry/verify/tempo-config.yaml`, `telemetry/overhead-world.json`;
+      `telemetry/overhead-world.json`;
       `make telemetry-up`, `telemetry-down`, `telemetry-clean`.
 - [x] `crates/v3-telemetry`: identity, `build.rs` revision, the four
       records, bounded exporter with exact per-run counts, stderr
@@ -312,7 +315,7 @@ Overhead check, method fixed before any run:
       on `grafana/otel-lgtm:0.34.0`, or the failed check is recorded and the
       spec has been revised to the separate-services layout before
       implementation continues.
-- [ ] `make telemetry-clean CUTOFF=<date>` previews disk use, interval and
+- [ ] `make telemetry-clean CUTOFF=<date or RFC3339>` previews disk use, interval and
       targets per store and deletes only with `PROCEED=1`, keeping everything
       newer.
 - [ ] A `v3-cli run --telemetry on` run appears in Loki with the identity
