@@ -178,12 +178,19 @@ and discarded.
       `docs/progress/lab/t22-f02-{food-seeking,wall}.json` values committed
       at df2ddbe3 (the comparison target, since the files are regenerated in
       place); wall time, creature-ticks and `readings_creature_ticks`
-      recorded in the readings file. Equal for all three arenas (ring
-      included); creature-ticks less `readings_creature_ticks` equal F02's.
+      recorded in the readings file. Run from the clean tree at 47a70794
+      (summaries `dirty: false`): equal for all three arenas (ring
+      included); creature-ticks less `readings_creature_ticks` equal F02's;
+      food-seeking 58.8 s, wall 32.7 s, ring 0.2 s (exit 2) -> readings
+      file, Quick runs.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The full
       survivor list stays here; `docs/workflow.md` requires it in the spec.
-- [ ] Benchmark: `Not applicable: lab feature` (below).
+- [x] Benchmark: `Not applicable: lab feature` (below).
+- [x] `cargo test -p v3-lab` (125 unit, 18 integration pass), `cargo
+      clippy -p v3-lab --all-targets` (0 warnings), `cargo check
+      --workspace --all-targets` and `make roadmap-check` clean at
+      47a70794 plus the regenerated summaries and documents.
 
 ## Performance and Goal Impact
 
@@ -208,7 +215,13 @@ projected at ≈ 46 × 1.46 ≈ 67 s at 8 threads against F01's 60 s criterion; 
 3 × 64 + 2, about 8% of the creature-ticks before the battery and steering
 work, under 10% with it.
 
-**Measured verdict.** Not applicable: lab feature; scope checked in review.
+**Measured verdict.** Not applicable: lab feature. `git diff --stat
+main...HEAD` plus the working tree touches only `crates/v3-lab/**`
+(`campaign.rs`, `cli.rs`, `eval.rs`, `lib.rs`, `readings.rs`,
+`readings/tests.rs`, `run.rs`, `summary.rs`,
+`tests/fixtures/summary-v2-wall.json`, `tests/lab_run.rs`), this spec, the
+readings file and `docs/progress/lab/t22-f02-{food-seeking,wall,ring}.json`,
+within the predeclared scope (the track checkbox lands at closure).
 
 - Full readings: [`docs/progress/readings/t22-f03.md`](../../progress/readings/t22-f03.md).
 
