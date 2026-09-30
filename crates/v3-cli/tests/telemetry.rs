@@ -93,6 +93,7 @@ fn command_with(
         .env_remove(v3_telemetry::CREATURE_WINDOWS_ENV)
         .env_remove(v3_telemetry::WINDOW_TICKS_ENV)
         .env_remove(v3_telemetry::WINDOW_INTERVAL_ENV)
+        .env_remove(v3_telemetry::PRESET_ENV)
         .envs(env.iter().copied());
     if let Some(traces) = traces {
         command.env(v3_telemetry::TICK_TRACES_ENV, traces);
@@ -442,6 +443,7 @@ fn a_run_of_zero_ticks_takes_its_completion_snapshot_and_no_trace() {
             metrics_interval: v3_telemetry::DEFAULT_METRICS_INTERVAL,
             tick_traces: v3_telemetry::Switch::On,
             windows: v3_telemetry::WindowSettings::default(),
+            preset: v3_telemetry::Preset::Standard,
         }),
         None,
     );
@@ -654,4 +656,66 @@ fn windows_off_export_no_window_and_invalid_settings_refuse_to_start() {
         let stderr = String::from_utf8(output.stderr).unwrap();
         assert!(stderr.contains(name), "{stderr}");
     }
+}
+
+/// The start line's settings, as `key=value` fields.
+fn start_line(stderr: &str) -> std::collections::BTreeMap<String, String> {
+    stderr
+        .lines()
+        .find_map(|line| line.strip_prefix("telemetry: on "))
+        .expect("the start line")
+        .split(' ')
+        .filter_map(|field| field.split_once('='))
+        .map(|(key, value)| (key.to_owned(), value.to_owned()))
+        .collect()
+}
+
+#[test]
+fn a_preset_sets_the_base_settings_and_an_explicit_variable_overrides_one() {
+    let receiver = Receiver::start();
+    let on = windowed(
+        &receiver,
+        SHORT,
+        &[
+            (v3_telemetry::PRESET_ENV, "phases"),
+            (v3_telemetry::METRICS_INTERVAL_ENV, "500"),
+        ],
+    );
+    let line = start_line(&on.stderr);
+    let expected = [
+        ("preset", "phases"),
+        ("interval_ms", "500"),
+        ("tick_traces", "on"),
+        ("windows", "off"),
+        ("window_ticks", "8"),
+        ("window_interval_ms", "10000"),
+    ];
+    for (key, value) in expected {
+        assert_eq!(line[key], value, "{line:?}");
+    }
+    let run_id = announced_run(&on.stderr);
+    assert!(windows(&receiver, &run_id).is_empty());
+    let started = receiver
+        .records()
+        .into_iter()
+        .find(|r| {
+            r.event_name == "run.started" && r.attribute("petri.run_id") == Some(run_id.as_str())
+        })
+        .unwrap();
+    assert_eq!(started.attribute("petri.preset"), Some("phases"));
+    assert_eq!(started.attribute("petri.metrics_interval_ms"), Some("500"));
+    assert_eq!(started.attribute("petri.creature_windows"), Some("off"));
+
+    let output = command_with(
+        "on",
+        Some(&closed_endpoint()),
+        None,
+        None,
+        SHORT,
+        &[(v3_telemetry::PRESET_ENV, "full")],
+    );
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains(v3_telemetry::PRESET_ENV), "{stderr}");
 }

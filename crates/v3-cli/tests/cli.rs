@@ -1,6 +1,13 @@
 use v3_cli::{run_simulation, RunError};
 use v3_core::config::SimulationConfig;
 
+/// Spawned binaries run with `--telemetry off` (T21.F05): no test exports or
+/// depends on a stack. The flag exists only with the `telemetry` feature.
+#[cfg(feature = "telemetry")]
+const TELEMETRY_OFF: &[&str] = &["--telemetry", "off"];
+#[cfg(not(feature = "telemetry"))]
+const TELEMETRY_OFF: &[&str] = &[];
+
 fn default_config() -> SimulationConfig {
     let mut cfg = SimulationConfig::default();
     cfg.world.width = 32;
@@ -254,6 +261,7 @@ fn recipe_cli_save_reload_and_failures() {
     std::fs::write(&input, r#"{"world":{"width":8,"height":8,"world_seed":18446744073709551615,"terrain":[{"params":{"pattern_type":"Noise","density":0.2,"cluster_size":1},"seed":18446744073709551615}],"food":{"fertility":{"enabled":true,"layers":[{"weight":1.0,"algorithm":{"Fbm":{"octaves":2,"frequency":0.1,"lacunarity":2.0,"persistence":0.5,"seed":18446744073709551615}}}]}}},"population":{"initial_creatures":2,"founder_profile":"forage_first_sparse"},"runtime":{"max_actions_per_turn":2},"energy":{"costs":{"move_cost":0.25}}}"#).unwrap();
     let run = |input: &std::path::Path, save: Option<&std::path::Path>| {
         let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"));
+        cmd.args(TELEMETRY_OFF);
         cmd.args(["run", "--ticks", "1", "--seed", "42", "--config"])
             .arg(input);
         if let Some(path) = save {
@@ -338,6 +346,7 @@ fn recruitment_cli_passes_every_option_into_the_written_summary() {
         let raw = dir.join(format!("{name}-raw.json"));
         let summary = dir.join(format!("{name}-summary.json"));
         let output = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+            .args(TELEMETRY_OFF)
             .current_dir(&dir)
             .args([
                 "recruitment",

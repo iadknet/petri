@@ -373,6 +373,7 @@ fn telemetry(receiver: &Receiver, limits: Limits, interval_ms: u64) -> (Telemetr
             ticks: 2,
             interval: Duration::from_millis(interval_ms),
         },
+        preset: crate::Preset::Standard,
     });
     (telemetry, reports)
 }

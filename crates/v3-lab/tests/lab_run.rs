@@ -22,6 +22,13 @@ use v3_lab::summary::{
 };
 use v3_lab::{sha256_hex, GenomeFile, LabError};
 
+/// Spawned binaries run with `--telemetry off` (T21.F05): no test exports or
+/// depends on a stack. The flag exists only with the `telemetry` feature.
+#[cfg(feature = "telemetry")]
+const TELEMETRY_OFF: &[&str] = &["--telemetry", "off"];
+#[cfg(not(feature = "telemetry"))]
+const TELEMETRY_OFF: &[&str] = &[];
+
 /// A temporary lab root outside any checkout, with `lab` =
 /// `<root>/.bench-artifacts/lab`; removed on drop.
 struct Scratch {
@@ -812,6 +819,7 @@ fn an_injected_root_without_a_checkout_records_git_unavailable() {
 fn the_cli_refuses_to_run_outside_a_checkout() {
     let scratch = Scratch::new("cli-no-checkout");
     let output = Command::new(env!("CARGO_BIN_EXE_v3-lab"))
+        .args(TELEMETRY_OFF)
         .args(["run", "--quick", "--calibrate-only"])
         .current_dir(&scratch.root)
         // Stop git's discovery at the temp directory even if it sits in a repo.
@@ -1141,7 +1149,8 @@ fn the_lab_command_records_one_measurement_after_its_run() {
             .env_remove(v3_telemetry::TICK_TRACES_ENV)
             .env_remove(v3_telemetry::CREATURE_WINDOWS_ENV)
             .env_remove(v3_telemetry::WINDOW_TICKS_ENV)
-            .env_remove(v3_telemetry::WINDOW_INTERVAL_ENV);
+            .env_remove(v3_telemetry::WINDOW_INTERVAL_ENV)
+            .env_remove(v3_telemetry::PRESET_ENV);
         if let Some(endpoint) = endpoint {
             command.env(v3_telemetry::ENDPOINT_ENV, endpoint);
         }

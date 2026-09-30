@@ -36,6 +36,7 @@ fn telemetry(endpoint: &str) -> (Telemetry, ReportSink) {
         metrics_interval: Duration::from_secs(3_600),
         tick_traces: v3_telemetry::Switch::On,
         windows: v3_telemetry::WindowSettings::default(),
+        preset: v3_telemetry::Preset::Standard,
     });
     (telemetry, reports)
 }
@@ -334,6 +335,7 @@ async fn interval_snapshots_carry_tick_traces_and_lifecycle_snapshots_do_not() {
         tick_traces: v3_telemetry::Switch::On,
         // Tick traces only: creature windows have their own tests.
         windows: WINDOWS_OFF,
+        preset: v3_telemetry::Preset::Standard,
     });
     let mut config = test_config();
     config.world.width = 32;
@@ -457,6 +459,7 @@ async fn run_loop_emits_interval_traces_at_snapshot_ticks() {
         metrics_interval: Duration::from_millis(100),
         tick_traces: v3_telemetry::Switch::On,
         windows: WINDOWS_OFF,
+        preset: v3_telemetry::Preset::Standard,
     });
     let mut config = test_config();
     config.world.width = 32;
@@ -514,6 +517,7 @@ fn windowed(endpoint: &str, interval_ms: u64) -> (Telemetry, ReportSink) {
             ticks: 3,
             interval: Duration::from_millis(interval_ms),
         },
+        preset: v3_telemetry::Preset::Standard,
     });
     (telemetry, reports)
 }

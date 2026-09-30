@@ -255,7 +255,7 @@ from_ms=$((($(date -u +%s) - 60) * 1000))
 note "running the workload, T=$ticks"
 OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 PETRI_TELEMETRY='' PETRI_TELEMETRY_METRICS_INTERVAL_MS='' \
   PETRI_TELEMETRY_TICK_TRACES='' PETRI_TELEMETRY_CREATURE_WINDOWS='' PETRI_TELEMETRY_WINDOW_TICKS='' \
-  PETRI_TELEMETRY_WINDOW_INTERVAL_MS='' \
+  PETRI_TELEMETRY_WINDOW_INTERVAL_MS='' PETRI_TELEMETRY_PRESET='' \
   "$root/scripts/bench-wait" "$root/target/release/v3-cli" --telemetry on run --seed 7 \
   --ticks "$ticks" --sample-every "$ticks" --config "$recipe" \
   >"$scratch/stdout" 2>"$scratch/stderr"
@@ -267,7 +267,7 @@ note "run $run_id"
 note 'running the tiny sweep'
 OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 PETRI_TELEMETRY='' PETRI_TELEMETRY_METRICS_INTERVAL_MS='' \
   PETRI_TELEMETRY_TICK_TRACES='' PETRI_TELEMETRY_CREATURE_WINDOWS='' PETRI_TELEMETRY_WINDOW_TICKS='' \
-  PETRI_TELEMETRY_WINDOW_INTERVAL_MS='' \
+  PETRI_TELEMETRY_WINDOW_INTERVAL_MS='' PETRI_TELEMETRY_PRESET='' \
   "$root/target/release/v3-cli" --telemetry on bench --profile sweep --width 32 --height 32 \
   --founders 16 --seeds 11,22 --ticks 20 --feature t21-f06-dashboards \
   --out "$scratch/sweep-raw.json" --summary-out "$scratch/sweep-summary.json" \

@@ -1,37 +1,73 @@
 #!/bin/sh
 # Telemetry overhead check (T21): the telemetry build against the reference
-# build of the same commit (`--no-default-features`) on the T21 workload
+# build of the same commit (`--no-default-features`), one ratio per pair of
+# adjacent runs (process wall of the telemetry run over the reference run's),
+# order alternating pair by pair. Every timed run goes through
+# scripts/bench-wait, is spawned with every PETRI_TELEMETRY* and OTEL_*
+# variable removed, and, on the telemetry side, with `--telemetry on`,
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 and PETRI_TELEMETRY_PRESET
+# set to the preset under test. Each telemetry run's stderr start line must
+# show that endpoint and the preset's settings (scripts/telemetry-stats.mjs
+# check), or its pair is void. Each run's timeout is the time left in the cap;
+# a killed or failed run is charged in full and voids its pair; a void enters
+# its cell as an infinite ratio. Reaching the cap ends the check inconclusive.
+#
+# Statistic (scripts/telemetry-stats.mjs): per cell the median ratio and its
+# 90% distribution-free interval; pass when the upper bound is below the
+# ceiling 1.05, fail when the lower bound is at or above it, else
+# inconclusive. Pairs n: five reference runs' spread (max - min) / median
+# sets 16 at <= 5%, 24 at <= 10%, 32 at <= 20%; above 20% the spread block is
+# repeated once after 60 s idle, and if still above 20% no pair runs.
+#
+# PETRI_OVERHEAD_MODE=routine (default), the check after F05: the T21
+# workload
 #   v3-cli run --seed 7 --ticks T --sample-every T --config telemetry/overhead-world.json
 # or, with PETRI_OVERHEAD_WORKLOAD=bench, the bench workload (T21.F06)
 #   v3-cli bench --profile sweep --config telemetry/overhead-world.json
 #     --seeds 7 --ticks T --out <scratch> --summary-out <scratch>
-# whose telemetry side adds `--telemetry on`. Self time is the sum of the
-# invocation's `self_time_us` lines (the measurement and its seed run); in
-# bench mode each state's row also gives the median, over its pairs, of the
-# raw reports' `environment.wall_clock_ms_total` ratio (no ceiling).
-#
-# States (docs/specs/roadmap/t21-f01-local-telemetry-stack-and-run-identity.md):
-#   a  telemetry on, stack healthy: pairs of one telemetry run with the stack
-#      started and one reference run with it stopped
-#   b  telemetry on, stack stopped: pairs, the reference also stopped
+# with preset standard and the states
+#   a  telemetry on, stack healthy: the stack is started before each
+#      telemetry run and stopped before each reference run
+#   b  telemetry on, stack stopped, the reference also stopped
 #   c  idle-stack cost: three reference runs with the stack started against
 #      the reference runs of b (block comparison, no ceiling)
-# Pair order alternates. The spread of three reference runs sets n (5 at
-# <= 5%, 8 at <= 10%, else inconclusive before any pair). A state passes when
-# its median ratio <= 1.25 and at least ceil(0.75 n) pairs are <= 1.25, fails
-# when the median > 1.25 and at least ceil(0.75 n) pairs are > 1.25, and is
-# otherwise inconclusive; one inconclusive state is rerun once when it fits.
-# Calibration, spread, pairs, the c block and the rerun share a cap of 300 s
-# of measured run time; a run that would pass it is refused and the rest is
-# inconclusive. Every timed run goes through scripts/bench-wait.
+# under a 300 s cap of measured run time; a pair count the cap cannot hold
+# (two states, two runs a pair, at the slowest spread run) makes it
+# inconclusive before any pair. In bench mode each state also gives the
+# median, over its pairs, of the raw reports' environment.wall_clock_ms_total
+# ratio (no ceiling). T comes from TELEMETRY_TICKS or the `- Workload ticks
+# T: N` line of docs/progress/readings/t21-f01.md; without either it is
+# calibrated with three reference runs to about 4 s per run.
+#
+# PETRI_OVERHEAD_MODE=qualify, T21.F05's qualifying measurement
+# (docs/specs/roadmap/t21-f05-qualified-sampling-defaults.md, Performance and
+# Goal Impact), run workload only, cap 3,600 s of measured process wall over
+# every attempt: TELEMETRY_USED_MS carries the time earlier attempts used, and
+# the script prints the value for the next. Worlds W1 (the built-in default
+# world, T1 ticks: TELEMETRY_DEFAULT_TICKS, else the `- Default-world ticks
+# T1: N` line of docs/progress/readings/t21-f05.md, else calibrated from 20
+# ticks to 5 s, the third run in 4 to 6 s) and W2 (the routine workload, T as
+# above). Per world: three `--ticks 1` reference runs (init), the spread
+# block, then cells b, a and s of preset standard, s being on with the stack
+# paused, its verdict ratio (telemetry wall - flush_ms) / reference wall and
+# the flush-included ratio recorded beside it. In a, a telemetry run with any
+# failed, dropped or abandoned record or counts inconsistent with its preset
+# voids its pair. Then (c) per world, 6 pairs of state a per world for each
+# of minimal, phases and dense (no ceiling; a lower bound at or above 1.05 is
+# labelled "exceeds the ceiling; opt-in"), and one storage block per preset
+# and world: `du -sk` of the three stores after 60 s settled, three telemetry
+# runs back to back, 60 s settle, `du -sk` again, less the idle growth rate of
+# one 60 s window read at the start. Qualification passes only when all six
+# cells pass and the cap was not reached.
+#
+# Smoke knobs, qualify mode only and never set for the qualifying run (the
+# output is then marked a smoke run): TELEMETRY_SMOKE_PAIRS (pairs per cell and
+# preset, in place of the table and the 6), TELEMETRY_SMOKE_SETTLE_S (in place
+# of every 60 s idle and settle wait) and TELEMETRY_SMOKE_CAP_S (the cap).
 #
 # Runs on the scratch Compose project and volume petri-telemetry-overhead,
 # created here and removed on exit (scripts/telemetry-scratch.sh); refuses
-# while petri-telemetry is up. T comes from TELEMETRY_TICKS or the
-# `- Workload ticks T: N` line of
-# docs/progress/readings/t21-f01.md; without either it is calibrated with
-# three reference runs to about 4 s per run, and the script prints the line
-# to record.
+# while petri-telemetry is up.
 set -eu
 
 [ "$#" -eq 0 ] || { printf 'Usage: scripts/telemetry-overhead\n' >&2; exit 2; }
@@ -39,16 +75,48 @@ set -eu
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 aqua_root=${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}
 node=$aqua_root/bin/node
+stats_js=$root/scripts/telemetry-stats.mjs
 export AQUA_POLICY_CONFIG="${AQUA_POLICY_CONFIG:-$root/aqua-policy.yaml}"
-readings=$root/docs/progress/readings/t21-f01.md
+f01_readings=$root/docs/progress/readings/t21-f01.md
+f05_readings=$root/docs/progress/readings/t21-f05.md
 recipe=$root/telemetry/overhead-world.json
-cap_ms=300000
-ceiling=1.25
+endpoint=http://127.0.0.1:4318
+ceiling=1.05
+mode=${PETRI_OVERHEAD_MODE:-routine}
 workload=${PETRI_OVERHEAD_WORKLOAD:-run}
+
+die() { printf 'telemetry-overhead: %s\n' "$*" >&2; exit 2; }
+whole() {
+  case "$2" in ''|*[!0-9]*) die "$1 must be a whole number, not $2" ;; esac
+}
 case "$workload" in
   run | bench) ;;
-  *) printf 'telemetry-overhead: PETRI_OVERHEAD_WORKLOAD must be run or bench, not %s\n' "$workload" >&2; exit 2 ;;
+  *) die "PETRI_OVERHEAD_WORKLOAD must be run or bench, not $workload" ;;
 esac
+smoke=''
+settle_s=60
+case "$mode" in
+  routine) cap_ms=300000 ;;
+  qualify)
+    [ "$workload" = run ] || die 'PETRI_OVERHEAD_MODE=qualify measures the run workload only'
+    cap_ms=3600000
+    if [ -n "${TELEMETRY_SMOKE_PAIRS:-}" ]; then whole TELEMETRY_SMOKE_PAIRS "$TELEMETRY_SMOKE_PAIRS"; smoke=1; fi
+    if [ -n "${TELEMETRY_SMOKE_SETTLE_S:-}" ]; then
+      whole TELEMETRY_SMOKE_SETTLE_S "$TELEMETRY_SMOKE_SETTLE_S"
+      settle_s=$TELEMETRY_SMOKE_SETTLE_S
+      smoke=1
+    fi
+    if [ -n "${TELEMETRY_SMOKE_CAP_S:-}" ]; then
+      whole TELEMETRY_SMOKE_CAP_S "$TELEMETRY_SMOKE_CAP_S"
+      cap_ms=$((TELEMETRY_SMOKE_CAP_S * 1000))
+      smoke=1
+    fi
+    ;;
+  *) die "PETRI_OVERHEAD_MODE must be routine or qualify, not $mode" ;;
+esac
+used_ms=${TELEMETRY_USED_MS:-0}
+whole TELEMETRY_USED_MS "$used_ms"
+
 compose_file=$root/telemetry/compose.yaml
 . "$root/scripts/telemetry-scratch.sh"
 scratch_stack petri-telemetry-overhead
@@ -56,22 +124,15 @@ compose() {
   docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" "$@"
 }
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/petri-overhead.XXXXXX")
-trap 'scratch_stack_remove; rm -rf "$scratch"' EXIT
+# A paused container is unpaused first, so `down` can stop it.
+trap 'compose unpause lgtm >/dev/null 2>&1 || true; scratch_stack_remove; rm -rf "$scratch"' EXIT
 trap 'exit 130' INT TERM
 
-stack_stop() {
-  compose stop lgtm >/dev/null 2>&1
-}
-
-stack_ready() {
-  scratch_stack_ready
-  sleep 5
-}
-
-stack_start() {
-  compose start lgtm >/dev/null 2>&1
-  stack_ready
-}
+stack_stop() { compose stop lgtm >/dev/null 2>&1; }
+stack_ready() { scratch_stack_ready; sleep 5; }
+stack_start() { compose start lgtm >/dev/null 2>&1; stack_ready; }
+stack_pause() { compose pause lgtm >/dev/null 2>&1; }
+stack_unpause() { compose unpause lgtm >/dev/null 2>&1 || true; }
 
 printf 'Building the telemetry and reference builds\n'
 cargo build --release --quiet -p v3-cli --manifest-path "$root/Cargo.toml" \
@@ -86,238 +147,515 @@ scratch_volume_create
 compose up -d --quiet-pull >/dev/null 2>&1
 stack_ready
 
-used_ms=0
+capped=0
 estimate_ms=0
-refused=0
+world_config=$recipe
 
-# timed KIND TICKS: runs one workload run under bench-wait and sets run_ms,
-# run_self (the sum of its self_time_us) and, in bench mode, run_stored (the
-# raw report's environment.wall_clock_ms_total); returns 1, running nothing,
-# when the run would pass the cap. Call it outside subshells so the measured
-# total accumulates.
+median() {
+  sort -n | awk '{ v[NR] = $1 } END { if (NR == 0) { print "-"; exit } printf "%.10g\n", (NR % 2) ? v[(NR + 1) / 2] : (v[NR / 2] + v[NR / 2 + 1]) / 2 }'
+}
+
+# timed KIND TICKS [PRESET [EXPORT_CHECK]]: one workload run under bench-wait
+# with the remaining cap as its timeout. Sets run_status (ok, failed or
+# timeout), run_ms (charged), run_stored (bench mode) and, for a telemetry
+# run, check_status (ok or void:<cause>), the run line totals chk_<name> and
+# the start line in $scratch/start. Returns 1, running nothing, when the cap
+# is spent. Call it outside subshells so the measured total accumulates.
 timed() {
   kind=$1
   run_ticks=$2
-  if [ $((used_ms + estimate_ms)) -gt "$cap_ms" ]; then
-    refused=1
+  run_preset=${3:-standard}
+  run_export=${4:-0}
+  remaining=$((cap_ms - used_ms))
+  if [ "$remaining" -le 0 ]; then
+    capped=1
     return 1
   fi
   if [ "$kind" = telemetry ]; then
     set -- "$telemetry_bin" --telemetry on
+    spawn_preset=$run_preset
   else
     set -- "$reference_bin"
+    spawn_preset=''
   fi
   if [ "$workload" = bench ]; then
     rm -f "$scratch/raw.json" "$scratch/summary.json"
-    set -- "$@" bench --profile sweep --config "$recipe" --seeds 7 --ticks "$run_ticks" \
+    set -- "$@" bench --profile sweep --config "$world_config" --seeds 7 --ticks "$run_ticks" \
       --out "$scratch/raw.json" --summary-out "$scratch/summary.json"
     raw=$scratch/raw.json
   else
-    set -- "$@" run --seed 7 --ticks "$run_ticks" --sample-every "$run_ticks" --config "$recipe"
+    set -- "$@" run --seed 7 --ticks "$run_ticks" --sample-every "$run_ticks"
+    if [ -n "$world_config" ]; then set -- "$@" --config "$world_config"; fi
     raw=''
   fi
   # shellcheck disable=SC2016 # JavaScript, not shell.
-  OVERHEAD_RAW=$raw "$root/scripts/bench-wait" "$node" -e '
+  OVERHEAD_RAW=$raw OVERHEAD_TIMEOUT_MS=$remaining OVERHEAD_PRESET=$spawn_preset \
+    OVERHEAD_ENDPOINT=$endpoint "$root/scripts/bench-wait" "$node" -e '
     const { spawnSync } = require("child_process");
     const [bin, ...args] = process.argv.slice(1);
+    const env = {};
+    for (const [name, value] of Object.entries(process.env)) {
+      if (!/^(PETRI_TELEMETRY|OTEL_|OVERHEAD_)/.test(name)) env[name] = value;
+    }
+    if (process.env.OVERHEAD_PRESET) {
+      env.OTEL_EXPORTER_OTLP_ENDPOINT = process.env.OVERHEAD_ENDPOINT;
+      env.PETRI_TELEMETRY_PRESET = process.env.OVERHEAD_PRESET;
+    }
     const began = process.hrtime.bigint();
-    const run = spawnSync(bin, args, { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" });
+    const run = spawnSync(bin, args, {
+      stdio: ["ignore", "ignore", "pipe"], encoding: "utf8", env,
+      timeout: Number(process.env.OVERHEAD_TIMEOUT_MS), killSignal: "SIGKILL",
+      maxBuffer: 64 * 1024 * 1024,
+    });
     const ms = Number(process.hrtime.bigint() - began) / 1e6;
-    if (run.status !== 0) { process.stderr.write(run.stderr || ""); process.exit(1); }
-    let self = 0;
-    for (const match of (run.stderr || "").matchAll(/self_time_us=(\d+)/g)) self += Number(match[1]);
+    process.stderr.write(run.stderr || "");
+    const status = run.error && run.error.code === "ETIMEDOUT" ? "timeout"
+      : run.status === 0 ? "ok" : "failed";
     let stored = "-";
-    if (process.env.OVERHEAD_RAW) {
+    if (status === "ok" && process.env.OVERHEAD_RAW) {
       const report = JSON.parse(require("fs").readFileSync(process.env.OVERHEAD_RAW, "utf8"));
       stored = report.environment.wall_clock_ms_total;
     }
-    console.log(`${Math.round(ms)} ${self} ${stored}`);
-  ' "$@" >"$scratch/run"
-  read -r run_ms run_self run_stored <"$scratch/run"
+    console.log(`${status} ${Math.round(ms)} ${stored}`);
+  ' "$@" >"$scratch/run" 2>"$scratch/stderr"
+  read -r run_status run_ms run_stored <"$scratch/run"
   used_ms=$((used_ms + run_ms))
+  if [ "$run_status" = timeout ] || [ "$used_ms" -ge "$cap_ms" ]; then capped=1; fi
   if [ "$run_ms" -gt "$estimate_ms" ]; then estimate_ms=$run_ms; fi
+  check_status=ok
+  chk_self_time_us=0 chk_flush_ms=0 chk_dropped=0 chk_abandoned=0 chk_bytes=0
+  if [ "$kind" = telemetry ]; then
+    "$node" "$stats_js" check "$run_preset" "$endpoint" "$run_export" <"$scratch/stderr" >"$scratch/check"
+    # One `name=value` field per word: check_status (status=) and chk_<name>.
+    for field in $(head -n 1 "$scratch/check"); do
+      name=${field%%=*}
+      value=${field#*=}
+      case "$name" in
+        status) check_status=$value ;;
+        self_time_us) chk_self_time_us=$value ;;
+        flush_ms) chk_flush_ms=$value ;;
+        dropped) chk_dropped=$value ;;
+        abandoned) chk_abandoned=$value ;;
+        bytes) chk_bytes=$value ;;
+      esac
+    done
+    sed -n '2p' "$scratch/check" >"$scratch/start"
+  fi
 }
 
-median() {
-  sort -n | awk '{ v[NR] = $1 } END { if (NR == 0) exit; print (NR % 2) ? v[(NR + 1) / 2] : (v[NR / 2] + v[NR / 2 + 1]) / 2 }'
-}
-
-ticks=${TELEMETRY_TICKS:-}
-if [ -z "$ticks" ] && [ -f "$readings" ]; then
-  ticks=$(sed -n 's/^- Workload ticks T: \([0-9][0-9]*\).*$/\1/p' "$readings" | head -n 1)
-fi
-
-stack_stop
-if [ -z "$ticks" ]; then
-  # Three reference runs, each at the T the previous one scales to 4 s; a
-  # fixed startup cost makes a short trial undershoot, so the first trial is
-  # long enough for it to be minor. T is the third run's, which must itself
-  # take 3 to 5 s.
-  next=1000
-  for _ in 1 2 3; do
-    trial=$next
-    timed reference "$trial" || break
-    printf 'Calibration: %s ticks in %s ms\n' "$trial" "$run_ms"
-    next=$(awk -v t="$trial" -v ms="$run_ms" 'BEGIN { printf "%d", t * 4000 / ms + 0.5 }')
-  done
-  if [ "$run_ms" -lt 3000 ] || [ "$run_ms" -gt 5000 ]; then
-    printf 'telemetry-overhead: calibration ended on a %s ms run at %s ticks, outside 3 to 5 s; T not set\n' \
-      "$run_ms" "$trial" >&2
+# must KIND TICKS: timed, where a failed run is a defect: prints its stderr
+# and the time used, and exits 1. Returns 1 when the cap is reached.
+must() {
+  timed "$@" || return 1
+  if [ "$run_status" = failed ]; then
+    tail -n 20 "$scratch/stderr" >&2
+    printf 'telemetry-overhead: a %s run failed; measured time used %s ms (TELEMETRY_USED_MS=%s)\n' \
+      "$1" "$used_ms" "$used_ms" >&2
     exit 1
   fi
-  ticks=$trial
-  estimate_ms=0
-  printf 'Calibrated T=%s (%s ms); record:\n- Workload ticks T: %s\n' "$ticks" "$run_ms" "$ticks"
-fi
-case "$ticks" in
-  ''|*[!0-9]*|0) printf 'telemetry-overhead: invalid T %s\n' "$ticks" >&2; exit 2 ;;
-esac
+  [ "$run_status" = ok ]
+}
 
-: >"$scratch/spread"
-for _ in 1 2 3; do
-  timed reference "$ticks" || break
-  printf '%s\n' "$run_ms" >>"$scratch/spread"
-done
-spread=$(sort -n "$scratch/spread" | awk '{ v[NR] = $1 } END { if (NR < 3) { print "none"; exit } printf "%.4f", (v[3] - v[1]) / v[2] }')
-pairs=$(awk -v s="$spread" 'BEGIN { if (s == "none") print 0; else if (s <= 0.05) print 5; else if (s <= 0.10) print 8; else print 0 }')
-need=$(awk -v n="$pairs" 'BEGIN { x = 0.75 * n; printf "%d", (x == int(x)) ? x : int(x) + 1 }')
+# calibrate START TARGET_MS LOW_MS HIGH_MS: three reference runs, each at the
+# tick count the previous one scales to TARGET_MS; the third must take LOW_MS
+# to HIGH_MS. Sets cal_ticks.
+calibrate() {
+  next=$1
+  for _ in 1 2 3; do
+    cal_ticks=$next
+    must reference "$cal_ticks" || return 1
+    printf 'Calibration: %s ticks in %s ms\n' "$cal_ticks" "$run_ms"
+    next=$(awk -v t="$cal_ticks" -v ms="$run_ms" -v g="$2" 'BEGIN { n = int(t * g / ms + 0.5); print (n < 1) ? 1 : n }')
+  done
+  if [ "$run_ms" -lt "$3" ] || [ "$run_ms" -gt "$4" ]; then
+    printf 'telemetry-overhead: calibration ended on a %s ms run at %s ticks, outside %s to %s ms; measured time used %s ms (TELEMETRY_USED_MS=%s)\n' \
+      "$run_ms" "$cal_ticks" "$3" "$4" "$used_ms" "$used_ms" >&2
+    exit 1
+  fi
+}
 
-# pairs_for STATE N: N alternating pairs; ratios to $scratch/STATE.ratio,
-# reference times to $scratch/STATE.ref, self times to $scratch/STATE.self,
-# stored-reading ratios (bench mode) to $scratch/STATE.stored.
+# spread_block WORLD TICKS: five reference runs, repeated once after the idle
+# wait when their spread is above 20%. Sets pairs (0 when no pair may run).
+spread_block() {
+  pairs=0
+  for attempt in 1 2; do
+    : >"$scratch/$1.spread"
+    for _ in 1 2 3 4 5; do
+      must reference "$2" || return 0
+      printf '%s\n' "$run_ms" >>"$scratch/$1.spread"
+    done
+    for field in $("$node" "$stats_js" spread "$scratch/$1.spread"); do
+      case "$field" in
+        spread=*) spread=${field#spread=} ;;
+        n=*) pairs=${field#n=} ;;
+      esac
+    done
+    printf -- '- %s spread (attempt %s): %s -> n = %s\n' "$1" "$attempt" "$spread" "$pairs"
+    [ "$pairs" -eq 0 ] && [ "$attempt" -eq 1 ] || break
+    sleep "$settle_s"
+  done
+  if [ -n "${TELEMETRY_SMOKE_PAIRS:-}" ]; then pairs=$TELEMETRY_SMOKE_PAIRS; fi
+}
+
+# pairs_for CELL N PRESET STATE TICKS: N alternating pairs of the telemetry
+# run in STATE (a, b or s) and the reference with the stack stopped. Pair
+# lines (`TEL_MS REF_MS FLUSH_MS` or `void`) go to $scratch/CELL.pairs, the
+# telemetry runs' totals to CELL.<name>, the reference times to CELL.ref, void
+# causes to CELL.voids and the first start line to CELL.start.
 pairs_for() {
-  state=$1
+  cell=$1
   n=$2
-  : >"$scratch/$state.ratio"
-  : >"$scratch/$state.ref"
-  : >"$scratch/$state.self"
-  : >"$scratch/$state.stored"
+  preset=$3
+  state=$4
+  pair_ticks=$5
+  export_check=0
+  if [ "$mode" = qualify ] && [ "$state" = a ]; then export_check=1; fi
+  for file in pairs ref self_time_us flush_ms dropped abandoned wire stored voids start; do
+    : >"$scratch/$cell.$file"
+  done
   i=0
-  while [ "$i" -lt "$n" ]; do
+  while [ "$i" -lt "$n" ] && [ "$capped" -eq 0 ]; do
     if [ $((i % 2)) -eq 0 ]; then order='telemetry reference'; else order='reference telemetry'; fi
-    tel_ms=''
-    ref_ms=''
-    tel_stored=''
-    ref_stored=''
+    cause=''
+    ran=0
     for kind in $order; do
-      if [ "$state" = a ]; then
-        if [ "$kind" = telemetry ]; then stack_start; else stack_stop; fi
-      fi
-      if ! timed "$kind" "$ticks"; then
-        stack_stop
-        return 0
-      fi
       if [ "$kind" = telemetry ]; then
+        case "$state" in
+          a) stack_start ;;
+          s) stack_start; stack_pause ;;
+        esac
+        timed telemetry "$pair_ticks" "$preset" "$export_check" || break
+        case "$state" in
+          a) stack_stop ;;
+          s) stack_unpause; stack_stop ;;
+        esac
+        ran=$((ran + 1))
         tel_ms=$run_ms
+        tel_flush=${chk_flush_ms:--}
         tel_stored=$run_stored
-        printf '%s\n' "$run_self" >>"$scratch/$state.self"
+        if [ "$run_status" != ok ]; then
+          cause=${cause:-"telemetry $run_status"}
+        elif [ "$check_status" != ok ]; then
+          cause=${cause:-$check_status}
+        fi
+        [ -s "$scratch/$cell.start" ] || cp "$scratch/start" "$scratch/$cell.start"
+        printf '%s\n' "$chk_self_time_us" >>"$scratch/$cell.self_time_us"
+        printf '%s\n' "$chk_flush_ms" >>"$scratch/$cell.flush_ms"
+        printf '%s\n' "$chk_dropped" >>"$scratch/$cell.dropped"
+        printf '%s\n' "$chk_abandoned" >>"$scratch/$cell.abandoned"
+        printf '%s %s\n' "$chk_bytes" "$run_ms" >>"$scratch/$cell.wire"
       else
+        timed reference "$pair_ticks" || break
+        ran=$((ran + 1))
         ref_ms=$run_ms
         ref_stored=$run_stored
-        printf '%s\n' "$ref_ms" >>"$scratch/$state.ref"
+        printf '%s\n' "$ref_ms" >>"$scratch/$cell.ref"
+        if [ "$run_status" != ok ]; then cause=${cause:-"reference $run_status"}; fi
       fi
     done
-    awk -v t="$tel_ms" -v r="$ref_ms" 'BEGIN { printf "%.4f\n", t / r }' >>"$scratch/$state.ratio"
-    if [ "$workload" = bench ]; then
-      awk -v t="$tel_stored" -v r="$ref_stored" 'BEGIN { printf "%.4f\n", t / r }' >>"$scratch/$state.stored"
+    [ "$ran" -eq 2 ] || break
+    if [ -n "$cause" ]; then
+      printf 'void\n' >>"$scratch/$cell.pairs"
+      printf 'pair %s: %s\n' "$((i + 1))" "$cause" >>"$scratch/$cell.voids"
+    else
+      printf '%s %s %s\n' "$tel_ms" "$ref_ms" "$tel_flush" >>"$scratch/$cell.pairs"
+      if [ "$workload" = bench ]; then
+        awk -v t="$tel_stored" -v r="$ref_stored" 'BEGIN { printf "%.4f\n", t / r }' >>"$scratch/$cell.stored"
+      fi
     fi
     i=$((i + 1))
   done
+  stack_unpause
   stack_stop
 }
 
-# verdict STATE: pass, fail or inconclusive.
-verdict() {
-  # With n = 0 no pair ran and no ratio file exists.
-  if [ "$pairs" -eq 0 ] || [ ! -s "$scratch/$1.ratio" ]; then
-    printf 'inconclusive\n'
-    return
-  fi
-  got=$(grep -c . "$scratch/$1.ratio")
-  if [ "$got" -lt "$pairs" ]; then
-    printf 'inconclusive\n'
-    return
-  fi
-  med=$(median <"$scratch/$1.ratio")
-  awk -v m="$med" -v c="$ceiling" -v need="$need" '
-    { if ($1 <= c) under++; else over++ }
-    END {
-      if (m <= c && under >= need) print "pass"
-      else if (m > c && over >= need) print "fail"
-      else print "inconclusive"
-    }' "$scratch/$1.ratio"
+# cell_stats CELL N [--subtract-flush]: sets median, lower, upper, verdict
+# and got; a cell short of N pairs is inconclusive.
+cell_stats() {
+  got=$(grep -c . "$scratch/$1.pairs" || true)
+  for field in $("$node" "$stats_js" cell "$ceiling" "$scratch/$1.pairs" ${3:+"$3"}); do
+    case "$field" in
+      median=*) median=${field#median=} ;;
+      lower=*) lower=${field#lower=} ;;
+      upper=*) upper=${field#upper=} ;;
+      verdict=*) verdict=${field#verdict=} ;;
+    esac
+  done
+  if [ "$got" -lt "$2" ] || [ "$2" -eq 0 ]; then verdict=inconclusive; fi
+  interval="[$lower, $upper]"
+  if [ "$lower" = - ]; then interval=-; fi
 }
 
-row() {
-  state=$1
-  label=$2
-  if [ -s "$scratch/$state.ratio" ]; then
-    med=$(median <"$scratch/$state.ratio")
-    self=$(median <"$scratch/$state.self")
-    per_tick=$(awk -v s="$self" -v t="$ticks" 'BEGIN { printf "%.3f", s / t }')
-    got=$(grep -c . "$scratch/$state.ratio")
+# per_tick CELL TICKS: the median self_time_us per tick, or -.
+per_tick() {
+  self=$(median <"$scratch/$1.self_time_us")
+  if [ "$self" = - ]; then printf -- '-'; else awk -v s="$self" -v t="$2" 'BEGIN { printf "%.3f", s / t }'; fi
+}
+
+# block_ratio CELL: median of CELL.c over the median of CELL's b reference runs.
+idle_cost() {
+  if [ -s "$scratch/$1.c" ] && [ -s "$scratch/$1-b.ref" ]; then
+    awk -v s="$(median <"$scratch/$1.c")" -v r="$(median <"$scratch/$1-b.ref")" 'BEGIN { printf "%.4f", s / r }'
   else
-    med=-
-    per_tick=-
-    got=0
+    printf -- '-'
   fi
-  stored_cell=''
-  if [ "$workload" = bench ]; then
-    stored=-
-    if [ -s "$scratch/$state.stored" ]; then stored=$(median <"$scratch/$state.stored"); fi
-    stored_cell=" $stored |"
-  fi
-  printf '| %s | %s | %s | %s | %s |%s\n' "$label" "$med" "$(verdict "$state")" "$got/$pairs" "$per_tick" "$stored_cell"
 }
 
-if [ "$pairs" -gt 0 ]; then
-  pairs_for b "$pairs"
-  pairs_for a "$pairs"
-  : >"$scratch/c.started"
+# idle_block WORLD TICKS: (c), three reference runs with the stack started.
+idle_block() {
+  : >"$scratch/$1.c"
+  [ "$capped" -eq 0 ] || return 0
   stack_start
   for _ in 1 2 3; do
-    timed reference "$ticks" || break
-    printf '%s\n' "$run_ms" >>"$scratch/c.started"
+    must reference "$2" || break
+    printf '%s\n' "$run_ms" >>"$scratch/$1.c"
   done
   stack_stop
-  rerun=''
-  for state in a b; do
-    if [ "$(verdict "$state")" = inconclusive ] && [ "$refused" -eq 0 ] &&
-      [ $((used_ms + 2 * pairs * estimate_ms)) -le "$cap_ms" ]; then
-      for file in ratio ref self stored; do
-        [ -f "$scratch/$state.$file" ] && cp "$scratch/$state.$file" "$scratch/${state}0.$file"
-      done
-      pairs_for "$state" "$pairs"
-      rerun=$state
-      break
-    fi
+}
+
+used_line() {
+  printf '\nMeasured time used: %s s of %s s (TELEMETRY_USED_MS=%s)' \
+    "$(awk -v u="$used_ms" 'BEGIN { printf "%.1f", u / 1000 }')" $((cap_ms / 1000)) "$used_ms"
+  if [ "$capped" -eq 1 ]; then printf ' (cap reached: inconclusive)'; fi
+  printf '\n'
+}
+
+f01_ticks() {
+  ticks=${TELEMETRY_TICKS:-}
+  if [ -z "$ticks" ] && [ -f "$f01_readings" ]; then
+    ticks=$(sed -n 's/^- Workload ticks T: \([0-9][0-9]*\).*$/\1/p' "$f01_readings" | head -n 1)
+  fi
+}
+
+if [ "$mode" = routine ]; then
+  stack_stop
+  f01_ticks
+  if [ -z "$ticks" ]; then
+    calibrate 1000 4000 3000 5000 || { used_line; exit 0; }
+    ticks=$cal_ticks
+    printf 'Calibrated T=%s (%s ms); record:\n- Workload ticks T: %s\n' "$ticks" "$run_ms" "$ticks"
+  fi
+  whole T "$ticks"
+  estimate_ms=0
+  spread_block w "$ticks"
+  if [ "$pairs" -gt 0 ] && [ $((used_ms + 4 * pairs * estimate_ms)) -gt "$cap_ms" ]; then
+    printf 'telemetry-overhead: %s pairs per state at %s ms per run do not fit the %s s cap; inconclusive\n' \
+      "$pairs" "$estimate_ms" $((cap_ms / 1000))
+    pairs=0
+  fi
+  for state in b a; do
+    : >"$scratch/w-$state.pairs"
+    : >"$scratch/w-$state.self_time_us"
+    : >"$scratch/w-$state.stored"
+    if [ "$pairs" -gt 0 ]; then pairs_for "w-$state" "$pairs" standard "$state" "$ticks"; fi
   done
+  : >"$scratch/w.c"
+  if [ "$pairs" -gt 0 ]; then idle_block w "$ticks"; fi
+
+  printf '\nWorkload=%s  T=%s  spread=%s  pairs n=%s  ceiling=%s\n\n' "$workload" "$ticks" "${spread:--}" "$pairs" "$ceiling"
+  head_tail=''
+  rule_tail=''
+  if [ "$workload" = bench ]; then head_tail=' Median stored-reading ratio |'; rule_tail=' --- |'; fi
+  printf '| State | Median ratio | 90%% interval | Verdict | Pairs | self_time_us per tick |%s\n' "$head_tail"
+  printf '| --- | --- | --- | --- | --- | --- |%s\n' "$rule_tail"
+  for state in a b; do
+    cell_stats "w-$state" "$pairs"
+    stored_cell=''
+    if [ "$workload" = bench ]; then stored_cell=" $(median <"$scratch/w-$state.stored") |"; fi
+    label='a: on, stack healthy'
+    [ "$state" = a ] || label='b: on, stack stopped'
+    printf '| %s | %s | %s | %s | %s/%s | %s |%s\n' "$label" "$median" "$interval" "$verdict" \
+      "$got" "$pairs" "$(per_tick "w-$state" "$ticks")" "$stored_cell"
+    if [ -s "$scratch/w-$state.voids" ]; then sed 's/^/  void /' "$scratch/w-$state.voids"; fi
+  done
+  empty_tail=''
+  if [ "$workload" = bench ]; then empty_tail=' - |'; fi
+  printf '| c: idle-stack cost | %s | - | recorded | 3 vs b | - |%s\n' "$(idle_cost w)" "$empty_tail"
+  used_line
+  exit 0
 fi
 
-printf '\nWorkload=%s  T=%s  spread=%s  pairs n=%s (pass needs %s)\n\n' "$workload" "$ticks" "$spread" "$pairs" "$need"
-head_tail=''
-rule_tail=''
-empty_tail=''
-if [ "$workload" = bench ]; then
-  head_tail=' Median stored-reading ratio |'
-  rule_tail=' --- |'
-  empty_tail=' - |'
+# Qualify mode.
+[ -z "$smoke" ] || printf 'SMOKE RUN (TELEMETRY_SMOKE_* set): not a qualifying measurement\n'
+
+# Every file the report reads exists, so a cell the cap stopped reads empty.
+for world in W1 W2; do
+  : >"$scratch/$world.c"
+  for cell in b a s minimal phases standard dense; do
+    for file in pairs ref self_time_us flush_ms dropped abandoned wire voids start disk walls; do
+      : >"$scratch/$world-$cell.$file"
+    done
+  done
+done
+
+# du_stores: KB in /data/prometheus, /data/tempo and /data/loki, space-separated.
+du_stores() {
+  compose exec -T lgtm du -sk /data/prometheus /data/tempo /data/loki |
+    awk '{ v[$2] = $1 } END { printf "%d %d %d\n", v["/data/prometheus"], v["/data/tempo"], v["/data/loki"] }'
+}
+now_s() { awk 'BEGIN { srand(); print srand() }'; }
+
+before=$(du_stores)
+idle_began=$(now_s)
+sleep "$settle_s"
+after=$(du_stores)
+idle_s=$(($(now_s) - idle_began))
+# KB per second per store.
+idle_rate=$(printf '%s %s\n' "$before" "$after" | awk -v s="$idle_s" '{ printf "%.4f %.4f %.4f\n", ($4 - $1) / s, ($5 - $2) / s, ($6 - $3) / s }')
+stack_stop
+
+cells_for() {
+  world=$1
+  wticks=$2
+  printf '\n### World %s (ticks %s)\n\n' "$world" "$wticks"
+  : >"$scratch/$world.init"
+  for _ in 1 2 3; do
+    must reference 1 || break
+    printf '%s\n' "$run_ms" >>"$scratch/$world.init"
+  done
+  printf -- '- %s init (median of three reference runs of one tick): %s ms\n' "$world" "$(median <"$scratch/$world.init")"
+  pairs=0
+  if [ "$capped" -eq 0 ]; then spread_block "$world" "$wticks"; fi
+  eval "pairs_$world=\$pairs"
+  for state in b a s; do
+    if [ "$pairs" -gt 0 ] && [ "$capped" -eq 0 ]; then
+      pairs_for "$world-$state" "$pairs" standard "$state" "$wticks"
+      printf -- '- %s %s first start line: %s\n' "$world" "$state" "$(cat "$scratch/$world-$state.start")"
+    fi
+  done
+}
+
+t1=${TELEMETRY_DEFAULT_TICKS:-}
+if [ -z "$t1" ] && [ -f "$f05_readings" ]; then
+  t1=$(sed -n 's/^- Default-world ticks T1: \([0-9][0-9]*\).*$/\1/p' "$f05_readings" | head -n 1)
 fi
-printf '| State | Median ratio | Verdict | Pairs | self_time_us per tick |%s\n' "$head_tail"
-printf '| --- | --- | --- | --- | --- |%s\n' "$rule_tail"
-if [ -n "${rerun:-}" ]; then
-  row "${rerun}0" "$rerun (first run)"
+world_config=''
+if [ -z "$t1" ]; then
+  if calibrate 20 5000 4000 6000; then
+    t1=$cal_ticks
+    printf 'Calibrated T1=%s (%s ms); record:\n- Default-world ticks T1: %s\n' "$t1" "$run_ms" "$t1"
+  fi
 fi
-row a 'a: on, stack healthy'
-row b 'b: on, stack stopped'
-if [ -s "$scratch/c.started" ] && [ -s "$scratch/b.ref" ]; then
-  idle=$(awk -v s="$(median <"$scratch/c.started")" -v r="$(median <"$scratch/b.ref")" 'BEGIN { printf "%.4f", s / r }')
+if [ -n "$t1" ]; then
+  whole T1 "$t1"
+  cells_for W1 "$t1"
+fi
+f01_ticks
+whole T "$ticks"
+world_config=$recipe
+[ "$capped" -eq 1 ] || cells_for W2 "$ticks"
+
+world_args() {
+  if [ "$1" = W1 ]; then world_config=''; wticks=${t1:-0}; else world_config=$recipe; wticks=$ticks; fi
+}
+for world in W1 W2; do
+  world_args "$world"
+  if [ "$capped" -eq 0 ] && [ "$wticks" -gt 0 ]; then idle_block "$world" "$wticks"; fi
+done
+preset_pairs=${TELEMETRY_SMOKE_PAIRS:-6}
+for world in W1 W2; do
+  world_args "$world"
+  for preset in minimal phases dense; do
+    if [ "$capped" -eq 0 ] && [ "$wticks" -gt 0 ]; then
+      pairs_for "$world-$preset" "$preset_pairs" "$preset" a "$wticks"
+    fi
+  done
+done
+for world in W1 W2; do
+  world_args "$world"
+  for preset in minimal phases standard dense; do
+    [ "$capped" -eq 0 ] && [ "$wticks" -gt 0 ] || continue
+    stack_start
+    sleep "$settle_s"
+    before=$(du_stores)
+    began=$(now_s)
+    for _ in 1 2 3; do
+      timed telemetry "$wticks" "$preset" 0 || break
+      printf '%s\n' "$run_ms" >>"$scratch/$world-$preset.walls"
+    done
+    sleep "$settle_s"
+    after=$(du_stores)
+    elapsed=$(($(now_s) - began))
+    stack_stop
+    # Corrected growth per store (KB), then the three runs' total.
+    printf '%s %s %s %s\n' "$before" "$after" "$idle_rate" "$elapsed" | awk '{
+      p = ($4 - $1) - $7 * $10; t = ($5 - $2) - $8 * $10; l = ($6 - $3) - $9 * $10
+      printf "%.0f %.0f %.0f\n", p, t, l }' >"$scratch/$world-$preset.disk"
+  done
+done
+
+# Report.
+printf '\n## Qualification (%s)\n\n' "$(date -u +%Y-%m-%dT%H:%MZ)"
+printf -- '- Default-world ticks T1: %s\n- Workload ticks T: %s\n' "${t1:--}" "$ticks"
+printf -- '- Idle growth (KB/s, prometheus tempo loki): %s over %s s\n\n' "$idle_rate" "$idle_s"
+printf '| World | Cell | n | Median | 90%% interval | Verdict | Flush-included median | flush_ms median (max) | dropped | abandoned | self_time_us per tick |\n'
+printf '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n'
+passes=0
+for world in W1 W2; do
+  world_args "$world"
+  eval "n=\${pairs_$world:-0}"
+  for state in b a s; do
+    cell="$world-$state"
+    included=-
+    if [ "$state" = s ]; then
+      cell_stats "$cell" "$n"
+      included=$median
+      cell_stats "$cell" "$n" --subtract-flush
+    else
+      cell_stats "$cell" "$n"
+    fi
+    if [ "$verdict" = pass ]; then passes=$((passes + 1)); fi
+    max_flush=$(sort -n "$scratch/$cell.flush_ms" | tail -n 1)
+    printf '| %s | %s | %s/%s | %s | %s | %s | %s | %s (%s) | %s | %s | %s |\n' "$world" "$state" "$got" "$n" \
+      "$median" "$interval" "$verdict" "$included" "$(median <"$scratch/$cell.flush_ms")" "${max_flush:--}" \
+      "$(median <"$scratch/$cell.dropped")" "$(median <"$scratch/$cell.abandoned")" "$(per_tick "$cell" "$wticks")"
+    if [ -n "$max_flush" ] && [ "$max_flush" -gt 10000 ]; then
+      printf '  flush_ms %s exceeds the 10 s bound\n' "$max_flush"
+    fi
+    if [ -s "$scratch/$cell.voids" ]; then sed 's/^/  void /' "$scratch/$cell.voids"; fi
+  done
+done
+printf '\n| World | (c) idle-stack cost |\n| --- | --- |\n'
+for world in W1 W2; do printf '| %s | %s |\n' "$world" "$(idle_cost "$world")"; done
+
+printf '\n| World | Preset | n | Median | 90%% interval | Label | Wire bytes per run | per hour | Disk KB per run (prom tempo loki) | Disk MB per hour |\n'
+printf '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n'
+for world in W1 W2; do
+  world_args "$world"
+  for preset in minimal phases standard dense; do
+    if [ "$preset" = standard ]; then
+      cell="$world-a"
+      eval "n=\${pairs_$world:-0}"
+    else
+      cell="$world-$preset"
+      n=$preset_pairs
+    fi
+    cell_stats "$cell" "$n"
+    label=recorded
+    if [ "$preset" = standard ]; then
+      label="qualifying cell a: $verdict"
+    elif [ "$verdict" = fail ]; then
+      label='exceeds the ceiling; opt-in'
+    fi
+    wire=$(awk '{ print $1 }' "$scratch/$cell.wire" | median)
+    wire_hour=$(awk '$2 > 0 { printf "%d\n", $1 / $2 * 3600000 }' "$scratch/$cell.wire" | median)
+    disk=$(awk '{ printf "%.0f %.0f %.0f", $1 / 3, $2 / 3, $3 / 3 }' "$scratch/$world-$preset.disk")
+    wall=$(median <"$scratch/$world-$preset.walls")
+    disk_hour=-
+    if [ -n "$disk" ] && [ "$wall" != - ]; then
+      disk_hour=$(awk -v w="$wall" '{ printf "%.1f", ($1 + $2 + $3) / 3 / 1024 / w * 3600000 }' "$scratch/$world-$preset.disk")
+    fi
+    printf '| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n' "$world" "$preset" "$got/$n" "$median" "$interval" \
+      "$label" "$wire" "$wire_hour" "${disk:--}" "$disk_hour"
+  done
+done
+printf '\nPer-hour figures are repeated-short-invocation rates, not the growth of one continuous hour-long run.\n'
+
+used_line
+if [ "$passes" -eq 6 ] && [ "$capped" -eq 0 ]; then
+  qualification=pass
 else
-  idle=-
+  qualification='not pass: user stop (D5)'
 fi
-printf '| c: idle-stack cost | %s | recorded | 3 vs b | - |%s\n' "$idle" "$empty_tail"
-printf '\nMeasured time used: %s s of %s s' "$(awk -v u="$used_ms" 'BEGIN { printf "%.1f", u / 1000 }')" $((cap_ms / 1000))
-if [ "$refused" -eq 1 ]; then
-  printf ' (cap reached: remaining runs refused, inconclusive)'
-fi
-printf '\n'
+[ -z "$smoke" ] || qualification="$qualification (smoke run, not a qualifying measurement)"
+printf 'Qualification: %s\n' "$qualification"

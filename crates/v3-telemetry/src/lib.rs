@@ -8,7 +8,9 @@
 //! come from OS entropy and the flag enters no recorded configuration.
 //!
 //! When on, the binary writes one stderr line when its first run starts
-//! (`telemetry: on endpoint=… invocation=… run=…`) and one per run once each of
+//! (`telemetry: on endpoint=… preset=… interval_ms=… tick_traces=… windows=…
+//! window_ticks=… window_interval_ms=… invocation=… run=…`, the effective
+//! sampling settings of T21.F05) and one per run once each of
 //! the run's records has been exported, failed, dropped or abandoned
 //! (`telemetry: run=… exported=… failed=… dropped=… abandoned=… bytes=…
 //! self_time_us=… flush_ms=… snapshots=… traces=…`).
@@ -20,6 +22,7 @@
 
 mod export;
 mod metrics;
+mod preset;
 mod queue;
 pub mod testing;
 mod trace;
@@ -48,6 +51,7 @@ use crate::queue::{PostEncoded, QueueProcessor, RunKey, Shared, Signal};
 pub use crate::metrics::{
     resolve_metrics_interval, Trigger, DEFAULT_METRICS_INTERVAL, METRICS_INTERVAL_ENV,
 };
+pub use crate::preset::{Preset, Settings, PRESET_ENV};
 pub use crate::trace::{
     resolve_tick_traces, TickSample, FIRST_UNTRACED_TICK, MAX_TICK_TRACES_PER_RUN, PHASES,
     TICK_TRACES_ENV,
@@ -209,30 +213,31 @@ pub struct Options {
     pub tick_traces: Switch,
     /// Creature windows (T21.F04).
     pub windows: WindowSettings,
+    /// The preset the sampling settings started from (T21.F05); recorded
+    /// only, the settings above are the effective ones.
+    pub preset: Preset,
 }
 
 impl Options {
-    /// Stderr reports, contract limits, the endpoint from [`ENDPOINT_ENV`], the
-    /// interval from [`METRICS_INTERVAL_ENV`] and the tick-trace switch from
-    /// [`TICK_TRACES_ENV`], both of which must be valid.
+    /// Stderr reports, contract limits, the endpoint from [`ENDPOINT_ENV`] and
+    /// the sampling settings from [`PRESET_ENV`] and each setting's variable,
+    /// all of which must be valid ([`Settings::resolve`]).
     pub fn from_env(service: Service) -> Result<Self, String> {
         let endpoint = std::env::var(ENDPOINT_ENV)
             .ok()
             .map(|value| value.trim().to_owned())
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| DEFAULT_ENDPOINT.to_owned());
-        let metrics_interval =
-            resolve_metrics_interval(std::env::var(METRICS_INTERVAL_ENV).ok().as_deref())?;
-        let tick_traces = resolve_tick_traces(std::env::var(TICK_TRACES_ENV).ok().as_deref())?;
-        let windows = WindowSettings::from_env()?;
+        let settings = Settings::resolve(|name| std::env::var(name).ok())?;
         Ok(Self {
             service,
             endpoint,
             limits: Limits::default(),
             reports: ReportSink::Stderr,
-            metrics_interval,
-            tick_traces,
-            windows,
+            metrics_interval: settings.metrics_interval,
+            tick_traces: settings.tick_traces,
+            windows: settings.windows,
+            preset: settings.preset,
         })
     }
 }
@@ -393,6 +398,7 @@ struct Active {
     metrics_interval: Duration,
     tick_traces: Switch,
     windows: WindowSettings,
+    preset: Preset,
 }
 
 impl fmt::Debug for Active {
@@ -541,6 +547,7 @@ impl Telemetry {
                 metrics_interval: options.metrics_interval,
                 tick_traces: options.tick_traces,
                 windows: options.windows,
+                preset: options.preset,
             })),
         }
     }
@@ -577,8 +584,11 @@ impl Telemetry {
         if let Some(every) = start.sample_every {
             extra.push(("petri.sample_every", u64_value(every)));
         }
-        let interval_ms = u64::try_from(active.metrics_interval.as_millis()).unwrap_or(u64::MAX);
-        extra.push(("petri.metrics_interval_ms", u64_value(interval_ms)));
+        extra.push(("petri.preset", AnyValue::from(active.preset.name())));
+        extra.push((
+            "petri.metrics_interval_ms",
+            u64_value(active.metrics_interval_ms()),
+        ));
         extra.push((
             "petri.tick_traces",
             AnyValue::from(active.tick_traces.to_string()),
@@ -930,6 +940,10 @@ impl Telemetry {
 }
 
 impl Active {
+    fn metrics_interval_ms(&self) -> u64 {
+        u64::try_from(self.metrics_interval.as_millis()).unwrap_or(u64::MAX)
+    }
+
     /// Captures and offers the trace of the tick `sim` just ran, when tick
     /// traces are on, the run is below its cap and the seam is that tick's.
     fn tick_trace(&self, run: &mut RunHandle, sim: &Simulation, sample: TickSample) {
@@ -970,8 +984,16 @@ impl Active {
         self.shared.register_run(key, id.to_owned());
         if !self.announced.swap(true, Ordering::Relaxed) {
             self.shared.sink().write(&format!(
-                "telemetry: on endpoint={} invocation={} run={id}",
-                self.endpoint, self.invocation_id
+                "telemetry: on endpoint={} preset={} interval_ms={} tick_traces={} windows={} \
+                 window_ticks={} window_interval_ms={} invocation={} run={id}",
+                self.endpoint,
+                self.preset,
+                self.metrics_interval_ms(),
+                self.tick_traces,
+                self.windows.switch,
+                self.windows.ticks,
+                self.windows.interval_ms(),
+                self.invocation_id
             ));
         }
     }

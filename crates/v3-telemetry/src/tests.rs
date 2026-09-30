@@ -45,6 +45,7 @@ fn options(endpoint: &str, limits: Limits) -> Options {
         metrics_interval: DEFAULT_METRICS_INTERVAL,
         tick_traces: Switch::On,
         windows: WindowSettings::default(),
+        preset: Preset::Standard,
     }
 }
 
@@ -308,6 +309,7 @@ fn records_reach_the_receiver_with_identity_and_resource() {
     assert_eq!(started.attribute("petri.ticks_requested"), Some("10"));
     assert_eq!(started.attribute("petri.sample_every"), Some("5"));
     assert_eq!(started.attribute("petri.metrics_interval_ms"), Some("1000"));
+    assert_eq!(started.attribute("petri.preset"), Some("standard"));
     assert_eq!(
         started.attribute("petri.config_digest"),
         Some(v3_core::config::config_digest(&config).as_str())
@@ -330,7 +332,8 @@ fn records_reach_the_receiver_with_identity_and_resource() {
     assert_eq!(
         lines[0],
         format!(
-            "telemetry: on endpoint={} invocation={} run={}",
+            "telemetry: on endpoint={} preset=standard interval_ms=1000 tick_traces=on \
+             windows=on window_ticks=8 window_interval_ms=10000 invocation={} run={}",
             receiver.endpoint(),
             started.resource["petri.invocation_id"],
             run.id()

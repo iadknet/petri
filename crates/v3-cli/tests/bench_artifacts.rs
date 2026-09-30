@@ -7,6 +7,13 @@ use proptest::prelude::*;
 use serde_json::{json, Value};
 use v3_cli::bench::{self, artifacts};
 
+/// Spawned binaries run with `--telemetry off` (T21.F05): no test exports or
+/// depends on a stack. The flag exists only with the `telemetry` feature.
+#[cfg(feature = "telemetry")]
+const TELEMETRY_OFF: &[&str] = &["--telemetry", "off"];
+#[cfg(not(feature = "telemetry"))]
+const TELEMETRY_OFF: &[&str] = &[];
+
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
 struct Temp(PathBuf);
@@ -716,6 +723,7 @@ fn measurement_evidence_distinguishes_clean_and_dirty_git_worktrees() {
 
 fn sweep(dir: &Path, extra: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+        .args(TELEMETRY_OFF)
         .current_dir(dir)
         .args([
             "bench",
@@ -770,6 +778,7 @@ fn direct_sweep_writes_pair_and_conversion_never_overwrites_input() {
     )
     .unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+        .args(TELEMETRY_OFF)
         .current_dir(&dir.0)
         .args([
             "bench-summarize",
@@ -1846,6 +1855,7 @@ fn bench_summarize_converts_a_v1_summary_without_provenance() {
     write_v1_summary(&raw, &raw_path, &dir.0.join("v1.json"));
     let run = |args: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+            .args(TELEMETRY_OFF)
             .current_dir(&dir.0)
             .arg("bench-summarize")
             .args(args)
@@ -1892,6 +1902,7 @@ fn bench_summarize_converts_a_full_report_with_provenance() {
     .unwrap();
 
     let output = Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+        .args(TELEMETRY_OFF)
         .current_dir(&dir.0)
         .args([
             "bench-summarize",

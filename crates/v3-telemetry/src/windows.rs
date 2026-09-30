@@ -94,7 +94,17 @@ impl WindowSettings {
         ticks: Option<&str>,
         interval_ms: Option<&str>,
     ) -> Result<Self, String> {
-        let defaults = Self::default();
+        Self::resolve_over(Self::default(), switch, ticks, interval_ms)
+    }
+
+    /// [`WindowSettings::resolve`] with `defaults` (a preset's windows) in
+    /// place of the built-in defaults.
+    pub fn resolve_over(
+        defaults: Self,
+        switch: Option<&str>,
+        ticks: Option<&str>,
+        interval_ms: Option<&str>,
+    ) -> Result<Self, String> {
         let switch = match present(switch) {
             Some(value) => value
                 .parse()
@@ -130,16 +140,6 @@ impl WindowSettings {
             ticks,
             interval,
         })
-    }
-
-    /// [`WindowSettings::resolve`] against the process environment.
-    pub fn from_env() -> Result<Self, String> {
-        let var = |name| std::env::var(name).ok();
-        Self::resolve(
-            var(CREATURE_WINDOWS_ENV).as_deref(),
-            var(WINDOW_TICKS_ENV).as_deref(),
-            var(WINDOW_INTERVAL_ENV).as_deref(),
-        )
     }
 
     pub(crate) fn interval_ms(&self) -> u64 {
