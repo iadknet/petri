@@ -570,6 +570,8 @@ fn run_cognition(
                         age,
                         typed_local_food: ss.typed_local_food.clone(),
                         typed_area_food: ss.perception.typed_area_food.clone(),
+                        uses_typed_local_food: genome_uses_typed_local_food(&creature.genome),
+                        uses_extended_perception: genome_uses_extended_perception(&creature.genome),
                         failed_action_penalty,
                         applied: Vec::with_capacity(runtime_config.max_actions_per_turn),
                         damage_received: 0.0,

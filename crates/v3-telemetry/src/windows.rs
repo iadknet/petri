@@ -30,6 +30,7 @@ use v3_core::runtime::trace::domain::{
     AppliedAction, BackendTrace, MeshHopTrace, MeshPassTrace, TickOutcome, TickTrace,
 };
 use v3_core::runtime::trace::recording::{ActiveTrace, TraceBudget, TruncationReason};
+use v3_core::simulation::energy_accounting::DeathCause;
 use v3_core::simulation::Simulation;
 
 use crate::queue::Signal;
@@ -307,10 +308,7 @@ pub(crate) fn genome_body(genome: &CreatureGenome) -> (String, String) {
     let value = serde_json::to_value(genome).expect("genomes serialize");
     let body = serde_json::to_string(&v3_core::config::sort_json_keys_recursive(value))
         .expect("sorted JSON serializes");
-    let hash: String = Sha256::digest(body.as_bytes())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+    let hash = hex::encode(Sha256::digest(body.as_bytes()));
     (body, format!("sha256:{hash}"))
 }
 
@@ -326,12 +324,10 @@ pub(crate) fn action_label(action: &WorldAction) -> String {
     }
 }
 
-/// A unit-variant enum's serde name (`NoDecision`, `Decided`, …).
-fn variant<T: serde::Serialize>(value: &T) -> String {
-    serde_json::to_value(value)
-        .ok()
-        .and_then(|value| value.as_str().map(str::to_owned))
-        .unwrap_or_default()
+/// A unit-variant enum's name (`NoDecision`, `Decided`, …), which its serde
+/// name also is.
+fn variant<T: std::fmt::Debug>(value: &T) -> String {
+    format!("{value:?}")
 }
 
 fn ints(a: &mut Attributes, key: &str, values: impl IntoIterator<Item = i64>) {
@@ -458,7 +454,9 @@ fn tick_attributes(a: &mut Attributes, record: &TickTrace) {
     a.doubles("petri.neighbor_occupied", &sensed.neighbor_occupied);
     a.double("petri.age_ticks", sensed.age_ticks);
     a.doubles("petri.previous_outcome", &sensed.previous_outcome);
-    if let Some(p) = &record.debug_perception {
+    let outcome = record.outcome.as_ref();
+    let perceived = outcome.is_some_and(|outcome| outcome.uses_extended_perception);
+    if let Some(p) = record.debug_perception.as_ref().filter(|_| perceived) {
         a.doubles("petri.area_food", &p.area_food);
         a.doubles("petri.area_barrier", &p.area_barrier);
         a.doubles("petri.area_occupancy", &p.area_occupancy);
@@ -485,21 +483,23 @@ fn tick_attributes(a: &mut Attributes, record: &TickTrace) {
     );
     a.count("petri.hops", record.hops.len());
     a.count("petri.passes", record.passes.len());
-    if let Some(outcome) = &record.outcome {
+    if let Some(outcome) = outcome {
         outcome_attributes(a, outcome);
     }
 }
 
 fn outcome_attributes(a: &mut Attributes, outcome: &TickOutcome) {
-    let local = &outcome.typed_local_food;
-    if !local.food_here_by_type.is_empty() {
+    if outcome.uses_typed_local_food {
+        let local = &outcome.typed_local_food;
         a.doubles("petri.food_here_by_type", &local.food_here_by_type);
+        for (index, ring) in local.neighbor_food_by_type.iter().enumerate() {
+            a.doubles(format!("petri.neighbor_food.{index}"), ring);
+        }
     }
-    for (index, ring) in local.neighbor_food_by_type.iter().enumerate() {
-        a.doubles(format!("petri.neighbor_food.{index}"), ring);
-    }
-    for (index, area) in outcome.typed_area_food.iter().enumerate() {
-        a.doubles(format!("petri.area_food.{index}"), area);
+    if outcome.uses_extended_perception {
+        for (index, area) in outcome.typed_area_food.iter().enumerate() {
+            a.doubles(format!("petri.area_food.{index}"), area);
+        }
     }
     ints(
         a,
@@ -624,14 +624,7 @@ pub(crate) fn encode(
     a.int("petri.ticks_requested", meta.ticks_requested);
     a.count("petri.ticks_recorded", trace.ticks.len());
     a.text("petri.end_reason", ending.reason.as_str());
-    let died = trace.removed.or_else(|| {
-        trace
-            .ticks
-            .last()
-            .and_then(|t| t.outcome.as_ref())
-            .and_then(|o| o.died)
-    });
-    if let Some(cause) = died {
+    if let Some(cause) = died(trace) {
         a.text("petri.died", cause.as_key());
     }
     let truncated = trace
@@ -684,17 +677,23 @@ fn window_trace(id: CreatureId, ticks: u32) -> ActiveTrace {
     trace
 }
 
-/// How a window that just ran a tick ended, if it did.
-fn window_end(trace: &ActiveTrace) -> Option<EndReason> {
-    let died = trace.removed.is_some()
-        || trace
+/// The removal cause of the recording's creature: gone at a tick's start, or
+/// removed in its last recorded tick.
+fn died(trace: &ActiveTrace) -> Option<DeathCause> {
+    trace.removed.or_else(|| {
+        trace
             .ticks
             .last()
             .and_then(|t| t.outcome.as_ref())
-            .is_some_and(|o| o.died.is_some());
+            .and_then(|o| o.died)
+    })
+}
+
+/// How a window that just ran a tick ended, if it did.
+fn window_end(trace: &ActiveTrace) -> Option<EndReason> {
     if trace.truncated.is_some() {
         Some(EndReason::Truncated)
-    } else if died {
+    } else if died(trace).is_some() {
         Some(EndReason::Died)
     } else if trace.is_complete() {
         Some(EndReason::Complete)
@@ -771,9 +770,23 @@ impl Active {
         })
     }
 
-    /// Encodes and offers one sample, counting its bytes toward the run's.
-    fn export(&self, run: &mut RunHandle, meta: &SampleMeta, trace: &ActiveTrace, ending: &Ending) {
-        let (request, encoded) = encode(&self.resource, run, meta, trace, ending);
+    /// Encodes and offers one sample that ended as `reason` at `sim`'s
+    /// tick, counting its bytes toward the run's.
+    fn export(
+        &self,
+        run: &mut RunHandle,
+        sim: &Simulation,
+        meta: &SampleMeta,
+        trace: &ActiveTrace,
+        reason: EndReason,
+        tick_end: Option<Instant>,
+    ) {
+        let ending = Ending {
+            reason,
+            tick: sim.tick,
+            tick_end,
+        };
+        let (request, encoded) = encode(&self.resource, run, meta, trace, &ending);
         let body = request.encode_to_vec();
         run.samples.bytes += (body.len() as u64).min(BODY_RESERVATION);
         self.shared.add_recorded(run.key, encoded.ticks);
@@ -788,15 +801,22 @@ impl Active {
         slot: &mut Option<ActiveTrace>,
         reason: EndReason,
     ) {
-        let (Some(meta), Some(trace)) = (run.samples.window.take(), slot.take()) else {
-            return;
-        };
-        let ending = Ending {
-            reason,
-            tick: sim.tick,
-            tick_end: None,
-        };
-        self.export(run, &meta, &trace, &ending);
+        if let (Some(meta), Some(trace)) = (run.samples.window.take(), slot.take()) {
+            self.export(run, sim, &meta, &trace, reason, None);
+        }
+    }
+
+    /// Exports the admitted manual sample, recorded as `trace`, as `reason`.
+    fn end_manual(
+        &self,
+        run: &mut RunHandle,
+        sim: &Simulation,
+        trace: Option<&ActiveTrace>,
+        reason: EndReason,
+    ) {
+        if let (Some(meta), Some(trace)) = (run.samples.manual.take(), trace) {
+            self.export(run, sim, &meta, trace, reason, None);
+        }
     }
 
     pub(crate) fn before_tick(
@@ -847,12 +867,8 @@ impl Active {
         let (Some(meta), Some(trace)) = (run.samples.window.take(), slot.take()) else {
             return;
         };
-        let ending = Ending {
-            reason,
-            tick: sim.tick,
-            tick_end: trace.ticks.is_empty().then(|| last_tick_end(sim)).flatten(),
-        };
-        self.export(run, &meta, &trace, &ending);
+        let tick_end = trace.ticks.is_empty().then(|| last_tick_end(sim)).flatten();
+        self.export(run, sim, &meta, &trace, reason, tick_end);
         self.shared.add_self_time(run.key, began.elapsed());
     }
 
@@ -869,14 +885,7 @@ impl Active {
         }
         let began = Instant::now();
         self.end_window(run, sim, slot, EndReason::Manual);
-        if let (Some(meta), Some(old)) = (run.samples.manual.take(), replaced) {
-            let ending = Ending {
-                reason: EndReason::Replaced,
-                tick: sim.tick,
-                tick_end: None,
-            };
-            self.export(run, &meta, old, &ending);
-        }
+        self.end_manual(run, sim, replaced, EndReason::Replaced);
         if run.samples.interval_passed(began, self.windows.interval) && run.samples.fits_caps() {
             run.samples.manual = self.start_sample(
                 run,
@@ -892,16 +901,8 @@ impl Active {
     }
 
     pub(crate) fn hand_over(&self, run: &mut RunHandle, sim: &Simulation, sample: &ActiveTrace) {
-        let Some(meta) = run.samples.manual.take() else {
-            return;
-        };
         let began = Instant::now();
-        let ending = Ending {
-            reason: EndReason::Complete,
-            tick: sim.tick,
-            tick_end: None,
-        };
-        self.export(run, &meta, sample, &ending);
+        self.end_manual(run, sim, Some(sample), EndReason::Complete);
         self.shared.add_self_time(run.key, began.elapsed());
     }
 
@@ -928,14 +929,7 @@ impl Active {
     ) {
         let began = Instant::now();
         self.end_window(run, sim, slot, EndReason::RunEnd);
-        if let (Some(meta), Some(trace)) = (run.samples.manual.take(), manual) {
-            let ending = Ending {
-                reason: EndReason::RunEnd,
-                tick: sim.tick,
-                tick_end: None,
-            };
-            self.export(run, &meta, trace, &ending);
-        }
+        self.end_manual(run, sim, manual, EndReason::RunEnd);
         self.shared.add_self_time(run.key, began.elapsed());
     }
 }

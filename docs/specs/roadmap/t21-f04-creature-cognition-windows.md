@@ -1,7 +1,7 @@
 # T21.F04 — Creature Cognition Windows
 
 **Status**: In Progress
-**Last updated**: 2026-09-29
+**Last updated**: 2026-09-30
 **Feature**: T21.F04
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
 
@@ -235,43 +235,43 @@ is closure evidence.
       server's manual precedence and export at `get_sample`.
 - [x] `telemetry/grafana/dashboards/petri-run.json`: the `Creature windows`
       row; `scripts/telemetry-dashboards-check`: the rows above.
-- [ ] Run the checks on this host; record them in
+- [x] Run the checks on this host; record them in
       `docs/progress/readings/t21-f04.md`.
 
 ## Verification
 
-- [ ] Viability: `cargo test -p v3-core --test viability` -> passes, run
+- [x] Viability: `cargo test -p v3-core --test viability` -> passes, run
       before any other test of the tick-loop change.
-- [ ] Seam: `cargo test -p v3-core --features telemetry-seams --lib` (a
+- [x] Seam: `cargo test -p v3-core --features telemetry-seams --lib` (a
       `make check` row) -> the seam rows of the table; `cargo test -p
       v3-core --lib` still passes without the feature.
-- [ ] Neutrality and window content: `cargo test -p v3-cli` (inside `make
+- [x] Neutrality and window content: `cargo test -p v3-cli` (inside `make
       check`, no Docker) -> the CLI rows.
-- [ ] Encoding and bounds: `cargo test -p v3-telemetry` -> the encoding
+- [x] Encoding and bounds: `cargo test -p v3-telemetry` -> the encoding
       rows.
-- [ ] Server: `cargo test -p v3-server` -> the server rows.
-- [ ] Reference build: `cargo build --release -p v3-cli -p v3-server -p
+- [x] Server: `cargo test -p v3-server` -> the server rows.
+- [x] Reference build: `cargo build --release -p v3-cli -p v3-server -p
       v3-lab --no-default-features` compiles, `cargo tree -p v3-cli -p
       v3-server -p v3-lab --no-default-features -e features` shows neither
       `v3-telemetry` nor `telemetry-seams`, and clippy `-D warnings` passes
       with and without the feature.
-- [ ] Dashboards (Docker, outside `make check`):
+- [x] Dashboards (Docker, outside `make check`):
       `scripts/telemetry-dashboards-check` -> every row passes, including
       the five above; the `Creature windows` panel and one window opened
       from it, with its events visible, recorded as a checklist row in the
       readings file.
-- [ ] Bytes per run: the workload run's `bytes=` and `windows=`, the genome
+- [x] Bytes per run: the workload run's `bytes=` and `windows=`, the genome
       record's body size, and Tempo's and Loki's growth over ten runs, in
       the readings file.
-- [ ] Parent comparison: `scripts/telemetry-parent-compare 2d640fe9` (F03's
+- [x] Parent comparison: `scripts/telemetry-parent-compare 2d640fe9` (F03's
       closing commit) -> identical canonical output, in the readings file.
-- [ ] Overhead check: `scripts/telemetry-overhead` -> the table in the
+- [x] Overhead check: `scripts/telemetry-overhead` -> the table in the
       readings file, verdict in Performance and Goal Impact; then the
       per-creature-tick reading.
-- [ ] `make check` -> exit 0.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
+- [x] `make check` -> exit 0.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
-- [ ] Benchmark summary: `Not applicable: observability feature`.
+- [x] Benchmark summary: `Not applicable: observability feature`.
 
 | Test rows | What is asserted |
 | --- | --- |
@@ -282,6 +282,17 @@ is closure evidence.
 | CLI: content | the receiver holds a window trace with a `creature_window` root, as many `creature_tick` children as `petri.ticks_recorded`, the IDs of invariant 5, `hop`, `pass` and `action` events, the sensed arrays (`petri.food_here_by_type` and `petri.neighbor_food.<i>` for each of two food types; the area banks absent for the founder, which never reads them), and a `creature.genome` record with the root's hash; two `on` runs of the same seed pick the same first creature; a run shorter than the window exports it with `run_end`; `recorded=` equals the sum of `petri.ticks_recorded`; `PETRI_TELEMETRY_CREATURE_WINDOWS=off` yields no window and `windows=0`; an invalid setting is refused |
 | Encoding | a synthetic window encodes the predicted trace and span IDs, parents, timestamps, names, attribute keys, arrays and the config group values, and a zero-tick window its root alone spanning its start instant; alternating window and manual samples get distinct IDs; a manual sample past 2,048 events is cut at encoding and marked truncated; the 4,097th sample, and a sample when more than 248 MiB are counted (one at exactly 248 MiB is), are not admitted and `run.ended` says which cap, with genome bodies counted; a genome body over 4 MiB is dropped and the root marked; a window item over the body cap is dropped and counted (the queue-bounds drop is the `Item::Encoded` path F03's test covers); the oversized-genome case runs with `Limits.max_body_bytes` lowered; a failed or rejected post is `failed`; a tick trace is not captured at tick `2^63` |
 | Server | a window exports under `step`; `start_sample` ends an active window as `manual` and the completed manual sample is exported once, with policy `manual` and its start digest, when `get_sample` hands it over, then windows resume; a second `start_sample` exports the first as `replaced`; a `start_sample` inside the interval serves HTTP, exports nothing and counts in `petri.samples_skipped`; a config patch ends a window as `config_change` and a manual sample spanning one carries `petri.config_changed` on the root and the new digest on the later tick spans; reset and shutdown export a pending window and an unfetched manual sample as `run_end` under the old run; the payload neutrality test still passes |
+
+| Item | Result (2026-09-30; transcripts in the readings file) |
+| --- | --- |
+| Viability | 28 passed, plain and with `--features telemetry-seams` |
+| Seam, neutrality, content, encoding, server | pass inside `make check` (both `v3-core --lib` rows); the founder's tick spans carry the typed-food banks and no extended-perception bank |
+| Reference build | build exit 0; `cargo tree` 0 matches; clippy `-D warnings` exit 0 with `--workspace --no-default-features` and in `make check` |
+| Dashboards | every row PASS, `Creature windows` 1 row, window trace 1 root + 8 tick spans with 48 hop, 24 pass, 16 action events; browser: the row's span link opens the window, a tick's 11 events visible |
+| Bytes per run | `windows=1 recorded=8` on ten runs; about 88–92 KB per window request plus genome record; genome body 12,090 B (97 units); Tempo +492, Loki +168 KiB over ten runs |
+| Parent comparison | `identical: 3 canonical lines, T=6908` |
+| Overhead check | inconclusive: spread 16.19% then 15.28% (n = 0) on a loaded host |
+| `make check` | exit 0 |
 
 ## Performance and Goal Impact
 
@@ -314,10 +325,10 @@ unchanged, with T = 6908 fixed:
 | Record | Value |
 | --- | --- |
 | Profiles | `Not applicable: observability feature` |
-| Parent comparison | pending |
-| Overhead check | pending |
-| Self-timed cost per tick | pending |
-| Attribution block (i), (ii) | pending |
+| Parent comparison | identical canonical output against `2d640fe9`, T = 6908 |
+| Overhead check | inconclusive: F01's method, T = 6908; both attempts (the second the one rerun) stopped at the spread measurement, 16.19% and 15.28% > 10%, so n = 0 and states (a) and (b) inconclusive, (c) without a reading; 25.0 s of the 300 s cap; host load average 8.0 to 13.0 |
+| Self-timed cost per tick | 0.51–0.71 µs (ten windows-on workload runs, `self_time_us` 3,496–4,891), below the expected 6 µs |
+| Attribution block (i), (ii) | taken, 32.2 s (57.2 s of the cap in all), stack stopped: (i) windows off against the reference, ratios 1.0759 and 1.0047, median 1.0403, within this host's noise; (ii) back-to-back windows against windows off, 42.4 and 41.3 µs per recorded creature-tick, median 41.9 µs, below the expected 50 µs to 1 ms |
 
 - Readings: [`docs/progress/readings/t21-f04.md`](../../progress/readings/t21-f04.md).
 
