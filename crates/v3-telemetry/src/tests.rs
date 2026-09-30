@@ -50,7 +50,10 @@ fn start(config: &SimulationConfig) -> RunStart<'_> {
 fn held() -> (Telemetry, ReportSink) {
     let options = options("http://unused", Limits::default());
     let reports = options.reports.clone();
-    (Telemetry::with_exporter(options, AcceptAll, true), reports)
+    (
+        Telemetry::with_exporter(options, AcceptAll, Arc::default(), true),
+        reports,
+    )
 }
 
 fn active(telemetry: &Telemetry) -> &Active {
@@ -135,6 +138,46 @@ fn build_revision_is_a_commit_or_unknown() {
             || std::env::var("PETRI_BUILD_REVISION").is_ok(),
         "unexpected build revision {BUILD_REVISION}"
     );
+}
+
+/// The build script's `rerun-if-changed` lines, read from the `output` file
+/// Cargo writes beside its `OUT_DIR`.
+fn build_script_watches() -> Vec<std::path::PathBuf> {
+    let output = std::path::Path::new(env!("OUT_DIR"))
+        .parent()
+        .expect("OUT_DIR has a parent")
+        .join("output");
+    std::fs::read_to_string(&output)
+        .unwrap_or_else(|error| panic!("{}: {error}", output.display()))
+        .lines()
+        .filter_map(|line| line.strip_prefix("cargo::rerun-if-changed="))
+        .filter(|path| *path != "build.rs")
+        .map(std::path::PathBuf::from)
+        .collect()
+}
+
+#[test]
+fn the_build_script_watches_head_by_an_absolute_path() {
+    let overridden =
+        option_env!("PETRI_BUILD_REVISION").is_some_and(|value| !value.trim().is_empty());
+    if overridden || BUILD_REVISION == "unknown" {
+        return;
+    }
+    let head = std::process::Command::new("git")
+        .args(["rev-parse", "--path-format=absolute", "--git-path", "HEAD"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("git runs");
+    let head = std::path::PathBuf::from(String::from_utf8(head.stdout).unwrap().trim());
+    let watches = build_script_watches();
+    assert!(
+        watches.contains(&head),
+        "{watches:?} lacks {}",
+        head.display()
+    );
+    for path in &watches {
+        assert!(path.is_absolute() && path.exists(), "{}", path.display());
+    }
 }
 
 #[test]
@@ -278,6 +321,35 @@ fn an_unknown_recipe_is_omitted_not_empty() {
         .records()
         .iter()
         .all(|record| record.attribute("petri.recipe").is_none()));
+}
+
+#[test]
+fn records_a_partial_success_rejects_count_as_failed_for_their_run() {
+    let receiver = Receiver::rejecting(1);
+    let options = options(receiver.endpoint(), Limits::default());
+    let reports = options.reports.clone();
+    let telemetry = Telemetry::start_otlp(options, true);
+    let config = small_config();
+    // Both runs are queued before the worker takes anything, so one batch
+    // could hold all six records.
+    let four = telemetry.begin_run(start(&config)).unwrap();
+    telemetry.run_state(&four, RunState::Running, 0);
+    telemetry.run_state(&four, RunState::Paused, 1);
+    telemetry.end_run(four.clone(), EndStatus::Reset, 1, Flush::Background);
+    let two = telemetry.begin_run(start(&config)).unwrap();
+    telemetry.end_run(two.clone(), EndStatus::Completed, 1, Flush::Background);
+    active(&telemetry).shared.release();
+    telemetry.shutdown();
+
+    for (run, exported) in [(&four, "3"), (&two, "1")] {
+        let line = run_line(&reports, run);
+        assert_eq!(line["exported"], exported, "{line:?}");
+        assert_eq!(line["failed"], "1", "{line:?}");
+        assert_eq!(line["abandoned"], "0", "{line:?}");
+        // Each run's one batch was partly rejected: no accepted batch bytes.
+        assert_eq!(line["bytes"], "0", "{line:?}");
+    }
+    assert_eq!(receiver.records().len(), 4);
 }
 
 #[test]

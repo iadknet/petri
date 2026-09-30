@@ -19,7 +19,12 @@ futures-executor = "=0.3.32"
 opentelemetry = { version = "=0.33.0", default-features = false, features = ["logs"] }
 opentelemetry_sdk = { version = "=0.33.0", default-features = false, features = ["logs"] }
 opentelemetry-otlp = { version = "=0.33.0", default-features = false, features = ["logs", "http-proto", "reqwest-blocking-client"] }
-# The in-test OTLP receiver (`testing`) decodes what the exporter sent; both
-# crates are already in the exporter's dependency tree.
+# The exporter's HTTP client (`export`) decodes partial-success responses; all
+# three crates are already in the exporter's dependency tree.
+opentelemetry-http = { version = "=0.33.0", default-features = false, features = ["reqwest-blocking"] }
+reqwest = { version = "=0.13.5", default-features = false, features = ["blocking"] }
+async-trait = "=0.1.89"
+# The export client and the in-test OTLP receiver (`testing`) decode OTLP
+# messages; both crates are already in the exporter's dependency tree.
 opentelemetry-proto = { version = "=0.33.0", default-features = false, features = ["gen-tonic-messages", "logs"] }
 prost = "=0.14.4"

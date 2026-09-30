@@ -189,7 +189,7 @@ telemetry-down: ## Stop the local telemetry stack; its data volume stays.
 
 telemetry-clean: ## Preview retiring telemetry before CUTOFF=YYYY-MM-DD (00:00 UTC) or RFC3339; PROCEED=1 deletes.
 	@if [ -z "$(CUTOFF)" ]; then echo 'error: set CUTOFF=YYYY-MM-DD or RFC3339' >&2; exit 2; fi
-	@scripts/telemetry-cleanup "$(CUTOFF)" $(if $(PROCEED),--proceed)
+	@scripts/telemetry-cleanup "$(CUTOFF)" $(if $(and $(filter 1,$(PROCEED)),$(filter 1,$(words $(PROCEED)))),--proceed)
 
 format: ## Apply safe Rust and frontend formatting.
 	@cargo fmt --all

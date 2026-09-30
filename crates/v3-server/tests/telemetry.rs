@@ -249,3 +249,31 @@ async fn simulation_payloads_are_identical_off_on_and_on_with_a_closed_port() {
     assert_eq!(on, off);
     assert_eq!(closed, off);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn shutdown_stops_the_running_simulation_at_the_tick_run_ended_reports() {
+    let receiver = Receiver::start();
+    let (telemetry, _) = telemetry(receiver.endpoint());
+    let state = AppState::from_config_with_telemetry(test_config(), 0, telemetry);
+    let app = router(state.clone());
+    call(&app, "POST", "/v3/simulation/start", "").await;
+    while state.sim.lock().await.sim.tick == 0 {
+        tokio::task::yield_now().await;
+    }
+
+    state.shutdown_telemetry().await;
+    // A loop still running would move the tick past the one reported.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let ended = receiver
+        .records()
+        .into_iter()
+        .find(|record| record.event_name == "run.ended")
+        .expect("run.ended was exported");
+    let handle = state.sim.lock().await;
+    assert_ne!(handle.status, v3_server::state::SimulationStatus::Running);
+    assert_eq!(
+        ended.attribute("petri.tick"),
+        Some(handle.sim.tick.to_string().as_str())
+    );
+}

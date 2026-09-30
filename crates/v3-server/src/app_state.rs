@@ -56,14 +56,26 @@ impl AppState {
         state
     }
 
-    /// Ends the current run as `shutdown` and flushes, abandoning what is
-    /// still pending after the flush bound. Blocks on a worker thread, not on
-    /// the runtime.
+    /// Stops the simulation, ends the current run as `shutdown` at the tick it
+    /// stopped on and flushes, abandoning what is still pending after the flush
+    /// bound. Blocks on a worker thread, not on the runtime.
+    ///
+    /// A running loop exits at its next status check, since the status leaves
+    /// `Running`; the process is exiting, so no `run.state` is emitted for it.
+    /// The simulation lock stays held through the flush on purpose: it keeps
+    /// any in-flight lifecycle handler from ticking or restarting the loop
+    /// before the process exits.
     #[cfg(feature = "telemetry")]
     pub async fn shutdown_telemetry(&self) {
-        let tick = self.sim.lock().await.sim.tick;
+        use crate::state::SimulationStatus;
+        let mut handle = self.sim.lock().await;
+        if handle.status == SimulationStatus::Running {
+            handle.status = SimulationStatus::Paused;
+        }
+        let tick = handle.sim.tick;
         let telemetry = self.telemetry.clone();
         let _ = tokio::task::spawn_blocking(move || telemetry.shutdown(tick)).await;
+        drop(handle);
     }
 
     pub fn publish_ws_frame(&self, frame: WsFrame) {
