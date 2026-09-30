@@ -266,7 +266,10 @@ pub async fn patch_config(
     handle.cached_fertility_u8 =
         crate::query::cache::build_primary_food_fertility_u8(handle.sim.world.food());
     #[cfg(feature = "telemetry")]
-    app.telemetry.config(&normalized_config, handle.sim.tick);
+    {
+        let (sim, samples) = handle.telemetry_parts();
+        app.telemetry.config(sim, samples.window);
+    }
     let state = handle.status;
     let frame = crate::state::build_ws_frame(&handle);
     drop(handle);

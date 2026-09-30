@@ -3,6 +3,33 @@
 use crate::contracts::CreatureId;
 use crate::runtime::trace::domain::{ExecutionSample, TickTrace};
 
+/// Hard caps on what one recording retains (T21.F04). An event is one hop,
+/// pass or applied-action record; bytes are records' in-memory sizes
+/// (`crate::runtime::trace::size`).
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TraceBudget {
+    pub max_events: u32,
+    pub max_bytes: u64,
+}
+
+/// Which cap ended a recording.
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TruncationReason {
+    Events,
+    Bytes,
+}
+
+/// Where a budgeted recording was cut: the tick (`TickTrace::tick_number`)
+/// whose record did not fit, and the cap it met.
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Truncation {
+    pub tick: u64,
+    pub reason: TruncationReason,
+}
+
 /// In-progress trace recording state.
 #[derive(Debug)]
 pub struct ActiveTrace {
@@ -11,6 +38,23 @@ pub struct ActiveTrace {
     pub ticks: Vec<TickTrace>,
     /// Whether to capture extended perception debug snapshots per tick.
     pub include_perception_debug: bool,
+    /// The caps this recording keeps under; `None` records everything.
+    #[cfg(feature = "telemetry-seams")]
+    pub budget: Option<TraceBudget>,
+    /// Events retained so far.
+    #[cfg(feature = "telemetry-seams")]
+    pub events: u32,
+    /// Bytes retained so far.
+    #[cfg(feature = "telemetry-seams")]
+    pub bytes: u64,
+    /// Set once, when a record did not fit the budget; the recording then
+    /// ends after that tick.
+    #[cfg(feature = "telemetry-seams")]
+    pub truncated: Option<Truncation>,
+    /// The removal cause of a creature gone at a tick's start, recorded in
+    /// that tick (for example a phase-0 death).
+    #[cfg(feature = "telemetry-seams")]
+    pub removed: Option<crate::simulation::energy_accounting::DeathCause>,
 }
 
 impl ActiveTrace {
@@ -21,6 +65,16 @@ impl ActiveTrace {
             ticks_remaining: num_ticks,
             ticks: Vec::with_capacity(num_ticks as usize),
             include_perception_debug: false,
+            #[cfg(feature = "telemetry-seams")]
+            budget: None,
+            #[cfg(feature = "telemetry-seams")]
+            events: 0,
+            #[cfg(feature = "telemetry-seams")]
+            bytes: 0,
+            #[cfg(feature = "telemetry-seams")]
+            truncated: None,
+            #[cfg(feature = "telemetry-seams")]
+            removed: None,
         }
     }
 

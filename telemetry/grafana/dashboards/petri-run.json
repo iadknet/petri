@@ -1311,6 +1311,51 @@
       "options": {
         "showHeader": true
       }
+    },
+    {
+      "id": 23,
+      "type": "row",
+      "title": "Creature windows",
+      "gridPos": {
+        "x": 0,
+        "y": 93,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 24,
+      "type": "table",
+      "title": "Creature windows",
+      "description": "One row per creature window or manual sample of the run: its sample index, creature, policy, ticks recorded, end reason and truncation. The span ID opens the trace, whose tick spans carry the hop, pass and action events.",
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 94,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo"
+          },
+          "queryType": "traceql",
+          "tableType": "spans",
+          "limit": 500,
+          "query": "{ span.petri.run_id = \"$run_id\" && name = \"creature_window\" } | select(span.petri.window, span.petri.creature_id, span.petri.sample_policy, span.petri.ticks_recorded, span.petri.end_reason, span.petri.truncated)"
+        }
+      ],
+      "options": {
+        "showHeader": true
+      }
     }
   ]
 }

@@ -33,6 +33,9 @@ pub(crate) enum Signal {
     Metrics,
     /// A tick trace: an OTLP trace request for `/v1/traces`.
     Traces,
+    /// A creature window or manual sample (T21.F04): an OTLP trace request
+    /// for `/v1/traces`.
+    Windows,
 }
 
 impl Signal {
@@ -41,6 +44,7 @@ impl Signal {
         match self {
             Self::Metrics => "snapshot",
             Self::Traces => "trace",
+            Self::Windows => "window",
         }
     }
 }
@@ -79,6 +83,10 @@ pub(crate) struct RunCounts {
     pub(crate) bytes: u64,
     pub(crate) snapshots: u64,
     pub(crate) traces: u64,
+    /// Creature windows and manual samples taken (T21.F04).
+    pub(crate) windows: u64,
+    /// Creature-ticks those samples recorded.
+    pub(crate) recorded: u64,
 }
 
 impl RunCounts {
@@ -212,6 +220,7 @@ impl Shared {
             match signal {
                 Signal::Metrics => entry.counts.snapshots += 1,
                 Signal::Traces => entry.counts.traces += 1,
+                Signal::Windows => entry.counts.windows += 1,
             }
         }
         let bytes = body.len() as u64;
@@ -250,6 +259,18 @@ impl Shared {
         state.queue.push_back(Entry { run, bytes, item });
         drop(state);
         self.changed.notify_all();
+    }
+
+    /// Adds creature-ticks a sample of `run` recorded.
+    pub(crate) fn add_recorded(&self, run: RunKey, ticks: u64) {
+        if let Some(entry) = self.lock().runs.get_mut(&run) {
+            entry.counts.recorded += ticks;
+        }
+    }
+
+    /// The largest body the queue accepts.
+    pub(crate) fn max_body_bytes(&self) -> u64 {
+        self.limits.max_body_bytes
     }
 
     pub(crate) fn add_self_time(&self, run: RunKey, elapsed: Duration) {
@@ -365,10 +386,12 @@ impl Shared {
             bytes,
             snapshots,
             traces,
+            windows,
+            recorded,
             ..
         } = entry.counts;
         self.sink.write(&format!(
-            "telemetry: run={} exported={exported} failed={failed} dropped={dropped} abandoned={abandoned} bytes={bytes} self_time_us={} flush_ms={flush_ms} snapshots={snapshots} traces={traces}",
+            "telemetry: run={} exported={exported} failed={failed} dropped={dropped} abandoned={abandoned} bytes={bytes} self_time_us={} flush_ms={flush_ms} snapshots={snapshots} traces={traces} windows={windows} recorded={recorded}",
             entry.id,
             entry.self_time.as_micros(),
         ));

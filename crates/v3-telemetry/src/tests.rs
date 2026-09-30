@@ -44,6 +44,7 @@ fn options(endpoint: &str, limits: Limits) -> Options {
         reports: ReportSink::capture(),
         metrics_interval: DEFAULT_METRICS_INTERVAL,
         tick_traces: Switch::On,
+        windows: WindowSettings::default(),
     }
 }
 
@@ -741,7 +742,7 @@ impl PostEncoded for RejectSpans {
     fn post(&self, signal: Signal, _body: Vec<u8>) -> Outcome {
         match signal {
             Signal::Metrics => Outcome::Exported { rejected: 0 },
-            Signal::Traces => Outcome::Exported { rejected: 1 },
+            Signal::Traces | Signal::Windows => Outcome::Exported { rejected: 1 },
         }
     }
 }

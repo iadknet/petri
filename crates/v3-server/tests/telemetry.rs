@@ -1,7 +1,7 @@
 //! Server run telemetry (T21.F01): run identity across `startup`, the
 //! lifecycle records and their snapshots (T21.F02), the bounded shutdown
 //! flush, and neutrality of the simulation payloads with telemetry off, on,
-//! and on with a closed port.
+//! and on with a closed port; creature windows and manual samples (T21.F04).
 #![cfg(feature = "telemetry")]
 
 use std::collections::BTreeMap;
@@ -35,9 +35,16 @@ fn telemetry(endpoint: &str) -> (Telemetry, ReportSink) {
         // Longer than any test: only transition and run-end snapshots.
         metrics_interval: Duration::from_secs(3_600),
         tick_traces: v3_telemetry::Switch::On,
+        windows: v3_telemetry::WindowSettings::default(),
     });
     (telemetry, reports)
 }
+
+const WINDOWS_OFF: v3_telemetry::WindowSettings = v3_telemetry::WindowSettings {
+    switch: v3_telemetry::Switch::Off,
+    ticks: 8,
+    interval: Duration::from_secs(10),
+};
 
 fn request(method: &str, uri: &str, body: &str) -> Request<Body> {
     Request::builder()
@@ -325,6 +332,8 @@ async fn interval_snapshots_carry_tick_traces_and_lifecycle_snapshots_do_not() {
         reports: ReportSink::capture(),
         metrics_interval: INTERVAL,
         tick_traces: v3_telemetry::Switch::On,
+        // Tick traces only: creature windows have their own tests.
+        windows: WINDOWS_OFF,
     });
     let mut config = test_config();
     config.world.width = 32;
@@ -447,6 +456,7 @@ async fn run_loop_emits_interval_traces_at_snapshot_ticks() {
         reports: ReportSink::capture(),
         metrics_interval: Duration::from_millis(100),
         tick_traces: v3_telemetry::Switch::On,
+        windows: WINDOWS_OFF,
     });
     let mut config = test_config();
     config.world.width = 32;
@@ -485,4 +495,259 @@ async fn run_loop_emits_interval_traces_at_snapshot_ticks() {
         assert_eq!(span.attribute("petri.config_digest"), Some(digest.as_str()));
         assert_eq!(span.attribute("petri.sample_policy"), Some("interval"));
     }
+}
+
+// ── Creature windows (T21.F04) ──────────────────────────────────────────
+
+/// Telemetry with 3-tick windows `interval_ms` apart.
+fn windowed(endpoint: &str, interval_ms: u64) -> (Telemetry, ReportSink) {
+    let reports = ReportSink::capture();
+    let telemetry = Telemetry::start_with(Options {
+        service: Service::Server,
+        endpoint: endpoint.to_owned(),
+        limits: Limits::default(),
+        reports: reports.clone(),
+        metrics_interval: Duration::from_secs(3_600),
+        tick_traces: v3_telemetry::Switch::On,
+        windows: v3_telemetry::WindowSettings {
+            switch: v3_telemetry::Switch::On,
+            ticks: 3,
+            interval: Duration::from_millis(interval_ms),
+        },
+    });
+    (telemetry, reports)
+}
+
+/// A paused, seeded server app.
+async fn paused(telemetry: Telemetry) -> (AppState, axum::Router) {
+    let mut config = test_config();
+    config.world.width = 32;
+    config.world.height = 32;
+    config.population.initial_creatures = 16;
+    let state = AppState::from_config_with_telemetry(config, 0, telemetry);
+    let app = router(state.clone());
+    call(&app, "POST", "/v3/simulation/startup", r#"{"seed":4}"#).await;
+    call(&app, "POST", "/v3/simulation/start", "").await;
+    call(&app, "POST", "/v3/simulation/pause", "").await;
+    (state, app)
+}
+
+async fn steps(app: &axum::Router, count: u32) {
+    call(
+        app,
+        "POST",
+        "/v3/simulation/step",
+        &format!(r#"{{"steps":{count}}}"#),
+    )
+    .await;
+}
+
+/// A living creature's server ID.
+async fn some_creature(state: &AppState) -> u64 {
+    use slotmap::Key as _;
+    let handle = state.sim.lock().await;
+    handle.sim.creatures.keys().next().unwrap().data().as_ffi()
+}
+
+/// Each exported sample's root, in export order, as
+/// `(window, policy, end_reason)`.
+fn samples(receiver: &Receiver) -> Vec<(String, String, String)> {
+    receiver
+        .traces()
+        .iter()
+        .filter_map(|trace| trace.spans.first().filter(|s| s.name == "creature_window"))
+        .map(|root| {
+            let get = |key| root.attribute(key).unwrap().to_owned();
+            (
+                get("petri.window"),
+                get("petri.sample_policy"),
+                get("petri.end_reason"),
+            )
+        })
+        .collect()
+}
+
+fn roots(receiver: &Receiver) -> Vec<v3_telemetry::testing::ReceivedSpan> {
+    receiver
+        .traces()
+        .into_iter()
+        .filter_map(|trace| {
+            trace
+                .spans
+                .into_iter()
+                .next()
+                .filter(|s| s.name == "creature_window")
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_window_exports_under_step_and_a_manual_sample_at_hand_over() {
+    let receiver = Receiver::start();
+    let (telemetry, reports) = windowed(receiver.endpoint(), 10);
+    let (state, app) = paused(telemetry).await;
+    steps(&app, 3).await;
+    tokio::time::sleep(Duration::from_millis(15)).await;
+    // A window starts; the manual sample ends it as `manual`.
+    steps(&app, 1).await;
+    tokio::time::sleep(Duration::from_millis(15)).await;
+    let id = some_creature(&state).await;
+    let uri = format!("/v3/simulation/creature/{id}/sample");
+    call(&app, "POST", &uri, r#"{"ticks":2}"#).await;
+    steps(&app, 2).await;
+    let sample = call(&app, "GET", &uri, "").await;
+    assert_eq!(sample["status"], "complete");
+    assert_eq!(call(&app, "GET", &uri, "").await["status"], "idle");
+    // Windows resume.
+    tokio::time::sleep(Duration::from_millis(15)).await;
+    steps(&app, 3).await;
+    state.shutdown_telemetry().await;
+
+    assert_eq!(
+        samples(&receiver),
+        [
+            ("0".into(), "window".into(), "complete".into()),
+            ("1".into(), "window".into(), "manual".into()),
+            ("2".into(), "manual".into(), "complete".into()),
+            ("3".into(), "window".into(), "complete".into()),
+        ]
+    );
+    let manual = &roots(&receiver)[2];
+    assert_eq!(manual.attribute("petri.ticks_recorded"), Some("2"));
+    assert_eq!(
+        manual.attribute("petri.creature_id"),
+        Some(id.to_string().as_str())
+    );
+    let line = run_lines(&reports)
+        .into_values()
+        .find(|line| line["windows"] != "0")
+        .unwrap();
+    assert_eq!(line["windows"], "4");
+}
+
+#[tokio::test]
+async fn a_second_start_replaces_the_first_and_one_inside_the_interval_is_skipped() {
+    let receiver = Receiver::start();
+    let (telemetry, _) = windowed(receiver.endpoint(), 300);
+    let (state, app) = paused(telemetry).await;
+    let id = some_creature(&state).await;
+    let uri = format!("/v3/simulation/creature/{id}/sample");
+    tokio::time::sleep(Duration::from_millis(350)).await;
+    call(&app, "POST", &uri, r#"{"ticks":2}"#).await;
+    steps(&app, 1).await;
+    tokio::time::sleep(Duration::from_millis(350)).await;
+    call(&app, "POST", &uri, r#"{"ticks":2}"#).await;
+    // Inside the interval: served over HTTP, never exported.
+    call(&app, "POST", &uri, r#"{"ticks":1}"#).await;
+    steps(&app, 1).await;
+    assert_eq!(call(&app, "GET", &uri, "").await["status"], "complete");
+    state.shutdown_telemetry().await;
+
+    assert_eq!(
+        samples(&receiver),
+        [
+            ("0".into(), "manual".into(), "replaced".into()),
+            ("1".into(), "manual".into(), "replaced".into()),
+        ]
+    );
+    let ended = receiver
+        .records()
+        .into_iter()
+        .rfind(|r| r.event_name == "run.ended")
+        .unwrap();
+    assert_eq!(ended.attribute("petri.samples_skipped"), Some("1"));
+}
+
+#[tokio::test]
+async fn a_patch_ends_a_window_and_marks_a_manual_sample_spanning_it() {
+    let receiver = Receiver::start();
+    let (telemetry, _) = windowed(receiver.endpoint(), 10);
+    let (state, app) = paused(telemetry).await;
+    steps(&app, 1).await;
+    call(&app, "PATCH", "/v3/simulation/config", GRAZING_PATCH).await;
+    tokio::time::sleep(Duration::from_millis(15)).await;
+    let id = some_creature(&state).await;
+    let uri = format!("/v3/simulation/creature/{id}/sample");
+    call(&app, "POST", &uri, r#"{"ticks":2}"#).await;
+    steps(&app, 1).await;
+    call(
+        &app,
+        "PATCH",
+        "/v3/simulation/config",
+        r#"{"world":{"food":{"shared":{"grazing":{"enabled":true}}}}}"#,
+    )
+    .await;
+    steps(&app, 1).await;
+    call(&app, "GET", &uri, "").await;
+    state.shutdown_telemetry().await;
+
+    let roots = roots(&receiver);
+    assert_eq!(
+        roots[0].attribute("petri.end_reason"),
+        Some("config_change")
+    );
+    let manual = &roots[1];
+    assert_eq!(manual.attribute("petri.sample_policy"), Some("manual"));
+    assert_eq!(manual.attribute("petri.config_changed"), Some("true"));
+    let traces = receiver.traces();
+    let trace = traces
+        .iter()
+        .find(|t| t.spans[0].attribute("petri.sample_policy") == Some("manual"))
+        .unwrap();
+    let digests: Vec<_> = trace.spans[1..]
+        .iter()
+        .map(|span| span.attribute("petri.config_digest").unwrap().to_owned())
+        .collect();
+    assert_eq!(digests.len(), 2);
+    assert_ne!(
+        digests[0], digests[1],
+        "the later tick ran under the new digest"
+    );
+    assert_eq!(
+        manual.attribute("petri.config_digest"),
+        Some(digests[0].as_str())
+    );
+}
+
+#[tokio::test]
+async fn reset_and_shutdown_export_pending_samples_under_the_old_run() {
+    let receiver = Receiver::start();
+    let (telemetry, _) = windowed(receiver.endpoint(), 10);
+    let (state, app) = paused(telemetry).await;
+    steps(&app, 1).await;
+    // A pending window at reset.
+    call(&app, "POST", "/v3/simulation/startup", r#"{"seed":5}"#).await;
+    call(&app, "POST", "/v3/simulation/start", "").await;
+    call(&app, "POST", "/v3/simulation/pause", "").await;
+    let id = some_creature(&state).await;
+    let uri = format!("/v3/simulation/creature/{id}/sample");
+    call(&app, "POST", &uri, r#"{"ticks":1}"#).await;
+    steps(&app, 1).await;
+    // An unfetched manual sample at shutdown.
+    state.shutdown_telemetry().await;
+
+    let records = receiver.records();
+    let runs: Vec<String> = records
+        .iter()
+        .filter(|r| r.event_name == "run.started")
+        .map(|r| r.attribute("petri.run_id").unwrap().to_owned())
+        .collect();
+    let roots = roots(&receiver);
+    let summary: Vec<_> = roots
+        .iter()
+        .map(|root| {
+            (
+                root.attribute("petri.run_id").unwrap().to_owned(),
+                root.attribute("petri.sample_policy").unwrap().to_owned(),
+                root.attribute("petri.end_reason").unwrap().to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        summary,
+        [
+            (runs[1].clone(), "window".into(), "run_end".into()),
+            (runs[2].clone(), "manual".into(), "run_end".into()),
+        ]
+    );
 }

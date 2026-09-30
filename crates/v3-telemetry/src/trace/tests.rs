@@ -26,6 +26,7 @@ fn run(started: Instant, recipe: Option<&str>) -> RunHandle {
         last_snapshot: None,
         last_stamp_ns: None,
         traces_taken: 0,
+        samples: crate::windows::Samples::default(),
     }
 }
 

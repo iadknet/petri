@@ -141,9 +141,29 @@ pub struct ReceivedSpan {
     pub start_time_unix_nano: u64,
     pub end_time_unix_nano: u64,
     pub attributes: BTreeMap<String, String>,
+    pub events: Vec<ReceivedEvent>,
 }
 
 impl ReceivedSpan {
+    pub fn attribute(&self, key: &str) -> Option<&str> {
+        self.attributes.get(key).map(String::as_str)
+    }
+
+    /// The span's events named `name`, in order.
+    pub fn events_named<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a ReceivedEvent> {
+        self.events.iter().filter(move |event| event.name == name)
+    }
+}
+
+/// One decoded span event; array values render as `[a, b, …]`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReceivedEvent {
+    pub name: String,
+    pub time_unix_nano: u64,
+    pub attributes: BTreeMap<String, String>,
+}
+
+impl ReceivedEvent {
     pub fn attribute(&self, key: &str) -> Option<&str> {
         self.attributes.get(key).map(String::as_str)
     }
@@ -197,6 +217,15 @@ pub fn decode_traces(body: &[u8]) -> Vec<ReceivedTrace> {
                     start_time_unix_nano: span.start_time_unix_nano,
                     end_time_unix_nano: span.end_time_unix_nano,
                     attributes: to_map(&span.attributes),
+                    events: span
+                        .events
+                        .iter()
+                        .map(|event| ReceivedEvent {
+                            name: event.name.clone(),
+                            time_unix_nano: event.time_unix_nano,
+                            attributes: to_map(&event.attributes),
+                        })
+                        .collect(),
                 })
                 .collect(),
         })
@@ -231,6 +260,14 @@ fn render(value: Option<&AnyValue>) -> Option<String> {
         any_value::Value::BoolValue(flag) => flag.to_string(),
         any_value::Value::IntValue(number) => number.to_string(),
         any_value::Value::DoubleValue(number) => number.to_string(),
+        any_value::Value::ArrayValue(array) => {
+            let items: Vec<String> = array
+                .values
+                .iter()
+                .map(|item| render(Some(item)).unwrap_or_default())
+                .collect();
+            format!("[{}]", items.join(", "))
+        }
         other => format!("{other:?}"),
     })
 }

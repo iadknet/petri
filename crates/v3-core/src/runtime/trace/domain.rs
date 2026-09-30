@@ -46,6 +46,63 @@ pub struct TickTrace {
     /// Final per-kind bars: commits of each kind this tick, in `VoteKind`
     /// index order.
     pub commit_counts: [u32; VOTE_KIND_COUNT],
+    /// What the tick applied and left behind (T21.F04); never serialized.
+    #[cfg(feature = "telemetry-seams")]
+    #[serde(skip)]
+    pub outcome: Option<TickOutcome>,
+}
+
+/// One action the world applied to the traced creature, as `push_action_log`
+/// built its entry, with the realized accounting from the `EnergyFlows`
+/// deltas around it (T21.F04).
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AppliedAction {
+    pub entry: crate::creature::action_log::ActionLogEntry,
+    /// `action_charges` delta.
+    pub charge: f64,
+    /// `failed_action_penalty` delta.
+    pub penalty: f64,
+    /// `food_intake_by_type`, `predation_attacker_credit` and
+    /// `predation_kill_bonus_credit` deltas.
+    pub reward: f64,
+}
+
+/// The traced creature's state after the tick.
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StateAfter {
+    pub position: crate::contracts::Position,
+    pub energy: f32,
+    pub shared_memory: [f32; 16],
+    pub previous_outcome: [f32; OUTCOME_CHANNEL_COUNT],
+}
+
+/// What a recorded tick applied and left behind (T21.F04).
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone)]
+pub struct TickOutcome {
+    /// Position at cognition.
+    pub position: crate::contracts::Position,
+    /// Age at cognition.
+    pub age: u64,
+    /// The typed local food bank cognition read (empty when not read).
+    pub typed_local_food: crate::sensors::typed_food::TypedFoodLocalSnapshot,
+    /// The typed area food bank cognition read (empty when not read).
+    pub typed_area_food: Vec<[f32; 7]>,
+    /// The failed-action penalty in force for the tick.
+    pub failed_action_penalty: f32,
+    /// Applied actions in order.
+    pub applied: Vec<AppliedAction>,
+    /// Energy stolen from the creature this tick, lethal or not.
+    pub damage_received: f32,
+    pub offspring_spawned: u32,
+    /// `None` when the creature was removed.
+    pub after: Option<StateAfter>,
+    /// The removal cause when the creature was removed this tick.
+    pub died: Option<crate::simulation::energy_accounting::DeathCause>,
+    /// The tick's phase timings.
+    pub phases: Option<crate::simulation::stats::TickPhaseTimings>,
 }
 
 /// Why a tick's pass loop ended (T19.F04).

@@ -99,6 +99,10 @@ impl Simulation {
                     .unwrap_or(DeathCause::Unattributed)
             };
             self.stats.mortality.record(cause);
+            #[cfg(feature = "telemetry-seams")]
+            if self.stats.observed_creature == Some(id) {
+                self.stats.observed_removal = Some(cause);
+            }
             self.stats.reproductive_success_by_cognitive_class.record(
                 CognitiveClass::from_companions(&structural_companions(&creature.genome)),
                 creature.offspring_spawned_count,

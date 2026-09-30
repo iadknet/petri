@@ -12,7 +12,9 @@
 use std::time::Duration;
 
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
-use opentelemetry_proto::tonic::common::v1::{any_value, AnyValue, InstrumentationScope, KeyValue};
+use opentelemetry_proto::tonic::common::v1::{
+    any_value, AnyValue, ArrayValue, InstrumentationScope, KeyValue,
+};
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::{span::SpanKind, ResourceSpans, ScopeSpans, Span};
 use v3_core::config::SimulationConfig;
@@ -25,6 +27,9 @@ use crate::{saturating_nanos, RunHandle, Switch, RUN_ID_KEY};
 pub const TICK_TRACES_ENV: &str = "PETRI_TELEMETRY_TICK_TRACES";
 /// The most tick traces one run captures.
 pub const MAX_TICK_TRACES_PER_RUN: u64 = 65_536;
+/// The first tick whose trace is not captured: trace IDs from `2^63` up
+/// belong to creature windows (T21.F04).
+pub const FIRST_UNTRACED_TICK: u64 = 1 << 63;
 /// The phase spans' names, in `run_tick`'s order.
 pub const PHASES: [&str; 5] = [
     "world_update",
@@ -77,7 +82,7 @@ pub(crate) fn span_id(index: u64) -> [u8; 8] {
     index.to_be_bytes()
 }
 
-fn key_value(key: impl Into<String>, value: any_value::Value) -> KeyValue {
+pub(crate) fn key_value(key: impl Into<String>, value: any_value::Value) -> KeyValue {
     KeyValue {
         key: key.into(),
         value: Some(AnyValue { value: Some(value) }),
@@ -87,16 +92,16 @@ fn key_value(key: impl Into<String>, value: any_value::Value) -> KeyValue {
 
 /// A span's attributes as they are built.
 #[derive(Default)]
-struct Attributes(Vec<KeyValue>);
+pub(crate) struct Attributes(pub(crate) Vec<KeyValue>);
 
 impl Attributes {
-    fn text(&mut self, key: impl Into<String>, value: impl Into<String>) {
+    pub(crate) fn text(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.0
             .push(key_value(key, any_value::Value::StringValue(value.into())));
     }
 
     /// An integer, or its decimal string when it exceeds `i64`.
-    fn int(&mut self, key: impl Into<String>, value: impl Into<u64>) {
+    pub(crate) fn int(&mut self, key: impl Into<String>, value: impl Into<u64>) {
         let value: u64 = value.into();
         match i64::try_from(value) {
             Ok(number) => self
@@ -106,18 +111,44 @@ impl Attributes {
         }
     }
 
-    fn count(&mut self, key: impl Into<String>, value: usize) {
+    pub(crate) fn count(&mut self, key: impl Into<String>, value: usize) {
         self.int(key, u64::try_from(value).unwrap_or(u64::MAX));
     }
 
-    fn double(&mut self, key: impl Into<String>, value: impl Into<f64>) {
+    pub(crate) fn double(&mut self, key: impl Into<String>, value: impl Into<f64>) {
         self.0
             .push(key_value(key, any_value::Value::DoubleValue(value.into())));
     }
 
-    fn flag(&mut self, key: impl Into<String>, value: bool) {
+    pub(crate) fn flag(&mut self, key: impl Into<String>, value: bool) {
         self.0
             .push(key_value(key, any_value::Value::BoolValue(value)));
+    }
+
+    /// An OTLP array of `values`, in order.
+    pub(crate) fn array(
+        &mut self,
+        key: impl Into<String>,
+        values: impl IntoIterator<Item = any_value::Value>,
+    ) {
+        let values = values
+            .into_iter()
+            .map(|value| AnyValue { value: Some(value) })
+            .collect();
+        self.0.push(key_value(
+            key,
+            any_value::Value::ArrayValue(ArrayValue { values }),
+        ));
+    }
+
+    /// An array of doubles.
+    pub(crate) fn doubles<T: Into<f64> + Copy>(&mut self, key: impl Into<String>, values: &[T]) {
+        self.array(
+            key,
+            values
+                .iter()
+                .map(|value| any_value::Value::DoubleValue((*value).into())),
+        );
     }
 }
 
@@ -136,7 +167,7 @@ fn identity(run: &RunHandle, tick: u64, sample: TickSample) -> Attributes {
     a
 }
 
-fn config_key(path: &str) -> String {
+pub(crate) fn config_key(path: &str) -> String {
     format!("{CONFIG_PREFIX}{path}")
 }
 
@@ -278,7 +309,7 @@ fn world_update(a: &mut Attributes, config: &SimulationConfig) {
     }
 }
 
-fn cognition(a: &mut Attributes, config: &SimulationConfig) {
+pub(crate) fn cognition(a: &mut Attributes, config: &SimulationConfig) {
     let runtime = &config.runtime;
     a.int(config_key("runtime.max_mesh_hops"), runtime.max_mesh_hops);
     a.int(config_key("runtime.max_vm_steps"), runtime.max_vm_steps);
@@ -313,7 +344,7 @@ fn cognition(a: &mut Attributes, config: &SimulationConfig) {
     );
 }
 
-fn actions(a: &mut Attributes, config: &SimulationConfig) {
+pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
     let costs = &config.energy.costs;
     for (field, value) in [
         ("move_cost", costs.move_cost),
@@ -450,6 +481,11 @@ pub(crate) fn encode(
         ));
     }
 
+    request(resource, spans)
+}
+
+/// One trace request carrying `spans` under the `petri` scope.
+pub(crate) fn request(resource: &[KeyValue], spans: Vec<Span>) -> ExportTraceServiceRequest {
     ExportTraceServiceRequest {
         resource_spans: vec![ResourceSpans {
             resource: Some(Resource {

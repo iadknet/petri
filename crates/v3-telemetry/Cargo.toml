@@ -16,6 +16,10 @@ workspace = true
 v3-core = { path = "../v3-core", features = ["telemetry-seams"] }
 rand = { workspace = true }
 serde_json = { workspace = true }
+serde = { workspace = true }
+# Creature windows (T21.F04): genome hashes and creature server IDs.
+sha2 = { workspace = true }
+slotmap = { workspace = true }
 futures-executor = "=0.3.32"
 opentelemetry = { version = "=0.33.0", default-features = false, features = ["logs"] }
 opentelemetry_sdk = { version = "=0.33.0", default-features = false, features = ["logs"] }

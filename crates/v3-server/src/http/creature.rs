@@ -437,6 +437,13 @@ pub async fn start_sample(
 
     let mut active = ActiveTrace::new(creature_id, req.ticks);
     active.include_perception_debug = req.include_perception_debug;
+    #[cfg(feature = "telemetry")]
+    {
+        let replaced = handle.active_trace.take();
+        let (sim, samples) = handle.telemetry_parts();
+        app.telemetry
+            .start_sample(sim, samples.window, replaced.as_ref(), &active);
+    }
     handle.active_trace = Some(active);
 
     to_json_value(StartSampleResponse {
@@ -476,6 +483,8 @@ pub async fn get_sample(
             .active_trace
             .take()
             .expect("active_trace confirmed Some above");
+        #[cfg(feature = "telemetry")]
+        app.telemetry.hand_over(&handle.sim, &trace);
         let sample = assemble_execution_sample(trace.into_sample(ffi_id))
             .map_err(|error| AppError::Internal(format!("failed to assemble sample: {error}")))?;
 

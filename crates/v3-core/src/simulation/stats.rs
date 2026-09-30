@@ -355,6 +355,20 @@ pub struct SimStats {
     /// The last tick's phase timings (T21.F03); `None` before the first tick.
     #[cfg(feature = "telemetry-seams")]
     pub last_tick_phases: Option<TickPhaseTimings>,
+    /// The creature a trace records this tick (T21.F04); set by `run_tick`
+    /// at the tick's start, `None` untraced.
+    #[cfg(feature = "telemetry-seams")]
+    pub observed_creature: Option<crate::contracts::CreatureId>,
+    /// Why the observed creature was removed this tick, by any path.
+    #[cfg(feature = "telemetry-seams")]
+    pub observed_removal: Option<super::energy_accounting::DeathCause>,
+    /// Energy predators stole from the observed creature this tick.
+    #[cfg(feature = "telemetry-seams")]
+    pub observed_damage: f32,
+    /// The observed creature's applied actions this tick, in order, captured
+    /// where each action-log entry is built; at most `max_actions_per_turn`.
+    #[cfg(feature = "telemetry-seams")]
+    pub observed_actions: Vec<crate::runtime::trace::domain::AppliedAction>,
 
     // ── Predation cumulative ─────────────────────────────────────────────────
     pub predation_actions_attempted_total: u64,
@@ -449,6 +463,13 @@ impl SimStats {
         self.last_tick_food_total_density_by_type.clear();
         self.last_tick_food_grazing_modifier_mean_by_type.clear();
         self.last_tick_food_grazed_cell_share_by_type.clear();
+        #[cfg(feature = "telemetry-seams")]
+        {
+            self.observed_creature = None;
+            self.observed_removal = None;
+            self.observed_damage = 0.0;
+            self.observed_actions.clear();
+        }
     }
 
     pub fn record_food_growth_summary(&mut self, summary: FoodGrowthSummary) {

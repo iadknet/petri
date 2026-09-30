@@ -221,19 +221,19 @@ is closure evidence.
 
 ## Implementation Tasks
 
-- [ ] `cargo test -p v3-core --test viability` first, then `v3-core`:
+- [x] `cargo test -p v3-core --test viability` first, then `v3-core`:
       `TraceBudget`, `Truncation`, `TickOutcome`, the budget checks in
       `RecordingMeshExecution` and the outcome join in `run_tick`, all
       behind `telemetry-seams`; the tick-level equivalence, budget and
       outcome tests under the feature (the existing `make check` row).
-- [ ] `crates/v3-telemetry`: the three settings in `Options`; window
+- [x] `crates/v3-telemetry`: the three settings in `Options`; window
       selection, `before_tick`/`after_tick` and the manual hand-over API;
       `windows.rs` encoding (spans, events, arrays, genome record);
       `Signal::Windows`, `windows=`, per-run caps, `petri.windows_capped`;
       the in-test receiver decodes span events.
-- [ ] `v3-cli` and `v3-server`: the window slot around `run_tick`; the
+- [x] `v3-cli` and `v3-server`: the window slot around `run_tick`; the
       server's manual precedence and export at `get_sample`.
-- [ ] `telemetry/grafana/dashboards/petri-run.json`: the `Creature windows`
+- [x] `telemetry/grafana/dashboards/petri-run.json`: the `Creature windows`
       row; `scripts/telemetry-dashboards-check`: the rows above.
 - [ ] Run the checks on this host; record them in
       `docs/progress/readings/t21-f04.md`.

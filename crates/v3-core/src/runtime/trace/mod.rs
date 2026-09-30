@@ -4,3 +4,5 @@
 
 pub mod domain;
 pub mod recording;
+#[cfg(feature = "telemetry-seams")]
+pub mod size;
