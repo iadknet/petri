@@ -43,7 +43,7 @@ it stores is closure evidence.
   - Goal: Measurement tooling. A selected creature is recorded for a short run of consecutive ticks, showing what it sensed, how its brain routed and voted, what it chose, what the world actually applied and what changed in its state, reachable from the run's dashboard.
 - [ ] **T21.F05 — Qualified Sampling Defaults** — Depends on: T21.F03, T21.F04, T21.F06
   - Goal: Measurement tooling. The cost of each level of detail is measured, the user sets the default's ceiling from it with 5% as the target, the default export cadences and sampling caps are chosen to stay under it with margin, with named presets and their measured time and storage costs, and telemetry becomes on by default in every binary.
-- [ ] **T21.F06 — Benchmark, Assay and Lab Run Records** — Depends on: T21.F02
+- [x] **T21.F06 — Benchmark, Assay and Lab Run Records** — Depends on: T21.F02
   - Goal: Measurement tooling. Benchmark, assay and lab commands appear in the stack with identity, lifecycle and end-of-run totals, held in memory and exported only after every timed region of the invocation has finished, so stored measurements do not move.
 - [ ] **T21.F07 — Telemetry Conventions in the Feature Contract** — Depends on: T21.F02
   - Goal: Measurement tooling. The feature spec template's telemetry section names the delivered conventions, and a feature that adds a mechanism or counter ships its exported signals with it.

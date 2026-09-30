@@ -1,6 +1,6 @@
 # T21.F06 — Benchmark, Assay and Lab Run Records
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-30
 **Feature**: T21.F06
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -277,22 +277,23 @@ bench path, with F01's method otherwise unchanged and T = 6908 fixed:
 
 ## Success Criteria
 
-- [ ] A `v3-cli bench --profile gate --telemetry on` run against the local
-      stack shows on `petri-runs` as one row of `Measurements` and three seed
+- [x] A `v3-cli bench --profile gate --telemetry on` run against the local
+      stack shows on `petri-runs` as one measurement in `Measurements` (its
+      started and ended rows) and three seed
       runs in `Runs started` and `Runs ended` under the same invocation ID;
       the measurement's `petri_summary_path` names the written summary and
       its body equals the `Totals` fields summed over that summary's
       `per_seed` rows; the same command with
       `--telemetry off` writes a byte-identical `deterministic` block.
-- [ ] The receiver's first request in the fixture arrives after the
+- [x] The receiver's first request in the fixture arrives after the
       `measurement.ended` timestamp, and no interval snapshot, trace or
       window is captured however the environment is set.
-- [ ] `v3-lab run --quick --telemetry on` and one assay pilot
+- [x] `v3-lab run --quick --telemetry on` and one assay pilot
       (`v3-cli input-opportunity --pilot` or `recruitment --pilot`, the
       shorter, named in the readings file) each show one measurement whose
       body is the totals of its own summary; the other assay is covered by
       its record test.
-- [ ] `make check` exits 0 with the fixture inside it; the reference build
+- [x] `make check` exits 0 with the fixture inside it; the reference build
       compiles without `v3-telemetry`.
 
 ## Notes for AI Agents
@@ -303,3 +304,8 @@ bench path, with F01's method otherwise unchanged and T = 6908 fixed:
 - Exception: plan committed after round 2 `not-ready` (user, 2026-09-30).
   Round 3 failed on the Codex usage limit; the three round-2 corrections
   are unconfirmed; details in the readings file.
+- Exception: overhead inconclusive on both attempts (spread 18.31% and
+  22.26%, loaded host), accepted by the user on 2026-09-30.
+- Cost: `/usage` awaiting; 4 passes (advisor 2, 2, 2, 2); 2 spec-owner
+  resumes; 2 Codex rounds plus one failed on the usage limit; review by
+  Opus `high` (user substitute): 0 P1, 2 P2, 6 P3, fixed.
