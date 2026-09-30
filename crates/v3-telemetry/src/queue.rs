@@ -474,6 +474,11 @@ impl Shared {
         self.report_if_resolved(&mut state, run);
     }
 
+    /// Whether the worker is held (takes no batch until [`Shared::release`]).
+    pub(crate) fn is_held(&self) -> bool {
+        self.lock().held
+    }
+
     /// Lets the worker take batches. A run that ended while held counts its
     /// flush time from now, not from its end.
     pub(crate) fn release(&self) {

@@ -963,6 +963,8 @@ fn a_trace_abandoned_by_the_flush_is_counted_for_its_run() {
     let mut run = telemetry.begin_run(start(&config)).unwrap();
     assert!(telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd));
     telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+    // The held worker exports nothing, so the flush abandons every record.
+    active(&telemetry).shared.flush_run(run.key);
     let line = run_line(&reports, &run);
     assert_eq!(line["exported"], "0", "{line:?}");
     // `run.started`, the snapshot, the trace and `run.ended`.
@@ -1027,6 +1029,38 @@ fn a_held_telemetry_sends_nothing_until_released_then_everything() {
         // The held period is not flush time.
         assert!(line["flush_ms"].parse::<u64>().unwrap() < 300, "{line:?}");
     }
+}
+
+#[test]
+fn a_held_telemetry_ends_a_waiting_run_in_the_background_and_abandons_nothing() {
+    let limits = Limits {
+        flush_timeout: Duration::from_secs(2),
+        ..Limits::default()
+    };
+    let (telemetry, reports) = held_with(limits, AcceptAll);
+    let config = small_config();
+    let run = telemetry.begin_run(start(&config)).unwrap();
+
+    let began = Instant::now();
+    telemetry.end_run(run.clone(), EndStatus::Completed, 10, Flush::Wait);
+    assert!(
+        began.elapsed() < limits.flush_timeout / 2,
+        "a held exporter cannot export, so waiting would only time out"
+    );
+    assert!(
+        reports
+            .lines()
+            .iter()
+            .all(|line| parse_run_line(line).is_none()),
+        "nothing resolves before release: {:?}",
+        reports.lines()
+    );
+
+    telemetry.release();
+    telemetry.shutdown();
+    let line = run_line(&reports, &run);
+    assert_eq!(line["exported"], "2", "{line:?}");
+    assert_eq!(line["abandoned"], "0", "{line:?}");
 }
 
 #[test]

@@ -146,3 +146,17 @@ fn a_world_set_profile_must_name_the_seeds_its_recipes_carry() {
         "only the world set is tied to the checked-in recipes"
     );
 }
+
+#[test]
+fn only_a_profile_of_one_config_has_an_effective_config_digest() {
+    for params in [gate_profile_params(), small_profile("sweep")] {
+        assert_eq!(
+            effective_config_digest(&params),
+            Some(v3_core::config::config_digest(&build_config(&params))),
+            "{}",
+            params.name
+        );
+    }
+    assert_eq!(effective_config_digest(&goal_profile_params()), None);
+    assert_eq!(effective_config_digest(&small_world_set_params()), None);
+}

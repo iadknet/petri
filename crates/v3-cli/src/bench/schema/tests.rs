@@ -213,3 +213,49 @@ fn indicator_rejects_a_non_string_non_object_value_naming_both_accepted_shapes()
         "unexpected error: {error}"
     );
 }
+
+fn per_seed(optional: Option<u64>) -> PerSeed {
+    PerSeed {
+        tick_zero_connectivity: None,
+        seed: 99,
+        ticks: 1,
+        creature_ticks: 2,
+        mesh_hops: 3,
+        vm_steps: 4,
+        graph_relax_iters: 5,
+        plasticity_updates: 6,
+        actions_applied: 7,
+        births: 8,
+        pass_cap_hits: optional.map(|base| base + 9),
+        passes: optional.map(|base| base + 10),
+        decided_passes: optional.map(|base| base + 11),
+        final_population: 12,
+        extinction_tick: optional.map(|base| base + 13),
+    }
+}
+
+#[test]
+fn per_seed_totals_list_every_counter_in_field_order_and_omit_absent_ones() {
+    let always = [
+        ("ticks", 1),
+        ("creature_ticks", 2),
+        ("mesh_hops", 3),
+        ("vm_steps", 4),
+        ("graph_relax_iters", 5),
+        ("plasticity_updates", 6),
+        ("actions_applied", 7),
+        ("births", 8),
+    ];
+    let mut present = always.to_vec();
+    present.extend([
+        ("pass_cap_hits", 9),
+        ("passes", 10),
+        ("decided_passes", 11),
+        ("final_population", 12),
+        ("extinction_tick", 13),
+    ]);
+    let mut absent = always.to_vec();
+    absent.push(("final_population", 12));
+    assert_eq!(per_seed(Some(0)).totals(), present);
+    assert_eq!(per_seed(None).totals(), absent);
+}

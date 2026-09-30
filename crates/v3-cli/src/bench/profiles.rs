@@ -290,6 +290,13 @@ pub fn goal_world_configs() -> Vec<(GoalCase, SimulationConfig)> {
 
 const DEFAULT_FOOD_COVERAGE: &str = "default";
 
+/// The `config_digest` of the one effective config every seed of `params`
+/// runs; `None` for the goal world set, whose cases carry their own digests.
+#[must_use]
+pub fn effective_config_digest(params: &ProfileParams) -> Option<String> {
+    (params.name != GOAL_WORLD_SET).then(|| v3_core::config::config_digest(&build_config(params)))
+}
+
 pub fn build_config(params: &ProfileParams) -> SimulationConfig {
     let mut config = params
         .recipe
