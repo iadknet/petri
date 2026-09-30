@@ -22,6 +22,15 @@ export const PRESETS = {
   dense: { interval_ms: '250', tick_traces: 'on', windows: 'on', window_ticks: '16', window_interval_ms: '2000' },
 };
 
+// Least snapshots and windows a healthy run of at least 4 s exports per
+// preset (spec, Export check row); a preset without a signal exports none.
+const MIN_COUNTS = {
+  minimal: { snapshots: 0, windows: 0 },
+  phases: { snapshots: 0, windows: 0 },
+  standard: { snapshots: 4, windows: 1 },
+  dense: { snapshots: 12, windows: 2 },
+};
+
 const sorted = (values) => [...values].sort((a, b) => a - b);
 
 export function median(values) {
@@ -127,10 +136,11 @@ export function checkRun(stderr, { preset, endpoint, exportCheck }) {
     }
     const { snapshots, traces, windows } = totals;
     const settings = PRESETS[preset];
+    const least = MIN_COUNTS[preset];
     const consistent =
       (settings.tick_traces === 'off' ? traces === 0 : traces === snapshots) &&
-      (settings.windows === 'off' ? windows === 0 : windows >= 1) &&
-      (preset === 'standard' || preset === 'dense' ? snapshots >= 4 : true);
+      (settings.windows === 'off' ? windows === 0 : windows >= least.windows) &&
+      snapshots >= least.snapshots;
     if (!consistent) return result('void:export-counts');
   }
   return result('ok');

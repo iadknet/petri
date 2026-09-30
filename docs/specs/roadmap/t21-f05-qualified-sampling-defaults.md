@@ -1,6 +1,6 @@
 # T21.F05 — Qualified Sampling Defaults
 
-**Status**: In Progress
+**Status**: Blocked
 **Last updated**: 2026-09-30
 **Feature**: T21.F05
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -141,13 +141,16 @@ exports; the counts, caps and sampling policies stay F02–F04's.
       (worlds, cells, presets, storage blocks, cap 3,600 s,
       `TELEMETRY_USED_MS` carry, the readings lines it prints), the
       environment scrub, the run timeout and the export check, and the
-      shared statistic and pair table in routine mode, ceiling 1.05.
+      shared statistic and pair table in routine mode, verdicts against
+      1.05 (the ceiling only once the Measured verdict records a D5 pass);
+      the `s` flush flag above 10,050 ms; the `dense` export check
+      (`snapshots` ≥ 12, `traces` = `snapshots`, `windows` ≥ 2).
 - [ ] Default flip: `resolve_switch`, `Switch::default`, the three help
       texts, the three `…_default_off` tests become `…_default_on`;
       `--telemetry off` at the thirteen spawn sites (done: a per-file
       `TELEMETRY_OFF` constant, empty without the `telemetry` feature; the
       flip itself waits for a pass).
-- [ ] Parent comparison against `8b0a158f`, T = 6908.
+- [x] Parent comparison against `8b0a158f`, T = 6908.
 - [ ] The qualifying measurement, once, recorded in
       `docs/progress/readings/t21-f05.md`; D5 applied; the Measured verdict
       and the preset cost table filled in.
@@ -176,17 +179,21 @@ exports; the counts, caps and sampling policies stay F02–F04's.
 - [x] `node --test scripts/telemetry-stats.test.mjs` -> median, interval
       ranks and verdict on fixed inputs, including the strict comparison
       at exactly 1.05 and a voided pair entering as an infinite ratio.
-      12 tests pass; `make quality-check` runs the file.
-- [ ] `scripts/telemetry-parent-compare 8b0a158f` -> identical canonical
-      output; transcript in the readings file.
+      12 tests pass (the `dense` minimum counts among them); `make
+      quality-check` runs the file and exits 0.
+- [x] `scripts/telemetry-parent-compare 8b0a158f` -> identical canonical
+      output; transcript in the readings file. Exit 0, `identical: 3
+      canonical lines, T=6908`.
 - [ ] `PETRI_OVERHEAD_MODE=qualify scripts/telemetry-overhead` -> the
       readings file's qualification section (per-cell ratios, intervals,
       verdicts, flush and self time, presets, storage, measured time); the
-      verdict copied to Performance and Goal Impact.
+      verdict copied to Performance and Goal Impact. Attempt 1 exit 1:
+      W1 calibration ended on 40 ticks in 3,895 ms (outside 4–6 s),
+      `TELEMETRY_USED_MS=11917`, no cell run.
 - [ ] Mutation gate: `Not applicable: observability feature` (the
       workflow's exemption; no run).
 - [ ] Benchmark summary: `Not applicable: observability feature`.
-- [ ] `make check`, `make check-docs`, `make roadmap-check` exit 0.
+- [ ] `make check`, `make check-docs`, `make roadmap-check` exit 0. Before the flip: `env -u PETRI_TELEMETRY make check` exit 0 and `make roadmap-check` exit 0 on the blocked state; rerun after the D5 outcome.
 
 ## Performance and Goal Impact
 
@@ -242,9 +249,12 @@ Qualifying measurement, method fixed before any run:
 | Projection | at n = 32: W1 pairs about 10 s in `b` and `a` and 20 s in `s` (1,280 s), W2 about 8, 8 and 18 s (1,088 s), calibration, init, spread and (c) about 130 s, preset pairs about 320 s, storage runs about 110 s: about 2,930 s; at n = 24 about 2,340 s; at n = 16 about 1,590 s. The `s` runs' 10 s flush is inside those figures; elapsed session time adds the stack's two state changes per `a` and `s` pair (about 10–20 s each, roughly 50 minutes at n = 32) and the settle waits, so about 2 to 2.5 hours |
 | Expected | `standard`: every cell's median within 1.00–1.02 (F01–F02 measured 0.994–1.010 healthy and stopped; self time ≤ 0.7 µs per tick at F04 against a tick of about 0.55 ms on W2 and 100 ms on W1), `s` equal to `b` within noise on its verdict ratio, with `flush_ms` at 10,000, `abandoned` > 0, and its flush-included ratio about 3 on W1 and 3.5 on W2 (the 10 s flush over a 5 or 4 s run); (c) ≤ 1.02; `minimal` ≈ `phases` ≈ `standard`; `dense` 0–5 points above `standard`; wire bytes for `standard` about 200 KB per wall second (0.7 GB per hour), disk about 15 MB per hour in Prometheus and about 70 MB per hour in Tempo (F03's 22 MB of tick traces and F04's 50 MB of windows), `dense` about four times that |
 
-**Measured verdict.** Filled in at closure: one row per cell (median,
-interval, n, verdict, `flush_ms`, self time), (c), the preset cost table,
-measured time used, and the D5 outcome.
+**Measured verdict.** None: attempt 1 stopped in the W1 calibration before
+any cell (11.9 s of the 3,600 s cap used). The rule scales linearly from
+the second run, but ticks 41–48 cost about 255 ms each against about 97 ms
+for ticks 1–40, so both trajectories landed on 40 ticks under 4 s. D5 is not
+applied, every default stays off, and a changed calibration rule or a fixed
+T1 needs the user's decision before a further attempt.
 
 - Readings: [`docs/progress/readings/t21-f05.md`](../../progress/readings/t21-f05.md).
 

@@ -152,6 +152,10 @@ test('the export check voids failures and counts inconsistent with the preset', 
     ['phases', { windows: 1 }],
     ['minimal', { traces: 1, windows: 0 }],
     ['minimal', { traces: 0, windows: 1 }],
+    // dense: 250 ms snapshots and 2 s windows over a run of at least 4 s.
+    ['dense', { snapshots: 11, traces: 11, windows: 3 }],
+    ['dense', { snapshots: 20, traces: 20, windows: 1 }],
+    ['dense', { snapshots: 20, traces: 19, windows: 3 }],
   ]) {
     assert.match(check(preset, fields), /^void:/, `${preset} ${JSON.stringify(fields)}`);
   }
