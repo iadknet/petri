@@ -191,8 +191,13 @@ pairs_for() {
 
 # verdict STATE: pass, fail or inconclusive.
 verdict() {
-  got=$(grep -c . "$scratch/$1.ratio" || true)
-  if [ "$got" -lt "$pairs" ] || [ "$pairs" -eq 0 ]; then
+  # With n = 0 no pair ran and no ratio file exists.
+  if [ "$pairs" -eq 0 ] || [ ! -s "$scratch/$1.ratio" ]; then
+    printf 'inconclusive\n'
+    return
+  fi
+  got=$(grep -c . "$scratch/$1.ratio")
+  if [ "$got" -lt "$pairs" ]; then
     printf 'inconclusive\n'
     return
   fi
