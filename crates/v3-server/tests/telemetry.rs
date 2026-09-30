@@ -303,9 +303,20 @@ async fn step(app: &axum::Router) -> u64 {
         .unwrap()
 }
 
+/// Every tick is a paused `step`, so which snapshots are interval ones does not
+/// depend on tick cadence: a step after sleeping past `INTERVAL` is sampled,
+/// and a step right after a snapshot or a run's start is not, which `quick`
+/// confirms against the clock.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn interval_snapshots_carry_tick_traces_and_lifecycle_snapshots_do_not() {
-    const INTERVAL: Duration = Duration::from_millis(400);
+    const INTERVAL: Duration = Duration::from_secs(1);
+    const PAST_INTERVAL: Duration = Duration::from_millis(1_100);
+    let quick = |since: Instant, what: &str| {
+        assert!(
+            since.elapsed() < INTERVAL,
+            "{what}: the host stalled past the interval; the step may be sampled"
+        );
+    };
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(Options {
         service: Service::Server,
@@ -324,26 +335,32 @@ async fn interval_snapshots_carry_tick_traces_and_lifecycle_snapshots_do_not() {
 
     call(&app, "POST", "/v3/simulation/startup", r#"{"seed":1}"#).await;
     call(&app, "POST", "/v3/simulation/start", "").await;
-    tokio::time::sleep(Duration::from_millis(15)).await;
     call(&app, "POST", "/v3/simulation/pause", "").await;
     // A step once the interval has passed: an interval snapshot and its trace.
-    tokio::time::sleep(INTERVAL + Duration::from_millis(50)).await;
+    tokio::time::sleep(PAST_INTERVAL).await;
+    let before = Instant::now();
     let sampled = step(&app).await;
     // A step inside the interval, a patch and a resume: the transition
     // snapshot at the unsampled tick takes no trace.
     let unsampled = step(&app).await;
+    quick(before, "unsampled");
     call(&app, "PATCH", "/v3/simulation/config", GRAZING_PATCH).await;
     tokio::time::sleep(Duration::from_millis(15)).await;
     call(&app, "POST", "/v3/simulation/start", "").await;
-    tokio::time::sleep(INTERVAL * 2 + Duration::from_millis(100)).await;
     call(&app, "POST", "/v3/simulation/pause", "").await;
-    // A step inside the interval of the pause, then a reset at its tick.
+    // The next interval trace carries the patched digest; a step inside its
+    // interval, then a reset at that step's tick.
+    tokio::time::sleep(PAST_INTERVAL).await;
+    let before = Instant::now();
+    step(&app).await;
     let reset_tick = step(&app).await;
+    quick(before, "reset");
+    let before = Instant::now();
     call(&app, "POST", "/v3/simulation/startup", r#"{"seed":2}"#).await;
     call(&app, "POST", "/v3/simulation/start", "").await;
-    tokio::time::sleep(Duration::from_millis(15)).await;
     call(&app, "POST", "/v3/simulation/pause", "").await;
     let shutdown_tick = step(&app).await;
+    quick(before, "shutdown");
     state.shutdown_telemetry().await;
 
     let records = receiver.records();

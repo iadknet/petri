@@ -4,10 +4,9 @@
 //! only to log it and reports the request as exported. The HTTP client here
 //! decodes that response itself and adds its `rejected_log_records` to a
 //! counter the queue worker reads after each export, so rejected records are
-//! counted as failed. Run snapshots (T21.F02) are posted to `/v1/metrics` by
-//! [`MetricsClient`] and tick traces (T21.F03) to `/v1/traces` by
-//! [`TracesClient`] on the same HTTP client; each reads its response's
-//! rejected data points or spans itself. A success response whose body does
+//! counted as failed. Run snapshots (T21.F02) are posted to `/v1/metrics` and
+//! tick traces (T21.F03) to `/v1/traces` by [`EncodedClient`] on the same HTTP
+//! client, which reads each response's rejected data points or spans itself. A success response whose body does
 //! not decode confirms nothing, so its request counts as failed; an empty body
 //! decodes to full acceptance.
 
@@ -101,62 +100,38 @@ fn post_proto<R: Message + Default>(
     }
 }
 
-/// Posts snapshots to the collector's `/v1/metrics`, with no retry.
+/// Posts the requests the worker encodes itself, with no retry: snapshots to
+/// the collector's `/v1/metrics` and tick traces to its `/v1/traces`.
 #[derive(Debug)]
-pub(crate) struct MetricsClient {
+pub(crate) struct EncodedClient {
     client: reqwest::blocking::Client,
-    url: String,
+    metrics_url: String,
+    traces_url: String,
 }
 
-impl MetricsClient {
-    fn post(&self, body: Vec<u8>) -> Outcome {
-        post_proto(
-            &self.client,
-            &self.url,
-            body,
-            |decoded: ExportMetricsServiceResponse| {
-                decoded
-                    .partial_success
-                    .map_or(0, |partial| count(partial.rejected_data_points))
-            },
-        )
-    }
-}
-
-/// Posts tick traces to the collector's `/v1/traces`, with no retry.
-#[derive(Debug)]
-pub(crate) struct TracesClient {
-    client: reqwest::blocking::Client,
-    url: String,
-}
-
-impl TracesClient {
-    fn post(&self, body: Vec<u8>) -> Outcome {
-        post_proto(
-            &self.client,
-            &self.url,
-            body,
-            |decoded: ExportTraceServiceResponse| {
-                decoded
-                    .partial_success
-                    .map_or(0, |partial| count(partial.rejected_spans))
-            },
-        )
-    }
-}
-
-/// The clients for the requests the worker encodes itself.
-#[derive(Debug)]
-pub(crate) struct EncodedClients {
-    metrics: MetricsClient,
-    traces: TracesClient,
-}
-
-impl PostEncoded for EncodedClients {
+impl PostEncoded for EncodedClient {
     fn post(&self, signal: Signal, body: Vec<u8>) -> Outcome {
         match signal {
-            Signal::Metrics => self.metrics.post(body),
-            Signal::Traces => self.traces.post(body),
+            Signal::Metrics => post_proto(
+                &self.client,
+                &self.metrics_url,
+                body,
+                |decoded: ExportMetricsServiceResponse| {
+                    decoded
+                        .partial_success
+                        .map_or(0, |partial| count(partial.rejected_data_points))
+                },
+            ),
+            Signal::Traces => post_proto(
+                &self.client,
+                &self.traces_url,
+                body,
+                |decoded: ExportTraceServiceResponse| {
+                    decoded
+                        .partial_success
+                        .map_or(0, |partial| count(partial.rejected_spans))
+                },
+            ),
         }
     }
 }
@@ -168,7 +143,7 @@ pub(crate) fn build(
     endpoint: &str,
     timeout: Duration,
     rejections: Arc<Rejections>,
-) -> Result<(LogExporter, EncodedClients), ExporterBuildError> {
+) -> Result<(LogExporter, EncodedClient), ExporterBuildError> {
     let base = endpoint.trim_end_matches('/');
     // reqwest's blocking client starts and stops its own runtime, which
     // panics on a thread that is already inside one (the server's main).
@@ -180,15 +155,10 @@ pub(crate) fn build(
     .join()
     .map_err(|_| ExporterBuildError::InternalFailure("HTTP client build panicked".to_owned()))?
     .map_err(|error| ExporterBuildError::InternalFailure(error.to_string()))?;
-    let encoded = EncodedClients {
-        metrics: MetricsClient {
-            client: inner.clone(),
-            url: format!("{base}/v1/metrics"),
-        },
-        traces: TracesClient {
-            client: inner.clone(),
-            url: format!("{base}/v1/traces"),
-        },
+    let encoded = EncodedClient {
+        client: inner.clone(),
+        metrics_url: format!("{base}/v1/metrics"),
+        traces_url: format!("{base}/v1/traces"),
     };
     let url = format!("{base}/v1/logs");
     let logs = LogExporter::builder()
