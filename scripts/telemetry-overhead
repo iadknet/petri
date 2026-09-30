@@ -38,7 +38,7 @@
 # median, over its pairs, of the raw reports' environment.wall_clock_ms_total
 # ratio (no ceiling). T comes from TELEMETRY_TICKS or the `- Workload ticks
 # T: N` line of docs/progress/readings/t21-f01.md; without either it is
-# calibrated with three reference runs to about 4 s per run.
+# calibrated with up to three reference runs to about 4 s, the first in 3 to 5 s.
 #
 # PETRI_OVERHEAD_MODE=qualify, T21.F05's qualifying measurement
 # (docs/specs/roadmap/t21-f05-qualified-sampling-defaults.md, Performance and
@@ -47,7 +47,8 @@
 # the script prints the value for the next. Worlds W1 (the built-in default
 # world, T1 ticks: TELEMETRY_DEFAULT_TICKS, else the `- Default-world ticks
 # T1: N` line of docs/progress/readings/t21-f05.md, else calibrated from 20
-# ticks to 5 s, the third run in 4 to 6 s) and W2 (the routine workload, T as
+# ticks towards 5 s, three scaling runs then bisection, T1 the first run in 4
+# to 6 s within eight runs, else inconclusive) and W2 (the routine workload, T as
 # above). Per world: three `--ticks 1` reference runs (init), the spread
 # block, then cells b, a and s of preset standard, s being on with the stack
 # paused, its verdict ratio (telemetry wall - flush_ms) / reference wall and
@@ -262,22 +263,31 @@ must() {
   [ "$run_status" = ok ]
 }
 
-# calibrate START TARGET_MS LOW_MS HIGH_MS: three reference runs, each at the
-# tick count the previous one scales to TARGET_MS; the third must take LOW_MS
-# to HIGH_MS. Sets cal_ticks.
+# calibrate START TARGET_MS LOW_MS HIGH_MS MAX_RUNS: reference runs chosen by
+# telemetry-stats.mjs calibrate (three runs from START, each at the count the
+# previous scales to TARGET_MS, then bisection) until one takes LOW_MS to
+# HIGH_MS; every run is charged. Sets cal_ticks, the last run's run_ms its
+# time; exits 1 when MAX_RUNS runs miss the band, returns 1 when the cap is reached.
 calibrate() {
-  next=$1
-  for _ in 1 2 3; do
-    cal_ticks=$next
+  : >"$scratch/calibration"
+  while :; do
+    step=$("$node" "$stats_js" calibrate "$@" "$scratch/calibration")
+    case "$step" in
+      t1=*)
+        cal_ticks=${step#t1=}
+        return 0
+        ;;
+      next=*) cal_ticks=${step#next=} ;;
+      *)
+        printf 'telemetry-overhead: calibration found no run in %s to %s ms within %s runs; inconclusive; measured time used %s ms (TELEMETRY_USED_MS=%s)\n' \
+          "$3" "$4" "$5" "$used_ms" "$used_ms" >&2
+        exit 1
+        ;;
+    esac
     must reference "$cal_ticks" || return 1
     printf 'Calibration: %s ticks in %s ms\n' "$cal_ticks" "$run_ms"
-    next=$(awk -v t="$cal_ticks" -v ms="$run_ms" -v g="$2" 'BEGIN { n = int(t * g / ms + 0.5); print (n < 1) ? 1 : n }')
+    printf '%s %s\n' "$cal_ticks" "$run_ms" >>"$scratch/calibration"
   done
-  if [ "$run_ms" -lt "$3" ] || [ "$run_ms" -gt "$4" ]; then
-    printf 'telemetry-overhead: calibration ended on a %s ms run at %s ticks, outside %s to %s ms; measured time used %s ms (TELEMETRY_USED_MS=%s)\n' \
-      "$run_ms" "$cal_ticks" "$3" "$4" "$used_ms" "$used_ms" >&2
-    exit 1
-  fi
 }
 
 # spread_block WORLD TICKS: five reference runs, repeated once after the idle
@@ -437,7 +447,7 @@ if [ "$mode" = routine ]; then
   stack_stop
   f01_ticks
   if [ -z "$ticks" ]; then
-    calibrate 1000 4000 3000 5000 || { used_line; exit 0; }
+    calibrate 1000 4000 3000 5000 3 || { used_line; exit 0; }
     ticks=$cal_ticks
     printf 'Calibrated T=%s (%s ms); record:\n- Workload ticks T: %s\n' "$ticks" "$run_ms" "$ticks"
   fi
@@ -544,7 +554,7 @@ if [ -z "$t1" ] && [ -f "$f05_readings" ]; then
 fi
 world_config=''
 if [ -z "$t1" ]; then
-  if calibrate 20 5000 4000 6000; then
+  if calibrate 20 5000 4000 6000 8; then
     t1=$cal_ticks
     printf 'Calibrated T1=%s (%s ms); record:\n- Default-world ticks T1: %s\n' "$t1" "$run_ms" "$t1"
   fi
