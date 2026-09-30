@@ -121,30 +121,12 @@ pub(crate) fn end_seed(run: Option<RunHandle>, tick: u64, per_seed: &PerSeed) {
     let (Some(installed), Some(run)) = (INSTALLED.get(), run) else {
         return;
     };
-    let totals: Vec<(&str, u64)> = [
-        ("ticks", Some(per_seed.ticks)),
-        ("creature_ticks", Some(per_seed.creature_ticks)),
-        ("mesh_hops", Some(per_seed.mesh_hops)),
-        ("vm_steps", Some(per_seed.vm_steps)),
-        ("graph_relax_iters", Some(per_seed.graph_relax_iters)),
-        ("plasticity_updates", Some(per_seed.plasticity_updates)),
-        ("actions_applied", Some(per_seed.actions_applied)),
-        ("births", Some(per_seed.births)),
-        ("pass_cap_hits", per_seed.pass_cap_hits),
-        ("passes", per_seed.passes),
-        ("decided_passes", per_seed.decided_passes),
-        ("final_population", Some(per_seed.final_population)),
-        ("extinction_tick", per_seed.extinction_tick),
-    ]
-    .into_iter()
-    .filter_map(|(name, value)| Some((name, value?)))
-    .collect();
     installed.telemetry.end_run_with_totals(
         run,
         EndStatus::Completed,
         tick,
         Flush::Background,
-        &totals,
+        &per_seed.totals(),
     );
 }
 
@@ -164,6 +146,13 @@ impl Measurement {
         install(telemetry.clone(), None);
         let handle = telemetry.begin_measurement(start);
         Ok(Self { telemetry, handle })
+    }
+
+    /// Whether `measurement.started` was emitted, so `measurement.ended` will
+    /// be.
+    #[must_use]
+    pub fn is_recording(&self) -> bool {
+        self.handle.is_some()
     }
 
     /// Emits `measurement.ended`, releases the exporter and runs the bounded

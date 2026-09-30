@@ -187,9 +187,13 @@ mechanism switch and no config value; the held mode is not configuration.
 
 - [x] Fixture and neutrality: `cargo test -p v3-cli` (inside `make check`,
       no Docker) -> the CLI rows below: the three `measurement::` tests
-      (a `#[path]` submodule of `telemetry.rs`) pass (2026-09-30).
+      (a `#[path]` submodule of `telemetry.rs`) pass; the binary's
+      `measure::tests` build both assay bodies from hand-built typed
+      summaries and reject a summary missing a required field; lib 144
+      passed, bin 17 passed (2026-09-30).
 - [x] Held exporter and records: `cargo test -p v3-telemetry` -> the crate
-      rows: 59 passed (2026-09-30).
+      rows, and `Flush::Wait` on a held exporter returning at once with
+      nothing abandoned after release: 60 passed (2026-09-30).
 - [x] Lab: `cargo test -p v3-lab` -> the lab row: both lab tests pass
       (2026-09-30).
 - [x] Reference build: `cargo build --release -p v3-cli -p v3-server -p
@@ -206,6 +210,8 @@ mechanism switch and no config value; the held mode is not configuration.
 - [x] Overhead check: `PETRI_OVERHEAD_WORKLOAD=bench scripts/telemetry-overhead`
       -> the table in the readings file, verdict in Performance and Goal
       Impact: inconclusive (2026-09-30).
+- [x] `make bench` passes `--telemetry off`: `node --test
+      scripts/benchmark-artifacts.test.mjs` -> 5 passed (2026-09-30).
 - [x] `make check` -> exit 0 (2026-09-30).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
@@ -265,6 +271,7 @@ bench path, with F01's method otherwise unchanged and T = 6908 fixed:
 | Profiles | `Not applicable: observability feature` |
 | Parent comparison | identical canonical output against `1c594616`, T = 6908 |
 | Overhead check | inconclusive: bench workload, F01's method, T = 6908; both attempts (the second the one rerun) stopped at the spread measurement, 18.31% and 22.26% > 10%, so n = 0, states (a) and (b) inconclusive, (c) and the stored-reading ratio without a reading; 28.2 s of the 300 s cap; host load average 6.1 to 6.7 (1 min) |
+| `self_time_us` per tick | no reading (no pairs ran) |
 
 - Readings: [`docs/progress/readings/t21-f06.md`](../../progress/readings/t21-f06.md).
 

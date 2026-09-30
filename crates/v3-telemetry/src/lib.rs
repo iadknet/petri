@@ -695,8 +695,8 @@ impl Telemetry {
 
     /// [`Telemetry::end_run`] with the run's totals, each recorded as
     /// `petri.total.<name>` (a benchmark seed's `PerSeed` counters). A held
-    /// telemetry ends runs with [`Flush::Background`]: nothing resolves before
-    /// release.
+    /// telemetry treats [`Flush::Wait`] as [`Flush::Background`]: nothing is
+    /// exported, so nothing resolves, before release.
     pub fn end_run_with_totals(
         &self,
         run: RunHandle,
@@ -732,7 +732,7 @@ impl Telemetry {
         active.emit_with(&run, "run.ended", tick, extra, totals, None);
         active.shared.add_self_time(run.key, began.elapsed());
         active.shared.mark_ended(run.key);
-        if flush == Flush::Wait {
+        if flush == Flush::Wait && !active.shared.is_held() {
             active.shared.flush_run(run.key);
         }
     }

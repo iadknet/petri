@@ -724,10 +724,8 @@ fn execute_bench(prepared: PreparedBench) -> Result<BenchDone, String> {
     let mut measurement_evidence = artifacts::measurement_evidence(&invocation, severe);
     // World-set identities are already captured per case. Other profiles also
     // retain the effective config identity without changing comparison inputs.
-    if report.deterministic.profile.cases.is_empty() {
-        measurement_evidence["effective_config_digest"] = serde_json::json!(
-            v3_core::config::config_digest(&bench::build_config(&params))
-        );
+    if let Some(digest) = bench::effective_config_digest(&params) {
+        measurement_evidence["effective_config_digest"] = serde_json::json!(digest);
     }
     artifacts::write_json(
         &paths.raw,
@@ -801,7 +799,10 @@ struct Switch;
 mod measure {
     use std::path::Path;
 
+    use serde::de::DeserializeOwned;
     use serde_json::{json, Value};
+    use v3_cli::opportunity::RunSummary as OpportunitySummary;
+    use v3_cli::recruitment::RunSummary as RecruitmentSummary;
     use v3_cli::telemetry::Measurement;
     use v3_telemetry::{MeasurementEnd, MeasurementStart};
 
@@ -821,10 +822,10 @@ mod measure {
     }
 
     pub(super) fn bench(switch: Switch, prepared: &PreparedBench) -> Measurement {
-        // The goal world set has no one effective config: its cases carry
-        // their own digests.
-        let digest = (prepared.profile != "goal")
-            .then(|| v3_core::config::config_digest(&bench::build_config(&prepared.params)));
+        // Building the config to digest it is work only a record needs.
+        let digest = (switch == Switch::On)
+            .then(|| bench::effective_config_digest(&prepared.params))
+            .flatten();
         begin(
             switch,
             MeasurementStart {
@@ -896,92 +897,137 @@ mod measure {
         )
     }
 
-    /// An assay's `measurement.ended`: the written summary's readings, and
-    /// `body` of it as the totals; no summary (an error exit) records only
-    /// the code.
-    fn assay_end(
+    /// What an assay's written summary gives its `measurement.ended`.
+    #[derive(Debug, PartialEq)]
+    struct AssayReadings<'a> {
+        incomplete: bool,
+        stop_reason: Option<&'a str>,
+        horizon: Option<u64>,
+        gate_favorable: Option<bool>,
+        raw_sha256: &'a str,
+        raw_bytes: u64,
+        /// The totals block.
+        body: Value,
+    }
+
+    /// Reads the summary an assay wrote at `path`.
+    fn read_summary<T: DeserializeOwned>(path: &Path) -> Result<T, String> {
+        let bytes = std::fs::read(path)
+            .map_err(|error| format!("cannot read summary {}: {error}", path.display()))?;
+        serde_json::from_slice(&bytes)
+            .map_err(|error| format!("cannot parse summary {}: {error}", path.display()))
+    }
+
+    /// An assay's `measurement.ended`: its summary's readings. No summary (an
+    /// error exit) records only the code; a summary that cannot be read as
+    /// its command's `RunSummary` records only the code and the path, and
+    /// says why on stderr.
+    fn assay_end<T: DeserializeOwned>(
         measurement: Measurement,
         code: u8,
         summary_path: Option<&Path>,
-        body: fn(&Value) -> Value,
+        readings: fn(&T) -> AssayReadings<'_>,
     ) {
-        let summary = summary_path.and_then(|path| {
-            let bytes = std::fs::read(path).ok()?;
-            Some((path, serde_json::from_slice::<Value>(&bytes).ok()?))
-        });
         let mut end = MeasurementEnd {
             exit_code: code,
             ..MeasurementEnd::default()
         };
         let path_text;
-        if let Some((path, summary)) = &summary {
+        let summary;
+        if let Some(path) = summary_path.filter(|_| measurement.is_recording()) {
             path_text = path.display().to_string();
             end.summary_path = Some(&path_text);
-            end.incomplete = summary["incomplete"].as_bool();
-            end.stop_reason = summary["stop_reason"].as_str();
-            end.horizon = summary["horizon"].as_u64();
-            end.gate_favorable = summary["gate_favorable"].as_bool();
-            end.raw_sha256 = summary["raw"]["sha256"].as_str();
-            end.raw_bytes = summary["raw"]["bytes"].as_u64();
-            end.body = Some(body(summary).to_string());
+            summary = read_summary::<T>(path);
+            match &summary {
+                Ok(summary) => {
+                    let readings = readings(summary);
+                    end.incomplete = Some(readings.incomplete);
+                    end.stop_reason = readings.stop_reason;
+                    end.horizon = readings.horizon;
+                    end.gate_favorable = readings.gate_favorable;
+                    end.raw_sha256 = Some(readings.raw_sha256);
+                    end.raw_bytes = Some(readings.raw_bytes);
+                    end.body = Some(readings.body.to_string());
+                }
+                Err(message) => {
+                    eprintln!("telemetry: measurement.ended without readings: {message}")
+                }
+            }
         }
         measurement.finish(end);
     }
 
-    pub(super) fn recruitment_end(measurement: Measurement, code: u8, summary: Option<&Path>) {
-        assay_end(measurement, code, summary, |summary| {
-            json!({
-                "expected_proposals": summary["expected_proposals"],
-                "lineage_count": summary["lineage_count"],
-                "proposal_count": summary["proposal_count"],
-            })
-        });
+    /// The recruitment summary's readings; the body is its three counts.
+    fn recruitment_readings(summary: &RecruitmentSummary) -> AssayReadings<'_> {
+        AssayReadings {
+            incomplete: summary.incomplete,
+            stop_reason: summary.stop_reason.as_deref(),
+            horizon: None,
+            gate_favorable: None,
+            raw_sha256: &summary.raw.sha256,
+            raw_bytes: summary.raw.bytes,
+            body: json!({
+                "expected_proposals": summary.expected_proposals,
+                "lineage_count": summary.lineage_count,
+                "proposal_count": summary.proposal_count,
+            }),
+        }
     }
 
-    /// Per world, its case, requested replicates, and the count and sums of
-    /// its replicate rows; per family and world, the verdict row's counts.
-    pub(super) fn opportunity_end(measurement: Measurement, code: u8, summary: Option<&Path>) {
-        assay_end(measurement, code, summary, |summary| {
-            let worlds = summary["worlds"]
-                .as_array()
-                .map(Vec::as_slice)
-                .unwrap_or_default();
-            let sum = |rows: &[Value], field: &str| -> u64 {
-                rows.iter().filter_map(|row| row[field].as_u64()).sum()
-            };
-            let world_rows: Vec<Value> = worlds
-                .iter()
-                .map(|world| {
-                    let rows = world["replicates"]
-                        .as_array()
-                        .map(Vec::as_slice)
-                        .unwrap_or_default();
-                    json!({
-                        "case": world["case"]["name"],
-                        "replicates_requested": world["replicates_requested"],
-                        "replicates": rows.len(),
-                        "ticks": sum(rows, "ticks"),
-                        "births_total": sum(rows, "births_total"),
-                    })
+    /// The input-opportunity summary's readings; the body holds, per world,
+    /// its case name, requested replicates, and the count and sums of its
+    /// replicate rows, and per family and world the verdict row's counts.
+    fn opportunity_readings(summary: &OpportunitySummary) -> AssayReadings<'_> {
+        let worlds: Vec<Value> = summary
+            .worlds
+            .iter()
+            .map(|world| {
+                let rows = &world.replicates;
+                json!({
+                    "case": world.case.name,
+                    "replicates_requested": world.replicates_requested,
+                    "replicates": rows.len(),
+                    "ticks": rows.iter().map(|row| row.ticks).sum::<u64>(),
+                    "births_total": rows.iter().map(|row| row.births_total).sum::<u64>(),
                 })
-                .collect();
-            let verdicts: Vec<Value> = worlds
-                .iter()
-                .flat_map(|world| world["verdicts"].as_array().cloned().unwrap_or_default())
-                .map(|row| {
-                    json!({
-                        "family": row["family"],
-                        "world": row["world"],
-                        "verdict": row["verdict"],
-                        "sampled": row["sampled"],
-                        "exposed": row["exposed"],
-                        "applied": row["applied"],
-                    })
+            })
+            .collect();
+        let verdicts: Vec<Value> = summary
+            .worlds
+            .iter()
+            .flat_map(|world| &world.verdicts)
+            .map(|row| {
+                json!({
+                    "family": row.family,
+                    "world": row.world,
+                    "verdict": row.verdict,
+                    "sampled": row.sampled,
+                    "exposed": row.exposed,
+                    "applied": row.applied,
                 })
-                .collect();
-            json!({ "worlds": world_rows, "verdicts": verdicts })
-        });
+            })
+            .collect();
+        AssayReadings {
+            incomplete: summary.incomplete,
+            stop_reason: summary.stop_reason.as_deref(),
+            horizon: Some(summary.horizon),
+            gate_favorable: Some(summary.gate_favorable),
+            raw_sha256: &summary.raw.sha256,
+            raw_bytes: summary.raw.bytes,
+            body: json!({ "worlds": worlds, "verdicts": verdicts }),
+        }
     }
+
+    pub(super) fn recruitment_end(measurement: Measurement, code: u8, summary: Option<&Path>) {
+        assay_end(measurement, code, summary, recruitment_readings);
+    }
+
+    pub(super) fn opportunity_end(measurement: Measurement, code: u8, summary: Option<&Path>) {
+        assay_end(measurement, code, summary, opportunity_readings);
+    }
+
+    #[cfg(test)]
+    mod tests;
 }
 
 /// The reference build records nothing.

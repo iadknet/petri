@@ -81,6 +81,33 @@ pub struct PerSeed {
     pub extinction_tick: Option<u64>,
 }
 
+impl PerSeed {
+    /// The seed's counters as `(field, value)` in field order, the absent
+    /// optional ones omitted; `seed` and `tick_zero_connectivity` are not
+    /// counters.
+    #[must_use]
+    pub fn totals(&self) -> Vec<(&'static str, u64)> {
+        [
+            ("ticks", Some(self.ticks)),
+            ("creature_ticks", Some(self.creature_ticks)),
+            ("mesh_hops", Some(self.mesh_hops)),
+            ("vm_steps", Some(self.vm_steps)),
+            ("graph_relax_iters", Some(self.graph_relax_iters)),
+            ("plasticity_updates", Some(self.plasticity_updates)),
+            ("actions_applied", Some(self.actions_applied)),
+            ("births", Some(self.births)),
+            ("pass_cap_hits", self.pass_cap_hits),
+            ("passes", self.passes),
+            ("decided_passes", self.decided_passes),
+            ("final_population", Some(self.final_population)),
+            ("extinction_tick", self.extinction_tick),
+        ]
+        .into_iter()
+        .filter_map(|(name, value)| Some((name, value?)))
+        .collect()
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Totals {
     pub ticks: u64,
