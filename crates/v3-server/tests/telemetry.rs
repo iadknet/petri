@@ -34,6 +34,7 @@ fn telemetry(endpoint: &str) -> (Telemetry, ReportSink) {
         reports: reports.clone(),
         // Longer than any test: only transition and run-end snapshots.
         metrics_interval: Duration::from_secs(3_600),
+        tick_traces: v3_telemetry::Switch::On,
     });
     (telemetry, reports)
 }
@@ -293,4 +294,124 @@ async fn shutdown_stops_the_running_simulation_at_the_tick_run_ended_reports() {
         ended.attribute("petri.tick"),
         Some(handle.sim.tick.to_string().as_str())
     );
+}
+
+/// The tick of a `step` of one tick.
+async fn step(app: &axum::Router) -> u64 {
+    call(app, "POST", "/v3/simulation/step", r#"{"steps":1}"#).await["tick"]
+        .as_u64()
+        .unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn interval_snapshots_carry_tick_traces_and_lifecycle_snapshots_do_not() {
+    const INTERVAL: Duration = Duration::from_millis(400);
+    let receiver = Receiver::start();
+    let telemetry = Telemetry::start_with(Options {
+        service: Service::Server,
+        endpoint: receiver.endpoint().to_owned(),
+        limits: Limits::default(),
+        reports: ReportSink::capture(),
+        metrics_interval: INTERVAL,
+        tick_traces: v3_telemetry::Switch::On,
+    });
+    let mut config = test_config();
+    config.world.width = 32;
+    config.world.height = 32;
+    config.population.initial_creatures = 16;
+    let state = AppState::from_config_with_telemetry(config, 0, telemetry);
+    let app = router(state.clone());
+
+    call(&app, "POST", "/v3/simulation/startup", r#"{"seed":1}"#).await;
+    call(&app, "POST", "/v3/simulation/start", "").await;
+    tokio::time::sleep(Duration::from_millis(15)).await;
+    call(&app, "POST", "/v3/simulation/pause", "").await;
+    // A step once the interval has passed: an interval snapshot and its trace.
+    tokio::time::sleep(INTERVAL + Duration::from_millis(50)).await;
+    let sampled = step(&app).await;
+    // A step inside the interval, a patch and a resume: the transition
+    // snapshot at the unsampled tick takes no trace.
+    let unsampled = step(&app).await;
+    call(&app, "PATCH", "/v3/simulation/config", GRAZING_PATCH).await;
+    tokio::time::sleep(Duration::from_millis(15)).await;
+    call(&app, "POST", "/v3/simulation/start", "").await;
+    tokio::time::sleep(INTERVAL * 2 + Duration::from_millis(100)).await;
+    call(&app, "POST", "/v3/simulation/pause", "").await;
+    // A step inside the interval of the pause, then a reset at its tick.
+    let reset_tick = step(&app).await;
+    call(&app, "POST", "/v3/simulation/startup", r#"{"seed":2}"#).await;
+    call(&app, "POST", "/v3/simulation/start", "").await;
+    tokio::time::sleep(Duration::from_millis(15)).await;
+    call(&app, "POST", "/v3/simulation/pause", "").await;
+    let shutdown_tick = step(&app).await;
+    state.shutdown_telemetry().await;
+
+    let records = receiver.records();
+    let runs: Vec<&str> = records
+        .iter()
+        .filter(|record| record.event_name == "run.started")
+        .map(|record| record.attribute("petri.run_id").unwrap())
+        .collect();
+    assert_eq!(runs.len(), 3);
+    let (first, second) = (runs[1], runs[2]);
+    let snapshot_ticks = |run: &str| -> Vec<u64> {
+        receiver
+            .snapshots()
+            .iter()
+            .filter(|snapshot| snapshot.run_id() == Some(run))
+            .map(|snapshot| snapshot.tick().unwrap())
+            .collect()
+    };
+    let traces = receiver.traces();
+    let traces_of = |run: &str| -> Vec<&v3_telemetry::testing::ReceivedTrace> {
+        traces
+            .iter()
+            .filter(|trace| trace.run_id() == Some(run))
+            .collect()
+    };
+    let trace_ticks = |run: &str| -> Vec<u64> {
+        traces_of(run)
+            .iter()
+            .map(|trace| trace.tick().unwrap())
+            .collect()
+    };
+
+    let first_snapshots = snapshot_ticks(first);
+    let first_traces = trace_ticks(first);
+    assert!(first_traces.contains(&sampled), "{first_traces:?}");
+    for tick in [unsampled, reset_tick] {
+        assert!(
+            first_snapshots.contains(&tick),
+            "{tick}: {first_snapshots:?}"
+        );
+        assert!(!first_traces.contains(&tick), "{tick}: {first_traces:?}");
+    }
+    assert!(first_traces
+        .iter()
+        .all(|tick| first_snapshots.contains(tick)));
+    let patched = records
+        .iter()
+        .find(|record| record.event_name == "run.config")
+        .and_then(|record| record.attribute("petri.config_digest"))
+        .unwrap();
+    let running: Vec<_> = traces_of(first)
+        .into_iter()
+        .filter(|trace| trace.tick().unwrap() > unsampled)
+        .collect();
+    assert!(!running.is_empty(), "{first_traces:?}");
+    for trace in running {
+        for span in &trace.spans {
+            assert_eq!(span.attribute("petri.config_digest"), Some(patched));
+            assert_eq!(span.attribute("petri.sample_policy"), Some("interval"));
+        }
+    }
+    let before = &traces_of(first)[0];
+    assert_ne!(
+        before.spans[0].attribute("petri.config_digest"),
+        Some(patched)
+    );
+
+    assert!(snapshot_ticks(second).contains(&shutdown_tick));
+    assert!(trace_ticks(second).is_empty(), "{:?}", trace_ticks(second));
+    assert!(trace_ticks(runs[0]).is_empty());
 }

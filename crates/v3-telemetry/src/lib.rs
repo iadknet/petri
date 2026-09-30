@@ -11,15 +11,18 @@
 //! (`telemetry: on endpoint=… invocation=… run=…`) and one per run once each of
 //! the run's records has been exported, failed, dropped or abandoned
 //! (`telemetry: run=… exported=… failed=… dropped=… abandoned=… bytes=…
-//! self_time_us=… flush_ms=… snapshots=…`).
+//! self_time_us=… flush_ms=… snapshots=… traces=…`).
 //!
 //! A run's snapshots (T21.F02, [`Telemetry::snapshot`]) export its cumulative
-//! counters and per-tick values as OTLP metrics through the same queue.
+//! counters and per-tick values as OTLP metrics through the same queue, and
+//! the tick traces taken with its interval and completion snapshots (T21.F03,
+//! [`Telemetry::tick_snapshot`]) export one span per timed phase of the tick.
 
 mod export;
 mod metrics;
 mod queue;
 pub mod testing;
+mod trace;
 
 use std::fmt;
 use std::str::FromStr;
@@ -39,10 +42,13 @@ use v3_core::simulation::Simulation;
 
 use crate::export::Rejections;
 use crate::metrics::{Census, Moment, Taken};
-use crate::queue::{PostMetrics, QueueProcessor, RunKey, Shared};
+use crate::queue::{PostEncoded, QueueProcessor, RunKey, Shared, Signal};
 
 pub use crate::metrics::{
     resolve_metrics_interval, Trigger, DEFAULT_METRICS_INTERVAL, METRICS_INTERVAL_ENV,
+};
+pub use crate::trace::{
+    resolve_tick_traces, TickSample, MAX_TICK_TRACES_PER_RUN, PHASES, TICK_TRACES_ENV,
 };
 
 /// The environment variable that switches telemetry when no flag is given.
@@ -192,11 +198,14 @@ pub struct Options {
     pub reports: ReportSink,
     /// The least wall time between a run's interval snapshots.
     pub metrics_interval: Duration,
+    /// Whether interval and completion snapshots carry a tick trace.
+    pub tick_traces: Switch,
 }
 
 impl Options {
-    /// Stderr reports, contract limits, the endpoint from [`ENDPOINT_ENV`] and
-    /// the interval from [`METRICS_INTERVAL_ENV`], which must be valid.
+    /// Stderr reports, contract limits, the endpoint from [`ENDPOINT_ENV`], the
+    /// interval from [`METRICS_INTERVAL_ENV`] and the tick-trace switch from
+    /// [`TICK_TRACES_ENV`], both of which must be valid.
     pub fn from_env(service: Service) -> Result<Self, String> {
         let endpoint = std::env::var(ENDPOINT_ENV)
             .ok()
@@ -205,12 +214,14 @@ impl Options {
             .unwrap_or_else(|| DEFAULT_ENDPOINT.to_owned());
         let metrics_interval =
             resolve_metrics_interval(std::env::var(METRICS_INTERVAL_ENV).ok().as_deref())?;
+        let tick_traces = resolve_tick_traces(std::env::var(TICK_TRACES_ENV).ok().as_deref())?;
         Ok(Self {
             service,
             endpoint,
             limits: Limits::default(),
             reports: ReportSink::Stderr,
             metrics_interval,
+            tick_traces,
         })
     }
 }
@@ -285,6 +296,8 @@ pub struct RunHandle {
     started_ns: u64,
     last_snapshot: Option<Taken>,
     last_stamp_ns: Option<u64>,
+    /// Tick traces captured, up to [`MAX_TICK_TRACES_PER_RUN`].
+    traces_taken: u64,
 }
 
 impl RunHandle {
@@ -311,6 +324,7 @@ struct Active {
     /// The log resource's attributes, for snapshot requests.
     resource: Vec<opentelemetry_proto::tonic::common::v1::KeyValue>,
     metrics_interval: Duration,
+    tick_traces: Switch,
 }
 
 impl fmt::Debug for Active {
@@ -349,8 +363,8 @@ impl Telemetry {
     }
 
     /// Off for [`Switch::Off`]; otherwise exports to the environment's
-    /// endpoint and reports on stderr. An invalid [`METRICS_INTERVAL_ENV`]
-    /// refuses to start when the switch is on.
+    /// endpoint and reports on stderr. An invalid [`METRICS_INTERVAL_ENV`] or
+    /// [`TICK_TRACES_ENV`] refuses to start when the switch is on.
     pub fn start(service: Service, switch: Switch) -> Result<Self, String> {
         match switch {
             Switch::Off => Ok(Self::off()),
@@ -373,8 +387,8 @@ impl Telemetry {
             options.limits.request_timeout,
             Arc::clone(&rejections),
         ) {
-            Ok((exporter, metrics)) => {
-                Self::with_exporter(options, exporter, metrics, rejections, held)
+            Ok((exporter, encoded)) => {
+                Self::with_exporter(options, exporter, encoded, rejections, held)
             }
             Err(error) => {
                 options
@@ -385,16 +399,16 @@ impl Telemetry {
         }
     }
 
-    fn with_exporter<E, M>(
+    fn with_exporter<E, P>(
         options: Options,
         mut exporter: E,
-        metrics: M,
+        encoded: P,
         rejections: Arc<Rejections>,
         held: bool,
     ) -> Self
     where
         E: LogExporter + 'static,
-        M: PostMetrics + Send + 'static,
+        P: PostEncoded + Send + 'static,
     {
         let (_, invocation_id) = entropy_id();
         let resource = Resource::builder_empty()
@@ -412,7 +426,7 @@ impl Telemetry {
         let worker_shared = Arc::clone(&shared);
         let spawned = std::thread::Builder::new()
             .name("petri-telemetry".to_owned())
-            .spawn(move || queue::run_worker(&worker_shared, exporter, metrics, &rejections));
+            .spawn(move || queue::run_worker(&worker_shared, exporter, encoded, &rejections));
         if let Err(error) = spawned {
             shared
                 .sink()
@@ -436,6 +450,7 @@ impl Telemetry {
                 announced: AtomicBool::new(false),
                 resource: proto_resource,
                 metrics_interval: options.metrics_interval,
+                tick_traces: options.tick_traces,
             })),
         }
     }
@@ -461,6 +476,7 @@ impl Telemetry {
             started_ns: unix_ns(SystemTime::now()),
             last_snapshot: None,
             last_stamp_ns: None,
+            traces_taken: 0,
         };
         active.shared.register_run(key, run.id.clone());
         if !active.announced.swap(true, Ordering::Relaxed) {
@@ -478,6 +494,10 @@ impl Telemetry {
         }
         let interval_ms = u64::try_from(active.metrics_interval.as_millis()).unwrap_or(u64::MAX);
         extra.push(("petri.metrics_interval_ms", u64_value(interval_ms)));
+        extra.push((
+            "petri.tick_traces",
+            AnyValue::from(active.tick_traces.to_string()),
+        ));
         let body = serde_json::to_string(start.config).expect("config must serialize");
         active.emit(&run, "run.started", start.tick, extra, Some(body));
         active.shared.add_self_time(key, began.elapsed());
@@ -523,8 +543,28 @@ impl Telemetry {
         );
         active
             .shared
-            .offer_snapshot(run.key, request.encode_to_vec());
+            .offer_encoded(run.key, Signal::Metrics, request.encode_to_vec());
         active.shared.add_self_time(run.key, began.elapsed());
+        true
+    }
+
+    /// [`Telemetry::snapshot`] right after the `run_tick` that produced `sim`,
+    /// with `sample`'s trigger; when the snapshot is taken and tick traces are
+    /// on, also takes the trace of that tick unless the run has reached
+    /// [`MAX_TICK_TRACES_PER_RUN`]. Returns whether the snapshot was taken.
+    /// A server transition, reset or shutdown snapshot uses
+    /// [`Telemetry::snapshot`] instead: its config may postdate the tick.
+    pub fn tick_snapshot(&self, run: &mut RunHandle, sim: &Simulation, sample: TickSample) -> bool {
+        let trigger = match sample {
+            TickSample::Interval => Trigger::Interval,
+            TickSample::RunEnd => Trigger::RunEnd,
+        };
+        if !self.snapshot(run, sim, trigger) {
+            return false;
+        }
+        if let Some(active) = &self.active {
+            active.tick_trace(run, sim, sample);
+        }
         true
     }
 
@@ -557,13 +597,19 @@ impl Telemetry {
             return;
         };
         let began = Instant::now();
-        let extra = vec![
+        let mut extra = vec![
             ("petri.status", AnyValue::from(status.as_str())),
             (
                 "petri.wall_seconds",
                 AnyValue::Double(run.started.elapsed().as_secs_f64()),
             ),
         ];
+        if run.traces_taken >= MAX_TICK_TRACES_PER_RUN {
+            extra.push((
+                "petri.tick_traces_capped",
+                u64_value(MAX_TICK_TRACES_PER_RUN),
+            ));
+        }
         active.emit(&run, "run.ended", tick, extra, None);
         active.shared.add_self_time(run.key, began.elapsed());
         active.shared.mark_ended(run.key);
@@ -583,6 +629,37 @@ impl Telemetry {
 }
 
 impl Active {
+    /// Captures and offers the trace of the tick `sim` just ran, when tick
+    /// traces are on, the run is below its cap and the seam is that tick's.
+    fn tick_trace(&self, run: &mut RunHandle, sim: &Simulation, sample: TickSample) {
+        if self.tick_traces == Switch::Off || run.traces_taken >= MAX_TICK_TRACES_PER_RUN {
+            return;
+        }
+        let Some(seam) = sim
+            .stats
+            .last_tick_phases
+            .filter(|seam| seam.tick == sim.tick)
+        else {
+            return;
+        };
+        let began = Instant::now();
+        run.traces_taken += 1;
+        let request = trace::encode(
+            &self.resource,
+            run,
+            &trace::Capture {
+                seam: &seam,
+                stats: &sim.stats,
+                config: &sim.config,
+                population: sim.creatures.len(),
+                sample,
+            },
+        );
+        self.shared
+            .offer_encoded(run.key, Signal::Traces, request.encode_to_vec());
+        self.shared.add_self_time(run.key, began.elapsed());
+    }
+
     fn emit(
         &self,
         run: &RunHandle,

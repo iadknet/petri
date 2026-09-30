@@ -1,5 +1,6 @@
 //! The process's run telemetry (T21.F01), with the run's snapshots (T21.F02):
-//! interval snapshots after ticks and one at completion.
+//! interval snapshots after ticks and one at completion, each with the trace
+//! of the tick that just ran (T21.F03).
 //!
 //! `main` installs it once when `--telemetry` or `PETRI_TELEMETRY` resolves on;
 //! `run_simulation` reads it, so its public signature does not depend on the
@@ -9,7 +10,7 @@ use std::sync::OnceLock;
 
 use v3_core::config::SimulationConfig;
 use v3_core::simulation::Simulation;
-use v3_telemetry::{EndStatus, Flush, RunHandle, RunStart, Telemetry, Trigger};
+use v3_telemetry::{EndStatus, Flush, RunHandle, RunStart, Telemetry, TickSample};
 
 struct Installed {
     telemetry: Telemetry,
@@ -42,18 +43,23 @@ pub(crate) fn begin_run(
     })
 }
 
-/// Takes an interval snapshot after a tick when one is due.
+/// Takes an interval snapshot and its tick trace after a tick when one is due.
 pub(crate) fn after_tick(run: Option<&mut RunHandle>, sim: &Simulation) {
     if let (Some(installed), Some(run)) = (INSTALLED.get(), run) {
-        installed.telemetry.snapshot(run, sim, Trigger::Interval);
+        installed
+            .telemetry
+            .tick_snapshot(run, sim, TickSample::Interval);
     }
 }
 
-/// Takes the run-end snapshot unless the final tick has one, emits
+/// Takes the run-end snapshot and the last tick's trace unless the final
+/// tick has a snapshot, emits
 /// `run.ended` (`completed`) and waits for the bounded end-of-run flush.
 pub(crate) fn end_run(run: Option<RunHandle>, sim: &Simulation) {
     if let (Some(installed), Some(mut run)) = (INSTALLED.get(), run) {
-        installed.telemetry.snapshot(&mut run, sim, Trigger::RunEnd);
+        installed
+            .telemetry
+            .tick_snapshot(&mut run, sim, TickSample::RunEnd);
         installed
             .telemetry
             .end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);

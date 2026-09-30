@@ -1,11 +1,12 @@
 //! The bounded export queue with exact per-run accounting.
 //!
-//! The queue is one FIFO of items: log records and run snapshots (T21.F02),
-//! each attributed to its run when it is offered. From then on an item is in
-//! exactly one place: dropped (queue full or body over the cap), queued, in
-//! the one batch in flight, or resolved as exported, failed or abandoned. A
-//! batch holds records of one run only, or one snapshot, so what a
-//! collector's partial success rejects belongs to that run. A run's report
+//! The queue is one FIFO of items: log records, run snapshots (T21.F02) and
+//! tick traces (T21.F03), each attributed to its run when it is offered. From
+//! then on an item is in exactly one place: dropped (queue full or body over
+//! the cap), queued, in the one batch in flight, or resolved as exported,
+//! failed or abandoned. A batch holds records of one run only, or one
+//! snapshot or trace, so what a collector's partial success rejects belongs
+//! to that run. A run's report
 //! line is written once, when the run has ended and none of its items is
 //! queued or in flight, or when a flush deadline abandons the rest.
 
@@ -25,10 +26,29 @@ use crate::{Limits, ReportSink, RUN_ID_KEY};
 /// A run's key: its 128-bit ID.
 pub(crate) type RunKey = u128;
 
-/// A queued item: a log record, or an encoded OTLP metrics request.
+/// The OTLP signal of an encoded request the worker posts itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Signal {
+    /// A run snapshot: an OTLP metrics request for `/v1/metrics`.
+    Metrics,
+    /// A tick trace: an OTLP trace request for `/v1/traces`.
+    Traces,
+}
+
+impl Signal {
+    /// The item's name on a gap line.
+    fn item_name(self) -> &'static str {
+        match self {
+            Self::Metrics => "snapshot",
+            Self::Traces => "trace",
+        }
+    }
+}
+
+/// A queued item: a log record, or an encoded OTLP request.
 enum Item {
     Record(Box<(SdkLogRecord, InstrumentationScope)>),
-    Snapshot(Vec<u8>),
+    Encoded(Signal, Vec<u8>),
 }
 
 struct Entry {
@@ -37,15 +57,16 @@ struct Entry {
     item: Item,
 }
 
-/// What the worker exports next: leading records of one run, or one snapshot.
+/// What the worker exports next: leading records of one run, or one encoded
+/// request.
 enum Batch {
     Records(Vec<(SdkLogRecord, InstrumentationScope)>),
-    Snapshot(Vec<u8>),
+    Encoded(Signal, Vec<u8>),
 }
 
 /// One run's counts. `accepted` items entered the queue; each of them ends as
-/// exported, failed or abandoned. `snapshots` counts snapshots taken, whether
-/// or not the queue accepted them.
+/// exported, failed or abandoned. `snapshots` and `traces` count those taken,
+/// whether or not the queue accepted them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct RunCounts {
     pub(crate) accepted: u64,
@@ -54,9 +75,10 @@ pub(crate) struct RunCounts {
     pub(crate) dropped: u64,
     pub(crate) abandoned: u64,
     /// Payload bytes of exported items: a record's body plus attribute keys
-    /// and values, a snapshot's encoded request.
+    /// and values, a snapshot's or trace's encoded request.
     pub(crate) bytes: u64,
     pub(crate) snapshots: u64,
+    pub(crate) traces: u64,
 }
 
 impl RunCounts {
@@ -82,16 +104,17 @@ struct InFlight {
 /// How the collector answered a batch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Outcome {
-    /// Accepted, except this many items (records, or a snapshot's data
-    /// points) a partial success rejected.
+    /// Accepted, except this many items (records, a snapshot's data points
+    /// or a trace's spans) a partial success rejected.
     Exported { rejected: u64 },
     /// The request failed; nothing of the batch was stored.
     Failed,
 }
 
-/// Posts one encoded metrics request and reports how the collector answered.
-pub(crate) trait PostMetrics {
-    fn post(&self, body: Vec<u8>) -> Outcome;
+/// Posts one encoded request of `signal` and reports how the collector
+/// answered.
+pub(crate) trait PostEncoded {
+    fn post(&self, signal: Signal, body: Vec<u8>) -> Outcome;
 }
 
 #[derive(Default)]
@@ -182,14 +205,23 @@ impl Shared {
         );
     }
 
-    /// Counts a snapshot taken for `run` and queues its encoded request, or
-    /// drops and counts it as a record would be.
-    pub(crate) fn offer_snapshot(&self, run: RunKey, body: Vec<u8>) {
+    /// Counts a snapshot or trace taken for `run` and queues its encoded
+    /// request, or drops and counts it as a record would be.
+    pub(crate) fn offer_encoded(&self, run: RunKey, signal: Signal, body: Vec<u8>) {
         if let Some(entry) = self.lock().runs.get_mut(&run) {
-            entry.counts.snapshots += 1;
+            match signal {
+                Signal::Metrics => entry.counts.snapshots += 1,
+                Signal::Traces => entry.counts.traces += 1,
+            }
         }
         let bytes = body.len() as u64;
-        self.enqueue(run, bytes, bytes, "snapshot", Item::Snapshot(body));
+        self.enqueue(
+            run,
+            bytes,
+            bytes,
+            signal.item_name(),
+            Item::Encoded(signal, body),
+        );
     }
 
     fn enqueue(&self, run: RunKey, bytes: u64, body_bytes: u64, name: &'static str, item: Item) {
@@ -332,18 +364,19 @@ impl Shared {
             abandoned,
             bytes,
             snapshots,
+            traces,
             ..
         } = entry.counts;
         self.sink.write(&format!(
-            "telemetry: run={} exported={exported} failed={failed} dropped={dropped} abandoned={abandoned} bytes={bytes} self_time_us={} flush_ms={flush_ms} snapshots={snapshots}",
+            "telemetry: run={} exported={exported} failed={failed} dropped={dropped} abandoned={abandoned} bytes={bytes} self_time_us={} flush_ms={flush_ms} snapshots={snapshots} traces={traces}",
             entry.id,
             entry.self_time.as_micros(),
         ));
     }
 
     /// The worker's next batch: the queue's leading records of one run, up to
-    /// the batch bound, or its leading snapshot alone; `None` once the queue
-    /// is closed.
+    /// the batch bound, or its leading encoded request alone; `None` once the
+    /// queue is closed.
     fn take_batch(&self) -> Option<Batch> {
         let mut state = self.lock();
         while !state.closed && (state.held || state.queue.is_empty()) {
@@ -357,7 +390,7 @@ impl Shared {
         }
         let front = state.queue.front()?;
         let run = front.run;
-        let take = if matches!(front.item, Item::Snapshot(_)) {
+        let take = if matches!(front.item, Item::Encoded(..)) {
             1
         } else {
             state
@@ -379,7 +412,7 @@ impl Shared {
         for entry in entries {
             match entry.item {
                 Item::Record(record) => records.push(*record),
-                Item::Snapshot(body) => return Some(Batch::Snapshot(body)),
+                Item::Encoded(signal, body) => return Some(Batch::Encoded(signal, body)),
             }
         }
         Some(Batch::Records(records))
@@ -429,17 +462,17 @@ impl Shared {
 
 /// Exports batches until the queue closes: records through the log exporter,
 /// whose partial-success rejections `rejections` holds after each export, and
-/// snapshots through `metrics`. Owns both so their HTTP clients are used and
-/// dropped off any async runtime.
-pub(crate) fn run_worker<E: LogExporter, M: PostMetrics>(
+/// snapshots and traces through `encoded`. Owns both so their HTTP clients are
+/// used and dropped off any async runtime.
+pub(crate) fn run_worker<E: LogExporter, P: PostEncoded>(
     shared: &Shared,
     exporter: E,
-    metrics: M,
+    encoded: P,
     rejections: &Rejections,
 ) {
     while let Some(batch) = shared.take_batch() {
         let outcome = match batch {
-            Batch::Snapshot(body) => metrics.post(body),
+            Batch::Encoded(signal, body) => encoded.post(signal, body),
             Batch::Records(records) => {
                 let refs: Vec<(&SdkLogRecord, &InstrumentationScope)> =
                     records.iter().map(|item| (&item.0, &item.1)).collect();

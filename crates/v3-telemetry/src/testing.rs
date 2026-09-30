@@ -1,9 +1,10 @@
 //! An in-process OTLP/HTTP receiver for tests, on an ephemeral port.
 //!
-//! It decodes each `POST /v1/logs` protobuf body and keeps the records, and
-//! each `POST /v1/metrics` body and keeps the snapshot; in
-//! [`Receiver::rejecting`] mode it answers with a partial success that rejects
-//! records or data points, in [`Receiver::garbled`] mode it answers `200 OK`
+//! It decodes each `POST /v1/logs` protobuf body and keeps the records, each
+//! `POST /v1/metrics` body and keeps the snapshot, and each `POST /v1/traces`
+//! body and keeps the trace; in [`Receiver::rejecting`] mode it answers with a
+//! partial success that rejects records, data points or spans, in
+//! [`Receiver::garbled`] mode it answers `200 OK`
 //! with a body that does not decode, and in [`Receiver::hanging`] mode it
 //! accepts the connection and never answers.
 
@@ -18,6 +19,9 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     ExportMetricsPartialSuccess, ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+};
+use opentelemetry_proto::tonic::collector::trace::v1::{
+    ExportTracePartialSuccess, ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
 use opentelemetry_proto::tonic::common::v1::{any_value, AnyValue, KeyValue};
 use opentelemetry_proto::tonic::metrics::v1::{metric, number_data_point, NumberDataPoint};
@@ -127,12 +131,98 @@ impl ReceivedSnapshot {
     }
 }
 
+/// One decoded span, IDs as lowercase hex (an empty parent is `""`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReceivedSpan {
+    pub trace_id: String,
+    pub span_id: String,
+    pub parent_span_id: String,
+    pub name: String,
+    pub start_time_unix_nano: u64,
+    pub end_time_unix_nano: u64,
+    pub attributes: BTreeMap<String, String>,
+}
+
+impl ReceivedSpan {
+    pub fn attribute(&self, key: &str) -> Option<&str> {
+        self.attributes.get(key).map(String::as_str)
+    }
+}
+
+/// One decoded `POST /v1/traces` request: a tick trace.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ReceivedTrace {
+    pub resource: BTreeMap<String, String>,
+    pub spans: Vec<ReceivedSpan>,
+}
+
+impl ReceivedTrace {
+    /// The run the trace's first span names.
+    pub fn run_id(&self) -> Option<&str> {
+        self.spans.first()?.attribute("petri.run_id")
+    }
+
+    /// The first span's `petri.tick`.
+    pub fn tick(&self) -> Option<u64> {
+        self.spans.first()?.attribute("petri.tick")?.parse().ok()
+    }
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Decodes an OTLP trace request body into its traces, one per resource.
+pub fn decode_traces(body: &[u8]) -> Vec<ReceivedTrace> {
+    let Ok(request) = ExportTraceServiceRequest::decode(body) else {
+        return Vec::new();
+    };
+    request
+        .resource_spans
+        .into_iter()
+        .map(|resource_spans| ReceivedTrace {
+            resource: resource_spans
+                .resource
+                .map(|resource| to_map(&resource.attributes))
+                .unwrap_or_default(),
+            spans: resource_spans
+                .scope_spans
+                .into_iter()
+                .flat_map(|scope| scope.spans)
+                .map(|span| ReceivedSpan {
+                    trace_id: hex(&span.trace_id),
+                    span_id: hex(&span.span_id),
+                    parent_span_id: hex(&span.parent_span_id),
+                    name: span.name,
+                    start_time_unix_nano: span.start_time_unix_nano,
+                    end_time_unix_nano: span.end_time_unix_nano,
+                    attributes: to_map(&span.attributes),
+                })
+                .collect(),
+        })
+        .collect()
+}
+
 /// A test OTLP receiver. Its threads live until the test process exits.
 #[derive(Debug)]
 pub struct Receiver {
     endpoint: String,
+    stores: Stores,
+}
+
+/// What a receiver keeps.
+#[derive(Debug, Clone, Default)]
+struct Stores {
     records: Arc<Mutex<Vec<ReceivedRecord>>>,
     snapshots: Arc<Mutex<Vec<ReceivedSnapshot>>>,
+    traces: Arc<Mutex<Vec<ReceivedTrace>>>,
+}
+
+fn locked<T: Clone>(store: &Mutex<Vec<T>>) -> Vec<T> {
+    store
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone()
 }
 
 fn render(value: Option<&AnyValue>) -> Option<String> {
@@ -275,7 +365,7 @@ enum Answer {
     /// `200 OK` with an empty body: every record accepted.
     Accept,
     /// `200 OK` with a partial success rejecting up to this many records, or
-    /// data points of a snapshot, which is then not kept.
+    /// data points of a snapshot or spans of a trace, which is then not kept.
     Reject(u64),
     /// `200 OK` with a body that is not a valid response message.
     Garble,
@@ -312,12 +402,32 @@ fn receive_metrics(
     .encode_to_vec()
 }
 
-fn serve(
-    stream: TcpStream,
-    records: &Mutex<Vec<ReceivedRecord>>,
-    snapshots: &Mutex<Vec<ReceivedSnapshot>>,
-    answer: Answer,
-) {
+/// Keeps a trace request's traces unless spans are rejected; returns the
+/// reply body.
+fn receive_traces(body: &[u8], traces: &Mutex<Vec<ReceivedTrace>>, answer: Answer) -> Vec<u8> {
+    let decoded = decode_traces(body);
+    let spans: usize = decoded.iter().map(|trace| trace.spans.len()).sum();
+    let rejected = match answer {
+        Answer::Reject(limit) => limit.min(spans as u64),
+        Answer::Accept | Answer::Garble | Answer::Hang => 0,
+    };
+    if rejected == 0 {
+        traces
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .extend(decoded);
+        return Vec::new();
+    }
+    ExportTraceServiceResponse {
+        partial_success: Some(ExportTracePartialSuccess {
+            rejected_spans: rejected as i64,
+            error_message: "rejected by the test receiver".to_owned(),
+        }),
+    }
+    .encode_to_vec()
+}
+
+fn serve(stream: TcpStream, stores: &Stores, answer: Answer) {
     let Ok(mut writer) = stream.try_clone() else {
         return;
     };
@@ -330,9 +440,11 @@ fn serve(
             }
         }
         let reply = if path.ends_with("/v1/metrics") {
-            receive_metrics(&body, snapshots, answer)
+            receive_metrics(&body, &stores.snapshots, answer)
+        } else if path.ends_with("/v1/traces") {
+            receive_traces(&body, &stores.traces, answer)
         } else {
-            receive_logs(&body, records, answer)
+            receive_logs(&body, &stores.records, answer)
         };
         // Field 1, length-delimited, 5 bytes long, with no bytes following:
         // truncated for either response type.
@@ -383,13 +495,14 @@ impl Receiver {
 
     /// A receiver that keeps all but the last `per_request` records of each
     /// logs request and reports those as rejected in a partial success; a
-    /// metrics request has up to `per_request` data points rejected and its
-    /// snapshot is not kept.
+    /// metrics or trace request has up to `per_request` data points or spans
+    /// rejected and its snapshot or trace is not kept.
     pub fn rejecting(per_request: u64) -> Self {
         Self::spawn(Answer::Reject(per_request))
     }
 
-    /// A receiver that keeps every record and snapshot but answers `200 OK`
+    /// A receiver that keeps every record, snapshot and trace but answers
+    /// `200 OK`
     /// with a body that does not decode as a response.
     pub fn garbled() -> Self {
         Self::spawn(Answer::Garble)
@@ -406,41 +519,34 @@ impl Receiver {
             "http://{}",
             listener.local_addr().expect("listener has an address")
         );
-        let records: Arc<Mutex<Vec<ReceivedRecord>>> = Arc::default();
-        let snapshots: Arc<Mutex<Vec<ReceivedSnapshot>>> = Arc::default();
-        let (shared_records, shared_snapshots) = (Arc::clone(&records), Arc::clone(&snapshots));
+        let stores = Stores::default();
+        let shared = stores.clone();
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
-                let records = Arc::clone(&shared_records);
-                let snapshots = Arc::clone(&shared_snapshots);
-                std::thread::spawn(move || serve(stream, &records, &snapshots, answer));
+                let stores = shared.clone();
+                std::thread::spawn(move || serve(stream, &stores, answer));
             }
         });
-        Self {
-            endpoint,
-            records,
-            snapshots,
-        }
+        Self { endpoint, stores }
     }
 
-    /// The OTLP base endpoint (no `/v1/logs` or `/v1/metrics`).
+    /// The OTLP base endpoint (no `/v1/logs`, `/v1/metrics` or `/v1/traces`).
     pub fn endpoint(&self) -> &str {
         &self.endpoint
     }
 
     pub fn records(&self) -> Vec<ReceivedRecord> {
-        self.records
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clone()
+        locked(&self.stores.records)
     }
 
     /// The snapshots received and kept, in arrival order.
     pub fn snapshots(&self) -> Vec<ReceivedSnapshot> {
-        self.snapshots
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clone()
+        locked(&self.stores.snapshots)
+    }
+
+    /// The traces received and kept, in arrival order.
+    pub fn traces(&self) -> Vec<ReceivedTrace> {
+        locked(&self.stores.traces)
     }
 
     /// Polls until `done` holds for the received records or `timeout` passes.

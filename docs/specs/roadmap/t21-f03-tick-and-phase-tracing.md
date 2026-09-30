@@ -166,21 +166,21 @@ never zero. Nothing here is closure evidence.
 
 ## Implementation Tasks
 
-- [ ] `v3-core`: `TickPhaseTimings` and `SimStats::last_tick_phases` behind
+- [x] `v3-core`: `TickPhaseTimings` and `SimStats::last_tick_phases` behind
       `telemetry-seams`; `run_tick` records them; a unit test under the
       feature checks the fields against `phase_wall_clock` and the order,
       run by a `Makefile` row inside `make check`.
-- [ ] `crates/v3-telemetry`: `v3-core` with `telemetry-seams`;
+- [x] `crates/v3-telemetry`: `v3-core` with `telemetry-seams`;
       `opentelemetry-proto` feature `trace`; `PETRI_TELEMETRY_TICK_TRACES`
       in `Options`; trace capture and encoding (`trace.rs`); `Item::Trace`,
       `TracesClient` for `/v1/traces`, partial-success and undecodable
       accounting, `traces=`; `petri.tick_traces` on `run.started`; the
       in-test receiver decodes `POST /v1/traces`.
-- [ ] `v3-cli` and `v3-server`: `after_tick` and the CLI's completion take
+- [x] `v3-cli` and `v3-server`: `after_tick` and the CLI's completion take
       the trace with the snapshot they already take; the server's
       transition, reset and shutdown snapshots do not.
-- [ ] `telemetry/grafana/dashboards/petri-run.json`: the `Tick traces` row.
-- [ ] `scripts/telemetry-dashboards-check`: the rows above.
+- [x] `telemetry/grafana/dashboards/petri-run.json`: the `Tick traces` row.
+- [x] `scripts/telemetry-dashboards-check`: the rows above.
 - [ ] Run the checks on this host; record them in
       `docs/progress/readings/t21-f03.md`.
 
