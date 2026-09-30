@@ -1,12 +1,13 @@
 //! The bounded export queue with exact per-run accounting.
 //!
-//! Every record is attributed to its run when it is offered. From then on it is
-//! in exactly one place: dropped (queue full or body over the cap), queued, in
+//! The queue is one FIFO of items: log records and run snapshots (T21.F02),
+//! each attributed to its run when it is offered. From then on an item is in
+//! exactly one place: dropped (queue full or body over the cap), queued, in
 //! the one batch in flight, or resolved as exported, failed or abandoned. A
-//! batch holds records of one run only, so the records a collector's partial
-//! success rejects are that run's failures. A run's report line is written
-//! once, when the run has ended and none of its records is queued or in
-//! flight, or when a flush deadline abandons the rest.
+//! batch holds records of one run only, or one snapshot, so what a
+//! collector's partial success rejects belongs to that run. A run's report
+//! line is written once, when the run has ended and none of its items is
+//! queued or in flight, or when a flush deadline abandons the rest.
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -24,14 +25,27 @@ use crate::{Limits, ReportSink, RUN_ID_KEY};
 /// A run's key: its 128-bit ID.
 pub(crate) type RunKey = u128;
 
+/// A queued item: a log record, or an encoded OTLP metrics request.
+enum Item {
+    Record(Box<(SdkLogRecord, InstrumentationScope)>),
+    Snapshot(Vec<u8>),
+}
+
 struct Entry {
     run: RunKey,
     bytes: u64,
-    item: Box<(SdkLogRecord, InstrumentationScope)>,
+    item: Item,
 }
 
-/// One run's counts. `accepted` records entered the queue; each of them ends as
-/// exported, failed or abandoned.
+/// What the worker exports next: leading records of one run, or one snapshot.
+enum Batch {
+    Records(Vec<(SdkLogRecord, InstrumentationScope)>),
+    Snapshot(Vec<u8>),
+}
+
+/// One run's counts. `accepted` items entered the queue; each of them ends as
+/// exported, failed or abandoned. `snapshots` counts snapshots taken, whether
+/// or not the queue accepted them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct RunCounts {
     pub(crate) accepted: u64,
@@ -39,8 +53,10 @@ pub(crate) struct RunCounts {
     pub(crate) failed: u64,
     pub(crate) dropped: u64,
     pub(crate) abandoned: u64,
-    /// Payload bytes (body plus attribute keys and values) of exported records.
+    /// Payload bytes of exported items: a record's body plus attribute keys
+    /// and values, a snapshot's encoded request.
     pub(crate) bytes: u64,
+    pub(crate) snapshots: u64,
 }
 
 impl RunCounts {
@@ -65,11 +81,17 @@ struct InFlight {
 
 /// How the collector answered a batch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Outcome {
-    /// Accepted, except this many records a partial success rejected.
+pub(crate) enum Outcome {
+    /// Accepted, except this many items (records, or a snapshot's data
+    /// points) a partial success rejected.
     Exported { rejected: u64 },
-    /// The request failed; no record of the batch was stored.
+    /// The request failed; nothing of the batch was stored.
     Failed,
+}
+
+/// Posts one encoded metrics request and reports how the collector answered.
+pub(crate) trait PostMetrics {
+    fn post(&self, body: Vec<u8>) -> Outcome;
 }
 
 #[derive(Default)]
@@ -150,6 +172,27 @@ impl Shared {
                 .attributes_iter()
                 .map(|(key, value)| key.as_str().len() as u64 + value_bytes(value))
                 .sum::<u64>();
+        let name = record.event_name().unwrap_or("unnamed").to_owned();
+        self.enqueue(
+            run,
+            bytes,
+            body_bytes,
+            &name,
+            Item::Record(Box::new((record, scope))),
+        );
+    }
+
+    /// Counts a snapshot taken for `run` and queues its encoded request, or
+    /// drops and counts it as a record would be.
+    pub(crate) fn offer_snapshot(&self, run: RunKey, body: Vec<u8>) {
+        if let Some(entry) = self.lock().runs.get_mut(&run) {
+            entry.counts.snapshots += 1;
+        }
+        let bytes = body.len() as u64;
+        self.enqueue(run, bytes, bytes, "snapshot", Item::Snapshot(body));
+    }
+
+    fn enqueue(&self, run: RunKey, bytes: u64, body_bytes: u64, name: &str, item: Item) {
         let over_cap = body_bytes > self.limits.max_body_bytes;
         let mut state = self.lock();
         let full = state.closed
@@ -164,8 +207,7 @@ impl Shared {
             drop(state);
             if let Some(id) = gap {
                 self.sink.write(&format!(
-                    "telemetry: gap run={id} record={} body_bytes={body_bytes} cap={} dropped whole",
-                    record.event_name().unwrap_or("unnamed"),
+                    "telemetry: gap run={id} record={name} body_bytes={body_bytes} cap={} dropped whole",
                     self.limits.max_body_bytes,
                 ));
             }
@@ -173,11 +215,7 @@ impl Shared {
         }
         entry.counts.accepted += 1;
         state.queued_bytes += bytes;
-        state.queue.push_back(Entry {
-            run,
-            bytes,
-            item: Box::new((record, scope)),
-        });
+        state.queue.push_back(Entry { run, bytes, item });
         drop(state);
         self.changed.notify_all();
     }
@@ -293,18 +331,20 @@ impl Shared {
             dropped,
             abandoned,
             bytes,
+            snapshots,
             ..
         } = entry.counts;
         self.sink.write(&format!(
-            "telemetry: run={} exported={exported} failed={failed} dropped={dropped} abandoned={abandoned} bytes={bytes} self_time_us={} flush_ms={flush_ms}",
+            "telemetry: run={} exported={exported} failed={failed} dropped={dropped} abandoned={abandoned} bytes={bytes} self_time_us={} flush_ms={flush_ms} snapshots={snapshots}",
             entry.id,
             entry.self_time.as_micros(),
         ));
     }
 
     /// The worker's next batch: the queue's leading records of one run, up to
-    /// the batch bound; `None` once the queue is closed.
-    fn take_batch(&self) -> Option<Vec<Entry>> {
+    /// the batch bound, or its leading snapshot alone; `None` once the queue
+    /// is closed.
+    fn take_batch(&self) -> Option<Batch> {
         let mut state = self.lock();
         while !state.closed && (state.held || state.queue.is_empty()) {
             state = self
@@ -315,22 +355,34 @@ impl Shared {
         if state.closed {
             return None;
         }
-        let run = state.queue.front()?.run;
-        let take = state
-            .queue
-            .iter()
-            .take(self.limits.batch_records)
-            .take_while(|entry| entry.run == run)
-            .count();
-        let batch: Vec<Entry> = state.queue.drain(..take).collect();
-        let bytes = batch.iter().map(|entry| entry.bytes).sum();
+        let front = state.queue.front()?;
+        let run = front.run;
+        let take = if matches!(front.item, Item::Snapshot(_)) {
+            1
+        } else {
+            state
+                .queue
+                .iter()
+                .take(self.limits.batch_records)
+                .take_while(|entry| entry.run == run && matches!(entry.item, Item::Record(_)))
+                .count()
+        };
+        let entries: Vec<Entry> = state.queue.drain(..take).collect();
+        let bytes = entries.iter().map(|entry| entry.bytes).sum();
         state.queued_bytes -= bytes;
         state.in_flight = Some(InFlight {
             run,
-            records: batch.len() as u64,
+            records: entries.len() as u64,
             bytes,
         });
-        Some(batch)
+        let mut records = Vec::with_capacity(entries.len());
+        for entry in entries {
+            match entry.item {
+                Item::Record(record) => records.push(*record),
+                Item::Snapshot(body) => return Some(Batch::Snapshot(body)),
+            }
+        }
+        Some(Batch::Records(records))
     }
 
     /// Resolves the in-flight batch; records a flush already abandoned are not
@@ -375,21 +427,31 @@ impl Shared {
     }
 }
 
-/// Exports batches until the queue closes; `rejections` holds what the
-/// collector's partial success rejected of the batch just exported. Owns the
-/// exporter so its HTTP client is used and dropped off any async runtime.
-pub(crate) fn run_worker<E: LogExporter>(shared: &Shared, exporter: E, rejections: &Rejections) {
+/// Exports batches until the queue closes: records through the log exporter,
+/// whose partial-success rejections `rejections` holds after each export, and
+/// snapshots through `metrics`. Owns both so their HTTP clients are used and
+/// dropped off any async runtime.
+pub(crate) fn run_worker<E: LogExporter, M: PostMetrics>(
+    shared: &Shared,
+    exporter: E,
+    metrics: M,
+    rejections: &Rejections,
+) {
     while let Some(batch) = shared.take_batch() {
-        let refs: Vec<(&SdkLogRecord, &InstrumentationScope)> = batch
-            .iter()
-            .map(|entry| (&entry.item.0, &entry.item.1))
-            .collect();
-        let result = futures_executor::block_on(exporter.export(LogBatch::new(&refs)));
-        let rejected = rejections.take();
-        shared.complete_batch(match result {
-            Ok(()) => Outcome::Exported { rejected },
-            Err(_) => Outcome::Failed,
-        });
+        let outcome = match batch {
+            Batch::Snapshot(body) => metrics.post(body),
+            Batch::Records(records) => {
+                let refs: Vec<(&SdkLogRecord, &InstrumentationScope)> =
+                    records.iter().map(|item| (&item.0, &item.1)).collect();
+                let result = futures_executor::block_on(exporter.export(LogBatch::new(&refs)));
+                let rejected = rejections.take();
+                match result {
+                    Ok(()) => Outcome::Exported { rejected },
+                    Err(_) => Outcome::Failed,
+                }
+            }
+        };
+        shared.complete_batch(outcome);
     }
     let _ = exporter.shutdown();
 }

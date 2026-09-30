@@ -235,7 +235,12 @@ fn main() {
 
             #[cfg(feature = "telemetry")]
             v3_cli::telemetry::install(
-                v3_telemetry::Telemetry::start(v3_telemetry::Service::Cli, switch),
+                v3_telemetry::Telemetry::start(v3_telemetry::Service::Cli, switch).unwrap_or_else(
+                    |message| {
+                        eprintln!("error: {message}");
+                        std::process::exit(1);
+                    },
+                ),
                 args.config.as_ref().map(|path| path.display().to_string()),
             );
 

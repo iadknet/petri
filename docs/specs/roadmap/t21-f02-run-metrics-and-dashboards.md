@@ -204,23 +204,23 @@ a value that was not captured is absent, never zero.
 
 ## Implementation Tasks
 
-- [ ] `crates/v3-telemetry`: `PETRI_TELEMETRY_METRICS_INTERVAL_MS` in
+- [x] `crates/v3-telemetry`: `PETRI_TELEMETRY_METRICS_INTERVAL_MS` in
       `Options`; the snapshot copy and census; OTLP metrics encoding of the
       families above; snapshot items in the queue with `/v1/metrics` posting,
       partial-success accounting and `snapshots=`; `petri.metrics_interval_ms`
       on `run.started`; the in-test receiver decodes `POST /v1/metrics`.
-- [ ] `v3-cli`: snapshot hook in `run_simulation` after each tick and at
+- [x] `v3-cli`: snapshot hook in `run_simulation` after each tick and at
       completion; `v3-server`: hooks in `run_loop`, `step`, transitions,
       `startup` and shutdown.
-- [ ] `telemetry/grafana/dashboards.yaml`, `telemetry/grafana/dashboards/
+- [x] `telemetry/grafana/dashboards.yaml`, `telemetry/grafana/dashboards/
       {petri-runs,petri-run}.json`, the compose mounts.
-- [ ] `scripts/telemetry-dashboards-check`.
+- [x] `scripts/telemetry-dashboards-check`.
 - [ ] Run the checks on this host; record them in
       `docs/progress/readings/t21-f02.md`.
 
 ## Verification
 
-- [ ] Neutrality and snapshot content: `cargo test -p v3-cli` (inside
+- [x] Neutrality and snapshot content: `cargo test -p v3-cli` (inside
       `make check`, no Docker) -> canonical NDJSON identical with telemetry
       off, on with the in-test receiver, and on with a closed port; with the
       interval `10`, the receiver holds at least two snapshots, ticks and
@@ -229,7 +229,7 @@ a value that was not captured is absent, never zero.
       maps that `TickSampleEvent` carries equal to the final `tick_sample`;
       a run whose ticks all fall inside one interval still yields exactly
       one snapshot, the run-end one.
-- [ ] Encoding and bounds: `cargo test -p v3-telemetry` -> a `SimStats` with
+- [x] Encoding and bounds: `cargo test -p v3-telemetry` -> a `SimStats` with
       every map key populated encodes every family in the table with the
       predicted OTel names, kinds, attribute keys and `as_key()` values and
       no other series, so the families `tick_sample` does not carry are
@@ -238,14 +238,14 @@ a value that was not captured is absent, never zero.
       snapshot as failed with no bytes; a snapshot and records of one run
       queued together are attributed to that run across a reset; an
       invalid interval is refused.
-- [ ] Server: `cargo test -p v3-server` -> a snapshot at a transition, none
+- [x] Server: `cargo test -p v3-server` -> a snapshot at a transition, none
       for a second transition at the same tick, one at reset from the ending
       run at the `run.ended` tick, and one at shutdown; the three-state
       payload neutrality test still passes.
-- [ ] Reference build: `cargo build --release -p v3-cli -p v3-server -p v3-lab
+- [x] Reference build: `cargo build --release -p v3-cli -p v3-server -p v3-lab
       --no-default-features` compiles, `cargo tree -e features` shows neither
       `v3-telemetry` nor `telemetry-seams`, clippy `-D warnings` passes with
-      and without the feature.
+      and without the feature. Passed 2026-09-30 (tree: 0 matching lines).
 - [ ] Dashboards (Docker, outside `make check`):
       `scripts/telemetry-dashboards-check` -> every check passes; transcript
       and the stored Prometheus names in the readings file; the two
@@ -257,7 +257,7 @@ a value that was not captured is absent, never zero.
       closing commit) -> identical canonical output, in the readings file.
 - [ ] Overhead check: `scripts/telemetry-overhead` -> the table in the
       readings file, verdict in Performance and Goal Impact.
-- [ ] `make check` -> exit 0.
+- [x] `make check` -> exit 0 (2026-09-30; runs the three test rows above).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
 - [ ] Benchmark summary: `Not applicable: observability feature`.
@@ -315,3 +315,11 @@ method is F01's, unchanged, with T = 6908 fixed:
 - Decision: F02 exports every cumulative `SimStats` field and no more; a
   counter a later mechanism feature adds ships its own family under the
   naming rule above (track ownership note, applied 2026-09-30).
+- Decision: keys sharing an `as_key()` string (`WorldInputKey` across food
+  types) are summed into one series.
+- Decision: the interval variable is read only when telemetry is on.
+- Decision: the interval counts from `run.started`; a run's first
+  transition snapshot needs no 10 ms gap.
+- Decision: `reproductive_success.<x>` names follow the table; other
+  `_sum` fields keep `_sum`.
+- Decision: the check script lists the 36 map families the workload keys.

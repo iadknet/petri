@@ -2202,6 +2202,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-proto",
  "opentelemetry_sdk",
+ "proptest",
  "prost",
  "rand 0.8.6",
  "reqwest",

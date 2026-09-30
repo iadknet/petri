@@ -113,7 +113,7 @@ pub fn run_simulation<W: std::io::Write>(
 ) -> Result<(), RunError> {
     let mut sim = seed_simulation(config, seed);
     #[cfg(feature = "telemetry")]
-    let telemetry_run = telemetry::begin_run(&sim.config, seed, ticks, sample_every);
+    let mut telemetry_run = telemetry::begin_run(&sim.config, seed, ticks, sample_every);
 
     let started = RunStartedEvent {
         protocol_version: PROTOCOL_VERSION,
@@ -130,6 +130,8 @@ pub fn run_simulation<W: std::io::Write>(
 
     for _ in 0..ticks {
         run_tick(&mut sim, &mut None);
+        #[cfg(feature = "telemetry")]
+        telemetry::after_tick(telemetry_run.as_mut(), &sim);
         let current_tick = sim.tick;
 
         let should_sample = current_tick.is_multiple_of(sample_every) || current_tick == ticks;
@@ -156,7 +158,7 @@ pub fn run_simulation<W: std::io::Write>(
     };
     emit(out, &completed)?;
     #[cfg(feature = "telemetry")]
-    telemetry::end_run(telemetry_run, sim.tick);
+    telemetry::end_run(telemetry_run, &sim);
 
     Ok(())
 }

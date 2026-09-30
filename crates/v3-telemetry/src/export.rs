@@ -4,7 +4,9 @@
 //! only to log it and reports the request as exported. The HTTP client here
 //! decodes that response itself and adds its `rejected_log_records` to a
 //! counter the queue worker reads after each export, so rejected records are
-//! counted as failed.
+//! counted as failed. Run snapshots (T21.F02) are posted to `/v1/metrics` by
+//! [`MetricsClient`] on the same HTTP client, which reads the response's
+//! rejected data points itself.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -15,7 +17,10 @@ use opentelemetry_otlp::{
     ExporterBuildError, LogExporter, Protocol, RetryPolicy, WithExportConfig, WithHttpConfig,
 };
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceResponse;
+use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceResponse;
 use prost::Message;
+
+use crate::queue::{Outcome, PostMetrics};
 
 /// Records the collector rejected since the worker last took the count.
 #[derive(Debug, Default)]
@@ -58,12 +63,49 @@ impl HttpClient for CountingClient {
     }
 }
 
-/// Builds the OTLP/HTTP protobuf log exporter for `url`, with no retry.
-pub(crate) fn build(
+/// Posts snapshots to the collector's `/v1/metrics`, with no retry.
+#[derive(Debug)]
+pub(crate) struct MetricsClient {
+    client: reqwest::blocking::Client,
     url: String,
+}
+
+impl PostMetrics for MetricsClient {
+    fn post(&self, body: Vec<u8>) -> Outcome {
+        let response = self
+            .client
+            .post(&self.url)
+            .header("content-type", "application/x-protobuf")
+            .body(body)
+            .send();
+        let Ok(response) = response else {
+            return Outcome::Failed;
+        };
+        if !response.status().is_success() {
+            return Outcome::Failed;
+        }
+        let Ok(bytes) = response.bytes() else {
+            return Outcome::Failed;
+        };
+        let rejected = ExportMetricsServiceResponse::decode(bytes.as_ref())
+            .ok()
+            .and_then(|decoded| decoded.partial_success)
+            .map_or(0, |partial| {
+                u64::try_from(partial.rejected_data_points).unwrap_or(0)
+            });
+        Outcome::Exported { rejected }
+    }
+}
+
+/// Builds the OTLP/HTTP protobuf log exporter for `<endpoint>/v1/logs` and the
+/// metrics client for `<endpoint>/v1/metrics` on one HTTP client, with no
+/// retry.
+pub(crate) fn build(
+    endpoint: &str,
     timeout: Duration,
     rejections: Arc<Rejections>,
-) -> Result<LogExporter, ExporterBuildError> {
+) -> Result<(LogExporter, MetricsClient), ExporterBuildError> {
+    let base = endpoint.trim_end_matches('/');
     // reqwest's blocking client starts and stops its own runtime, which
     // panics on a thread that is already inside one (the server's main).
     let inner = std::thread::spawn(move || {
@@ -74,12 +116,18 @@ pub(crate) fn build(
     .join()
     .map_err(|_| ExporterBuildError::InternalFailure("HTTP client build panicked".to_owned()))?
     .map_err(|error| ExporterBuildError::InternalFailure(error.to_string()))?;
-    LogExporter::builder()
+    let metrics = MetricsClient {
+        client: inner.clone(),
+        url: format!("{base}/v1/metrics"),
+    };
+    let url = format!("{base}/v1/logs");
+    let logs = LogExporter::builder()
         .with_http()
         .with_http_client(CountingClient { inner, rejections })
         .with_protocol(Protocol::HttpBinary)
         .with_endpoint(url)
         .with_timeout(timeout)
         .with_retry_policy(RetryPolicy::disabled())
-        .build()
+        .build()?;
+    Ok((logs, metrics))
 }

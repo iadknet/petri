@@ -62,7 +62,12 @@ async fn main() {
     let state = v3_server::state::AppState::from_config_with_telemetry(
         v3_core::config::SimulationConfig::default(),
         0,
-        v3_telemetry::Telemetry::start(v3_telemetry::Service::Server, switch),
+        v3_telemetry::Telemetry::start(v3_telemetry::Service::Server, switch).unwrap_or_else(
+            |message| {
+                eprintln!("error: {message}");
+                std::process::exit(1);
+            },
+        ),
     );
     let app = v3_server::router(state.clone());
     let listener = tokio::net::TcpListener::bind(&bind_addr)
