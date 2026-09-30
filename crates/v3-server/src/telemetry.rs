@@ -5,13 +5,17 @@
 //!
 //! Snapshots (T21.F02): an interval snapshot after each tick when due, one
 //! at a transition when due, and one from the ending run's simulation at
-//! reset and at shutdown, each taken before the record it accompanies.
+//! reset and at shutdown, each taken before the record it accompanies. Only
+//! the interval snapshot carries a tick trace (T21.F03): a config patch
+//! accepted while paused may postdate the tick the others would trace.
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use v3_core::config::SimulationConfig;
 use v3_core::simulation::Simulation;
-use v3_telemetry::{EndStatus, Flush, RunHandle, RunStart, RunState, Telemetry, Trigger};
+use v3_telemetry::{
+    EndStatus, Flush, RunHandle, RunStart, RunState, Telemetry, TickSample, Trigger,
+};
 
 use crate::state::SimulationStatus;
 
@@ -84,10 +88,11 @@ impl ServerTelemetry {
         }
     }
 
-    /// Takes an interval snapshot of `sim` after a tick when one is due.
+    /// Takes an interval snapshot of `sim` and its tick trace after a tick
+    /// when one is due.
     pub(crate) fn after_tick(&self, sim: &Simulation) {
         if let Some(run) = self.current().as_mut() {
-            self.telemetry.snapshot(run, sim, Trigger::Interval);
+            self.telemetry.tick_snapshot(run, sim, TickSample::Interval);
         }
     }
 
@@ -152,6 +157,7 @@ mod tests {
             limits: Limits::default(),
             reports: ReportSink::capture(),
             metrics_interval: Duration::from_secs(3_600),
+            tick_traces: v3_telemetry::Switch::On,
         }));
         let mut first = seed_simulation(config(), 1);
         telemetry.begin(&first.config, 1);

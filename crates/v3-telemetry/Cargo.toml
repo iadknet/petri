@@ -12,7 +12,8 @@ build = "build.rs"
 workspace = true
 
 [dependencies]
-v3-core = { path = "../v3-core" }
+# The tick-phase seam tick traces read (T21.F03).
+v3-core = { path = "../v3-core", features = ["telemetry-seams"] }
 rand = { workspace = true }
 serde_json = { workspace = true }
 futures-executor = "=0.3.32"
@@ -25,9 +26,10 @@ opentelemetry-http = { version = "=0.33.0", default-features = false, features =
 reqwest = { version = "=0.13.5", default-features = false, features = ["blocking"] }
 async-trait = "=0.1.89"
 # The export client and the in-test OTLP receiver (`testing`) decode OTLP
-# messages, and run snapshots are encoded as OTLP metrics requests (T21.F02);
+# messages, run snapshots are encoded as OTLP metrics requests (T21.F02) and
+# tick traces as OTLP trace requests (T21.F03);
 # both crates are already in the exporter's dependency tree.
-opentelemetry-proto = { version = "=0.33.0", default-features = false, features = ["gen-tonic-messages", "logs", "metrics"] }
+opentelemetry-proto = { version = "=0.33.0", default-features = false, features = ["gen-tonic-messages", "logs", "metrics", "trace"] }
 prost = "=0.14.4"
 
 [dev-dependencies]

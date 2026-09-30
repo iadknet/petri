@@ -1,11 +1,12 @@
 //! Telemetry neutrality (T21.F01): one seeded run's canonical NDJSON is the same
 //! with telemetry off, on with a receiver listening, and on with a closed port;
-//! and the run's snapshots (T21.F02) agree with its final `tick_sample`.
+//! the run's snapshots (T21.F02) agree with its final `tick_sample`; and each
+//! snapshot after a tick carries that tick's trace (T21.F03).
 #![cfg(feature = "telemetry")]
 
 use std::process::Command;
 
-use v3_telemetry::testing::{closed_endpoint, parse_run_line, PointValue, Receiver};
+use v3_telemetry::testing::{closed_endpoint, parse_run_line, PointValue, ReceivedTrace, Receiver};
 
 struct RunOutput {
     canonical: Vec<String>,
@@ -50,11 +51,12 @@ const LIVING: Shape = Shape {
 };
 
 /// One `v3-cli run` of `shape` with the telemetry `switch`, the OTLP
-/// `endpoint` and the metrics `interval`.
+/// `endpoint`, the metrics `interval` and the tick-trace switch `traces`.
 fn command(
     switch: &str,
     endpoint: Option<&str>,
     interval: Option<&str>,
+    traces: Option<&str>,
     shape: Shape,
 ) -> std::process::Output {
     let recipe =
@@ -69,7 +71,11 @@ fn command(
         .arg(&recipe)
         .env_remove(v3_telemetry::SWITCH_ENV)
         .env_remove(v3_telemetry::ENDPOINT_ENV)
-        .env_remove(v3_telemetry::METRICS_INTERVAL_ENV);
+        .env_remove(v3_telemetry::METRICS_INTERVAL_ENV)
+        .env_remove(v3_telemetry::TICK_TRACES_ENV);
+    if let Some(traces) = traces {
+        command.env(v3_telemetry::TICK_TRACES_ENV, traces);
+    }
     if let Some(endpoint) = endpoint {
         command.env(v3_telemetry::ENDPOINT_ENV, endpoint);
     }
@@ -85,7 +91,17 @@ fn run_with(
     interval: Option<&str>,
     shape: Shape,
 ) -> RunOutput {
-    let output = command(switch, endpoint, interval, shape);
+    run_traced(switch, endpoint, interval, None, shape)
+}
+
+fn run_traced(
+    switch: &str,
+    endpoint: Option<&str>,
+    interval: Option<&str>,
+    traces: Option<&str>,
+    shape: Shape,
+) -> RunOutput {
+    let output = command(switch, endpoint, interval, traces, shape);
     assert!(output.status.success(), "{output:?}");
     RunOutput {
         canonical: canonical(&output.stdout),
@@ -135,6 +151,7 @@ fn canonical_output_is_identical_off_on_and_on_with_a_closed_port() {
         records[0].attribute("petri.metrics_interval_ms"),
         Some("1000")
     );
+    assert_eq!(records[0].attribute("petri.tick_traces"), Some("on"));
     assert_eq!(records[1].attribute("petri.status"), Some("completed"));
     assert_eq!(records[1].attribute("petri.tick"), Some("30"));
     // Thirty ticks fall inside one 1,000 ms interval: the run-end snapshot is
@@ -146,15 +163,27 @@ fn canonical_output_is_identical_off_on_and_on_with_a_closed_port() {
         .map(|snapshot| snapshot.tick())
         .collect();
     assert_eq!(ticks, [Some(30)]);
+    // So is its trace: the completion one.
+    let traces: Vec<(Option<u64>, Option<String>)> = receiver
+        .traces()
+        .iter()
+        .filter(|trace| trace.run_id() == Some(run_id.as_str()))
+        .map(|trace| {
+            let policy = trace.spans[0].attribute("petri.sample_policy");
+            (trace.tick(), policy.map(str::to_owned))
+        })
+        .collect();
+    assert_eq!(traces, [(Some(30), Some("run_end".to_owned()))]);
     let line = run_line(&on.stderr);
     assert_eq!(line["run"], run_id);
-    assert_eq!(line["exported"], "3");
+    assert_eq!(line["exported"], "4");
     assert_eq!(line["snapshots"], "1");
+    assert_eq!(line["traces"], "1");
 
     let closed = run("on", Some(&closed_endpoint()));
     let line = run_line(&closed.stderr);
     assert_eq!(line["exported"], "0");
-    assert_eq!(line["failed"], "3");
+    assert_eq!(line["failed"], "4");
 
     assert_eq!(on.canonical, off.canonical);
     assert_eq!(closed.canonical, off.canonical);
@@ -185,6 +214,25 @@ fn snapshots_every_10_ms_end_at_the_final_tick_sample() {
             pair[1].time_unix_nano().unwrap(),
         );
         assert!(later >= earlier + 1_000_000, "{earlier} then {later}");
+    }
+
+    let snapshot_ticks: Vec<u64> = snapshots
+        .iter()
+        .map(|snapshot| snapshot.tick().unwrap())
+        .collect();
+    let traces: Vec<ReceivedTrace> = receiver
+        .traces()
+        .into_iter()
+        .filter(|trace| trace.run_id() == Some(run_id.as_str()))
+        .collect();
+    assert!(!traces.is_empty());
+    assert_eq!(run_line(&on.stderr)["traces"], traces.len().to_string());
+    let mut trace_ticks = std::collections::BTreeSet::new();
+    for trace in &traces {
+        let tick = trace.tick().unwrap();
+        assert!(snapshot_ticks.contains(&tick), "trace tick {tick}");
+        assert!(trace_ticks.insert(tick), "two traces of tick {tick}");
+        assert_trace_shape(trace, &run_id, tick, TICKS);
     }
 
     let last = snapshots.last().unwrap();
@@ -277,10 +325,117 @@ fn snapshots_every_10_ms_end_at_the_final_tick_sample() {
     }
 }
 
+/// Six spans, `tick` then the phases, with IDs derived from the run and the
+/// tick, the identity attributes and `petri.phase` on each, and the sample
+/// policy the tick's snapshot implies.
+fn assert_trace_shape(trace: &ReceivedTrace, run_id: &str, tick: u64, last_tick: u64) {
+    let names: Vec<&str> = trace.spans.iter().map(|span| span.name.as_str()).collect();
+    let mut expected = vec!["tick"];
+    expected.extend(v3_telemetry::PHASES);
+    assert_eq!(names, expected);
+    let trace_id = format!("{}{tick:016x}", &run_id[..16]);
+    let policy = if tick == last_tick {
+        ["interval", "run_end"].as_slice()
+    } else {
+        ["interval"].as_slice()
+    };
+    for (index, span) in trace.spans.iter().enumerate() {
+        assert_eq!(span.trace_id, trace_id);
+        assert_eq!(span.span_id, format!("{:016x}", index + 1));
+        let parent = if index == 0 {
+            String::new()
+        } else {
+            format!("{:016x}", 1)
+        };
+        assert_eq!(span.parent_span_id, parent);
+        assert_eq!(span.attribute("petri.run_id"), Some(run_id));
+        assert_eq!(
+            span.attribute("petri.tick"),
+            Some(tick.to_string().as_str())
+        );
+        assert_eq!(span.attribute("petri.seed"), Some("7"));
+        assert!(span.attribute("petri.config_digest").is_some());
+        assert!(span.attribute("petri.recipe").is_some());
+        assert_eq!(span.attribute("petri.world"), Some("64x64"));
+        assert!(policy.contains(&span.attribute("petri.sample_policy").unwrap()));
+        assert_eq!(span.attribute("petri.phase"), Some(names[index]));
+        assert!(span.start_time_unix_nano <= span.end_time_unix_nano);
+    }
+    let root = &trace.spans[0];
+    assert!(trace.spans[1..].iter().all(|span| {
+        span.start_time_unix_nano >= root.start_time_unix_nano
+            && span.end_time_unix_nano <= root.end_time_unix_nano
+    }));
+    assert_eq!(trace.resource["service.name"], "v3-cli");
+}
+
+#[test]
+fn tick_traces_off_leave_the_snapshots_and_send_no_trace() {
+    let off = run_with("off", None, None, LIVING);
+    let receiver = Receiver::start();
+    let on = run_traced(
+        "on",
+        Some(receiver.endpoint()),
+        Some("10"),
+        Some("off"),
+        LIVING,
+    );
+    assert_eq!(on.canonical, off.canonical);
+    let line = run_line(&on.stderr);
+    assert_eq!(line["traces"], "0");
+    assert!(line["snapshots"].parse::<u64>().unwrap() >= 2, "{line:?}");
+    assert!(receiver.traces().is_empty());
+    assert!(!receiver.snapshots().is_empty());
+    let started = &receiver.records()[0];
+    assert_eq!(started.attribute("petri.tick_traces"), Some("off"));
+}
+
+#[test]
+fn an_invalid_tick_trace_switch_refuses_to_start_a_run_with_telemetry_on() {
+    for invalid in ["yes", "OFF", "1"] {
+        let output = command("on", Some(&closed_endpoint()), None, Some(invalid), SMALL);
+        assert!(!output.status.success(), "{invalid}");
+        assert!(output.stdout.is_empty(), "{invalid}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(v3_telemetry::TICK_TRACES_ENV), "{stderr}");
+    }
+}
+
+#[test]
+fn a_run_of_zero_ticks_takes_its_completion_snapshot_and_no_trace() {
+    let receiver = Receiver::start();
+    let reports = v3_telemetry::ReportSink::capture();
+    v3_cli::telemetry::install(
+        v3_telemetry::Telemetry::start_with(v3_telemetry::Options {
+            service: v3_telemetry::Service::Cli,
+            endpoint: receiver.endpoint().to_owned(),
+            limits: v3_telemetry::Limits::default(),
+            reports: reports.clone(),
+            metrics_interval: v3_telemetry::DEFAULT_METRICS_INTERVAL,
+            tick_traces: v3_telemetry::Switch::On,
+        }),
+        None,
+    );
+    let mut config = v3_core::config::SimulationConfig::default();
+    config.world.width = 16;
+    config.world.height = 16;
+    let mut out = Vec::new();
+    v3_cli::run_simulation(config, 7, 0, 10, &mut out).expect("the run completes");
+    let line = reports
+        .lines()
+        .iter()
+        .find_map(|line| parse_run_line(line))
+        .expect("the run's line");
+    assert_eq!(line["snapshots"], "1", "{line:?}");
+    assert_eq!(line["traces"], "0", "{line:?}");
+    assert_eq!(receiver.snapshots().len(), 1);
+    assert!(receiver.traces().is_empty());
+}
+
 #[test]
 fn an_invalid_metrics_interval_refuses_to_start_a_run_with_telemetry_on() {
     for invalid in ["0", "9", "3600001", "soon"] {
-        let output = command("on", Some(&closed_endpoint()), Some(invalid), SMALL);
+        let output = command("on", Some(&closed_endpoint()), Some(invalid), None, SMALL);
         assert!(!output.status.success(), "{invalid}");
         assert!(output.stdout.is_empty(), "{invalid}");
         let stderr = String::from_utf8(output.stderr).unwrap();

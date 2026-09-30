@@ -51,6 +51,7 @@ rust-test-all: rust-test-core-unit rust-test-creature-workflow rust-test-tempora
 
 rust-test-core-unit: ## Run v3-core unit tests.
 	@cargo test -p v3-core --lib
+	@cargo test -p v3-core --features telemetry-seams --lib
 
 rust-test-creature-workflow: ## Run v3-core creature workflow integration tests.
 	@cargo test -p v3-core --test creature_workflow_e2e

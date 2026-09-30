@@ -1,5 +1,6 @@
 #!/bin/sh
-# Dashboard and metric-name check for run snapshots (T21.F02).
+# Dashboard and metric-name check for run snapshots (T21.F02) and tick
+# traces (T21.F03).
 #
 # Usage: scripts/telemetry-dashboards-check
 #
@@ -15,11 +16,20 @@
 #      is stored under its Prometheus name (the lists below);
 #   3. every panel query of both dashboards, read from the JSON with node and
 #      evaluated through /api/ds/query with $run_id set to the run, returns
-#      data;
+#      data: a Prometheus target by its expr, a Tempo target by its query,
+#      queryType, tableType and limit, polled up to 120 s after the run (the
+#      live store cuts a block before search finds a trace), its row count
+#      recorded;
 #   4. petri_run_tick of the run has at least three samples with distinct,
 #      non-decreasing timestamps, the last at T;
 #   5. the run's Loki run.started line carries petri_metrics_interval_ms;
-#   6. after the scratch stack's own `down -v`, the external petri-telemetry
+#   6. the first Tick traces row's trace, from Tempo's /api/v2/traces, has six
+#      spans, tick and the five phases, each with petri.run_id, petri.tick
+#      and petri.sample_policy; the trace ID composed from the run ID and that
+#      tick answers with the same spans;
+#   7. that trace's petri.tick is one of the run's petri_run_tick values;
+#   8. the run's Loki run.started line carries petri_tick_traces;
+#   9. after the scratch stack's own `down -v`, the external petri-telemetry
 #      volume still exists when it existed at the start.
 # Prints one PASS or FAIL line per check, removes the scratch stack and volume
 # (scripts/telemetry-scratch.sh), and exits 1 when any check fails.
@@ -226,6 +236,7 @@ cargo build --release --quiet -p v3-cli --manifest-path "$root/Cargo.toml" --tar
 from_ms=$((($(date -u +%s) - 60) * 1000))
 note "running the workload, T=$ticks"
 OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 PETRI_TELEMETRY='' PETRI_TELEMETRY_METRICS_INTERVAL_MS='' \
+  PETRI_TELEMETRY_TICK_TRACES='' \
   "$root/scripts/bench-wait" "$root/target/release/v3-cli" --telemetry on run --seed 7 \
   --ticks "$ticks" --sample-every "$ticks" --config "$recipe" \
   >"$scratch/stdout" 2>"$scratch/stderr"
@@ -290,31 +301,53 @@ to_ms=$(($(date -u +%s) * 1000))
     const d = JSON.parse(fs.readFileSync(`${dir}/${file}`, "utf8"));
     for (const panel of d.panels) {
       for (const t of panel.targets || []) {
-        const query = { ...t, expr: t.expr.replaceAll("$run_id", runId), intervalMs: 1000, maxDataPoints: 500 };
+        const tempo = t.queryType === "traceql";
+        const query = tempo
+          ? { refId: t.refId, datasource: t.datasource, queryType: t.queryType, tableType: t.tableType,
+              limit: t.limit, query: t.query.replaceAll("$run_id", runId) }
+          : { ...t, expr: t.expr.replaceAll("$run_id", runId), intervalMs: 1000, maxDataPoints: 500 };
         const body = { queries: [query], from: String(from), to: String(to) };
-        console.log([d.uid, panel.title, t.refId, JSON.stringify(body)].join("\t"));
+        console.log([tempo ? "tempo" : "prometheus", d.uid, panel.title, t.refId, JSON.stringify(body)].join("\t"));
       }
     }
   }
 ' "$root/telemetry/grafana/dashboards" "$run_id" "$from_ms" "$to_ms" >"$scratch/queries.tsv"
-empty=
-total=0
-tab=$(printf '\t')
-while IFS="$tab" read -r uid title ref body; do
-  total=$((total + 1))
-  curl -sS --max-time 30 -X POST -H 'Content-Type: application/json' \
-    "$grafana/api/ds/query" -d "$body" >"$scratch/answer.json" || true
+# rows ANSWER REF: the answer's row count for REF; 0 for an error or an
+# answer that does not parse.
+rows() {
   "$node" -e '
     const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
     const result = (r.results || {})[process.argv[2]] || {};
-    const rows = (result.frames || []).some((f) =>
-      ((f.data && f.data.values) || []).some((column) => column.length > 0));
-    process.exit(!result.error && rows ? 0 : 1);
-  ' "$scratch/answer.json" "$ref" 2>/dev/null || empty="$empty [$uid / $title / $ref]"
+    const counts = (result.frames || []).map((f) =>
+      Math.max(0, ...((f.data && f.data.values) || []).map((column) => column.length)));
+    console.log(result.error ? 0 : counts.reduce((a, b) => a + b, 0));
+  ' "$1" "$2" 2>/dev/null || printf '0\n'
+}
+empty=
+total=0
+trace_rows=0
+tab=$(printf '\t')
+while IFS="$tab" read -r kind uid title ref body; do
+  total=$((total + 1))
+  waited=0
+  while :; do
+    curl -sS --max-time 30 -X POST -H 'Content-Type: application/json' \
+      "$grafana/api/ds/query" -d "$body" >"$scratch/answer.json" || true
+    count=$(rows "$scratch/answer.json" "$ref")
+    [ "$count" -eq 0 ] && [ "$kind" = tempo ] && [ "$waited" -lt 120 ] || break
+    sleep 5
+    waited=$((waited + 5))
+  done
+  if [ "$kind" = tempo ]; then
+    cp "$scratch/answer.json" "$scratch/tick-traces.json"
+    trace_rows=$count
+    note "$title: $count row(s) after ${waited} s"
+  fi
+  [ "$count" -gt 0 ] || empty="$empty [$uid / $title / $ref]"
 done <"$scratch/queries.tsv"
 status=0
 [ -z "$empty" ] || status=1
-check 'panel queries return data' "$status" "$total queries${empty:+; empty:$empty}"
+check 'panel queries return data' "$status" "$total queries, Tick traces $trace_rows row(s)${empty:+; empty:$empty}"
 
 # ── 4. tick samples ───────────────────────────────────────────────────────────
 get "/api/datasources/proxy/uid/prometheus/api/v1/query?query=petri_run_tick%7Bpetri_run_id%3D%22$run_id%22%7D%5B30m%5D" \
@@ -348,9 +381,89 @@ detail=$("$node" -e '
 ' "$scratch/started.json") && status=0 || status=1
 check 'run.started carries petri_metrics_interval_ms' "$status" "$detail"
 
-compose exec -T lgtm du -s /data/prometheus /data/loki || true
+# ── 6. trace content ──────────────────────────────────────────────────────────
+# shellcheck disable=SC2016 # JavaScript template literals.
+trace_id=$("$node" -e '
+  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  for (const f of (r.results || {}).A ? r.results.A.frames || [] : []) {
+    const names = ((f.schema && f.schema.fields) || []).map((field) => field.name);
+    const column = names.findIndex((name) => name === "traceIdHidden" || name === "traceID");
+    const values = column < 0 ? [] : f.data.values[column];
+    if (values.length > 0) { console.log(values[0]); process.exit(0); }
+  }
+  process.exit(1);
+' "$scratch/tick-traces.json" 2>/dev/null) || trace_id=
+# spans FILE: one line per span, `name tick policy run`, sorted; exits 1 when
+# the trace has no spans.
+spans() {
+  "$node" -e '
+    const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const t = r.trace || r;
+    const value = (v) => v.stringValue ?? v.intValue ?? v.doubleValue ?? v.boolValue;
+    const lines = [];
+    for (const batch of t.resourceSpans || t.batches || []) {
+      for (const scope of batch.scopeSpans || batch.instrumentationLibrarySpans || []) {
+        for (const span of scope.spans || []) {
+          const a = Object.fromEntries((span.attributes || []).map((kv) => [kv.key, value(kv.value || {})]));
+          lines.push([span.name, a["petri.tick"], a["petri.sample_policy"], a["petri.run_id"]].join(" "));
+        }
+      }
+    }
+    lines.sort();
+    console.log(lines.join("\n"));
+    process.exit(lines.length > 0 ? 0 : 1);
+  ' "$1" 2>/dev/null
+}
+status=1
+detail="no trace ID in the Tick traces answer"
+trace_tick=
+if [ -n "$trace_id" ]; then
+  get "/api/datasources/proxy/uid/tempo/api/v2/traces/$trace_id" >"$scratch/trace.json" || true
+  spans "$scratch/trace.json" >"$scratch/trace.txt" || true
+  trace_tick=$(sed -n 's/^tick \([0-9][0-9]*\) .*$/\1/p' "$scratch/trace.txt" | head -n 1)
+  expected=$(printf '%s\n' tick world_update sensor_assembly cognition actions reward_learning | sort)
+  names=$(cut -d ' ' -f 1 "$scratch/trace.txt")
+  complete=$(awk -v run="$run_id" 'NF == 4 && $4 == run { n++ } END { print n + 0 }' "$scratch/trace.txt")
+  detail="trace $trace_id: $(grep -c . "$scratch/trace.txt") span(s), tick ${trace_tick:-absent}"
+  if [ "$names" = "$expected" ] && [ "$complete" -eq 6 ] && [ -n "$trace_tick" ]; then
+    composed=$(printf '%s%016x' "$(printf '%s' "$run_id" | cut -c 1-16)" "$trace_tick")
+    get "/api/datasources/proxy/uid/tempo/api/v2/traces/$composed" >"$scratch/composed.json" || true
+    spans "$scratch/composed.json" >"$scratch/composed.txt" || true
+    if cmp -s "$scratch/trace.txt" "$scratch/composed.txt"; then
+      status=0
+      detail="$detail; composed ID $composed answers with the same spans"
+    else
+      detail="$detail; composed ID $composed does not answer with the same spans"
+    fi
+  fi
+fi
+check 'trace content' "$status" "$detail"
 
-# ── 6. volume survives ────────────────────────────────────────────────────────
+# ── 7. snapshot join ──────────────────────────────────────────────────────────
+# shellcheck disable=SC2016 # JavaScript template literals.
+detail=$("$node" -e '
+  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const ticks = ((r.data || {}).result || []).flatMap((s) => s.values || []).map((v) => v[1]);
+  const tick = process.argv[2];
+  console.log(`trace tick ${tick || "absent"} among petri_run_tick ${ticks.join(",")}`);
+  process.exit(tick !== "" && ticks.includes(tick) ? 0 : 1);
+' "$scratch/ticks.json" "${trace_tick:-}") && status=0 || status=1
+check 'trace joins a snapshot' "$status" "$detail"
+
+# ── 8. Loki run.started carries petri_tick_traces ─────────────────────────────
+# shellcheck disable=SC2016 # JavaScript template literals.
+detail=$("$node" -e '
+  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const streams = (r.data || {}).result || [];
+  const values = streams.map((s) => s.stream.petri_tick_traces).filter((v) => v !== undefined);
+  console.log(`petri_tick_traces=${values.join(",") || "absent"}`);
+  process.exit(values.length > 0 ? 0 : 1);
+' "$scratch/started.json") && status=0 || status=1
+check 'run.started carries petri_tick_traces' "$status" "$detail"
+
+compose exec -T lgtm du -s /data/prometheus /data/loki /data/tempo || true
+
+# ── 9. volume survives ────────────────────────────────────────────────────────
 scratch_stack_remove
 if [ "$production_volume" = present ]; then
   docker volume inspect petri-telemetry >/dev/null 2>&1 && status=0 || status=1

@@ -7,7 +7,7 @@ use v3_core::config::SimulationConfig;
 
 use super::*;
 use crate::queue::{Outcome, RunCounts};
-use crate::testing::{closed_endpoint, parse_run_line, Receiver};
+use crate::testing::{closed_endpoint, parse_run_line, ReceivedTrace, Receiver};
 
 /// Accepts every batch and snapshot at once.
 #[derive(Debug)]
@@ -19,18 +19,19 @@ impl LogExporter for AcceptAll {
     }
 }
 
-impl PostMetrics for AcceptAll {
-    fn post(&self, _body: Vec<u8>) -> Outcome {
+impl PostEncoded for AcceptAll {
+    fn post(&self, _signal: Signal, _body: Vec<u8>) -> Outcome {
         Outcome::Exported { rejected: 0 }
     }
 }
 
-/// Answers every snapshot with a partial success rejecting two data points.
+/// Answers every snapshot or trace with a partial success rejecting two data
+/// points or spans.
 #[derive(Debug)]
 struct RejectPoints;
 
-impl PostMetrics for RejectPoints {
-    fn post(&self, _body: Vec<u8>) -> Outcome {
+impl PostEncoded for RejectPoints {
+    fn post(&self, _signal: Signal, _body: Vec<u8>) -> Outcome {
         Outcome::Exported { rejected: 2 }
     }
 }
@@ -42,6 +43,7 @@ fn options(endpoint: &str, limits: Limits) -> Options {
         limits,
         reports: ReportSink::capture(),
         metrics_interval: DEFAULT_METRICS_INTERVAL,
+        tick_traces: Switch::On,
     }
 }
 
@@ -72,7 +74,7 @@ fn held() -> (Telemetry, ReportSink) {
     held_with(Limits::default(), AcceptAll)
 }
 
-fn held_with<M: PostMetrics + Send + 'static>(
+fn held_with<M: PostEncoded + Send + 'static>(
     limits: Limits,
     metrics: M,
 ) -> (Telemetry, ReportSink) {
@@ -728,4 +730,241 @@ fn a_snapshot_reaches_the_receiver_with_the_run_resource_and_census() {
             ),
         }
     }
+}
+
+/// Answers every trace with a partial success rejecting one span; accepts
+/// every snapshot.
+#[derive(Debug)]
+struct RejectSpans;
+
+impl PostEncoded for RejectSpans {
+    fn post(&self, signal: Signal, _body: Vec<u8>) -> Outcome {
+        match signal {
+            Signal::Metrics => Outcome::Exported { rejected: 0 },
+            Signal::Traces => Outcome::Exported { rejected: 1 },
+        }
+    }
+}
+
+/// `small_config`'s simulation after `ticks` ticks.
+fn ticked(config: &SimulationConfig, ticks: u64) -> Simulation {
+    let mut sim = simulation(config);
+    for _ in 0..ticks {
+        v3_core::simulation::run_tick(&mut sim, &mut None);
+    }
+    sim
+}
+
+#[test]
+fn a_tick_snapshot_takes_the_trace_of_the_tick_that_just_ran_and_only_then() {
+    let config = small_config();
+    let (telemetry, _) = held();
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    // No tick has run: the snapshot is taken, no trace.
+    let mut sim = simulation(&config);
+    assert!(telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd));
+    assert_eq!(counts(&telemetry, &run).traces, 0);
+    // A seam from an earlier tick is not this tick's.
+    v3_core::simulation::run_tick(&mut sim, &mut None);
+    sim.tick += 1;
+    assert!(telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd));
+    assert_eq!(counts(&telemetry, &run).traces, 0);
+    // A snapshot the cadence skips takes no trace.
+    v3_core::simulation::run_tick(&mut sim, &mut None);
+    assert!(!telemetry.tick_snapshot(&mut run, &sim, TickSample::Interval));
+    assert_eq!(counts(&telemetry, &run).traces, 0);
+    assert!(telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd));
+    let taken = counts(&telemetry, &run);
+    assert_eq!((taken.snapshots, taken.traces), (3, 1));
+    // A plain snapshot never takes one.
+    v3_core::simulation::run_tick(&mut sim, &mut None);
+    assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
+    assert_eq!(counts(&telemetry, &run).traces, 1);
+}
+
+#[test]
+fn tick_traces_off_take_snapshots_without_traces_and_say_so_on_run_started() {
+    let receiver = Receiver::start();
+    let config = small_config();
+    let sim = ticked(&config, 2);
+    let mut starts = Vec::new();
+    for switch in [Switch::On, Switch::Off] {
+        let options = Options {
+            tick_traces: switch,
+            ..options(receiver.endpoint(), Limits::default())
+        };
+        let reports = options.reports.clone();
+        let telemetry = Telemetry::start_with(options);
+        let mut run = telemetry.begin_run(start(&config)).unwrap();
+        assert!(telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd));
+        telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+        let line = run_line(&reports, &run);
+        let traces = if switch == Switch::On { "1" } else { "0" };
+        assert_eq!(line["traces"], traces, "{line:?}");
+        assert_eq!(line["snapshots"], "1", "{line:?}");
+        starts.push(run.id().to_owned());
+    }
+    let records = receiver.records();
+    let started = |id: &str| {
+        records
+            .iter()
+            .find(|record| {
+                record.event_name == "run.started" && record.attribute("petri.run_id") == Some(id)
+            })
+            .and_then(|record| record.attribute("petri.tick_traces"))
+            .map(str::to_owned)
+    };
+    assert_eq!(started(&starts[0]).as_deref(), Some("on"));
+    assert_eq!(started(&starts[1]).as_deref(), Some("off"));
+    let traces = receiver.traces();
+    assert_eq!(traces.len(), 1);
+    assert_eq!(traces[0].run_id(), Some(starts[0].as_str()));
+    assert_eq!(traces[0].tick(), Some(2));
+    assert_eq!(
+        traces[0].spans[0].attribute("petri.sample_policy"),
+        Some("run_end")
+    );
+    let record = records
+        .iter()
+        .find(|record| record.attribute("petri.run_id") == Some(starts[0].as_str()))
+        .unwrap();
+    assert_eq!(traces[0].resource, record.resource);
+    assert!(records
+        .iter()
+        .all(|record| record.attribute("petri.tick_traces_capped").is_none()));
+}
+
+#[test]
+fn trace_items_past_the_queue_bound_are_dropped_and_counted_as_taken() {
+    let config = small_config();
+    let limits = Limits {
+        max_queue_records: 3,
+        ..Limits::default()
+    };
+    let (telemetry, reports) = held_with(limits, AcceptAll);
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    let mut sim = ticked(&config, 1);
+    // `run.started`, a snapshot and a trace fill the queue; the next tick's
+    // snapshot and trace are dropped.
+    for _ in 0..2 {
+        assert!(telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd));
+        v3_core::simulation::run_tick(&mut sim, &mut None);
+    }
+    let queued = counts(&telemetry, &run);
+    assert_eq!(
+        (
+            queued.accepted,
+            queued.dropped,
+            queued.snapshots,
+            queued.traces
+        ),
+        (3, 2, 2, 2)
+    );
+    active(&telemetry).shared.release();
+    wait_for_drain(&telemetry, &run);
+    telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+    let line = run_line(&reports, &run);
+    assert_eq!(line["exported"], "4");
+    assert_eq!(line["dropped"], "2");
+    assert_eq!(line["traces"], "2");
+}
+
+#[test]
+fn a_trace_with_rejected_spans_counts_as_failed_with_no_bytes() {
+    let config = small_config();
+    let sim = ticked(&config, 1);
+    let outcome = |rejecting: bool| {
+        let (telemetry, reports) = if rejecting {
+            held_with(Limits::default(), RejectSpans)
+        } else {
+            held()
+        };
+        let mut run = telemetry.begin_run(start(&config)).unwrap();
+        telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd);
+        active(&telemetry).shared.release();
+        telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+        let line = run_line(&reports, &run);
+        (
+            line["exported"].clone(),
+            line["failed"].clone(),
+            line["bytes"].parse::<u64>().unwrap(),
+        )
+    };
+    let (exported, failed, accepted_bytes) = outcome(false);
+    assert_eq!((exported.as_str(), failed.as_str()), ("4", "0"));
+    let (exported, failed, rejected_bytes) = outcome(true);
+    assert_eq!((exported.as_str(), failed.as_str()), ("3", "1"));
+    // The trace's encoded request, over 1 KB, is not counted.
+    assert!(
+        accepted_bytes > rejected_bytes + 1_024,
+        "{accepted_bytes} vs {rejected_bytes}"
+    );
+}
+
+#[test]
+fn a_rejecting_or_garbling_collector_fails_the_trace_it_answers() {
+    let config = small_config();
+    let sim = ticked(&config, 1);
+    for receiver in [Receiver::rejecting(1), Receiver::garbled()] {
+        let options = options(receiver.endpoint(), Limits::default());
+        let reports = options.reports.clone();
+        let telemetry = Telemetry::start_with(options);
+        let mut run = telemetry.begin_run(start(&config)).unwrap();
+        telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd);
+        telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+        let line = run_line(&reports, &run);
+        assert_eq!(line["exported"], "0", "{line:?}");
+        assert_eq!(line["failed"], "4", "{line:?}");
+        assert_eq!(line["traces"], "1", "{line:?}");
+        assert_eq!(line["bytes"], "0", "{line:?}");
+    }
+}
+
+#[test]
+fn the_65536th_trace_is_the_last_captured_and_run_ended_says_so() {
+    let receiver = Receiver::start();
+    let options = options(receiver.endpoint(), Limits::default());
+    let reports = options.reports.clone();
+    let telemetry = Telemetry::start_with(options);
+    let config = small_config();
+    let mut sim = ticked(&config, 1);
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    run.traces_taken = MAX_TICK_TRACES_PER_RUN - 1;
+    assert!(telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd));
+    assert_eq!(run.traces_taken, MAX_TICK_TRACES_PER_RUN);
+    v3_core::simulation::run_tick(&mut sim, &mut None);
+    assert!(telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd));
+    assert_eq!(run.traces_taken, MAX_TICK_TRACES_PER_RUN);
+    telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+
+    let line = run_line(&reports, &run);
+    assert_eq!(line["traces"], "1", "{line:?}");
+    assert_eq!(line["snapshots"], "2", "{line:?}");
+    let ended = receiver
+        .records()
+        .into_iter()
+        .find(|record| record.event_name == "run.ended")
+        .unwrap();
+    assert_eq!(ended.attribute("petri.tick_traces_capped"), Some("65536"));
+    let ticks: Vec<Option<u64>> = receiver.traces().iter().map(ReceivedTrace::tick).collect();
+    assert_eq!(ticks, [Some(1)]);
+}
+
+#[test]
+fn a_trace_abandoned_by_the_flush_is_counted_for_its_run() {
+    let config = small_config();
+    let limits = Limits {
+        flush_timeout: Duration::from_millis(50),
+        ..Limits::default()
+    };
+    let (telemetry, reports) = held_with(limits, AcceptAll);
+    let sim = ticked(&config, 1);
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    assert!(telemetry.tick_snapshot(&mut run, &sim, TickSample::RunEnd));
+    telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+    let line = run_line(&reports, &run);
+    assert_eq!(line["exported"], "0", "{line:?}");
+    // `run.started`, the snapshot, the trace and `run.ended`.
+    assert_eq!(line["abandoned"], "4", "{line:?}");
+    assert_eq!(line["traces"], "1", "{line:?}");
 }

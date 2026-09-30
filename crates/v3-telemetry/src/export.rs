@@ -5,10 +5,11 @@
 //! decodes that response itself and adds its `rejected_log_records` to a
 //! counter the queue worker reads after each export, so rejected records are
 //! counted as failed. Run snapshots (T21.F02) are posted to `/v1/metrics` by
-//! [`MetricsClient`] on the same HTTP client, which reads the response's
-//! rejected data points itself. A success response whose body does not decode
-//! confirms nothing, so its request counts as failed; an empty body decodes
-//! to full acceptance.
+//! [`MetricsClient`] and tick traces (T21.F03) to `/v1/traces` by
+//! [`TracesClient`] on the same HTTP client; each reads its response's
+//! rejected data points or spans itself. A success response whose body does
+//! not decode confirms nothing, so its request counts as failed; an empty body
+//! decodes to full acceptance.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -20,9 +21,10 @@ use opentelemetry_otlp::{
 };
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceResponse;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceResponse;
+use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceResponse;
 use prost::Message;
 
-use crate::queue::{Outcome, PostMetrics};
+use crate::queue::{Outcome, PostEncoded, Signal};
 
 /// Records the collector rejected since the worker last took the count.
 #[derive(Debug, Default)]
@@ -69,6 +71,36 @@ impl HttpClient for CountingClient {
     }
 }
 
+/// Posts `body` to `url` with no retry; a success whose body decodes as `R`
+/// is exported with the count `rejected` reads from it.
+fn post_proto<R: Message + Default>(
+    client: &reqwest::blocking::Client,
+    url: &str,
+    body: Vec<u8>,
+    rejected: impl FnOnce(R) -> u64,
+) -> Outcome {
+    let response = client
+        .post(url)
+        .header("content-type", "application/x-protobuf")
+        .body(body)
+        .send();
+    let Ok(response) = response else {
+        return Outcome::Failed;
+    };
+    if !response.status().is_success() {
+        return Outcome::Failed;
+    }
+    let Ok(bytes) = response.bytes() else {
+        return Outcome::Failed;
+    };
+    match R::decode(bytes.as_ref()) {
+        Ok(decoded) => Outcome::Exported {
+            rejected: rejected(decoded),
+        },
+        Err(_) => Outcome::Failed,
+    }
+}
+
 /// Posts snapshots to the collector's `/v1/metrics`, with no retry.
 #[derive(Debug)]
 pub(crate) struct MetricsClient {
@@ -76,42 +108,67 @@ pub(crate) struct MetricsClient {
     url: String,
 }
 
-impl PostMetrics for MetricsClient {
+impl MetricsClient {
     fn post(&self, body: Vec<u8>) -> Outcome {
-        let response = self
-            .client
-            .post(&self.url)
-            .header("content-type", "application/x-protobuf")
-            .body(body)
-            .send();
-        let Ok(response) = response else {
-            return Outcome::Failed;
-        };
-        if !response.status().is_success() {
-            return Outcome::Failed;
-        }
-        let Ok(bytes) = response.bytes() else {
-            return Outcome::Failed;
-        };
-        let Ok(decoded) = ExportMetricsServiceResponse::decode(bytes.as_ref()) else {
-            return Outcome::Failed;
-        };
-        Outcome::Exported {
-            rejected: decoded
-                .partial_success
-                .map_or(0, |partial| count(partial.rejected_data_points)),
+        post_proto(
+            &self.client,
+            &self.url,
+            body,
+            |decoded: ExportMetricsServiceResponse| {
+                decoded
+                    .partial_success
+                    .map_or(0, |partial| count(partial.rejected_data_points))
+            },
+        )
+    }
+}
+
+/// Posts tick traces to the collector's `/v1/traces`, with no retry.
+#[derive(Debug)]
+pub(crate) struct TracesClient {
+    client: reqwest::blocking::Client,
+    url: String,
+}
+
+impl TracesClient {
+    fn post(&self, body: Vec<u8>) -> Outcome {
+        post_proto(
+            &self.client,
+            &self.url,
+            body,
+            |decoded: ExportTraceServiceResponse| {
+                decoded
+                    .partial_success
+                    .map_or(0, |partial| count(partial.rejected_spans))
+            },
+        )
+    }
+}
+
+/// The clients for the requests the worker encodes itself.
+#[derive(Debug)]
+pub(crate) struct EncodedClients {
+    metrics: MetricsClient,
+    traces: TracesClient,
+}
+
+impl PostEncoded for EncodedClients {
+    fn post(&self, signal: Signal, body: Vec<u8>) -> Outcome {
+        match signal {
+            Signal::Metrics => self.metrics.post(body),
+            Signal::Traces => self.traces.post(body),
         }
     }
 }
 
 /// Builds the OTLP/HTTP protobuf log exporter for `<endpoint>/v1/logs` and the
-/// metrics client for `<endpoint>/v1/metrics` on one HTTP client, with no
-/// retry.
+/// clients for `<endpoint>/v1/metrics` and `<endpoint>/v1/traces` on one HTTP
+/// client, with no retry.
 pub(crate) fn build(
     endpoint: &str,
     timeout: Duration,
     rejections: Arc<Rejections>,
-) -> Result<(LogExporter, MetricsClient), ExporterBuildError> {
+) -> Result<(LogExporter, EncodedClients), ExporterBuildError> {
     let base = endpoint.trim_end_matches('/');
     // reqwest's blocking client starts and stops its own runtime, which
     // panics on a thread that is already inside one (the server's main).
@@ -123,9 +180,15 @@ pub(crate) fn build(
     .join()
     .map_err(|_| ExporterBuildError::InternalFailure("HTTP client build panicked".to_owned()))?
     .map_err(|error| ExporterBuildError::InternalFailure(error.to_string()))?;
-    let metrics = MetricsClient {
-        client: inner.clone(),
-        url: format!("{base}/v1/metrics"),
+    let encoded = EncodedClients {
+        metrics: MetricsClient {
+            client: inner.clone(),
+            url: format!("{base}/v1/metrics"),
+        },
+        traces: TracesClient {
+            client: inner.clone(),
+            url: format!("{base}/v1/traces"),
+        },
     };
     let url = format!("{base}/v1/logs");
     let logs = LogExporter::builder()
@@ -136,5 +199,5 @@ pub(crate) fn build(
         .with_timeout(timeout)
         .with_retry_policy(RetryPolicy::disabled())
         .build()?;
-    Ok((logs, metrics))
+    Ok((logs, encoded))
 }

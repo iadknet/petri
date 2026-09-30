@@ -183,6 +183,35 @@ pub struct PhaseWallClock {
     pub reward_learning: Duration,
 }
 
+/// One timed phase of a tick: its start relative to the tick's start and the
+/// `Duration` `run_tick` added to [`PhaseWallClock`] for it (T21.F03).
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PhaseTiming {
+    pub offset: Duration,
+    pub elapsed: Duration,
+}
+
+/// The last tick's timing, for tick traces (T21.F03). Plain data, wall time
+/// only; `run_tick` overwrites it every tick and nothing reads it back.
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TickPhaseTimings {
+    /// The tick count after the tick (`sim.tick` once it returns).
+    pub tick: u64,
+    /// The population before phase 0.
+    pub population_start: usize,
+    /// The rayon threads in effect during the tick.
+    pub threads: usize,
+    /// When phase 0 started.
+    pub started: std::time::Instant,
+    /// From the tick's start to the end of its last phase's bookkeeping.
+    pub elapsed: Duration,
+    /// `world_update`, `sensor_assembly`, `cognition`, `actions`,
+    /// `reward_learning`, in order.
+    pub phases: [PhaseTiming; 5],
+}
+
 /// Observability counters for the simulation.
 ///
 /// Cumulative counters never reset. Per-tick counters are reset at the start
@@ -323,6 +352,9 @@ pub struct SimStats {
     // ── Phase wall-clock (cumulative, observational, never asserted) ─────────
     /// Cumulative wall-clock per tick phase (T10.F09).
     pub phase_wall_clock: PhaseWallClock,
+    /// The last tick's phase timings (T21.F03); `None` before the first tick.
+    #[cfg(feature = "telemetry-seams")]
+    pub last_tick_phases: Option<TickPhaseTimings>,
 
     // ── Predation cumulative ─────────────────────────────────────────────────
     pub predation_actions_attempted_total: u64,
