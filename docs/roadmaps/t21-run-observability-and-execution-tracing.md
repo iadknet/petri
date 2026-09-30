@@ -35,7 +35,7 @@ it stores is closure evidence.
 
 - [x] **T21.F01 — Local Telemetry Stack and Run Identity** — Depends on: None
   - Goal: Measurement tooling. One command starts a local stack that keeps its data until the user retires it, and a run started with the telemetry flag appears in it with its identity, full config and start and end status, while a stopped stack changes nothing about the run.
-- [ ] **T21.F02 — Run Metrics and Dashboards** — Depends on: T21.F01
+- [x] **T21.F02 — Run Metrics and Dashboards** — Depends on: T21.F01
   - Goal: Measurement tooling. The cumulative counters a run already keeps are exported per run as complete counts and its per-tick values as sampled gauges, and provisioned dashboards list runs and show one run's history against wall time and ticks.
 - [ ] **T21.F03 — Tick and Phase Tracing** — Depends on: T21.F02
   - Goal: Measurement tooling. A sampled tick becomes one short trace whose spans show how long each phase took and the config and world state in force, reachable from the run's dashboard.
