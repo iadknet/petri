@@ -125,12 +125,12 @@ exports; the counts, caps and sampling policies stay F02–F04's.
 
 ## Implementation Tasks
 
-- [ ] Preset resolution in `v3-telemetry` (`Options::from_env`,
+- [x] Preset resolution in `v3-telemetry` (`Options::from_env`,
       `WindowSettings`): the four presets, per-setting override, invalid
       refuses, `petri.preset` on `run.started`, the effective settings on
       the stderr start line, preset scrubbing in the three fixture helpers;
       unit tests first.
-- [ ] `scripts/telemetry-stats.mjs` (median, order-statistic interval,
+- [x] `scripts/telemetry-stats.mjs` (median, order-statistic interval,
       verdict) with `scripts/telemetry-stats.test.mjs` under `make check`;
       `scripts/telemetry-overhead` gains `PETRI_OVERHEAD_MODE=qualify`
       (worlds, cells, presets, storage blocks, cap 3,600 s,
@@ -139,7 +139,9 @@ exports; the counts, caps and sampling policies stay F02–F04's.
       shared statistic and pair table in routine mode, ceiling 1.05.
 - [ ] Default flip: `resolve_switch`, `Switch::default`, the three help
       texts, the three `…_default_off` tests become `…_default_on`;
-      `--telemetry off` at the thirteen spawn sites.
+      `--telemetry off` at the thirteen spawn sites (done: a per-file
+      `TELEMETRY_OFF` constant, empty without the `telemetry` feature; the
+      flip itself waits for a pass).
 - [ ] Parent comparison against `8b0a158f`, T = 6908.
 - [ ] The qualifying measurement, once, recorded in
       `docs/progress/readings/t21-f05.md`; D5 applied; the Measured verdict
@@ -147,22 +149,29 @@ exports; the counts, caps and sampling policies stay F02–F04's.
 
 ## Verification
 
-- [ ] `cargo test -p v3-telemetry` -> preset resolution (each preset's
+- [x] `cargo test -p v3-telemetry` -> preset resolution (each preset's
       values, override precedence, invalid refuses, default `standard`),
       `petri.preset` on `run.started` and the stderr start line's settings;
       the neutrality and measurement fixtures pass with
       `PETRI_TELEMETRY_PRESET=minimal` exported in the caller's environment.
+      Ran `PETRI_TELEMETRY_PRESET=minimal cargo test -p v3-telemetry -p v3-cli
+      -p v3-lab -p v3-server`: all pass (v3-telemetry lib 65, v3-cli
+      telemetry 13 with `a_preset_sets_the_base_settings_…`); without the
+      scrub four v3-cli fixtures failed under that export.
 - [ ] `cargo test -p v3-cli`, `-p v3-server`, `-p v3-lab` -> the switch
       tests: `resolve_switch(None, None)` is `On`, `--telemetry off` beats
       `PETRI_TELEMETRY=on`, `PETRI_TELEMETRY=off` beats the default; the
       neutrality test unchanged.
-- [ ] Every `CARGO_BIN_EXE` spawn in `crates/*/tests` passes
+- [x] Every `CARGO_BIN_EXE` spawn in `crates/*/tests` passes
       `--telemetry off`, or `--telemetry <switch>` explicitly in a
       telemetry fixture (reviewer grep against the diff); `make check`
       passes with the stack down and `PETRI_TELEMETRY` unset.
-- [ ] `node --test scripts/telemetry-stats.test.mjs` -> median, interval
+      `.args(TELEMETRY_OFF)` at the thirteen sites; `env -u PETRI_TELEMETRY
+      make check` exit 0 with no stack running (before the flip).
+- [x] `node --test scripts/telemetry-stats.test.mjs` -> median, interval
       ranks and verdict on fixed inputs, including the strict comparison
       at exactly 1.05 and a voided pair entering as an infinite ratio.
+      12 tests pass; `make quality-check` runs the file.
 - [ ] `scripts/telemetry-parent-compare 8b0a158f` -> identical canonical
       output; transcript in the readings file.
 - [ ] `PETRI_OVERHEAD_MODE=qualify scripts/telemetry-overhead` -> the

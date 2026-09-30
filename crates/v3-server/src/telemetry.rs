@@ -226,6 +226,7 @@ mod tests {
             metrics_interval: Duration::from_secs(3_600),
             tick_traces: v3_telemetry::Switch::On,
             windows: v3_telemetry::WindowSettings::default(),
+            preset: v3_telemetry::Preset::Standard,
         }));
         let mut first = seed_simulation(config(), 1);
         telemetry.begin(&first.config, 1);

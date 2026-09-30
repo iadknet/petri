@@ -65,6 +65,7 @@ fn cli(cwd: &Path, args: &[&str], endpoint: Option<&str>, env: &[(&str, &str)]) 
         v3_telemetry::CREATURE_WINDOWS_ENV,
         v3_telemetry::WINDOW_TICKS_ENV,
         v3_telemetry::WINDOW_INTERVAL_ENV,
+        v3_telemetry::PRESET_ENV,
     ] {
         command.env_remove(name);
     }

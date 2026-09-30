@@ -148,7 +148,7 @@ policy-check: ## Validate roadmap, repository, provenance, and retirement policy
 
 quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
 	@scripts/quality-check
-	@$(AQUA_ROOT_DIR)/bin/node --test scripts/benchmark-artifacts.test.mjs scripts/historical-benchmarks.test.mjs
+	@$(AQUA_ROOT_DIR)/bin/node --test scripts/benchmark-artifacts.test.mjs scripts/historical-benchmarks.test.mjs scripts/telemetry-stats.test.mjs
 	@scripts/bench-wait-test
 	@sh scripts/rust-mutants-test
 	@sh scripts/dev-sh-test

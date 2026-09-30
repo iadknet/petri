@@ -16,6 +16,13 @@ use std::path::PathBuf;
 use proptest::prelude::*;
 use v3_cli::bench;
 
+/// Spawned binaries run with `--telemetry off` (T21.F05): no test exports or
+/// depends on a stack. The flag exists only with the `telemetry` feature.
+#[cfg(feature = "telemetry")]
+const TELEMETRY_OFF: &[&str] = &["--telemetry", "off"];
+#[cfg(not(feature = "telemetry"))]
+const TELEMETRY_OFF: &[&str] = &[];
+
 /// Repository root, derived from `CARGO_MANIFEST_DIR` (`crates/v3-cli`) so the
 /// test does not depend on the working directory `cargo test` was invoked
 /// from.
@@ -338,6 +345,7 @@ fn wall_clock_levels_are_strict_at_their_thresholds() {
 fn bench_subcommand_writes_a_report_and_rejects_zero_threads() {
     let sweep_args = |threads: &str, out: &std::path::Path| {
         let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"));
+        command.args(TELEMETRY_OFF);
         command.args([
             "bench",
             "--profile",
@@ -419,6 +427,7 @@ fn sweep_output_and_reference_selection_stay_separate_from_goal() {
         std::env::temp_dir().join(format!("t01-f12-sweep-missing-out-{}", std::process::id()));
     std::fs::create_dir_all(&missing_out_dir).expect("create isolated working directory");
     let rejected = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+        .args(TELEMETRY_OFF)
         .args(base_args)
         .current_dir(&missing_out_dir)
         .output()
@@ -439,6 +448,7 @@ fn sweep_output_and_reference_selection_stay_separate_from_goal() {
         std::process::id()
     ));
     let accepted = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+        .args(TELEMETRY_OFF)
         .args(base_args)
         .args(["--out", out.to_str().expect("UTF-8 output path")])
         .arg("--summary-out")
@@ -990,6 +1000,7 @@ fn world_inspect_prints_readings_writes_a_preview_and_rejects_a_missing_recipe()
 
     let inspect = |args: &[&std::path::Path]| {
         let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"));
+        command.args(TELEMETRY_OFF);
         command.args(["world", "inspect", "--seed", "11", "--config"]);
         command.args(args);
         command.output().expect("the v3-cli binary must run")
@@ -1051,6 +1062,7 @@ fn world_inspect_prints_readings_writes_a_preview_and_rejects_a_missing_recipe()
     // A seed that is not a number is rejected by argument parsing, before any
     // world is built. clap exits 2 for a usage error rather than 1.
     let bad_seed = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+        .args(TELEMETRY_OFF)
         .args(["world", "inspect", "--seed", "later", "--config"])
         .arg(&recipe)
         .output()
@@ -1068,6 +1080,7 @@ fn world_inspect_prints_readings_writes_a_preview_and_rejects_a_missing_recipe()
 fn an_explicit_compare_path_is_preferred_over_the_profile_default_selection() {
     let sweep = |out: &std::path::Path, compare: Option<&std::path::Path>| {
         let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"));
+        command.args(TELEMETRY_OFF);
         command
             .args([
                 "bench",
