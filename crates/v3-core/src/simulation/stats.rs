@@ -355,13 +355,19 @@ pub struct SimStats {
     /// The last tick's phase timings (T21.F03); `None` before the first tick.
     #[cfg(feature = "telemetry-seams")]
     pub last_tick_phases: Option<TickPhaseTimings>,
-    /// The creature a trace records this tick (T21.F04); set by `run_tick`
-    /// at the tick's start, `None` untraced.
+    /// The creature a trace records (T21.F04): set by `run_tick` at each
+    /// tick's start (`None` untraced) or by `Simulation::observe_creature`
+    /// when a sample starts between ticks, and kept until the next.
     #[cfg(feature = "telemetry-seams")]
     pub observed_creature: Option<crate::contracts::CreatureId>,
-    /// Why the observed creature was removed this tick, by any path.
+    /// The observed creature's removal and its cause, by any path, during a
+    /// tick or between ticks; kept across ticks and read by key
+    /// ([`Self::removal_of`]).
     #[cfg(feature = "telemetry-seams")]
-    pub observed_removal: Option<super::energy_accounting::DeathCause>,
+    pub observed_removal: Option<(
+        crate::contracts::CreatureId,
+        super::energy_accounting::DeathCause,
+    )>,
     /// Energy predators stole from the observed creature this tick.
     #[cfg(feature = "telemetry-seams")]
     pub observed_damage: f32,
@@ -465,11 +471,21 @@ impl SimStats {
         self.last_tick_food_grazed_cell_share_by_type.clear();
         #[cfg(feature = "telemetry-seams")]
         {
-            self.observed_creature = None;
-            self.observed_removal = None;
             self.observed_damage = 0.0;
             self.observed_actions.clear();
         }
+    }
+
+    /// Why `id` was removed while observed, if it was.
+    #[cfg(feature = "telemetry-seams")]
+    #[must_use]
+    pub fn removal_of(
+        &self,
+        id: crate::contracts::CreatureId,
+    ) -> Option<super::energy_accounting::DeathCause> {
+        self.observed_removal
+            .filter(|&(removed, _)| removed == id)
+            .map(|(_, cause)| cause)
     }
 
     pub fn record_food_growth_summary(&mut self, summary: FoodGrowthSummary) {

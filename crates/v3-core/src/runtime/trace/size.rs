@@ -68,8 +68,13 @@ impl MeshHopTrace {
     /// The hop record's bytes, backend trace included.
     #[must_use]
     pub fn retained_bytes(&self) -> u64 {
-        size_of::<Self>() as u64
-            + buffer(&self.input_refs)
+        size_of::<Self>() as u64 + self.heap_bytes()
+    }
+
+    /// Bytes the hop record owns beyond its own `size_of`.
+    #[must_use]
+    pub fn heap_bytes(&self) -> u64 {
+        buffer(&self.input_refs)
             + self
                 .route
                 .as_ref()
@@ -102,8 +107,14 @@ impl TickTrace {
     /// hop and pass record and its outcome.
     #[must_use]
     pub fn retained_bytes(&self) -> u64 {
-        size_of::<Self>() as u64
-            + buffer(&self.final_actions)
+        size_of::<Self>() as u64 + self.heap_bytes()
+    }
+
+    /// Bytes the tick record owns beyond its own `size_of`, which lives in
+    /// the recording's tick buffer.
+    #[must_use]
+    pub fn heap_bytes(&self) -> u64 {
+        buffer(&self.final_actions)
             + spare(&self.hops)
             + self
                 .hops
@@ -121,13 +132,15 @@ impl TickTrace {
 }
 
 /// What a recorded tick reserves against the caps before its first hop.
+/// The tick record's fixed part is not in it: that is a slot of the
+/// recording's tick buffer, charged when the buffer grows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TickReserve {
     /// `max_actions_per_turn` applied-action events.
     pub events: u32,
-    /// The tick record's fixed part, `max_actions_per_turn` selected and
-    /// applied action records, the outcome's food banks at the configured
-    /// type count, and the recorder's hop preallocation (`max_mesh_hops`).
+    /// `max_actions_per_turn` selected and applied action records, the
+    /// outcome's food banks at the configured type count, and the
+    /// recorder's hop preallocation (`max_mesh_hops`).
     pub bytes: u64,
 }
 
@@ -137,8 +150,7 @@ impl TickReserve {
         let actions = config.runtime.max_actions_per_turn;
         let types = config.world.food.types.len();
         let hops = config.runtime.max_mesh_hops.max(1) as usize;
-        let bytes = size_of::<TickTrace>()
-            + actions * (size_of::<WorldAction>() + size_of::<AppliedAction>())
+        let bytes = actions * (size_of::<WorldAction>() + size_of::<AppliedAction>())
             + types * (size_of::<f32>() + size_of::<[f32; 8]>() + size_of::<[f32; 7]>())
             + hops * size_of::<MeshHopTrace>();
         Self {

@@ -625,6 +625,52 @@ async fn a_window_exports_under_step_and_a_manual_sample_at_hand_over() {
     assert_eq!(line["windows"], "4");
 }
 
+/// Paints a barrier over the creature `id`, between ticks.
+async fn paint_over(state: &AppState, app: &axum::Router, id: u64) {
+    let position = {
+        let handle = state.sim.lock().await;
+        let key = slotmap::KeyData::from_ffi(id).into();
+        handle.sim.creatures[key].position
+    };
+    let body = format!(
+        r#"{{"tool":"barrier","brush_half_extent":0,"points":[{{"x":{},"y":{}}}]}}"#,
+        position.x, position.y
+    );
+    call(app, "POST", "/v3/simulation/paint", &body).await;
+}
+
+#[tokio::test]
+async fn a_creature_painted_over_between_ticks_ends_its_sample_as_died() {
+    for recorded_first in [false, true] {
+        let receiver = Receiver::start();
+        let (telemetry, _) = windowed(receiver.endpoint(), 3_600_000);
+        let (state, app) = paused(telemetry).await;
+        let id = some_creature(&state).await;
+        let uri = format!("/v3/simulation/creature/{id}/sample");
+        call(&app, "POST", &uri, r#"{"ticks":3}"#).await;
+        if recorded_first {
+            steps(&app, 1).await;
+        }
+        paint_over(&state, &app, id).await;
+        steps(&app, 1).await;
+        assert_eq!(call(&app, "GET", &uri, "").await["status"], "complete");
+        state.shutdown_telemetry().await;
+
+        let roots = roots(&receiver);
+        let manual = roots
+            .iter()
+            .find(|root| root.attribute("petri.sample_policy") == Some("manual"))
+            .expect("the manual sample was exported");
+        assert_eq!(
+            manual.attribute("petri.died"),
+            Some("external_removal"),
+            "recorded_first={recorded_first}"
+        );
+        let recorded = if recorded_first { "1" } else { "0" };
+        assert_eq!(manual.attribute("petri.ticks_recorded"), Some(recorded));
+    }
+}
+
 #[tokio::test]
 async fn a_second_start_replaces_the_first_and_one_inside_the_interval_is_skipped() {
     let receiver = Receiver::start();

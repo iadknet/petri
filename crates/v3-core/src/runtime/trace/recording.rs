@@ -38,13 +38,16 @@ pub struct ActiveTrace {
     pub ticks: Vec<TickTrace>,
     /// Whether to capture extended perception debug snapshots per tick.
     pub include_perception_debug: bool,
-    /// The caps this recording keeps under; `None` records everything.
+    /// The caps this recording keeps under; `None` records everything. A
+    /// budgeted recording starts from [`Self::budgeted`], whose tick buffer
+    /// holds no uncharged slot.
     #[cfg(feature = "telemetry-seams")]
     pub budget: Option<TraceBudget>,
     /// Events retained so far.
     #[cfg(feature = "telemetry-seams")]
     pub events: u32,
-    /// Bytes retained so far.
+    /// Bytes retained so far: the tick buffer at capacity and every
+    /// record's own buffers.
     #[cfg(feature = "telemetry-seams")]
     pub bytes: u64,
     /// Set once, when a record did not fit the budget; the recording then
@@ -52,7 +55,8 @@ pub struct ActiveTrace {
     #[cfg(feature = "telemetry-seams")]
     pub truncated: Option<Truncation>,
     /// The removal cause of a creature gone at a tick's start, recorded in
-    /// that tick (for example a phase-0 death).
+    /// that tick: a phase-0 death, a removal between ticks, or one in an
+    /// earlier tick of a recording still running.
     #[cfg(feature = "telemetry-seams")]
     pub removed: Option<crate::simulation::energy_accounting::DeathCause>,
 }
@@ -76,6 +80,19 @@ impl ActiveTrace {
             #[cfg(feature = "telemetry-seams")]
             removed: None,
         }
+    }
+
+    /// A recording of `num_ticks` ticks kept under `budget`. Its tick buffer
+    /// starts empty and grows one slot per recorded tick, each charged to
+    /// `bytes` before it is allocated, so the counter covers every buffer
+    /// the recording holds.
+    #[cfg(feature = "telemetry-seams")]
+    #[must_use]
+    pub fn budgeted(creature_id: CreatureId, num_ticks: u32, budget: TraceBudget) -> Self {
+        let mut trace = Self::new(creature_id, 0);
+        trace.ticks_remaining = num_ticks;
+        trace.budget = Some(budget);
+        trace
     }
 
     /// Whether recording is complete (all requested ticks captured).

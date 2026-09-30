@@ -335,6 +335,28 @@ fn a_manual_sample_past_2048_events_is_cut_at_encoding_and_marked_truncated() {
     assert_eq!(root.attribute("petri.truncated_tick"), Some("2"));
 }
 
+#[test]
+fn a_tick_allocates_no_more_events_than_the_allowance_left() {
+    let (mut trace, _) = recorded(1);
+    let hop = trace.ticks[0].hops[0].clone();
+    trace.ticks[0].hops = vec![hop; 100];
+    let record = &trace.ticks[0];
+    for allowance in [0, 1, 5, 99] {
+        let mut left = allowance;
+        let (events, cut) = tick_events(record, 0, 0, &mut left);
+        assert_eq!(events.len(), allowance as usize);
+        assert!(events.capacity() <= allowance as usize, "{allowance}");
+        assert!(cut);
+        assert_eq!(left, 0);
+    }
+    let total = record.hops.len() + record.passes.len();
+    let mut left = 2_048;
+    let (events, cut) = tick_events(record, 0, 0, &mut left);
+    assert!(!cut);
+    assert!(events.len() >= total);
+    assert_eq!(left as usize, 2_048 - events.len());
+}
+
 // ── Through the exporter ────────────────────────────────────────────────
 
 fn telemetry(receiver: &Receiver, limits: Limits, interval_ms: u64) -> (Telemetry, ReportSink) {
