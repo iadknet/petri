@@ -1,6 +1,6 @@
 # T21.F02 — Run Metrics and Dashboards
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-30
 **Feature**: T21.F02
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -319,31 +319,31 @@ method is F01's, unchanged, with T = 6908 fixed:
 
 ## Success Criteria
 
-- [ ] A `v3-cli run --telemetry on` run and a `v3-server --telemetry on` run
+- [x] A `v3-cli run --telemetry on` run and a `v3-server --telemetry on` run
       appear in Prometheus with every scalar family in the table and every
       map family with a key, each series carrying `petri_run_id`, and the
       last snapshot of a run holds its final counts.
-- [ ] `Petri / Runs` lists runs with identity and links to `Petri / Run`,
+- [x] `Petri / Runs` lists runs with identity and links to `Petri / Run`,
       which shows the selected run against wall time and against ticks, and
       `scripts/telemetry-dashboards-check` passes, including the line that
       shows a scratch project's `down -v` leaves `petri-telemetry` in place.
-- [ ] The neutrality, encoding, bounds and server tests pass inside
+- [x] The neutrality, encoding, bounds and server tests pass inside
       `make check` without Docker; the interval setting is process-level and
       recorded on `run.started`.
-- [ ] The parent comparison is identical and the overhead check passes in
+- [x] The parent comparison is identical and the overhead check passes in
       states (a) and (b), with the idle-stack cost and the self-timed cost
       per tick recorded.
 
 ## Notes for AI Agents
 
-- Decision: F02 exports every cumulative `SimStats` field and no more; a
-  counter a later mechanism feature adds ships its own family under the
-  naming rule above (track ownership note, applied 2026-09-30).
+- Decision: F02 exports every cumulative `SimStats` field; a later
+  feature's counter ships its own family under the naming rule.
 - Decision: keys sharing an `as_key()` string (`WorldInputKey` across food
   types) are summed into one series.
-- Decision: the interval variable is read only when telemetry is on.
-- Decision: the interval counts from `run.started`; a run's first
-  transition snapshot needs no 10 ms gap.
+- Decision: the interval is read only with telemetry on and counts from
+  `run.started`; a first transition snapshot needs no 10 ms gap.
+- Cost: `/usage` awaiting; 3 passes (advisor 2, 2, 2); 3 spec-owner
+  resumes; 2 Codex rounds, `ready`; review 1 P1, fixed.
 - Decision: `reproductive_success.<x>` names follow the table; other
   `_sum` fields keep `_sum`.
 - Decision: the check script lists the 36 map families the workload keys.
