@@ -1,6 +1,6 @@
 # T21.F05 — Qualified Sampling Defaults
 
-**Status**: Blocked
+**Status**: In Progress
 **Last updated**: 2026-09-30
 **Feature**: T21.F05
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -228,7 +228,7 @@ Qualifying measurement, method fixed before any run:
 | Command | `PETRI_OVERHEAD_MODE=qualify scripts/telemetry-overhead`, every timed run under `scripts/bench-wait`, on the scratch stack `petri-telemetry-overhead`; the orchestrator has stopped the host's other containers, and no build, test, server or other measurement runs alongside |
 | Isolation | the script removes every `PETRI_TELEMETRY*` and `OTEL_*` variable from the timed runs' environment, sets `OTEL_EXPORTER_OTLP_ENDPOINT` to the scratch stack's `http://127.0.0.1:4318` and `PETRI_TELEMETRY_PRESET` to the preset under test, and checks every telemetry run's stderr start line against the preset table (invariant 3), voiding the pair on a mismatch; the first line of each cell is printed for the readings |
 | Worlds | W1, default-size: `v3-cli run --seed 7 --ticks T1 --sample-every T1` with no `--config` (the built-in default: 1600×1600, 10,000 founders); W2, small: F01's workload, `--config telemetry/overhead-world.json` (128×128, 256 founders), T = 6908 |
-| T1 | calibrated once by F01's rule aimed at 5 s, starting at 20 ticks (not F01's 1,000, which is minutes on this world): three reference runs, each at the tick count the previous one scales to 5 s, the third must take 4 to 6 s; charged to the cap; printed as `- Default-world ticks T1: N` for the readings file and fixed for later closures (about 45–60 from the probe) |
+| T1 | calibrated once, charged to the cap, by a bracketing search on the reference build aimed at 4 to 6 s: three runs as F01's rule, starting at 20 ticks, each at the count the previous run scales to 5 s; if the third run is outside the band, the search continues by bisection between the nearest counts measured below and above the band (when no run has landed above it, the next count is the one the last run scales to 6 s), up to five more runs; the first count whose run lands in 4 to 6 s is T1, printed as `- Default-world ticks T1: N` for the readings file and fixed for later closures; if none lands in the band within eight runs the attempt stops as inconclusive for the user. Linear scaling alone fails on this world because its per-tick cost steps up near tick 41 (attempt 1: ticks 1–40 about 97 ms, 41–48 about 255 ms; 40 ticks 3,895 ms, 48 ticks 5,939 ms), so the bracket 40–48 resolves in one or two bisection runs (about 44–46) |
 | Init | three reference runs of `--ticks 1` per world; the median is an upper bound on a run's start-up share (it holds one tick: about 0.25 s, 5% of a W1 run; under 10% of a W2 run), recorded so a reader sees the most the ratio can be diluted; no correction is applied |
 | Reference | the same commit built with `--no-default-features`, always run with the stack stopped |
 | Spread | five consecutive reference runs per world after calibration; spread = (max − min) / median |
