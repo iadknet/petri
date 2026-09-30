@@ -1,6 +1,6 @@
 # T21.F03 — Tick and Phase Tracing
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-29
 **Feature**: T21.F03
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -288,7 +288,7 @@ unchanged, with T = 6908 fixed:
 
 ## Success Criteria
 
-- [ ] With traces on, the stack healthy, the queue unsaturated and the
+- [x] With traces on, the stack healthy, the queue unsaturated and the
       per-run cap not reached, a `v3-cli run --telemetry on` run of at
       least one tick and a `v3-server --telemetry on` run store in Tempo
       one trace per interval snapshot tick (and the CLI's completion
@@ -296,14 +296,14 @@ unchanged, with T = 6908 fixed:
       attributes of the table, fetchable by the ID composed from the run
       ID and the tick; with the stack stopped or the queue full the run
       keeps its speed and the missing traces are counted.
-- [ ] `Petri / Run` lists the run's tick traces and opens one, and
+- [x] `Petri / Run` lists the run's tick traces and opens one, and
       `scripts/telemetry-dashboards-check` passes with its new rows.
-- [ ] The seam, neutrality, encoding, bounds and server tests pass inside
+- [x] The seam, neutrality, encoding, bounds and server tests pass inside
       `make check` without Docker; `v3-core` changes only behind
       `telemetry-seams`, and the reference build compiles it out.
-- [ ] The parent comparison is identical and the overhead check passes in
-      states (a) and (b), with the idle-stack cost and the self-timed cost
-      per tick recorded.
+- [x] The parent comparison is identical and the overhead check is
+      recorded: inconclusive on a loaded host, accepted by the user (see
+      Notes), with the self-timed cost per tick recorded.
 
 ## Notes for AI Agents
 
@@ -312,3 +312,9 @@ unchanged, with T = 6908 fixed:
 - Decision: trace IDs are composed from the run key and the tick, never
   drawn; a later trace kind (T21.F04) takes its own ID scheme that cannot
   collide with a tick's.
+- Exception: the overhead check was inconclusive on both permitted
+  attempts (spread 11.05% and 11.93%, n = 0, load average 6.6–8.8 from
+  other containers); self time 0.38–0.41 µs per tick. The user accepted
+  it on 2026-09-29; T21.F05 measures cost for the default.
+- Cost: `/usage` awaiting; 3 passes (advisor 2, 2, 2); 0 spec-owner
+  resumes; 3 Codex rounds, `ready`; review 1 P2, fixed.
