@@ -39,7 +39,7 @@ it stores is closure evidence.
   - Goal: Measurement tooling. The cumulative counters a run already keeps are exported per run as complete counts and its per-tick values as sampled gauges, and provisioned dashboards list runs and show one run's history against wall time and ticks.
 - [x] **T21.F03 — Tick and Phase Tracing** — Depends on: T21.F02
   - Goal: Measurement tooling. A sampled tick becomes one short trace whose spans show how long each phase took and the config and world state in force, reachable from the run's dashboard.
-- [ ] **T21.F04 — Creature Cognition Windows** — Depends on: T21.F02
+- [x] **T21.F04 — Creature Cognition Windows** — Depends on: T21.F02
   - Goal: Measurement tooling. A selected creature is recorded for a short run of consecutive ticks, showing what it sensed, how its brain routed and voted, what it chose, what the world actually applied and what changed in its state, reachable from the run's dashboard.
 - [ ] **T21.F05 — Qualified Sampling Defaults** — Depends on: T21.F03, T21.F04, T21.F06
   - Goal: Measurement tooling. The cost of each level of detail is measured, the user sets the default's ceiling from it with 5% as the target, the default export cadences and sampling caps are chosen to stay under it with margin, with named presets and their measured time and storage costs, and telemetry becomes on by default in every binary.

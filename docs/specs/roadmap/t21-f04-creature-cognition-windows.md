@@ -1,6 +1,6 @@
 # T21.F04 — Creature Cognition Windows
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-30
 **Feature**: T21.F04
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -335,7 +335,7 @@ unchanged, with T = 6908 fixed:
 
 ## Success Criteria
 
-- [ ] With windows on, the stack healthy, the queue unsaturated and the
+- [x] With windows on, the stack healthy, the queue unsaturated and the
       per-run caps not reached, a `v3-cli run --telemetry on` run of at
       least one tick with a living population and a `v3-server --telemetry
       on` run store in Tempo
@@ -346,12 +346,12 @@ unchanged, with T = 6908 fixed:
       sample is stored with policy `manual`; with the stack stopped or the
       queue full the run keeps its speed and the missing windows are
       counted.
-- [ ] `Petri / Run` lists the run's windows and opens one, and
+- [x] `Petri / Run` lists the run's windows and opens one, and
       `scripts/telemetry-dashboards-check` passes with its new rows.
-- [ ] The viability, seam, neutrality, encoding, bounds and server tests
+- [x] The viability, seam, neutrality, encoding, bounds and server tests
       pass inside `make check` without Docker; `v3-core` changes only
       behind `telemetry-seams`, and the reference build compiles them out.
-- [ ] The parent comparison is identical and the overhead check, the
+- [x] The parent comparison is identical and the overhead check, the
       self-timed cost and the per-creature-tick reading are recorded with
       the verdicts above.
 
@@ -371,3 +371,7 @@ unchanged, with T = 6908 fixed:
 - Exception: plan committed after round 3 `not-ready` (user, 2026-09-29).
   No new blocking finding; the two upheld items were fixed as Codex
   proposed and are unconfirmed; details in the readings file.
+- Exception: overhead inconclusive on both attempts (spread 16.19% and
+  15.28%, loaded host), accepted by the user on 2026-09-30.
+- Cost: `/usage` awaiting; 4 passes (advisor 2, 3, 2, 2); 1 spec-owner
+  resume; 3 Codex rounds, final `not-ready`; review 3 P1, 1 P2, fixed.
