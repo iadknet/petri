@@ -96,12 +96,17 @@ Invariants:
    applies D5 as the Goal states. No cell is rerun or extended.
 5. The ceiling in force after this closure is the one recorded in the
    Measured verdict, and `scripts/telemetry-overhead` carries it as its
-   routine ceiling; the routine check keeps F01's workload, states, ratio
-   and 300 s cap and adopts the statistic, pair table, environment
-   isolation and run timeout below, because F01's 75%-of-pairs rule at a
-   fixed n cannot decide at 5% on a host whose pair ratios spread 6–12%
-   (readings file). A pair count the 300 s cap cannot hold makes the
-   routine check inconclusive before any pair.
+   routine ceiling, 1.05: that figure is the ceiling only once the
+   Measured verdict records a D5 pass; on any other outcome the feature
+   stays open and the user's decision sets both the record and the
+   script's value before closure. The routine check keeps F01's workload,
+   states, ratio and 300 s cap and adopts the statistic, pair table,
+   environment isolation and run timeout below, because F01's
+   75%-of-pairs rule at a fixed n cannot decide at 5% on a host whose pair
+   ratios spread 6–12% (readings file). It drops F01's one rerun of an
+   inconclusive state: n fresh pairs rarely fit the cap and a rerun is an
+   extension of an inconclusive result. A pair count the 300 s cap cannot
+   hold makes the routine check inconclusive before any pair.
 
 | Preset | `METRICS_INTERVAL_MS` | `TICK_TRACES` | `CREATURE_WINDOWS` | `WINDOW_TICKS` | `WINDOW_INTERVAL_MS` |
 | --- | --- | --- | --- | --- | --- |
@@ -204,7 +209,8 @@ and F06 as process wall time, flush included. With the slow state defined
 as a paused stack, every export request runs to its 5 s timeout and the
 end-of-run flush to its 10 s bound, which a 5 s workload cannot amortize.
 The user decided option (a): in `s` the verdict ratio subtracts `flush_ms`,
-and the flush is bounded separately at F01's 10 s. The healthy and stopped
+and the flush is bounded separately at F01's 10 s deadline, read with 50 ms
+of scheduling slack. The healthy and stopped
 states keep the flush inside their ratio. The 60-minute allowance is
 unblocked.
 
@@ -221,8 +227,8 @@ Qualifying measurement, method fixed before any run:
 | Spread | five consecutive reference runs per world after calibration; spread = (max − min) / median |
 | Pairs (n) | spread ≤ 5%: 16; ≤ 10%: 24; ≤ 20%: 32; above 20%: the spread block is repeated once after 60 s idle (charged), and if still above 20% that world's cells are inconclusive and it runs no pair |
 | Cells and pairs | per world, three cells of preset `standard`: `b` on with the stack stopped, `a` on with the stack started and ready (`scratch_stack_ready` plus 5 s before every telemetry run), `s` on with the stack paused (`docker compose pause lgtm`; the port accepts and never answers, so every export request runs to the 5 s timeout and the end flush to its 10 s bound); a pair is one telemetry run and one reference run adjacent in time, order alternating pair by pair as F01's; the reference always runs with the stack stopped, so `a` starts and stops the stack once per pair and `s` pauses, then unpauses and stops it |
-| Ratio | per pair, telemetry process wall / reference process wall, F01's and F06's quantity, the end flush included, in `a` and `b`; in `s` the verdict ratio is (telemetry process wall − `flush_ms` from the stderr line) / reference process wall, the flush-included ratio recorded beside it (user decision above); the median `flush_ms`, `dropped` and `abandoned` per cell are recorded, and every cell's `flush_ms` stays within F01's 10 s bound |
-| Export check | in `a`, a telemetry run whose line shows `failed`, `dropped` or `abandoned` above zero, or counts inconsistent with its preset (`standard`: `snapshots` ≥ 4, `traces` = `snapshots`, `windows` ≥ 1; `phases`: `windows` = 0; `minimal`: `traces` = `windows` = 0), voids its pair |
+| Ratio | per pair, telemetry process wall / reference process wall, F01's and F06's quantity, the end flush included, in `a` and `b`; in `s` the verdict ratio is (telemetry process wall − `flush_ms` from the stderr line) / reference process wall, the flush-included ratio recorded beside it (user decision above); the median `flush_ms`, `dropped` and `abandoned` per cell are recorded, and every cell's `flush_ms` stays within F01's 10 s deadline plus 50 ms of scheduling slack (the reading includes the return from the abandoned wait; the script flags above 10,050) |
+| Export check | in `a`, a telemetry run whose line shows `failed`, `dropped` or `abandoned` above zero, or counts inconsistent with its preset (`standard`: `snapshots` ≥ 4, `traces` = `snapshots`, `windows` ≥ 1; `phases`: `windows` = 0; `minimal`: `traces` = `windows` = 0; `dense`: `snapshots` ≥ 12, `traces` = `snapshots`, `windows` ≥ 2, from its 250 ms interval and 2 s window interval over a run of at least 4 s), voids its pair |
 | Statistic | per cell, the median of its n ratios with its 90% distribution-free interval: the lower bound is the (k + 1)-th smallest ratio and the upper the (n − k)-th, k the largest count with P(Binomial(n, ½) ≤ k) ≤ 0.05 (n = 16: k = 4; 24: k = 7; 32: k = 10), computed by `scripts/telemetry-stats.mjs` with no random draw |
 | Verdict per cell | pass when the interval's upper bound is below 1.05 (D5's "under 5%", a strict comparison on unrounded values); fail when its lower bound is at or above 1.05; else inconclusive |
 | Qualification | pass when all six cells pass and the cap was not reached; the margin is the interval, not the point estimate: the upper bound sits under the ceiling, and the median is recorded as the headroom; D5 then records 5% as the ceiling; any fail or inconclusive cell, or the cap reached anywhere in the measurement, is a user stop with every reading reported |
@@ -245,7 +251,7 @@ measured time used, and the D5 outcome.
 ## Success Criteria
 
 - [ ] Every binary defaults to telemetry on, the flag beats the variable
-      beats the default, and the twelve test spawn sites, `make bench` and
+      beats the default, and the thirteen test spawn sites, `make bench` and
       the parent comparison pass `--telemetry off`.
 - [ ] `PETRI_TELEMETRY_PRESET` selects `minimal`, `phases`, `standard` or
       `dense`, an explicit variable overrides one setting, and `run.started`
