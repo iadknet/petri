@@ -23,6 +23,7 @@ mod metrics;
 mod queue;
 pub mod testing;
 mod trace;
+mod windows;
 
 use std::fmt;
 use std::str::FromStr;
@@ -48,8 +49,14 @@ pub use crate::metrics::{
     resolve_metrics_interval, Trigger, DEFAULT_METRICS_INTERVAL, METRICS_INTERVAL_ENV,
 };
 pub use crate::trace::{
-    resolve_tick_traces, TickSample, MAX_TICK_TRACES_PER_RUN, PHASES, TICK_TRACES_ENV,
+    resolve_tick_traces, TickSample, FIRST_UNTRACED_TICK, MAX_TICK_TRACES_PER_RUN, PHASES,
+    TICK_TRACES_ENV,
 };
+pub use crate::windows::{
+    WindowSettings, CREATURE_WINDOWS_ENV, MAX_EVENTS_PER_SAMPLE, MAX_SAMPLES_PER_RUN,
+    MAX_SAMPLE_BYTES_PER_RUN, WINDOW_BUDGET, WINDOW_INTERVAL_ENV, WINDOW_TICKS_ENV,
+};
+use v3_core::runtime::trace::recording::ActiveTrace;
 
 /// The environment variable that switches telemetry when no flag is given.
 pub const SWITCH_ENV: &str = "PETRI_TELEMETRY";
@@ -200,6 +207,8 @@ pub struct Options {
     pub metrics_interval: Duration,
     /// Whether interval and completion snapshots carry a tick trace.
     pub tick_traces: Switch,
+    /// Creature windows (T21.F04).
+    pub windows: WindowSettings,
 }
 
 impl Options {
@@ -215,6 +224,7 @@ impl Options {
         let metrics_interval =
             resolve_metrics_interval(std::env::var(METRICS_INTERVAL_ENV).ok().as_deref())?;
         let tick_traces = resolve_tick_traces(std::env::var(TICK_TRACES_ENV).ok().as_deref())?;
+        let windows = WindowSettings::from_env()?;
         Ok(Self {
             service,
             endpoint,
@@ -222,6 +232,7 @@ impl Options {
             reports: ReportSink::Stderr,
             metrics_interval,
             tick_traces,
+            windows,
         })
     }
 }
@@ -298,6 +309,8 @@ pub struct RunHandle {
     last_stamp_ns: Option<u64>,
     /// Tick traces captured, up to [`MAX_TICK_TRACES_PER_RUN`].
     traces_taken: u64,
+    /// Creature windows and manual samples (T21.F04).
+    samples: windows::Samples,
 }
 
 impl RunHandle {
@@ -325,6 +338,7 @@ struct Active {
     resource: Vec<opentelemetry_proto::tonic::common::v1::KeyValue>,
     metrics_interval: Duration,
     tick_traces: Switch,
+    windows: WindowSettings,
 }
 
 impl fmt::Debug for Active {
@@ -355,7 +369,7 @@ fn unix_ns(time: SystemTime) -> u64 {
 }
 
 /// An integer attribute, or its decimal string when it exceeds `i64`.
-fn u64_value(value: u64) -> AnyValue {
+pub(crate) fn u64_value(value: u64) -> AnyValue {
     i64::try_from(value).map_or_else(|_| AnyValue::from(value.to_string()), AnyValue::Int)
 }
 
@@ -454,6 +468,7 @@ impl Telemetry {
                 resource: proto_resource,
                 metrics_interval: options.metrics_interval,
                 tick_traces: options.tick_traces,
+                windows: options.windows,
             })),
         }
     }
@@ -480,6 +495,7 @@ impl Telemetry {
             last_snapshot: None,
             last_stamp_ns: None,
             traces_taken: 0,
+            samples: windows::Samples::default(),
         };
         active.shared.register_run(key, run.id.clone());
         if !active.announced.swap(true, Ordering::Relaxed) {
@@ -500,6 +516,18 @@ impl Telemetry {
         extra.push((
             "petri.tick_traces",
             AnyValue::from(active.tick_traces.to_string()),
+        ));
+        extra.push((
+            "petri.creature_windows",
+            AnyValue::from(active.windows.switch.to_string()),
+        ));
+        extra.push((
+            "petri.window_ticks",
+            AnyValue::Int(i64::from(active.windows.ticks)),
+        ));
+        extra.push((
+            "petri.window_interval_ms",
+            u64_value(active.windows.interval_ms()),
         ));
         let body = serde_json::to_string(start.config).expect("config must serialize");
         active.emit(&run, "run.started", start.tick, extra, Some(body));
@@ -613,11 +641,100 @@ impl Telemetry {
                 u64_value(MAX_TICK_TRACES_PER_RUN),
             ));
         }
+        extra.push(("petri.samples_skipped", u64_value(run.samples.skipped)));
+        if let Some(cap) = run.samples.capped {
+            extra.push(("petri.windows_capped", AnyValue::from(cap.as_str())));
+        }
         active.emit(&run, "run.ended", tick, extra, None);
         active.shared.add_self_time(run.key, began.elapsed());
         active.shared.mark_ended(run.key);
         if flush == Flush::Wait {
             active.shared.flush_run(run.key);
+        }
+    }
+
+    /// Starts a creature window into `slot` before a tick when one is due:
+    /// windows are on, neither a window nor a manual sample is active, the
+    /// interval has passed since the run's last sample start, the run is
+    /// below its caps and the population is not empty. Pass `slot` to
+    /// `run_tick` unless a manual sample is active, then call
+    /// [`Telemetry::after_tick`].
+    pub fn before_tick(
+        &self,
+        run: &mut RunHandle,
+        sim: &Simulation,
+        slot: &mut Option<ActiveTrace>,
+        manual_active: bool,
+    ) {
+        if let Some(active) = &self.active {
+            active.before_tick(run, sim, slot, manual_active);
+        }
+    }
+
+    /// After `run_tick`: notes the digest each recorded tick ran under, and
+    /// exports and clears a window in `slot` that ended (complete, died or
+    /// truncated). `manual` is the server sampler's recording, if any.
+    pub fn after_tick(
+        &self,
+        run: &mut RunHandle,
+        sim: &Simulation,
+        slot: &mut Option<ActiveTrace>,
+        manual: Option<&ActiveTrace>,
+    ) {
+        if let Some(active) = &self.active {
+            active.after_tick(run, sim, slot, manual);
+        }
+    }
+
+    /// A manual sample starts: exports an open window as `manual` and an
+    /// unfetched sample it replaces as `replaced`, then admits `sample` for
+    /// export when the interval has passed and the run is below its caps
+    /// (else counts it in `petri.samples_skipped`).
+    pub fn start_manual(
+        &self,
+        run: &mut RunHandle,
+        sim: &Simulation,
+        slot: &mut Option<ActiveTrace>,
+        replaced: Option<&ActiveTrace>,
+        sample: &ActiveTrace,
+    ) {
+        if let Some(active) = &self.active {
+            active.start_manual(run, sim, slot, replaced, sample);
+        }
+    }
+
+    /// Exports an admitted manual sample once, as `complete`, when the
+    /// sampler hands it over.
+    pub fn hand_over(&self, run: &mut RunHandle, sim: &Simulation, sample: &ActiveTrace) {
+        if let Some(active) = &self.active {
+            active.hand_over(run, sim, sample);
+        }
+    }
+
+    /// A config patch landed: exports an open window as `config_change` and
+    /// marks an admitted manual sample `petri.config_changed`.
+    pub fn config_patched(
+        &self,
+        run: &mut RunHandle,
+        sim: &Simulation,
+        slot: &mut Option<ActiveTrace>,
+    ) {
+        if let Some(active) = &self.active {
+            active.config_patched(run, sim, slot);
+        }
+    }
+
+    /// The run ends: exports an open window and an admitted, unfetched
+    /// manual sample as `run_end`. Call before [`Telemetry::end_run`].
+    pub fn end_samples(
+        &self,
+        run: &mut RunHandle,
+        sim: &Simulation,
+        slot: &mut Option<ActiveTrace>,
+        manual: Option<&ActiveTrace>,
+    ) {
+        if let Some(active) = &self.active {
+            active.end_samples(run, sim, slot, manual);
         }
     }
 
@@ -635,7 +752,10 @@ impl Active {
     /// Captures and offers the trace of the tick `sim` just ran, when tick
     /// traces are on, the run is below its cap and the seam is that tick's.
     fn tick_trace(&self, run: &mut RunHandle, sim: &Simulation, sample: TickSample) {
-        if self.tick_traces == Switch::Off || run.traces_taken >= MAX_TICK_TRACES_PER_RUN {
+        if self.tick_traces == Switch::Off
+            || run.traces_taken >= MAX_TICK_TRACES_PER_RUN
+            || sim.tick >= FIRST_UNTRACED_TICK
+        {
             return;
         }
         let Some(seam) = sim

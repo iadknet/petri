@@ -7,7 +7,7 @@ use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
-use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode};
+use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, UntracedMeshExecution};
 use crate::runtime::trace::domain::{
     BackendTrace, DecisionInputs, MeshHopTrace, MeshPassTrace, TraceGateScore, TraceRouteDecision,
 };
@@ -31,7 +31,7 @@ pub fn execute_creature_mesh_traced(
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
 ) -> (MeshOutput, Vec<MeshHopTrace>, Vec<MeshPassTrace>) {
-    execute_creature_mesh_impl(
+    let recorded = execute_creature_mesh_impl(
         genome,
         sensors,
         energy,
@@ -40,7 +40,57 @@ pub fn execute_creature_mesh_traced(
         graph_runtime,
         config,
         RecordingMeshExecution::new(config.max_mesh_hops.max(1) as usize),
+    );
+    (recorded.output, recorded.hops, recorded.passes)
+}
+
+/// [`execute_creature_mesh_traced`] under a budget (T21.F04): hop and pass
+/// records are stored while `limit` admits them; the first that does not fit
+/// sets [`RecordedMesh::truncated`] and every later node of the tick runs
+/// through the untraced executors with nothing recorded. The output is the
+/// untraced path's either way.
+#[cfg(feature = "telemetry-seams")]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn execute_creature_mesh_budgeted(
+    genome: &CreatureGenome,
+    sensors: &SensorSnapshot,
+    energy: &mut f32,
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
+    graph_runtime: &mut GraphRuntimeState,
+    config: &RuntimeConfig,
+    limit: Option<RecordLimit>,
+) -> RecordedMesh {
+    let mut mode = RecordingMeshExecution::new(config.max_mesh_hops.max(1) as usize);
+    mode.limit = limit;
+    execute_creature_mesh_impl(
+        genome,
+        sensors,
+        energy,
+        shared_memory,
+        prev_shared_memory,
+        graph_runtime,
+        config,
+        mode,
     )
+}
+
+/// What the recording mode leaves: the output and the records it kept.
+pub(crate) struct RecordedMesh {
+    pub(crate) output: MeshOutput,
+    pub(crate) hops: Vec<MeshHopTrace>,
+    pub(crate) passes: Vec<MeshPassTrace>,
+    /// The cap the first record that did not fit met.
+    #[cfg(feature = "telemetry-seams")]
+    pub(crate) truncated: Option<crate::runtime::trace::recording::TruncationReason>,
+}
+
+/// The events and bytes a tick's mesh records may still take.
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RecordLimit {
+    pub(crate) events: u32,
+    pub(crate) bytes: u64,
 }
 
 pub(crate) struct RecordingMeshExecution {
@@ -49,6 +99,11 @@ pub(crate) struct RecordingMeshExecution {
     /// The decision state the dispatch in flight resolves against, taken
     /// by the `record_hop` that follows it.
     dispatch_inputs: Option<DecisionInputs>,
+    /// What is left for records; `None` records everything.
+    #[cfg(feature = "telemetry-seams")]
+    limit: Option<RecordLimit>,
+    #[cfg(feature = "telemetry-seams")]
+    truncated: Option<crate::runtime::trace::recording::TruncationReason>,
 }
 
 impl RecordingMeshExecution {
@@ -57,7 +112,46 @@ impl RecordingMeshExecution {
             hops: Vec::with_capacity(max_hops),
             passes: Vec::new(),
             dispatch_inputs: None,
+            #[cfg(feature = "telemetry-seams")]
+            limit: None,
+            #[cfg(feature = "telemetry-seams")]
+            truncated: None,
         }
+    }
+
+    /// Whether records are still being kept this tick.
+    #[inline]
+    fn recording(&self) -> bool {
+        #[cfg(feature = "telemetry-seams")]
+        {
+            self.truncated.is_none()
+        }
+        #[cfg(not(feature = "telemetry-seams"))]
+        {
+            true
+        }
+    }
+
+    /// Takes one record of `bytes` from the limit, or truncates.
+    #[inline]
+    #[cfg_attr(not(feature = "telemetry-seams"), allow(unused_variables))]
+    fn admit(&mut self, bytes: impl FnOnce() -> u64) -> bool {
+        #[cfg(feature = "telemetry-seams")]
+        if let Some(limit) = &mut self.limit {
+            use crate::runtime::trace::recording::TruncationReason;
+            if limit.events == 0 {
+                self.truncated = Some(TruncationReason::Events);
+                return false;
+            }
+            let bytes = bytes();
+            if bytes > limit.bytes {
+                self.truncated = Some(TruncationReason::Bytes);
+                return false;
+            }
+            limit.events -= 1;
+            limit.bytes -= bytes;
+        }
+        true
     }
 }
 
@@ -98,8 +192,10 @@ fn decision_inputs(
 }
 
 impl MeshExecutionMode for RecordingMeshExecution {
-    type BackendTrace = BackendTrace;
-    type Output = (MeshOutput, Vec<MeshHopTrace>, Vec<MeshPassTrace>);
+    /// `None` once the tick's recording truncated: the node then ran
+    /// through the untraced executors.
+    type BackendTrace = Option<BackendTrace>;
+    type Output = RecordedMesh;
 
     const RECORDS_HOPS: bool = true;
 
@@ -117,7 +213,23 @@ impl MeshExecutionMode for RecordingMeshExecution {
         sensors: &SensorSnapshot,
         config: &RuntimeConfig,
         side_outputs: &mut MeshSideOutputs,
-    ) -> (NodeResult, BackendTrace) {
+    ) -> (NodeResult, Option<BackendTrace>) {
+        if !self.recording() {
+            let (result, ()) = UntracedMeshExecution.execute_node(
+                node,
+                node_idx,
+                upstream_slots,
+                energy,
+                energy_consumed,
+                shared_memory,
+                prev_shared_memory,
+                graph_runtime,
+                sensors,
+                config,
+                side_outputs,
+            );
+            return (result, None);
+        }
         self.dispatch_inputs = Some(decision_inputs(
             sensors,
             upstream_slots,
@@ -139,7 +251,7 @@ impl MeshExecutionMode for RecordingMeshExecution {
                     config,
                     side_outputs,
                 );
-                (result, BackendTrace::Vm(trace))
+                (result, Some(BackendTrace::Vm(trace)))
             }
             BackendDef::Graph(def) => {
                 let (result, trace) = execute_graph_node_traced(
@@ -156,7 +268,7 @@ impl MeshExecutionMode for RecordingMeshExecution {
                     shared_memory,
                     prev_shared_memory,
                 );
-                (result, BackendTrace::Graph(trace))
+                (result, Some(BackendTrace::Graph(trace)))
             }
         }
     }
@@ -173,8 +285,12 @@ impl MeshExecutionMode for RecordingMeshExecution {
         result: &NodeResult,
         route_result: Option<(usize, NodeId)>,
         vote_contribution: VoteVector,
-        backend_trace: BackendTrace,
+        backend_trace: Option<BackendTrace>,
     ) {
+        let decision_inputs = self.dispatch_inputs.take();
+        let Some((backend_trace, decision_inputs)) = backend_trace.zip(decision_inputs) else {
+            return;
+        };
         let route = route_result.map(|(selected_target_idx, selected_target_id)| {
             let gate_scores = node
                 .targets
@@ -197,7 +313,7 @@ impl MeshExecutionMode for RecordingMeshExecution {
             }
         });
 
-        self.hops.push(MeshHopTrace {
+        let hop = MeshHopTrace {
             hop_index,
             pass_index,
             node_id: node.node_id,
@@ -208,21 +324,49 @@ impl MeshExecutionMode for RecordingMeshExecution {
             output_slots: result.output_slots,
             route,
             vote_contribution,
-            decision_inputs: self
-                .dispatch_inputs
-                .take()
-                .expect("every recorded hop follows its dispatch"),
+            decision_inputs,
             backend_trace,
-        });
+        };
+        if self.admit(|| hop_bytes(&hop)) {
+            self.hops.push(hop);
+        }
     }
 
     fn record_pass(&mut self, pass: MeshPassTrace) {
-        self.passes.push(pass);
+        if self.recording() && self.admit(|| pass_bytes(&pass)) {
+            self.passes.push(pass);
+        }
     }
 
     fn finish(self, output: MeshOutput) -> Self::Output {
-        (output, self.hops, self.passes)
+        RecordedMesh {
+            output,
+            hops: self.hops,
+            passes: self.passes,
+            #[cfg(feature = "telemetry-seams")]
+            truncated: self.truncated,
+        }
     }
+}
+
+#[cfg(feature = "telemetry-seams")]
+fn hop_bytes(hop: &MeshHopTrace) -> u64 {
+    hop.retained_bytes()
+}
+
+#[cfg(feature = "telemetry-seams")]
+fn pass_bytes(pass: &MeshPassTrace) -> u64 {
+    pass.retained_bytes()
+}
+
+#[cfg(not(feature = "telemetry-seams"))]
+fn hop_bytes(_: &MeshHopTrace) -> u64 {
+    0
+}
+
+#[cfg(not(feature = "telemetry-seams"))]
+fn pass_bytes(_: &MeshPassTrace) -> u64 {
+    0
 }
 
 #[cfg(test)]

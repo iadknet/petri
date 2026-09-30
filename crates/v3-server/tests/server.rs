@@ -1493,6 +1493,8 @@ async fn health_payload_contains_mutation_skip_by_reason() {
         sim,
         status: SimulationStatus::Paused,
         active_trace: None,
+        #[cfg(feature = "telemetry")]
+        window_trace: None,
         cached_fertility_u8,
     };
     let frame = build_ws_frame(&handle);
@@ -1574,6 +1576,8 @@ async fn status_payload_includes_state() {
         sim,
         status: SimulationStatus::Paused,
         active_trace: None,
+        #[cfg(feature = "telemetry")]
+        window_trace: None,
         cached_fertility_u8,
     };
 
@@ -1599,6 +1603,8 @@ async fn status_and_health_include_food_occupancy_depletion_summaries() {
         sim,
         status: SimulationStatus::Paused,
         active_trace: None,
+        #[cfg(feature = "telemetry")]
+        window_trace: None,
         cached_fertility_u8,
     };
 
@@ -1656,6 +1662,8 @@ async fn ws_frame_msgpack_roundtrip() {
         sim,
         status: SimulationStatus::Running,
         active_trace: None,
+        #[cfg(feature = "telemetry")]
+        window_trace: None,
         cached_fertility_u8,
     };
 

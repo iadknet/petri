@@ -4,10 +4,10 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::Json;
 use v3_core::config::resolve_config;
-use v3_core::simulation::{run_tick, seed_simulation};
+use v3_core::simulation::seed_simulation;
 
 use crate::error::{AppError, FieldError};
-use crate::state::{build_ws_frame, AppState, SimHandle, SimulationStatus};
+use crate::state::{build_ws_frame, AppState, SimulationStatus};
 use crate::types::{config_digest, StepRequest, PROTOCOL_VERSION};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(100);
@@ -55,8 +55,12 @@ pub async fn startup(
 
     let mut handle = app.sim.lock().await;
     #[cfg(feature = "telemetry")]
-    app.telemetry
-        .reset(&handle.sim, handle.status, &new_sim, seed);
+    {
+        let status = handle.status;
+        let (old, samples) = handle.telemetry_parts();
+        app.telemetry.reset(old, status, &new_sim, seed, samples);
+        handle.window_trace = None;
+    }
     handle.status = SimulationStatus::Idle;
     handle.sim = new_sim;
     handle.active_trace = None;
@@ -163,15 +167,11 @@ pub async fn step(
         });
     }
 
-    {
-        let SimHandle {
-            sim, active_trace, ..
-        } = &mut *handle;
-        for _ in 0..req.steps {
-            run_tick(sim, active_trace);
+    for _ in 0..req.steps {
+        handle.tick(
             #[cfg(feature = "telemetry")]
-            app.telemetry.after_tick(sim);
-        }
+            &app.telemetry,
+        );
     }
     let frame = build_ws_frame(&handle);
     let tick = handle.sim.tick;
@@ -193,10 +193,10 @@ pub(crate) async fn run_loop(app: AppState) {
         if handle.status != SimulationStatus::Running {
             break;
         }
-        let h = &mut *handle;
-        run_tick(&mut h.sim, &mut h.active_trace);
-        #[cfg(feature = "telemetry")]
-        app.telemetry.after_tick(&h.sim);
+        handle.tick(
+            #[cfg(feature = "telemetry")]
+            &app.telemetry,
+        );
         let frame = if last_frame.elapsed() >= FRAME_INTERVAL {
             // Projection refresh may be slightly stale while the simulation runs,
             // avoiding a full frame rebuild on every tick.
@@ -257,6 +257,8 @@ mod tests {
             sim,
             status: SimulationStatus::Paused,
             active_trace: None,
+            #[cfg(feature = "telemetry")]
+            window_trace: None,
             cached_fertility_u8: std::sync::Arc::from(vec![0u8; 16]),
         };
 

@@ -59,6 +59,12 @@ impl OutcomeAccumulator {
         }
     }
 
+    /// Offspring `id` spawned this tick (T21.F04 outcome join).
+    #[cfg(feature = "telemetry-seams")]
+    pub(crate) fn offspring_spawned(&self, id: CreatureId) -> u32 {
+        self.records.get(id).map_or(0, |rec| rec.offspring_spawned)
+    }
+
     /// Record damage received by a creature (e.g. from predation).
     pub(crate) fn record_damage(&mut self, id: CreatureId, amount: f32) {
         if let Some(rec) = self.records.get_mut(id) {

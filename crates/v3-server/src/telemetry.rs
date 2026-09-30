@@ -8,16 +8,27 @@
 //! reset and at shutdown, each taken before the record it accompanies. Only
 //! the interval snapshot carries a tick trace (T21.F03): a config patch
 //! accepted while paused may postdate the tick the others would trace.
+//!
+//! Creature windows (T21.F04) record into the handle's window slot while no
+//! manual sample is active; the manual Execution Sampler exports its sample
+//! at hand-over, or when a new sample replaces it or the run ends.
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use v3_core::config::SimulationConfig;
+use v3_core::runtime::trace::recording::ActiveTrace;
 use v3_core::simulation::Simulation;
 use v3_telemetry::{
     EndStatus, Flush, RunHandle, RunStart, RunState, Telemetry, TickSample, Trigger,
 };
 
 use crate::state::SimulationStatus;
+
+/// A handle's two recording slots: the window slot and the manual sampler's.
+pub struct Samples<'a> {
+    pub window: &'a mut Option<ActiveTrace>,
+    pub manual: Option<&'a ActiveTrace>,
+}
 
 /// The process's telemetry and its current run; off by default.
 #[derive(Clone, Debug, Default)]
@@ -60,17 +71,20 @@ impl ServerTelemetry {
         });
     }
 
-    /// A `startup`: ends the current run as `reset` at `old`'s tick, after its
-    /// run-end snapshot of `old`, without waiting for its export, and begins
-    /// the run of `new`. A status that changes to idle is reported on the new
-    /// run.
+    /// A `startup`: exports the ending run's open window and unfetched
+    /// manual sample as `run_end`, ends the run as `reset` at `old`'s tick,
+    /// after its run-end snapshot of `old`, without waiting for its export,
+    /// and begins the run of `new`. A status that changes to idle is
+    /// reported on the new run.
     pub(crate) fn reset(
         &self,
         old: &Simulation,
         old_status: SimulationStatus,
         new: &Simulation,
         seed: u64,
+        samples: Samples<'_>,
     ) {
+        self.end_samples(old, samples);
         self.end(old, EndStatus::Reset);
         self.begin(&new.config, seed);
         if old_status != SimulationStatus::Idle {
@@ -88,11 +102,59 @@ impl ServerTelemetry {
         }
     }
 
-    /// Takes an interval snapshot of `sim` and its tick trace after a tick
-    /// when one is due.
-    pub(crate) fn after_tick(&self, sim: &Simulation) {
+    /// Starts a creature window into `window` when one is due and no manual
+    /// sample is active.
+    pub(crate) fn before_tick(
+        &self,
+        sim: &Simulation,
+        window: &mut Option<ActiveTrace>,
+        manual_active: bool,
+    ) {
         if let Some(run) = self.current().as_mut() {
+            self.telemetry.before_tick(run, sim, window, manual_active);
+        }
+    }
+
+    /// Exports a window that ended, then takes an interval snapshot of `sim`
+    /// and its tick trace after a tick when one is due.
+    pub(crate) fn after_tick(
+        &self,
+        sim: &Simulation,
+        window: &mut Option<ActiveTrace>,
+        manual: Option<&ActiveTrace>,
+    ) {
+        if let Some(run) = self.current().as_mut() {
+            self.telemetry.after_tick(run, sim, window, manual);
             self.telemetry.tick_snapshot(run, sim, TickSample::Interval);
+        }
+    }
+
+    /// `start_sample`: ends an open window as `manual`, exports the unfetched
+    /// sample `replaced` as `replaced`, and admits `sample` for export.
+    pub(crate) fn start_sample(
+        &self,
+        sim: &Simulation,
+        window: &mut Option<ActiveTrace>,
+        replaced: Option<&ActiveTrace>,
+        sample: &ActiveTrace,
+    ) {
+        if let Some(run) = self.current().as_mut() {
+            self.telemetry
+                .start_manual(run, sim, window, replaced, sample);
+        }
+    }
+
+    /// `get_sample` hands a completed sample over: it exports once.
+    pub(crate) fn hand_over(&self, sim: &Simulation, sample: &ActiveTrace) {
+        if let Some(run) = self.current().as_mut() {
+            self.telemetry.hand_over(run, sim, sample);
+        }
+    }
+
+    fn end_samples(&self, sim: &Simulation, samples: Samples<'_>) {
+        if let Some(run) = self.current().as_mut() {
+            self.telemetry
+                .end_samples(run, sim, samples.window, samples.manual);
         }
     }
 
@@ -105,16 +167,21 @@ impl ServerTelemetry {
         }
     }
 
-    /// Emits `run.config` for an accepted config patch.
-    pub(crate) fn config(&self, config: &SimulationConfig, tick: u64) {
+    /// An accepted config patch, already applied to `sim`: ends an open
+    /// window as `config_change`, marks an admitted manual sample, and emits
+    /// `run.config`.
+    pub(crate) fn config(&self, sim: &Simulation, window: &mut Option<ActiveTrace>) {
         if let Some(run) = self.current().as_mut() {
-            self.telemetry.run_config(run, config, tick);
+            self.telemetry.config_patched(run, sim, window);
+            self.telemetry.run_config(run, &sim.config, sim.tick);
         }
     }
 
-    /// Ends the current run as `shutdown` after its run-end snapshot of
+    /// Exports the open window and unfetched manual sample as `run_end` and
+    /// ends the current run as `shutdown` after its run-end snapshot of
     /// `sim`; returns at once. [`ServerTelemetry::flush`] follows it.
-    pub fn end_for_shutdown(&self, sim: &Simulation) {
+    pub fn end_for_shutdown(&self, sim: &Simulation, samples: Samples<'_>) {
+        self.end_samples(sim, samples);
         self.end(sim, EndStatus::Shutdown);
     }
 
@@ -158,6 +225,7 @@ mod tests {
             reports: ReportSink::capture(),
             metrics_interval: Duration::from_secs(3_600),
             tick_traces: v3_telemetry::Switch::On,
+            windows: v3_telemetry::WindowSettings::default(),
         }));
         let mut first = seed_simulation(config(), 1);
         telemetry.begin(&first.config, 1);
@@ -167,11 +235,20 @@ mod tests {
         std::thread::sleep(Duration::from_millis(15));
         telemetry.transition(SimulationStatus::Running, &first);
         ticks(&mut first, 1);
-        telemetry.after_tick(&first);
+        telemetry.after_tick(&first, &mut None, None);
         let mut second = seed_simulation(config(), 2);
-        telemetry.reset(&first, SimulationStatus::Running, &second, 2);
+        let (mut first_window, mut second_window) = (None, None);
+        let first_samples = Samples {
+            window: &mut first_window,
+            manual: None,
+        };
+        telemetry.reset(&first, SimulationStatus::Running, &second, 2, first_samples);
         ticks(&mut second, 2);
-        telemetry.end_for_shutdown(&second);
+        let second_samples = Samples {
+            window: &mut second_window,
+            manual: None,
+        };
+        telemetry.end_for_shutdown(&second, second_samples);
         telemetry.flush();
 
         let records = receiver.records();

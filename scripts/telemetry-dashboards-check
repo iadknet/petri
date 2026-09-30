@@ -1,6 +1,6 @@
 #!/bin/sh
-# Dashboard and metric-name check for run snapshots (T21.F02) and tick
-# traces (T21.F03).
+# Dashboard and metric-name check for run snapshots (T21.F02), tick traces
+# (T21.F03) and creature windows (T21.F04).
 #
 # Usage: scripts/telemetry-dashboards-check
 #
@@ -29,7 +29,19 @@
 #      tick answers with the same spans;
 #   7. that trace's petri.tick is one of the run's petri_run_tick values;
 #   8. the run's Loki run.started line carries petri_tick_traces;
-#   9. after the scratch stack's own `down -v`, the external petri-telemetry
+#   9. the first Creature windows row's trace has one creature_window span and
+#      as many creature_tick spans as its petri.ticks_recorded, each with
+#      petri.run_id, petri.tick and petri.sample_policy = window, and at least
+#      one hop and one pass event across them; the ID composed from the run
+#      ID and petri.window answers with the same spans;
+#  10. the tick-trace ID composed from the run ID and the first tick span's
+#      petri.tick answers with a tick trace when that tick had a snapshot,
+#      else the row records that it had none;
+#  11. the run's Loki creature.genome line carries the root's
+#      petri.genome_hash;
+#  12. the run's Loki run.started line carries petri_creature_windows,
+#      petri_window_ticks and petri_window_interval_ms;
+#  13. after the scratch stack's own `down -v`, the external petri-telemetry
 #      volume still exists when it existed at the start.
 # Prints one PASS or FAIL line per check, removes the scratch stack and volume
 # (scripts/telemetry-scratch.sh), and exits 1 when any check fails.
@@ -236,7 +248,8 @@ cargo build --release --quiet -p v3-cli --manifest-path "$root/Cargo.toml" --tar
 from_ms=$((($(date -u +%s) - 60) * 1000))
 note "running the workload, T=$ticks"
 OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 PETRI_TELEMETRY='' PETRI_TELEMETRY_METRICS_INTERVAL_MS='' \
-  PETRI_TELEMETRY_TICK_TRACES='' \
+  PETRI_TELEMETRY_TICK_TRACES='' PETRI_TELEMETRY_CREATURE_WINDOWS='' PETRI_TELEMETRY_WINDOW_TICKS='' \
+  PETRI_TELEMETRY_WINDOW_INTERVAL_MS='' \
   "$root/scripts/bench-wait" "$root/target/release/v3-cli" --telemetry on run --seed 7 \
   --ticks "$ticks" --sample-every "$ticks" --config "$recipe" \
   >"$scratch/stdout" 2>"$scratch/stderr"
@@ -326,6 +339,7 @@ rows() {
 empty=
 total=0
 trace_rows=0
+window_rows=0
 tab=$(printf '\t')
 while IFS="$tab" read -r kind uid title ref body; do
   total=$((total + 1))
@@ -339,15 +353,17 @@ while IFS="$tab" read -r kind uid title ref body; do
     waited=$((waited + 5))
   done
   if [ "$kind" = tempo ]; then
-    cp "$scratch/answer.json" "$scratch/tick-traces.json"
-    trace_rows=$count
+    case "$title" in
+      'Creature windows') cp "$scratch/answer.json" "$scratch/windows.json"; window_rows=$count ;;
+      *) cp "$scratch/answer.json" "$scratch/tick-traces.json"; trace_rows=$count ;;
+    esac
     note "$title: $count row(s) after ${waited} s"
   fi
   [ "$count" -gt 0 ] || empty="$empty [$uid / $title / $ref]"
 done <"$scratch/queries.tsv"
 status=0
 [ -z "$empty" ] || status=1
-check 'panel queries return data' "$status" "$total queries, Tick traces $trace_rows row(s)${empty:+; empty:$empty}"
+check 'panel queries return data' "$status" "$total queries, Tick traces $trace_rows row(s), Creature windows $window_rows row(s)${empty:+; empty:$empty}"
 
 # ── 4. tick samples ───────────────────────────────────────────────────────────
 get "/api/datasources/proxy/uid/prometheus/api/v1/query?query=petri_run_tick%7Bpetri_run_id%3D%22$run_id%22%7D%5B30m%5D" \
@@ -382,17 +398,20 @@ detail=$("$node" -e '
 check 'run.started carries petri_metrics_interval_ms' "$status" "$detail"
 
 # ── 6. trace content ──────────────────────────────────────────────────────────
-# shellcheck disable=SC2016 # JavaScript template literals.
-trace_id=$("$node" -e '
-  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
-  for (const f of (r.results || {}).A ? r.results.A.frames || [] : []) {
-    const names = ((f.schema && f.schema.fields) || []).map((field) => field.name);
-    const column = names.findIndex((name) => name === "traceIdHidden" || name === "traceID");
-    const values = column < 0 ? [] : f.data.values[column];
-    if (values.length > 0) { console.log(values[0]); process.exit(0); }
-  }
-  process.exit(1);
-' "$scratch/tick-traces.json" 2>/dev/null) || trace_id=
+# first_trace ANSWER: the first row's trace ID of a spans-table answer.
+first_trace() {
+  "$node" -e '
+    const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    for (const f of (r.results || {}).A ? r.results.A.frames || [] : []) {
+      const names = ((f.schema && f.schema.fields) || []).map((field) => field.name);
+      const column = names.findIndex((name) => name === "traceIdHidden" || name === "traceID");
+      const values = column < 0 ? [] : f.data.values[column];
+      if (values.length > 0) { console.log(values[0]); process.exit(0); }
+    }
+    process.exit(1);
+  ' "$1" 2>/dev/null
+}
+trace_id=$(first_trace "$scratch/tick-traces.json") || trace_id=
 # spans FILE: one line per span, `name tick policy run`, sorted; exits 1 when
 # the trace has no spans.
 spans() {
@@ -461,9 +480,127 @@ detail=$("$node" -e '
 ' "$scratch/started.json") && status=0 || status=1
 check 'run.started carries petri_tick_traces' "$status" "$detail"
 
+# ── 9. window content ─────────────────────────────────────────────────────────
+# window_spans FILE: one line per span, `name tick policy run window`, sorted,
+# then `events hop=H pass=P action=A`, `recorded N`, `hash H` and
+# `first_tick T` (the lowest creature_tick petri.tick); exits 1 when the trace
+# has no spans.
+window_spans() {
+  # shellcheck disable=SC2016 # JavaScript template literals.
+  "$node" -e '
+    const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const t = r.trace || r;
+    const value = (v) => v.stringValue ?? v.intValue ?? v.doubleValue ?? v.boolValue;
+    const lines = [];
+    const events = { hop: 0, pass: 0, action: 0 };
+    let recorded = "absent", hash = "absent", first = null;
+    for (const batch of t.resourceSpans || t.batches || []) {
+      for (const scope of batch.scopeSpans || batch.instrumentationLibrarySpans || []) {
+        for (const span of scope.spans || []) {
+          const a = Object.fromEntries((span.attributes || []).map((kv) => [kv.key, value(kv.value || {})]));
+          lines.push([span.name, a["petri.tick"], a["petri.sample_policy"], a["petri.run_id"], a["petri.window"]].join(" "));
+          for (const e of span.events || []) if (e.name in events) events[e.name] += 1;
+          if (span.name === "creature_window") { recorded = a["petri.ticks_recorded"]; hash = a["petri.genome_hash"]; }
+          if (span.name === "creature_tick" && (first === null || Number(a["petri.tick"]) < first)) first = Number(a["petri.tick"]);
+        }
+      }
+    }
+    lines.sort();
+    console.log(lines.join("\n"));
+    console.log(`events hop=${events.hop} pass=${events.pass} action=${events.action}`);
+    console.log(`recorded ${recorded}`);
+    console.log(`hash ${hash}`);
+    console.log(`first_tick ${first ?? "absent"}`);
+    process.exit(lines.length > 0 ? 0 : 1);
+  ' "$1" 2>/dev/null
+}
+status=1
+detail="no trace ID in the Creature windows answer"
+first_tick=
+genome_hash=
+window_id=$(first_trace "$scratch/windows.json") || window_id=
+if [ -n "$window_id" ]; then
+  get "/api/datasources/proxy/uid/tempo/api/v2/traces/$window_id" >"$scratch/window.json" || true
+  window_spans "$scratch/window.json" >"$scratch/window.txt" || true
+  roots=$(grep -c '^creature_window ' "$scratch/window.txt" || true)
+  ticks_seen=$(grep -c '^creature_tick ' "$scratch/window.txt" || true)
+  good=$(awk -v run="$run_id" '$1 == "creature_tick" && NF == 5 && $3 == "window" && $4 == run { n++ } END { print n + 0 }' "$scratch/window.txt")
+  recorded=$(sed -n 's/^recorded //p' "$scratch/window.txt")
+  counts=$(sed -n 's/^events //p' "$scratch/window.txt")
+  hops=$(printf '%s\n' "$counts" | sed -n 's/.*hop=\([0-9]*\).*/\1/p')
+  passes=$(printf '%s\n' "$counts" | sed -n 's/.*pass=\([0-9]*\).*/\1/p')
+  window=$(awk '$1 == "creature_window" { print $5 }' "$scratch/window.txt")
+  genome_hash=$(sed -n 's/^hash //p' "$scratch/window.txt")
+  first_tick=$(sed -n 's/^first_tick \([0-9][0-9]*\)$/\1/p' "$scratch/window.txt")
+  detail="trace $window_id: $roots root(s), $ticks_seen tick span(s), petri.ticks_recorded ${recorded:-absent}, $counts"
+  if [ "$roots" -eq 1 ] && [ "$ticks_seen" = "$recorded" ] && [ "$good" = "$recorded" ] &&
+    [ "${hops:-0}" -gt 0 ] && [ "${passes:-0}" -gt 0 ] && [ -n "$window" ]; then
+    composed=$(printf '%s8%015x' "$(printf '%s' "$run_id" | cut -c 1-16)" "$window")
+    get "/api/datasources/proxy/uid/tempo/api/v2/traces/$composed" >"$scratch/window-composed.json" || true
+    window_spans "$scratch/window-composed.json" >"$scratch/window-composed.txt" || true
+    if cmp -s "$scratch/window.txt" "$scratch/window-composed.txt"; then
+      status=0
+      detail="$detail; composed ID $composed answers with the same spans"
+    else
+      detail="$detail; composed ID $composed does not answer with the same spans"
+    fi
+  fi
+fi
+check 'window content' "$status" "$detail"
+
+# ── 10. window joins a tick trace ─────────────────────────────────────────────
+status=1
+detail="no creature_tick petri.tick"
+if [ -n "$first_tick" ]; then
+  composed=$(printf '%s%016x' "$(printf '%s' "$run_id" | cut -c 1-16)" "$first_tick")
+  get "/api/datasources/proxy/uid/tempo/api/v2/traces/$composed" >"$scratch/join.json" || true
+  if "$node" -e '
+    const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const ticks = ((r.data || {}).result || []).flatMap((s) => s.values || []).map((v) => v[1]);
+    process.exit(ticks.includes(process.argv[2]) ? 0 : 1);
+  ' "$scratch/ticks.json" "$first_tick" 2>/dev/null; then
+    if spans "$scratch/join.json" >/dev/null; then
+      status=0
+      detail="tick $first_tick had a snapshot; tick trace $composed answers"
+    else
+      detail="tick $first_tick had a snapshot; tick trace $composed does not answer"
+    fi
+  else
+    status=0
+    detail="tick $first_tick had no snapshot, so no tick trace (ID $composed)"
+  fi
+fi
+check 'window joins a tick trace' "$status" "$detail"
+
+# ── 11. Loki creature.genome ──────────────────────────────────────────────────
+query="{service_name=\"v3-cli\"} | petri_run_id=\"$run_id\" | event_name=\"creature.genome\""
+curl -sS --max-time 30 -G "$grafana/api/datasources/proxy/uid/loki/loki/api/v1/query_range" \
+  --data-urlencode "query=$query" --data-urlencode "start=${from_ms}000000" \
+  --data-urlencode limit=10 >"$scratch/genome.json" || true
+# shellcheck disable=SC2016 # JavaScript template literals.
+detail=$("$node" -e '
+  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const hashes = ((r.data || {}).result || []).map((s) => s.stream.petri_genome_hash).filter((v) => v !== undefined);
+  console.log(`creature.genome petri_genome_hash=${hashes.join(",") || "absent"}, root ${process.argv[2] || "absent"}`);
+  process.exit(process.argv[2] && hashes.includes(process.argv[2]) ? 0 : 1);
+' "$scratch/genome.json" "${genome_hash:-}") && status=0 || status=1
+check 'creature.genome carries the root hash' "$status" "$detail"
+
+# ── 12. Loki run.started carries the window settings ──────────────────────────
+# shellcheck disable=SC2016 # JavaScript template literals.
+detail=$("$node" -e '
+  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const streams = (r.data || {}).result || [];
+  const keys = ["petri_creature_windows", "petri_window_ticks", "petri_window_interval_ms"];
+  const found = keys.map((k) => `${k}=${streams.map((s) => s.stream[k]).filter((v) => v !== undefined).join(",") || "absent"}`);
+  console.log(found.join(" "));
+  process.exit(found.every((f) => !f.endsWith("=absent")) ? 0 : 1);
+' "$scratch/started.json") && status=0 || status=1
+check 'run.started carries the window settings' "$status" "$detail"
+
 compose exec -T lgtm du -s /data/prometheus /data/loki /data/tempo || true
 
-# ── 9. volume survives ────────────────────────────────────────────────────────
+# ── 13. volume survives ───────────────────────────────────────────────────────
 scratch_stack_remove
 if [ "$production_volume" = present ]; then
   docker volume inspect petri-telemetry >/dev/null 2>&1 && status=0 || status=1

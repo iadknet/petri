@@ -292,6 +292,8 @@ mod tests {
                 termination_reason: core_trace::TerminationReason::NoDecision,
                 priority_bid: 0.0,
                 commit_counts: [0; VOTE_KIND_COUNT],
+                #[cfg(feature = "telemetry")]
+                outcome: None,
             }],
         };
 
@@ -390,6 +392,8 @@ mod tests {
                 termination_reason: core_trace::TerminationReason::NoDecision,
                 priority_bid: 0.0,
                 commit_counts: [1, 0, 0, 0],
+                #[cfg(feature = "telemetry")]
+                outcome: None,
             }],
         };
 

@@ -11,4 +11,6 @@ mod previous_outcome;
 mod reproductive_success;
 mod support;
 mod trace;
+#[cfg(feature = "telemetry-seams")]
+mod window_seam;
 mod work_counters;

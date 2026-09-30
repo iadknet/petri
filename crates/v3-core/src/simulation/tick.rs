@@ -19,6 +19,7 @@ use crate::runtime::trace::domain::{
     PerceptionDebugSnapshot, StaticInputsSnapshot, TerminationReason, TickTrace,
 };
 use crate::runtime::trace::recording::ActiveTrace;
+#[cfg(not(feature = "telemetry-seams"))]
 use crate::runtime::traced_mesh::execute_creature_mesh_traced;
 use crate::runtime::types::MeshOutput;
 use crate::sensors::perception::{
@@ -46,6 +47,18 @@ mod helpers;
 
 pub(crate) use self::helpers::sort_by_priority_bid;
 use self::helpers::{remove_creature_from_sim, remove_creature_if_dead};
+
+#[cfg(feature = "telemetry-seams")]
+#[path = "tick/window_seam.rs"]
+mod window_seam;
+#[cfg(feature = "telemetry-seams")]
+use self::window_seam::{record_limit, FlowMarks};
+#[cfg(feature = "telemetry-seams")]
+use crate::runtime::trace::domain::TickOutcome;
+#[cfg(feature = "telemetry-seams")]
+use crate::runtime::trace::recording::Truncation;
+#[cfg(feature = "telemetry-seams")]
+use crate::runtime::traced_mesh::{execute_creature_mesh_budgeted, RecordedMesh};
 
 #[cfg(test)]
 #[path = "tick/tests/mod.rs"]
@@ -462,6 +475,12 @@ fn run_cognition(
     // Clone RuntimeConfig for cognition phase (small struct, ~7 scalars).
     let runtime_config = sim.config.runtime.clone();
     let tick_number = sim.tick;
+    #[cfg(feature = "telemetry-seams")]
+    let failed_action_penalty = sim.config.failed_action_penalty_for_tick(sim.tick);
+    #[cfg(feature = "telemetry-seams")]
+    let limit = trace
+        .as_ref()
+        .and_then(|active| record_limit(active, &sim.config));
     let mut creature_refs: HashMap<_, _> = sim.creatures.iter_mut().collect();
 
     // Extract traced creature (if any) before building parallel work vec.
@@ -496,6 +515,25 @@ fn run_cognition(
             let energy_before = creature.energy;
             let si_snapshot = StaticInputsSnapshot::from(&ss.local);
 
+            #[cfg(feature = "telemetry-seams")]
+            let (position, age) = (creature.position, creature.age);
+            #[cfg(feature = "telemetry-seams")]
+            let RecordedMesh {
+                output,
+                hops,
+                passes,
+                truncated,
+            } = execute_creature_mesh_budgeted(
+                &creature.genome,
+                ss,
+                &mut creature.energy,
+                &mut creature.shared_memory,
+                &creature.prev_shared_memory,
+                &mut creature.graph_runtime,
+                &runtime_config,
+                limit,
+            );
+            #[cfg(not(feature = "telemetry-seams"))]
             let (output, hops, passes) = execute_creature_mesh_traced(
                 &creature.genome,
                 ss,
@@ -526,8 +564,36 @@ fn run_cognition(
                     termination_reason: output.termination_reason,
                     priority_bid: output.priority_bid,
                     commit_counts: output.commit_counts,
+                    #[cfg(feature = "telemetry-seams")]
+                    outcome: Some(TickOutcome {
+                        position,
+                        age,
+                        typed_local_food: ss.typed_local_food.clone(),
+                        typed_area_food: ss.perception.typed_area_food.clone(),
+                        failed_action_penalty,
+                        applied: Vec::with_capacity(runtime_config.max_actions_per_turn),
+                        damage_received: 0.0,
+                        offspring_spawned: 0,
+                        after: None,
+                        died: None,
+                        phases: None,
+                    }),
                 });
                 active.ticks_remaining = active.ticks_remaining.saturating_sub(1);
+                #[cfg(feature = "telemetry-seams")]
+                if active.budget.is_some() {
+                    if let Some(record) = active.ticks.last_mut() {
+                        record.hops.shrink_to_fit();
+                        record.passes.shrink_to_fit();
+                    }
+                    if let Some(reason) = truncated {
+                        active.truncated = Some(Truncation {
+                            tick: tick_number,
+                            reason,
+                        });
+                        active.ticks_remaining = 0;
+                    }
+                }
             }
 
             // Insert traced creature's decision at its queue position.
@@ -712,21 +778,23 @@ fn push_action_log(
     direction: u8,
     amount: f32,
     food_type: Option<OrdinaryFoodTypeId>,
-) {
+) -> ActionLogEntry {
     let energy_after = sim.creatures.get(ctx.id).map_or(0.0, |c| c.energy);
+    let entry = ActionLogEntry {
+        tick: ctx.tick,
+        action_type,
+        result,
+        direction,
+        energy_before: ctx.energy_before,
+        energy_after,
+        amount,
+        food_type,
+        priority_bid: ctx.priority_bid,
+    };
     if let Some(log) = sim.action_logs.get_mut(ctx.id) {
-        log.push(ActionLogEntry {
-            tick: ctx.tick,
-            action_type,
-            result,
-            direction,
-            energy_before: ctx.energy_before,
-            energy_after,
-            amount,
-            food_type,
-            priority_bid: ctx.priority_bid,
-        });
+        log.push(entry);
     }
+    entry
 }
 
 /// Charge the complexity- and age-adjusted penalty for a failed action.
@@ -773,7 +841,11 @@ impl BarrierContext {
 }
 
 /// NoOp cannot fail; no `failed_action_penalty` is possible.
-fn execute_noop(sim: &mut Simulation, ctx: &ActionContext, outcome_acc: &mut OutcomeAccumulator) {
+fn execute_noop(
+    sim: &mut Simulation,
+    ctx: &ActionContext,
+    outcome_acc: &mut OutcomeAccumulator,
+) -> ActionLogEntry {
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
         creature.record_action_attempt(ActionType::NoOp);
         apply_noop(creature, &sim.config, &mut sim.stats.energy_flows);
@@ -788,7 +860,7 @@ fn execute_noop(sim: &mut Simulation, ctx: &ActionContext, outcome_acc: &mut Out
         NO_DIRECTION,
         0.0,
         None,
-    );
+    )
 }
 
 fn execute_eat(
@@ -796,7 +868,7 @@ fn execute_eat(
     ctx: &ActionContext,
     type_idx: OrdinaryFoodTypeId,
     outcome_acc: &mut OutcomeAccumulator,
-) {
+) -> ActionLogEntry {
     let mut action_result = ActionResult::Success;
     let mut amount = 0.0;
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
@@ -836,7 +908,7 @@ fn execute_eat(
         NO_DIRECTION,
         amount,
         Some(type_idx),
-    );
+    )
 }
 
 fn execute_move(
@@ -844,7 +916,7 @@ fn execute_move(
     ctx: &ActionContext,
     dir: Direction,
     outcome_acc: &mut OutcomeAccumulator,
-) {
+) -> ActionLogEntry {
     let mut action_result = ActionResult::Success;
     let mut blocked_cause = None;
     let barrier = BarrierContext::for_creature(sim, ctx.id);
@@ -902,7 +974,7 @@ fn execute_move(
         dir.to_index() as u8,
         0.0,
         None,
-    );
+    )
 }
 
 fn execute_reproduce(
@@ -913,7 +985,7 @@ fn execute_reproduce(
     outcome_acc: &mut OutcomeAccumulator,
     reproduce_rng: &mut SmallRng,
     successful_spawn_targets: &mut HashSet<Position>,
-) {
+) -> ActionLogEntry {
     let barrier = BarrierContext::for_creature(sim, ctx.id);
     let reproduction_target = barrier
         .position
@@ -990,7 +1062,7 @@ fn execute_reproduce(
         direction.to_index() as u8,
         energy_transfer_fraction,
         None,
-    );
+    )
 }
 
 fn execute_steal_energy(
@@ -999,7 +1071,7 @@ fn execute_steal_energy(
     direction: Direction,
     amount: f32,
     outcome_acc: &mut OutcomeAccumulator,
-) {
+) -> ActionLogEntry {
     // Snapshot predation events length to extract damage info.
     let pred_events_before = sim.stats.last_tick_predation_events.len();
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
@@ -1042,7 +1114,7 @@ fn execute_steal_energy(
         direction.to_index() as u8,
         actual_stolen,
         None,
-    );
+    )
 }
 
 /// Phase 2: sequential action execution.
@@ -1086,7 +1158,11 @@ fn run_phase_2(
                 failed_action_penalty,
             };
 
-            match *action {
+            #[cfg(feature = "telemetry-seams")]
+            let marks = (sim.stats.observed_creature == Some(id))
+                .then(|| FlowMarks::of(&sim.stats.energy_flows));
+            #[cfg_attr(not(feature = "telemetry-seams"), allow(unused_variables))]
+            let entry = match *action {
                 WorldAction::NoOp => execute_noop(sim, &ctx, outcome_acc),
                 WorldAction::Eat { type_idx } => execute_eat(sim, &ctx, type_idx, outcome_acc),
                 WorldAction::Move(dir) => execute_move(sim, &ctx, dir, outcome_acc),
@@ -1103,8 +1179,13 @@ fn run_phase_2(
                     &mut successful_spawn_targets,
                 ),
                 WorldAction::StealEnergy { direction, amount } => {
-                    execute_steal_energy(sim, &ctx, direction, amount, outcome_acc);
+                    execute_steal_energy(sim, &ctx, direction, amount, outcome_acc)
                 }
+            };
+            #[cfg(feature = "telemetry-seams")]
+            if let Some(marks) = marks {
+                let applied = marks.applied(entry, &sim.stats.energy_flows);
+                sim.stats.observed_actions.push(applied);
             }
 
             // Floor energy at 0.0 — creatures cannot spend more than they have.
@@ -1213,6 +1294,10 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
 pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
     // Reset per-tick counters at the start of each tick.
     sim.stats.reset_tick_counters();
+    #[cfg(feature = "telemetry-seams")]
+    {
+        sim.stats.observed_creature = window_seam::observed(trace);
+    }
 
     #[cfg(feature = "telemetry-seams")]
     let population_start = sim.creatures.len();
@@ -1252,8 +1337,14 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
     if let Some(ref mut active) = trace {
         if !active.is_complete() && !sim.creatures.contains_key(active.creature_id) {
             active.ticks_remaining = 0;
+            #[cfg(feature = "telemetry-seams")]
+            {
+                active.removed = sim.stats.observed_removal;
+            }
         }
     }
+    #[cfg(feature = "telemetry-seams")]
+    window_seam::reserve_tick(trace, &sim.config, sim.tick);
 
     // Derive a separate RNG for reproduction to avoid double-borrowing sim.rng.
     let mut reproduce_rng = SmallRng::seed_from_u64(sim.rng.next_u64());
@@ -1307,6 +1398,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
             elapsed: tick_started.elapsed(),
             phases,
         });
+        window_seam::finish_tick(sim, trace, &outcome_acc, sim.tick - 1);
     }
 }
 

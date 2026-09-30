@@ -107,6 +107,10 @@ pub fn apply_steal_energy(
     victim.energy -= actual;
     sim.stats.energy_flows.predation_victim_debit +=
         victim.observe_energy(before, DeathCause::Predation);
+    #[cfg(feature = "telemetry-seams")]
+    if sim.stats.observed_creature == Some(victim_id) {
+        sim.stats.observed_damage += actual;
+    }
     let attacker = &mut sim.creatures[attacker_id];
     let before = attacker.energy;
     attacker.energy += actual;

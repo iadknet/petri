@@ -24,6 +24,10 @@ pub struct SimHandle {
     pub sim: Simulation,
     pub status: SimulationStatus,
     pub active_trace: Option<v3_core::runtime::trace::recording::ActiveTrace>,
+    /// The creature window recording (T21.F04), used while `active_trace`
+    /// is empty.
+    #[cfg(feature = "telemetry")]
+    pub window_trace: Option<v3_core::runtime::trace::recording::ActiveTrace>,
     /// Cached quantized fertility grid. Computed once at startup/restart; fertility
     /// is static and does not change between resets.
     pub cached_fertility_u8: Arc<[u8]>,
@@ -38,8 +42,49 @@ impl SimHandle {
             sim,
             status: SimulationStatus::Idle,
             active_trace: None,
+            #[cfg(feature = "telemetry")]
+            window_trace: None,
             cached_fertility_u8,
         }
+    }
+
+    /// The simulation and the two recording slots, borrowed apart.
+    #[cfg(feature = "telemetry")]
+    pub(crate) fn telemetry_parts(&mut self) -> (&Simulation, crate::telemetry::Samples<'_>) {
+        (
+            &self.sim,
+            crate::telemetry::Samples {
+                window: &mut self.window_trace,
+                manual: self.active_trace.as_ref(),
+            },
+        )
+    }
+
+    /// Runs one tick: a creature window starts into its slot when due and
+    /// records while no manual sample does; the manual sample otherwise
+    /// takes the tick.
+    pub(crate) fn tick(
+        &mut self,
+        #[cfg(feature = "telemetry")] telemetry: &crate::telemetry::ServerTelemetry,
+    ) {
+        #[cfg(feature = "telemetry")]
+        {
+            let manual = self.active_trace.is_some();
+            telemetry.before_tick(&self.sim, &mut self.window_trace, manual);
+            let slot = if manual {
+                &mut self.active_trace
+            } else {
+                &mut self.window_trace
+            };
+            v3_core::simulation::run_tick(&mut self.sim, slot);
+            telemetry.after_tick(
+                &self.sim,
+                &mut self.window_trace,
+                self.active_trace.as_ref(),
+            );
+        }
+        #[cfg(not(feature = "telemetry"))]
+        v3_core::simulation::run_tick(&mut self.sim, &mut self.active_trace);
     }
 }
 

@@ -473,6 +473,8 @@ mod tests {
             sim,
             status: SimulationStatus::Paused,
             active_trace: None,
+            #[cfg(feature = "telemetry")]
+            window_trace: None,
             cached_fertility_u8,
         };
         let frame = build_ws_frame(&handle);

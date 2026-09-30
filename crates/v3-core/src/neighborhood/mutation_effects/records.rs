@@ -221,12 +221,12 @@ impl TracedBattery {
             runtime,
             decay_rate,
             || RecordingMeshExecution::new(max_hops),
-            |(output, hops, passes), state| {
-                dispatched.extend(hops.iter().map(|hop| hop.node_id));
+            |recorded, state| {
+                dispatched.extend(recorded.hops.iter().map(|hop| hop.node_id));
                 TracedExecution {
-                    computation: ComputationRecord::from_trace(&hops, &passes),
-                    state: StateRecord::read(genome, &output, &state),
-                    actions: output.actions,
+                    computation: ComputationRecord::from_trace(&recorded.hops, &recorded.passes),
+                    state: StateRecord::read(genome, &recorded.output, &state),
+                    actions: recorded.output.actions,
                 }
             },
         );

@@ -128,10 +128,14 @@ pub fn run_simulation<W: std::io::Write>(
     let sample_every = sample_every as u64;
     let mut last_sampled_tick: Option<u64> = None;
 
+    // The creature window slot (T21.F04); telemetry off leaves it empty.
+    let mut window: Option<v3_core::runtime::trace::recording::ActiveTrace> = None;
     for _ in 0..ticks {
-        run_tick(&mut sim, &mut None);
         #[cfg(feature = "telemetry")]
-        telemetry::after_tick(telemetry_run.as_mut(), &sim);
+        telemetry::before_tick(telemetry_run.as_mut(), &sim, &mut window);
+        run_tick(&mut sim, &mut window);
+        #[cfg(feature = "telemetry")]
+        telemetry::after_tick(telemetry_run.as_mut(), &sim, &mut window);
         let current_tick = sim.tick;
 
         let should_sample = current_tick.is_multiple_of(sample_every) || current_tick == ticks;
@@ -158,7 +162,7 @@ pub fn run_simulation<W: std::io::Write>(
     };
     emit(out, &completed)?;
     #[cfg(feature = "telemetry")]
-    telemetry::end_run(telemetry_run, &sim);
+    telemetry::end_run(telemetry_run, &sim, &mut window);
 
     Ok(())
 }

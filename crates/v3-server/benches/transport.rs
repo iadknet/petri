@@ -21,6 +21,8 @@ fn transport_handle(seed: u64) -> SimHandle {
         sim,
         status: SimulationStatus::Running,
         active_trace: None,
+        #[cfg(feature = "telemetry")]
+        window_trace: None,
         cached_fertility_u8,
     }
 }

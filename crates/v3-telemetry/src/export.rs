@@ -101,7 +101,8 @@ fn post_proto<R: Message + Default>(
 }
 
 /// Posts the requests the worker encodes itself, with no retry: snapshots to
-/// the collector's `/v1/metrics` and tick traces to its `/v1/traces`.
+/// the collector's `/v1/metrics`, and tick traces and creature windows to
+/// its `/v1/traces`.
 #[derive(Debug)]
 pub(crate) struct EncodedClient {
     client: reqwest::blocking::Client,
@@ -122,7 +123,7 @@ impl PostEncoded for EncodedClient {
                         .map_or(0, |partial| count(partial.rejected_data_points))
                 },
             ),
-            Signal::Traces => post_proto(
+            Signal::Traces | Signal::Windows => post_proto(
                 &self.client,
                 &self.traces_url,
                 body,
