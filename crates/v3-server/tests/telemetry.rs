@@ -432,3 +432,57 @@ async fn interval_snapshots_carry_tick_traces_and_lifecycle_snapshots_do_not() {
     assert!(trace_ticks(second).is_empty(), "{:?}", trace_ticks(second));
     assert!(trace_ticks(runs[0]).is_empty());
 }
+
+/// The free-running loop samples on its own: with a short interval, an
+/// interval trace arrives while `run_loop` ticks, at a tick with an interval
+/// snapshot of the same run and under the run's config digest.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn run_loop_emits_interval_traces_at_snapshot_ticks() {
+    const DEADLINE: Duration = Duration::from_secs(30);
+    let receiver = Receiver::start();
+    let telemetry = Telemetry::start_with(Options {
+        service: Service::Server,
+        endpoint: receiver.endpoint().to_owned(),
+        limits: Limits::default(),
+        reports: ReportSink::capture(),
+        metrics_interval: Duration::from_millis(100),
+        tick_traces: v3_telemetry::Switch::On,
+    });
+    let mut config = test_config();
+    config.world.width = 32;
+    config.world.height = 32;
+    config.population.initial_creatures = 16;
+    let state = AppState::from_config_with_telemetry(config, 0, telemetry);
+    let app = router(state.clone());
+
+    let started = call(&app, "POST", "/v3/simulation/startup", r#"{"seed":1}"#).await;
+    let digest = started["config_digest"].as_str().unwrap().to_owned();
+    call(&app, "POST", "/v3/simulation/start", "").await;
+    let deadline = Instant::now() + DEADLINE;
+    let trace = loop {
+        if let Some(trace) = receiver.traces().into_iter().next() {
+            break trace;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "no interval trace from the running loop within {DEADLINE:?}"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    };
+    call(&app, "POST", "/v3/simulation/pause", "").await;
+    state.shutdown_telemetry().await;
+
+    let run = trace.run_id().unwrap();
+    let tick = trace.tick().unwrap();
+    let snapshot_ticks: Vec<u64> = receiver
+        .snapshots()
+        .iter()
+        .filter(|snapshot| snapshot.run_id() == Some(run))
+        .map(|snapshot| snapshot.tick().unwrap())
+        .collect();
+    assert!(snapshot_ticks.contains(&tick), "{tick}: {snapshot_ticks:?}");
+    for span in &trace.spans {
+        assert_eq!(span.attribute("petri.config_digest"), Some(digest.as_str()));
+        assert_eq!(span.attribute("petri.sample_policy"), Some("interval"));
+    }
+}

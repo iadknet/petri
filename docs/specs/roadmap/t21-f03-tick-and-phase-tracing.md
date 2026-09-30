@@ -243,6 +243,7 @@ never zero. Nothing here is closure evidence.
 | Item | Result (2026-09-29; transcripts in the readings file) |
 | --- | --- |
 | Seam, neutrality, encoding, server | pass inside `make check` (both `v3-core --lib` rows); the server test runs every tick as a paused `step` with a 1 s interval, 5/5 repeat runs pass |
+| Server free-running loop | `run_loop_emits_interval_traces_at_snapshot_ticks` (100 ms interval, polled to a 30 s deadline): the loop's interval trace sits at a snapshot tick of its run under the run's digest; 5/5 pass, and it fails with `run_loop`'s `after_tick` removed |
 | Reference build | build exit 0; `cargo tree` 0 matches; clippy `-D warnings` exit 0 without the feature and in `make check` with it |
 | Dashboards | every row PASS, `Tick traces` 4 rows; browser: panel lists the run's four traces, the span link opens the six-span trace |
 | Bytes per run | `bytes=` 801,625–805,701, `snapshots=4 traces=4`; about 6.2 KB per trace; Tempo +380 KiB over ten runs |
