@@ -1,6 +1,6 @@
 # T21.F05 — Qualified Sampling Defaults
 
-**Status**: In Progress
+**Status**: Blocked
 **Last updated**: 2026-09-30
 **Feature**: T21.F05
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -136,7 +136,7 @@ exports; the counts, caps and sampling policies stay F02–F04's.
       the stderr start line, preset scrubbing in the three fixture helpers;
       unit tests first.
 - [x] `scripts/telemetry-stats.mjs` (median, order-statistic interval,
-      verdict) with `scripts/telemetry-stats.test.mjs` under `make check`;
+      verdict, the T1 calibration rule) with `scripts/telemetry-stats.test.mjs` under `make check`;
       `scripts/telemetry-overhead` gains `PETRI_OVERHEAD_MODE=qualify`
       (worlds, cells, presets, storage blocks, cap 3,600 s,
       `TELEMETRY_USED_MS` carry, the readings lines it prints), the
@@ -151,9 +151,10 @@ exports; the counts, caps and sampling policies stay F02–F04's.
       `TELEMETRY_OFF` constant, empty without the `telemetry` feature; the
       flip itself waits for a pass).
 - [x] Parent comparison against `8b0a158f`, T = 6908.
-- [ ] The qualifying measurement, once, recorded in
-      `docs/progress/readings/t21-f05.md`; D5 applied; the Measured verdict
-      and the preset cost table filled in.
+- [x] The qualifying measurement, once, recorded in
+      `docs/progress/readings/t21-f05.md`; D5 applied (not a pass: no
+      flip, user stop); the Measured verdict and the preset cost table
+      filled in.
 
 ## Verification
 
@@ -179,21 +180,24 @@ exports; the counts, caps and sampling policies stay F02–F04's.
 - [x] `node --test scripts/telemetry-stats.test.mjs` -> median, interval
       ranks and verdict on fixed inputs, including the strict comparison
       at exactly 1.05 and a voided pair entering as an infinite ratio.
-      12 tests pass (the `dense` minimum counts among them); `make
+      14 tests pass (the `dense` minimum counts and the T1 calibration
+      rule among them); `make
       quality-check` runs the file and exits 0.
 - [x] `scripts/telemetry-parent-compare 8b0a158f` -> identical canonical
       output; transcript in the readings file. Exit 0, `identical: 3
       canonical lines, T=6908`.
-- [ ] `PETRI_OVERHEAD_MODE=qualify scripts/telemetry-overhead` -> the
+- [x] `PETRI_OVERHEAD_MODE=qualify scripts/telemetry-overhead` -> the
       readings file's qualification section (per-cell ratios, intervals,
       verdicts, flush and self time, presets, storage, measured time); the
-      verdict copied to Performance and Goal Impact. Attempt 1 exit 1:
-      W1 calibration ended on 40 ticks in 3,895 ms (outside 4–6 s),
-      `TELEMETRY_USED_MS=11917`, no cell run.
+      verdict copied to Performance and Goal Impact. Attempt 2
+      (`TELEMETRY_USED_MS=11917`, bracketing T1 rule) exit 0,
+      `Qualification: not pass: user stop (D5)`, 2,174.1 s of the cap used.
 - [ ] Mutation gate: `Not applicable: observability feature` (the
       workflow's exemption; no run).
 - [ ] Benchmark summary: `Not applicable: observability feature`.
-- [ ] `make check`, `make check-docs`, `make roadmap-check` exit 0. Before the flip: `env -u PETRI_TELEMETRY make check` exit 0 and `make roadmap-check` exit 0 on the blocked state; rerun after the D5 outcome.
+- [ ] `make check`, `make check-docs`, `make roadmap-check` exit 0. Before the flip: `env -u PETRI_TELEMETRY make check` exit 0 and `make roadmap-check` exit 0 on the blocked state; after attempt 2
+      (D5 not a pass, no flip) `env -u PETRI_TELEMETRY make check` exit 0
+      and `make roadmap-check` exit 0.
 
 ## Performance and Goal Impact
 
@@ -249,12 +253,40 @@ Qualifying measurement, method fixed before any run:
 | Projection | at n = 32: W1 pairs about 10 s in `b` and `a` and 20 s in `s` (1,280 s), W2 about 8, 8 and 18 s (1,088 s), calibration, init, spread and (c) about 130 s, preset pairs about 320 s, storage runs about 110 s: about 2,930 s; at n = 24 about 2,340 s; at n = 16 about 1,590 s. The `s` runs' 10 s flush is inside those figures; elapsed session time adds the stack's two state changes per `a` and `s` pair (about 10–20 s each, roughly 50 minutes at n = 32) and the settle waits, so about 2 to 2.5 hours |
 | Expected | `standard`: every cell's median within 1.00–1.02 (F01–F02 measured 0.994–1.010 healthy and stopped; self time ≤ 0.7 µs per tick at F04 against a tick of about 0.55 ms on W2 and 100 ms on W1), `s` equal to `b` within noise on its verdict ratio, with `flush_ms` at 10,000, `abandoned` > 0, and its flush-included ratio about 3 on W1 and 3.5 on W2 (the 10 s flush over a 5 or 4 s run); (c) ≤ 1.02; `minimal` ≈ `phases` ≈ `standard`; `dense` 0–5 points above `standard`; wire bytes for `standard` about 200 KB per wall second (0.7 GB per hour), disk about 15 MB per hour in Prometheus and about 70 MB per hour in Tempo (F03's 22 MB of tick traces and F04's 50 MB of windows), `dense` about four times that |
 
-**Measured verdict.** None: attempt 1 stopped in the W1 calibration before
-any cell (11.9 s of the 3,600 s cap used). The rule scales linearly from
-the second run, but ticks 41–48 cost about 255 ms each against about 97 ms
-for ticks 1–40, so both trajectories landed on 40 ticks under 4 s. D5 is not
-applied, every default stays off, and a changed calibration rule or a fixed
-T1 needs the user's decision before a further attempt.
+**Measured verdict: not a pass (user stop under D5).** Attempt 2,
+2026-09-30, load averages 4.03 4.76 5.82 before and 3.13 3.27 3.53 after;
+T1 = 41 (calibration 20 → 2,023 ms, 49 → 6,001 ms, 41 → 4,119 ms); W1
+spread 0.0221 (n = 16), W2 spread 0.1538 (n = 32); init 201 ms (W1) and
+9 ms (W2). Five cells pass; W1 `s` is inconclusive, its upper bound 1.0505
+not below 1.05. No void pair, cap not reached: 2,174.1 s of 3,600 s used
+over both attempts. Against Expected: W1 `a` and `s` medians sit above
+1.00–1.02, (c) on W1 is 1.0881 against ≤ 1.02, and W1 `minimal`'s upper
+bound is 1.0531. The 5% ceiling is not recorded, routine mode's 1.05
+stays a non-ceiling threshold, and every default stays off.
+
+| World | Cell | n | Median | 90% interval | Verdict | Flush-included median | `flush_ms` median (max) | `abandoned` | Self time µs/tick |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| W1 | b | 16 | 1.0063 | [0.9901, 1.0132] | pass | – | 0 (0) | 0 | 87.0 |
+| W1 | a | 16 | 1.0249 | [1.0170, 1.0347] | pass | – | 5.5 (7) | 0 | 100.1 |
+| W1 | s | 16 | 1.0335 | [1.0232, 1.0505] | inconclusive | 3.2505 | 10,003 (10,006) | 12 | 119.5 |
+| W2 | b | 32 | 1.0005 | [0.9851, 1.0258] | pass | – | 0 (0) | 0 | 0.596 |
+| W2 | a | 32 | 1.0051 | [0.9959, 1.0184] | pass | – | 7 (19) | 0 | 0.660 |
+| W2 | s | 32 | 0.9919 | [0.9878, 1.0085] | pass | 3.4853 | 10,005 (10,011) | 10 | 0.622 |
+
+Idle stack (c): W1 1.0881, W2 0.9982. Presets, state `a` (the `standard`
+rows are the qualifying `a` cells; no preset's lower bound reaches 1.05;
+per-hour figures are repeated-short-invocation rates):
+
+| World | Preset | n | Median | 90% interval | Wire bytes per run | Wire MB per hour | Disk KB per run (prom, tempo, loki) | Disk MB per hour |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| W1 | minimal | 6 | 1.0247 | [1.0072, 1.0531] | 241,956 | 187 | 21, −3, 4 | 17.5 |
+| W1 | phases | 6 | 1.0146 | [1.0005, 1.0269] | 233,904 | 196 | 24, 111, 4 | 114.6 |
+| W1 | standard | 16 | 1.0249 | [1.0170, 1.0347] | 319,309 | 266 | 65, 127, 16 | 174.1 |
+| W1 | dense | 6 | 1.0090 | [0.9815, 1.0202] | 992,664 | 837 | 84, 162, 32 | 230.5 |
+| W2 | minimal | 6 | 0.9853 | [0.9649, 1.0206] | 781,038 | 732 | 113, −3, 4 | 103.7 |
+| W2 | phases | 6 | 1.0252 | [0.9961, 1.0295] | 805,492 | 752 | 72, 111, 4 | 168.7 |
+| W2 | standard | 32 | 1.0051 | [0.9959, 1.0184] | 894,750 | 836 | 71, 677, 16 | 702.4 |
+| W2 | dense | 6 | 1.0171 | [0.9857, 1.0449] | 3,419,363 | 3,184 | 225, 167, 29 | 381.7 |
 
 - Readings: [`docs/progress/readings/t21-f05.md`](../../progress/readings/t21-f05.md).
 
@@ -266,10 +298,10 @@ T1 needs the user's decision before a further attempt.
 - [ ] `PETRI_TELEMETRY_PRESET` selects `minimal`, `phases`, `standard` or
       `dense`, an explicit variable overrides one setting, and `run.started`
       carries the preset.
-- [ ] The qualifying measurement ran once under the predeclared method,
+- [x] The qualifying measurement ran once under the predeclared method,
       every cell's reading is in the readings file, and the Measured verdict
       records the D5 outcome and, on pass, the 5% ceiling.
-- [ ] Each preset's measured time and storage cost is recorded.
+- [x] Each preset's measured time and storage cost is recorded.
 - [ ] `make check` passes with no stack listening; the neutrality test and
       the parent comparison hold.
 

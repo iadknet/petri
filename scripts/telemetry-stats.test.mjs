@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  calibrationStep,
   cellStats,
   checkRun,
   intervalRank,
@@ -177,6 +178,55 @@ test('the command line reads pair lines and prints the cell', () => {
     writeFileSync(file, '100\n104\n102\n101\n103\n');
     const out = execFileSync(process.execPath, [script, 'spread', file], { encoding: 'utf8' }).trim();
     assert.equal(out, 'spread=0.0392 n=16');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('calibration: three scaling runs, then bisection, first in-band count is T1', () => {
+  const rule = { start: 20, target: 5000, low: 4000, high: 6000, maxRuns: 8 };
+  const step = (history) => calibrationStep(history, rule);
+  assert.deepEqual(step([]), { next: 20 });
+  // Attempt 1's history: 48 ticks at 5,939 ms is already in the band.
+  assert.deepEqual(step([[20, 2083]]), { next: 48 });
+  assert.deepEqual(step([[20, 2083], [48, 5939]]), { t1: 48 });
+  assert.deepEqual(step([[20, 2083], [48, 5939], [40, 3895]]), { t1: 48 });
+  // The band is inclusive at both ends.
+  assert.deepEqual(step([[20, 1000], [100, 4000]]), { t1: 100 });
+  assert.deepEqual(step([[20, 1000], [100, 6000]]), { t1: 100 });
+  // Fewer than three runs keep scaling to the target even across the band.
+  assert.deepEqual(step([[20, 1000], [100, 9000]]), { next: 56 });
+  // Three runs all below: the last scales to the top of the band.
+  assert.deepEqual(step([[20, 2083], [30, 3000], [40, 3895]]), { next: 62 });
+  // Bracketed: bisect between the nearest counts below and above the band.
+  assert.deepEqual(step([[20, 2083], [48, 6100], [40, 3895]]), { next: 44 });
+  assert.deepEqual(step([[40, 3895], [62, 9500], [20, 2083]]), { next: 51 });
+  assert.deepEqual(step([[40, 3895], [62, 9500], [20, 2083], [51, 7000]]), { next: 45 });
+  assert.deepEqual(step([[40, 3895], [62, 9500], [20, 2083], [51, 3990]]), { next: 56 });
+  // A bisection count already measured means the bracket is exhausted.
+  assert.deepEqual(step([[40, 3895], [41, 6500], [20, 2083]]), { inconclusive: true });
+  // Eight runs outside the band.
+  const eight = [[20, 1000], [100, 3000], [133, 3500], [200, 3900], [240, 3950], [290, 3990], [350, 3999], [420, 3999]];
+  assert.deepEqual(step(eight.slice(0, 7)), { next: 525 });
+  assert.deepEqual(step(eight), { inconclusive: true });
+  // With maxRuns 3 (routine mode) there is no bisection.
+  const routine = { start: 1000, target: 4000, low: 3000, high: 5000, maxRuns: 3 };
+  assert.deepEqual(calibrationStep([[1000, 1000], [4000, 2900], [5517, 5100]], routine), { inconclusive: true });
+});
+
+test('the calibrate command prints the next count, T1 or inconclusive', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'telemetry-stats-'));
+  try {
+    const file = join(dir, 'history');
+    const run = () => execFileSync(process.execPath, [script, 'calibrate', '20', '5000', '4000', '6000', '8', file], { encoding: 'utf8' }).trim();
+    writeFileSync(file, '');
+    assert.equal(run(), 'next=20');
+    writeFileSync(file, '20 2083\n');
+    assert.equal(run(), 'next=48');
+    writeFileSync(file, '20 2083\n48 5939\n');
+    assert.equal(run(), 't1=48');
+    writeFileSync(file, '40 3895\n41 6500\n20 2083\n');
+    assert.equal(run(), 'inconclusive');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

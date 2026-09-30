@@ -7,6 +7,9 @@
 //     `-`) or `void`; prints `n= k= median= lower= upper= verdict=`.
 //   telemetry-stats.mjs spread FILE
 //     FILE holds one reference wall time per line; prints `spread= n=`.
+//   telemetry-stats.mjs calibrate START TARGET LOW HIGH MAXRUNS FILE
+//     FILE holds one run per line, `TICKS MS`; prints `next=N`, `t1=N` or
+//     `inconclusive` (calibrationStep).
 //   telemetry-stats.mjs check PRESET ENDPOINT EXPORT_CHECK(0|1) < STDERR
 //     prints `status= self_time_us= flush_ms= failed= dropped= abandoned=
 //     bytes= snapshots= traces= windows=` then the start line on its own line.
@@ -79,6 +82,27 @@ export function pairRatio(line, { subtractFlush = false } = {}) {
   if (tel === 'void') return Infinity;
   const wall = subtractFlush ? Number(tel) - Number(flush) : Number(tel);
   return wall / Number(ref);
+}
+
+// The calibration rule (spec, T1 row) over the `[ticks, ms]` runs so far:
+// `{ t1 }` for the first run within LOW..HIGH ms inclusive; else the next
+// count, `{ next }`: START, then each run scaled to TARGET until three runs,
+// then bisection between the nearest counts below and above the band, or the
+// last run scaled to HIGH while none is above it; `{ inconclusive }` after
+// MAXRUNS runs or when the bisection count was already measured.
+export function calibrationStep(history, { start, target, low, high, maxRuns }) {
+  const hit = history.find(([, ms]) => ms >= low && ms <= high);
+  if (hit) return { t1: hit[0] };
+  const scale = ([ticks, ms], goal) => ({ next: Math.max(1, Math.round((ticks * goal) / ms)) });
+  if (history.length === 0) return { next: start };
+  if (history.length >= maxRuns) return { inconclusive: true };
+  const last = history[history.length - 1];
+  if (history.length < 3) return scale(last, target);
+  const below = history.filter(([, ms]) => ms < low).map(([ticks]) => ticks);
+  const above = history.filter(([, ms]) => ms > high).map(([ticks]) => ticks);
+  if (above.length === 0) return scale(last, high);
+  const next = Math.floor((Math.max(...below) + Math.min(...above)) / 2);
+  return history.some(([ticks]) => ticks === next) ? { inconclusive: true } : { next };
 }
 
 // (max - min) / median.
@@ -159,6 +183,11 @@ function main(argv) {
   } else if (command === 'spread') {
     const value = spread(lines(rest[0]).map(Number));
     console.log(`spread=${fixed(value)} n=${pairCount(value)}`);
+  } else if (command === 'calibrate') {
+    const [start, target, low, high, maxRuns] = rest.slice(0, 5).map(Number);
+    const history = lines(rest[5]).map((line) => line.trim().split(/\s+/).map(Number));
+    const step = calibrationStep(history, { start, target, low, high, maxRuns });
+    console.log(step.t1 ? `t1=${step.t1}` : step.next ? `next=${step.next}` : 'inconclusive');
   } else if (command === 'check') {
     const [preset, endpoint, exportCheck] = rest;
     if (!PRESETS[preset]) throw new Error(`unknown preset ${preset}`);
@@ -166,7 +195,7 @@ function main(argv) {
     console.log([`status=${run.status}`, ...COUNTS.map((name) => `${name}=${run[name]}`)].join(' '));
     console.log(run.start);
   } else {
-    console.error('Usage: telemetry-stats.mjs cell CEILING FILE [--subtract-flush] | spread FILE | check PRESET ENDPOINT 0|1');
+    console.error('Usage: telemetry-stats.mjs cell CEILING FILE [--subtract-flush] | spread FILE | calibrate START TARGET LOW HIGH MAXRUNS FILE | check PRESET ENDPOINT 0|1');
     process.exit(2);
   }
 }
