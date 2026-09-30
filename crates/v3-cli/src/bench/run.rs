@@ -137,13 +137,20 @@ pub(super) struct NeighborhoodObservation<'a> {
     )>,
 }
 
+/// `recipe` names the goal case's recipe on the world set; the seed's
+/// telemetry run records it (T21.F06).
 pub(super) fn run_one_seed(
     config: &SimulationConfig,
     seed: u64,
     horizon: u64,
     observe_goal_indicators: bool,
     neighborhood: Option<NeighborhoodObservation<'_>>,
+    #[cfg_attr(not(feature = "telemetry"), allow(unused_variables))] recipe: Option<&str>,
 ) -> SeedRun {
+    // `run.started` precedes the seed's timer and `run.ended` follows it, so
+    // neither sits inside a stored wall-clock interval.
+    #[cfg(feature = "telemetry")]
+    let telemetry_run = crate::telemetry::begin_seed(config, seed, horizon, recipe);
     let start = Instant::now();
     let mut sim = seed_simulation(config.clone(), seed);
     let observation_start = Instant::now();
@@ -175,6 +182,25 @@ pub(super) fn run_one_seed(
 
     let tracking = WorldTracking::observe(&sim).with_transferred_counters(&sim);
     let persistence = persistence.finish(seed);
+    let per_seed = PerSeed {
+        tick_zero_connectivity: Some(tick_zero_connectivity),
+        seed,
+        ticks: ticks_executed,
+        creature_ticks: sim.stats.creature_ticks_total,
+        mesh_hops: sim.stats.mesh_hops_total,
+        vm_steps: sim.stats.vm_steps_total,
+        graph_relax_iters: sim.stats.graph_relax_iters_total,
+        plasticity_updates: sim.stats.plasticity_updates_total,
+        actions_applied: sim.stats.actions_applied_total,
+        births: sim.stats.reproduction_actions_spawned_total,
+        pass_cap_hits: Some(sim.stats.pass_cap_hits_total),
+        passes: Some(sim.stats.passes_total),
+        decided_passes: Some(sim.stats.decided_passes_total),
+        final_population: persistence.final_population,
+        extinction_tick: persistence.extinction_tick,
+    };
+    #[cfg(feature = "telemetry")]
+    crate::telemetry::end_seed(telemetry_run, sim.tick, &per_seed);
     let complexities: Vec<u32> = sim
         .creatures
         .values()
@@ -265,24 +291,6 @@ pub(super) fn run_one_seed(
             input_use_wall_clock_ms,
         }
     });
-
-    let per_seed = PerSeed {
-        tick_zero_connectivity: Some(tick_zero_connectivity),
-        seed,
-        ticks: ticks_executed,
-        creature_ticks: sim.stats.creature_ticks_total,
-        mesh_hops: sim.stats.mesh_hops_total,
-        vm_steps: sim.stats.vm_steps_total,
-        graph_relax_iters: sim.stats.graph_relax_iters_total,
-        plasticity_updates: sim.stats.plasticity_updates_total,
-        actions_applied: sim.stats.actions_applied_total,
-        births: sim.stats.reproduction_actions_spawned_total,
-        pass_cap_hits: Some(sim.stats.pass_cap_hits_total),
-        passes: Some(sim.stats.passes_total),
-        decided_passes: Some(sim.stats.decided_passes_total),
-        final_population: persistence.final_population,
-        extinction_tick: persistence.extinction_tick,
-    };
 
     let phases = sim.stats.phase_wall_clock;
     let throughput = SeedThroughput {
@@ -503,6 +511,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
             params.ticks,
             observe_goal_indicators,
             neighborhood,
+            case.as_ref().map(|case| case.case.recipe_path.as_str()),
         );
         pooled_complexities.extend(run.complexities.iter().copied());
         wall_clock.push(SeedWallClock {

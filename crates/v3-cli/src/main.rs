@@ -10,7 +10,9 @@ use v3_core::config::SimulationConfig;
 #[command(name = "v3-cli")]
 struct Cli {
     /// Export run telemetry over OTLP (`on` or `off`); beats PETRI_TELEMETRY,
-    /// default off. Only `run` exports records at T21.F01.
+    /// default off. `run` exports its run; `bench`, `recruitment` and
+    /// `input-opportunity` export one measurement record pair (and `bench`
+    /// one run per seed) after their work ends.
     #[cfg(feature = "telemetry")]
     #[arg(long, global = true, value_name = "on|off")]
     telemetry: Option<v3_telemetry::Switch>,
@@ -208,6 +210,8 @@ fn main() {
         eprintln!("error: {message}");
         std::process::exit(1);
     });
+    #[cfg(not(feature = "telemetry"))]
+    let switch = Switch;
     match cli.command {
         Commands::Run(args) => {
             if args.ticks < 1 {
@@ -258,7 +262,7 @@ fn main() {
                 }
             }
         }
-        Commands::Bench(args) => run_bench(args),
+        Commands::Bench(args) => run_bench(&args, switch),
         Commands::BenchSummarize(args) => {
             let result = match (&args.from_summary_v1, &args.input, &args.provenance) {
                 (Some(v1), _, _) => artifacts::convert_summary_v1(v1, &args.out),
@@ -284,8 +288,8 @@ fn main() {
                 }
             }
         }
-        Commands::Recruitment(args) => run_recruitment(args),
-        Commands::InputOpportunity(args) => run_input_opportunity(args),
+        Commands::Recruitment(args) => run_recruitment(args, switch),
+        Commands::InputOpportunity(args) => run_input_opportunity(args, switch),
         Commands::World(args) => match args.command {
             WorldCommands::Inspect(args) => {
                 if let Err(message) = run_world_inspect(&args, &mut std::io::stdout()) {
@@ -475,14 +479,22 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
     }
 }
 
-fn run_input_opportunity(args: InputOpportunityArgs) {
-    let cwd = match std::env::current_dir() {
-        Ok(cwd) => cwd,
-        Err(e) => {
-            eprintln!("error: cannot identify the working directory: {e}");
-            std::process::exit(1);
-        }
-    };
+/// Exits with a measurement command's `code` once its telemetry has closed;
+/// `0` returns.
+fn exit_with(code: u8) {
+    if code != 0 {
+        std::process::exit(i32::from(code));
+    }
+}
+
+fn working_directory() -> std::path::PathBuf {
+    std::env::current_dir().unwrap_or_else(|e| {
+        eprintln!("error: cannot identify the working directory: {e}");
+        std::process::exit(1);
+    })
+}
+
+fn run_input_opportunity(args: InputOpportunityArgs, switch: Switch) {
     let options = v3_cli::opportunity::Options {
         pilot: args.pilot,
         threads: args.threads,
@@ -491,9 +503,11 @@ fn run_input_opportunity(args: InputOpportunityArgs) {
         raw: args.out,
         summary: args.summary_out,
         source_revision: bench::detect_git_revision(),
-        ..v3_cli::opportunity::Options::new(&args.feature, cwd)
+        ..v3_cli::opportunity::Options::new(&args.feature, working_directory())
     };
-    match v3_cli::opportunity::run(&options) {
+    let measurement = measure::opportunity(switch, &options);
+    let result = v3_cli::opportunity::run(&options);
+    let code = match &result {
         Ok(outcome) => {
             println!(
                 "wrote {} ({} bytes, {} replicates) and {}",
@@ -504,24 +518,28 @@ fn run_input_opportunity(args: InputOpportunityArgs) {
             );
             if outcome.incomplete {
                 eprintln!("incomplete: a cap stopped the run between replicates");
-                std::process::exit(3);
+                3
+            } else {
+                0
             }
         }
         Err(e) => {
             eprintln!("error: {e}");
-            std::process::exit(1);
-        }
-    }
-}
-
-fn run_recruitment(args: RecruitmentArgs) {
-    let cwd = match std::env::current_dir() {
-        Ok(cwd) => cwd,
-        Err(e) => {
-            eprintln!("error: cannot identify the working directory: {e}");
-            std::process::exit(1);
+            1
         }
     };
+    measure::opportunity_end(
+        measurement,
+        code,
+        result
+            .as_ref()
+            .ok()
+            .map(|outcome| outcome.summary.as_path()),
+    );
+    exit_with(code);
+}
+
+fn run_recruitment(args: RecruitmentArgs, switch: Switch) {
     let options = v3_cli::recruitment::Options {
         pilot: args.pilot,
         threads: args.threads,
@@ -531,9 +549,11 @@ fn run_recruitment(args: RecruitmentArgs) {
         raw: args.out,
         summary: args.summary_out,
         source_revision: bench::detect_git_revision(),
-        ..v3_cli::recruitment::Options::new(&args.feature, cwd)
+        ..v3_cli::recruitment::Options::new(&args.feature, working_directory())
     };
-    match v3_cli::recruitment::run(&options) {
+    let measurement = measure::recruitment(switch, &options);
+    let result = v3_cli::recruitment::run(&options);
+    let code = match &result {
         Ok(outcome) => {
             println!(
                 "wrote {} ({} bytes, {} lineages, {} proposals) and {}",
@@ -551,29 +571,82 @@ fn run_recruitment(args: RecruitmentArgs) {
             }
             if outcome.incomplete {
                 eprintln!("incomplete: a cap stopped the run between lineages");
-                std::process::exit(3);
+                3
+            } else {
+                0
             }
         }
         Err(e) => {
             eprintln!("error: {e}");
-            std::process::exit(1);
+            1
         }
-    }
+    };
+    measure::recruitment_end(
+        measurement,
+        code,
+        result
+            .as_ref()
+            .ok()
+            .map(|outcome| outcome.summary.as_path()),
+    );
+    exit_with(code);
 }
 
-fn run_bench(args: BenchArgs) {
-    if let Err(e) = run_bench_result(args) {
+fn run_bench(args: &BenchArgs, switch: Switch) {
+    let prepared = prepare_bench(args).unwrap_or_else(|e| {
         eprintln!("error: {e}");
         std::process::exit(1);
-    }
+    });
+    let measurement = measure::bench(switch, &prepared);
+    let result = execute_bench(prepared);
+    let code = match &result {
+        Ok(done) if done.severe => {
+            eprintln!("error: severe work-counter regression against a stored reference");
+            3
+        }
+        Ok(_) => 0,
+        Err(e) => {
+            eprintln!("error: {e}");
+            1
+        }
+    };
+    measure::bench_end(measurement, code, &result);
+    exit_with(code);
 }
 
-fn run_bench_result(args: BenchArgs) -> Result<(), String> {
+/// A benchmark whose arguments, outputs and references are resolved: what
+/// runs after `measurement.started`.
+struct PreparedBench {
+    params: ProfileParams,
+    feature: String,
+    /// `--feature`, when given.
+    #[cfg_attr(not(feature = "telemetry"), allow(dead_code))]
+    label: Option<String>,
+    threads: Option<NonZeroUsize>,
+    invocation: artifacts::Invocation,
+    #[cfg_attr(not(feature = "telemetry"), allow(dead_code))]
+    profile: &'static str,
+    paths: artifacts::OutputPaths,
+    selection: bench::ReferenceSelection,
+}
+
+/// What a completed benchmark wrote.
+struct BenchDone {
+    severe: bool,
+    #[cfg(feature = "telemetry")]
+    summary_path: String,
+    #[cfg(feature = "telemetry")]
+    raw: (String, u64),
+    #[cfg(feature = "telemetry")]
+    totals: bench::Totals,
+}
+
+fn prepare_bench(args: &BenchArgs) -> Result<PreparedBench, String> {
     let ResolvedBench {
         params,
         feature,
         threads,
-    } = resolve_bench_profile(&args)?;
+    } = resolve_bench_profile(args)?;
     let invocation = artifacts::Invocation::capture()?;
     let profile = match args.profile {
         BenchProfile::Gate => "gate",
@@ -614,6 +687,28 @@ fn run_bench_result(args: BenchArgs) -> Result<(), String> {
             }
         }
     }
+    Ok(PreparedBench {
+        params,
+        feature,
+        label: args.feature.clone(),
+        threads,
+        invocation,
+        profile,
+        paths,
+        selection,
+    })
+}
+
+fn execute_bench(prepared: PreparedBench) -> Result<BenchDone, String> {
+    let PreparedBench {
+        params,
+        feature,
+        threads,
+        invocation,
+        paths,
+        selection,
+        ..
+    } = prepared;
     let mut report = bench::build_report_with_threads(&params, &feature, threads)?;
     let severe = bench::apply_comparisons_for_outputs(
         &mut report,
@@ -642,6 +737,8 @@ fn run_bench_result(args: BenchArgs) -> Result<(), String> {
         },
     )?;
     let comparison = std::mem::take(&mut report.comparison);
+    #[cfg(feature = "telemetry")]
+    let totals = report.deterministic.totals;
     drop(report);
     let provenance = artifacts::ConversionProvenance {
         verified_at: bench::rfc3339_now(),
@@ -649,7 +746,8 @@ fn run_bench_result(args: BenchArgs) -> Result<(), String> {
         supplied_evidence: None,
         from_summary_v1: None,
     };
-    artifacts::convert(&paths.raw, &paths.summary, &provenance)?;
+    #[cfg_attr(not(feature = "telemetry"), allow(unused_variables))]
+    let summary = artifacts::convert(&paths.raw, &paths.summary, &provenance)?;
 
     println!(
         "wrote raw {} and summary {}",
@@ -675,12 +773,243 @@ fn run_bench_result(args: BenchArgs) -> Result<(), String> {
             );
         }
     }
+    Ok(BenchDone {
+        severe,
+        #[cfg(feature = "telemetry")]
+        summary_path: paths.summary.display().to_string(),
+        #[cfg(feature = "telemetry")]
+        raw: (summary.raw.sha256, summary.raw.bytes as u64),
+        #[cfg(feature = "telemetry")]
+        totals,
+    })
+}
 
-    if severe {
-        eprintln!("error: severe work-counter regression against a stored reference");
-        std::process::exit(3);
+/// The `--telemetry` switch; the reference build has none.
+#[cfg(feature = "telemetry")]
+type Switch = v3_telemetry::Switch;
+
+/// The reference build's stand-in for the `--telemetry` switch.
+#[cfg(not(feature = "telemetry"))]
+#[derive(Clone, Copy)]
+struct Switch;
+
+/// Measurement records (T21.F06): `measurement.started` after argument
+/// resolution and before the command's work, `measurement.ended` after its
+/// output, then release and the bounded flush. Summary readings are taken
+/// from the files the command already wrote.
+#[cfg(feature = "telemetry")]
+mod measure {
+    use std::path::Path;
+
+    use serde_json::{json, Value};
+    use v3_cli::telemetry::Measurement;
+    use v3_telemetry::{MeasurementEnd, MeasurementStart};
+
+    use super::{bench, BenchDone, PreparedBench, Switch};
+
+    /// Starts the measurement, or exits 1 before any record when a telemetry
+    /// setting is invalid.
+    fn begin(switch: Switch, start: MeasurementStart<'_>) -> Measurement {
+        Measurement::begin(switch, start).unwrap_or_else(|message| {
+            eprintln!("error: {message}");
+            std::process::exit(1);
+        })
     }
-    Ok(())
+
+    fn threads(threads: Option<std::num::NonZeroUsize>) -> Option<u64> {
+        threads.map(|threads| threads.get() as u64)
+    }
+
+    pub(super) fn bench(switch: Switch, prepared: &PreparedBench) -> Measurement {
+        // The goal world set has no one effective config: its cases carry
+        // their own digests.
+        let digest = (prepared.profile != "goal")
+            .then(|| v3_core::config::config_digest(&bench::build_config(&prepared.params)));
+        begin(
+            switch,
+            MeasurementStart {
+                command: "bench",
+                feature: prepared.label.as_deref(),
+                profile: Some(prepared.profile),
+                seeds: Some(&prepared.params.seeds),
+                config_digest: digest.as_deref(),
+                threads: threads(prepared.threads),
+                ..MeasurementStart::default()
+            },
+        )
+    }
+
+    pub(super) fn bench_end(
+        measurement: Measurement,
+        code: u8,
+        result: &Result<BenchDone, String>,
+    ) {
+        let mut end = MeasurementEnd {
+            exit_code: code,
+            ..MeasurementEnd::default()
+        };
+        if let Ok(done) = result {
+            end.severe = Some(done.severe);
+            end.summary_path = Some(&done.summary_path);
+            end.raw_sha256 = Some(&done.raw.0);
+            end.raw_bytes = Some(done.raw.1);
+            end.body = serde_json::to_value(done.totals)
+                .ok()
+                .map(|totals| totals.to_string());
+        }
+        measurement.finish(end);
+    }
+
+    pub(super) fn recruitment(
+        switch: Switch,
+        options: &v3_cli::recruitment::Options,
+    ) -> Measurement {
+        let digest = v3_core::config::config_digest(
+            &v3_core::neighborhood::recruitment_paths::task_config(),
+        );
+        begin(
+            switch,
+            MeasurementStart {
+                command: "recruitment",
+                feature: Some(&options.feature),
+                pilot: Some(options.pilot),
+                config_digest: Some(&digest),
+                threads: threads(options.threads),
+                ..MeasurementStart::default()
+            },
+        )
+    }
+
+    pub(super) fn opportunity(
+        switch: Switch,
+        options: &v3_cli::opportunity::Options,
+    ) -> Measurement {
+        begin(
+            switch,
+            MeasurementStart {
+                command: "input-opportunity",
+                feature: Some(&options.feature),
+                pilot: Some(options.pilot),
+                threads: threads(options.threads),
+                ..MeasurementStart::default()
+            },
+        )
+    }
+
+    /// An assay's `measurement.ended`: the written summary's readings, and
+    /// `body` of it as the totals; no summary (an error exit) records only
+    /// the code.
+    fn assay_end(
+        measurement: Measurement,
+        code: u8,
+        summary_path: Option<&Path>,
+        body: fn(&Value) -> Value,
+    ) {
+        let summary = summary_path.and_then(|path| {
+            let bytes = std::fs::read(path).ok()?;
+            Some((path, serde_json::from_slice::<Value>(&bytes).ok()?))
+        });
+        let mut end = MeasurementEnd {
+            exit_code: code,
+            ..MeasurementEnd::default()
+        };
+        let path_text;
+        if let Some((path, summary)) = &summary {
+            path_text = path.display().to_string();
+            end.summary_path = Some(&path_text);
+            end.incomplete = summary["incomplete"].as_bool();
+            end.stop_reason = summary["stop_reason"].as_str();
+            end.horizon = summary["horizon"].as_u64();
+            end.gate_favorable = summary["gate_favorable"].as_bool();
+            end.raw_sha256 = summary["raw"]["sha256"].as_str();
+            end.raw_bytes = summary["raw"]["bytes"].as_u64();
+            end.body = Some(body(summary).to_string());
+        }
+        measurement.finish(end);
+    }
+
+    pub(super) fn recruitment_end(measurement: Measurement, code: u8, summary: Option<&Path>) {
+        assay_end(measurement, code, summary, |summary| {
+            json!({
+                "expected_proposals": summary["expected_proposals"],
+                "lineage_count": summary["lineage_count"],
+                "proposal_count": summary["proposal_count"],
+            })
+        });
+    }
+
+    /// Per world, its case, requested replicates, and the count and sums of
+    /// its replicate rows; per family and world, the verdict row's counts.
+    pub(super) fn opportunity_end(measurement: Measurement, code: u8, summary: Option<&Path>) {
+        assay_end(measurement, code, summary, |summary| {
+            let worlds = summary["worlds"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            let sum = |rows: &[Value], field: &str| -> u64 {
+                rows.iter().filter_map(|row| row[field].as_u64()).sum()
+            };
+            let world_rows: Vec<Value> = worlds
+                .iter()
+                .map(|world| {
+                    let rows = world["replicates"]
+                        .as_array()
+                        .map(Vec::as_slice)
+                        .unwrap_or_default();
+                    json!({
+                        "case": world["case"]["name"],
+                        "replicates_requested": world["replicates_requested"],
+                        "replicates": rows.len(),
+                        "ticks": sum(rows, "ticks"),
+                        "births_total": sum(rows, "births_total"),
+                    })
+                })
+                .collect();
+            let verdicts: Vec<Value> = worlds
+                .iter()
+                .flat_map(|world| world["verdicts"].as_array().cloned().unwrap_or_default())
+                .map(|row| {
+                    json!({
+                        "family": row["family"],
+                        "world": row["world"],
+                        "verdict": row["verdict"],
+                        "sampled": row["sampled"],
+                        "exposed": row["exposed"],
+                        "applied": row["applied"],
+                    })
+                })
+                .collect();
+            json!({ "worlds": world_rows, "verdicts": verdicts })
+        });
+    }
+}
+
+/// The reference build records nothing.
+#[cfg(not(feature = "telemetry"))]
+mod measure {
+    use std::path::Path;
+
+    use super::{BenchDone, PreparedBench, Switch};
+
+    pub(super) struct Measurement;
+
+    pub(super) fn bench(_: Switch, _: &PreparedBench) -> Measurement {
+        Measurement
+    }
+
+    pub(super) fn bench_end(_: Measurement, _: u8, _: &Result<BenchDone, String>) {}
+
+    pub(super) fn recruitment(_: Switch, _: &v3_cli::recruitment::Options) -> Measurement {
+        Measurement
+    }
+
+    pub(super) fn opportunity(_: Switch, _: &v3_cli::opportunity::Options) -> Measurement {
+        Measurement
+    }
+
+    pub(super) fn recruitment_end(_: Measurement, _: u8, _: Option<&Path>) {}
+
+    pub(super) fn opportunity_end(_: Measurement, _: u8, _: Option<&Path>) {}
 }
 
 #[cfg(test)]

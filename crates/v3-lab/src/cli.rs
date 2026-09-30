@@ -5,11 +5,13 @@ use std::path::{Path, PathBuf};
 use clap::{Args, Parser, Subcommand};
 
 use crate::ladder::{StallRates, RETENTION_DEPTH};
-use crate::output::{GitProvenance, LabRoot, DEFAULT_BYTE_CAP};
+use crate::output::{GitProvenance, LabRoot, DEFAULT_BYTE_CAP, SUMMARY};
 use crate::readings::SignatureArms;
-use crate::run::{run, RunParams, UserArm};
+use crate::run::{run, RunOutcome, RunParams, UserArm};
 use crate::scene::{ArenaId, Assay};
-use crate::summary::{render_report, Summary, SUMMARY_KIND, SUMMARY_VERSION, SUMMARY_VERSION_MIN};
+use crate::summary::{
+    render_report, Incomplete, Summary, Timing, SUMMARY_KIND, SUMMARY_VERSION, SUMMARY_VERSION_MIN,
+};
 use crate::LabError;
 
 /// `(replicates, generations, population)` for a campaign run.
@@ -24,8 +26,8 @@ pub const QUICK_MUTANTS: u32 = 8;
 #[derive(Parser, Debug)]
 #[command(name = "v3-lab", about = "Petri capability-assay lab (T22)")]
 pub struct Cli {
-    /// Run telemetry (`on` or `off`); beats PETRI_TELEMETRY, default off. The
-    /// lab exports nothing until T21.F06.
+    /// Run telemetry (`on` or `off`); beats PETRI_TELEMETRY, default off.
+    /// `run` and `why-not` export one measurement record pair after the run.
     #[cfg(feature = "telemetry")]
     #[arg(long, global = true, value_name = "on|off")]
     pub telemetry: Option<v3_telemetry::Switch>,
@@ -282,32 +284,98 @@ pub fn resolve_checkout(cwd: &Path) -> Result<LabRoot, LabError> {
     })
 }
 
-/// Run the parsed command and return the process exit code.
+/// What a `run` or `why-not` wrote, as plain data for the binary's run
+/// record (T21.F06): the summary's path and its `timing`, `exit_code` and
+/// `incomplete`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Measurement {
+    /// `run` or `why-not`.
+    pub command: &'static str,
+    pub assay: &'static str,
+    pub seed: u64,
+    pub summary_path: PathBuf,
+    pub timing: Timing,
+    pub exit_code: u8,
+    pub incomplete: Option<Incomplete>,
+}
+
+impl Measurement {
+    fn of(command: &'static str, args: &RunArgs, outcome: &RunOutcome) -> Self {
+        Self {
+            command,
+            assay: args.assay.name(),
+            seed: args.seed,
+            summary_path: outcome.dir.join(SUMMARY),
+            timing: outcome.summary.timing.clone(),
+            exit_code: outcome.summary.exit_code,
+            incomplete: outcome.summary.incomplete,
+        }
+    }
+
+    /// `exit_code`, `incomplete` and `timing` as compact JSON with sorted
+    /// keys, as `summary.json` records them.
+    #[must_use]
+    pub fn body(&self) -> String {
+        serde_json::json!({
+            "exit_code": self.exit_code,
+            "incomplete": self.incomplete,
+            "timing": self.timing,
+        })
+        .to_string()
+    }
+}
+
+/// A command's exit code and, for `run` and `why-not`, its measurement.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Executed {
+    pub exit_code: u8,
+    pub measurement: Option<Measurement>,
+}
+
+/// Run the parsed command in the checkout containing the working directory.
 ///
 /// # Errors
 ///
 /// Any [`LabError`].
-pub fn execute(cli: Cli) -> Result<u8, LabError> {
+pub fn execute(cli: Cli) -> Result<Executed, LabError> {
     match cli.command {
-        Command::Run(args) => {
+        Command::Report { .. } => execute_command(cli.command, None),
+        Command::Run(_) | Command::WhyNot(_) => {
             let lab_root = resolve_checkout(&std::env::current_dir()?)?;
-            let outcome = run(&args.params(), &lab_root)?;
-            print!("{}", render_report(&outcome.summary));
-            println!("\nrun directory: {}", outcome.dir.display());
-            Ok(outcome.exit_code)
-        }
-        Command::WhyNot(args) => {
-            let lab_root = resolve_checkout(&std::env::current_dir()?)?;
-            let outcome = run(&args.params(), &lab_root)?;
-            print!("{}", crate::ladder::render(&outcome.summary));
-            println!("\nrun directory: {}", outcome.dir.display());
-            Ok(outcome.exit_code)
-        }
-        Command::Report { summary } => {
-            print!("{}", render_report(&read_summary(&summary)?));
-            Ok(0)
+            execute_command(cli.command, Some(&lab_root))
         }
     }
+}
+
+/// [`execute`] on an injected lab root, as library callers run it.
+///
+/// # Errors
+///
+/// Any [`LabError`].
+pub fn execute_with_root(cli: Cli, lab_root: &LabRoot) -> Result<Executed, LabError> {
+    execute_command(cli.command, Some(lab_root))
+}
+
+fn execute_command(command: Command, lab_root: Option<&LabRoot>) -> Result<Executed, LabError> {
+    let (name, args, render): (_, _, fn(&Summary) -> String) = match command {
+        Command::Report { summary } => {
+            print!("{}", render_report(&read_summary(&summary)?));
+            return Ok(Executed {
+                exit_code: 0,
+                measurement: None,
+            });
+        }
+        Command::Run(args) => ("run", args, render_report),
+        Command::WhyNot(args) => ("why-not", args, crate::ladder::render),
+    };
+    let lab_root = lab_root.expect("run and why-not have a lab root");
+    let outcome = run(&args.params(), lab_root)?;
+    print!("{}", render(&outcome.summary));
+    println!("\nrun directory: {}", outcome.dir.display());
+    Ok(Executed {
+        exit_code: outcome.exit_code,
+        measurement: Some(Measurement::of(name, &args, &outcome)),
+    })
 }
 
 #[cfg(test)]
