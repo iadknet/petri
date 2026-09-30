@@ -173,6 +173,12 @@ scratch project (`telemetry-verify`, `telemetry-overhead`,
 `telemetry-dashboards-check`) creates and removes its own named volume
 explicitly (incident in the readings file).
 
+| Script | Stack it uses (shared helper `scripts/telemetry-scratch.sh`, which refuses to run while `petri-telemetry` is up) |
+| --- | --- |
+| `scripts/telemetry-overhead` | Creates, readies and removes its own project and volume `petri-telemetry-overhead`; needs no `make telemetry-up`; state (a) and the (c) block start and stop that scratch stack, the reference always runs with it stopped; the method and verdict rules are F01's |
+| `scripts/telemetry-verify` | Its own project and volume `petri-telemetry-verify`, as at F01 |
+| `scripts/telemetry-dashboards-check` | Its own project and volume `petri-telemetry-dashboards` (table above) |
+
 | Dashboard | Panels (every query filtered to the run) |
 | --- | --- |
 | `petri-runs`, `Petri / Runs`, default range 7 days | Runs started (Loki table of `run.started`: time, `service_name`, `petri_run_id`, `petri_seed`, `petri_world`, `petri_recipe`, `petri_build_revision`, `petri_ticks_requested`, `petri_metrics_interval_ms`; each row links to `/d/petri-run?var-run_id=<id>`); Runs ended (Loki table of `run.ended`: time, run ID, `petri_status`, `petri_tick`, `petri_wall_seconds`); Runs with metrics in range (Prometheus table `max by (petri_run_id, service_name) (petri_run_tick)`, linked the same way) |
