@@ -526,8 +526,8 @@ fn outcome_attributes(a: &mut Attributes, outcome: &TickOutcome) {
     }
 }
 
-/// The recorded tick's events, stopping once `left` reaches zero; returns
-/// whether any were cut.
+/// The recorded tick's events, at most `left` of them, taken from `left`;
+/// returns whether any were cut. Events past the allowance are never built.
 fn tick_events(
     record: &TickTrace,
     cognition: u64,
@@ -535,8 +535,9 @@ fn tick_events(
     left: &mut u32,
 ) -> (Vec<Event>, bool) {
     let applied = record.outcome.as_ref().map_or(&[][..], |o| &o.applied[..]);
-    let mut events = Vec::with_capacity(record.hops.len() + record.passes.len() + applied.len());
-    let all = record
+    let total = record.hops.len() + record.passes.len() + applied.len();
+    let kept = total.min(*left as usize);
+    let events: Vec<Event> = record
         .hops
         .iter()
         .map(|hop| hop_event(hop, cognition))
@@ -546,15 +547,11 @@ fn tick_events(
                 .iter()
                 .enumerate()
                 .map(|(index, action)| action_event(index, action, actions)),
-        );
-    for next in all {
-        if *left == 0 {
-            return (events, true);
-        }
-        *left -= 1;
-        events.push(next);
-    }
-    (events, false)
+        )
+        .take(kept)
+        .collect();
+    *left -= kept as u32;
+    (events, kept < total)
 }
 
 /// The recorded tick's start and end, and its cognition and actions phase
@@ -671,8 +668,7 @@ pub(crate) fn encode(
 
 /// A fresh recording of `id` for a window.
 fn window_trace(id: CreatureId, ticks: u32) -> ActiveTrace {
-    let mut trace = ActiveTrace::new(id, ticks);
-    trace.budget = Some(WINDOW_BUDGET);
+    let mut trace = ActiveTrace::budgeted(id, ticks, WINDOW_BUDGET);
     trace.include_perception_debug = true;
     trace
 }

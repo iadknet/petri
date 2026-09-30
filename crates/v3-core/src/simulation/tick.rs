@@ -587,6 +587,7 @@ fn run_cognition(
                     if let Some(record) = active.ticks.last_mut() {
                         record.hops.shrink_to_fit();
                         record.passes.shrink_to_fit();
+                        record.final_actions.shrink_to_fit();
                     }
                     if let Some(reason) = truncated {
                         active.truncated = Some(Truncation {
@@ -1341,7 +1342,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
             active.ticks_remaining = 0;
             #[cfg(feature = "telemetry-seams")]
             {
-                active.removed = sim.stats.observed_removal;
+                active.removed = sim.stats.removal_of(active.creature_id);
             }
         }
     }
@@ -1373,6 +1374,8 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
     // Sort decisions by priority bid descending. Stable sort preserves the
     // pre-existing random shuffle order among creatures with equal bids.
     sort_by_priority_bid(&mut decisions);
+    #[cfg(all(test, feature = "telemetry-seams"))]
+    window_seam::capture_decided(&decisions);
 
     // ── Phase 2: Sequential action execution ────────────────────────────────
     let phase_started = Instant::now();

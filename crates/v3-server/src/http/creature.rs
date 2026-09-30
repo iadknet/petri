@@ -443,6 +443,8 @@ pub async fn start_sample(
         let (sim, samples) = handle.telemetry_parts();
         app.telemetry
             .start_sample(sim, samples.window, replaced.as_ref(), &active);
+        // A removal before the sample's first tick keeps its cause.
+        handle.sim.observe_creature(creature_id);
     }
     handle.active_trace = Some(active);
 

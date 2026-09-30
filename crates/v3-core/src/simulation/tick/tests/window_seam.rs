@@ -4,6 +4,7 @@
 use std::fmt::Write as _;
 
 use super::super::run_tick;
+use super::super::window_seam::{take_decided, Decided};
 use super::support::*;
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, InputReference, NodeId, Position, WorldInputKey};
@@ -107,9 +108,44 @@ fn logged_at(sim: &Simulation, id: CreatureId, tick: u64) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// A recording of `ticks` ticks of `id` under `budget`, or unbudgeted.
+fn recording(id: CreatureId, ticks: u32, budget: Option<TraceBudget>) -> ActiveTrace {
+    budget.map_or_else(
+        || ActiveTrace::new(id, ticks),
+        |budget| ActiveTrace::budgeted(id, ticks, budget),
+    )
+}
+
+/// Runs one tick of each simulation and asserts both handed the action phase
+/// the same sorted decision queue, and that a tick recorded this tick holds
+/// the traced creature's queued actions; returns the untraced queue.
+fn tick_both(
+    traced: &mut Simulation,
+    plain: &mut Simulation,
+    trace: &mut Option<ActiveTrace>,
+    tick: u64,
+) -> Vec<Decided> {
+    run_tick(traced, trace);
+    let traced_queue = take_decided();
+    run_tick(plain, &mut None);
+    let plain_queue = take_decided();
+    assert_eq!(traced_queue, plain_queue, "decision queue at tick {tick}");
+    if let Some(active) = trace.as_ref() {
+        if let Some(record) = active.ticks.last().filter(|r| r.tick_number == tick) {
+            let decided = plain_queue
+                .iter()
+                .find(|entry| entry.id == active.creature_id)
+                .expect("the traced creature decided");
+            assert_eq!(record.final_actions, decided.actions, "tick {tick}");
+        }
+    }
+    plain_queue
+}
+
 /// Runs `traced` and `plain` side by side for 50 ticks, `traced` with a trace
-/// whose target moves to a new creature every 8 ticks; asserts each recorded
-/// tick applied what the untraced run applied, and equal state every tick.
+/// whose target moves to a new creature every 8 ticks; asserts every tick's
+/// decision queue, each recorded tick's applied actions and the state after
+/// every tick equal the untraced run's.
 fn assert_equivalent(mut traced: Simulation, mut plain: Simulation, budget: Option<TraceBudget>) {
     let mut trace: Option<ActiveTrace> = None;
     let mut recorded = 0;
@@ -120,15 +156,13 @@ fn assert_equivalent(mut traced: Simulation, mut plain: Simulation, budget: Opti
                 break;
             }
             let target = population[(tick / 8) as usize % population.len()];
-            let mut next = ActiveTrace::new(target, 8);
-            next.budget = budget;
+            let mut next = recording(target, 8, budget);
             next.include_perception_debug = true;
             trace = Some(next);
         }
         let target = trace.as_ref().map(|t| t.creature_id);
         let before = trace.as_ref().map_or(0, |t| t.ticks.len());
-        run_tick(&mut traced, &mut trace);
-        run_tick(&mut plain, &mut None);
+        tick_both(&mut traced, &mut plain, &mut trace, tick);
         assert_eq!(fingerprint(&traced), fingerprint(&plain), "tick {tick}");
         let active = trace.as_ref().unwrap();
         if active.ticks.len() > before {
@@ -219,11 +253,11 @@ fn an_event_cap_truncates_at_the_predicted_record_and_ends_the_window() {
 
     let (mut traced, _) = budget_sim();
     let (mut plain, _) = budget_sim();
-    let mut trace = Some(ActiveTrace::new(id, 4));
-    trace.as_mut().unwrap().budget = Some(TraceBudget {
+    let budget = TraceBudget {
         max_events: 3,
         max_bytes: WINDOW_BUDGET.max_bytes,
-    });
+    };
+    let mut trace = Some(ActiveTrace::budgeted(id, 4, budget));
     run_tick(&mut traced, &mut trace);
     run_tick(&mut plain, &mut None);
 
@@ -244,24 +278,38 @@ fn an_event_cap_truncates_at_the_predicted_record_and_ends_the_window() {
     assert!(active.events <= 3);
 }
 
-#[test]
-fn a_byte_cap_below_one_hop_truncates_at_the_first_hop() {
-    let (sim, id) = budget_sim();
-    let reference = unbudgeted_first_tick();
-    let reserve = TickReserve::for_config(&sim.config);
-    let first_hop = reference.hops[0].retained_bytes();
+/// What a first tick needs before its first hop: the tick buffer's first
+/// slot and the tick reserve.
+fn tick_start_bytes(config: &SimulationConfig) -> u64 {
+    std::mem::size_of::<TickTrace>() as u64 + TickReserve::for_config(config).bytes
+}
 
-    let (mut traced, _) = budget_sim();
+/// One budgeted first tick of `budget_sim` under `max_bytes`, with the
+/// untraced run's state asserted equal.
+fn first_tick_under(max_bytes: u64) -> ActiveTrace {
+    let (mut traced, id) = budget_sim();
     let (mut plain, _) = budget_sim();
-    let mut trace = Some(ActiveTrace::new(id, 4));
-    trace.as_mut().unwrap().budget = Some(TraceBudget {
+    let budget = TraceBudget {
         max_events: WINDOW_BUDGET.max_events,
-        max_bytes: reserve.bytes + first_hop - 1,
-    });
+        max_bytes,
+    };
+    let mut trace = Some(ActiveTrace::budgeted(id, 4, budget));
     run_tick(&mut traced, &mut trace);
     run_tick(&mut plain, &mut None);
+    assert_eq!(fingerprint(&traced), fingerprint(&plain));
+    trace.unwrap()
+}
 
-    let active = trace.as_ref().unwrap();
+#[test]
+fn a_byte_cap_below_one_hop_truncates_at_the_first_hop() {
+    let (sim, _) = budget_sim();
+    let reference = unbudgeted_first_tick();
+    // The first hop goes into the reserved preallocation: it takes only the
+    // buffers it owns.
+    let first_hop = reference.hops[0].heap_bytes();
+    let fits = tick_start_bytes(&sim.config) + first_hop;
+
+    let active = first_tick_under(fits - 1);
     assert_eq!(active.ticks.len(), 1, "the reserved tick record is kept");
     assert!(active.ticks[0].hops.is_empty());
     assert!(active.ticks[0].passes.is_empty());
@@ -269,14 +317,25 @@ fn a_byte_cap_below_one_hop_truncates_at_the_first_hop() {
     let truncation = active.truncated.expect("the window truncated");
     assert_eq!(truncation.reason, TruncationReason::Bytes);
     assert!(active.is_complete());
-    assert!(active.bytes < reserve.bytes + first_hop);
-    assert_eq!(fingerprint(&traced), fingerprint(&plain));
+    assert!(active.bytes < fits);
+
+    // At exactly its bytes the first hop is kept and the next record, which
+    // owns buffers or needs a new slot, does not fit.
+    let active = first_tick_under(fits);
+    assert_eq!(active.ticks[0].hops.len(), 1);
+    assert!(active.ticks[0].passes.is_empty());
+    assert_eq!(active.truncated.unwrap().reason, TruncationReason::Bytes);
+    assert!(active.bytes <= fits);
 }
 
 #[test]
 fn a_tick_whose_reserve_does_not_fit_is_not_recorded() {
     let (sim, id) = budget_sim();
-    let reserve = TickReserve::for_config(&sim.config);
+    let start = tick_start_bytes(&sim.config);
+    // At exactly the tick's start bytes the tick is recorded.
+    let active = first_tick_under(start);
+    assert_eq!(active.ticks.len(), 1);
+    assert_eq!(active.ticks.capacity(), 1);
     for (budget, reason) in [
         (
             TraceBudget {
@@ -288,19 +347,19 @@ fn a_tick_whose_reserve_does_not_fit_is_not_recorded() {
         (
             TraceBudget {
                 max_events: WINDOW_BUDGET.max_events,
-                max_bytes: reserve.bytes - 1,
+                max_bytes: start - 1,
             },
             TruncationReason::Bytes,
         ),
     ] {
         let (mut traced, _) = budget_sim();
         let (mut plain, _) = budget_sim();
-        let mut trace = Some(ActiveTrace::new(id, 4));
-        trace.as_mut().unwrap().budget = Some(budget);
+        let mut trace = Some(ActiveTrace::budgeted(id, 4, budget));
         run_tick(&mut traced, &mut trace);
         run_tick(&mut plain, &mut None);
         let active = trace.as_ref().unwrap();
         assert!(active.ticks.is_empty());
+        assert_eq!(active.ticks.capacity(), 0, "nothing allocated");
         assert_eq!(active.truncated.unwrap().reason, reason);
         assert_eq!(active.truncated.unwrap().tick, 0);
         assert!(active.is_complete());
@@ -313,8 +372,7 @@ fn a_tick_whose_reserve_does_not_fit_is_not_recorded() {
 fn retained_counts_match_the_records_kept() {
     let (_, id) = budget_sim();
     let (mut traced, _) = budget_sim();
-    let mut trace = Some(ActiveTrace::new(id, 3));
-    trace.as_mut().unwrap().budget = Some(WINDOW_BUDGET);
+    let mut trace = Some(ActiveTrace::budgeted(id, 3, WINDOW_BUDGET));
     for _ in 0..3 {
         run_tick(&mut traced, &mut trace);
     }
@@ -326,6 +384,9 @@ fn retained_counts_match_the_records_kept() {
         .map(|t| t.hops.len() + t.passes.len() + t.outcome.as_ref().unwrap().applied.len())
         .sum();
     assert_eq!(active.events as usize, events);
+    // The tick buffer holds no spare slot, so the records' own sizes are all
+    // the recording retains.
+    assert_eq!(active.ticks.capacity(), active.ticks.len());
     let bytes: u64 = active.ticks.iter().map(TickTrace::retained_bytes).sum();
     assert_eq!(active.bytes, bytes);
 }
@@ -335,13 +396,43 @@ fn a_none_budget_records_every_hop() {
     let (_, id) = budget_sim();
     let reference = unbudgeted_first_tick();
     let (mut traced, _) = budget_sim();
-    let mut trace = Some(ActiveTrace::new(id, 1));
-    trace.as_mut().unwrap().budget = Some(WINDOW_BUDGET);
+    let mut trace = Some(ActiveTrace::budgeted(id, 1, WINDOW_BUDGET));
     run_tick(&mut traced, &mut trace);
     let budgeted = &trace.as_ref().unwrap().ticks[0];
     assert_eq!(budgeted.hops.len(), reference.hops.len());
     assert_eq!(budgeted.passes.len(), reference.passes.len());
     assert!(!reference.hops.is_empty());
+}
+
+/// What `active` keeps allocated, measured at capacity at every level: its
+/// tick buffer, spare slots included, and each record's own buffers.
+fn measured_bytes(active: &ActiveTrace) -> u64 {
+    let slot = std::mem::size_of::<TickTrace>() as u64;
+    active.ticks.capacity() as u64 * slot
+        + active.ticks.iter().map(TickTrace::heap_bytes).sum::<u64>()
+}
+
+proptest::proptest! {
+    #![proptest_config(proptest::prelude::ProptestConfig::with_cases(32))]
+
+    /// Whatever the caps, after every tick the byte counter equals what the
+    /// recording keeps allocated and neither counter passes its cap.
+    #[test]
+    fn the_counters_bound_what_the_recording_retains(
+        max_events in 0u32..48,
+        max_bytes in 0u64..96 * 1024,
+    ) {
+        let (mut sim, id) = budget_sim();
+        let budget = TraceBudget { max_events, max_bytes };
+        let mut trace = Some(ActiveTrace::budgeted(id, 6, budget));
+        for _ in 0..6 {
+            run_tick(&mut sim, &mut trace);
+            let active = trace.as_ref().unwrap();
+            proptest::prop_assert_eq!(active.bytes, measured_bytes(active));
+            proptest::prop_assert!(active.bytes <= max_bytes);
+            proptest::prop_assert!(active.events <= max_events);
+        }
+    }
 }
 
 // ── Outcome ──────────────────────────────────────────────────────────────
@@ -576,6 +667,43 @@ fn a_creature_dying_in_the_action_phase_keeps_what_it_applied() {
     assert!(outcome.after.is_none());
 }
 
+/// A traced creature whose queue outlives it: the actions queued after its
+/// death, or all of them when a predator kills it before its turn, are never
+/// applied, so only the decision queue can show them equal.
+#[test]
+fn decisions_discarded_by_a_death_match_the_untraced_run() {
+    fn dying() -> (Simulation, CreatureId) {
+        let (mut sim, id) = make_sim_with_custom_genome(1.0, eat_then_move_genome());
+        sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+        sim.config.startup.ramps.failed_action_penalty.enabled = false;
+        sim.creatures[id].energy = 0.01;
+        (sim, id)
+    }
+    fn preyed() -> (Simulation, CreatureId) {
+        let (mut sim, attacker, victim) = make_sim_two_creatures(150.0, 3.0);
+        sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+        sim.config.predation.steal_cost_rate = 0.0;
+        sim.creatures[attacker].genome = bidding(steal_north_genome());
+        sim.creatures[victim].genome = eat_then_move_genome();
+        (sim, victim)
+    }
+    for fixture in [dying, preyed] {
+        for budget in [Some(WINDOW_BUDGET), None] {
+            let (mut traced, id) = fixture();
+            let (mut plain, _) = fixture();
+            let mut trace = Some(recording(id, 3, budget));
+            let queue = tick_both(&mut traced, &mut plain, &mut trace, 0);
+            let decided = queue.iter().find(|entry| entry.id == id).unwrap();
+            assert!(decided.actions.len() > 1, "the queue outlives the creature");
+            assert!(!plain.creatures.contains_key(id), "the creature died");
+            let record = &trace.as_ref().unwrap().ticks[0];
+            let applied = &record.outcome.as_ref().unwrap().applied;
+            assert!(applied.len() < decided.actions.len());
+            assert_eq!(fingerprint(&traced), fingerprint(&plain));
+        }
+    }
+}
+
 #[test]
 fn a_creature_dying_in_phase_zero_ends_the_window_with_its_cause() {
     let decay = SimulationConfig::default()
@@ -583,13 +711,48 @@ fn a_creature_dying_in_phase_zero_ends_the_window_with_its_cause() {
         .lifecycle
         .energy_decay_per_tick;
     let (mut sim, id) = make_sim_with_one_creature(decay * 0.5);
-    let mut trace = Some(ActiveTrace::new(id, 5));
-    trace.as_mut().unwrap().budget = Some(WINDOW_BUDGET);
+    let mut trace = Some(ActiveTrace::budgeted(id, 5, WINDOW_BUDGET));
     run_tick(&mut sim, &mut trace);
     let active = trace.unwrap();
     assert!(active.ticks.is_empty());
     assert!(active.is_complete());
     assert_eq!(active.removed, Some(DeathCause::LifecycleDecay));
+}
+
+/// Paints a barrier over `id`, as the server's paint handler does between
+/// ticks.
+fn paint_over(sim: &mut Simulation, id: CreatureId) {
+    let at = sim.creatures[id].position;
+    let point = crate::kernel::paint::PaintPoint { x: at.x, y: at.y };
+    sim.apply_paint(crate::kernel::paint::PaintTool::Barrier, 0, &[point]);
+    assert!(!sim.creatures.contains_key(id));
+}
+
+#[test]
+fn a_removal_between_ticks_ends_the_window_with_its_cause() {
+    // Inside the window, after a recorded tick.
+    let (mut sim, id) = make_sim_with_one_creature(150.0);
+    let mut trace = Some(ActiveTrace::budgeted(id, 4, WINDOW_BUDGET));
+    run_tick(&mut sim, &mut trace);
+    paint_over(&mut sim, id);
+    run_tick(&mut sim, &mut trace);
+    let active = trace.unwrap();
+    assert_eq!(active.ticks.len(), 1);
+    assert!(active.is_complete());
+    assert_eq!(active.removed, Some(DeathCause::ExternalRemoval));
+
+    // Before the window's first tick: a sample started between ticks names
+    // its creature to the simulation.
+    let (mut sim, id) = make_sim_with_one_creature(150.0);
+    run_tick(&mut sim, &mut None);
+    let mut trace = Some(ActiveTrace::new(id, 4));
+    sim.observe_creature(id);
+    paint_over(&mut sim, id);
+    run_tick(&mut sim, &mut trace);
+    let active = trace.unwrap();
+    assert!(active.ticks.is_empty());
+    assert!(active.is_complete());
+    assert_eq!(active.removed, Some(DeathCause::ExternalRemoval));
 }
 
 fn typed_food_reader_genome() -> CreatureGenome {

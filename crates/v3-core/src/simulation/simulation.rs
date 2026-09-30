@@ -86,6 +86,14 @@ impl Simulation {
         stats
     }
 
+    /// Names the creature a sample records (T21.F04), so a removal before the
+    /// sample's next tick, by any path, keeps its cause for the sample.
+    /// `run_tick` sets the same name at each tick's start.
+    #[cfg(feature = "telemetry-seams")]
+    pub fn observe_creature(&mut self, id: CreatureId) {
+        self.stats.observed_creature = Some(id);
+    }
+
     /// Remove one creature and record mortality and exit-time lifetime aggregates.
     pub fn remove_creature(&mut self, id: CreatureId) {
         if let Some(creature) = self.creatures.remove(id) {
@@ -101,7 +109,7 @@ impl Simulation {
             self.stats.mortality.record(cause);
             #[cfg(feature = "telemetry-seams")]
             if self.stats.observed_creature == Some(id) {
-                self.stats.observed_removal = Some(cause);
+                self.stats.observed_removal = Some((id, cause));
             }
             self.stats.reproductive_success_by_cognitive_class.record(
                 CognitiveClass::from_companions(&structural_companions(&creature.genome)),

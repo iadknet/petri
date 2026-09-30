@@ -11,6 +11,8 @@ use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, Untrac
 use crate::runtime::trace::domain::{
     BackendTrace, DecisionInputs, MeshHopTrace, MeshPassTrace, TraceGateScore, TraceRouteDecision,
 };
+#[cfg(feature = "telemetry-seams")]
+use crate::runtime::trace::recording::TruncationReason;
 use crate::runtime::traced_vm::execute_vm_node_traced;
 use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
@@ -131,28 +133,55 @@ impl RecordingMeshExecution {
             true
         }
     }
+}
 
-    /// Takes one record of `bytes` from the limit, or truncates.
-    #[inline]
-    #[cfg_attr(not(feature = "telemetry-seams"), allow(unused_variables))]
-    fn admit(&mut self, bytes: impl FnOnce() -> u64) -> bool {
-        #[cfg(feature = "telemetry-seams")]
-        if let Some(limit) = &mut self.limit {
-            use crate::runtime::trace::recording::TruncationReason;
-            if limit.events == 0 {
-                self.truncated = Some(TruncationReason::Events);
-                return false;
-            }
-            let bytes = bytes();
-            if bytes > limit.bytes {
-                self.truncated = Some(TruncationReason::Bytes);
-                return false;
-            }
-            limit.events -= 1;
-            limit.bytes -= bytes;
+#[cfg(feature = "telemetry-seams")]
+impl RecordLimit {
+    /// Takes one record bound for `into` from the limit: the `heap` bytes
+    /// the record owns and, when `into` is full, the slots `into` grows by
+    /// (doubling, or one when doubling does not fit), charged before it
+    /// grows. `Err` names the cap the record does not fit.
+    fn take<T>(&mut self, into: &mut Vec<T>, heap: u64) -> Result<(), TruncationReason> {
+        if self.events == 0 {
+            return Err(TruncationReason::Events);
         }
-        true
+        let slot = std::mem::size_of::<T>() as u64;
+        let left = self.bytes;
+        let fits = |slots: usize| heap + slots as u64 * slot <= left;
+        let candidates = if into.len() < into.capacity() {
+            [0, 0]
+        } else {
+            [into.capacity().max(1), 1]
+        };
+        let growth = candidates
+            .into_iter()
+            .find(|&n| fits(n))
+            .ok_or(TruncationReason::Bytes)?;
+        let before = into.capacity();
+        into.reserve_exact(growth);
+        let grown = (into.capacity() - before) as u64 * slot;
+        self.bytes = self.bytes.saturating_sub(heap + grown);
+        self.events -= 1;
+        Ok(())
     }
+}
+
+/// Whether a record owning `heap` bytes may go into `into`: always without
+/// a limit; a record the limit does not take sets `truncated`.
+#[cfg(feature = "telemetry-seams")]
+fn admit<T>(
+    limit: &mut Option<RecordLimit>,
+    truncated: &mut Option<TruncationReason>,
+    into: &mut Vec<T>,
+    heap: impl FnOnce() -> u64,
+) -> bool {
+    let Some(limit) = limit else {
+        return true;
+    };
+    limit
+        .take(into, heap())
+        .map_err(|reason| *truncated = Some(reason))
+        .is_ok()
 }
 
 /// Each decision-state input as `resolve_input` returns it to this dispatch.
@@ -327,15 +356,24 @@ impl MeshExecutionMode for RecordingMeshExecution {
             decision_inputs,
             backend_trace,
         };
-        if self.admit(|| hop_bytes(&hop)) {
-            self.hops.push(hop);
+        #[cfg(feature = "telemetry-seams")]
+        if !admit(&mut self.limit, &mut self.truncated, &mut self.hops, || {
+            hop.heap_bytes()
+        }) {
+            return;
         }
+        self.hops.push(hop);
     }
 
     fn record_pass(&mut self, pass: MeshPassTrace) {
-        if self.recording() && self.admit(|| pass_bytes(&pass)) {
-            self.passes.push(pass);
+        if !self.recording() {
+            return;
         }
+        #[cfg(feature = "telemetry-seams")]
+        if !admit(&mut self.limit, &mut self.truncated, &mut self.passes, || 0) {
+            return;
+        }
+        self.passes.push(pass);
     }
 
     fn finish(self, output: MeshOutput) -> Self::Output {
@@ -347,26 +385,6 @@ impl MeshExecutionMode for RecordingMeshExecution {
             truncated: self.truncated,
         }
     }
-}
-
-#[cfg(feature = "telemetry-seams")]
-fn hop_bytes(hop: &MeshHopTrace) -> u64 {
-    hop.retained_bytes()
-}
-
-#[cfg(feature = "telemetry-seams")]
-fn pass_bytes(pass: &MeshPassTrace) -> u64 {
-    pass.retained_bytes()
-}
-
-#[cfg(not(feature = "telemetry-seams"))]
-fn hop_bytes(_: &MeshHopTrace) -> u64 {
-    0
-}
-
-#[cfg(not(feature = "telemetry-seams"))]
-fn pass_bytes(_: &MeshPassTrace) -> u64 {
-    0
 }
 
 #[cfg(test)]
@@ -1387,5 +1405,81 @@ mod tests {
         assert_eq!(passes[0].end_reason, PassEndReason::PassCapReached);
         assert_eq!(hops.len(), 1);
         assert!(hops[0].route.is_some(), "route before the cap kept");
+    }
+
+    /// One VM node looping on itself that votes `Eat` and `Move` N by one
+    /// unit each: several passes of `max_mesh_hops` hops.
+    #[cfg(feature = "telemetry-seams")]
+    fn looping_two_vote_genome() -> CreatureGenome {
+        let id = NodeId::new(0);
+        CreatureGenome {
+            entry_node_id: id,
+            nodes: vec![NodeGenome {
+                node_id: id,
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![1.0],
+                    program: vec![
+                        VmInstruction::LoadConst {
+                            dst: 0,
+                            const_idx: 0,
+                        },
+                        VmInstruction::AddVote { sink: 0, src: 0 },
+                        VmInstruction::AddVote { sink: 1, src: 0 },
+                        VmInstruction::Halt,
+                    ],
+                }),
+                targets: wrap_targets(vec![id]),
+            }],
+        }
+    }
+
+    #[cfg(feature = "telemetry-seams")]
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig::with_cases(64))]
+
+        /// Whatever the limit, what the recording mode holds beyond the
+        /// reserved hop preallocation (its buffers at capacity and each
+        /// hop's own buffers) stays within the limit's bytes, the records
+        /// within its events, and the output is the unbudgeted one.
+        #[test]
+        fn budgeted_records_hold_no_more_than_their_limit(
+            bytes in 0u64..16 * 1024,
+            events in 0u32..16,
+        ) {
+            use std::mem::size_of;
+            let config = RuntimeConfig {
+                max_mesh_hops: 2,
+                ..default_config()
+            };
+            let genome = looping_two_vote_genome();
+            let (reference, all_hops, all_passes) =
+                run_traced(&genome, &empty_ss(), &config, 100.0);
+            proptest::prop_assert!(all_passes.len() > 1 && all_hops.len() > 2);
+
+            let mut energy = 100.0;
+            let recorded = execute_creature_mesh_budgeted(
+                &genome,
+                &empty_ss(),
+                &mut energy,
+                &mut [0.0; 16],
+                &[0.0; 16],
+                &mut GraphRuntimeState::new(),
+                &config,
+                Some(RecordLimit { events, bytes }),
+            );
+            let hop = size_of::<MeshHopTrace>();
+            let preallocated = config.max_mesh_hops as usize * hop;
+            let held = (recorded.hops.capacity() * hop).saturating_sub(preallocated)
+                + recorded.passes.capacity() * size_of::<MeshPassTrace>();
+            let held = held as u64
+                + recorded.hops.iter().map(MeshHopTrace::heap_bytes).sum::<u64>();
+            proptest::prop_assert!(held <= bytes, "held {} of {}", held, bytes);
+            proptest::prop_assert!(
+                recorded.hops.len() + recorded.passes.len() <= events as usize
+            );
+            proptest::prop_assert_eq!(recorded.output.actions, reference.actions);
+        }
     }
 }
