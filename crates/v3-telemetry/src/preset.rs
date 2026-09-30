@@ -124,7 +124,7 @@ impl Settings {
             Some(set) => resolve_tick_traces(Some(&set))?,
             None => base.tick_traces,
         };
-        let windows = WindowSettings::resolve_over(
+        let windows = WindowSettings::resolve(
             base.windows,
             value(CREATURE_WINDOWS_ENV).as_deref(),
             value(WINDOW_TICKS_ENV).as_deref(),

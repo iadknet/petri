@@ -77,12 +77,18 @@ fn ns(run: &RunHandle, instant: Instant) -> u64 {
 #[test]
 fn window_settings_default_to_on_8_ticks_10_s_and_refuse_anything_else() {
     assert_eq!(
-        WindowSettings::resolve(None, Some(""), Some(" ")),
+        WindowSettings::resolve(WindowSettings::default(), None, Some(""), Some(" ")),
         Ok(WindowSettings::default())
     );
     assert_eq!(WindowSettings::default().ticks, 8);
     assert_eq!(WindowSettings::default().interval, Duration::from_secs(10));
-    let set = WindowSettings::resolve(Some("off"), Some("64"), Some("10")).unwrap();
+    let set = WindowSettings::resolve(
+        WindowSettings::default(),
+        Some("off"),
+        Some("64"),
+        Some("10"),
+    )
+    .unwrap();
     assert_eq!(
         (set.switch, set.ticks, set.interval),
         (Switch::Off, 64, Duration::from_millis(10))
@@ -95,7 +101,9 @@ fn window_settings_default_to_on_8_ticks_10_s_and_refuse_anything_else() {
         (None, None, Some("3600001")),
         (None, None, Some("1.5")),
     ] {
-        assert!(WindowSettings::resolve(switch, ticks, interval).is_err());
+        assert!(
+            WindowSettings::resolve(WindowSettings::default(), switch, ticks, interval).is_err()
+        );
     }
 }
 

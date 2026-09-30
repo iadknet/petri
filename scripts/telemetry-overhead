@@ -13,9 +13,10 @@
 # its cell as an infinite ratio. Reaching the cap ends the check inconclusive.
 #
 # Statistic (scripts/telemetry-stats.mjs): per cell the median ratio and its
-# 90% distribution-free interval; pass when the upper bound is below the
-# ceiling 1.05, fail when the lower bound is at or above it, else
-# inconclusive. Pairs n: five reference runs' spread (max - min) / median
+# 90% distribution-free interval; pass when the upper bound is below 1.05,
+# fail when the lower bound is at or above it, else inconclusive. 1.05 is
+# D5's 5% target; it is the ceiling in force only once T21.F05's Measured
+# verdict records a D5 pass (docs/workflow.md, "Benchmark gate"). Pairs n: five reference runs' spread (max - min) / median
 # sets 16 at <= 5%, 24 at <= 10%, 32 at <= 20%; above 20% the spread block is
 # repeated once after 60 s idle, and if still above 20% no pair runs.
 #
@@ -81,7 +82,12 @@ f01_readings=$root/docs/progress/readings/t21-f01.md
 f05_readings=$root/docs/progress/readings/t21-f05.md
 recipe=$root/telemetry/overhead-world.json
 endpoint=http://127.0.0.1:4318
+# The ceiling the verdicts are read against: D5's 5%, in force only once
+# T21.F05's Measured verdict records a D5 pass.
 ceiling=1.05
+# F01's 10 s flush deadline plus 50 ms of scheduling slack (the reading
+# includes the return from the abandoned wait).
+flush_bound_ms=10050
 mode=${PETRI_OVERHEAD_MODE:-routine}
 workload=${PETRI_OVERHEAD_WORKLOAD:-run}
 
@@ -392,7 +398,7 @@ per_tick() {
   if [ "$self" = - ]; then printf -- '-'; else awk -v s="$self" -v t="$2" 'BEGIN { printf "%.3f", s / t }'; fi
 }
 
-# block_ratio CELL: median of CELL.c over the median of CELL's b reference runs.
+# idle_cost WORLD: median of WORLD.c over the median of WORLD's b reference runs.
 idle_cost() {
   if [ -s "$scratch/$1.c" ] && [ -s "$scratch/$1-b.ref" ]; then
     awk -v s="$(median <"$scratch/$1.c")" -v r="$(median <"$scratch/$1-b.ref")" 'BEGIN { printf "%.4f", s / r }'
@@ -452,7 +458,8 @@ if [ "$mode" = routine ]; then
   : >"$scratch/w.c"
   if [ "$pairs" -gt 0 ]; then idle_block w "$ticks"; fi
 
-  printf '\nWorkload=%s  T=%s  spread=%s  pairs n=%s  ceiling=%s\n\n' "$workload" "$ticks" "${spread:--}" "$pairs" "$ceiling"
+  printf '\nWorkload=%s  T=%s  spread=%s  pairs n=%s  verdicts against %s (D5 target; the ceiling only once T21.F05 records a D5 pass)\n\n' \
+    "$workload" "$ticks" "${spread:--}" "$pairs" "$ceiling"
   head_tail=''
   rule_tail=''
   if [ "$workload" = bench ]; then head_tail=' Median stored-reading ratio |'; rule_tail=' --- |'; fi
@@ -504,9 +511,15 @@ idle_s=$(($(now_s) - idle_began))
 idle_rate=$(printf '%s %s\n' "$before" "$after" | awk -v s="$idle_s" '{ printf "%.4f %.4f %.4f\n", ($4 - $1) / s, ($5 - $2) / s, ($6 - $3) / s }')
 stack_stop
 
+# world_args WORLD: sets world_config and wticks (0 when W1 has no T1).
+world_args() {
+  if [ "$1" = W1 ]; then world_config=''; wticks=${t1:-0}; else world_config=$recipe; wticks=$ticks; fi
+}
+
+# cells_for WORLD: init, spread and the cells b, a and s of preset standard.
 cells_for() {
   world=$1
-  wticks=$2
+  world_args "$world"
   printf '\n### World %s (ticks %s)\n\n' "$world" "$wticks"
   : >"$scratch/$world.init"
   for _ in 1 2 3; do
@@ -538,16 +551,11 @@ if [ -z "$t1" ]; then
 fi
 if [ -n "$t1" ]; then
   whole T1 "$t1"
-  cells_for W1 "$t1"
+  cells_for W1
 fi
 f01_ticks
 whole T "$ticks"
-world_config=$recipe
-[ "$capped" -eq 1 ] || cells_for W2 "$ticks"
-
-world_args() {
-  if [ "$1" = W1 ]; then world_config=''; wticks=${t1:-0}; else world_config=$recipe; wticks=$ticks; fi
-}
+[ "$capped" -eq 1 ] || cells_for W2
 for world in W1 W2; do
   world_args "$world"
   if [ "$capped" -eq 0 ] && [ "$wticks" -gt 0 ]; then idle_block "$world" "$wticks"; fi
@@ -609,8 +617,8 @@ for world in W1 W2; do
     printf '| %s | %s | %s/%s | %s | %s | %s | %s | %s (%s) | %s | %s | %s |\n' "$world" "$state" "$got" "$n" \
       "$median" "$interval" "$verdict" "$included" "$(median <"$scratch/$cell.flush_ms")" "${max_flush:--}" \
       "$(median <"$scratch/$cell.dropped")" "$(median <"$scratch/$cell.abandoned")" "$(per_tick "$cell" "$wticks")"
-    if [ -n "$max_flush" ] && [ "$max_flush" -gt 10000 ]; then
-      printf '  flush_ms %s exceeds the 10 s bound\n' "$max_flush"
+    if [ -n "$max_flush" ] && [ "$max_flush" -gt "$flush_bound_ms" ]; then
+      printf '  flush_ms %s exceeds the 10 s flush bound plus 50 ms of scheduling slack (%s)\n' "$max_flush" "$flush_bound_ms"
     fi
     if [ -s "$scratch/$cell.voids" ]; then sed 's/^/  void /' "$scratch/$cell.voids"; fi
   done

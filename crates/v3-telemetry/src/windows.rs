@@ -87,19 +87,9 @@ fn present(value: Option<&str>) -> Option<&str> {
 }
 
 impl WindowSettings {
-    /// Parses the three variables' values; unset or empty takes the default,
-    /// anything else out of range is refused.
+    /// Parses the three variables' values; unset or empty takes the value in
+    /// `defaults` (a preset's windows), anything else out of range is refused.
     pub fn resolve(
-        switch: Option<&str>,
-        ticks: Option<&str>,
-        interval_ms: Option<&str>,
-    ) -> Result<Self, String> {
-        Self::resolve_over(Self::default(), switch, ticks, interval_ms)
-    }
-
-    /// [`WindowSettings::resolve`] with `defaults` (a preset's windows) in
-    /// place of the built-in defaults.
-    pub fn resolve_over(
         defaults: Self,
         switch: Option<&str>,
         ticks: Option<&str>,
