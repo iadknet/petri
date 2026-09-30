@@ -1,6 +1,6 @@
 # T21.F01 — Local Telemetry Stack and Run Identity
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-29
 **Feature**: T21.F01
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -154,16 +154,17 @@ structured metadata, so at F01 a run is found in Grafana Explore or the Loki
 API with `{service_name="v3-cli"} | petri_run_id="<id>"`.
 
 **Failure behavior and self-report.** Export is best effort over OTLP/HTTP
-with the blocking client on the SDK's own thread. When telemetry is on, the
-binary prints one stderr line at start
+with the blocking client. When telemetry is on, the binary prints one stderr
+line at start
 (`telemetry: on endpoint=<url> invocation=<id> run=<id>`) and one per run
 (`telemetry: run=<id> exported=<n> failed=<n> dropped=<n> abandoned=<n> bytes=<n> self_time_us=<n> flush_ms=<n>`).
 Every record is attributed to its run when enqueued; the run's line prints
 once the run has ended and each of its records has been exported, failed,
 dropped by the full queue, or abandoned by the shutdown flush, so a server
-reset never blocks on the previous run's flush. `bytes` counts body plus
-attribute key and value bytes of fully accepted batches. Every count is
-exact; records a partial success rejects are `failed`. `self_time_us` is the time
+reset never blocks on the previous run's flush. `exported` is records the
+receiver accepted; a partial success's rejects are `failed`, and as it
+reports only a count, `bytes` (body plus attribute bytes) covers fully
+accepted batches only. Every count is exact. `self_time_us` is the time
 inside telemetry calls on the simulation thread and `flush_ms` the time the
 end-of-run or shutdown flush took.
 
@@ -267,9 +268,9 @@ no recorded configuration.
 - [x] Overhead check: `scripts/telemetry-overhead` -> the table in the
       readings file, verdict in Performance and Goal Impact.
 - [x] `make check` -> exit 0.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
-- [ ] Benchmark summary: `Not applicable: observability feature`.
+- [x] Benchmark summary: `Not applicable: observability feature`.
 
 | Item (2026-09-29) | Result |
 | --- | --- |
@@ -326,20 +327,20 @@ Overhead check, method fixed before any run:
 
 ## Success Criteria
 
-- [ ] `make telemetry-up` starts the stack, prints each store's disk use,
+- [x] `make telemetry-up` starts the stack, prints each store's disk use,
       and Grafana answers on `127.0.0.1:3300`; the three verifications pass
       on `grafana/otel-lgtm:0.34.0`, or the failed check is recorded and the
       spec has been revised to the separate-services layout before
       implementation continues.
-- [ ] `make telemetry-clean CUTOFF=<date or RFC3339>` previews disk use, interval and
+- [x] `make telemetry-clean CUTOFF=<date or RFC3339>` previews disk use, interval and
       targets per store and deletes only with `PROCEED=1`, keeping everything
       newer.
-- [ ] A `v3-cli run --telemetry on` run appears in Loki with the identity
+- [x] A `v3-cli run --telemetry on` run appears in Loki with the identity
       attributes, `run.started` and `run.ended`; a `v3-server --telemetry on`
       run adds `run.state` and `run.config`, and a reset starts a new run ID.
-- [ ] The telemetry-neutrality and bounds tests pass inside `make check`
+- [x] The telemetry-neutrality and bounds tests pass inside `make check`
       without Docker, and the flag defaults to off in all three binaries.
-- [ ] The parent comparison is identical and the overhead check passes in
+- [x] The parent comparison is identical and the overhead check passes in
       states (a) and (b), with the idle-stack cost and the self-timed cost
       per tick recorded.
 
@@ -352,10 +353,9 @@ Overhead check, method fixed before any run:
   volumes, retention settings, endpoints and cleanup paths) before
   implementation continues; a failure both layouts share is a user blocker.
 - Exception: the challenge loop ended `not-ready` (user decision to commit
-  the plan, 2026-09-29). Round 1 Astra `high` `task-mun4xhdu-i5w6ec`,
-  rounds 2 and 3 `gpt-5.6-sol` `medium` `task-mun5iwhp-qtpui0` and
-  `task-mun5qsde-efqqrb`; every round-1 and round-2 fix was confirmed except
-  the config-body bound, refixed after round 3 unconfirmed; the
-  `profile_ticks` rebuttal was accepted in round 2 and re-raised in round 3;
-  dispositions in the readings file. No fourth round (user).
+  the plan, 2026-09-29). Rounds, models and dispositions are in the
+  readings file; the round-3 fixes are unconfirmed. No fourth round (user).
 - Decision: `profile_ticks` keeps no flag (user, 2026-09-29).
+- Cost: `/usage` awaiting; 4 implementer passes (advisor 3, 2, 4, 2);
+  5 spec-owner resumes; 3 Codex rounds, final `not-ready`; review 4 P1,
+  0 P2, 0 P3, all fixed in one pass.
