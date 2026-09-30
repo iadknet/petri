@@ -181,19 +181,19 @@ never zero. Nothing here is closure evidence.
       transition, reset and shutdown snapshots do not.
 - [x] `telemetry/grafana/dashboards/petri-run.json`: the `Tick traces` row.
 - [x] `scripts/telemetry-dashboards-check`: the rows above.
-- [ ] Run the checks on this host; record them in
+- [x] Run the checks on this host; record them in
       `docs/progress/readings/t21-f03.md`.
 
 ## Verification
 
-- [ ] Seam: `cargo test -p v3-core --features telemetry-seams --lib`
+- [x] Seam: `cargo test -p v3-core --features telemetry-seams --lib`
       (a `make check` row) -> after
       a tick, `last_tick_phases` holds the tick count and five phases in
       order, each elapsed equal to that tick's `phase_wall_clock`
       increment, each phase's offset plus elapsed at most the next phase's
       offset, and the last phase's end within the tick's elapsed;
       `cargo test -p v3-core --lib` still passes without the feature.
-- [ ] Neutrality and trace content: `cargo test -p v3-cli` (inside
+- [x] Neutrality and trace content: `cargo test -p v3-cli` (inside
       `make check`, no Docker) -> canonical NDJSON identical with telemetry
       off, on with the in-test receiver, and on with a closed port; with
       the interval `10`, every trace the receiver holds has six spans with
@@ -203,7 +203,7 @@ never zero. Nothing here is closure evidence.
       shorter than the interval yields exactly one trace, the completion
       one, and a run of zero ticks none; with
       `PETRI_TELEMETRY_TICK_TRACES=off` snapshots arrive and no trace does.
-- [ ] Encoding and bounds: `cargo test -p v3-telemetry` -> a synthetic
+- [x] Encoding and bounds: `cargo test -p v3-telemetry` -> a synthetic
       seam and config encode the six spans with the predicted trace and
       span IDs, timestamps, names and attribute keys, one shared trace ID,
       an empty parent on the root and the root's span ID as every phase's
@@ -214,31 +214,41 @@ never zero. Nothing here is closure evidence.
       last captured and `run.ended` carries `petri.tick_traces_capped`;
       a trace abandoned by the flush is counted for its run; an invalid
       `PETRI_TELEMETRY_TICK_TRACES` is refused.
-- [ ] Server: `cargo test -p v3-server` -> a trace accompanies an interval
+- [x] Server: `cargo test -p v3-server` -> a trace accompanies an interval
       snapshot after `step`; an unsampled tick followed by a config patch
       and a resume yields a transition snapshot and no trace, and the next
       interval trace carries the new digest; reset and shutdown snapshots
       have no trace; the three-state payload neutrality test still passes.
-- [ ] Reference build: `cargo build --release -p v3-cli -p v3-server -p v3-lab
+- [x] Reference build: `cargo build --release -p v3-cli -p v3-server -p v3-lab
       --no-default-features` compiles, `cargo tree -p v3-cli -p v3-server
       -p v3-lab --no-default-features -e features` shows neither
       `v3-telemetry` nor `telemetry-seams`, and clippy `-D warnings`
       passes with and without the feature.
-- [ ] Dashboards (Docker, outside `make check`):
+- [x] Dashboards (Docker, outside `make check`):
       `scripts/telemetry-dashboards-check` -> every row passes, including
       the four above; the `Tick traces` panel and one trace opened from it
       in a browser, recorded as a checklist row in the readings file.
-- [ ] Bytes per run: the workload run's `bytes=`, `snapshots=` and
+- [x] Bytes per run: the workload run's `bytes=`, `snapshots=` and
       `traces=` figures and Tempo's growth over ten runs, in the readings
       file.
-- [ ] Parent comparison: `scripts/telemetry-parent-compare 6b027f2a` (F02's
+- [x] Parent comparison: `scripts/telemetry-parent-compare 6b027f2a` (F02's
       closing commit) -> identical canonical output, in the readings file.
-- [ ] Overhead check: `scripts/telemetry-overhead` -> the table in the
+- [x] Overhead check: `scripts/telemetry-overhead` -> the table in the
       readings file, verdict in Performance and Goal Impact.
-- [ ] `make check` -> exit 0.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
+- [x] `make check` -> exit 0.
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
-- [ ] Benchmark summary: `Not applicable: observability feature`.
+- [x] Benchmark summary: `Not applicable: observability feature`.
+
+| Item | Result (2026-09-29; transcripts in the readings file) |
+| --- | --- |
+| Seam, neutrality, encoding, server | pass inside `make check` (both `v3-core --lib` rows); the server test runs every tick as a paused `step` with a 1 s interval, 5/5 repeat runs pass |
+| Reference build | build exit 0; `cargo tree` 0 matches; clippy `-D warnings` exit 0 without the feature and in `make check` with it |
+| Dashboards | every row PASS, `Tick traces` 4 rows; browser: panel lists the run's four traces, the span link opens the six-span trace |
+| Bytes per run | `bytes=` 801,625–805,701, `snapshots=4 traces=4`; about 6.2 KB per trace; Tempo +380 KiB over ten runs |
+| Parent comparison | `identical: 3 canonical lines, T=6908` |
+| Overhead check | inconclusive: spread 11.05% then 11.93% (n = 0) on a loaded host |
+| `make check` | exit 0 |
 
 ## Performance and Goal Impact
 
@@ -269,8 +279,9 @@ unchanged, with T = 6908 fixed:
 | Record | Value |
 | --- | --- |
 | Profiles | `Not applicable: observability feature` |
-| Parent comparison | pending |
-| Overhead check | pending |
+| Parent comparison | identical canonical output against `6b027f2a`, T = 6908 |
+| Overhead check | inconclusive: F01's method, T = 6908; both attempts (the second the one rerun) stopped at the spread measurement, 11.05% and 11.93% > 10%, so n = 0 and states (a) and (b) inconclusive, (c) without a reading; 24.6 s of the 300 s cap; host load average 6.6 to 8.8 |
+| Self-timed cost per tick | 0.38–0.41 µs (ten traces-on workload runs, `self_time_us` 2,615–2,809) |
 
 - Readings: [`docs/progress/readings/t21-f03.md`](../../progress/readings/t21-f03.md).
 

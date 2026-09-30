@@ -344,11 +344,14 @@ fn entropy_id() -> (u128, String) {
     (value, format!("{value:032x}"))
 }
 
+/// `duration` in nanoseconds, saturating at `u64::MAX`.
+pub(crate) fn saturating_nanos(duration: Duration) -> u64 {
+    u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
+}
+
 /// `time` in Unix nanoseconds; `0` before the epoch.
 fn unix_ns(time: SystemTime) -> u64 {
-    time.duration_since(UNIX_EPOCH).map_or(0, |since| {
-        u64::try_from(since.as_nanos()).unwrap_or(u64::MAX)
-    })
+    time.duration_since(UNIX_EPOCH).map_or(0, saturating_nanos)
 }
 
 /// An integer attribute, or its decimal string when it exceeds `i64`.

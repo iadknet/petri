@@ -19,7 +19,7 @@ use v3_core::config::SimulationConfig;
 use v3_core::simulation::stats::TickPhaseTimings;
 use v3_core::simulation::SimStats;
 
-use crate::{RunHandle, Switch, RUN_ID_KEY};
+use crate::{saturating_nanos, RunHandle, Switch, RUN_ID_KEY};
 
 /// The environment variable that turns tick traces off while telemetry is on.
 pub const TICK_TRACES_ENV: &str = "PETRI_TELEMETRY_TICK_TRACES";
@@ -387,10 +387,6 @@ fn actions(a: &mut Attributes, config: &SimulationConfig) {
     );
 }
 
-fn nanos(duration: Duration) -> u64 {
-    u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
-}
-
 /// What one tick trace is made of, read on the simulation thread.
 pub(crate) struct Capture<'a> {
     pub(crate) seam: &'a TickPhaseTimings,
@@ -409,9 +405,9 @@ pub(crate) fn encode(
 ) -> ExportTraceServiceRequest {
     let seam = capture.seam;
     let trace = trace_id(run.key, seam.tick).to_vec();
-    let tick_start_ns = run
-        .started_ns
-        .saturating_add(nanos(seam.started.saturating_duration_since(run.started)));
+    let tick_start_ns = run.started_ns.saturating_add(saturating_nanos(
+        seam.started.saturating_duration_since(run.started),
+    ));
     let root = span_id(1).to_vec();
     let span = |index: u64,
                 name: &str,
@@ -425,7 +421,7 @@ pub(crate) fn encode(
         name: name.to_owned(),
         kind: SpanKind::Internal as i32,
         start_time_unix_nano: start_ns,
-        end_time_unix_nano: start_ns.saturating_add(nanos(elapsed)),
+        end_time_unix_nano: start_ns.saturating_add(saturating_nanos(elapsed)),
         attributes: attributes.0,
         ..Span::default()
     };
@@ -447,7 +443,7 @@ pub(crate) fn encode(
         spans.push(span(
             index as u64 + 2,
             PHASES[index],
-            tick_start_ns.saturating_add(nanos(phase.offset)),
+            tick_start_ns.saturating_add(saturating_nanos(phase.offset)),
             phase.elapsed,
             root.clone(),
             attributes,
