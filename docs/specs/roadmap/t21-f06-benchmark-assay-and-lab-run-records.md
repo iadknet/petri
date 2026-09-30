@@ -60,10 +60,14 @@ Invariants:
 
 1. No `SimulationConfig` or `RuntimeConfig` field, no production RNG draw,
    no simulation default, no stored summary content and no deterministic
-   output changes; `v3-core` is not edited. Everything F06 adds to `v3-cli`
-   and `v3-lab` sits behind their `telemetry` feature, and `v3-lab`'s
-   library exposes plain data only (strings, numbers, paths); the binary
-   maps it to records.
+   output changes; `v3-core` is not edited. Every call into `v3-telemetry`
+   and every capture in `v3-cli` and `v3-lab` sits behind their `telemetry`
+   feature. Unconditional and behavior-preserving: `main.rs` command
+   functions return exit codes and `run_bench_result` is split so one exit
+   point can end the measurement; `run_one_seed` builds `PerSeed` before its
+   observation closure and takes the recipe path; `v3-lab`'s library
+   returns plain data only (`Measurement`, `Executed`, `execute_with_root`;
+   strings, numbers, paths) that the binary maps to records.
 2. Held exporter. A measurement command starts telemetry held:
    `Telemetry::start_held` builds the exporter as `start` does, but the
    worker takes no batch until `Telemetry::release`. Exporter activity means
@@ -125,14 +129,16 @@ attributes of F01. An attribute that does not apply is omitted, never zero.
 | Record | Emitted | Attributes and body |
 | --- | --- | --- |
 | `measurement.started` | after argument resolution and before the library entry, on every command above | `petri.run_id` (the measurement's), `petri.tick` 0 (on both measurement records), `petri.command` (`bench`, `recruitment`, `input-opportunity`, `run`, `why-not`), `petri.feature` (`--feature` where the command has one; the lab has none), `petri.profile` (`gate`, `goal`, `sweep`) or `petri.assay` (the lab's assay name), `petri.pilot` (assays), `petri.seed` (the lab's `--seed`) or `petri.seeds` (bench, comma-joined), `petri.config_digest` (`config_digest` of the one effective config: bench gate and sweep, recruitment's task config; absent for the goal world set, the opportunity worlds and the lab, whose summaries carry their own), `petri.threads` when explicit, `petri.tick` 0; no body |
-| `measurement.ended` | after the entry returns, on every exit path after `measurement.started`, including exit 3 and the error exit 1 | `petri.run_id`, `petri.exit_code`, `petri.wall_seconds` (since `measurement.started`), `petri.incomplete` (assays, lab: the summary's field), `petri.severe` (bench), `petri.stop_reason` (assays, when set), `petri.horizon` and `petri.gate_favorable` (input-opportunity), `petri.summary_path` (bench summary; assay summary; the lab's `summary.json`), `petri.raw_sha256` and `petri.raw_bytes` (bench and assays: the summary's raw identity); body: the totals block as compact key-sorted JSON — bench `deterministic.totals`; recruitment `{expected_proposals, lineage_count, proposal_count}`; input-opportunity `{worlds: [{case, replicates_requested, replicates, ticks, births_total}], verdicts: [{family, world, verdict, sampled, exposed, applied}]}`, where `replicates`, `ticks` and `births_total` are the count and sums of the world's `ReplicateRow`s and each verdict row is the summary's `VerdictRow` cut to those fields (bounded: three worlds, one row per family and world); lab `timing` plus `exit_code` and `incomplete`; absent on an error exit |
-| `run.started` (F01) | `run_one_seed`, before the seed's timer | F01's attributes; `petri.ticks_requested` = the profile's ticks; `petri.recipe` = the goal case's recipe path on the world set; body the effective config as in F01 |
+| `measurement.ended` | after the entry returns, on every exit path after `measurement.started`, including exit 3 and the error exit 1 | `petri.run_id`, `petri.exit_code`, `petri.wall_seconds` (since `measurement.started`), `petri.incomplete` (assays, lab: the summary's field), `petri.severe` (bench), `petri.stop_reason` (assays, when set), `petri.horizon` and `petri.gate_favorable` (input-opportunity), `petri.summary_path` (bench summary; assay summary; the lab's `summary.json`), `petri.raw_sha256` and `petri.raw_bytes` (bench and assays: the summary's raw identity); body: the totals block as compact key-sorted JSON — bench: the eleven `Totals` fields, each the sum over the stored summary's `deterministic.per_seed` rows (the v2 keep-list drops the raw report's `deterministic.totals` block and keeps every `per_seed` row, so the sums are what the summary carries; they equal the raw report's `deterministic.totals`, which the code may read); recruitment `{expected_proposals, lineage_count, proposal_count}`; input-opportunity `{worlds: [{case (the case name), replicates_requested, replicates, ticks, births_total}], verdicts: [{family, world, verdict, sampled, exposed, applied}]}`, where `replicates`, `ticks` and `births_total` are the count and sums of the world's `ReplicateRow`s and each verdict row is the summary's `VerdictRow` cut to those fields (bounded: three worlds, one row per family and world); lab `timing` plus `exit_code` and `incomplete`, each copied from `summary.json` as written (`incomplete` is `null` or a cause string there; the boolean lives in `petri.incomplete`); absent on an error exit |
+| `run.started` (F01) | `run_one_seed`, before the seed's timer | F01's attributes, its cadence attributes included although nothing is sampled here; `petri.ticks_requested` = the profile's ticks; `petri.recipe` = the goal case's recipe path on the world set (checked by diff, not by a test: it needs a goal world-set run); body the effective config as in F01 |
 | `run.ended` (F01) | `run_one_seed`, after `wall_clock_ms` | `petri.status` `completed`, `petri.tick` where the seed stopped (extinction included), `petri.wall_seconds`, and the seed's `PerSeed` totals as `petri.total.<field>`: `ticks`, `creature_ticks`, `mesh_hops`, `vm_steps`, `graph_relax_iters`, `plasticity_updates`, `actions_applied`, `births`, `pass_cap_hits`, `passes`, `decided_passes`, `final_population`, `extinction_tick` (omitted when none) |
 
-**Dashboard.** `petri-runs` gains one Loki table, `Measurements`: time,
-`service_name`, `petri_command`, `petri_profile` or `petri_assay`,
-`petri_feature`, `petri_run_id`, and from `measurement.ended` the exit code,
-wall seconds, `petri_summary_path`; nothing on it is closure evidence.
+**Dashboard.** `petri-runs` gains one Loki table, `Measurements`, one row
+per `measurement.*` record (a started and an ended row share
+`petri_run_id`): time, `event_name`, `service_name`, `petri_command`,
+`petri_profile` or `petri_assay`, `petri_feature`, `petri_run_id`, and on
+the ended row the exit code, wall seconds and `petri_summary_path`; nothing
+on it is closure evidence.
 
 **Lab boundary.** `v3_lab::cli::execute` returns the exit code and, for `run`
 and `why-not`, a plain `Measurement` value (command, assay, seed, summary
@@ -181,9 +187,7 @@ mechanism switch and no config value; the held mode is not configuration.
 
 - [x] Fixture and neutrality: `cargo test -p v3-cli` (inside `make check`,
       no Docker) -> the CLI rows below: the three `measurement::` tests
-      pass (2026-09-30); the exit-path row uses an existing-directory
-      `--out` and the bench body is the raw report's `deterministic.totals`
-      (the summary omits it), spec owner ruling pending.
+      (a `#[path]` submodule of `telemetry.rs`) pass (2026-09-30).
 - [x] Held exporter and records: `cargo test -p v3-telemetry` -> the crate
       rows: 59 passed (2026-09-30).
 - [x] Lab: `cargo test -p v3-lab` -> the lab row: both lab tests pass
@@ -211,9 +215,9 @@ mechanism switch and no config value; the held mode is not configuration.
 | --- | --- |
 | CLI: fixture workload | `v3-cli --telemetry <switch> bench --profile sweep --width 32 --height 32 --founders 16 --seeds 11,22 --ticks 20 --feature t21-f06-fixture --out <tmp> --summary-out <tmp>`, once off, once on against the in-test receiver with `PETRI_TELEMETRY_METRICS_INTERVAL_MS=10`, tick traces and windows on, and once on against a closed port |
 | CLI: deterministic fields | the raw report's and the summary's `deterministic` blocks (keys sorted) are byte-identical across the three runs; stdout is identical; the two `on` runs exit 0 |
-| CLI: boundaries only | the receiver holds exactly six records: `measurement.started`, `run.started` and `run.ended` for seeds 11 and 22, `measurement.ended`, in that order of timestamps; no snapshot, trace or window arrived and both stderr run lines say `snapshots=0`; for each seed `run.ended` − `run.started` ≥ that seed's `wall_clock_ms` in the raw report; `measurement.started` ≤ the first `run.started` and `measurement.ended` ≥ the last `run.ended`; `run.ended` carries every `petri.total.*` of the table with the raw report's `per_seed` values; `measurement.ended` carries `petri.exit_code` 0, `petri.summary_path` equal to `--summary-out`, `petri.raw_sha256` and `petri.raw_bytes` equal to the summary's raw identity, and a body equal to the summary's `totals` |
+| CLI: boundaries only | the receiver holds exactly six records: `measurement.started`, `run.started` and `run.ended` for seeds 11 and 22, `measurement.ended`, in that order of timestamps; no snapshot, trace or window arrived and both stderr run lines say `snapshots=0`; for each seed `run.ended` − `run.started` ≥ that seed's `wall_clock_ms` in the raw report; `measurement.started` ≤ the first `run.started` and `measurement.ended` ≥ the last `run.ended`; `run.ended` carries every `petri.total.*` of the table with the raw report's `per_seed` values; `measurement.ended` carries `petri.exit_code` 0, `petri.summary_path` equal to `--summary-out`, `petri.raw_sha256` and `petri.raw_bytes` equal to the summary's raw identity, and a body equal to the `Totals` fields summed over the written summary's `deterministic.per_seed` rows (and to the raw report's `deterministic.totals`) |
 | CLI: exporter after the last region | the receiver's first request arrived (its own clock, `SystemTime` at accept) at or after the `measurement.ended` record's timestamp, which was set after the summary was written; the same holds with the tight interval and traces on |
-| CLI: exit paths | a sweep whose `--out` cannot be written (its parent is an existing file, so the failure lands after the report is built) exits 1 with `measurement.started` and a `measurement.ended` carrying `petri.exit_code` 1 and no body; the fixture sweep run again with `--compare` naming a copy of its own raw report whose positive `per_creature_tick` work counters are divided by ten (a severe level is a positive delta of the current run over the reference) exits 3 with `petri.exit_code` 3, `petri.severe` true and the totals body; an invalid `PETRI_TELEMETRY_METRICS_INTERVAL_MS` with `--telemetry on` refuses to start before any record |
+| CLI: exit paths | a sweep whose `--out` names an existing directory (argument resolution accepts it; `write_json` fails after the report is built, whereas a parent that is a file fails in `output_paths` before `measurement.started` and writes no record) exits 1 with `measurement.started` and a `measurement.ended` carrying `petri.exit_code` 1 and no body; the fixture sweep run again with `--compare` naming a copy of its own raw report whose positive `per_creature_tick` work counters are divided by ten (a severe level is a positive delta of the current run over the reference) exits 3 with `petri.exit_code` 3, `petri.severe` true and the totals body; an invalid `PETRI_TELEMETRY_METRICS_INTERVAL_MS` with `--telemetry on` refuses to start before any record |
 | CLI: assays | `v3-cli --telemetry on recruitment --feature t21-f06-fixture --pilot --threads 1 --wall-cap-secs 0 --out <tmp> --summary-out <tmp>` in a scratch git checkout (the arguments of `recruitment_cli_passes_every_option_into_the_written_summary`) exits 3 with exactly `measurement.started` and `measurement.ended`, `petri.command` `recruitment`, `petri.exit_code` 3, `petri.incomplete` true, `petri.stop_reason` set, `petri.summary_path` and the raw identity equal to the written summary's, the body equal to the summary's three counts, and the first request at or after `measurement.ended`; `v3-cli --telemetry on input-opportunity --feature t21-f06-fixture --pilot --out <unwritable>` exits 1 with `petri.exit_code` 1 and no body, having run no replicate; each command's stderr shows one `telemetry: run=…` line for the measurement, printed after the command's own output |
 | Lab: command | `v3-lab --telemetry on run` with `lab_run.rs`'s `tiny` sizes, the crate directory as cwd and `--out` naming a fresh directory under the checkout's `.bench-artifacts/lab/` (the only place `resolve_out` admits; removed by the test), against the receiver: exit code as without telemetry; exactly `measurement.started` and `measurement.ended` with `petri.command` `run`, `petri.assay`, `petri.seed`, `petri.exit_code` equal to the process exit, `petri.summary_path` naming the written `summary.json` and a body equal to that file's `timing`, `exit_code` and `incomplete`; the first request at or after `measurement.ended`; `summary.json` byte-identical to the same run with `--telemetry off` once `timing` is removed from both |
 | Crate: held | a held telemetry with records queued and an accepting receiver: the receiver has zero requests until `release`, then all of them; `shutdown` after release flushes within the bound; per-run lines print once per run and once for the measurement |
@@ -225,9 +229,10 @@ mechanism switch and no config value; the held mode is not configuration.
 **Predeclaration — written before the run.** Profiles: `Not applicable:
 observability feature`; the diff changes no simulation behavior, adds no
 `SimulationConfig` or `RuntimeConfig` field, draws no production RNG and
-writes no stored summary content; `v3-core` is not edited; every change to
-`v3-cli` and `v3-lab` sits behind the `telemetry` feature; the reviewer checks
-that and the capture placement of invariant 3 against the diff. Measurement
+writes no stored summary content; `v3-core` is not edited; every call into
+`v3-telemetry` and every capture sits behind the `telemetry` feature, and the
+unconditional restructuring invariant 1 names changes no output; the reviewer
+checks that and the capture placement of invariant 3 against the diff. Measurement
 feature: the natural-analog rule and the environmental-pressure rule do not
 apply, and no indicator can move.
 
@@ -269,7 +274,8 @@ bench path, with F01's method otherwise unchanged and T = 6908 fixed:
       stack shows on `petri-runs` as one row of `Measurements` and three seed
       runs in `Runs started` and `Runs ended` under the same invocation ID;
       the measurement's `petri_summary_path` names the written summary and
-      its body equals that summary's `totals`; the same command with
+      its body equals the `Totals` fields summed over that summary's
+      `per_seed` rows; the same command with
       `--telemetry off` writes a byte-identical `deterministic` block.
 - [ ] The receiver's first request in the fixture arrives after the
       `measurement.ended` timestamp, and no interval snapshot, trace or
