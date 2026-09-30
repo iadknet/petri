@@ -56,7 +56,8 @@ impl Budget {
 }
 
 const ROWS: &str = "rows.ndjson";
-const SUMMARY: &str = "summary.json";
+/// A run directory's summary file.
+pub const SUMMARY: &str = "summary.json";
 const ELITES: &str = "elites";
 /// What a run writes; a directory holding any of these is not reused.
 const RUN_OUTPUTS: [&str; 3] = [ROWS, SUMMARY, ELITES];

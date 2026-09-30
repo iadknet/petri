@@ -1,6 +1,6 @@
 #!/bin/sh
 # Dashboard and metric-name check for run snapshots (T21.F02), tick traces
-# (T21.F03) and creature windows (T21.F04).
+# (T21.F03), creature windows (T21.F04) and measurement records (T21.F06).
 #
 # Usage: scripts/telemetry-dashboards-check
 #
@@ -9,7 +9,10 @@
 # petri-telemetry is up: same host ports), runs the F01 workload
 #   v3-cli run --telemetry on --seed 7 --ticks T --sample-every T
 #     --config telemetry/overhead-world.json
-# under scripts/bench-wait, then through Grafana on 127.0.0.1:3300, with the
+# under scripts/bench-wait, then the tiny sweep
+#   v3-cli --telemetry on bench --profile sweep --width 32 --height 32
+#     --founders 16 --seeds 11,22 --ticks 20 --feature t21-f06-dashboards
+# with its outputs in a scratch directory, then through Grafana on 127.0.0.1:3300, with the
 # query range from one minute before the run to now, checks that:
 #   1. both dashboards are provisioned in folder Petri;
 #   2. every scalar family, and every map family with a key on the workload,
@@ -41,7 +44,10 @@
 #      petri.genome_hash;
 #  12. the run's Loki run.started line carries petri_creature_windows,
 #      petri_window_ticks and petri_window_interval_ms;
-#  13. after the scratch stack's own `down -v`, the external petri-telemetry
+#  13. the Measurements panel's query (petri-runs) returns the sweep's
+#      measurement: its run ID, from the sweep's `telemetry: on` line, is in
+#      the answer with both measurement.started and measurement.ended;
+#  14. after the scratch stack's own `down -v`, the external petri-telemetry
 #      volume still exists when it existed at the start.
 # Prints one PASS or FAIL line per check, removes the scratch stack and volume
 # (scripts/telemetry-scratch.sh), and exits 1 when any check fails.
@@ -258,6 +264,19 @@ run_id=$(sed -n 's/^telemetry: on .* run=\([0-9a-f]*\)$/\1/p' "$scratch/stderr" 
 [ -n "$run_id" ] || { note 'the workload announced no run'; exit 1; }
 note "run $run_id"
 
+note 'running the tiny sweep'
+OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 PETRI_TELEMETRY='' PETRI_TELEMETRY_METRICS_INTERVAL_MS='' \
+  PETRI_TELEMETRY_TICK_TRACES='' PETRI_TELEMETRY_CREATURE_WINDOWS='' PETRI_TELEMETRY_WINDOW_TICKS='' \
+  PETRI_TELEMETRY_WINDOW_INTERVAL_MS='' \
+  "$root/target/release/v3-cli" --telemetry on bench --profile sweep --width 32 --height 32 \
+  --founders 16 --seeds 11,22 --ticks 20 --feature t21-f06-dashboards \
+  --out "$scratch/sweep-raw.json" --summary-out "$scratch/sweep-summary.json" \
+  >"$scratch/sweep.stdout" 2>"$scratch/sweep.stderr"
+cat "$scratch/sweep.stderr"
+measurement_id=$(sed -n 's/^telemetry: on .* run=\([0-9a-f]*\)$/\1/p' "$scratch/sweep.stderr" | head -n 1)
+[ -n "$measurement_id" ] || { note 'the sweep announced no measurement'; exit 1; }
+note "measurement $measurement_id"
+
 # Waits up to 60 s for the run's last tick sample to be queryable.
 waited=0
 until get "/api/datasources/proxy/uid/prometheus/api/v1/query?query=max(petri_run_tick%7Bpetri_run_id%3D%22$run_id%22%7D)" |
@@ -358,6 +377,9 @@ while IFS="$tab" read -r kind uid title ref body; do
       *) cp "$scratch/answer.json" "$scratch/tick-traces.json"; trace_rows=$count ;;
     esac
     note "$title: $count row(s) after ${waited} s"
+  fi
+  if [ "$title" = Measurements ]; then
+    cp "$scratch/answer.json" "$scratch/measurements.json"
   fi
   [ "$count" -gt 0 ] || empty="$empty [$uid / $title / $ref]"
 done <"$scratch/queries.tsv"
@@ -598,9 +620,29 @@ detail=$("$node" -e '
 ' "$scratch/started.json") && status=0 || status=1
 check 'run.started carries the window settings' "$status" "$detail"
 
+# ── 13. Measurements panel ────────────────────────────────────────────────────
+# shellcheck disable=SC2016 # JavaScript template literals.
+detail=$("$node" -e '
+  const fs = require("fs");
+  const [, file, id] = process.argv;
+  const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "{}";
+  const rows = [];
+  for (const result of Object.values(JSON.parse(text).results || {})) {
+    for (const frame of result.frames || []) {
+      const names = ((frame.schema || {}).fields || []).map((f) => f.name);
+      const values = (frame.data || {}).values || [];
+      const labels = values[names.indexOf("labels")] || [];
+      for (const row of labels) if (row && row.petri_run_id === id) rows.push(row.event_name);
+    }
+  }
+  console.log(`measurement ${id}: ${rows.sort().join(", ") || "no rows"}`);
+  process.exit(rows.includes("measurement.started") && rows.includes("measurement.ended") ? 0 : 1);
+' "$scratch/measurements.json" "$measurement_id") && status=0 || status=1
+check 'Measurements panel returns the sweep' "$status" "$detail"
+
 compose exec -T lgtm du -s /data/prometheus /data/loki /data/tempo || true
 
-# ── 13. volume survives ───────────────────────────────────────────────────────
+# ── 14. volume survives ───────────────────────────────────────────────────────
 scratch_stack_remove
 if [ "$production_volume" = present ]; then
   docker volume inspect petri-telemetry >/dev/null 2>&1 && status=0 || status=1

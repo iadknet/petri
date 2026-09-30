@@ -151,27 +151,27 @@ mechanism switch and no config value; the held mode is not configuration.
 
 ## Implementation Tasks
 
-- [ ] `v3-telemetry`: `Telemetry::start_held`, `Telemetry::release`;
+- [x] `v3-telemetry`: `Telemetry::start_held`, `Telemetry::release`;
       `release` leaves `cfg(test)`; `begin_measurement`/`end_measurement`
       (or equivalent) emitting the two records above under per-run
       accounting; `end_run` accepts the seed totals; `testing.rs`
       `ReceivedRecord` gains `time_unix_nano` and `Receiver` the arrival time
       of its first request.
-- [ ] `v3-cli`: `main.rs` starts held for `bench`, `recruitment` and
+- [x] `v3-cli`: `main.rs` starts held for `bench`, `recruitment` and
       `input-opportunity`, captures the two measurement records, releases
       and flushes on every exit path, then exits with the command's code;
       the flag's doc no longer says only `run` exports; `bench/run.rs`
       captures the seed records at the two boundaries through the
       `telemetry` module's installed handle, behind the feature.
-- [ ] `v3-lab`: `cli::execute` returns the plain `Measurement`; `main.rs`
+- [x] `v3-lab`: `cli::execute` returns the plain `Measurement`; `main.rs`
       starts held, captures, releases, flushes, exits.
-- [ ] Fixture and the assay and exit-path rows in
+- [x] Fixture and the assay and exit-path rows in
       `crates/v3-cli/tests/telemetry.rs`; the lab command row in
       `crates/v3-lab/tests/lab_run.rs` (Verification table).
-- [ ] `telemetry/grafana/dashboards/petri-runs.json`: the `Measurements`
+- [x] `telemetry/grafana/dashboards/petri-runs.json`: the `Measurements`
       panel; `scripts/telemetry-dashboards-check` runs the tiny sweep with
       telemetry on and asserts the panel query returns its row.
-- [ ] `scripts/telemetry-overhead`: `PETRI_OVERHEAD_WORKLOAD=bench` runs the
+- [x] `scripts/telemetry-overhead`: `PETRI_OVERHEAD_WORKLOAD=bench` runs the
       bench workload of the Performance section instead of `run`, sums the
       `self_time_us` of the invocation's stderr lines, and reads the raw
       report's `environment.wall_clock_ms_total` beside the process time.
@@ -179,15 +179,19 @@ mechanism switch and no config value; the held mode is not configuration.
 
 ## Verification
 
-- [ ] Fixture and neutrality: `cargo test -p v3-cli` (inside `make check`,
-      no Docker) -> the CLI rows below.
-- [ ] Held exporter and records: `cargo test -p v3-telemetry` -> the crate
-      rows.
-- [ ] Lab: `cargo test -p v3-lab` -> the lab row.
-- [ ] Reference build: `cargo build --release -p v3-cli -p v3-server -p
+- [x] Fixture and neutrality: `cargo test -p v3-cli` (inside `make check`,
+      no Docker) -> the CLI rows below: the three `measurement::` tests
+      pass (2026-09-30); the exit-path row uses an existing-directory
+      `--out` and the bench body is the raw report's `deterministic.totals`
+      (the summary omits it), spec owner ruling pending.
+- [x] Held exporter and records: `cargo test -p v3-telemetry` -> the crate
+      rows: 59 passed (2026-09-30).
+- [x] Lab: `cargo test -p v3-lab` -> the lab row: both lab tests pass
+      (2026-09-30).
+- [x] Reference build: `cargo build --release -p v3-cli -p v3-server -p
       v3-lab --no-default-features` compiles; `cargo tree … -e features`
       shows neither `v3-telemetry` nor `telemetry-seams`; clippy
-      `-D warnings` passes with and without the feature.
+      `-D warnings` passes with and without the feature (2026-09-30).
 - [ ] Dashboards (Docker, outside `make check`):
       `scripts/telemetry-dashboards-check` -> every row passes, the
       `Measurements` row included.
@@ -198,7 +202,7 @@ mechanism switch and no config value; the held mode is not configuration.
 - [ ] Overhead check: `PETRI_OVERHEAD_WORKLOAD=bench scripts/telemetry-overhead`
       -> the table in the readings file, verdict in Performance and Goal
       Impact.
-- [ ] `make check` -> exit 0.
+- [x] `make check` -> exit 0 (2026-09-30).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
 - [ ] Benchmark summary: `Not applicable: observability feature`.

@@ -266,6 +266,87 @@
       "options": {
         "showHeader": true
       }
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Measurements",
+      "description": "Benchmark, assay and lab invocations with telemetry on (T21.F06): measurement.started carries the command, profile or assay and feature; measurement.ended the exit code, wall seconds and summary path. Not closure evidence.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "expr": "{service_name=~\"v3-cli|v3-lab\"} | event_name=~\"measurement[.](started|ended)\"",
+          "queryType": "range"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "labels",
+            "keepTime": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "includeByName": {
+              "Time": true,
+              "service_name": true,
+              "event_name": true,
+              "petri_command": true,
+              "petri_profile": true,
+              "petri_assay": true,
+              "petri_feature": true,
+              "petri_run_id": true,
+              "petri_exit_code": true,
+              "petri_wall_seconds": true,
+              "petri_summary_path": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "service_name": 1,
+              "event_name": 2,
+              "petri_command": 3,
+              "petri_profile": 4,
+              "petri_assay": 5,
+              "petri_feature": 6,
+              "petri_run_id": 7,
+              "petri_exit_code": 8,
+              "petri_wall_seconds": 9,
+              "petri_summary_path": 10
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Time",
+            "desc": true
+          }
+        ]
+      }
     }
   ]
 }

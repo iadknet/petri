@@ -1026,3 +1026,189 @@ fn a_v2_summary_renders_without_readings_and_a_v4_summary_renders_readings_and_t
     }
     assert!(ladder.contains("verdict: food-seeking, arena sparse-food-v1, start founder"));
 }
+
+/// `tiny` as command-line flags after `subcommand`, writing to `out`.
+fn tiny_argv(subcommand: &str, out: &Path) -> Vec<String> {
+    let mut argv: Vec<String> = [
+        subcommand,
+        "--seed",
+        "7",
+        "--replicates",
+        "1",
+        "--generations",
+        "2",
+        "--population",
+        "2",
+        "--elite-fraction",
+        "0.5",
+        "--scenes",
+        "1",
+        "--validation-scenes",
+        "4",
+        "--lifetime",
+        "100",
+        "--arena-size",
+        "48",
+        "--food-fraction",
+        "0.08",
+        "--calibration-lifetimes",
+        "100",
+        "--calibration-scenes",
+        "4",
+        "--threads",
+        "1",
+        "--mutants",
+        "2",
+        "--retention-depth",
+        "2",
+        "--out",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    argv.push(out.display().to_string());
+    argv
+}
+
+/// T21.F06: `run` and `why-not` return the plain measurement of the
+/// `summary.json` they wrote; `report` returns none.
+#[test]
+fn execute_returns_the_measurement_of_the_written_summary() {
+    use v3_lab::cli::{execute_with_root, Cli};
+    use v3_lab::output::SUMMARY;
+
+    let scratch = Scratch::new("measurement");
+    let root = LabRoot::without_git(scratch.root.clone());
+    for subcommand in ["run", "why-not"] {
+        let out = scratch.lab.join(subcommand);
+        let mut argv = vec!["v3-lab".to_owned()];
+        argv.extend(tiny_argv(subcommand, &out));
+        let cli = <Cli as clap::Parser>::parse_from(argv);
+        let executed = execute_with_root(cli, &root).unwrap();
+        let measurement = executed.measurement.expect("a measurement");
+        let summary = read_summary(&out.join(SUMMARY)).unwrap();
+        assert_eq!(measurement.command, subcommand);
+        assert_eq!(measurement.assay, "food-seeking");
+        assert_eq!(measurement.seed, 7);
+        assert_eq!(
+            measurement.summary_path,
+            out.join(SUMMARY).canonicalize().unwrap()
+        );
+        assert_eq!(measurement.timing, summary.timing);
+        assert_eq!(measurement.exit_code, summary.exit_code);
+        assert_eq!(executed.exit_code, summary.exit_code);
+        assert_eq!(measurement.incomplete, summary.incomplete);
+    }
+    let report = <Cli as clap::Parser>::parse_from([
+        "v3-lab".to_owned(),
+        "report".to_owned(),
+        scratch.lab.join("run").join(SUMMARY).display().to_string(),
+    ]);
+    let executed = execute_with_root(report, &root).unwrap();
+    assert_eq!(executed.exit_code, 0);
+    assert!(executed.measurement.is_none());
+}
+
+/// T21.F06: `v3-lab --telemetry on run` records one measurement, exported
+/// only after it ended, and writes the same `summary.json` as with telemetry
+/// off, `timing` aside.
+#[cfg(feature = "telemetry")]
+#[test]
+fn the_lab_command_records_one_measurement_after_its_run() {
+    use v3_telemetry::testing::Receiver;
+
+    let crate_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let lab = crate_dir.join("../../.bench-artifacts/lab");
+    let off_dir = lab.join(format!("t21-f06-off-{}", std::process::id()));
+    let on_dir = lab.join(format!("t21-f06-on-{}", std::process::id()));
+    struct Remove(Vec<PathBuf>);
+    impl Drop for Remove {
+        fn drop(&mut self) {
+            for dir in &self.0 {
+                let _ = std::fs::remove_dir_all(dir);
+            }
+        }
+    }
+    let _cleanup = Remove(vec![off_dir.clone(), on_dir.clone()]);
+    let lab_cli = |switch: &str, out: &Path, endpoint: Option<&str>| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_v3-lab"));
+        command
+            .current_dir(crate_dir)
+            .args(["--telemetry", switch])
+            .args(tiny_argv("run", out))
+            .env_remove(v3_telemetry::SWITCH_ENV)
+            .env_remove(v3_telemetry::ENDPOINT_ENV)
+            .env_remove(v3_telemetry::METRICS_INTERVAL_ENV)
+            .env_remove(v3_telemetry::TICK_TRACES_ENV)
+            .env_remove(v3_telemetry::CREATURE_WINDOWS_ENV)
+            .env_remove(v3_telemetry::WINDOW_TICKS_ENV)
+            .env_remove(v3_telemetry::WINDOW_INTERVAL_ENV);
+        if let Some(endpoint) = endpoint {
+            command.env(v3_telemetry::ENDPOINT_ENV, endpoint);
+        }
+        command.output().unwrap()
+    };
+    let without_timing = |dir: &Path| {
+        let mut summary: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(dir.join("summary.json")).unwrap()).unwrap();
+        summary.as_object_mut().unwrap().remove("timing");
+        serde_json::to_vec(&summary).unwrap()
+    };
+
+    let off = lab_cli("off", &off_dir, None);
+    assert!(
+        !String::from_utf8_lossy(&off.stderr).contains("telemetry:"),
+        "{off:?}"
+    );
+    let receiver = Receiver::start();
+    let on = lab_cli("on", &on_dir, Some(receiver.endpoint()));
+    assert_eq!(on.status.code(), off.status.code(), "{on:?}");
+    assert_eq!(without_timing(&on_dir), without_timing(&off_dir));
+
+    let mut records = receiver.records();
+    records.sort_by_key(|record| record.time_unix_nano);
+    let names: Vec<&str> = records.iter().map(|r| r.event_name.as_str()).collect();
+    assert_eq!(names, ["measurement.started", "measurement.ended"]);
+    let (started, ended) = (&records[0], &records[1]);
+    assert_eq!(started.resource["service.name"], "v3-lab");
+    assert_eq!(started.attribute("petri.command"), Some("run"));
+    assert_eq!(started.attribute("petri.assay"), Some("food-seeking"));
+    assert_eq!(started.attribute("petri.seed"), Some("7"));
+    assert_eq!(started.attribute("petri.threads"), Some("1"));
+    let code = on.status.code().unwrap().to_string();
+    assert_eq!(ended.attribute("petri.exit_code"), Some(code.as_str()));
+    let summary_path = on_dir.join("summary.json").canonicalize().unwrap();
+    assert_eq!(
+        ended.attribute("petri.summary_path").map(PathBuf::from),
+        Some(summary_path.clone())
+    );
+    let summary: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&summary_path).unwrap()).unwrap();
+    let body = serde_json::json!({
+        "exit_code": summary["exit_code"],
+        "incomplete": summary["incomplete"],
+        "timing": summary["timing"],
+    });
+    assert_eq!(ended.body.as_deref(), Some(body.to_string().as_str()));
+    assert_eq!(
+        ended.attribute("petri.incomplete"),
+        Some(if summary["incomplete"].is_null() {
+            "false"
+        } else {
+            "true"
+        })
+    );
+    let first = receiver.first_request_at().expect("a request arrived");
+    let first_ns = first
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    assert!(first_ns >= u128::from(ended.time_unix_nano));
+    let stderr = String::from_utf8(on.stderr).unwrap();
+    assert_eq!(
+        stderr
+            .lines()
+            .filter(|l| l.starts_with("telemetry: run="))
+            .count(),
+        1
+    );
+}

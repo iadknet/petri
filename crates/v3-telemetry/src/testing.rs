@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -34,6 +34,8 @@ pub struct ReceivedRecord {
     pub event_name: String,
     pub attributes: BTreeMap<String, String>,
     pub body: Option<String>,
+    /// The record's timestamp, as sent.
+    pub time_unix_nano: u64,
 }
 
 impl ReceivedRecord {
@@ -245,6 +247,8 @@ struct Stores {
     records: Arc<Mutex<Vec<ReceivedRecord>>>,
     snapshots: Arc<Mutex<Vec<ReceivedSnapshot>>>,
     traces: Arc<Mutex<Vec<ReceivedTrace>>>,
+    /// When the receiver accepted its first connection, by its own clock.
+    first_request_at: Arc<Mutex<Option<SystemTime>>>,
 }
 
 fn locked<T: Clone>(store: &Mutex<Vec<T>>) -> Vec<T> {
@@ -296,6 +300,7 @@ fn decode(body: &[u8]) -> Vec<ReceivedRecord> {
                     event_name: record.event_name.clone(),
                     attributes: to_map(&record.attributes),
                     body: render(record.body.as_ref()),
+                    time_unix_nano: record.time_unix_nano,
                 });
             }
         }
@@ -560,6 +565,11 @@ impl Receiver {
         let shared = stores.clone();
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
+                shared
+                    .first_request_at
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .get_or_insert_with(SystemTime::now);
                 let stores = shared.clone();
                 std::thread::spawn(move || serve(stream, &stores, answer));
             }
@@ -574,6 +584,16 @@ impl Receiver {
 
     pub fn records(&self) -> Vec<ReceivedRecord> {
         locked(&self.stores.records)
+    }
+
+    /// When the first request arrived: the receiver's clock when it accepted
+    /// its first connection, which precedes that request.
+    pub fn first_request_at(&self) -> Option<SystemTime> {
+        *self
+            .stores
+            .first_request_at
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// The snapshots received and kept, in arrival order.

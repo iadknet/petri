@@ -969,3 +969,199 @@ fn a_trace_abandoned_by_the_flush_is_counted_for_its_run() {
     assert_eq!(line["abandoned"], "4", "{line:?}");
     assert_eq!(line["traces"], "1", "{line:?}");
 }
+
+/// A measurement's start with every attribute present.
+fn measurement_start(seeds: &[u64]) -> MeasurementStart<'_> {
+    MeasurementStart {
+        command: "bench",
+        feature: Some("t21-f06-test"),
+        profile: Some("sweep"),
+        seeds: Some(seeds),
+        config_digest: Some("digest"),
+        threads: Some(2),
+        ..MeasurementStart::default()
+    }
+}
+
+#[test]
+fn a_held_telemetry_sends_nothing_until_released_then_everything() {
+    let receiver = Receiver::start();
+    let options = options(receiver.endpoint(), Limits::default());
+    let reports = options.reports.clone();
+    let telemetry = Telemetry::start_otlp(options, true);
+    let config = small_config();
+    let measurement = telemetry
+        .begin_measurement(measurement_start(&[7]))
+        .unwrap();
+    let run = telemetry.begin_run(start(&config)).unwrap();
+    telemetry.end_run(run.clone(), EndStatus::Completed, 10, Flush::Background);
+    telemetry.end_measurement(measurement.clone(), MeasurementEnd::default());
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(receiver.records().is_empty());
+    assert_eq!(receiver.first_request_at(), None);
+    assert!(reports
+        .lines()
+        .iter()
+        .all(|line| parse_run_line(line).is_none()));
+
+    let released = SystemTime::now();
+    telemetry.release();
+    let began = Instant::now();
+    telemetry.shutdown();
+    assert!(began.elapsed() < Limits::default().flush_timeout);
+    assert_eq!(receiver.records().len(), 4);
+    assert!(receiver.first_request_at().unwrap() >= released);
+    let lines: Vec<_> = reports
+        .lines()
+        .iter()
+        .filter_map(|line| parse_run_line(line))
+        .collect();
+    assert_eq!(
+        lines.len(),
+        2,
+        "one line per run and one for the measurement"
+    );
+    for id in [run.id(), measurement.id()] {
+        let line = lines.iter().find(|fields| fields["run"] == id).unwrap();
+        assert_eq!(line["exported"], "2", "{line:?}");
+        // The held period is not flush time.
+        assert!(line["flush_ms"].parse::<u64>().unwrap() < 300, "{line:?}");
+    }
+}
+
+#[test]
+fn measurement_records_carry_their_attributes_and_omit_absent_ones() {
+    let receiver = Receiver::start();
+    let telemetry = Telemetry::start_otlp(options(receiver.endpoint(), Limits::default()), true);
+    let seeds = [11, 22];
+    let full = telemetry
+        .begin_measurement(measurement_start(&seeds))
+        .unwrap();
+    telemetry.end_measurement(
+        full.clone(),
+        MeasurementEnd {
+            exit_code: 3,
+            incomplete: Some(true),
+            severe: Some(true),
+            stop_reason: Some("wall_cap"),
+            horizon: Some(500),
+            gate_favorable: Some(false),
+            summary_path: Some("/tmp/summary.json"),
+            raw_sha256: Some("abc"),
+            raw_bytes: Some(12),
+            body: Some(r#"{"a":1}"#.to_owned()),
+        },
+    );
+    let bare = telemetry
+        .begin_measurement(MeasurementStart {
+            command: "run",
+            assay: Some("food-seeking"),
+            seed: Some(7),
+            ..MeasurementStart::default()
+        })
+        .unwrap();
+    telemetry.end_measurement(
+        bare.clone(),
+        MeasurementEnd {
+            exit_code: 1,
+            ..MeasurementEnd::default()
+        },
+    );
+    telemetry.release();
+    telemetry.shutdown();
+    let records = receiver.records();
+    let find = |id: &str, event: &str| {
+        records
+            .iter()
+            .find(|r| r.event_name == event && r.attribute("petri.run_id") == Some(id))
+            .unwrap_or_else(|| panic!("{event} for {id}"))
+            .clone()
+    };
+    let started = find(full.id(), "measurement.started");
+    let expected: BTreeMap<String, String> = [
+        ("event.name", "measurement.started"),
+        ("petri.run_id", full.id()),
+        ("petri.tick", "0"),
+        ("petri.command", "bench"),
+        ("petri.feature", "t21-f06-test"),
+        ("petri.profile", "sweep"),
+        ("petri.seeds", "11,22"),
+        ("petri.config_digest", "digest"),
+        ("petri.threads", "2"),
+    ]
+    .into_iter()
+    .map(|(key, value)| (key.to_owned(), value.to_owned()))
+    .collect();
+    assert_eq!(started.attributes, expected);
+    assert_eq!(started.body, None);
+    assert!(started.time_unix_nano > 0);
+    let ended = find(full.id(), "measurement.ended");
+    for (key, value) in [
+        ("petri.tick", "0"),
+        ("petri.exit_code", "3"),
+        ("petri.incomplete", "true"),
+        ("petri.severe", "true"),
+        ("petri.stop_reason", "wall_cap"),
+        ("petri.horizon", "500"),
+        ("petri.gate_favorable", "false"),
+        ("petri.summary_path", "/tmp/summary.json"),
+        ("petri.raw_sha256", "abc"),
+        ("petri.raw_bytes", "12"),
+    ] {
+        assert_eq!(ended.attribute(key), Some(value), "{key}");
+    }
+    assert!(ended.attribute("petri.wall_seconds").is_some());
+    assert_eq!(ended.body.as_deref(), Some(r#"{"a":1}"#));
+    assert!(ended.time_unix_nano >= started.time_unix_nano);
+
+    let bare_started = find(bare.id(), "measurement.started");
+    for key in [
+        "petri.feature",
+        "petri.profile",
+        "petri.pilot",
+        "petri.seeds",
+        "petri.config_digest",
+        "petri.threads",
+    ] {
+        assert_eq!(bare_started.attribute(key), None, "{key}");
+    }
+    assert_eq!(bare_started.attribute("petri.assay"), Some("food-seeking"));
+    assert_eq!(bare_started.attribute("petri.seed"), Some("7"));
+    let bare_ended = find(bare.id(), "measurement.ended");
+    let keys: Vec<&str> = bare_ended.attributes.keys().map(String::as_str).collect();
+    assert_eq!(
+        keys,
+        [
+            "event.name",
+            "petri.exit_code",
+            "petri.run_id",
+            "petri.tick",
+            "petri.wall_seconds"
+        ]
+    );
+    assert_eq!(bare_ended.body, None);
+}
+
+#[test]
+fn run_ended_with_totals_encodes_each_as_petri_total() {
+    let receiver = Receiver::start();
+    let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
+    let config = small_config();
+    let run = telemetry.begin_run(start(&config)).unwrap();
+    telemetry.end_run_with_totals(
+        run,
+        EndStatus::Completed,
+        20,
+        Flush::Wait,
+        &[("ticks", 20), ("creature_ticks", 320)],
+    );
+    let ended = receiver
+        .records()
+        .into_iter()
+        .find(|record| record.event_name == "run.ended")
+        .unwrap();
+    assert_eq!(ended.attribute("petri.total.ticks"), Some("20"));
+    assert_eq!(ended.attribute("petri.total.creature_ticks"), Some("320"));
+    assert_eq!(ended.attribute("petri.tick"), Some("20"));
+    assert!(ended.time_unix_nano > 0);
+}

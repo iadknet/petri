@@ -32,7 +32,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use opentelemetry::logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity};
-use opentelemetry::KeyValue;
+use opentelemetry::{Key, KeyValue};
 use opentelemetry_proto::transform::common::tonic::ResourceAttributesWithSchema;
 use opentelemetry_sdk::logs::{LogExporter, SdkLogger, SdkLoggerProvider};
 use opentelemetry_sdk::Resource;
@@ -320,6 +320,60 @@ impl RunHandle {
     }
 }
 
+/// What `measurement.started` records about a measurement command
+/// (T21.F06): an absent field is omitted from the record.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MeasurementStart<'a> {
+    /// `bench`, `recruitment`, `input-opportunity`, `run` or `why-not`.
+    pub command: &'a str,
+    pub feature: Option<&'a str>,
+    /// The benchmark profile.
+    pub profile: Option<&'a str>,
+    /// The lab's assay.
+    pub assay: Option<&'a str>,
+    pub pilot: Option<bool>,
+    /// The lab's `--seed`.
+    pub seed: Option<u64>,
+    /// A benchmark's seeds, recorded comma-joined.
+    pub seeds: Option<&'a [u64]>,
+    /// The digest of the one effective config, where there is one.
+    pub config_digest: Option<&'a str>,
+    /// `--threads`, when given.
+    pub threads: Option<u64>,
+}
+
+/// What `measurement.ended` records: the command's exit code and the totals
+/// its stored summary carries; an absent field is omitted.
+#[derive(Debug, Clone, Default)]
+pub struct MeasurementEnd<'a> {
+    pub exit_code: u8,
+    pub incomplete: Option<bool>,
+    pub severe: Option<bool>,
+    pub stop_reason: Option<&'a str>,
+    pub horizon: Option<u64>,
+    pub gate_favorable: Option<bool>,
+    pub summary_path: Option<&'a str>,
+    pub raw_sha256: Option<&'a str>,
+    pub raw_bytes: Option<u64>,
+    /// The totals block as compact, key-sorted JSON.
+    pub body: Option<String>,
+}
+
+/// One measurement's identity: a run ID of its own, accounted as a run.
+#[derive(Debug, Clone)]
+pub struct MeasurementHandle {
+    key: RunKey,
+    id: String,
+    started: Instant,
+}
+
+impl MeasurementHandle {
+    /// The measurement's run ID: 32 lowercase hex digits.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+}
+
 /// Telemetry for one process; cheap to clone, a no-op when off.
 #[derive(Debug, Clone, Default)]
 pub struct Telemetry {
@@ -389,6 +443,24 @@ impl Telemetry {
         }
     }
 
+    /// [`Telemetry::start`] for a measurement command (T21.F06): the exporter
+    /// and its worker are built, but the worker takes no batch, so nothing is
+    /// encoded or sent, until [`Telemetry::release`].
+    pub fn start_held(service: Service, switch: Switch) -> Result<Self, String> {
+        match switch {
+            Switch::Off => Ok(Self::off()),
+            Switch::On => Options::from_env(service).map(|options| Self::start_otlp(options, true)),
+        }
+    }
+
+    /// Lets a held exporter take batches; runs that ended before it count
+    /// their flush time from here. A no-op when not held or off.
+    pub fn release(&self) {
+        if let Some(active) = &self.active {
+            active.shared.release();
+        }
+    }
+
     /// Enabled telemetry with explicit options. When the exporter cannot be
     /// built, it says so on the report sink and returns telemetry that is off.
     pub fn start_with(options: Options) -> Self {
@@ -396,7 +468,7 @@ impl Telemetry {
     }
 
     /// [`Telemetry::start_with`]; with `held`, the worker takes no batch until
-    /// released (tests).
+    /// released.
     fn start_otlp(options: Options, held: bool) -> Self {
         let rejections = Arc::<Rejections>::default();
         match export::build(
@@ -497,13 +569,7 @@ impl Telemetry {
             traces_taken: 0,
             samples: windows::Samples::default(),
         };
-        active.shared.register_run(key, run.id.clone());
-        if !active.announced.swap(true, Ordering::Relaxed) {
-            active.shared.sink().write(&format!(
-                "telemetry: on endpoint={} invocation={} run={}",
-                active.endpoint, active.invocation_id, run.id
-            ));
-        }
+        active.register(key, &run.id);
         let mut extra = Vec::new();
         if let Some(ticks) = start.ticks_requested {
             extra.push(("petri.ticks_requested", u64_value(ticks)));
@@ -624,6 +690,21 @@ impl Telemetry {
     /// Emits `run.ended`. With [`Flush::Wait`] it returns once the run's line
     /// is written, abandoning what is still pending after the flush bound.
     pub fn end_run(&self, run: RunHandle, status: EndStatus, tick: u64, flush: Flush) {
+        self.end_run_with_totals(run, status, tick, flush, &[]);
+    }
+
+    /// [`Telemetry::end_run`] with the run's totals, each recorded as
+    /// `petri.total.<name>` (a benchmark seed's `PerSeed` counters). A held
+    /// telemetry ends runs with [`Flush::Background`]: nothing resolves before
+    /// release.
+    pub fn end_run_with_totals(
+        &self,
+        run: RunHandle,
+        status: EndStatus,
+        tick: u64,
+        flush: Flush,
+        totals: &[(&str, u64)],
+    ) {
         let Some(active) = &self.active else {
             return;
         };
@@ -645,7 +726,10 @@ impl Telemetry {
         if let Some(cap) = run.samples.capped {
             extra.push(("petri.windows_capped", AnyValue::from(cap.as_str())));
         }
-        active.emit(&run, "run.ended", tick, extra, None);
+        let totals = totals
+            .iter()
+            .map(|&(name, value)| (Key::from(format!("petri.total.{name}")), u64_value(value)));
+        active.emit_with(&run, "run.ended", tick, extra, totals, None);
         active.shared.add_self_time(run.key, began.elapsed());
         active.shared.mark_ended(run.key);
         if flush == Flush::Wait {
@@ -738,6 +822,108 @@ impl Telemetry {
         }
     }
 
+    /// Draws the measurement's run ID, registers it for per-run accounting
+    /// and emits `measurement.started`; `None` when off. Call it after
+    /// argument resolution and before the command's timed work.
+    pub fn begin_measurement(&self, start: MeasurementStart<'_>) -> Option<MeasurementHandle> {
+        let active = self.active.as_ref()?;
+        let began = Instant::now();
+        let (key, id) = entropy_id();
+        active.register(key, &id);
+        let mut attributes = vec![
+            (Key::from_static_str("petri.tick"), AnyValue::Int(0)),
+            (
+                "petri.command".into(),
+                AnyValue::from(start.command.to_owned()),
+            ),
+        ];
+        let text = [
+            ("petri.feature", start.feature),
+            ("petri.profile", start.profile),
+            ("petri.assay", start.assay),
+        ];
+        attributes.extend(text.into_iter().filter_map(|(key, value)| {
+            Some((Key::from_static_str(key), AnyValue::from(value?.to_owned())))
+        }));
+        if let Some(pilot) = start.pilot {
+            attributes.push(("petri.pilot".into(), AnyValue::Boolean(pilot)));
+        }
+        if let Some(seed) = start.seed {
+            attributes.push(("petri.seed".into(), u64_value(seed)));
+        }
+        if let Some(seeds) = start.seeds {
+            let joined: Vec<String> = seeds.iter().map(u64::to_string).collect();
+            attributes.push(("petri.seeds".into(), AnyValue::from(joined.join(","))));
+        }
+        if let Some(digest) = start.config_digest {
+            attributes.push((
+                "petri.config_digest".into(),
+                AnyValue::from(digest.to_owned()),
+            ));
+        }
+        if let Some(threads) = start.threads {
+            attributes.push(("petri.threads".into(), u64_value(threads)));
+        }
+        active.emit_record(&id, "measurement.started", attributes, None);
+        active.shared.add_self_time(key, began.elapsed());
+        Some(MeasurementHandle {
+            key,
+            id,
+            started: began,
+        })
+    }
+
+    /// Emits `measurement.ended` and marks the measurement ended; its line is
+    /// written once its records resolve (after release, by the shutdown
+    /// flush).
+    pub fn end_measurement(&self, measurement: MeasurementHandle, end: MeasurementEnd<'_>) {
+        let Some(active) = &self.active else {
+            return;
+        };
+        let began = Instant::now();
+        let mut attributes = vec![
+            (Key::from_static_str("petri.tick"), AnyValue::Int(0)),
+            (
+                "petri.exit_code".into(),
+                AnyValue::Int(i64::from(end.exit_code)),
+            ),
+            (
+                "petri.wall_seconds".into(),
+                AnyValue::Double(measurement.started.elapsed().as_secs_f64()),
+            ),
+        ];
+        let flags = [
+            ("petri.incomplete", end.incomplete),
+            ("petri.severe", end.severe),
+            ("petri.gate_favorable", end.gate_favorable),
+        ];
+        attributes.extend(flags.into_iter().filter_map(|(key, value)| {
+            Some((Key::from_static_str(key), AnyValue::Boolean(value?)))
+        }));
+        let text = [
+            ("petri.stop_reason", end.stop_reason),
+            ("petri.summary_path", end.summary_path),
+            ("petri.raw_sha256", end.raw_sha256),
+        ];
+        attributes.extend(text.into_iter().filter_map(|(key, value)| {
+            Some((Key::from_static_str(key), AnyValue::from(value?.to_owned())))
+        }));
+        let counts = [
+            ("petri.horizon", end.horizon),
+            ("petri.raw_bytes", end.raw_bytes),
+        ];
+        attributes.extend(
+            counts
+                .into_iter()
+                .filter_map(|(key, value)| Some((Key::from_static_str(key), u64_value(value?)))),
+        );
+        active.emit_record(&measurement.id, "measurement.ended", attributes, end.body);
+        active
+            .shared
+            .add_self_time(measurement.key, began.elapsed());
+        active.shared.mark_ended(measurement.key);
+    }
+
     /// The process-shutdown flush: waits for every pending record up to the
     /// flush bound, abandons the rest, writes every outstanding run line and
     /// stops the exporter thread.
@@ -783,12 +969,65 @@ impl Active {
         self.shared.add_self_time(run.key, began.elapsed());
     }
 
+    /// Registers a run or measurement for accounting; the process's first
+    /// writes the `telemetry: on` line.
+    fn register(&self, key: RunKey, id: &str) {
+        self.shared.register_run(key, id.to_owned());
+        if !self.announced.swap(true, Ordering::Relaxed) {
+            self.shared.sink().write(&format!(
+                "telemetry: on endpoint={} invocation={} run={id}",
+                self.endpoint, self.invocation_id
+            ));
+        }
+    }
+
     fn emit(
         &self,
         run: &RunHandle,
         event: &'static str,
         tick: u64,
         extra: Vec<(&'static str, AnyValue)>,
+        body: Option<String>,
+    ) {
+        self.emit_with(run, event, tick, extra, std::iter::empty(), body);
+    }
+
+    /// A run's record: its identity, then `extra`, then `more`.
+    fn emit_with(
+        &self,
+        run: &RunHandle,
+        event: &'static str,
+        tick: u64,
+        extra: Vec<(&'static str, AnyValue)>,
+        more: impl IntoIterator<Item = (Key, AnyValue)>,
+        body: Option<String>,
+    ) {
+        let mut identity = vec![
+            ("petri.seed", u64_value(run.seed)),
+            ("petri.world", AnyValue::from(run.world.clone())),
+        ];
+        if let Some(recipe) = &run.recipe {
+            identity.push(("petri.recipe", AnyValue::from(recipe.clone())));
+        }
+        identity.push((
+            "petri.config_digest",
+            AnyValue::from(run.config_digest.clone()),
+        ));
+        identity.push(("petri.tick", u64_value(tick)));
+        let attributes = identity
+            .into_iter()
+            .chain(extra)
+            .map(|(key, value)| (Key::from_static_str(key), value))
+            .chain(more);
+        self.emit_record(&run.id, event, attributes, body);
+    }
+
+    /// One log record named `event` for run `run_id`, stamped now.
+    fn emit_record(
+        &self,
+        run_id: &str,
+        event: &'static str,
+        attributes: impl IntoIterator<Item = (Key, AnyValue)>,
         body: Option<String>,
     ) {
         let mut record = self.logger.create_log_record();
@@ -801,15 +1040,8 @@ impl Active {
         // Loki 3.7 drops the OTLP `event_name` field; the attribute keeps the
         // record's name queryable there as `event_name`.
         record.add_attribute("event.name", event);
-        record.add_attribute(RUN_ID_KEY, run.id.clone());
-        record.add_attribute("petri.seed", u64_value(run.seed));
-        record.add_attribute("petri.world", run.world.clone());
-        if let Some(recipe) = &run.recipe {
-            record.add_attribute("petri.recipe", recipe.clone());
-        }
-        record.add_attribute("petri.config_digest", run.config_digest.clone());
-        record.add_attribute("petri.tick", u64_value(tick));
-        for (key, value) in extra {
+        record.add_attribute(RUN_ID_KEY, run_id.to_owned());
+        for (key, value) in attributes {
             record.add_attribute(key, value);
         }
         if let Some(body) = body {

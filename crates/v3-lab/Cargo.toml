@@ -17,7 +17,8 @@ path = "src/main.rs"
 [features]
 default = ["telemetry"]
 # T21 run telemetry; `--no-default-features` is the reference build without it.
-# The lab accepts the flag and exports nothing until T21.F06.
+# `run` and `why-not` record one measurement (T21.F06); only the binary
+# touches `v3-telemetry`.
 telemetry = ["dep:v3-telemetry", "v3-core/telemetry-seams"]
 
 [dependencies]

@@ -2,8 +2,12 @@
 //! with telemetry off, on with a receiver listening, and on with a closed port;
 //! the run's snapshots (T21.F02) agree with its final `tick_sample`; and each
 //! snapshot after a tick carries that tick's trace (T21.F03); and creature
-//! windows (T21.F04) export the recorded creature's ticks.
+//! windows (T21.F04) export the recorded creature's ticks. The measurement
+//! commands' records (T21.F06) are in `telemetry/measurement.rs`.
 #![cfg(feature = "telemetry")]
+
+#[path = "telemetry/measurement.rs"]
+mod measurement;
 
 use std::process::Command;
 

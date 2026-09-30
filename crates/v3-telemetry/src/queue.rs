@@ -132,7 +132,8 @@ struct State {
     in_flight: Option<InFlight>,
     runs: HashMap<RunKey, RunEntry>,
     closed: bool,
-    /// Test hook: while set, the worker takes no batch.
+    /// While set, the worker takes no batch: a measurement command's held
+    /// exporter (T21.F06).
     held: bool,
 }
 
@@ -311,6 +312,8 @@ impl Shared {
     /// Waits for every run to resolve, abandons what remains at the flush
     /// deadline, writes every outstanding line and stops the worker.
     pub(crate) fn shutdown(&self) {
+        // A still-held exporter is released so the flush can export.
+        self.release();
         let deadline = Instant::now() + self.limits.flush_timeout;
         let mut state = self.lock();
         loop {
@@ -471,9 +474,21 @@ impl Shared {
         self.report_if_resolved(&mut state, run);
     }
 
-    #[cfg(test)]
+    /// Lets the worker take batches. A run that ended while held counts its
+    /// flush time from now, not from its end.
     pub(crate) fn release(&self) {
-        self.lock().held = false;
+        let mut state = self.lock();
+        if !state.held {
+            return;
+        }
+        state.held = false;
+        let now = Instant::now();
+        for entry in state.runs.values_mut() {
+            if let Some(ended) = entry.ended_at.as_mut() {
+                *ended = now;
+            }
+        }
+        drop(state);
         self.changed.notify_all();
     }
 
