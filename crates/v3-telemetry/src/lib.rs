@@ -841,28 +841,23 @@ impl Telemetry {
             ("petri.feature", start.feature),
             ("petri.profile", start.profile),
             ("petri.assay", start.assay),
+            ("petri.config_digest", start.config_digest),
         ];
         attributes.extend(text.into_iter().filter_map(|(key, value)| {
             Some((Key::from_static_str(key), AnyValue::from(value?.to_owned())))
         }));
+        let counts = [("petri.seed", start.seed), ("petri.threads", start.threads)];
+        attributes.extend(
+            counts
+                .into_iter()
+                .filter_map(|(key, value)| Some((Key::from_static_str(key), u64_value(value?)))),
+        );
         if let Some(pilot) = start.pilot {
             attributes.push(("petri.pilot".into(), AnyValue::Boolean(pilot)));
-        }
-        if let Some(seed) = start.seed {
-            attributes.push(("petri.seed".into(), u64_value(seed)));
         }
         if let Some(seeds) = start.seeds {
             let joined: Vec<String> = seeds.iter().map(u64::to_string).collect();
             attributes.push(("petri.seeds".into(), AnyValue::from(joined.join(","))));
-        }
-        if let Some(digest) = start.config_digest {
-            attributes.push((
-                "petri.config_digest".into(),
-                AnyValue::from(digest.to_owned()),
-            ));
-        }
-        if let Some(threads) = start.threads {
-            attributes.push(("petri.threads".into(), u64_value(threads)));
         }
         active.emit_record(&id, "measurement.started", attributes, None);
         active.shared.add_self_time(key, began.elapsed());

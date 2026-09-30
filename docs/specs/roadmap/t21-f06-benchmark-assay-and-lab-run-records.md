@@ -181,7 +181,7 @@ mechanism switch and no config value; the held mode is not configuration.
       bench workload of the Performance section instead of `run`, sums the
       `self_time_us` of the invocation's stderr lines, and reads the raw
       report's `environment.wall_clock_ms_total` beside the process time.
-- [ ] Readings file: bytes per measurement, the checks below.
+- [x] Readings file: bytes per measurement, the checks below.
 
 ## Verification
 
@@ -196,20 +196,20 @@ mechanism switch and no config value; the held mode is not configuration.
       v3-lab --no-default-features` compiles; `cargo tree … -e features`
       shows neither `v3-telemetry` nor `telemetry-seams`; clippy
       `-D warnings` passes with and without the feature (2026-09-30).
-- [ ] Dashboards (Docker, outside `make check`):
+- [x] Dashboards (Docker, outside `make check`):
       `scripts/telemetry-dashboards-check` -> every row passes, the
-      `Measurements` row included.
-- [ ] Bytes: the tiny sweep's and one gate run's `bytes=` lines (measurement
-      and seed runs) in the readings file.
-- [ ] Parent comparison: `scripts/telemetry-parent-compare 1c594616` ->
-      identical canonical output, in the readings file.
-- [ ] Overhead check: `PETRI_OVERHEAD_WORKLOAD=bench scripts/telemetry-overhead`
+      `Measurements` row included (2026-09-30).
+- [x] Bytes: the tiny sweep's and one gate run's `bytes=` lines (measurement
+      and seed runs) in the readings file (2026-09-30).
+- [x] Parent comparison: `scripts/telemetry-parent-compare 1c594616` ->
+      identical canonical output, in the readings file (2026-09-30).
+- [x] Overhead check: `PETRI_OVERHEAD_WORKLOAD=bench scripts/telemetry-overhead`
       -> the table in the readings file, verdict in Performance and Goal
-      Impact.
+      Impact: inconclusive (2026-09-30).
 - [x] `make check` -> exit 0 (2026-09-30).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
-- [ ] Benchmark summary: `Not applicable: observability feature`.
+- [x] Benchmark summary: `Not applicable: observability feature`.
 
 | Test rows | What is asserted |
 | --- | --- |
@@ -263,8 +263,8 @@ bench path, with F01's method otherwise unchanged and T = 6908 fixed:
 | Record | Value |
 | --- | --- |
 | Profiles | `Not applicable: observability feature` |
-| Parent comparison | pending |
-| Overhead check | pending |
+| Parent comparison | identical canonical output against `1c594616`, T = 6908 |
+| Overhead check | inconclusive: bench workload, F01's method, T = 6908; both attempts (the second the one rerun) stopped at the spread measurement, 18.31% and 22.26% > 10%, so n = 0, states (a) and (b) inconclusive, (c) and the stored-reading ratio without a reading; 28.2 s of the 300 s cap; host load average 6.1 to 6.7 (1 min) |
 
 - Readings: [`docs/progress/readings/t21-f06.md`](../../progress/readings/t21-f06.md).
 

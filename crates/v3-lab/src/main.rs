@@ -41,7 +41,7 @@ fn main() -> ExitCode {
 /// only this module touches `v3_telemetry`.
 #[cfg(feature = "telemetry")]
 mod record {
-    use v3_lab::cli::{Cli, Command, Measurement};
+    use v3_lab::cli::{Cli, Measurement};
     use v3_telemetry::{MeasurementEnd, MeasurementStart, Service, Telemetry};
 
     /// Held telemetry and `measurement.started` for `run` and `why-not`;
@@ -50,10 +50,8 @@ mod record {
         cli: &Cli,
     ) -> Result<Option<(Telemetry, v3_telemetry::MeasurementHandle)>, String> {
         let switch = v3_telemetry::switch_from_env(cli.telemetry)?;
-        let (command, args) = match &cli.command {
-            Command::Run(args) => ("run", args),
-            Command::WhyNot(args) => ("why-not", args),
-            Command::Report { .. } => return Ok(None),
+        let Some((command, args)) = cli.command.measured() else {
+            return Ok(None);
         };
         let telemetry = Telemetry::start_held(Service::Lab, switch)?;
         let handle = telemetry.begin_measurement(MeasurementStart {

@@ -170,6 +170,21 @@ fn assert_line_last(stderr: &str, id: &str) {
     assert_eq!(mine, 1, "{stderr}");
 }
 
+/// The eleven `Totals` fields (the leading `TOTALS` entries) summed over a
+/// written summary's `deterministic.per_seed` rows, as compact key-sorted JSON.
+fn summed_totals(summary: &Value) -> String {
+    let rows = summary["deterministic"]["per_seed"].as_array().unwrap();
+    assert!(!rows.is_empty(), "the summary keeps its per_seed rows");
+    let sums: serde_json::Map<String, Value> = TOTALS[..11]
+        .iter()
+        .map(|field| {
+            let sum: u64 = rows.iter().map(|row| row[*field].as_u64().unwrap()).sum();
+            ((*field).to_owned(), Value::from(sum))
+        })
+        .collect();
+    compact(&Value::Object(sums))
+}
+
 /// A sweep's `deterministic` blocks (raw report, summary) and stdout.
 fn deterministic(scratch: &Scratch, output: &Output) -> (String, String, String) {
     let raw = read_json(&scratch.path("raw.json"));
@@ -321,11 +336,11 @@ fn bench_records_region_boundaries_only_and_keeps_its_deterministic_output() {
         ended.attribute("petri.raw_bytes"),
         Some(summary["raw"]["bytes"].to_string().as_str())
     );
-    // The totals block: the summary names it and the raw report carries it.
-    assert_eq!(
-        ended.body.as_deref(),
-        Some(compact(&raw["deterministic"]["totals"]).as_str())
-    );
+    // The totals block: the `Totals` fields summed over the written summary's
+    // `per_seed` rows, which equal the raw report's `deterministic.totals`.
+    let summed = summed_totals(&summary);
+    assert_eq!(ended.body.as_deref(), Some(summed.as_str()));
+    assert_eq!(summed, compact(&raw["deterministic"]["totals"]));
     assert_exported_after(&receiver, ended);
 }
 

@@ -261,13 +261,13 @@ row() {
     per_tick=-
     got=0
   fi
+  stored_cell=''
   if [ "$workload" = bench ]; then
     stored=-
     if [ -s "$scratch/$state.stored" ]; then stored=$(median <"$scratch/$state.stored"); fi
-    printf '| %s | %s | %s | %s | %s | %s |\n' "$label" "$med" "$(verdict "$state")" "$got/$pairs" "$per_tick" "$stored"
-  else
-    printf '| %s | %s | %s | %s | %s |\n' "$label" "$med" "$(verdict "$state")" "$got/$pairs" "$per_tick"
+    stored_cell=" $stored |"
   fi
+  printf '| %s | %s | %s | %s | %s |%s\n' "$label" "$med" "$(verdict "$state")" "$got/$pairs" "$per_tick" "$stored_cell"
 }
 
 if [ "$pairs" -gt 0 ]; then
@@ -295,13 +295,16 @@ if [ "$pairs" -gt 0 ]; then
 fi
 
 printf '\nWorkload=%s  T=%s  spread=%s  pairs n=%s (pass needs %s)\n\n' "$workload" "$ticks" "$spread" "$pairs" "$need"
+head_tail=''
+rule_tail=''
+empty_tail=''
 if [ "$workload" = bench ]; then
-  printf '| State | Median ratio | Verdict | Pairs | self_time_us per tick | Median stored-reading ratio |\n'
-  printf '| --- | --- | --- | --- | --- | --- |\n'
-else
-  printf '| State | Median ratio | Verdict | Pairs | self_time_us per tick |\n'
-  printf '| --- | --- | --- | --- | --- |\n'
+  head_tail=' Median stored-reading ratio |'
+  rule_tail=' --- |'
+  empty_tail=' - |'
 fi
+printf '| State | Median ratio | Verdict | Pairs | self_time_us per tick |%s\n' "$head_tail"
+printf '| --- | --- | --- | --- | --- |%s\n' "$rule_tail"
 if [ -n "${rerun:-}" ]; then
   row "${rerun}0" "$rerun (first run)"
 fi
@@ -312,11 +315,7 @@ if [ -s "$scratch/c.started" ] && [ -s "$scratch/b.ref" ]; then
 else
   idle=-
 fi
-if [ "$workload" = bench ]; then
-  printf '| c: idle-stack cost | %s | recorded | 3 vs b | - | - |\n' "$idle"
-else
-  printf '| c: idle-stack cost | %s | recorded | 3 vs b | - |\n' "$idle"
-fi
+printf '| c: idle-stack cost | %s | recorded | 3 vs b | - |%s\n' "$idle" "$empty_tail"
 printf '\nMeasured time used: %s s of %s s' "$(awk -v u="$used_ms" 'BEGIN { printf "%.1f", u / 1000 }')" $((cap_ms / 1000))
 if [ "$refused" -eq 1 ]; then
   printf ' (cap reached: remaining runs refused, inconclusive)'

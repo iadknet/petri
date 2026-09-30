@@ -49,6 +49,19 @@ pub enum Command {
     },
 }
 
+impl Command {
+    /// A measured subcommand's name (`run` or `why-not`) and arguments;
+    /// `None` for `report`, which records no measurement.
+    #[must_use]
+    pub fn measured(&self) -> Option<(&'static str, &RunArgs)> {
+        match self {
+            Self::Run(args) => Some(("run", args)),
+            Self::WhyNot(args) => Some(("why-not", args)),
+            Self::Report { .. } => None,
+        }
+    }
+}
+
 #[derive(Args, Debug)]
 pub struct RunArgs {
     #[arg(long, value_enum, default_value = "food-seeking")]
@@ -338,13 +351,11 @@ pub struct Executed {
 ///
 /// Any [`LabError`].
 pub fn execute(cli: Cli) -> Result<Executed, LabError> {
-    match cli.command {
-        Command::Report { .. } => execute_command(cli.command, None),
-        Command::Run(_) | Command::WhyNot(_) => {
-            let lab_root = resolve_checkout(&std::env::current_dir()?)?;
-            execute_command(cli.command, Some(&lab_root))
-        }
+    if let Command::Report { summary } = &cli.command {
+        return report(summary);
     }
+    let lab_root = resolve_checkout(&std::env::current_dir()?)?;
+    execute_with_root(cli, &lab_root)
 }
 
 /// [`execute`] on an injected lab root, as library callers run it.
@@ -353,28 +364,30 @@ pub fn execute(cli: Cli) -> Result<Executed, LabError> {
 ///
 /// Any [`LabError`].
 pub fn execute_with_root(cli: Cli, lab_root: &LabRoot) -> Result<Executed, LabError> {
-    execute_command(cli.command, Some(lab_root))
-}
-
-fn execute_command(command: Command, lab_root: Option<&LabRoot>) -> Result<Executed, LabError> {
-    let (name, args, render): (_, _, fn(&Summary) -> String) = match command {
-        Command::Report { summary } => {
-            print!("{}", render_report(&read_summary(&summary)?));
-            return Ok(Executed {
-                exit_code: 0,
-                measurement: None,
-            });
-        }
-        Command::Run(args) => ("run", args, render_report),
-        Command::WhyNot(args) => ("why-not", args, crate::ladder::render),
+    let render: fn(&Summary) -> String = match &cli.command {
+        Command::Report { summary } => return report(summary),
+        Command::Run(_) => render_report,
+        Command::WhyNot(_) => crate::ladder::render,
     };
-    let lab_root = lab_root.expect("run and why-not have a lab root");
+    let (name, args) = cli
+        .command
+        .measured()
+        .expect("run and why-not are measured");
     let outcome = run(&args.params(), lab_root)?;
     print!("{}", render(&outcome.summary));
     println!("\nrun directory: {}", outcome.dir.display());
     Ok(Executed {
         exit_code: outcome.exit_code,
-        measurement: Some(Measurement::of(name, &args, &outcome)),
+        measurement: Some(Measurement::of(name, args, &outcome)),
+    })
+}
+
+/// `report`: renders a stored summary; records no measurement.
+fn report(summary: &Path) -> Result<Executed, LabError> {
+    print!("{}", render_report(&read_summary(summary)?));
+    Ok(Executed {
+        exit_code: 0,
+        measurement: None,
     })
 }
 
