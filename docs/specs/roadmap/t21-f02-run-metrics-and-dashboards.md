@@ -66,8 +66,10 @@ Invariants:
    is.
 4. Cadence, as hard caps: at most one snapshot per tick and, for the
    interval snapshots, at most one per `PETRI_TELEMETRY_METRICS_INTERVAL_MS`
-   of wall time (default `1000`; `10` to `3600000`; anything else refuses to
-   start, as an invalid `--telemetry` does), so the export rate is bounded
+   of wall time (default `1000`; `10` to `3600000`; read only when telemetry
+   resolves on, and then anything else refuses to start, as an invalid
+   `--telemetry` does; `v3-lab` reads it once T21.F06 gives it an exporter),
+   so the export rate is bounded
    by wall time whatever the tick rate. After a tick, an interval snapshot is
    taken when the interval has passed since the run's last snapshot. A
    server `run.state` transition takes one when the tick has none and at
@@ -89,7 +91,10 @@ Invariants:
    creature ID, tick, lineage ID, genome hash, seed or config value is a
    metric attribute; the run's `run.started` record carries those.
 7. Names: an OTel name is `petri.run.<field>` for a cumulative value, with
-   every `_total` token removed from the field name, and
+   every `_total` token removed from the field name and, where the table
+   says so, a `_by_<key>` or `_sum` suffix dropped because the attribute or
+   the family already names it (`mutation_operator_funnel`,
+   `reproductive_success.<x>`); the table is authoritative; and
    `petri.tick.<field>` for a sampled per-tick value, the `last_tick_`
    prefix dropped and the rest verbatim (`compute_total_mean` keeps its
    name); Prometheus appends `_total` to monotonic sums. `u64` counters and `Duration`s are monotonic sums; every
@@ -161,6 +166,13 @@ at `/otel-lgtm/grafana/conf/provisioning/dashboards/petri.yaml` and
 `telemetry/grafana/dashboards/` at `/otel-lgtm/petri-dashboards`, both
 read-only; `telemetry/verify/compose.yaml` is unchanged.
 
+The data volume is declared `external: true`, so no `docker compose down
+-v`, on any project, can remove it: `make telemetry-up` creates
+`petri-telemetry` with `docker volume create` when it is missing, and every
+scratch project (`telemetry-verify`, `telemetry-overhead`,
+`telemetry-dashboards-check`) creates and removes its own named volume
+explicitly (incident in the readings file).
+
 | Dashboard | Panels (every query filtered to the run) |
 | --- | --- |
 | `petri-runs`, `Petri / Runs`, default range 7 days | Runs started (Loki table of `run.started`: time, `service_name`, `petri_run_id`, `petri_seed`, `petri_world`, `petri_recipe`, `petri_build_revision`, `petri_ticks_requested`, `petri_metrics_interval_ms`; each row links to `/d/petri-run?var-run_id=<id>`); Runs ended (Loki table of `run.ended`: time, run ID, `petri_status`, `petri_tick`, `petri_wall_seconds`); Runs with metrics in range (Prometheus table `max by (petri_run_id, service_name) (petri_run_tick)`, linked the same way) |
@@ -169,23 +181,19 @@ read-only; `telemetry/verify/compose.yaml` is unchanged.
 A panel whose series are sampled gauges says `(sampled)` in its title.
 
 **Check command.** `scripts/telemetry-dashboards-check` (POSIX `sh`,
-`scripts/bench-wait` around the run) starts the stack under Compose project
-and scratch volume `petri-telemetry-dashboards` and refuses while
-`petri-telemetry` is up; runs the F01 workload (`v3-cli run --telemetry on
---seed 7 --ticks T --sample-every T --config telemetry/overhead-world.json`,
-T from the F01 readings line); then, through Grafana on `127.0.0.1:3300`
-with the query range from one minute before the run to now, asserts: both
-dashboards are provisioned in folder `Petri` (`/api/dashboards/uid/`);
-every scalar family in the table above, and every map family with a key on
-the workload, appears in
-`/api/datasources/proxy/uid/prometheus/api/v1/label/__name__/values` under
-its Prometheus name, the names listed in the script; every panel query of
-both dashboards, read from the JSON with `node` (Aqua) and evaluated through
-`/api/ds/query` with `$run_id` substituted by the run's ID, returns data;
-`petri_run_tick` for the run has at least three samples with distinct
-timestamps, non-decreasing, ending at T; the Loki `run.started` line of the
-run carries `petri_metrics_interval_ms`. It prints one pass/fail line per
-check and removes the scratch volume.
+`scripts/bench-wait` around the run) prints one pass/fail line per row and
+removes its scratch volume at the end.
+
+| Step | What it does or asserts |
+| --- | --- |
+| Stack | Compose project and scratch volume `petri-telemetry-dashboards`, created and removed explicitly; refuses while `petri-telemetry` is up |
+| Workload | `v3-cli run --telemetry on --seed 7 --ticks T --sample-every T --config telemetry/overhead-world.json`, T from the F01 readings line |
+| Provisioning | both dashboards present in folder `Petri` via `/api/dashboards/uid/` on `127.0.0.1:3300` |
+| Names | every scalar family in the table above, and every map family with a key on the workload, appears under its Prometheus name in `/api/datasources/proxy/uid/prometheus/api/v1/label/__name__/values`; the names are listed in the script |
+| Panels | every panel query of both dashboards, read from the JSON with `node` (Aqua) and evaluated through `/api/ds/query` with `$run_id` substituted by the run's ID and a range from one minute before the run to now, returns data |
+| Tick gauge | `petri_run_tick` for the run has at least three samples with distinct timestamps, non-decreasing, ending at T |
+| Run record | the Loki `run.started` line of the run carries `petri_metrics_interval_ms` |
+| Volume survives | after the script's own `down -v`, `petri-telemetry` still exists when it existed at the start |
 
 ## Telemetry
 
@@ -215,6 +223,9 @@ a value that was not captured is absent, never zero.
 - [x] `telemetry/grafana/dashboards.yaml`, `telemetry/grafana/dashboards/
       {petri-runs,petri-run}.json`, the compose mounts.
 - [x] `scripts/telemetry-dashboards-check`.
+- [ ] External data volume: `external: true` in `telemetry/compose.yaml`,
+      `docker volume create` in `make telemetry-up`, explicit scratch
+      volumes in the three scripts, the volume-survives check.
 - [ ] Run the checks on this host; record them in
       `docs/progress/readings/t21-f02.md`.
 
@@ -250,7 +261,9 @@ a value that was not captured is absent, never zero.
       `scripts/telemetry-dashboards-check` -> every check passes; transcript
       and the stored Prometheus names in the readings file; the two
       dashboards opened in a browser on the same run, with the tick-axis
-      panels plotting, recorded as a checklist row there.
+      panels plotting, recorded as a checklist row there; the
+      volume-survives line passes with `petri-telemetry` present, and
+      `scripts/telemetry-verify` still exits 0 on its own scratch volume.
 - [ ] Bytes per run: the workload run's `bytes=` and `snapshots=` figures and
       each store's growth over ten runs, in the readings file.
 - [ ] Parent comparison: `scripts/telemetry-parent-compare 5c14c8d3` (F01's
@@ -302,7 +315,8 @@ method is F01's, unchanged, with T = 6908 fixed:
       last snapshot of a run holds its final counts.
 - [ ] `Petri / Runs` lists runs with identity and links to `Petri / Run`,
       which shows the selected run against wall time and against ticks, and
-      `scripts/telemetry-dashboards-check` passes.
+      `scripts/telemetry-dashboards-check` passes, including the line that
+      shows a scratch project's `down -v` leaves `petri-telemetry` in place.
 - [ ] The neutrality, encoding, bounds and server tests pass inside
       `make check` without Docker; the interval setting is process-level and
       recorded on `run.started`.
