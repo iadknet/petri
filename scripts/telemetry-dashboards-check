@@ -18,9 +18,11 @@
 #      data;
 #   4. petri_run_tick of the run has at least three samples with distinct,
 #      non-decreasing timestamps, the last at T;
-#   5. the run's Loki run.started line carries petri_metrics_interval_ms.
+#   5. the run's Loki run.started line carries petri_metrics_interval_ms;
+#   6. after the scratch stack's own `down -v`, the external petri-telemetry
+#      volume still exists when it existed at the start.
 # Prints one PASS or FAIL line per check, removes the scratch stack and volume
-# on exit, and exits 1 when any check fails.
+# (scripts/telemetry-scratch.sh), and exits 1 when any check fails.
 #
 # Environment:
 #   TELEMETRY_TICKS  the workload's T; default the `- Workload ticks T: N`
@@ -37,8 +39,6 @@ export AQUA_POLICY_CONFIG="${AQUA_POLICY_CONFIG:-$root/aqua-policy.yaml}"
 readings=$root/docs/progress/readings/t21-f01.md
 recipe=$root/telemetry/overhead-world.json
 grafana=http://127.0.0.1:3300
-export PETRI_TELEMETRY_PROJECT=petri-telemetry-dashboards
-export PETRI_TELEMETRY_VOLUME=petri-telemetry-dashboards
 
 ticks=${TELEMETRY_TICKS:-}
 if [ -z "$ticks" ]; then
@@ -48,11 +48,8 @@ case "$ticks" in
   '' | *[!0-9]*) printf 'telemetry-dashboards-check: no workload T (set TELEMETRY_TICKS)\n' >&2; exit 2 ;;
 esac
 
-if [ -n "$(docker compose -p petri-telemetry -f "$compose_file" ps -q --status running lgtm 2>/dev/null)" ]; then
-  printf 'telemetry-dashboards-check: the petri-telemetry stack is up and holds the same ports; stop it with make telemetry-down\n' >&2
-  exit 1
-fi
-
+. "$root/scripts/telemetry-scratch.sh"
+scratch_stack petri-telemetry-dashboards
 compose() {
   docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" "$@"
 }
@@ -60,7 +57,7 @@ note() { printf 'telemetry-dashboards-check: %s\n' "$*"; }
 
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/petri-dashboards.XXXXXX")
 cleanup() {
-  compose down -v --remove-orphans >/dev/null 2>&1 || true
+  scratch_stack_remove
   rm -rf "$scratch"
 }
 trap cleanup 0
@@ -216,19 +213,12 @@ get() {
 }
 
 # ── stack ─────────────────────────────────────────────────────────────────────
-compose down -v --remove-orphans >/dev/null 2>&1 || true
+production_volume=absent
+if docker volume inspect petri-telemetry >/dev/null 2>&1; then production_volume=present; fi
+scratch_volume_create
 note "starting the scratch stack $PETRI_TELEMETRY_PROJECT"
 compose up -d --quiet-pull >/dev/null 2>&1
-waited=0
-until compose exec -T lgtm curl -sf http://127.0.0.1:9090/-/ready >/dev/null 2>&1 &&
-  compose exec -T lgtm curl -sf http://127.0.0.1:3100/ready >/dev/null 2>&1 &&
-  curl -sf "$grafana/api/health" >/dev/null 2>&1 &&
-  curl -sf -o /dev/null -X POST -H 'Content-Type: application/json' -d '{}' \
-    http://127.0.0.1:4318/v1/metrics 2>/dev/null; do
-  waited=$((waited + 2))
-  [ "$waited" -lt 240 ] || { note 'stack not ready after 240 s'; exit 1; }
-  sleep 2
-done
+scratch_stack_ready
 
 # ── workload ──────────────────────────────────────────────────────────────────
 note 'building v3-cli (release)'
@@ -359,6 +349,16 @@ detail=$("$node" -e '
 check 'run.started carries petri_metrics_interval_ms' "$status" "$detail"
 
 compose exec -T lgtm du -s /data/prometheus /data/loki || true
+
+# ── 6. volume survives ────────────────────────────────────────────────────────
+scratch_stack_remove
+if [ "$production_volume" = present ]; then
+  docker volume inspect petri-telemetry >/dev/null 2>&1 && status=0 || status=1
+  check 'petri-telemetry volume survives' "$status" "present at the start and after the scratch stack's down -v"
+else
+  note 'petri-telemetry volume absent at the start; survival not checked'
+fi
+
 if [ "$failures" -eq 0 ]; then
   note 'all checks passed'
 else

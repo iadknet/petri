@@ -4,7 +4,8 @@
 # Usage: scripts/telemetry-verify
 #
 # Runs on the scratch Compose project and volume petri-telemetry-verify, never
-# on petri-telemetry, and removes the scratch stack and volume on exit.
+# on petri-telemetry, and creates and removes the scratch volume itself
+# (scripts/telemetry-scratch.sh).
 # Refuses while petri-telemetry is up (same host ports). Layers
 # telemetry/verify/compose.yaml over the production file to mount
 # telemetry/verify/tempo-config.yaml, the production Tempo file with a 1m
@@ -41,16 +42,8 @@ compose_file=$root/telemetry/compose.yaml
 old_image=${TELEMETRY_VERIFY_OLD_IMAGE:-grafana/otel-lgtm:0.33.1}
 new_image=${TELEMETRY_VERIFY_NEW_IMAGE:-grafana/otel-lgtm:0.34.0}
 loki_wait=${TELEMETRY_VERIFY_LOKI_WAIT:-900}
-# Exported so scripts/telemetry-cleanup and every compose call below act on
-# the scratch stack and its volume only.
-export PETRI_TELEMETRY_PROJECT=petri-telemetry-verify
-export PETRI_TELEMETRY_VOLUME=petri-telemetry-verify
-
-if [ -n "$(docker compose -p petri-telemetry -f "$compose_file" ps -q --status running lgtm 2>/dev/null)" ]; then
-  printf 'telemetry-verify: the petri-telemetry stack is up and holds the same ports; stop it with make telemetry-down\n' >&2
-  exit 1
-fi
-
+. "$root/scripts/telemetry-scratch.sh"
+scratch_stack petri-telemetry-verify
 compose() {
   docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" \
     -f "$root/telemetry/verify/compose.yaml" "$@"
@@ -60,10 +53,7 @@ in_stack() {
 }
 note() { printf 'telemetry-verify: %s\n' "$*"; }
 
-cleanup_stack() {
-  compose down -v --remove-orphans >/dev/null 2>&1 || true
-}
-trap cleanup_stack 0
+trap scratch_stack_remove 0
 trap 'exit 130' INT
 trap 'exit 143' HUP TERM
 
@@ -239,7 +229,7 @@ trace_after=$(printf '%08x%024x' "$run_id" 4)
 log_before=petri-verify-before-$run_id
 log_after=petri-verify-after-$run_id
 
-cleanup_stack
+scratch_volume_create
 note "phase 1: samples under $old_image"
 up "$old_image"
 write_span "$trace_before"

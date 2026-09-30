@@ -18,8 +18,10 @@
 # of measured run time; a run that would pass it is refused and the rest is
 # inconclusive. Every timed run goes through scripts/bench-wait.
 #
-# Uses the petri-telemetry stack (make telemetry-up first; the compose file's
-# PETRI_TELEMETRY_PROJECT selects another) and leaves it stopped. T comes from TELEMETRY_TICKS or the `- Workload ticks T: N` line of
+# Runs on the scratch Compose project and volume petri-telemetry-overhead,
+# created here and removed on exit (scripts/telemetry-scratch.sh); refuses
+# while petri-telemetry is up. T comes from TELEMETRY_TICKS or the
+# `- Workload ticks T: N` line of
 # docs/progress/readings/t21-f01.md; without either it is calibrated with
 # three reference runs to about 4 s per run, and the script prints the line
 # to record.
@@ -35,34 +37,28 @@ readings=$root/docs/progress/readings/t21-f01.md
 recipe=$root/telemetry/overhead-world.json
 cap_ms=300000
 ceiling=1.25
-scratch=$(mktemp -d "${TMPDIR:-/tmp}/petri-overhead.XXXXXX")
-trap 'rm -rf "$scratch"' EXIT
-trap 'exit 130' INT TERM
-
-# The project is the compose file's: PETRI_TELEMETRY_PROJECT, default
-# petri-telemetry.
+compose_file=$root/telemetry/compose.yaml
+. "$root/scripts/telemetry-scratch.sh"
+scratch_stack petri-telemetry-overhead
 compose() {
-  docker compose -f "$root/telemetry/compose.yaml" "$@"
+  docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" "$@"
 }
-
-if [ -z "$(compose ps -a -q lgtm 2>/dev/null)" ]; then
-  printf 'telemetry-overhead: no %s stack; run make telemetry-up first\n' "${PETRI_TELEMETRY_PROJECT:-petri-telemetry}" >&2
-  exit 1
-fi
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/petri-overhead.XXXXXX")
+trap 'scratch_stack_remove; rm -rf "$scratch"' EXIT
+trap 'exit 130' INT TERM
 
 stack_stop() {
   compose stop lgtm >/dev/null 2>&1
 }
 
+stack_ready() {
+  scratch_stack_ready
+  sleep 5
+}
+
 stack_start() {
   compose start lgtm >/dev/null 2>&1
-  waited=0
-  until compose exec -T lgtm curl -sf http://127.0.0.1:3000/api/health >/dev/null 2>&1; do
-    waited=$((waited + 1))
-    [ "$waited" -lt 120 ] || { printf 'telemetry-overhead: Grafana not healthy after 120 s\n' >&2; exit 1; }
-    sleep 1
-  done
-  sleep 5
+  stack_ready
 }
 
 printf 'Building the telemetry and reference builds\n'
@@ -72,6 +68,11 @@ cargo build --release --quiet -p v3-cli --no-default-features \
   --manifest-path "$root/Cargo.toml" --target-dir "$root/target/reference"
 telemetry_bin=$root/target/release/v3-cli
 reference_bin=$root/target/reference/release/v3-cli
+
+printf 'Starting the scratch stack %s\n' "$PETRI_TELEMETRY_PROJECT"
+scratch_volume_create
+compose up -d --quiet-pull >/dev/null 2>&1
+stack_ready
 
 used_ms=0
 estimate_ms=0

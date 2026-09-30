@@ -21,7 +21,7 @@ use opentelemetry_proto::tonic::metrics::v1::{
 };
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use v3_core::simulation::energy_accounting::DeathCause;
-use v3_core::simulation::reproductive_success::CognitiveClass;
+use v3_core::simulation::reproductive_success::{CognitiveClass, ReproductiveSuccessTotals};
 use v3_core::simulation::stats::MutationValueTotals;
 use v3_core::simulation::{SimStats, Simulation};
 
@@ -462,25 +462,21 @@ fn counters(f: &mut Families, s: &SimStats) {
         }),
     );
     let success = &s.reproductive_success_by_cognitive_class;
-    for (field, read) in [
-        ("creatures_observed", 0),
-        ("offspring_spawned", 1),
-        ("survival_ticks", 2),
-    ] {
+    type Read = fn(&ReproductiveSuccessTotals) -> u64;
+    let fields: [(&str, Read); 3] = [
+        ("creatures_observed", |t| t.creatures_observed_total),
+        ("offspring_spawned", |t| t.offspring_spawned_sum),
+        ("survival_ticks", |t| t.survival_ticks_sum),
+    ];
+    for (field, read) in fields {
         f.push(
             format!("petri.run.reproductive_success.{field}"),
             Kind::Sum,
             "",
             CognitiveClass::ALL.map(|class| {
-                let totals = success.totals(class);
-                let value = match read {
-                    0 => totals.creatures_observed_total,
-                    1 => totals.offspring_spawned_sum,
-                    _ => totals.survival_ticks_sum,
-                };
                 (
                     vec![("petri.cognitive_class", class.as_key().to_owned())],
-                    Value::Int(value),
+                    Value::Int(read(&success.totals(class))),
                 )
             }),
         );

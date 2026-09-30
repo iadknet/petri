@@ -223,10 +223,11 @@ a value that was not captured is absent, never zero.
 - [x] `telemetry/grafana/dashboards.yaml`, `telemetry/grafana/dashboards/
       {petri-runs,petri-run}.json`, the compose mounts.
 - [x] `scripts/telemetry-dashboards-check`.
-- [ ] External data volume: `external: true` in `telemetry/compose.yaml`,
+- [x] External data volume: `external: true` in `telemetry/compose.yaml`,
       `docker volume create` in `make telemetry-up`, explicit scratch
-      volumes in the three scripts, the volume-survives check.
-- [ ] Run the checks on this host; record them in
+      volumes in the three scripts (`scripts/telemetry-scratch.sh`), the
+      volume-survives check.
+- [x] Run the checks on this host; record them in
       `docs/progress/readings/t21-f02.md`.
 
 ## Verification
@@ -257,23 +258,23 @@ a value that was not captured is absent, never zero.
       --no-default-features` compiles, `cargo tree -e features` shows neither
       `v3-telemetry` nor `telemetry-seams`, clippy `-D warnings` passes with
       and without the feature. Passed 2026-09-30 (tree: 0 matching lines).
-- [ ] Dashboards (Docker, outside `make check`):
+- [x] Dashboards (Docker, outside `make check`):
       `scripts/telemetry-dashboards-check` -> every check passes; transcript
       and the stored Prometheus names in the readings file; the two
       dashboards opened in a browser on the same run, with the tick-axis
       panels plotting, recorded as a checklist row there; the
       volume-survives line passes with `petri-telemetry` present, and
-      `scripts/telemetry-verify` still exits 0 on its own scratch volume.
-- [ ] Bytes per run: the workload run's `bytes=` and `snapshots=` figures and
+      `scripts/telemetry-verify` still exits 0 on its own scratch volume. Passed 2026-09-30.
+- [x] Bytes per run: the workload run's `bytes=` and `snapshots=` figures and
       each store's growth over ten runs, in the readings file.
-- [ ] Parent comparison: `scripts/telemetry-parent-compare 5c14c8d3` (F01's
+- [x] Parent comparison: `scripts/telemetry-parent-compare 5c14c8d3` (F01's
       closing commit) -> identical canonical output, in the readings file.
-- [ ] Overhead check: `scripts/telemetry-overhead` -> the table in the
+- [x] Overhead check: `scripts/telemetry-overhead` -> the table in the
       readings file, verdict in Performance and Goal Impact.
 - [x] `make check` -> exit 0 (2026-09-30; runs the three test rows above).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
-- [ ] Benchmark summary: `Not applicable: observability feature`.
+- [x] Benchmark summary: `Not applicable: observability feature`.
 
 ## Performance and Goal Impact
 
@@ -302,8 +303,11 @@ method is F01's, unchanged, with T = 6908 fixed:
 | Record | Value |
 | --- | --- |
 | Profiles | `Not applicable: observability feature` |
-| Parent comparison | pending |
-| Overhead check | pending |
+| Parent comparison | method above, `BASE` `5c14c8d3`, T = 6908: identical canonical output |
+| Overhead check | method above, default interval, n = 8 (spread 6.09%), T = 6908; measured time 150.9 s of 300 s, one attempt |
+| (a) on, stack healthy | median ratio 1.001, 8 pairs, pass; self time 0.463 µs per tick |
+| (b) on, stack stopped | median ratio 0.994, 8 pairs, pass; self time 0.371 µs per tick |
+| (c) idle-stack cost | 1.016 |
 
 - Readings: [`docs/progress/readings/t21-f02.md`](../../progress/readings/t21-f02.md).
 
