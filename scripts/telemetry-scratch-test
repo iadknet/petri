@@ -1,0 +1,81 @@
+#!/bin/sh
+# Docker-free tests of scripts/telemetry-scratch.sh, the scratch-stack helper
+# of telemetry-verify, telemetry-overhead and telemetry-dashboards-check: a stub
+# `docker` on PATH records every call. The production volume petri-telemetry
+# is external, so no script may create or remove it.
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+root=$(dirname -- "$script_dir")
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-telemetry-scratch-test.XXXXXX")
+trap 'rm -rf "$test_root"' 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+export SCRATCH_TEST_FIXTURE="$test_root"
+mkdir "$test_root/bin"
+
+# The stub answers `ps` with a container only when production-up exists.
+cat >"$test_root/bin/docker" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$*" >>"$SCRATCH_TEST_FIXTURE/docker-calls"
+case "$*" in
+  *'-p petri-telemetry '*' ps '*) [ ! -f "$SCRATCH_TEST_FIXTURE/production-up" ] || printf 'prod\n' ;;
+esac
+STUB
+chmod +x "$test_root/bin/docker"
+
+fail() { printf 'telemetry-scratch-test: %s\n' "$*" >&2; exit 1; }
+
+# run_helper NAME: selects NAME, creates its volume and removes the stack.
+run_helper() {
+  rm -f "$test_root/docker-calls"
+  status=0
+  PATH="$test_root/bin:$PATH" sh -c '
+    root=$1
+    compose_file=$root/telemetry/compose.yaml
+    . "$root/scripts/telemetry-scratch.sh"
+    scratch_stack "$2"
+    compose() { docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" "$@"; }
+    [ "$PETRI_TELEMETRY_PROJECT" = "$2" ] && [ "$PETRI_TELEMETRY_VOLUME" = "$2" ] || exit 9
+    scratch_volume_create
+    scratch_stack_remove
+  ' helper "$root" "$1" >"$test_root/output" 2>&1 || status=$?
+}
+
+run_helper petri-telemetry-demo
+[ "$status" -eq 0 ] || { cat "$test_root/output" >&2; fail "scratch stack refused (status $status)"; }
+grep -qx 'volume create petri-telemetry-demo' "$test_root/docker-calls" || fail 'scratch volume not created'
+grep -q '^compose -p petri-telemetry-demo .* down ' "$test_root/docker-calls" || fail 'scratch stack not taken down'
+[ "$(grep -c '^volume rm -f petri-telemetry-demo$' "$test_root/docker-calls")" -eq 2 ] ||
+  fail 'scratch volume not removed before creation and at the end'
+if grep -Eq '^volume (create|rm)( -f)? petri-telemetry$' "$test_root/docker-calls"; then
+  fail 'touched the production volume'
+fi
+
+# The production name, or a name outside the scratch prefix, is refused before docker.
+for name in petri-telemetry other petri-telemetry-; do
+  run_helper "$name"
+  [ "$status" -eq 2 ] || fail "accepted scratch name $name (status $status)"
+  [ ! -f "$test_root/docker-calls" ] || fail "touched docker before refusing $name"
+done
+
+# A running production stack holds the ports: refused, nothing created.
+: >"$test_root/production-up"
+run_helper petri-telemetry-demo
+rm "$test_root/production-up"
+[ "$status" -eq 1 ] || fail "ran beside a running production stack (status $status)"
+if grep -q 'volume create' "$test_root/docker-calls"; then fail 'created a volume beside production'; fi
+
+# The production volume is external, and make telemetry-up creates it.
+awk '/^volumes:/ { on = 1 } on && /external: true/ { found = 1 } END { exit !found }' \
+  "$root/telemetry/compose.yaml" || fail 'compose.yaml data volume is not external'
+grep -q 'docker volume create' "$root/Makefile" || fail 'make telemetry-up does not create the volume'
+
+# Each scratch script goes through the helper under its own name.
+for script in verify overhead dashboards-check; do
+  case "$script" in dashboards-check) name=petri-telemetry-dashboards ;; *) name=petri-telemetry-$script ;; esac
+  grep -q "^scratch_stack $name\$" "$root/scripts/telemetry-$script" ||
+    fail "telemetry-$script does not select scratch stack $name"
+done
+
+printf 'telemetry-scratch-test: ok\n'

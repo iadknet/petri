@@ -172,12 +172,12 @@ impl Shared {
                 .attributes_iter()
                 .map(|(key, value)| key.as_str().len() as u64 + value_bytes(value))
                 .sum::<u64>();
-        let name = record.event_name().unwrap_or("unnamed").to_owned();
+        let name = record.event_name().unwrap_or("unnamed");
         self.enqueue(
             run,
             bytes,
             body_bytes,
-            &name,
+            name,
             Item::Record(Box::new((record, scope))),
         );
     }
@@ -192,7 +192,7 @@ impl Shared {
         self.enqueue(run, bytes, bytes, "snapshot", Item::Snapshot(body));
     }
 
-    fn enqueue(&self, run: RunKey, bytes: u64, body_bytes: u64, name: &str, item: Item) {
+    fn enqueue(&self, run: RunKey, bytes: u64, body_bytes: u64, name: &'static str, item: Item) {
         let over_cap = body_bytes > self.limits.max_body_bytes;
         let mut state = self.lock();
         let full = state.closed

@@ -153,6 +153,7 @@ quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
 	@sh scripts/dev-sh-test
 	@sh scripts/skill-check-test
 	@sh scripts/telemetry-cleanup-test
+	@sh scripts/telemetry-scratch-test
 
 dependency-audit: ## Scan Cargo and npm dependency locks with OSV.
 	@scripts/dependency-audit
@@ -177,6 +178,8 @@ project-precommit: ## Run the project-validation pre-commit entry point.
 
 TELEMETRY_COMPOSE = docker compose -f telemetry/compose.yaml
 telemetry-up: ## Start the local telemetry stack (Grafana on 127.0.0.1:3300, OTLP on 4317/4318) and print each store's disk use.
+	@volume=$${PETRI_TELEMETRY_VOLUME:-petri-telemetry}; \
+		docker volume inspect "$$volume" >/dev/null 2>&1 || docker volume create "$$volume" >/dev/null
 	@$(TELEMETRY_COMPOSE) up -d
 	@waited=0; until $(TELEMETRY_COMPOSE) exec -T lgtm du -s /data/prometheus /data/tempo /data/loki 2>/dev/null; do \
 		waited=$$((waited + 1)); \

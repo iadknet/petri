@@ -29,6 +29,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use opentelemetry::logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity};
 use opentelemetry::KeyValue;
+use opentelemetry_proto::transform::common::tonic::ResourceAttributesWithSchema;
 use opentelemetry_sdk::logs::{LogExporter, SdkLogger, SdkLoggerProvider};
 use opentelemetry_sdk::Resource;
 use prost::Message as _;
@@ -336,25 +337,6 @@ fn unix_ns(time: SystemTime) -> u64 {
     })
 }
 
-/// A resource attribute as an OTLP protobuf key-value.
-fn proto_attribute(
-    key: &opentelemetry::Key,
-    value: &opentelemetry::Value,
-) -> opentelemetry_proto::tonic::common::v1::KeyValue {
-    use opentelemetry_proto::tonic::common::v1::{any_value, AnyValue as ProtoValue, KeyValue};
-    let value = match value {
-        opentelemetry::Value::Bool(flag) => any_value::Value::BoolValue(*flag),
-        opentelemetry::Value::I64(number) => any_value::Value::IntValue(*number),
-        opentelemetry::Value::F64(number) => any_value::Value::DoubleValue(*number),
-        other => any_value::Value::StringValue(other.to_string()),
-    };
-    KeyValue {
-        key: key.as_str().to_owned(),
-        value: Some(ProtoValue { value: Some(value) }),
-        ..KeyValue::default()
-    }
-}
-
 /// An integer attribute, or its decimal string when it exceeds `i64`.
 fn u64_value(value: u64) -> AnyValue {
     i64::try_from(value).map_or_else(|_| AnyValue::from(value.to_string()), AnyValue::Int)
@@ -425,10 +407,7 @@ impl Telemetry {
             ])
             .build();
         exporter.set_resource(&resource);
-        let proto_resource = resource
-            .iter()
-            .map(|(key, value)| proto_attribute(key, value))
-            .collect();
+        let proto_resource = ResourceAttributesWithSchema::from(&resource).attributes.0;
         let shared = Shared::new(options.limits, options.reports, held);
         let worker_shared = Arc::clone(&shared);
         let spawned = std::thread::Builder::new()

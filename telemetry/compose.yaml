@@ -1,9 +1,12 @@
 # Petri's local telemetry stack (T21.F01): one grafana/otel-lgtm container.
 # Grafana on http://127.0.0.1:3300 (admin/admin); OTLP on 127.0.0.1:4317
-# (gRPC) and 127.0.0.1:4318 (HTTP). Data lives in a named volume and nothing
-# expires by age; retire it with `make telemetry-clean CUTOFF=<date or RFC3339>`.
-# PETRI_LGTM_IMAGE, PETRI_TELEMETRY_VOLUME and PETRI_TELEMETRY_PROJECT exist
-# for the scripts' scratch stacks (telemetry-verify, telemetry-dashboards-check).
+# (gRPC) and 127.0.0.1:4318 (HTTP). Data lives in the external volume
+# petri-telemetry, which `make telemetry-up` creates and no `docker compose
+# down -v` removes; nothing expires by age; retire it with
+# `make telemetry-clean CUTOFF=<date or RFC3339>`. PETRI_LGTM_IMAGE,
+# PETRI_TELEMETRY_VOLUME and PETRI_TELEMETRY_PROJECT exist for the scripts'
+# scratch stacks (scripts/telemetry-scratch.sh), which create and remove their
+# own volumes.
 name: ${PETRI_TELEMETRY_PROJECT:-petri-telemetry}
 
 services:
@@ -41,3 +44,4 @@ services:
 volumes:
   data:
     name: ${PETRI_TELEMETRY_VOLUME:-petri-telemetry}
+    external: true
