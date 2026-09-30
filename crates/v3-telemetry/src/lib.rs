@@ -13,6 +13,7 @@
 //! (`telemetry: run=… exported=… failed=… dropped=… abandoned=… bytes=…
 //! self_time_us=… flush_ms=…`).
 
+mod export;
 mod queue;
 pub mod testing;
 
@@ -24,12 +25,12 @@ use std::time::{Duration, Instant, SystemTime};
 
 use opentelemetry::logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity};
 use opentelemetry::KeyValue;
-use opentelemetry_otlp::{Protocol, RetryPolicy, WithExportConfig, WithHttpConfig};
 use opentelemetry_sdk::logs::{LogExporter, SdkLogger, SdkLoggerProvider};
 use opentelemetry_sdk::Resource;
 use rand::RngCore;
 use v3_core::config::SimulationConfig;
 
+use crate::export::Rejections;
 use crate::queue::{QueueProcessor, RunKey, Shared};
 
 /// The environment variable that switches telemetry when no flag is given.
@@ -327,16 +328,16 @@ impl Telemetry {
     /// Enabled telemetry with explicit options. When the exporter cannot be
     /// built, it says so on the report sink and returns telemetry that is off.
     pub fn start_with(options: Options) -> Self {
+        Self::start_otlp(options, false)
+    }
+
+    /// [`Telemetry::start_with`]; with `held`, the worker takes no batch until
+    /// released (tests).
+    fn start_otlp(options: Options, held: bool) -> Self {
         let url = format!("{}/v1/logs", options.endpoint.trim_end_matches('/'));
-        let exporter = opentelemetry_otlp::LogExporter::builder()
-            .with_http()
-            .with_protocol(Protocol::HttpBinary)
-            .with_endpoint(url)
-            .with_timeout(options.limits.request_timeout)
-            .with_retry_policy(RetryPolicy::disabled())
-            .build();
-        match exporter {
-            Ok(exporter) => Self::with_exporter(options, exporter, false),
+        let rejections = Arc::<Rejections>::default();
+        match export::build(url, options.limits.request_timeout, Arc::clone(&rejections)) {
+            Ok(exporter) => Self::with_exporter(options, exporter, rejections, held),
             Err(error) => {
                 options
                     .reports
@@ -346,7 +347,12 @@ impl Telemetry {
         }
     }
 
-    fn with_exporter<E>(options: Options, mut exporter: E, held: bool) -> Self
+    fn with_exporter<E>(
+        options: Options,
+        mut exporter: E,
+        rejections: Arc<Rejections>,
+        held: bool,
+    ) -> Self
     where
         E: LogExporter + 'static,
     {
@@ -365,7 +371,7 @@ impl Telemetry {
         let worker_shared = Arc::clone(&shared);
         let spawned = std::thread::Builder::new()
             .name("petri-telemetry".to_owned())
-            .spawn(move || queue::run_worker(&worker_shared, exporter));
+            .spawn(move || queue::run_worker(&worker_shared, exporter, &rejections));
         if let Err(error) = spawned {
             shared
                 .sink()

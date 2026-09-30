@@ -79,4 +79,23 @@ run_cleanup
 run_cleanup 2020-01-02 --proceed extra
 [ "$status" -eq 2 ] || fail "extra argument accepted (status $status)"
 
+# `make telemetry-clean` passes --proceed only for PROCEED=1.
+expect_make_proceed() {
+  proceed=$1
+  expected=$2
+  line=$(make -s -n -C "$script_dir/.." telemetry-clean CUTOFF=2020-01-02 PROCEED="$proceed" | grep 'scripts/telemetry-cleanup ') ||
+    fail "make telemetry-clean PROCEED=$proceed runs no cleanup"
+  case $line in
+    *--proceed*) found=yes ;;
+    *) found=no ;;
+  esac
+  [ "$found" = "$expected" ] || fail "make telemetry-clean PROCEED=$proceed: --proceed $found, expected $expected"
+}
+expect_make_proceed 1 yes
+expect_make_proceed 0 no
+expect_make_proceed yes no
+expect_make_proceed '0 1' no
+expect_make_proceed '1 1' no
+expect_make_proceed '' no
+
 printf 'telemetry-cleanup-test: ok\n'

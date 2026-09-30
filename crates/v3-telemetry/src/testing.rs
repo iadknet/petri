@@ -1,7 +1,9 @@
 //! An in-process OTLP/HTTP log receiver for tests, on an ephemeral port.
 //!
-//! It decodes each `POST /v1/logs` protobuf body and keeps the records, or, in
-//! [`Receiver::hanging`] mode, accepts the connection and never answers.
+//! It decodes each `POST /v1/logs` protobuf body and keeps the records; in
+//! [`Receiver::rejecting`] mode it answers with a partial success that rejects
+//! records, and in [`Receiver::hanging`] mode it accepts the connection and
+//! never answers.
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -9,7 +11,9 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
+use opentelemetry_proto::tonic::collector::logs::v1::{
+    ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
+};
 use opentelemetry_proto::tonic::common::v1::{any_value, AnyValue, KeyValue};
 use prost::Message;
 
@@ -104,25 +108,53 @@ fn read_request(reader: &mut BufReader<TcpStream>) -> Option<Vec<u8>> {
     Some(body)
 }
 
-fn serve(stream: TcpStream, records: &Mutex<Vec<ReceivedRecord>>, answer: bool) {
+/// How a receiver answers each request.
+#[derive(Debug, Clone, Copy)]
+enum Answer {
+    /// `200 OK` with an empty body: every record accepted.
+    Accept,
+    /// `200 OK` with a partial success rejecting up to this many records.
+    Reject(u64),
+    /// Never answer.
+    Hang,
+}
+
+fn serve(stream: TcpStream, records: &Mutex<Vec<ReceivedRecord>>, answer: Answer) {
     let Ok(mut writer) = stream.try_clone() else {
         return;
     };
     let mut reader = BufReader::new(stream);
     while let Some(body) = read_request(&mut reader) {
-        if !answer {
-            // Hold the connection open and never reply.
-            loop {
+        let decoded = decode(&body);
+        let rejected = match answer {
+            Answer::Hang => loop {
+                // Hold the connection open and never reply.
                 std::thread::park();
-            }
-        }
+            },
+            Answer::Accept => 0,
+            Answer::Reject(limit) => limit.min(decoded.len() as u64),
+        };
+        let accepted = decoded.len() - rejected as usize;
         records
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .extend(decode(&body));
-        let reply =
-            "HTTP/1.1 200 OK\r\ncontent-type: application/x-protobuf\r\ncontent-length: 0\r\n\r\n";
-        if writer.write_all(reply.as_bytes()).is_err() {
+            .extend(decoded.into_iter().take(accepted));
+        let reply = if rejected == 0 {
+            Vec::new()
+        } else {
+            ExportLogsServiceResponse {
+                partial_success: Some(ExportLogsPartialSuccess {
+                    rejected_log_records: rejected as i64,
+                    error_message: "rejected by the test receiver".to_owned(),
+                }),
+            }
+            .encode_to_vec()
+        };
+        let head = format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: application/x-protobuf\r\ncontent-length: {}\r\n\r\n",
+            reply.len()
+        );
+        if writer.write_all(head.as_bytes()).is_err() || writer.write_all(&reply).is_err() {
             return;
         }
     }
@@ -131,15 +163,21 @@ fn serve(stream: TcpStream, records: &Mutex<Vec<ReceivedRecord>>, answer: bool) 
 impl Receiver {
     /// A receiver that answers every request with `200 OK`.
     pub fn start() -> Self {
-        Self::spawn(true)
+        Self::spawn(Answer::Accept)
+    }
+
+    /// A receiver that keeps all but the last `per_request` records of each
+    /// request and reports those as rejected in a partial success.
+    pub fn rejecting(per_request: u64) -> Self {
+        Self::spawn(Answer::Reject(per_request))
     }
 
     /// A receiver that accepts connections and never answers.
     pub fn hanging() -> Self {
-        Self::spawn(false)
+        Self::spawn(Answer::Hang)
     }
 
-    fn spawn(answer: bool) -> Self {
+    fn spawn(answer: Answer) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind an ephemeral port");
         let endpoint = format!(
             "http://{}",

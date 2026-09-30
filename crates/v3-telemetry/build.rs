@@ -6,7 +6,7 @@
 //! checked-out ref moves, not when a tracked file changes, so the dirty flag can
 //! be stale between rebuilds.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 const OVERRIDE: &str = "PETRI_BUILD_REVISION";
@@ -21,13 +21,10 @@ fn git(args: &[&str]) -> Option<String> {
 }
 
 /// The absolute path `git rev-parse --git-path name` resolves to; it follows a
-/// linked worktree's `.git` file.
+/// linked worktree's `.git` file. Without `--path-format=absolute` Git answers
+/// relative to the working directory (`../../.git/HEAD` from this crate).
 fn git_path(name: &str) -> Option<PathBuf> {
-    let path = PathBuf::from(git(&["rev-parse", "--git-path", name])?);
-    if path.is_absolute() {
-        return Some(path);
-    }
-    Some(Path::new(&git(&["rev-parse", "--show-toplevel"])?).join(path))
+    git(&["rev-parse", "--path-format=absolute", "--git-path", name]).map(PathBuf::from)
 }
 
 /// Tells Cargo to rerun when `name` changes. A ref with no loose file lives

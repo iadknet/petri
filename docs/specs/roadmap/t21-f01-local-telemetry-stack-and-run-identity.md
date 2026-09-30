@@ -70,7 +70,7 @@ Invariants (options weighed are in the readings file):
    the crate's body cap is the same 4 MiB, a body over it is dropped whole,
    counted in `dropped` and named on stderr as a gap, and the verification
    measures the workload's config body (2,777 B measured) against that
-   cap; one export batch of at most 512 records in flight; request timeout 5 s; no retry; the flush that starts
+   cap; one export batch of at most 512 records of one run in flight; request timeout 5 s; no retry; the flush that starts
    at a run's end (CLI) or at process shutdown (server) finishes within 10 s
    and abandons what remains. Counters are kept per run and released when
    that run's summary line prints.
@@ -132,7 +132,7 @@ identity, the records and the exporter; the binaries call it.
 | `service.version` | resource | `CARGO_PKG_VERSION` |
 | `process.pid` | resource | the process ID |
 | `petri.invocation_id` | resource | 128 bits of OS entropy as 32 lowercase hex, once per process |
-| `petri.build_revision` | resource | 40-hex commit from the crate's `build.rs` (`git rev-parse HEAD`), `-dirty` appended when tracked files differ when the crate builds, `unknown` when no repository is visible; `PETRI_BUILD_REVISION` overrides it; `rerun-if-changed` on the paths `git rev-parse --git-path HEAD` and the checked-out ref resolve to (linked worktrees have a `.git` file), so a dirty flag can be stale between rebuilds |
+| `petri.build_revision` | resource | 40-hex commit from the crate's `build.rs` (`git rev-parse HEAD`), `-dirty` appended when tracked files differ when the crate builds, `unknown` when no repository is visible; `PETRI_BUILD_REVISION` overrides it; `rerun-if-changed` on the absolute paths `git rev-parse --path-format=absolute --git-path` gives for `HEAD` and the checked-out ref (or `packed-refs`), in an ordinary checkout or a linked worktree, so a dirty flag can be stale between rebuilds |
 | `petri.run_id` | record | 32 lowercase hex, drawn at each `seed_simulation` |
 | `petri.seed` | record | the run seed |
 | `petri.world` | record | `<width>x<height>` of the effective config |
@@ -146,7 +146,7 @@ identity, the records and the exporter; the binaries call it.
 | `run.started` | after `seed_simulation`, before the first tick: CLI `run_simulation`; server `AppState` construction (the initial seed-0 run) and every `startup` | identity above; CLI adds `petri.ticks_requested` and `petri.sample_every`; body is the full effective `SimulationConfig` as compact JSON, the same document `--save-config` writes |
 | `run.state` | each server status transition (`idle`, `running`, `paused`) | `petri.state`, `petri.tick` |
 | `run.config` | a server config patch is accepted | the new digest; body the new full config |
-| `run.ended` | CLI after `run_completed`; server at the next `startup` (`reset`) and at SIGINT/SIGTERM (`shutdown`) | `petri.status` (`completed`, `reset`, `shutdown`), `petri.tick`, `petri.wall_seconds` |
+| `run.ended` | CLI after `run_completed`; server at the next `startup` (`reset`) and at SIGINT/SIGTERM (`shutdown`: the run loop stops and the simulation lock is held through the flush, so `petri.tick` is where it stopped; that stop emits no `run.state`) | `petri.status` (`completed`, `reset`, `shutdown`), `petri.tick`, `petri.wall_seconds` |
 
 An attribute that is not known is omitted, never written as zero. Loki keeps
 resource attributes such as `service.name` as labels and the rest as
@@ -162,8 +162,8 @@ Every record is attributed to its run when enqueued; the run's line prints
 once the run has ended and each of its records has been exported, failed,
 dropped by the full queue, or abandoned by the shutdown flush, so a server
 reset never blocks on the previous run's flush. `bytes` counts body plus
-attribute key and value bytes of the exported records. Every count is
-exact. `self_time_us` is the time
+attribute key and value bytes of fully accepted batches. Every count is
+exact; records a partial success rejects are `failed`. `self_time_us` is the time
 inside telemetry calls on the simulation thread and `flush_ms` the time the
 end-of-run or shutdown flush took.
 
@@ -263,7 +263,7 @@ no recorded configuration.
 - [x] Parent comparison: `scripts/telemetry-parent-compare ae97765f` (the
       merge base with `main`, F01's parent) -> identical canonical output,
       result in the readings file; the server is covered by its three-state
-      neutrality test (no `v3-core` source and no tick-path code changes).
+      neutrality test.
 - [x] Overhead check: `scripts/telemetry-overhead` -> the table in the
       readings file, verdict in Performance and Goal Impact.
 - [x] `make check` -> exit 0.
@@ -273,7 +273,7 @@ no recorded configuration.
 
 | Item (2026-09-29) | Result |
 | --- | --- |
-| Neutrality, bounds, flag precedence, server tests | pass inside `make check`: `canonical_output_is_identical_off_on_and_on_with_a_closed_port`, 13 `v3-telemetry` tests, three `telemetry_flag_beats_environment_which_beats_default_off`, `each_seeding_is_a_run_and_each_reset_ends_the_previous_one`, `simulation_payloads_are_identical_off_on_and_on_with_a_closed_port`, `shutdown_with_pending_records_ends_within_10_s_with_exact_counts` |
+| Neutrality, bounds, flag precedence, server tests | pass inside `make check`: `canonical_output_is_identical_off_on_and_on_with_a_closed_port`, 15 `v3-telemetry` tests (including `records_a_partial_success_rejects_count_as_failed_for_their_run` and `the_build_script_watches_head_by_an_absolute_path`), three `telemetry_flag_beats_environment_which_beats_default_off`, `each_seeding_is_a_run_and_each_reset_ends_the_previous_one`, `simulation_payloads_are_identical_off_on_and_on_with_a_closed_port`, `shutdown_with_pending_records_ends_within_10_s_with_exact_counts`, `shutdown_stops_the_running_simulation_at_the_tick_run_ended_reports`; `telemetry-cleanup-test` passes `--proceed` only for `PROCEED=1` |
 | Reference build | compiles; `cargo tree -e features` shows 0 `v3-telemetry`/`telemetry-seams` lines; clippy `-D warnings` passes with and without the feature |
 | `scripts/telemetry-verify` | exit 0, all 10 checks PASS; Loki delete processed after 318 s; straddling block kept whole under the `1m0s` window |
 | Bytes per run | `bytes=3377`; stored `run.started` body 2,777 B; ten runs: Loki +16 KiB, Tempo 0, Prometheus +36 KiB (+164 KiB idle over the same time) |

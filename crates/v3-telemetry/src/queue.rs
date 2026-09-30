@@ -3,8 +3,10 @@
 //! Every record is attributed to its run when it is offered. From then on it is
 //! in exactly one place: dropped (queue full or body over the cap), queued, in
 //! the one batch in flight, or resolved as exported, failed or abandoned. A
-//! run's report line is written once, when the run has ended and none of its
-//! records is queued or in flight, or when a flush deadline abandons the rest.
+//! batch holds records of one run only, so the records a collector's partial
+//! success rejects are that run's failures. A run's report line is written
+//! once, when the run has ended and none of its records is queued or in
+//! flight, or when a flush deadline abandons the rest.
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -16,6 +18,7 @@ use opentelemetry::InstrumentationScope;
 use opentelemetry_sdk::error::OTelSdkResult;
 use opentelemetry_sdk::logs::{LogBatch, LogExporter, LogProcessor, SdkLogRecord};
 
+use crate::export::Rejections;
 use crate::{Limits, ReportSink, RUN_ID_KEY};
 
 /// A run's key: its 128-bit ID.
@@ -53,10 +56,20 @@ struct RunEntry {
     ended_at: Option<Instant>,
 }
 
-/// The batch the worker is exporting: records per run and their bytes.
-#[derive(Default)]
+/// The batch the worker is exporting: one run's records and their bytes.
 struct InFlight {
-    per_run: HashMap<RunKey, (u64, u64)>,
+    run: RunKey,
+    records: u64,
+    bytes: u64,
+}
+
+/// How the collector answered a batch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Outcome {
+    /// Accepted, except this many records a partial success rejected.
+    Exported { rejected: u64 },
+    /// The request failed; no record of the batch was stored.
+    Failed,
 }
 
 #[derive(Default)]
@@ -249,12 +262,8 @@ impl Shared {
             }
         });
         state.queued_bytes -= freed;
-        if let Some((count, _)) = state
-            .in_flight
-            .as_mut()
-            .and_then(|flight| flight.per_run.remove(&run))
-        {
-            abandoned += count;
+        if let Some(flight) = state.in_flight.take_if(|flight| flight.run == run) {
+            abandoned += flight.records;
         }
         if let Some(entry) = state.runs.get_mut(&run) {
             entry.counts.abandoned += abandoned;
@@ -293,7 +302,8 @@ impl Shared {
         ));
     }
 
-    /// The worker's next batch, or `None` once the queue is closed.
+    /// The worker's next batch: the queue's leading records of one run, up to
+    /// the batch bound; `None` once the queue is closed.
     fn take_batch(&self) -> Option<Vec<Entry>> {
         let mut state = self.lock();
         while !state.closed && (state.held || state.queue.is_empty()) {
@@ -305,38 +315,52 @@ impl Shared {
         if state.closed {
             return None;
         }
-        let take = state.queue.len().min(self.limits.batch_records);
+        let run = state.queue.front()?.run;
+        let take = state
+            .queue
+            .iter()
+            .take(self.limits.batch_records)
+            .take_while(|entry| entry.run == run)
+            .count();
         let batch: Vec<Entry> = state.queue.drain(..take).collect();
-        let mut flight = InFlight::default();
-        for entry in &batch {
-            state.queued_bytes -= entry.bytes;
-            let slot = flight.per_run.entry(entry.run).or_default();
-            slot.0 += 1;
-            slot.1 += entry.bytes;
-        }
-        state.in_flight = Some(flight);
+        let bytes = batch.iter().map(|entry| entry.bytes).sum();
+        state.queued_bytes -= bytes;
+        state.in_flight = Some(InFlight {
+            run,
+            records: batch.len() as u64,
+            bytes,
+        });
         Some(batch)
     }
 
     /// Resolves the in-flight batch; records a flush already abandoned are not
-    /// counted twice.
-    fn complete_batch(&self, exported: bool) {
+    /// counted twice. A partial success names how many records it rejected,
+    /// not which, so the bytes of a partly rejected batch are not counted.
+    fn complete_batch(&self, outcome: Outcome) {
         let mut state = self.lock();
-        let Some(flight) = state.in_flight.take() else {
+        let Some(InFlight {
+            run,
+            records,
+            bytes,
+        }) = state.in_flight.take()
+        else {
             return;
         };
-        for (run, (count, bytes)) in flight.per_run {
-            if let Some(entry) = state.runs.get_mut(&run) {
-                if exported {
-                    entry.counts.exported += count;
+        if let Some(entry) = state.runs.get_mut(&run) {
+            match outcome {
+                Outcome::Exported { rejected: 0 } => {
+                    entry.counts.exported += records;
                     entry.counts.bytes += bytes;
-                } else {
-                    entry.counts.failed += count;
                 }
+                Outcome::Exported { rejected } => {
+                    let rejected = rejected.min(records);
+                    entry.counts.exported += records - rejected;
+                    entry.counts.failed += rejected;
+                }
+                Outcome::Failed => entry.counts.failed += records,
             }
-            self.report_if_resolved(&mut state, run);
         }
-        self.changed.notify_all();
+        self.report_if_resolved(&mut state, run);
     }
 
     #[cfg(test)]
@@ -351,16 +375,21 @@ impl Shared {
     }
 }
 
-/// Exports batches until the queue closes. Owns the exporter so its HTTP client
-/// is created, used and dropped off any async runtime.
-pub(crate) fn run_worker<E: LogExporter>(shared: &Shared, exporter: E) {
+/// Exports batches until the queue closes; `rejections` holds what the
+/// collector's partial success rejected of the batch just exported. Owns the
+/// exporter so its HTTP client is used and dropped off any async runtime.
+pub(crate) fn run_worker<E: LogExporter>(shared: &Shared, exporter: E, rejections: &Rejections) {
     while let Some(batch) = shared.take_batch() {
         let refs: Vec<(&SdkLogRecord, &InstrumentationScope)> = batch
             .iter()
             .map(|entry| (&entry.item.0, &entry.item.1))
             .collect();
-        let exported = futures_executor::block_on(exporter.export(LogBatch::new(&refs))).is_ok();
-        shared.complete_batch(exported);
+        let result = futures_executor::block_on(exporter.export(LogBatch::new(&refs)));
+        let rejected = rejections.take();
+        shared.complete_batch(match result {
+            Ok(()) => Outcome::Exported { rejected },
+            Err(_) => Outcome::Failed,
+        });
     }
     let _ = exporter.shutdown();
 }

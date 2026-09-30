@@ -2195,13 +2195,16 @@ dependencies = [
 name = "v3-telemetry"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "futures-executor",
  "opentelemetry",
+ "opentelemetry-http",
  "opentelemetry-otlp",
  "opentelemetry-proto",
  "opentelemetry_sdk",
  "prost",
  "rand 0.8.6",
+ "reqwest",
  "serde_json",
  "v3-core",
 ]
