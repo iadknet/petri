@@ -252,8 +252,8 @@ a value that was not captured is absent, never zero.
       predicted OTel names, kinds, attribute keys and `as_key()` values and
       no other series, so the families `tick_sample` does not carry are
       covered here; snapshot items past the queue bounds are dropped and
-      counted; a partial success with rejected data points counts the
-      snapshot as failed with no bytes; a snapshot and records of one run
+      counted; a partial success with rejected data points or an
+      undecodable `200 OK` fails what it answers, with no bytes; a snapshot and records of one run
       queued together are attributed to that run across a reset; an
       invalid interval is refused.
 - [x] Server: `cargo test -p v3-server` -> a snapshot at a transition, none
@@ -263,7 +263,7 @@ a value that was not captured is absent, never zero.
 - [x] Reference build: `cargo build --release -p v3-cli -p v3-server -p v3-lab
       --no-default-features` compiles, `cargo tree -e features` shows neither
       `v3-telemetry` nor `telemetry-seams`, clippy `-D warnings` passes with
-      and without the feature. Passed 2026-09-30 (tree: 0 matching lines).
+      and without the feature. Passed 2026-09-29; readings file.
 - [x] Dashboards (Docker, outside `make check`):
       `scripts/telemetry-dashboards-check` -> every check passes; transcript
       and the stored Prometheus names in the readings file; the two
@@ -277,7 +277,7 @@ a value that was not captured is absent, never zero.
       closing commit) -> identical canonical output, in the readings file.
 - [x] Overhead check: `scripts/telemetry-overhead` -> the table in the
       readings file, verdict in Performance and Goal Impact.
-- [x] `make check` -> exit 0 (2026-09-30; runs the three test rows above).
+- [x] `make check` -> exit 0 (2026-09-29; runs the three test rows).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
 - [x] Benchmark summary: `Not applicable: observability feature`.

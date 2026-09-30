@@ -398,6 +398,22 @@ fn a_closed_port_fails_records_without_blocking_the_flush() {
 }
 
 #[test]
+fn records_answered_with_an_undecodable_success_count_as_failed() {
+    let receiver = Receiver::garbled();
+    let options = options(receiver.endpoint(), Limits::default());
+    let reports = options.reports.clone();
+    let telemetry = Telemetry::start_with(options);
+    let config = small_config();
+    let run = telemetry.begin_run(start(&config)).unwrap();
+    telemetry.end_run(run.clone(), EndStatus::Completed, 1, Flush::Wait);
+    let line = run_line(&reports, &run);
+    assert_eq!(line["exported"], "0", "{line:?}");
+    assert_eq!(line["failed"], "2", "{line:?}");
+    assert_eq!(line["abandoned"], "0", "{line:?}");
+    assert_eq!(line["bytes"], "0", "{line:?}");
+}
+
+#[test]
 fn a_silent_receiver_bounds_the_run_flush_at_10_s_and_abandons_the_rest() {
     let receiver = Receiver::hanging();
     let limits = Limits::default();
@@ -601,6 +617,24 @@ fn a_rejecting_collector_fails_the_snapshot_it_answers() {
     assert_eq!(line["failed"], "3");
     assert_eq!(line["snapshots"], "1");
     assert!(receiver.snapshots().is_empty());
+}
+
+#[test]
+fn a_snapshot_answered_with_an_undecodable_success_counts_as_failed() {
+    let receiver = Receiver::garbled();
+    let options = options(receiver.endpoint(), Limits::default());
+    let reports = options.reports.clone();
+    let telemetry = Telemetry::start_with(options);
+    let config = small_config();
+    let sim = simulation(&config);
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    telemetry.snapshot(&mut run, &sim, Trigger::RunEnd);
+    telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+    let line = run_line(&reports, &run);
+    assert_eq!(line["exported"], "0", "{line:?}");
+    assert_eq!(line["failed"], "3", "{line:?}");
+    assert_eq!(line["snapshots"], "1", "{line:?}");
+    assert_eq!(line["bytes"], "0", "{line:?}");
 }
 
 #[test]
