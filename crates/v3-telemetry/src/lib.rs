@@ -11,9 +11,13 @@
 //! (`telemetry: on endpoint=… invocation=… run=…`) and one per run once each of
 //! the run's records has been exported, failed, dropped or abandoned
 //! (`telemetry: run=… exported=… failed=… dropped=… abandoned=… bytes=…
-//! self_time_us=… flush_ms=…`).
+//! self_time_us=… flush_ms=… snapshots=…`).
+//!
+//! A run's snapshots (T21.F02, [`Telemetry::snapshot`]) export its cumulative
+//! counters and per-tick values as OTLP metrics through the same queue.
 
 mod export;
+mod metrics;
 mod queue;
 pub mod testing;
 
@@ -21,17 +25,24 @@ use std::fmt;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use opentelemetry::logs::{AnyValue, LogRecord as _, Logger as _, LoggerProvider as _, Severity};
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::logs::{LogExporter, SdkLogger, SdkLoggerProvider};
 use opentelemetry_sdk::Resource;
+use prost::Message as _;
 use rand::RngCore;
 use v3_core::config::SimulationConfig;
+use v3_core::simulation::Simulation;
 
 use crate::export::Rejections;
-use crate::queue::{QueueProcessor, RunKey, Shared};
+use crate::metrics::{Census, Moment, Taken};
+use crate::queue::{PostMetrics, QueueProcessor, RunKey, Shared};
+
+pub use crate::metrics::{
+    resolve_metrics_interval, Trigger, DEFAULT_METRICS_INTERVAL, METRICS_INTERVAL_ENV,
+};
 
 /// The environment variable that switches telemetry when no flag is given.
 pub const SWITCH_ENV: &str = "PETRI_TELEMETRY";
@@ -174,26 +185,32 @@ impl ReportSink {
 #[derive(Debug, Clone)]
 pub struct Options {
     pub service: Service,
-    /// OTLP base endpoint, without the `/v1/logs` path.
+    /// OTLP base endpoint, without the `/v1/logs` or `/v1/metrics` path.
     pub endpoint: String,
     pub limits: Limits,
     pub reports: ReportSink,
+    /// The least wall time between a run's interval snapshots.
+    pub metrics_interval: Duration,
 }
 
 impl Options {
-    /// Stderr reports, contract limits and the endpoint from [`ENDPOINT_ENV`].
-    pub fn from_env(service: Service) -> Self {
+    /// Stderr reports, contract limits, the endpoint from [`ENDPOINT_ENV`] and
+    /// the interval from [`METRICS_INTERVAL_ENV`], which must be valid.
+    pub fn from_env(service: Service) -> Result<Self, String> {
         let endpoint = std::env::var(ENDPOINT_ENV)
             .ok()
             .map(|value| value.trim().to_owned())
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| DEFAULT_ENDPOINT.to_owned());
-        Self {
+        let metrics_interval =
+            resolve_metrics_interval(std::env::var(METRICS_INTERVAL_ENV).ok().as_deref())?;
+        Ok(Self {
             service,
             endpoint,
             limits: Limits::default(),
             reports: ReportSink::Stderr,
-        }
+            metrics_interval,
+        })
     }
 }
 
@@ -253,7 +270,7 @@ pub struct RunStart<'a> {
     pub sample_every: Option<u64>,
 }
 
-/// The identity every record of one run carries.
+/// The identity every record of one run carries, and its snapshot cadence.
 #[derive(Debug, Clone)]
 pub struct RunHandle {
     key: RunKey,
@@ -263,6 +280,10 @@ pub struct RunHandle {
     recipe: Option<String>,
     config_digest: String,
     started: Instant,
+    /// The run's start in Unix nanoseconds, carried by its cumulative sums.
+    started_ns: u64,
+    last_snapshot: Option<Taken>,
+    last_stamp_ns: Option<u64>,
 }
 
 impl RunHandle {
@@ -286,6 +307,9 @@ struct Active {
     endpoint: String,
     invocation_id: String,
     announced: AtomicBool,
+    /// The log resource's attributes, for snapshot requests.
+    resource: Vec<opentelemetry_proto::tonic::common::v1::KeyValue>,
+    metrics_interval: Duration,
 }
 
 impl fmt::Debug for Active {
@@ -305,6 +329,32 @@ fn entropy_id() -> (u128, String) {
     (value, format!("{value:032x}"))
 }
 
+/// `time` in Unix nanoseconds; `0` before the epoch.
+fn unix_ns(time: SystemTime) -> u64 {
+    time.duration_since(UNIX_EPOCH).map_or(0, |since| {
+        u64::try_from(since.as_nanos()).unwrap_or(u64::MAX)
+    })
+}
+
+/// A resource attribute as an OTLP protobuf key-value.
+fn proto_attribute(
+    key: &opentelemetry::Key,
+    value: &opentelemetry::Value,
+) -> opentelemetry_proto::tonic::common::v1::KeyValue {
+    use opentelemetry_proto::tonic::common::v1::{any_value, AnyValue as ProtoValue, KeyValue};
+    let value = match value {
+        opentelemetry::Value::Bool(flag) => any_value::Value::BoolValue(*flag),
+        opentelemetry::Value::I64(number) => any_value::Value::IntValue(*number),
+        opentelemetry::Value::F64(number) => any_value::Value::DoubleValue(*number),
+        other => any_value::Value::StringValue(other.to_string()),
+    };
+    KeyValue {
+        key: key.as_str().to_owned(),
+        value: Some(ProtoValue { value: Some(value) }),
+        ..KeyValue::default()
+    }
+}
+
 /// An integer attribute, or its decimal string when it exceeds `i64`.
 fn u64_value(value: u64) -> AnyValue {
     i64::try_from(value).map_or_else(|_| AnyValue::from(value.to_string()), AnyValue::Int)
@@ -317,11 +367,12 @@ impl Telemetry {
     }
 
     /// Off for [`Switch::Off`]; otherwise exports to the environment's
-    /// endpoint and reports on stderr.
-    pub fn start(service: Service, switch: Switch) -> Self {
+    /// endpoint and reports on stderr. An invalid [`METRICS_INTERVAL_ENV`]
+    /// refuses to start when the switch is on.
+    pub fn start(service: Service, switch: Switch) -> Result<Self, String> {
         match switch {
-            Switch::Off => Self::off(),
-            Switch::On => Self::start_with(Options::from_env(service)),
+            Switch::Off => Ok(Self::off()),
+            Switch::On => Options::from_env(service).map(Self::start_with),
         }
     }
 
@@ -334,10 +385,15 @@ impl Telemetry {
     /// [`Telemetry::start_with`]; with `held`, the worker takes no batch until
     /// released (tests).
     fn start_otlp(options: Options, held: bool) -> Self {
-        let url = format!("{}/v1/logs", options.endpoint.trim_end_matches('/'));
         let rejections = Arc::<Rejections>::default();
-        match export::build(url, options.limits.request_timeout, Arc::clone(&rejections)) {
-            Ok(exporter) => Self::with_exporter(options, exporter, rejections, held),
+        match export::build(
+            &options.endpoint,
+            options.limits.request_timeout,
+            Arc::clone(&rejections),
+        ) {
+            Ok((exporter, metrics)) => {
+                Self::with_exporter(options, exporter, metrics, rejections, held)
+            }
             Err(error) => {
                 options
                     .reports
@@ -347,14 +403,16 @@ impl Telemetry {
         }
     }
 
-    fn with_exporter<E>(
+    fn with_exporter<E, M>(
         options: Options,
         mut exporter: E,
+        metrics: M,
         rejections: Arc<Rejections>,
         held: bool,
     ) -> Self
     where
         E: LogExporter + 'static,
+        M: PostMetrics + Send + 'static,
     {
         let (_, invocation_id) = entropy_id();
         let resource = Resource::builder_empty()
@@ -367,11 +425,15 @@ impl Telemetry {
             ])
             .build();
         exporter.set_resource(&resource);
+        let proto_resource = resource
+            .iter()
+            .map(|(key, value)| proto_attribute(key, value))
+            .collect();
         let shared = Shared::new(options.limits, options.reports, held);
         let worker_shared = Arc::clone(&shared);
         let spawned = std::thread::Builder::new()
             .name("petri-telemetry".to_owned())
-            .spawn(move || queue::run_worker(&worker_shared, exporter, &rejections));
+            .spawn(move || queue::run_worker(&worker_shared, exporter, metrics, &rejections));
         if let Err(error) = spawned {
             shared
                 .sink()
@@ -393,6 +455,8 @@ impl Telemetry {
                 endpoint: options.endpoint,
                 invocation_id,
                 announced: AtomicBool::new(false),
+                resource: proto_resource,
+                metrics_interval: options.metrics_interval,
             })),
         }
     }
@@ -415,6 +479,9 @@ impl Telemetry {
             recipe: start.recipe.map(str::to_owned),
             config_digest: v3_core::config::config_digest(start.config),
             started: began,
+            started_ns: unix_ns(SystemTime::now()),
+            last_snapshot: None,
+            last_stamp_ns: None,
         };
         active.shared.register_run(key, run.id.clone());
         if !active.announced.swap(true, Ordering::Relaxed) {
@@ -430,10 +497,56 @@ impl Telemetry {
         if let Some(every) = start.sample_every {
             extra.push(("petri.sample_every", u64_value(every)));
         }
+        let interval_ms = u64::try_from(active.metrics_interval.as_millis()).unwrap_or(u64::MAX);
+        extra.push(("petri.metrics_interval_ms", u64_value(interval_ms)));
         let body = serde_json::to_string(start.config).expect("config must serialize");
         active.emit(&run, "run.started", start.tick, extra, Some(body));
         active.shared.add_self_time(key, began.elapsed());
         Some(run)
+    }
+
+    /// Takes a snapshot of `sim` for `run` when `trigger`'s cadence rule says
+    /// it is due, and offers it to the queue; returns whether one was taken.
+    /// Call it before the `run.state` or `run.ended` it accompanies, on the
+    /// simulation thread, with the run's current simulation.
+    pub fn snapshot(&self, run: &mut RunHandle, sim: &Simulation, trigger: Trigger) -> bool {
+        let Some(active) = &self.active else {
+            return false;
+        };
+        let began = Instant::now();
+        if !metrics::due(
+            trigger,
+            run.last_snapshot,
+            run.started,
+            sim.tick,
+            began,
+            active.metrics_interval,
+        ) {
+            return false;
+        }
+        run.last_snapshot = Some(Taken {
+            tick: sim.tick,
+            at: began,
+        });
+        let time_ns = metrics::stamp(unix_ns(SystemTime::now()), run.last_stamp_ns);
+        run.last_stamp_ns = Some(time_ns);
+        let request = metrics::encode(
+            &active.resource,
+            &run.id,
+            &sim.stats,
+            &Census::of(sim),
+            Moment {
+                tick: sim.tick,
+                elapsed: run.started.elapsed(),
+                time_ns,
+                start_ns: run.started_ns,
+            },
+        );
+        active
+            .shared
+            .offer_snapshot(run.key, request.encode_to_vec());
+        active.shared.add_self_time(run.key, began.elapsed());
+        true
     }
 
     /// Emits `run.state` for a status transition.

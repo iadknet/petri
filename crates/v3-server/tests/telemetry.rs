@@ -1,6 +1,7 @@
 //! Server run telemetry (T21.F01): run identity across `startup`, the
-//! lifecycle records, the bounded shutdown flush, and neutrality of the
-//! simulation payloads with telemetry off, on, and on with a closed port.
+//! lifecycle records and their snapshots (T21.F02), the bounded shutdown
+//! flush, and neutrality of the simulation payloads with telemetry off, on,
+//! and on with a closed port.
 #![cfg(feature = "telemetry")]
 
 use std::collections::BTreeMap;
@@ -31,6 +32,8 @@ fn telemetry(endpoint: &str) -> (Telemetry, ReportSink) {
         endpoint: endpoint.to_owned(),
         limits: Limits::default(),
         reports: reports.clone(),
+        // Longer than any test: only transition and run-end snapshots.
+        metrics_interval: Duration::from_secs(3_600),
     });
     (telemetry, reports)
 }
@@ -138,10 +141,22 @@ async fn each_seeding_is_a_run_and_each_reset_ends_the_previous_one() {
         Some(v3_core::config::config_digest(&patched).as_str())
     );
 
+    // The loop never ticks before the pause, so every run stays at tick 0:
+    // the first run's snapshot is its run-end one, the second's is taken at
+    // `running` (none at `paused` or at reset, the tick has one), the third's
+    // at `idle` (none at shutdown).
+    let snapshots = receiver.snapshots();
     let lines = run_lines(&reports);
-    for ((run, names), _) in runs.iter().zip(expected) {
+    for (run, names) in &runs {
+        let ticks: Vec<Option<u64>> = snapshots
+            .iter()
+            .filter(|snapshot| snapshot.run_id() == Some(run.as_str()))
+            .map(|snapshot| snapshot.tick())
+            .collect();
+        assert_eq!(ticks, [Some(0)], "{run}");
         let line = &lines[run];
-        assert_eq!(line["exported"], names.len().to_string(), "{line:?}");
+        assert_eq!(line["exported"], (names.len() + 1).to_string(), "{line:?}");
+        assert_eq!(line["snapshots"], "1", "{line:?}");
         assert_eq!(line["failed"], "0");
     }
 }
@@ -174,7 +189,9 @@ async fn shutdown_with_pending_records_ends_within_10_s_with_exact_counts() {
         let count = |key: &str| line[key].parse::<u64>().unwrap();
         assert_eq!(count("exported"), 0);
         assert_eq!(count("dropped"), 0);
-        assert_eq!(count("failed") + count("abandoned"), 2, "{line:?}");
+        // `run.started`, `run.ended` and the run-end snapshot.
+        assert_eq!(count("failed") + count("abandoned"), 3, "{line:?}");
+        assert_eq!(count("snapshots"), 1, "{line:?}");
     }
 }
 

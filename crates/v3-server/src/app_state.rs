@@ -72,9 +72,9 @@ impl AppState {
         if handle.status == SimulationStatus::Running {
             handle.status = SimulationStatus::Paused;
         }
-        let tick = handle.sim.tick;
+        self.telemetry.end_for_shutdown(&handle.sim);
         let telemetry = self.telemetry.clone();
-        let _ = tokio::task::spawn_blocking(move || telemetry.shutdown(tick)).await;
+        let _ = tokio::task::spawn_blocking(move || telemetry.flush()).await;
         drop(handle);
     }
 

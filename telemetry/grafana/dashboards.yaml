@@ -1,0 +1,17 @@
+# Grafana dashboard provider for Petri's dashboards (T21.F02). Mounted by
+# telemetry/compose.yaml at the image's provisioning path; the dashboards are
+# telemetry/grafana/dashboards/*.json, provisioned read-only into folder Petri.
+# A UI edit is not kept: save it as a copy, or change the JSON here.
+apiVersion: 1
+
+providers:
+  - name: petri
+    orgId: 1
+    folder: Petri
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /otel-lgtm/petri-dashboards
+      foldersFromFilesStructure: false

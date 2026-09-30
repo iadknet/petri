@@ -6,10 +6,10 @@ use opentelemetry_sdk::logs::{LogBatch, LogExporter};
 use v3_core::config::SimulationConfig;
 
 use super::*;
-use crate::queue::RunCounts;
+use crate::queue::{Outcome, RunCounts};
 use crate::testing::{closed_endpoint, parse_run_line, Receiver};
 
-/// Accepts every batch at once.
+/// Accepts every batch and snapshot at once.
 #[derive(Debug)]
 struct AcceptAll;
 
@@ -19,13 +19,34 @@ impl LogExporter for AcceptAll {
     }
 }
 
+impl PostMetrics for AcceptAll {
+    fn post(&self, _body: Vec<u8>) -> Outcome {
+        Outcome::Exported { rejected: 0 }
+    }
+}
+
+/// Answers every snapshot with a partial success rejecting two data points.
+#[derive(Debug)]
+struct RejectPoints;
+
+impl PostMetrics for RejectPoints {
+    fn post(&self, _body: Vec<u8>) -> Outcome {
+        Outcome::Exported { rejected: 2 }
+    }
+}
+
 fn options(endpoint: &str, limits: Limits) -> Options {
     Options {
         service: Service::Cli,
         endpoint: endpoint.to_owned(),
         limits,
         reports: ReportSink::capture(),
+        metrics_interval: DEFAULT_METRICS_INTERVAL,
     }
+}
+
+fn simulation(config: &SimulationConfig) -> Simulation {
+    v3_core::simulation::seed_simulation(config.clone(), 7)
 }
 
 fn small_config() -> SimulationConfig {
@@ -48,10 +69,17 @@ fn start(config: &SimulationConfig) -> RunStart<'_> {
 
 /// Telemetry whose worker takes nothing until released.
 fn held() -> (Telemetry, ReportSink) {
-    let options = options("http://unused", Limits::default());
+    held_with(Limits::default(), AcceptAll)
+}
+
+fn held_with<M: PostMetrics + Send + 'static>(
+    limits: Limits,
+    metrics: M,
+) -> (Telemetry, ReportSink) {
+    let options = options("http://unused", limits);
     let reports = options.reports.clone();
     (
-        Telemetry::with_exporter(options, AcceptAll, Arc::default(), true),
+        Telemetry::with_exporter(options, AcceptAll, metrics, Arc::default(), true),
         reports,
     )
 }
@@ -276,6 +304,7 @@ fn records_reach_the_receiver_with_identity_and_resource() {
     assert_eq!(started.attribute("petri.recipe"), Some("recipes/x.json"));
     assert_eq!(started.attribute("petri.ticks_requested"), Some("10"));
     assert_eq!(started.attribute("petri.sample_every"), Some("5"));
+    assert_eq!(started.attribute("petri.metrics_interval_ms"), Some("1000"));
     assert_eq!(
         started.attribute("petri.config_digest"),
         Some(v3_core::config::config_digest(&config).as_str())
@@ -470,4 +499,199 @@ fn shutdown_abandons_pending_records_of_every_run_within_the_bound() {
         .map(|run| run_line(&reports, run)["abandoned"].parse::<u64>().unwrap())
         .sum();
     assert!(abandoned > 0, "a silent receiver leaves records to abandon");
+}
+
+#[test]
+fn the_metrics_interval_is_whole_milliseconds_from_10_to_3600000_defaulting_to_1000() {
+    let default = Ok(Duration::from_millis(1_000));
+    assert_eq!(resolve_metrics_interval(None), default);
+    assert_eq!(resolve_metrics_interval(Some("")), default);
+    assert_eq!(resolve_metrics_interval(Some(" ")), default);
+    assert_eq!(
+        resolve_metrics_interval(Some("10")),
+        Ok(Duration::from_millis(10))
+    );
+    assert_eq!(
+        resolve_metrics_interval(Some("3600000")),
+        Ok(Duration::from_millis(3_600_000))
+    );
+    for invalid in ["0", "9", "3600001", "-10", "1.5", "1s", "ten"] {
+        let error = resolve_metrics_interval(Some(invalid)).unwrap_err();
+        assert!(error.contains(METRICS_INTERVAL_ENV), "{error}");
+    }
+}
+
+#[test]
+fn snapshots_past_the_queue_bound_are_dropped_and_counted_as_taken() {
+    let config = small_config();
+    let sim = simulation(&config);
+    let limits = Limits {
+        max_queue_records: 3,
+        ..Limits::default()
+    };
+    let (telemetry, reports) = held_with(limits, AcceptAll);
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    // `run.started` and two snapshots fill the queue; the third is dropped.
+    let mut sim = sim;
+    for _ in 0..3 {
+        assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
+        sim.tick += 1;
+    }
+    let queued = counts(&telemetry, &run);
+    assert_eq!(
+        (queued.accepted, queued.dropped, queued.snapshots),
+        (3, 1, 3)
+    );
+
+    active(&telemetry).shared.release();
+    wait_for_drain(&telemetry, &run);
+    telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+    let line = run_line(&reports, &run);
+    assert_eq!(line["exported"], "4");
+    assert_eq!(line["dropped"], "1");
+    assert_eq!(line["snapshots"], "3");
+}
+
+#[test]
+fn a_snapshot_with_rejected_data_points_counts_as_failed_with_no_bytes() {
+    let config = small_config();
+    let sim = simulation(&config);
+    let bytes_of = |metrics_rejected: bool| {
+        let (telemetry, reports) = if metrics_rejected {
+            held_with(Limits::default(), RejectPoints)
+        } else {
+            held()
+        };
+        let mut run = telemetry.begin_run(start(&config)).unwrap();
+        telemetry.snapshot(&mut run, &sim, Trigger::RunEnd);
+        active(&telemetry).shared.release();
+        telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+        let line = run_line(&reports, &run);
+        (
+            line["exported"].clone(),
+            line["failed"].clone(),
+            line["bytes"].parse::<u64>().unwrap(),
+        )
+    };
+    let (exported, failed, accepted_bytes) = bytes_of(false);
+    assert_eq!((exported.as_str(), failed.as_str()), ("3", "0"));
+    let (exported, failed, rejected_bytes) = bytes_of(true);
+    assert_eq!((exported.as_str(), failed.as_str()), ("2", "1"));
+    // The two records' bytes remain; the snapshot's encoded request, over
+    // 1 KB for any simulation, does not.
+    assert!(
+        accepted_bytes > rejected_bytes + 1_024,
+        "{accepted_bytes} vs {rejected_bytes}"
+    );
+}
+
+#[test]
+fn a_rejecting_collector_fails_the_snapshot_it_answers() {
+    let receiver = Receiver::rejecting(1);
+    let options = options(receiver.endpoint(), Limits::default());
+    let reports = options.reports.clone();
+    let telemetry = Telemetry::start_with(options);
+    let config = small_config();
+    let sim = simulation(&config);
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    telemetry.snapshot(&mut run, &sim, Trigger::RunEnd);
+    telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+    let line = run_line(&reports, &run);
+    assert_eq!(line["exported"], "0");
+    assert_eq!(line["failed"], "3");
+    assert_eq!(line["snapshots"], "1");
+    assert!(receiver.snapshots().is_empty());
+}
+
+#[test]
+fn snapshots_and_records_of_one_run_stay_attributed_to_it_across_a_reset() {
+    let receiver = Receiver::start();
+    let options = options(receiver.endpoint(), Limits::default());
+    let reports = options.reports.clone();
+    let telemetry = Telemetry::start_otlp(options, true);
+    let config = small_config();
+    let mut sim = simulation(&config);
+    // Everything is queued before the worker takes anything: one FIFO holds
+    // the first run's records and snapshot, then the second run's.
+    let mut first = telemetry.begin_run(start(&config)).unwrap();
+    telemetry.run_state(&first, RunState::Running, 0);
+    assert!(telemetry.snapshot(&mut first, &sim, Trigger::RunEnd));
+    telemetry.end_run(first.clone(), EndStatus::Reset, 0, Flush::Background);
+    sim.tick = 5;
+    let mut second = telemetry.begin_run(start(&config)).unwrap();
+    assert!(telemetry.snapshot(&mut second, &sim, Trigger::Transition));
+    telemetry.run_state(&second, RunState::Running, 5);
+    active(&telemetry).shared.release();
+    telemetry.end_run(second.clone(), EndStatus::Shutdown, 5, Flush::Wait);
+    telemetry.shutdown();
+
+    let snapshots = receiver.snapshots();
+    let ticks: Vec<(Option<&str>, Option<u64>)> = snapshots
+        .iter()
+        .map(|snapshot| (snapshot.run_id(), snapshot.tick()))
+        .collect();
+    assert_eq!(
+        ticks,
+        [(Some(first.id()), Some(0)), (Some(second.id()), Some(5))]
+    );
+    for (run, exported) in [(&first, "4"), (&second, "4")] {
+        let line = run_line(&reports, run);
+        assert_eq!(line["exported"], exported, "{line:?}");
+        assert_eq!(line["failed"], "0", "{line:?}");
+        assert_eq!(line["snapshots"], "1", "{line:?}");
+    }
+}
+
+#[test]
+fn a_snapshot_reaches_the_receiver_with_the_run_resource_and_census() {
+    let receiver = Receiver::start();
+    let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
+    let config = small_config();
+    let mut sim = simulation(&config);
+    for _ in 0..3 {
+        v3_core::simulation::run_tick(&mut sim, &mut None);
+    }
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
+    telemetry.end_run(run.clone(), EndStatus::Completed, sim.tick, Flush::Wait);
+
+    let snapshots = receiver.snapshots();
+    assert_eq!(snapshots.len(), 1);
+    let snapshot = &snapshots[0];
+    let record = &receiver.records()[0];
+    assert_eq!(snapshot.resource, record.resource);
+    assert!(snapshot
+        .points
+        .iter()
+        .all(|point| point.attribute("petri.run_id") == Some(run.id())));
+    assert_eq!(snapshot.tick(), Some(3));
+    let census = Census::of(&sim);
+    let value = |name: &str| snapshot.value(name, &[]).unwrap().as_f64();
+    assert_eq!(value("petri.tick.population"), census.population as f64);
+    assert_eq!(
+        value("petri.tick.mean_energy"),
+        f64::from(sim.mean_energy())
+    );
+    assert_eq!(
+        value("petri.run.creature_ticks"),
+        sim.stats.creature_ticks_total as f64
+    );
+    for point in &snapshot.points {
+        let sampled = point.name.starts_with("petri.tick.");
+        assert_eq!(
+            point.description == "sampled at the snapshot tick",
+            sampled,
+            "{}",
+            point.name
+        );
+        match point.kind {
+            crate::testing::MetricKind::Gauge => assert_eq!(point.start_time_unix_nano, 0),
+            _ => assert!(
+                point.start_time_unix_nano > 0
+                    && point.start_time_unix_nano <= point.time_unix_nano,
+                "{}",
+                point.name
+            ),
+        }
+    }
 }

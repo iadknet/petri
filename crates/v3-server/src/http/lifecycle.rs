@@ -56,7 +56,7 @@ pub async fn startup(
     let mut handle = app.sim.lock().await;
     #[cfg(feature = "telemetry")]
     app.telemetry
-        .reset(handle.sim.tick, handle.status, &new_sim.config, seed);
+        .reset(&handle.sim, handle.status, &new_sim, seed);
     handle.status = SimulationStatus::Idle;
     handle.sim = new_sim;
     handle.active_trace = None;
@@ -90,7 +90,8 @@ pub async fn start(State(app): State<AppState>) -> Result<impl IntoResponse, App
         let frame = build_ws_frame(&handle);
         let tick = handle.sim.tick;
         #[cfg(feature = "telemetry")]
-        app.telemetry.transition(SimulationStatus::Running, tick);
+        app.telemetry
+            .transition(SimulationStatus::Running, &handle.sim);
         drop(handle);
         app.publish_ws_frame(frame);
         tick
@@ -121,7 +122,8 @@ pub async fn pause_sim(State(app): State<AppState>) -> Result<impl IntoResponse,
     let tick = handle.sim.tick;
     #[cfg(feature = "telemetry")]
     if changed {
-        app.telemetry.transition(SimulationStatus::Paused, tick);
+        app.telemetry
+            .transition(SimulationStatus::Paused, &handle.sim);
     }
     drop(handle);
     app.publish_ws_frame(frame);
@@ -167,6 +169,8 @@ pub async fn step(
         } = &mut *handle;
         for _ in 0..req.steps {
             run_tick(sim, active_trace);
+            #[cfg(feature = "telemetry")]
+            app.telemetry.after_tick(sim);
         }
     }
     let frame = build_ws_frame(&handle);
@@ -191,6 +195,8 @@ pub(crate) async fn run_loop(app: AppState) {
         }
         let h = &mut *handle;
         run_tick(&mut h.sim, &mut h.active_trace);
+        #[cfg(feature = "telemetry")]
+        app.telemetry.after_tick(&h.sim);
         let frame = if last_frame.elapsed() >= FRAME_INTERVAL {
             // Projection refresh may be slightly stale while the simulation runs,
             // avoiding a full frame rebuild on every tick.

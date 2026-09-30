@@ -1,0 +1,367 @@
+#!/bin/sh
+# Dashboard and metric-name check for run snapshots (T21.F02).
+#
+# Usage: scripts/telemetry-dashboards-check
+#
+# Starts the stack under the scratch Compose project and volume
+# petri-telemetry-dashboards (never petri-telemetry, and it refuses while
+# petri-telemetry is up: same host ports), runs the F01 workload
+#   v3-cli run --telemetry on --seed 7 --ticks T --sample-every T
+#     --config telemetry/overhead-world.json
+# under scripts/bench-wait, then through Grafana on 127.0.0.1:3300, with the
+# query range from one minute before the run to now, checks that:
+#   1. both dashboards are provisioned in folder Petri;
+#   2. every scalar family, and every map family with a key on the workload,
+#      is stored under its Prometheus name (the lists below);
+#   3. every panel query of both dashboards, read from the JSON with node and
+#      evaluated through /api/ds/query with $run_id set to the run, returns
+#      data;
+#   4. petri_run_tick of the run has at least three samples with distinct,
+#      non-decreasing timestamps, the last at T;
+#   5. the run's Loki run.started line carries petri_metrics_interval_ms.
+# Prints one PASS or FAIL line per check, removes the scratch stack and volume
+# on exit, and exits 1 when any check fails.
+#
+# Environment:
+#   TELEMETRY_TICKS  the workload's T; default the `- Workload ticks T: N`
+#                    line of docs/progress/readings/t21-f01.md
+set -eu
+
+[ "$#" -eq 0 ] || { printf 'Usage: scripts/telemetry-dashboards-check\n' >&2; exit 2; }
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+compose_file=$root/telemetry/compose.yaml
+aqua_root=${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}
+node=$aqua_root/bin/node
+export AQUA_POLICY_CONFIG="${AQUA_POLICY_CONFIG:-$root/aqua-policy.yaml}"
+readings=$root/docs/progress/readings/t21-f01.md
+recipe=$root/telemetry/overhead-world.json
+grafana=http://127.0.0.1:3300
+export PETRI_TELEMETRY_PROJECT=petri-telemetry-dashboards
+export PETRI_TELEMETRY_VOLUME=petri-telemetry-dashboards
+
+ticks=${TELEMETRY_TICKS:-}
+if [ -z "$ticks" ]; then
+  ticks=$(sed -n 's/^- Workload ticks T: \([0-9][0-9]*\).*$/\1/p' "$readings" | head -n 1)
+fi
+case "$ticks" in
+  '' | *[!0-9]*) printf 'telemetry-dashboards-check: no workload T (set TELEMETRY_TICKS)\n' >&2; exit 2 ;;
+esac
+
+if [ -n "$(docker compose -p petri-telemetry -f "$compose_file" ps -q --status running lgtm 2>/dev/null)" ]; then
+  printf 'telemetry-dashboards-check: the petri-telemetry stack is up and holds the same ports; stop it with make telemetry-down\n' >&2
+  exit 1
+fi
+
+compose() {
+  docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" "$@"
+}
+note() { printf 'telemetry-dashboards-check: %s\n' "$*"; }
+
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/petri-dashboards.XXXXXX")
+cleanup() {
+  compose down -v --remove-orphans >/dev/null 2>&1 || true
+  rm -rf "$scratch"
+}
+trap cleanup 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+
+failures=0
+check() {
+  # check NAME STATUS DETAIL
+  if [ "$2" -eq 0 ]; then
+    printf 'PASS %s: %s\n' "$1" "$3"
+  else
+    printf 'FAIL %s: %s\n' "$1" "$3"
+    failures=$((failures + 1))
+  fi
+}
+
+# Families present on every run: the scalars, the gauges and the families
+# over fixed key sets (death causes, cognitive classes, flows, phases,
+# actions, food types).
+always_names='
+petri_run_tick
+petri_run_elapsed_seconds
+petri_run_reproduction_actions_attempted_total
+petri_run_reproduction_actions_spawned_total
+petri_run_reproduction_actions_rejected_total
+petri_run_mutation_events_attempted_total
+petri_run_mutation_events_applied_total
+petri_run_mutation_events_skipped_total
+petri_run_move_actions_attempted_total
+petri_run_mutation_reachable_target_total
+petri_run_mutation_unreachable_target_total
+petri_run_mutation_executed_target_total
+petri_run_mutation_not_applicable_target_total
+petri_run_mesh_hops_total
+petri_run_vm_steps_total
+petri_run_graph_relax_iters_total
+petri_run_plasticity_updates_total
+petri_run_plasticity_changes_total
+petri_run_hebbian_updates_total
+petri_run_hebbian_changes_total
+petri_run_reward_modulated_updates_total
+petri_run_reward_modulated_changes_total
+petri_run_shared_memory_writes_changed_total
+petri_run_creature_ticks_total
+petri_run_mesh_dispatches_energy_exhausted_total
+petri_run_pass_cap_hits_total
+petri_run_passes_total
+petri_run_decided_passes_total
+petri_run_actions_applied_total
+petri_run_predation_actions_attempted_total
+petri_run_predation_actions_transferred_total
+petri_run_predation_actions_rejected_total
+petri_run_predation_kills_total
+petri_run_deaths_total
+petri_run_deaths_by_cause_total
+petri_run_reproductive_success_creatures_observed_total
+petri_run_reproductive_success_offspring_spawned_total
+petri_run_reproductive_success_survival_ticks_total
+petri_run_energy_flow
+petri_run_genome_size_creature_ticks_total
+petri_run_phase_wall_clock_seconds_total
+petri_run_mutation_outcome_summary_carriers_observed_total
+petri_run_mutation_outcome_summary_survival_ticks_sum_total
+petri_run_mutation_outcome_summary_offspring_spawned_sum_total
+petri_run_mutation_outcome_summary_final_energy_sum
+petri_run_mutation_outcome_summary_helpful_total
+petri_run_mutation_outcome_summary_neutral_total
+petri_run_mutation_outcome_summary_detrimental_total
+petri_run_mutation_outcome_summary_confidence_low_total
+petri_run_mutation_outcome_summary_confidence_medium_total
+petri_run_mutation_outcome_summary_confidence_high_total
+petri_run_mutation_outcome_summary_viability_score_sum
+petri_run_mutation_outcome_summary_viability_score_delta_sum
+petri_run_mutation_outcome_summary_survived_short_horizon_total
+petri_run_mutation_outcome_summary_survived_long_horizon_total
+petri_run_mutation_outcome_summary_reproduced_once_total
+petri_run_mutation_outcome_summary_mean_lifetime_energy_sum
+petri_run_mutation_outcome_summary_action_attempted_total
+petri_run_mutation_outcome_summary_blocked_move_total
+petri_run_mutation_outcome_summary_invalid_reproduce_total
+petri_run_mutation_outcome_summary_invalid_action_total
+petri_tick_actions
+petri_tick_predation_kills
+petri_tick_compute_total_mean
+petri_tick_compute_total_min
+petri_tick_compute_total_max
+petri_tick_compute_vm_mean
+petri_tick_compute_graph_mean
+petri_tick_priority_bid_mean
+petri_tick_priority_bidders_count
+petri_tick_food_occupancy_depletion_mean
+petri_tick_food_occupancy_depletion_occupied_cells
+petri_tick_food_growth_suppressed_by_occupancy_depletion
+petri_tick_food_cells_with_type_inhibition
+petri_tick_food_growth_suppressed_by_type_inhibition
+petri_tick_food_total_density
+petri_tick_food_grazing_modifier_mean
+petri_tick_food_grazed_cell_share
+petri_tick_population
+petri_tick_mean_energy
+petri_tick_mean_genome_size
+petri_tick_mean_mesh_nodes
+petri_tick_mean_generation
+'
+
+# Families over maps that hold only the keys a run met: those the workload
+# (seed 7, T ticks, telemetry/overhead-world.json) gives a key. It gives none
+# to mutation_events_skipped_total_by_operator,
+# mutation_skip_reasons_total_by_operator or four of the six reader-state
+# maps; a change in simulation behavior can change this list.
+keyed_names='
+petri_run_mutation_events_attempted_by_domain_total
+petri_run_mutation_events_applied_by_domain_total
+petri_run_mutation_events_attempted_by_operator_total
+petri_run_mutation_events_applied_by_operator_total
+petri_run_mutation_events_skipped_by_reason_total
+petri_run_mutation_operator_funnel_total
+petri_run_mutation_added_node_input_classes_by_operator_total
+petri_run_mutation_added_node_world_inputs_by_operator_total
+petri_run_mutation_value_carriers_observed_total
+petri_run_mutation_value_survival_ticks_sum_total
+petri_run_mutation_value_offspring_spawned_sum_total
+petri_run_mutation_value_final_energy_sum
+petri_run_mutation_value_helpful_total
+petri_run_mutation_value_neutral_total
+petri_run_mutation_value_detrimental_total
+petri_run_mutation_value_confidence_low_total
+petri_run_mutation_value_confidence_medium_total
+petri_run_mutation_value_confidence_high_total
+petri_run_mutation_value_viability_score_sum
+petri_run_mutation_value_viability_score_delta_sum
+petri_run_mutation_value_survived_short_horizon_total
+petri_run_mutation_value_survived_long_horizon_total
+petri_run_mutation_value_reproduced_once_total
+petri_run_mutation_value_mean_lifetime_energy_sum
+petri_run_mutation_value_action_attempted_total
+petri_run_mutation_value_blocked_move_total
+petri_run_mutation_value_invalid_reproduce_total
+petri_run_mutation_value_invalid_action_total
+petri_run_reproduction_actions_rejected_by_reason_total
+petri_run_reproduction_actions_rejected_invalid_target_by_cause_total
+petri_run_reproduction_actions_rejected_invalid_target_avoidable_by_reader_state_total
+petri_run_move_actions_blocked_avoidable_by_reader_state_total
+petri_run_eat_actions_applied_by_type_total
+petri_run_eat_actions_failed_by_type_total
+petri_run_move_actions_blocked_by_cause_total
+petri_run_predation_actions_by_result_total
+'
+
+get() {
+  curl -sS --max-time 30 "$grafana$1"
+}
+
+# ── stack ─────────────────────────────────────────────────────────────────────
+compose down -v --remove-orphans >/dev/null 2>&1 || true
+note "starting the scratch stack $PETRI_TELEMETRY_PROJECT"
+compose up -d --quiet-pull >/dev/null 2>&1
+waited=0
+until compose exec -T lgtm curl -sf http://127.0.0.1:9090/-/ready >/dev/null 2>&1 &&
+  compose exec -T lgtm curl -sf http://127.0.0.1:3100/ready >/dev/null 2>&1 &&
+  curl -sf "$grafana/api/health" >/dev/null 2>&1 &&
+  curl -sf -o /dev/null -X POST -H 'Content-Type: application/json' -d '{}' \
+    http://127.0.0.1:4318/v1/metrics 2>/dev/null; do
+  waited=$((waited + 2))
+  [ "$waited" -lt 240 ] || { note 'stack not ready after 240 s'; exit 1; }
+  sleep 2
+done
+
+# ── workload ──────────────────────────────────────────────────────────────────
+note 'building v3-cli (release)'
+cargo build --release --quiet -p v3-cli --manifest-path "$root/Cargo.toml" --target-dir "$root/target"
+from_ms=$((($(date -u +%s) - 60) * 1000))
+note "running the workload, T=$ticks"
+OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318 PETRI_TELEMETRY='' PETRI_TELEMETRY_METRICS_INTERVAL_MS='' \
+  "$root/scripts/bench-wait" "$root/target/release/v3-cli" --telemetry on run --seed 7 \
+  --ticks "$ticks" --sample-every "$ticks" --config "$recipe" \
+  >"$scratch/stdout" 2>"$scratch/stderr"
+cat "$scratch/stderr"
+run_id=$(sed -n 's/^telemetry: on .* run=\([0-9a-f]*\)$/\1/p' "$scratch/stderr" | head -n 1)
+[ -n "$run_id" ] || { note 'the workload announced no run'; exit 1; }
+note "run $run_id"
+
+# Waits up to 60 s for the run's last tick sample to be queryable.
+waited=0
+until get "/api/datasources/proxy/uid/prometheus/api/v1/query?query=max(petri_run_tick%7Bpetri_run_id%3D%22$run_id%22%7D)" |
+  grep -q "\"$ticks\""; do
+  waited=$((waited + 2))
+  [ "$waited" -lt 60 ] || break
+  sleep 2
+done
+sleep 5
+
+# ── 1. provisioning ───────────────────────────────────────────────────────────
+missing=
+for uid in petri-runs petri-run; do
+  get "/api/dashboards/uid/$uid" >"$scratch/$uid.json" || true
+  "$node" -e '
+    const d = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    process.exit(d.meta && d.meta.folderTitle === "Petri" && d.dashboard.uid === process.argv[2] ? 0 : 1);
+  ' "$scratch/$uid.json" "$uid" 2>/dev/null || missing="$missing $uid"
+done
+status=0
+[ -z "$missing" ] || status=1
+check 'dashboards provisioned' "$status" "petri-runs and petri-run in folder Petri${missing:+; missing$missing}"
+
+# ── 2. metric names ───────────────────────────────────────────────────────────
+get /api/datasources/proxy/uid/prometheus/api/v1/label/__name__/values >"$scratch/names.json"
+"$node" -e '
+  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  for (const name of r.data || []) if (name.startsWith("petri_")) console.log(name);
+' "$scratch/names.json" >"$scratch/names.txt"
+check_names() {
+  # check_names LABEL NAMES
+  missing=
+  count=0
+  for name in $2; do
+    count=$((count + 1))
+    grep -qx "$name" "$scratch/names.txt" || missing="$missing $name"
+  done
+  status=0
+  [ -z "$missing" ] || status=1
+  check "Prometheus names ($1)" "$status" "$count names stored${missing:+; missing$missing}"
+}
+check_names 'scalar and fixed-key families' "$always_names"
+check_names 'map families keyed on the workload' "$keyed_names"
+printf 'Stored petri_ names (%s):\n' "$(grep -c . "$scratch/names.txt")"
+sed 's/^/  /' "$scratch/names.txt"
+
+# ── 3. panel queries ──────────────────────────────────────────────────────────
+to_ms=$(($(date -u +%s) * 1000))
+# shellcheck disable=SC2016 # JavaScript template literals.
+"$node" -e '
+  const fs = require("fs");
+  const [, dir, runId, from, to] = process.argv;
+  for (const file of ["petri-runs.json", "petri-run.json"]) {
+    const d = JSON.parse(fs.readFileSync(`${dir}/${file}`, "utf8"));
+    for (const panel of d.panels) {
+      for (const t of panel.targets || []) {
+        const query = { ...t, expr: t.expr.replaceAll("$run_id", runId), intervalMs: 1000, maxDataPoints: 500 };
+        const body = { queries: [query], from: String(from), to: String(to) };
+        console.log([d.uid, panel.title, t.refId, JSON.stringify(body)].join("\t"));
+      }
+    }
+  }
+' "$root/telemetry/grafana/dashboards" "$run_id" "$from_ms" "$to_ms" >"$scratch/queries.tsv"
+empty=
+total=0
+tab=$(printf '\t')
+while IFS="$tab" read -r uid title ref body; do
+  total=$((total + 1))
+  curl -sS --max-time 30 -X POST -H 'Content-Type: application/json' \
+    "$grafana/api/ds/query" -d "$body" >"$scratch/answer.json" || true
+  "$node" -e '
+    const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const result = (r.results || {})[process.argv[2]] || {};
+    const rows = (result.frames || []).some((f) =>
+      ((f.data && f.data.values) || []).some((column) => column.length > 0));
+    process.exit(!result.error && rows ? 0 : 1);
+  ' "$scratch/answer.json" "$ref" 2>/dev/null || empty="$empty [$uid / $title / $ref]"
+done <"$scratch/queries.tsv"
+status=0
+[ -z "$empty" ] || status=1
+check 'panel queries return data' "$status" "$total queries${empty:+; empty:$empty}"
+
+# ── 4. tick samples ───────────────────────────────────────────────────────────
+get "/api/datasources/proxy/uid/prometheus/api/v1/query?query=petri_run_tick%7Bpetri_run_id%3D%22$run_id%22%7D%5B30m%5D" \
+  >"$scratch/ticks.json"
+# shellcheck disable=SC2016 # JavaScript template literals.
+detail=$("$node" -e '
+  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const values = ((r.data || {}).result || []).flatMap((s) => s.values || []);
+  const times = values.map((v) => v[0]);
+  const ticks = values.map((v) => Number(v[1]));
+  const distinct = new Set(times).size === times.length;
+  const ordered = ticks.every((t, i) => i === 0 || t >= ticks[i - 1]);
+  const last = ticks[ticks.length - 1];
+  console.log(`${values.length} samples, ticks ${ticks.join(",")}`);
+  process.exit(values.length >= 3 && distinct && ordered && last === Number(process.argv[2]) ? 0 : 1);
+' "$scratch/ticks.json" "$ticks") && status=0 || status=1
+check 'petri_run_tick samples' "$status" "$detail; want at least 3, distinct timestamps, non-decreasing, last $ticks"
+
+# ── 5. Loki run.started ───────────────────────────────────────────────────────
+query="{service_name=\"v3-cli\"} | petri_run_id=\"$run_id\" | event_name=\"run.started\""
+curl -sS --max-time 30 -G "$grafana/api/datasources/proxy/uid/loki/loki/api/v1/query_range" \
+  --data-urlencode "query=$query" --data-urlencode "start=${from_ms}000000" \
+  --data-urlencode limit=10 >"$scratch/started.json" || true
+# shellcheck disable=SC2016 # JavaScript template literals.
+detail=$("$node" -e '
+  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  const streams = (r.data || {}).result || [];
+  const values = streams.map((s) => s.stream.petri_metrics_interval_ms).filter((v) => v !== undefined);
+  console.log(`${streams.length} stream(s), petri_metrics_interval_ms=${values.join(",") || "absent"}`);
+  process.exit(values.length > 0 ? 0 : 1);
+' "$scratch/started.json") && status=0 || status=1
+check 'run.started carries petri_metrics_interval_ms' "$status" "$detail"
+
+compose exec -T lgtm du -s /data/prometheus /data/loki || true
+if [ "$failures" -eq 0 ]; then
+  note 'all checks passed'
+else
+  note "$failures check(s) failed"
+  exit 1
+fi
