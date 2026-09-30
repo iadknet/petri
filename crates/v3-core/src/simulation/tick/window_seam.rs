@@ -5,7 +5,7 @@
 use crate::config::SimulationConfig;
 use crate::contracts::CreatureId;
 use crate::creature::action_log::ActionLogEntry;
-use crate::runtime::trace::domain::{AppliedAction, StateAfter, TickOutcome};
+use crate::runtime::trace::domain::{AppliedAction, StateAfter};
 use crate::runtime::trace::recording::{ActiveTrace, Truncation, TruncationReason};
 use crate::runtime::trace::size::TickReserve;
 use crate::runtime::traced_mesh::RecordLimit;
@@ -63,20 +63,6 @@ pub(super) fn record_limit(active: &ActiveTrace, config: &SimulationConfig) -> O
     })
 }
 
-/// The outcome of the tick `trace` recorded as `tick`, if it recorded it.
-pub(super) fn recorded_outcome(
-    trace: &mut Option<ActiveTrace>,
-    tick: u64,
-) -> Option<&mut TickOutcome> {
-    trace
-        .as_mut()?
-        .ticks
-        .last_mut()
-        .filter(|record| record.tick_number == tick)?
-        .outcome
-        .as_mut()
-}
-
 /// The `EnergyFlows` sums an applied action's accounting is read from.
 #[derive(Clone, Copy)]
 pub(super) struct FlowMarks {
@@ -121,10 +107,18 @@ pub(super) fn finish_tick(
     outcome_acc: &OutcomeAccumulator,
     tick: u64,
 ) {
-    let Some(id) = observed_record(trace, tick) else {
+    let Some(active) = trace.as_mut() else {
         return;
     };
-    let Some(outcome) = recorded_outcome(trace, tick) else {
+    let id = active.creature_id;
+    let Some(record) = active
+        .ticks
+        .last_mut()
+        .filter(|record| record.tick_number == tick)
+    else {
+        return;
+    };
+    let Some(outcome) = record.outcome.as_mut() else {
         return;
     };
     outcome
@@ -140,25 +134,13 @@ pub(super) fn finish_tick(
         previous_outcome: creature.previous_outcome,
     });
     outcome.phases = sim.stats.last_tick_phases;
-    let Some(active) = trace.as_mut().filter(|active| active.budget.is_some()) else {
+    if active.budget.is_none() {
         return;
-    };
-    let record = active.ticks.last().expect("the recorded tick");
-    let events = record.hops.len()
-        + record.passes.len()
-        + record.outcome.as_ref().map_or(0, |o| o.applied.len());
+    }
+    let events = record.hops.len() + record.passes.len() + outcome.applied.len();
+    let bytes = record.retained_bytes();
     active.events = active
         .events
         .saturating_add(u32::try_from(events).unwrap_or(u32::MAX));
-    active.bytes = active.bytes.saturating_add(record.retained_bytes());
-}
-
-/// The traced creature, when `trace` recorded `tick`.
-fn observed_record(trace: &Option<ActiveTrace>, tick: u64) -> Option<CreatureId> {
-    let active = trace.as_ref()?;
-    active
-        .ticks
-        .last()
-        .filter(|record| record.tick_number == tick)
-        .map(|_| active.creature_id)
+    active.bytes = active.bytes.saturating_add(bytes);
 }

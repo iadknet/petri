@@ -90,6 +90,10 @@ pub struct TickOutcome {
     pub typed_local_food: crate::sensors::typed_food::TypedFoodLocalSnapshot,
     /// The typed area food bank cognition read (empty when not read).
     pub typed_area_food: Vec<[f32; 7]>,
+    /// Whether sensor assembly built the typed local food bank for the genome.
+    pub uses_typed_local_food: bool,
+    /// Whether sensor assembly built the extended perception banks.
+    pub uses_extended_perception: bool,
     /// The failed-action penalty in force for the tick.
     pub failed_action_penalty: f32,
     /// Applied actions in order.

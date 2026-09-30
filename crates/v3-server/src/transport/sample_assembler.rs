@@ -225,7 +225,26 @@ mod tests {
     };
     use v3_core::runtime::OUTPUT_SLOT_COUNT;
 
+    /// A tick the recorder produced. The literals below take from it only the
+    /// fields they do not name: the seam-only `outcome`, which exists whenever
+    /// `v3-core/telemetry-seams` is unified in (a workspace build turns it on
+    /// through `v3-telemetry` even with this crate's `telemetry` off), so no
+    /// cfg of this crate can name it correctly.
+    fn recorded_tick() -> TickTrace {
+        let mut config = v3_core::config::SimulationConfig::default();
+        config.world.width = 16;
+        config.world.height = 16;
+        config.population.initial_creatures = 2;
+        let mut sim = v3_core::simulation::seed_simulation(config, 1);
+        let id = sim.creatures.keys().next().expect("a founder");
+        let mut trace = Some(v3_core::runtime::trace::recording::ActiveTrace::new(id, 1));
+        v3_core::simulation::run_tick(&mut sim, &mut trace);
+        trace.expect("the recording").ticks.remove(0)
+    }
+
     #[test]
+    // Every field is named when the seam is off.
+    #[allow(clippy::needless_update)]
     fn assembler_preserves_route_shape() {
         let sample = ExecutionSample {
             creature_id: 42,
@@ -292,8 +311,7 @@ mod tests {
                 termination_reason: core_trace::TerminationReason::NoDecision,
                 priority_bid: 0.0,
                 commit_counts: [0; VOTE_KIND_COUNT],
-                #[cfg(feature = "telemetry")]
-                outcome: None,
+                ..recorded_tick()
             }],
         };
 
@@ -311,6 +329,8 @@ mod tests {
     }
 
     #[test]
+    // Every field is named when the seam is off.
+    #[allow(clippy::needless_update)]
     fn assembler_maps_graph_effect_phase_and_pass_records() {
         let sample = ExecutionSample {
             creature_id: 7,
@@ -392,8 +412,7 @@ mod tests {
                 termination_reason: core_trace::TerminationReason::NoDecision,
                 priority_bid: 0.0,
                 commit_counts: [1, 0, 0, 0],
-                #[cfg(feature = "telemetry")]
-                outcome: None,
+                ..recorded_tick()
             }],
         };
 

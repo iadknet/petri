@@ -193,8 +193,6 @@ fn a_window_encodes_predicted_ids_parents_times_names_and_attributes() {
             "petri.neighbor_food.0",
             "petri.neighbor_food.1",
             "petri.food_here_by_type",
-            "petri.area_food",
-            "petri.nearby_core",
             "petri.position",
             "petri.actions_selected",
             "petri.commit_counts",
@@ -203,6 +201,10 @@ fn a_window_encodes_predicted_ids_parents_times_names_and_attributes() {
             "petri.previous_outcome_end",
         ] {
             assert!(span.attribute(key).is_some(), "{key}");
+        }
+        // The founder never reads extended perception: its banks are absent.
+        for key in PERCEPTION_KEYS {
+            assert!(span.attribute(key).is_none(), "{key}");
         }
         assert!(span
             .attribute("petri.neighbor_food")
@@ -235,6 +237,49 @@ fn a_window_encodes_predicted_ids_parents_times_names_and_attributes() {
             events: events as u32
         }
     );
+}
+
+/// The extended-perception attributes of a two-food-type tick span.
+const PERCEPTION_KEYS: [&str; 8] = [
+    "petri.area_food",
+    "petri.area_barrier",
+    "petri.area_occupancy",
+    "petri.nearby_core",
+    "petri.nearby_vitals",
+    "petri.nearby_identity",
+    "petri.area_food.0",
+    "petri.area_food.1",
+];
+
+const TYPED_LOCAL_KEYS: [&str; 3] = [
+    "petri.food_here_by_type",
+    "petri.neighbor_food.0",
+    "petri.neighbor_food.1",
+];
+
+#[test]
+fn a_tick_span_carries_exactly_the_banks_sensor_assembly_built() {
+    let started = Instant::now();
+    let (mut trace, creature_id) = recorded(1);
+    let run = run(started);
+    let meta = meta(0, Policy::Window, creature_id, started);
+    let ending = Ending {
+        reason: EndReason::Complete,
+        tick: 1,
+        tick_end: None,
+    };
+    let outcome = trace.ticks[0].outcome.as_mut().unwrap();
+    outcome.uses_extended_perception = true;
+    outcome.uses_typed_local_food = false;
+    outcome.typed_area_food = vec![[0.25; 7]; 2];
+    let received = decoded(&encode(&[], &run, &meta, &trace, &ending).0);
+    let span = &received.spans[1];
+    for key in PERCEPTION_KEYS {
+        assert!(span.attribute(key).is_some(), "{key}");
+    }
+    for key in TYPED_LOCAL_KEYS {
+        assert!(span.attribute(key).is_none(), "{key}");
+    }
 }
 
 #[test]
