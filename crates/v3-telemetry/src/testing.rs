@@ -3,8 +3,9 @@
 //! It decodes each `POST /v1/logs` protobuf body and keeps the records, and
 //! each `POST /v1/metrics` body and keeps the snapshot; in
 //! [`Receiver::rejecting`] mode it answers with a partial success that rejects
-//! records or data points, and in [`Receiver::hanging`] mode it accepts the
-//! connection and never answers.
+//! records or data points, in [`Receiver::garbled`] mode it answers `200 OK`
+//! with a body that does not decode, and in [`Receiver::hanging`] mode it
+//! accepts the connection and never answers.
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -276,6 +277,8 @@ enum Answer {
     /// `200 OK` with a partial success rejecting up to this many records, or
     /// data points of a snapshot, which is then not kept.
     Reject(u64),
+    /// `200 OK` with a body that is not a valid response message.
+    Garble,
     /// Never answer.
     Hang,
 }
@@ -291,7 +294,7 @@ fn receive_metrics(
     let points: usize = decoded.iter().map(|snapshot| snapshot.points.len()).sum();
     let rejected = match answer {
         Answer::Reject(limit) => limit.min(points as u64),
-        Answer::Accept | Answer::Hang => 0,
+        Answer::Accept | Answer::Garble | Answer::Hang => 0,
     };
     if rejected == 0 {
         snapshots
@@ -331,6 +334,12 @@ fn serve(
         } else {
             receive_logs(&body, records, answer)
         };
+        // Field 1, length-delimited, 5 bytes long, with no bytes following:
+        // truncated for either response type.
+        let reply = match answer {
+            Answer::Garble => vec![0x0a, 0x05],
+            _ => reply,
+        };
         let head = format!(
             "HTTP/1.1 200 OK\r\ncontent-type: application/x-protobuf\r\ncontent-length: {}\r\n\r\n",
             reply.len()
@@ -347,7 +356,7 @@ fn receive_logs(body: &[u8], records: &Mutex<Vec<ReceivedRecord>>, answer: Answe
     let decoded = decode(body);
     let rejected = match answer {
         Answer::Reject(limit) => limit.min(decoded.len() as u64),
-        Answer::Accept | Answer::Hang => 0,
+        Answer::Accept | Answer::Garble | Answer::Hang => 0,
     };
     let accepted = decoded.len() - rejected as usize;
     records
@@ -378,6 +387,12 @@ impl Receiver {
     /// snapshot is not kept.
     pub fn rejecting(per_request: u64) -> Self {
         Self::spawn(Answer::Reject(per_request))
+    }
+
+    /// A receiver that keeps every record and snapshot but answers `200 OK`
+    /// with a body that does not decode as a response.
+    pub fn garbled() -> Self {
+        Self::spawn(Answer::Garble)
     }
 
     /// A receiver that accepts connections and never answers.

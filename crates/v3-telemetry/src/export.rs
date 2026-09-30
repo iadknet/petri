@@ -6,7 +6,9 @@
 //! counter the queue worker reads after each export, so rejected records are
 //! counted as failed. Run snapshots (T21.F02) are posted to `/v1/metrics` by
 //! [`MetricsClient`] on the same HTTP client, which reads the response's
-//! rejected data points itself.
+//! rejected data points itself. A success response whose body does not decode
+//! confirms nothing, so its request counts as failed; an empty body decodes
+//! to full acceptance.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -38,6 +40,11 @@ impl Rejections {
     }
 }
 
+/// A partial success's rejected count; a negative count is zero.
+fn count(rejected: i64) -> u64 {
+    u64::try_from(rejected).unwrap_or(0)
+}
+
 /// The blocking reqwest client, plus the rejected count of each successful
 /// response.
 #[derive(Debug)]
@@ -51,13 +58,12 @@ impl HttpClient for CountingClient {
     async fn send_bytes(&self, request: Request<Bytes>) -> Result<Response<Bytes>, HttpError> {
         let response = self.inner.send_bytes(request).await?;
         if response.status().is_success() {
-            let rejected = ExportLogsServiceResponse::decode(response.body().as_ref())
-                .ok()
-                .and_then(|decoded| decoded.partial_success)
-                .map_or(0, |partial| {
-                    u64::try_from(partial.rejected_log_records).unwrap_or(0)
-                });
-            self.rejections.add(rejected);
+            let decoded = ExportLogsServiceResponse::decode(response.body().as_ref())?;
+            self.rejections.add(
+                decoded
+                    .partial_success
+                    .map_or(0, |partial| count(partial.rejected_log_records)),
+            );
         }
         Ok(response)
     }
@@ -87,13 +93,14 @@ impl PostMetrics for MetricsClient {
         let Ok(bytes) = response.bytes() else {
             return Outcome::Failed;
         };
-        let rejected = ExportMetricsServiceResponse::decode(bytes.as_ref())
-            .ok()
-            .and_then(|decoded| decoded.partial_success)
-            .map_or(0, |partial| {
-                u64::try_from(partial.rejected_data_points).unwrap_or(0)
-            });
-        Outcome::Exported { rejected }
+        let Ok(decoded) = ExportMetricsServiceResponse::decode(bytes.as_ref()) else {
+            return Outcome::Failed;
+        };
+        Outcome::Exported {
+            rejected: decoded
+                .partial_success
+                .map_or(0, |partial| count(partial.rejected_data_points)),
+        }
     }
 }
 
