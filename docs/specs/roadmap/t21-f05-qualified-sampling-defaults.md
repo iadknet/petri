@@ -1,6 +1,6 @@
 # T21.F05 — Qualified Sampling Defaults
 
-**Status**: Blocked
+**Status**: In Progress
 **Last updated**: 2026-09-30
 **Feature**: T21.F05
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -9,9 +9,9 @@
 
 Telemetry is on by default in `v3-cli`, `v3-server` and `v3-lab`, and the
 default configuration is the named preset `standard`, whose cost against the
-reference build is qualified under the 5% ceiling by one 60-minute
-measurement on a default-size world and a small one with the stack healthy,
-stopped and slow. Four named presets (`minimal`, `phases`, `standard`,
+reference build was measured by one 60-minute measurement on a default-size
+world and a small one with the stack healthy, stopped and slow, from which
+the user set the ceiling at 10% of elapsed time with 5% as the target. Four named presets (`minimal`, `phases`, `standard`,
 `dense`) select the sampling settings T21.F02–F04 delivered, each with its
 measured time and storage cost. Tests that start a binary and invocations
 that produce stored closure measurements pass `--telemetry off` explicitly,
@@ -21,9 +21,11 @@ output is identical.
 
 **D5 (user decision, goal of 2026-09-30).** "If F05's qualifying measurement
 puts the default under 5%, record 5% as the ceiling, otherwise stop and
-report the measurements for the user's decision." The default flips to on
-only in a closure whose qualifying verdict is pass; any other outcome leaves
-every default off, and the feature stops for the user under the blocker rule.
+report the measurements for the user's decision." Resolved 2026-09-30: the
+measurement put five cells under 5% and W1 `s` inconclusive at
+[1.0232, 1.0505], so it stopped for the user, who decided to record 10% as
+the ceiling and flip the default to on; 5% stays the target; later T21
+closures, and any later feature that adds work to a run, are held to 10%.
 
 ## Non-Goals
 
@@ -94,19 +96,19 @@ Invariants:
    run once, inside the 60-minute allowance, by the implementer's
    verification pass, with nothing else measuring on the host; its verdict
    applies D5 as the Goal states. No cell is rerun or extended.
-5. The ceiling in force after this closure is the one recorded in the
-   Measured verdict, and `scripts/telemetry-overhead` carries it as its
-   routine ceiling, 1.05: that figure is the ceiling only once the
-   Measured verdict records a D5 pass; on any other outcome the feature
-   stays open and the user's decision sets both the record and the
-   script's value before closure. The routine check keeps F01's workload,
+5. The ceiling in force after this closure is 10%, ratio 1.10, the user's
+   D5 decision recorded in the Measured verdict, and
+   `scripts/telemetry-overhead` carries it as its routine ceiling; 5% stays
+   the target the Expected row is written against. The routine check keeps F01's workload,
    states, ratio and 300 s cap and adopts the statistic, pair table,
    environment isolation and run timeout below, because F01's
    75%-of-pairs rule at a fixed n cannot decide at 5% on a host whose pair
    ratios spread 6–12% (readings file). It drops F01's one rerun of an
    inconclusive state: n fresh pairs rarely fit the cap and a rerun is an
    extension of an inconclusive result. A pair count the 300 s cap cannot
-   hold makes the routine check inconclusive before any pair.
+   hold makes the routine check inconclusive before any pair. Routine
+   calibration, unused while T = 6908 is pinned, accepts the first in-band
+   run of up to three, the same acceptance the qualifying search uses.
 
 | Preset | `METRICS_INTERVAL_MS` | `TICK_TRACES` | `CREATURE_WINDOWS` | `WINDOW_TICKS` | `WINDOW_INTERVAL_MS` |
 | --- | --- | --- | --- | --- | --- |
@@ -142,19 +144,20 @@ exports; the counts, caps and sampling policies stay F02–F04's.
       `TELEMETRY_USED_MS` carry, the readings lines it prints), the
       environment scrub, the run timeout and the export check, and the
       shared statistic and pair table in routine mode, verdicts against
-      1.05 (the ceiling only once the Measured verdict records a D5 pass);
+      the ceiling, 1.10 after the user's decision (the flip pass sets it);
       the `s` flush flag above 10,050 ms; the `dense` export check
       (`snapshots` ≥ 12, `traces` = `snapshots`, `windows` ≥ 2).
-- [ ] Default flip: `resolve_switch`, `Switch::default`, the three help
-      texts, the three `…_default_off` tests become `…_default_on`;
-      `--telemetry off` at the thirteen spawn sites (done: a per-file
-      `TELEMETRY_OFF` constant, empty without the `telemetry` feature; the
-      flip itself waits for a pass).
+- [ ] Default flip (unblocked by the user's decision): `resolve_switch`,
+      `Switch::default`, the three help texts, the three `…_default_off`
+      tests become `…_default_on`; the routine ceiling and its test move
+      to 1.10; `--telemetry off` at the thirteen spawn sites is done (a
+      per-file `TELEMETRY_OFF` constant, empty without the `telemetry`
+      feature).
 - [x] Parent comparison against `8b0a158f`, T = 6908.
 - [x] The qualifying measurement, once, recorded in
-      `docs/progress/readings/t21-f05.md`; D5 applied (not a pass: no
-      flip, user stop); the Measured verdict and the preset cost table
-      filled in.
+      `docs/progress/readings/t21-f05.md`; D5 applied (not under 5%: user
+      stop, then the user's 10% ceiling and the flip); the Measured verdict
+      and the preset cost table filled in.
 
 ## Verification
 
@@ -179,7 +182,8 @@ exports; the counts, caps and sampling policies stay F02–F04's.
       make check` exit 0 with no stack running (before the flip).
 - [x] `node --test scripts/telemetry-stats.test.mjs` -> median, interval
       ranks and verdict on fixed inputs, including the strict comparison
-      at exactly 1.05 and a voided pair entering as an infinite ratio.
+      at exactly the ceiling (1.10 after this closure) and a voided pair
+      entering as an infinite ratio.
       14 tests pass (the `dense` minimum counts and the T1 calibration
       rule among them); `make
       quality-check` runs the file and exits 0.
@@ -195,9 +199,8 @@ exports; the counts, caps and sampling policies stay F02–F04's.
 - [ ] Mutation gate: `Not applicable: observability feature` (the
       workflow's exemption; no run).
 - [ ] Benchmark summary: `Not applicable: observability feature`.
-- [ ] `make check`, `make check-docs`, `make roadmap-check` exit 0. Before the flip: `env -u PETRI_TELEMETRY make check` exit 0 and `make roadmap-check` exit 0 on the blocked state; after attempt 2
-      (D5 not a pass, no flip) `env -u PETRI_TELEMETRY make check` exit 0
-      and `make roadmap-check` exit 0.
+- [ ] After the flip: `env -u PETRI_TELEMETRY make check`,
+      `make check-docs` and `make roadmap-check` exit 0.
 
 ## Performance and Goal Impact
 
@@ -232,7 +235,7 @@ Qualifying measurement, method fixed before any run:
 | Command | `PETRI_OVERHEAD_MODE=qualify scripts/telemetry-overhead`, every timed run under `scripts/bench-wait`, on the scratch stack `petri-telemetry-overhead`; the orchestrator has stopped the host's other containers, and no build, test, server or other measurement runs alongside |
 | Isolation | the script removes every `PETRI_TELEMETRY*` and `OTEL_*` variable from the timed runs' environment, sets `OTEL_EXPORTER_OTLP_ENDPOINT` to the scratch stack's `http://127.0.0.1:4318` and `PETRI_TELEMETRY_PRESET` to the preset under test, and checks every telemetry run's stderr start line against the preset table (invariant 3), voiding the pair on a mismatch; the first line of each cell is printed for the readings |
 | Worlds | W1, default-size: `v3-cli run --seed 7 --ticks T1 --sample-every T1` with no `--config` (the built-in default: 1600×1600, 10,000 founders); W2, small: F01's workload, `--config telemetry/overhead-world.json` (128×128, 256 founders), T = 6908 |
-| T1 | calibrated once, charged to the cap, by a bracketing search on the reference build aimed at 4 to 6 s: three runs as F01's rule, starting at 20 ticks, each at the count the previous run scales to 5 s; if the third run is outside the band, the search continues by bisection between the nearest counts measured below and above the band (when no run has landed above it, the next count is the one the last run scales to 6 s), up to five more runs; the first count whose run lands in 4 to 6 s is T1, printed as `- Default-world ticks T1: N` for the readings file and fixed for later closures; if none lands in the band within eight runs the attempt stops as inconclusive for the user. Linear scaling alone fails on this world because its per-tick cost steps up near tick 41 (attempt 1: ticks 1–40 about 97 ms, 41–48 about 255 ms; 40 ticks 3,895 ms, 48 ticks 5,939 ms), so the bracket 40–48 resolves in one or two bisection runs (about 44–46) |
+| T1 | calibrated once, charged to the cap, by a bracketing search on the reference build aimed at 4 to 6 s: three runs as F01's rule, starting at 20 ticks, each at the count the previous run scales to 5 s; if the third run is outside the band, the search continues by bisection between the nearest counts measured below and above the band (when no run has landed above it, the next count is the one the last run scales to 6 s), up to five more runs; the first count whose run lands in 4 to 6 s is T1, printed as `- Default-world ticks T1: N` for the readings file and fixed for later closures; if none lands in the band within eight runs the attempt stops as inconclusive for the user. Linear scaling alone fails on this world because its per-tick cost steps up near tick 41 (ticks 1–40 about 97 ms, 41–48 about 255 ms): attempt 1, under F01's third-run rule, ran 20 → 2,083 ms, 48 → 5,939 ms, 40 → 3,895 ms and stopped; attempt 2, under this rule, ran 20 → 2,023 ms, 49 → 6,001 ms, 41 → 4,119 ms and took T1 = 41, the first in-band run |
 | Init | three reference runs of `--ticks 1` per world; the median is an upper bound on a run's start-up share (it holds one tick: about 0.25 s, 5% of a W1 run; under 10% of a W2 run), recorded so a reader sees the most the ratio can be diluted; no correction is applied |
 | Reference | the same commit built with `--no-default-features`, always run with the stack stopped |
 | Spread | five consecutive reference runs per world after calibration; spread = (max − min) / median |
@@ -253,7 +256,8 @@ Qualifying measurement, method fixed before any run:
 | Projection | at n = 32: W1 pairs about 10 s in `b` and `a` and 20 s in `s` (1,280 s), W2 about 8, 8 and 18 s (1,088 s), calibration, init, spread and (c) about 130 s, preset pairs about 320 s, storage runs about 110 s: about 2,930 s; at n = 24 about 2,340 s; at n = 16 about 1,590 s. The `s` runs' 10 s flush is inside those figures; elapsed session time adds the stack's two state changes per `a` and `s` pair (about 10–20 s each, roughly 50 minutes at n = 32) and the settle waits, so about 2 to 2.5 hours |
 | Expected | `standard`: every cell's median within 1.00–1.02 (F01–F02 measured 0.994–1.010 healthy and stopped; self time ≤ 0.7 µs per tick at F04 against a tick of about 0.55 ms on W2 and 100 ms on W1), `s` equal to `b` within noise on its verdict ratio, with `flush_ms` at 10,000, `abandoned` > 0, and its flush-included ratio about 3 on W1 and 3.5 on W2 (the 10 s flush over a 5 or 4 s run); (c) ≤ 1.02; `minimal` ≈ `phases` ≈ `standard`; `dense` 0–5 points above `standard`; wire bytes for `standard` about 200 KB per wall second (0.7 GB per hour), disk about 15 MB per hour in Prometheus and about 70 MB per hour in Tempo (F03's 22 MB of tick traces and F04's 50 MB of windows), `dense` about four times that |
 
-**Measured verdict: not a pass (user stop under D5).** Attempt 2,
+**Measured verdict: not under 5%; the user recorded 10% as the ceiling and
+flipped the default on (D5 resolved 2026-09-30).** Attempt 2,
 2026-09-30, load averages 4.03 4.76 5.82 before and 3.13 3.27 3.53 after;
 T1 = 41 (calibration 20 → 2,023 ms, 49 → 6,001 ms, 41 → 4,119 ms); W1
 spread 0.0221 (n = 16), W2 spread 0.1538 (n = 32); init 201 ms (W1) and
@@ -261,17 +265,18 @@ spread 0.0221 (n = 16), W2 spread 0.1538 (n = 32); init 201 ms (W1) and
 not below 1.05. No void pair, cap not reached: 2,174.1 s of 3,600 s used
 over both attempts. Against Expected: W1 `a` and `s` medians sit above
 1.00–1.02, (c) on W1 is 1.0881 against ≤ 1.02, and W1 `minimal`'s upper
-bound is 1.0531. The 5% ceiling is not recorded, routine mode's 1.05
-stays a non-ceiling threshold, and every default stays off.
+bound is 1.0531. Under the user's 10% ceiling every cell passes: the
+largest upper bound of the six is 1.0505, and of the preset `a` cells
+1.0531; routine mode's ceiling is 1.10 and the default is on.
 
-| World | Cell | n | Median | 90% interval | Verdict | Flush-included median | `flush_ms` median (max) | `abandoned` | Self time µs/tick |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| W1 | b | 16 | 1.0063 | [0.9901, 1.0132] | pass | – | 0 (0) | 0 | 87.0 |
-| W1 | a | 16 | 1.0249 | [1.0170, 1.0347] | pass | – | 5.5 (7) | 0 | 100.1 |
-| W1 | s | 16 | 1.0335 | [1.0232, 1.0505] | inconclusive | 3.2505 | 10,003 (10,006) | 12 | 119.5 |
-| W2 | b | 32 | 1.0005 | [0.9851, 1.0258] | pass | – | 0 (0) | 0 | 0.596 |
-| W2 | a | 32 | 1.0051 | [0.9959, 1.0184] | pass | – | 7 (19) | 0 | 0.660 |
-| W2 | s | 32 | 0.9919 | [0.9878, 1.0085] | pass | 3.4853 | 10,005 (10,011) | 10 | 0.622 |
+| World | Cell | n | Median | 90% interval | Verdict at 1.05 | Verdict at 1.10 | Flush-included median | `flush_ms` median (max) | `abandoned` | Self time µs/tick |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| W1 | b | 16 | 1.0063 | [0.9901, 1.0132] | pass | pass | – | 0 (0) | 0 | 87.0 |
+| W1 | a | 16 | 1.0249 | [1.0170, 1.0347] | pass | pass | – | 5.5 (7) | 0 | 100.1 |
+| W1 | s | 16 | 1.0335 | [1.0232, 1.0505] | inconclusive | pass | 3.2505 | 10,003 (10,006) | 12 | 119.5 |
+| W2 | b | 32 | 1.0005 | [0.9851, 1.0258] | pass | pass | – | 0 (0) | 0 | 0.596 |
+| W2 | a | 32 | 1.0051 | [0.9959, 1.0184] | pass | pass | – | 7 (19) | 0 | 0.660 |
+| W2 | s | 32 | 0.9919 | [0.9878, 1.0085] | pass | pass | 3.4853 | 10,005 (10,011) | 10 | 0.622 |
 
 Idle stack (c): W1 1.0881, W2 0.9982. Presets, state `a` (the `standard`
 rows are the qualifying `a` cells; no preset's lower bound reaches 1.05;
@@ -300,18 +305,22 @@ per-hour figures are repeated-short-invocation rates):
       carries the preset.
 - [x] The qualifying measurement ran once under the predeclared method,
       every cell's reading is in the readings file, and the Measured verdict
-      records the D5 outcome and, on pass, the 5% ceiling.
+      records the D5 outcome and the ceiling the user set from it (10%).
 - [x] Each preset's measured time and storage cost is recorded.
 - [ ] `make check` passes with no stack listening; the neutrality test and
       the parent comparison hold.
 
 ## Notes for AI Agents
 
-- Decision: D5, verbatim in the Goal; the flip lands only with a pass.
+- Decision: D5, verbatim in the Goal, resolved by the user on 2026-09-30:
+  the measurement was not under 5% (W1 `s` inconclusive at
+  [1.0232, 1.0505]); the ceiling is recorded as 10% (ratio 1.10), the
+  default flips to on, 5% stays the target, and later T21 closures and any
+  later feature that adds work to a run are held to 10%.
 - Decision: (user, 2026-09-30) in the paused stack state the verdict ratio
   subtracts `flush_ms` and the flush is bounded separately at 10 s; the
   healthy and stopped states keep the flush inside their ratio.
 - Decision: (user, 2026-09-30) the qualifying measurement runs on the
   loaded host as it is, and the user accepts whatever verdict comes out;
-  D5 applies as written: the flip lands only on a pass, and any other
-  outcome stops for the user.
+  the outcome stopped for the user, who then set the ceiling (first
+  bullet).
