@@ -1,0 +1,1365 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Selected runs",
+      "description": "Identity of each selected run from its run.started record: when it started, which binary, seed, world, preset, build revision and full-config digest. Runs with the same build and config digest differ only by seed.",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "queryType": "range",
+          "expr": "{service_name=~\"v3-cli|v3-server|v3-lab\"} | event_name=\"run.started\" | petri_run_id=~\"$runs\""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "labels",
+            "keepTime": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "includeByName": {
+              "Time": true,
+              "service_name": true,
+              "petri_run_id": true,
+              "petri_seed": true,
+              "petri_world": true,
+              "petri_preset": true,
+              "petri_recipe": true,
+              "petri_build_revision": true,
+              "petri_config_digest": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "service_name": 1,
+              "petri_run_id": 2,
+              "petri_seed": 3,
+              "petri_world": 4,
+              "petri_preset": 5,
+              "petri_recipe": 6,
+              "petri_build_revision": 7,
+              "petri_config_digest": 8
+            },
+            "renameByName": {}
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "petri_run_id"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open run",
+                    "url": "/d/petri-run?var-run_id=${__value.raw}&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Time",
+            "desc": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "type": "row",
+      "title": "Against ticks",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 3,
+      "type": "trend",
+      "title": "Population by tick (sampled)",
+      "description": "Living creatures at sampled ticks. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_run_tick{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_tick_population{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #A": "tick",
+              "Value #B": "population"
+            }
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "run",
+            "rowField": "tick",
+            "valueField": "population",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^tick\\\\run$",
+            "renamePattern": "tick"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "tick",
+                "destinationType": "number"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "tick"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "interval": "1s",
+      "maxDataPoints": 5000,
+      "options": {
+        "xField": "tick",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "trend",
+      "title": "Mean energy by tick (sampled)",
+      "description": "Mean creature energy at sampled ticks. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_run_tick{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_tick_mean_energy{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #A": "tick",
+              "Value #B": "mean energy"
+            }
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "run",
+            "rowField": "tick",
+            "valueField": "mean energy",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^tick\\\\run$",
+            "renamePattern": "tick"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "tick",
+                "destinationType": "number"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "tick"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "interval": "1s",
+      "maxDataPoints": 5000,
+      "options": {
+        "xField": "tick",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "trend",
+      "title": "Mean genome size by tick (sampled)",
+      "description": "Mean genome size at sampled ticks. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_run_tick{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_tick_mean_genome_size{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #A": "tick",
+              "Value #B": "mean genome size"
+            }
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "run",
+            "rowField": "tick",
+            "valueField": "mean genome size",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^tick\\\\run$",
+            "renamePattern": "tick"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "tick",
+                "destinationType": "number"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "tick"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "interval": "1s",
+      "maxDataPoints": 5000,
+      "options": {
+        "xField": "tick",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "trend",
+      "title": "Mean mesh nodes by tick (sampled)",
+      "description": "Mean mesh node count at sampled ticks. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_run_tick{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_tick_mean_mesh_nodes{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #A": "tick",
+              "Value #B": "mean mesh nodes"
+            }
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "run",
+            "rowField": "tick",
+            "valueField": "mean mesh nodes",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^tick\\\\run$",
+            "renamePattern": "tick"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "tick",
+                "destinationType": "number"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "tick"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "interval": "1s",
+      "maxDataPoints": 5000,
+      "options": {
+        "xField": "tick",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "trend",
+      "title": "Births so far by tick",
+      "description": "Offspring spawned since the run started. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_run_tick{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_run_reproduction_actions_spawned_total{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #A": "tick",
+              "Value #B": "births"
+            }
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "run",
+            "rowField": "tick",
+            "valueField": "births",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^tick\\\\run$",
+            "renamePattern": "tick"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "tick",
+                "destinationType": "number"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "tick"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "interval": "1s",
+      "maxDataPoints": 5000,
+      "options": {
+        "xField": "tick",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "trend",
+      "title": "Deaths so far by tick",
+      "description": "Creatures that died since the run started. One line per selected run, labelled by the first eight characters of its run ID. Points are sampled at a step of the time range divided by 5,000: narrow the range to the runs for finer detail.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 23,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_run_tick{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (run) (label_replace(petri_run_deaths_total{petri_run_id=~\"$runs\"}, \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": true,
+          "instant": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "Value #A": "tick",
+              "Value #B": "deaths"
+            }
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "run",
+            "rowField": "tick",
+            "valueField": "deaths",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "^tick\\\\run$",
+            "renamePattern": "tick"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "tick",
+                "destinationType": "number"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "tick"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "interval": "1s",
+      "maxDataPoints": 5000,
+      "options": {
+        "xField": "tick",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "row",
+      "title": "Behaviour, run totals side by side",
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 10,
+      "type": "barchart",
+      "title": "Barrier bumps next to a barrier, by barrier reader",
+      "description": "Of the moves a creature made while standing next to a barrier, the share that walked into the barrier. Split by whether the creature's brain has a reachable node reading the barrier input (presence, not use). If creatures that can sense barriers bump as often as creatures that cannot, the sensor is not shaping their movement. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum by (run, petri_reader_state) (label_replace(last_over_time(petri_run_move_blocked_barrier_with_barrier_neighbor_by_reader_state_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")) or 0 * sum by (run, petri_reader_state) (label_replace(last_over_time(petri_run_move_attempts_with_barrier_neighbor_by_reader_state_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))) / sum by (run, petri_reader_state) (label_replace(last_over_time(petri_run_move_attempts_with_barrier_neighbor_by_reader_state_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "petri_reader_state",
+            "rowField": "run",
+            "valueField": "Value",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "run\\petri_reader_state": "run"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "run",
+        "stacking": "none",
+        "groupWidth": 0.8,
+        "barWidth": 0.9,
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "barchart",
+      "title": "Eat hit rate, by food type",
+      "description": "Of the typed Eat actions naming a food type, the share that found food. A low hit rate means creatures eat without checking what is under them. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum by (run, petri_food_type) (label_replace(last_over_time(petri_run_eat_actions_applied_by_type_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")) or 0 * sum by (run, petri_food_type) (label_replace(last_over_time(petri_run_eat_actions_failed_by_type_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))) / ((sum by (run, petri_food_type) (label_replace(last_over_time(petri_run_eat_actions_applied_by_type_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")) or 0 * sum by (run, petri_food_type) (label_replace(last_over_time(petri_run_eat_actions_failed_by_type_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))) + (sum by (run, petri_food_type) (label_replace(last_over_time(petri_run_eat_actions_failed_by_type_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")) or 0 * sum by (run, petri_food_type) (label_replace(last_over_time(petri_run_eat_actions_applied_by_type_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "petri_food_type",
+            "rowField": "run",
+            "valueField": "Value",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "run\\petri_food_type": "run"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "run",
+        "stacking": "none",
+        "groupWidth": 0.8,
+        "barWidth": 0.9,
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "barchart",
+      "title": "Offspring per removed creature, by cognitive class",
+      "description": "Offspring spawned per creature, over creatures that have died or been removed so far (living creatures are not counted). Classes are an accounting precedence over carried structure (plasticity, then stateful node, then shared memory, then none), not an ability ranking. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum by (run, petri_cognitive_class) (label_replace(last_over_time(petri_run_reproductive_success_offspring_spawned_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")) or 0 * sum by (run, petri_cognitive_class) (label_replace(last_over_time(petri_run_reproductive_success_creatures_observed_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))) / sum by (run, petri_cognitive_class) (label_replace(last_over_time(petri_run_reproductive_success_creatures_observed_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "petri_cognitive_class",
+            "rowField": "run",
+            "valueField": "Value",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "run\\petri_cognitive_class": "run"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "run",
+        "stacking": "none",
+        "groupWidth": 0.8,
+        "barWidth": 0.9,
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "barchart",
+      "title": "Lifespan of removed creatures, by cognitive class",
+      "description": "Age at removal in ticks, averaged over creatures that have died or been removed so far (living creatures are not counted). Classes are an accounting precedence over carried structure (plasticity, then stateful node, then shared memory, then none), not an ability ranking. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum by (run, petri_cognitive_class) (label_replace(last_over_time(petri_run_reproductive_success_survival_ticks_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")) or 0 * sum by (run, petri_cognitive_class) (label_replace(last_over_time(petri_run_reproductive_success_creatures_observed_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))) / sum by (run, petri_cognitive_class) (label_replace(last_over_time(petri_run_reproductive_success_creatures_observed_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "petri_cognitive_class",
+            "rowField": "run",
+            "valueField": "Value",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "run\\petri_cognitive_class": "run"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "run",
+        "stacking": "none",
+        "groupWidth": 0.8,
+        "barWidth": 0.9,
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "barchart",
+      "title": "Deaths, share by cause",
+      "description": "Each cause's share of the run's deaths, where the cause is the energy debit that took the creature to zero. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (run, petri_cause) (label_replace(last_over_time(petri_run_deaths_by_cause_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")) / ignoring (petri_cause) group_left () sum by (run) (label_replace(last_over_time(petri_run_deaths_by_cause_total{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "petri_cause",
+            "rowField": "run",
+            "valueField": "Value",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "run\\petri_cause": "run"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "run",
+        "stacking": "normal",
+        "groupWidth": 0.8,
+        "barWidth": 0.9,
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "barchart",
+      "title": "Action mix (sampled)",
+      "description": "Each action's share of the actions taken at sampled ticks, averaged over the time range. One group of bars per selected run, labelled by the first eight characters of its run ID; totals over the whole time range.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (run, petri_action) (label_replace(avg_over_time(petri_tick_actions{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\")) / ignoring (petri_action) group_left () sum by (run) (label_replace(avg_over_time(petri_tick_actions{petri_run_id=~\"$runs\"}[$__range]), \"run\", \"$1\", \"petri_run_id\", \"(.{8}).*\"))",
+          "legendFormat": "",
+          "range": false,
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "petri_action",
+            "rowField": "run",
+            "valueField": "Value",
+            "emptyValue": "null"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "run\\petri_action": "run"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 1
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xField": "run",
+        "stacking": "normal",
+        "groupWidth": 0.8,
+        "barWidth": 0.9,
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 41,
+  "tags": [
+    "petri"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "runs",
+        "label": "Runs",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(petri_run_tick, petri_run_id)",
+          "refId": "runs"
+        },
+        "definition": "label_values(petri_run_tick, petri_run_id)",
+        "refresh": 2,
+        "sort": 0,
+        "includeAll": false,
+        "multi": true,
+        "current": {},
+        "options": [],
+        "hide": 0
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timezone": "utc",
+  "title": "Petri / Compare runs",
+  "uid": "petri-compare",
+  "version": 1
+}

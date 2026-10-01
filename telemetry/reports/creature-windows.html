@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creature Window Readings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a lab readout. Findings first (one column of readings), then the window viewer: a picker beside a tick-by-tick strip. */
+:root {
+  --plane: #f6f6f3;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --ring: rgba(11, 11, 11, 0.10);
+  --food: #1baf7a;
+  --fruit: #eb6834;
+  --other: #2a78d6;
+  --barrier: #6b6a64;
+  --blocked: #d03b3b;
+  --ok: #006300;
+  --chance: #0b0b0b;
+  --wash: rgba(42, 120, 214, 0.08);
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --plane: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255, 255, 255, 0.10);
+    --food: #199e70; --fruit: #d95926; --other: #3987e5; --barrier: #8f8d86; --blocked: #e05252;
+    --ok: #0ca30c; --chance: #ffffff; --wash: rgba(57, 135, 229, 0.14);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --plane: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255, 255, 255, 0.10);
+  --food: #199e70; --fruit: #d95926; --other: #3987e5; --barrier: #8f8d86; --blocked: #e05252;
+  --ok: #0ca30c; --chance: #ffffff; --wash: rgba(57, 135, 229, 0.14);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--plane); color: var(--ink); font: 400 16px/1.5 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; display: grid; gap: 40px; }
+h1, h2, h3 { font-family: var(--display); font-stretch: 85%; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 800; line-height: 1.05; }
+h2 { font-size: 24px; font-weight: 700; }
+h3 { font-size: 17px; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.ink2 { color: var(--ink-2); }
+header { display: grid; gap: 14px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 13px/1.4 var(--mono); color: var(--ink-2); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; font-size: 14px; }
+.controls select { font: 400 13px var(--mono); background: var(--surface); color: var(--ink); border: 1px solid var(--axis); border-radius: 6px; padding: 5px 8px; max-width: 100%; }
+a.btn { text-decoration: none; display: inline-block; }
+.status { font: 400 13px var(--mono); color: var(--ink-2); }
+.status.err { color: var(--blocked); }
+.content[hidden] { display: none !important; }
+.verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.verdict { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.verdict b { font: 700 26px/1.1 var(--display); font-stretch: 85%; }
+.verdict span { color: var(--ink-2); font-size: 14px; line-height: 1.35; }
+section { display: grid; gap: 16px; }
+.section-head { display: grid; gap: 6px; }
+.panel { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 18px; min-width: 0; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.three { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+.chart { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--ink-2); font: 400 12px var(--body); }
+.chart .val { fill: var(--ink); font: 600 12px var(--mono); }
+.chart .lbl { fill: var(--ink); font: 600 13px var(--body); }
+.chart .tick { fill: var(--muted); font: 400 11px var(--mono); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); align-items: center; }
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sw-line { width: 2px; height: 14px; background: var(--chance); display: inline-block; }
+details { font-size: 14px; color: var(--ink-2); }
+summary { cursor: pointer; color: var(--ink-2); }
+summary:focus-visible, button:focus-visible { outline: 2px solid var(--other); outline-offset: 2px; }
+.tbl-wrap { overflow-x: auto; margin-top: 8px; }
+table { border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 4px 12px 4px 0; border-bottom: 1px solid var(--grid); }
+td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.patterns { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.patterns li { display: grid; grid-template-columns: 3.2em 1fr; gap: 10px; align-items: baseline; font-size: 14px; min-width: 0; }
+.patterns code { font: 400 13px var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+.note { font-size: 13px; color: var(--muted); max-width: 72ch; }
+
+/* viewer */
+.viewer { display: grid; grid-template-columns: minmax(250px, 300px) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 820px) { .viewer { grid-template-columns: 1fr; } }
+.picker { display: grid; gap: 10px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 600 12px var(--body); border: 1px solid var(--axis); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.list { max-height: 560px; overflow-y: auto; border: 1px solid var(--ring); border-radius: 8px; background: var(--surface); }
+.row { display: grid; gap: 3px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--grid); background: transparent; color: var(--ink); padding: 8px 12px; cursor: pointer; font: inherit; }
+.row:hover { background: var(--wash); }
+.row[aria-current="true"] { background: var(--wash); box-shadow: inset 3px 0 0 var(--other); }
+.row .top { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
+.row .strip { font: 400 11px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pill { font: 600 10px/1 var(--mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--axis); color: var(--ink-2); }
+.pill.stuck { border-color: var(--blocked); color: var(--blocked); }
+.pill.died { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.detail { display: grid; gap: 14px; min-width: 0; }
+.dhead { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; }
+.nav { display: flex; gap: 6px; margin-left: auto; }
+.btn { font: 600 13px var(--body); border: 1px solid var(--axis); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.ticks { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+.tcol { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 10px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.tcol .th { display: flex; justify-content: space-between; font: 600 12px var(--mono); color: var(--ink-2); }
+.acts { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.acts li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; justify-content: space-between; }
+.res { font: 600 11px var(--mono); }
+.res.bad { color: var(--blocked); }
+.res.good { color: var(--ok); }
+.brain { display: flex; flex-wrap: wrap; gap: 3px; }
+.node { font: 600 10px/1 var(--mono); padding: 3px 4px; border-radius: 3px; border: 1px solid var(--axis); color: var(--muted); }
+.node.vote { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.small { font-size: 12px; color: var(--muted); }
+.grid-svg { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--surface); font: 400 12px/1.4 var(--body); padding: 6px 8px; border-radius: 6px; max-width: 260px; z-index: 10; }
+@media (prefers-reduced-motion: no-preference) { .row, .chip, .btn { transition: background-color 120ms; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Petri · creature window readings</div>
+    <h1 id="title">Creature windows</h1>
+    <p class="ink2">Every reading below comes from the creature windows the run recorded in the telemetry stack: consecutive ticks of one creature, with what it sensed in its eight neighboring cells, what its brain did, what it chose and what the world applied. Nothing new is measured.</p>
+    <form class="controls" id="controls">
+      <label for="run">Run</label>
+      <select id="run"></select>
+      <label for="limit">Windows</label>
+      <select id="limit"><option>100</option><option selected>300</option><option>1000</option></select>
+      <button class="btn" type="submit">Load</button>
+      <a class="btn" id="dash-link" href="#">Run dashboard</a>
+    </form>
+    <div class="meta" id="meta"></div>
+    <p class="status" id="status" role="status">Loading…</p>
+    <p class="status err" id="notice" hidden></p>
+  </header>
+
+  <div class="content" id="content" hidden style="display:grid;gap:40px">
+  <div class="verdicts" id="verdicts"></div>
+
+  <section>
+    <div class="section-head">
+      <div class="eyebrow">Senses → movement</div>
+      <h2>Where the first move of a tick lands, against chance</h2>
+      <p class="ink2">For each tick with a move, did the creature step toward a neighbor holding food, fruit, a barrier or another creature? Chance is the share of its eight neighbors holding that thing at the moment it sensed them. Ticks where none or all eight neighbors held it are left out, because there was no choice to make. A tick can hold several actions; only its first move starts from the sensed cell, so only that move is read here.</p>
+    </div>
+    <div class="two">
+      <div class="panel">
+        <svg class="chart" id="moves" role="img" aria-label="Share of first moves landing on each kind of neighbor, with the chance level"></svg>
+        <div class="legend" style="margin-top:8px"><span class="key"><span class="sw-line"></span>chance from the sensed neighbors</span><span class="key">bar: share of moves that went there</span></div>
+        <details><summary>Show as table</summary><div class="tbl-wrap"><table id="moves-table"></table></div></details>
+      </div>
+      <div class="panel" style="display:grid;gap:14px;align-content:start">
+        <h3>What the world did with those moves</h3>
+        <svg class="chart" id="outcomes" role="img" aria-label="Share of applied first moves that succeeded or were blocked"></svg>
+        <p class="note" id="not-applied"></p>
+        <h3>Eating on the sensed cell, against food underfoot</h3>
+        <svg class="chart" id="eat" role="img" aria-label="Share of ticks with an Eat chosen before any move, by whether food was underfoot"></svg>
+        <p class="note">Counts an Eat only when it comes before the tick's first move, because a later Eat lands on another cell. A creature that used its food sense would eat far more often when food is underfoot.</p>
+      </div>
+    </div>
+    <p class="note">Ticks inside one window are not independent: a creature pressed against a wall bumps it on every tick. Read the ratios as a description of this sample, not as a test, and check the counts.</p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div class="eyebrow">Behavior</div>
+      <h2>Fixed programs</h2>
+      <p class="ink2">A window whose action sequence repeats with a period of one to three ticks is running the same program whatever it senses. A window that only ever moves one way has no steering.</p>
+    </div>
+    <div class="two">
+      <div class="panel">
+        <svg class="chart" id="fixed" role="img" aria-label="Share of windows running a fixed program or moving one direction only"></svg>
+      </div>
+      <div class="panel">
+        <h3 style="margin-bottom:10px">Most common first four ticks</h3>
+        <ul class="patterns" id="patterns"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div class="eyebrow">Brain</div>
+      <h2>How much of the brain takes part in a decision</h2>
+      <p class="ink2">Per creature-tick: how many mesh hops ran, how many distinct nodes they visited, and how many of those nodes cast a non-zero vote. Visiting a node is not the same as using it.</p>
+    </div>
+    <div class="three">
+      <div class="panel"><h3>Hops per tick</h3><svg class="chart" id="h-hops" role="img" aria-label="Distribution of hops per tick"></svg></div>
+      <div class="panel"><h3>Distinct nodes visited</h3><svg class="chart" id="h-nodes" role="img" aria-label="Distribution of distinct nodes per tick"></svg></div>
+      <div class="panel"><h3>Nodes that cast a vote</h3><svg class="chart" id="h-voting" role="img" aria-label="Distribution of voting nodes per tick"></svg></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div class="eyebrow">Window viewer</div>
+      <h2>One creature, tick by tick</h2>
+      <p class="ink2">Each tick shows the 3×3 neighborhood it sensed at the start of the tick (north at the top), every action it chose in order with what the world did with it, and the brain nodes that ran, filled where the node cast a vote. Moves are drawn as a path: each starts where the earlier ones left the creature, so a second step can leave the sensed area.</p>
+    </div>
+    <div class="legend" id="grid-legend"></div>
+    <div class="viewer">
+      <div class="picker">
+        <div class="chips" id="chips" role="group" aria-label="Filter windows"></div>
+        <div class="list" id="list"></div>
+      </div>
+      <div class="detail" id="detail"></div>
+    </div>
+  </section>
+  </div>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(() => {
+  // ── data access: same-origin Grafana data source proxy ──────────────────
+  const PROXY = "/api/datasources/proxy/uid";
+  const params = new URLSearchParams(location.search);
+  const getJSON = async (url) => { const r = await fetch(url, { credentials: "same-origin" }); if (!r.ok) throw new Error(`${r.status} ${r.statusText} for ${url.split("?")[0]}`); return r.json(); };
+  const status = document.getElementById("status");
+  const fmt = (n) => Number(n).toLocaleString("en-US");
+  const say = (t, err) => { status.textContent = t; status.classList.toggle("err", !!err); };
+  const nowS = () => Math.floor(Date.now() / 1000);
+  const rangeS = () => {
+    const f = Number(params.get("from")), t = Number(params.get("to"));
+    return [Number.isFinite(f) && f > 0 ? Math.floor(f / 1000) : nowS() - 30 * 86400, Number.isFinite(t) && t > 0 ? Math.ceil(t / 1000) : nowS()];
+  };
+
+  function val(v) {
+    if (v.arrayValue) return (v.arrayValue.values || []).map(val);
+    if ("stringValue" in v) return v.stringValue;
+    if ("doubleValue" in v) return v.doubleValue;
+    if ("boolValue" in v) return v.boolValue;
+    if ("intValue" in v) return Number(v.intValue);
+    return null;
+  }
+  const attrs = (o) => Object.fromEntries((o.attributes || []).map((a) => [a.key.replace(/^petri\./, ""), val(a.value)]));
+  const ring = (a, k) => (Array.isArray(a[k]) && a[k].length === 8 ? a[k].map((x) => Math.round(x * 100) / 100) : null);
+
+  // one Tempo trace → one window, the same shape the prototype used
+  function parseWindow(trace) {
+    const spans = (trace.trace || trace).resourceSpans.flatMap((rs) => rs.scopeSpans.flatMap((ss) => ss.spans));
+    const ws = spans.find((s) => s.name === "creature_window");
+    if (!ws) return null;
+    const w = attrs(ws);
+    const ticks = spans.filter((s) => s.name === "creature_tick").map((s) => {
+      const a = attrs(s);
+      const sel = a.actions_selected || [];
+      const res = sel.map(() => null);
+      const hops = [];
+      for (const e of s.events || []) {
+        const ea = attrs(e);
+        if (e.name === "hop") hops.push([ea.node, (ea.backend || "?")[0], (ea.vote_contribution || []).reduce((t, x) => t + Math.abs(x), 0)]);
+        else if (e.name === "action" && Number.isInteger(ea.index) && ea.index < sel.length) res[ea.index] = ea.result;
+      }
+      return { t: a.tick, e0: a.energy_start || 0, e1: a.energy_end || 0, here: a.food_here || 0,
+        f0: ring(a, "neighbor_food.0"), f1: ring(a, "neighbor_food.1"), b: ring(a, "neighbor_barrier"), o: ring(a, "neighbor_occupied"),
+        sel, res, hops };
+    }).sort((x, y) => x.t - y.t);
+    if (!ticks.length) return null;
+    const seq = ticks.map((t) => t.sel.join("+") || "-");
+    const moveRes = ticks.flatMap((t) => t.sel.map((s, i) => (s.startsWith("move:") ? t.res[i] : null)).filter(Boolean));
+    const tags = [];
+    if (w.end_reason === "died") tags.push("died");
+    if (moveRes.length >= 4 && moveRes.every((r) => r !== "Success")) tags.push("stuck");
+    if (seq.length >= 4 && [1, 2, 3].some((p) => seq.every((x, i) => x === seq[i % p]))) tags.push("fixed");
+    if (new Set(seq.flatMap((x) => x.split("+")).filter((m) => m.startsWith("move:"))).size > 2) tags.push("varied");
+    return { id: w.window, creature: w.creature_id, lineage: w.lineage_id, gen: w.generation, gsize: w.genome_size, end: w.end_reason,
+      truncated: w.truncated === true || w.truncated === "true", tags, ticks };
+  }
+
+  // the readings: same definitions as the prototype (first move only; Eat before the first move)
+  function readings(W) {
+    const labels = [["f0", "Primary food"], ["f1", "Fruit"], ["b", "Barrier"], ["o", "Another creature"]];
+    const mv = {}, ch = {}, hit = {};
+    for (const [, l] of labels) { mv[l] = 0; ch[l] = 0; hit[l] = 0; }
+    const res = { Success: 0, Blocked: 0, "Not applied": 0 };
+    const eat = { here: 0, hereEat: 0, none: 0, noneEat: 0 };
+    const hist = { hops: new Map(), nodes: new Map(), voting: new Map() };
+    const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+    for (const w of W) for (const t of w.ticks) {
+      const first = t.sel.findIndex((s) => s.startsWith("move:"));
+      if (first >= 0) {
+        const d = Number(t.sel[first].split(":")[1]);
+        const r = t.res[first] || "Not applied";
+        res[r] = (res[r] || 0) + 1;
+        for (const [k, l] of labels) {
+          const rg = t[k];
+          if (!rg) continue;
+          const present = rg.map((x) => x > 0), n = present.filter(Boolean).length;
+          if (n === 0 || n === 8) continue;
+          mv[l]++; hit[l] += present[d] ? 1 : 0; ch[l] += n / 8;
+        }
+      }
+      const before = first >= 0 ? t.sel.slice(0, first) : t.sel;
+      const ate = before.some((s) => s.startsWith("eat"));
+      if (t.here > 0) { eat.here++; eat.hereEat += ate; } else { eat.none++; eat.noneEat += ate; }
+      bump(hist.hops, t.hops.length);
+      bump(hist.nodes, new Set(t.hops.map((h) => h[0])).size);
+      bump(hist.voting, new Set(t.hops.filter((h) => h[2] > 0).map((h) => h[0])).size);
+    }
+    const full = W.filter((w) => w.ticks.length >= 4);
+    const patterns = new Map();
+    for (const w of full) { const p = w.ticks.slice(0, 4).map((t) => t.sel.join("+") || "—").join(" · "); patterns.set(p, (patterns.get(p) || 0) + 1); }
+    const energy = W.map((w) => w.ticks[w.ticks.length - 1].e1 - w.ticks[0].e0).sort((a, b) => a - b);
+    return {
+      windows: W.length,
+      ticks: W.reduce((n, w) => n + w.ticks.length, 0),
+      tick_range: [Math.min(...W.map((w) => w.ticks[0].t)), Math.max(...W.map((w) => w.ticks[w.ticks.length - 1].t))],
+      moves: labels.map(([, l]) => ({ label: l, n: mv[l], landed: mv[l] ? hit[l] / mv[l] : 0, chance: mv[l] ? ch[l] / mv[l] : 0 })),
+      move_results: res,
+      eat: { here_n: eat.here, here: eat.here ? eat.hereEat / eat.here : 0, none_n: eat.none, none: eat.none ? eat.noneEat / eat.none : 0 },
+      fixed: { n: full.length, periodic: full.filter((w) => w.tags.includes("fixed")).length,
+        one_direction: full.filter((w) => new Set(w.ticks.flatMap((t) => t.sel.filter((s) => s.startsWith("move:")))).size === 1).length,
+        patterns: [...patterns].sort((a, b) => b[1] - a[1]).slice(0, 6) },
+      hist: Object.fromEntries(Object.entries(hist).map(([k, m]) => [k, [...m].sort((a, b) => a[0] - b[0])])),
+      energy: { median: energy[Math.floor(energy.length / 2)] || 0, losing: energy.filter((e) => e < 0).length / (energy.length || 1), died: W.filter((w) => w.end === "died").length },
+    };
+  }
+
+  async function runs() {
+    const to = nowS();
+    const q = `{service_name=~"v3-cli|v3-server|v3-lab"} | event_name=~"run.started|run.ended"`;
+    const r = await getJSON(`${PROXY}/loki/loki/api/v1/query_range?` + new URLSearchParams({ query: q, start: String(to - 86400 * 365) + "000000000", end: String(to) + "000000000", limit: "2000", direction: "backward" }));
+    const started = new Map(), ended = new Map();
+    for (const st of r.data.result) for (const [ns] of st.values) {
+      const rec = { ...st.stream, ts: Number(ns) / 1e6 };
+      (rec.event_name === "run.ended" ? ended : started).set(rec.petri_run_id, rec);
+    }
+    return [...started.values()].map((x) => {
+      const e = ended.get(x.petri_run_id);
+      return { ...x, endTs: e ? e.ts : null, windowsCapped: e ? e.petri_windows_capped || null : null };
+    }).sort((a, b) => b.ts - a.ts);
+  }
+
+  // Tempo searches at most 7 days at a time: walk the range newest first in 7-day slices
+  async function windowsFor(run, limit, from, to) {
+    const q = `{ span.petri.run_id = "${run}" && name = "creature_window" } | select(span.petri.tick, span.petri.ticks_recorded, span.petri.window)`;
+    const SLICE = 7 * 86400 - 60;
+    let found = [];
+    for (let end = to; end > from && found.length < limit; end -= SLICE) {
+      const start = Math.max(from, end - SLICE);
+      say(`Finding creature windows… ${found.length} so far`);
+      const r = await getJSON(`${PROXY}/tempo/api/search?` + new URLSearchParams({ q, start: String(start), end: String(end), limit: "20000", spss: "1" }));
+      found = found.concat(r.traces || []);
+    }
+    found = [...new Map(found.map((t) => [t.traceID, t])).values()].sort((a, b) => Number(b.startTimeUnixNano) - Number(a.startTimeUnixNano));
+    const pick = found.slice(0, limit);
+    let newest = null;
+    if (found.length) {
+      const t0 = found[0];
+      const a = Object.fromEntries(((t0.spanSet || (t0.spanSets || [])[0] || {}).spans || []).flatMap((sp) => sp.attributes || []).map((x) => [x.key, val(x.value)]));
+      const tick = Number(a["petri.tick"]), n = Number(a["petri.ticks_recorded"]) || 1;
+      const startS = Number(t0.startTimeUnixNano) / 1e9;
+      if (Number.isFinite(tick)) newest = { startS, endS: startS + (Number(t0.durationMs) || 0) / 1000, endTick: tick + n - 1, index: Number(a["petri.window"]) };
+    }
+    const W = [], failed = [];
+    let done = 0, incomplete = 0;
+    const queue = pick.map((t) => t.traceID);
+    const fetchTrace = async (id) => {
+      try { return await getJSON(`${PROXY}/tempo/api/v2/traces/${id}`); }
+      catch { return getJSON(`${PROXY}/tempo/api/v2/traces/${id}`); } // one retry
+    };
+    const worker = async () => {
+      while (queue.length) {
+        const id = queue.shift();
+        try {
+          const w = parseWindow(await fetchTrace(id));
+          if (w) W.push(w); else incomplete++; // trace without a window span or ticks
+        } catch (e) { failed.push({ id, msg: e.message }); }
+        done++;
+        if (done % 10 === 0 || done === pick.length) say(`Loading creature windows… ${done} of ${pick.length}${failed.length ? ` (${failed.length} failed)` : ""}`);
+      }
+    };
+    await Promise.all(Array.from({ length: 8 }, worker));
+    W.sort((a, b) => a.id - b.id);
+    return { W, total: found.length, requested: pick.length, failed, incomplete, newest };
+  }
+
+  async function main() {
+    const runSel = document.getElementById("run"), limSel = document.getElementById("limit");
+    let list = [];
+    try { list = await runs(); } catch (e) { say(`Could not list runs from Loki: ${e.message}`, true); }
+    const wanted = params.get("run") || (list[0] && list[0].petri_run_id);
+    runSel.replaceChildren(...list.map((r) => {
+      const o = document.createElement("option");
+      o.value = r.petri_run_id;
+      o.textContent = `${r.petri_run_id.slice(0, 8)} · ${r.service_name} · ${r.petri_world || "?"} · seed ${r.petri_seed} · ${new Date(r.ts).toISOString().slice(0, 16).replace("T", " ")}`;
+      return o;
+    }));
+    if (wanted && !list.some((r) => r.petri_run_id === wanted)) { const o = document.createElement("option"); o.value = o.textContent = wanted; runSel.prepend(o); }
+    runSel.value = wanted || "";
+    if (params.get("limit")) limSel.value = params.get("limit");
+    document.getElementById("controls").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const p = new URLSearchParams(location.search);
+      p.set("run", runSel.value); p.set("limit", limSel.value);
+      location.search = p.toString();
+    });
+    if (!wanted) { say("No runs found in the selected time range.", true); return; }
+    const id = list.find((r) => r.petri_run_id === wanted) || {};
+    // the run's own lifetime, narrowed by a from/to in the URL when one is given
+    let [from, to] = rangeS();
+    if (id.ts) { from = Math.max(params.get("from") ? from : 0, Math.floor(id.ts / 1000) - 60); }
+    if (id.endTs && !params.get("to")) to = Math.ceil(id.endTs / 1000) + 60;
+    document.getElementById("dash-link").href = `/d/petri-run?var-run_id=${encodeURIComponent(wanted)}&from=${from * 1000}&to=${to * 1000}`;
+    say("Finding creature windows…");
+    let W, total, requested, failed, incomplete, newest;
+    try { ({ W, total, requested, failed, incomplete, newest } = await windowsFor(wanted, Number(limSel.value) || 300, from, to)); }
+    catch (e) { say(`Could not search Tempo for creature windows: ${e.message}`, true); return; }
+    if (!W.length && requested) {
+      say(`Found ${requested} creature windows but could not read any of them: ${failed.length} failed to load${failed.length ? ` (first error: ${failed[0].msg})` : ""}, ${incomplete} were incomplete traces. No readings shown.`, true);
+      return;
+    }
+    if (!W.length) {
+      say(id.petri_creature_windows === "on" ? "No creature windows for this run in the selected time range." : "This run recorded no creature windows: they were off for it, or it ran before telemetry recorded them.", true);
+      return;
+    }
+    const META = { run: wanted, service: id.service_name, world: id.petri_world, seed: id.petri_seed, build: id.petri_build_revision,
+      windowTicks: id.petri_window_ticks, windowIntervalMs: Number(id.petri_window_interval_ms) || null, total,
+      requested, failed: failed.length, incomplete, truncated: W.filter((w) => w.truncated).length };
+    if (failed.length || incomplete) {
+      say(`Readings cover ${W.length} of the ${requested} windows requested: ${failed.length} failed to load${failed.length ? ` (first error: ${failed[0].msg})` : ""} and ${incomplete} were incomplete traces. Press Load to try again.`, true);
+    } else {
+      say(`Showing ${W.length} creature windows.`);
+    }
+    document.getElementById("content").hidden = false;
+    const R = readings(W);
+    render(R, W, META);
+    // Each run records at most 4,096 windows or 256 MiB of them (T21.F04), and says
+    // which cap it met only in its run.ended record. Windows start on a wall-clock
+    // interval, so "recording stopped" means: after the newest window ended and a
+    // new one was due, the run kept ticking with creatures alive and none started.
+    const notice = document.getElementById("notice");
+    const nw = newest;
+    if (nw) {
+      const at = `tick ${fmt(nw.endTick)} (${new Date(nw.startS * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC)`;
+      if (id.windowsCapped) {
+        notice.textContent = `This run used up its creature-window budget (${id.windowsCapped === "bytes" ? "256 MiB of windows" : "4,096 windows"}). Its newest window ends at ${at}; readings describe the run up to there.`;
+        notice.hidden = false;
+      } else {
+        const intervalS = (Number(META.windowIntervalMs) || 10000) / 1000;
+        const dueS = Math.max(nw.startS + intervalS, nw.endS) + 30;
+        const spanS = Math.floor(to - dueS);
+        // A sample's trace ID is the run ID's first half plus 2^63 + its index (T21.F04),
+        // so later samples can be asked for directly, without waiting on search to catch up.
+        const laterExists = async () => {
+          if (!Number.isInteger(nw.index)) return true; // cannot check: say nothing
+          for (let k = nw.index + 1; k <= nw.index + 3; k++) {
+            const tid = wanted.slice(0, 16) + (BigInt(2) ** BigInt(63) + BigInt(k)).toString(16).padStart(16, "0");
+            // 404 or an empty trace: that sample is absent. Any other failure: cannot
+            // tell, so claim nothing.
+            let r;
+            try { r = await fetch(`${PROXY}/tempo/api/v2/traces/${tid}`, { credentials: "same-origin" }); } catch { return true; }
+            if (r.status === 404) continue;
+            if (!r.ok) return true;
+            let t;
+            try { t = await r.json(); } catch { return true; }
+            if (((t.trace || {}).resourceSpans || []).length) return true;
+          }
+          return false;
+        };
+        if (spanS >= Math.max(300, 10 * intervalS) && !(await laterExists())) {
+          const sel = `{petri_run_id="${wanted}"}`;
+          const q1 = `max_over_time(petri_run_tick${sel}[${spanS}s]) - min_over_time(petri_run_tick${sel}[${spanS}s])`;
+          const q2 = `max_over_time(petri_tick_population${sel}[${spanS}s])`;
+          const q3 = `max_over_time(petri_run_tick${sel}[${spanS}s])`;
+          try {
+            const ask = (q) => getJSON(`${PROXY}/prometheus/api/v1/query?` + new URLSearchParams({ query: q, time: String(to) }))
+              .then((r) => (r.data.result.length ? Number(r.data.result[0].value[1]) : null));
+            const [advanced, pop, runTick] = await Promise.all([ask(q1), ask(q2), ask(q3)]);
+            if (advanced > 0 && pop > 0) {
+              notice.textContent = `The telemetry stack holds no creature window from this run after the one ending at ${at}, although the run kept ticking with creatures alive for at least ${Math.round(spanS / 60)} minutes after the next was due, to tick ${fmt(runTick)}. Each run records at most 4,096 windows or 256 MiB of them and names the cap it met only when it ends, so the likeliest cause is that this run used up its budget. Readings describe the run up to ${at.split(" (")[0]}.`;
+              notice.hidden = false;
+            }
+          } catch (e) { console.warn("stopped-recording check skipped:", e); }
+        }
+      }
+    }
+  }
+
+  function render(R, W, META) {
+  const DIRS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const CELL = { 0: [1, 0], 1: [2, 0], 2: [2, 1], 3: [2, 2], 4: [1, 2], 5: [0, 2], 6: [0, 1], 7: [0, 0] };
+  const pct = (x) => (x * 100).toFixed(0) + "%";
+  const fmt = (n) => n.toLocaleString("en-US");
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs = {}, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const html = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const actionName = (s) => {
+    if (s === "noop") return "Noop";
+    const [a, d] = s.split(":");
+    const name = { move: "Move", eat: "Eat", reproduce: "Reproduce", steal: "Steal" }[a] || a;
+    return a === "move" ? `${name} ${DIRS[+d]}` : a === "eat" ? `${name} type ${d}` : a === "reproduce" ? `${name} ${DIRS[+d]}` : `${name}`;
+  };
+
+  // tooltip
+  const tip = document.getElementById("tip");
+  const showTip = (ev, text) => { tip.textContent = text; tip.hidden = false; const x = Math.min(ev.clientX + 12, innerWidth - 270); tip.style.left = x + "px"; tip.style.top = ev.clientY + 14 + "px"; };
+  const hideTip = () => { tip.hidden = true; };
+  const hover = (node, text) => { node.addEventListener("pointermove", (e) => showTip(e, text)); node.addEventListener("pointerleave", hideTip); };
+
+  // header
+  const applied = R.move_results.Blocked + R.move_results.Success;
+  const blocked = applied ? R.move_results.Blocked / applied : 0;
+  document.getElementById("meta").replaceChildren(...[
+    `run ${META.run.slice(0, 8)} · ${META.service || "?"}`,
+    `world ${META.world || "?"} · seed ${META.seed || "?"}`,
+    `build ${(META.build || "?").slice(0, 10)}`,
+    `${R.windows} windows · ${fmt(R.ticks)} creature-ticks`,
+    `ticks ${fmt(R.tick_range[0])}–${fmt(R.tick_range[1])}`,
+    `windows of ${META.windowTicks || "?"} ticks every ${META.windowIntervalMs ? META.windowIntervalMs / 1000 + " s" : "?"}`,
+    META.total > META.requested ? `latest ${fmt(META.requested)} of ${fmt(META.total)} windows in range requested` : `all ${fmt(META.total)} windows in range requested`,
+    ...(META.failed || META.incomplete ? [`${META.failed} failed to load · ${META.incomplete} incomplete · readings use ${R.windows}`] : []),
+    ...(META.truncated ? [`${META.truncated} windows cut short by the recorder's size cap`] : []),
+  ].map((t) => html("span", "", t)));
+  document.getElementById("title").textContent = `Creature windows · run ${META.run.slice(0, 8)}`;
+  const mv = Object.fromEntries(R.moves.map((m) => [m.label, m]));
+  const verdicts = [
+    [pct(blocked), "of applied first moves are blocked. The creature stays where it was."],
+    mv["Barrier"].n ? [(mv["Barrier"].landed / mv["Barrier"].chance).toFixed(1) + "×", `chance: how often a move heads into a sensed barrier (${fmt(mv["Barrier"].n)} moves).`] : ["—", "no move was made next to a barrier in this sample."],
+    [R.fixed.n ? pct(R.fixed.periodic / R.fixed.n) : "—", "of windows repeat the same 1–3 tick program for all their ticks."],
+    [pct(R.energy.losing), "of windows end with less energy than they started."],
+  ];
+  const vbox = document.getElementById("verdicts");
+  vbox.replaceChildren();
+  for (const [b, s] of verdicts) { const d = html("div", "verdict"); d.append(html("b", "", b), html("span", "", s)); vbox.append(d); }
+
+  // moves against chance
+  const color = { "Primary food": "var(--food)", "Fruit": "var(--fruit)", "Barrier": "var(--barrier)", "Another creature": "var(--other)" };
+  (() => {
+    const svg = document.getElementById("moves");
+    svg.replaceChildren();
+    const W0 = 520, rowH = 54, top = 10, left = 128, right = 96, H = top + rowH * R.moves.length + 26;
+    svg.setAttribute("viewBox", `0 0 ${W0} ${H}`);
+    const x = (v) => left + v * (W0 - left - right);
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+      el("line", { x1: x(t), x2: x(t), y1: top, y2: H - 22, stroke: "var(--grid)", "stroke-width": 1 }, svg);
+      el("text", { x: x(t), y: H - 6, "text-anchor": "middle", class: "tick" }, svg).textContent = pct(t);
+    }
+    R.moves.forEach((m, i) => {
+      const y = top + i * rowH + 12;
+      el("text", { x: 0, y: y + 12, class: "lbl" }, svg).textContent = m.label;
+      el("text", { x: 0, y: y + 28, class: "tick" }, svg).textContent = `n = ${fmt(m.n)} moves`;
+      const bar = el("rect", { x: x(0), y, width: Math.max(2, x(m.landed) - x(0)), height: 18, rx: 4, fill: color[m.label] }, svg);
+      el("line", { x1: x(m.chance), x2: x(m.chance), y1: y - 5, y2: y + 23, stroke: "var(--chance)", "stroke-width": 2 }, svg);
+      const ratio = m.n ? m.landed / m.chance : NaN;
+      el("text", { x: W0 - right + 10, y: y + 13, class: "val" }, svg).textContent = m.n ? `${ratio.toFixed(1)}× chance` : "no data";
+      const hit = el("rect", { x: 0, y: y - 8, width: W0, height: rowH - 10, fill: "transparent" }, svg);
+      hover(hit, m.n ? `${m.label}: ${pct(m.landed)} of ${fmt(m.n)} moves went there; chance ${pct(m.chance)} (${ratio.toFixed(2)}×)` : `${m.label}: no move had this choice in the sample`);
+      void bar;
+    });
+    const t = document.getElementById("moves-table");
+    t.innerHTML = "<tr><th>Neighbor</th><th>Moves</th><th>Went there</th><th>Chance</th><th>Ratio</th></tr>" +
+      R.moves.map((m) => m.n ? `<tr><td>${m.label}</td><td class="n">${fmt(m.n)}</td><td class="n">${(m.landed * 100).toFixed(1)}%</td><td class="n">${(m.chance * 100).toFixed(1)}%</td><td class="n">${(m.landed / m.chance).toFixed(2)}×</td></tr>` : `<tr><td>${m.label}</td><td class="n">0</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>`).join("");
+  })();
+
+  // simple labelled horizontal bars
+  function hbars(id, rows, opts = {}) {
+    const svg = document.getElementById(id);
+    svg.replaceChildren();
+    const W0 = 520, rowH = 36, left = opts.left ?? 170, right = 60, H = rowH * rows.length + 4;
+    svg.setAttribute("viewBox", `0 0 ${W0} ${H}`);
+    const x = (v) => left + v * (W0 - left - right);
+    rows.forEach((r, i) => {
+      const y = i * rowH + 6;
+      el("text", { x: 0, y: y + 13, class: "lbl" }, svg).textContent = r.label;
+      if (r.sub) el("text", { x: 0, y: y + 28, class: "tick" }, svg).textContent = r.sub;
+      el("rect", { x: x(0), y, width: x(1) - x(0), height: 18, rx: 4, fill: "var(--grid)" }, svg);
+      el("rect", { x: x(0), y, width: Math.max(2, x(r.v) - x(0)), height: 18, rx: 4, fill: r.color || "var(--other)" }, svg);
+      el("text", { x: x(1) + 8, y: y + 13, class: "val" }, svg).textContent = pct(r.v);
+      const hit = el("rect", { x: 0, y: y - 4, width: W0, height: rowH - 4, fill: "transparent" }, svg);
+      hover(hit, r.tip || `${r.label}: ${pct(r.v)}`);
+    });
+  }
+  const nm = applied;
+  hbars("outcomes", [
+    { label: "Moved", sub: `${fmt(R.move_results.Success)} of ${fmt(nm)}`, v: R.move_results.Success / nm, color: "var(--ok)" },
+    { label: "✕ Blocked", sub: `${fmt(R.move_results.Blocked)} of ${fmt(nm)}`, v: R.move_results.Blocked / nm, color: "var(--blocked)" },
+  ]);
+  document.getElementById("not-applied").textContent = `${R.move_results["Not applied"] || 0} first moves were chosen but never applied (the tick ended first) and are left out of these two bars.`;
+  hbars("eat", [
+    { label: "Food underfoot", sub: `${fmt(R.eat.here_n)} ticks`, v: R.eat.here, color: "var(--food)", tip: `Ate on ${pct(R.eat.here)} of ${fmt(R.eat.here_n)} ticks with food underfoot` },
+    { label: "Nothing underfoot", sub: `${fmt(R.eat.none_n)} ticks`, v: R.eat.none, color: "var(--barrier)", tip: `Ate on ${pct(R.eat.none)} of ${fmt(R.eat.none_n)} ticks with nothing underfoot` },
+  ]);
+  hbars("fixed", [
+    { label: "Repeat a 1–3 tick program", sub: `${R.fixed.periodic} of ${R.fixed.n} windows`, v: R.fixed.periodic / R.fixed.n },
+    { label: "Move one way only", sub: `${R.fixed.one_direction} of ${R.fixed.n} windows`, v: R.fixed.one_direction / R.fixed.n },
+  ], { left: 190 });
+  const pl = document.getElementById("patterns");
+  pl.replaceChildren();
+  for (const [p, n] of R.fixed.patterns) {
+    const li = html("li");
+    const pretty = p.split(" · ").map((tick) => tick.split("+").map((a) => a === "—" ? "—" : actionName(a)).join(" + ")).join("  →  ");
+    li.append(html("span", "mono muted", "×" + n), html("code", "", pretty));
+    pl.append(li);
+  }
+
+  // histograms
+  function hist(id, pairs, bins, unit) {
+    const counts = bins.map(() => 0);
+    let total = 0;
+    for (const [v, c] of pairs) { const i = bins.findIndex(([lo, hi]) => v >= lo && v <= hi); if (i >= 0) counts[i] += c; total += c; }
+    const svg = document.getElementById(id);
+    svg.replaceChildren();
+    if (!total) { svg.setAttribute("viewBox", "0 0 300 60"); el("text", { x: 150, y: 30, "text-anchor": "middle", class: "tick" }, svg).textContent = "no ticks"; return; }
+    const W0 = 300, H0 = 170, top = 18, bottom = 30, gap = 2;
+    svg.setAttribute("viewBox", `0 0 ${W0} ${H0}`);
+    const max = Math.max(...counts);
+    const bw = (W0 - gap * (bins.length - 1)) / bins.length;
+    el("line", { x1: 0, x2: W0, y1: H0 - bottom, y2: H0 - bottom, stroke: "var(--axis)", "stroke-width": 1 }, svg);
+    counts.forEach((c, i) => {
+      const h = max ? (c / max) * (H0 - top - bottom) : 0;
+      const x = i * (bw + gap);
+      el("rect", { x, y: H0 - bottom - h, width: bw, height: Math.max(h, 0), rx: 3, fill: "var(--other)" }, svg);
+      const [lo, hi] = bins[i];
+      el("text", { x: x + bw / 2, y: H0 - bottom + 14, "text-anchor": "middle", class: "tick" }, svg).textContent = lo === hi ? lo : `${lo}–${hi}`;
+      if (c === max) el("text", { x: x + bw / 2, y: H0 - bottom - h - 5, "text-anchor": "middle", class: "val" }, svg).textContent = pct(c / total);
+      const hit = el("rect", { x, y: top - 10, width: bw, height: H0 - top - bottom + 10, fill: "transparent" }, svg);
+      hover(hit, `${lo === hi ? lo : lo + "–" + hi} ${unit}: ${fmt(c)} ticks (${pct(c / total)})`);
+    });
+    el("text", { x: W0 / 2, y: H0 - 2, "text-anchor": "middle", class: "tick" }, svg).textContent = unit;
+  }
+  hist("h-hops", R.hist.hops, [[1, 4], [5, 8], [9, 12], [13, 16], [17, 24], [25, 32], [33, 48], [49, 96]], "hops");
+  hist("h-nodes", R.hist.nodes, [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 8], [9, 14]], "nodes");
+  hist("h-voting", R.hist.voting, [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5]], "voting nodes");
+
+  // grid legend
+  const gl = document.getElementById("grid-legend");
+  gl.replaceChildren();
+  const legendItems = [["var(--food)", "Primary food (shade = amount)"], ["var(--fruit)", "Fruit"], ["var(--other)", "Another creature"], ["var(--barrier)", "Barrier"]];
+  for (const [c, t] of legendItems) { const k = html("span", "key"); const s = html("span", "sw"); s.style.background = c; k.append(s, document.createTextNode(t)); gl.append(k); }
+  const kArrow = html("span", "key"); kArrow.innerHTML = '<svg width="22" height="12" aria-hidden="true"><line x1="1" y1="6" x2="17" y2="6" stroke="currentColor" stroke-width="2"/><path d="M15 2 L21 6 L15 10 Z" fill="currentColor"/></svg>move'; gl.append(kArrow);
+  const kBlock = html("span", "key"); kBlock.innerHTML = '<span class="res bad">✕</span> blocked move'; gl.append(kBlock);
+  const kNode = html("span", "key"); kNode.innerHTML = '<span class="node vote">7g</span> node that voted · <span class="node">7v</span> node that ran (g graph, v VM)'; gl.append(kNode);
+
+  // sensed grid for one tick, on a 5×5 field so a multi-move path can leave the sensed 3×3
+  function grid(t) {
+    const c = 30, S = c * 5, svg = el("svg", { viewBox: `0 0 ${S} ${S}`, class: "grid-svg", role: "img" });
+    const cellXY = (gx, gy) => [(gx + 2) * c, (gy + 2) * c];
+    const desc = [];
+    // path of moves, each from where the previous ones left the creature
+    const steps = [];
+    let px = 0, py = 0, off = 0;
+    t.sel.forEach((a, i) => {
+      if (!a.startsWith("move:")) return;
+      const d = +a.split(":")[1];
+      const [cx, cy] = CELL[d];
+      const dx = cx - 1, dy = cy - 1, r = t.res[i];
+      if (Math.abs(px + dx) > 2 || Math.abs(py + dy) > 2) { off++; return; }
+      steps.push({ n: steps.length + 1, x0: px, y0: py, dx, dy, r, label: actionName(a) });
+      if (r === "Success") { px += dx; py += dy; }
+    });
+    const reached = new Set(steps.map((m) => `${m.x0 + m.dx},${m.y0 + m.dy}`));
+    // outer ring: only the cells the path reaches, outlined as not sensed
+    for (let gy = -2; gy <= 2; gy++) for (let gx = -2; gx <= 2; gx++) {
+      if (Math.abs(gx) <= 1 && Math.abs(gy) <= 1) continue;
+      if (!reached.has(`${gx},${gy}`)) continue;
+      const [x, y] = cellXY(gx, gy);
+      el("rect", { x: x + 1, y: y + 1, width: c - 2, height: c - 2, rx: 4, fill: "none", stroke: "var(--axis)", "stroke-dasharray": "3 3" }, svg);
+    }
+    for (let d = 0; d < 8; d++) {
+      const [cx, cy] = CELL[d];
+      const [x, y] = cellXY(cx - 1, cy - 1);
+      const f0 = t.f0 ? t.f0[d] : 0, f1 = t.f1 ? t.f1[d] : 0, b = t.b ? t.b[d] : 0, o = t.o ? t.o[d] : 0;
+      el("rect", { x: x + 1, y: y + 1, width: c - 2, height: c - 2, rx: 4, fill: "var(--plane)", stroke: "var(--grid)" }, svg);
+      if (f0 > 0) el("rect", { x: x + 1, y: y + 1, width: c - 2, height: c - 2, rx: 4, fill: "var(--food)", "fill-opacity": 0.25 + 0.6 * Math.min(f0, 1) }, svg);
+      if (b > 0) el("rect", { x: x + 1, y: y + 1, width: c - 2, height: c - 2, rx: 4, fill: "var(--barrier)" }, svg);
+      if (f1 > 0) el("path", { d: `M${x + c - 10} ${y + 3} l5 5 l-5 5 l-5 -5 Z`, fill: "var(--fruit)", stroke: "var(--surface)", "stroke-width": 1.5 }, svg);
+      if (o > 0) el("circle", { cx: x + c / 2, cy: y + c / 2, r: 6.5, fill: "var(--other)", stroke: "var(--surface)", "stroke-width": 2 }, svg);
+      const parts = [];
+      if (f0 > 0) parts.push(`food ${f0}`); if (f1 > 0) parts.push(`fruit ${f1}`); if (b > 0) parts.push("barrier"); if (o > 0) parts.push("creature");
+      desc.push(`${DIRS[d]}: ${parts.join(", ") || "empty"}`);
+      const hit = el("rect", { x, y, width: c, height: c, fill: "transparent" }, svg);
+      hover(hit, `${DIRS[d]} (sensed at tick start): ${parts.join(", ") || "empty"}`);
+    }
+    const [sx0, sy0] = cellXY(0, 0);
+    el("rect", { x: sx0 + 1, y: sy0 + 1, width: c - 2, height: c - 2, rx: 4, fill: t.here > 0 ? "var(--food)" : "var(--plane)", "fill-opacity": t.here > 0 ? 0.25 + 0.6 * Math.min(t.here, 1) : 1, stroke: "var(--ink)", "stroke-width": 2 }, svg);
+    const ctr = (gx, gy) => [(gx + 2.5) * c, (gy + 2.5) * c];
+    for (const m of steps) {
+      const [ax, ay] = ctr(m.x0, m.y0), [bx, by] = ctr(m.x0 + m.dx, m.y0 + m.dy);
+      const len = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / len, uy = (by - ay) / len;
+      const bad = m.r && m.r !== "Success", none = !m.r;
+      const col = bad ? "var(--blocked)" : none ? "var(--muted)" : "var(--ink)";
+      const sx = ax + ux * 7, sy = ay + uy * 7, ex = bx - ux * 6, ey = by - uy * 6;
+      el("line", { x1: sx, y1: sy, x2: ex - ux * 5, y2: ey - uy * 5, stroke: col, "stroke-width": 2.5, "stroke-linecap": "round", ...(none ? { "stroke-dasharray": "3 3" } : {}) }, svg);
+      const qx = -uy, qy = ux;
+      el("path", { d: `M${ex} ${ey} L${ex - ux * 8 + qx * 4.5} ${ey - uy * 8 + qy * 4.5} L${ex - ux * 8 - qx * 4.5} ${ey - uy * 8 - qy * 4.5} Z`, fill: col }, svg);
+      if (bad) { const x2 = el("text", { x: bx, y: by + 4, "text-anchor": "middle", fill: "var(--blocked)", "font-size": 12, "font-weight": 700 }, svg); x2.textContent = "✕"; }
+      if (steps.length > 1) { const n = el("text", { x: sx + ux * 8 + qx * 7, y: sy + uy * 8 + qy * 7 + 3.5, "text-anchor": "middle", fill: col, "font-size": 9, "font-weight": 700 }, svg); n.textContent = m.n; }
+    }
+    const pathText = steps.map((m) => `${m.n}. ${m.label} ${m.r ? (m.r === "Success" ? "moved" : m.r.toLowerCase()) : "not applied"}`).join("; ");
+    svg.setAttribute("aria-label", `Sensed at tick start: ${desc.join("; ")}. Underfoot: ${t.here > 0 ? "food " + t.here : "nothing"}. Moves: ${pathText || "none"}${off ? `; ${off} more off view` : ""}.`);
+    const wrap = html("div");
+    wrap.append(svg);
+    if (off) wrap.append(html("div", "small", `+${off} move${off > 1 ? "s" : ""} beyond this view`));
+    return wrap;
+  }
+
+  function energyLine(ticks) {
+    const W0 = 600, H0 = 70, pad = 8;
+    const pts = [ticks[0].e0, ...ticks.map((t) => t.e1)];
+    const lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1;
+    const x = (i) => pad + (i * (W0 - 2 * pad)) / (pts.length - 1);
+    const y = (v) => H0 - 18 - ((v - lo) / span) * (H0 - 34);
+    const svg = el("svg", { viewBox: `0 0 ${W0} ${H0}`, class: "chart", role: "img", "aria-label": `Energy from ${pts[0].toFixed(2)} to ${pts[pts.length - 1].toFixed(2)}` });
+    el("line", { x1: pad, x2: W0 - pad, y1: H0 - 18, y2: H0 - 18, stroke: "var(--grid)" }, svg);
+    el("path", { d: pts.map((v, i) => `${i ? "L" : "M"}${x(i)} ${y(v)}`).join(" "), fill: "none", stroke: "var(--other)", "stroke-width": 2, "stroke-linejoin": "round" }, svg);
+    pts.forEach((v, i) => {
+      const c = el("circle", { cx: x(i), cy: y(v), r: i === pts.length - 1 ? 4.5 : 3, fill: "var(--other)", stroke: "var(--surface)", "stroke-width": 2 }, svg);
+      void c;
+      const hit = el("rect", { x: x(i) - 20, y: 0, width: 40, height: H0, fill: "transparent" }, svg);
+      hover(hit, i === 0 ? `Start: energy ${v.toFixed(3)}` : `After tick ${ticks[i - 1].t}: energy ${v.toFixed(3)}`);
+    });
+    el("text", { x: pad, y: H0 - 3, class: "tick" }, svg).textContent = `energy ${pts[0].toFixed(2)}`;
+    el("text", { x: W0 - pad, y: H0 - 3, class: "tick", "text-anchor": "end" }, svg).textContent = `${pts[pts.length - 1].toFixed(2)}`;
+    return svg;
+  }
+
+  // viewer
+  const FILTERS = [["all", "All"], ["stuck", "Stuck on a wall"], ["fixed", "Fixed program"], ["varied", "Varied moves"], ["died", "Died"]];
+  let filter = "stuck", current = null;
+  const list = document.getElementById("list"), detail = document.getElementById("detail"), chips = document.getElementById("chips");
+  chips.replaceChildren();
+  const visible = () => W.filter((w) => filter === "all" || w.tags.includes(filter));
+  for (const [k, label] of FILTERS) {
+    const b = html("button", "chip", `${label} · ${k === "all" ? W.length : W.filter((w) => w.tags.includes(k)).length}`);
+    b.type = "button"; b.dataset.k = k;
+    b.addEventListener("click", () => { filter = k; renderList(); const v = visible(); if (v.length && !v.includes(current)) select(v[v.length - 1]); });
+    chips.append(b);
+  }
+  function renderList() {
+    for (const b of chips.children) b.setAttribute("aria-pressed", String(b.dataset.k === filter));
+    list.replaceChildren();
+    for (const w of visible().slice().reverse()) {
+      const r = html("button", "row"); r.type = "button";
+      r.setAttribute("aria-current", String(w === current));
+      const top = html("div", "top");
+      top.append(html("span", "mono", `#${w.id}`), html("span", "small", `gen ${w.gen} · ${w.gsize} units · tick ${fmt(w.ticks[0].t)}`));
+      for (const t of w.tags.filter((t) => t === "stuck" || t === "died")) top.append(html("span", "pill " + t, t));
+      r.append(top, html("div", "strip", w.ticks.map((t) => t.sel.map(actionName).join("+") || "—").join(" · ")));
+      r.addEventListener("click", () => select(w));
+      list.append(r);
+    }
+  }
+  function select(w) {
+    current = w;
+    renderList();
+    detail.replaceChildren();
+    const head = html("div", "dhead");
+    head.append(html("h3", "", `Window #${w.id}`), html("span", "small mono", `creature ${w.creature} · lineage ${w.lineage} · generation ${w.gen} · genome ${w.gsize} units · ${w.end === "died" ? "died in the window" : "lived through it"}`));
+    const nav = html("div", "nav");
+    const vis = visible();
+    const idx = vis.indexOf(w);
+    const prev = html("button", "btn", "← Older"), next = html("button", "btn", "Newer →");
+    prev.type = next.type = "button";
+    prev.disabled = idx <= 0; next.disabled = idx < 0 || idx >= vis.length - 1;
+    prev.addEventListener("click", () => select(vis[idx - 1])); next.addEventListener("click", () => select(vis[idx + 1]));
+    nav.append(prev, next); head.append(nav);
+    const ep = html("div", "panel"); ep.style.padding = "10px 14px"; ep.append(energyLine(w.ticks));
+    const ticks = html("div", "ticks");
+    for (const t of w.ticks) {
+      const col = html("div", "tcol");
+      const th = html("div", "th"); th.append(html("span", "", `tick ${fmt(t.t)}`), html("span", "", `${(t.e1 - t.e0 >= 0 ? "+" : "") + (t.e1 - t.e0).toFixed(2)} E`));
+      const ul = html("ol", "acts");
+      t.sel.forEach((a, i) => {
+        const li = html("li");
+        const r = t.res[i];
+        const ok = r === "Success";
+        li.append(html("span", "", `${i + 1}. ${actionName(a)}`), html("span", "res " + (r == null ? "" : ok ? "good" : "bad"), r == null ? "not applied" : ok ? "ok" : r));
+        ul.append(li);
+      });
+      if (!t.sel.length) ul.append(html("li", "small", "nothing chosen"));
+      const brain = html("div", "brain");
+      const seen = new Map();
+      for (const [node, be, v] of t.hops) { const k = node; const prevV = seen.get(k); seen.set(k, { be, v: Math.max(v, prevV ? prevV.v : 0), n: (prevV ? prevV.n : 0) + 1 }); }
+      for (const [node, s] of seen) { const n = html("span", "node" + (s.v > 0 ? " vote" : ""), `${node}${s.be}`); n.title = `node ${node} (${s.be === "g" ? "graph" : "VM"}) ran ${s.n}×, vote ${s.v}`; brain.append(n); }
+      const bl = html("div", "small", `${t.hops.length} hops · ${seen.size} nodes`);
+      col.append(th, grid(t), ul, bl, brain);
+      ticks.append(col);
+    }
+    detail.append(head, ep, ticks);
+  }
+  if (!W.some((w) => w.tags.includes(filter))) filter = "all";
+  renderList();
+  const v = visible();
+  const start = v.filter((w) => w.ticks.length >= 8);
+  if (v.length) select(start.length ? start[start.length - 1] : v[v.length - 1]);
+  }
+
+  main();
+})();
+</script>
+</body>
+</html>

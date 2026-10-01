@@ -870,12 +870,518 @@
       }
     },
     {
+      "id": 25,
+      "type": "row",
+      "title": "Behaviour",
+      "gridPos": {
+        "x": 0,
+        "y": 57,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "Barrier bumps next to a barrier, by barrier reader",
+      "description": "Of the moves a creature made while standing next to a barrier, the share that walked into the barrier. Split by whether the creature's brain has a reachable node reading the barrier input (presence, not use). If creatures that can sense barriers bump as often as creatures that cannot, the sensor is not shaping their movement.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 58,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum by (petri_reader_state) (rate(petri_run_move_blocked_barrier_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\"}[1m])) or 0 * sum by (petri_reader_state) (rate(petri_run_move_attempts_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\"}[1m]))) / sum by (petri_reader_state) (rate(petri_run_move_attempts_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "{{petri_reader_state}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 27,
+      "type": "bargauge",
+      "title": "Barrier bumps next to a barrier, run so far",
+      "description": "Of the moves a creature made while standing next to a barrier, the share that walked into the barrier. Split by whether the creature's brain has a reachable node reading the barrier input (presence, not use). If creatures that can sense barriers bump as often as creatures that cannot, the sensor is not shaping their movement. Totals since the run started.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 58,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum by (petri_reader_state) (last_over_time(petri_run_move_blocked_barrier_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\"}[$__range])) or 0 * sum by (petri_reader_state) (last_over_time(petri_run_move_attempts_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\"}[$__range]))) / sum by (petri_reader_state) (last_over_time(petri_run_move_attempts_with_barrier_neighbor_by_reader_state_total{petri_run_id=\"$run_id\"}[$__range]))",
+          "legendFormat": "{{petri_reader_state}}",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "bargauge",
+      "title": "Offspring per removed creature, by cognitive class",
+      "description": "Offspring spawned per creature, over creatures that have died or been removed so far (living creatures are not counted). Classes are an accounting precedence over carried structure (plasticity, then stateful node, then shared memory, then none), not an ability ranking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 66,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_cognitive_class) (last_over_time(petri_run_reproductive_success_offspring_spawned_total{petri_run_id=\"$run_id\"}[$__range])) / sum by (petri_cognitive_class) (last_over_time(petri_run_reproductive_success_creatures_observed_total{petri_run_id=\"$run_id\"}[$__range]))",
+          "legendFormat": "{{petri_cognitive_class}}",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 29,
+      "type": "bargauge",
+      "title": "Lifespan of removed creatures, by cognitive class",
+      "description": "Age at removal in ticks, averaged over creatures that have died or been removed so far (living creatures are not counted). Classes are an accounting precedence over carried structure (plasticity, then stateful node, then shared memory, then none), not an ability ranking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 66,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_cognitive_class) (last_over_time(petri_run_reproductive_success_survival_ticks_total{petri_run_id=\"$run_id\"}[$__range])) / sum by (petri_cognitive_class) (last_over_time(petri_run_reproductive_success_creatures_observed_total{petri_run_id=\"$run_id\"}[$__range]))",
+          "legendFormat": "{{petri_cognitive_class}}",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Eat hit rate, by food type",
+      "description": "Of the typed Eat actions naming a food type, the share that found food. A low hit rate means creatures eat without checking what is under them.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 74,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum by (petri_food_type) (rate(petri_run_eat_actions_applied_by_type_total{petri_run_id=\"$run_id\"}[1m])) or 0 * sum by (petri_food_type) (rate(petri_run_eat_actions_failed_by_type_total{petri_run_id=\"$run_id\"}[1m]))) / ((sum by (petri_food_type) (rate(petri_run_eat_actions_applied_by_type_total{petri_run_id=\"$run_id\"}[1m])) or 0 * sum by (petri_food_type) (rate(petri_run_eat_actions_failed_by_type_total{petri_run_id=\"$run_id\"}[1m]))) + (sum by (petri_food_type) (rate(petri_run_eat_actions_failed_by_type_total{petri_run_id=\"$run_id\"}[1m])) or 0 * sum by (petri_food_type) (rate(petri_run_eat_actions_applied_by_type_total{petri_run_id=\"$run_id\"}[1m]))))",
+          "legendFormat": "food type {{petri_food_type}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Food eaten, by food type (rate)",
+      "description": "Eat actions that consumed food, per second, by the food type the action named. Shows what the population actually harvests.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 74,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_food_type) (rate(petri_run_eat_actions_applied_by_type_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "food type {{petri_food_type}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Blocked moves, share of all moves, by cause",
+      "description": "Of the move actions executed, the share that did not move the creature, by what blocked it: a barrier, another creature, or the world edge.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 82,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_cause) (rate(petri_run_move_actions_blocked_by_cause_total{petri_run_id=\"$run_id\"}[1m])) / ignoring (petri_cause) group_left () sum (rate(petri_run_move_actions_attempted_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "{{petri_cause}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 33,
+      "type": "timeseries",
+      "title": "Predation attempts, by result (rate)",
+      "description": "StealEnergy actions per second, by what happened: energy transferred, or rejected (for example no victim in the target cell).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 82,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (petri_result) (rate(petri_run_predation_actions_by_result_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "{{petri_result}}",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "interval": "1s",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "auto",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
       "id": 15,
       "type": "row",
       "title": "Against ticks",
       "gridPos": {
         "x": 0,
-        "y": 57,
+        "y": 90,
         "w": 24,
         "h": 1
       },
@@ -892,7 +1398,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 58,
+        "y": 91,
         "w": 12,
         "h": 8
       },
@@ -969,7 +1475,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 58,
+        "y": 91,
         "w": 12,
         "h": 8
       },
@@ -1046,7 +1552,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 66,
+        "y": 99,
         "w": 12,
         "h": 8
       },
@@ -1123,7 +1629,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 66,
+        "y": 99,
         "w": 12,
         "h": 8
       },
@@ -1200,7 +1706,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 74,
+        "y": 107,
         "w": 12,
         "h": 8
       },
@@ -1273,7 +1779,7 @@
       "title": "Tick traces",
       "gridPos": {
         "x": 0,
-        "y": 82,
+        "y": 115,
         "w": 24,
         "h": 1
       },
@@ -1291,7 +1797,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 83,
+        "y": 116,
         "w": 24,
         "h": 10
       },
@@ -1318,7 +1824,7 @@
       "title": "Creature windows",
       "gridPos": {
         "x": 0,
-        "y": 93,
+        "y": 126,
         "w": 24,
         "h": 1
       },
@@ -1336,7 +1842,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 94,
+        "y": 127,
         "w": 24,
         "h": 10
       },
@@ -1356,6 +1862,18 @@
       "options": {
         "showHeader": true
       }
+    }
+  ],
+  "links": [
+    {
+      "title": "Creature window report",
+      "tooltip": "Readings and a tick-by-tick viewer built from this run's creature windows",
+      "type": "link",
+      "icon": "doc",
+      "url": "/public/petri/creature-windows.html?run=${run_id}",
+      "targetBlank": true,
+      "includeVars": false,
+      "keepTime": false
     }
   ]
 }
