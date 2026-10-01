@@ -13,19 +13,17 @@ reference build was measured by one 60-minute measurement on a default-size
 world and a small one with the stack healthy, stopped and slow, from which
 the user set the ceiling at 10% of elapsed time with 5% as the target. Four named presets (`minimal`, `phases`, `standard`,
 `dense`) select the sampling settings T21.F02–F04 delivered, each with its
-measured time and storage cost. Tests that start a binary and invocations
-that produce stored closure measurements pass `--telemetry off` explicitly,
-so `make check` needs no Docker and closure evidence is taken in isolation.
-With telemetry off, on, or on with no stack listening, a run's deterministic
+measured time and storage cost. Tests that start a binary pass
+`--telemetry off`, so `make check` needs no Docker; closure benchmark runs
+export and still write their stored reports. With telemetry off, on, or on with no stack listening, a run's deterministic
 output is identical.
 
 **D5 (user decision, goal of 2026-09-30).** "If F05's qualifying measurement
 puts the default under 5%, record 5% as the ceiling, otherwise stop and
-report the measurements for the user's decision." Resolved 2026-09-30: the
-measurement put five cells under 5% and W1 `s` inconclusive at
-[1.0232, 1.0505], so it stopped for the user, who decided to record 10% as
-the ceiling and flip the default to on; 5% stays the target; later T21
-closures, and any later feature that adds work to a run, are held to 10%.
+report the measurements for the user's decision." Resolved 2026-09-30
+(Notes): five cells under 5%, W1 `s` inconclusive at [1.0232, 1.0505]; the
+user recorded 10% as the ceiling and flipped the default on; 5% stays the
+target.
 
 ## Non-Goals
 
@@ -35,8 +33,8 @@ closures, and any later feature that adds work to a run, are held to 10%.
   `run.started`; no change to any cap, queue bound or cadence semantics of
   F02–F04; no change to what a preset's settings mean.
 - No CPU-time reading, no thread-count change and no second reference: the
-  ceiling governs elapsed time of the telemetry build against the
-  `--no-default-features` build of the same commit, as the workflow says.
+  ceiling governs elapsed time against the `--no-default-features` build,
+  as the workflow says.
 - The bench, assay and lab paths are not re-measured: they export only after
   their last timed region (F06), so the qualifying workload is `v3-cli run`.
 - No edit to the assay modules, `v3-core` or `docs/workflow.md`.
@@ -52,7 +50,7 @@ closures, and any later feature that adds work to a run, are held to 10%.
 | F02 spec | as above | `PETRI_TELEMETRY_METRICS_INTERVAL_MS` (default 1000, 10–3600000); the settings pattern (read only when on, invalid refuses to start, recorded on `run.started`); a snapshot is about 195 KB on the wire (F02 readings). |
 | F03 spec | as above | `PETRI_TELEMETRY_TICK_TRACES` (default on); about 5–6 KB per trace, one per snapshot. |
 | F04 spec | as above | `PETRI_TELEMETRY_CREATURE_WINDOWS` (on), `_WINDOW_TICKS` (8, 1–64), `_WINDOW_INTERVAL_MS` (10000, 10–3600000); about 80 KB per window plus a 12 KB genome record; 42 µs per recorded creature-tick; windows off against the reference read 1.04 at spread 15–16%. |
-| F06 spec | as above | Measurement commands hold export until the last timed region; `make bench` already passes `--telemetry off`; D2: closure measurement runs stay off. |
+| F06 spec | as above | Measurement commands hold export until the last timed region; `make bench` passed `--telemetry off` from F06 until the user's decision of 2026-09-30 (invariant 2), which supersedes D2's second half. |
 | Switch and settings | `crates/v3-telemetry/src/lib.rs` `resolve_switch`, `Options::from_env`; `metrics.rs` `resolve_metrics_interval`; `trace.rs` `resolve_tick_traces`; `windows.rs` `WindowSettings::from_env` | `resolve_switch(None, None)` is `Off`; each setting resolves its own variable with a built-in default; a preset slots in as the source of those defaults. |
 | Binaries | `crates/v3-cli/src/main.rs` `Cli`, `crates/v3-server/src/bin/server.rs` `Args`, `crates/v3-lab/src/{main,cli}.rs` | The flag's help says "default off"; each binary has a `…_which_beats_default_off` test. |
 | Binary-spawning tests | `crates/v3-cli/tests/{cli,bench,bench_artifacts}.rs` (2, 6 and 4 `CARGO_BIN_EXE` sites without the flag) and `crates/v3-lab/tests/lab_run.rs` (one site without it, line 814); the telemetry fixtures in `crates/v3-cli/tests/telemetry.rs`, `telemetry/measurement.rs` and `lab_run.rs`'s telemetry test pass `--telemetry <switch>` explicitly on every leg | The thirteen sites that gain `--telemetry off`; the fixtures' explicit `on` legs are the exception. |
@@ -71,10 +69,10 @@ Invariants:
    so. The invocations that pass `--telemetry off` explicitly are every
    test that spawns a binary (the thirteen `CARGO_BIN_EXE` sites above; the
    only spawns without `off` are the telemetry fixtures' legs, which pass
-   `on` explicitly), `make bench` and `scripts/telemetry-parent-compare`. `make lab`, `scripts/dev.sh` and a
-   hand-run assay or lab command follow the default; one whose output will
-   be cited as closure evidence is started with `--telemetry off` by
-   whoever runs it. `make check` passes with no stack listening and
+   `on` explicitly) and `scripts/telemetry-parent-compare`, which checks
+   behavior on both sides. Everything else, `make bench` included, follows
+   the default: closure benchmark runs export and still write their stored
+   reports (Notes). `make check` passes with no stack listening and
    `PETRI_TELEMETRY` unset.
 3. Presets. `PETRI_TELEMETRY_PRESET` names the base values of the five
    settings (table below); default `standard`; read only when telemetry
@@ -89,23 +87,23 @@ Invariants:
    `telemetry/measurement.rs` and `crates/v3-lab/tests/lab_run.rs` remove
    `PETRI_TELEMETRY_PRESET` from the spawned environment as they remove
    `PETRI_TELEMETRY` and the endpoint, and a test of one preset sets it
-   explicitly. Presets change no cap: the
-   per-run caps of F03 and F04 and the queue bounds of F01 hold under every
-   preset.
+   explicitly. Presets change no cap or queue bound.
 4. Qualification. The predeclared method in Performance and Goal Impact is
    run once, inside the 60-minute allowance, by the implementer's
    verification pass, with nothing else measuring on the host; its verdict
    applies D5 as the Goal states. No cell is rerun or extended.
 5. The ceiling in force after this closure is 10%, ratio 1.10, the user's
    D5 decision recorded in the Measured verdict, and
-   `scripts/telemetry-overhead` carries it as its routine ceiling; 5% stays
-   the target the Expected row is written against. The routine check keeps F01's workload,
+   `scripts/telemetry-overhead` carries it in its one `ceiling` variable,
+   read by both the routine and the qualify mode, so a later qualify run
+   would be judged at 1.10 while the recorded qualifying run was judged at
+   the predeclared 1.05; 5% stays the target the Expected row is written
+   against. The routine check keeps F01's workload,
    states, ratio and 300 s cap and adopts the statistic, pair table,
    environment isolation and run timeout below, because F01's
-   75%-of-pairs rule at a fixed n cannot decide at 5% on a host whose pair
-   ratios spread 6–12% (readings file). It drops F01's one rerun of an
-   inconclusive state: n fresh pairs rarely fit the cap and a rerun is an
-   extension of an inconclusive result. A pair count the 300 s cap cannot
+   75%-of-pairs rule cannot decide at 5% on this host (readings file), and
+   drops F01's one rerun of an inconclusive state, an extension that rarely
+   fits the cap. A pair count the 300 s cap cannot
    hold makes the routine check inconclusive before any pair. Routine
    calibration, unused while T = 6908 is pinned, accepts the first in-band
    run of up to three, the same acceptance the qualifying search uses.
@@ -222,16 +220,12 @@ tick loop) but run because it costs seconds; `BASE` is `8b0a158f`,
 T = 6908. Both sides pass `--telemetry off`. Expected: identical canonical
 output.
 
-**Slow-state quantity (user decision, 2026-09-30).** The workflow's
-ceiling is one ratio, telemetry on against the reference, measured by F01
-and F06 as process wall time, flush included. With the slow state defined
-as a paused stack, every export request runs to its 5 s timeout and the
-end-of-run flush to its 10 s bound, which a 5 s workload cannot amortize.
-The user decided option (a): in `s` the verdict ratio subtracts `flush_ms`,
-and the flush is bounded separately at F01's 10 s deadline, read with 50 ms
-of scheduling slack. The healthy and stopped
-states keep the flush inside their ratio. The 60-minute allowance is
-unblocked.
+**Slow-state quantity (user decision, 2026-09-30).** In `s` the verdict
+ratio subtracts `flush_ms`, and the flush is bounded separately at F01's
+10 s deadline read with 50 ms of scheduling slack; the healthy and stopped
+states keep the flush inside their ratio. A paused stack runs every request
+to its 5 s timeout and the flush to its bound, which a 5 s workload cannot
+amortize.
 
 Qualifying measurement, method fixed before any run:
 
@@ -263,7 +257,7 @@ Qualifying measurement, method fixed before any run:
 
 **Measured verdict: not under 5%; the user recorded 10% as the ceiling and
 flipped the default on (D5 resolved 2026-09-30).** Attempt 2,
-2026-09-30, load averages 4.03 4.76 5.82 before and 3.13 3.27 3.53 after;
+2026-09-30, load average 3.1–5.8;
 T1 = 41 (calibration 20 → 2,023 ms, 49 → 6,001 ms, 41 → 4,119 ms); W1
 spread 0.0221 (n = 16), W2 spread 0.1538 (n = 32); init 201 ms (W1) and
 9 ms (W2). Five cells pass; W1 `s` is inconclusive, its upper bound 1.0505
@@ -303,8 +297,9 @@ per-hour figures are repeated-short-invocation rates):
 ## Success Criteria
 
 - [ ] Every binary defaults to telemetry on, the flag beats the variable
-      beats the default, and the thirteen test spawn sites, `make bench` and
-      the parent comparison pass `--telemetry off`.
+      beats the default, the thirteen test spawn sites and the parent
+      comparison pass `--telemetry off`, and `make bench` follows the
+      default.
 - [ ] `PETRI_TELEMETRY_PRESET` selects `minimal`, `phases`, `standard` or
       `dense`, an explicit variable overrides one setting, and `run.started`
       carries the preset.
@@ -322,6 +317,13 @@ per-hour figures are repeated-short-invocation rates):
   [1.0232, 1.0505]); the ceiling is recorded as 10% (ratio 1.10), the
   default flips to on, 5% stays the target, and later T21 closures and any
   later feature that adds work to a run are held to 10%.
+- Decision: (user, 2026-09-30, after the flip) closure benchmark runs
+  export telemetry to the stack and the stored benchmark reports are still
+  written as before; `make bench` no longer passes `--telemetry off`, and
+  tests that start a binary still do. Reason, quoted: "The performance
+  parts of the benchmark are only to catch severe regressions, I think it
+  is fine to export telemetry to grafana and do the stored benchmark
+  reports." This supersedes the second half of F06's D2.
 - Decision: (user, 2026-09-30) in the paused stack state the verdict ratio
   subtracts `flush_ms` and the flush is bounded separately at 10 s; the
   healthy and stopped states keep the flush inside their ratio.
