@@ -10,6 +10,10 @@
 //   telemetry-stats.mjs calibrate START TARGET LOW HIGH MAXRUNS FILE
 //     FILE holds one run per line, `TICKS MS`; prints `next=N`, `t1=N` or
 //     `inconclusive` (calibrationStep).
+//   telemetry-stats.mjs wait USED_MS CAP_MS WAIT_MS
+//     prints `used=N` or `inconclusive` (chargeWait).
+//   telemetry-stats.mjs flush VERDICT MAX_FLUSH_MS BOUND_MS
+//     prints the verdict, or `fail-flush-bound` (flushVerdict).
 //   telemetry-stats.mjs check PRESET ENDPOINT EXPORT_CHECK(0|1) < STDERR
 //     prints `status= self_time_us= flush_ms= failed= dropped= abandoned=
 //     bytes= snapshots= traces= windows=` then the start line on its own line.
@@ -101,8 +105,22 @@ export function calibrationStep(history, { start, target, low, high, maxRuns }) 
   const below = history.filter(([, ms]) => ms < low).map(([ticks]) => ticks);
   const above = history.filter(([, ms]) => ms > high).map(([ticks]) => ticks);
   if (above.length === 0) return scale(last, high);
+  if (below.length === 0) return { inconclusive: true };
   const next = Math.floor((Math.max(...below) + Math.min(...above)) / 2);
   return history.some(([ticks]) => ticks === next) ? { inconclusive: true } : { next };
+}
+
+// A charged idle wait (the spread retry): `{ usedMs }` with the wait added, or
+// `{ inconclusive }` when the cap left cannot hold it.
+export function chargeWait(usedMs, capMs, waitMs) {
+  const charged = usedMs + waitMs;
+  return charged >= capMs ? { inconclusive: true } : { usedMs: charged };
+}
+
+// A cell's verdict against the flush bound: `fail-flush-bound` when its
+// largest flush_ms (a number, or '' / '-' when none was read) is above it.
+export function flushVerdict(verdict, maxFlushMs, boundMs) {
+  return Number(maxFlushMs) > boundMs ? 'fail-flush-bound' : verdict;
 }
 
 // (max - min) / median.
@@ -188,6 +206,12 @@ function main(argv) {
     const history = lines(rest[5]).map((line) => line.trim().split(/\s+/).map(Number));
     const step = calibrationStep(history, { start, target, low, high, maxRuns });
     console.log(step.t1 ? `t1=${step.t1}` : step.next ? `next=${step.next}` : 'inconclusive');
+  } else if (command === 'wait') {
+    const charged = chargeWait(...rest.map(Number));
+    console.log(charged.inconclusive ? 'inconclusive' : `used=${charged.usedMs}`);
+  } else if (command === 'flush') {
+    const [verdict, maxFlushMs, boundMs] = rest;
+    console.log(flushVerdict(verdict, maxFlushMs, Number(boundMs)));
   } else if (command === 'check') {
     const [preset, endpoint, exportCheck] = rest;
     if (!PRESETS[preset]) throw new Error(`unknown preset ${preset}`);
@@ -195,7 +219,7 @@ function main(argv) {
     console.log([`status=${run.status}`, ...COUNTS.map((name) => `${name}=${run[name]}`)].join(' '));
     console.log(run.start);
   } else {
-    console.error('Usage: telemetry-stats.mjs cell CEILING FILE [--subtract-flush] | spread FILE | calibrate START TARGET LOW HIGH MAXRUNS FILE | check PRESET ENDPOINT 0|1');
+    console.error('Usage: telemetry-stats.mjs cell CEILING FILE [--subtract-flush] | spread FILE | calibrate START TARGET LOW HIGH MAXRUNS FILE | wait USED CAP WAIT | flush VERDICT MAX BOUND | check PRESET ENDPOINT 0|1');
     process.exit(2);
   }
 }

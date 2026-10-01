@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 import {
   calibrationStep,
   cellStats,
+  chargeWait,
   checkRun,
+  flushVerdict,
   intervalRank,
   median,
   pairCount,
@@ -210,6 +212,8 @@ test('calibration: three scaling runs, then bisection, first in-band count is T1
   assert.deepEqual(step([[40, 3895], [62, 9500], [20, 2083]]), { next: 51 });
   assert.deepEqual(step([[40, 3895], [62, 9500], [20, 2083], [51, 7000]]), { next: 45 });
   assert.deepEqual(step([[40, 3895], [62, 9500], [20, 2083], [51, 3990]]), { next: 56 });
+  // Three runs all above: no lower bracket to bisect from.
+  assert.deepEqual(step([[20, 7000], [14, 6500], [11, 6200]]), { inconclusive: true });
   // A bisection count already measured means the bracket is exhausted.
   assert.deepEqual(step([[40, 3895], [41, 6500], [20, 2083]]), { inconclusive: true });
   // Eight runs outside the band.
@@ -237,4 +241,28 @@ test('the calibrate command prints the next count, T1 or inconclusive', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('the spread retry wait is charged, and is inconclusive when the cap cannot hold it', () => {
+  assert.deepEqual(chargeWait(1000, 3600000, 60000), { usedMs: 61000 });
+  assert.deepEqual(chargeWait(3540000, 3600000, 60000), { inconclusive: true });
+  assert.deepEqual(chargeWait(3550000, 3600000, 60000), { inconclusive: true });
+  assert.deepEqual(chargeWait(3539999, 3600000, 60000), { usedMs: 3599999 });
+});
+
+test('a flush above the bound fails the cell; at the bound or unread it does not', () => {
+  assert.equal(flushVerdict('pass', '10050', 10050), 'pass');
+  assert.equal(flushVerdict('pass', '10051', 10050), 'fail-flush-bound');
+  assert.equal(flushVerdict('inconclusive', '10051', 10050), 'fail-flush-bound');
+  assert.equal(flushVerdict('pass', '', 10050), 'pass');
+  assert.equal(flushVerdict('inconclusive', '-', 10050), 'inconclusive');
+});
+
+test('the wait and flush commands print the charge and the bounded verdict', () => {
+  const run = (...args) => execFileSync(process.execPath, [script, ...args], { encoding: 'utf8' }).trim();
+  assert.equal(run('wait', '1000', '3600000', '60000'), 'used=61000');
+  assert.equal(run('wait', '3540000', '3600000', '60000'), 'inconclusive');
+  assert.equal(run('flush', 'pass', '10011', '10050'), 'pass');
+  assert.equal(run('flush', 'pass', '10051', '10050'), 'fail-flush-bound');
+  assert.equal(run('flush', 'pass', '', '10050'), 'pass');
 });
