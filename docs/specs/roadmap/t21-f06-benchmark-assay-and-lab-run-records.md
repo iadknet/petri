@@ -27,8 +27,7 @@ identical.
   command; the F02 interval cadence, F03 traces and F04 windows capture
   inside the loop and stay off here whatever the environment says.
 - No change to what closure measurement runs do: `make bench` and the closure
-  profiles keep the default (off) now and pass `--telemetry off` explicitly
-  from T21.F05, as the track's flag note says.
+  profiles keep the default (off). Superseded 2026-09-30 (T21.F05 spec).
 - No records from `v3-cli bench-summarize`, `v3-cli world inspect` or
   `v3-lab report`: they run no simulation.
 - No server change; no new dashboard beyond one panel on `petri-runs`.
@@ -54,7 +53,8 @@ identical.
 
 **D2 (user decision, 2026-09-29, applied by the goal of 2026-09-30).**
 Measurement commands record identity, lifecycle and the totals their stored
-summary already carries. Closure measurement runs stay off.
+summary already carries. Closure measurement runs stay off (second half
+superseded 2026-09-30: T21.F05 spec).
 
 Invariants:
 
@@ -210,8 +210,9 @@ mechanism switch and no config value; the held mode is not configuration.
 - [x] Overhead check: `PETRI_OVERHEAD_WORKLOAD=bench scripts/telemetry-overhead`
       -> the table in the readings file, verdict in Performance and Goal
       Impact: inconclusive (2026-09-30).
-- [x] `make bench` passes `--telemetry off`: `node --test
-      scripts/benchmark-artifacts.test.mjs` -> 5 passed (2026-09-30).
+- [x] `make bench` passed `--telemetry off` (until 2026-09-30, T21.F05
+      spec): `node --test scripts/benchmark-artifacts.test.mjs` -> 5
+      passed (2026-09-30).
 - [x] `make check` -> exit 0 (2026-09-30).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: `Not applicable:
       observability feature`.
@@ -300,7 +301,8 @@ bench path, with F01's method otherwise unchanged and T = 6908 fixed:
 
 - Decision: D2 (user, 2026-09-29, applied 2026-09-30): measurement commands
   record identity, lifecycle and the totals their stored summary already
-  carries; closure measurement runs stay off.
+  carries; closure measurement runs stay off (superseded 2026-09-30,
+  T21.F05 spec).
 - Exception: plan committed after round 2 `not-ready` (user, 2026-09-30).
   Round 3 failed on the Codex usage limit; the three round-2 corrections
   are unconfirmed; details in the readings file.
