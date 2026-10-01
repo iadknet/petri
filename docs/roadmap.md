@@ -38,6 +38,7 @@ feature whose closure moved it.
 - [ ] **T20 — Input Evolvability and Structured Variation** — [Roadmap](roadmaps/t20-input-evolvability-and-structured-variation.md) — Depends on: None
 - [x] **T21 — Run Observability and Execution Tracing** — [Roadmap](roadmaps/t21-run-observability-and-execution-tracing.md) — Depends on: None
 - [ ] **T22 — Capability Assays and Evolvability Lab** — [Roadmap](roadmaps/t22-capability-assays-and-evolvability-lab.md) — Depends on: None
+- [ ] **T23 — Behavior and Cognition Readings** — [Roadmap](roadmaps/t23-behavior-and-cognition-readings.md) — Depends on: None
 
 ## Final Success Criteria
 
@@ -51,6 +52,7 @@ feature whose closure moved it.
 
 ## Notes for AI Agents
 
+- T23 — Behavior and Cognition Readings was drafted on 2026-09-30 after the user found the T21 dashboards answered nothing about how creatures live, what they do or whether they use their senses. It turns the [live survey](strategy/live-survey-2026-09-16.md) readings into continuous, chance-baselined dashboard readings (movement against chance, sensor reactivity, brain use, life histories, selection on sensing, lineages) and lays the dashboards out by question. Measurement tooling under T21's rules: not closure evidence, not an objective. Draft; open decisions D1 to D3 are in the track notes, and it is not yet in the order of new starts.
 - Action-parameter storage cleanup, 2026-09-24 (user-approved): add T11.F27 — Compact Action-Parameter Storage directly after T11.F25 and before T11.F26, so the mutation-effect readings and T20 are taken on a surface with no undecoded parameter fields. T11.F25 made fresh parameter-target draws select decoded fields; T11.F27 removes the fields and the inherited wiring to them (audit M3's storage alternative). T11.F26 now depends on T11.F27; T20 inherits it through T11.F26.
 - Mutation-effect diagnostics, 2026-09-24 (user-approved): add T11.F26 — Mutation-Effect Attribution and Observation Coverage directly after T11.F25 and before T20.F01, which now depends on its observation handoff. The [bounded follow-up experiments](strategy/drift-silence-followup-2026-09-24.md) support distinguishing mutation exposure, already-actionless parents, state/cost effects and battery coverage before choosing a repair; they do not establish that T11 harmed cognition. Reuse existing instruments and selected-genome sampling, with unresolved causes and failed samples retained. Earlier priorities, including T11.F10/F13, remain in place; this decision adds measurement, not a mutation-policy change.
 - Follow-up audit, 2026-09-23: three subagents reviewed all 18 tracks with unfinished features; [per-track dispositions](strategy/post-t20-roadmap-audit-2026-09-23.md) retain those features and remove stale requirements. T02.F06 now explicitly requires seasons; T08.F06 no longer requires the deferred T04.F05 proof assay. T13 qualification failures update blocked rows and the master priority list, as T20 already requires. Current priorities and feature completion states are unchanged.
