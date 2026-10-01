@@ -1,6 +1,6 @@
 # T21.F05 — Qualified Sampling Defaults
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-30
 **Feature**: T21.F05
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -199,9 +199,9 @@ exports; the counts, caps and sampling policies stay F02–F04's.
       verdict copied to Performance and Goal Impact. Attempt 2
       (`TELEMETRY_USED_MS=11917`, bracketing T1 rule) exit 0,
       `Qualification: not pass: user stop (D5)`, 2,174.1 s of the cap used.
-- [ ] Mutation gate: `Not applicable: observability feature` (the
+- [x] Mutation gate: `Not applicable: observability feature` (the
       workflow's exemption; no run).
-- [ ] Benchmark summary: `Not applicable: observability feature`.
+- [x] Benchmark summary: `Not applicable: observability feature`.
 - [x] After the flip: `env -u PETRI_TELEMETRY make check`,
       `make check-docs` and `make roadmap-check` exit 0 (no stack running).
 
@@ -296,18 +296,18 @@ per-hour figures are repeated-short-invocation rates):
 
 ## Success Criteria
 
-- [ ] Every binary defaults to telemetry on, the flag beats the variable
+- [x] Every binary defaults to telemetry on, the flag beats the variable
       beats the default, the thirteen test spawn sites and the parent
       comparison pass `--telemetry off`, and `make bench` follows the
       default.
-- [ ] `PETRI_TELEMETRY_PRESET` selects `minimal`, `phases`, `standard` or
+- [x] `PETRI_TELEMETRY_PRESET` selects `minimal`, `phases`, `standard` or
       `dense`, an explicit variable overrides one setting, and `run.started`
       carries the preset.
 - [x] The qualifying measurement ran once under the predeclared method,
       every cell's reading is in the readings file, and the Measured verdict
       records the D5 outcome and the ceiling the user set from it (10%).
 - [x] Each preset's measured time and storage cost is recorded.
-- [ ] `make check` passes with no stack listening; the neutrality test and
+- [x] `make check` passes with no stack listening; the neutrality test and
       the parent comparison hold.
 
 ## Notes for AI Agents
@@ -328,6 +328,6 @@ per-hour figures are repeated-short-invocation rates):
   subtracts `flush_ms` and the flush is bounded separately at 10 s; the
   healthy and stopped states keep the flush inside their ratio.
 - Decision: (user, 2026-09-30) the qualifying measurement runs on the
-  loaded host as it is, and the user accepts whatever verdict comes out;
-  the outcome stopped for the user, who then set the ceiling (first
-  bullet).
+  loaded host as it is, and the user accepts whatever verdict comes out.
+- Cost: `/usage` awaiting; 5 passes (advisor 2 each); 7 spec-owner
+  resumes; 3 Codex rounds, `ready`; review 3 P1, fixed.
