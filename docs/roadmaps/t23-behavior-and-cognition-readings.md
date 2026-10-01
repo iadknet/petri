@@ -50,7 +50,7 @@ question. Like T21, it is an instrument for looking at runs.
   - Goal: Measurement tooling. When a creature window closes, its ticks add to run-level Prometheus counts of where first moves land against chance, how many moves are blocked, how often it eats with and without food underfoot, whether it ran a fixed program, and how many nodes ran and voted, so those readings chart and compare across runs with no work added to the tick loop.
 - [ ] **T23.F09 — Creature Window Viewer** — Depends on: T23.F10
   - Goal: Measurement tooling. Any retained creature window opens as a tick-by-tick view of the neighborhood it sensed, the moves it chose and what the world applied, its energy, and the brain nodes that ran and voted.
-- [ ] **T23.F10 — Thinned Creature Window Store** — Depends on: None
+- [x] **T23.F10 — Thinned Creature Window Store** — Depends on: None
   - Goal: Measurement tooling. When a creature window closes, a compact record of it goes to Loki, and a scheduled job in the telemetry stack thins each run's records by age, keeping all of the newest 300, every second one of the next 300 and every tenth one older than that, so a long run keeps its recent windows in full and a sample of its whole history.
 
 ## Notes for AI Agents
