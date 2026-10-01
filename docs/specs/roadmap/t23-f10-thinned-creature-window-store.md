@@ -1,6 +1,6 @@
 # T23.F10 — Thinned Creature Window Store
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-01
 **Feature**: T23.F10
 **Track**: [T23 — Behavior and Cognition Readings](../../roadmaps/t23-behavior-and-cognition-readings.md)
@@ -149,7 +149,7 @@ Invariants:
 | `window_records=` on the stderr run line | count | `creature.window` records offered | per run, beside `windows=` (traces) |
 | `petri.windows_capped` on `run.ended` | existing attribute | the first T21 cap met | now means the cap that stopped traces and genome records, not windows |
 | Job pass line | job stdout (`docker compose logs`) | each pass | per run touched: `N`, the requests issued by band, stored bytes, any error |
-| Recorded configuration | `telemetry/compose.yaml` | the job service | `PETRI_WINDOW_STORE_PASS_S`, `PETRI_WINDOW_STORE_CAP_BYTES`. These are stack settings, not run settings; the band sizes are fixed constants |
+| Recorded configuration | `telemetry/compose.yaml` | the job service | `PETRI_WINDOW_STORE_PASS_S`, `PETRI_WINDOW_STORE_CAP_BYTES`, `PETRI_WINDOW_STORE_LOKI` (Loki base URL, default `http://lgtm:3100`). These are stack settings, not run settings; the band sizes are fixed constants |
 
 ## Implementation Tasks
 
@@ -161,13 +161,13 @@ Invariants:
       read-only, reaches Loki over the Compose network and has small resource
       limits; the compose header updated; a Docker-free stub test
       `scripts/telemetry-window-store-test` run by `quality-check`.
-- [ ] Scratch-stack verification of the job on a portless scratch stack
+- [x] Scratch-stack verification of the job on a portless scratch stack
       (invariant 9), recorded in the readings file.
-- [ ] Track checks, `make check`, spec and readings updated.
+- [x] Track checks, `make check`, spec and readings updated (overhead check deferred, see Notes).
 
 ## Verification
 
-- [ ] `cargo test -p v3-telemetry`, `-p v3-cli`, `-p v3-server` (inside `make
+- [x] `cargo test -p v3-telemetry`, `-p v3-cli`, `-p v3-server` (inside `make
       check`) -> the rows below.
 - [x] `scripts/telemetry-window-store-test` (inside `make check`) -> the job
       rows below.
@@ -180,14 +180,14 @@ Invariants:
       normal` lists no `v3-telemetry` (the default-feature tree does).
 - [x] Parent comparison: `scripts/telemetry-parent-compare <merge base>` ->
       identical canonical output (`ac5f6b74`: 3 canonical lines, T = 6,908).
-- [ ] Overhead check: `scripts/telemetry-overhead` -> verdict against 1.10.
+- [x] Overhead check (not run: deferred by user decision 2026-10-01): `scripts/telemetry-overhead` -> verdict against 1.10.
       Deferred: user decision 2026-10-01, see Notes.
 - [x] Bytes: record body sizes (median and maximum) and the run line counts
       from one default CLI run, in the readings file. T21 workload (T =
       6,908), throwaway in-process receiver: `window_records=1 windows=1
       recorded=8 snapshots=5 traces=5`, `creature.window` body 3,323 B
       (median and maximum).
-- [ ] `make check` -> exit 0.
+- [x] `make check` -> exit 0 (worktree, code at 1e9314af).
 - [x] Mutation gate: `Not applicable: observability feature`.
 - [x] Benchmark summary: `Not applicable: observability feature`.
 
@@ -236,18 +236,18 @@ on 2026-10-01 (see Notes).
 
 ## Success Criteria
 
-- [ ] Every ended sample emits one `creature.window` record, including samples
+- [x] Every ended sample emits one `creature.window` record, including samples
       after T21.F04's trace caps.
-- [ ] On a scratch stack, the job leaves each run's stored records equal to the
+- [x] On a scratch stack, the job leaves each run's stored records equal to the
       nested keep set, with at most one request per band per pass and none
       once nothing is left to delete.
-- [ ] The 1-in-10 floor holds until the per-run byte cap binds; then the
+- [x] The 1-in-10 floor holds until the per-run byte cap binds; then the
       oldest records thin further, nested. For a
       reachable cap, the run's stored bytes converge to at or under the cap
       within the passes the tiers need, with or without new arrivals. An
       unreachable cap is logged.
-- [ ] The neutrality test, parent comparison and overhead check pass, and
-      `make check` exits 0.
+- [x] The neutrality test, parent comparison and overhead check pass, and
+      `make check` exits 0. Met except the overhead check, deferred (see Notes).
 
 ## Notes for AI Agents
 
@@ -271,3 +271,9 @@ on 2026-10-01 (see Notes).
   while the user's live `petri-telemetry` stack is up. The pre-cap path is
   expected to show no change; run it the next time the stack is down, or at
   the next T23 closure that runs it.
+- Exception: the overhead rows are checked on the user's 2026-10-01 deferral.
+- Decision: final review on Codex `gpt-6.1-sol` high (user choice,
+  2026-09-29); its P2 and P3 were spec fixes, applied.
+- Cost: implementer passes 3 plus 1 interrupted (advisor consults 0, no
+  Fable); spec-owner resumes after Plan 2; Codex challenge rounds 4, final
+  `verdict: ready`; review 0 P1, 1 P2, 1 P3; `/usage` totals await the user.
