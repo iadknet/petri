@@ -26,6 +26,8 @@ itself.
   the feature's own row, its dependency rows, and the track "Notes for AI
   Agents" entries that name them — not the whole track; and the sections of the
   flat feature spec the orchestrator's brief names.
+- The Telemetry section of `docs/specs/roadmap/_feature-template.md`: the
+  conventions table the Telemetry check compares the diff against.
 - Read each document once and work from what you read. Do not re-read a spec,
   track, or workflow to reconfirm something already in your context. When a Bash
   result is spilled to a `tool-results/*.txt` file, re-run the command narrowed
@@ -59,6 +61,30 @@ itself.
   simulation behavior, and no workflow machinery introduced outside
   `docs/workflow.md` and its `workflow-codex.md` / `workflow-history.md`
   companions.
+- Telemetry, against the template's conventions table:
+  - the spec's Telemetry section is filled in or carries a
+    `Not applicable` reason the diff supports;
+  - each numeric cumulative counter or numeric `last_tick_*` value the diff
+    adds has its family in `crates/v3-telemetry/src/metrics.rs`, its
+    expected row in `crates/v3-telemetry/src/metrics/tests.rs` and its
+    Telemetry row; a per-event record or seam is trace material and a
+    measurement record is not a metric;
+  - each config value or mechanism switch the diff adds is listed as
+    recorded configuration (config body or `run.started` attribute) and,
+    when it governs a traced phase, sits in that phase's group in
+    `crates/v3-telemetry/src/trace.rs`;
+  - no metric attribute carries a tick, creature, lineage, genome, seed or
+    config value;
+  - a policy-sampled observation the diff adds names its policy, per-run cap
+    and projected size, while a gauge is bounded by the snapshot cadence; a
+    trace kind it adds has an entropy-free ID that collides with neither
+    delivered kind; an unsampled record at a region boundary needs neither;
+  - a value not captured is absent, never zero;
+  - a test the diff adds that spawns a binary passes `--telemetry off`, or
+    is a telemetry fixture that passes `on` and scrubs `PETRI_TELEMETRY*`
+    and the endpoint;
+  - telemetry capture, export and seams the diff adds sit behind
+    `telemetry` and `telemetry-seams`.
 - Spec claim spot-check: pick at least three claims from the spec's Verification
   and Performance sections — a command result, a stored-report path, and a
   specific number — and check each against the diff or the stored file. Report
@@ -81,6 +107,16 @@ itself.
   beyond the feature, or a blocking regression. Blocks closure. An unjustified
   `#[mutants::skip]` or `exclude_re` in the diff is a waived check. The survivor
   list itself is not yours to audit — see above.
+- Telemetry P1: a counter, per-tick value, config value or mechanism switch
+  the diff adds without its exported signal, because the T21.F07 row makes
+  the signal part of the feature; a policy-sampled observation (span,
+  event, window or body, not a cadence-bounded gauge) the diff adds without
+  its policy, per-run cap and projected size, the `AGENTS.md` trace rule; a
+  departure that unbounds memory, series or storage or can collide trace
+  IDs, which is wrong behavior.
+- Telemetry P2: a departure that only causes later rework (a name, a
+  description, an attribute set). A spec planned before 2026-09-29 is still
+  not required to have a Telemetry section.
 - P2: likely to cause rework or mislead a later feature. Advisory.
 - P3: wording, organization, or small cleanups. Advisory.
 
