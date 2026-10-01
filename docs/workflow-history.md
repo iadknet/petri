@@ -246,6 +246,13 @@ delegations conditional on the Benchmark gate's exemptions.
 The feature spec template gained a Telemetry section the same day, accepting
 `Not applicable`, so a mechanism or counter ships with its exported signals.
 
+On 2026-10-01 the user extended the observability exemption to T23, the
+behavior and cognition readings track. Like T21 it adds no mechanism and only
+observes the simulation, so its features skip the benchmark profiles and the
+mutation gate under the same reviewed no-behavior-change claim, and the same
+three track checks stand in; T23's additions sit behind the reference build's
+switch with T21's.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the

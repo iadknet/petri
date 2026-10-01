@@ -181,7 +181,7 @@ are required workflow checks, not an automatic SubagentStop gate.
 
 A lab feature under the shared contract's exemption ("Lab features skip the
 profiles" in the Benchmark gate section) spawns no benchmark specialist; its
-spec records `Not applicable: lab feature` with the diff scope. A T21 feature
+spec records `Not applicable: lab feature` with the diff scope. A T21 or T23 feature
 under the shared contract's observability exemption ("Observability features
 skip the profiles and the mutation gate" in the same section) spawns neither
 the benchmark specialist nor the mutation specialist; the persistent
@@ -226,7 +226,7 @@ the existing severity rules and route remediation to the same implementer agent.
 
 ### Mutation specialist
 
-A T21 feature under the shared contract's observability exemption spawns no
+A T21 or T23 feature under the shared contract's observability exemption spawns no
 mutation specialist; its spec records
 `Not applicable: observability feature`. Otherwise, after final review and any
 post-review remediation, spawn

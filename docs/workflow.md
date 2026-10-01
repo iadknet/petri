@@ -294,8 +294,8 @@ second full run; that ordering cost about two fresh runs per feature and up to
 six on one of them. Delegate it to a fresh `roadmap-mutation-specialist` whose
 only scope is this gate, its test-only triage, and the spec's Verification
 record. Give it the worktree and spec paths, feature ID, final-review result,
-and only the spec's Verification and Notes for AI Agents sections. A T21
-feature under the Benchmark gate's observability exemption skips this gate.
+and only the spec's Verification and Notes for AI Agents sections. A T21 or
+T23 feature under the Benchmark gate's observability exemption skips this gate.
 
 The gate is a fresh `make rust-mutants` (`MUTANTS_ITERATE=0`, the default).
 The target diffs the worktree (committed, uncommitted, and untracked) against
@@ -433,21 +433,22 @@ and no series entry, so later comparisons reference the last measured closure,
 and the ordinary benchmark tests inside `make check` still run.
 
 **Observability features skip the profiles and the mutation gate (user
-decision, 2026-09-26, recorded 2026-09-29).** A T21 feature does not run the
+decision, 2026-09-26, recorded 2026-09-29; extended to T23 on 2026-10-01).**
+A T21 or T23 feature does not run the
 gate or goal profile and does not run the mutation gate. No benchmark or
 mutation specialist is spawned, and the goal command's delegation clauses for
 them do not apply. The exemption is keyed to the track, not to a diff scope,
-because T21 wires export into `v3-cli`, `v3-server` and observation seams in
+because both tracks wire export into `v3-cli`, `v3-server` and observation seams in
 `v3-core`. It holds only while the feature changes no simulation behavior: no
 simulation default, no `SimulationConfig` or `RuntimeConfig` field, no
 production RNG draw, no stored summary content and no deterministic output.
 The process-level telemetry default that T21.F05 flips is not a simulation
-default. The reviewer checks that claim against the diff, and a T21 feature
+default. The reviewer checks that claim against the diff, and a feature
 that fails it loses both exemptions for that closure. An exempt closure adds
 no benchmark summary and no series entry. `make check`, the spec challenge
 loop and the Codex review still apply.
 
-Three track checks stand in for the skipped gates; the T21 track notes state
+Three track checks stand in for the skipped gates; the T21 and T23 track notes state
 who delivers each and what it must show.
 
 1. The telemetry-neutrality test runs inside `make check` from T21.F01 on.
@@ -462,10 +463,10 @@ who delivers each and what it must show.
 **One ceiling, one reference.** The ceiling in force is 25% until T21.F05
 closes and the ceiling T21.F05 recorded after that. It applies to one ratio:
 the changed build with telemetry on against the reference build of the same
-commit, in which everything T21 added is compiled out. Both sides hold the
+commit, in which everything T21 and T23 added is compiled out. Both sides hold the
 same simulation code, so a change another track makes to simulation cost
 moves both. Ratios recorded at earlier closures are attribution only and are
-never multiplied into a current reading. The reviewer checks that every T21
+never multiplied into a current reading. The reviewer checks that every T21 or T23
 addition to `v3-core` and to the binaries' run loops sits behind the build
 switch the reference turns off.
 
@@ -621,7 +622,7 @@ feature row, update the track and master rollups only if their own criteria are
 now satisfied, run `make check-docs` (the closure edits are documentation, and
 the full suite was just run on the same code), and commit. Then:
 
-0. For a T21 feature under the observability exemption, confirm instead that
+0. For a T21 or T23 feature under the observability exemption, confirm instead that
    the spec records both `Not applicable: observability feature` items, the
    reviewer accepted the no-behavior-change claim, and the parent comparison
    and the overhead check are each recorded with a result or a
