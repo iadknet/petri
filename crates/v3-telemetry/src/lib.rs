@@ -749,8 +749,9 @@ impl Telemetry {
 
     /// Starts a creature window into `slot` before a tick when one is due:
     /// windows are on, neither a window nor a manual sample is active, the
-    /// interval has passed since the run's last sample start, the run is
-    /// below its caps and the population is not empty. Pass `slot` to
+    /// interval has passed since the run's last sample start and the
+    /// population is not empty. A window past the run's caps records and
+    /// emits its `creature.window` record but exports no trace or genome. Pass `slot` to
     /// `run_tick` unless a manual sample is active, then call
     /// [`Telemetry::after_tick`].
     pub fn before_tick(
@@ -782,8 +783,9 @@ impl Telemetry {
 
     /// A manual sample starts: exports an open window as `manual` and an
     /// unfetched sample it replaces as `replaced`, then admits `sample` for
-    /// export when the interval has passed and the run is below its caps
-    /// (else counts it in `petri.samples_skipped`).
+    /// export when the interval has passed (else counts it in
+    /// `petri.samples_skipped`); past the run's caps it exports only its
+    /// `creature.window` record.
     pub fn start_manual(
         &self,
         run: &mut RunHandle,

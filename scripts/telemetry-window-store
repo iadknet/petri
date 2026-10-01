@@ -1,0 +1,272 @@
+#!/bin/sh
+# Thins each run's `creature.window` records in Loki (T23.F10).
+#
+# Usage: telemetry-window-store [--once | --passes N]
+#   Runs one pass every PETRI_WINDOW_STORE_PASS_S seconds, forever, or N
+#   passes (--once is --passes 1) and exits non-zero if any Loki call failed.
+#
+# A run's records carry `petri_window` (the sample index) and `petri_keep`
+# (2 for indexes divisible by ten, else 1 for even ones, else 0). With N the
+# highest index Loki's queries return for the run, a record is kept while
+# N - index < 300, or N - index < 600 at keep level 1 or more, or at keep
+# level 2. A pass sends one delete request per band (indexes N-599..N-300,
+# and N-600 and older) that still returns records outside that set; its
+# label filters select the service, the event, the run, the band's index
+# range and the keep levels below the band's, and its time range spans the
+# selected records, rounded outward to the query step. When a run's stored
+# bytes (`bytes_over_time`) still exceed PETRI_WINDOW_STORE_CAP_BYTES, one cap
+# request deletes, at age 600 or more, the oldest records whose index is not
+# divisible by 10^t for the lowest tier t >= 2 that has such records, as far
+# as their bytes cover the excess.
+#
+# The job keeps no state outside its process. A pass looks at every run with
+# a record newer than 3 h before the last successful pass started (every run
+# on the first pass) and every run a previous pass left unsettled; a run is
+# settled once a pass sends it no request. Queries hide records under
+# accepted delete requests, so each pass recomputes its work from what they
+# return. Discovery and counting use metric queries only.
+#
+# Environment:
+#   PETRI_WINDOW_STORE_PASS_S     seconds between passes (600)
+#   PETRI_WINDOW_STORE_CAP_BYTES  per-run stored-byte cap (500000000)
+#   PETRI_WINDOW_STORE_LOKI       Loki's base URL (http://lgtm:3100)
+set -u
+
+pass_s=${PETRI_WINDOW_STORE_PASS_S:-600}
+cap=${PETRI_WINDOW_STORE_CAP_BYTES:-500000000}
+loki=${PETRI_WINDOW_STORE_LOKI:-http://lgtm:3100}
+# 2026-10-01T00:00:00Z: no `creature.window` record is older.
+epoch=1790812800
+# Exceeds a record's worst delay from its timestamp to Loki (10,245 s).
+margin=10800
+# Band edges, in indexes below N.
+recent=300
+older=600
+
+usage() {
+  printf 'Usage: telemetry-window-store [--once | --passes N]\n' >&2
+  exit 2
+}
+
+is_count() {
+  case $1 in '' | *[!0-9]*) return 1 ;; *) return 0 ;; esac
+}
+
+passes=0
+case $# in
+  0) ;;
+  1) [ "$1" = --once ] || usage; passes=1 ;;
+  2) [ "$1" = --passes ] && is_count "$2" && [ "$2" -gt 0 ] || usage; passes=$2 ;;
+  *) usage ;;
+esac
+is_count "$pass_s" || { printf 'telemetry-window-store: invalid PETRI_WINDOW_STORE_PASS_S: %s\n' "$pass_s" >&2; exit 2; }
+is_count "$cap" && [ "$cap" -gt 0 ] || { printf 'telemetry-window-store: invalid PETRI_WINDOW_STORE_CAP_BYTES: %s\n' "$cap" >&2; exit 2; }
+
+log() { printf 'window-store: %s\n' "$*"; }
+
+# A Loki call; its body on stdout. A failure logs Loki's message and fails.
+call() {
+  if ! body=$(curl -sS --max-time 120 --fail-with-body "$@" 2>&1); then
+    log "error: $(printf '%s' "$body" | tr '\n' ' ')" >&2
+    return 1
+  fi
+  printf '%s\n' "$body"
+}
+
+# instant QUERY TIME
+instant() {
+  call -G "$loki/loki/api/v1/query" --data-urlencode "query=$1" --data-urlencode "time=$2"
+}
+
+# range QUERY START END: one point per step.
+range() {
+  call -G "$loki/loki/api/v1/query_range" --data-urlencode "query=$1" \
+    --data-urlencode "start=$2" --data-urlencode "end=$3" --data-urlencode "step=${step}s"
+}
+
+# delete QUERY START END
+delete() {
+  call -X POST -G "$loki/loki/api/v1/delete" --data-urlencode "query=$1" \
+    --data-urlencode "start=$2" --data-urlencode "end=$3" >/dev/null
+}
+
+# The non-zero `[time,"value"]` samples of a response, one `time value` per
+# line, in time order.
+points() {
+  awk '{
+    s = $0
+    while (match(s, /\[[0-9.]+,"[^"]*"\]/)) {
+      p = substr(s, RSTART + 1, RLENGTH - 2)
+      s = substr(s, RSTART + RLENGTH)
+      split(p, a, ",")
+      gsub(/"/, "", a[2])
+      if (a[2] + 0 != 0) printf "%d %s\n", a[1], a[2]
+    }
+  }' | sort -n
+}
+
+# `service run` for each series of a discovery response.
+runs() {
+  awk '{
+    n = split($0, parts, /"metric":/)
+    for (i = 2; i <= n; i++) {
+      p = parts[i]; svc = ""; run = ""
+      if (match(p, /"service_name":"[^"]*"/)) svc = substr(p, RSTART + 16, RLENGTH - 17)
+      if (match(p, /"petri_run_id":"[^"]*"/)) run = substr(p, RSTART + 16, RLENGTH - 17)
+      if (svc ~ /^[A-Za-z0-9._-]+$/ && run ~ /^[0-9a-f]+$/) print svc, run
+    }
+  }'
+}
+
+# Sum, first and last time of `time value` lines: `sum first last`.
+summary() {
+  awk 'NR == 1 { first = $1 } { sum += $2; last = $1 }
+    END { printf "%.0f %d %d\n", sum, first, last }'
+}
+
+# bytes SELECTOR: the selected records' bytes per step over the run's span.
+bytes() {
+  response=$(range "sum(bytes_over_time($1 | keep petri_run_id [${step}s]))" "$first" "$last") ||
+    return 1
+  printf '%s\n' "$response" | points
+}
+
+# band NAME FILTERS: deletes the run's records under FILTERS, when queries
+# still return any, over their time span rounded outward; sets band_bytes.
+band() {
+  band_bytes=0
+  found=$(bytes "$sel$2") || return 1
+  [ -n "$found" ] || return 0
+  read -r found_bytes found_first found_last <<EOF
+$(printf '%s\n' "$found" | summary)
+EOF
+  delete "$sel$2" $((found_first - step)) $((found_last + 1)) || return 1
+  requests="$requests $1"
+  band_bytes=$found_bytes
+}
+
+# cap_tier EXCESS: one request deleting, at age 600 or more, the oldest records
+# not divisible by 10^t, for the lowest tier t >= 2 with such records, as far
+# as their bytes cover EXCESS. Fails with status 3 when no tier has any.
+cap_tier() {
+  tier=2
+  divisor=100
+  while [ "$tier" -le 18 ] && [ $((divisor / 10)) -le "$n" ]; do
+    filter=" | petri_window <= $((n - older)) | petri_keep >= 2 | petri_window !~ \"0|.*0{$tier}\""
+    found=$(bytes "$sel$filter") || return 1
+    if [ -n "$found" ]; then
+      start=$(($(printf '%s\n' "$found" | awk 'NR == 1 { print $1 }') - step))
+      end=$(printf '%s\n' "$found" | awk -v excess="$1" '
+        { sum += $2; last = $1; if (sum >= excess) { print $1; exit } }
+        END { if (sum < excess) print last + 1 }')
+      delete "$sel$filter" "$start" "$end" || return 1
+      requests="$requests cap:$tier"
+      return 0
+    fi
+    tier=$((tier + 1))
+    divisor=$((divisor * 10))
+  done
+  return 3
+}
+
+# One run's pass; prints its line. Returns 0 when it sent no request, 1 when
+# it did, 2 when a call failed.
+pass_run() {
+  svc=$1
+  run=$2
+  sel="{service_name=\"$svc\"} | event_name=\"creature.window\" | petri_run_id=\"$run\""
+  first=$epoch
+  last=$grid_end
+  span=$(bytes "$sel") || return 2
+  if [ -z "$span" ]; then
+    log "run=$run service=$svc records=0"
+    return 0
+  fi
+  read -r stored first last <<EOF
+$(printf '%s\n' "$span" | summary)
+EOF
+  n=$(instant "max_over_time($sel | unwrap petri_window [$((last - first + step))s]) by (petri_run_id)" "$last") || return 2
+  n=$(printf '%s\n' "$n" | points | awk 'NR == 1 { printf "%d", $2 }')
+  n=${n:-0}
+  requests=""
+  recent_bytes=0
+  older_bytes=0
+  if [ "$n" -ge "$recent" ]; then
+    lo=$((n - older + 1))
+    [ "$lo" -ge 0 ] || lo=0
+    band recent " | petri_window >= $lo | petri_window <= $((n - recent)) | petri_keep < 1" || return 2
+    recent_bytes=$band_bytes
+  fi
+  if [ "$n" -ge "$older" ]; then
+    band older " | petri_window <= $((n - older)) | petri_keep < 2" || return 2
+    older_bytes=$band_bytes
+  fi
+  kept=$((stored - recent_bytes - older_bytes))
+  note=""
+  if [ "$kept" -gt "$cap" ] && [ "$n" -lt "$older" ]; then
+    # Every record is at age under 600, which the cap never thins.
+    note=" cap=unreachable"
+  elif [ "$kept" -gt "$cap" ]; then
+    # The kept records at age under 600, which the cap never thins.
+    newest=$(bytes "$sel | petri_window > $((n - recent))") || return 2
+    middle=$(bytes "$sel | petri_window > $((n - older)) | petri_window <= $((n - recent)) | petri_keep >= 1") ||
+      return 2
+    young=$(printf '%s\n%s\n' "$newest" "$middle" | summary)
+    [ "${young%% *}" -le "$cap" ] || note=" cap=unreachable"
+    cap_tier $((kept - cap))
+    case $? in
+      0) ;;
+      3) note=" cap=unreachable" ;;
+      *) return 2 ;;
+    esac
+  fi
+  log "run=$run service=$svc N=$n bytes=$stored kept=$kept requests=${requests# }$note"
+  [ -z "$requests" ]
+}
+
+unsettled=""
+last_ok=""
+done_passes=0
+failed=0
+while :; do
+  now=$(date -u +%s)
+  span_s=$((now - epoch))
+  step=$(((span_s + 9999) / 10000))
+  [ "$step" -ge 60 ] || step=60
+  # The first step boundary at or after now, so the newest records are counted.
+  grid_end=$((epoch + (span_s / step + 1) * step))
+  since=${last_ok:-$epoch}
+  [ -z "$last_ok" ] || since=$((last_ok - margin))
+  [ "$since" -ge "$epoch" ] || since=$epoch
+  if found=$(instant "sum by (service_name, petri_run_id) (count_over_time({service_name=~\".+\"} | event_name=\"creature.window\" | keep service_name, petri_run_id [$((now - since + 1))s]))" "$now"); then
+    last_ok=$now
+    listed=$( { printf '%s\n' "$found" | runs; printf '%s' "$unsettled"; } | sort -u)
+  else
+    failed=1
+    listed=$(printf '%s' "$unsettled" | sort -u)
+  fi
+  unsettled=""
+  pass_started=$(date -u +%s)
+  count=0
+  while read -r svc run; do
+    [ -n "${run:-}" ] || continue
+    count=$((count + 1))
+    pass_run "$svc" "$run" </dev/null
+    case $? in
+      0) ;;
+      2) failed=1; log "run=$run service=$svc failed; retried next pass"
+         unsettled="$unsettled$svc $run
+" ;;
+      *) unsettled="$unsettled$svc $run
+" ;;
+    esac
+  done <<EOF
+$listed
+EOF
+  log "pass runs=$count unsettled=$(printf '%s' "$unsettled" | grep -c .) seconds=$(($(date -u +%s) - pass_started))"
+  done_passes=$((done_passes + 1))
+  if [ "$passes" -gt 0 ] && [ "$done_passes" -ge "$passes" ]; then
+    exit "$failed"
+  fi
+  sleep "$pass_s"
+done

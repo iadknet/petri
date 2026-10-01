@@ -12,7 +12,9 @@ mod measurement;
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use v3_telemetry::testing::{closed_endpoint, parse_run_line, PointValue, ReceivedTrace, Receiver};
+use v3_telemetry::testing::{
+    closed_endpoint, parse_run_line, PointValue, ReceivedRecord, ReceivedTrace, Receiver,
+};
 
 struct RunOutput {
     canonical: Vec<String>,
@@ -185,7 +187,15 @@ fn canonical_output_is_identical_off_on_and_on_with_a_closed_port() {
         .filter(|record| record.attribute("petri.run_id") == Some(run_id.as_str()))
         .map(|record| record.event_name.as_str())
         .collect();
-    assert_eq!(names, ["run.started", "creature.genome", "run.ended"]);
+    assert_eq!(
+        names,
+        [
+            "run.started",
+            "creature.genome",
+            "creature.window",
+            "run.ended"
+        ]
+    );
     assert_eq!(records[0].resource["service.name"], "v3-cli");
     assert_eq!(records[0].attribute("petri.ticks_requested"), Some("30"));
     assert_eq!(
@@ -193,8 +203,8 @@ fn canonical_output_is_identical_off_on_and_on_with_a_closed_port() {
         Some("1000")
     );
     assert_eq!(records[0].attribute("petri.tick_traces"), Some("on"));
-    assert_eq!(records[2].attribute("petri.status"), Some("completed"));
-    assert_eq!(records[2].attribute("petri.tick"), Some("30"));
+    assert_eq!(records[3].attribute("petri.status"), Some("completed"));
+    assert_eq!(records[3].attribute("petri.tick"), Some("30"));
     // Thirty ticks fall inside one 1,000 ms interval: the run-end snapshot is
     // the only one.
     let ticks: Vec<Option<u64>> = receiver
@@ -215,18 +225,19 @@ fn canonical_output_is_identical_off_on_and_on_with_a_closed_port() {
     assert_eq!(traces, [(Some(30), Some("run_end".to_owned()))]);
     let line = run_line(&on.stderr);
     assert_eq!(line["run"], run_id);
-    // `run.started`, the genome record, the window, the snapshot, its trace
-    // and `run.ended`.
-    assert_eq!(line["exported"], "6");
+    // `run.started`, the genome record, the window record, the window, the
+    // snapshot, its trace and `run.ended`.
+    assert_eq!(line["exported"], "7");
     assert_eq!(line["snapshots"], "1");
     assert_eq!(line["traces"], "1");
     assert_eq!(line["windows"], "1");
     assert_eq!(line["recorded"], "8");
+    assert_eq!(line["window_records"], "1");
 
     let closed = run("on", Some(&closed_endpoint()));
     let line = run_line(&closed.stderr);
     assert_eq!(line["exported"], "0");
-    assert_eq!(line["failed"], "6");
+    assert_eq!(line["failed"], "7");
 
     assert_eq!(on.canonical, off.canonical);
     assert_eq!(closed.canonical, off.canonical);
@@ -515,6 +526,17 @@ fn windows(receiver: &Receiver, run_id: &str) -> Vec<ReceivedTrace> {
         .collect()
 }
 
+/// The run's `creature.window` records (T23.F10).
+fn window_records(receiver: &Receiver, run_id: &str) -> Vec<ReceivedRecord> {
+    receiver
+        .records()
+        .into_iter()
+        .filter(|r| {
+            r.event_name == "creature.window" && r.attribute("petri.run_id") == Some(run_id)
+        })
+        .collect()
+}
+
 fn windowed(receiver: &Receiver, shape: Shape, env: &[(&str, &str)]) -> RunOutput {
     let output = command_with("on", Some(receiver.endpoint()), None, None, shape, env);
     assert!(output.status.success(), "{output:?}");
@@ -601,6 +623,15 @@ fn a_window_exports_its_creature_ticks_events_and_genome() {
     let line = run_line(&on.stderr);
     assert_eq!(line["windows"], "1");
     assert_eq!(line["recorded"], recorded.to_string());
+    let window_records = window_records(&receiver, &run_id);
+    assert_eq!(line["window_records"], window_records.len().to_string());
+    let body: serde_json::Value =
+        serde_json::from_str(window_records[0].body.as_deref().unwrap()).unwrap();
+    assert_eq!(body["ticks"].as_array().unwrap().len(), recorded);
+    assert_eq!(
+        Some(body["genome_hash"].as_str().unwrap()),
+        root.attribute("petri.genome_hash")
+    );
 
     // The same seed picks the same first creature.
     let again = windowed(&receiver, TWO_FOODS, &[]);
@@ -635,8 +666,10 @@ fn windows_off_export_no_window_and_invalid_settings_refuse_to_start() {
     );
     let run_id = announced_run(&on.stderr);
     assert!(windows(&receiver, &run_id).is_empty());
+    assert!(window_records(&receiver, &run_id).is_empty());
     let line = run_line(&on.stderr);
     assert_eq!(line["windows"], "0");
+    assert_eq!(line["window_records"], "0");
     assert_eq!(line["recorded"], "0");
     let started = receiver
         .records()

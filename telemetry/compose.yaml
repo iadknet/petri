@@ -6,7 +6,13 @@
 # `make telemetry-clean CUTOFF=<date or RFC3339>`. PETRI_LGTM_IMAGE,
 # PETRI_TELEMETRY_VOLUME and PETRI_TELEMETRY_PROJECT exist for the scripts'
 # scratch stacks (scripts/telemetry-scratch.sh), which create and remove their
-# own volumes.
+# own volumes. The window-store service (T23.F10) runs
+# scripts/telemetry-window-store in the same image: every
+# PETRI_WINDOW_STORE_PASS_S seconds it thins each run's creature.window records
+# in Loki by age in window indexes (all of the newest 300, the even ones of the
+# next 300, every tenth beyond) and holds a run's stored record bytes at
+# PETRI_WINDOW_STORE_CAP_BYTES; `docker compose logs window-store` shows each
+# pass.
 name: ${PETRI_TELEMETRY_PROJECT:-petri-telemetry}
 
 services:
@@ -43,6 +49,24 @@ services:
         limits:
           cpus: "2"
           memory: 2g
+
+  window-store:
+    image: ${PETRI_LGTM_IMAGE:-grafana/otel-lgtm:0.34.0}
+    entrypoint: ["sh", "/petri/telemetry-window-store"]
+    environment:
+      PETRI_WINDOW_STORE_PASS_S: ${PETRI_WINDOW_STORE_PASS_S:-600}
+      PETRI_WINDOW_STORE_CAP_BYTES: ${PETRI_WINDOW_STORE_CAP_BYTES:-500000000}
+      PETRI_WINDOW_STORE_LOKI: http://lgtm:3100
+    volumes:
+      - ../scripts/telemetry-window-store:/petri/telemetry-window-store:ro
+    depends_on:
+      - lgtm
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128m
 
 volumes:
   data:

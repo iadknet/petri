@@ -78,4 +78,8 @@ for script in verify overhead dashboards-check; do
     fail "telemetry-$script does not select scratch stack $name"
 done
 
+# The overhead check starts only lgtm: the window-store job is not run work.
+grep -q '^compose up -d --quiet-pull lgtm ' "$root/scripts/telemetry-overhead" ||
+  fail 'telemetry-overhead does not start only the lgtm service'
+
 printf 'telemetry-scratch-test: ok\n'

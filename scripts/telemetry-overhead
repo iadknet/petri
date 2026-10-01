@@ -71,7 +71,8 @@
 #
 # Runs on the scratch Compose project and volume petri-telemetry-overhead,
 # created here and removed on exit (scripts/telemetry-scratch.sh); refuses
-# while petri-telemetry is up.
+# while petri-telemetry is up. Only the `lgtm` service starts: the window-store
+# job (T23.F10) is not work added to a run.
 set -eu
 
 [ "$#" -eq 0 ] || { printf 'Usage: scripts/telemetry-overhead\n' >&2; exit 2; }
@@ -153,7 +154,7 @@ reference_bin=$root/target/reference/release/v3-cli
 
 printf 'Starting the scratch stack %s\n' "$PETRI_TELEMETRY_PROJECT"
 scratch_volume_create
-compose up -d --quiet-pull >/dev/null 2>&1
+compose up -d --quiet-pull lgtm >/dev/null 2>&1
 stack_ready
 
 capped=0
