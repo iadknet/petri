@@ -147,23 +147,20 @@ different, no signal is added or renamed, and no configuration is recorded.
 
 ## Verification
 
-- [x] `make check-docs` -> exit 0 on the working tree over `995f82ae`
+- [x] `make check-docs` -> exit 0 on the working tree over `5bff240e`
       (`roadmap-check`, `policy-check`, `quality-check`).
 - [ ] `make check` -> exit 0 on the final code at closure, recorded as the
       tested commit (user's goal; the suite is unchanged in what it asserts,
-      the telemetry-neutrality test included). The first run on the WIP
-      build exited 2 on the shared-recipe race in
-      `crates/v3-cli/tests/telemetry.rs` (`an_invalid_tick_trace_switch_…`
-      failed with `EOF while parsing`, 13/13 on rerun); the fix in
-      invariant 1 is recorded here with `cargo test -p v3-cli --test
-      telemetry` passing on the fixed helper.
-      The build pass's run on the working tree over `995f82ae` exited 2:
-      `an_invalid_tick_trace_switch_refuses_to_start_a_run_with_telemetry_on`
-      in `crates/v3-cli/tests/telemetry.rs` read an empty
-      `t21-small.json` (EOF). The recipe path is shared by parallel tests and
-      rewritten on each call (line 81), so the race is in existing test code,
-      not this diff. `cargo test -p v3-cli --test telemetry` then passed
-      13/13.
+      the telemetry-neutrality test included). `command_with` in
+      `crates/v3-cli/tests/telemetry.rs` writes each call's recipe to
+      `t21-<shape>-<pid>-<seq>.json` and removes it after the run, so
+      parallel tests no longer read a recipe another test is rewriting (the
+      `EOF while parsing` failure of
+      `an_invalid_tick_trace_switch_refuses_to_start_a_run_with_telemetry_on`).
+      On the fixed helper `cargo test -p v3-cli --test telemetry` passes
+      13/13 in each of 10 consecutive runs. `make check` on the working tree
+      over `5bff240e` exits 0 (35 `test result: ok` lines, no failures); the
+      closure run on the tested commit remains.
 - [x] Template–code agreement: every file path, function name, script
       variable, attribute and setting name the template's conventions cite
       resolves by `grep` in the worktree. The `file:line` table is in
