@@ -1,6 +1,6 @@
 # T23 — Behavior and Cognition Readings
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-10-01
 **Master**: [Program Roadmap](../roadmap.md)
 
@@ -26,7 +26,7 @@ question. Like T21, it is an instrument for looking at runs.
 - [ ] A run's dashboard shows reproductive success by sensor use and brain use, and those classes' population share over time.
 - [ ] A run's dashboard shows the largest lineages' population share over time, each with its action mix and its move-against-chance reading.
 - [ ] Readings taken from recorded creature windows chart per run with their sample counts, and any recorded window opens as a tick-by-tick view of what the creature sensed, chose and got.
-- [ ] A long run keeps its newest 300 creature windows in full and a nested, age-thinned sample of all older ones, never below one in ten, inside a per-run byte cap.
+- [ ] A long run keeps its newest 300 creature windows in full and a nested, age-thinned sample of all older ones, never below one in ten until its per-run byte cap binds, after which the oldest records thin further.
 - [ ] Every reading keeps T21's guarantees: byte-identical seeded output with telemetry on or off, no production RNG, bounded memory, and total telemetry cost under the ceiling T21.F05 recorded.
 
 ## Executable Features
