@@ -10,7 +10,7 @@ use v3_core::config::SimulationConfig;
 #[command(name = "v3-cli")]
 struct Cli {
     /// Export run telemetry over OTLP (`on` or `off`); beats PETRI_TELEMETRY,
-    /// default off. `run` exports its run; `bench`, `recruitment` and
+    /// default on. `run` exports its run; `bench`, `recruitment` and
     /// `input-opportunity` export one measurement record pair (and `bench`
     /// one run per seed) after their work ends.
     #[cfg(feature = "telemetry")]
@@ -1070,11 +1070,19 @@ mod tests {
 
     #[cfg(feature = "telemetry")]
     #[test]
-    fn telemetry_flag_beats_environment_which_beats_default_off() {
+    fn telemetry_flag_beats_environment_which_beats_default_on() {
+        use clap::CommandFactory as _;
         use v3_telemetry::Switch;
         let run = ["v3-cli", "run", "--ticks", "1", "--seed", "1"];
-        assert_eq!(switch_for(&run, None), Switch::Off);
-        assert_eq!(switch_for(&run, Some("on")), Switch::On);
+        assert_eq!(switch_for(&run, None), Switch::On);
+        assert_eq!(switch_for(&run, Some("off")), Switch::Off);
+        let help = Cli::command()
+            .get_arguments()
+            .find(|arg| arg.get_id() == "telemetry")
+            .and_then(|arg| arg.get_help())
+            .map(ToString::to_string)
+            .unwrap_or_default();
+        assert!(help.contains("default on"), "{help}");
         let off = [
             "v3-cli",
             "--telemetry",
@@ -1096,7 +1104,7 @@ mod tests {
             "--seed",
             "1",
         ];
-        assert_eq!(switch_for(&on, None), Switch::On);
+        assert_eq!(switch_for(&on, Some("off")), Switch::On);
         // Global: accepted after the subcommand and by every subcommand.
         let after = [
             "v3-cli",

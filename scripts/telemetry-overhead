@@ -13,10 +13,10 @@
 # its cell as an infinite ratio. Reaching the cap ends the check inconclusive.
 #
 # Statistic (scripts/telemetry-stats.mjs): per cell the median ratio and its
-# 90% distribution-free interval; pass when the upper bound is below 1.05,
-# fail when the lower bound is at or above it, else inconclusive. 1.05 is
-# D5's 5% target; it is the ceiling in force only once T21.F05's Measured
-# verdict records a D5 pass (docs/workflow.md, "Benchmark gate"). Pairs n: five reference runs' spread (max - min) / median
+# 90% distribution-free interval; pass when the upper bound is below 1.10,
+# fail when the lower bound is at or above it, else inconclusive. 1.10 is the
+# ceiling the user set at T21.F05's D5 decision; 5% stays the target
+# (docs/workflow.md, "Benchmark gate"). Pairs n: five reference runs' spread (max - min) / median
 # sets 16 at <= 5%, 24 at <= 10%, 32 at <= 20%; above 20% the spread block is
 # repeated once after 60 s idle, and if still above 20% no pair runs.
 #
@@ -55,7 +55,7 @@
 # the flush-included ratio recorded beside it. In a, a telemetry run with any
 # failed, dropped or abandoned record or counts inconsistent with its preset
 # voids its pair. Then (c) per world, 6 pairs of state a per world for each
-# of minimal, phases and dense (no ceiling; a lower bound at or above 1.05 is
+# of minimal, phases and dense (no ceiling; a lower bound at or above 1.10 is
 # labelled "exceeds the ceiling; opt-in"), and one storage block per preset
 # and world: `du -sk` of the three stores after 60 s settled, three telemetry
 # runs back to back, 60 s settle, `du -sk` again, less the idle growth rate of
@@ -83,9 +83,9 @@ f01_readings=$root/docs/progress/readings/t21-f01.md
 f05_readings=$root/docs/progress/readings/t21-f05.md
 recipe=$root/telemetry/overhead-world.json
 endpoint=http://127.0.0.1:4318
-# The ceiling the verdicts are read against: D5's 5%, in force only once
-# T21.F05's Measured verdict records a D5 pass.
-ceiling=1.05
+# The ceiling the verdicts are read against: 10%, the user's D5 decision at
+# T21.F05 (5% stays the target).
+ceiling=1.10
 # F01's 10 s flush deadline plus 50 ms of scheduling slack (the reading
 # includes the return from the abandoned wait).
 flush_bound_ms=10050
@@ -468,7 +468,7 @@ if [ "$mode" = routine ]; then
   : >"$scratch/w.c"
   if [ "$pairs" -gt 0 ]; then idle_block w "$ticks"; fi
 
-  printf '\nWorkload=%s  T=%s  spread=%s  pairs n=%s  verdicts against %s (D5 target; the ceiling only once T21.F05 records a D5 pass)\n\n' \
+  printf '\nWorkload=%s  T=%s  spread=%s  pairs n=%s  verdicts against the ceiling %s (D5 decision; 5%% target)\n\n' \
     "$workload" "$ticks" "${spread:--}" "$pairs" "$ceiling"
   head_tail=''
   rule_tail=''

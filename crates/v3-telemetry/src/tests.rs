@@ -122,10 +122,11 @@ fn wait_for_drain(telemetry: &Telemetry, run: &RunHandle) {
 }
 
 #[test]
-fn switch_defaults_off_and_flag_beats_environment() {
-    assert_eq!(resolve_switch(None, None), Ok(Switch::Off));
-    assert_eq!(resolve_switch(None, Some("")), Ok(Switch::Off));
-    assert_eq!(resolve_switch(None, Some("on")), Ok(Switch::On));
+fn switch_defaults_on_and_flag_beats_environment() {
+    assert_eq!(Switch::default(), Switch::On);
+    assert_eq!(resolve_switch(None, None), Ok(Switch::On));
+    assert_eq!(resolve_switch(None, Some("")), Ok(Switch::On));
+    assert_eq!(resolve_switch(None, Some("off")), Ok(Switch::Off));
     assert_eq!(
         resolve_switch(Some(Switch::Off), Some("on")),
         Ok(Switch::Off)

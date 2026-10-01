@@ -144,15 +144,15 @@ exports; the counts, caps and sampling policies stay F02–F04's.
       `TELEMETRY_USED_MS` carry, the readings lines it prints), the
       environment scrub, the run timeout and the export check, and the
       shared statistic and pair table in routine mode, verdicts against
-      the ceiling, 1.10 after the user's decision (the flip pass sets it);
+      the ceiling, 1.10 after the user's decision;
       the `s` flush flag above 10,050 ms; the `dense` export check
       (`snapshots` ≥ 12, `traces` = `snapshots`, `windows` ≥ 2).
-- [ ] Default flip (unblocked by the user's decision): `resolve_switch`,
-      `Switch::default`, the three help texts, the three `…_default_off`
-      tests become `…_default_on`; the routine ceiling and its test move
-      to 1.10; `--telemetry off` at the thirteen spawn sites is done (a
-      per-file `TELEMETRY_OFF` constant, empty without the `telemetry`
-      feature).
+- [x] Default flip: `Switch::default` is `On` and `resolve_switch` falls
+      back to it; the three help texts say "default on"; the three
+      `…_default_on` tests also check the help text; the routine ceiling is
+      1.10, pinned by `telemetry-stats.test.mjs`; `--telemetry off` at the
+      thirteen spawn sites (a per-file `TELEMETRY_OFF` constant, empty
+      without the `telemetry` feature).
 - [x] Parent comparison against `8b0a158f`, T = 6908.
 - [x] The qualifying measurement, once, recorded in
       `docs/progress/readings/t21-f05.md`; D5 applied (not under 5%: user
@@ -170,21 +170,26 @@ exports; the counts, caps and sampling policies stay F02–F04's.
       -p v3-lab -p v3-server`: all pass (v3-telemetry lib 65, v3-cli
       telemetry 13 with `a_preset_sets_the_base_settings_…`); without the
       scrub four v3-cli fixtures failed under that export.
-- [ ] `cargo test -p v3-cli`, `-p v3-server`, `-p v3-lab` -> the switch
+- [x] `cargo test -p v3-cli`, `-p v3-server`, `-p v3-lab` -> the switch
       tests: `resolve_switch(None, None)` is `On`, `--telemetry off` beats
       `PETRI_TELEMETRY=on`, `PETRI_TELEMETRY=off` beats the default; the
-      neutrality test unchanged.
+      neutrality test unchanged. The four switch tests (with v3-telemetry's
+      `switch_defaults_on_…`) pass;
+      `cargo build --release -p v3-cli -p v3-server -p v3-lab
+      --no-default-features` compiles with 0 `v3-telemetry`/`telemetry-seams`
+      lines in `cargo tree -e features`; clippy `-D warnings` passes with and
+      without default features.
 - [x] Every `CARGO_BIN_EXE` spawn in `crates/*/tests` passes
       `--telemetry off`, or `--telemetry <switch>` explicitly in a
       telemetry fixture (reviewer grep against the diff); `make check`
       passes with the stack down and `PETRI_TELEMETRY` unset.
       `.args(TELEMETRY_OFF)` at the thirteen sites; `env -u PETRI_TELEMETRY
-      make check` exit 0 with no stack running (before the flip).
+      make check` exit 0 with no stack running.
 - [x] `node --test scripts/telemetry-stats.test.mjs` -> median, interval
       ranks and verdict on fixed inputs, including the strict comparison
-      at exactly the ceiling (1.10 after this closure) and a voided pair
-      entering as an infinite ratio.
-      14 tests pass (the `dense` minimum counts and the T1 calibration
+      at exactly the ceiling 1.10, read from `scripts/telemetry-overhead`,
+      and a voided pair entering as an infinite ratio.
+      15 tests pass (the `dense` minimum counts and the T1 calibration
       rule among them); `make
       quality-check` runs the file and exits 0.
 - [x] `scripts/telemetry-parent-compare 8b0a158f` -> identical canonical
@@ -199,8 +204,8 @@ exports; the counts, caps and sampling policies stay F02–F04's.
 - [ ] Mutation gate: `Not applicable: observability feature` (the
       workflow's exemption; no run).
 - [ ] Benchmark summary: `Not applicable: observability feature`.
-- [ ] After the flip: `env -u PETRI_TELEMETRY make check`,
-      `make check-docs` and `make roadmap-check` exit 0.
+- [x] After the flip: `env -u PETRI_TELEMETRY make check`,
+      `make check-docs` and `make roadmap-check` exit 0 (no stack running).
 
 ## Performance and Goal Impact
 
