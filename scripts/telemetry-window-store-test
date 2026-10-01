@@ -1,0 +1,309 @@
+#!/bin/sh
+# Docker-free tests of scripts/telemetry-window-store (T23.F10): a stub `curl`
+# on PATH answers the job's Loki calls from a store of synthetic records
+# (`service run index keep unix_seconds bytes`) and applies its delete
+# requests to that store at once, as Loki's queries hide accepted ones.
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+job=$script_dir/telemetry-window-store
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-window-store-test.XXXXXX")
+trap 'rm -rf "$test_root"' 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+export WINDOW_STORE_TEST_FIXTURE="$test_root"
+mkdir "$test_root/bin"
+
+cat >"$test_root/bin/curl" <<'STUB'
+#!/bin/sh
+# Answers the Loki calls of telemetry-window-store from $FIX/store.
+fix=$WINDOW_STORE_TEST_FIXTURE
+method=GET url='' query='' start='' end='' time='' step=''
+while [ "$#" -gt 0 ]; do
+  case $1 in
+    -X) method=$2; shift ;;
+    http*) url=$1 ;;
+    query=*) query=${1#query=} ;;
+    start=*) start=${1#start=} ;;
+    end=*) end=${1#end=} ;;
+    time=*) time=${1#time=} ;;
+    step=*) step=${1#step=}; step=${step%s} ;;
+  esac
+  shift
+done
+path=${url#http://*/}
+printf '%s /%s start=%s end=%s time=%s step=%s query=%s\n' \
+  "$method" "$path" "$start" "$end" "$time" "$step" "$query" >>"$fix/calls"
+if [ -f "$fix/fail" ] && printf '%s %s\n' "$method" "$query" | grep -qF -- "$(cat "$fix/fail")"; then
+  printf 'stub: injected failure\n'
+  exit 22
+fi
+case $query in
+  *'count_over_time('*) mode=count ;;
+  *'unwrap petri_window'*) mode=max ;;
+  *) mode=bytes ;;
+esac
+# A late arrival lands once the first pass has listed the runs.
+if [ "$mode" = count ] && [ -f "$fix/late" ] && [ -f "$fix/listed" ]; then
+  cat "$fix/late" >>"$fix/store"
+  rm "$fix/late"
+fi
+[ "$mode" != count ] || : >"$fix/listed"
+[ "$method" = POST ] && mode=delete
+awk -v q="$query" -v mode="$mode" -v start="$start" -v end="$end" -v time="$time" \
+  -v step="$step" -v deleted="$fix/deleted" -v kept="$fix/store.next" '
+  function arg(re, skip,   v) {
+    if (!match(q, re)) return ""
+    v = substr(q, RSTART + skip, RLENGTH - skip)
+    gsub(/["{} ]/, "", v)
+    return v
+  }
+  BEGIN {
+    svc = arg("service_name=\"[^\"]*\"", 14)
+    run = arg("petri_run_id=\"[^\"]*\"", 14)
+    wge = arg("petri_window >= [0-9]+", 16)
+    wle = arg("petri_window <= [0-9]+", 16)
+    wgt = arg("petri_window > [0-9]+", 15)
+    klt = arg("petri_keep < [0-9]+", 13)
+    kge = arg("petri_keep >= [0-9]+", 14)
+    tier = arg("0[{][0-9]+[}]", 1)
+    span = arg("[[][0-9]+s[]]", 1)
+  }
+  function selected() {
+    if (svc != "" && $1 != svc) return 0
+    if (run != "" && $2 != run) return 0
+    if (wge != "" && $3 < wge + 0) return 0
+    if (wle != "" && $3 > wle + 0) return 0
+    if (wgt != "" && $3 <= wgt + 0) return 0
+    if (klt != "" && $4 >= klt + 0) return 0
+    if (kge != "" && $4 < kge + 0) return 0
+    if (tier != "") {
+      d = 1; for (i = 0; i < tier; i++) d *= 10
+      if ($3 == 0 || $3 % d == 0) return 0
+    }
+    return 1
+  }
+  mode == "delete" {
+    if (selected() && $5 >= start && $5 <= end) print >>deleted
+    else print >kept
+    next
+  }
+  !selected() { next }
+  mode == "bytes" {
+    if ($5 <= start - step || $5 > end) next
+    k = int(($5 - start + step - 1) / step); bytes[k] += $6; next
+  }
+  $5 <= time - span || $5 > time { next }
+  mode == "count" { count[$1 " " $2]++; next }
+  mode == "max" { if (!found || $3 > max) max = $3; found = 1 }
+  END {
+    if (mode == "delete") exit
+    printf "{\"status\":\"success\",\"data\":{\"result\":["
+    if (mode == "bytes") {
+      printf "{\"metric\":{},\"values\":["
+      sep = ""
+      for (t = start + 0; t <= end + 0; t += step) {
+        k = (t - start) / step
+        printf "%s[%d,\"%d\"]", sep, t, bytes[k] + 0; sep = ","
+      }
+      printf "]}"
+    } else if (mode == "max" && found) {
+      printf "{\"metric\":{\"petri_run_id\":\"%s\"},\"value\":[%d,\"%d\"]}", run, time, max
+    } else if (mode == "count") {
+      sep = ""
+      for (key in count) {
+        split(key, p, " ")
+        printf "%s{\"metric\":{\"petri_run_id\":\"%s\",\"service_name\":\"%s\"},\"value\":[%d,\"%d\"]}", sep, p[2], p[1], time, count[key]
+        sep = ","
+      }
+    }
+    printf "]}}\n"
+  }' "$fix/store"
+if [ "$mode" = delete ]; then
+  mv "$fix/store.next" "$fix/store"
+  printf '%s\n' "$query" >>"$fix/requests"
+fi
+STUB
+chmod +x "$test_root/bin/curl"
+
+fail() { printf 'telemetry-window-store-test: %s\n' "$*" >&2; exit 1; }
+
+now=$(date -u +%s)
+run_a=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+run_b=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+# records RUN FIRST LAST AGE_S SPACING_S [SERVICE]: one 1,000-byte record per
+# index, index FIRST stamped AGE_S seconds ago, each next one SPACING_S later.
+records() {
+  awk -v run="$1" -v first="$2" -v last="$3" -v t0=$((now - $4)) -v gap="$5" \
+    -v svc="${6:-v3-cli}" 'BEGIN {
+      for (i = first; i <= last; i++) {
+        keep = i % 10 == 0 ? 2 : i % 2 == 0 ? 1 : 0
+        print svc, run, i, keep, t0 + (i - first) * gap, 1000
+      }
+    }'
+}
+
+# reset: an empty store and call log.
+reset() {
+  rm -f "$test_root/store" "$test_root/calls" "$test_root/requests" "$test_root/deleted" \
+    "$test_root/fail" "$test_root/late" "$test_root/listed"
+  : >"$test_root/store"
+}
+
+# job [ARGS...]: runs the job with the stub; output in $test_root/output.
+job() {
+  status=0
+  PATH="$test_root/bin:$PATH" PETRI_WINDOW_STORE_PASS_S=0 \
+    PETRI_WINDOW_STORE_CAP_BYTES="${cap:-500000000}" \
+    sh "$job" "$@" >"$test_root/output" 2>&1 || status=$?
+}
+
+requests() { cat "$test_root/requests" 2>/dev/null | grep -c . || true; }
+
+# The keep set of indexes FIRST..N with highest index N, against the store.
+expect_keep_set() {
+  run=$1 n=$2
+  awk -v run="$run" -v n="$n" '$2 == run {
+      age = n - $3
+      ok = age < 300 || (age < 600 && $4 >= 1) || $4 == 2
+      if (!ok) { print "kept " $3; bad = 1 }
+      seen[$3] = 1
+    }
+    END { exit bad }' "$test_root/store" || fail "$run holds records outside its keep set"
+}
+
+# No request while N < 300.
+reset
+records "$run_a" 0 299 3600 1 >>"$test_root/store"
+job --once
+[ "$status" -eq 0 ] || { cat "$test_root/output" >&2; fail "N < 300 failed"; }
+[ "$(requests)" -eq 0 ] || fail 'a request while N < 300'
+grep -q "run=$run_a service=v3-cli N=299 bytes=300000 kept=300000 requests=\$" "$test_root/output" ||
+  { cat "$test_root/output" >&2; fail 'no pass line for N < 300'; }
+
+# A sparse history: index 1 and index 1,000 only; index 1 goes.
+reset
+records "$run_a" 1 1 3600 1 >>"$test_root/store"
+records "$run_a" 1000 1000 1800 1 >>"$test_root/store"
+job --once
+[ "$(requests)" -eq 1 ] || { cat "$test_root/output" >&2; fail 'sparse: expected one request'; }
+[ "$(awk '{ print $3 }' "$test_root/store")" = 1000 ] || fail 'sparse: index 1 survived'
+grep -q 'petri_window <= 400 | petri_keep < 2' "$test_root/requests" || fail 'sparse: not the older band'
+
+# One request per band, each naming the service, event, run, index range and
+# keep levels, over its records' time span; then the store is the keep set,
+# another run and a non-window record are untouched, and a second pass sends
+# nothing.
+reset
+records "$run_a" 0 999 5000 2 >>"$test_root/store"
+records "$run_b" 0 999 5000 2 v3-server >>"$test_root/store"
+job --passes 2
+[ "$status" -eq 0 ] || { cat "$test_root/output" >&2; fail "bands failed"; }
+[ "$(requests)" -eq 4 ] || { cat "$test_root/requests" >&2; fail 'bands: expected two requests per run'; }
+grep -qxF "{service_name=\"v3-cli\"} | event_name=\"creature.window\" | petri_run_id=\"$run_a\" | petri_window >= 400 | petri_window <= 699 | petri_keep < 1" "$test_root/requests" ||
+  { cat "$test_root/requests" >&2; fail 'bands: recent band request'; }
+grep -qxF "{service_name=\"v3-server\"} | event_name=\"creature.window\" | petri_run_id=\"$run_b\" | petri_window <= 399 | petri_keep < 2" "$test_root/requests" ||
+  { cat "$test_root/requests" >&2; fail 'bands: older band request'; }
+expect_keep_set "$run_a" 999
+expect_keep_set "$run_b" 999
+[ "$(awk -v r="$run_a" '$2 == r' "$test_root/store" | grep -c .)" -eq $((300 + 150 + 40)) ] ||
+  fail 'bands: run a lost a retained record'
+# Each request's time range covers exactly its selected records, rounded
+# outward by less than one step.
+st=$(sed -n 's/^GET .* step=\([0-9][0-9]*\) .*/\1/p' "$test_root/calls" | sed -n 1p)
+awk -v run="$run_a" '/^POST/ && $0 ~ run {
+    for (i = 1; i <= NF; i++) {
+      if ($i ~ /^start=/) s = substr($i, 7)
+      if ($i ~ /^end=/) e = substr($i, 5)
+    }
+    print s, e
+  }' "$test_root/calls" >"$test_root/ranges"
+awk -v run="$run_a" '$2 == run && $3 <= 399 && $4 < 2 { if (!lo || $5 < lo) lo = $5; if ($5 > hi) hi = $5 }
+  END { print lo, hi }' "$test_root/deleted" >"$test_root/older"
+read -r older_lo older_hi <"$test_root/older"
+read -r s e <<EOF
+$(sed -n 2p "$test_root/ranges")
+EOF
+[ "$s" -le "$older_lo" ] && [ "$s" -gt $((older_lo - 2 * st)) ] && [ "$e" -ge "$older_hi" ] &&
+  [ "$e" -le $((older_hi + st + 1)) ] || fail "bands: older range $s..$e for records $older_lo..$older_hi"
+grep -c '^POST' "$test_root/calls" | grep -qx 4 || fail 'bands: the second pass sent a request'
+sed -n '/pass runs=/p' "$test_root/output" | sed -n 2p | grep -q 'unsettled=0' ||
+  { cat "$test_root/output" >&2; fail 'bands: unsettled after the second pass'; }
+
+# A settled run with no newer arrival is not listed again; an unsettled one
+# is, with no new arrival. A record stamped 2.9 h before the last pass
+# started is found, one stamped 3.1 h before is not.
+reset
+records "$run_a" 0 999 18000 2 >>"$test_root/store"
+records "$run_b" 0 10 18000 2 >>"$test_root/store"
+run_c=cccccccccccccccccccccccccccccccc
+run_d=dddddddddddddddddddddddddddddddd
+records "$run_c" 0 0 10440 1 >"$test_root/late"
+records "$run_d" 0 0 11160 1 >>"$test_root/late"
+printf 'POST {service_name="v3-cli"} | event_name="creature.window" | petri_run_id="%s" | petri_window <= 399\n' \
+  "$run_a" >"$test_root/fail"
+job --passes 2
+[ "$status" -ne 0 ] || fail 'a failed call left the exit status 0'
+second=$(awk '/pass runs=/ { n++ } n == 1 && !/pass runs=/' "$test_root/output")
+printf '%s\n' "$second" | grep -q "run=$run_a" || { cat "$test_root/output" >&2; fail 'the unsettled run was not listed again'; }
+printf '%s\n' "$second" | grep -q "run=$run_b" && fail 'the settled run was listed again'
+printf '%s\n' "$second" | grep -q "run=$run_c" || { cat "$test_root/output" >&2; fail 'a record 2.9 h before the last pass was missed'; }
+printf '%s\n' "$second" | grep -q "run=$run_d" && fail 'a record 3.1 h before the last pass was listed'
+# The failed older-band request ended run a's pass: no cap or later request.
+# Pass 1: the recent band, then the failed older band; pass 2: the older band.
+[ "$(grep -c "^POST.*$run_a" "$test_root/calls")" -eq 3 ] ||
+  { grep '^POST' "$test_root/calls" >&2; fail 'a request after the failed call'; }
+grep -q 'error: stub: injected failure' "$test_root/output" || fail 'the failure was not logged'
+
+# Over the cap: tier 2 (1 in 100) whole, then the oldest of tier 3 (1 in 1,000)
+# as far as the excess needs, never age under 600 or index 0; then settled.
+reset
+records "$run_a" 0 2999 30000 10 >>"$test_root/store"
+cap=460000 job --passes 4
+[ "$status" -eq 0 ] || { cat "$test_root/output" >&2; fail "cap failed"; }
+grep -n 'requests=' "$test_root/output" | sed -n 1p | grep -q 'requests=recent older cap:2$' ||
+  { cat "$test_root/output" >&2; fail 'cap: first pass'; }
+grep -n 'requests=' "$test_root/output" | sed -n 2p | grep -q 'requests=cap:3$' ||
+  { cat "$test_root/output" >&2; fail 'cap: second pass'; }
+grep -n 'requests=' "$test_root/output" | sed -n 3p | grep -q 'kept=460000 requests=$' ||
+  { cat "$test_root/output" >&2; fail 'cap: third pass'; }
+awk '$3 >= 2400 && (2999 - $3 < 300 || $4 >= 1) { young++ }
+  $3 < 2400 && $3 % 100 != 0 { bad = 1 }
+  $3 == 0 { zero = 1 }
+  END { exit !(young == 450 && !bad && zero) }' "$test_root/store" ||
+  fail 'cap: thinned age under 600, index 0, or not nested'
+[ "$(grep -c . "$test_root/store")" -eq 460 ] || { grep "requests=" "$test_root/output" >&2; fail "cap: $(grep -c . "$test_root/store") stored records, not 460"; }
+# Tier 3 went oldest first: 100..900 and 1100..1500 are gone, 1600.. remain.
+awk '$3 % 1000 != 0 && $3 < 1600 && $3 < 2400 { bad = 1 } END { exit bad }' "$test_root/store" ||
+  fail 'cap: tier 3 was not taken oldest first'
+
+# An unreachable cap is logged: the records at age under 600 alone exceed it.
+reset
+records "$run_a" 0 999 5000 2 >>"$test_root/store"
+cap=100000 job --passes 3
+grep -q 'cap=unreachable' "$test_root/output" || { cat "$test_root/output" >&2; fail 'unreachable cap not logged'; }
+[ "$(awk '$3 > 399' "$test_root/store" | grep -c .)" -eq 450 ] || fail 'unreachable: age under 600 thinned'
+awk '$3 <= 399 && $3 != 0' "$test_root/store" | grep -q . && fail 'unreachable: older records not thinned to index 0'
+
+# Over the cap with no record at age 600 or more: unreachable, no request and
+# no query with a negative index bound.
+reset
+records "$run_a" 0 99 5000 2 >>"$test_root/store"
+cap=50000 job --once
+[ "$status" -eq 0 ] || { cat "$test_root/output" >&2; fail 'young cap failed'; }
+grep -q "N=99 .*requests= cap=unreachable" "$test_root/output" ||
+  { cat "$test_root/output" >&2; fail 'young cap: unreachable not logged'; }
+[ "$(requests)" -eq 0 ] || fail 'young cap: a request'
+grep -q 'petri_window [<>=]* -' "$test_root/calls" && fail 'young cap: a negative index bound'
+
+# Usage and settings errors.
+job --passes 0
+[ "$status" -eq 2 ] || fail '--passes 0 accepted'
+job --once extra
+[ "$status" -eq 2 ] || fail 'an extra argument accepted'
+status=0
+PATH="$test_root/bin:$PATH" PETRI_WINDOW_STORE_CAP_BYTES=0 sh "$job" --once >/dev/null 2>&1 || status=$?
+[ "$status" -eq 2 ] || fail 'a zero cap accepted'
+
+printf 'telemetry-window-store-test: ok\n'

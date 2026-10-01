@@ -153,9 +153,9 @@ Invariants:
 
 ## Implementation Tasks
 
-- [ ] Producer: admission past the caps (invariant 2); building and emitting
+- [x] Producer: admission past the caps (invariant 2); building and emitting
       the record (invariants 3 and 4); the `window_records=` count; tests.
-- [ ] Job: `scripts/telemetry-window-store`, a POSIX `sh` script with a
+- [x] Job: `scripts/telemetry-window-store`, a POSIX `sh` script with a
       `--once` mode; a `window-store` service in `telemetry/compose.yaml` that
       runs the stack's lgtm image (`PETRI_LGTM_IMAGE`) with the script mounted
       read-only, reaches Loki over the Compose network and has small resource
@@ -169,14 +169,15 @@ Invariants:
 
 - [ ] `cargo test -p v3-telemetry`, `-p v3-cli`, `-p v3-server` (inside `make
       check`) -> the rows below.
-- [ ] `scripts/telemetry-window-store-test` (inside `make check`) -> the job
+- [x] `scripts/telemetry-window-store-test` (inside `make check`) -> the job
       rows below.
-- [ ] Scratch stack (Docker, outside `make check`) -> the stack rows below,
-      in the readings file.
+- [x] Scratch stack (Docker, outside `make check`) -> the stack rows below,
+      in the readings file: every keep set reached, the cap held at 920,000
+      B, `cap=unreachable` with no request, later passes request nothing.
 - [ ] Reference build: `cargo build --release -p v3-cli -p v3-server
       --no-default-features` compiles and `cargo tree` shows no `v3-telemetry`.
-- [ ] Parent comparison: `scripts/telemetry-parent-compare <merge base>` ->
-      identical canonical output.
+- [x] Parent comparison: `scripts/telemetry-parent-compare <merge base>` ->
+      identical canonical output (`ac5f6b74`: 3 canonical lines, T = 6,908).
 - [ ] Overhead check: `scripts/telemetry-overhead` -> verdict against 1.10.
 - [ ] Bytes: record body sizes (median and maximum) and the run line counts
       from one default CLI run, in the readings file.
@@ -190,7 +191,7 @@ Invariants:
 | Caps | with the caps lowered for the test, the samples past the count cap and past the byte cap are still admitted and emit records, with no trace, no genome record and `petri.windows_capped` set; a manual sample past a cap is not skipped |
 | CLI | neutrality: canonical NDJSON identical with telemetry off, on, and on with a closed port; the receiver's `creature.window` count equals `window_records=`; `PETRI_TELEMETRY_CREATURE_WINDOWS=off` gives none |
 | Job (stubbed Loki) | no request while `N < 300`; a sparse history (indexes 1 and 1,000 only) deletes index 1; one request per band with run, event, index-range and keep-level filters and a time range from the selected records; no request when the queries return nothing outside the keep set; a settled run with no newer arrival is not listed after the first pass, while an unsettled one is, even with no new arrival; a record timestamped 2.9 h before the last pass started is found; a failed call sends no further request for that run; over the cap, one request thins the oldest records at age 600 or more to 1 in 100, then 1 in 1,000 once the first tier is exhausted, never touching age under 600 or index 0; an unreachable cap is logged |
-| Stack | on a portless scratch stack beside the running production stack: one run of 6,000 synthetic records (past the 5,000-entry query limit) and one of 1,300 with index gaps and interleaved timestamps, plus non-window records, sent over OTLP; after the passes and Loki's filtering, each run's queried indexes equal the keep set and nothing else changed; a further pass issues no request; records sent in two batches, the second holding a lower index, end in the keep set; with a small cap, an idle finished run needing two tiers thins nested to 1 in 100 and then 1 in 1,000 over successive passes, and its queried bytes end at or under the cap; pass time and request count recorded |
+| Stack | on a portless scratch stack beside the running production stack: one run of 6,000 synthetic records (past the 5,000-entry query limit) and one of 1,300 with index gaps and interleaved timestamps, plus non-window records, sent over OTLP; after the passes and Loki's filtering, each run's queried indexes equal the keep set and nothing else changed; a further pass issues no request; records sent in two batches, the second holding a lower index, end in the keep set; with a small cap, an idle finished run needing two tiers thins nested to 1 in 100 and then 1 in 1,000 over successive passes, and its queried bytes end at or under the cap; a run over a small cap with `N < 600` logs `cap=unreachable` and sends no request; pass time and request count recorded; all on the final `scripts/telemetry-window-store` |
 
 ## Performance and Goal Impact
 
@@ -216,7 +217,10 @@ measure. Per window, that work is a subset of the pre-cap work: recording and
 the record, with no trace encoding and no genome record. Its share of a run
 still depends on wall-time cadence and simulation throughput.
 No indicator, goal-profile reading or epoch moves. The job runs outside every
-process and timed region.
+process and timed region. The job is not work added to a run, so the overhead
+check's scratch stack starts only `lgtm`. `telemetry-verify` and
+`telemetry-dashboards-check`, which time nothing, keep starting the whole
+stack.
 
 **Measured verdict.** Pending.
 

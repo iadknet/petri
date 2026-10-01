@@ -87,6 +87,8 @@ pub(crate) struct RunCounts {
     pub(crate) windows: u64,
     /// Creature-ticks those samples recorded.
     pub(crate) recorded: u64,
+    /// `creature.window` records offered (T23.F10), one per ended sample.
+    pub(crate) window_records: u64,
 }
 
 impl RunCounts {
@@ -269,6 +271,13 @@ impl Shared {
         }
     }
 
+    /// Counts one `creature.window` record offered for `run`.
+    pub(crate) fn add_window_record(&self, run: RunKey) {
+        if let Some(entry) = self.lock().runs.get_mut(&run) {
+            entry.counts.window_records += 1;
+        }
+    }
+
     /// The largest body the queue accepts.
     pub(crate) fn max_body_bytes(&self) -> u64 {
         self.limits.max_body_bytes
@@ -391,10 +400,11 @@ impl Shared {
             traces,
             windows,
             recorded,
+            window_records,
             ..
         } = entry.counts;
         self.sink.write(&format!(
-            "telemetry: run={} exported={exported} failed={failed} dropped={dropped} abandoned={abandoned} bytes={bytes} self_time_us={} flush_ms={flush_ms} snapshots={snapshots} traces={traces} windows={windows} recorded={recorded}",
+            "telemetry: run={} exported={exported} failed={failed} dropped={dropped} abandoned={abandoned} bytes={bytes} self_time_us={} flush_ms={flush_ms} snapshots={snapshots} traces={traces} windows={windows} window_records={window_records} recorded={recorded}",
             entry.id,
             entry.self_time.as_micros(),
         ));

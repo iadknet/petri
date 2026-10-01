@@ -60,6 +60,8 @@ fn meta(index: u64, policy: Policy, creature_id: u64, started_at: Instant) -> Sa
         started_at,
         digest: "digest-0".to_owned(),
         root: Vec::new(),
+        start: Start::default(),
+        traced: true,
         ticks_requested: 3,
         tick_digests: Vec::new(),
         config_changed: false,
@@ -365,6 +367,216 @@ fn a_tick_allocates_no_more_events_than_the_allowance_left() {
     assert_eq!(left as usize, 2_048 - events.len());
 }
 
+// ── The `creature.window` record (T23.F10) ──────────────────────────────
+
+#[test]
+fn keep_levels_of_indexes_0_1_2_10_and_15() {
+    let levels: Vec<u8> = [0, 1, 2, 10, 15]
+        .into_iter()
+        .map(record::keep_level)
+        .collect();
+    assert_eq!(levels, [2, 0, 1, 2, 0]);
+}
+
+proptest! {
+    /// The levels nest: level 2 is every tenth index, level at least 1 every
+    /// second, so each thinning band keeps a subset of the band before it.
+    #[test]
+    fn keep_levels_nest_tenths_inside_evens(index: u64) {
+        let level = record::keep_level(index);
+        prop_assert!(level <= 2);
+        prop_assert_eq!(level == 2, index % 10 == 0);
+        prop_assert_eq!(level >= 1, index % 2 == 0);
+    }
+}
+
+/// `value` as the record serializes it: an `f32` in shortest round-trip form.
+fn f(value: f32) -> serde_json::Value {
+    serde_json::from_str(&serde_json::to_string(&value).unwrap()).unwrap()
+}
+
+fn ring(values: &[f32; 8]) -> serde_json::Value {
+    values.iter().copied().map(f).collect()
+}
+
+fn record_of(meta: &SampleMeta, trace: &ActiveTrace, ending: &Ending) -> serde_json::Value {
+    serde_json::from_str(&record::body(meta, trace, ending)).unwrap()
+}
+
+#[test]
+fn a_window_record_holds_every_body_field_with_exact_values() {
+    let started = Instant::now();
+    let (mut trace, creature_id) = recorded(2);
+    let graph = trace.ticks[0].hops[0].clone();
+    assert!(matches!(graph.backend_trace, BackendTrace::Graph(_)));
+    let mut first = graph.clone();
+    first.node_id = v3_core::contracts::NodeId(7);
+    first.vote_contribution.fill(0.0);
+    first.vote_contribution[0] = 0.5;
+    first.vote_contribution[1] = -0.25;
+    let mut vm = graph;
+    vm.node_id = v3_core::contracts::NodeId(3);
+    vm.vote_contribution.fill(0.0);
+    vm.backend_trace = BackendTrace::Vm(v3_core::runtime::trace::domain::VmTrace {
+        register_count: 0,
+        constants: Vec::new(),
+        steps: Vec::new(),
+        final_registers: Vec::new(),
+        final_payload: vm.output_slots,
+        slot_writes: Vec::new(),
+    });
+    trace.ticks[0].hops = vec![first, vm];
+    trace.ticks[0].energy_before = 0.1;
+    trace.ticks[0].static_inputs.food_here = 0.3;
+    trace.ticks[0]
+        .outcome
+        .as_mut()
+        .unwrap()
+        .after
+        .as_mut()
+        .unwrap()
+        .energy = 2.5;
+    // The second tick removed its creature and read no typed food bank.
+    let second = trace.ticks[1].outcome.as_mut().unwrap();
+    second.after = None;
+    second.died = Some(DeathCause::LifecycleDecay);
+    second.uses_typed_local_food = false;
+    let mut meta = meta(15, Policy::Window, creature_id, started);
+    meta.start = Start {
+        lineage: 4,
+        generation: 2,
+        genome_size: 97,
+        genome_hash: "sha256:ab".to_owned(),
+        age: 11,
+    };
+    meta.config_changed = true;
+    let ending = Ending {
+        reason: EndReason::Died,
+        tick: 2,
+        tick_end: None,
+    };
+    let body = record::body(&meta, &trace, &ending);
+    assert!(body.contains("\"e0\":0.1,"), "{body}");
+    assert!(body.contains("\"e1\":2.5,"), "{body}");
+    assert!(body.contains("[7,\"g\",0.75],[3,\"v\",0.0]"), "{body}");
+    let ticks: Vec<serde_json::Value> = trace
+        .ticks
+        .iter()
+        .map(|record| {
+            let outcome = record.outcome.as_ref().unwrap();
+            let sensed = &record.static_inputs;
+            let mut tick = serde_json::json!({
+                "t": record.tick_number + 1,
+                "e0": f(record.energy_before),
+                "here": f(sensed.food_here),
+                "food": ring(&sensed.neighbor_food),
+                "barrier": ring(&sensed.neighbor_barrier),
+                "occupied": ring(&sensed.neighbor_occupied),
+                "sel": record.final_actions.iter().map(action_label).collect::<Vec<_>>(),
+                "res": outcome.applied.iter().map(|a| a.entry.result.as_key()).collect::<Vec<_>>(),
+                "hops": record.hops.iter().map(|hop| serde_json::json!([
+                    hop.node_id.0,
+                    if matches!(hop.backend_trace, BackendTrace::Vm(_)) { "v" } else { "g" },
+                    f(hop.vote_contribution.iter().map(|v| v.abs()).sum()),
+                ])).collect::<Vec<_>>(),
+            });
+            if let Some(after) = &outcome.after {
+                tick["e1"] = f(after.energy);
+            }
+            if outcome.uses_typed_local_food {
+                tick["food_by_type"] = outcome
+                    .typed_local_food
+                    .neighbor_food_by_type
+                    .iter()
+                    .map(ring)
+                    .collect();
+            }
+            tick
+        })
+        .collect();
+    assert_eq!(ticks[0]["food_by_type"].as_array().map(Vec::len), Some(2));
+    assert!(ticks[1].get("e1").is_none());
+    assert!(ticks[1].get("food_by_type").is_none());
+    let expected = serde_json::json!({
+        "v": 1,
+        "window": 15,
+        "policy": "window",
+        "creature": creature_id.to_string(),
+        "ticks_requested": 3,
+        "lineage": 4,
+        "generation": 2,
+        "genome_size": 97,
+        "genome_hash": "sha256:ab",
+        "age_start": 11,
+        "end": "died",
+        "died": "lifecycle_decay",
+        "config_changed": true,
+        "ticks": ticks,
+    });
+    assert_eq!(record_of(&meta, &trace, &ending), expected);
+}
+
+#[test]
+fn a_zero_tick_manual_sample_records_its_start_and_no_tick() {
+    let started = Instant::now();
+    let (mut trace, creature_id) = recorded(1);
+    trace.ticks.clear();
+    let meta = meta(4, Policy::Manual, creature_id, started);
+    let ending = Ending {
+        reason: EndReason::Replaced,
+        tick: 4,
+        tick_end: None,
+    };
+    let record = record_of(&meta, &trace, &ending);
+    assert_eq!(record["policy"], "manual");
+    assert_eq!(record["end"], "replaced");
+    assert_eq!(record["ticks"], serde_json::json!([]));
+    for absent in ["died", "truncated", "config_changed"] {
+        assert!(record.get(absent).is_none(), "{absent}");
+    }
+}
+
+#[test]
+fn a_manual_record_past_2048_hops_cuts_only_hops_and_is_truncated() {
+    let started = Instant::now();
+    let (mut trace, creature_id) = recorded(3);
+    trace.budget = None;
+    let hop = trace.ticks[1].hops[0].clone();
+    trace.ticks[1].hops = vec![hop; 2_100];
+    let meta = meta(0, Policy::Manual, creature_id, started);
+    let ending = Ending {
+        reason: EndReason::Complete,
+        tick: 3,
+        tick_end: None,
+    };
+    let record = record_of(&meta, &trace, &ending);
+    let ticks = record["ticks"].as_array().unwrap();
+    let hops: usize = ticks
+        .iter()
+        .map(|t| t["hops"].as_array().unwrap().len())
+        .sum();
+    assert_eq!(hops, record::MAX_RECORD_HOPS);
+    assert_eq!(
+        ticks[0]["hops"].as_array().unwrap().len(),
+        trace.ticks[0].hops.len()
+    );
+    assert_eq!(ticks[2]["hops"], serde_json::json!([]));
+    for (tick, recorded) in ticks.iter().zip(&trace.ticks) {
+        assert_eq!(
+            tick["sel"].as_array().unwrap().len(),
+            recorded.final_actions.len()
+        );
+        assert_eq!(
+            tick["res"].as_array().unwrap().len(),
+            recorded.outcome.as_ref().unwrap().applied.len()
+        );
+    }
+    assert_eq!(
+        record["truncated"],
+        serde_json::json!({"reason": "hops", "tick": 2})
+    );
+}
+
 // ── Through the exporter ────────────────────────────────────────────────
 
 fn telemetry(receiver: &Receiver, limits: Limits, interval_ms: u64) -> (Telemetry, ReportSink) {
@@ -481,7 +693,42 @@ fn windows_and_manual_samples_alternate_with_distinct_ids() {
     assert_eq!(ids.len(), 3);
     let fields = line(&reports, &id);
     assert_eq!(fields["windows"], "3");
+    assert_eq!(fields["window_records"], "3");
     assert_eq!(fields["recorded"], "4");
+    let records: Vec<_> = receiver
+        .records()
+        .into_iter()
+        .filter(|r| r.event_name == "creature.window")
+        .map(|r| {
+            let body: serde_json::Value = serde_json::from_str(r.body.as_deref().unwrap()).unwrap();
+            (
+                r.attribute("petri.window").unwrap().to_owned(),
+                r.attribute("petri.keep").unwrap().to_owned(),
+                r.attribute("petri.sample_policy").unwrap().to_owned(),
+                r.attribute("petri.tick").unwrap().to_owned(),
+                body["end"].as_str().unwrap().to_owned(),
+                body["creature"] == r.attribute("petri.creature_id").unwrap(),
+            )
+        })
+        .collect();
+    let row = |w: &str, keep: &str, policy: &str, tick: &str, end: &str| {
+        (
+            w.to_owned(),
+            keep.to_owned(),
+            policy.to_owned(),
+            tick.to_owned(),
+            end.to_owned(),
+            true,
+        )
+    };
+    assert_eq!(
+        records,
+        [
+            row("0", "2", "window", "1", "manual"),
+            row("1", "0", "manual", "2", "complete"),
+            row("2", "1", "window", "4", "complete"),
+        ]
+    );
     let genomes = receiver
         .records()
         .into_iter()
@@ -490,43 +737,135 @@ fn windows_and_manual_samples_alternate_with_distinct_ids() {
     assert_eq!(genomes, 3);
 }
 
-fn capped_run(receiver: &Receiver, prepare: impl Fn(&mut Samples)) -> (bool, Option<String>, u64) {
-    let (telemetry, _) = telemetry(receiver, Limits::default(), 10);
+/// What one sample started with the run's samples prepared by `prepare`
+/// exported.
+#[derive(Debug, PartialEq, Eq)]
+struct Capped {
+    admitted: bool,
+    cap: Option<String>,
+    /// Bytes counted toward the per-run cap.
+    counted: u64,
+    genomes: usize,
+    traces: usize,
+    /// The `creature.window` records' `petri.window` values.
+    records: Vec<String>,
+}
+
+fn capped_run(receiver: &Receiver, manual: bool, prepare: impl Fn(&mut Samples)) -> Capped {
+    let (telemetry, reports) = telemetry(receiver, Limits::default(), 10);
     let config = config();
-    let sim = seed_simulation(config.clone(), 3);
+    let mut sim = seed_simulation(config.clone(), 3);
     let mut run = telemetry.begin_run(start(&config)).unwrap();
     prepare(&mut run.samples);
     let before = run.samples.bytes;
     let mut slot = None;
-    telemetry.before_tick(&mut run, &sim, &mut slot, false);
-    let admitted = slot.is_some();
+    let sample = ActiveTrace::new(sim.creatures.keys().next().unwrap(), 1);
+    let admitted = if manual {
+        telemetry.start_manual(&mut run, &sim, &mut slot, None, &sample);
+        run.samples.manual.is_some()
+    } else {
+        telemetry.before_tick(&mut run, &sim, &mut slot, false);
+        slot.is_some()
+    };
+    let mut manual_slot = Some(sample);
+    if manual {
+        run_tick(&mut sim, &mut manual_slot);
+        telemetry.end_samples(&mut run, &sim, &mut slot, manual_slot.as_ref());
+    } else {
+        run_tick(&mut sim, &mut slot);
+        telemetry.end_samples(&mut run, &sim, &mut slot, None);
+    }
     let counted = run.samples.bytes - before;
     let id = run.id().to_owned();
     telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);
-    let cap = receiver
+    let mine: Vec<_> = receiver
         .records()
         .into_iter()
-        .find(|r| r.event_name == "run.ended" && r.attribute("petri.run_id") == Some(id.as_str()))
+        .filter(|r| r.attribute("petri.run_id") == Some(id.as_str()))
+        .collect();
+    let cap = mine
+        .iter()
+        .find(|r| r.event_name == "run.ended")
         .and_then(|r| r.attribute("petri.windows_capped").map(str::to_owned));
-    (admitted, cap, counted)
+    let named = |name: &'static str| mine.iter().filter(move |r| r.event_name == name);
+    let fields = line(&reports, &id);
+    let records: Vec<String> = named("creature.window")
+        .map(|r| r.attribute("petri.window").unwrap().to_owned())
+        .collect();
+    assert_eq!(fields["window_records"], records.len().to_string());
+    Capped {
+        admitted,
+        cap,
+        counted,
+        genomes: named("creature.genome").count(),
+        traces: roots(receiver)
+            .iter()
+            .filter(|r| r.attribute("petri.run_id") == Some(id.as_str()))
+            .count(),
+        records,
+    }
 }
 
 #[test]
-fn the_4097th_sample_and_one_past_248_mib_are_not_admitted() {
+fn samples_past_either_cap_are_admitted_and_recorded_without_trace_or_genome() {
     let receiver = Receiver::start();
-    let (admitted, cap, counted) = capped_run(&receiver, |s| s.next_index = 4_095);
-    assert!(admitted);
-    assert_eq!(cap, None);
-    assert!(counted > 0, "the genome body counts");
-    let (admitted, cap, _) = capped_run(&receiver, |s| s.next_index = 4_096);
-    assert!(!admitted);
-    assert_eq!(cap.as_deref(), Some("count"));
-    let (admitted, cap, _) = capped_run(&receiver, |s| s.bytes = 248 * MIB);
-    assert!(admitted);
-    assert_eq!(cap, None);
-    let (admitted, cap, _) = capped_run(&receiver, |s| s.bytes = 248 * MIB + 1);
-    assert!(!admitted);
-    assert_eq!(cap.as_deref(), Some("bytes"));
+    for manual in [false, true] {
+        let below = capped_run(&receiver, manual, |s| s.next_index = 4_095);
+        assert!(below.admitted, "{manual}");
+        assert_eq!(below.cap, None);
+        assert!(below.counted > 0, "the genome body and trace count");
+        assert_eq!((below.genomes, below.traces), (1, 1));
+        assert_eq!(below.records, ["4095"]);
+        let count = capped_run(&receiver, manual, |s| s.next_index = 4_096);
+        assert_eq!(
+            count,
+            Capped {
+                admitted: true,
+                cap: Some("count".to_owned()),
+                counted: 0,
+                genomes: 0,
+                traces: 0,
+                records: vec!["4096".to_owned()],
+            },
+            "{manual}"
+        );
+        let below = capped_run(&receiver, manual, |s| s.bytes = 248 * MIB);
+        assert!(below.admitted);
+        assert_eq!(below.cap, None);
+        assert_eq!((below.genomes, below.traces), (1, 1));
+        let bytes = capped_run(&receiver, manual, |s| s.bytes = 248 * MIB + 1);
+        assert_eq!(
+            bytes,
+            Capped {
+                admitted: true,
+                cap: Some("bytes".to_owned()),
+                counted: 0,
+                genomes: 0,
+                traces: 0,
+                records: vec!["0".to_owned()],
+            },
+            "{manual}"
+        );
+    }
+}
+
+#[test]
+fn a_manual_sample_inside_the_interval_is_skipped_with_no_record() {
+    let receiver = Receiver::start();
+    let (telemetry, reports) = telemetry(&receiver, Limits::default(), 60_000);
+    let config = config();
+    let sim = seed_simulation(config.clone(), 3);
+    let mut run = telemetry.begin_run(start(&config)).unwrap();
+    let mut slot = None;
+    telemetry.before_tick(&mut run, &sim, &mut slot, false);
+    let sample = ActiveTrace::new(sim.creatures.keys().nth(1).unwrap(), 1);
+    telemetry.start_manual(&mut run, &sim, &mut slot, None, &sample);
+    assert!(run.samples.manual.is_none());
+    assert_eq!(run.samples.skipped, 1);
+    let id = run.id().to_owned();
+    telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);
+    // Only the window the manual sample ended records.
+    assert_eq!(line(&reports, &id)["window_records"], "1");
 }
 
 #[test]
@@ -550,8 +889,9 @@ fn an_oversized_genome_body_and_window_item_are_dropped_counted_and_marked() {
     telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);
     let fields = line(&reports, &id);
     assert_eq!(fields["windows"], "1");
-    // `run.started` (its config body), the genome record and the window.
-    assert_eq!(fields["dropped"], "3", "{fields:?}");
+    // `run.started` (its config body), the genome record, the window record
+    // and the window.
+    assert_eq!(fields["dropped"], "4", "{fields:?}");
     assert!(reports
         .lines()
         .iter()

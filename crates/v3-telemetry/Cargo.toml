@@ -15,6 +15,8 @@ workspace = true
 # The tick-phase seam tick traces read (T21.F03).
 v3-core = { path = "../v3-core", features = ["telemetry-seams"] }
 rand = { workspace = true }
+# The `creature.window` record body (T23.F10).
+serde = { workspace = true }
 serde_json = { workspace = true }
 # Creature windows (T21.F04): genome hashes and creature server IDs.
 sha2 = { workspace = true }

@@ -8,6 +8,10 @@
 //! a pure function of the seed, the run's sample index and the population;
 //! nothing here draws from a simulation RNG or changes a decision.
 //!
+//! Every ended sample also emits one compact `creature.window` log record
+//! (T23.F10, [`record`]). The per-run caps stop only the traces and genome
+//! records of later samples, never their admission or their record.
+//!
 //! IDs carry no entropy: sample `k`'s trace ID is the run key's high 64 bits
 //! followed by `2^63 + k`, so it never meets a tick trace's (whose low half is
 //! a tick below `2^63`); span `1` is the root and the `i`th recorded tick is
@@ -43,7 +47,7 @@ pub const CREATURE_WINDOWS_ENV: &str = "PETRI_TELEMETRY_CREATURE_WINDOWS";
 pub const WINDOW_TICKS_ENV: &str = "PETRI_TELEMETRY_WINDOW_TICKS";
 /// The least wall time between sample starts, `10` to `3600000` ms.
 pub const WINDOW_INTERVAL_ENV: &str = "PETRI_TELEMETRY_WINDOW_INTERVAL_MS";
-/// The most samples (windows and manual) one run exports.
+/// The most samples (windows and manual) one run exports as traces.
 pub const MAX_SAMPLES_PER_RUN: u64 = 4_096;
 /// The most encoded sample bytes (window requests and genome bodies) per run.
 pub const MAX_SAMPLE_BYTES_PER_RUN: u64 = 256 * MIB;
@@ -204,7 +208,7 @@ impl EndReason {
     }
 }
 
-/// Which per-run cap stopped samples.
+/// Which per-run cap stopped sample traces and genome records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Cap {
     Count,
@@ -220,6 +224,16 @@ impl Cap {
     }
 }
 
+/// The creature's attributes when its sample started.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Start {
+    pub(crate) lineage: u32,
+    pub(crate) generation: u64,
+    pub(crate) genome_size: u32,
+    pub(crate) genome_hash: String,
+    pub(crate) age: u64,
+}
+
 /// What a sample captured when it started.
 #[derive(Debug, Clone)]
 pub(crate) struct SampleMeta {
@@ -231,6 +245,10 @@ pub(crate) struct SampleMeta {
     pub(crate) digest: String,
     /// The root's creature, genome and config attributes, read at start.
     pub(crate) root: Vec<KeyValue>,
+    pub(crate) start: Start,
+    /// Whether the sample was below the per-run caps when it started, so it
+    /// exports its genome record and trace.
+    pub(crate) traced: bool,
     pub(crate) ticks_requested: u32,
     /// The digest in force when each recorded tick ran.
     pub(crate) tick_digests: Vec<String>,
@@ -246,14 +264,15 @@ pub(crate) struct Samples {
     pub(crate) bytes: u64,
     pub(crate) last_admitted: Option<Instant>,
     pub(crate) capped: Option<Cap>,
-    /// Manual samples started inside the interval or past a cap.
+    /// Manual samples started inside the interval.
     pub(crate) skipped: u64,
     pub(crate) window: Option<SampleMeta>,
     pub(crate) manual: Option<SampleMeta>,
 }
 
 impl Samples {
-    /// Whether one more sample fits the per-run caps; records the cap met.
+    /// Whether one more sample's trace and genome record fit the per-run
+    /// caps; records the cap met.
     fn fits_caps(&mut self) -> bool {
         let cap = if self.next_index >= MAX_SAMPLES_PER_RUN {
             Some(Cap::Count)
@@ -614,16 +633,7 @@ pub(crate) fn encode(
     if let Some(cause) = died(trace) {
         a.text("petri.died", cause.as_key());
     }
-    let truncated = trace
-        .truncated
-        .map(|t| {
-            let reason = match t.reason {
-                TruncationReason::Events => "events",
-                TruncationReason::Bytes => "bytes",
-            };
-            (reason, t.tick + 1)
-        })
-        .or(cut.map(|tick| ("events", tick)));
+    let truncated = truncation(trace).or(cut.map(|tick| ("events", tick)));
     a.flag("petri.truncated", truncated.is_some());
     if let Some((reason, tick)) = truncated {
         a.text("petri.truncated_reason", reason);
@@ -654,6 +664,18 @@ pub(crate) fn encode(
             events,
         },
     )
+}
+
+/// The recorder's truncation of `trace`, as its reason and the tick count
+/// after the tick it stopped in.
+fn truncation(trace: &ActiveTrace) -> Option<(&'static str, u64)> {
+    trace.truncated.map(|t| {
+        let reason = match t.reason {
+            TruncationReason::Events => "events",
+            TruncationReason::Bytes => "bytes",
+        };
+        (reason, t.tick + 1)
+    })
 }
 
 /// A fresh recording of `id` for a window.
@@ -701,8 +723,9 @@ impl Active {
         self.windows.switch == Switch::On
     }
 
-    /// Captures a sample's start metadata for the living creature `id` and
-    /// emits its genome record; allocates the run's next sample index.
+    /// Captures a sample's start metadata for the living creature `id`, and
+    /// emits its genome record when `traced`; allocates the run's next sample
+    /// index.
     fn start_sample(
         &self,
         run: &mut RunHandle,
@@ -710,6 +733,7 @@ impl Active {
         id: CreatureId,
         policy: Policy,
         ticks_requested: u32,
+        traced: bool,
     ) -> Option<SampleMeta> {
         let creature = sim.creatures.get(id)?;
         let started_at = Instant::now();
@@ -719,18 +743,27 @@ impl Active {
         let creature_id = id.data().as_ffi();
         let (body, hash) = genome_body(&creature.genome);
         let body_len = body.len() as u64;
-        let dropped = body_len > self.shared.max_body_bytes();
-        run.samples.bytes += body_len.min(BODY_RESERVATION);
-        let extra = vec![
-            ("petri.window", crate::u64_value(index)),
-            ("petri.creature_id", LogValue::from(creature_id.to_string())),
-            ("petri.genome_hash", LogValue::from(hash.clone())),
-            (
-                "petri.genome_size",
-                LogValue::Int(i64::from(creature.cached_genome_size)),
-            ),
-        ];
-        self.emit(run, "creature.genome", sim.tick, extra, Some(body));
+        let dropped = traced && body_len > self.shared.max_body_bytes();
+        if traced {
+            run.samples.bytes += body_len.min(BODY_RESERVATION);
+            let extra = vec![
+                ("petri.window", crate::u64_value(index)),
+                ("petri.creature_id", LogValue::from(creature_id.to_string())),
+                ("petri.genome_hash", LogValue::from(hash.clone())),
+                (
+                    "petri.genome_size",
+                    LogValue::Int(i64::from(creature.cached_genome_size)),
+                ),
+            ];
+            self.emit(run, "creature.genome", sim.tick, extra, Some(body));
+        }
+        let start = Start {
+            lineage: creature.identity.lineage_id,
+            generation: creature.generation,
+            genome_size: creature.cached_genome_size,
+            genome_hash: hash.clone(),
+            age: creature.age,
+        };
         let mut root = Attributes::default();
         root.int("petri.lineage_id", creature.identity.lineage_id);
         root.int("petri.kin_tag", creature.identity.kin_tag);
@@ -750,14 +783,17 @@ impl Active {
             started_at,
             digest: run.config_digest.clone(),
             root: root.0,
+            start,
+            traced,
             ticks_requested,
             tick_digests: Vec::new(),
             config_changed: false,
         })
     }
 
-    /// Encodes and offers one sample that ended as `reason` at `sim`'s
-    /// tick, counting its bytes toward the run's.
+    /// Emits the `creature.window` record of one sample that ended as
+    /// `reason` at `sim`'s tick and, when the sample is traced, encodes and
+    /// offers its trace, counting its bytes toward the run's.
     fn export(
         &self,
         run: &mut RunHandle,
@@ -772,6 +808,24 @@ impl Active {
             tick: sim.tick,
             tick_end,
         };
+        let extra = vec![
+            ("petri.window", crate::u64_value(meta.index)),
+            (
+                "petri.keep",
+                LogValue::Int(i64::from(record::keep_level(meta.index))),
+            ),
+            ("petri.sample_policy", LogValue::from(meta.policy.as_str())),
+            (
+                "petri.creature_id",
+                LogValue::from(meta.creature_id.to_string()),
+            ),
+        ];
+        let record = record::body(meta, trace, &ending);
+        self.emit(run, "creature.window", sim.tick, extra, Some(record));
+        self.shared.add_window_record(run.key);
+        if !meta.traced {
+            return;
+        }
         let (request, encoded) = encode(&self.resource, run, meta, trace, &ending);
         let body = request.encode_to_vec();
         run.samples.bytes += (body.len() as u64).min(BODY_RESERVATION);
@@ -816,16 +870,18 @@ impl Active {
             return;
         }
         let began = Instant::now();
-        if !run.samples.interval_passed(began, self.windows.interval) || !run.samples.fits_caps() {
+        if !run.samples.interval_passed(began, self.windows.interval) {
             return;
         }
+        let traced = run.samples.fits_caps();
         let n = select(run.seed, run.samples.next_index, sim.creatures.len());
         let id = sim
             .creatures
             .keys()
             .nth(n)
             .expect("n is below the population");
-        run.samples.window = self.start_sample(run, sim, id, Policy::Window, self.windows.ticks);
+        run.samples.window =
+            self.start_sample(run, sim, id, Policy::Window, self.windows.ticks, traced);
         *slot = Some(window_trace(id, self.windows.ticks));
         self.shared.add_self_time(run.key, began.elapsed());
     }
@@ -872,13 +928,15 @@ impl Active {
         let began = Instant::now();
         self.end_window(run, sim, slot, EndReason::Manual);
         self.end_manual(run, sim, replaced, EndReason::Replaced);
-        if run.samples.interval_passed(began, self.windows.interval) && run.samples.fits_caps() {
+        if run.samples.interval_passed(began, self.windows.interval) {
+            let traced = run.samples.fits_caps();
             run.samples.manual = self.start_sample(
                 run,
                 sim,
                 sample.creature_id,
                 Policy::Manual,
                 sample.ticks_remaining,
+                traced,
             );
         } else {
             run.samples.skipped += 1;
@@ -919,6 +977,8 @@ impl Active {
         self.shared.add_self_time(run.key, began.elapsed());
     }
 }
+
+mod record;
 
 #[cfg(test)]
 mod tests;
