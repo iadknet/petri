@@ -10,6 +10,7 @@
 mod measurement;
 
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use v3_telemetry::testing::{closed_endpoint, parse_run_line, PointValue, ReceivedTrace, Receiver};
 
@@ -76,8 +77,15 @@ fn command_with(
     shape: Shape,
     env: &[(&str, &str)],
 ) -> std::process::Output {
-    let recipe =
-        std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("t21-{}.json", shape.name));
+    // Each call writes its own recipe file: tests run in parallel threads, so a
+    // shared path could be read while another test rewrites it.
+    static RECIPE_SEQ: AtomicUsize = AtomicUsize::new(0);
+    let recipe = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!(
+        "t21-{}-{}-{}.json",
+        shape.name,
+        std::process::id(),
+        RECIPE_SEQ.fetch_add(1, Ordering::Relaxed)
+    ));
     std::fs::write(&recipe, shape.recipe).expect("write recipe");
     let (ticks, sample_every) = (shape.ticks, shape.sample_every);
     let mut command = Command::new(env!("CARGO_BIN_EXE_v3-cli"));
@@ -104,7 +112,9 @@ fn command_with(
     if let Some(interval) = interval {
         command.env(v3_telemetry::METRICS_INTERVAL_ENV, interval);
     }
-    command.output().expect("v3-cli runs")
+    let output = command.output().expect("v3-cli runs");
+    let _ = std::fs::remove_file(&recipe);
+    output
 }
 
 fn run_with(
