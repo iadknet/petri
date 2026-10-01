@@ -18,12 +18,22 @@
       "commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
       "path": "skills/composition-patterns",
       "license": "MIT"
+    },
+    "agents-md": {
+      "repository": "local",
+      "commit": null,
+      "path": ".agents/skills/agents-md",
+      "license": "MIT"
     }
   },
   "excluded_files": [
     "nested AGENTS.md and CLAUDE.md; gh installation metadata; source checks, contributor, and changelog files"
   ],
   "files": [
+    {
+      "path": "agents-md/SKILL.md",
+      "sha256": "882fe03816c21a9c4def20c19c3e82d1d4f98294a722879f4d985a5703b42db7"
+    },
     {
       "path": "composition-patterns/README.md",
       "sha256": "85915a43a6f0b4efe525e3cf6398dd866166da2025837c4460468a24a940da94"

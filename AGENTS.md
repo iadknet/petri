@@ -1,19 +1,46 @@
 # Petri repository instructions
 
-- Use verification proportionate to the changed files. Run `make check` before completing application or runtime source-code or build-configuration changes; documentation-only work uses `make check-docs`.
-- Commits, remotes, pull requests, and other external state require explicit user authorization.
-- Roadmap features are executed through the workflow in `docs/workflow.md`. Do not add parallel workflow machinery. That contract is split across `docs/workflow.md` (live contract), `docs/workflow-codex.md` (Codex substitutions), and `docs/workflow-history.md` (rationale and dated changes); the split is one workflow, not several.
-- For every Codex roadmap feature, follow `docs/workflow-codex.md`: Sol at `medium` effort orchestrates with one separate persistent Astra `xhigh` spec owner and advisor for spec writing, readiness review, implementation advice, and escalation decisions. Delegate feature implementation and production-code remediation to one persistent Astra `xhigh` subagent, use a fresh Astra `high` subagent for final review, a separate Sol `medium` mutation specialist for the mutation gate and test-only survivor remediation, and a separate Terra `high` benchmark specialist for the baseline runs and their records (not spawned for a lab feature under the workflow's Benchmark gate exemption); do not spawn a separate advisor. Run the benchmark and mutation specialists sequentially and not alongside competing builds, tests, servers, or measurements. This delegation applies to feature execution, not requests to generate a goal prompt or edit the workflow.
-- For every Claude roadmap feature, the Opus 5.5 `medium` orchestrator delegates the flat spec, its adversarial Codex Astra `high` challenge loop, and every requirement question during implementation to one persistent Fable 5.1 `high` spec owner (resumed with `SendMessage`), feature implementation and production-code remediation to fresh Opus 5.5 `medium` roadmap implementers, the final review to a fresh read-only Codex Astra `high` job run through the Codex plugin, the mutation gate and test-only survivor remediation to a separate Opus 5.5 `medium` mutation specialist, and the gate and goal baseline runs and their records to a separate Sonnet 5 benchmark specialist (not spawned for a lab feature under the workflow's Benchmark gate exemption). Run the benchmark and mutation specialists sequentially and not alongside competing builds, tests, servers, or measurements. This delegation applies to feature execution, not requests to generate a goal command or edit the workflow.
-- When asked for the next roadmap goal command, produce it from `docs/workflow.md` and do not implement the feature in that session.
-- `docs/archive/` and `docs/prds/archive/` are historical and non-executable.
+Repo-wide rules, layout and pointers only; detail lives in the linked documents.
+Before editing this file, follow `.agents/skills/agents-md/SKILL.md`.
+
+## Layout
+
+- `crates/`: `v3-core` (simulation), `v3-cli` (commands, benchmarks), `v3-server` (API server),
+  `v3-lab` (capability assay lab, T22), `v3-telemetry` (run telemetry, T21).
+- `frontend/`: web UI, with its own `frontend/AGENTS.md`. `scripts/`: POSIX checks and tooling.
+  `telemetry/`: local observability stack. `experiments/worlds/`: world files.
+- `docs/README.md` indexes the documentation: roadmap tracks in `docs/roadmaps/`, feature specs in
+  `docs/specs/roadmap/`, research notes in `docs/strategy/`, progress records in `docs/progress/`.
+- `CONTRIBUTING.md` covers roadmap editing and commits; `SECURITY.md` covers dependencies and reporting.
+
+## Rules
+
+- Verify in proportion to the changed files: run `make check` before completing source, runtime
+  or build-configuration changes; documentation-only work uses `make check-docs`.
+- Commits, remotes, pull requests and other external state require explicit user authorization.
 - Preserve existing user changes and work carefully in dirty worktrees.
-- Runtime-facing telemetry and state must derive from applied simulation behavior; backward compatibility is not a default goal.
-- Any telemetry or experiment output commits only the bare minimum summary needed to regenerate its report. Richer telemetry stays in the ignored `.bench-artifacts/` tree beneath a byte cap the producing command enforces, and per-tick traces or exhaustive per-proposal records are never written without a predeclared size projection.
-- Capability, discovery and reachability questions are explored on the T22 lab harness (`crates/v3-lab`, delivered by T22.F01; `docs/roadmaps/t22-capability-assays-and-evolvability-lab.md`), not with new one-off assay code inside `v3-core` or scratch crates. Lab selection, lab tasks and authored solutions never enter production. Lab experiments (exploration before a track exists, and diagnosis of why a capability is not evolving) are not roadmap features: they run existing assays with new parameters, arms, genome files or arena files, record a dated research note in `docs/strategy/`, and may add arenas, arms or readings inside `crates/v3-lab` through an ordinary commit gated by `make check`; a track or feature is created only when the note recommends one.
-- Use TDD for behavior changes and bug fixes. Test determinism is required only where assertions depend on reproducibility.
-- Pure invariants get property tests (proptest in v3-core); assertions must not depend on which cases were drawn, and `proptest-regressions/` files are committed when they appear.
-- Use `$rust-skills` for every Rust change, loading only the rule files relevant to the affected code.
-- Run `cargo test -p v3-core --test viability` first when production defaults, founder behavior, or tick-loop mechanics change.
-- Shell automation must be POSIX `sh` compatible; do not add Bash or Zsh runtime dependencies.
-- All `wait_agent` tool calls MUST use at least 10 minutes timeout. `wait_agent` calls are considered non-blocking and will be interrupted when a subagent responds or a new user message comes in; hence, this does not violate the developer instruction.
+- Roadmap features run through `docs/workflow.md` (live contract, Claude roles, goal command);
+  Codex runs apply `docs/workflow-codex.md`; rationale is in `docs/workflow-history.md`.
+  These are one workflow: add no parallel workflow machinery.
+- Asked for the next roadmap goal command, produce it from `docs/workflow.md` and do not
+  implement the feature in that session. Generating a goal command or editing the workflow
+  documents is not feature execution and uses none of the workflow's delegation.
+- `docs/archive/` and `docs/prds/archive/` are historical and non-executable.
+- Runtime-facing telemetry and state derive from applied simulation behavior; backward
+  compatibility is not a default goal.
+- Telemetry and experiment output follows the telemetry commit rule in `docs/workflow.md`:
+  commit only the minimum summary; richer data stays byte-capped under ignored `.bench-artifacts/`.
+- Capability, discovery and reachability questions run on the T22 lab (`crates/v3-lab`), not as
+  one-off assay code in `v3-core` or scratch crates; lab code never enters production. Lab
+  experiments are not roadmap features; see the exploration contract in
+  `docs/roadmaps/t22-capability-assays-and-evolvability-lab.md`.
+- Use TDD for behavior changes and bug fixes. Require determinism only where an assertion depends
+  on reproducibility.
+- Pure invariants get proptest property tests in v3-core whose assertions do not depend on which
+  cases were drawn; commit `proptest-regressions/` files when they appear.
+- Use `$rust-skills` for every Rust change, loading only the rule files relevant to the code.
+- Run `cargo test -p v3-core --test viability` first when production defaults, founder behavior or
+  tick-loop mechanics change.
+- Shell automation is POSIX `sh`; add no Bash or Zsh runtime dependencies.
+- Codex: every `wait_agent` call uses a timeout of at least 10 minutes (it returns early when a
+  subagent responds or the user writes).
