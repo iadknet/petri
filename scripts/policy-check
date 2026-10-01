@@ -8,6 +8,20 @@ fail() {
 
 [ -f AGENTS.md ] || fail 'AGENTS.md is missing'
 
+# AGENTS.md loads into every agent session: keep it to repo-wide rules, layout
+# and pointers (.agents/skills/agents-md). The width limit stops a rule from
+# hiding as one long paragraph under the line limit.
+for instructions in AGENTS.md frontend/AGENTS.md; do
+  [ -f "$instructions" ] || continue
+  awk -v file="$instructions" '
+    length > 120 { printf "policy-check: %s:%d is longer than 120 characters\n", file, NR > "/dev/stderr"; bad = 1 }
+    END {
+      if (NR >= 300) { printf "policy-check: %s has %d lines; keep it under 300\n", file, NR > "/dev/stderr"; bad = 1 }
+      exit bad
+    }
+  ' "$instructions" || fail "$instructions is bloated; move detail to the documents it points to"
+done
+
 scripts/dependency-policy-check
 scripts/skill-provenance-check
 scripts/tracked-size-check
