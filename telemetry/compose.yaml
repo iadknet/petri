@@ -35,6 +35,9 @@ services:
       # Petri dashboards (T21.F02), provisioned read-only.
       - ./grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/petri.yaml:ro
       - ./grafana/dashboards:/otel-lgtm/petri-dashboards:ro
+      # Petri report pages, served by Grafana at /public/petri/ so they read
+      # Tempo, Loki and Prometheus through its data source proxy.
+      - ./reports:/otel-lgtm/grafana/public/petri:ro
     deploy:
       resources:
         limits:
