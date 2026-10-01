@@ -36,7 +36,7 @@ feature whose closure moved it.
 - [ ] **T18 — Founder Architecture** — [Roadmap](roadmaps/t18-founder-architecture.md) — Depends on: None
 - [ ] **T19 — Mesh Action Selection and Live State** — [Roadmap](roadmaps/t19-mesh-action-selection-and-live-state.md) — Depends on: None
 - [ ] **T20 — Input Evolvability and Structured Variation** — [Roadmap](roadmaps/t20-input-evolvability-and-structured-variation.md) — Depends on: None
-- [ ] **T21 — Run Observability and Execution Tracing** — [Roadmap](roadmaps/t21-run-observability-and-execution-tracing.md) — Depends on: None
+- [x] **T21 — Run Observability and Execution Tracing** — [Roadmap](roadmaps/t21-run-observability-and-execution-tracing.md) — Depends on: None
 - [ ] **T22 — Capability Assays and Evolvability Lab** — [Roadmap](roadmaps/t22-capability-assays-and-evolvability-lab.md) — Depends on: None
 
 ## Final Success Criteria

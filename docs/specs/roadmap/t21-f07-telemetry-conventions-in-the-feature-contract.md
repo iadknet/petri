@@ -1,6 +1,6 @@
 # T21.F07 — Telemetry Conventions in the Feature Contract
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-30
 **Feature**: T21.F07
 **Track**: [T21 — Run Observability and Execution Tracing](../../roadmaps/t21-run-observability-and-execution-tracing.md)
@@ -151,7 +151,7 @@ different, no signal is added or renamed, and no configuration is recorded.
 
 - [x] `make check-docs` -> exit 0 on the working tree over `09ddc2f3`
       (`roadmap-check`, `policy-check`, `quality-check`).
-- [ ] `make check` -> exit 0 on the final code at closure, recorded as the
+- [x] `make check` -> exit 0 on tested commit `6fe12415` (35 suites ok, 0 failed), recorded as the
       tested commit (user's goal; the suite is unchanged in what it asserts,
       the telemetry-neutrality test included). `command_with` in
       `crates/v3-cli/tests/telemetry.rs` writes each call's recipe to
@@ -203,13 +203,13 @@ The tested commit of `make check` is recorded in Verification.
 
 ## Success Criteria
 
-- [ ] The template's Telemetry section names the delivered conventions in
+- [x] The template's Telemetry section names the delivered conventions in
       the table above, cites the owning specs, and no longer carries the
       interim wording.
-- [ ] `.claude/agents/roadmap-reviewer.md` tells the reviewer to read the
+- [x] `.claude/agents/roadmap-reviewer.md` tells the reviewer to read the
       template's conventions and check a diff's signals against them, with
       the P1 and P2 severities of invariant 5.
-- [ ] `make check-docs` and, at closure, `make check` exit 0; the diff is
+- [x] `make check-docs` and, at closure, `make check` exit 0; the diff is
       within invariant 1.
 
 ## Notes for AI Agents
@@ -223,3 +223,5 @@ The tested commit of `make check` is recorded in Verification.
   race is in T21's own test helper (spec owner ruling, 2026-09-30); it
   changes no production code, behavior or assertion, so the observability
   exemption holds.
+- Cost: `/usage` awaiting; 3 passes (advisor 2 each); 1 spec-owner
+  resume; 3 Codex rounds, `ready`; review 2 P1, 1 P2, fixed.

@@ -1,7 +1,7 @@
 # T21 — Run Observability and Execution Tracing
 
-**Status**: In Progress
-**Last updated**: 2026-09-29
+**Status**: Complete
+**Last updated**: 2026-09-30
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -17,19 +17,19 @@ it stores is closure evidence.
 
 ## Track Success Criteria
 
-- [ ] One command starts the local stack from a Docker Compose file, and its stored history survives a restart of the stack and of the host.
-- [ ] Stored data is kept until the user retires it: size retention is off and time retention is set far beyond any planned use in every store, and one cleanup command retires data older than a stated date, keeps everything newer, and first shows exactly what it will remove and how much disk each store holds.
-- [ ] One command-line flag turns telemetry on or off for a run; in every binary it defaults to off until T21.F05 closes and to on afterwards, and tests that start a binary pass the off flag explicitly; closure benchmark runs export and still write their stored reports (user decision, 2026-09-30).
-- [ ] With telemetry on, every simulation run by `v3-server` and `v3-cli run` appears in the stack with an invocation ID, a run ID, its seed, build revision, world, full effective config and lifecycle status; a server reset starts a new run.
-- [ ] Benchmark, assay and lab commands appear with identity, lifecycle and end-of-run totals, exported only after every timed region of the invocation has finished.
-- [ ] The cumulative counters the runtime already maintains are exported per run as complete counts, per-tick values are exported as sampled gauges and labelled as such, and provisioned dashboards list runs and show one run's history against wall time and against ticks.
-- [ ] Sampled tick traces show each phase's duration, and sampled creature traces show consecutive ticks of one creature's inputs, routing, votes, selected actions, applied outcomes and state changes.
-- [ ] Every span carries its run and build identity, tick, phase, the config values and mechanism switches in force at capture, and the digest of the full effective config; a field that was not captured is marked absent, never zero.
-- [ ] Every sample names the policy that selected it, so a manually targeted creature is never read as a representative one.
-- [ ] With the stack stopped or slow, a run keeps its speed, holds bounded telemetry memory, ends within a bounded flush time, and records what it dropped.
-- [ ] The default telemetry configuration stays under the ceiling the user sets at T21.F05 from measured cost, with 5% of elapsed time as the target, measured as total telemetry cost against a reference build with T21's work compiled out, with the stack healthy, stopped and slow; every closure before T21.F05 closes stays under the 25% interim ceiling, and every closure after it stays under the ceiling F05 recorded.
-- [ ] A seeded run produces byte-identical deterministic output with telemetry on, off and with the stack stopped, and with telemetry off it matches the build of the feature's parent commit; telemetry consumes no production RNG and no telemetry setting enters the config digest.
-- [ ] The feature spec template has a telemetry section, and the final review checks it.
+- [x] One command starts the local stack from a Docker Compose file, and its stored history survives a restart of the stack and of the host.
+- [x] Stored data is kept until the user retires it: size retention is off and time retention is set far beyond any planned use in every store, and one cleanup command retires data older than a stated date, keeps everything newer, and first shows exactly what it will remove and how much disk each store holds.
+- [x] One command-line flag turns telemetry on or off for a run; in every binary it defaults to off until T21.F05 closes and to on afterwards, and tests that start a binary pass the off flag explicitly; closure benchmark runs export and still write their stored reports (user decision, 2026-09-30).
+- [x] With telemetry on, every simulation run by `v3-server` and `v3-cli run` appears in the stack with an invocation ID, a run ID, its seed, build revision, world, full effective config and lifecycle status; a server reset starts a new run.
+- [x] Benchmark, assay and lab commands appear with identity, lifecycle and end-of-run totals, exported only after every timed region of the invocation has finished.
+- [x] The cumulative counters the runtime already maintains are exported per run as complete counts, per-tick values are exported as sampled gauges and labelled as such, and provisioned dashboards list runs and show one run's history against wall time and against ticks.
+- [x] Sampled tick traces show each phase's duration, and sampled creature traces show consecutive ticks of one creature's inputs, routing, votes, selected actions, applied outcomes and state changes.
+- [x] Every span carries its run and build identity, tick, phase, the config values and mechanism switches in force at capture, and the digest of the full effective config; a field that was not captured is marked absent, never zero.
+- [x] Every sample names the policy that selected it, so a manually targeted creature is never read as a representative one.
+- [x] With the stack stopped or slow, a run keeps its speed, holds bounded telemetry memory, ends within a bounded flush time, and records what it dropped.
+- [x] The default telemetry configuration stays under the ceiling the user sets at T21.F05 from measured cost, with 5% of elapsed time as the target, measured as total telemetry cost against a reference build with T21's work compiled out, with the stack healthy, stopped and slow; every closure before T21.F05 closes stays under the 25% interim ceiling, and every closure after it stays under the ceiling F05 recorded. (Met as recorded, 2026-09-30: F01 and F02 passed the interim check; F03, F04 and F06 were inconclusive on a loaded host and accepted by the user; F05 recorded 10% as the ceiling with every cell under it; F07 adds no work to a run.)
+- [x] A seeded run produces byte-identical deterministic output with telemetry on, off and with the stack stopped, and with telemetry off it matches the build of the feature's parent commit; telemetry consumes no production RNG and no telemetry setting enters the config digest.
+- [x] The feature spec template has a telemetry section, and the final review checks it.
 
 ## Executable Features
 
@@ -45,7 +45,7 @@ it stores is closure evidence.
   - Goal: Measurement tooling. The cost of each level of detail is measured, the user sets the default's ceiling from it with 5% as the target, the default export cadences and sampling caps are chosen to stay under it with margin, with named presets and their measured time and storage costs, and telemetry becomes on by default in every binary.
 - [x] **T21.F06 — Benchmark, Assay and Lab Run Records** — Depends on: T21.F02
   - Goal: Measurement tooling. Benchmark, assay and lab commands appear in the stack with identity, lifecycle and end-of-run totals, held in memory and exported only after every timed region of the invocation has finished, so stored measurements do not move.
-- [ ] **T21.F07 — Telemetry Conventions in the Feature Contract** — Depends on: T21.F02
+- [x] **T21.F07 — Telemetry Conventions in the Feature Contract** — Depends on: T21.F02
   - Goal: Measurement tooling. The feature spec template's telemetry section names the delivered conventions, and a feature that adds a mechanism or counter ships its exported signals with it.
 
 ## Notes for AI Agents
