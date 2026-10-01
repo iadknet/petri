@@ -88,7 +88,7 @@ bench: ## Run gate/goal/sweep. FEATURE labels the run; OUT overrides local raw o
 	if [ -n "$(FEATURE)" ]; then set -- "$$@" --feature "$(FEATURE)"; fi; \
 	if [ -n "$(OUT)" ]; then set -- "$$@" --out "$(OUT)"; fi; \
 	if [ -n "$(SUMMARY_OUT)" ]; then set -- "$$@" --summary-out "$(SUMMARY_OUT)"; fi; \
-	scripts/bench-wait cargo run --release -p v3-cli -- --telemetry off bench "$$@" $(BENCH_ARGS)
+	scripts/bench-wait cargo run --release -p v3-cli -- bench "$$@" $(BENCH_ARGS)
 
 rust-test-server: ## Run v3-server tests.
 	@cargo test -p v3-server

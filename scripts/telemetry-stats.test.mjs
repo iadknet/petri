@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -54,16 +54,23 @@ test('verdict: pass below, fail at or above, inconclusive across the ceiling', (
   const at = (value) => range(16, () => value);
   assert.equal(cellStats(at(1.0), 1.05).verdict, 'pass');
   assert.equal(cellStats(at(1.1), 1.05).verdict, 'fail');
-  // Strict: an upper bound of exactly 1.05 does not pass, and a lower bound of
-  // exactly 1.05 fails.
-  assert.equal(cellStats(at(1.05), 1.05).verdict, 'fail');
-  const upperAt = [...range(11, () => 1.0), ...range(5, () => 1.05)];
-  assert.equal(cellStats(upperAt, 1.05).upper, 1.05);
-  assert.equal(cellStats(upperAt, 1.05).verdict, 'inconclusive');
   const straddle = [...range(8, () => 1.0), ...range(8, () => 1.1)];
   assert.equal(cellStats(straddle, 1.05).verdict, 'inconclusive');
-  // Unrounded: 1.04999 passes although it prints as 1.0500.
-  assert.equal(cellStats(at(1.04999), 1.05).verdict, 'pass');
+});
+
+test('the routine ceiling is 1.10 and compares strictly at the boundary', () => {
+  const at = (value) => range(16, () => value);
+  const overhead = readFileSync(new URL('./telemetry-overhead', import.meta.url), 'utf8');
+  const ceiling = Number(overhead.match(/^ceiling=(\S+)$/m)?.[1]);
+  assert.equal(ceiling, 1.1);
+  // Strict: an upper bound of exactly the ceiling does not pass, and a lower
+  // bound of exactly the ceiling fails.
+  assert.equal(cellStats(at(1.1), ceiling).verdict, 'fail');
+  const upperAt = [...range(11, () => 1.0), ...range(5, () => 1.1)];
+  assert.equal(cellStats(upperAt, ceiling).upper, 1.1);
+  assert.equal(cellStats(upperAt, ceiling).verdict, 'inconclusive');
+  // Unrounded: 1.09999 passes although it prints as 1.1000.
+  assert.equal(cellStats(at(1.09999), ceiling).verdict, 'pass');
 });
 
 test('a voided pair enters as an infinite ratio and only moves towards fail', () => {

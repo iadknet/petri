@@ -76,8 +76,8 @@ pub(crate) const RUN_ID_KEY: &str = "petri.run_id";
 /// Whether a process exports telemetry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Switch {
-    On,
     #[default]
+    On,
     Off,
 }
 
@@ -102,7 +102,7 @@ impl fmt::Display for Switch {
     }
 }
 
-/// The flag beats [`SWITCH_ENV`], which beats the default `off`. An unset or
+/// The flag beats [`SWITCH_ENV`], which beats the default `on`. An unset or
 /// empty variable counts as absent; any other value must be `on` or `off`.
 pub fn resolve_switch(flag: Option<Switch>, env: Option<&str>) -> Result<Switch, String> {
     if let Some(flag) = flag {
@@ -112,7 +112,7 @@ pub fn resolve_switch(flag: Option<Switch>, env: Option<&str>) -> Result<Switch,
         Some(value) => value
             .parse()
             .map_err(|error| format!("invalid {SWITCH_ENV}: {error}")),
-        None => Ok(Switch::Off),
+        None => Ok(Switch::default()),
     }
 }
 

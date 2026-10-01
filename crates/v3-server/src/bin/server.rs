@@ -13,7 +13,7 @@ fn resolve_bind_addr(env_value: Option<String>) -> String {
 #[command(name = "v3-server")]
 struct Args {
     /// Export run telemetry over OTLP (`on` or `off`); beats PETRI_TELEMETRY,
-    /// default off.
+    /// default on.
     #[arg(long, value_name = "on|off")]
     telemetry: Option<v3_telemetry::Switch>,
 }
@@ -91,21 +91,28 @@ mod tests {
 
     #[cfg(feature = "telemetry")]
     #[test]
-    fn telemetry_flag_beats_environment_which_beats_default_off() {
+    fn telemetry_flag_beats_environment_which_beats_default_on() {
         use super::Args;
-        use clap::Parser as _;
+        use clap::{CommandFactory as _, Parser as _};
         use v3_telemetry::Switch;
         let parse = |argv: &[&str]| Args::try_parse_from(argv).expect("arguments must parse");
         let telemetry_switch =
             |args: &Args, env: Option<&str>| v3_telemetry::resolve_switch(args.telemetry, env);
         let plain = parse(&["v3-server"]);
-        assert_eq!(telemetry_switch(&plain, None), Ok(Switch::Off));
-        assert_eq!(telemetry_switch(&plain, Some("on")), Ok(Switch::On));
+        assert_eq!(telemetry_switch(&plain, None), Ok(Switch::On));
+        assert_eq!(telemetry_switch(&plain, Some("off")), Ok(Switch::Off));
         let off = parse(&["v3-server", "--telemetry", "off"]);
         assert_eq!(telemetry_switch(&off, Some("on")), Ok(Switch::Off));
         let on = parse(&["v3-server", "--telemetry", "on"]);
-        assert_eq!(telemetry_switch(&on, None), Ok(Switch::On));
+        assert_eq!(telemetry_switch(&on, Some("off")), Ok(Switch::On));
         assert!(Args::try_parse_from(["v3-server", "--telemetry", "maybe"]).is_err());
+        let help = Args::command()
+            .get_arguments()
+            .find(|arg| arg.get_id() == "telemetry")
+            .and_then(|arg| arg.get_help())
+            .map(ToString::to_string)
+            .unwrap_or_default();
+        assert!(help.contains("default on"), "{help}");
     }
 
     #[test]

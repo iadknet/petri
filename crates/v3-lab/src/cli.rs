@@ -26,7 +26,7 @@ pub const QUICK_MUTANTS: u32 = 8;
 #[derive(Parser, Debug)]
 #[command(name = "v3-lab", about = "Petri capability-assay lab (T22)")]
 pub struct Cli {
-    /// Run telemetry (`on` or `off`); beats PETRI_TELEMETRY, default off.
+    /// Run telemetry (`on` or `off`); beats PETRI_TELEMETRY, default on.
     /// `run` and `why-not` export one measurement record pair after the run.
     #[cfg(feature = "telemetry")]
     #[arg(long, global = true, value_name = "on|off")]
@@ -397,7 +397,8 @@ mod tests {
 
     #[cfg(feature = "telemetry")]
     #[test]
-    fn telemetry_flag_beats_environment_which_beats_default_off() {
+    fn telemetry_flag_beats_environment_which_beats_default_on() {
+        use clap::CommandFactory as _;
         use v3_telemetry::{resolve_switch, Switch};
         let flag = |argv: &[&str]| {
             Cli::try_parse_from(argv)
@@ -405,12 +406,19 @@ mod tests {
                 .telemetry
         };
         let plain = flag(&["v3-lab", "report", "x.json"]);
-        assert_eq!(resolve_switch(plain, None), Ok(Switch::Off));
-        assert_eq!(resolve_switch(plain, Some("on")), Ok(Switch::On));
+        assert_eq!(resolve_switch(plain, None), Ok(Switch::On));
+        assert_eq!(resolve_switch(plain, Some("off")), Ok(Switch::Off));
         let off = flag(&["v3-lab", "--telemetry", "off", "report", "x.json"]);
         assert_eq!(resolve_switch(off, Some("on")), Ok(Switch::Off));
         let on = flag(&["v3-lab", "--telemetry", "on", "report", "x.json"]);
-        assert_eq!(resolve_switch(on, None), Ok(Switch::On));
+        assert_eq!(resolve_switch(on, Some("off")), Ok(Switch::On));
+        let help = Cli::command()
+            .get_arguments()
+            .find(|arg| arg.get_id() == "telemetry")
+            .and_then(|arg| arg.get_help())
+            .map(ToString::to_string)
+            .unwrap_or_default();
+        assert!(help.contains("default on"), "{help}");
     }
 
     #[test]

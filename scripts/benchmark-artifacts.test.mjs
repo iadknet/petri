@@ -185,7 +185,7 @@ test('make forwards distinct optional paths with spaces through one existing pre
     chmodSync(wrapper, 0o755);
     const run = (...args) => execFileSync('make', ['--no-print-directory', '-f',join(root,'Makefile'),'bench',...args], {cwd:dir,encoding:'utf8'}).trim().split('\n');
     const args = run('PROFILE=goal','FEATURE=test-feature','OUT=raw dir/full.json','SUMMARY_OUT=summary dir/summary.json','BENCH_ARGS=--threads 1');
-    assert.deepEqual(args, ['cargo','run','--release','-p','v3-cli','--','--telemetry','off','bench','--profile','goal','--feature','test-feature','--out','raw dir/full.json','--summary-out','summary dir/summary.json','--threads','1']);
+    assert.deepEqual(args, ['cargo','run','--release','-p','v3-cli','--','bench','--profile','goal','--feature','test-feature','--out','raw dir/full.json','--summary-out','summary dir/summary.json','--threads','1']);
     const defaults = run('PROFILE=sweep','FEATURE=test-feature','BENCH_ARGS=--width 8');
     assert.ok(!defaults.includes('--out'));
     assert.ok(defaults.includes('--feature'));
