@@ -174,16 +174,22 @@ Invariants:
 - [x] Scratch stack (Docker, outside `make check`) -> the stack rows below,
       in the readings file: every keep set reached, the cap held at 920,000
       B, `cap=unreachable` with no request, later passes request nothing.
-- [ ] Reference build: `cargo build --release -p v3-cli -p v3-server
+- [x] Reference build: `cargo build --release -p v3-cli -p v3-server
       --no-default-features` compiles and `cargo tree` shows no `v3-telemetry`.
+      Exit 0; `cargo tree -p v3-cli -p v3-server --no-default-features -e
+      normal` lists no `v3-telemetry` (the default-feature tree does).
 - [x] Parent comparison: `scripts/telemetry-parent-compare <merge base>` ->
       identical canonical output (`ac5f6b74`: 3 canonical lines, T = 6,908).
 - [ ] Overhead check: `scripts/telemetry-overhead` -> verdict against 1.10.
-- [ ] Bytes: record body sizes (median and maximum) and the run line counts
-      from one default CLI run, in the readings file.
+      Deferred: user decision 2026-10-01, see Notes.
+- [x] Bytes: record body sizes (median and maximum) and the run line counts
+      from one default CLI run, in the readings file. T21 workload (T =
+      6,908), throwaway in-process receiver: `window_records=1 windows=1
+      recorded=8 snapshots=5 traces=5`, `creature.window` body 3,323 B
+      (median and maximum).
 - [ ] `make check` -> exit 0.
-- [ ] Mutation gate: `Not applicable: observability feature`.
-- [ ] Benchmark summary: `Not applicable: observability feature`.
+- [x] Mutation gate: `Not applicable: observability feature`.
+- [x] Benchmark summary: `Not applicable: observability feature`.
 
 | Rows | What is asserted |
 | --- | --- |
@@ -222,7 +228,9 @@ check's scratch stack starts only `lgtm`. `telemetry-verify` and
 `telemetry-dashboards-check`, which time nothing, keep starting the whole
 stack.
 
-**Measured verdict.** Pending.
+**Measured verdict.** The parent comparison is identical (`ac5f6b74`, 3
+canonical lines, T = 6,908). The overhead check is deferred by user decision
+on 2026-10-01 (see Notes).
 
 - Full readings: [`docs/progress/readings/t23-f10.md`](../../progress/readings/t23-f10.md).
 
@@ -258,3 +266,8 @@ stack.
 - Decision: user ruling (2026-10-01): T21.F04's caps rule changes. Past the
   per-run caps, windows still send the compact Loki record, with no Tempo
   trace and no genome record.
+- Deferred: the overhead check (`scripts/telemetry-overhead`, routine) was not
+  run at closure, by user decision on 2026-10-01, because it refuses to run
+  while the user's live `petri-telemetry` stack is up. The pre-cap path is
+  expected to show no change; run it the next time the stack is down, or at
+  the next T23 closure that runs it.
