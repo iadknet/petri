@@ -128,44 +128,46 @@ different, no signal is added or renamed, and no configuration is recorded.
 
 ## Implementation Tasks
 
-- [ ] Replace the template's Telemetry section: keep the signal table and
+- [x] Replace the template's Telemetry section: keep the signal table and
       the `Not applicable` form, add the conventions table above with the
       `From` column pointing at the owning specs, and remove the interim
       paragraph and bullets (invariant 3).
-- [ ] Extend `.claude/agents/roadmap-reviewer.md` as the Reviewer extension
+- [x] Extend `.claude/agents/roadmap-reviewer.md` as the Reviewer extension
       paragraph states (invariants 4–6).
-- [ ] Record in `docs/progress/readings/t21-f07.md` the grep results that
+- [x] Record in `docs/progress/readings/t21-f07.md` the grep results that
       tie each file and attribute name the template cites to the code
       (Verification), beside the challenge-loop table.
-- [ ] Run `make check-docs`; at closure the orchestrator runs `make check`
+- [x] Run `make check-docs`; at closure the orchestrator runs `make check`
       on the final code (the user's goal requires it at each closure).
 
 ## Verification
 
-- [ ] `make check-docs` -> exit 0 on the final diff (`roadmap-check`,
-      `policy-check`, `quality-check`).
+- [x] `make check-docs` -> exit 0 on the working tree over `995f82ae`
+      (`roadmap-check`, `policy-check`, `quality-check`).
 - [ ] `make check` -> exit 0 on the final code at closure, recorded as the
       tested commit (user's goal; the diff is documentation-only, so this
       re-runs the suite unchanged, including the telemetry-neutrality test).
-- [ ] Template–code agreement: every file path, function name, script
+      The build pass's run on the working tree over `995f82ae` exited 2:
+      `an_invalid_tick_trace_switch_refuses_to_start_a_run_with_telemetry_on`
+      in `crates/v3-cli/tests/telemetry.rs` read an empty
+      `t21-small.json` (EOF). The recipe path is shared by parallel tests and
+      rewritten on each call (line 81), so the race is in existing test code,
+      not this diff. `cargo test -p v3-cli --test telemetry` then passed
+      13/13.
+- [x] Template–code agreement: every file path, function name, script
       variable, attribute and setting name the template's conventions cite
-      resolves by `grep` in the worktree (`metrics.rs` families and
-      `run_scalars!`, `trace.rs` phase groups and `CONFIG_PREFIX`,
-      `preset.rs` preset names, `telemetry-dashboards-check` `always_names`,
-      `telemetry-overhead` `ceiling`, the cap values), results in
+      resolves by `grep` in the worktree. The `file:line` table is in
       `docs/progress/readings/t21-f07.md`.
-- [ ] Template–source agreement: each convention row of the template is
-      listed in the readings file against the sentence of the closed spec,
-      track note or `AGENTS.md` it restates, with that source's condition or
-      exception carried over (invariant 2).
-- [ ] Template–reviewer agreement: each check in the reviewer's Telemetry
-      bullet names a convention row of the template (invariant 6), listed in
-      the readings file as a two-column table.
-- [ ] `git diff --stat 3195f536` plus `git status --porcelain` list only the
-      files invariant 1 allows, recorded in the readings file.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: Not applicable:
+- [x] Template–source agreement: the readings file lists each convention row
+      against the closed-spec sentence, track note or `AGENTS.md` rule it
+      restates, with that source's condition or exception (invariant 2).
+- [x] Template–reviewer agreement: the readings file maps each check in the
+      reviewer's Telemetry bullet to a template row (invariant 6).
+- [x] `git diff --stat 3195f536` plus `git status --porcelain` list only the
+      files invariant 1 allows (readings file, Diff scope).
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: Not applicable:
       observability feature.
-- [ ] Benchmark summary: Not applicable: observability feature.
+- [x] Benchmark summary: Not applicable: observability feature.
 
 ## Performance and Goal Impact
 
