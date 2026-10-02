@@ -12,9 +12,13 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use serde_json::json;
+use v3_core::contracts::InputReference;
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::creature::genome::analysis::mesh_reachable_nodes;
-use v3_core::creature::genome::CreatureGenome;
+use v3_core::creature::genome::cgp::{
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
+};
+use v3_core::creature::genome::{BackendDef, CreatureGenome};
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::MutationEngine;
 use v3_lab::arena::arena_config;
@@ -431,4 +435,162 @@ fn e7_two_step_and_sterility() {
         json!({"probe": "e7-two-step", "silent_children": silent.len(),
         "grandchildren": tally(&grand), "direct_children": tally(&direct)})
     );
+}
+
+// Run 2 (`docs/strategy/evolvability-exploration-2026-10-run2.md`). Diagnostic
+// genomes (run 2 plan rule 7) are hand-edited, scored on fixed scenes only,
+// and never start a lineage, enter selection or seed an arm.
+
+fn graph_mut(genome: &mut CreatureGenome, node: usize) -> &mut CgpGraphBackendDef {
+    match &mut genome.nodes[node].backend_def {
+        BackendDef::Graph(def) => def,
+        BackendDef::Vm(_) => panic!("node {node} is not a Graph node"),
+    }
+}
+
+/// The readiness signal silenced: node 0's `CustomOutput(1)` (the founder's
+/// can-reproduce slot) loses every input edge.
+fn silenced(genome: &CreatureGenome) -> CreatureGenome {
+    let mut g = genome.clone();
+    graph_mut(&mut g, 0)
+        .sink_mut(OutputSinkKind::CustomOutput(1))
+        .expect("fixed catalog")
+        .inputs
+        .clear();
+    g
+}
+
+/// Node 1's input reference `idx` re-pointed to upstream slot `slot`.
+fn repointed(genome: &CreatureGenome, pairs: &[(usize, usize)]) -> CreatureGenome {
+    let mut g = genome.clone();
+    for &(idx, slot) in pairs {
+        g.nodes[1].input_refs[idx] = InputReference::UpstreamSlot(slot);
+    }
+    g
+}
+
+/// The plateau with the readiness signal restored: node 0 regains the
+/// founder's `Multiply(CN0, CN1)` feeding `CustomOutput(1)`, and node 1's
+/// input ref 1 reads slot 1 again. Every other plateau edit is kept.
+fn restored(plateau: &CreatureGenome) -> CreatureGenome {
+    let mut g = plateau.clone();
+    let def = graph_mut(&mut g, 0);
+    let idx = u16::try_from(def.compute_nodes.len()).expect("small graph");
+    def.compute_nodes.push(ComputeNode {
+        kind: ComputeNodeKind::Multiply,
+        inputs: vec![
+            GraphEdge {
+                source: GraphSource::ComputeNode(0),
+                weight: 1.0,
+            },
+            GraphEdge {
+                source: GraphSource::ComputeNode(1),
+                weight: 1.0,
+            },
+        ],
+        plasticity: None,
+    });
+    def.sink_mut(OutputSinkKind::CustomOutput(1))
+        .expect("fixed catalog")
+        .inputs = vec![GraphEdge {
+        source: GraphSource::ComputeNode(idx),
+        weight: 1.0,
+    }];
+    repointed(&g, &[(1, 1)])
+}
+
+/// Bank totals for one genome: mean score, food, moves, penalty, deaths.
+fn bank_row(
+    setup: &Setup,
+    name: &str,
+    genome: &CreatureGenome,
+    bank: &[Scene],
+) -> serde_json::Value {
+    let s: Vec<_> = bank
+        .par_iter()
+        .map(|sc| evaluate_genome(setup, genome, sc).0)
+        .collect();
+    json!({"genome": name,
+        "score": s.iter().map(|x| x.score).sum::<f64>() / s.len() as f64,
+        "food_eaten": s.iter().map(|x| x.food_eaten).sum::<u32>(),
+        "moves_attempted": s.iter().map(|x| x.moves_attempted).sum::<u64>(),
+        "penalty_charged": s.iter().map(|x| x.penalty_charged).sum::<f64>(),
+        "deaths": s.iter().filter(|x| x.death_tick.is_some()).count(),
+        "scores": s.iter().map(|x| x.score).collect::<Vec<_>>()})
+}
+
+/// P1, sterility-shortcut diagnostics (run 2 phase 1) on run 1's E3 bank:
+/// the founder 2 × 2 (readiness silenced × the plateau's upstream
+/// re-pointing), its decomposition, the plateau and its restoration, and
+/// three elites with an intact readiness path, silenced and unsilenced.
+#[test]
+#[ignore = "exploration probe; seconds in release"]
+fn p1_sterility_diagnostics() {
+    const MARGIN: f64 = 0.5;
+    let setup = setup();
+    let founder = founder_genome_with_age_gate(
+        setup.config.population.founder_profile,
+        &setup.config.energy.lifecycle,
+    );
+    let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
+    let plateau = elite(&dir, "native-1");
+    let bank = scenes(0xE3_BA_4C, 32, &setup);
+    let repoint = [(1, 12), (2, 9)];
+    let mut genomes: Vec<(String, CreatureGenome)> = vec![
+        ("founder".into(), founder.clone()),
+        ("founder+silenced".into(), silenced(&founder)),
+        ("founder+repointed".into(), repointed(&founder, &repoint)),
+        (
+            "founder+silenced+repointed".into(),
+            silenced(&repointed(&founder, &repoint)),
+        ),
+        ("founder+ref1".into(), repointed(&founder, &[(1, 12)])),
+        ("founder+ref2".into(), repointed(&founder, &[(2, 9)])),
+        ("plateau".into(), plateau.clone()),
+        ("plateau+restored".into(), restored(&plateau)),
+    ];
+    for name in ["native-0", "native-5", "shuffled-score-5"] {
+        let g = elite(&dir, name);
+        genomes.push((format!("{name}+silenced"), silenced(&g)));
+        genomes.push((name.into(), g));
+    }
+    let mut out = out_file();
+    let mut score = BTreeMap::new();
+    for (name, g) in &genomes {
+        let row = bank_row(&setup, name, g, &bank);
+        score.insert(name.clone(), row["score"].as_f64().unwrap());
+        let mut row = row;
+        row["probe"] = json!("p1");
+        println!("{row}");
+        if let Some(f) = out.as_mut() {
+            writeln!(f, "{row}").unwrap();
+        }
+    }
+    let s = |k: &str| score[k];
+    let gain = s("plateau") - s("founder");
+    let silence_alone = s("founder+silenced") - s("founder");
+    let silence_with_repoint = s("founder+silenced+repointed") - s("founder+repointed");
+    let restoration = s("plateau") - s("plateau+restored");
+    let mut contrasts = vec![
+        ("founder", silence_alone),
+        ("founder+repointed", silence_with_repoint),
+        ("plateau-restored", restoration),
+    ];
+    for name in ["native-0", "native-5", "shuffled-score-5"] {
+        contrasts.push((name, s(&format!("{name}+silenced")) - s(name)));
+    }
+    let dominant = silence_alone >= 0.7 * gain && restoration >= 0.7 * gain;
+    let contributor = !dominant && contrasts.iter().any(|(_, d)| *d > MARGIN);
+    let summary = json!({"probe": "p1-verdict", "margin": MARGIN, "gain": gain,
+        "silence_main": (silence_alone + silence_with_repoint) / 2.0,
+        "repoint_main": ((s("founder+repointed") - s("founder"))
+            + (s("founder+silenced+repointed") - s("founder+silenced"))) / 2.0,
+        "interaction": silence_with_repoint - silence_alone,
+        "silence_alone_share": silence_alone / gain, "restoration_share": restoration / gain,
+        "contrasts": contrasts.iter().map(|(n, d)| json!({"genome": n, "silencing_delta": d})).collect::<Vec<_>>(),
+        "verdict": if dominant { "dominant" } else if contributor { "contributor" } else { "no-shortcut" }});
+    println!("{summary}");
+    if let Some(f) = out.as_mut() {
+        writeln!(f, "{summary}").unwrap();
+    }
 }
