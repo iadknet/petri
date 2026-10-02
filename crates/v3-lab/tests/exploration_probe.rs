@@ -594,3 +594,300 @@ fn p1_sterility_diagnostics() {
         writeln!(f, "{summary}").unwrap();
     }
 }
+
+/// A P2 candidate scene rule for the repaired instrument (run 2 phase 1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Rule {
+    /// T22.F01 as built: start energy 100, refused reproduction charged.
+    Base,
+    /// R1: start energy 20 (production `initial_energy`), nothing else.
+    Start20,
+    /// R2: refused-reproduce penalty refunded, reproduce-attempt ticks paused.
+    RefundPause,
+    /// R3: reproduction accepted, offspring removed at birth, ticks paused.
+    AcceptPause,
+    /// R4: start 20, energy capped at 20 after every tick.
+    Ceiling20,
+    /// R5: start 20, energy reset to 20 after every tick.
+    Held20,
+}
+
+impl Rule {
+    const ALL: [Self; 6] = [
+        Self::Base,
+        Self::Start20,
+        Self::RefundPause,
+        Self::AcceptPause,
+        Self::Ceiling20,
+        Self::Held20,
+    ];
+    fn start(self) -> f32 {
+        match self {
+            Self::Base | Self::RefundPause | Self::AcceptPause => START_ENERGY,
+            Self::Start20 | Self::Ceiling20 | Self::Held20 => 20.0,
+        }
+    }
+    fn paused(self) -> bool {
+        matches!(self, Self::RefundPause | Self::AcceptPause)
+    }
+}
+
+/// One scene under `rule`: the lab evaluation loop (`eval.rs`) with the
+/// rule's hooks, scored as `Tally::finish` scores. Returns (score, food,
+/// died, paused ticks).
+#[allow(clippy::too_many_lines)]
+fn eval_rule(
+    setup: &Setup,
+    genome: &CreatureGenome,
+    scene: &Scene,
+    rule: Rule,
+) -> (f64, u32, bool, u32) {
+    use slotmap::SlotMap;
+    use v3_core::contracts::{CreatureId, OrdinaryFoodTypeId};
+    use v3_core::creature::action_log::ActionType;
+    use v3_core::creature::identity::CreatureIdentityState;
+    use v3_core::creature::state::{CreatureState, SHARED_MEMORY_SLOTS};
+    use v3_core::kernel::WorldState;
+    use v3_core::simulation::{run_tick, Simulation};
+    use v3_lab::eval::{efficiency, expressed, Progress};
+    use v3_lab::geodesic::Terrain;
+    const FOOD: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
+    let mut config = setup.config.clone();
+    if rule == Rule::AcceptPause {
+        config.energy.lifecycle.min_reproduce_energy = v3_lab::arena::production_defaults()
+            .energy
+            .lifecycle
+            .min_reproduce_energy;
+    }
+    let size = config.world.width;
+    let mut world = WorldState::new(size, size, config.world.edge_mode);
+    for &cell in &scene.barriers {
+        world.set_barrier(cell, true);
+    }
+    let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+    let id = creatures.insert_with_key(|id| {
+        CreatureState::new(
+            id,
+            expressed(genome),
+            scene.start,
+            rule.start(),
+            0,
+            setup.phenotype.channels,
+            setup.phenotype.active_channel,
+            setup.phenotype.polarity,
+            CreatureIdentityState::founder(0, scene.seed),
+            [0.0; SHARED_MEMORY_SLOTS],
+        )
+    });
+    let mut sim = Simulation::new(world, creatures, setup.start_tick, config, scene.seed);
+    sim.world.place_creature(scene.start, id);
+    let density = sim.config.world.food.shared.max_density;
+    for &cell in &scene.food {
+        sim.world.set_food_type(cell, FOOD, density);
+    }
+    let read = |sim: &Simulation| {
+        (
+            sim.stats
+                .eat_actions_applied_total_by_type
+                .values()
+                .sum::<u64>(),
+            sim.stats.move_actions_attempted_total,
+            sim.stats
+                .move_actions_blocked_total_by_cause
+                .values()
+                .sum::<u64>(),
+            sim.stats.energy_flows.failed_action_penalty,
+        )
+    };
+    let mut progress = Progress::new(
+        &scene.food,
+        Terrain::from_cells(size, &scene.barriers),
+        scene.start,
+    );
+    let (mut food, mut first, mut moves, mut blocked) = (0u32, None, 0u64, 0u64);
+    let (mut counted, mut world_ticks, mut paused, mut died) = (0u32, 0u32, 0u32, false);
+    let cap = if rule.paused() {
+        3 * setup.lifetime
+    } else {
+        setup.lifetime
+    };
+    let mut before = read(&sim);
+    while counted < setup.lifetime && world_ticks < cap {
+        let attempts =
+            sim.creatures[id].lifetime_actions_attempted_by_type[ActionType::Reproduce as usize];
+        run_tick(&mut sim, &mut None);
+        world_ticks += 1;
+        let now = read(&sim);
+        let bites = u32::try_from(now.0 - before.0).unwrap();
+        food += bites;
+        moves += now.1 - before.1;
+        blocked += now.2 - before.2;
+        let penalty = now.3 - before.3;
+        before = now;
+        if rule == Rule::AcceptPause {
+            let others: Vec<CreatureId> = sim.creatures.keys().filter(|k| *k != id).collect();
+            for other in others {
+                let at = sim.creatures[other].position;
+                sim.world.remove_creature(at);
+                sim.creatures.remove(other);
+                sim.action_logs.remove(other);
+            }
+        }
+        let Some(creature) = sim.creatures.get_mut(id) else {
+            died = true;
+            if bites > 0 && first.is_none() {
+                first = Some(counted + 1);
+            }
+            break;
+        };
+        let attempted =
+            creature.lifetime_actions_attempted_by_type[ActionType::Reproduce as usize] > attempts;
+        if rule == Rule::RefundPause && attempted {
+            #[allow(clippy::cast_possible_truncation)]
+            let refund = penalty as f32;
+            creature.energy =
+                (creature.energy + refund).min(sim.config.energy.lifecycle.max_energy);
+        }
+        match rule {
+            Rule::Ceiling20 => creature.energy = creature.energy.min(20.0),
+            Rule::Held20 => creature.energy = 20.0,
+            _ => {}
+        }
+        if rule.paused() && attempted {
+            paused += 1;
+        } else {
+            counted += 1;
+        }
+        if bites > 0 && first.is_none() {
+            first = Some(counted.max(1));
+        }
+        let at = creature.position;
+        if bites > 0 {
+            let world = &sim.world;
+            progress.open(at, |cell| world.food_at_type(cell, FOOD) > 0.0);
+        } else {
+            progress.observe(at);
+        }
+    }
+    let scoring = setup.scoring;
+    #[allow(clippy::cast_precision_loss)]
+    let blocked_fraction = if moves == 0 {
+        0.0
+    } else {
+        blocked as f64 / moves as f64
+    };
+    let score = f64::from(food)
+        + progress.value(scoring.exhausted)
+        + scoring.efficiency_weight * efficiency(progress.d_start(), first)
+        - scoring.blocked_weight * blocked_fraction;
+    (score, food, died, paused)
+}
+
+/// P1b and P2 (run 2 phase 1): the wall-v1 silencing diagnostics, and every
+/// candidate rule's silencing contrasts on the food and wall development
+/// banks.
+#[test]
+#[ignore = "exploration probe; seconds-to-minutes in release"]
+#[allow(clippy::too_many_lines)]
+fn p2_repair_candidates() {
+    use v3_lab::eval::Scoring;
+    use v3_lab::scene::{Assay, Geometry};
+    const MARGIN: f64 = 0.5;
+    let food_setup = setup();
+    let wall_setup = setup().with_scoring(Scoring::BARRIER_NAVIGATION);
+    let founder = founder_genome_with_age_gate(
+        food_setup.config.population.founder_profile,
+        &food_setup.config.energy.lifecycle,
+    );
+    let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
+    let wall_dir = dir.replace("base-food-s1", "base-wall-s1");
+    let plateau = elite(&dir, "native-1");
+    let repoint = [(1, 12), (2, 9)];
+    let base_pairs = |extra: Vec<(String, CreatureGenome)>| {
+        let mut pairs: Vec<(String, CreatureGenome, CreatureGenome)> = vec![
+            ("founder".into(), founder.clone(), silenced(&founder)),
+            (
+                "founder+repointed".into(),
+                repointed(&founder, &repoint),
+                silenced(&repointed(&founder, &repoint)),
+            ),
+        ];
+        for (name, g) in extra {
+            let s = silenced(&g);
+            pairs.push((name, g, s));
+        }
+        pairs
+    };
+    let mut food_pairs = base_pairs(
+        ["native-0", "native-5", "shuffled-score-5"]
+            .iter()
+            .map(|n| ((*n).to_string(), elite(&dir, n)))
+            .collect(),
+    );
+    food_pairs.push((
+        "founder/ref1".into(),
+        founder.clone(),
+        repointed(&founder, &[(1, 12)]),
+    ));
+    food_pairs.push((
+        "plateau-restored".into(),
+        restored(&plateau),
+        plateau.clone(),
+    ));
+    let wall_pairs = base_pairs(
+        ["native-0", "native-1", "shuffled-score-1"]
+            .iter()
+            .map(|n| ((*n).to_string(), elite(&wall_dir, n)))
+            .collect(),
+    );
+    let food_bank = scenes(0xE3_BA_4C, 32, &food_setup);
+    let wall_spec = SceneSpec {
+        geometry: Geometry::Wall { scale: 2 },
+        size: SIZE,
+        vision_radius: wall_setup.config.runtime.perception.vision_radius,
+        assay: Assay::BarrierNavigation,
+    };
+    let mut rng = SmallRng::seed_from_u64(0xB2_DE_00);
+    let wall_bank: Vec<Scene> = (0..32)
+        .map(|_| wall_spec.draw(&mut rng).expect("feasible scene"))
+        .collect();
+    let mut out = out_file();
+    for (assay, setup, bank, pairs) in [
+        ("food", &food_setup, &food_bank, &food_pairs),
+        ("wall", &wall_setup, &wall_bank, &wall_pairs),
+    ] {
+        for rule in Rule::ALL {
+            let bank_eval = |g: &CreatureGenome| {
+                let r: Vec<_> = bank
+                    .par_iter()
+                    .map(|sc| eval_rule(setup, g, sc, rule))
+                    .collect();
+                (
+                    r.iter().map(|x| x.0).sum::<f64>() / r.len() as f64,
+                    r.iter().map(|x| x.1).sum::<u32>(),
+                    r.iter().filter(|x| x.2).count(),
+                    r.iter().map(|x| x.3).sum::<u32>(),
+                )
+            };
+            let rows: Vec<serde_json::Value> = pairs
+                .iter()
+                .map(|(name, unsilenced, silenced)| {
+                    let (u, uf, ud, up) = bank_eval(unsilenced);
+                    let (s, sf, sd, sp) = bank_eval(silenced);
+                    json!({"pair": name, "unsilenced": u, "silenced": s, "delta": s - u,
+                        "food": [uf, sf], "deaths": [ud, sd], "paused": [up, sp]})
+                })
+                .collect();
+            let max_abs = rows
+                .iter()
+                .map(|r| r["delta"].as_f64().unwrap().abs())
+                .fold(0.0_f64, f64::max);
+            let row = json!({"probe": "p2", "assay": assay, "rule": format!("{rule:?}"),
+                "max_abs_delta": max_abs, "passes": max_abs <= MARGIN, "pairs": rows});
+            println!("{row}");
+            if let Some(f) = out.as_mut() {
+                writeln!(f, "{row}").unwrap();
+            }
+        }
+    }
+}
