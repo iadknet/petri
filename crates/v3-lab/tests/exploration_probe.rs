@@ -244,3 +244,82 @@ fn e4_elite_neighbourhood_audit() {
         }
     }
 }
+
+fn elite(dir: &str, name: &str) -> CreatureGenome {
+    let path = format!("{dir}/{name}.json");
+    let file: v3_lab::GenomeFile =
+        serde_json::from_str(&std::fs::read_to_string(&path).expect("elite")).expect("genome file");
+    file.genome
+}
+
+fn child_of(setup: &Setup, parent: &CreatureGenome, frozen: &Frozen, seed: u64) -> CreatureGenome {
+    let mut child = parent.clone();
+    let mut rng = SmallRng::seed_from_u64(seed);
+    MutationEngine::apply_mutations_with_food_type_count(
+        &mut child,
+        &setup.config.mutation,
+        &mesh_reachable_nodes(parent),
+        ParentExecuted::Record(&frozen.record, frozen.age),
+        &mut rng,
+        setup.config.world.food.types.len(),
+    );
+    child
+}
+
+/// E7, two-step neighbourhood of the plateau (H3) plus the sterility check.
+/// Parent: E1's `native-1` elite (`PETRI_E4_ELITES`). Up to 32 genome-changed,
+/// bank-silent children (zero delta on every bank scene) each get 16
+/// grandchildren; the matched control is as many further direct children.
+/// Also prints founder and plateau bank totals of food, moves and penalty.
+#[test]
+#[ignore = "exploration probe; minutes in release"]
+fn e7_two_step_and_sterility() {
+    let setup = setup();
+    let founder =
+        founder_genome_with_age_gate(setup.config.population.founder_profile, &setup.config.energy.lifecycle);
+    let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
+    let plateau = elite(&dir, "native-1");
+    let bank = scenes(0xE3_BA_4C, 32, &setup);
+    let batch = scenes(0xE4_A0_00, 4, &setup);
+    for (name, g) in [("founder", &founder), ("plateau", &plateau)] {
+        let s: Vec<_> = bank.iter().map(|sc| evaluate_genome(&setup, g, sc).0).collect();
+        println!("{}", json!({"probe": "e7-sterility", "genome": name,
+            "score": s.iter().map(|x| x.score).sum::<f64>() / 32.0,
+            "food_eaten": s.iter().map(|x| x.food_eaten).sum::<u32>(),
+            "moves_attempted": s.iter().map(|x| x.moves_attempted).sum::<u64>(),
+            "penalty_charged": s.iter().map(|x| x.penalty_charged).sum::<f64>(),
+            "deaths": s.iter().filter(|x| x.death_tick.is_some()).count()}));
+    }
+    let parent_bank = scores(&setup, &plateau, &bank);
+    let frozen: Frozen = evaluate_genome(&setup, &plateau, batch.last().unwrap()).1;
+    let delta = |g: &CreatureGenome| -> Vec<f64> {
+        scores(&setup, g, &bank).iter().zip(&parent_bank).map(|(c, p)| c - p).collect()
+    };
+    let silent: Vec<CreatureGenome> = (0..256u64)
+        .into_par_iter()
+        .filter_map(|i| {
+            let c = child_of(&setup, &plateau, &frozen, 0xE7_10_0000 + i);
+            (c != plateau && delta(&c).iter().all(|d| *d == 0.0)).then_some(c)
+        })
+        .collect();
+    let silent: Vec<CreatureGenome> = silent.into_iter().take(32).collect();
+    let tally = |gains: &[f64]| json!({"n": gains.len(), "improved": gains.iter().filter(|g| **g > 0.0).count(),
+        "improved_gt1": gains.iter().filter(|g| **g > 1.0).count(),
+        "max": gains.iter().copied().fold(f64::MIN, f64::max)});
+    let mut grand = Vec::new();
+    for (k, s) in silent.iter().enumerate() {
+        // The silent child's own record on the same batch, as a parent's would be.
+        let f = evaluate_genome(&setup, s, batch.last().unwrap()).1;
+        let gains: Vec<f64> = (0..16u64)
+            .into_par_iter()
+            .map(|j| mean(&delta(&child_of(&setup, s, &f, 0xE7_20_0000 + k as u64 * 100 + j))))
+            .collect();
+        grand.extend(gains);
+    }
+    let direct: Vec<f64> = (0..grand.len() as u64)
+        .into_par_iter()
+        .map(|i| mean(&delta(&child_of(&setup, &plateau, &frozen, 0xE7_30_0000 + i))))
+        .collect();
+    println!("{}", json!({"probe": "e7-two-step", "silent_children": silent.len(),
+        "grandchildren": tally(&grand), "direct_children": tally(&direct)}));
+}
