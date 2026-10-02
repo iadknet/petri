@@ -31,13 +31,22 @@ fn setup() -> Setup {
 }
 
 fn scenes(seed: u64, n: usize, setup: &Setup) -> Vec<Scene> {
-    let spec = SceneSpec::sparse(SIZE, FRACTION, setup.config.runtime.perception.vision_radius);
+    let spec = SceneSpec::sparse(
+        SIZE,
+        FRACTION,
+        setup.config.runtime.perception.vision_radius,
+    );
     let mut rng = SmallRng::seed_from_u64(seed);
-    (0..n).map(|_| spec.draw(&mut rng).expect("feasible scene")).collect()
+    (0..n)
+        .map(|_| spec.draw(&mut rng).expect("feasible scene"))
+        .collect()
 }
 
 fn scores(setup: &Setup, genome: &CreatureGenome, scenes: &[Scene]) -> Vec<f64> {
-    scenes.iter().map(|s| evaluate_genome(setup, genome, s).0.score).collect()
+    scenes
+        .iter()
+        .map(|s| evaluate_genome(setup, genome, s).0.score)
+        .collect()
 }
 
 fn mean(v: &[f64]) -> f64 {
@@ -53,7 +62,9 @@ fn corr(a: &[f64], b: &[f64]) -> Option<f64> {
 }
 
 fn out_file() -> Option<std::fs::File> {
-    std::env::var("PETRI_PROBE_OUT").ok().map(|p| std::fs::File::create(p).expect("probe out"))
+    std::env::var("PETRI_PROBE_OUT")
+        .ok()
+        .map(|p| std::fs::File::create(p).expect("probe out"))
 }
 
 /// E3, fixed-pool selection audit (H1). Children of the founder are scored on
@@ -68,8 +79,10 @@ fn e3_fixed_pool_selection_audit() {
     const POOL: usize = 64;
     const KEEP: usize = 16;
     let setup = setup();
-    let founder =
-        founder_genome_with_age_gate(setup.config.population.founder_profile, &setup.config.energy.lifecycle);
+    let founder = founder_genome_with_age_gate(
+        setup.config.population.founder_profile,
+        &setup.config.energy.lifecycle,
+    );
     let reachable = mesh_reachable_nodes(&founder);
     let bank = scenes(0xE3_BA_4C, 32, &setup);
     let founder_bank = scores(&setup, &founder, &bank);
@@ -102,19 +115,40 @@ fn e3_fixed_pool_selection_audit() {
                 let a = mean(&scores(&setup, &child, &batch_a)) - founder_a;
                 let b = mean(&scores(&setup, &child, &batch_b)) - founder_b;
                 let bank_scores = scores(&setup, &child, &bank);
-                let deltas: Vec<f64> = bank_scores.iter().zip(&founder_bank).map(|(c, f)| c - f).collect();
+                let deltas: Vec<f64> = bank_scores
+                    .iter()
+                    .zip(&founder_bank)
+                    .map(|(c, f)| c - f)
+                    .collect();
                 let wins = deltas.iter().filter(|d| **d > 0.0).count() as f64;
                 let losses = deltas.iter().filter(|d| **d < 0.0).count() as f64;
-                (false, summary.applied_events, a, b, mean(&deltas), wins - losses)
+                (
+                    false,
+                    summary.applied_events,
+                    a,
+                    b,
+                    mean(&deltas),
+                    wins - losses,
+                )
             })
             .collect();
         // Truncation on batch A over the whole pool (identical children score 0).
         let mut order: Vec<usize> = (0..POOL).collect();
-        order.sort_by(|x, y| children[*y].2.partial_cmp(&children[*x].2).unwrap().then(x.cmp(y)));
+        order.sort_by(|x, y| {
+            children[*y]
+                .2
+                .partial_cmp(&children[*x].2)
+                .unwrap()
+                .then(x.cmp(y))
+        });
         let trunc: Vec<f64> = order[..KEEP].iter().map(|i| children[*i].4).collect();
-        let random: Vec<f64> = (0..KEEP).map(|k| children[(k * 4 + pool as usize) % POOL].4).collect();
-        summary_pools.push(json!({"pool": pool, "founder_a": founder_a, "founder_b": founder_b,
-            "trunc_bank_gain": mean(&trunc), "random_bank_gain": mean(&random)}));
+        let random: Vec<f64> = (0..KEEP)
+            .map(|k| children[(k * 4 + pool as usize) % POOL].4)
+            .collect();
+        summary_pools.push(
+            json!({"pool": pool, "founder_a": founder_a, "founder_b": founder_b,
+            "trunc_bank_gain": mean(&trunc), "random_bank_gain": mean(&random)}),
+        );
         for (i, c) in children.iter().enumerate() {
             rows.push((pool, i, *c));
         }
@@ -125,32 +159,65 @@ fn e3_fixed_pool_selection_audit() {
     let db: Vec<f64> = changed.iter().map(|r| r.2 .3).collect();
     let dbank: Vec<f64> = changed.iter().map(|r| r.2 .4).collect();
     let a_up = changed.iter().filter(|r| r.2 .2 > 0.0).count();
-    let a_up_bank_up = changed.iter().filter(|r| r.2 .2 > 0.0 && r.2 .4 > 0.0).count();
+    let a_up_bank_up = changed
+        .iter()
+        .filter(|r| r.2 .2 > 0.0 && r.2 .4 > 0.0)
+        .count();
     let bank_up = changed.iter().filter(|r| r.2 .4 > 0.0).count();
-    let bank_up_sign = changed.iter().filter(|r| r.2 .4 > 0.0 && r.2 .5 >= 4.0).count();
+    let bank_up_sign = changed
+        .iter()
+        .filter(|r| r.2 .4 > 0.0 && r.2 .5 >= 4.0)
+        .count();
     let bank_changed = changed.iter().filter(|r| r.2 .4 != 0.0).count();
     let mut hist: BTreeMap<String, usize> = BTreeMap::new();
     for d in &dbank {
-        let k = if *d > 1.0 { ">+1" } else if *d > 0.0 { "(0,+1]" } else if *d == 0.0 { "0" } else if *d >= -1.0 { "[-1,0)" } else { "<-1" };
+        let k = if *d > 1.0 {
+            ">+1"
+        } else if *d > 0.0 {
+            "(0,+1]"
+        } else if *d == 0.0 {
+            "0"
+        } else if *d >= -1.0 {
+            "[-1,0)"
+        } else {
+            "<-1"
+        };
         *hist.entry(k.to_owned()).or_default() += 1;
     }
-    let pools_trunc: Vec<f64> = summary_pools.iter().map(|p| p["trunc_bank_gain"].as_f64().unwrap()).collect();
-    let pools_rand: Vec<f64> = summary_pools.iter().map(|p| p["random_bank_gain"].as_f64().unwrap()).collect();
-    let fa: Vec<f64> = summary_pools.iter().map(|p| p["founder_a"].as_f64().unwrap()).collect();
-    println!("{}", json!({
-        "probe": "e3", "children": rows.len(), "identical": rows.len() - changed.len(),
-        "changed_genome": changed.len(), "bank_score_changed": bank_changed,
-        "founder_bank_mean": mean(&founder_bank), "founder_4scene_means": fa,
-        "corr_a_bank": corr(&da, &dbank), "corr_a_b": corr(&da, &db),
-        "a_improved": a_up, "a_improved_and_bank_improved": a_up_bank_up,
-        "bank_improved": bank_up, "bank_improved_sign4": bank_up_sign, "bank_delta_hist": hist,
-        "trunc_bank_gain_by_pool": pools_trunc, "random_bank_gain_by_pool": pools_rand,
-        "trunc_minus_random_mean": mean(&pools_trunc) - mean(&pools_rand),
-    }));
+    let pools_trunc: Vec<f64> = summary_pools
+        .iter()
+        .map(|p| p["trunc_bank_gain"].as_f64().unwrap())
+        .collect();
+    let pools_rand: Vec<f64> = summary_pools
+        .iter()
+        .map(|p| p["random_bank_gain"].as_f64().unwrap())
+        .collect();
+    let fa: Vec<f64> = summary_pools
+        .iter()
+        .map(|p| p["founder_a"].as_f64().unwrap())
+        .collect();
+    println!(
+        "{}",
+        json!({
+            "probe": "e3", "children": rows.len(), "identical": rows.len() - changed.len(),
+            "changed_genome": changed.len(), "bank_score_changed": bank_changed,
+            "founder_bank_mean": mean(&founder_bank), "founder_4scene_means": fa,
+            "corr_a_bank": corr(&da, &dbank), "corr_a_b": corr(&da, &db),
+            "a_improved": a_up, "a_improved_and_bank_improved": a_up_bank_up,
+            "bank_improved": bank_up, "bank_improved_sign4": bank_up_sign, "bank_delta_hist": hist,
+            "trunc_bank_gain_by_pool": pools_trunc, "random_bank_gain_by_pool": pools_rand,
+            "trunc_minus_random_mean": mean(&pools_trunc) - mean(&pools_rand),
+        })
+    );
     if let Some(mut f) = out_file() {
         for (pool, i, c) in &rows {
-            writeln!(f, "{}", json!({"pool": pool, "i": i, "identical": c.0, "applied": c.1,
-                "da": c.2, "db": c.3, "dbank": c.4, "sign": c.5})).unwrap();
+            writeln!(
+                f,
+                "{}",
+                json!({"pool": pool, "i": i, "identical": c.0, "applied": c.1,
+                "da": c.2, "db": c.3, "dbank": c.4, "sign": c.5})
+            )
+            .unwrap();
         }
     }
 }
@@ -165,8 +232,10 @@ fn e3_fixed_pool_selection_audit() {
 fn e4_elite_neighbourhood_audit() {
     const CHILDREN: u64 = 96;
     let setup = setup();
-    let founder =
-        founder_genome_with_age_gate(setup.config.population.founder_profile, &setup.config.energy.lifecycle);
+    let founder = founder_genome_with_age_gate(
+        setup.config.population.founder_profile,
+        &setup.config.energy.lifecycle,
+    );
     let bank = scenes(0xE3_BA_4C, 32, &setup);
     let batch = scenes(0xE4_A0_00, 4, &setup);
     let food_types = setup.config.world.food.types.len();
@@ -176,7 +245,8 @@ fn e4_elite_neighbourhood_audit() {
         for r in 0..8 {
             let path = format!("{dir}/{arm}-{r}.json");
             let file: v3_lab::GenomeFile =
-                serde_json::from_str(&std::fs::read_to_string(&path).expect("elite")).expect("genome file");
+                serde_json::from_str(&std::fs::read_to_string(&path).expect("elite"))
+                    .expect("genome file");
             parents.push((format!("{arm}-{r}"), file.genome));
         }
     }
@@ -213,7 +283,11 @@ fn e4_elite_neighbourhood_audit() {
                 if child == *parent {
                     return (true, 0.0, ops, founder_target);
                 }
-                let d: Vec<f64> = scores(&setup, &child, &bank).iter().zip(&parent_bank).map(|(c, p)| c - p).collect();
+                let d: Vec<f64> = scores(&setup, &child, &bank)
+                    .iter()
+                    .zip(&parent_bank)
+                    .map(|(c, p)| c - p)
+                    .collect();
                 (false, mean(&d), ops, founder_target)
             })
             .collect();
@@ -225,7 +299,10 @@ fn e4_elite_neighbourhood_audit() {
                 *ops_improved.entry(o.clone()).or_default() += 1;
             }
         }
-        let improved_founder_only = improved.iter().filter(|k| !k.3.is_empty() && k.3.iter().all(|b| *b)).count();
+        let improved_founder_only = improved
+            .iter()
+            .filter(|k| !k.3.is_empty() && k.3.iter().all(|b| *b))
+            .count();
         let improved_new_node = improved.iter().filter(|k| k.3.iter().any(|b| !b)).count();
         let row = json!({
             "probe": "e4", "parent": name, "nodes": parent.nodes.len(), "genome_size": parent.genome_size(),
@@ -275,25 +352,37 @@ fn child_of(setup: &Setup, parent: &CreatureGenome, frozen: &Frozen, seed: u64) 
 #[ignore = "exploration probe; minutes in release"]
 fn e7_two_step_and_sterility() {
     let setup = setup();
-    let founder =
-        founder_genome_with_age_gate(setup.config.population.founder_profile, &setup.config.energy.lifecycle);
+    let founder = founder_genome_with_age_gate(
+        setup.config.population.founder_profile,
+        &setup.config.energy.lifecycle,
+    );
     let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
     let plateau = elite(&dir, "native-1");
     let bank = scenes(0xE3_BA_4C, 32, &setup);
     let batch = scenes(0xE4_A0_00, 4, &setup);
     for (name, g) in [("founder", &founder), ("plateau", &plateau)] {
-        let s: Vec<_> = bank.iter().map(|sc| evaluate_genome(&setup, g, sc).0).collect();
-        println!("{}", json!({"probe": "e7-sterility", "genome": name,
+        let s: Vec<_> = bank
+            .iter()
+            .map(|sc| evaluate_genome(&setup, g, sc).0)
+            .collect();
+        println!(
+            "{}",
+            json!({"probe": "e7-sterility", "genome": name,
             "score": s.iter().map(|x| x.score).sum::<f64>() / 32.0,
             "food_eaten": s.iter().map(|x| x.food_eaten).sum::<u32>(),
             "moves_attempted": s.iter().map(|x| x.moves_attempted).sum::<u64>(),
             "penalty_charged": s.iter().map(|x| x.penalty_charged).sum::<f64>(),
-            "deaths": s.iter().filter(|x| x.death_tick.is_some()).count()}));
+            "deaths": s.iter().filter(|x| x.death_tick.is_some()).count()})
+        );
     }
     let parent_bank = scores(&setup, &plateau, &bank);
     let frozen: Frozen = evaluate_genome(&setup, &plateau, batch.last().unwrap()).1;
     let delta = |g: &CreatureGenome| -> Vec<f64> {
-        scores(&setup, g, &bank).iter().zip(&parent_bank).map(|(c, p)| c - p).collect()
+        scores(&setup, g, &bank)
+            .iter()
+            .zip(&parent_bank)
+            .map(|(c, p)| c - p)
+            .collect()
     };
     let silent: Vec<CreatureGenome> = (0..256u64)
         .into_par_iter()
@@ -303,23 +392,42 @@ fn e7_two_step_and_sterility() {
         })
         .collect();
     let silent: Vec<CreatureGenome> = silent.into_iter().take(32).collect();
-    let tally = |gains: &[f64]| json!({"n": gains.len(), "improved": gains.iter().filter(|g| **g > 0.0).count(),
+    let tally = |gains: &[f64]| {
+        json!({"n": gains.len(), "improved": gains.iter().filter(|g| **g > 0.0).count(),
         "improved_gt1": gains.iter().filter(|g| **g > 1.0).count(),
-        "max": gains.iter().copied().fold(f64::MIN, f64::max)});
+        "max": gains.iter().copied().fold(f64::MIN, f64::max)})
+    };
     let mut grand = Vec::new();
     for (k, s) in silent.iter().enumerate() {
         // The silent child's own record on the same batch, as a parent's would be.
         let f = evaluate_genome(&setup, s, batch.last().unwrap()).1;
         let gains: Vec<f64> = (0..16u64)
             .into_par_iter()
-            .map(|j| mean(&delta(&child_of(&setup, s, &f, 0xE7_20_0000 + k as u64 * 100 + j))))
+            .map(|j| {
+                mean(&delta(&child_of(
+                    &setup,
+                    s,
+                    &f,
+                    0xE7_20_0000 + k as u64 * 100 + j,
+                )))
+            })
             .collect();
         grand.extend(gains);
     }
     let direct: Vec<f64> = (0..grand.len() as u64)
         .into_par_iter()
-        .map(|i| mean(&delta(&child_of(&setup, &plateau, &frozen, 0xE7_30_0000 + i))))
+        .map(|i| {
+            mean(&delta(&child_of(
+                &setup,
+                &plateau,
+                &frozen,
+                0xE7_30_0000 + i,
+            )))
+        })
         .collect();
-    println!("{}", json!({"probe": "e7-two-step", "silent_children": silent.len(),
-        "grandchildren": tally(&grand), "direct_children": tally(&direct)}));
+    println!(
+        "{}",
+        json!({"probe": "e7-two-step", "silent_children": silent.len(),
+        "grandchildren": tally(&grand), "direct_children": tally(&direct)})
+    );
 }
