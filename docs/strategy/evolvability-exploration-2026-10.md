@@ -75,8 +75,7 @@ baseline hashes in [`baseline-hashes.json`](evolvability-exploration-2026-10/bas
   Shuffled-score's best fell to −0.73–1.59: on wall-v1 selection, not drift,
   carries the gains.
 - E3, selection audit on 512 founder children. 351 identical (68.6 %), 161
-  genome-changed, of which 96 score identically on all 32 bank scenes
-  (silent on the assay) and 65 change it: 23 improve (14 by more than one
+  genome-changed, of which 96 have a zero bank-mean delta and 65 do not: 23 improve (14 by more than one
   point) and 42 get worse. A paired 4-scene delta predicts the 32-scene delta
   (Pearson 0.94; two independent 4-scene batches 0.86). Truncation on one
   batch gains +0.75 bank points over a fixed pseudo-random pick, ahead in 8 of
@@ -100,24 +99,26 @@ baseline hashes in [`baseline-hashes.json`](evolvability-exploration-2026-10/bas
   ([`e4-elite-neighbourhoods.ndjson`](evolvability-exploration-2026-10/e4-elite-neighbourhoods.ndjson)).
   Six of E1's eight native elites score exactly 14.30 on the 32-scene bank
   (the founder 9.10; the two others 11.63 and 12.55): native selection
-  converges on one phenotype. None of their 196 genome-changed children
-  improves on it (one-sided 95 % upper bound about 1.5 %); most are
+  converges on one phenotype. No bank-mean improvement was observed among the 196
+  sampled genome-changed children of the eight native elites (0 in each of
+  the eight parents; children cluster within parents and reuse seeds across
+  them, so no pooled bound is given); most are
   bank-silent (175 of 196 zero-delta) and the rest worse. The founder's
   children improve in 3 of 28; the shuffled-score elites, spread from 1.25
-  to 18.61, in 10 of 267. Of the 13 improvers, 12 touch founder nodes only
-  and one an added node: **added nodes essentially never carry an
-  improvement here.** What the plateau is: native-1 differs from the founder
+  to 18.61, in 10 of 267. Of the 13 improvers, 12 had every applied event
+  targeted at a founder node and one at an added node. Target identity is
+  descriptive: which tissue causally carries a gain was not ablated, so
+  recruitment is unestablished either way. What the plateau is: native-1 differs from the founder
   by deleting node 0's `Multiply` of the energy and age thresholds, whose
   output fed `CustomOutput 1`, the upstream slot that tells node 1 to vote
   `Reproduce`; node 1 also re-points two upstream references. The plateau
   creature never attempts reproduction. In the lab reproduction is always
   refused (`min_reproduce_energy` above `max_energy`) and each refused
   attempt forfeits a foraging tick and pays the failed-action penalty, so
-  **the most accessible "improvement" in the food-seeking assay is deleting
-  the reproduction drive**, which in the world would end the lineage. This is
-  a benefit-rung instrument confound, not food seeking. Beyond that one step
-  the founder architecture has no one-step improvement at all: sensor-guided
-  movement is several coordinated edits away (H3).
+  the plateau is a **suspected sterility shortcut**: the most accessible
+  gain in the food-seeking assay appears to be abandoning the reproduction
+  drive, which in the world would end the lineage. E7 supports this by
+  association only. Path length to a sensor-guided gain is unresolved.
 - E5, E6, E8: no mechanism arm moved reach. Summaries:
   [`e5-arms-food-seed1.json`](evolvability-exploration-2026-10/e5-arms-food-seed1.json),
   [`e6-horizon-food-seed1.json`](evolvability-exploration-2026-10/e6-horizon-food-seed1.json),
@@ -148,9 +149,11 @@ baseline hashes in [`baseline-hashes.json`](evolvability-exploration-2026-10/bas
   independent silent intermediates (zero delta on every bank scene) gave 512
   grandchildren, of which 1 improved, by +6.40 bank points, enough to clear
   the threshold; 512 matched direct children gave 1 improvement of +0.23.
-  Neutral intermediates two edits out are about as productive as direct
-  children (1 vs 1), so **H3 is not supported at two steps**; the one large
-  two-step gain is a single event and is not analysed further here.
+  The prespecified H3 criterion (≥ 5 grandchild improvers with ≤ 1 direct)
+  was not met. The counts are equal but the magnitudes are not (+6.40 against
+  +0.23): the single large two-step gain is an unresolved stepping-stone
+  lead whose ancestry was not analysed and which was not validated on fresh
+  scenes, so it is not threshold reach.
 - H2 exposure. The ladder's relevant families are `FoodHere`,
   `NeighborFoodRing` and `AreaFoodSummary` (food-seeking) plus the barrier
   ring and area summary (barrier navigation). Occupancy, the three
@@ -182,14 +185,37 @@ Review 1 (Stage 0, Codex `gpt-6.1-sol` high, read-only, brief and output under
 
 | ID | Status after this run |
 | --- | --- |
-| H1 instrument limit | Split. Scene-sampling noise in four-scene paired selection: not the bottleneck in the sampled founder neighbourhood (E3). Instrument confound: **found**; the food-seeking benefit rung is dominated by abandoning reproduction (E4, E7) |
+| H1 instrument limit | Split. Scene-sampling noise in four-scene paired selection: not the bottleneck in the sampled founder neighbourhood (E3). Instrument confound: a suspected sterility shortcut, supported by association (E4, E7), not isolated causally |
 | H2 exposure | Food and barrier families only; social families need a multi-creature scene kind (finding, T22 candidate) |
-| H3 stepping stones | Not supported at two steps from the plateau (E7: 1 of 512 vs 1 of 512) |
-| H4 incumbent masking / duplication | `copy100` no detectable difference (E5); improvements almost never involve added nodes (E4: 1 of 13) |
+| H3 stepping stones | Prespecified two-step criterion unmet (E7: 1 of 512 vs 1 of 512); one +6.40 two-step gain left as an unresolved lead |
+| H4 incumbent masking / duplication | `copy100` no detectable difference (E5); 1 of 13 improvers had an event targeted at an added node (E4, descriptive) |
 | H5 targeting | Not readable at two-to-three-node genome sizes (E5 `bias0` identical in 8 of 8) |
 | H6 cost | Not run: lab lifetimes of 200 ticks make carrying cost negligible and replication cost is unused in a lab that refuses reproduction (Codex advice 0) |
 | H7 step size | Not run: cut on Codex advice until edge contributions are measured |
-| H8 node boundary | Not implicated: 12 of 13 improvers touch founder nodes only; no prototype built |
+| H8 node boundary | Unresolved: too few improvers on added tissue to test a boundary barrier; no prototype built |
+
+Review 2 (Stages 1–2 and the draft recommendation, Codex `gpt-6.1-sol` high,
+read-only, `.bench-artifacts/lab/exploration/codex/review-2*`):
+
+| # | Finding | Severity | Disposition |
+| --- | --- | --- | --- |
+| 1 | Pooled 1.5 % bound on E4's 0/196 treats clustered children as independent | blocking | Accepted: bound removed, per-parent zeros reported |
+| 2 | "No one-step improvement at all" overstates a sample of mutation applications | blocking | Accepted: reworded to "no improvement observed among the sampled children"; path length left unresolved |
+| 3 | E7 "H3 not supported" hides the +6.40 vs +0.23 magnitudes | blocking | Accepted: criterion reported as unmet, the large gain kept as an unresolved lead |
+| 4 | Sterility shortcut stated as established and dominant | blocking | Accepted: "suspected sterility shortcut", association only; silencing-only, reference-only and restoration diagnostics named as the next check |
+| 5 | Score has no direct reproduction term, so "scored neutrally" is not a repair | blocking | Accepted: the candidate is stated as a behavioural requirement with unvalidated designs |
+| 6 | Leftover "score identically" in E3 | blocking | Accepted: replaced with "zero bank-mean delta" |
+| 7 | Target identity does not show which tissue carries a gain; H8 not excluded | advisory | Accepted: descriptive wording; H8 unresolved |
+| 8 | Arms pass the five checks; built-in controls suffice | advisory | Accepted, no change |
+| 9 | Holdouts sealed; frontier descriptive | advisory | Accepted; "no detectable difference" kept distinct from equivalence |
+| 10 | "More exploration, no mechanism feature" follows | advisory | Accepted; instrument candidate presented as needing validation |
+
+Advice rounds (not reviews): advice 0 redirected Stage 0 to the fixed-pool
+selection audit (E3) and cut H6/H7; advice 2 replaced a second duplication
+cycle with the supply arm (E8) and asked for the sterility counts (E7).
+Review 1 and review 2 cover the end of every stage the run reached; review 2
+was also the "after the fourth cycle" review, run after cycle 8 because of
+the turn budget (a deviation from the plan's cadence, recorded here).
 
 ## Recommendation
 
@@ -198,14 +224,20 @@ feature.** No arm moved reach beyond chance and no recruitment was seen, so
 nothing qualifies as a mechanism feature and the natural-world check was not
 run. The run's main result is about the instrument: the food-seeking assay's
 cheapest selectable gain is to stop attempting reproduction, which the lab
-always refuses at a cost (E4, E7), and the founder architecture has no
-sampled one-step improvement beyond that plateau (E4: 0 of 196). Until the
+always refuses at a cost (E4, E7), and no bank-mean improvement was observed among the 196 sampled children of
+the eight native elites (E4). Until the
 assay cannot be improved by abandoning reproduction, food-seeking reach and
 benefit readings mix sterility with foraging.
 
-1. **T22 feature candidate (instrument):** a food-seeking scene version in
-   which a refused reproduction attempt neither costs the tick nor the
-   penalty, or in which reproduction attempts are scored neutrally, built
+1. **T22 feature candidate (instrument), unvalidated:** a food-seeking
+   instrument version whose behavioural requirement is that abandoning
+   reproduction cannot raise the score. The current score has no direct
+   reproduction term; the effect is indirect (lost foraging ticks, penalty
+   energy, survival), so candidate designs (for example a refused attempt
+   that costs neither the tick nor the penalty) must be checked against
+   that requirement with diagnostic genomes that silence only the reproduce
+   vote, only re-point the references, or restore the signal, kept outside
+   evolving lineages. Built
    under the new-instrument rules (new assay or scorer name, frozen version,
    development set and sealed acceptance set, lab-authored comparator only if
    needed) and calibrated before any arm runs on it. Its first reading
