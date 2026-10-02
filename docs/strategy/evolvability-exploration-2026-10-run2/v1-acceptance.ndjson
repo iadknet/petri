@@ -1,0 +1,10 @@
+{"provenance":{"probe_commit":"4ac9248f","command":"PETRI_E4_ELITES=<run1 base-food-s1/elites> cargo test --release -p v3-lab --test exploration_probe v1_acceptance -- --ignored --exact (read once after the V1 freeze dba17051)","raw_sha256":"4b0530f9eb827b7c95acee60c2564ef4b5509471741a97293eacbd7f05b8b09c","raw":".bench-artifacts/lab/exploration/run2/v1-acceptance.ndjson"}}
+{"delta":0.0,"pair":"founder","probe":"v1-acceptance","silenced":8.796502976190478,"unsilenced":8.796502976190478}
+{"delta":0.0,"pair":"founder+repointed","probe":"v1-acceptance","silenced":9.077752976190476,"unsilenced":9.077752976190476}
+{"delta":0.0,"pair":"founder/ref1","probe":"v1-acceptance","silenced":8.796502976190478,"unsilenced":8.796502976190478}
+{"delta":0.0,"pair":"plateau-restored","probe":"v1-acceptance","silenced":9.077752976190476,"unsilenced":9.077752976190476}
+{"delta":0.0,"pair":"comparator","probe":"v1-acceptance","silenced":40.81427331349206,"unsilenced":40.81427331349206}
+{"delta":0.0,"pair":"native-0","probe":"v1-acceptance","silenced":9.077752976190476,"unsilenced":9.077752976190476}
+{"delta":0.0,"pair":"native-5","probe":"v1-acceptance","silenced":4.926041666666667,"unsilenced":4.926041666666667}
+{"delta":0.0,"pair":"shuffled-score-5","probe":"v1-acceptance","silenced":4.528125,"unsilenced":4.528125}
+{"accepted":true,"max_abs_delta":0.0,"probe":"v1-acceptance-verdict"}
