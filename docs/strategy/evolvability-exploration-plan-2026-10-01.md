@@ -8,7 +8,9 @@ Codex `gpt-6.1-sol` `high` on 2026-10-01 (verdict `not-ready`, 12 blocking,
 6 advisory); round 2 confirmed 17 fixes and reopened baseline identity; round 3 confirmed that fix (verdict `ready`).
 Amended the same day with decision 4 (new instruments); Codex rounds 4–6
 reviewed it (round 4 `not-ready`, 4 blocking and 2 advisory; round 5 fixed
-five and raised one; round 6 verdict `ready`).
+five and raised one; round 6 verdict `ready`). Run 1 closed on 2026-10-01
+([results](evolvability-exploration-2026-10.md)); its continuation is
+[run 2](evolvability-exploration-plan-2026-10-02.md), which amends this plan.
 
 ## Question
 
