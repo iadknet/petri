@@ -23,8 +23,9 @@ use a particular sensor, node or action.
    merges into `main`. The T22 exploration contract records this exception.
 2. One `/goal` run, capped at 150 turns.
 3. Claims are reviewed by Codex `gpt-6.1-sol` at `high`, read-only, through
-   `codex exec`. A fresh read-only `fable` agent stands in while Codex is
-   rate-limited.
+   `codex exec`. Fable is unavailable (credits exhausted): the run uses no
+   Fable advisor, agent or reviewer, and Codex takes every role Fable would
+   have had, including advice before an approach is chosen and when stuck.
 
 ## Starting evidence
 
@@ -292,8 +293,18 @@ Review at the end of every stage, after every fourth cycle, and before the
 note recommends anything. The brief asks for forcing violations against the
 five checks, confounds, missing matched controls, holdout leaks, overclaimed
 n, and alternative explanations. Each finding gets a disposition row in the
-note. On "usage limit", use a fresh read-only general-purpose agent with
-`model: "fable"` and the same brief.
+note.
+
+**Advice.** Where a run would consult an advisor (before committing to a
+stage's approach, when an approach is not converging, before the final
+recommendation), send a short read-only `codex exec` brief with the same
+command instead. Do not enable or call a Fable advisor.
+
+**Usage limit.** If a Codex job fails with "usage limit", keep running
+cycles and mark that review `pending` in the note; retry at the next review
+point. The note recommends nothing until a Codex review of it has completed.
+If Codex is still limited at closing, land the note labelled `unreviewed`
+and report it.
 
 ### Stop and ask only when
 
@@ -332,8 +343,9 @@ Start closing by turn 130, in this order:
 ## Goal command
 
 Open a new session in the main checkout on a clean, current `main`: Opus 5.5,
-effort `medium`, auto mode. Paste:
+effort `medium`, auto mode. Do not run `/advisor fable`; if the startup notice
+shows a Fable advisor on, turn it off. Paste:
 
 ```
-/goal An evolvability exploration run is complete on main. Read docs/strategy/evolvability-exploration-plan-2026-10-01.md first and follow it exactly; it is the run's contract, and the T22 exploration contract in docs/roadmaps/t22-capability-assays-and-evolvability-lab.md governs anything it does not cover. Confirm you are in the main checkout on a clean main, record the launch revision, create the worktree with EnterWorktree named evolvability-exploration, and read every starting-evidence document in full. Run research, predeclare, build, run, read, record cycles through the plan's stages without pausing to ask, except where the plan says to stop. Every arm must pass the plan's five not-forcing checks, matched controls and claim rules; the frontier table stays descriptive. Prototypes stay on the experiment branch as default-off proto commits classified policy-deviation and never merge. Commit the ledger and results note every cycle. Run the Codex reviews through codex exec as the plan says and record each finding's disposition. Begin closing by turn 130 in the plan's close order. Done means all of these are shown in this conversation, with command output and the note's ledger, frontier table and recommendation quoted, not only file paths: docs/strategy/evolvability-exploration-2026-10.md is on main with at least six completed (not incomplete) experiments, the frontier table, review dispositions and a recommendation; make check or make check-docs exited 0 on main; git worktree list no longer lists the worktree and git branch still lists its branch; git status on main is clean. If a concrete blocker stops the run, record it in the results note, land the note as above, report it, and stop. Stop after 150 turns.
+/goal An evolvability exploration run is complete on main. Read docs/strategy/evolvability-exploration-plan-2026-10-01.md first and follow it exactly; it is the run's contract, and the T22 exploration contract in docs/roadmaps/t22-capability-assays-and-evolvability-lab.md governs anything it does not cover. Confirm you are in the main checkout on a clean main, record the launch revision, create the worktree with EnterWorktree named evolvability-exploration, and read every starting-evidence document in full. Run research, predeclare, build, run, read, record cycles through the plan's stages without pausing to ask, except where the plan says to stop. Every arm must pass the plan's five not-forcing checks, matched controls and claim rules; the frontier table stays descriptive. Prototypes stay on the experiment branch as default-off proto commits classified policy-deviation and never merge. Commit the ledger and results note every cycle. Run the Codex reviews and advice through codex exec as the plan says, use no Fable advisor or agent, and record each finding's disposition. Begin closing by turn 130 in the plan's close order. Done means all of these are shown in this conversation, with command output and the note's ledger, frontier table and recommendation quoted, not only file paths: docs/strategy/evolvability-exploration-2026-10.md is on main with at least six completed (not incomplete) experiments, the frontier table, review dispositions and a recommendation; make check or make check-docs exited 0 on main; git worktree list no longer lists the worktree and git branch still lists its branch; git status on main is clean. If a concrete blocker stops the run, record it in the results note, land the note as above, report it, and stop. Stop after 150 turns.
 ```
