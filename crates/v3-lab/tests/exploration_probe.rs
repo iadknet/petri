@@ -154,3 +154,93 @@ fn e3_fixed_pool_selection_audit() {
         }
     }
 }
+
+/// E4, elite neighbourhood audit (H3, H4, H8). Parents: the founder and the
+/// final elites of a stored campaign (`PETRI_E4_ELITES`, an `elites/`
+/// directory). Each parent gets 96 children scored on the E3 bank against the
+/// parent; improvers are tallied by applied operator and by whether the
+/// event's target node is a founder node (ids 0 and 1) or one added later.
+#[test]
+#[ignore = "exploration probe; minutes in release"]
+fn e4_elite_neighbourhood_audit() {
+    const CHILDREN: u64 = 96;
+    let setup = setup();
+    let founder =
+        founder_genome_with_age_gate(setup.config.population.founder_profile, &setup.config.energy.lifecycle);
+    let bank = scenes(0xE3_BA_4C, 32, &setup);
+    let batch = scenes(0xE4_A0_00, 4, &setup);
+    let food_types = setup.config.world.food.types.len();
+    let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
+    let mut parents: Vec<(String, CreatureGenome)> = vec![("founder".into(), founder.clone())];
+    for arm in ["native", "shuffled-score"] {
+        for r in 0..8 {
+            let path = format!("{dir}/{arm}-{r}.json");
+            let file: v3_lab::GenomeFile =
+                serde_json::from_str(&std::fs::read_to_string(&path).expect("elite")).expect("genome file");
+            parents.push((format!("{arm}-{r}"), file.genome));
+        }
+    }
+    let mut out = out_file();
+    for (name, parent) in &parents {
+        let reachable = mesh_reachable_nodes(parent);
+        let parent_bank = scores(&setup, parent, &bank);
+        let frozen: Frozen = evaluate_genome(&setup, parent, batch.last().unwrap()).1;
+        let kids: Vec<(bool, f64, Vec<String>, Vec<bool>)> = (0..CHILDREN)
+            .into_par_iter()
+            .map(|i| {
+                let mut child = parent.clone();
+                let mut rng = SmallRng::seed_from_u64(0xE4_C0_0000 + i);
+                let summary = MutationEngine::apply_mutations_with_food_type_count(
+                    &mut child,
+                    &setup.config.mutation,
+                    &reachable,
+                    ParentExecuted::Record(&frozen.record, frozen.age),
+                    &mut rng,
+                    food_types,
+                );
+                let ops: Vec<String> = summary
+                    .events
+                    .iter()
+                    .filter(|e| format!("{:?}", e.outcome).starts_with("Applied"))
+                    .map(|e| e.operator.map_or("none".into(), |o| format!("{o:?}")))
+                    .collect();
+                let founder_target: Vec<bool> = summary
+                    .events
+                    .iter()
+                    .filter(|e| format!("{:?}", e.outcome).starts_with("Applied"))
+                    .map(|e| e.target.is_some_and(|t| t.0 <= 1))
+                    .collect();
+                if child == *parent {
+                    return (true, 0.0, ops, founder_target);
+                }
+                let d: Vec<f64> = scores(&setup, &child, &bank).iter().zip(&parent_bank).map(|(c, p)| c - p).collect();
+                (false, mean(&d), ops, founder_target)
+            })
+            .collect();
+        let changed: Vec<_> = kids.iter().filter(|k| !k.0).collect();
+        let improved: Vec<_> = changed.iter().filter(|k| k.1 > 0.0).collect();
+        let mut ops_improved: BTreeMap<String, usize> = BTreeMap::new();
+        for k in &improved {
+            for o in &k.2 {
+                *ops_improved.entry(o.clone()).or_default() += 1;
+            }
+        }
+        let improved_founder_only = improved.iter().filter(|k| !k.3.is_empty() && k.3.iter().all(|b| *b)).count();
+        let improved_new_node = improved.iter().filter(|k| k.3.iter().any(|b| !b)).count();
+        let row = json!({
+            "probe": "e4", "parent": name, "nodes": parent.nodes.len(), "genome_size": parent.genome_size(),
+            "parent_bank_mean": mean(&parent_bank), "children": CHILDREN, "changed": changed.len(),
+            "bank_silent": changed.iter().filter(|k| k.1 == 0.0).count(),
+            "improved": improved.len(), "worse": changed.iter().filter(|k| k.1 < 0.0).count(),
+            "improved_gt1": improved.iter().filter(|k| k.1 > 1.0).count(),
+            "max_gain": improved.iter().map(|k| k.1).fold(0.0_f64, f64::max),
+            "improved_targets_founder_nodes_only": improved_founder_only,
+            "improved_touch_added_node": improved_new_node,
+            "ops_improved": ops_improved,
+        });
+        println!("{row}");
+        if let Some(f) = out.as_mut() {
+            writeln!(f, "{row}").unwrap();
+        }
+    }
+}
