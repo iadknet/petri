@@ -6,6 +6,9 @@ no experiment run yet, no production source, default or founder changed.
 The run writes its results to a separate note, named below. Reviewed by
 Codex `gpt-6.1-sol` `high` on 2026-10-01 (verdict `not-ready`, 12 blocking,
 6 advisory); round 2 confirmed 17 fixes and reopened baseline identity; round 3 confirmed that fix (verdict `ready`).
+Amended the same day with decision 4 (new instruments); Codex rounds 4–6
+reviewed it (round 4 `not-ready`, 4 blocking and 2 advisory; round 5 fixed
+five and raised one; round 6 verdict `ready`).
 
 ## Question
 
@@ -26,6 +29,14 @@ use a particular sensor, node or action.
    `codex exec`. Fable is unavailable (credits exhausted): the run uses no
    Fable advisor, agent or reviewer, and Codex takes every role Fable would
    have had, including advice before an approach is chosen and when stuck.
+4. The run may design new instruments: assays, scene kinds, scorers,
+   relevant-site predicates and lab-authored comparators. Those inside the
+   ordinary exploration scope are `lab:` commits and may reach `main` as
+   exploration data; the harness-core changes an instrument needs are
+   `instr:` commits and stay on the branch. A lab-authored comparator on
+   `main` stays exploration data: making it an assay's built-in default, or
+   landing any `instr:` change, is a T22 feature. The T22 exploration
+   contract records this exception with decision 1.
 
 ## Starting evidence
 
@@ -120,10 +131,14 @@ build: `npm ci` in `frontend/`, `aqua policy allow` if prompted, at least
 - `docs:` commits: notes in `docs/strategy/`.
 - `proto:` commits: mechanism prototypes in `v3-core` or other production
   crates, observation adapters, telemetry exports, and the harness-core
-  changes needed to run and classify prototypes. Nothing else. The
-  lab/production boundary holds on the branch too: no production crate
-  depends on `v3-lab`, and no lab arena, scorer or selection code moves into
-  a production crate.
+  changes needed to run and classify prototypes.
+- `instr:` commits: the harness-core changes a new instrument needs (scene
+  kinds, formats, a built-in comparator, ladder predicates), under the
+  new-instrument rules below.
+
+Nothing else. The lab/production boundary holds on the branch too: no
+production crate depends on `v3-lab`, and no lab arena, scorer or selection
+code moves into a production crate.
 
 A prototype sits behind a new config field whose default reproduces `main`,
 and an arm selects it by overlay. The lab's automatic classification compares
@@ -132,9 +147,67 @@ first `proto:` commit extends it: any arm that enables a prototype field is
 `policy-deviation` in rows, summaries and verdicts, with a fixture for a
 non-mutation prototype.
 
+**New instruments.** The run may add an assay, scene kind, scorer,
+relevant-site predicate or comparator when a ledger row first names the open
+hypothesis it serves and the family or capability it exposes. Multi-creature
+scenes are out of scope for this run: the harness credits simulation-wide
+counters to the evaluated genome (`crates/v3-lab/src/eval.rs`), so a
+companion's success would count as the focal creature's. Social families
+are recorded as a finding, with a multi-creature scene kind as a T22 feature
+candidate.
+
+- *Behavior, not implementation.* A scorer grades only applied behavior in
+  the scene (food eaten, moves and action results, energy, position, death
+  tick), never node count, sensor reads, execution or any other internal
+  trait. Relevant-site predicates and brain readings are observation-only
+  and never feed selection. An instrument leaves the native mutation engine,
+  the selection rule and the evaluation start and lifetime unchanged, and no
+  trial is accepted, retried or weighted by observed behavior beyond the
+  lab's existing selection rule. An instrument is a measuring tool, not a
+  mechanism arm: it may name the scene, family and scorer it measures, and
+  not-forcing checks 1, 2 and 5 do not apply to it. What it adds never
+  reaches an evolving creature: no authored wiring, correspondence, founder
+  change or subsidy enters a start, a genome or the variation, and a
+  comparator's authored wiring stays inside the comparator.
+- *Versions.* An instrument version is its scene kind and geometry, scorer,
+  relevant-site predicate, comparator, calibration margin and
+  grid-selection rule, named and content-hashed in the ledger and frozen
+  before calibration. Any change to any part is a new version. At most two
+  versions per instrument.
+- *Comparator.* A new assay's comparator may be lab-authored: a
+  `--comparator` genome file (a `lab:` commit) or a new built-in in
+  `crates/v3-lab/src/comparator.rs` (an `instr:` commit, because comparators
+  are controls). It is labelled `lab-authored` in rows, summaries and the
+  note. It is a Petri genome run by the ordinary tick loop, so it senses only
+  through creature inputs and acts only through creature actions. It never
+  starts a lineage, enters selection or seeds an arm.
+- *Calibration.* The gate and the `uncalibrated` disposition apply
+  unchanged. Each version draws, when it is declared, a development set
+  (calibration scenes, usable while building) and a sealed acceptance set of
+  held-out scenes, read once, after the version is frozen. Failing
+  acceptance makes that version `uncalibrated` for good; there is no retry
+  against the same set, and a second version needs a fresh sealed set. The
+  note reports every version and its outcome. Only a calibrated version
+  yields reach or recruitment evidence; an uncalibrated one yields
+  exposure-rung readings only.
+- *Existing measurements stay fixed.* An `instr:` commit never changes an
+  existing assay's scoring, predicates, ablations, controls or readings; new
+  behavior lives under a new assay, arena, scorer or comparator name. After
+  each `instr:` commit, rerun every stored combination on the launch
+  revision plus the run's `lab:` and `instr:` commits, without `proto:`, and
+  require all three baseline hashes to match; log the check.
+- *Dependencies.* An instrument version's commits build and run on the
+  launch revision without any `proto:` commit; a prototype is compared only
+  on that same frozen version. Where this cannot be shown, the prototype's
+  evidence on that instrument is rejected.
+- *No assay shopping.* A version is calibrated and its baseline taken before
+  any prototype arm runs on it. A version declared or revised after a
+  prototype's results were read cannot be one of that prototype's two
+  assays for a *promising* claim.
+
 **Baseline identity.** Before any edit, at the launch revision, run every
 assay and settings combination the run will compare (seed, sizes, assay,
-arena) and store two sha256 hashes under
+arena) and store three sha256 hashes under
 `.bench-artifacts/lab/exploration/baseline/`:
 
 - the reference arm's NDJSON rows, which are byte-identical for a seed by
@@ -144,14 +217,17 @@ arena) and store two sha256 hashes under
   the seeds and resolved config digest, without the `timing` block
   (`wall_seconds`, `per_creature_tick_ms`), the source revision, the dirty
   state and the other arms. The first cycle writes the projection as a
-  `jq` filter stored beside the hashes and uses it unchanged after that.
+  `jq` filter stored beside the hashes and uses it unchanged after that;
+- every arm's NDJSON rows, controls included, plus the summary projection
+  widened to every arm (reach results, fidelity and ladder verdicts), with
+  timing fields removed; used for the `instr:` check above.
 
-Before a prototype arm is read, both hashes for the same combination must
-match. A combination added later gets its baseline from a temporary checkout
+Before a prototype arm is read, the first two hashes for the same
+combination must match. A combination added later gets its baseline from a temporary checkout
 of the launch revision. A new instrument (scene kind, scorer, assay) did not
-exist at launch, so its baseline is taken with its reviewed `lab:` commits
-applied to the launch revision and no `proto:` commit, before any prototype
-arm uses it.
+exist at launch, so its baseline is taken with its frozen version's `lab:`
+and `instr:` commits applied to the launch revision and no `proto:` commit,
+before any prototype arm uses it.
 
 **Branch verification.** Use TDD for prototype behavior and `$rust-skills`
 for Rust. When a prototype touches founder behavior or tick-loop mechanics,
@@ -277,8 +353,9 @@ turn 105 so confirmation is not squeezed out by more exploration.
 H2 is bounded: layout files hold only empty cells, barriers, food and one
 solo start, and the ladder knows food and barrier families. Another family
 needs new lab instrumentation (scene kind, scorer, relevant-site predicate);
-take on at most one in Stage 0, and record families that solo evaluation
-cannot expose (social ones) as a finding, not a gap to paper over.
+take on at most one in Stage 0. Later stages may add more under the
+new-instrument rules. Families that solo evaluation cannot expose (social
+ones) are recorded as a finding, not a gap to paper over.
 
 ### Review
 
@@ -335,7 +412,8 @@ Start closing by turn 130, in this order:
 3. Recheck `main`: if another session advanced or dirtied it since launch,
    follow the workflow's stop-and-report rule.
 4. Cherry-pick the `docs:` commits and every `lab:` commit that builds
-   without `proto:` changes; leave the rest on the branch.
+   without `proto:` or `instr:` changes; leave the rest on the branch. The
+   note lists `instr:` commits worth keeping as T22 feature candidates.
 5. Run `make check` if a `lab:` commit landed, else `make check-docs`.
 6. Record the branch name from `git worktree list`, remove the worktree, and
    keep the branch.
@@ -347,5 +425,5 @@ effort `medium`, auto mode. Do not run `/advisor fable`; if the startup notice
 shows a Fable advisor on, turn it off. Paste:
 
 ```
-/goal An evolvability exploration run is complete on main. Read docs/strategy/evolvability-exploration-plan-2026-10-01.md first and follow it exactly; it is the run's contract, and the T22 exploration contract in docs/roadmaps/t22-capability-assays-and-evolvability-lab.md governs anything it does not cover. Confirm you are in the main checkout on a clean main, record the launch revision, create the worktree with EnterWorktree named evolvability-exploration, and read every starting-evidence document in full. Run research, predeclare, build, run, read, record cycles through the plan's stages without pausing to ask, except where the plan says to stop. Every arm must pass the plan's five not-forcing checks, matched controls and claim rules; the frontier table stays descriptive. Prototypes stay on the experiment branch as default-off proto commits classified policy-deviation and never merge. Commit the ledger and results note every cycle. Run the Codex reviews and advice through codex exec as the plan says, use no Fable advisor or agent, and record each finding's disposition. Begin closing by turn 130 in the plan's close order. Done means all of these are shown in this conversation, with command output and the note's ledger, frontier table and recommendation quoted, not only file paths: docs/strategy/evolvability-exploration-2026-10.md is on main with at least six completed (not incomplete) experiments, the frontier table, review dispositions and a recommendation; make check or make check-docs exited 0 on main; git worktree list no longer lists the worktree and git branch still lists its branch; git status on main is clean. If a concrete blocker stops the run, record it in the results note, land the note as above, report it, and stop. Stop after 150 turns.
+/goal An evolvability exploration run is complete on main. Read docs/strategy/evolvability-exploration-plan-2026-10-01.md first and follow it exactly; it is the run's contract, and the T22 exploration contract in docs/roadmaps/t22-capability-assays-and-evolvability-lab.md governs anything it does not cover. Confirm you are in the main checkout on a clean main, record the launch revision, create the worktree with EnterWorktree named evolvability-exploration, and read every starting-evidence document in full. Run research, predeclare, build, run, read, record cycles through the plan's stages without pausing to ask, except where the plan says to stop. Every arm must pass the plan's five not-forcing checks, matched controls and claim rules; the frontier table stays descriptive. Prototypes stay on the experiment branch as default-off proto commits classified policy-deviation and never merge; harness changes for new instruments are instr commits that never merge either, and new assays and lab-authored comparators follow the plan's new-instrument rules. Commit the ledger and results note every cycle. Run the Codex reviews and advice through codex exec as the plan says, use no Fable advisor or agent, and record each finding's disposition. Begin closing by turn 130 in the plan's close order. Done means all of these are shown in this conversation, with command output and the note's ledger, frontier table and recommendation quoted, not only file paths: docs/strategy/evolvability-exploration-2026-10.md is on main with at least six completed (not incomplete) experiments, the frontier table, review dispositions and a recommendation; make check or make check-docs exited 0 on main; git worktree list no longer lists the worktree and git branch still lists its branch; git status on main is clean. If a concrete blocker stops the run, record it in the results note, land the note as above, report it, and stop. Stop after 150 turns.
 ```
