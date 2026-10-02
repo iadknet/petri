@@ -1,0 +1,27 @@
+{
+  "launch_revision": "ce40054dca9d68e0286755074a772a7cd510e5c1",
+  "binary": "target/release/v3-lab built from the launch revision, no edits",
+  "method": {
+    "reference_rows": "jq -c 'select(.arm==\"native\")' rows.ndjson | sha256",
+    "summary_projection": "jq -S -f baseline-projection.jq summary.json | sha256",
+    "all_arms": "sha256 of rows.ndjson followed by jq -S -f baseline-projection-all.jq summary.json"
+  },
+  "combinations": {
+    "food-seed1": {
+      "command": "v3-lab run --assay food-seeking --quick --replicates 8 --food-fraction 0.04 --lifetime 200 --seed 1",
+      "reference_rows": "48fcfe2c09ebf918356b28c5632e757f4e693f0e658c5314778cdc7e5d0dfdcc",
+      "summary_projection": "797814a36d98064967c9d63912365d735f65ded706a663f7cf48934c9cb0268d",
+      "all_arms": "1c7d119525fcafd280b04a73f2d7f762cb2c66be28e515d2ec63712fd8b85da4"
+    },
+    "wall-seed1": {
+      "command": "v3-lab run --assay barrier-navigation --quick --replicates 8 --scale 2 --lifetime 200 --seed 1",
+      "reference_rows": "5b0b7948170c8176f225eab512bf54b5d71d9a9eba186bf8f8bcb804a8147090",
+      "summary_projection": "8560ac5f395597641f799e029c71b561d58358126d9f06b9b46991ad56879b29",
+      "all_arms": "412ce1e530d1b794397a9af9db94cccf1934a7716d7a51cf1678fe2690bfcd17"
+    }
+  },
+  "holdout_reserved_not_read": {
+    "food": "seed 101, same sizes as food-seed1",
+    "wall": "seed 102, same sizes as wall-seed1"
+  }
+}
