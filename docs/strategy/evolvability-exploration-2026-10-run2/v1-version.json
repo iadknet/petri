@@ -1,0 +1,35 @@
+{
+  "version": "food-seeking V1 (run 2 repaired food-seeking instrument, rule R4)",
+  "frozen_at_commit": "0328335e",
+  "assay": "food-seeking",
+  "arena": "sparse-food-v1",
+  "arena_size": 64,
+  "food_fraction": 0.04,
+  "lifetime": 200,
+  "start_energy": 20.0,
+  "energy_ceiling": 20.0,
+  "scorer": "Scoring::BITES_AND_PROGRESS (unchanged)",
+  "relevant_site_predicate": "food-seeking families FoodHere, NeighborFoodRing, AreaFoodSummary (unchanged)",
+  "comparator": "built-in area_food(founder), lab-authored controller (unchanged)",
+  "calibration_margin": 1.0,
+  "grid_selection_rule": "unchanged (single point: --food-fraction 0.04 --lifetime 200)",
+  "command": "v3-lab run --assay food-seeking --food-fraction 0.04 --lifetime 200 --start-energy 20 --energy-ceiling 20 [--quick --replicates N --seed S ...]",
+  "harness_blobs_at_freeze": {
+    "crates/v3-lab/src/eval.rs": "45afba2c4f8f3d9ee9e4885f39f02954cd1bd3ac",
+    "crates/v3-lab/src/run.rs": "41c456205bcd6a3507de41c55ac30ba8817a449b",
+    "crates/v3-lab/src/calibration.rs": "6bf41aae26766b2c738e99f60cf01645ccefe7bb",
+    "crates/v3-lab/src/comparator.rs": "44b4f9f37d5890115f7b2bd233bfcdf7f2c7a6b3",
+    "crates/v3-lab/src/scene.rs": "5b25ed884a034d3e7ddd08228f2c54451479adf8"
+  },
+  "development_set": "P2 food bank (32 sparse scenes, seed 0xE3BA4C) plus the gate's calibration scenes",
+  "development_checks": {
+    "validation_pairs_max_abs_delta": 0.0,
+    "comparator_pair_delta": 0.0,
+    "harness_equals_probe_max_abs_diff": 0.0,
+    "calibration_seed1": {"verdict": "calibrated", "reach_threshold": 22.341666666666665, "founder": 8.708333333333334, "floor": 1.3333333333333333, "comparator": 43.35},
+    "calibration_seed2": {"verdict": "calibrated", "reach_threshold": 19.930555555555554, "founder": 6.520833333333333, "floor": 1.3333333333333333, "comparator": 38.52777777777778},
+    "instr_baseline_hash_check": "food-seed1 and wall-seed1: all three hashes equal the launch baseline"
+  },
+  "sealed_acceptance_set": "32 sparse scenes, seed 0xACCEF00D, read once after this freeze",
+  "acceptance_rule": "every P2 food pair and the comparator pair within m = 0.5"
+}

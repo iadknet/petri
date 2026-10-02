@@ -1,0 +1,4 @@
+{"provenance":{"probe_commit":"4ac9248f","command":"cargo test --release -p v3-lab --test exploration_probe p2c_barrier_comparator_silencing -- --ignored --exact","raw_sha256":"dcf0595365936edd428cbf9c649c1dddd0a5277975d747088abb070a1bce8f7a","raw":".bench-artifacts/lab/exploration/run2/p2c.ndjson"}}
+{"deaths":[32,32],"delta":0.00848896434634483,"passes":true,"probe":"p2c","rule":"Base","silenced":10.394404572036148,"unsilenced":10.385915607689803}
+{"deaths":[32,32],"delta":0.0,"passes":true,"probe":"p2c","rule":"Ceiling20","silenced":7.872474747474747,"unsilenced":7.872474747474747}
+{"deaths":[0,0],"delta":0.0,"passes":true,"probe":"p2c","rule":"Held20","silenced":10.394404572036148,"unsilenced":10.394404572036148}

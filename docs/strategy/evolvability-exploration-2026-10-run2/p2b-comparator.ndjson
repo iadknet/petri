@@ -1,0 +1,5 @@
+{"provenance":{"probe_commit":"1ef87f26","command":"cargo test --release -p v3-lab --test exploration_probe p2b_comparator_silencing -- --ignored --exact","raw_sha256":"aebd4ff0894bf575a6fef98370894905dd7b2e750ce4598966be06c1418c7e75","raw":".bench-artifacts/lab/exploration/run2/p2b.ndjson"}}
+{"deaths":[31,0],"delta":16.40564236111112,"food":[913,1441],"passes":false,"probe":"p2b","rule":"Base","silenced":45.45735367063493,"unsilenced":29.05171130952381}
+{"deaths":[32,6],"delta":7.70750248015873,"food":[1182,1434],"passes":false,"probe":"p2b","rule":"Start20","silenced":45.23599950396826,"unsilenced":37.52849702380953}
+{"deaths":[32,32],"delta":0.0,"food":[1245,1245],"passes":true,"probe":"p2b","rule":"Ceiling20","silenced":39.411681547619054,"unsilenced":39.411681547619054}
+{"deaths":[0,0],"delta":0.0,"food":[1441,1441],"passes":true,"probe":"p2b","rule":"Held20","silenced":45.45735367063493,"unsilenced":45.45735367063493}

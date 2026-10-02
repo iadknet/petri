@@ -34,6 +34,12 @@ fn setup() -> Setup {
     Setup::new(arena_config(SIZE), START_ENERGY, LIFETIME)
 }
 
+/// The E3, E4 and E7 setup (run 1's; run 2's withdrawn V1 variant lives on
+/// the exploration branch).
+fn probe_setup() -> Setup {
+    setup()
+}
+
 fn scenes(seed: u64, n: usize, setup: &Setup) -> Vec<Scene> {
     let spec = SceneSpec::sparse(
         SIZE,
@@ -83,7 +89,7 @@ fn e3_fixed_pool_selection_audit() {
     const POOLS: u64 = 8;
     const POOL: usize = 64;
     const KEEP: usize = 16;
-    let setup = setup();
+    let setup = probe_setup();
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
@@ -236,7 +242,7 @@ fn e3_fixed_pool_selection_audit() {
 #[ignore = "exploration probe; minutes in release"]
 fn e4_elite_neighbourhood_audit() {
     const CHILDREN: u64 = 96;
-    let setup = setup();
+    let setup = probe_setup();
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
@@ -356,13 +362,14 @@ fn child_of(setup: &Setup, parent: &CreatureGenome, frozen: &Frozen, seed: u64) 
 #[test]
 #[ignore = "exploration probe; minutes in release"]
 fn e7_two_step_and_sterility() {
-    let setup = setup();
+    let setup = probe_setup();
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
     );
     let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
-    let plateau = elite(&dir, "native-1");
+    let parent = std::env::var("PETRI_E7_PARENT").unwrap_or_else(|_| "native-1".into());
+    let plateau = elite(&dir, &parent);
     let bank = scenes(0xE3_BA_4C, 32, &setup);
     let batch = scenes(0xE4_A0_00, 4, &setup);
     for (name, g) in [("founder", &founder), ("plateau", &plateau)] {
@@ -610,6 +617,20 @@ enum Rule {
     Ceiling20,
     /// R5: start 20, energy reset to 20 after every tick.
     Held20,
+    /// R6 (plan designs 2 + 3 within the fixed lifetime): refused-reproduce
+    /// penalty refunded, score graded per foraging opportunity (scaled by
+    /// lifetime over the ticks without a reproduce attempt).
+    RateRefund,
+    /// R7 (plan designs 1 + 2 within the fixed lifetime): reproduction
+    /// accepted, offspring removed at birth, score graded per foraging
+    /// opportunity as R6.
+    RateAccept,
+    /// R6b (P2e): R6 with every failed-action penalty zero in the config, so
+    /// a reproduce attempt is never charged (exact for genomes whose only
+    /// failed actions are reproduce attempts).
+    RateZero,
+    /// R6c (P2e): R6b with only food scaled per opportunity (progress kept).
+    RateZeroFood,
 }
 
 impl Rule {
@@ -623,25 +644,43 @@ impl Rule {
     ];
     fn start(self) -> f32 {
         match self {
-            Self::Base | Self::RefundPause | Self::AcceptPause => START_ENERGY,
+            Self::Base
+            | Self::RefundPause
+            | Self::AcceptPause
+            | Self::RateRefund
+            | Self::RateAccept
+            | Self::RateZero
+            | Self::RateZeroFood => START_ENERGY,
             Self::Start20 | Self::Ceiling20 | Self::Held20 => 20.0,
         }
     }
     fn paused(self) -> bool {
         matches!(self, Self::RefundPause | Self::AcceptPause)
     }
+    fn rate(self) -> bool {
+        matches!(
+            self,
+            Self::RateRefund | Self::RateAccept | Self::RateZero | Self::RateZeroFood
+        )
+    }
+    fn accepts(self) -> bool {
+        matches!(self, Self::AcceptPause | Self::RateAccept)
+    }
+    fn refunds(self) -> bool {
+        matches!(self, Self::RefundPause | Self::RateRefund)
+    }
 }
 
 /// One scene under `rule`: the lab evaluation loop (`eval.rs`) with the
 /// rule's hooks, scored as `Tally::finish` scores. Returns (score, food,
-/// died, paused ticks).
+/// died, paused or reproduce-attempt ticks, births, refused reproductions).
 #[allow(clippy::too_many_lines)]
 fn eval_rule(
     setup: &Setup,
     genome: &CreatureGenome,
     scene: &Scene,
     rule: Rule,
-) -> (f64, u32, bool, u32) {
+) -> (f64, u32, bool, u32, u64, u64) {
     use slotmap::SlotMap;
     use v3_core::contracts::{CreatureId, OrdinaryFoodTypeId};
     use v3_core::creature::action_log::ActionType;
@@ -653,11 +692,15 @@ fn eval_rule(
     use v3_lab::geodesic::Terrain;
     const FOOD: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
     let mut config = setup.config.clone();
-    if rule == Rule::AcceptPause {
+    if rule.accepts() {
         config.energy.lifecycle.min_reproduce_energy = v3_lab::arena::production_defaults()
             .energy
             .lifecycle
             .min_reproduce_energy;
+    }
+    if matches!(rule, Rule::RateZero | Rule::RateZeroFood) {
+        config.energy.costs.failed_action_penalty = 0.0;
+        config.startup.ramps.failed_action_penalty.end = 0.0;
     }
     let size = config.world.width;
     let mut world = WorldState::new(size, size, config.world.edge_mode);
@@ -712,9 +755,12 @@ fn eval_rule(
         setup.lifetime
     };
     let mut before = read(&sim);
+    let births_before = sim.stats.reproduction_actions_spawned_total;
+    let refused_before = sim.stats.reproduction_actions_rejected_total;
     while counted < setup.lifetime && world_ticks < cap {
         let attempts =
             sim.creatures[id].lifetime_actions_attempted_by_type[ActionType::Reproduce as usize];
+        let attempts_total = sim.stats.reproduction_actions_attempted_total;
         run_tick(&mut sim, &mut None);
         world_ticks += 1;
         let now = read(&sim);
@@ -724,7 +770,7 @@ fn eval_rule(
         blocked += now.2 - before.2;
         let penalty = now.3 - before.3;
         before = now;
-        if rule == Rule::AcceptPause {
+        if rule.accepts() {
             let others: Vec<CreatureId> = sim.creatures.keys().filter(|k| *k != id).collect();
             for other in others {
                 let at = sim.creatures[other].position;
@@ -738,11 +784,15 @@ fn eval_rule(
             if bites > 0 && first.is_none() {
                 first = Some(counted + 1);
             }
+            // A death tick with a reproduce attempt is not an opportunity.
+            if rule.rate() && sim.stats.reproduction_actions_attempted_total > attempts_total {
+                paused += 1;
+            }
             break;
         };
         let attempted =
             creature.lifetime_actions_attempted_by_type[ActionType::Reproduce as usize] > attempts;
-        if rule == Rule::RefundPause && attempted {
+        if rule.refunds() && attempted {
             #[allow(clippy::cast_possible_truncation)]
             let refund = penalty as f32;
             creature.energy =
@@ -757,6 +807,9 @@ fn eval_rule(
             paused += 1;
         } else {
             counted += 1;
+            if rule.rate() && attempted {
+                paused += 1;
+            }
         }
         if bites > 0 && first.is_none() {
             first = Some(counted.max(1));
@@ -776,11 +829,175 @@ fn eval_rule(
     } else {
         blocked as f64 / moves as f64
     };
-    let score = f64::from(food)
-        + progress.value(scoring.exhausted)
+    let rest = progress.value(scoring.exhausted)
         + scoring.efficiency_weight * efficiency(progress.d_start(), first)
         - scoring.blocked_weight * blocked_fraction;
-    (score, food, died, paused)
+    let mut score = f64::from(food) + rest;
+    if rule.rate() {
+        // Per foraging opportunity: the lifetime's ticks without a reproduce
+        // attempt (ticks after a death stay opportunities, scored zero).
+        let opportunities = (setup.lifetime - paused).max(1);
+        let scale = f64::from(setup.lifetime) / f64::from(opportunities);
+        score = if rule == Rule::RateZeroFood {
+            f64::from(food) * scale + rest
+        } else {
+            score * scale
+        };
+    }
+    (
+        score,
+        food,
+        died,
+        paused,
+        sim.stats.reproduction_actions_spawned_total - births_before,
+        sim.stats.reproduction_actions_rejected_total - refused_before,
+    )
+}
+
+/// P2e (after advice 1): the lifetime-preserving rules on reproduction-active
+/// genomes with exact zero charging (R6b), food-only scaling (R6c), and R7's
+/// births and refusals reported; the plateau pair isolates silencing.
+#[test]
+#[ignore = "exploration probe; about a minute in release"]
+fn p2e_exact_zero_charge() {
+    let setup = setup();
+    let founder = founder_genome_with_age_gate(
+        setup.config.population.founder_profile,
+        &setup.config.energy.lifecycle,
+    );
+    let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
+    let comparator = v3_lab::comparator::area_food(&founder);
+    let restored_plateau = restored(&elite(&dir, "native-1"));
+    let pair = |name: &str, g: CreatureGenome| (name.to_string(), silenced(&g), g);
+    let pairs = [
+        pair("founder", founder.clone()),
+        pair("founder@0.08", gate_lowered(&founder, 0.08)),
+        pair("founder@0.05", gate_lowered(&founder, 0.05)),
+        pair("comparator", comparator.clone()),
+        pair("comparator@0.05", gate_lowered(&comparator, 0.05)),
+        pair("shuffled-score-5", elite(&dir, "shuffled-score-5")),
+        pair("restored-plateau", restored_plateau),
+    ];
+    let bank = scenes(0xE3_BA_4C, 32, &setup);
+    let mut out = out_file();
+    for rule in [
+        Rule::RateRefund,
+        Rule::RateZero,
+        Rule::RateZeroFood,
+        Rule::RateAccept,
+    ] {
+        let eval = |g: &CreatureGenome| {
+            let r: Vec<_> = bank
+                .par_iter()
+                .map(|sc| eval_rule(&setup, g, sc, rule))
+                .collect();
+            (
+                r.iter().map(|x| x.0).sum::<f64>() / r.len() as f64,
+                r.iter().map(|x| x.3).sum::<u32>(),
+                r.iter().map(|x| x.4).sum::<u64>(),
+                r.iter().map(|x| x.5).sum::<u64>(),
+                r.iter().filter(|x| x.2).count(),
+            )
+        };
+        let rows: Vec<serde_json::Value> = pairs
+            .iter()
+            .map(|(name, quiet, active)| {
+                let (a, attempt_ticks, births, refused, ad) = eval(active);
+                let (q, _, _, _, qd) = eval(quiet);
+                json!({"pair": name, "active": a, "silenced": q, "delta": q - a,
+                    "attempt_ticks": attempt_ticks, "births": births, "refused": refused,
+                    "deaths": [ad, qd]})
+            })
+            .collect();
+        let max_abs = rows
+            .iter()
+            .map(|r| r["delta"].as_f64().unwrap().abs())
+            .fold(0.0_f64, f64::max);
+        let row = json!({"probe": "p2e", "rule": format!("{rule:?}"), "max_abs_delta": max_abs,
+            "passes": max_abs <= 0.5, "pairs": rows});
+        println!("{row}");
+        if let Some(f) = out.as_mut() {
+            writeln!(f, "{row}").unwrap();
+        }
+    }
+}
+
+/// The founder (or another genome) with node 0's energy gate threshold set
+/// to `threshold` (a diagnostic genome: reproduction active at lower energy).
+fn gate_lowered(genome: &CreatureGenome, threshold: f32) -> CreatureGenome {
+    let mut g = genome.clone();
+    graph_mut(&mut g, 0).compute_nodes[0].kind = ComputeNodeKind::Threshold(threshold);
+    g
+}
+
+/// P2d (run 2, after review 1): every candidate rule's silencing contrast on
+/// reproduction-active diagnostic genomes, on P2's food bank.
+#[test]
+#[ignore = "exploration probe; about a minute in release"]
+fn p2d_active_genomes() {
+    let setup = setup();
+    let founder = founder_genome_with_age_gate(
+        setup.config.population.founder_profile,
+        &setup.config.energy.lifecycle,
+    );
+    let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
+    let comparator = v3_lab::comparator::area_food(&founder);
+    let plateau = elite(&dir, "native-1");
+    let pair = |name: &str, g: CreatureGenome| (name.to_string(), silenced(&g), g);
+    let pairs = [
+        pair("founder", founder.clone()),
+        pair("founder@0.08", gate_lowered(&founder, 0.08)),
+        pair("founder@0.05", gate_lowered(&founder, 0.05)),
+        pair("comparator", comparator.clone()),
+        pair("comparator@0.05", gate_lowered(&comparator, 0.05)),
+        pair("shuffled-score-5", elite(&dir, "shuffled-score-5")),
+        (
+            "plateau-restored".to_string(),
+            plateau,
+            restored(&elite(&dir, "native-1")),
+        ),
+    ];
+    let bank = scenes(0xE3_BA_4C, 32, &setup);
+    let mut out = out_file();
+    for rule in [
+        Rule::Base,
+        Rule::RefundPause,
+        Rule::AcceptPause,
+        Rule::Ceiling20,
+        Rule::Held20,
+        Rule::RateRefund,
+        Rule::RateAccept,
+    ] {
+        let eval = |g: &CreatureGenome| {
+            let r: Vec<_> = bank
+                .par_iter()
+                .map(|sc| eval_rule(&setup, g, sc, rule))
+                .collect();
+            (
+                r.iter().map(|x| x.0).sum::<f64>() / r.len() as f64,
+                r.iter().map(|x| x.3).sum::<u32>(),
+            )
+        };
+        let rows: Vec<serde_json::Value> = pairs
+            .iter()
+            .map(|(name, quiet, active)| {
+                let (a, ap) = eval(active);
+                let (q, _) = eval(quiet);
+                json!({"pair": name, "active": a, "silenced": q, "delta": q - a,
+                    "reproduce_ticks": ap})
+            })
+            .collect();
+        let max_abs = rows
+            .iter()
+            .map(|r| r["delta"].as_f64().unwrap().abs())
+            .fold(0.0_f64, f64::max);
+        let row = json!({"probe": "p2d", "rule": format!("{rule:?}"), "max_abs_delta": max_abs,
+            "passes": max_abs <= 0.5, "pairs": rows});
+        println!("{row}");
+        if let Some(f) = out.as_mut() {
+            writeln!(f, "{row}").unwrap();
+        }
+    }
 }
 
 /// P1b and P2 (run 2 phase 1): the wall-v1 silencing diagnostics, and every
@@ -891,6 +1108,62 @@ fn p2_repair_candidates() {
         }
     }
 }
+
+/// P2's wall development bank: 32 `wall-v1` scale-2 scenes.
+fn wall_bank(setup: &Setup) -> Vec<Scene> {
+    use v3_lab::scene::{Assay, Geometry};
+    let spec = SceneSpec {
+        geometry: Geometry::Wall { scale: 2 },
+        size: SIZE,
+        vision_radius: setup.config.runtime.perception.vision_radius,
+        assay: Assay::BarrierNavigation,
+    };
+    let mut rng = SmallRng::seed_from_u64(0xB2_DE_00);
+    (0..32)
+        .map(|_| spec.draw(&mut rng).expect("feasible scene"))
+        .collect()
+}
+
+/// P2c: the built-in barrier comparator silenced vs unsilenced under the
+/// base rule, R4 and R5 on the P2 wall bank.
+#[test]
+#[ignore = "exploration probe; seconds in release"]
+fn p2c_barrier_comparator_silencing() {
+    let setup = setup().with_scoring(v3_lab::eval::Scoring::BARRIER_NAVIGATION);
+    let founder = founder_genome_with_age_gate(
+        setup.config.population.founder_profile,
+        &setup.config.energy.lifecycle,
+    );
+    let comparator = v3_lab::comparator::barrier_comparator(&founder);
+    let quiet = silenced(&comparator);
+    let bank = wall_bank(&setup);
+    let mut out = out_file();
+    for rule in [Rule::Base, Rule::Ceiling20, Rule::Held20] {
+        let eval = |g: &CreatureGenome| {
+            let r: Vec<_> = bank
+                .par_iter()
+                .map(|sc| eval_rule(&setup, g, sc, rule))
+                .collect();
+            (
+                r.iter().map(|x| x.0).sum::<f64>() / r.len() as f64,
+                r.iter().filter(|x| x.2).count(),
+            )
+        };
+        let (u, ud) = eval(&comparator);
+        let (s, sd) = eval(&quiet);
+        let row = json!({"probe": "p2c", "rule": format!("{rule:?}"), "unsilenced": u,
+            "silenced": s, "delta": s - u, "deaths": [ud, sd], "passes": (s - u).abs() <= 0.5});
+        println!("{row}");
+        if let Some(f) = out.as_mut() {
+            writeln!(f, "{row}").unwrap();
+        }
+    }
+}
+
+// The withdrawn V1's harness probes (`v1_harness_matches_probe`,
+// `v1_acceptance`) and the `PETRI_PROBE_RULE=r4` setup of E3, E4 and E7 need
+// the exploration branch's instr commit (`--energy-ceiling`); they live on
+// branch `worktree-evolvability-exploration-2` at `ec9c81a4`.
 
 /// P2b: the built-in food comparator (it keeps the founder's readiness
 /// path) silenced vs unsilenced under R1, R4 and R5 on the P2 food bank.
