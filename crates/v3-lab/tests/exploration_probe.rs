@@ -74,6 +74,7 @@ fn out_file() -> Option<std::fs::File> {
 /// against a seeded random pick of the same size.
 #[test]
 #[ignore = "exploration probe; seconds-to-minutes in release"]
+#[allow(clippy::type_complexity)]
 fn e3_fixed_pool_selection_audit() {
     const POOLS: u64 = 8;
     const POOL: usize = 64;
@@ -100,7 +101,7 @@ fn e3_fixed_pool_selection_audit() {
             .into_par_iter()
             .map(|i| {
                 let mut child = founder.clone();
-                let mut rng = SmallRng::seed_from_u64(0xE3_C0_0000 + pool * 1_000 + i as u64);
+                let mut rng = SmallRng::seed_from_u64(0xE3_C0_00_00 + pool * 1_000 + i as u64);
                 let summary = MutationEngine::apply_mutations_with_food_type_count(
                     &mut child,
                     &setup.config.mutation,
@@ -259,7 +260,7 @@ fn e4_elite_neighbourhood_audit() {
             .into_par_iter()
             .map(|i| {
                 let mut child = parent.clone();
-                let mut rng = SmallRng::seed_from_u64(0xE4_C0_0000 + i);
+                let mut rng = SmallRng::seed_from_u64(0xE4_C0_00_00 + i);
                 let summary = MutationEngine::apply_mutations_with_food_type_count(
                     &mut child,
                     &setup.config.mutation,
@@ -387,7 +388,7 @@ fn e7_two_step_and_sterility() {
     let silent: Vec<CreatureGenome> = (0..256u64)
         .into_par_iter()
         .filter_map(|i| {
-            let c = child_of(&setup, &plateau, &frozen, 0xE7_10_0000 + i);
+            let c = child_of(&setup, &plateau, &frozen, 0xE7_10_00_00 + i);
             (c != plateau && delta(&c).iter().all(|d| *d == 0.0)).then_some(c)
         })
         .collect();
@@ -408,7 +409,7 @@ fn e7_two_step_and_sterility() {
                     &setup,
                     s,
                     &f,
-                    0xE7_20_0000 + k as u64 * 100 + j,
+                    0xE7_20_00_00 + k as u64 * 100 + j,
                 )))
             })
             .collect();
@@ -421,7 +422,7 @@ fn e7_two_step_and_sterility() {
                 &setup,
                 &plateau,
                 &frozen,
-                0xE7_30_0000 + i,
+                0xE7_30_00_00 + i,
             )))
         })
         .collect();
