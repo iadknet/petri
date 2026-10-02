@@ -891,3 +891,41 @@ fn p2_repair_candidates() {
         }
     }
 }
+
+/// P2b: the built-in food comparator (it keeps the founder's readiness
+/// path) silenced vs unsilenced under R1, R4 and R5 on the P2 food bank.
+#[test]
+#[ignore = "exploration probe; seconds in release"]
+fn p2b_comparator_silencing() {
+    let setup = setup();
+    let founder = founder_genome_with_age_gate(
+        setup.config.population.founder_profile,
+        &setup.config.energy.lifecycle,
+    );
+    let comparator = v3_lab::comparator::area_food(&founder);
+    let quiet = silenced(&comparator);
+    let bank = scenes(0xE3_BA_4C, 32, &setup);
+    let mut out = out_file();
+    for rule in [Rule::Base, Rule::Start20, Rule::Ceiling20, Rule::Held20] {
+        let eval = |g: &CreatureGenome| {
+            let r: Vec<_> = bank
+                .par_iter()
+                .map(|sc| eval_rule(&setup, g, sc, rule))
+                .collect();
+            (
+                r.iter().map(|x| x.0).sum::<f64>() / r.len() as f64,
+                r.iter().map(|x| x.1).sum::<u32>(),
+                r.iter().filter(|x| x.2).count(),
+            )
+        };
+        let (u, uf, ud) = eval(&comparator);
+        let (s, sf, sd) = eval(&quiet);
+        let row = json!({"probe": "p2b", "rule": format!("{rule:?}"), "unsilenced": u,
+            "silenced": s, "delta": s - u, "food": [uf, sf], "deaths": [ud, sd],
+            "passes": (s - u).abs() <= 0.5});
+        println!("{row}");
+        if let Some(f) = out.as_mut() {
+            writeln!(f, "{row}").unwrap();
+        }
+    }
+}
