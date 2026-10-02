@@ -1,0 +1,3 @@
+{"deaths":32,"food_eaten":283,"genome":"founder","moves_attempted":3124,"penalty_charged":1432.3678951263428,"probe":"e7-sterility","score":9.097395833333334}
+{"deaths":27,"food_eaten":447,"genome":"plateau","moves_attempted":5868,"penalty_charged":0.0,"probe":"e7-sterility","score":14.298958333333333}
+{"direct_children":{"improved":1,"improved_gt1":0,"max":0.22968750000000027,"n":512},"grandchildren":{"improved":1,"improved_gt1":1,"max":6.396354166666667,"n":512},"probe":"e7-two-step","silent_children":32}

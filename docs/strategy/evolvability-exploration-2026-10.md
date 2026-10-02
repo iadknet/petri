@@ -1,6 +1,6 @@
 # Evolvability exploration: results (2026-10)
 
-Status: in progress. Contract: the [run plan](evolvability-exploration-plan-2026-10-01.md)
+Status: complete; reviewed by Codex (two reviews, two advice rounds). Contract: the [run plan](evolvability-exploration-plan-2026-10-01.md)
 under the [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
 Launch revision `ce40054dca9d68e0286755074a772a7cd510e5c1` (clean `main`, 2026-10-01).
 Experiment branch `worktree-evolvability-exploration` (never merges). Compact
@@ -26,13 +26,24 @@ One row per experiment, predeclared before its run; `incomplete` rows kept.
 | E3 | 0 | H1: 4-scene truncation selection mostly tracks scene-sampling noise, not genotype benefit | Observation probe, no arms: 8 pools × 64 founder children (production engine, founder's last-scene record), each scored on two independent 4-scene batches and a 32-scene bank; truncation (top 16 of 64 on batch A) against a fixed pseudo-random 16 | food-seeking scenes (64², 0.04, 200 ticks); seeds in `crates/v3-lab/tests/exploration_probe.rs`; 15 min | Predicted: corr(4-scene Δ, bank Δ) < 0.3 and truncation's bank gain within noise of random. Falsified if corr ≥ 0.5 and truncation gain clearly above random in ≥ 6 of 8 pools | completed (9 s) | Falsified: corr 0.94; truncation above random in 8 of 8 pools |
 | E4 | 1 | H3/H4/H8: gains stop accumulating because the elites' beneficial neighbourhood collapses after the first steps, and what improvements remain are tuning of the incumbent founder nodes, not added nodes | Observation probe: founder, E1's 8 native and 8 shuffled-score final elites; 96 production children each, scored against the parent on the E3 32-scene bank; improvers tallied by applied operator and target node (founder ids 0–1 vs added) | food-seeking scenes as E3; elites from E1 (seed 1); 15 min | Predicted: native elites' improved share of genome-changed children below half the founder's, and ≥ 80 % of improvers target founder nodes only. Falsified if native elites keep ≥ the founder's improved share (then horizon/retention, not neighbourhood, is the limit) | completed (≈ 40 s) | Prediction held: native elites 0 improvers of 196 changed children (founder 3 of 28); 12 of 13 improvers anywhere touch founder nodes only |
 
+| E5 | 2 | H4 (duplicate-and-diverge; analog: gene duplication then divergence) and H5 (targeting; analog: transcription-associated mutagenesis, here removed) let lineages leave the plateau | Two mutation-policy arms, both `policy-deviation`: `copy100` = `large_copy_weight_percent` 100 (production 25), `bias0` = `executed_bias` 0 (production 0.9); built-in reference and controls in the same invocation; pure mutation-policy changes, so evaluation semantics and the founder/comparator are unchanged | food-seeking as E1 (seed 1, 8 reps); reference rows must hash to the E1 baseline; 15 min | Predicted: no detectable paired difference in reach (0/8 each) and the same plateau. Falsified if either arm reaches ≥ 3/8 or its replicates' final bests exceed the reference's in ≥ 6 of 8 seeds. Still to discover by ordinary variation: a sensor-to-move contribution worth ≥ 1.7 bank points | completed (218 s) | Prediction held: 0/8 in both arms; final bests equal the reference's in 7 of 8 seeds (`copy100`, higher in 1) and 8 of 8 (`bias0`) |
+| E6 | 2 | H3 / retention: given three times the generations, drift among silent plateau variants reaches a stepping stone | Reference and built-in controls only, `--generations 120` | food-seeking, seed 1, 8 reps, otherwise as E1; new combination, baseline is itself (no `proto:` or `instr:` commit exists); 15 min | Predicted: native still 0/8 and its training-scene bests no higher than at 40 generations in paired seeds. Falsified if native reaches ≥ 2/8 | completed (438.7 s by the run's own clock; the host slept during it, so the helper's elapsed 7,418 s is not run time) | Prediction held at the margin: native 1/8 (replicate 4, generation 50); native verdict now `stalls at benefit` (fail 6 of 6) |
+| E7 | 1 | H3: the plateau is escaped through neutral stepping stones two edits away, not one; plus a check that the plateau is the sterility shortcut | Observation probe on E1's `native-1` plateau elite: ≤ 32 bank-silent (every scene zero-delta) genome-changed children × 16 grandchildren, against as many further direct children; founder and plateau bank totals of food eaten, moves and penalty charged | E3 bank (32 food-seeking scenes); 15 min | Predicted: grandchildren and direct children both ≈ 0 improvers (escape needs more than two edits), and the plateau's penalty charged ≈ 0 where the founder's is large. H3 supported if grandchildren improve in ≥ 5 while direct children ≤ 1; sterility diagnosis falsified if penalty charged is similar | completed (90.9 s) | Prediction held: grandchildren 1 of 512 improve (one by +6.40) against direct children 1 of 512 (+0.23); penalty charged founder 1,432 vs plateau 0.0 |
+| E8 | 2 | Supply (analog: a mutator background, more blind variation per birth so edits can combine before selection removes intermediates; valley crossing, Weissman et al. 2009): a ×4 per-unit rate lets lineages leave the plateau | One mutation-policy arm, `rate4x` = `per_unit_rate` 0.02 (production 0.005; the founder's 0.485 requested events per birth become 1.94), `policy-deviation`; operators and targeting unchanged; built-in controls in the same invocation | food-seeking as E1 (seed 1, 8 reps); reference rows must hash to E1's; 15 min | Predicted: no detectable reach difference (0/8). Falsified if `rate4x` reaches ≥ 3/8. Ordinary variation still has to find the whole sensor-to-move path; raised supply is the intervention, not better per-edit evolvability | completed (210 s) | Prediction held: 2/8 vs 0/8 (two discordant pairs, exact paired p = 0.5); final best higher in 4, lower in 2, equal in 2 pairs; `stalls at benefit` (fail 3 of 3) |
+
 ## Frontier table
 
 Descriptive only: paired difference from the reference arm, by seed, in
 reached fraction and stall rung. It never ranks or retires an arm.
 
-| Arm | food-seeking (sparse-food-v1) | barrier-navigation (wall-v1) |
+| Arm | food-seeking (sparse-food-v1), seed 1, 8 paired replicates | barrier-navigation (wall-v1), seed 1, 8 paired replicates |
 | --- | --- | --- |
+| native (reference) | reached 0/8; `inconclusive at retention` (fail 0 / inconclusive 5 of 5) | reached 0/8; `inconclusive at retention` (0 / 8 of 8) |
+| shuffled-score (control) | 2/8 vs 0/8: two discordant pairs, no detectable difference (exact paired p = 0.5); `inconclusive at retention` | 0/8 vs 0/8; no detectable difference |
+| `copy100` (H4) | 0/8 vs 0/8; no detectable difference (final best equal in 7 of 8 pairs, higher in 1); `inconclusive at retention` | not run |
+| `bias0` (H5) | 0/8 vs 0/8; no detectable difference (final bests equal in 8 of 8); `inconclusive at retention` | not run |
+| `rate4x` (supply ×4) | 2/8 vs 0/8; no detectable difference (exact paired p = 0.5); final best higher in 4, lower in 2, equal in 2 pairs; `stalls at benefit` (fail 3 of 3) | not run |
+| native at 120 generations (E6; a horizon, not an arm) | 1/8; `stalls at benefit` (fail 6 of 6) | not run |
 
 ## Findings by rung and family
 
@@ -107,6 +118,39 @@ baseline hashes in [`baseline-hashes.json`](evolvability-exploration-2026-10/bas
   a benefit-rung instrument confound, not food seeking. Beyond that one step
   the founder architecture has no one-step improvement at all: sensor-guided
   movement is several coordinated edits away (H3).
+- E5, E6, E8: no mechanism arm moved reach. Summaries:
+  [`e5-arms-food-seed1.json`](evolvability-exploration-2026-10/e5-arms-food-seed1.json),
+  [`e6-horizon-food-seed1.json`](evolvability-exploration-2026-10/e6-horizon-food-seed1.json),
+  [`e8-rate4x-food-seed1.json`](evolvability-exploration-2026-10/e8-rate4x-food-seed1.json);
+  overlays [`copy100.json`](evolvability-exploration-2026-10/copy100.json),
+  [`bias0.json`](evolvability-exploration-2026-10/bias0.json),
+  [`rate4x.json`](evolvability-exploration-2026-10/rate4x.json). In E5 and E8
+  the reference arm's rows and summary projection hash to the E1 baseline
+  (`48fcfe2c…`, `797814a3…`), so the reference is unchanged by adding arms.
+  `bias0` changes almost nothing because on a two- or three-node genome every
+  node executes, so executed-biased targeting has nothing to bias; H5 cannot
+  be read at this genome size. `copy100` differs from the reference in one
+  replicate. Four times the supply (E8) and three times the generations (E6)
+  each reach 1–2 of 8, all within chance of the reference's 0/8, and turn the
+  ladder verdict from `inconclusive at retention` into `stalls at benefit`:
+  the longer a lineage sits on the plateau the more its touching children
+  fail to improve (E6 native benefit `fail` in 6 of 8 replicates). That is
+  the E4 plateau seen through the ladder.
+- E7, two-step and sterility
+  ([`e7-two-step-sterility.ndjson`](evolvability-exploration-2026-10/e7-two-step-sterility.ndjson)).
+  On the 32 bank scenes the founder is charged 1,432 penalty energy and the
+  plateau elite 0.0; the plateau eats 447 food against 283 and attempts 5,868
+  moves against 3,124 (both die in most scenes, 32 and 27 of 32). Every
+  refused `Reproduce` vote costs the founder a foraging tick and a penalty;
+  the plateau casts none. This is association, not an isolated cause: the
+  elite also re-points two upstream references, and no diagnostic genome
+  with only the reproduce vote silenced was built. From the plateau, 32
+  independent silent intermediates (zero delta on every bank scene) gave 512
+  grandchildren, of which 1 improved, by +6.40 bank points, enough to clear
+  the threshold; 512 matched direct children gave 1 improvement of +0.23.
+  Neutral intermediates two edits out are about as productive as direct
+  children (1 vs 1), so **H3 is not supported at two steps**; the one large
+  two-step gain is a single event and is not analysed further here.
 - H2 exposure. The ladder's relevant families are `FoodHere`,
   `NeighborFoodRing` and `AreaFoodSummary` (food-seeking) plus the barrier
   ring and area summary (barrier navigation). Occupancy, the three
@@ -134,6 +178,49 @@ Review 1 (Stage 0, Codex `gpt-6.1-sol` high, read-only, brief and output under
 | 6 | Shuffled-score benefit explanation untested; 2/8 vs 0/8 is p = 0.5 | advisory | Accepted: explanation qualified, exact paired p stated |
 | 7 | Empty frontier; E3 provenance thin | advisory | Accepted: frontier populated after the Stage 2 arms; E3 provenance names commit c6796b04 and its seeds |
 
+## Hypotheses at close
+
+| ID | Status after this run |
+| --- | --- |
+| H1 instrument limit | Split. Scene-sampling noise in four-scene paired selection: not the bottleneck in the sampled founder neighbourhood (E3). Instrument confound: **found**; the food-seeking benefit rung is dominated by abandoning reproduction (E4, E7) |
+| H2 exposure | Food and barrier families only; social families need a multi-creature scene kind (finding, T22 candidate) |
+| H3 stepping stones | Not supported at two steps from the plateau (E7: 1 of 512 vs 1 of 512) |
+| H4 incumbent masking / duplication | `copy100` no detectable difference (E5); improvements almost never involve added nodes (E4: 1 of 13) |
+| H5 targeting | Not readable at two-to-three-node genome sizes (E5 `bias0` identical in 8 of 8) |
+| H6 cost | Not run: lab lifetimes of 200 ticks make carrying cost negligible and replication cost is unused in a lab that refuses reproduction (Codex advice 0) |
+| H7 step size | Not run: cut on Codex advice until edge contributions are measured |
+| H8 node boundary | Not implicated: 12 of 13 improvers touch founder nodes only; no prototype built |
+
 ## Recommendation
 
-Pending.
+**More exploration, after one T22 instrument repair; no roadmap mechanism
+feature.** No arm moved reach beyond chance and no recruitment was seen, so
+nothing qualifies as a mechanism feature and the natural-world check was not
+run. The run's main result is about the instrument: the food-seeking assay's
+cheapest selectable gain is to stop attempting reproduction, which the lab
+always refuses at a cost (E4, E7), and the founder architecture has no
+sampled one-step improvement beyond that plateau (E4: 0 of 196). Until the
+assay cannot be improved by abandoning reproduction, food-seeking reach and
+benefit readings mix sterility with foraging.
+
+1. **T22 feature candidate (instrument):** a food-seeking scene version in
+   which a refused reproduction attempt neither costs the tick nor the
+   penalty, or in which reproduction attempts are scored neutrally, built
+   under the new-instrument rules (new assay or scorer name, frozen version,
+   development set and sealed acceptance set, lab-authored comparator only if
+   needed) and calibrated before any arm runs on it. Its first reading
+   should repeat E3, E4 and E7 on the founder. The same check applies to
+   `wall-v1` (E2's native gains were not decomposed here).
+2. **Then more exploration, in this order:** the elite-neighbourhood audit
+   (E4) on the repaired instrument; a multi-step path census from the
+   founder to a sensor-to-move contribution worth the threshold (how many
+   coordinated edits, through which operators), which is what H3, H4 and H8
+   need; the `rate4x` and horizon arms repeated with 16 replicates if the
+   plateau persists.
+3. **T22 feature candidate (instrument):** a multi-creature scene kind, so
+   social sensor families can be exposed without crediting a companion's
+   counters to the focal genome.
+
+No `instr:` or `proto:` commit was made, so none is listed as a candidate.
+The holdout seeds (101 food, 102 wall) were reserved and never read: no
+candidate was frozen.
