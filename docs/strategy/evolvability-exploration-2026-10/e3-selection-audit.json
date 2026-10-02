@@ -1,0 +1,7 @@
+{
+  "probe": "e3_fixed_pool_selection_audit",
+  "source": "crates/v3-lab/tests/exploration_probe.rs at the E3 commit on the launch revision, no proto or instr change",
+  "command": "PETRI_PROBE_OUT=.bench-artifacts/lab/exploration/e3-children.ndjson cargo test --release -p v3-lab --test exploration_probe e3 -- --ignored --nocapture",
+  "wall_seconds": 9.2,
+  "result": {"a_improved":25,"a_improved_and_bank_improved":19,"bank_delta_hist":{"(0,+1]":9,"0":96,"<-1":29,">+1":14,"[-1,0)":13},"bank_improved":23,"bank_improved_sign4":20,"bank_score_changed":65,"changed_genome":161,"children":512,"corr_a_b":0.8626063886588177,"corr_a_bank":0.9368275638410491,"founder_4scene_means":[5.058333333333334,8.433333333333334,7.683333333333334,9.2625,12.1875,13.979166666666666,10.75,12.741071428571429],"founder_bank_mean":9.097395833333334,"identical":351,"random_bank_gain_by_pool":[0.07659505208333334,-0.1948567708333333,-1.1118489583333337,0.006542968749999999,-0.4560221354166667,-0.20999348958333341,-0.5689127604166667,0.08199869791666667],"trunc_bank_gain_by_pool":[0.67333984375,-0.019108072916666673,0.14742838541666664,0.6026041666666666,0.9451822916666666,0.2983723958333333,0.5967447916666666,0.38037109374999994],"trunc_minus_random_mean":0.7501790364583334}
+}

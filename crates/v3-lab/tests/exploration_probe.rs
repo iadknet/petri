@@ -1,0 +1,156 @@
+//! Evolvability exploration probes (2026-10 run, `docs/strategy/evolvability-exploration-2026-10.md`).
+//! Observation only: production mutation engine, lab evaluator and scenes,
+//! no selection and nothing fed back into variation. Ignored by default; run
+//! with `cargo test --release -p v3-lab --test exploration_probe -- --ignored --nocapture`.
+//! Each probe prints one summary JSON line and, when `PETRI_PROBE_OUT` names a
+//! file under `.bench-artifacts/`, writes one compact JSON line per child.
+
+use std::collections::BTreeMap;
+use std::io::Write;
+
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
+use rayon::prelude::*;
+use serde_json::json;
+use v3_core::creature::founder::founder_genome_with_age_gate;
+use v3_core::creature::genome::analysis::mesh_reachable_nodes;
+use v3_core::creature::genome::CreatureGenome;
+use v3_core::mutation::reachability::ParentExecuted;
+use v3_core::mutation::MutationEngine;
+use v3_lab::arena::arena_config;
+use v3_lab::eval::{evaluate_genome, Frozen, Setup};
+use v3_lab::scene::{Scene, SceneSpec};
+
+const SIZE: u16 = 64;
+const FRACTION: f64 = 0.04;
+const LIFETIME: u32 = 200;
+const START_ENERGY: f32 = 100.0;
+
+fn setup() -> Setup {
+    Setup::new(arena_config(SIZE), START_ENERGY, LIFETIME)
+}
+
+fn scenes(seed: u64, n: usize, setup: &Setup) -> Vec<Scene> {
+    let spec = SceneSpec::sparse(SIZE, FRACTION, setup.config.runtime.perception.vision_radius);
+    let mut rng = SmallRng::seed_from_u64(seed);
+    (0..n).map(|_| spec.draw(&mut rng).expect("feasible scene")).collect()
+}
+
+fn scores(setup: &Setup, genome: &CreatureGenome, scenes: &[Scene]) -> Vec<f64> {
+    scenes.iter().map(|s| evaluate_genome(setup, genome, s).0.score).collect()
+}
+
+fn mean(v: &[f64]) -> f64 {
+    v.iter().sum::<f64>() / v.len() as f64
+}
+
+fn corr(a: &[f64], b: &[f64]) -> Option<f64> {
+    let (ma, mb) = (mean(a), mean(b));
+    let cov: f64 = a.iter().zip(b).map(|(x, y)| (x - ma) * (y - mb)).sum();
+    let va: f64 = a.iter().map(|x| (x - ma).powi(2)).sum();
+    let vb: f64 = b.iter().map(|y| (y - mb).powi(2)).sum();
+    (va > 0.0 && vb > 0.0).then(|| cov / (va * vb).sqrt())
+}
+
+fn out_file() -> Option<std::fs::File> {
+    std::env::var("PETRI_PROBE_OUT").ok().map(|p| std::fs::File::create(p).expect("probe out"))
+}
+
+/// E3, fixed-pool selection audit (H1). Children of the founder are scored on
+/// two independent 4-scene batches (the campaign's per-generation training
+/// size) and a 32-scene diagnostic bank. Reports how well a 4-scene delta
+/// predicts the bank delta and what truncation on batch A buys on the bank
+/// against a seeded random pick of the same size.
+#[test]
+#[ignore = "exploration probe; seconds-to-minutes in release"]
+fn e3_fixed_pool_selection_audit() {
+    const POOLS: u64 = 8;
+    const POOL: usize = 64;
+    const KEEP: usize = 16;
+    let setup = setup();
+    let founder =
+        founder_genome_with_age_gate(setup.config.population.founder_profile, &setup.config.energy.lifecycle);
+    let reachable = mesh_reachable_nodes(&founder);
+    let bank = scenes(0xE3_BA_4C, 32, &setup);
+    let founder_bank = scores(&setup, &founder, &bank);
+    let food_types = setup.config.world.food.types.len();
+    let mut rows = Vec::new();
+    let mut summary_pools = Vec::new();
+    for pool in 0..POOLS {
+        let batch_a = scenes(0xE3_A0_00 + pool, 4, &setup);
+        let batch_b = scenes(0xE3_B0_00 + pool, 4, &setup);
+        let founder_a = mean(&scores(&setup, &founder, &batch_a));
+        let founder_b = mean(&scores(&setup, &founder, &batch_b));
+        // The lab's frozen record: the parent's last training scene.
+        let frozen: Frozen = evaluate_genome(&setup, &founder, batch_a.last().unwrap()).1;
+        let children: Vec<(bool, u32, f64, f64, f64, f64)> = (0..POOL)
+            .into_par_iter()
+            .map(|i| {
+                let mut child = founder.clone();
+                let mut rng = SmallRng::seed_from_u64(0xE3_C0_0000 + pool * 1_000 + i as u64);
+                let summary = MutationEngine::apply_mutations_with_food_type_count(
+                    &mut child,
+                    &setup.config.mutation,
+                    &reachable,
+                    ParentExecuted::Record(&frozen.record, frozen.age),
+                    &mut rng,
+                    food_types,
+                );
+                if child == founder {
+                    return (true, summary.applied_events, 0.0, 0.0, 0.0, 0.0);
+                }
+                let a = mean(&scores(&setup, &child, &batch_a)) - founder_a;
+                let b = mean(&scores(&setup, &child, &batch_b)) - founder_b;
+                let bank_scores = scores(&setup, &child, &bank);
+                let deltas: Vec<f64> = bank_scores.iter().zip(&founder_bank).map(|(c, f)| c - f).collect();
+                let wins = deltas.iter().filter(|d| **d > 0.0).count() as f64;
+                let losses = deltas.iter().filter(|d| **d < 0.0).count() as f64;
+                (false, summary.applied_events, a, b, mean(&deltas), wins - losses)
+            })
+            .collect();
+        // Truncation on batch A over the whole pool (identical children score 0).
+        let mut order: Vec<usize> = (0..POOL).collect();
+        order.sort_by(|x, y| children[*y].2.partial_cmp(&children[*x].2).unwrap().then(x.cmp(y)));
+        let trunc: Vec<f64> = order[..KEEP].iter().map(|i| children[*i].4).collect();
+        let random: Vec<f64> = (0..KEEP).map(|k| children[(k * 4 + pool as usize) % POOL].4).collect();
+        summary_pools.push(json!({"pool": pool, "founder_a": founder_a, "founder_b": founder_b,
+            "trunc_bank_gain": mean(&trunc), "random_bank_gain": mean(&random)}));
+        for (i, c) in children.iter().enumerate() {
+            rows.push((pool, i, *c));
+        }
+    }
+    let changed: Vec<&(u64, usize, (bool, u32, f64, f64, f64, f64))> =
+        rows.iter().filter(|r| !r.2 .0).collect();
+    let da: Vec<f64> = changed.iter().map(|r| r.2 .2).collect();
+    let db: Vec<f64> = changed.iter().map(|r| r.2 .3).collect();
+    let dbank: Vec<f64> = changed.iter().map(|r| r.2 .4).collect();
+    let a_up = changed.iter().filter(|r| r.2 .2 > 0.0).count();
+    let a_up_bank_up = changed.iter().filter(|r| r.2 .2 > 0.0 && r.2 .4 > 0.0).count();
+    let bank_up = changed.iter().filter(|r| r.2 .4 > 0.0).count();
+    let bank_up_sign = changed.iter().filter(|r| r.2 .4 > 0.0 && r.2 .5 >= 4.0).count();
+    let bank_changed = changed.iter().filter(|r| r.2 .4 != 0.0).count();
+    let mut hist: BTreeMap<String, usize> = BTreeMap::new();
+    for d in &dbank {
+        let k = if *d > 1.0 { ">+1" } else if *d > 0.0 { "(0,+1]" } else if *d == 0.0 { "0" } else if *d >= -1.0 { "[-1,0)" } else { "<-1" };
+        *hist.entry(k.to_owned()).or_default() += 1;
+    }
+    let pools_trunc: Vec<f64> = summary_pools.iter().map(|p| p["trunc_bank_gain"].as_f64().unwrap()).collect();
+    let pools_rand: Vec<f64> = summary_pools.iter().map(|p| p["random_bank_gain"].as_f64().unwrap()).collect();
+    let fa: Vec<f64> = summary_pools.iter().map(|p| p["founder_a"].as_f64().unwrap()).collect();
+    println!("{}", json!({
+        "probe": "e3", "children": rows.len(), "identical": rows.len() - changed.len(),
+        "changed_genome": changed.len(), "bank_score_changed": bank_changed,
+        "founder_bank_mean": mean(&founder_bank), "founder_4scene_means": fa,
+        "corr_a_bank": corr(&da, &dbank), "corr_a_b": corr(&da, &db),
+        "a_improved": a_up, "a_improved_and_bank_improved": a_up_bank_up,
+        "bank_improved": bank_up, "bank_improved_sign4": bank_up_sign, "bank_delta_hist": hist,
+        "trunc_bank_gain_by_pool": pools_trunc, "random_bank_gain_by_pool": pools_rand,
+        "trunc_minus_random_mean": mean(&pools_trunc) - mean(&pools_rand),
+    }));
+    if let Some(mut f) = out_file() {
+        for (pool, i, c) in &rows {
+            writeln!(f, "{}", json!({"pool": pool, "i": i, "identical": c.0, "applied": c.1,
+                "da": c.2, "db": c.3, "dbank": c.4, "sign": c.5})).unwrap();
+        }
+    }
+}
