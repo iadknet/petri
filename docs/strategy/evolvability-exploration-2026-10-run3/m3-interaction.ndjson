@@ -1,0 +1,5 @@
+{"provenance":{"probe_commit":"f9966b33","command":"sh .bench-artifacts/lab/exploration/run3/m3.sh (jq over the m1, refine and m1refine summaries)","raw_sha256":"73fcee599ee9891b61d2c17c3d0b011a93536721526048a9a12b264e79563119","raw":".bench-artifacts/lab/exploration/run3/m3-interaction.ndjson"}}
+{"combo":"food-s3","ref":[0,1,0,0,0,0,1,0],"m1":[1,0,0,0,0,1,1,0],"refine":[0,0,1,1,0,1,0,0],"m1refine":[1,1,1,0,0,1,0,0],"interaction":[0,2,0,-1,0,-1,0,0],"positive":1,"nonpositive":7}
+{"combo":"food-s4","ref":[0,0,0,0,0,0,0,0],"m1":[0,0,0,0,0,0,0,0],"refine":[0,0,0,0,0,0,0,0],"m1refine":[0,0,0,0,0,0,0,0],"interaction":[0,0,0,0,0,0,0,0],"positive":0,"nonpositive":8}
+{"combo":"wall-s3","ref":[0,0,0,0,0,0,0,0],"m1":[0,0,0,0,0,0,0,0],"refine":[0,0,0,0,0,0,0,0],"m1refine":[0,0,0,0,0,0,0,0],"interaction":[0,0,0,0,0,0,0,0],"positive":0,"nonpositive":8}
+{"combo":"wall-s4","ref":[0,0,0,0,0,0,1,0],"m1":[0,0,0,0,0,0,0,0],"refine":[0,0,0,0,0,0,0,0],"m1refine":[0,0,0,0,0,0,0,0],"interaction":[0,0,0,0,0,0,1,0],"positive":1,"nonpositive":7}

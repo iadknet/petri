@@ -1,0 +1,33 @@
+{
+  "instrument": "food-seeking-hunger",
+  "version": 1,
+  "plan": "docs/strategy/evolvability-exploration-plan-2026-10-02-run3.md (rules 1, 2, 7)",
+  "implementation_commits": ["e6c018fe (energy ceiling)", "33ae32f9 (food-seeking-hunger assay)"],
+  "freeze": "this descriptor's commit, before any calibration gate or validation read",
+  "assay": "food-seeking-hunger",
+  "arena": "sparse-food-v1, 64 x 64",
+  "food_fraction": 0.04,
+  "lifetime": 200,
+  "energy_semantics": "every evaluated actor (genomes, the area_food comparator, scripted floor, half and oracle) starts at the production energy.lifecycle.initial_energy (20.0) and is capped at that value at every living tick boundary",
+  "scorer": "Scoring::BITES_AND_PROGRESS (unchanged)",
+  "relevant_site_predicate": "food-seeking families (unchanged)",
+  "comparator": "built-in area_food(founder), lab-authored (unchanged)",
+  "calibration": {"margin": 1.0, "grid_rule": "unchanged; single point via --food-fraction 0.04 --lifetime 200", "seeds": [3, 4]},
+  "command": "v3-lab run --assay food-seeking-hunger --food-fraction 0.04 --lifetime 200 [--seed S --replicates N ...]",
+  "harness_blobs": {
+    "crates/v3-lab/src/eval.rs": "45afba2c4f8f3d9ee9e4885f39f02954cd1bd3ac",
+    "crates/v3-lab/src/run.rs": "dec9d6146cde952c31dc9f9c28fb30c00327db31",
+    "crates/v3-lab/src/scene.rs": "bac45908d97f36160c5d0c4188ffa9f324807bf6",
+    "crates/v3-lab/src/calibration.rs": "6bf41aae26766b2c738e99f60cf01645ccefe7bb",
+    "crates/v3-lab/src/comparator.rs": "30649fc74c1e06ffe2dc7e3665724c3d82c0bc57"
+  },
+  "scene_banks": {
+    "food_development": {"seed": "0x3DF00D", "scenes": 32, "sha256": "0eacb7dd19d06d8eb1fbfdc2ee5365828ebe113961beb2fab7d52c5522dc101c"},
+    "food_acceptance_sealed": {"seed": "0x3AF00D", "scenes": 32, "sha256": "76e84a8fd9e34b801f81f99b4cb84393c80e650d187eac0a5a13b2fcad744fae"},
+    "wall_development": {"seed": "0xB2DE00", "scenes": 32, "sha256": "bc6b60c1bc618df14caf5d4d4e4a5d2e91ac57354c7f67d1869e83baf96f9bf9"},
+    "wall_acceptance_sealed": {"seed": "0x3ABA44", "scenes": 32, "sha256": "5b320c2b667abe07bcf139efcb3737287f74e6889338b88e6efa4bc143276f55"}
+  },
+  "validation_panel": "h1-manifest.ndjson (40 food and 42 wall panel genomes with their sha256; file sha256 e1ce4ef8b88077bdcd6ff1307618ae17472d31120a63780388e4fc2ca503e770)",
+  "requirement": "plan rule 2: for every base b and abandoning variant a, score(a) - score(b) <= 0.5 bank-mean points, on the development bank, then on the sealed acceptance bank",
+  "versions_used_before_this": 0
+}

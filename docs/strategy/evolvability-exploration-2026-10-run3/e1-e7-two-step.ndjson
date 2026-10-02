@@ -1,0 +1,4 @@
+{"provenance":{"probe_commit":"e61bdb2a","command":"PETRI_E7_PARENT=native-7 PETRI_PROBE_RULE=hunger PETRI_E4_ELITES=run3/b1-food-s4/elites cargo test --release -p v3-lab --test exploration_probe e7_two_step_and_sterility -- --ignored --exact (stdout lines)","raw_sha256":"c5c9e3e9e4f837389e369158b8b195d65a63b809b8d668e35b2fe7515c7a2044","raw":".bench-artifacts/lab/exploration/run3/e1-e7-lines.ndjson"}}
+{"deaths":32,"food_eaten":176,"genome":"founder","moves_attempted":1975,"penalty_charged":0.0,"probe":"e7-sterility","score":5.9375}
+{"deaths":32,"food_eaten":180,"genome":"plateau","moves_attempted":1995,"penalty_charged":0.0,"probe":"e7-sterility","score":6.0515625}
+{"direct_children":{"improved":1,"improved_gt1":0,"max":0.4661458333333333,"n":512},"grandchildren":{"improved":2,"improved_gt1":0,"max":0.7791666666666666,"n":512},"probe":"e7-two-step","silent_children":32}
