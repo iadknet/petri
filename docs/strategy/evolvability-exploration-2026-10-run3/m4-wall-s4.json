@@ -1,0 +1,563 @@
+{
+  "source": {
+    "revision": "69d00e3cc32f2c92739714a85c74ec5045c2aff6",
+    "dirty": false,
+    "config_digest": "2d997590cf6632743d6b604ba611256dc13aaa7455002e37bc56efe9a9dd580f",
+    "overlays": [
+      {
+        "name": "mutation-off",
+        "content": {
+          "mutation": {
+            "per_unit_rate": 0.0
+          }
+        },
+        "order": 0
+      },
+      {
+        "name": "m4",
+        "content": {
+          "mutation": {
+            "per_unit_rate": 0.02
+          }
+        },
+        "order": 1
+      }
+    ],
+    "arena_sha256": "16b18e8782a8d3411bca1bc98074ace0ece7ca8a1f5520edb749ff02cc721a3a",
+    "seeds": {
+      "seed": 4,
+      "replicates": [
+        4923817175037945696,
+        5406055151769824871,
+        9688184138233307301,
+        4997022713870280872,
+        16343736648342052393,
+        7793684870741362087,
+        14326336812374690530,
+        15703370782512785450
+      ],
+      "calibration": 6646458938678067406,
+      "validation": 14295911261567325110
+    },
+    "sizes": {
+      "replicates": 8,
+      "generations": 100,
+      "population": 32,
+      "elite_fraction": 0.25,
+      "scenes": 4,
+      "validation_scenes": 8,
+      "arena_size": 64,
+      "start_energy": 100.0,
+      "food_fraction": null,
+      "scale": 2,
+      "lifetime": 200,
+      "blocked_weight": 1.0,
+      "efficiency_weight": 1.0,
+      "quick": true,
+      "mutants": 8,
+      "signature_arms": "changing",
+      "stall_rates": {
+        "supply": 0.01,
+        "viability": 0.05,
+        "benefit": 0.05,
+        "retention": 0.2
+      },
+      "retention_depth": 2,
+      "relevant_families": [
+        "FoodHere(*)",
+        "NeighborFoodRing(*)",
+        "AreaFoodSummary(*)",
+        "NeighborBarrierRing",
+        "AreaBarrierSummary"
+      ]
+    }
+  },
+  "calibration": {
+    "verdict": "calibrated",
+    "selected": {
+      "food_fraction": null,
+      "scale": 2,
+      "lifetime": 200,
+      "means": {
+        "founder": 1.3453541260558803,
+        "floor": 0.34820143884892085,
+        "half": 10.30099672994772,
+        "oracle": 10.796435742971887,
+        "comparator": 10.366976213750407,
+        "floor_progress": 0.35,
+        "comparator_progress": 1.0,
+        "floor_blocked_fraction": 0.0017985611510791368,
+        "comparator_blocked_fraction": 0.0,
+        "floor_efficiency": 0.0,
+        "half_efficiency": 0.3183160070561513,
+        "oracle_efficiency": 0.8333333333333333,
+        "comparator_efficiency": 0.36697621375040734,
+        "comparator_wins": 8
+      }
+    },
+    "reach_threshold": 5.357588826299664
+  },
+  "arms": [
+    {
+      "name": "native",
+      "role": "reference",
+      "policy": "native",
+      "reached_fraction": 0.125,
+      "wilson_95": [
+        0.02241749145005667,
+        0.4708881822128535
+      ],
+      "final_best": [
+        2.2634526375295905,
+        1.1743025431771752,
+        0.0,
+        2.0341766367563974,
+        4.9879969992498125,
+        0.0,
+        6.052871148459384,
+        -0.24152542372881355
+      ],
+      "generation_to_threshold": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        98,
+        null
+      ]
+    },
+    {
+      "name": "founder-only",
+      "role": "control",
+      "policy": "native",
+      "reached_fraction": 0.0,
+      "wilson_95": [
+        0.0,
+        0.32440756488388023
+      ],
+      "final_best": [
+        1.2269330734243014,
+        -0.47368421052631576,
+        5.855100714749837,
+        0.9900909681611435,
+        2.9275503573749186,
+        -0.47368421052631576,
+        0.9900909681611435,
+        -0.7105263157894737
+      ],
+      "generation_to_threshold": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "name": "mutation-off",
+      "role": "control",
+      "policy": "policy-deviation",
+      "reached_fraction": 0.0,
+      "wilson_95": [
+        0.0,
+        0.32440756488388023
+      ],
+      "final_best": [
+        1.2269330734243014,
+        -0.47368421052631576,
+        5.855100714749837,
+        0.9900909681611435,
+        2.9275503573749186,
+        -0.47368421052631576,
+        0.9900909681611435,
+        -0.7105263157894737
+      ],
+      "generation_to_threshold": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "name": "shuffled-score",
+      "role": "control",
+      "policy": "native",
+      "reached_fraction": 0.0,
+      "wilson_95": [
+        0.0,
+        0.32440756488388023
+      ],
+      "final_best": [
+        0.008474576271186446,
+        0.0,
+        1.0,
+        -0.4642857142857143,
+        1.9666153055983564,
+        0.6733876985396012,
+        -0.2330508474576271,
+        -0.125
+      ],
+      "generation_to_threshold": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "name": "comparator",
+      "role": "instrument",
+      "policy": "native",
+      "reached_fraction": null,
+      "wilson_95": null,
+      "final_best": [
+        10.37960247637667,
+        10.505050505050505,
+        10.053763440860216,
+        10.404855001629196,
+        10.254154447702835,
+        10.505050505050505,
+        10.404855001629196,
+        10.53030303030303
+      ],
+      "generation_to_threshold": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "name": "random-walk",
+      "role": "instrument",
+      "policy": "native",
+      "reached_fraction": null,
+      "wilson_95": null,
+      "final_best": [
+        0.5464028776978417,
+        0.4410071942446043,
+        1.313882643884892,
+        0.4784172661870504,
+        0.4482014388489209,
+        0.34460431654676255,
+        1.190741380921237,
+        0.44100719424460433
+      ],
+      "generation_to_threshold": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "name": "m4",
+      "role": "user",
+      "policy": "policy-deviation",
+      "reached_fraction": 0.0,
+      "wilson_95": [
+        0.0,
+        0.32440756488388023
+      ],
+      "final_best": [
+        0.5095702790618044,
+        0.2468885281385281,
+        0.0,
+        0.65,
+        0.0,
+        0.0,
+        0.0,
+        2.457276666241876
+      ],
+      "generation_to_threshold": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  ],
+  "ladder": [
+    {
+      "name": "native",
+      "verdict": {
+        "kind": "stalls",
+        "rung": "retention",
+        "fail": 2,
+        "inconclusive": 0,
+        "of": 2,
+        "reached": null,
+        "completed": 8,
+        "incomplete": 0
+      },
+      "statuses": [
+        [
+          "supply:pass 1361/2376",
+          "viability:pass 1080/1360",
+          "benefit:pass 75/1080",
+          "retention:pass 14/66"
+        ],
+        [
+          "supply:pass 1216/2376",
+          "viability:pass 908/1213",
+          "benefit:pass 77/908",
+          "retention:fail 10/65"
+        ],
+        [
+          "supply:pass 636/2376",
+          "viability:pass 365/634",
+          "benefit:pass 23/365",
+          "retention:fail 3/26"
+        ],
+        [
+          "supply:pass 590/2376",
+          "viability:pass 462/590",
+          "benefit:fail 18/462",
+          "retention:fail 3/19"
+        ],
+        [
+          "supply:pass 1201/2376",
+          "viability:pass 802/1180",
+          "benefit:pass 44/802",
+          "retention:pass 12/43"
+        ],
+        [
+          "supply:pass 727/2376",
+          "viability:pass 516/727",
+          "benefit:pass 30/516",
+          "retention:pass 6/29"
+        ],
+        [
+          "supply:pass 576/2352",
+          "viability:pass 454/574",
+          "benefit:pass 23/454",
+          "retention:pass 10/30"
+        ],
+        [
+          "supply:pass 1040/2376",
+          "viability:pass 724/1029",
+          "benefit:pass 62/724",
+          "retention:pass 13/57"
+        ]
+      ]
+    },
+    {
+      "name": "mutation-off",
+      "verdict": {
+        "kind": "stalls",
+        "rung": "supply",
+        "fail": 8,
+        "inconclusive": 0,
+        "of": 8,
+        "reached": null,
+        "completed": 8,
+        "incomplete": 0
+      },
+      "statuses": [
+        [
+          "supply:fail 0/2376",
+          "viability:inconclusive 0/0",
+          "benefit:inconclusive 0/0",
+          "retention:inconclusive 0/0"
+        ],
+        [
+          "supply:fail 0/2376",
+          "viability:inconclusive 0/0",
+          "benefit:inconclusive 0/0",
+          "retention:inconclusive 0/0"
+        ],
+        [
+          "supply:fail 0/2376",
+          "viability:inconclusive 0/0",
+          "benefit:inconclusive 0/0",
+          "retention:inconclusive 0/0"
+        ],
+        [
+          "supply:fail 0/2376",
+          "viability:inconclusive 0/0",
+          "benefit:inconclusive 0/0",
+          "retention:inconclusive 0/0"
+        ],
+        [
+          "supply:fail 0/2376",
+          "viability:inconclusive 0/0",
+          "benefit:inconclusive 0/0",
+          "retention:inconclusive 0/0"
+        ],
+        [
+          "supply:fail 0/2376",
+          "viability:inconclusive 0/0",
+          "benefit:inconclusive 0/0",
+          "retention:inconclusive 0/0"
+        ],
+        [
+          "supply:fail 0/2376",
+          "viability:inconclusive 0/0",
+          "benefit:inconclusive 0/0",
+          "retention:inconclusive 0/0"
+        ],
+        [
+          "supply:fail 0/2376",
+          "viability:inconclusive 0/0",
+          "benefit:inconclusive 0/0",
+          "retention:inconclusive 0/0"
+        ]
+      ]
+    },
+    {
+      "name": "shuffled-score",
+      "verdict": {
+        "kind": "inconclusive",
+        "rung": "retention",
+        "fail": 4,
+        "inconclusive": 4,
+        "of": 8,
+        "reached": null,
+        "completed": 8,
+        "incomplete": 0
+      },
+      "statuses": [
+        [
+          "supply:pass 803/2376",
+          "viability:pass 531/797",
+          "benefit:pass 66/531",
+          "retention:fail 4/21"
+        ],
+        [
+          "supply:pass 692/2376",
+          "viability:pass 490/690",
+          "benefit:pass 34/490",
+          "retention:inconclusive 1/10"
+        ],
+        [
+          "supply:pass 655/2376",
+          "viability:pass 485/654",
+          "benefit:pass 67/485",
+          "retention:fail 3/17"
+        ],
+        [
+          "supply:pass 667/2376",
+          "viability:pass 436/665",
+          "benefit:pass 23/436",
+          "retention:inconclusive 3/7"
+        ],
+        [
+          "supply:pass 652/2376",
+          "viability:pass 437/650",
+          "benefit:pass 63/437",
+          "retention:fail 2/16"
+        ],
+        [
+          "supply:pass 611/2376",
+          "viability:pass 404/609",
+          "benefit:pass 31/404",
+          "retention:inconclusive 2/12"
+        ],
+        [
+          "supply:pass 964/2376",
+          "viability:pass 698/961",
+          "benefit:pass 66/698",
+          "retention:inconclusive 4/13"
+        ],
+        [
+          "supply:pass 1045/2376",
+          "viability:pass 782/1039",
+          "benefit:pass 69/782",
+          "retention:fail 3/20"
+        ]
+      ]
+    },
+    {
+      "name": "m4",
+      "verdict": {
+        "kind": "stalls",
+        "rung": "benefit",
+        "fail": 4,
+        "inconclusive": 0,
+        "of": 4,
+        "reached": null,
+        "completed": 8,
+        "incomplete": 0
+      },
+      "statuses": [
+        [
+          "supply:pass 2225/2376",
+          "viability:pass 1964/2225",
+          "benefit:pass 145/1964",
+          "retention:fail 6/124"
+        ],
+        [
+          "supply:pass 1900/2376",
+          "viability:pass 1719/1891",
+          "benefit:pass 109/1719",
+          "retention:fail 10/79"
+        ],
+        [
+          "supply:pass 1185/2376",
+          "viability:pass 792/1181",
+          "benefit:fail 9/792",
+          "retention:inconclusive 0/8"
+        ],
+        [
+          "supply:pass 2262/2376",
+          "viability:pass 2164/2262",
+          "benefit:pass 165/2164",
+          "retention:fail 2/111"
+        ],
+        [
+          "supply:pass 2063/2376",
+          "viability:pass 1800/2061",
+          "benefit:fail 31/1800",
+          "retention:fail 3/21"
+        ],
+        [
+          "supply:pass 1966/2376",
+          "viability:pass 1728/1966",
+          "benefit:fail 57/1728",
+          "retention:fail 6/48"
+        ],
+        [
+          "supply:pass 2024/2376",
+          "viability:pass 1797/2019",
+          "benefit:fail 47/1797",
+          "retention:fail 4/44"
+        ],
+        [
+          "supply:pass 2119/2376",
+          "viability:pass 1924/2119",
+          "benefit:pass 125/1924",
+          "retention:fail 9/98"
+        ]
+      ]
+    }
+  ],
+  "exit_code": 0,
+  "incomplete": null,
+  "wall_seconds": 397.717577375
+}
