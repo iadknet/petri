@@ -77,12 +77,24 @@ Opening hypotheses, to be confirmed, refined or killed:
 | H5 | Targeting: executed-biased targeting starves new, silent tissue of further edits | Targeting-variant arm against the reference arm |
 | H6 | Cost: maintenance and compute costs remove new tissue before it can help | Cost-variant arms with matched controls; survival of touching lineages |
 | H7 | Step size: new edges enter at weights too small to matter or large enough to be lethal | Initial-weight distribution arms |
+| H8 | Node boundary: a Graph edge reads only its own node (`GraphSource` in `cgp.rs`); other nodes reach it only through the 24-slot upstream baton from the previous hop or the 16 shared-memory slots. A new node's output then needs extra steps to reach anything, and mesh, Graph and VM operators split the mutation supply | Extend the H3 census to count how many partial paths cross a node boundary. If the boundary is implicated, a prototype arm adds a cross-node edge source that reads another node's last value this tick (zero if that node has not run yet). Analog: axon growth forming a direct projection between existing regions. It changes evaluation semantics, so it needs matched controls |
+
+H8 comes from a 2026-10-01 user question: why not make the mesh one graph,
+with VM and Graph nodes as node kinds inside it? That question bundles two
+changes. One address space is H8. Nesting graphs inside graphs (embedded CGP
+modules, Koza's automatically defined functions) is not an arm. Miller's
+review ([2020](https://link.springer.com/article/10.1007/s10710-019-09360-6), Section 3.2)
+calls the module comparisons unfair because the modular runs got larger
+genotypes, and leaves "whether module acquisition is beneficial" an open
+question. The
+[incremental-recruitment note](incremental-recruitment-research-2026-09-19.md)
+already rules out replacing the mesh before the smaller contest.
 
 ## Options considered
 
 | Option | Verdict | Why |
 | --- | --- | --- |
-| Stay inside the T22 contract (overlays, genome and arena files, lab code) | Rejected as the whole scope | Cannot test node architecture or operator changes, which H3–H7 need |
+| Stay inside the T22 contract (overlays, genome and arena files, lab code) | Rejected as the whole scope | Cannot test node architecture or operator changes, which H3–H8 need |
 | Branch-only prototypes as labelled arms | **Adopted** | Tests representation and operator changes on the real engine; nothing reaches production without a roadmap feature |
 | Run each change through the feature workflow | Rejected | T22 says lab exploration is not a feature; spec, mutation and benchmark gates buy nothing for throwaway arms |
 | [karpathy/autoresearch](https://github.com/karpathy/autoresearch) (checked 2026-10-01): one editable file, fixed 5-minute runs, keep the commit if `val_bpb` improves, else reset; never stop to ask | Partly borrowed | Borrowed: fresh branch, fixed per-run wall budget, append-only log, crash → log and move on, no pausing to ask. **Not** its keep-if-score-improves rule: hill-climbing a lab score is the engineered-solution pattern the natural-analog rule forbids |
@@ -257,7 +269,7 @@ Stages, which may step back: **0 Instrument** (pilot one full cycle and set
 the cycle budget from its turns and wall time; record the baselines;
 characterize the benefit rate with more replicates; list which families the
 current scenes can expose), **1 Diagnose** (which rung, and why, per exposed
-family), **2 Mechanism** (arms against H3–H7 and new hypotheses), **3
+family), **2 Mechanism** (arms against H3–H8 and new hypotheses), **3
 Confirm** (holdout, ablations, the natural-world check). Start Stage 3 by
 turn 105 so confirmation is not squeezed out by more exploration.
 
