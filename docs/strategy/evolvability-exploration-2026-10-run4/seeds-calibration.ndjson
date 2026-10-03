@@ -1,0 +1,12 @@
+{"assay":"food","seed":5,"verdict":"calibrated","selected":{"food_fraction":0.04,"scale":null,"lifetime":200},"reach_threshold":18.45}
+{"assay":"food","seed":6,"verdict":"calibrated","selected":{"food_fraction":0.04,"scale":null,"lifetime":200},"reach_threshold":20.895833333333332}
+{"assay":"food","seed":7,"verdict":"calibrated","selected":{"food_fraction":0.02,"scale":null,"lifetime":200},"reach_threshold":10.652840909090909}
+{"assay":"food","seed":8,"verdict":"calibrated","selected":{"food_fraction":0.04,"scale":null,"lifetime":200},"reach_threshold":21.238095238095237}
+{"assay":"food","seed":9,"verdict":"calibrated","selected":{"food_fraction":0.04,"scale":null,"lifetime":200},"reach_threshold":22.059375000000003}
+{"assay":"food","seed":10,"verdict":"calibrated","selected":{"food_fraction":0.04,"scale":null,"lifetime":200},"reach_threshold":21.330208333333335}
+{"assay":"wall","seed":5,"verdict":"calibrated","selected":{"food_fraction":null,"scale":2,"lifetime":200},"reach_threshold":5.641129248674497}
+{"assay":"wall","seed":6,"verdict":"calibrated","selected":{"food_fraction":null,"scale":2,"lifetime":200},"reach_threshold":5.882919343691239}
+{"assay":"wall","seed":7,"verdict":"calibrated","selected":{"food_fraction":null,"scale":2,"lifetime":200},"reach_threshold":6.2648121935068195}
+{"assay":"wall","seed":8,"verdict":"calibrated","selected":{"food_fraction":null,"scale":2,"lifetime":200},"reach_threshold":5.71901629795697}
+{"assay":"wall","seed":9,"verdict":"calibrated","selected":{"food_fraction":null,"scale":2,"lifetime":200},"reach_threshold":5.5355785362732615}
+{"assay":"wall","seed":10,"verdict":"calibrated","selected":{"food_fraction":null,"scale":2,"lifetime":200},"reach_threshold":5.484904070878195}
