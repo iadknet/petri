@@ -1,0 +1,1481 @@
+{
+ "row": "E4",
+ "config": {
+  "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+  "executed_bias": 0.9,
+  "executed_window_ticks": 100,
+  "food_types": 2,
+  "mesh_layer_probability": 0.2,
+  "neutral_input_recruitment": "Off",
+  "per_unit_rate": 0.005,
+  "scene_seed": 239455822
+ },
+ "elites": [
+  "elite0=/Users/istefanek/projects/petri/.bench-artifacts/lab/exploration/run4/m1-food-s5/elites/native-0.json",
+  "elite1=/Users/istefanek/projects/petri/.bench-artifacts/lab/exploration/run4/m1-food-s6/elites/native-0.json",
+  "elite2=/Users/istefanek/projects/petri/.bench-artifacts/lab/exploration/run4/m1-food-s7/elites/native-0.json"
+ ],
+ "parents": [
+  {
+   "parent": "founder",
+   "genome_size": 97,
+   "nodes": 2,
+   "executed_resolved": [
+    0,
+    1
+   ],
+   "births": 10000000,
+   "wall_secs": 23.647462666,
+   "identical_share": 0.7019132,
+   "zero_event_share": 0.61504,
+   "multi_event_share": 0.0511396,
+   "applied_events_per_birth": 0.357669,
+   "single_event_share": 0.24865,
+   "rates_all_births": {
+    "declare_target_on_vote_node": {
+     "count": 2009,
+     "cp95": [
+      0.00019221099539107334,
+      0.00020988049695674915
+     ],
+     "of": 10000000,
+     "rate": 0.0002009
+    },
+    "lose_declaration": null,
+    "connect_any": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_cardinal_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_component_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_signed": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_wrong_sign": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    }
+   },
+   "rates_single_event_births": {
+    "births": 2486500,
+    "declare_target_on_vote_node": {
+     "count": 1382,
+     "cp95": [
+      0.0005268884930743067,
+      0.0005858874257337887
+     ],
+     "of": 2486500,
+     "rate": 0.0005558013271667002
+    },
+    "lose_declaration": null,
+    "connect_any": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.4835619214781381e-06
+     ],
+     "of": 2486500,
+     "rate": 0.0
+    },
+    "connect_cardinal_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.4835619214781381e-06
+     ],
+     "of": 2486500,
+     "rate": 0.0
+    },
+    "connect_useful_signed": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.4835619214781381e-06
+     ],
+     "of": 2486500,
+     "rate": 0.0
+    }
+   },
+   "connect_occurrences": {
+    "total": 0,
+    "sinks": 0,
+    "compute_nodes": 0,
+    "move_sinks": 0,
+    "by_sub": {},
+    "zero_weight_edges": 0
+   },
+   "lose_declaration_by_class": null,
+   "authored_edge": null,
+   "factor_vs_section_2_1": {
+    "declare": 0.6278125,
+    "lose_unconnected": null,
+    "useful_connect": null
+   }
+  },
+  {
+   "parent": "founder+declared",
+   "genome_size": 98,
+   "nodes": 2,
+   "executed_resolved": [
+    0,
+    1
+   ],
+   "births": 10000000,
+   "wall_secs": 19.596662875,
+   "identical_share": 0.6993936,
+   "zero_event_share": 0.6119985,
+   "multi_event_share": 0.0521463,
+   "applied_events_per_birth": 0.3613126,
+   "single_event_share": 0.2500624,
+   "rates_all_births": {
+    "declare_target_on_vote_node": {
+     "count": 2040,
+     "cp95": [
+      0.0001952434934680558,
+      0.00021304798054772034
+     ],
+     "of": 10000000,
+     "rate": 0.000204
+    },
+    "lose_declaration": {
+     "count": 186426,
+     "cp95": [
+      0.018558856371115928,
+      0.01872662247363116
+     ],
+     "of": 10000000,
+     "rate": 0.0186426
+    },
+    "connect_any": {
+     "count": 5294,
+     "cp95": [
+      0.0005152378997432261,
+      0.0005438525671150329
+     ],
+     "of": 10000000,
+     "rate": 0.0005294
+    },
+    "connect_cardinal_move": {
+     "count": 806,
+     "cp95": [
+      7.513114875451476e-05,
+      8.636166863479344e-05
+     ],
+     "of": 10000000,
+     "rate": 8.06e-05
+    },
+    "connect_useful_component_move": {
+     "count": 116,
+     "cp95": [
+      9.585313512305849e-06,
+      1.3913078952543234e-05
+     ],
+     "of": 10000000,
+     "rate": 1.16e-05
+    },
+    "connect_useful_signed": {
+     "count": 55,
+     "cp95": [
+      4.143355202546051e-06,
+      7.159000060152909e-06
+     ],
+     "of": 10000000,
+     "rate": 5.5e-06
+    },
+    "connect_useful_wrong_sign": {
+     "count": 61,
+     "cp95": [
+      4.666019705334978e-06,
+      7.835698391744916e-06
+     ],
+     "of": 10000000,
+     "rate": 6.1e-06
+    }
+   },
+   "rates_single_event_births": {
+    "births": 2500624,
+    "declare_target_on_vote_node": {
+     "count": 1427,
+     "cp95": [
+      0.0005414377605266751,
+      0.0006010438067048374
+     ],
+     "of": 2500624,
+     "rate": 0.0005706575638720576
+    },
+    "lose_declaration": {
+     "count": 131468,
+     "cp95": [
+      0.05229777655409101,
+      0.0528514151991773
+     ],
+     "of": 2500624,
+     "rate": 0.05257407751025344
+    },
+    "connect_any": {
+     "count": 3753,
+     "cp95": [
+      0.0014532232797501154,
+      0.0015495878350067493
+     ],
+     "of": 2500624,
+     "rate": 0.001500825393981662
+    },
+    "connect_cardinal_move": {
+     "count": 564,
+     "cp95": [
+      0.00020731318612693395,
+      0.00024494752862075364
+     ],
+     "of": 2500624,
+     "rate": 0.00022554370429140886
+    },
+    "connect_useful_signed": {
+     "count": 37,
+     "cp95": [
+      1.0417986293920212e-05,
+      2.0394702838377743e-05
+     ],
+     "of": 2500624,
+     "rate": 1.4796306841812284e-05
+    }
+   },
+   "connect_occurrences": {
+    "total": 5300,
+    "sinks": 2927,
+    "compute_nodes": 2373,
+    "move_sinks": 876,
+    "by_sub": {
+     "0": 1963,
+     "1": 592,
+     "2": 548,
+     "3": 527,
+     "4": 578,
+     "5": 544,
+     "6": 548
+    },
+    "zero_weight_edges": 0
+   },
+   "lose_declaration_by_class": {
+    "prune_only": 99622,
+    "swap_only": 28906,
+    "raw_field_only": 44792,
+    "prune_any": 109638,
+    "swap_any": 36821,
+    "raw_field_any": 53167,
+    "add_only_or_none": 61,
+    "total": 186426
+   },
+   "authored_edge": null,
+   "factor_vs_section_2_1": {
+    "declare": 0.6375,
+    "lose_unconnected": 2.1677441860465114,
+    "useful_connect": 11.458333333333334
+   },
+   "ratio_lose_to_useful_connect": {
+    "point_single": 3553.189189189189,
+    "point_all": 3389.5636363636363,
+    "lower_bound": 2564.282351576099,
+    "upper_bound": 5073.093178287308,
+    "verdict": "supported"
+   }
+  },
+  {
+   "parent": "founder+declared+zero-edge",
+   "genome_size": 99,
+   "nodes": 2,
+   "executed_resolved": [
+    0,
+    1
+   ],
+   "births": 10000000,
+   "wall_secs": 21.470907792,
+   "identical_share": 0.6967184,
+   "zero_event_share": 0.6087012,
+   "multi_event_share": 0.0528779,
+   "applied_events_per_birth": 0.3649639,
+   "single_event_share": 0.2520445,
+   "rates_all_births": {
+    "declare_target_on_vote_node": {
+     "count": 2076,
+     "cp95": [
+      0.00019876574512917022,
+      0.00021672570816805292
+     ],
+     "of": 10000000,
+     "rate": 0.0002076
+    },
+    "lose_declaration": {
+     "count": 79606,
+     "cp95": [
+      0.007905613547617263,
+      0.008015871610115577
+     ],
+     "of": 10000000,
+     "rate": 0.0079606
+    },
+    "connect_any": {
+     "count": 6818,
+     "cp95": [
+      0.0006657165906359119,
+      0.0006981736281972961
+     ],
+     "of": 10000000,
+     "rate": 0.0006818
+    },
+    "connect_cardinal_move": {
+     "count": 2089,
+     "cp95": [
+      0.00020003783533767416,
+      0.00021805361060817097
+     ],
+     "of": 10000000,
+     "rate": 0.0002089
+    },
+    "connect_useful_component_move": {
+     "count": 122,
+     "cp95": [
+      1.013137246747009e-05,
+      1.4566799741599912e-05
+     ],
+     "of": 10000000,
+     "rate": 1.22e-05
+    },
+    "connect_useful_signed": {
+     "count": 59,
+     "cp95": [
+      4.491356224212151e-06,
+      7.610563629356637e-06
+     ],
+     "of": 10000000,
+     "rate": 5.9e-06
+    },
+    "connect_useful_wrong_sign": {
+     "count": 63,
+     "cp95": [
+      4.8410962202871666e-06,
+      8.060429635470268e-06
+     ],
+     "of": 10000000,
+     "rate": 6.3e-06
+    }
+   },
+   "rates_single_event_births": {
+    "births": 2520445,
+    "declare_target_on_vote_node": {
+     "count": 1479,
+     "cp95": [
+      0.0005572810329022571,
+      0.0006174782924220357
+     ],
+     "of": 2520445,
+     "rate": 0.0005868011402748324
+    },
+    "lose_declaration": {
+     "count": 56210,
+     "cp95": [
+      0.02211967067979842,
+      0.02248466274727151
+     ],
+     "of": 2520445,
+     "rate": 0.022301617373122605
+    },
+    "connect_any": {
+     "count": 4884,
+     "cp95": [
+      0.0018838354065685015,
+      0.0019928201166697357
+     ],
+     "of": 2520445,
+     "rate": 0.0019377530555120227
+    },
+    "connect_cardinal_move": {
+     "count": 1478,
+     "cp95": [
+      0.0005568943815463245,
+      0.0006170714374152397
+     ],
+     "of": 2520445,
+     "rate": 0.000586404384939961
+    },
+    "connect_useful_signed": {
+     "count": 42,
+     "cp95": [
+      1.2009771938770175e-05,
+      2.2524448022809285e-05
+     ],
+     "of": 2520445,
+     "rate": 1.6663724064599703e-05
+    }
+   },
+   "connect_occurrences": {
+    "total": 6823,
+    "sinks": 4195,
+    "compute_nodes": 2628,
+    "move_sinks": 2168,
+    "by_sub": {
+     "0": 1899,
+     "1": 595,
+     "2": 1238,
+     "3": 728,
+     "4": 1230,
+     "5": 588,
+     "6": 545
+    },
+    "zero_weight_edges": 1351
+   },
+   "lose_declaration_by_class": {
+    "prune_only": 19,
+    "swap_only": 29330,
+    "raw_field_only": 45313,
+    "prune_any": 1873,
+    "swap_any": 33134,
+    "raw_field_any": 49497,
+    "add_only_or_none": 66,
+    "total": 79606
+   },
+   "authored_edge": {
+    "all_births": {
+     "reweighted": {
+      "count": 2213,
+      "cp95": [
+       0.00021217586765315266,
+       0.0002307155106255343
+      ],
+      "of": 10000000,
+      "rate": 0.0002213
+     },
+     "retargeted_probe_class": {
+      "count": 82768,
+      "cp95": [
+       0.008220739173733171,
+       0.008333145794356012
+      ],
+      "of": 10000000,
+      "rate": 0.0082768
+     },
+     "removed": {
+      "count": 1114,
+      "cp95": [
+       0.00010495385609970986,
+       0.00011813843262514778
+      ],
+      "of": 10000000,
+      "rate": 0.0001114
+     },
+     "node_deleted": {
+      "count": 72,
+      "cp95": [
+       5.633560681561622e-06,
+       9.067199933487924e-06
+      ],
+      "of": 10000000,
+      "rate": 7.2e-06
+     }
+    },
+    "single_event": {
+     "reweighted": {
+      "count": 1550,
+      "cp95": [
+       0.0005847418237337476,
+       0.0006463564617510964
+      ],
+      "of": 2520445,
+      "rate": 0.0006149707690507034
+     },
+     "retargeted": {
+      "count": 58520,
+      "cp95": [
+       0.023032553531509292,
+       0.02340478740652069
+      ],
+      "of": 2520445,
+      "rate": 0.023218122196675586
+     },
+     "removed": {
+      "count": 794,
+      "cp95": [
+       0.0002934930561938054,
+       0.0003377157419380272
+      ],
+      "of": 2520445,
+      "rate": 0.00031502373588790866
+     },
+     "node_deleted": {
+      "count": 0,
+      "cp95": [
+       0.0,
+       1.4635815321351053e-06
+      ],
+      "of": 2520445,
+      "rate": 0.0
+     }
+    },
+    "fates_by_stratum_and_operator_class": {
+     "multi": {
+      "node_deleted": 72,
+      "removed": 320,
+      "declaration_changed": 23530,
+      "retargeted_other": 461,
+      "retargeted_true": 257,
+      "reweighted": 663
+     },
+     "single": {
+      "removed": 794,
+      "retargeted_other": 1522,
+      "retargeted_true": 788,
+      "declaration_changed": 56210,
+      "reweighted": 1550
+     }
+    }
+   },
+   "factor_vs_section_2_1": {
+    "declare": 0.6487499999999999,
+    "lose_unconnected": 0.9256511627906977,
+    "useful_connect": 12.291666666666668
+   },
+   "ratio_lose_to_useful_connect": {
+    "point_single": 1338.3333333333335,
+    "point_all": 1349.2542372881355,
+    "lower_bound": 982.029422314768,
+    "upper_bound": 1872.1973124806887,
+    "verdict": "inconclusive"
+   }
+  },
+  {
+   "parent": "elite0",
+   "genome_size": 100,
+   "nodes": 3,
+   "executed_resolved": [
+    0,
+    1
+   ],
+   "births": 10000000,
+   "wall_secs": 28.070705625,
+   "identical_share": 0.6949144,
+   "zero_event_share": 0.6058781,
+   "multi_event_share": 0.053742,
+   "applied_events_per_birth": 0.3682806,
+   "single_event_share": 0.2534612,
+   "rates_all_births": {
+    "declare_target_on_vote_node": {
+     "count": 2321,
+     "cp95": [
+      0.0002227536277828457,
+      0.0002417376953533501
+     ],
+     "of": 10000000,
+     "rate": 0.0002321
+    },
+    "lose_declaration": null,
+    "connect_any": {
+     "count": 1,
+     "cp95": [
+      2.531780840531184e-09,
+      5.571642132662369e-07
+     ],
+     "of": 10000000,
+     "rate": 1e-07
+    },
+    "connect_cardinal_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_component_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_signed": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_wrong_sign": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    }
+   },
+   "rates_single_event_births": {
+    "births": 2534612,
+    "declare_target_on_vote_node": {
+     "count": 1641,
+     "cp95": [
+      0.0006164961517474699,
+      0.0006795265288107033
+     ],
+     "of": 2534612,
+     "rate": 0.000647436372904413
+    },
+    "lose_declaration": null,
+    "connect_any": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.4554009724609962e-06
+     ],
+     "of": 2534612,
+     "rate": 0.0
+    },
+    "connect_cardinal_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.4554009724609962e-06
+     ],
+     "of": 2534612,
+     "rate": 0.0
+    },
+    "connect_useful_signed": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.4554009724609962e-06
+     ],
+     "of": 2534612,
+     "rate": 0.0
+    }
+   },
+   "connect_occurrences": {
+    "total": 1,
+    "sinks": 1,
+    "compute_nodes": 0,
+    "move_sinks": 0,
+    "by_sub": {
+     "5": 1
+    },
+    "zero_weight_edges": 0
+   },
+   "lose_declaration_by_class": null,
+   "authored_edge": null,
+   "factor_vs_section_2_1": {
+    "declare": 0.7253124999999999,
+    "lose_unconnected": null,
+    "useful_connect": null
+   }
+  },
+  {
+   "parent": "elite0+declared",
+   "genome_size": 101,
+   "nodes": 3,
+   "executed_resolved": [
+    0,
+    1
+   ],
+   "births": 10000000,
+   "wall_secs": 25.9862055,
+   "identical_share": 0.6916726,
+   "zero_event_share": 0.6026496,
+   "multi_event_share": 0.0546838,
+   "applied_events_per_birth": 0.3722417,
+   "single_event_share": 0.2553052,
+   "rates_all_births": {
+    "declare_target_on_vote_node": {
+     "count": 2008,
+     "cp95": [
+      0.00019211318151940437,
+      0.00020977831142804382
+     ],
+     "of": 10000000,
+     "rate": 0.0002008
+    },
+    "lose_declaration": {
+     "count": 300605,
+     "cp95": [
+      0.02995475367436845,
+      0.03016651850698654
+     ],
+     "of": 10000000,
+     "rate": 0.0300605
+    },
+    "connect_any": {
+     "count": 5132,
+     "cp95": [
+      0.0004992576242647817,
+      0.0005274328727385424
+     ],
+     "of": 10000000,
+     "rate": 0.0005132
+    },
+    "connect_cardinal_move": {
+     "count": 753,
+     "cp95": [
+      7.001720708638137e-05,
+      8.087573163290118e-05
+     ],
+     "of": 10000000,
+     "rate": 7.53e-05
+    },
+    "connect_useful_component_move": {
+     "count": 100,
+     "cp95": [
+      8.13640624225398e-06,
+      1.2162666226334107e-05
+     ],
+     "of": 10000000,
+     "rate": 1e-05
+    },
+    "connect_useful_signed": {
+     "count": 49,
+     "cp95": [
+      3.62504899359406e-06,
+      6.478054742797834e-06
+     ],
+     "of": 10000000,
+     "rate": 4.9e-06
+    },
+    "connect_useful_wrong_sign": {
+     "count": 51,
+     "cp95": [
+      3.797287154438944e-06,
+      6.705552750230215e-06
+     ],
+     "of": 10000000,
+     "rate": 5.1e-06
+    }
+   },
+   "rates_single_event_births": {
+    "births": 2553052,
+    "declare_target_on_vote_node": {
+     "count": 1421,
+     "cp95": [
+      0.0005280298091477342,
+      0.0005862902136822279
+     ],
+     "of": 2553052,
+     "rate": 0.0005565887416315845
+    },
+    "lose_declaration": {
+     "count": 213099,
+     "cp95": [
+      0.08312933606396117,
+      0.08380827939326713
+     ],
+     "of": 2553052,
+     "rate": 0.08346833515337722
+    },
+    "connect_any": {
+     "count": 3638,
+     "cp95": [
+      0.001379060559425549,
+      0.0014719985776791567
+     ],
+     "of": 2553052,
+     "rate": 0.0014249611837126703
+    },
+    "connect_cardinal_move": {
+     "count": 528,
+     "cp95": [
+      0.0001895464902597621,
+      0.00022522589702461682
+     ],
+     "of": 2553052,
+     "rate": 0.00020681129879062394
+    },
+    "connect_useful_signed": {
+     "count": 37,
+     "cp95": [
+      1.0204048172146596e-05,
+      1.9975890156842535e-05
+     ],
+     "of": 2553052,
+     "rate": 1.4492458437979328e-05
+    }
+   },
+   "connect_occurrences": {
+    "total": 5135,
+    "sinks": 2755,
+    "compute_nodes": 2380,
+    "move_sinks": 802,
+    "by_sub": {
+     "0": 1899,
+     "1": 559,
+     "2": 520,
+     "3": 540,
+     "4": 563,
+     "5": 492,
+     "6": 562
+    },
+    "zero_weight_edges": 0
+   },
+   "lose_declaration_by_class": {
+    "prune_only": 200843,
+    "swap_only": 29869,
+    "raw_field_only": 46052,
+    "prune_any": 221501,
+    "swap_any": 43701,
+    "raw_field_any": 59740,
+    "add_only_or_none": 0,
+    "total": 300605
+   },
+   "authored_edge": null,
+   "factor_vs_section_2_1": {
+    "declare": 0.6275,
+    "lose_unconnected": 3.495406976744186,
+    "useful_connect": 10.208333333333334
+   },
+   "ratio_lose_to_useful_connect": {
+    "point_single": 5759.4324324324325,
+    "point_all": 6134.795918367347,
+    "lower_bound": 4161.48343884871,
+    "upper_bound": 8213.238312813317,
+    "verdict": "supported"
+   }
+  },
+  {
+   "parent": "elite1",
+   "genome_size": 98,
+   "nodes": 2,
+   "executed_resolved": [
+    0,
+    1
+   ],
+   "births": 10000000,
+   "wall_secs": 19.928640167,
+   "identical_share": 0.6994327,
+   "zero_event_share": 0.6116018,
+   "multi_event_share": 0.0519918,
+   "applied_events_per_birth": 0.3614036,
+   "single_event_share": 0.2505291,
+   "rates_all_births": {
+    "declare_target_on_vote_node": {
+     "count": 2434,
+     "cp95": [
+      0.00023382657109288774,
+      0.0002532646978370967
+     ],
+     "of": 10000000,
+     "rate": 0.0002434
+    },
+    "lose_declaration": null,
+    "connect_any": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_cardinal_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_component_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_signed": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_wrong_sign": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    }
+   },
+   "rates_single_event_births": {
+    "births": 2505291,
+    "declare_target_on_vote_node": {
+     "count": 1736,
+     "cp95": [
+      0.0006607276455840583,
+      0.0007263023267040647
+     ],
+     "of": 2505291,
+     "rate": 0.0006929334755922565
+    },
+    "lose_declaration": null,
+    "connect_any": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.4724344351013663e-06
+     ],
+     "of": 2505291,
+     "rate": 0.0
+    },
+    "connect_cardinal_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.4724344351013663e-06
+     ],
+     "of": 2505291,
+     "rate": 0.0
+    },
+    "connect_useful_signed": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.4724344351013663e-06
+     ],
+     "of": 2505291,
+     "rate": 0.0
+    }
+   },
+   "connect_occurrences": {
+    "total": 0,
+    "sinks": 0,
+    "compute_nodes": 0,
+    "move_sinks": 0,
+    "by_sub": {},
+    "zero_weight_edges": 0
+   },
+   "lose_declaration_by_class": null,
+   "authored_edge": null,
+   "factor_vs_section_2_1": {
+    "declare": 0.760625,
+    "lose_unconnected": null,
+    "useful_connect": null
+   }
+  },
+  {
+   "parent": "elite1+declared",
+   "genome_size": 99,
+   "nodes": 2,
+   "executed_resolved": [
+    0,
+    1
+   ],
+   "births": 10000000,
+   "wall_secs": 20.575564292,
+   "identical_share": 0.6967047,
+   "zero_event_share": 0.6089187,
+   "multi_event_share": 0.0528658,
+   "applied_events_per_birth": 0.3648057,
+   "single_event_share": 0.2519378,
+   "rates_all_births": {
+    "declare_target_on_vote_node": {
+     "count": 1988,
+     "cp95": [
+      0.00019015701903973836,
+      0.0002077344859633956
+     ],
+     "of": 10000000,
+     "rate": 0.0001988
+    },
+    "lose_declaration": {
+     "count": 294332,
+     "cp95": [
+      0.029328530068548242,
+      0.02953814247667369
+     ],
+     "of": 10000000,
+     "rate": 0.0294332
+    },
+    "connect_any": {
+     "count": 5148,
+     "cp95": [
+      0.0005008357698951804,
+      0.0005290547240536791
+     ],
+     "of": 10000000,
+     "rate": 0.0005148
+    },
+    "connect_cardinal_move": {
+     "count": 743,
+     "cp95": [
+      6.905303933130158e-05,
+      7.983992367471826e-05
+     ],
+     "of": 10000000,
+     "rate": 7.43e-05
+    },
+    "connect_useful_component_move": {
+     "count": 97,
+     "cp95": [
+      7.866053318206223e-06,
+      1.1833164769547988e-05
+     ],
+     "of": 10000000,
+     "rate": 9.7e-06
+    },
+    "connect_useful_signed": {
+     "count": 56,
+     "cp95": [
+      4.230182410858152e-06,
+      7.272059720675461e-06
+     ],
+     "of": 10000000,
+     "rate": 5.6e-06
+    },
+    "connect_useful_wrong_sign": {
+     "count": 41,
+     "cp95": [
+      2.9422322456729155e-06,
+      5.562108885970307e-06
+     ],
+     "of": 10000000,
+     "rate": 4.1e-06
+    }
+   },
+   "rates_single_event_births": {
+    "births": 2519378,
+    "declare_target_on_vote_node": {
+     "count": 1443,
+     "cp95": [
+      0.0005435938957801256,
+      0.0006030846363153652
+     ],
+     "of": 2519378,
+     "rate": 0.000572760419436861
+    },
+    "lose_declaration": {
+     "count": 209784,
+     "cp95": [
+      0.0829272892384863,
+      0.08361001249611394
+     ],
+     "of": 2519378,
+     "rate": 0.08326817174715347
+    },
+    "connect_any": {
+     "count": 3685,
+     "cp95": [
+      0.0014158474023097667,
+      0.0015106296520306928
+     ],
+     "of": 2519378,
+     "rate": 0.0014626626095806186
+    },
+    "connect_cardinal_move": {
+     "count": 514,
+     "cp95": [
+      0.0001867616187976595,
+      0.0002224409930713933
+     ],
+     "of": 2519378,
+     "rate": 0.0002040186109428597
+    },
+    "connect_useful_signed": {
+     "count": 41,
+     "cp95": [
+      1.1678426066141778e-05,
+      2.207726199482396e-05
+     ],
+     "of": 2519378,
+     "rate": 1.6273858071317605e-05
+    }
+   },
+   "connect_occurrences": {
+    "total": 5152,
+    "sinks": 2871,
+    "compute_nodes": 2281,
+    "move_sinks": 804,
+    "by_sub": {
+     "0": 1833,
+     "1": 544,
+     "2": 580,
+     "3": 539,
+     "4": 532,
+     "5": 575,
+     "6": 549
+    },
+    "zero_weight_edges": 0
+   },
+   "lose_declaration_by_class": {
+    "prune_only": 196607,
+    "swap_only": 29332,
+    "raw_field_only": 45503,
+    "prune_any": 216382,
+    "swap_any": 42417,
+    "raw_field_any": 58749,
+    "add_only_or_none": 74,
+    "total": 294332
+   },
+   "authored_edge": null,
+   "factor_vs_section_2_1": {
+    "declare": 0.62125,
+    "lose_unconnected": 3.42246511627907,
+    "useful_connect": 11.666666666666668
+   },
+   "ratio_lose_to_useful_connect": {
+    "point_single": 5116.682926829268,
+    "point_all": 5255.928571428572,
+    "lower_bound": 3756.230698259988,
+    "upper_bound": 7159.356237097481,
+    "verdict": "supported"
+   }
+  },
+  {
+   "parent": "elite2",
+   "genome_size": 111,
+   "nodes": 4,
+   "executed_resolved": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "births": 10000000,
+   "wall_secs": 17.255355083,
+   "identical_share": 0.5753871,
+   "zero_event_share": 0.57337,
+   "multi_event_share": 0.1067191,
+   "applied_events_per_birth": 0.5544569,
+   "single_event_share": 0.3199109,
+   "rates_all_births": {
+    "declare_target_on_vote_node": {
+     "count": 1036,
+     "cp95": [
+      9.738701328360078e-05,
+      0.00011010538761152544
+     ],
+     "of": 10000000,
+     "rate": 0.0001036
+    },
+    "lose_declaration": null,
+    "connect_any": {
+     "count": 1,
+     "cp95": [
+      2.531780840531184e-09,
+      5.571642132662369e-07
+     ],
+     "of": 10000000,
+     "rate": 1e-07
+    },
+    "connect_cardinal_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_component_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_signed": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    },
+    "connect_useful_wrong_sign": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      3.6888787741107265e-07
+     ],
+     "of": 10000000,
+     "rate": 0.0
+    }
+   },
+   "rates_single_event_births": {
+    "births": 3199109,
+    "declare_target_on_vote_node": {
+     "count": 607,
+     "cp95": [
+      0.0001749454968205666,
+      0.00020545190013881998
+     ],
+     "of": 3199109,
+     "rate": 0.00018974033082336364
+    },
+    "lose_declaration": null,
+    "connect_any": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.153095229688983e-06
+     ],
+     "of": 3199109,
+     "rate": 0.0
+    },
+    "connect_cardinal_move": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.153095229688983e-06
+     ],
+     "of": 3199109,
+     "rate": 0.0
+    },
+    "connect_useful_signed": {
+     "count": 0,
+     "cp95": [
+      0.0,
+      1.153095229688983e-06
+     ],
+     "of": 3199109,
+     "rate": 0.0
+    }
+   },
+   "connect_occurrences": {
+    "total": 1,
+    "sinks": 0,
+    "compute_nodes": 1,
+    "move_sinks": 0,
+    "by_sub": {
+     "0": 1
+    },
+    "zero_weight_edges": 0
+   },
+   "lose_declaration_by_class": null,
+   "authored_edge": null,
+   "factor_vs_section_2_1": {
+    "declare": 0.32375,
+    "lose_unconnected": null,
+    "useful_connect": null
+   }
+  },
+  {
+   "parent": "elite2+declared",
+   "genome_size": 112,
+   "nodes": 4,
+   "executed_resolved": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "births": 10000000,
+   "wall_secs": 17.701353125,
+   "identical_share": 0.5723195,
+   "zero_event_share": 0.570392,
+   "multi_event_share": 0.1082177,
+   "applied_events_per_birth": 0.559453,
+   "single_event_share": 0.3213903,
+   "rates_all_births": {
+    "declare_target_on_vote_node": {
+     "count": 1121,
+     "cp95": [
+      0.00010563333701923971,
+      0.000118858942191713
+     ],
+     "of": 10000000,
+     "rate": 0.0001121
+    },
+    "lose_declaration": {
+     "count": 206415,
+     "cp95": [
+      0.02055346572005251,
+      0.020729811958913935
+     ],
+     "of": 10000000,
+     "rate": 0.0206415
+    },
+    "connect_any": {
+     "count": 3861,
+     "cp95": [
+      0.00037401861348468346,
+      0.0003984721656629664
+     ],
+     "of": 10000000,
+     "rate": 0.0003861
+    },
+    "connect_cardinal_move": {
+     "count": 551,
+     "cp95": [
+      5.0594846934426396e-05,
+      5.989870028205724e-05
+     ],
+     "of": 10000000,
+     "rate": 5.51e-05
+    },
+    "connect_useful_component_move": {
+     "count": 86,
+     "cp95": [
+      6.878895432327337e-06,
+      1.0620919306980614e-05
+     ],
+     "of": 10000000,
+     "rate": 8.6e-06
+    },
+    "connect_useful_signed": {
+     "count": 40,
+     "cp95": [
+      2.857660041322152e-06,
+      5.446860748603566e-06
+     ],
+     "of": 10000000,
+     "rate": 4e-06
+    },
+    "connect_useful_wrong_sign": {
+     "count": 46,
+     "cp95": [
+      3.3677799372022754e-06,
+      6.1357506600523415e-06
+     ],
+     "of": 10000000,
+     "rate": 4.6e-06
+    }
+   },
+   "rates_single_event_births": {
+    "births": 3213903,
+    "declare_target_on_vote_node": {
+     "count": 682,
+     "cp95": [
+      0.00019657524123545267,
+      0.00022874262846112048
+     ],
+     "of": 3213903,
+     "rate": 0.00021220304408689372
+    },
+    "lose_declaration": {
+     "count": 120638,
+     "cp95": [
+      0.037328750750499184,
+      0.03774466610358168
+     ],
+     "of": 3213903,
+     "rate": 0.037536291543335314
+    },
+    "connect_any": {
+     "count": 2239,
+     "cp95": [
+      0.000668109575408915,
+      0.0007261175978003354
+     ],
+     "of": 3213903,
+     "rate": 0.0006966607268483212
+    },
+    "connect_cardinal_move": {
+     "count": 323,
+     "cp95": [
+      8.983878167817538e-05,
+      0.00011208012841795734
+     ],
+     "of": 3213903,
+     "rate": 0.00010050085519071359
+    },
+    "connect_useful_signed": {
+     "count": 21,
+     "cp95": [
+      4.04472223963781e-06,
+      9.988066003330243e-06
+     ],
+     "of": 3213903,
+     "rate": 6.53411132818881e-06
+    }
+   },
+   "connect_occurrences": {
+    "total": 3861,
+    "sinks": 2086,
+    "compute_nodes": 1775,
+    "move_sinks": 638,
+    "by_sub": {
+     "0": 1447,
+     "1": 412,
+     "2": 398,
+     "3": 412,
+     "4": 433,
+     "5": 384,
+     "6": 375
+    },
+    "zero_weight_edges": 0
+   },
+   "lose_declaration_by_class": {
+    "prune_only": 111633,
+    "swap_only": 32909,
+    "raw_field_only": 45830,
+    "prune_any": 124056,
+    "swap_any": 42890,
+    "raw_field_any": 55804,
+    "add_only_or_none": 8,
+    "total": 206415
+   },
+   "authored_edge": null,
+   "factor_vs_section_2_1": {
+    "declare": 0.35031249999999997,
+    "lose_unconnected": 2.400174418604651,
+    "useful_connect": 8.333333333333334
+   },
+   "ratio_lose_to_useful_connect": {
+    "point_single": 5744.666666666666,
+    "point_all": 5160.375,
+    "lower_bound": 3737.335209644485,
+    "upper_bound": 9331.831425576846,
+    "verdict": "supported"
+   }
+  }
+ ],
+ "section_2_1_estimates": {
+  "declare": 0.00032,
+  "lose_unconnected": 0.0086,
+  "useful_connect": 4.8e-07
+ },
+ "probe_sha256": "aa0d423391257d7b619aa528539b74b59fe04915b4e83abd951c37c5bea4c235",
+ "reader_sha256": "fedfc58fff569966824b243af684edd9206202f79214ea78225100fb8a7253b5"
+}
