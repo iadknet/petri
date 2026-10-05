@@ -1,0 +1,2294 @@
+{
+ "row": "E10",
+ "kind": "descriptive",
+ "source": "run 6 main batches food-s12 and wall-s12 (the only completed ones)",
+ "decision_rule": "a clear ALT excess on both assays (b - c >= 2 of 8 on each) reorders E5 behind a dense-afferent variant",
+ "alt_excess_on_both": false,
+ "batches": {
+  "food": {
+   "batch": "food-s12",
+   "assay": "food-seeking-hunger",
+   "horizon": 1000,
+   "horizon_matches_frozen": true,
+   "exit_code": 0,
+   "incomplete": null,
+   "calibration_verdict": "calibrated",
+   "sizes": {
+    "replicates": 8,
+    "generations": 1000,
+    "population": 32,
+    "elite_fraction": 0.25,
+    "scenes": 4,
+    "validation_scenes": 8,
+    "arena_size": 64,
+    "start_energy": 20.0,
+    "energy_ceiling": 20.0,
+    "food_fraction": 0.02,
+    "scale": null,
+    "lifetime": 200,
+    "blocked_weight": 0.0,
+    "efficiency_weight": 0.0,
+    "quick": true,
+    "mutants": 8,
+    "signature_arms": "changing",
+    "stall_rates": {
+     "supply": 0.01,
+     "viability": 0.05,
+     "benefit": 0.05,
+     "retention": 0.2
+    },
+    "retention_depth": 2,
+    "relevant_families": [
+     "FoodHere(*)",
+     "NeighborFoodRing(*)",
+     "AreaFoodSummary(*)"
+    ]
+   },
+   "genome_sha256": {
+    "start": "e24ef162d4848e40963cf00b75c62cb898b5d2decbc5674d3d33975c79eefc3f",
+    "comparator": "a081391f475158b296effec51185322f3517b4378cff1ed978c03c0bed14b011",
+    "arm:alt": "fbb1a6edc01bdf7df6d6ac8be69560ddcdb73184e231a97e39a505a54ac5f7e6"
+   },
+   "wall_seconds": 2294.345928292,
+   "alt_vs_n": {
+    "n": 8,
+    "b": 0,
+    "c": 0,
+    "excess": 0.0,
+    "U": 0.3694166475528192,
+    "under_0_25": false
+   },
+   "r_vs_n": {
+    "n": 8,
+    "b": 0,
+    "c": 0,
+    "excess": 0.0,
+    "U": 0.3694166475528192,
+    "under_0_25": false
+   },
+   "arms": {
+    "native": {
+     "role": "reference",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      1.9583333333333333,
+      3.0666666666666664,
+      2.1145833333333335,
+      2.803571428571429,
+      0.7958333333333334,
+      2.9583333333333335,
+      1.65,
+      1.5625
+     ],
+     "final_best_mean": 2.1137276785714287,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      115,
+      138,
+      140,
+      282,
+      269,
+      211,
+      136,
+      123
+     ],
+     "final_genome_size_median": 140,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0,
+      "1000": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.9583333333333333,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 115
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 3.0666666666666664,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 138
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.1145833333333335,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 140
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.803571428571429,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 282
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.7958333333333334,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 269
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.9583333333333335,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 211
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.65,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 136
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.5625,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 123
+      }
+     ]
+    },
+    "native-aa": {
+     "role": "control",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      1.9583333333333333,
+      3.0666666666666664,
+      2.016369047619048,
+      2.803571428571429,
+      2.0625,
+      2.125,
+      1.7083333333333333,
+      2.775
+     ],
+     "final_best_mean": 2.3144717261904764,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      126,
+      137,
+      165,
+      161,
+      131,
+      139,
+      141,
+      137
+     ],
+     "final_genome_size_median": 139,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0,
+      "1000": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.9583333333333333,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 126
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 3.0666666666666664,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 137
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.016369047619048,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 165
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.803571428571429,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 161
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.0625,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 131
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.125,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 139
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.7083333333333333,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 141
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.775,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 137
+      }
+     ]
+    },
+    "alt": {
+     "role": "user",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      2.5000000000000004,
+      3.0666666666666664,
+      1.638888888888889,
+      2.1875,
+      0.9,
+      4.025,
+      1.1874999999999998,
+      1.6458333333333335
+     ],
+     "final_best_mean": 2.143923611111111,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      141,
+      204,
+      325,
+      140,
+      139,
+      476,
+      264,
+      140
+     ],
+     "final_genome_size_median": 204,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0,
+      "1000": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.5000000000000004,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 141
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 3.0666666666666664,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 204
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.638888888888889,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 325
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.1875,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 140
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.9,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 139
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 4.025,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 476
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.1874999999999998,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 264
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.6458333333333335,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 140
+      }
+     ]
+    },
+    "founder-only": {
+     "role": "control",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      1.9583333333333333,
+      3.0666666666666664,
+      2.1145833333333335,
+      2.866071428571429,
+      0.9,
+      2.125,
+      1.7083333333333333,
+      3.1083333333333334
+     ],
+     "final_best_mean": 2.2309151785714287,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      97,
+      97,
+      97,
+      97,
+      97,
+      97,
+      97,
+      97
+     ],
+     "final_genome_size_median": 97,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0,
+      "1000": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.9583333333333333,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 3.0666666666666664,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.1145833333333335,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.866071428571429,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.9,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.125,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.7083333333333333,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 3.1083333333333334,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      }
+     ]
+    },
+    "mutation-off": {
+     "role": "control",
+     "policy": "policy-deviation",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      1.9583333333333333,
+      3.0666666666666664,
+      2.1145833333333335,
+      2.866071428571429,
+      0.9,
+      2.125,
+      1.7083333333333333,
+      3.1083333333333334
+     ],
+     "final_best_mean": 2.2309151785714287,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      97,
+      97,
+      97,
+      97,
+      97,
+      97,
+      97,
+      97
+     ],
+     "final_genome_size_median": 97,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0,
+      "1000": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.9583333333333333,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 3.0666666666666664,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.1145833333333335,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.866071428571429,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.9,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 2.125,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.7083333333333333,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 3.1083333333333334,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 97
+      }
+     ]
+    },
+    "shuffled-score": {
+     "role": "control",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      0.0,
+      0.0,
+      0.33333333333333337,
+      0.5625,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "final_best_mean": 0.11197916666666667,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      2223,
+      3098,
+      32721,
+      3379,
+      1201,
+      3893,
+      1935,
+      2191
+     ],
+     "final_genome_size_median": 3098,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0,
+      "1000": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 2223
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 3098
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.33333333333333337,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 32721
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.5625,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 3379
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 1201
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 3893
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 1935
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 2191
+      }
+     ]
+    },
+    "comparator": {
+     "role": "instrument",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": null,
+     "wilson_95": null,
+     "generations_of_reach": [],
+     "final_best": [
+      16.303571428571427,
+      21.023809523809526,
+      19.760416666666668,
+      17.464285714285715,
+      24.95,
+      26.15625,
+      19.3125,
+      19.958333333333336
+     ],
+     "final_best_mean": 20.616145833333338,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      114,
+      114,
+      114,
+      114,
+      114,
+      114,
+      114,
+      114
+     ],
+     "final_genome_size_median": 114,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0,
+      "1000": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 16.303571428571427,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 114
+      },
+      {
+       "replicate": 1,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 21.023809523809526,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 114
+      },
+      {
+       "replicate": 2,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 19.760416666666668,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 114
+      },
+      {
+       "replicate": 3,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 17.464285714285715,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 114
+      },
+      {
+       "replicate": 4,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 24.95,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 114
+      },
+      {
+       "replicate": 5,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 26.15625,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 114
+      },
+      {
+       "replicate": 6,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 19.3125,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 114
+      },
+      {
+       "replicate": 7,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 19.958333333333336,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": 114
+      }
+     ]
+    },
+    "random-walk": {
+     "role": "instrument",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": null,
+     "wilson_95": null,
+     "generations_of_reach": [],
+     "final_best": [
+      0.7607142857142857,
+      1.3916666666666666,
+      0.9583333333333335,
+      1.0833333333333335,
+      0.25,
+      1.166666666666667,
+      0.3416666666666667,
+      0.75
+     ],
+     "final_best_mean": 0.8377976190476192,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [],
+     "final_genome_size_median": null,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0,
+      "1000": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.7607142857142857,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 1,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.3916666666666666,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 2,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.9583333333333335,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 3,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.0833333333333335,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 4,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.25,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 5,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 1.166666666666667,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 6,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.3416666666666667,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 7,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 1000,
+       "incomplete": false,
+       "final_best": 0.75,
+       "last_row_generation": 999,
+       "validation_mean": null,
+       "final_genome_size": null
+      }
+     ]
+    }
+   },
+   "provenance": {
+    "summary_sha256": "8bf8eca225a1f4668d6942744b34928fb7b02639e205afbad6548b156bb6653a",
+    "rows_sha256": "035dd916ea7ae5fa483129c3d7255f89234766b460798968a5f2a17fd10835c9",
+    "rows_bytes": 305711989
+   },
+   "alt_draw": {
+    "genome_sha256": "fbb1a6edc01bdf7df6d6ac8be69560ddcdb73184e231a97e39a505a54ac5f7e6",
+    "frozen_match": true,
+    "genome_size_after": 142,
+    "parity": {
+     "actions_identical_scenes": 32,
+     "alt_deaths": 32,
+     "alt_died_earlier_scenes": 31,
+     "alt_died_later_scenes": 0,
+     "alt_mean_score": 8.141145833333335,
+     "earliest_action_divergence": null,
+     "earliest_vote_divergence": null,
+     "faithful_scenes": 32,
+     "founder_deaths": 32,
+     "founder_mean_score": 8.193229166666669,
+     "mean_death_tick_difference": -0.96875,
+     "mean_energy_end_difference": 0.452021277975291,
+     "mean_score_difference": -0.0520833333333333,
+     "scenes": 32,
+     "score_equal_scenes": 28,
+     "survival_differs_scenes": 31,
+     "votes_equal_scenes": 32,
+     "votes_identical_scenes": 32
+    }
+   }
+  },
+  "wall": {
+   "batch": "wall-s12",
+   "assay": "barrier-navigation",
+   "horizon": 500,
+   "horizon_matches_frozen": true,
+   "exit_code": 0,
+   "incomplete": null,
+   "calibration_verdict": "calibrated",
+   "sizes": {
+    "replicates": 8,
+    "generations": 500,
+    "population": 32,
+    "elite_fraction": 0.25,
+    "scenes": 4,
+    "validation_scenes": 8,
+    "arena_size": 64,
+    "start_energy": 100.0,
+    "food_fraction": null,
+    "scale": 2,
+    "lifetime": 200,
+    "blocked_weight": 1.0,
+    "efficiency_weight": 1.0,
+    "quick": true,
+    "mutants": 8,
+    "signature_arms": "changing",
+    "stall_rates": {
+     "supply": 0.01,
+     "viability": 0.05,
+     "benefit": 0.05,
+     "retention": 0.2
+    },
+    "retention_depth": 2,
+    "relevant_families": [
+     "FoodHere(*)",
+     "NeighborFoodRing(*)",
+     "AreaFoodSummary(*)",
+     "NeighborBarrierRing",
+     "AreaBarrierSummary"
+    ]
+   },
+   "genome_sha256": {
+    "start": "e24ef162d4848e40963cf00b75c62cb898b5d2decbc5674d3d33975c79eefc3f",
+    "comparator": "fd36fc82e4db027183eb2a36c0806c06082479bfa9c766965c0d1116ea021a57",
+    "arm:alt": "55232efebd07d509514ef16d882ca6d2ab48fdca8a8a640b2f507f46c4093e5d"
+   },
+   "wall_seconds": 2307.753054417,
+   "alt_vs_n": {
+    "n": 8,
+    "b": 0,
+    "c": 1,
+    "excess": -0.125,
+    "U": 0.3694166475528192,
+    "under_0_25": false
+   },
+   "r_vs_n": {
+    "n": 8,
+    "b": 0,
+    "c": 1,
+    "excess": -0.125,
+    "U": 0.3694166475528192,
+    "under_0_25": false
+   },
+   "arms": {
+    "native": {
+     "role": "reference",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      0.0,
+      0.0,
+      0.4,
+      2.614795918367347,
+      0.14999999999999997,
+      0.6704918032786885,
+      0.5,
+      0.5441860465116279
+     ],
+     "final_best_mean": 0.609934221019708,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      3335,
+      802,
+      496,
+      1231,
+      7941,
+      8489,
+      297,
+      394
+     ],
+     "final_genome_size_median": 1231,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 3335
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 802
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.4,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 496
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 2.614795918367347,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 1231
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.14999999999999997,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 7941
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.6704918032786885,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 8489
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.5,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 297
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.5441860465116279,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 394
+      }
+     ]
+    },
+    "native-aa": {
+     "role": "control",
+     "policy": "native",
+     "reached": 1,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.125,
+     "wilson_95": [
+      0.02241749145005667,
+      0.4708881822128535
+     ],
+     "generations_of_reach": [
+      216
+     ],
+     "final_best": [
+      0.5476415094339622,
+      1.2437707641196014,
+      0.5975728155339806,
+      0.7000000000000001,
+      0.0,
+      0.6,
+      6.31489969801553,
+      0.6
+     ],
+     "final_best_mean": 1.3254855983878844,
+     "validation_mean": [
+      5.677941652286455
+     ],
+     "validation_mean_mean": 5.677941652286455,
+     "final_genome_size": [
+      336,
+      266,
+      601,
+      303,
+      146,
+      5433,
+      304,
+      4469
+     ],
+     "final_genome_size_median": 336,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 1,
+      "500": 1
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.5476415094339622,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 336
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 1.2437707641196014,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 266
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.5975728155339806,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 601
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.7000000000000001,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 303
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 146
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.6,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 5433
+      },
+      {
+       "replicate": 6,
+       "reached": true,
+       "generation_to_threshold": 216,
+       "generations_run": 217,
+       "incomplete": false,
+       "final_best": 6.31489969801553,
+       "last_row_generation": 216,
+       "validation_mean": 5.677941652286455,
+       "final_genome_size": 304
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.6,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 4469
+      }
+     ]
+    },
+    "alt": {
+     "role": "user",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      1.7087903711881836,
+      0.818283637442516,
+      1.042372881355932,
+      0.30000000000000004,
+      5.168138514711096,
+      0.44999999999999996,
+      0.6,
+      0.85
+     ],
+     "final_best_mean": 1.3671981755872158,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      4419,
+      290,
+      3341,
+      6970,
+      3634,
+      766,
+      4679,
+      6193
+     ],
+     "final_genome_size_median": 4419,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 1.7087903711881836,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 4419
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.818283637442516,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 290
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 1.042372881355932,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 3341
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.30000000000000004,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 6970
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 5.168138514711096,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 3634
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.44999999999999996,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 766
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.6,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 4679
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.85,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 6193
+      }
+     ]
+    },
+    "founder-only": {
+     "role": "control",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      -0.23684210526315788,
+      2.9275503573749186,
+      -0.47368421052631576,
+      0.0,
+      0.9900909681611435,
+      1.2269330734243014,
+      -0.47368421052631576,
+      -0.23684210526315788
+     ],
+     "final_best_mean": 0.46544022092267695,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      97,
+      97,
+      97,
+      97,
+      97,
+      97,
+      97,
+      97
+     ],
+     "final_genome_size_median": 97,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": -0.23684210526315788,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 2.9275503573749186,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": -0.47368421052631576,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.9900909681611435,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 1.2269330734243014,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": -0.47368421052631576,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": -0.23684210526315788,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      }
+     ]
+    },
+    "mutation-off": {
+     "role": "control",
+     "policy": "policy-deviation",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      -0.23684210526315788,
+      2.9275503573749186,
+      -0.47368421052631576,
+      0.0,
+      0.9900909681611435,
+      1.2269330734243014,
+      -0.47368421052631576,
+      -0.23684210526315788
+     ],
+     "final_best_mean": 0.46544022092267695,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      97,
+      97,
+      97,
+      97,
+      97,
+      97,
+      97,
+      97
+     ],
+     "final_genome_size_median": 97,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": -0.23684210526315788,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 2.9275503573749186,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": -0.47368421052631576,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.9900909681611435,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 1.2269330734243014,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": -0.47368421052631576,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": -0.23684210526315788,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 97
+      }
+     ]
+    },
+    "shuffled-score": {
+     "role": "control",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": 0.0,
+     "wilson_95": [
+      0.0,
+      0.32440756488388023
+     ],
+     "generations_of_reach": [],
+     "final_best": [
+      -0.2413793103448276,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.5733695652173914,
+      1.2832562917308679
+     ],
+     "final_best_mean": 0.20190581832542895,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      668,
+      1140,
+      453,
+      913,
+      276,
+      953,
+      716,
+      361
+     ],
+     "final_genome_size_median": 716,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": -0.2413793103448276,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 668
+      },
+      {
+       "replicate": 1,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 1140
+      },
+      {
+       "replicate": 2,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 453
+      },
+      {
+       "replicate": 3,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 913
+      },
+      {
+       "replicate": 4,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 276
+      },
+      {
+       "replicate": 5,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.0,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 953
+      },
+      {
+       "replicate": 6,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.5733695652173914,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 716
+      },
+      {
+       "replicate": 7,
+       "reached": false,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 1.2832562917308679,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 361
+      }
+     ]
+    },
+    "comparator": {
+     "role": "instrument",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": null,
+     "wilson_95": null,
+     "generations_of_reach": [],
+     "final_best": [
+      10.47979797979798,
+      10.254154447702835,
+      10.505050505050505,
+      10.454545454545455,
+      10.404855001629196,
+      10.37960247637667,
+      10.505050505050505,
+      10.47979797979798
+     ],
+     "final_best_mean": 10.432856793743891,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [
+      119,
+      119,
+      119,
+      119,
+      119,
+      119,
+      119,
+      119
+     ],
+     "final_genome_size_median": 119,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 10.47979797979798,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 119
+      },
+      {
+       "replicate": 1,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 10.254154447702835,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 119
+      },
+      {
+       "replicate": 2,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 10.505050505050505,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 119
+      },
+      {
+       "replicate": 3,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 10.454545454545455,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 119
+      },
+      {
+       "replicate": 4,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 10.404855001629196,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 119
+      },
+      {
+       "replicate": 5,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 10.37960247637667,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 119
+      },
+      {
+       "replicate": 6,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 10.505050505050505,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 119
+      },
+      {
+       "replicate": 7,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 10.47979797979798,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": 119
+      }
+     ]
+    },
+    "random-walk": {
+     "role": "instrument",
+     "policy": "native",
+     "reached": 0,
+     "of": 8,
+     "incomplete": 0,
+     "reached_fraction": null,
+     "wilson_95": null,
+     "generations_of_reach": [],
+     "final_best": [
+      0.4140287769784172,
+      0.19999999999999998,
+      0.9239940985701519,
+      0.5036581224530865,
+      1.8046501755310513,
+      0.3748201438848921,
+      3.1856271204945976,
+      1.09467712597209
+     ],
+     "final_best_mean": 1.0626819454855359,
+     "validation_mean": [],
+     "validation_mean_mean": null,
+     "final_genome_size": [],
+     "final_genome_size_median": null,
+     "cumulative_reached_before_generation": {
+      "100": 0,
+      "250": 0,
+      "500": 0
+     },
+     "replicates": [
+      {
+       "replicate": 0,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.4140287769784172,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 1,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.19999999999999998,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 2,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.9239940985701519,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 3,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.5036581224530865,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 4,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 1.8046501755310513,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 5,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 0.3748201438848921,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 6,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 3.1856271204945976,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": null
+      },
+      {
+       "replicate": 7,
+       "reached": null,
+       "generation_to_threshold": null,
+       "generations_run": 500,
+       "incomplete": false,
+       "final_best": 1.09467712597209,
+       "last_row_generation": 499,
+       "validation_mean": null,
+       "final_genome_size": null
+      }
+     ]
+    }
+   },
+   "provenance": {
+    "summary_sha256": "df20edd4c7d792ad8432026ab727ca5bebe2f6d1df49c4ea8df5b3294f3b42e6",
+    "rows_sha256": "ec3004d87c81900819703aaa5c5c460bf354151d4bfac3cfe8c84b86ad1d361d",
+    "rows_bytes": 168115154
+   },
+   "alt_draw": {
+    "genome_sha256": "55232efebd07d509514ef16d882ca6d2ab48fdca8a8a640b2f507f46c4093e5d",
+    "frozen_match": true,
+    "genome_size_after": 146,
+    "parity": {
+     "actions_identical_scenes": 32,
+     "alt_deaths": 32,
+     "alt_died_earlier_scenes": 22,
+     "alt_died_later_scenes": 0,
+     "alt_mean_score": 1.1677225471085122,
+     "earliest_action_divergence": null,
+     "earliest_vote_divergence": null,
+     "faithful_scenes": 32,
+     "founder_deaths": 32,
+     "founder_mean_score": 1.1677225471085122,
+     "mean_death_tick_difference": -0.6875,
+     "mean_energy_end_difference": 0.3667259020730853,
+     "mean_score_difference": 0.0,
+     "scenes": 32,
+     "score_equal_scenes": 32,
+     "survival_differs_scenes": 22,
+     "votes_equal_scenes": 32,
+     "votes_identical_scenes": 32
+    }
+   }
+  }
+ },
+ "reader_sha256": "375c65f6e23107683336638f3283d3ecb346bc8cf0c770b3f72bb7e7871bac06",
+ "stat6_sha256": "afe91aa42421e47fd3864bd2d2078fde7398f6a873a7ade6c17ba4925dd1f5a8"
+}
