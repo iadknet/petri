@@ -1,0 +1,56 @@
+{
+ "seeds": {
+  "food": [
+   12,
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "wall": [
+   12,
+   13,
+   14,
+   15,
+   16,
+   17
+  ]
+ },
+ "alt_sha256": {
+  "food-s12": "fbb1a6edc01bdf7df6d6ac8be69560ddcdb73184e231a97e39a505a54ac5f7e6",
+  "food-s13": "d53257475cf5654de8060535b11a251604b96456ecd4d02402f577b3a385e02d",
+  "food-s14": "e4d8fe0bc18d24fc08384d790bb2b9593b1cf0b2089cba9a335cce739249bee7",
+  "food-s15": "1087777f69b44653361e7414cdf5be1e56e197db22b2179c4c4af8c9b3205fd6",
+  "food-s16": "81b0ee7fed7d4e0c8ec1b270bcf726c3973cb9f707fe45c2042bb67ef75c6d05",
+  "food-s17": "6cc084a67d55ba59283095ccf693f28e478118e3914da7af60fbdca7f16cba2f",
+  "food-s101": "e486b5288ecc2f9667371055fd89e138a90a64e57f70b4c210312ec4a019cf53",
+  "food-s102": "8c2d2ea287f385cd587549896faf498ae5a521f1196a8c1d8d496d96a5c51069",
+  "wall-s12": "55232efebd07d509514ef16d882ca6d2ab48fdca8a8a640b2f507f46c4093e5d",
+  "wall-s13": "bc6c329f22683d49fc57ae5f7508da8ad16f4204ccabfe4acc548a1aa4170b91",
+  "wall-s14": "4451a1e193512747d41dc07d4a811bfdc791eda6a7ce5408c29a977e649f2938",
+  "wall-s15": "65d65cd497ae77f28e4f689aebdb46b301576d112493136898d2588fd3e3777f",
+  "wall-s16": "d87ca0539e79caf4596739052ec14fb8176f1b1bd1ff3ffa95e1b30f51d326a4",
+  "wall-s17": "9d21121b135d980c2337fe4a75790f8e471291d31c6603a833c7b86140dd33e6",
+  "wall-s101": "f54c7e3433138d6ee5d071644f805eb94f7e45dc46e8530c24092c5859ef5fb3",
+  "wall-s102": "b8d33cc25b248fb64247fe9cccd379dfa2ab90d4127a07885e4ac0481cf21822"
+ },
+ "horizon": {
+  "food": 1000,
+  "wall": 500
+ },
+ "replicates": 8,
+ "sizing": {
+  "choice": {
+   "k_food": 6,
+   "k_wall": 6,
+   "hours": 11.431488055555,
+   "joint_power": 0.95715
+  },
+  "accepted_c_risk": null,
+  "p_used": {
+   "food": 0.05,
+   "wall": 0.0625
+  }
+ }
+}
