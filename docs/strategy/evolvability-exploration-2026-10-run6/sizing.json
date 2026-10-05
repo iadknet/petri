@@ -1,0 +1,141 @@
+{
+ "pilot": {
+  "food": {
+   "p_hat": 0.0,
+   "known": 16,
+   "wall_seconds": 4653.864045583
+  },
+  "wall": {
+   "p_hat": 0.0625,
+   "known": 16,
+   "wall_seconds": 2205.02878775
+  }
+ },
+ "p_used": {
+  "food": 0.05,
+  "wall": 0.0625
+ },
+ "mc_seed": 20774,
+ "draws": 20000,
+ "per_assay_power": {
+  "food": {
+   "6": 0.98655,
+   "8": 0.9987,
+   "10": 0.99995,
+   "12": 1.0
+  },
+  "wall": {
+   "6": 0.9701,
+   "8": 0.99585,
+   "10": 0.9998,
+   "12": 0.9999
+  }
+ },
+ "options": [
+  {
+   "k_food": 6,
+   "k_wall": 6,
+   "hours": 11.431488055555,
+   "joint_power": 0.95715
+  },
+  {
+   "k_food": 6,
+   "k_wall": 8,
+   "hours": 12.656504048749444,
+   "joint_power": 0.98245
+  },
+  {
+   "k_food": 6,
+   "k_wall": 10,
+   "hours": 13.881520041943888,
+   "joint_power": 0.98635
+  },
+  {
+   "k_food": 6,
+   "k_wall": 12,
+   "hours": 15.106536035138335,
+   "joint_power": 0.98645
+  },
+  {
+   "k_food": 8,
+   "k_wall": 6,
+   "hours": 14.01696808087889,
+   "joint_power": 0.9688
+  },
+  {
+   "k_food": 8,
+   "k_wall": 8,
+   "hours": 15.241984074073335,
+   "joint_power": 0.99455
+  },
+  {
+   "k_food": 8,
+   "k_wall": 10,
+   "hours": 16.467000067267776,
+   "joint_power": 0.9985
+  },
+  {
+   "k_food": 8,
+   "k_wall": 12,
+   "hours": 17.692016060462223,
+   "joint_power": 0.9986
+  },
+  {
+   "k_food": 10,
+   "k_wall": 6,
+   "hours": 16.60244810620278,
+   "joint_power": 0.97005
+  },
+  {
+   "k_food": 10,
+   "k_wall": 8,
+   "hours": 17.827464099397222,
+   "joint_power": 0.9958
+  },
+  {
+   "k_food": 10,
+   "k_wall": 10,
+   "hours": 19.052480092591665,
+   "joint_power": 0.99975
+  },
+  {
+   "k_food": 10,
+   "k_wall": 12,
+   "hours": 20.27749608578611,
+   "joint_power": 0.99985
+  },
+  {
+   "k_food": 12,
+   "k_wall": 6,
+   "hours": 19.187928131526665,
+   "joint_power": 0.9701
+  },
+  {
+   "k_food": 12,
+   "k_wall": 8,
+   "hours": 20.41294412472111,
+   "joint_power": 0.99585
+  },
+  {
+   "k_food": 12,
+   "k_wall": 10,
+   "hours": 21.637960117915558,
+   "joint_power": 0.9998
+  },
+  {
+   "k_food": 12,
+   "k_wall": 12,
+   "hours": 22.86297611111,
+   "joint_power": 0.9999
+  }
+ ],
+ "choice": {
+  "k_food": 6,
+  "k_wall": 6,
+  "hours": 11.431488055555,
+  "joint_power": 0.95715
+ },
+ "accepted_c_risk": null,
+ "arms": 1,
+ "model_limits": "independent arms per pair apart from the shared N; scene and selection dependence ignored; masking ignored (it can only lower B power)"
+}
