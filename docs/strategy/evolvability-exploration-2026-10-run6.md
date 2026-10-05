@@ -5,7 +5,14 @@ Date: 2026-10-04. Plan:
 (committed on main at `18c796ae` after three Codex rounds), following
 [run 5](evolvability-exploration-2026-10-run5.md) under the
 [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
-Status: in progress.
+Status: **incomplete; outcome C (incomplete, closed by user decision on 2026-10-05)**.
+The run stopped at about 06:02 on 2026-10-05 when the host slept on battery: no
+process survived, main batches `food-s12` and `wall-s12` completed, `food-s13`
+is `incomplete` (replicate 1, generation 956), nine main batches never started,
+and nothing was analysed. The user decided on 2026-10-05 to close it rather than
+resume; the two completed batches are read descriptively as row E10 of the
+[evolvability diagnosis run](evolvability-diagnosis-run-2026-10.md) (ledger row
+E10 below). No campaign was resumed or rerun.
 
 ## Question
 
@@ -25,7 +32,11 @@ A/A control? And does M4 change persistence in the production goal worlds?
     0.08 on seeds 16 and 22.
   - Wall selects scale 2 on all of them.
 - **Evidence.** `.bench-artifacts/lab/exploration/run6/`, copied to the main
-  checkout at closing.
+  checkout on 2026-10-05 at closing; all 30 ALT draw file hashes
+  (`alt-draws.ndjson` `file_sha256`), the 16 frozen genome hashes
+  (`freeze.json`) and the two completed batches' `summary.json` and
+  `rows.ndjson` hashes (`e10-main-batches.json`) were verified against that
+  copy: 0 mismatches.
 
 ## Ledger
 
@@ -41,7 +52,8 @@ A/A control? And does M4 change persistence in the production goal worlds?
 | PL3 | Pilot 3 and sizing (rule 2, amended by A1 and A2) | Wall seed 11, 500 generations | Wall; food from PL2 | Joint B power ≥ 0.8 within 60 h, or the best affordable pair recorded as accepted C risk | completed | Wall pilot 3 completed in 2,205 s (exit 0). R and N reached on 1 of 16 replicates, so p̂ = 0.0625. **Sizing** ([`sizing.json`](evolvability-exploration-2026-10-run6/sizing.json), Monte Carlo seed `0x5126`): p = 0.05 on food (the floor) and 0.0625 on wall. The choice is k = 6 batches per assay, or 48 pairs each. Projected part L time is 11.4 h, with joint B power 0.957 (per assay 0.987 on food and 0.970 on wall). No C risk was accepted. Reach is rare at both horizons, so a B here excludes only the declared excess of at least 25 percentage points. The ALT matched controls (CT) ran at 100 generations: food in 156 s and wall in 288 s, both exit 0 |
 | F3 | Freeze of the main batches (before any main batch) | [`freeze.json`](evolvability-exploration-2026-10-run6/freeze.json) | Main seeds 12–17 on both assays | — | frozen | Food and wall seeds 12–17 (12 invocations). Horizon: food 1,000 and wall 500. 8 replicates. ALT hashes come from F1 for the main seeds and for bank 1 (101, 102). Tooling sha256 prefixes: `campaign6v2.sh` `6eb3d255`, `analyze6.py` `8d212577`, `size6.py` `11d898b5`, `prodread6.py` `d76f0235` |
 | L-M4 | M4 reaches more often than N by 1,000 generations | M4 against N by replicate on the frozen main batches | Both assays | A candidate if b − c ≥ ⌈n / 4⌉ on both assays; B if U < 0.25 on both (masked). Predicted: no detectable excess, since run 4 saw none at 100 generations | withdrawn (A1) | Not runnable at 1,000 generations: runaway genome growth (PL1) |
-| L-ALT | ALT reaches more often than N at the long horizon | ALT against N by replicate on the frozen main batches | Both assays | Horizon 1,000 generations on food and 500 on wall (A2). A candidate if b − c ≥ ⌈n / 4⌉ on both assays; B if U < 0.25 on both (masked). Predicted: no detectable excess. Decides the outcome alone (A1) | predeclared | |
-| CT | ALT matched controls (descriptive) | `--genome alt` invocation per assay at 100 generations on the pilot seed | Both assays | — | predeclared | |
-| MK | Masking (B only) with N as the reference | `r3_masking`, `PETRI_R3_REF=native-aa` | Development bank and validation scenes | Scene identity must hold | predeclared | |
-| P | Production check: M4 against the default | `v3-cli run`, 20,000 ticks, 3 goal worlds × 2 fresh seeds | Production | Descriptive only (A1). Readings P1–P4. Predicted: M4's P4 (genome size) exceeds D's in at least 2 of 3 worlds. Complete when all 12 runs finish and every manipulation check holds | predeclared | |
+| L-ALT | ALT reaches more often than N at the long horizon | ALT against N by replicate on the frozen main batches | Both assays | Horizon 1,000 generations on food and 500 on wall (A2). A candidate if b − c ≥ ⌈n / 4⌉ on both assays; B if U < 0.25 on both (masked). Predicted: no detectable excess. Decides the outcome alone (A1) | **not run** (closed by user decision) | Of the frozen 12 main batches, `food-s12` (2,297 s) and `wall-s12` (2,309 s) completed; `food-s13` is `incomplete` (replicate 1, generation 956, awake 7,714 s when the host slept); the other nine never started. The frozen n of 48 pairs per assay was not reached, so part L is `incomplete` and no A or B verdict exists. The two completed batches are read descriptively in E10 |
+| CT | ALT matched controls (descriptive) | `--genome alt` invocation per assay at 100 generations on the pilot seed | Both assays | — | ran, not analysed | Both invocations completed (PL3: food 156 s, wall 288 s, exit 0; `run6/ctrl/food-s11/`, `run6/ctrl/wall-s11/`). Reached fraction 0 on every arm of both; not read further because the run closed |
+| MK | Masking (B only) with N as the reference | `r3_masking`, `PETRI_R3_REF=native-aa` | Development bank and validation scenes | Scene identity must hold | not run | Part L never reached its analysis point |
+| P | Production check: M4 against the default | `v3-cli run`, 20,000 ticks, 3 goal worlds × 2 fresh seeds | Production | Descriptive only (A1). Readings P1–P4. Predicted: M4's P4 (genome size) exceeds D's in at least 2 of 3 worlds. Complete when all 12 runs finish and every manipulation check holds | not run | Was to follow part L; the run closed first. The production size question moves to the diagnosis run's E8 |
+| E10 | Diagnosis-run reading of the two completed main batches (run 6 as data): does ALT reach more often than N, and are ALT genomes larger? | R, N, ALT and the built-ins from `food-s12` and `wall-s12` | Food 1,000 generations, wall 500; 8 replicates each | Predicted: ALT reaches no more often than N; ALT genomes larger. A clear ALT excess on both assays (b − c ≥ 2 of 8 on each) would reorder the diagnosis run's E5 behind a dense-afferent variant | completed (descriptive) | Read on 2026-10-05 by the diagnosis run ([`e10-main-batches.json`](evolvability-exploration-2026-10-run6/e10-main-batches.json), reader [`e10read.py`](evolvability-exploration-2026-10-run6/e10read.py) sha256 `375c65f6…`, bounds from the frozen `stat6.py` `afe91aa4…`). **Food-s12** (1,000 generations, 2294 s): no arm reached (R 0/8, N 0/8, ALT 0/8). Final best means R 2.11, N 2.31, ALT 2.14, founder 2.23, comparator 20.6. Final elite genome size R median 140 (range 115–282), N median 139 (range 126–165), ALT median 204 (range 139–476); shuffled-score median 3098 (range 1201–32721). **Wall-s12** (500 generations, 2308 s): N reached 1/8 (replicate 6, generation 216, validation mean 5.68); R 0/8, ALT 0/8. Final best means R 0.61, N 1.33, ALT 1.37, founder 0.47. Genome size R median 1231 (range 297–8489), N median 336 (range 146–5433), ALT median 4419 (range 290–6970): wall's weak selection lets every arm drift. **ALT against N by replicate:** food b = 0, c = 0; wall b = 0, c = 1; U = 0.369 on both (above 0.25: 8 pairs cannot even reach the declared bound). R against N: food 0/0, wall 0/1. The decision rule's ALT excess (b − c ≥ 2 of 8 on both assays) is **not met**; ALT reaches no more often than N and its genomes are larger, as predicted. **Parity of the two draws (F1):** votes and actions identical in all 32 development scenes on both assays; food score equal in 28/32 (ALT dies 0.97 ticks earlier on average, mean score difference -0.052); wall score equal in 32/32 (mean death tick difference -0.69, mean score difference +0.000). Descriptive: 8 pairs decide nothing; ALT is **unresolved at this size** and the dense-afferent direction waits on the diagnosis run's E5 |
