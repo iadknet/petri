@@ -32,15 +32,32 @@ Where this plan and an earlier one disagree, this plan wins.
 ## Rules
 
 1. **Where.** A Claude worktree from a clean, current `main`, `EnterWorktree` named
-   `evolvability-diagnosis`. Record the launch revision. `npm ci` in `frontend/`,
-   at least 30 GiB free. Run 6 may still be running in
-   `.claude/worktrees/evolvability-exploration-6`: never touch that worktree, its branch
-   or its processes.
-2. **Host sharing.** Before every heavy job (a world run, a campaign, a twin screen, a
-   build of the whole workspace) check for run 6's jobs with
-   `pgrep -fl 'v3-lab-aa-instr|v3-cli'`. If any is present, run only the light rows
-   (E4, E3's analytic half, probe builds, note writing) and re-check every 20 minutes.
-   Never kill another session's process. One heavy job at a time.
+   `evolvability-diagnosis`, created after run 6 is closed (rule 2). Record the
+   launch revision. `npm ci` in `frontend/`, at least 30 GiB free.
+2. **Close run 6 first (phase 0, decided by the user on 2026-10-05).** Run 6 stopped
+   on 2026-10-05 at about 06:02 when the host slept: no process survives, main
+   batches `food-s12` and `wall-s12` completed, `food-s13` is `incomplete` (replicate 1,
+   generation 956), nine batches never started, and nothing was analysed. Its worktree
+   is `.claude/worktrees/evolvability-exploration-6` (locked) on branch
+   `worktree-evolvability-exploration-6`. Before anything else, in that worktree:
+   confirm `pgrep -fl 'v3-lab-aa-instr|v3-cli|campaign6|main6'` finds nothing;
+   mark the run `incomplete` in its note
+   (`docs/strategy/evolvability-exploration-2026-10-run6.md`): outcome **C
+   (incomplete, closed by user decision)**, rows PL3 and F3 as recorded, L-ALT and
+   MK and P `not run`, `food-s13` `incomplete` with its last generation; read the
+   two completed batches descriptively as row E10 of this run (below) and record
+   that reading in both notes; copy `.bench-artifacts/lab/exploration/run6/` from
+   the worktree to the main checkout's `.bench-artifacts/lab/exploration/run6/`
+   and verify every committed summary's recorded raw hash; commit the note on the
+   branch; cherry-pick the run 6 `docs:` commits (the note and its summaries folder,
+   nothing needing `instr:` or `proto:`) onto `main`; `make check-docs`; then
+   `git worktree unlock` and `git worktree remove` that worktree and keep its
+   branch. Never run or resume a run 6 campaign. If the close hits a conflict or a
+   missing hash, record it in the run 6 note and continue; do not stop the
+   diagnosis run for it.
+   **Host sharing after that.** One heavy job at a time; never kill another session's
+   process; before every heavy job check `pgrep -fl 'v3-lab|v3-cli'` and wait
+   20 minutes if something else is running.
 3. **Kills and caps.** Each world run or census has a 3 h awake-time kill; each twin
    screen 2 h; each lab campaign 1 h. A killed job is `incomplete` and is rerun once at
    double the limit. Byte cap 1.5 GiB per job; the run's evidence tree stays under
@@ -105,18 +122,19 @@ run may shrink a row to fit a kill and must say so.
 | E7 | 2 (world branch) | Experiment worlds at 800² with 2,500 founders (persistence first, 20,000 ticks): food in patches spaced beyond the founder's ring with regrowth that returns on the patch's far side, move cost raised until a random walker's expected intake is under its decay, offspring placed within a radius of 3. Then founder plus 1 % `A_vector` (the opportunity machinery with a recipe path and a 50,000-tick horizon, an `instr:` change), then founder alone for 50,000 ticks with the E2 census | 30 min per read; up to 3 h | Founder alone persists at low density or goes extinct; followers sweep; founder alone evolves causal food reads | Followers not sweeping means demand is still too weak at that geometry: iterate the world twice at most, then record |
 | E8 | 3 | `v3-cli run --ticks 20000 --sample-every 500` on Canyon, fresh seeds 1022 and 2022: default; `per_unit_rate` 0.02; `proto:` arm where a `Reproduce` commit occupies `1 + genome_size / 97` ticks (the parent acts on nothing else while it lasts). Read mean genome size, births per creature-tick, persistence | 2 h | Default near 5 × founder by dilution; ×4 grows; time cost holds near founder | Default past 10 × founder by 20,000 ticks moves the size defect ahead of the encoding defect in the plan forward |
 | E9 | 3 (if time) | Lab calibration against a known production positive: an authored scene set with fruit only west of the start, comparator = founder plus one `fruit ring[W]` → `Move(W)` edge; the lab at population 32 × 100 generations from the founder, 8 replicates | 1 h | Not reached | Not reached is written into the T22 amendment candidate: no lab negative is admissible about production |
-| E10 | 3 | Read run 6's note when it lands on `main` (check at every phase boundary) | — | No ALT excess | A positive ALT reorders the plan forward behind a dense-afferent variant of E5 |
+| E10 | 0 | Run 6's two completed main batches (`food-s12`, `wall-s12`, 8 replicates each, population 32, food 1,000 and wall 500 generations): from their `summary.json` and `rows.ndjson`, per arm (R, N, ALT and the built-ins) the reached count, generation of reach, final best, validation mean and final genome size; ALT against N by replicate (b, c over 8 pairs per assay) and run 4 rule 4's bound U; the ALT draw's parity against the founder from F1. Descriptive: 8 pairs decide nothing | minutes | ALT reaches no more often than N; ALT genomes larger | A clear ALT excess on both assays (b − c ≥ 2 of 8 on each) reorders E5 behind a dense-afferent variant; otherwise ALT is recorded as unresolved at this size and the dense-afferent direction waits on E5 |
 | E11 | 2 (both branches) | `instr:` instrument from the [recent-research scan](alife-recent-research-scan-2026-10-05.md): `food-seeking-hunger` with two mirror-image frozen layouts A and B (the development bank mirrored in the scene frame), switched every k generations with the scan's jitter, k in {3, 30, 300} as a pilot grid with one k chosen for the main batches; arms: switching, random-layout (predictability control), stationary V2 (reference); population 32, 300 generations, 8 replicates, seed batches 3 and 4; calibration, comparator and sterility repair unchanged. Reading: run 5's twin screen on each arm's final elites, scoring confirmed-helpful one-step children on the *other* layout (the alternate-neighborhood analog of Kumawat's reading); reach after a switch and lag descriptive only. T22.F03 ablation sentinels per generation record whether removing each silent node is neutral or deleterious (the Walsh masking reading, no arm) | 3 h | Switching elites have at least 3 × the stationary elites' alternate-layout helpful share | Positive: a lead for T02.F01's priority and for a non-stationary production world in the plan forward, never a stepped season. Negative at that size: the fluctuation lever is closed for this instrument class |
 
 ## Phases
 
-0. **Build and freeze.** Worktree, builds, E0. Codex review (a) of this plan.
+0. **Close run 6, build and freeze.** Rule 2's close of run 6 with E10, then the
+   worktree, builds, E0. Codex review (a) of this plan.
 1. **Premise and gradient.** E4 first (light), then E1, then E2 with E6. Codex review
    (b). Name the branch: world, variation, premise false, or mixed.
 2. **The branch.** Variation: E3, then E5. World: E7. Mixed: E7 first, then E5.
    Premise false: skip to phase 3. E11 runs on every branch except premise false,
    after the branch's own rows, because it reads neighborhoods rather than reach.
-3. **Size, calibration, run 6.** E8, E9 if time, E10.
+3. **Size and calibration.** E8, E9 if time.
 4. **The plan forward.** Written into the note as its last section (format below),
    reviewed by Codex (c), revised, closing review (d).
 5. **Close** in run 1's order: note and summaries committed on the branch; kept
@@ -146,16 +164,18 @@ The note's last section, titled "Plan forward", holds exactly these parts:
 
 ## Budget
 
-Machine time about 15 h (E1 1 h, E2 3.5 h, E3 and E5 4 h or E7 3 h, E11 3 h, E8 2 h,
-E9 1 h);
+Machine time about 15 h (run 6 close 0.5 h, E1 1 h, E2 3.5 h, E3 and E5 4 h or E7 3 h,
+E11 3 h, E8 2 h, E9 1 h). The host must stay awake and on power for the whole run:
+run 6 died when the machine slept on battery, so start `caffeinate -i` in a terminal
+before pasting the goal, and the run's own runner also wraps every heavy job in it;
 400 turns, closing from turn 360. Byte cap 40 GiB for the evidence tree.
 
 ## Goal command
 
-Open a new session in the main checkout on a clean, current `main`: Opus 5.5, effort
-`medium`, auto mode. Run `/advisor fable` first, so the Fable advisor is on before the
-goal is pasted. Paste:
+Plug the machine in and start `caffeinate -i` in a terminal. Open a new session in the
+main checkout on a clean, current `main`: Opus 5.5, effort `medium`, auto mode. Run
+`/advisor fable` first, so the Fable advisor is on before the goal is pasted. Paste:
 
 ```
-/goal An evolvability diagnosis run is complete on main. Read docs/strategy/evolvability-diagnosis-2026-10-05.md in full, then docs/strategy/evolvability-diagnosis-plan-2026-10-05.md, and follow the plan exactly; it is the run's contract, and the run 1 plan (docs/strategy/evolvability-exploration-plan-2026-10-01.md) and the T22 exploration contract govern anything it does not cover. You are Opus 5.5 and the implementer: you write the probes, run the rows, read the results and write the note. Confirm the Fable advisor is enabled and consult it through the advisor tool at every point the plan's rule 8 lists (before phase 0, before each phase's approach and the verdict branch, after each row's reading is drafted and before it is recorded, on any incomplete or contradicting row, before and after the plan forward is drafted, before closing), recording each consultation and its dispositions in the note's Advice table; if the advisor is unavailable, record that and send the brief to Codex instead. Confirm you are in the main checkout on a clean main, record the launch revision, create the worktree with EnterWorktree named evolvability-diagnosis, and never touch the run 6 worktree, branch or processes; before every heavy job check for run 6's processes as rule 2 says and wait if they are present. Send this plan to Codex for review (a) before any row runs and record each finding's disposition. Run phases 0 to 4 as predeclared rows without pausing to ask, except where rule 9 says to stop: predeclare and commit each row before it runs, keep incomplete rows, label every diagnostic arm, keep instr and proto commits default-off on the branch, and put experiment worlds under the note's folder, never under experiments/worlds. Name the verdict branch after phase 1 and run that branch's phase 2. Write the note's Plan forward section in the plan's six-part format, with roadmap feature candidates named by track and natural analog, the two user rulings stated with their numbers and the T22 amendment drafted as exact sentences, the refuted ideas listed, and the next goal command drafted; run Codex reviews (b), (c) and (d) and record dispositions. Close in the plan's order from turn 360 at the latest. Done means all of these are shown in this conversation, with command output and the note's ledger, Advice table and Plan forward quoted, not only file paths: docs/strategy/evolvability-diagnosis-run-2026-10.md is on main with at least E0, E1, E2, E4 and E6 completed (not incomplete), the verdict branch named, the Advice table holding a Fable consultation for every point rule 8 lists, and the six-part Plan forward present and Codex-reviewed; make check or make check-docs exited 0 on main; git worktree list no longer lists the evolvability-diagnosis worktree and git branch still lists its branch; git status on main is clean. If a concrete blocker stops the run, record it in the note, land the note as above, report it, and stop. Stop after 400 turns.
+/goal An evolvability diagnosis run is complete on main. Read docs/strategy/evolvability-diagnosis-2026-10-05.md in full, then docs/strategy/evolvability-diagnosis-plan-2026-10-05.md, and follow the plan exactly; it is the run's contract, and the run 1 plan (docs/strategy/evolvability-exploration-plan-2026-10-01.md) and the T22 exploration contract govern anything it does not cover. You are Opus 5.5 and the implementer: you write the probes, run the rows, read the results and write the note. Confirm the Fable advisor is enabled and consult it through the advisor tool at every point the plan's rule 8 lists (before phase 0, before each phase's approach and the verdict branch, after each row's reading is drafted and before it is recorded, on any incomplete or contradicting row, before and after the plan forward is drafted, before closing), recording each consultation and its dispositions in the note's Advice table; if the advisor is unavailable, record that and send the brief to Codex instead. Confirm you are in the main checkout on a clean main. First, as the plan's rule 2 says, close run 6: confirm no run 6 process exists, mark its note incomplete with outcome C closed by user decision, read its two completed batches as row E10 and record that reading in both notes, copy its evidence to the main checkout's .bench-artifacts and verify the recorded hashes, commit on its branch, cherry-pick its docs commits onto main, run make check-docs, then unlock and remove its worktree and keep its branch; never resume a run 6 campaign. Then record the launch revision and create the worktree with EnterWorktree named evolvability-diagnosis. Send this plan to Codex for review (a) before any row runs and record each finding's disposition. Run phases 0 to 4 as predeclared rows without pausing to ask, except where rule 9 says to stop: predeclare and commit each row before it runs, keep incomplete rows, label every diagnostic arm, keep instr and proto commits default-off on the branch, and put experiment worlds under the note's folder, never under experiments/worlds. Name the verdict branch after phase 1 and run that branch's phase 2. Write the note's Plan forward section in the plan's six-part format, with roadmap feature candidates named by track and natural analog, the two user rulings stated with their numbers and the T22 amendment drafted as exact sentences, the refuted ideas listed, and the next goal command drafted; run Codex reviews (b), (c) and (d) and record dispositions. Close in the plan's order from turn 360 at the latest. Done means all of these are shown in this conversation, with command output and the note's ledger, Advice table and Plan forward quoted, not only file paths: docs/strategy/evolvability-exploration-2026-10-run6.md is on main marked incomplete with its E10 reading and git worktree list no longer lists the run 6 worktree; docs/strategy/evolvability-diagnosis-run-2026-10.md is on main with at least E0, E1, E2, E4, E6 and E10 completed (not incomplete), the verdict branch named, the Advice table holding a Fable consultation for every point rule 8 lists, and the six-part Plan forward present and Codex-reviewed; make check or make check-docs exited 0 on main; git worktree list no longer lists the evolvability-diagnosis worktree and git branch still lists both branches; git status on main is clean. If a concrete blocker stops the run, record it in the note, land the note as above, report it, and stop. Stop after 400 turns.
 ```
