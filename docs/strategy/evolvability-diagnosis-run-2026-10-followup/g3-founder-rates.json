@@ -1,0 +1,325 @@
+{
+ "gate": "G3",
+ "off": {
+  "path": ".bench-artifacts/lab/diagnosis2/n12/g3/e4-off.json",
+  "sha256": "07b639db22fd8d913ecf339f12899528ebb1ebace66377aea921936efa8140a3",
+  "config": {
+   "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+   "executed_bias": 0.9,
+   "executed_window_ticks": 100,
+   "food_types": 2,
+   "mesh_layer_probability": 0.2,
+   "neutral_input_recruitment": "Off",
+   "per_unit_rate": 0.005,
+   "scene_seed": 239455822,
+   "silent_entry_decay_rate": null
+  }
+ },
+ "on": {
+  "path": ".bench-artifacts/lab/diagnosis2/n12/g3/e4-on.json",
+  "sha256": "d601743bb4df65cfef3417ded88c8ad692281a29b8c24365cf0c396c50245019",
+  "config": {
+   "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+   "executed_bias": 0.9,
+   "executed_window_ticks": 100,
+   "food_types": 2,
+   "mesh_layer_probability": 0.2,
+   "neutral_input_recruitment": "Off",
+   "per_unit_rate": 0.005,
+   "scene_seed": 239455822,
+   "silent_entry_decay_rate": 0.005
+  }
+ },
+ "checks": [
+  {
+   "check": "off founder+declared lost_declaration CP contains E4",
+   "pass": true,
+   "rate": 0.018679,
+   "cp95": [
+    0.01841453777584684,
+    0.018946255361469155
+   ],
+   "e4": 0.0186426
+  },
+  {
+   "check": "off founder+declared lost_declaration within 5 % of E4",
+   "pass": true,
+   "rate": 0.018679,
+   "e4": 0.0186426
+  },
+  {
+   "check": "off founder+declared+zero-edge lost_declaration CP contains E4",
+   "pass": true,
+   "rate": 0.007911,
+   "cp95": [
+    0.007738290692209604,
+    0.008086568685549966
+   ],
+   "e4": 0.0079606
+  },
+  {
+   "check": "off founder+declared+zero-edge lost_declaration within 5 % of E4",
+   "pass": true,
+   "rate": 0.007911,
+   "e4": 0.0079606
+  },
+  {
+   "check": "on founder+declared decay eligible > 0",
+   "pass": true,
+   "eligible": 2114094,
+   "applied": 10570
+  },
+  {
+   "check": "on founder+declared+zero-edge decay eligible > 0",
+   "pass": true,
+   "eligible": 1110532,
+   "applied": 5555
+  },
+  {
+   "check": "on founder+declared decay firing CP contains 0.005",
+   "pass": true,
+   "firing": {
+    "count": 10570,
+    "cp95": [
+     0.004905143276072665,
+     0.005095771921724779
+    ],
+    "of": 2114094,
+    "rate": 0.004999777682543917
+   }
+  },
+  {
+   "check": "on connected lost_declaration CP contains off point",
+   "pass": true,
+   "on": {
+    "count": 7883,
+    "cp95": [
+     0.007710595883712645,
+     0.008058263675849109
+    ],
+    "of": 1000000,
+    "rate": 0.007883
+   },
+   "off_rate": 0.007911
+  },
+  {
+   "check": "on connected lost_declaration within 10 % of off",
+   "pass": true,
+   "on_rate": 0.007883,
+   "off_rate": 0.007911
+  },
+  {
+   "check": "on founder attempted_events_per_birth within 5 % of off",
+   "pass": true,
+   "on": 0.484315,
+   "off": 0.484315
+  },
+  {
+   "check": "on founder applied events excluding InputRefPrune within 5 % of off",
+   "pass": true,
+   "on": 0.334972,
+   "off": 0.335356,
+   "raw_applied_on": 0.334972,
+   "raw_applied_off": 0.356773
+  },
+  {
+   "check": "on InputRefPrune applied 0 (ordinary loop)",
+   "pass": true,
+   "prune_applied": 0
+  }
+ ],
+ "pass": true,
+ "on_integrated_loss_founder_declared": {
+  "count": 4942,
+  "cp95": [
+   0.0048054921466823,
+   0.00508138735659075
+  ],
+  "of": 1000000,
+  "rate": 0.004942
+ },
+ "on_integrated_loss_founder_declared_by_ops": {
+  "InputRefAdd": 102,
+  "InputRefAdd+InputRefRawFieldMutation": 5,
+  "InputRefAdd+InputRefSwap": 5,
+  "InputRefRawFieldMutation": 184,
+  "InputRefRawFieldMutation+InputRefSwap": 10,
+  "InputRefSwap": 182,
+  "none": 4454
+ },
+ "on_decay_founder_declared": {
+  "applied": 10570,
+  "births_with_loss": {
+   "count": 10526,
+   "cp95": [
+    0.01032689470124587,
+    0.01072794805725713
+   ],
+   "of": 1000000,
+   "rate": 0.010526
+  },
+  "by_operator": {
+   "InputRefPrune": 6978,
+   "InputRefRawFieldMutation": 1824,
+   "InputRefSwap": 1768
+  },
+  "eligible": 2114094,
+  "firing": {
+   "count": 10570,
+   "cp95": [
+    0.004905143276072665,
+    0.005095771921724779
+   ],
+   "of": 2114094,
+   "rate": 0.004999777682543917
+  },
+  "note": "N2 decay pass (follow-up gate G3): eligible = silent entries visited (one Bernoulli trial each), firing = applied / eligible with its CP interval, births_with_loss per birth, by route"
+ },
+ "on_decay_founder": {
+  "applied": 5453,
+  "births_with_loss": {
+   "count": 5447,
+   "cp95": [
+    0.0053036756283759146,
+    0.005593200287058286
+   ],
+   "of": 1000000,
+   "rate": 0.005447
+  },
+  "by_operator": {
+   "InputRefPrune": 5209,
+   "InputRefRawFieldMutation": 113,
+   "InputRefSwap": 131
+  },
+  "eligible": 1097460,
+  "firing": {
+   "count": 5453,
+   "cp95": [
+    0.004838046820012265,
+    0.005102068251196801
+   ],
+   "of": 1097460,
+   "rate": 0.004968746013522133
+  },
+  "note": "N2 decay pass (follow-up gate G3): eligible = silent entries visited (one Bernoulli trial each), firing = applied / eligible with its CP interval, births_with_loss per birth, by route"
+ },
+ "off_lost_by_ops_founder_declared": {
+  "InputRefAdd": 1,
+  "InputRefAdd+InputRefPrune": 170,
+  "InputRefAdd+InputRefPrune+InputRefRawFieldMutation": 13,
+  "InputRefAdd+InputRefPrune+InputRefSwap": 7,
+  "InputRefAdd+InputRefRawFieldMutation": 88,
+  "InputRefAdd+InputRefRawFieldMutation+InputRefSwap": 7,
+  "InputRefAdd+InputRefSwap": 69,
+  "InputRefPrune": 9950,
+  "InputRefPrune+InputRefRawFieldMutation": 503,
+  "InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 27,
+  "InputRefPrune+InputRefSwap": 428,
+  "InputRefRawFieldMutation": 4400,
+  "InputRefRawFieldMutation+InputRefSwap": 300,
+  "InputRefSwap": 2713,
+  "none": 3
+ },
+ "off_applied_by_operator_founder": {
+  "GraphAddGraphEdge": 9538,
+  "GraphAddInternalGraphNode": 4783,
+  "GraphAlterGraphEdgeWeight": 19254,
+  "GraphCopyEdgeBundle": 9474,
+  "GraphCopyInternalNode": 4767,
+  "GraphCopySubgraph": 4896,
+  "GraphDisableHebbian": 14,
+  "GraphEnableHebbian": 4869,
+  "GraphEnableRewardModulation": 3,
+  "GraphMutateGraphOperatorParam": 19010,
+  "GraphMutateHebbianRate": 31,
+  "GraphMutateHebbianRule": 15,
+  "GraphRawFieldMutation": 19085,
+  "GraphRemoveGraphEdge": 9456,
+  "GraphRemoveInternalGraphNode": 4652,
+  "GraphRetargetGraphEdge": 9682,
+  "GraphSwapGraphOperator": 9533,
+  "GraphToggleHebbianLamarckian": 18,
+  "InputRefAdd": 21523,
+  "InputRefPrune": 21417,
+  "InputRefRawFieldMutation": 43088,
+  "InputRefSwap": 43030,
+  "TopologyAddNode": 9697,
+  "TopologyAddRouteTarget": 19261,
+  "TopologyChangeEntryNode": 964,
+  "TopologyCopyMeshBackwardSlice": 2473,
+  "TopologyCopyMeshForwardSlice": 2312,
+  "TopologyCopyNode": 2397,
+  "TopologyMutateGateBias": 39054,
+  "TopologyRemoveNode": 124,
+  "TopologyRemoveRouteTarget": 204,
+  "TopologyRetargetNodeTarget": 343,
+  "TopologySpliceNode": 9860,
+  "TopologySwapNodeBackend": 9694,
+  "TopologySwapRouteTargets": 390,
+  "VmConstantMutation": 542,
+  "VmCopyConstantBlock": 1,
+  "VmCopyGeneBackwardSlice": 1,
+  "VmCopyGeneForwardSlice": 2,
+  "VmCopyInstructionBlock": 144,
+  "VmCopyInstructionBlockRemapped": 144,
+  "VmDeleteInstruction": 2,
+  "VmInsertLoadCompareMotif": 263,
+  "VmInsertReadBidMotif": 77,
+  "VmInsertReadStoreMotif": 88,
+  "VmInstructionMutation": 286,
+  "VmInstructionRawFieldMutation": 12,
+  "VmMutateSlotAddress": 2,
+  "VmRegisterCountMutation": 298
+ },
+ "on_applied_by_operator_founder": {
+  "GraphAddGraphEdge": 9539,
+  "GraphAddInternalGraphNode": 4782,
+  "GraphAlterGraphEdgeWeight": 19254,
+  "GraphCopyEdgeBundle": 9475,
+  "GraphCopyInternalNode": 4768,
+  "GraphCopySubgraph": 4894,
+  "GraphDisableHebbian": 14,
+  "GraphEnableHebbian": 4868,
+  "GraphEnableRewardModulation": 3,
+  "GraphMutateGraphOperatorParam": 19011,
+  "GraphMutateHebbianRate": 31,
+  "GraphMutateHebbianRule": 15,
+  "GraphRawFieldMutation": 19084,
+  "GraphRemoveGraphEdge": 9458,
+  "GraphRemoveInternalGraphNode": 4653,
+  "GraphRetargetGraphEdge": 9681,
+  "GraphSwapGraphOperator": 9532,
+  "GraphToggleHebbianLamarckian": 18,
+  "InputRefAdd": 21470,
+  "InputRefRawFieldMutation": 42867,
+  "InputRefSwap": 42914,
+  "TopologyAddNode": 9697,
+  "TopologyAddRouteTarget": 19262,
+  "TopologyChangeEntryNode": 964,
+  "TopologyCopyMeshBackwardSlice": 2474,
+  "TopologyCopyMeshForwardSlice": 2312,
+  "TopologyCopyNode": 2396,
+  "TopologyMutateGateBias": 39060,
+  "TopologyRemoveNode": 124,
+  "TopologyRemoveRouteTarget": 204,
+  "TopologyRetargetNodeTarget": 342,
+  "TopologySpliceNode": 9860,
+  "TopologySwapNodeBackend": 9692,
+  "TopologySwapRouteTargets": 391,
+  "VmConstantMutation": 543,
+  "VmCopyConstantBlock": 1,
+  "VmCopyGeneBackwardSlice": 1,
+  "VmCopyGeneForwardSlice": 2,
+  "VmCopyInstructionBlock": 144,
+  "VmCopyInstructionBlockRemapped": 144,
+  "VmDeleteInstruction": 2,
+  "VmInsertLoadCompareMotif": 264,
+  "VmInsertReadBidMotif": 76,
+  "VmInsertReadStoreMotif": 88,
+  "VmInstructionMutation": 286,
+  "VmInstructionRawFieldMutation": 12,
+  "VmMutateSlotAddress": 2,
+  "VmRegisterCountMutation": 298
+ },
+ "on_skip_note": "SilentEntryDecaysOnly skips are not in the probe output; they are the gap between attempted and applied"
+}
