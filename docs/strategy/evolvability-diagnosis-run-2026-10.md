@@ -108,6 +108,16 @@ And, given the answer, what should Petri change?
   `main` is by `git cherry-pick`, which invokes no pre-commit hook, so it
   needs no bypass. Nothing in this run uses the affected package. Codex
   review (b) asked for this accounting.
+- **Branch and commits.** Branch `worktree-evolvability-diagnosis`.
+  `instr:` `3278e836` (one-edge arm sets), `ccb7d1fe` (census probe),
+  `17dddc52` and `2b8ef2c4` (run 3's energy ceiling and hunger assay,
+  cherry-picked), `8cc1730a` and `74e1d12f` (fixes and rustfmt, with lab
+  parts); `proto:` `7ea581e8` (reproduce hold), `9addf24f` (AddProjection),
+  `bd330b53` (its proptest regressions); `lab:` `09f78786` (E4 probe),
+  `6417117e`, `d47cdf20`, `a454632c` (run 5's screen, cherry-picked),
+  `33988a6a` (its adaptation), `6152b114` (E3 writer, fired detection); the
+  `docs+lab` commit `b2ed9dd9` carries the A4 probe fix, landed on `main` as
+  its docs part only.
 - **Landing scope (decided before the plan forward).** Only `docs:` commits
   land on `main`. The run's `lab:` probes (`diagnosis_probe.rs`: E4
   `transition_rates`, E3 prepared parents; the adapted run 5 screen) are
@@ -182,12 +192,22 @@ Outside the ladder: the founder's tie-state default heading is north
 (lowest-index argmax), which offers a hypothesis for every E1 slot's sign (E1);
 mean genome size in the goal worlds reaches 16 × and 20 × the founder by
 20,000 ticks and 118 × by 50,000, and the goal-seed Canyon world goes extinct
-at tick 36,652 (E2).
+at tick 36,652 (E2); on fresh Canyon seeds ×4 supply is extinct by 10,000 and
+18,000 ticks and the fixed founder (mutation off) is extinct before 5,500,
+while the default persists on both (E8).
 
 ## Advice
 
 Every Fable advisor consultation the plan's rule 8 lists, with the disposition
-of each point raised.
+of each point raised. Rule 8 coverage: before phase 0, Advice 1; before each
+phase's approach, Advice 1 (phase 0), 2 (phase 1), 6 (phase 2, late, stated
+there), 5 and 7 (phase 3's chain and order), 8 (phase 4, the plan forward);
+when naming the verdict branch, Advice 4; after each row's reading was
+drafted and before it was recorded, Advice 2 (E10 and E0, post hoc, stated),
+3 (E4), 4 (E1), 5 and 7 (E2, E6), 6 (E3), 9 (E5), 10 (E8); on incomplete or
+contradicting rows, Advice 4 (E1), 5 (E2 both halves), 6 (E3), 9 (E5), 10
+(E8); before the plan forward was drafted, Advice 8, and after, Advice 11;
+before closing, Advice 12.
 
 | # | Rule 8 point | Advice (summary) | Dispositions |
 | --- | --- | --- | --- |
@@ -336,8 +356,8 @@ projection unit, and E8's two-seed rule ("default past 10 × the founder by
 orders what remains, so **the order below is the run's judgment**, with its
 reason: the live worlds' binding phenomenon is genome size (three of four
 Canyon-and-Confluence trajectories past 10 × the founder by 20,000 ticks,
-118 × at 50,000, ×4 supply extinct on both fresh seeds; one connected edge
-among hundreds of inputs on a 10,000-unit genome), while the cleanup hazard
+118 × at 50,000, ×4 supply extinct on both fresh seeds; connected reads
+carried on genomes of about 11,000 units), while the cleanup hazard
 E4 measured is real but demonstrably not binding (E2: the silent and
 connected states become common, declared on 8 and 11 of 20 sampled parents,
 executed on 7 and 9) and the executed → causal stop is unexplained. Phenomenon
@@ -355,7 +375,10 @@ a vote-margin census of the executed reads on the live world (E2's census
 plus the ablation's vote deltas, not only its action changes) would separate
 them in one checkpoint.
 
-1. **T03.F12 — Replication as Time** (track T03). Natural analog: copying a
+1. **T03.F12 — Replication as Time** (track T03; distinct from the closed
+   T03.F11 Genome Replication Cost, the per-unit token surcharge on the
+   reproduce charge that E3 measured at 0.01 energy per unit per birth and
+   that E2 and E8 show does not bound size). Natural analog: copying a
    longer genome takes longer, and neural tissue costs metabolism; Avida
    bounds genome size by replication time, not by a token charge (Lenski et
    al. 2003, Methods). Evidence for the phenomenon: E2 (goal seeds 16 × and
@@ -403,14 +426,18 @@ them in one checkpoint.
    far below 1) is the only form E5 leaves open, and it is not distinguishable
    from the founder's own ring edges plus E1's single edge; the `aligned`
    variant stays inadmissible pending the ruling in part 3.
-4. **T18.F01 lead (no new row).** The founder's four cardinal `Move` votes tie
-   at 0.5 without adjacent food and the within-kind argmax takes the lowest
-   index, so its default heading is north; E1's slot pattern is consistent
-   with each edge's effect on that tie. Natural analog: a naive forager has
-   no fixed compass heading; its undirected search is symmetric. For T18.F01's
-   specialized profile: do not inherit a fixed-index default, and read the
-   tie-state hypothesis with a trajectory instrument before building on it.
-   Evidence: E1 (hypothesis), `vote_select.rs`.
+4. **T18.F01 lead (no new row): a recorded tension.** The founder's four
+   cardinal `Move` votes tie at 0.5 without adjacent food and the within-kind
+   argmax takes the lowest index, so its default heading is north; E1's slot
+   pattern is consistent with each edge's effect on that tie. Natural analog:
+   a naive forager has no fixed compass heading; its undirected search is
+   symmetric. T18's success criteria keep the canonical founder's
+   first-argmax cardinal-food steering, and the north default is a
+   consequence of first-argmax on tied votes, so T18.F01's spec must decide
+   whether first-argmax steering and a non-directional tie-state default can
+   coexist; this run records the tension and the hypothesis, to be read with
+   a trajectory instrument before anything is built on it. Evidence: E1
+   (hypothesis), `vote_select.rs`.
 5. **World side, after the above (tracks T12 and T02).** The goal-seed Canyon
    world is not persistent to 50,000 ticks (extinct at 36,652), which the
    shared baseline contract should read before any world is changed
@@ -500,10 +527,13 @@ current contract governs until then**:
 - "Replication cost as time holds genome size near the founder" for the
   realized arm (E8: 12 × against the default's 7.1 × on the persisting seed,
   at 39 % of its population; the other seed extinct).
-- "×4 per-unit supply is benign in production" (E8: extinct on both fresh
-  Canyon seeds by 10,000 and 18,000 ticks).
-- "The fixed founder persists in Canyon" (E8: both mutation-off worlds
-  extinct before 5,500 ticks; persistence needs mutation on these seeds).
+- M4 (×4 per-unit supply) as a production candidate: run 6's part P asked
+  whether it harms persistence and never ran; E8 answers it in one world on
+  two seeds, extinct on both by 10,000 and 18,000 ticks.
+- An unstated assumption of the fresh-seed design, that the fixed founder
+  persists in Canyon: both mutation-off worlds are extinct before 5,500
+  ticks (E8); persistence on these seeds needs mutation. A finding rather
+  than a refuted proposal; it is also under Findings.
 - Heavy-tailed weight jumps (run 5, unchanged) and run 6's dense silent
   afferents at 8 pairs (E10: unresolved, not refuted; its descriptive trigger
   was not met).
