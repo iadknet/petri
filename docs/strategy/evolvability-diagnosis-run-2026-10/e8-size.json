@@ -1,0 +1,823 @@
+{
+ "row": "E8",
+ "world": "Canyon country",
+ "window_ticks": [
+  15000,
+  20000
+ ],
+ "founder_units": 97,
+ "runs": {
+  "default-s1022": {
+   "completed": true,
+   "samples": 40,
+   "last_tick": 20000,
+   "window_samples": 11,
+   "window_alive_samples": 11,
+   "mean_population": 4664.0,
+   "mean_energy": 25.653513181818177,
+   "mean_genome_size": 688.1147402677917,
+   "mean_genome_size_founder_units": 7.093966394513316,
+   "mean_generation": 391.7158551852551,
+   "births_per_creature_tick": 0.018335064095658733,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 4889,
+    "mean_genome_size": 820.9267743914911,
+    "mean_generation": 441.60421354060134,
+    "reproduction_actions_spawned_total": 1371904,
+    "mutation_events_applied_total": 3395400
+   },
+   "trajectory_size": [
+    [
+     2500,
+     148.9,
+     974
+    ],
+    [
+     5000,
+     412.4,
+     1934
+    ],
+    [
+     7500,
+     469.8,
+     2930
+    ],
+    [
+     10000,
+     462.1,
+     3915
+    ],
+    [
+     12500,
+     540.8,
+     4590
+    ],
+    [
+     15000,
+     587.2,
+     4877
+    ],
+    [
+     17500,
+     684.9,
+     5008
+    ],
+    [
+     20000,
+     820.9,
+     4889
+    ]
+   ],
+   "sha256": "59569650ac4803e5c61e4c1227a6fc284ed4988e627b83c426eaab0ee72de558",
+   "applied": {
+    "per_unit_rate": 0.005,
+    "hold": null
+   }
+  },
+  "default-s2022": {
+   "completed": true,
+   "samples": 40,
+   "last_tick": 20000,
+   "window_samples": 11,
+   "window_alive_samples": 11,
+   "mean_population": 1208.1818181818182,
+   "mean_energy": 36.91158336363637,
+   "mean_genome_size": 2171.0965888158494,
+   "mean_genome_size_founder_units": 22.38243905995721,
+   "mean_generation": 441.7998122095134,
+   "births_per_creature_tick": 0.018527271240493907,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 1061,
+    "mean_genome_size": 2308.02356267672,
+    "mean_generation": 495.67577756833174,
+    "reproduction_actions_spawned_total": 835989,
+    "mutation_events_applied_total": 3101805
+   },
+   "trajectory_size": [
+    [
+     2500,
+     255.7,
+     1924
+    ],
+    [
+     5000,
+     434.4,
+     2226
+    ],
+    [
+     7500,
+     384.4,
+     3258
+    ],
+    [
+     10000,
+     831.8,
+     1310
+    ],
+    [
+     12500,
+     1194.8,
+     1760
+    ],
+    [
+     15000,
+     1649.7,
+     1264
+    ],
+    [
+     17500,
+     2034.0,
+     994
+    ],
+    [
+     20000,
+     2308.0,
+     1061
+    ]
+   ],
+   "sha256": "c268285d9c11881cf079e300ff47509c448c81a01db8c330e6e560906b5b899f",
+   "applied": {
+    "per_unit_rate": 0.005,
+    "hold": null
+   }
+  },
+  "x4-s1022": {
+   "completed": true,
+   "samples": 40,
+   "last_tick": 20000,
+   "window_samples": 11,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    9500,
+    10000
+   ],
+   "final": {
+    "tick": 20000,
+    "population": 0,
+    "mean_genome_size": 0.0,
+    "mean_generation": 0.0,
+    "reproduction_actions_spawned_total": 343195,
+    "mutation_events_applied_total": 3838581
+   },
+   "trajectory_size": [
+    [
+     2500,
+     394.9,
+     1593
+    ],
+    [
+     5000,
+     768.8,
+     1377
+    ],
+    [
+     7500,
+     2273.1,
+     528
+    ],
+    [
+     10000,
+     0.0,
+     0
+    ],
+    [
+     12500,
+     0.0,
+     0
+    ],
+    [
+     15000,
+     0.0,
+     0
+    ],
+    [
+     17500,
+     0.0,
+     0
+    ],
+    [
+     20000,
+     0.0,
+     0
+    ]
+   ],
+   "sha256": "1346a3cad3b673449540c5f02c6f1c3908074e532aa5997713dd1cd82744c3d8",
+   "applied": {
+    "per_unit_rate": 0.02,
+    "hold": null
+   }
+  },
+  "x4-s2022": {
+   "completed": true,
+   "samples": 40,
+   "last_tick": 20000,
+   "window_samples": 11,
+   "window_alive_samples": 6,
+   "mean_population": 459.5,
+   "mean_energy": 54.31556166666667,
+   "mean_genome_size": 3894.580642564628,
+   "mean_genome_size_founder_units": 40.150315902728124,
+   "mean_generation": 335.1868769485907,
+   "births_per_creature_tick": 0.009452823315118397,
+   "extinction_interval": [
+    17500,
+    18000
+   ],
+   "final": {
+    "tick": 20000,
+    "population": 0,
+    "mean_genome_size": 0.0,
+    "mean_generation": 0.0,
+    "reproduction_actions_spawned_total": 678134,
+    "mutation_events_applied_total": 10447381
+   },
+   "trajectory_size": [
+    [
+     2500,
+     216.1,
+     1691
+    ],
+    [
+     5000,
+     650.2,
+     2411
+    ],
+    [
+     7500,
+     658.9,
+     2485
+    ],
+    [
+     10000,
+     1044.5,
+     2297
+    ],
+    [
+     12500,
+     1622.0,
+     2307
+    ],
+    [
+     15000,
+     3297.6,
+     902
+    ],
+    [
+     17500,
+     4791.8,
+     12
+    ],
+    [
+     20000,
+     0.0,
+     0
+    ]
+   ],
+   "sha256": "cca3b9dff2902b6faf0a91cb4dbbb0f253d61d5a833e650982df890e61545ab7",
+   "applied": {
+    "per_unit_rate": 0.02,
+    "hold": null
+   }
+  },
+  "hold-s1022": {
+   "completed": true,
+   "samples": 40,
+   "last_tick": 20000,
+   "window_samples": 11,
+   "window_alive_samples": 11,
+   "mean_population": 1802.1818181818182,
+   "mean_energy": 39.941011545454536,
+   "mean_genome_size": 1168.4583414450115,
+   "mean_genome_size_founder_units": 12.045962282938262,
+   "mean_generation": 380.1843388018417,
+   "births_per_creature_tick": 0.01879268687304498,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 1282,
+    "mean_genome_size": 1348.3229329173166,
+    "mean_generation": 436.5499219968799,
+    "reproduction_actions_spawned_total": 783355,
+    "mutation_events_applied_total": 2508510
+   },
+   "trajectory_size": [
+    [
+     2500,
+     199.8,
+     3524
+    ],
+    [
+     5000,
+     220.6,
+     1756
+    ],
+    [
+     7500,
+     352.0,
+     1034
+    ],
+    [
+     10000,
+     796.6,
+     1849
+    ],
+    [
+     12500,
+     1185.5,
+     1988
+    ],
+    [
+     15000,
+     1263.8,
+     1695
+    ],
+    [
+     17500,
+     1110.1,
+     2202
+    ],
+    [
+     20000,
+     1348.3,
+     1282
+    ]
+   ],
+   "sha256": "728c45c1f2ba09f5d8e1cc75d40ed0755726c0273a9be8bad6f473af2ad59a5c",
+   "applied": {
+    "per_unit_rate": 0.005,
+    "hold": true
+   }
+  },
+  "hold-s2022": {
+   "completed": true,
+   "samples": 40,
+   "last_tick": 20000,
+   "window_samples": 11,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    6000,
+    6500
+   ],
+   "final": {
+    "tick": 20000,
+    "population": 0,
+    "mean_genome_size": 0.0,
+    "mean_generation": 0.0,
+    "reproduction_actions_spawned_total": 281578,
+    "mutation_events_applied_total": 181751
+   },
+   "trajectory_size": [
+    [
+     2500,
+     130.6,
+     1267
+    ],
+    [
+     5000,
+     348.2,
+     571
+    ],
+    [
+     7500,
+     0.0,
+     0
+    ],
+    [
+     10000,
+     0.0,
+     0
+    ],
+    [
+     12500,
+     0.0,
+     0
+    ],
+    [
+     15000,
+     0.0,
+     0
+    ],
+    [
+     17500,
+     0.0,
+     0
+    ],
+    [
+     20000,
+     0.0,
+     0
+    ]
+   ],
+   "sha256": "006d245f549dee0c396baea9b74e59a550f75883367c42f7ef127a4177435c10",
+   "applied": {
+    "per_unit_rate": 0.005,
+    "hold": true
+   }
+  },
+  "default-mutoff-s1022": {
+   "completed": true,
+   "samples": 40,
+   "last_tick": 20000,
+   "window_samples": 11,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    5000,
+    5500
+   ],
+   "final": {
+    "tick": 20000,
+    "population": 0,
+    "mean_genome_size": 0.0,
+    "mean_generation": 0.0,
+    "reproduction_actions_spawned_total": 288721,
+    "mutation_events_applied_total": 0
+   },
+   "trajectory_size": [
+    [
+     2500,
+     97.0,
+     3375
+    ],
+    [
+     5000,
+     97.0,
+     116
+    ],
+    [
+     7500,
+     0.0,
+     0
+    ],
+    [
+     10000,
+     0.0,
+     0
+    ],
+    [
+     12500,
+     0.0,
+     0
+    ],
+    [
+     15000,
+     0.0,
+     0
+    ],
+    [
+     17500,
+     0.0,
+     0
+    ],
+    [
+     20000,
+     0.0,
+     0
+    ]
+   ],
+   "sha256": "eca6616ce4e8c28f7e0721717bd83faa57ec33b3594d0fa86912728814ca1b96",
+   "applied": {
+    "per_unit_rate": 0.0,
+    "hold": null
+   }
+  },
+  "default-mutoff-s2022": {
+   "completed": true,
+   "samples": 40,
+   "last_tick": 20000,
+   "window_samples": 11,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    4000,
+    4500
+   ],
+   "final": {
+    "tick": 20000,
+    "population": 0,
+    "mean_genome_size": 0.0,
+    "mean_generation": 0.0,
+    "reproduction_actions_spawned_total": 279577,
+    "mutation_events_applied_total": 0
+   },
+   "trajectory_size": [
+    [
+     2500,
+     97.0,
+     5939
+    ],
+    [
+     5000,
+     0.0,
+     0
+    ],
+    [
+     7500,
+     0.0,
+     0
+    ],
+    [
+     10000,
+     0.0,
+     0
+    ],
+    [
+     12500,
+     0.0,
+     0
+    ],
+    [
+     15000,
+     0.0,
+     0
+    ],
+    [
+     17500,
+     0.0,
+     0
+    ],
+    [
+     20000,
+     0.0,
+     0
+    ]
+   ],
+   "sha256": "218c5affb60929e86fcd0704c725eebfc55390c7bfd3702c7cab77cf027c6d4a",
+   "applied": {
+    "per_unit_rate": 0.0,
+    "hold": null
+   }
+  },
+  "hold-mutoff-s1022": {
+   "completed": true,
+   "samples": 40,
+   "last_tick": 20000,
+   "window_samples": 11,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    5000,
+    5500
+   ],
+   "final": {
+    "tick": 20000,
+    "population": 0,
+    "mean_genome_size": 0.0,
+    "mean_generation": 0.0,
+    "reproduction_actions_spawned_total": 288721,
+    "mutation_events_applied_total": 0
+   },
+   "trajectory_size": [
+    [
+     2500,
+     97.0,
+     3375
+    ],
+    [
+     5000,
+     97.0,
+     116
+    ],
+    [
+     7500,
+     0.0,
+     0
+    ],
+    [
+     10000,
+     0.0,
+     0
+    ],
+    [
+     12500,
+     0.0,
+     0
+    ],
+    [
+     15000,
+     0.0,
+     0
+    ],
+    [
+     17500,
+     0.0,
+     0
+    ],
+    [
+     20000,
+     0.0,
+     0
+    ]
+   ],
+   "sha256": "e5fb210f77e76a2f84d59c88d7fa253bf3b9ffeb739a95615d60ac83a06f0b86",
+   "applied": {
+    "per_unit_rate": 0.0,
+    "hold": true
+   }
+  },
+  "hold-mutoff-s2022": {
+   "completed": true,
+   "samples": 40,
+   "last_tick": 20000,
+   "window_samples": 11,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    4000,
+    4500
+   ],
+   "final": {
+    "tick": 20000,
+    "population": 0,
+    "mean_genome_size": 0.0,
+    "mean_generation": 0.0,
+    "reproduction_actions_spawned_total": 279577,
+    "mutation_events_applied_total": 0
+   },
+   "trajectory_size": [
+    [
+     2500,
+     97.0,
+     5939
+    ],
+    [
+     5000,
+     0.0,
+     0
+    ],
+    [
+     7500,
+     0.0,
+     0
+    ],
+    [
+     10000,
+     0.0,
+     0
+    ],
+    [
+     12500,
+     0.0,
+     0
+    ],
+    [
+     15000,
+     0.0,
+     0
+    ],
+    [
+     17500,
+     0.0,
+     0
+    ],
+    [
+     20000,
+     0.0,
+     0
+    ]
+   ],
+   "sha256": "79cacd247f4f142ff0c5f282eead705a507b0f7931fbcabbe9ff02b17a4780b1",
+   "applied": {
+    "per_unit_rate": 0.0,
+    "hold": true
+   }
+  }
+ },
+ "reading": {
+  "mean_genome_size_founder_units": {
+   "default": {
+    "1022": 7.093966394513316,
+    "2022": 22.38243905995721
+   },
+   "x4": {
+    "1022": null,
+    "2022": 40.150315902728124
+   },
+   "hold": {
+    "1022": 12.045962282938262,
+    "2022": null
+   },
+   "default-mutoff": {
+    "1022": null,
+    "2022": null
+   },
+   "hold-mutoff": {
+    "1022": null,
+    "2022": null
+   }
+  },
+  "births_per_creature_tick": {
+   "default": {
+    "1022": 0.018335064095658733,
+    "2022": 0.018527271240493907
+   },
+   "x4": {
+    "1022": null,
+    "2022": 0.009452823315118397
+   },
+   "hold": {
+    "1022": 0.01879268687304498,
+    "2022": null
+   },
+   "default-mutoff": {
+    "1022": null,
+    "2022": null
+   },
+   "hold-mutoff": {
+    "1022": null,
+    "2022": null
+   }
+  },
+  "mean_population": {
+   "default": {
+    "1022": 4664.0,
+    "2022": 1208.1818181818182
+   },
+   "x4": {
+    "1022": null,
+    "2022": 459.5
+   },
+   "hold": {
+    "1022": 1802.1818181818182,
+    "2022": null
+   },
+   "default-mutoff": {
+    "1022": null,
+    "2022": null
+   },
+   "hold-mutoff": {
+    "1022": null,
+    "2022": null
+   }
+  }
+ },
+ "default_past_10x_founder_both_seeds": false,
+ "immediate_effect_hold_vs_default_mutoff": {
+  "1022": {
+   "mean_population": [
+    null,
+    null
+   ],
+   "births_per_creature_tick": [
+    null,
+    null
+   ],
+   "mean_energy": [
+    null,
+    null
+   ]
+  },
+  "2022": {
+   "mean_population": [
+    null,
+    null
+   ],
+   "births_per_creature_tick": [
+    null,
+    null
+   ],
+   "mean_energy": [
+    null,
+    null
+   ]
+  }
+ },
+ "complete": true,
+ "reader_sha256": "3e2c0b82426dc1f5ae7b376e9414c0aaa5c73baad0b232d356e6754ebc3c9794"
+}
