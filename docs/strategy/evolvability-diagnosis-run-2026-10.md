@@ -326,135 +326,136 @@ for (b) (the plan forward's reviews (c) and (d) follow).
 ## Plan forward
 
 Written after every row closed (E5 and E8 last); reviewed by Codex (c) and
-(d) below.
+(d) below; the candidates in part 2 are **unvalidated leads**, because the
+run 1 plan's natural-world check was not run for any of them (part 2 says why
+for each).
 
 ### 1. Verdict
 
 **Variation.** One authored sensor-to-motor edge on the 97-unit founder raises
-births 20 to 43 % over its silent twin in Canyon and Confluence (E1), while in
-the live goal worlds, whose genomes reach 16 to 118 times the founder's size,
-the same sensor families are declared, connected and executed on up to 11 of 20
-sampled parents by 50,000 ticks and causal on none (E2): the world rewards the
-first step, and ordinary variation does not deliver it as a working circuit.
-Decided by E1's predeclared rule; supported by E4 (the silent declaration is
-lost 2,564 to 5,073 times more often than it is usefully connected) and by E2;
-E6 is descriptive (Canyon 10.7 %, Confluence 29.8 % of creatures see food only
-at a distance).
-
-What E1 and E2 together leave open decides the order below: one edge on a
-small founder pays, yet populations carrying 10,000-unit genomes show no
-causal read in 50,000 ticks. Sign cancellation among many edges on a crowded
-vote surface, dilution of one edge's weight, or loss before selection sees it
-are the three readings; E5 (does one event that wires a whole family with a
-consistent sign do better per birth than one random edge?) and E8 (is the
-size runaway bounded, and by what?) discriminate them.
+births 20 to 43 % over its silent twin in the fixed, mutation-off 1,000-tick
+competitions of Canyon and Confluence (E1), while in the live goal worlds the
+same sensor families are declared, connected and executed on up to 11 of 20
+sampled parents by 50,000 ticks and causal on none of the 20 sampled at that
+checkpoint on the observation panels (E2). Decided by E1's predeclared rule;
+E4 (the silent declaration is lost 2,564 to 5,073 times more often than it is
+usefully connected) and E2 support it; E6 is descriptive (Canyon 10.7 %,
+Confluence 29.8 % of creatures see food only at a distance).
 
 ### 2. What to change, in order
 
-Neither predeclared contingency fired as written: E5 does not advance the
-projection unit, and E8's two-seed rule ("default past 10 × the founder by
-20,000 on both seeds") is not met (8.5 × and 23.8 ×). No predeclared rule
-orders what remains, so **the order below is the run's judgment**, with its
-reason: the live worlds' binding phenomenon is genome size (three of four
-Canyon-and-Confluence trajectories past 10 × the founder by 20,000 ticks,
-118 × at 50,000, ×4 supply extinct on both fresh seeds; connected reads
-carried on genomes of about 11,000 units), while the cleanup hazard
-E4 measured is real but demonstrably not binding (E2: the silent and
-connected states become common, declared on 8 and 11 of 20 sampled parents,
-executed on 7 and 9) and the executed → causal stop is unexplained. Phenomenon
-over clean evidence, therefore: size first with its repair untested, cleanup
-second on its clean numbers. Weighing clean evidence over phenomenon would
-swap (1) and (2).
+**What E1 and E2 together leave open.** One edge on a small founder pays, yet
+Confluence's 20 sampled parents at 50,000 ticks (genomes of about 11,000
+units) carry the reads at the executed stage with no ablation changing a
+committed action on the panels, after two causal food-summary incidences in
+the independently sampled 20 parents of tick 20,000. Three hypotheses, none
+tested here: sign cancellation among many edges on a crowded vote surface;
+dilution of one edge's weight; loss of the read before selection sees it
+(E4's hazards). Zero action changes does not establish zero vote
+contribution, so a vote-margin observation of the executed reads on the live
+world (the E2 census plus the ablation's vote deltas, not only its action
+changes) would narrow, not settle, these; run 1's H4 (incumbent masking) is
+the same question in the lab's words. This is the **follow-up diagnosis
+question**, not a feature.
 
-The **follow-up diagnosis question**, not a feature: why do reads that are
-declared, connected and executed on up to 11 of 20 sampled parents at 50,000
-ticks carry no weight on the committed action (E2)? Run 1's H4 (incumbent
-masking: the founder's food path wins the vote and a new contribution cannot
-change the action without displacing it) and weight dilution on a vote
-surface fed by a 10,000-unit genome are the two readings E2 and E5 point at;
-a vote-margin census of the executed reads on the live world (E2's census
-plus the ablation's vote deltas, not only its action changes) would separate
-them in one checkpoint.
+**Order.** Neither predeclared contingency fired as written: E5 does not
+advance the projection unit, and E8's two-seed rule ("default past 10 × the
+founder by 20,000 on both seeds") is not met (8.5 × and 23.8 ×). No
+predeclared rule orders what remains, so **the order below is the run's
+judgment**: genome size is an observed concern in every live trajectory
+(three of four Canyon-and-Confluence trajectories past 10 × the founder by
+20,000 ticks, 118 × at 50,000, ×4 supply extinct on both fresh seeds), while
+the cleanup hazard E4 measured is real and its contribution to the stall is
+unresolved (E2 shows the silent and connected states becoming common,
+declared on 8 and 11 of 20 sampled parents, which argues it is not the
+binding constraint there, without excluding that it limits circuit
+completion). Phenomenon before clean evidence, therefore: size first, cleanup
+second; weighing clean evidence over phenomenon would swap them.
 
-1. **T03.F12 — Replication as Time** (track T03; distinct from the closed
-   T03.F11 Genome Replication Cost, the per-unit token surcharge on the
-   reproduce charge that E3 measured at 0.01 energy per unit per birth and
-   that E2 and E8 show does not bound size). Natural analog: copying a
-   longer genome takes longer, and neural tissue costs metabolism; Avida
-   bounds genome size by replication time, not by a token charge (Lenski et
-   al. 2003, Methods). Evidence for the phenomenon: E2 (goal seeds 16 × and
-   20 × the founder at 20,000, 118 × at 50,000; Canyon extinct at 36,652), E8
-   (fresh seeds 8.5 × and 23.8 × at 20,000 with the default persisting on
-   both; ×4 supply extinct on both; the fixed founder extinct on both before
-   5,500, so mutation is load-bearing for persistence in Canyon). **Repair
-   untested:** the E8 prototype's realized hold was one tick short (zero for
-   a founder-size genome) and ran on one persisting seed, where it did not
-   hold size (12 × against 7.1 ×) and halved the population; the feature's own
-   goal profile is the test, and the hold's tick arithmetic must count from
-   the tick after the birth. What variation still has to discover: everything
-   about the circuit; this changes only what a large genome costs in
-   reproductive time. Goal-profile expectation: mean genome size at the goal
-   checkpoints near a small multiple of the founder's; births per
-   creature-tick lower at equal population; Canyon persisting past 36,652 at
-   its goal seed; the depth-drift behavior-changing share rising as junk stops
-   diluting the executed core.
-2. **T11.F28 — Cleanup-Operator Decay** (track T11; option B of T11.F22's
-   recorded follow-on). Natural analog: an unused gene is lost at the mutation
-   rate per site, about 10⁻⁸, and silent synapses persist; nothing in a cell
-   removes an unused receptor at 1 % per generation. Evidence: E4 (the silent
-   declaration lost at 1.9 % per birth, 53 % `Prune`; the connected entry
-   retyped or swapped at 0.8 % per birth; lose-to-useful-connect 2,564 to
-   5,073), E3 (the declared state energy-neutral within 10⁻³, the connected
-   state at the line, so the hazard is mutational), with E2's caveat that the
-   silent states already become common in the live worlds. Scope: `Prune`
-   weighted at a per-unit decay rate instead of one InputRef event in six; an
-   addressed entry excluded from `RawFieldMutation`'s type retargeting and
-   from `Swap`, or those bounded to a rate of the same order as the decay.
-   What variation still has to discover: the connection, its sign and its
-   weight. Goal-profile expectation: declared-but-unconnected families rise
-   in the input-use funnel; the depth-drift behavior-changing share may fall
-   as silent cargo accumulates; dead-per-birth not up.
+1. **T03.F12 — Genome-Length-Dependent Reproductive Time** (track T03;
+   distinct from the closed T03.F11 Genome Replication Cost, the per-unit
+   token surcharge that E3 measured at 0.01 energy per unit per birth and
+   that E2 and E8 show does not bound size). Natural analog: copying a longer
+   genome takes longer, and neural tissue costs metabolism; Avida bounds
+   genome size by replication time (Lenski et al. 2003, Methods). Evidence
+   for the phenomenon: E2 (goal seeds 16 × and 20 × at 20,000, 118 × at
+   50,000; Canyon extinct at 36,652), E8 (fresh seeds 8.5 × and 23.8 × at
+   20,000 with the default persisting on both; ×4 extinct on both; the fixed
+   founder extinct on both before 5,500). **Unvalidated lead, natural-world
+   check not run for the proposed semantics:** the E8 prototype realized a
+   hold one tick shorter than declared (zero for a founder-size genome), and
+   on the one seed where both persisted it did not hold size (12 × against
+   7.1 ×, window means) and left the population at 39 % of the default's
+   (1,802 against 4,664, window means); the other seed went extinct. What
+   variation still has to discover: everything about the circuit; this
+   changes only what a large genome costs in reproductive time. Expected
+   goal-profile reading if it works: mean genome size at the goal checkpoints
+   near a small multiple of the founder's, births per creature-tick lower at
+   equal population, Canyon persisting past 36,652 at its goal seed, and the
+   depth-drift behavior-changing share rising.
+2. **T11.F28 — Slower Loss of Silent Structure** (track T11; option B of
+   T11.F22's recorded follow-on). Natural analog: an unused gene is lost at
+   the mutation rate per site, about 10⁻⁸, and silent synapses persist;
+   nothing in a cell removes an unused receptor at 1 % per generation.
+   Evidence: E4 (the silent declaration lost at 1.9 % per birth, 53 %
+   `Prune`, 24 % type retargeting, 16 % `Swap`; the connected entry retyped
+   or swapped at 0.8 % per birth; lose-to-useful-connect 2,564 to 5,073), E3
+   (the declared state energy-neutral within 10⁻³, the connected state at the
+   line, so the hazard is mutational), with E2's caveat above. **Unvalidated
+   lead, natural-world check not run:** no prototype of slower loss was built
+   or run beside the default. What variation still has to discover: the
+   connection, its sign and its weight. Expected goal-profile reading if it
+   works: declared-but-unconnected families rise in the input-use funnel; the
+   depth-drift behavior-changing share may fall as silent cargo accumulates;
+   dead-per-birth not up.
 3. **Projection as one unit of variation: not advanced** (would be T20 or
-   T11). E5 found no variant several times more often confirmed-helpful than
-   its native twins (food 1 to 3 against 8 of 476 fired births; wall 39 to 62
-   against 42 of 1,535; every ratio's interval spans 1, no doubling excluded)
-   and found dense wiring (every channel to every sink, 56 to 128 edges)
-   harmful in four fired births of five on food and in 36 to 43 % on wall
-   against the twins' 19 to 22 %, every lower bound above 1. The natural
-   analog stands (topographic projections; Gaier and Ha 2019; Kirschner and
-   Gerhart 2007; Stanley, D'Ambrosio and Gauci 2009); the operator as written
-   does not. A sparse, low-gain projection (one edge per channel at a weight
-   far below 1) is the only form E5 leaves open, and it is not distinguishable
-   from the founder's own ring edges plus E1's single edge; the `aligned`
-   variant stays inadmissible pending the ruling in part 3.
-4. **T18.F01 lead (no new row): a recorded tension.** The founder's four
-   cardinal `Move` votes tie at 0.5 without adjacent food and the within-kind
-   argmax takes the lowest index, so its default heading is north; E1's slot
-   pattern is consistent with each edge's effect on that tie. Natural analog:
-   a naive forager has no fixed compass heading; its undirected search is
-   symmetric. T18's success criteria keep the canonical founder's
-   first-argmax cardinal-food steering, and the north default is a
-   consequence of first-argmax on tied votes, so T18.F01's spec must decide
-   whether first-argmax steering and a non-directional tie-state default can
-   coexist; this run records the tension and the hypothesis, to be read with
-   a trajectory instrument before anything is built on it. Evidence: E1
-   (hypothesis), `vote_select.rs`.
-5. **World side, after the above (tracks T12 and T02).** The goal-seed Canyon
-   world is not persistent to 50,000 ticks (extinct at 36,652), which the
-   shared baseline contract should read before any world is changed
-   (T12.F06 candidate: goal-world persistence to 50,000 ticks as a baseline
-   reading); E6's Canyon share (10.7 % see food only at a distance) keeps the
-   static-sparsity lever (Section 3.1) and T02.F01 Seasons open as later
-   candidates. Natural analogs: patchy resources beyond a random walk's reach;
-   seasons. Not first: E1 shows the first step already pays in two goal
-   worlds.
+   T11). E5 established no correspondence advantage: no variant was several
+   times more often confirmed-helpful than its native twins (food 1 to 3
+   against 8 of 476 fired births; wall 39 to 62 against 42 of 1,535; every
+   ratio's interval spans 1, no doubling excluded, so smaller benefits remain
+   unresolved), and dense wiring (every channel to every sink, 56 to 128
+   edges at weights of order 1) was harmful in four fired births of five on
+   food and in 36 to 43 % on wall against the twins' 19 to 22 %, every lower
+   bound above 1. The natural analog stands (topographic projections; Gaier
+   and Ha 2019; Kirschner and Gerhart 2007; Stanley, D'Ambrosio and Gauci
+   2009); the operator as written does not. Low-gain sparse wiring was not
+   tested and is one untested possibility; the `aligned` variant stays
+   inadmissible pending the ruling in part 3.
+4. **T18.F01: a recorded tension and a hypothesis, not a mechanism.** The
+   founder's four cardinal `Move` votes tie at 0.5 without adjacent food and
+   the within-kind argmax takes the lowest index, so its default heading is
+   north; E1's slot pattern is consistent with each edge's effect on that tie
+   (hypothesis; trajectory evidence not gathered). T18's success criteria
+   keep the founder's first-argmax cardinal-food steering, and the north
+   default is a consequence of first-argmax on tied votes, so T18.F01's spec
+   must decide whether that steering and a non-directional tie-state default
+   can coexist. Natural analog: a naive forager's undirected search has no
+   fixed compass heading. Evidence: E1, `vote_select.rs`. What variation still
+   has to discover: unchanged by this item, which changes no operator.
+   Expected reading: a trajectory instrument on the live world showing
+   whether tie-state ticks and their headings carry the birth differences E1
+   measured. Not a feature candidate of this run.
+5. **World side, after the above.** (a) **T12.F06 — Goal-World Persistence
+   Reading** (track T12): observation only, so the natural-analog rule does
+   not apply; the shared baseline contract reads each goal world's
+   persistence to 50,000 ticks at its goal seed, which this run found to fail
+   for Canyon (extinct at 36,652, E2) with both E8 mutation-off worlds
+   extinct before 5,500 (E8). Nothing to discover; the expected reading is
+   the persistence table itself. (b) The static-sparsity lever (Section 3.1,
+   T12) and T02.F01 Seasons stay open as later candidates: E6's Canyon share
+   (10.7 % see food only at a distance) keeps the first alive, and E7 and E11
+   were not run, so neither has evidence from this run; their natural analogs
+   (patchy resources beyond a random walk's reach; seasons) and their
+   remainders for variation (everything) are as the diagnosis note states.
+   Not first: E1 shows the first step already pays in two goal worlds.
 
 T22 instrument candidates (stay on the branch): the E4 `transition_rates`
 probe (per-birth transition counting by genome diff), the E1 `--arm-set`
 option of the opportunity assay (diagnostic one-edge sets), the E2 census
 probe (checkpointed input-use funnel on a live world with inline samples and
-the E6 gradient reading), the adapted run 5 screen (fired-birth detection by
-operator name), and the `AddProjection` operator as a `proto:` arm.
+the E6 gradient reading), and the adapted run 5 screen (fired-birth
+detection by operator name). The `AddProjection` operator and the
+reproduce hold are mechanism prototypes (`proto:`), not instruments.
 
 ### 3. The two user rulings
 
@@ -465,29 +466,36 @@ births, food 2 against 3 of 476 (ratio 0.67, bounds 0.008 to 30), wall 62
 against 53 of 1,535 (1.17, bounds 0.58 to 2.37); `aligned` against `shared`
 food 2 against 2, wall 62 against 39 (1.59, bounds 0.75 to 3.46); `aligned`
 against its native twins food 2 against 8, wall 62 against 42 (1.48, bounds
-0.70 to 3.16). **On this evidence there is nothing to admit**: index
-correspondence did not raise the helpful rate per fired birth beyond the
-equal-edge-count scrambled control on either assay, and the question can
-rest until an instrument separates the ring families from the summaries.
-Two facts bear on it beyond E5's numbers. First, `aligned` means two different things by family
-width: for the 8-wide rings, channel *i* → sink *i* is ring[d] → Move(d), the
-founder's own food-to-move correspondence and exactly what check 3 names;
-for the 7-wide summaries (`nearest_dx` is sub-value 3; sink 3 is Move(SE))
-the pairing is arbitrary and spatially meaningless. The screen records a
-genome diff for confirmed children only, so E5's fired births cannot be
-split by family width after the fact: the ruling's numbers mix a meaningful
-correspondence with a meaningless one, and only the ring families carry the
-check-3 question. Second, E1's (f): a wrong-component edge paid under the
-verdict rule in two worlds, so at the first step correspondence was not what
-paid; a consistent sign into a cardinal move was.
+0.70 to 3.16). **No correspondence advantage was established on this
+evidence**, and smaller benefits remain unresolved (no interval excludes a
+doubling); there is nothing to admit now, and the question can rest until an
+instrument separates the ring families from the summaries. Two facts bear on
+it beyond E5's numbers. First, `aligned` means two different things by
+family width: for the 8-wide rings, channel *i* → sink *i* is ring[d] →
+Move(d), the founder's own food-to-move correspondence and exactly what
+check 3 names; for the 7-wide summaries (`nearest_dx` is sub-value 3; sink 3
+is Move(SE)) the pairing is arbitrary and spatially meaningless. The screen
+records a genome diff for confirmed children only, so E5's fired births
+cannot be split by family width after the fact: the pooled numbers mix a
+meaningful correspondence with a meaningless one, and only the ring families
+carry the check-3 question. Second, E1's (f): a wrong-component edge paid
+under the verdict rule in two worlds, so correct component correspondence
+was not necessary for a positive at the first step within those
+competitions; what did pay there is a trajectory question (the tie-state
+hypothesis of part 2, item 4), not a measured mechanism.
 
 **The lab's role.** E9 (the calibration against a known production positive)
 did not run, so this run holds no calibration evidence for "no lab negative is
 admissible about production". What it holds is the split that worked: the
-lab's twin screen (E3, E5) and the E4 probe read mechanisms at any scale in
-minutes, and the reach and funnel verdicts (E1, E2) came from the production
-worlds, where the lab's five exploration runs could not see them (Section 1 of
-the diagnosis note). Draft amendment to the T22 exploration contract, as
+lab's twin screen (E3 on 20,000 children per prepared parent; E5 on 16 strata
+per assay, about 5.1 h) and the E4 probe (10⁷ births per parent, 1,054 s)
+read conditional measurements on frozen inputs (parent genomes, dispatch
+records, configuration and observation banks), while the reach and funnel
+verdicts (E1, eight replicates of 1,000 ticks in three goal worlds; E2, 20
+sampled parents per checkpoint) came from the production worlds, where the
+five exploration runs' lab campaigns could not see them (Section 1 of the
+diagnosis note). Transfer of a lab measurement to production needs its own
+evidence in each case. Draft amendment to the T22 exploration contract, as
 exact sentences to add after "Lab experiments are not roadmap features and do
 not use the feature workflow.", **provisional, for the user's ruling; the
 current contract governs until then**:
@@ -495,64 +503,75 @@ current contract governs until then**:
 > Reach and retention verdicts about production behavior are read in the
 > production worlds, through the opportunity assay, the input-use census and
 > `v3-cli run` samples; the lab is the framework of record for calibration,
-> enumeration and twin screens, which are scale-independent. A lab reach
+> enumeration and twin screens, which are conditional measurements on frozen
+> inputs whose transfer to production needs its own evidence. A lab reach
 > negative is admissible as evidence about production only after that lab
 > instrument has reproduced a known production positive.
 
 ### 4. What was refuted and should not be retried
 
+Each item names the row that refutes it and the setting the refutation holds
+in.
+
 - The note's Section 2.1 estimate of the useful one-edge connection,
   4.8 × 10⁻⁷ per birth: measured 5.5 × 10⁻⁶ (E4), because `random_graph_source`
   reaches the new entry's components in 1.1 % of source draws and 15 % of
-  leaf landings fall on cardinal `Move` sinks. The estimate's method (surfaces
-  × sub-values × references × sign) undercounts sink targeting; do not reuse it.
+  leaf landings fall on cardinal `Move` sinks. E4 also exposed loss routes
+  the estimate omitted: half of the silent declaration's losses are `Prune`,
+  the rest type retargeting and `Swap`, and a connected entry is still lost
+  at 0.8 % per birth by those two. The estimate's method (surfaces ×
+  sub-values × references × sign) undercounts sink targeting and omits those
+  routes; do not reuse it.
 - "A wrong-sign edge makes 10 to 20 % of children harmful" (the E3
   prediction): the children's harmful share sits at the founder's 21 to 26 %
   for every prepared parent; the harm is the carrier's (bank A 4.45 against
   8.19). Children's shares do not read a carrier's cost.
 - "The world blocks the first step" as the whole explanation: within the
-  fixed, mutation-off 1,000-tick competitions one edge pays 1.20 and 1.43
-  (E1). The world-first lever of Section 7.1 is not where E1 and E2 point.
-- "Correspondence is what pays at the first step": the wrong-component edge
-  (f) is positive in two worlds; the wrong-sink edge (d) is negative (E1).
-- "An unconnected declaration is lost by `Prune`" as the whole janitor: half
-  of the losses are `Prune`, the rest type retargeting and `Swap`, and a
-  connected entry is still lost at 0.8 % per birth by those two (E4). A repair
-  that re-weights `Prune` alone leaves most of the connected state's hazard.
+  fixed, mutation-off 1,000-tick competitions of Canyon and Confluence one
+  edge pays 1.20 and 1.43 (E1). The world-first lever of Section 7.1 is not
+  where E1 and E2 point.
 - "A whole-family event wired at weights of order 1 helps" (Section 3.3's
-  projection unit as an operator): at this size it is refuted as harmful
-  (E5: fired births harmful 3.2 to 6.0 × their twins under dense wiring on
-  food, 1.6 to 2.4 × on wall; every variant's harm lower bound above 1 on
-  wall), and no variant is several times more often helpful; the
+  projection unit as an operator): at this size and gain it is refuted as
+  harmful (E5: fired births harmful 3.2 to 6.0 × their twins under dense
+  wiring on food, 1.6 to 2.4 × on wall; every variant's harm lower bound
+  above 1 on wall), and no variant is several times more often helpful; the
   smaller-benefit null stays inconclusive.
-- "Replication cost as time holds genome size near the founder" for the
+- "A reproductive time cost holds genome size near the founder", for the
   realized arm (E8: 12 × against the default's 7.1 × on the persisting seed,
-  at 39 % of its population; the other seed extinct).
+  window means, at 39 % of its population; the other seed extinct).
 - M4 (×4 per-unit supply) as a production candidate: run 6's part P asked
   whether it harms persistence and never ran; E8 answers it in one world on
   two seeds, extinct on both by 10,000 and 18,000 ticks.
-- An unstated assumption of the fresh-seed design, that the fixed founder
-  persists in Canyon: both mutation-off worlds are extinct before 5,500
-  ticks (E8); persistence on these seeds needs mutation. A finding rather
-  than a refuted proposal; it is also under Findings.
-- Heavy-tailed weight jumps (run 5, unchanged) and run 6's dense silent
-  afferents at 8 pairs (E10: unresolved, not refuted; its descriptive trigger
-  was not met).
-- Not refuted and not confirmed: the live survey's premise that nothing a
-  third node could do is rewarded (E2: reads reach execution and stop there).
-- The plan's budget: a 50,000-tick census of a world whose genomes reach
-  11,000 units costs 2.5 × the estimate; the kill must reap the process tree.
+
+Carried as findings, not refuted: run 6's dense silent afferents (E10:
+unresolved at 8 pairs); the live survey's premise that nothing a third node
+could do is rewarded (E2: reads reach execution and stop there, neither
+confirmed nor refuted); the fixed founder's persistence in Canyon (E8: an
+unstated assumption of the fresh-seed design, false on both seeds); the
+plan's census budget (2.5 × the estimate) and the first runner's
+launcher-only kill (operational, fixed).
 
 ### 5. The next goal command
 
-For the first feature candidate, **T03.F12 — Replication as Time**. The row
-does not exist on `main` (rule 6: this run adds no roadmap row); the user
-adds it to track T03 first, with its dependencies and the natural analog
-above, then pastes, in the workflow's exact form (`<TNN.FNN>` = `T03.F12`,
-`<tnn-fnn>` = `t03-f12`):
+The candidates above are unvalidated leads, so the next command is a
+**second, short diagnosis run** that supplies the two readings the run 1 plan
+requires before a feature is recommended: the natural-world check of a
+corrected genome-length-dependent reproductive time (hold counted from the
+tick after the birth) and of a slower-loss prototype, each on Canyon seeds
+1022 and 2022 for 20,000 ticks beside the default with their mutation-off
+pairs, and the vote-margin census of executed reads at the E2 checkpoints.
+In this run's form:
 
 ```
-/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, and, unless the workflow's Benchmark gate exempts this feature from them, the gate and goal baseline runs and their records to roadmap-benchmark-specialist and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the final diff review as a fresh read-only Codex Astra high job through the Codex channel; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
+/goal An evolvability diagnosis follow-up is complete on main. Read docs/strategy/evolvability-diagnosis-run-2026-10.md in full (its Plan forward is the contract: part 2's two unvalidated leads and the follow-up diagnosis question), then the diagnosis plan and the run 1 plan it inherits. Confirm Fable 5.1 with the Fable advisor enabled and Codex for reviews, a clean main, and create the worktree with EnterWorktree named evolvability-diagnosis-2. Predeclare and commit three rows before they run: N1 the corrected reproductive-time prototype (proto, default off, hold counted from the tick after the birth, tested on the founder) beside the default on Canyon seeds 1022 and 2022 for 20,000 ticks with mutation-off pairs; N2 a slower-loss prototype (proto, default off: Prune, type retargeting and Swap of silent entries at a per-unit decay rate) in the same design; N3 the vote-margin census (instr: the E2 census plus each executed read's ablation vote deltas) on Confluence seed 33 at 20,000 and 50,000 ticks. Consult the advisor at every rule 8 point and record it; send the predeclaration to Codex before any row runs and the note's reading before closing. Write docs/strategy/evolvability-diagnosis-run-2026-10-followup.md with the rows, the Advice table and a plan forward that names which lead, if either, becomes the next roadmap feature, with its track and natural analog. Land docs only; keep proto and instr on the branch. Done means the note is on main with N1, N2 and N3 completed, make check-docs exited 0 on main, the worktree removed and its branch kept, main clean. Stop after 200 turns.
+```
+
+If the follow-up validates the first lead, the feature command follows, after
+the user adds the row to track T03 with its dependencies and natural analog,
+in the workflow's exact form:
+
+```
+/goal Roadmap feature T03.F12 is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Opus 5.5 at effort medium in the main checkout on a clean main; create the feature worktree with EnterWorktree named t03-f12; delegate the flat spec and its Codex adversarial challenge rounds to roadmap-spec-owner, verify the final Codex verdict, and commit the spec there, and route requirement questions during implementation back to that same spec owner; delegate feature implementation and production-code remediation to roadmap-implementer, and, unless the workflow's Benchmark gate exempts this feature from them, the gate and goal baseline runs and their records to roadmap-benchmark-specialist and the mutation gate and test-only survivor remediation to roadmap-mutation-specialist; run the final diff review as a fresh read-only Codex Astra high job through the Codex channel; run the benchmark and mutation specialists sequentially and never alongside competing builds, tests, servers, or measurements; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the T03.F12 row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
 ```
 
 ### 6. Cost
@@ -561,16 +580,43 @@ above, then pastes, in the workflow's exact form (`<TNN.FNN>` = `T03.F12`,
 | --- | --- |
 | Run 6 close (phase 0) | about 25 min of session time; no heavy job |
 | E0 | pilot 451 s; reproduction 451 s |
-| E4 | counted run 1,054 s; pilots 2 s per 10⁶ births and 1,027 s |
 | E1 | `one-edge` 2,050 s; `one-edge-control` 1,781 s |
-| E2 | Canyon 2,884 s (extinct at 36,652); Confluence 15,108 s to 50,000; stopped rerun 708 s |
+| E2 | Canyon 2,605 s of simulation (footer; the outer runner measured 2,884 s including its compile); Confluence 15,108 s to 50,000; the stopped duplicate rerun 708 s |
 | E3 | freezes 10 s; six screens 925 s |
-| E5 | pilot 40 s; main 04:55 to 09:59 UTC (about 5.1 h: 160 variant screens of 6,000 or 12,000 twins and 32 A/A screens) |
+| E4 | counted run 1,054 s; pilots 2 s per 10⁶ births and 1,027 s |
+| E5 | pilot 40 s; main 04:55 to 09:59 UTC on 2026-10-06 (about 5.1 h: 160 variant screens of 6,000 or 12,000 twins and 32 A/A screens) |
 | E6 | inside E2's 20,000 checkpoints (seconds) |
+| E7 | not run (world branch); 0 |
 | E8 | 10:00 to 13:14 UTC (about 3.2 h, ten 20,000-tick Canyon runs and the release build) |
+| E9 | not run (time); 0 |
 | E10 | reader seconds |
+| E11 | not run (time); 0 |
 | Builds, tests, clippy | about 20 min in all |
-| Codex reviews (a) to (a4), (b) | remote; no host time |
+| Codex reviews (a) to (a4), (b), (c), (d) | remote; no host time |
 
-Turns: about 285 of 400 when the plan forward was completed; the closing
+Turns: about 300 of 400 when the plan forward was completed; the closing
 count is in the final report.
+
+### Review (c): the draft plan forward
+
+Job `.bench-artifacts/lab/diagnosis/codex/review-c.out.md`, verdict
+`not-ready`, 10 blocking and 3 advisory; the six-part format, the ruling
+counts, the T22 sentences' provisionality and the judgment-order statement
+were confirmed. Every finding is adopted in the section above; no second
+round (none changes a verdict or an order).
+
+| # | Finding (short) | Severity | Disposition |
+| --- | --- | --- | --- |
+| 1 | "Binding phenomenon" and "demonstrably not binding" overclaimed E2 | blocking | Adopted: size is an observed concern, cleanup's contribution unresolved, order kept as judgment |
+| 2 | "No causal read in 50,000 ticks" overstated the 20-parent sample; causes stated as settled | blocking | Adopted: the sampled result stated precisely, the three causes called hypotheses, the vote-margin reading as narrowing them |
+| 3 | Implementation prescribed (hold arithmetic, operator scope); `AddProjection` listed as an instrument | blocking | Adopted: candidates renamed to their phenomena, prescriptions removed from the candidates and kept only in the evidence account, both prototypes removed from the instrument list |
+| 4 | The natural-world check deferred to feature execution; cleanup had no prototype reading | blocking | Adopted: both candidates marked unvalidated leads with the check not run, and part 5 drafts the follow-up diagnosis command that supplies the readings |
+| 5 | Items 4 and 5 lacked the required fields; T12.F06 lacked an analog or an observation-only statement | blocking | Adopted: each item carries its track, analog or applicability, rows, remainder and expected reading; E7 and E11 named as not run |
+| 6 | Inconclusive E5 results converted into exclusions | blocking | Adopted: "no correspondence advantage was established", smaller benefits unresolved, low gain untested, the founder-equivalence sentence removed |
+| 7 | "Correspondence was not what paid" named a mechanism E1 did not identify | blocking | Adopted: correct correspondence shown unnecessary for (f)'s positive; the mechanism a trajectory question |
+| 8 | The refuted list held non-refutations and an unsupported "whole janitor" proposition | blocking | Adopted: only supported, scoped refutations remain with their rows; the rest carried as findings; E4 described as exposing omitted loss routes |
+| 9 | "At any scale in minutes" and "scale-independent" overstated the lab instruments | blocking | Adopted: conditional measurements on frozen inputs, with the pertinent sizes and E5's 5.1 h, in part 3 and in the T22 sentences |
+| 10 | The goal command was not instantiated | blocking | Adopted: `T03.F12` and `t03-f12` substituted, every other word kept; the follow-up diagnosis command precedes it |
+| 11 | Part 1 exceeded two sentences | advisory | Adopted: two sentences; the hypothesis paragraph moved to part 2 |
+| 12 | E7, E9, E11 absent from the cost table; Canyon's 2,884 s against the footer's 2,605 s | advisory | Adopted: rows added; both figures given with their sources |
+| 13 | "Halved the population" was 39 % of the default's window mean | advisory | Adopted |
