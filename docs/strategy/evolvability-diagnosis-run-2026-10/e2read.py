@@ -72,8 +72,12 @@ def main():
             continue
         cohorts = {}
         for c in r["input_use"]["cohorts"]:
-            if "Defined" in c:
-                d = c["Defined"]
+            # The bench's `Indicator` serializes untagged: a defined cohort is
+            # the block itself, an undefined one its reason string.
+            if isinstance(c, dict) and "Defined" in c:
+                c = c["Defined"]
+            if isinstance(c, dict) and "cohort" in c:
+                d = c
                 cohorts[d["cohort"]] = {
                     "parents_requested": d["parents_requested"], "parents_evaluated": d["parents_evaluated"],
                     "consistency_violations": d["consistency_violations"],
@@ -82,7 +86,7 @@ def main():
                     "families": family_rows(d), "retention": channel_retention(d),
                 }
             else:
-                cohorts[str(c.get("Undefined"))] = None
+                cohorts[str(c.get("Undefined") if isinstance(c, dict) else c)] = None
         cp = {"tick": r["tick"], "living": r["living"], "census_secs": r["census_secs"], "sim_secs_so_far": r["sim_secs_so_far"],
               "selected_parents": r["selected_parents"], "selected_generations": r["selected_generations"],
               "age_deciles": r["age_deciles"], "energy_deciles": r["energy_deciles"], "sample": r["sample"], "cohorts": cohorts}
@@ -96,6 +100,8 @@ def main():
         if not sel:
             return None
         n = sel["parents_evaluated"]
+        # A family absent from the family rows was declared on no reachable
+        # node of any parent: every stage is 0 of n.
         tot = sum((v[field] or 0) for k, v in sel["families"].items() if k.startswith(fam_prefix))
         return tot / n if n else None
     reading = {}
@@ -136,7 +142,7 @@ def main():
     for fam, r in reading.items():
         print(fam, {k: r[k] for k in ("share_causal", "share_connected", "retained_share_at_last", "premise_qualified", "variation_support")})
     if e6:
-        print("E6", e6["shares"], e6["step_comparison"])
+        print("E6", e6["shares"], e6["step_comparison"], e6.get("lookahead3_comparison"))
 
 
 if __name__ == "__main__":
