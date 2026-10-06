@@ -96,14 +96,25 @@ def main():
         checkpoints.append(cp)
     # Reading rule on the selected cohort.
     def share(cp, fam_prefix, field):
+        """Typed-row incidences of the family summed over its food types,
+        over parents_evaluated. A typed family row counts the parents with the
+        stage on that typed family, so the sum over types counts
+        parent-type incidences, not distinct parents (a parent declaring both
+        types counts twice); the per-type rows are reported beside it. A
+        family absent from the rows was declared on no reachable node of any
+        parent: every stage is 0 of n."""
         sel = cp["cohorts"].get("selected")
         if not sel:
             return None
         n = sel["parents_evaluated"]
-        # A family absent from the family rows was declared on no reachable
-        # node of any parent: every stage is 0 of n.
         tot = sum((v[field] or 0) for k, v in sel["families"].items() if k.startswith(fam_prefix))
         return tot / n if n else None
+
+    def typed(cp, fam_prefix, field):
+        sel = cp["cohorts"].get("selected")
+        if not sel:
+            return None
+        return {k: (v[field] or 0) for k, v in sel["families"].items() if k.startswith(fam_prefix)}
     reading = {}
     for fam in TARGETS:
         causal = [share(cp, fam, "family_causal") for cp in checkpoints]
@@ -116,12 +127,21 @@ def main():
             kept = sum(v["retained_causal_pairs"] for k, v in last["retention"].items() if k.startswith(fam))
             ret = kept / pairs if pairs else None
         adequate = all(cp["cohorts"].get("selected", {}) and cp["cohorts"]["selected"]["parents_evaluated"] == 20 for cp in checkpoints)
+        ticks = [cp["tick"] for cp in checkpoints]
+        # The row's rules are evaluable only with the three declared
+        # checkpoints (10,000, 20,000, 50,000) and adequacy at each; with
+        # fewer the fields below are None and only the descriptive directions
+        # are reported.
+        evaluable = ticks == [10000, 20000, 50000] and adequate
         inc = lambda xs: all(x is not None for x in xs) and len(xs) >= 2 and all(b > a for a, b in zip(xs, xs[1:]))
-        reading[fam] = {"share_declared": declared, "share_connected": connected, "share_causal": causal,
-                        "retained_share_at_last": ret, "adequate_20_parents": adequate,
-                        "causal_strictly_increasing": inc(causal), "connected_strictly_increasing": inc(connected),
-                        "premise_qualified": inc(causal) and (ret is not None and ret > 0.9) and adequate,
-                        "variation_support": inc(connected) and not inc(causal) and adequate}
+        reading[fam] = {"share_declared_incidences": declared, "share_connected_incidences": connected,
+                        "share_causal_incidences": causal,
+                        "typed_rows": {str(cp["tick"]): {f: typed(cp, fam, f) for f in ("family_declared", "family_connected", "family_executed", "family_causal")} for cp in checkpoints},
+                        "retained_share_at_last": ret, "adequate_20_parents": adequate, "checkpoints": ticks,
+                        "rules_evaluable": evaluable,
+                        "descriptive_direction": ("causal rising" if inc(causal) else "connected rising, causal not" if inc(connected) else "flat or mixed"),
+                        "premise_qualified": (inc(causal) and (ret is not None and ret > 0.9)) if evaluable else None,
+                        "variation_support": (inc(connected) and not inc(causal)) if evaluable else None}
     traj = [s for s in samples if s["kind"] == "sample"]
     out = {"row": "E2", "world": header["world"], "seed": header["seed"], "threads": header["threads"],
            "horizon": header["horizon"], "checkpoints_reached": [cp["tick"] for cp in checkpoints],
@@ -140,7 +160,7 @@ def main():
             fr = {k: v for k, v in sel.get("families", {}).items() if k.startswith(fam)}
             print(f"     {fam}: {fr}")
     for fam, r in reading.items():
-        print(fam, {k: r[k] for k in ("share_causal", "share_connected", "retained_share_at_last", "premise_qualified", "variation_support")})
+        print(fam, {k: r[k] for k in ("share_causal_incidences", "share_connected_incidences", "retained_share_at_last", "rules_evaluable", "descriptive_direction", "premise_qualified", "variation_support")})
     if e6:
         print("E6", e6["shares"], e6["step_comparison"], e6.get("lookahead3_comparison"))
 

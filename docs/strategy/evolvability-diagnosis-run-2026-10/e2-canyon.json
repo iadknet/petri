@@ -1003,44 +1003,112 @@
  ],
  "reading": {
   "AreaFoodSummary": {
-   "share_declared": [
+   "share_declared_incidences": [
     0.05,
     0.1
    ],
-   "share_connected": [
+   "share_connected_incidences": [
     0.0,
     0.05
    ],
-   "share_causal": [
+   "share_causal_incidences": [
     0.0,
     0.0
    ],
+   "typed_rows": {
+    "10000": {
+     "family_declared": {
+      "AreaFoodSummary:0": 1
+     },
+     "family_connected": {
+      "AreaFoodSummary:0": 0
+     },
+     "family_executed": {
+      "AreaFoodSummary:0": 0
+     },
+     "family_causal": {
+      "AreaFoodSummary:0": 0
+     }
+    },
+    "20000": {
+     "family_declared": {
+      "AreaFoodSummary:0": 2
+     },
+     "family_connected": {
+      "AreaFoodSummary:0": 1
+     },
+     "family_executed": {
+      "AreaFoodSummary:0": 0
+     },
+     "family_causal": {
+      "AreaFoodSummary:0": 0
+     }
+    }
+   },
    "retained_share_at_last": null,
    "adequate_20_parents": true,
-   "causal_strictly_increasing": false,
-   "connected_strictly_increasing": true,
-   "premise_qualified": false,
-   "variation_support": true
+   "checkpoints": [
+    10000,
+    20000
+   ],
+   "rules_evaluable": false,
+   "descriptive_direction": "connected rising, causal not",
+   "premise_qualified": null,
+   "variation_support": null
   },
   "NeighborBarrierRing": {
-   "share_declared": [
+   "share_declared_incidences": [
     0.05,
     0.3
    ],
-   "share_connected": [
+   "share_connected_incidences": [
     0.05,
     0.1
    ],
-   "share_causal": [
+   "share_causal_incidences": [
     0.0,
     0.0
    ],
+   "typed_rows": {
+    "10000": {
+     "family_declared": {
+      "NeighborBarrierRing": 1
+     },
+     "family_connected": {
+      "NeighborBarrierRing": 1
+     },
+     "family_executed": {
+      "NeighborBarrierRing": 0
+     },
+     "family_causal": {
+      "NeighborBarrierRing": 0
+     }
+    },
+    "20000": {
+     "family_declared": {
+      "NeighborBarrierRing": 6
+     },
+     "family_connected": {
+      "NeighborBarrierRing": 2
+     },
+     "family_executed": {
+      "NeighborBarrierRing": 1
+     },
+     "family_causal": {
+      "NeighborBarrierRing": 0
+     }
+    }
+   },
    "retained_share_at_last": null,
    "adequate_20_parents": true,
-   "causal_strictly_increasing": false,
-   "connected_strictly_increasing": true,
-   "premise_qualified": false,
-   "variation_support": true
+   "checkpoints": [
+    10000,
+    20000
+   ],
+   "rules_evaluable": false,
+   "descriptive_direction": "connected rising, causal not",
+   "premise_qualified": null,
+   "variation_support": null
   }
  },
  "e6": {
@@ -1096,6 +1164,6 @@
  "provenance": {
   "census_sha256": "3c978d06f817e06879067409a7afde188d4bb48a0eb65fa86a1c2089b670e1d6",
   "samples_sha256": "4ceb5ce94f92ca4bfe06ba4bf15929da022908a079d88fb3853dfb677ec5445b",
-  "reader_sha256": "a4b4d7de17dc85c0167ee81afbf80979ff16b07c6e0857a5bda3b080f98c5afe"
+  "reader_sha256": "247a1bb2b6c1c9148d8af5d68e5379c157058fc42f2f010b0ea7fc803fcf85f2"
  }
 }
