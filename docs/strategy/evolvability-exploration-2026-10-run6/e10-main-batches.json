@@ -102,7 +102,7 @@
       136,
       123
      ],
-     "final_genome_size_median": 140,
+     "final_genome_size_median": 139.0,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -235,7 +235,7 @@
       141,
       137
      ],
-     "final_genome_size_median": 139,
+     "final_genome_size_median": 138.0,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -368,7 +368,7 @@
       264,
       140
      ],
-     "final_genome_size_median": 204,
+     "final_genome_size_median": 172.5,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -501,7 +501,7 @@
       97,
       97
      ],
-     "final_genome_size_median": 97,
+     "final_genome_size_median": 97.0,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -634,7 +634,7 @@
       97,
       97
      ],
-     "final_genome_size_median": 97,
+     "final_genome_size_median": 97.0,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -767,7 +767,7 @@
       1935,
       2191
      ],
-     "final_genome_size_median": 3098,
+     "final_genome_size_median": 2660.5,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -897,7 +897,7 @@
       114,
       114
      ],
-     "final_genome_size_median": 114,
+     "final_genome_size_median": 114.0,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -1246,7 +1246,7 @@
       297,
       394
      ],
-     "final_genome_size_median": 1231,
+     "final_genome_size_median": 1016.5,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -1382,7 +1382,7 @@
       304,
       4469
      ],
-     "final_genome_size_median": 336,
+     "final_genome_size_median": 320.0,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 1,
@@ -1514,7 +1514,7 @@
       4679,
       6193
      ],
-     "final_genome_size_median": 4419,
+     "final_genome_size_median": 4026.5,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -1646,7 +1646,7 @@
       97,
       97
      ],
-     "final_genome_size_median": 97,
+     "final_genome_size_median": 97.0,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -1778,7 +1778,7 @@
       97,
       97
      ],
-     "final_genome_size_median": 97,
+     "final_genome_size_median": 97.0,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -1910,7 +1910,7 @@
       716,
       361
      ],
-     "final_genome_size_median": 716,
+     "final_genome_size_median": 692.0,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -2039,7 +2039,7 @@
       119,
       119
      ],
-     "final_genome_size_median": 119,
+     "final_genome_size_median": 119.0,
      "cumulative_reached_before_generation": {
       "100": 0,
       "250": 0,
@@ -2289,6 +2289,6 @@
    }
   }
  },
- "reader_sha256": "375c65f6e23107683336638f3283d3ecb346bc8cf0c770b3f72bb7e7871bac06",
+ "reader_sha256": "148fb3c6733f4a71082d61872cdcdead43cf54cc6f68ebf2df34507b6a7a8f06",
  "stat6_sha256": "afe91aa42421e47fd3864bd2d2078fde7398f6a873a7ade6c17ba4925dd1f5a8"
 }
