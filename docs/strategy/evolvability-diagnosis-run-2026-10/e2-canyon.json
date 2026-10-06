@@ -1,0 +1,1101 @@
+{
+ "row": "E2",
+ "world": "Canyon country",
+ "seed": 22,
+ "threads": 8,
+ "horizon": 50000,
+ "checkpoints_reached": [
+  10000,
+  20000
+ ],
+ "complete": false,
+ "extinct": {
+  "kind": "extinct",
+  "tick": 36652
+ },
+ "footer": {
+  "census_secs": 1.182628666,
+  "elapsed_secs": 2605.211623292,
+  "extinct": true,
+  "kind": "footer",
+  "sim_secs": 2602.989656389004,
+  "threads": 8,
+  "ticks": 36652
+ },
+ "trajectory": [
+  {
+   "tick": 500,
+   "population": 1568,
+   "mean_genome_size": 101.61033163265306,
+   "mean_generation": 11.983418367346939,
+   "mean_age": 40.401147959183675,
+   "mean_energy": 26.737058339108312,
+   "births_total": 116873
+  },
+  {
+   "tick": 1000,
+   "population": 1345,
+   "mean_genome_size": 106.13011152416357,
+   "mean_generation": 23.198513011152418,
+   "mean_age": 42.72862453531599,
+   "mean_energy": 30.539986847706665,
+   "births_total": 123738
+  },
+  {
+   "tick": 1500,
+   "population": 3845,
+   "mean_genome_size": 123.66710013003902,
+   "mean_generation": 40.75838751625488,
+   "mean_age": 35.478283485045516,
+   "mean_energy": 34.957435522883436,
+   "births_total": 149552
+  },
+  {
+   "tick": 2000,
+   "population": 3221,
+   "mean_genome_size": 121.51754113629308,
+   "mean_generation": 43.37348649487737,
+   "mean_age": 40.54920832039739,
+   "mean_energy": 29.386642661733273,
+   "births_total": 171831
+  },
+  {
+   "tick": 2500,
+   "population": 2290,
+   "mean_genome_size": 125.0353711790393,
+   "mean_generation": 52.110917030567684,
+   "mean_age": 38.877729257641924,
+   "mean_energy": 28.040959074392134,
+   "births_total": 187835
+  },
+  {
+   "tick": 3000,
+   "population": 1094,
+   "mean_genome_size": 129.71206581352834,
+   "mean_generation": 68.05667276051189,
+   "mean_age": 40.857404021937846,
+   "mean_energy": 30.299789062787998,
+   "births_total": 199834
+  },
+  {
+   "tick": 3500,
+   "population": 838,
+   "mean_genome_size": 173.0799522673031,
+   "mean_generation": 85.02267303102626,
+   "mean_age": 37.12291169451074,
+   "mean_energy": 21.84995870462892,
+   "births_total": 209579
+  },
+  {
+   "tick": 4000,
+   "population": 316,
+   "mean_genome_size": 166.7879746835443,
+   "mean_generation": 101.83227848101266,
+   "mean_age": 42.265822784810126,
+   "mean_energy": 22.218308495734878,
+   "births_total": 214649
+  },
+  {
+   "tick": 4500,
+   "population": 2045,
+   "mean_genome_size": 227.85672371638142,
+   "mean_generation": 107.6361858190709,
+   "mean_age": 35.47041564792176,
+   "mean_energy": 22.83132960262246,
+   "births_total": 225140
+  },
+  {
+   "tick": 5000,
+   "population": 1751,
+   "mean_genome_size": 312.14677327241577,
+   "mean_generation": 121.85037121644774,
+   "mean_age": 38.21073672187322,
+   "mean_energy": 29.202120352470487,
+   "births_total": 255721
+  },
+  {
+   "tick": 5500,
+   "population": 2442,
+   "mean_genome_size": 355.1838656838657,
+   "mean_generation": 135.67772317772318,
+   "mean_age": 28.424242424242426,
+   "mean_energy": 32.34490537271819,
+   "births_total": 285912
+  },
+  {
+   "tick": 6000,
+   "population": 1802,
+   "mean_genome_size": 358.53607103218644,
+   "mean_generation": 149.75416204217535,
+   "mean_age": 34.03607103218646,
+   "mean_energy": 30.713940763972147,
+   "births_total": 309894
+  },
+  {
+   "tick": 6500,
+   "population": 1247,
+   "mean_genome_size": 487.4410585404972,
+   "mean_generation": 156.17321571772254,
+   "mean_age": 36.56696070569367,
+   "mean_energy": 26.962422827266174,
+   "births_total": 324669
+  },
+  {
+   "tick": 7000,
+   "population": 1271,
+   "mean_genome_size": 596.7136113296617,
+   "mean_generation": 162.71754523996853,
+   "mean_age": 39.83477576711251,
+   "mean_energy": 24.626868857081064,
+   "births_total": 338815
+  },
+  {
+   "tick": 7500,
+   "population": 1629,
+   "mean_genome_size": 585.1534683855126,
+   "mean_generation": 178.85205647636587,
+   "mean_age": 31.80171884591774,
+   "mean_energy": 32.85950479074224,
+   "births_total": 353411
+  },
+  {
+   "tick": 8000,
+   "population": 1782,
+   "mean_genome_size": 715.8125701459035,
+   "mean_generation": 191.80359147025814,
+   "mean_age": 36.662177328843995,
+   "mean_energy": 30.33676473015353,
+   "births_total": 374225
+  },
+  {
+   "tick": 8500,
+   "population": 2007,
+   "mean_genome_size": 702.3931240657698,
+   "mean_generation": 205.12506228201295,
+   "mean_age": 34.45739910313901,
+   "mean_energy": 27.753684679266225,
+   "births_total": 395115
+  },
+  {
+   "tick": 9000,
+   "population": 1977,
+   "mean_genome_size": 776.0050581689428,
+   "mean_generation": 213.50328780981286,
+   "mean_age": 36.36418816388468,
+   "mean_energy": 29.554824104966933,
+   "births_total": 412863
+  },
+  {
+   "tick": 9500,
+   "population": 2214,
+   "mean_genome_size": 677.4661246612466,
+   "mean_generation": 222.2642276422764,
+   "mean_age": 39.79448961156278,
+   "mean_energy": 25.693726459492837,
+   "births_total": 433015
+  },
+  {
+   "tick": 10000,
+   "population": 1745,
+   "mean_genome_size": 815.5919770773639,
+   "mean_generation": 236.33123209169054,
+   "mean_age": 40.89226361031518,
+   "mean_energy": 27.121969173528402,
+   "births_total": 449074
+  },
+  {
+   "tick": 10500,
+   "population": 2881,
+   "mean_genome_size": 779.7851440472058,
+   "mean_generation": 243.01041305102396,
+   "mean_age": 36.54599097535578,
+   "mean_energy": 26.635281182735053,
+   "births_total": 469243
+  },
+  {
+   "tick": 11000,
+   "population": 1881,
+   "mean_genome_size": 859.7719298245614,
+   "mean_generation": 255.2020202020202,
+   "mean_age": 41.99043062200957,
+   "mean_energy": 24.701022502044804,
+   "births_total": 494632
+  },
+  {
+   "tick": 11500,
+   "population": 2210,
+   "mean_genome_size": 964.7099547511312,
+   "mean_generation": 264.3714932126697,
+   "mean_age": 35.328054298642535,
+   "mean_energy": 28.136799372934917,
+   "births_total": 511794
+  },
+  {
+   "tick": 12000,
+   "population": 2656,
+   "mean_genome_size": 1019.4514307228916,
+   "mean_generation": 281.6283885542169,
+   "mean_age": 36.491340361445786,
+   "mean_energy": 27.926864635272242,
+   "births_total": 534072
+  },
+  {
+   "tick": 12500,
+   "population": 2257,
+   "mean_genome_size": 1167.0726628267612,
+   "mean_generation": 293.08639787328315,
+   "mean_age": 39.26273814798405,
+   "mean_energy": 28.40338561515042,
+   "births_total": 560725
+  },
+  {
+   "tick": 13000,
+   "population": 2026,
+   "mean_genome_size": 1032.4674234945705,
+   "mean_generation": 297.9802566633761,
+   "mean_age": 44.81539980256663,
+   "mean_energy": 24.997828433214735,
+   "births_total": 578162
+  },
+  {
+   "tick": 13500,
+   "population": 4191,
+   "mean_genome_size": 1037.9253161536626,
+   "mean_generation": 309.93342877594847,
+   "mean_age": 35.24290145549988,
+   "mean_energy": 28.843171186170952,
+   "births_total": 601918
+  },
+  {
+   "tick": 14000,
+   "population": 2245,
+   "mean_genome_size": 1154.36570155902,
+   "mean_generation": 332.3340757238307,
+   "mean_age": 41.01380846325167,
+   "mean_energy": 26.98255733630572,
+   "births_total": 626499
+  },
+  {
+   "tick": 14500,
+   "population": 2105,
+   "mean_genome_size": 1130.9771971496436,
+   "mean_generation": 338.09928741092637,
+   "mean_age": 40.3895486935867,
+   "mean_energy": 27.28602976406838,
+   "births_total": 643083
+  },
+  {
+   "tick": 15000,
+   "population": 2226,
+   "mean_genome_size": 1000.0539083557951,
+   "mean_generation": 355.259209344115,
+   "mean_age": 41.28706199460917,
+   "mean_energy": 26.273529578565963,
+   "births_total": 660781
+  },
+  {
+   "tick": 15500,
+   "population": 3439,
+   "mean_genome_size": 993.8996801395755,
+   "mean_generation": 373.7819133469032,
+   "mean_age": 36.867984879325384,
+   "mean_energy": 29.70581533138698,
+   "births_total": 683138
+  },
+  {
+   "tick": 16000,
+   "population": 2446,
+   "mean_genome_size": 1087.1921504497138,
+   "mean_generation": 378.0551921504497,
+   "mean_age": 39.91618969746525,
+   "mean_energy": 28.51122958385496,
+   "births_total": 707448
+  },
+  {
+   "tick": 16500,
+   "population": 1820,
+   "mean_genome_size": 1190.8670329670329,
+   "mean_generation": 386.1291208791209,
+   "mean_age": 39.621428571428574,
+   "mean_energy": 28.10327588160942,
+   "births_total": 725914
+  },
+  {
+   "tick": 17000,
+   "population": 2271,
+   "mean_genome_size": 1219.2263320123293,
+   "mean_generation": 406.0206957287539,
+   "mean_age": 35.54557463672391,
+   "mean_energy": 30.779894160041984,
+   "births_total": 742767
+  },
+  {
+   "tick": 17500,
+   "population": 1795,
+   "mean_genome_size": 1321.3587743732592,
+   "mean_generation": 421.91142061281334,
+   "mean_age": 34.053481894150416,
+   "mean_energy": 33.624292722551935,
+   "births_total": 765253
+  },
+  {
+   "tick": 18000,
+   "population": 2965,
+   "mean_genome_size": 1258.4266441821248,
+   "mean_generation": 438.4654300168634,
+   "mean_age": 33.0043844856661,
+   "mean_energy": 33.55359419153573,
+   "births_total": 784241
+  },
+  {
+   "tick": 18500,
+   "population": 1448,
+   "mean_genome_size": 1517.9060773480662,
+   "mean_generation": 457.7175414364641,
+   "mean_age": 32.776933701657455,
+   "mean_energy": 32.0324315551195,
+   "births_total": 806639
+  },
+  {
+   "tick": 19000,
+   "population": 1530,
+   "mean_genome_size": 1409.4437908496732,
+   "mean_generation": 465.518954248366,
+   "mean_age": 35.543137254901964,
+   "mean_energy": 31.13312847659089,
+   "births_total": 821133
+  },
+  {
+   "tick": 19500,
+   "population": 1731,
+   "mean_genome_size": 1596.2819179664934,
+   "mean_generation": 479.89254766031195,
+   "mean_age": 33.673021374927785,
+   "mean_energy": 35.379473608484304,
+   "births_total": 836812
+  },
+  {
+   "tick": 20000,
+   "population": 1949,
+   "mean_genome_size": 1584.6716264751155,
+   "mean_generation": 493.0636223704464,
+   "mean_age": 34.2252437147255,
+   "mean_energy": 33.65590748091488,
+   "births_total": 857687
+  },
+  {
+   "tick": 20500,
+   "population": 1318,
+   "mean_genome_size": 1808.48406676783,
+   "mean_generation": 491.6805766312595,
+   "mean_age": 36.59408194233687,
+   "mean_energy": 31.96729784554976,
+   "births_total": 876848
+  },
+  {
+   "tick": 21000,
+   "population": 859,
+   "mean_genome_size": 1769.651920838184,
+   "mean_generation": 509.72060535506404,
+   "mean_age": 36.71245634458673,
+   "mean_energy": 32.88494268217589,
+   "births_total": 887805
+  },
+  {
+   "tick": 21500,
+   "population": 1303,
+   "mean_genome_size": 1842.4804297774367,
+   "mean_generation": 517.8879508825787,
+   "mean_age": 39.24865694551036,
+   "mean_energy": 33.12272280305967,
+   "births_total": 900854
+  },
+  {
+   "tick": 22000,
+   "population": 1484,
+   "mean_genome_size": 1956.5754716981132,
+   "mean_generation": 530.983153638814,
+   "mean_age": 37.75269541778976,
+   "mean_energy": 34.93909635593628,
+   "births_total": 915432
+  },
+  {
+   "tick": 22500,
+   "population": 1438,
+   "mean_genome_size": 2200.1098748261475,
+   "mean_generation": 538.5458970792768,
+   "mean_age": 40.85813630041724,
+   "mean_energy": 36.405440110925674,
+   "births_total": 928257
+  },
+  {
+   "tick": 23000,
+   "population": 1273,
+   "mean_genome_size": 2119.5616653574234,
+   "mean_generation": 549.4823252160252,
+   "mean_age": 40.9528672427337,
+   "mean_energy": 33.66162636177285,
+   "births_total": 939801
+  },
+  {
+   "tick": 23500,
+   "population": 1330,
+   "mean_genome_size": 2305.1924812030074,
+   "mean_generation": 561.2045112781955,
+   "mean_age": 45.75488721804511,
+   "mean_energy": 34.73004402579894,
+   "births_total": 950358
+  },
+  {
+   "tick": 24000,
+   "population": 996,
+   "mean_genome_size": 2382.4407630522087,
+   "mean_generation": 580.4979919678715,
+   "mean_age": 44.161646586345384,
+   "mean_energy": 35.49733194017626,
+   "births_total": 961645
+  },
+  {
+   "tick": 24500,
+   "population": 976,
+   "mean_genome_size": 1977.4743852459017,
+   "mean_generation": 575.5686475409836,
+   "mean_age": 44.49180327868852,
+   "mean_energy": 33.89435006368173,
+   "births_total": 972796
+  },
+  {
+   "tick": 25000,
+   "population": 878,
+   "mean_genome_size": 2617.1856492027337,
+   "mean_generation": 603.2015945330296,
+   "mean_age": 42.40888382687927,
+   "mean_energy": 37.06387199308715,
+   "births_total": 979911
+  },
+  {
+   "tick": 25500,
+   "population": 1451,
+   "mean_genome_size": 2484.3218470020674,
+   "mean_generation": 626.7918676774639,
+   "mean_age": 40.51343900758098,
+   "mean_energy": 35.405933612383784,
+   "births_total": 995493
+  },
+  {
+   "tick": 26000,
+   "population": 772,
+   "mean_genome_size": 2814.300518134715,
+   "mean_generation": 643.6230569948186,
+   "mean_age": 42.77849740932643,
+   "mean_energy": 40.041363956319856,
+   "births_total": 1005428
+  },
+  {
+   "tick": 26500,
+   "population": 981,
+   "mean_genome_size": 3212.8705402650357,
+   "mean_generation": 674.1213047910296,
+   "mean_age": 36.2579001019368,
+   "mean_energy": 47.212079290144914,
+   "births_total": 1012916
+  },
+  {
+   "tick": 27000,
+   "population": 914,
+   "mean_genome_size": 3178.7242888402625,
+   "mean_generation": 664.5448577680526,
+   "mean_age": 41.47592997811816,
+   "mean_energy": 41.930450194448035,
+   "births_total": 1021028
+  },
+  {
+   "tick": 27500,
+   "population": 490,
+   "mean_genome_size": 3228.2224489795917,
+   "mean_generation": 678.1020408163265,
+   "mean_age": 49.71632653061224,
+   "mean_energy": 49.19079616282667,
+   "births_total": 1028329
+  },
+  {
+   "tick": 28000,
+   "population": 828,
+   "mean_genome_size": 3264.503623188406,
+   "mean_generation": 681.1038647342995,
+   "mean_age": 45.61352657004831,
+   "mean_energy": 48.49872879316841,
+   "births_total": 1033135
+  },
+  {
+   "tick": 28500,
+   "population": 820,
+   "mean_genome_size": 3114.881707317073,
+   "mean_generation": 678.0926829268293,
+   "mean_age": 46.95,
+   "mean_energy": 44.44747195839882,
+   "births_total": 1040626
+  },
+  {
+   "tick": 29000,
+   "population": 547,
+   "mean_genome_size": 3310.1188299817186,
+   "mean_generation": 688.235831809872,
+   "mean_age": 43.05667276051188,
+   "mean_energy": 46.617035608078055,
+   "births_total": 1046688
+  },
+  {
+   "tick": 29500,
+   "population": 528,
+   "mean_genome_size": 3487.6117424242425,
+   "mean_generation": 691.9829545454545,
+   "mean_age": 40.85227272727273,
+   "mean_energy": 41.12284676183128,
+   "births_total": 1056417
+  },
+  {
+   "tick": 30000,
+   "population": 152,
+   "mean_genome_size": 2749.407894736842,
+   "mean_generation": 682.0723684210526,
+   "mean_age": 58.25657894736842,
+   "mean_energy": 38.47090884572581,
+   "births_total": 1059603
+  },
+  {
+   "tick": 30500,
+   "population": 627,
+   "mean_genome_size": 2862.7097288676237,
+   "mean_generation": 691.2902711323763,
+   "mean_age": 48.985645933014354,
+   "mean_energy": 34.68999116890358,
+   "births_total": 1062629
+  },
+  {
+   "tick": 31000,
+   "population": 292,
+   "mean_genome_size": 2549.4623287671234,
+   "mean_generation": 692.5410958904109,
+   "mean_age": 49.14041095890411,
+   "mean_energy": 34.13023673008158,
+   "births_total": 1065552
+  },
+  {
+   "tick": 31500,
+   "population": 432,
+   "mean_genome_size": 2123.5185185185187,
+   "mean_generation": 692.7777777777778,
+   "mean_age": 50.111111111111114,
+   "mean_energy": 32.30474172849898,
+   "births_total": 1067935
+  },
+  {
+   "tick": 32000,
+   "population": 206,
+   "mean_genome_size": 2152.878640776699,
+   "mean_generation": 699.1893203883495,
+   "mean_age": 57.87864077669903,
+   "mean_energy": 29.893359529161916,
+   "births_total": 1070278
+  },
+  {
+   "tick": 32500,
+   "population": 296,
+   "mean_genome_size": 2199.875,
+   "mean_generation": 707.9898648648649,
+   "mean_age": 48.20945945945946,
+   "mean_energy": 29.942512744383233,
+   "births_total": 1072475
+  },
+  {
+   "tick": 33000,
+   "population": 184,
+   "mean_genome_size": 2313.820652173913,
+   "mean_generation": 718.4130434782609,
+   "mean_age": 47.391304347826086,
+   "mean_energy": 32.026707822537944,
+   "births_total": 1073878
+  },
+  {
+   "tick": 33500,
+   "population": 147,
+   "mean_genome_size": 2511.5510204081634,
+   "mean_generation": 725.8299319727892,
+   "mean_age": 47.70068027210884,
+   "mean_energy": 34.82629681120113,
+   "births_total": 1075228
+  },
+  {
+   "tick": 34000,
+   "population": 377,
+   "mean_genome_size": 2350.8116710875333,
+   "mean_generation": 731.6737400530504,
+   "mean_age": 44.289124668435015,
+   "mean_energy": 31.230716372674593,
+   "births_total": 1077171
+  },
+  {
+   "tick": 34500,
+   "population": 117,
+   "mean_genome_size": 2516.769230769231,
+   "mean_generation": 741.4871794871794,
+   "mean_age": 59.02564102564103,
+   "mean_energy": 33.31183885254411,
+   "births_total": 1078994
+  },
+  {
+   "tick": 35000,
+   "population": 92,
+   "mean_genome_size": 2540.4021739130435,
+   "mean_generation": 752.0869565217391,
+   "mean_age": 34.858695652173914,
+   "mean_energy": 35.703143862278566,
+   "births_total": 1079742
+  },
+  {
+   "tick": 35500,
+   "population": 36,
+   "mean_genome_size": 2544.1944444444443,
+   "mean_generation": 761.4444444444445,
+   "mean_age": 36.833333333333336,
+   "mean_energy": 56.83922002050612,
+   "births_total": 1080226
+  },
+  {
+   "tick": 36000,
+   "population": 139,
+   "mean_genome_size": 2689.906474820144,
+   "mean_generation": 769.2517985611511,
+   "mean_age": 50.62589928057554,
+   "mean_energy": 38.92782780763914,
+   "births_total": 1081040
+  },
+  {
+   "tick": 36500,
+   "population": 71,
+   "mean_genome_size": 2940.169014084507,
+   "mean_generation": 782.1408450704225,
+   "mean_age": 41.04225352112676,
+   "mean_energy": 33.6632462135503,
+   "births_total": 1082197
+  }
+ ],
+ "checkpoints": [
+  {
+   "tick": 10000,
+   "living": 1745,
+   "census_secs": 0.371610208,
+   "sim_secs_so_far": 544.9695924819999,
+   "selected_parents": 20,
+   "selected_generations": [
+    225,
+    250,
+    242,
+    203,
+    258,
+    220,
+    244,
+    240,
+    248,
+    205,
+    247,
+    216,
+    243,
+    246,
+    243,
+    252,
+    239,
+    248,
+    243,
+    257
+   ],
+   "age_deciles": [
+    0.0,
+    6.0,
+    12.0,
+    18.0,
+    23.0,
+    31.0,
+    39.0,
+    50.0,
+    65.0,
+    92.0,
+    243.0
+   ],
+   "energy_deciles": [
+    0.05147382616996765,
+    5.683564186096191,
+    10.03691577911377,
+    13.580612182617188,
+    17.684856414794922,
+    21.393869400024414,
+    24.988235473632812,
+    30.059528350830078,
+    36.44509506225586,
+    53.5915641784668,
+    198.0
+   ],
+   "sample": {
+    "births_total": 449074,
+    "kind": "sample",
+    "mean_age": 40.89226361031518,
+    "mean_energy": 27.121969173528402,
+    "mean_generation": 236.33123209169054,
+    "mean_genome_size": 815.5919770773639,
+    "population": 1745,
+    "tick": 10000
+   },
+   "cohorts": {
+    "founder": {
+     "parents_requested": 1,
+     "parents_evaluated": 1,
+     "consistency_violations": 0,
+     "retention_parents": 1,
+     "retained_share_all_families": {
+      "retained_causal_pairs": 125,
+      "retention_pairs": 130,
+      "share": "0.961538"
+     },
+     "families": {},
+     "retention": {}
+    },
+    "drift": {
+     "parents_requested": 0,
+     "parents_evaluated": 0,
+     "consistency_violations": 0,
+     "retention_parents": 0,
+     "retained_share_all_families": "no retention pair",
+     "families": {},
+     "retention": {}
+    },
+    "selected": {
+     "parents_requested": 20,
+     "parents_evaluated": 20,
+     "consistency_violations": 0,
+     "retention_parents": 19,
+     "retained_share_all_families": {
+      "retained_causal_pairs": 1183,
+      "retention_pairs": 1190,
+      "share": "0.994118"
+     },
+     "families": {
+      "NeighborBarrierRing": {
+       "family_declared": 1,
+       "family_connected": 1,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 1,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0
+      }
+     },
+     "retention": {
+      "NeighborBarrierRing": {
+       "retention_pairs": 0,
+       "retained_causal_pairs": 0,
+       "channels": 8,
+       "channels_causal": 0,
+       "retained_share": null
+      },
+      "AreaFoodSummary:0": {
+       "retention_pairs": 0,
+       "retained_causal_pairs": 0,
+       "channels": 7,
+       "channels_causal": 0,
+       "retained_share": null
+      }
+     }
+    }
+   }
+  },
+  {
+   "tick": 20000,
+   "living": 1949,
+   "census_secs": 0.811018458,
+   "sim_secs_so_far": 1345.562356079003,
+   "selected_parents": 20,
+   "selected_generations": [
+    511,
+    462,
+    511,
+    463,
+    466,
+    469,
+    510,
+    465,
+    517,
+    428,
+    502,
+    509,
+    506,
+    467,
+    465,
+    511,
+    465,
+    513,
+    467,
+    467
+   ],
+   "age_deciles": [
+    0.0,
+    4.0,
+    9.0,
+    14.0,
+    19.0,
+    25.0,
+    32.0,
+    41.0,
+    55.0,
+    79.0,
+    191.0
+   ],
+   "energy_deciles": [
+    0.015489041805267334,
+    8.780254364013672,
+    13.849143028259277,
+    18.389970779418945,
+    22.574193954467773,
+    27.395936965942383,
+    32.03502655029297,
+    38.017494201660156,
+    46.097896575927734,
+    65.15211486816406,
+    200.0
+   ],
+   "sample": {
+    "births_total": 857687,
+    "kind": "sample",
+    "mean_age": 34.2252437147255,
+    "mean_energy": 33.65590748091488,
+    "mean_generation": 493.0636223704464,
+    "mean_genome_size": 1584.6716264751155,
+    "population": 1949,
+    "tick": 20000
+   },
+   "cohorts": {
+    "founder": {
+     "parents_requested": 1,
+     "parents_evaluated": 1,
+     "consistency_violations": 0,
+     "retention_parents": 1,
+     "retained_share_all_families": {
+      "retained_causal_pairs": 125,
+      "retention_pairs": 130,
+      "share": "0.961538"
+     },
+     "families": {},
+     "retention": {}
+    },
+    "drift": {
+     "parents_requested": 0,
+     "parents_evaluated": 0,
+     "consistency_violations": 0,
+     "retention_parents": 0,
+     "retained_share_all_families": "no retention pair",
+     "families": {},
+     "retention": {}
+    },
+    "selected": {
+     "parents_requested": 20,
+     "parents_evaluated": 20,
+     "consistency_violations": 0,
+     "retention_parents": 20,
+     "retained_share_all_families": {
+      "retained_causal_pairs": 1178,
+      "retention_pairs": 1180,
+      "share": "0.998305"
+     },
+     "families": {
+      "NeighborBarrierRing": {
+       "family_declared": 6,
+       "family_connected": 2,
+       "family_executed": 1,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 2,
+       "family_connected": 1,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0
+      }
+     },
+     "retention": {
+      "NeighborBarrierRing": {
+       "retention_pairs": 0,
+       "retained_causal_pairs": 0,
+       "channels": 8,
+       "channels_causal": 0,
+       "retained_share": null
+      },
+      "AreaFoodSummary:0": {
+       "retention_pairs": 0,
+       "retained_causal_pairs": 0,
+       "channels": 7,
+       "channels_causal": 0,
+       "retained_share": null
+      }
+     }
+    }
+   },
+   "e6": {
+    "classes": {
+     "blind": 7,
+     "gradient_informative": 209,
+     "inside": 1733,
+     "visible_zero_vector": 0
+    },
+    "kind": "e6",
+    "living": 1949,
+    "lookahead3_comparison": [
+     {
+      "class": "gradient_informative",
+      "creatures": 209,
+      "mean_food_random_cardinal": 0.17016922061002138,
+      "mean_food_toward": 0.22539798995507895,
+      "toward_better_share": 0.3875598086124402
+     },
+     {
+      "class": "inside",
+      "creatures": 978,
+      "mean_food_random_cardinal": 0.8807701859968506,
+      "mean_food_toward": 1.2294107827717071,
+      "toward_better_share": 0.6462167689161554
+     }
+    ],
+    "rule": "inside: FoodHere(0) > 0 or a cardinal NeighborFoodRing(0) cell > 0; blind: AreaFoodSummary(0).max_value == 0; visible_zero_vector: visible, not inside, nearest vector (0, 0); gradient_informative: the rest. Step: the type-0 food on the cardinal neighbor along the larger-magnitude nearest component (ties -> x), against the mean over the four cardinal neighbors; barriers, occupancy and move charges ignored; an out-of-bounds cell counts 0",
+    "shares": {
+     "blind": 0.0035915854284248334,
+     "gradient_informative": 0.10723447922011288,
+     "inside": 0.8891739353514623,
+     "visible_zero_vector": 0.0
+    },
+    "step_comparison": [
+     {
+      "class": "gradient_informative",
+      "creatures": 209,
+      "mean_food_random_cardinal": 0.0,
+      "mean_food_toward": 0.0,
+      "toward_better_share": 0.0
+     },
+     {
+      "class": "inside",
+      "creatures": 978,
+      "mean_food_random_cardinal": 0.24555467735301484,
+      "mean_food_toward": 0.40469950251983655,
+      "toward_better_share": 0.7413087934560327
+     }
+    ],
+    "tick": 20000
+   }
+  }
+ ],
+ "reading": {
+  "AreaFoodSummary": {
+   "share_declared": [
+    0.05,
+    0.1
+   ],
+   "share_connected": [
+    0.0,
+    0.05
+   ],
+   "share_causal": [
+    0.0,
+    0.0
+   ],
+   "retained_share_at_last": null,
+   "adequate_20_parents": true,
+   "causal_strictly_increasing": false,
+   "connected_strictly_increasing": true,
+   "premise_qualified": false,
+   "variation_support": true
+  },
+  "NeighborBarrierRing": {
+   "share_declared": [
+    0.05,
+    0.3
+   ],
+   "share_connected": [
+    0.05,
+    0.1
+   ],
+   "share_causal": [
+    0.0,
+    0.0
+   ],
+   "retained_share_at_last": null,
+   "adequate_20_parents": true,
+   "causal_strictly_increasing": false,
+   "connected_strictly_increasing": true,
+   "premise_qualified": false,
+   "variation_support": true
+  }
+ },
+ "e6": {
+  "classes": {
+   "blind": 7,
+   "gradient_informative": 209,
+   "inside": 1733,
+   "visible_zero_vector": 0
+  },
+  "kind": "e6",
+  "living": 1949,
+  "lookahead3_comparison": [
+   {
+    "class": "gradient_informative",
+    "creatures": 209,
+    "mean_food_random_cardinal": 0.17016922061002138,
+    "mean_food_toward": 0.22539798995507895,
+    "toward_better_share": 0.3875598086124402
+   },
+   {
+    "class": "inside",
+    "creatures": 978,
+    "mean_food_random_cardinal": 0.8807701859968506,
+    "mean_food_toward": 1.2294107827717071,
+    "toward_better_share": 0.6462167689161554
+   }
+  ],
+  "rule": "inside: FoodHere(0) > 0 or a cardinal NeighborFoodRing(0) cell > 0; blind: AreaFoodSummary(0).max_value == 0; visible_zero_vector: visible, not inside, nearest vector (0, 0); gradient_informative: the rest. Step: the type-0 food on the cardinal neighbor along the larger-magnitude nearest component (ties -> x), against the mean over the four cardinal neighbors; barriers, occupancy and move charges ignored; an out-of-bounds cell counts 0",
+  "shares": {
+   "blind": 0.0035915854284248334,
+   "gradient_informative": 0.10723447922011288,
+   "inside": 0.8891739353514623,
+   "visible_zero_vector": 0.0
+  },
+  "step_comparison": [
+   {
+    "class": "gradient_informative",
+    "creatures": 209,
+    "mean_food_random_cardinal": 0.0,
+    "mean_food_toward": 0.0,
+    "toward_better_share": 0.0
+   },
+   {
+    "class": "inside",
+    "creatures": 978,
+    "mean_food_random_cardinal": 0.24555467735301484,
+    "mean_food_toward": 0.40469950251983655,
+    "toward_better_share": 0.7413087934560327
+   }
+  ],
+  "tick": 20000
+ },
+ "provenance": {
+  "census_sha256": "3c978d06f817e06879067409a7afde188d4bb48a0eb65fa86a1c2089b670e1d6",
+  "samples_sha256": "4ceb5ce94f92ca4bfe06ba4bf15929da022908a079d88fb3853dfb677ec5445b",
+  "reader_sha256": "a4b4d7de17dc85c0167ee81afbf80979ff16b07c6e0857a5bda3b080f98c5afe"
+ }
+}
