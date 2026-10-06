@@ -86,10 +86,19 @@ opposing signs across a family's channels (cancellation), or neither?
   `AddProjection` prototype and the one-edge arm sets are not taken.
 - **Branch verification.** TDD for the prototypes; `cargo test -p v3-core
   --test viability` first (both prototypes touch births; it passed, 20 tests,
-  before the first gate); `make check` on the branch before a prototype's
-  results count, with the `v3-cli` recipe-digest pin test the one allowed
-  failure (two new `RuntimeConfig` fields), as the run 1 plan allows;
-  recorded under Run setup when run.
+  before the first gate). `make check` at `3778b30a` (log
+  `.bench-artifacts/lab/diagnosis2/make-check-branch.log`): policy, quality,
+  format, viability and every Rust test binary up to `rust-test-cli` passed,
+  where it exited 2 on exactly the failure the run 1 contract allows, the
+  `v3-cli` recipe-digest pin test
+  `checked_in_goal_recipe_identities_are_unchanged_by_json_precision` (35 of
+  36 passing; two new `RuntimeConfig` fields). A first `make check` at
+  `de579cdf` had stopped at `rust-format-check` on the new test code, fixed
+  by the rustfmt-only commit `0dd4c7d0`. The targets after the pin failure
+  were run one by one (`remaining-checks-branch.log`): `rust-test-server`,
+  `rust-test-lab`, `rust-test-telemetry`, `rust-test-doc`, `rust-clippy`,
+  `frontend-check`, `dependency-audit` and `skill-check` all exited 0. The
+  prototypes' results therefore count.
 - **Founder fact found while testing N2.** The founder is not fully
   addressed: node 0's entry 4, `NeighborOccupiedRing`, has no consumer, so
   the N2 decay pass visits one silent entry on every founder birth. The
@@ -114,6 +123,33 @@ opposing signs across a family's channels (cancellation), or neither?
 | G1 | Instrument identity: the census probe (which builds its config through `resolve_config` on the recipe, as `v3-cli run --config` does) against E8's `v3-cli run` samples. A 2,000-tick smoke run on the Canyon goal recipe, seed 1022, default config, before any prototype arm; then the full `default` and `default-mutoff` reruns of N1 (both seeds, 20,000 ticks) compared at every sample | Every inline sample's `population`, `mean_genome_size`, `mean_generation` and `reproduction_actions_spawned_total` must equal E8's `default-s1022` (and, for the full runs, `default-s2022`, `default-mutoff-s1022`, `default-mutoff-s2022`) `tick_sample` fields at the same ticks (E8 ran the pinned launch-revision production binary). The smoke run blocks N1 and N2 until equal; a full-run inequality voids the N1 and N2 readings until explained and fixed. The instrument is verified on the new binary with both prototype flags off, not on a separate no-prototype build, as E2's census was (a recorded deviation from the strict baseline-identity reading) |
 | G2 | Observation identity: N3's census is the E2 census plus a reading | N3's `input_use` blocks at 20,000 and 50,000 and its `e6` block at 20,000, each serialized once with sorted keys and compact separators, must hash-equal the same blocks of E2's Confluence census (`.bench-artifacts/lab/diagnosis/e2/census-confluence.ndjson`, same procedure). The run keeps E2's eight-thread rayon pool. N3's vote-delta reading is interpreted only after G2 passes, or after an observation-preserving correction is made and G2 then passes; a mismatch is never waived |
 | G3 | Mechanism identity for N2, on the founder, through the E4 probe (`PETRI_E4_BIRTHS=1000000`, parents founder, founder+declared, founder+declared+zero-edge, no elites) on the N2 binary, once with the rate off and once at 0.005 (`PETRI_E4_DECAY=0.005`) | **Off path, equivalence with E4:** founder+declared's integrated `lose_declaration` and the connected parent's must each have a 95 % CP interval containing E4's point estimate (0.018643 and 0.0079606) and a point estimate within 5 % of it (E4's own interval at 10⁷ births is negligible beside a 10⁶ estimate's). **On path:** the decay pass's firing rate (`decay.firing` = losses applied over silent entries visited, one Bernoulli trial each) has a CP interval containing 0.005; the connected parent's integrated `lose_declaration` (its entry is addressed, so N2 must not touch it) has a CP interval containing the off path's point estimate and is within 10 % of it; and the ordinary **requested** supply is unchanged: the on path's `attempted_events_per_birth` of the founder parent within 5 % of the off path's, its applied events per birth *excluding* `InputRefPrune` within 5 % of the off path's (amendment A2, pre-data: the founder's own silent entry makes every otherwise-applicable `Prune` draw a terminal skip, so raw applied events drop by about the Prune share and are not the invariant), `InputRefPrune` applied 0. The integrated final-child loss of founder+declared on the on path is reported beside the firing rate as a separate reading (it adds node deletion and connection-then-edit routes). Either failure marks N2 confounded: its world runs may run but do not count toward validation |
+
+**Gate results.** **G3 passed** (12 of 12 checks,
+[`g3-founder-rates.json`](evolvability-diagnosis-run-2026-10-followup/g3-founder-rates.json),
+reader [`g3read.py`](evolvability-diagnosis-run-2026-10-followup/g3read.py);
+raw probe outputs `n12/g3/e4-off.json` sha256 `07b639db…` and `e4-on.json`
+`d601743b…`, 10⁶ births per parent, 111 s and 40 s). Off path: the silent
+declaration lost at 0.018679 per birth (CP 0.01841 to 0.01895; E4 0.018643),
+the connected entry at 0.007911 (CP 0.00774 to 0.00809; E4 0.0079606). On
+path: the decay pass visited 2.11 silent entries per founder+declared birth
+(the declared entry and the founder's own `NeighborOccupiedRing`) and fired
+on 0.0049998 of them (CP 0.004905 to 0.005096, 10,570 of 2,114,094); the
+connected entry's loss 0.007883 (CP 0.00771 to 0.00806), inside the off
+path's; the founder's requested supply identical (0.484315 attempted events
+per birth on both paths) and its applied events excluding `InputRefPrune`
+0.334972 against 0.335356 (raw applied 0.334972 against 0.356773: the Prune
+share, now terminal skips); `InputRefPrune` applied 0 on every parent. The
+integrated final-child loss of the silent declaration on the on path is
+0.004942 per birth (CP 0.00481 to 0.00508), 3.8 × below the default's, by
+`Prune` 66 %, retype 17 % and `Swap` 17 % of the decay's own losses on that
+entry (the founder's ring entry, which has no swap or retype route, is lost
+by prune alone). **G1 smoke passed** (`g1-default-s1022`, 2,000 ticks,
+8 threads, 371 s including the release test build:
+[`g1-smoke.json`](evolvability-diagnosis-run-2026-10-followup/g1-smoke.json),
+reader [`g1check.py`](evolvability-diagnosis-run-2026-10-followup/g1check.py)):
+all four samples equal E8's `default-s1022` on every compared field, 0
+mismatches. The full-run comparison follows the `default` and
+`default-mutoff` runs.
 
 ## Ledger
 
@@ -198,4 +234,7 @@ and the cost table.
 
 | Row | Wall |
 | --- | --- |
-| Predeclaration and amendment A1 | session time; no heavy job |
+| Predeclaration and amendments A1, A2 | session time; no heavy job |
+| Builds, tests, `make check` and the step-by-step remainder | about 25 min in all |
+| G3 | 111 s (off) and 40 s (on) |
+| G1 smoke | 371 s |
