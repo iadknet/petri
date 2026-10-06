@@ -1,0 +1,1342 @@
+{
+ "rows": [
+  "N1",
+  "N2"
+ ],
+ "world": "Canyon country",
+ "window_ticks": [
+  15000,
+  20000
+ ],
+ "founder_units": 97,
+ "runs": {
+  "default-s1022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "per_unit_rate": 0.005,
+    "reproduce_hold_per_founder_size": false,
+    "silent_entry_decay_rate": null
+   },
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 4664.0,
+   "mean_energy": 25.653502801624395,
+   "mean_genome_size": 688.1147402677917,
+   "mean_genome_size_founder_units": 7.093966394513316,
+   "mean_generation": 391.7158551852551,
+   "births_per_creature_tick": 0.018335064095658733,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 4889,
+    "mean_genome_size": 820.9267743914911,
+    "mean_generation": 441.60421354060134,
+    "reproduction_actions_spawned_total": 1371904
+   },
+   "trajectory": [
+    [
+     2500,
+     148.9,
+     974
+    ],
+    [
+     5000,
+     412.4,
+     1934
+    ],
+    [
+     7500,
+     469.8,
+     2930
+    ],
+    [
+     10000,
+     462.1,
+     3915
+    ],
+    [
+     12500,
+     540.8,
+     4590
+    ],
+    [
+     15000,
+     587.2,
+     4877
+    ],
+    [
+     17500,
+     684.9,
+     5008
+    ],
+    [
+     20000,
+     820.9,
+     4889
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 3915,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 2,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 2
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 1,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": null
+    },
+    "20000": {
+     "living": 4889,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 5,
+       "family_connected": 3,
+       "family_executed": 3,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 2
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 3,
+       "family_connected": 1,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 2
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": 0.02986295766005318
+    }
+   },
+   "footer": {
+    "census_secs": 0.540993208,
+    "elapsed_secs": 1471.014486166,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 1469.7446465260036,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "ccccc1a35010fa4c6853b01402e707358db19bf44fe7e94fe66ba827cf4da9c7",
+   "sha256_census": "7f5bcfc2462f168b31fd026c2f31b16a2dda753b027e2c17dc595f418dc5ed02"
+  },
+  "default-s2022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "per_unit_rate": 0.005,
+    "reproduce_hold_per_founder_size": false,
+    "silent_entry_decay_rate": null
+   },
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 1208.1818181818182,
+   "mean_energy": 36.91158163572497,
+   "mean_genome_size": 2171.0965888158494,
+   "mean_genome_size_founder_units": 22.38243905995721,
+   "mean_generation": 441.7998122095134,
+   "births_per_creature_tick": 0.018527271240493907,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 1061,
+    "mean_genome_size": 2308.02356267672,
+    "mean_generation": 495.67577756833174,
+    "reproduction_actions_spawned_total": 835989
+   },
+   "trajectory": [
+    [
+     2500,
+     255.7,
+     1924
+    ],
+    [
+     5000,
+     434.4,
+     2226
+    ],
+    [
+     7500,
+     384.4,
+     3258
+    ],
+    [
+     10000,
+     831.8,
+     1310
+    ],
+    [
+     12500,
+     1194.8,
+     1760
+    ],
+    [
+     15000,
+     1649.7,
+     1264
+    ],
+    [
+     17500,
+     2034.0,
+     994
+    ],
+    [
+     20000,
+     2308.0,
+     1061
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 1310,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 6,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 6
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 14,
+       "family_connected": 7,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 7
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": null
+    },
+    "20000": {
+     "living": 1061,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 7,
+       "family_connected": 3,
+       "family_executed": 1,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 4
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 1,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": 0.13006597549481622
+    }
+   },
+   "footer": {
+    "census_secs": 1.831819583,
+    "elapsed_secs": 1413.768886375,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 1411.2871608300045,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "a5419ac294cea2d00c8a56be53448659cb837f8ce6b40fac1ff5a25f727b7aa0",
+   "sha256_census": "7f7bd6c0c12b79f0995d3a0342031ed40691bb13d643578ea884abb1a68ae599"
+  },
+  "hold2-s1022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "per_unit_rate": 0.005,
+    "reproduce_hold_per_founder_size": true,
+    "silent_entry_decay_rate": null
+   },
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 2565.181818181818,
+   "mean_energy": 29.770613307666505,
+   "mean_genome_size": 443.2780156587698,
+   "mean_genome_size_founder_units": 4.56987645009041,
+   "mean_generation": 382.3186128215406,
+   "births_per_creature_tick": 0.019772364154077356,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 2931,
+    "mean_genome_size": 432.9078812691914,
+    "mean_generation": 439.3913340156943,
+    "reproduction_actions_spawned_total": 1029336
+   },
+   "trajectory": [
+    [
+     2500,
+     176.6,
+     1212
+    ],
+    [
+     5000,
+     362.8,
+     4546
+    ],
+    [
+     7500,
+     461.7,
+     3901
+    ],
+    [
+     10000,
+     530.9,
+     2204
+    ],
+    [
+     12500,
+     394.8,
+     2814
+    ],
+    [
+     15000,
+     519.1,
+     2400
+    ],
+    [
+     17500,
+     394.1,
+     3310
+    ],
+    [
+     20000,
+     432.9,
+     2931
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 2204,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 2,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 2
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 1,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": null
+    },
+    "20000": {
+     "living": 2931,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 4,
+       "family_connected": 1,
+       "family_executed": 1,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 3
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 6,
+       "family_connected": 2,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 4
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": 0.18389628113271922
+    }
+   },
+   "footer": {
+    "census_secs": 0.731986125,
+    "elapsed_secs": 1161.841998833,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 1160.6874828760056,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "935a2d2d4d616b8e40c34a8ae1c6a8ac59c15f6984e8ca1ffdcc673c14af8993",
+   "sha256_census": "732c14d71943e3b7b77df22637bb1ec42fb795abb1148d52a190b00dfde0b5c3"
+  },
+  "hold2-s2022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "per_unit_rate": 0.005,
+    "reproduce_hold_per_founder_size": true,
+    "silent_entry_decay_rate": null
+   },
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 2648.3636363636365,
+   "mean_energy": 25.129067957060524,
+   "mean_genome_size": 886.5652357054765,
+   "mean_genome_size_founder_units": 9.13984779077811,
+   "mean_generation": 466.16551235887727,
+   "births_per_creature_tick": 0.018166104676733616,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 1848,
+    "mean_genome_size": 1080.512445887446,
+    "mean_generation": 525.4453463203463,
+    "reproduction_actions_spawned_total": 860601
+   },
+   "trajectory": [
+    [
+     2500,
+     118.1,
+     597
+    ],
+    [
+     5000,
+     141.8,
+     1336
+    ],
+    [
+     7500,
+     194.5,
+     2995
+    ],
+    [
+     10000,
+     339.3,
+     3199
+    ],
+    [
+     12500,
+     447.6,
+     2108
+    ],
+    [
+     15000,
+     639.1,
+     3102
+    ],
+    [
+     17500,
+     948.7,
+     1950
+    ],
+    [
+     20000,
+     1080.5,
+     1848
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 3199,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 2,
+       "family_connected": 1,
+       "family_executed": 1,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": null
+    },
+    "20000": {
+     "living": 1848,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 3,
+       "family_connected": 2,
+       "family_executed": 2,
+       "family_causal": 2,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 6,
+       "family_connected": 1,
+       "family_executed": 3,
+       "family_causal": 1,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 5
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": 0.08658008658008658
+    }
+   },
+   "footer": {
+    "census_secs": 1.493117582,
+    "elapsed_secs": 1389.985081042,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 1387.6513553140032,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "f4ab0439076ebf781953d2ce1acd562df4285a1513d912af336dfd2750d62205",
+   "sha256_census": "428c1b12ee8a8201fd163a7c233481b35b7f5e8ed654d5462cbca8803aaa33f9"
+  },
+  "slow-s1022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "per_unit_rate": 0.005,
+    "reproduce_hold_per_founder_size": false,
+    "silent_entry_decay_rate": 0.005
+   },
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 3220.818181818182,
+   "mean_energy": 31.73542928274627,
+   "mean_genome_size": 577.6619595453916,
+   "mean_genome_size_founder_units": 5.955277933457645,
+   "mean_generation": 334.315866599638,
+   "births_per_creature_tick": 0.016898258759942265,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 2866,
+    "mean_genome_size": 681.0094207955339,
+    "mean_generation": 383.1877180739707,
+    "reproduction_actions_spawned_total": 1047981
+   },
+   "trajectory": [
+    [
+     2500,
+     118.9,
+     831
+    ],
+    [
+     5000,
+     190.9,
+     2333
+    ],
+    [
+     7500,
+     245.8,
+     2416
+    ],
+    [
+     10000,
+     318.1,
+     3476
+    ],
+    [
+     12500,
+     373.5,
+     2899
+    ],
+    [
+     15000,
+     488.7,
+     2589
+    ],
+    [
+     17500,
+     558.4,
+     2931
+    ],
+    [
+     20000,
+     681.0,
+     2866
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 3476,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 2,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 2
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 7,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 7
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": null
+    },
+    "20000": {
+     "living": 2866,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 7,
+       "family_connected": 2,
+       "family_executed": 1,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 5
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 9,
+       "family_connected": 3,
+       "family_executed": 3,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 6
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": 0.2278436845778088
+    }
+   },
+   "footer": {
+    "census_secs": 0.774915708,
+    "elapsed_secs": 1317.592113042,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 1316.3139594330091,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "ae22bc87b7bbe36bf69101ad08e46fa4f858e058c6e30288a82292633b04b9e3",
+   "sha256_census": "484a2ac4110f4cb249d8a9ef412387189eeccdfec9d71ef097874bbdde7c5527"
+  },
+  "slow-s2022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "per_unit_rate": 0.005,
+    "reproduce_hold_per_founder_size": false,
+    "silent_entry_decay_rate": 0.005
+   },
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 1776.6363636363637,
+   "mean_energy": 34.800155985496275,
+   "mean_genome_size": 865.7312260553498,
+   "mean_genome_size_founder_units": 8.925064186137627,
+   "mean_generation": 357.6131831317629,
+   "births_per_creature_tick": 0.022149135527049637,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 1613,
+    "mean_genome_size": 1214.5313081215127,
+    "mean_generation": 450.19342839429635,
+    "reproduction_actions_spawned_total": 688467
+   },
+   "trajectory": [
+    [
+     2500,
+     134.6,
+     700
+    ],
+    [
+     5000,
+     113.6,
+     125
+    ],
+    [
+     7500,
+     142.3,
+     205
+    ],
+    [
+     10000,
+     231.0,
+     4653
+    ],
+    [
+     12500,
+     420.9,
+     2042
+    ],
+    [
+     15000,
+     536.7,
+     1648
+    ],
+    [
+     17500,
+     797.9,
+     1563
+    ],
+    [
+     20000,
+     1214.5,
+     1613
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 4653,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 1,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": null
+    },
+    "20000": {
+     "living": 1613,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 4,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 4
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 8,
+       "family_connected": 4,
+       "family_executed": 3,
+       "family_causal": 1,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 4
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "e6_gradient_informative": 0.26596404215747055
+    }
+   },
+   "footer": {
+    "census_secs": 1.202052334,
+    "elapsed_secs": 1207.067036333,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 1205.5289113410076,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "19a91561c5dcbfc0eb754b6bb8129c297fc8018658f0424a215081575d01f852",
+   "sha256_census": "59eb84fa269397b0953eb3b4dee17455b9ff853382530fb9ffeb199ea6c36b2d"
+  },
+  "default-mutoff-s1022": {
+   "completed": true,
+   "extinct_tick": 5340,
+   "prototypes": {
+    "per_unit_rate": 0.0,
+    "reproduce_hold_per_founder_size": false,
+    "silent_entry_decay_rate": null
+   },
+   "samples": 10,
+   "last_tick": 5000,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    5000,
+    5340
+   ],
+   "final": {
+    "tick": 5000,
+    "population": 116,
+    "mean_genome_size": 97.0,
+    "mean_generation": 149.97413793103448,
+    "reproduction_actions_spawned_total": 288492
+   },
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     3375
+    ],
+    [
+     5000,
+     97.0,
+     116
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 227.238634708,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 227.2170066079994,
+    "threads": 8,
+    "ticks": 5340
+   },
+   "sha256_samples": "fd6d5f2c36ba382375b96b994569be868ca37d79cd16b82bdd72c0c1306d73c4",
+   "sha256_census": "3df98a75ad1b8d14aa53aa749fa5a5bac737812483900e3e963c58d47bc69556"
+  },
+  "default-mutoff-s2022": {
+   "completed": true,
+   "extinct_tick": 4144,
+   "prototypes": {
+    "per_unit_rate": 0.0,
+    "reproduce_hold_per_founder_size": false,
+    "silent_entry_decay_rate": null
+   },
+   "samples": 8,
+   "last_tick": 4000,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    4000,
+    4144
+   ],
+   "final": {
+    "tick": 4000,
+    "population": 134,
+    "mean_genome_size": 97.0,
+    "mean_generation": 121.42537313432835,
+    "reproduction_actions_spawned_total": 279555
+   },
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     5939
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 198.996974083,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 198.97638141899992,
+    "threads": 8,
+    "ticks": 4144
+   },
+   "sha256_samples": "564819931e8e9bce13528a66c8f71ea40ce534a57aa70be351d77035e7b4bea1",
+   "sha256_census": "88b5438e790af19769fe4bac1a2b01524701fbdd6d1c09e45eb4278105d31cc2"
+  },
+  "hold2-mutoff-s1022": {
+   "completed": true,
+   "extinct_tick": 4197,
+   "prototypes": {
+    "per_unit_rate": 0.0,
+    "reproduce_hold_per_founder_size": true,
+    "silent_entry_decay_rate": null
+   },
+   "samples": 8,
+   "last_tick": 4000,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    4000,
+    4197
+   ],
+   "final": {
+    "tick": 4000,
+    "population": 46,
+    "mean_genome_size": 97.0,
+    "mean_generation": 114.8913043478261,
+    "reproduction_actions_spawned_total": 269116
+   },
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     3735
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 181.075225,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 181.05732859600036,
+    "threads": 8,
+    "ticks": 4197
+   },
+   "sha256_samples": "b27eb7e1480bb7a27820dafa274e30a1179e457a7fa1e79431cc6550923edd93",
+   "sha256_census": "86cfe5239d5b8c768916f3c45d04c3e12f025181078e7502f8bfb848e627c7d4"
+  },
+  "hold2-mutoff-s2022": {
+   "completed": true,
+   "extinct_tick": 6055,
+   "prototypes": {
+    "per_unit_rate": 0.0,
+    "reproduce_hold_per_founder_size": true,
+    "silent_entry_decay_rate": null
+   },
+   "samples": 12,
+   "last_tick": 6000,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    6000,
+    6055
+   ],
+   "final": {
+    "tick": 6000,
+    "population": 12,
+    "mean_genome_size": 97.0,
+    "mean_generation": 183.58333333333334,
+    "reproduction_actions_spawned_total": 286646
+   },
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     4068
+    ],
+    [
+     5000,
+     97.0,
+     182
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 242.338666084,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 242.3184827880007,
+    "threads": 8,
+    "ticks": 6055
+   },
+   "sha256_samples": "1521fa298ec1931cf72000bb6972d2d9fd0be1b62f5f9d4d6330783e6ca31a65",
+   "sha256_census": "781e4217a20c3f629a4c9058a7fe84032eb9f2812dc41c91d8d7f65dcd9d106c"
+  },
+  "slow-mutoff-s1022": {
+   "completed": true,
+   "extinct_tick": 5340,
+   "prototypes": {
+    "per_unit_rate": 0.0,
+    "reproduce_hold_per_founder_size": false,
+    "silent_entry_decay_rate": 0.005
+   },
+   "samples": 10,
+   "last_tick": 5000,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    5000,
+    5340
+   ],
+   "final": {
+    "tick": 5000,
+    "population": 116,
+    "mean_genome_size": 97.0,
+    "mean_generation": 149.97413793103448,
+    "reproduction_actions_spawned_total": 288492
+   },
+   "trajectory": [
+    [
+     2500,
+     96.4,
+     3375
+    ],
+    [
+     5000,
+     97.0,
+     116
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 231.090421667,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 231.06868518600012,
+    "threads": 8,
+    "ticks": 5340
+   },
+   "sha256_samples": "23fdd3ef060c0d8e96b9fbbe3cf24bce999fb702b86bd0b59f147785014b4eeb",
+   "sha256_census": "84e88bec94c7fc7d473209383bca00335e041ecc844793103b76cb95fea24da4"
+  },
+  "slow-mutoff-s2022": {
+   "completed": true,
+   "extinct_tick": 4144,
+   "prototypes": {
+    "per_unit_rate": 0.0,
+    "reproduce_hold_per_founder_size": false,
+    "silent_entry_decay_rate": 0.005
+   },
+   "samples": 8,
+   "last_tick": 4000,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    4000,
+    4144
+   ],
+   "final": {
+    "tick": 4000,
+    "population": 134,
+    "mean_genome_size": 96.99253731343283,
+    "mean_generation": 121.42537313432835,
+    "reproduction_actions_spawned_total": 279555
+   },
+   "trajectory": [
+    [
+     2500,
+     96.8,
+     5939
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 189.124239167,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 189.10044027100022,
+    "threads": 8,
+    "ticks": 4144
+   },
+   "sha256_samples": "837b42f7c48815987ee79fbff6bfdb1da5faa9c54265a2329398fe1048f86243",
+   "sha256_census": "649fdfa047de2f1342571a23c4ee4d206d63462d94836921d70dab670b1fb166"
+  }
+ },
+ "n1": {
+  "per_seed": {
+   "1022": {
+    "hold2_reaches_20000": true,
+    "size_below_default": true,
+    "population_ratio": 0.5499961016684859,
+    "population_at_least_half": true,
+    "births_default": 0.018335064095658733,
+    "births_hold2": 0.019772364154077356,
+    "pair": {
+     "default_mutoff_extinction": [
+      5000,
+      5340
+     ],
+     "hold2_mutoff_extinction": [
+      4000,
+      4197
+     ]
+    }
+   },
+   "2022": {
+    "hold2_reaches_20000": true,
+    "size_below_default": true,
+    "population_ratio": 2.1920240782543265,
+    "population_at_least_half": true,
+    "births_default": 0.018527271240493907,
+    "births_hold2": 0.018166104676733616,
+    "pair": {
+     "default_mutoff_extinction": [
+      4000,
+      4144
+     ],
+     "hold2_mutoff_extinction": [
+      6000,
+      6055
+     ]
+    }
+   }
+  },
+  "validated": true
+ },
+ "n2": {
+  "per_seed": {
+   "1022": {
+    "slow_reaches_20000": true,
+    "population_ratio": 0.6905699360673632,
+    "population_at_least_half": true,
+    "size_default": 7.093966394513316,
+    "size_slow": 5.955277933457645,
+    "pair": {
+     "default_mutoff_extinction": [
+      5000,
+      5340
+     ],
+     "slow_mutoff_extinction": [
+      5000,
+      5340
+     ]
+    }
+   },
+   "2022": {
+    "slow_reaches_20000": true,
+    "population_ratio": 1.4705041384499624,
+    "population_at_least_half": true,
+    "size_default": 22.38243905995721,
+    "size_slow": 8.925064186137627,
+    "pair": {
+     "default_mutoff_extinction": [
+      4000,
+      4144
+     ],
+     "slow_mutoff_extinction": [
+      4000,
+      4144
+     ]
+    }
+   }
+  },
+  "typed_rows": {
+   "AreaFoodSummary:0": {
+    "1022": {
+     "default": 3,
+     "slow": 9,
+     "slow_above_default": true
+    },
+    "2022": {
+     "default": 1,
+     "slow": 8,
+     "slow_above_default": true
+    }
+   },
+   "AreaFoodSummary:1": {
+    "1022": {
+     "default": 0,
+     "slow": 0,
+     "slow_above_default": false
+    },
+    "2022": {
+     "default": 0,
+     "slow": 0,
+     "slow_above_default": false
+    }
+   },
+   "NeighborBarrierRing": {
+    "1022": {
+     "default": 5,
+     "slow": 7,
+     "slow_above_default": true
+    },
+    "2022": {
+     "default": 7,
+     "slow": 4,
+     "slow_above_default": false
+    }
+   }
+  },
+  "any_typed_row_above_default_on_both_seeds": true,
+  "validated_given_g3": true
+ }
+}
