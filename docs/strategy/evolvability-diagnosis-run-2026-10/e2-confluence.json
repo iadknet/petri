@@ -6,11 +6,20 @@
  "horizon": 50000,
  "checkpoints_reached": [
   10000,
-  20000
+  20000,
+  50000
  ],
- "complete": false,
+ "complete": true,
  "extinct": null,
- "footer": null,
+ "footer": {
+  "census_secs": 6.771045418,
+  "elapsed_secs": 15108.299523291,
+  "extinct": false,
+  "kind": "footer",
+  "sim_secs": 15089.332387050034,
+  "threads": 8,
+  "ticks": 50000
+ },
  "trajectory": [
   {
    "tick": 500,
@@ -794,6 +803,123 @@
    "mean_age": 43.4216827402727,
    "mean_energy": 54.49375394708717,
    "births_total": 3462250
+  },
+  {
+   "tick": 44000,
+   "population": 2612,
+   "mean_genome_size": 6775.940658499234,
+   "mean_generation": 1129.446784073507,
+   "mean_age": 43.822358346094944,
+   "mean_energy": 53.7094458275133,
+   "births_total": 3493289
+  },
+  {
+   "tick": 44500,
+   "population": 2338,
+   "mean_genome_size": 7051.766039349872,
+   "mean_generation": 1140.603507271172,
+   "mean_age": 41.99828913601369,
+   "mean_energy": 56.032582679882935,
+   "births_total": 3519854
+  },
+  {
+   "tick": 45000,
+   "population": 2630,
+   "mean_genome_size": 6875.980608365019,
+   "mean_generation": 1156.015969581749,
+   "mean_age": 41.5680608365019,
+   "mean_energy": 56.14610839445895,
+   "births_total": 3548170
+  },
+  {
+   "tick": 45500,
+   "population": 2724,
+   "mean_genome_size": 7149.403817914831,
+   "mean_generation": 1169.6424375917768,
+   "mean_age": 46.16740088105727,
+   "mean_energy": 52.00727078257328,
+   "births_total": 3577948
+  },
+  {
+   "tick": 46000,
+   "population": 2905,
+   "mean_genome_size": 7317.211015490534,
+   "mean_generation": 1180.2110154905336,
+   "mean_age": 43.549397590361444,
+   "mean_energy": 55.757323226460905,
+   "births_total": 3605849
+  },
+  {
+   "tick": 46500,
+   "population": 2234,
+   "mean_genome_size": 7793.529095792301,
+   "mean_generation": 1189.8818263205014,
+   "mean_age": 44.44941808415398,
+   "mean_energy": 56.91885106923224,
+   "births_total": 3632164
+  },
+  {
+   "tick": 47000,
+   "population": 2562,
+   "mean_genome_size": 8233.213895394223,
+   "mean_generation": 1196.9570647931303,
+   "mean_age": 50.61319281811085,
+   "mean_energy": 58.99337757561446,
+   "births_total": 3655544
+  },
+  {
+   "tick": 47500,
+   "population": 2124,
+   "mean_genome_size": 8660.639830508475,
+   "mean_generation": 1205.903483992467,
+   "mean_age": 53.26129943502825,
+   "mean_energy": 61.1626843588774,
+   "births_total": 3678707
+  },
+  {
+   "tick": 48000,
+   "population": 2011,
+   "mean_genome_size": 9309.770263550472,
+   "mean_generation": 1216.3689706613625,
+   "mean_age": 50.11685728493287,
+   "mean_energy": 63.42961084691522,
+   "births_total": 3698396
+  },
+  {
+   "tick": 48500,
+   "population": 1739,
+   "mean_genome_size": 9610.679700977573,
+   "mean_generation": 1226.8631397354802,
+   "mean_age": 49.58769407705578,
+   "mean_energy": 64.9366016886987,
+   "births_total": 3715682
+  },
+  {
+   "tick": 49000,
+   "population": 1548,
+   "mean_genome_size": 10157.864341085271,
+   "mean_generation": 1236.1330749354006,
+   "mean_age": 53.458656330749356,
+   "mean_energy": 69.20630776139039,
+   "births_total": 3731278
+  },
+  {
+   "tick": 49500,
+   "population": 1422,
+   "mean_genome_size": 10628.927566807313,
+   "mean_generation": 1245.831223628692,
+   "mean_age": 56.23347398030943,
+   "mean_energy": 69.8273762620451,
+   "births_total": 3745236
+  },
+  {
+   "tick": 50000,
+   "population": 1545,
+   "mean_genome_size": 11485.124271844661,
+   "mean_generation": 1254.3967637540452,
+   "mean_age": 58.79676375404531,
+   "mean_energy": 74.52742132464466,
+   "births_total": 3757508
   }
  ],
  "checkpoints": [
@@ -1144,46 +1270,311 @@
     ],
     "tick": 20000
    }
+  },
+  {
+   "tick": 50000,
+   "living": 1545,
+   "census_secs": 5.428902584,
+   "sim_secs_so_far": 15089.332387050034,
+   "selected_parents": 20,
+   "selected_generations": [
+    1277,
+    1248,
+    1252,
+    1276,
+    1243,
+    1255,
+    1247,
+    1251,
+    1245,
+    1246,
+    1281,
+    1251,
+    1249,
+    1249,
+    1278,
+    1249,
+    1275,
+    1279,
+    1251,
+    1277
+   ],
+   "age_deciles": [
+    0.0,
+    5.0,
+    11.0,
+    19.0,
+    29.0,
+    40.0,
+    54.0,
+    70.0,
+    93.0,
+    130.0,
+    2462.0
+   ],
+   "energy_deciles": [
+    0.09993331134319305,
+    15.71484088897705,
+    26.970314025878906,
+    38.38238525390625,
+    51.70619201660156,
+    65.43902587890625,
+    81.60413360595703,
+    97.00625610351562,
+    119.88166809082031,
+    147.3245086669922,
+    200.0
+   ],
+   "sample": {
+    "births_total": 3757508,
+    "kind": "sample",
+    "mean_age": 58.79676375404531,
+    "mean_energy": 74.52742132464466,
+    "mean_generation": 1254.3967637540452,
+    "mean_genome_size": 11485.124271844661,
+    "population": 1545,
+    "tick": 50000
+   },
+   "cohorts": {
+    "founder": {
+     "parents_requested": 1,
+     "parents_evaluated": 1,
+     "consistency_violations": 0,
+     "retention_parents": 1,
+     "retained_share_all_families": {
+      "retained_causal_pairs": 125,
+      "retention_pairs": 130,
+      "share": "0.961538"
+     },
+     "families": {},
+     "retention": {}
+    },
+    "drift": {
+     "parents_requested": 0,
+     "parents_evaluated": 0,
+     "consistency_violations": 0,
+     "retention_parents": 0,
+     "retained_share_all_families": "no retention pair",
+     "families": {},
+     "retention": {}
+    },
+    "selected": {
+     "parents_requested": 20,
+     "parents_evaluated": 20,
+     "consistency_violations": 0,
+     "retention_parents": 20,
+     "retained_share_all_families": {
+      "retained_causal_pairs": 1109,
+      "retention_pairs": 1110,
+      "share": "0.999099"
+     },
+     "families": {
+      "NeighborBarrierRing": {
+       "family_declared": 11,
+       "family_connected": 9,
+       "family_executed": 9,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 8,
+       "family_connected": 7,
+       "family_executed": 7,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 4,
+       "family_connected": 4,
+       "family_executed": 4,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0
+      }
+     },
+     "retention": {
+      "NeighborBarrierRing": {
+       "retention_pairs": 0,
+       "retained_causal_pairs": 0,
+       "channels": 8,
+       "channels_causal": 0,
+       "retained_share": null
+      },
+      "AreaFoodSummary:0": {
+       "retention_pairs": 0,
+       "retained_causal_pairs": 0,
+       "channels": 7,
+       "channels_causal": 0,
+       "retained_share": null
+      },
+      "AreaFoodSummary:1": {
+       "retention_pairs": 0,
+       "retained_causal_pairs": 0,
+       "channels": 7,
+       "channels_causal": 0,
+       "retained_share": null
+      }
+     }
+    }
+   }
   }
  ],
  "reading": {
   "AreaFoodSummary": {
-   "share_declared": [
+   "share_declared_incidences": [
     0.3,
-    0.65
-   ],
-   "share_connected": [
-    0.0,
+    0.65,
     0.6
    ],
-   "share_causal": [
+   "share_connected_incidences": [
     0.0,
-    0.1
+    0.6,
+    0.55
    ],
-   "retained_share_at_last": 1.0,
+   "share_causal_incidences": [
+    0.0,
+    0.1,
+    0.0
+   ],
+   "typed_rows": {
+    "10000": {
+     "family_declared": {
+      "AreaFoodSummary:0": 5,
+      "AreaFoodSummary:1": 1
+     },
+     "family_connected": {
+      "AreaFoodSummary:0": 0,
+      "AreaFoodSummary:1": 0
+     },
+     "family_executed": {
+      "AreaFoodSummary:0": 2,
+      "AreaFoodSummary:1": 1
+     },
+     "family_causal": {
+      "AreaFoodSummary:0": 0,
+      "AreaFoodSummary:1": 0
+     }
+    },
+    "20000": {
+     "family_declared": {
+      "AreaFoodSummary:0": 7,
+      "AreaFoodSummary:1": 6
+     },
+     "family_connected": {
+      "AreaFoodSummary:0": 6,
+      "AreaFoodSummary:1": 6
+     },
+     "family_executed": {
+      "AreaFoodSummary:0": 3,
+      "AreaFoodSummary:1": 5
+     },
+     "family_causal": {
+      "AreaFoodSummary:0": 1,
+      "AreaFoodSummary:1": 1
+     }
+    },
+    "50000": {
+     "family_declared": {
+      "AreaFoodSummary:0": 8,
+      "AreaFoodSummary:1": 4
+     },
+     "family_connected": {
+      "AreaFoodSummary:0": 7,
+      "AreaFoodSummary:1": 4
+     },
+     "family_executed": {
+      "AreaFoodSummary:0": 7,
+      "AreaFoodSummary:1": 4
+     },
+     "family_causal": {
+      "AreaFoodSummary:0": 0,
+      "AreaFoodSummary:1": 0
+     }
+    }
+   },
+   "retained_share_at_last": null,
    "adequate_20_parents": true,
-   "causal_strictly_increasing": true,
-   "connected_strictly_increasing": true,
-   "premise_qualified": true,
+   "checkpoints": [
+    10000,
+    20000,
+    50000
+   ],
+   "rules_evaluable": true,
+   "descriptive_direction": "flat or mixed",
+   "premise_qualified": false,
    "variation_support": false
   },
   "NeighborBarrierRing": {
-   "share_declared": [
+   "share_declared_incidences": [
     0.2,
-    0.2
+    0.2,
+    0.55
    ],
-   "share_connected": [
+   "share_connected_incidences": [
     0.0,
-    0.1
+    0.1,
+    0.45
    ],
-   "share_causal": [
+   "share_causal_incidences": [
+    0.0,
     0.0,
     0.0
    ],
+   "typed_rows": {
+    "10000": {
+     "family_declared": {
+      "NeighborBarrierRing": 4
+     },
+     "family_connected": {
+      "NeighborBarrierRing": 0
+     },
+     "family_executed": {
+      "NeighborBarrierRing": 0
+     },
+     "family_causal": {
+      "NeighborBarrierRing": 0
+     }
+    },
+    "20000": {
+     "family_declared": {
+      "NeighborBarrierRing": 4
+     },
+     "family_connected": {
+      "NeighborBarrierRing": 2
+     },
+     "family_executed": {
+      "NeighborBarrierRing": 1
+     },
+     "family_causal": {
+      "NeighborBarrierRing": 0
+     }
+    },
+    "50000": {
+     "family_declared": {
+      "NeighborBarrierRing": 11
+     },
+     "family_connected": {
+      "NeighborBarrierRing": 9
+     },
+     "family_executed": {
+      "NeighborBarrierRing": 9
+     },
+     "family_causal": {
+      "NeighborBarrierRing": 0
+     }
+    }
+   },
    "retained_share_at_last": null,
    "adequate_20_parents": true,
-   "causal_strictly_increasing": false,
-   "connected_strictly_increasing": true,
+   "checkpoints": [
+    10000,
+    20000,
+    50000
+   ],
+   "rules_evaluable": true,
+   "descriptive_direction": "connected rising, causal not",
    "premise_qualified": false,
    "variation_support": true
   }
@@ -1239,8 +1630,8 @@
   "tick": 20000
  },
  "provenance": {
-  "census_sha256": "5bce65147243aac9a895cbc3e7cf3afef3eac6f2cee941f0746927131aa8c205",
-  "samples_sha256": "701152830acea769810fd8bbf5c1098215878a640bec1dee58fbaf9982efea22",
-  "reader_sha256": "a4b4d7de17dc85c0167ee81afbf80979ff16b07c6e0857a5bda3b080f98c5afe"
+  "census_sha256": "7f398166675327d972cda38eb74aaf2e72dd378f672f7bed55db8baf2d83c26b",
+  "samples_sha256": "8167e99c1abc6fe5c9ac395a145dbe2e80dcc2773bbe91a3fc1a78dc97d532d2",
+  "reader_sha256": "247a1bb2b6c1c9148d8af5d68e5379c157058fc42f2f010b0ea7fc803fcf85f2"
  }
 }
