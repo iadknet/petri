@@ -134,7 +134,20 @@ genomes and are never recommended as mechanisms.
 
 ## Verdict branch
 
-Named after phase 1 (E4, E1, E2 with E6).
+**Variation**, named after phase 1 on E1's predeclared rule: the one-edge arm
+(a) (`nearest_dx → Move(E)` at +0.5) is positive in Canyon (A/Z 1.20, 7 of 8)
+and Confluence (1.43, 8 of 8), so the first step toward sensing pays at
+production scale and the world is not where the block is. E4 supports the
+variation diagnosis on its own terms (the unconnected declaration is lost
+about 3,400 times more often than it is usefully connected, lower bound
+2,564). E2 cannot move the branch (amendment A1) and, with two checkpoints
+per world so far, points different ways in the two worlds; E6 is descriptive
+on this branch (Canyon under 20 % gradient-informative, Confluence in the
+mixed band). Phase 2 therefore runs E3 then E5; E11 follows if time allows;
+E7 does not run. Two findings outside the branch question are carried to the
+plan forward: the founder's deterministic north default (E1) and the goal
+worlds' genome-size runaway past 10 × the founder before tick 20,000, with
+Canyon's extinction at tick 36,652 (E2).
 
 ## Findings
 
