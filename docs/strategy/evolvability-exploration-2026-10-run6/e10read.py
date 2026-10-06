@@ -23,6 +23,16 @@ VAL_RE = re.compile(r'"validation_mean":(null|[-0-9.eE+]+)')
 BEST_RE = re.compile(r'"best":([-0-9.eE+]+)')
 
 
+def median(xs):
+    """Ordinary median: the mean of the two middle values when the count is even
+    (review (d), finding 3: the first version took the upper middle value)."""
+    if not xs:
+        return None
+    s = sorted(xs)
+    n = len(s)
+    return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
+
+
 def sha(path):
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -84,7 +94,7 @@ def read_batch(d, assay, seed, horizon):
             "final_best_mean": sum(x["final_best"] for x in reps) / len(reps),
             "validation_mean": vals, "validation_mean_mean": sum(vals) / len(vals) if vals else None,
             "final_genome_size": sizes,
-            "final_genome_size_median": sorted(sizes)[len(sizes) // 2] if sizes else None,
+            "final_genome_size_median": median(sizes),
             "cumulative_reached_before_generation": curve, "replicates": reps,
         }
 

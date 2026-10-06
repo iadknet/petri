@@ -1,8 +1,10 @@
 """Diagnosis run row E3: three readings kept apart.
 (i) analytic energy cost of the declared reference (1 genome unit) and of
-    the zero-weight edge (1 more unit) at the carry cost per unit per tick,
-    over E2's lifetime proxy (mean living age at tick 20,000), as a fraction
-    of the per-birth energy (transfer fraction x mean living energy);
+    the zero-weight edge (1 more unit): the carry cost per unit per tick over
+    E2's lifetime proxy (mean living age at tick 20,000) plus the per-birth
+    replication surcharge per unit above the founder, each and combined, as
+    fractions of the per-birth energy (transfer fraction x mean living
+    energy); neutrality is read on the combined charge (review (d), 4);
 (ii) the mutational loss hazard per birth of each state from E4
     (`lose_declaration` on parent (b), the authored edge's fates on (c));
 (iii) run 5's twin screen on the three prepared parents (strata 1 to 3 of the
@@ -19,6 +21,12 @@ import os
 import sys
 
 CARRY = 1e-4  # energy per genome unit per tick (production default)
+# Per-birth replication surcharge per genome unit above the founder:
+# `genome_replication_cost_per_unit` (0.1, production default) multiplies the
+# Step 5 reproduce charge (0.1 energy) per unit above the founder's size.
+REPRODUCE_CHARGE = 0.1
+REPLICATION_RATE = 0.1
+SURCHARGE = REPRODUCE_CHARGE * REPLICATION_RATE  # energy per unit per birth
 STRATA = {"1": "founder+declared", "2": "founder+declared+zero-edge", "3": "founder+declared+wrong-sign-edge"}
 
 
@@ -99,15 +107,28 @@ def main():
             continue
         age, energy = cp["sample"]["mean_age"], cp["sample"]["mean_energy"]
         per_birth = transfer * energy
+        def state(units):
+            carry = CARRY * units * age
+            surcharge = SURCHARGE * units
+            combined = carry + surcharge
+            share = (lambda x: (x / per_birth) if per_birth else None)
+            return {
+                "units": units,
+                "carry_cost_over_lifetime": carry,
+                "surcharge_per_birth": surcharge,
+                "combined_per_birth": combined,
+                "carry_share_of_birth": share(carry),
+                "surcharge_share_of_birth": share(surcharge),
+                "combined_share_of_birth": share(combined),
+                "energy_neutral_within_1e-3": (combined / per_birth) < 1e-3 if per_birth else None,
+            }
+
         analytic[e2["world"]] = {
             "mean_living_age_20k": age, "mean_living_energy_20k": energy, "transfer_fraction": transfer,
             "per_birth_energy": per_birth,
-            "declared_reference_units": 1, "zero_edge_units": 1,
-            "declared_cost_over_lifetime": CARRY * 1 * age,
-            "zero_edge_total_cost_over_lifetime": CARRY * 2 * age,
-            "declared_cost_share_of_birth": (CARRY * age / per_birth) if per_birth else None,
-            "zero_edge_cost_share_of_birth": (CARRY * 2 * age / per_birth) if per_birth else None,
-            "energy_neutral_within_1e-3": (CARRY * 2 * age / per_birth) < 1e-3 if per_birth else None,
+            "carry_per_unit_per_tick": CARRY, "surcharge_per_unit_per_birth": SURCHARGE,
+            "declared": state(1),
+            "declared_plus_zero_edge": state(2),
         }
     # (ii) hazards from E4
     hazards = {}

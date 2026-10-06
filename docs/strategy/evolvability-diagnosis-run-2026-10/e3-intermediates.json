@@ -6,26 +6,56 @@
    "mean_living_energy_20k": 33.65590748091488,
    "transfer_fraction": 0.6666667,
    "per_birth_energy": 22.437272775806832,
-   "declared_reference_units": 1,
-   "zero_edge_units": 1,
-   "declared_cost_over_lifetime": 0.0034225243714725503,
-   "zero_edge_total_cost_over_lifetime": 0.006845048742945101,
-   "declared_cost_share_of_birth": 0.00015253744987951096,
-   "zero_edge_cost_share_of_birth": 0.0003050748997590219,
-   "energy_neutral_within_1e-3": true
+   "carry_per_unit_per_tick": 0.0001,
+   "surcharge_per_unit_per_birth": 0.010000000000000002,
+   "declared": {
+    "units": 1,
+    "carry_cost_over_lifetime": 0.0034225243714725503,
+    "surcharge_per_birth": 0.010000000000000002,
+    "combined_per_birth": 0.013422524371472552,
+    "carry_share_of_birth": 0.00015253744987951096,
+    "surcharge_share_of_birth": 0.00044568696471803743,
+    "combined_share_of_birth": 0.0005982244145975484,
+    "energy_neutral_within_1e-3": true
+   },
+   "declared_plus_zero_edge": {
+    "units": 2,
+    "carry_cost_over_lifetime": 0.006845048742945101,
+    "surcharge_per_birth": 0.020000000000000004,
+    "combined_per_birth": 0.026845048742945105,
+    "carry_share_of_birth": 0.0003050748997590219,
+    "surcharge_share_of_birth": 0.0008913739294360749,
+    "combined_share_of_birth": 0.0011964488291950968,
+    "energy_neutral_within_1e-3": false
+   }
   },
   "Confluence": {
    "mean_living_age_20k": 25.45794640488193,
    "mean_living_energy_20k": 54.37023172948809,
    "transfer_fraction": 0.6666667,
    "per_birth_energy": 36.246822965333116,
-   "declared_reference_units": 1,
-   "zero_edge_units": 1,
-   "declared_cost_over_lifetime": 0.002545794640488193,
-   "zero_edge_total_cost_over_lifetime": 0.005091589280976386,
-   "declared_cost_share_of_birth": 7.02349732257368e-05,
-   "zero_edge_cost_share_of_birth": 0.0001404699464514736,
-   "energy_neutral_within_1e-3": true
+   "carry_per_unit_per_tick": 0.0001,
+   "surcharge_per_unit_per_birth": 0.010000000000000002,
+   "declared": {
+    "units": 1,
+    "carry_cost_over_lifetime": 0.002545794640488193,
+    "surcharge_per_birth": 0.010000000000000002,
+    "combined_per_birth": 0.012545794640488194,
+    "carry_share_of_birth": 7.02349732257368e-05,
+    "surcharge_share_of_birth": 0.00027588624828068706,
+    "combined_share_of_birth": 0.00034612122150642384,
+    "energy_neutral_within_1e-3": true
+   },
+   "declared_plus_zero_edge": {
+    "units": 2,
+    "carry_cost_over_lifetime": 0.005091589280976386,
+    "surcharge_per_birth": 0.020000000000000004,
+    "combined_per_birth": 0.02509158928097639,
+    "carry_share_of_birth": 0.0001404699464514736,
+    "surcharge_share_of_birth": 0.0005517724965613741,
+    "combined_share_of_birth": 0.0006922424430128477,
+    "energy_neutral_within_1e-3": true
+   }
   }
  },
  "hazards": {
@@ -1890,5 +1920,5 @@
   }
  },
  "note": "the screen's shares are properties of each prepared parent's one-step neighborhood, not a selection coefficient of carrying the state",
- "reader_sha256": "6c52aca1b3a3776ba52504aa6e7f210336f8b599a05bb356eb3110193b133dca"
+ "reader_sha256": "e3ee9acb1efea5cc51be5b0a8533a6e992ab2139aaaaeb5c026db61779e59b12"
 }
