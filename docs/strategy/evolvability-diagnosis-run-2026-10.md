@@ -147,11 +147,22 @@ And, given the answer, what should Petri change?
   the catalog-coverage unit test
   `per_operator_rows_is_deterministic_and_covers_the_full_catalog`, which
   expected trials from the default-off `AddProjection` prototype; the test now
-  exempts it as it does the two other inert operators (`proto:` `33fc7f01`),
-  and `make check` at `33fc7f01` exited 2 with exactly that named failure (the `v3-cli` recipe-digest pin test `checked_in_goal_recipe_identities_are_unchanged_by_json_precision`, broken by the two new `RuntimeConfig` fields of the prototypes, `projection_growth` and `reproduce_hold_per_founder_size`); every other step passed (15 Rust test binaries ok, clippy, policy, quality, frontend) (log
-  `.bench-artifacts/lab/diagnosis/make-check-branch.log`). That failure is the one
-  the run 1 contract allows, so the E5 and E8 readings count, with the test
-  exemption as the only code change since they were recorded.
+  exempts it as it does the two other inert operators (`proto:` `33fc7f01`).
+  `make check` at `33fc7f01` exited 2 with exactly the failure the run 1
+  contract allows: the `v3-cli` recipe-digest pin test
+  `checked_in_goal_recipe_identities_are_unchanged_by_json_precision`, broken
+  by the prototypes' two new `RuntimeConfig` fields (`projection_growth`,
+  `reproduce_hold_per_founder_size`); policy, quality, the frontend, format,
+  viability and every Rust test binary up to that one passed (log
+  `.bench-artifacts/lab/diagnosis/make-check-branch.log`). `make` stops
+  `rust-check` at that failure, so the steps after it were run one by one:
+  `rust-test-server`, `rust-test-lab`, `rust-test-telemetry`, `rust-test-doc` and `skill-check` exited 0, `dependency-audit` exited 2 on the one known advisory GHSA-68fv-2mgg-jv7q (`source-map-js` 1.2.1, fix blocked by the seven-day release age until 2026-10-07, the pre-commit gate deviation above); `rust-clippy` failed on three lints in the prototype operator's own
+  file (`needless_range_loop`, two `manual_is_multiple_of`), fixed in
+  `proto:` `cdc8c86b`, after which it exited 0
+  (`clippy-branch.log`, `remaining-checks-branch.log`). The E5 and E8
+  readings therefore count, the test exemption and the lint fixes being the
+  only code changes since they were recorded, neither touching a code path
+  the readings ran.
 
 ## Ledger
 
@@ -665,5 +676,5 @@ in the workflow's exact form:
 | Builds, tests, clippy | about 20 min in all |
 | Codex reviews (a) to (a4), (b), (c), (d) | remote; no host time |
 
-Turns: about 300 of 400 when the plan forward was completed, about 332 at the
+Turns: about 300 of 400 when the plan forward was completed, about 344 at the
 closing commit; the final count is in the final report.
