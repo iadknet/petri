@@ -1,0 +1,638 @@
+{
+ "row": "E1",
+ "diagnostic": true,
+ "sets": {
+  "one-edge": {
+   "set": "one-edge",
+   "control_sink": "ActionVote(Move(0))",
+   "control_sink_seed": 14769901,
+   "incomplete": false,
+   "stop_reason": null,
+   "wall_secs": 2049.995173959,
+   "threads": 3,
+   "horizon": 1000,
+   "raw_sha256": "5ebc274e4c738f03d56468516c20162bbc8b5dfafb8fd12e0e4e51476b81df64",
+   "summary_sha256": "650f6c14866c0d3b7bca0768334f064e2e3eadc0477583a9cf6f16f465318c8f",
+   "slots": {
+    "a": {
+     "reference": "World(AreaFoodSummary { type_idx: OrdinaryFoodTypeId(0) })",
+     "sub_idx": 3,
+     "sink": "ActionVote(Move(2))",
+     "weight": 0.5,
+     "ring_family": false,
+     "z_is_twin": true,
+     "competence": {
+      "battery_executions": 80,
+      "battery_inert_differs": 0,
+      "battery_authored_differs": 0,
+      "battery_authored_non_move_differs": 0,
+      "contexts": 64,
+      "context_inert_differs": 0,
+      "context_authored_differs": 2,
+      "context_authored_non_move_differs": 0
+     }
+    },
+    "b": {
+     "reference": "World(AreaFoodSummary { type_idx: OrdinaryFoodTypeId(0) })",
+     "sub_idx": 3,
+     "sink": "ActionVote(Move(2))",
+     "weight": -0.5,
+     "ring_family": false,
+     "z_is_twin": true,
+     "competence": {
+      "battery_executions": 80,
+      "battery_inert_differs": 0,
+      "battery_authored_differs": 0,
+      "battery_authored_non_move_differs": 0,
+      "contexts": 64,
+      "context_inert_differs": 0,
+      "context_authored_differs": 2,
+      "context_authored_non_move_differs": 0
+     }
+    },
+    "c": {
+     "reference": "World(NeighborBarrierRing)",
+     "sub_idx": 2,
+     "sink": "ActionVote(Move(2))",
+     "weight": -0.5,
+     "ring_family": true,
+     "z_is_twin": true,
+     "competence": {
+      "battery_executions": 80,
+      "battery_inert_differs": 0,
+      "battery_authored_differs": 0,
+      "battery_authored_non_move_differs": 0,
+      "contexts": 64,
+      "context_inert_differs": 0,
+      "context_authored_differs": 4,
+      "context_authored_non_move_differs": 0
+     }
+    }
+   },
+   "worlds": {
+    "Orchards in grassland": {
+     "replicates": 8,
+     "founder_fallback": false,
+     "births_f": 179116,
+     "births_i": 134100,
+     "slots": {
+      "a": {
+       "verdict": "inconclusive",
+       "pooled_a_over_z": "1.089752",
+       "informative": 8,
+       "above_one": 5,
+       "below_line": 3,
+       "exposed_share": 0.35121951219512193,
+       "applied_share": 0.13853658536585367,
+       "sampled": 2050,
+       "ratios": [
+        "1.499868",
+        "0.839821",
+        "0.866364",
+        "1.289417",
+        "1.052184",
+        "0.920158",
+        "1.118954",
+        "1.437952"
+       ],
+       "a_over_f_pooled": 1.1142276513544296,
+       "z_over_f_pooled": 1.0224603050537082,
+       "births_a": 199576,
+       "births_z": 183139
+      },
+      "b": {
+       "verdict": "negative",
+       "pooled_a_over_z": "0.863339",
+       "informative": 8,
+       "above_one": 0,
+       "below_line": 8,
+       "exposed_share": 0.58377239199157,
+       "applied_share": 0.18440463645943098,
+       "sampled": 949,
+       "ratios": [
+        "0.833395",
+        "0.912768",
+        "0.916999",
+        "0.801604",
+        "0.877283",
+        "0.812353",
+        "0.873126",
+        "0.906924"
+       ],
+       "a_over_f_pooled": 0.7963554344670493,
+       "z_over_f_pooled": 0.9224134080707475,
+       "births_a": 142640,
+       "births_z": 165219
+      },
+      "c": {
+       "verdict": "not_applicable",
+       "pooled_a_over_z": "0.960800",
+       "informative": 8,
+       "above_one": 3,
+       "below_line": 5,
+       "exposed_share": 0.0,
+       "applied_share": 0.0,
+       "sampled": 1831,
+       "ratios": [
+        "0.932532",
+        "0.815903",
+        "0.944768",
+        "1.123622",
+        "0.622714",
+        "0.906867",
+        "1.159139",
+        "1.443566"
+       ],
+       "a_over_f_pooled": 0.9679983921034413,
+       "z_over_f_pooled": 1.0074923513253982,
+       "births_a": 173384,
+       "births_z": 180458
+      }
+     }
+    },
+    "Canyon country": {
+     "replicates": 8,
+     "founder_fallback": false,
+     "births_f": 126928,
+     "births_i": 117384,
+     "slots": {
+      "a": {
+       "verdict": "positive",
+       "pooled_a_over_z": "1.200328",
+       "informative": 8,
+       "above_one": 7,
+       "below_line": 1,
+       "exposed_share": 0.39306599832915623,
+       "applied_share": 0.1324143692564745,
+       "sampled": 2394,
+       "ratios": [
+        "1.103972",
+        "0.988748",
+        "1.340366",
+        "1.262935",
+        "1.335000",
+        "1.185261",
+        "1.170001",
+        "1.262584"
+       ],
+       "a_over_f_pooled": 1.1531576957015002,
+       "z_over_f_pooled": 0.960702130341611,
+       "births_a": 146368,
+       "births_z": 121940
+      },
+      "b": {
+       "verdict": "negative",
+       "pooled_a_over_z": "0.873258",
+       "informative": 8,
+       "above_one": 1,
+       "below_line": 7,
+       "exposed_share": 0.6362442547603414,
+       "applied_share": 0.24359816152330926,
+       "sampled": 1523,
+       "ratios": [
+        "0.781019",
+        "1.179589",
+        "0.839770",
+        "0.931233",
+        "0.833888",
+        "0.867117",
+        "0.744331",
+        "0.863364"
+       ],
+       "a_over_f_pooled": 0.9187964830455061,
+       "z_over_f_pooled": 1.0521476742720282,
+       "births_a": 116621,
+       "births_z": 133547
+      },
+      "c": {
+       "verdict": "inconclusive_exposure",
+       "pooled_a_over_z": "0.981488",
+       "informative": 8,
+       "above_one": 3,
+       "below_line": 6,
+       "exposed_share": 0.05974165769644779,
+       "applied_share": 0.0,
+       "sampled": 1858,
+       "ratios": [
+        "0.905249",
+        "0.919022",
+        "1.124348",
+        "1.013717",
+        "1.068990",
+        "0.943983",
+        "0.916962",
+        "0.977432"
+       ],
+       "a_over_f_pooled": 0.9490419765536368,
+       "z_over_f_pooled": 0.9669418883146351,
+       "births_a": 120460,
+       "births_z": 122732
+      }
+     }
+    },
+    "Confluence": {
+     "replicates": 8,
+     "founder_fallback": false,
+     "births_f": 141826,
+     "births_i": 252990,
+     "slots": {
+      "a": {
+       "verdict": "positive",
+       "pooled_a_over_z": "1.426064",
+       "informative": 8,
+       "above_one": 8,
+       "below_line": 0,
+       "exposed_share": 0.3925233644859813,
+       "applied_share": 0.15644047135310848,
+       "sampled": 2461,
+       "ratios": [
+        "1.073626",
+        "1.421301",
+        "1.851952",
+        "1.520876",
+        "1.612122",
+        "1.763713",
+        "1.311199",
+        "1.070219"
+       ],
+       "a_over_f_pooled": 1.4374867795749722,
+       "z_over_f_pooled": 1.0080098148435406,
+       "births_a": 203873,
+       "births_z": 142962
+      },
+      "b": {
+       "verdict": "negative",
+       "pooled_a_over_z": "0.862022",
+       "informative": 8,
+       "above_one": 1,
+       "below_line": 7,
+       "exposed_share": 0.5963003264417845,
+       "applied_share": 0.1719260065288357,
+       "sampled": 919,
+       "ratios": [
+        "0.924120",
+        "1.480091",
+        "0.580188",
+        "0.931171",
+        "0.529170",
+        "0.956619",
+        "0.939711",
+        "0.955830"
+       ],
+       "a_over_f_pooled": 0.9495579089870687,
+       "z_over_f_pooled": 1.1015469660005923,
+       "births_a": 134672,
+       "births_z": 156228
+      },
+      "c": {
+       "verdict": "inconclusive_exposure",
+       "pooled_a_over_z": "1.090779",
+       "informative": 8,
+       "above_one": 5,
+       "below_line": 3,
+       "exposed_share": 0.054692775151924375,
+       "applied_share": 0.0,
+       "sampled": 1481,
+       "ratios": [
+        "0.974569",
+        "1.244667",
+        "1.159482",
+        "1.058988",
+        "0.942459",
+        "1.212909",
+        "0.973649",
+        "1.148340"
+       ],
+       "a_over_f_pooled": 1.0458096540831723,
+       "z_over_f_pooled": 0.9587734265931493,
+       "births_a": 148323,
+       "births_z": 135979
+      }
+     }
+    }
+   }
+  },
+  "one-edge-control": {
+   "set": "one-edge-control",
+   "control_sink": "ActionVote(Move(0))",
+   "control_sink_seed": 14769901,
+   "incomplete": false,
+   "stop_reason": null,
+   "wall_secs": 1780.889513958,
+   "threads": 3,
+   "horizon": 1000,
+   "raw_sha256": "eed6f54c42f5e1f0720231f5cc6663402b903cc666d2d7d8d776aa9a66d6265d",
+   "summary_sha256": "60a09adefe3c5bf4af98a9dfcdc81873b74f3be982cbf4d97bd2cf7d5ea2cb36",
+   "slots": {
+    "d": {
+     "reference": "World(AreaFoodSummary { type_idx: OrdinaryFoodTypeId(0) })",
+     "sub_idx": 3,
+     "sink": "ActionVote(Move(0))",
+     "weight": 0.5,
+     "ring_family": false,
+     "z_is_twin": true,
+     "competence": {
+      "battery_executions": 80,
+      "battery_inert_differs": 0,
+      "battery_authored_differs": 0,
+      "battery_authored_non_move_differs": 0,
+      "contexts": 64,
+      "context_inert_differs": 0,
+      "context_authored_differs": 2,
+      "context_authored_non_move_differs": 0
+     }
+    },
+    "e": {
+     "reference": "World(NeighborBarrierRing)",
+     "sub_idx": 2,
+     "sink": "ActionVote(Move(0))",
+     "weight": -0.5,
+     "ring_family": true,
+     "z_is_twin": true,
+     "competence": {
+      "battery_executions": 80,
+      "battery_inert_differs": 0,
+      "battery_authored_differs": 0,
+      "battery_authored_non_move_differs": 0,
+      "contexts": 64,
+      "context_inert_differs": 0,
+      "context_authored_differs": 4,
+      "context_authored_non_move_differs": 0
+     }
+    },
+    "f": {
+     "reference": "World(AreaFoodSummary { type_idx: OrdinaryFoodTypeId(0) })",
+     "sub_idx": 4,
+     "sink": "ActionVote(Move(2))",
+     "weight": 0.5,
+     "ring_family": false,
+     "z_is_twin": true,
+     "competence": {
+      "battery_executions": 80,
+      "battery_inert_differs": 0,
+      "battery_authored_differs": 0,
+      "battery_authored_non_move_differs": 0,
+      "contexts": 64,
+      "context_inert_differs": 0,
+      "context_authored_differs": 2,
+      "context_authored_non_move_differs": 0
+     }
+    }
+   },
+   "worlds": {
+    "Orchards in grassland": {
+     "replicates": 8,
+     "founder_fallback": false,
+     "births_f": 174893,
+     "births_i": 163541,
+     "slots": {
+      "d": {
+       "verdict": "negative",
+       "pooled_a_over_z": "0.874531",
+       "informative": 8,
+       "above_one": 1,
+       "below_line": 8,
+       "exposed_share": 0.551347414420976,
+       "applied_share": 0.1551347414420976,
+       "sampled": 1373,
+       "ratios": [
+        "0.941092",
+        "0.741159",
+        "1.017411",
+        "0.815632",
+        "0.775206",
+        "0.857743",
+        "0.952143",
+        "0.942503"
+       ],
+       "a_over_f_pooled": 0.8734254658562663,
+       "z_over_f_pooled": 0.9987363702378026,
+       "births_a": 152756,
+       "births_z": 174672
+      },
+      "e": {
+       "verdict": "not_applicable",
+       "pooled_a_over_z": "1.043763",
+       "informative": 8,
+       "above_one": 3,
+       "below_line": 6,
+       "exposed_share": 0.0,
+       "applied_share": 0.0,
+       "sampled": 1650,
+       "ratios": [
+        "1.004764",
+        "0.831175",
+        "1.752078",
+        "1.364351",
+        "0.904815",
+        "0.965832",
+        "0.848855",
+        "0.843960"
+       ],
+       "a_over_f_pooled": 1.048012213181774,
+       "z_over_f_pooled": 1.004071060591333,
+       "births_a": 183290,
+       "births_z": 175605
+      },
+      "f": {
+       "verdict": "positive",
+       "pooled_a_over_z": "1.144023",
+       "informative": 8,
+       "above_one": 7,
+       "below_line": 2,
+       "exposed_share": 0.4087709799675149,
+       "applied_share": 0.19599350297780185,
+       "sampled": 1847,
+       "ratios": [
+        "1.018993",
+        "1.331290",
+        "1.050677",
+        "1.120845",
+        "1.204626",
+        "0.911641",
+        "1.332944",
+        "1.237346"
+       ],
+       "a_over_f_pooled": 1.077367304580515,
+       "z_over_f_pooled": 0.9417358041774113,
+       "births_a": 188424,
+       "births_z": 164703
+      }
+     }
+    },
+    "Canyon country": {
+     "replicates": 8,
+     "founder_fallback": false,
+     "births_f": 126443,
+     "births_i": 131867,
+     "slots": {
+      "d": {
+       "verdict": "negative",
+       "pooled_a_over_z": "0.903714",
+       "informative": 8,
+       "above_one": 1,
+       "below_line": 8,
+       "exposed_share": 0.6058168316831684,
+       "applied_share": 0.20606435643564355,
+       "sampled": 1616,
+       "ratios": [
+        "0.791929",
+        "0.855751",
+        "1.035355",
+        "0.841649",
+        "0.863153",
+        "0.866790",
+        "0.994946",
+        "0.995948"
+       ],
+       "a_over_f_pooled": 0.9267496025877273,
+       "z_over_f_pooled": 1.0254897463679287,
+       "births_a": 117181,
+       "births_z": 129666
+      },
+      "e": {
+       "verdict": "negative",
+       "pooled_a_over_z": "0.909223",
+       "informative": 8,
+       "above_one": 2,
+       "below_line": 7,
+       "exposed_share": 0.16797078768909754,
+       "applied_share": 0.15910276473656756,
+       "sampled": 1917,
+       "ratios": [
+        "0.876100",
+        "0.949234",
+        "0.813705",
+        "0.801399",
+        "1.130652",
+        "0.894994",
+        "0.853354",
+        "1.000861"
+       ],
+       "a_over_f_pooled": 0.9456514002356793,
+       "z_over_f_pooled": 1.0400654840521024,
+       "births_a": 119571,
+       "births_z": 131509
+      },
+      "f": {
+       "verdict": "positive",
+       "pooled_a_over_z": "1.194331",
+       "informative": 8,
+       "above_one": 7,
+       "below_line": 1,
+       "exposed_share": 0.4366438356164384,
+       "applied_share": 0.22517123287671234,
+       "sampled": 2336,
+       "ratios": [
+        "1.141741",
+        "0.993713",
+        "1.265249",
+        "1.262342",
+        "1.087590",
+        "1.086373",
+        "1.304584",
+        "1.413649"
+       ],
+       "a_over_f_pooled": 1.1673639505547955,
+       "z_over_f_pooled": 0.9774206559477393,
+       "births_a": 147605,
+       "births_z": 123588
+      }
+     }
+    },
+    "Confluence": {
+     "replicates": 8,
+     "founder_fallback": false,
+     "births_f": 153614,
+     "births_i": 263297,
+     "slots": {
+      "d": {
+       "verdict": "inconclusive",
+       "pooled_a_over_z": "0.948466",
+       "informative": 8,
+       "above_one": 4,
+       "below_line": 6,
+       "exposed_share": 0.6004882017900732,
+       "applied_share": 0.1822620016273393,
+       "sampled": 1229,
+       "ratios": [
+        "0.717182",
+        "0.936318",
+        "0.739392",
+        "1.015911",
+        "1.031206",
+        "0.915337",
+        "1.074429",
+        "1.281470"
+       ],
+       "a_over_f_pooled": 0.8800109365031833,
+       "z_over_f_pooled": 0.9278255888135196,
+       "births_a": 135182,
+       "births_z": 142527
+      },
+      "e": {
+       "verdict": "inconclusive",
+       "pooled_a_over_z": "0.929160",
+       "informative": 8,
+       "above_one": 3,
+       "below_line": 6,
+       "exposed_share": 0.0982620320855615,
+       "applied_share": 0.08288770053475936,
+       "sampled": 1496,
+       "ratios": [
+        "1.142078",
+        "0.831238",
+        "1.031945",
+        "0.924971",
+        "0.648364",
+        "0.977554",
+        "0.905227",
+        "1.115123"
+       ],
+       "a_over_f_pooled": 0.8763849649120523,
+       "z_over_f_pooled": 0.9432017915033786,
+       "births_a": 134625,
+       "births_z": 144889
+      },
+      "f": {
+       "verdict": "inconclusive",
+       "pooled_a_over_z": "1.164049",
+       "informative": 8,
+       "above_one": 6,
+       "below_line": 3,
+       "exposed_share": 0.43013199817933545,
+       "applied_share": 0.1993627674101047,
+       "sampled": 2197,
+       "ratios": [
+        "1.505149",
+        "1.254455",
+        "0.876337",
+        "0.982803",
+        "1.185837",
+        "1.346799",
+        "1.143600",
+        "1.045867"
+       ],
+       "a_over_f_pooled": 1.1713385498717566,
+       "z_over_f_pooled": 1.006262450037106,
+       "births_a": 179934,
+       "births_z": 154576
+      }
+     }
+    }
+   }
+  }
+ },
+ "decision": {
+  "demand_worlds": [
+   "Canyon country",
+   "Confluence"
+  ],
+  "void_slots": [],
+  "positive_anywhere": true,
+  "world_rule_met": false,
+  "branch": "variation"
+ },
+ "cross_set_note": "descriptive only: the two sets are two competitions",
+ "reader_sha256": "2807435249e2c3e38dda45d4c46ba8427b1c5cddab06420d421e5a42efab11ec"
+}
