@@ -1,0 +1,1273 @@
+{
+ "row": "E5",
+ "assays": {
+  "food": {
+   "variants": {
+    "random": {
+     "strata": 16,
+     "pairs": 96000,
+     "twin_equal": 92984,
+     "mutation_sha256": "efb6f412ce33d350a1b69bf9fea17b13907319732327693236503eea324acad9",
+     "native_confirmed_per_birth": {
+      "count": 280,
+      "of": 96000,
+      "share": 0.002916666666666667,
+      "cp_bonferroni": [
+       0.0024780281917900094,
+       0.0034076106007304152
+      ]
+     },
+     "native_harmful_per_birth": {
+      "count": 6594,
+      "of": 96000,
+      "share": 0.0686875,
+      "cp_bonferroni": [
+       0.06655107684413777,
+       0.07086876389091828
+      ]
+     },
+     "arm_confirmed_per_birth": {
+      "count": 274,
+      "of": 96000,
+      "share": 0.0028541666666666667,
+      "cp_bonferroni": [
+       0.002420463412694746,
+       0.003340190454859837
+      ]
+     },
+     "arm_harmful_per_birth": {
+      "count": 6884,
+      "of": 96000,
+      "share": 0.07170833333333333,
+      "cp_bonferroni": [
+       0.06952847860811692,
+       0.07393271180401112
+      ]
+     },
+     "fired_births": {
+      "count": 476,
+      "of": 96000,
+      "share": 0.004958333333333334,
+      "cp_bonferroni": [
+       0.004380689115149671,
+       0.005587886138192333
+      ]
+     },
+     "fired_confirmed_per_fired_birth": {
+      "count": 1,
+      "of": 476,
+      "share": 0.0021008403361344537,
+      "cp_bonferroni": [
+       8.771750205455962e-06,
+       0.015932013795860456
+      ]
+     },
+     "fired_harmful_per_fired_birth": {
+      "count": 391,
+      "of": 476,
+      "share": 0.8214285714285714,
+      "cp_bonferroni": [
+       0.7707568540850094,
+       0.8652120071318266
+      ]
+     },
+     "fired_identical": 0,
+     "fired_evaluated": 476,
+     "twin_confirmed_per_fired_birth": {
+      "count": 8,
+      "of": 476,
+      "share": 0.01680672268907563,
+      "cp_bonferroni": [
+       0.005260038395529278,
+       0.03921217026908691
+      ]
+     },
+     "twin_harmful_per_fired_birth": {
+      "count": 90,
+      "of": 476,
+      "share": 0.18907563025210083,
+      "cp_bonferroni": [
+       0.14415066747167082,
+       0.24065967934772975
+      ]
+     },
+     "fired_vs_twin_confirmed": {
+      "point": 0.125,
+      "lower": 0.0002236996867365745,
+      "upper": 3.0288778518046042,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_vs_twin_harmful": {
+      "point": 4.344444444444444,
+      "lower": 3.202683790546155,
+      "upper": 6.002136669272532,
+      "declared_effect_supported": true,
+      "doubling_excluded": false
+     },
+     "fired_confirmed_vs_native_per_birth": {
+      "point": 0.7202881152460984,
+      "lower": 0.0025741644903838935,
+      "upper": 6.429310953218788,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     }
+    },
+    "shared": {
+     "strata": 16,
+     "pairs": 96000,
+     "twin_equal": 92984,
+     "mutation_sha256": "955b9ec46d6aa67456a243100b72ffd3b757088c22e960507fb5d0f32288a958",
+     "native_confirmed_per_birth": {
+      "count": 280,
+      "of": 96000,
+      "share": 0.002916666666666667,
+      "cp_bonferroni": [
+       0.0024780281917900094,
+       0.0034076106007304152
+      ]
+     },
+     "native_harmful_per_birth": {
+      "count": 6594,
+      "of": 96000,
+      "share": 0.0686875,
+      "cp_bonferroni": [
+       0.06655107684413777,
+       0.07086876389091828
+      ]
+     },
+     "arm_confirmed_per_birth": {
+      "count": 275,
+      "of": 96000,
+      "share": 0.002864583333333333,
+      "cp_bonferroni": [
+       0.0024300537876418204,
+       0.0033514308815988936
+      ]
+     },
+     "arm_harmful_per_birth": {
+      "count": 6878,
+      "of": 96000,
+      "share": 0.07164583333333334,
+      "cp_bonferroni": [
+       0.06946686550043624,
+       0.0738693314677254
+      ]
+     },
+     "fired_births": {
+      "count": 476,
+      "of": 96000,
+      "share": 0.004958333333333334,
+      "cp_bonferroni": [
+       0.004380689115149671,
+       0.005587886138192333
+      ]
+     },
+     "fired_confirmed_per_fired_birth": {
+      "count": 2,
+      "of": 476,
+      "share": 0.004201680672268907,
+      "cp_bonferroni": [
+       0.0001980602452251503,
+       0.019799571706304697
+      ]
+     },
+     "fired_harmful_per_fired_birth": {
+      "count": 385,
+      "of": 476,
+      "share": 0.8088235294117647,
+      "cp_bonferroni": [
+       0.7570636755046534,
+       0.8539700570005682
+      ]
+     },
+     "fired_identical": 0,
+     "fired_evaluated": 476,
+     "twin_confirmed_per_fired_birth": {
+      "count": 8,
+      "of": 476,
+      "share": 0.01680672268907563,
+      "cp_bonferroni": [
+       0.005260038395529278,
+       0.03921217026908691
+      ]
+     },
+     "twin_harmful_per_fired_birth": {
+      "count": 90,
+      "of": 476,
+      "share": 0.18907563025210083,
+      "cp_bonferroni": [
+       0.14415066747167082,
+       0.24065967934772975
+      ]
+     },
+     "fired_vs_twin_confirmed": {
+      "point": 0.25,
+      "lower": 0.005050989115521922,
+      "upper": 3.7641496539517973,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_vs_twin_harmful": {
+      "point": 4.277777777777778,
+      "lower": 3.145785274693939,
+      "upper": 5.9241491696068245,
+      "declared_effect_supported": true,
+      "doubling_excluded": false
+     },
+     "fired_confirmed_vs_native_per_birth": {
+      "point": 1.4405762304921967,
+      "lower": 0.05812291028285229,
+      "upper": 7.990051030049997,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     }
+    },
+    "aligned": {
+     "strata": 16,
+     "pairs": 96000,
+     "twin_equal": 92984,
+     "mutation_sha256": "d569a408753876932e86690498cdd0b04388de4f748d82278c7010a5fc2982d2",
+     "native_confirmed_per_birth": {
+      "count": 280,
+      "of": 96000,
+      "share": 0.002916666666666667,
+      "cp_bonferroni": [
+       0.0024780281917900094,
+       0.0034076106007304152
+      ]
+     },
+     "native_harmful_per_birth": {
+      "count": 6594,
+      "of": 96000,
+      "share": 0.0686875,
+      "cp_bonferroni": [
+       0.06655107684413777,
+       0.07086876389091828
+      ]
+     },
+     "arm_confirmed_per_birth": {
+      "count": 275,
+      "of": 96000,
+      "share": 0.002864583333333333,
+      "cp_bonferroni": [
+       0.0024300537876418204,
+       0.0033514308815988936
+      ]
+     },
+     "arm_harmful_per_birth": {
+      "count": 6616,
+      "of": 96000,
+      "share": 0.06891666666666667,
+      "cp_bonferroni": [
+       0.0667769075141047,
+       0.07110124249831534
+      ]
+     },
+     "fired_births": {
+      "count": 476,
+      "of": 96000,
+      "share": 0.004958333333333334,
+      "cp_bonferroni": [
+       0.004380689115149671,
+       0.005587886138192333
+      ]
+     },
+     "fired_confirmed_per_fired_birth": {
+      "count": 2,
+      "of": 476,
+      "share": 0.004201680672268907,
+      "cp_bonferroni": [
+       0.0001980602452251503,
+       0.019799571706304697
+      ]
+     },
+     "fired_harmful_per_fired_birth": {
+      "count": 123,
+      "of": 476,
+      "share": 0.25840336134453784,
+      "cp_bonferroni": [
+       0.20719503165468223,
+       0.3147709106384021
+      ]
+     },
+     "fired_identical": 0,
+     "fired_evaluated": 476,
+     "twin_confirmed_per_fired_birth": {
+      "count": 8,
+      "of": 476,
+      "share": 0.01680672268907563,
+      "cp_bonferroni": [
+       0.005260038395529278,
+       0.03921217026908691
+      ]
+     },
+     "twin_harmful_per_fired_birth": {
+      "count": 90,
+      "of": 476,
+      "share": 0.18907563025210083,
+      "cp_bonferroni": [
+       0.14415066747167082,
+       0.24065967934772975
+      ]
+     },
+     "fired_vs_twin_confirmed": {
+      "point": 0.25,
+      "lower": 0.005050989115521922,
+      "upper": 3.7641496539517973,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_vs_twin_harmful": {
+      "point": 1.366666666666667,
+      "lower": 0.8609461801671631,
+      "upper": 2.183624371356188,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_confirmed_vs_native_per_birth": {
+      "point": 1.4405762304921967,
+      "lower": 0.05812291028285229,
+      "upper": 7.990051030049997,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     }
+    },
+    "scrambled": {
+     "strata": 16,
+     "pairs": 96000,
+     "twin_equal": 92984,
+     "mutation_sha256": "92cf40fbaa7881d563fe43716e390cb941eff89bae15bee424c60119a3742c0c",
+     "native_confirmed_per_birth": {
+      "count": 280,
+      "of": 96000,
+      "share": 0.002916666666666667,
+      "cp_bonferroni": [
+       0.0024780281917900094,
+       0.0034076106007304152
+      ]
+     },
+     "native_harmful_per_birth": {
+      "count": 6594,
+      "of": 96000,
+      "share": 0.0686875,
+      "cp_bonferroni": [
+       0.06655107684413777,
+       0.07086876389091828
+      ]
+     },
+     "arm_confirmed_per_birth": {
+      "count": 276,
+      "of": 96000,
+      "share": 0.002875,
+      "cp_bonferroni": [
+       0.0024396456753861253,
+       0.0033626698032678815
+      ]
+     },
+     "arm_harmful_per_birth": {
+      "count": 6608,
+      "of": 96000,
+      "share": 0.06883333333333333,
+      "cp_bonferroni": [
+       0.0666947864730214,
+       0.07101670562014578
+      ]
+     },
+     "fired_births": {
+      "count": 476,
+      "of": 96000,
+      "share": 0.004958333333333334,
+      "cp_bonferroni": [
+       0.004380689115149671,
+       0.005587886138192333
+      ]
+     },
+     "fired_confirmed_per_fired_birth": {
+      "count": 3,
+      "of": 476,
+      "share": 0.0063025210084033615,
+      "cp_bonferroni": [
+       0.0006655849417285975,
+       0.023366239979620118
+      ]
+     },
+     "fired_harmful_per_fired_birth": {
+      "count": 115,
+      "of": 476,
+      "share": 0.2415966386554622,
+      "cp_bonferroni": [
+       0.19173239367227968,
+       0.29698211781357375
+      ]
+     },
+     "fired_identical": 0,
+     "fired_evaluated": 476,
+     "twin_confirmed_per_fired_birth": {
+      "count": 8,
+      "of": 476,
+      "share": 0.01680672268907563,
+      "cp_bonferroni": [
+       0.005260038395529278,
+       0.03921217026908691
+      ]
+     },
+     "twin_harmful_per_fired_birth": {
+      "count": 90,
+      "of": 476,
+      "share": 0.18907563025210083,
+      "cp_bonferroni": [
+       0.14415066747167082,
+       0.24065967934772975
+      ]
+     },
+     "fired_vs_twin_confirmed": {
+      "point": 0.375,
+      "lower": 0.016973937865747624,
+      "upper": 4.442218520587234,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_vs_twin_harmful": {
+      "point": 1.277777777777778,
+      "lower": 0.7966951264621486,
+      "upper": 2.060220205861607,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_confirmed_vs_native_per_birth": {
+      "point": 2.1608643457382954,
+      "lower": 0.1953230634937955,
+      "upper": 9.429368098811443,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     }
+    },
+    "aa": {
+     "strata": 16,
+     "pairs": 96000,
+     "twin_equal": 38354,
+     "mutation_sha256": "61ba1174e27b45b04813e17cbfc1a5a1d5ea2fbd486d963f1870854578b40fe1",
+     "native_confirmed_per_birth": {
+      "count": 280,
+      "of": 96000,
+      "share": 0.002916666666666667,
+      "cp_bonferroni": [
+       0.0024780281917900094,
+       0.0034076106007304152
+      ]
+     },
+     "native_harmful_per_birth": {
+      "count": 6594,
+      "of": 96000,
+      "share": 0.0686875,
+      "cp_bonferroni": [
+       0.06655107684413777,
+       0.07086876389091828
+      ]
+     },
+     "arm_confirmed_per_birth": {
+      "count": 313,
+      "of": 96000,
+      "share": 0.0032604166666666667,
+      "cp_bonferroni": [
+       0.002795539762094678,
+       0.0037775205477447726
+      ]
+     },
+     "arm_harmful_per_birth": {
+      "count": 6525,
+      "of": 96000,
+      "share": 0.06796875,
+      "cp_bonferroni": [
+       0.06584283471147523,
+       0.07013958148112304
+      ]
+     },
+     "fired_births": {
+      "count": 0,
+      "of": 96000,
+      "share": 0.0,
+      "cp_bonferroni": [
+       0.0,
+       5.708835918144528e-05
+      ]
+     },
+     "fired_confirmed_per_fired_birth": {
+      "count": 0,
+      "of": 0,
+      "share": null,
+      "cp_bonferroni": [
+       0.0,
+       1.0
+      ]
+     },
+     "fired_harmful_per_fired_birth": {
+      "count": 0,
+      "of": 0,
+      "share": null,
+      "cp_bonferroni": [
+       0.0,
+       1.0
+      ]
+     },
+     "fired_identical": 0,
+     "fired_evaluated": 0,
+     "twin_confirmed_per_fired_birth": {
+      "count": 0,
+      "of": 0,
+      "share": null,
+      "cp_bonferroni": [
+       0.0,
+       1.0
+      ]
+     },
+     "twin_harmful_per_fired_birth": {
+      "count": 0,
+      "of": 0,
+      "share": null,
+      "cp_bonferroni": [
+       0.0,
+       1.0
+      ]
+     },
+     "fired_vs_twin_confirmed": null,
+     "fired_vs_twin_harmful": null,
+     "fired_confirmed_vs_native_per_birth": null
+    }
+   },
+   "contrasts": {
+    "aligned_vs_scrambled_fired_confirmed": {
+     "point": 0.6666666666666666,
+     "lower": 0.008476342167070832,
+     "upper": 29.747625682280347,
+     "declared_effect_supported": false,
+     "doubling_excluded": false
+    },
+    "aligned_vs_shared_fired_confirmed": {
+     "point": 1.0,
+     "lower": 0.010003259068582923,
+     "upper": 99.9674199322383,
+     "declared_effect_supported": false,
+     "doubling_excluded": false
+    }
+   }
+  },
+  "wall": {
+   "variants": {
+    "random": {
+     "strata": 16,
+     "pairs": 192000,
+     "twin_equal": 182165,
+     "mutation_sha256": "efb6f412ce33d350a1b69bf9fea17b13907319732327693236503eea324acad9",
+     "native_confirmed_per_birth": {
+      "count": 3528,
+      "of": 192000,
+      "share": 0.018375,
+      "cp_bonferroni": [
+       0.017576246334228607,
+       0.019198817379460442
+      ]
+     },
+     "native_harmful_per_birth": {
+      "count": 15555,
+      "of": 192000,
+      "share": 0.081015625,
+      "cp_bonferroni": [
+       0.07938101840587763,
+       0.08267198624518174
+      ]
+     },
+     "arm_confirmed_per_birth": {
+      "count": 3569,
+      "of": 192000,
+      "share": 0.018588541666666666,
+      "cp_bonferroni": [
+       0.017785185866072695,
+       0.01941694944017852
+      ]
+     },
+     "arm_harmful_per_birth": {
+      "count": 15901,
+      "of": 192000,
+      "share": 0.08281770833333334,
+      "cp_bonferroni": [
+       0.08116651337995728,
+       0.08449056389406812
+      ]
+     },
+     "fired_births": {
+      "count": 1535,
+      "of": 192000,
+      "share": 0.007994791666666667,
+      "cp_bonferroni": [
+       0.007468738637841364,
+       0.008546506113521646
+      ]
+     },
+     "fired_confirmed_per_fired_birth": {
+      "count": 48,
+      "of": 1535,
+      "share": 0.031270358306188926,
+      "cp_bonferroni": [
+       0.02075807455934807,
+       0.044927254165594455
+      ]
+     },
+     "fired_harmful_per_fired_birth": {
+      "count": 661,
+      "of": 1535,
+      "share": 0.43061889250814334,
+      "cp_bonferroni": [
+       0.3972209753867859,
+       0.4644717889273783
+      ]
+     },
+     "fired_identical": 0,
+     "fired_evaluated": 1535,
+     "twin_confirmed_per_fired_birth": {
+      "count": 42,
+      "of": 1535,
+      "share": 0.02736156351791531,
+      "cp_bonferroni": [
+       0.0175951455697756,
+       0.04030583710669439
+      ]
+     },
+     "twin_harmful_per_fired_birth": {
+      "count": 336,
+      "of": 1535,
+      "share": 0.21889250814332248,
+      "cp_bonferroni": [
+       0.19167548066519502,
+       0.24795766150591975
+      ]
+     },
+     "fired_vs_twin_confirmed": {
+      "point": 1.1428571428571428,
+      "lower": 0.5150141034014244,
+      "upper": 2.5533891713160424,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_vs_twin_harmful": {
+      "point": 1.9672619047619049,
+      "lower": 1.6019709694564233,
+      "upper": 2.423219638294187,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_confirmed_vs_native_per_birth": {
+      "point": 1.7017882071395336,
+      "lower": 1.081216313956701,
+      "upper": 2.5561347577441222,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     }
+    },
+    "shared": {
+     "strata": 16,
+     "pairs": 192000,
+     "twin_equal": 182165,
+     "mutation_sha256": "955b9ec46d6aa67456a243100b72ffd3b757088c22e960507fb5d0f32288a958",
+     "native_confirmed_per_birth": {
+      "count": 3528,
+      "of": 192000,
+      "share": 0.018375,
+      "cp_bonferroni": [
+       0.017576246334228607,
+       0.019198817379460442
+      ]
+     },
+     "native_harmful_per_birth": {
+      "count": 15555,
+      "of": 192000,
+      "share": 0.081015625,
+      "cp_bonferroni": [
+       0.07938101840587763,
+       0.08267198624518174
+      ]
+     },
+     "arm_confirmed_per_birth": {
+      "count": 3560,
+      "of": 192000,
+      "share": 0.018541666666666668,
+      "cp_bonferroni": [
+       0.017739318688024364,
+       0.019369069194470734
+      ]
+     },
+     "arm_harmful_per_birth": {
+      "count": 15799,
+      "of": 192000,
+      "share": 0.08228645833333334,
+      "cp_bonferroni": [
+       0.08064012900323503,
+       0.08395447599253508
+      ]
+     },
+     "fired_births": {
+      "count": 1535,
+      "of": 192000,
+      "share": 0.007994791666666667,
+      "cp_bonferroni": [
+       0.007468738637841364,
+       0.008546506113521646
+      ]
+     },
+     "fired_confirmed_per_fired_birth": {
+      "count": 39,
+      "of": 1535,
+      "share": 0.025407166123778503,
+      "cp_bonferroni": [
+       0.016035129894211395,
+       0.037974293679652826
+      ]
+     },
+     "fired_harmful_per_fired_birth": {
+      "count": 559,
+      "of": 1535,
+      "share": 0.36416938110749186,
+      "cp_bonferroni": [
+       0.33192751819101507,
+       0.39730231387336346
+      ]
+     },
+     "fired_identical": 0,
+     "fired_evaluated": 1535,
+     "twin_confirmed_per_fired_birth": {
+      "count": 42,
+      "of": 1535,
+      "share": 0.02736156351791531,
+      "cp_bonferroni": [
+       0.0175951455697756,
+       0.04030583710669439
+      ]
+     },
+     "twin_harmful_per_fired_birth": {
+      "count": 336,
+      "of": 1535,
+      "share": 0.21889250814332248,
+      "cp_bonferroni": [
+       0.19167548066519502,
+       0.24795766150591975
+      ]
+     },
+     "fired_vs_twin_confirmed": {
+      "point": 0.9285714285714286,
+      "lower": 0.3978364188731394,
+      "upper": 2.158225604275983,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_vs_twin_harmful": {
+      "point": 1.6636904761904763,
+      "lower": 1.3386459453405137,
+      "upper": 2.0727863182841975,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_confirmed_vs_native_per_birth": {
+      "point": 1.382702918300871,
+      "lower": 0.8352144602076548,
+      "upper": 2.160546282609862,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     }
+    },
+    "aligned": {
+     "strata": 16,
+     "pairs": 192000,
+     "twin_equal": 182165,
+     "mutation_sha256": "d569a408753876932e86690498cdd0b04388de4f748d82278c7010a5fc2982d2",
+     "native_confirmed_per_birth": {
+      "count": 3528,
+      "of": 192000,
+      "share": 0.018375,
+      "cp_bonferroni": [
+       0.017576246334228607,
+       0.019198817379460442
+      ]
+     },
+     "native_harmful_per_birth": {
+      "count": 15555,
+      "of": 192000,
+      "share": 0.081015625,
+      "cp_bonferroni": [
+       0.07938101840587763,
+       0.08267198624518174
+      ]
+     },
+     "arm_confirmed_per_birth": {
+      "count": 3583,
+      "of": 192000,
+      "share": 0.018661458333333332,
+      "cp_bonferroni": [
+       0.01785653747584591,
+       0.01949142715728397
+      ]
+     },
+     "arm_harmful_per_birth": {
+      "count": 15728,
+      "of": 192000,
+      "share": 0.08191666666666667,
+      "cp_bonferroni": [
+       0.08027373626554968,
+       0.08358130469447306
+      ]
+     },
+     "fired_births": {
+      "count": 1535,
+      "of": 192000,
+      "share": 0.007994791666666667,
+      "cp_bonferroni": [
+       0.007468738637841364,
+       0.008546506113521646
+      ]
+     },
+     "fired_confirmed_per_fired_birth": {
+      "count": 62,
+      "of": 1535,
+      "share": 0.040390879478827364,
+      "cp_bonferroni": [
+       0.028315127011175202,
+       0.05553806827064506
+      ]
+     },
+     "fired_harmful_per_fired_birth": {
+      "count": 488,
+      "of": 1535,
+      "share": 0.31791530944625407,
+      "cp_bonferroni": [
+       0.28686841476362823,
+       0.35015723930999865
+      ]
+     },
+     "fired_identical": 0,
+     "fired_evaluated": 1535,
+     "twin_confirmed_per_fired_birth": {
+      "count": 42,
+      "of": 1535,
+      "share": 0.02736156351791531,
+      "cp_bonferroni": [
+       0.0175951455697756,
+       0.04030583710669439
+      ]
+     },
+     "twin_harmful_per_fired_birth": {
+      "count": 336,
+      "of": 1535,
+      "share": 0.21889250814332248,
+      "cp_bonferroni": [
+       0.19167548066519502,
+       0.24795766150591975
+      ]
+     },
+     "fired_vs_twin_confirmed": {
+      "point": 1.4761904761904763,
+      "lower": 0.7025068586523004,
+      "upper": 3.156442670531049,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_vs_twin_harmful": {
+      "point": 1.4523809523809523,
+      "lower": 1.1569249888121709,
+      "upper": 1.8268233270880807,
+      "declared_effect_supported": false,
+      "doubling_excluded": true
+     },
+     "fired_confirmed_vs_native_per_birth": {
+      "point": 2.198143100888564,
+      "lower": 1.4748370408204259,
+      "upper": 3.1598367031581853,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     }
+    },
+    "scrambled": {
+     "strata": 16,
+     "pairs": 192000,
+     "twin_equal": 182165,
+     "mutation_sha256": "92cf40fbaa7881d563fe43716e390cb941eff89bae15bee424c60119a3742c0c",
+     "native_confirmed_per_birth": {
+      "count": 3528,
+      "of": 192000,
+      "share": 0.018375,
+      "cp_bonferroni": [
+       0.017576246334228607,
+       0.019198817379460442
+      ]
+     },
+     "native_harmful_per_birth": {
+      "count": 15555,
+      "of": 192000,
+      "share": 0.081015625,
+      "cp_bonferroni": [
+       0.07938101840587763,
+       0.08267198624518174
+      ]
+     },
+     "arm_confirmed_per_birth": {
+      "count": 3574,
+      "of": 192000,
+      "share": 0.018614583333333334,
+      "cp_bonferroni": [
+       0.01781066821200296,
+       0.019443548996589788
+      ]
+     },
+     "arm_harmful_per_birth": {
+      "count": 15717,
+      "of": 192000,
+      "share": 0.081859375,
+      "cp_bonferroni": [
+       0.08021697208484957,
+       0.0835234885316552
+      ]
+     },
+     "fired_births": {
+      "count": 1535,
+      "of": 192000,
+      "share": 0.007994791666666667,
+      "cp_bonferroni": [
+       0.007468738637841364,
+       0.008546506113521646
+      ]
+     },
+     "fired_confirmed_per_fired_birth": {
+      "count": 53,
+      "of": 1535,
+      "share": 0.03452768729641694,
+      "cp_bonferroni": [
+       0.023431500671415223,
+       0.04874176347962317
+      ]
+     },
+     "fired_harmful_per_fired_birth": {
+      "count": 477,
+      "of": 1535,
+      "share": 0.31074918566775245,
+      "cp_bonferroni": [
+       0.27991833554279477,
+       0.3428222086781988
+      ]
+     },
+     "fired_identical": 0,
+     "fired_evaluated": 1535,
+     "twin_confirmed_per_fired_birth": {
+      "count": 42,
+      "of": 1535,
+      "share": 0.02736156351791531,
+      "cp_bonferroni": [
+       0.0175951455697756,
+       0.04030583710669439
+      ]
+     },
+     "twin_harmful_per_fired_birth": {
+      "count": 336,
+      "of": 1535,
+      "share": 0.21889250814332248,
+      "cp_bonferroni": [
+       0.19167548066519502,
+       0.24795766150591975
+      ]
+     },
+     "fired_vs_twin_confirmed": {
+      "point": 1.261904761904762,
+      "lower": 0.5813426132147864,
+      "upper": 2.770182450968196,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     },
+     "fired_vs_twin_harmful": {
+      "point": 1.4196428571428572,
+      "lower": 1.1288956906706107,
+      "upper": 1.7885553618462866,
+      "declared_effect_supported": false,
+      "doubling_excluded": true
+     },
+     "fired_confirmed_vs_native_per_birth": {
+      "point": 1.8790578120499017,
+      "lower": 1.2204658343426429,
+      "upper": 2.7731611490163135,
+      "declared_effect_supported": false,
+      "doubling_excluded": false
+     }
+    },
+    "aa": {
+     "strata": 16,
+     "pairs": 192000,
+     "twin_equal": 46732,
+     "mutation_sha256": "61ba1174e27b45b04813e17cbfc1a5a1d5ea2fbd486d963f1870854578b40fe1",
+     "native_confirmed_per_birth": {
+      "count": 3528,
+      "of": 192000,
+      "share": 0.018375,
+      "cp_bonferroni": [
+       0.017576246334228607,
+       0.019198817379460442
+      ]
+     },
+     "native_harmful_per_birth": {
+      "count": 15555,
+      "of": 192000,
+      "share": 0.081015625,
+      "cp_bonferroni": [
+       0.07938101840587763,
+       0.08267198624518174
+      ]
+     },
+     "arm_confirmed_per_birth": {
+      "count": 3685,
+      "of": 192000,
+      "share": 0.019192708333333332,
+      "cp_bonferroni": [
+       0.018376481236947788,
+       0.020033954245220198
+      ]
+     },
+     "arm_harmful_per_birth": {
+      "count": 15391,
+      "of": 192000,
+      "share": 0.08016145833333334,
+      "cp_bonferroni": [
+       0.07853479804560792,
+       0.0818099178549982
+      ]
+     },
+     "fired_births": {
+      "count": 0,
+      "of": 192000,
+      "share": 0.0,
+      "cp_bonferroni": [
+       0.0,
+       2.8544586988255016e-05
+      ]
+     },
+     "fired_confirmed_per_fired_birth": {
+      "count": 0,
+      "of": 0,
+      "share": null,
+      "cp_bonferroni": [
+       0.0,
+       1.0
+      ]
+     },
+     "fired_harmful_per_fired_birth": {
+      "count": 0,
+      "of": 0,
+      "share": null,
+      "cp_bonferroni": [
+       0.0,
+       1.0
+      ]
+     },
+     "fired_identical": 0,
+     "fired_evaluated": 0,
+     "twin_confirmed_per_fired_birth": {
+      "count": 0,
+      "of": 0,
+      "share": null,
+      "cp_bonferroni": [
+       0.0,
+       1.0
+      ]
+     },
+     "twin_harmful_per_fired_birth": {
+      "count": 0,
+      "of": 0,
+      "share": null,
+      "cp_bonferroni": [
+       0.0,
+       1.0
+      ]
+     },
+     "fired_vs_twin_confirmed": null,
+     "fired_vs_twin_harmful": null,
+     "fired_confirmed_vs_native_per_birth": null
+    }
+   },
+   "contrasts": {
+    "aligned_vs_scrambled_fired_confirmed": {
+     "point": 1.169811320754717,
+     "lower": 0.5809212673031935,
+     "upper": 2.37023095743917,
+     "declared_effect_supported": false,
+     "doubling_excluded": false
+    },
+    "aligned_vs_shared_fired_confirmed": {
+     "point": 1.5897435897435896,
+     "lower": 0.7456393330192961,
+     "upper": 3.4635246884213915,
+     "declared_effect_supported": false,
+     "doubling_excluded": false
+    }
+   }
+  }
+ },
+ "files_sha256": {
+  "food-s0-aa.ndjson": "de9cf47848493d91b46872cc8a39d1bef8da7034de60c57b74283cb9d28ad27f",
+  "food-s0-aligned.ndjson": "5afde8707b8c12c425d7bd22f46ca400307bbbf173d619b9a6476fb07a29419c",
+  "food-s0-random.ndjson": "3fad865832be0282d39bac072fb3951a0fe724ffd7ea71ab5b41712908a7be7d",
+  "food-s0-scrambled.ndjson": "5df3b00a4b7c64ca6b737dfe1fcf6332ecb600baf37d67b7965804188bf57e6a",
+  "food-s0-shared.ndjson": "01247da6291ed736c50ed80f8a417cd2b69309a26a2ba333f176e66a99483a90",
+  "food-s1-aa.ndjson": "5559e12ef58416a0ab10efe7b850b3ebbd08d020a57a6e9d6ec2ef64b7382045",
+  "food-s1-aligned.ndjson": "4774c9a8ebfdb9465d6e8d121d96d3bcd7c030927e9d93b7564971f27b250d20",
+  "food-s1-random.ndjson": "8b1d9766e8dbafb95b14e2c6a1fd4b1a90f05a1d9d0cf8690864fa52ffc8bd5f",
+  "food-s1-scrambled.ndjson": "1ed6d59107b372f424c83e0fd2991506f7fb1b90d9789614e66442c336ba6bbb",
+  "food-s1-shared.ndjson": "4eb02c76cf30355eee45d323d7a30d0a70e016faf5ec6d5a6dfb492e4b6b4f53",
+  "food-s10-aa.ndjson": "ee6186dce8e298c6ec214ea8ff9962e617505d46c8079e89073e3bfb4019a6cd",
+  "food-s10-aligned.ndjson": "5e8d15e5d804c5a1667df909aa8860ef076c04592d4297bc4a39ee9238e6fe6e",
+  "food-s10-random.ndjson": "09a37673728bd25c5becf73407b6d5a9c1ec56e510be38d4c92434db13cce825",
+  "food-s10-scrambled.ndjson": "662e40ab664365513bbb744f610ed0acf6fbc546f83a8a4f3735857fc49b53d0",
+  "food-s10-shared.ndjson": "01e6faf143631e54bec7605660ed1455c9f951fc7780f4cbca624956adc323e5",
+  "food-s11-aa.ndjson": "356f49fcb06b2abb98029ab748fe6b9940dacabdd613d3cbae35d2c818a6599e",
+  "food-s11-aligned.ndjson": "af17798959c6101e64542f43d0766d5072a4a7474bff41aaea21bf5a36a0ace7",
+  "food-s11-random.ndjson": "5109bf996fdded015feb6e4550ab8b8b76e90d4f32167e19c953497b58136ad6",
+  "food-s11-scrambled.ndjson": "dc9ef89f7bd56bf6cbe2f8cdca910d4e5f80d2d41cdb4db48a26ec47eb8751f9",
+  "food-s11-shared.ndjson": "7b198e0d5d3e55796fc616b8e20065fda21c2a0e4e315e8366be250011cc466b",
+  "food-s12-aa.ndjson": "0a61f3c177d8d4b1a027fb270f8dccee41443ecf9dba8b9530a908ca1cc784e9",
+  "food-s12-aligned.ndjson": "595b5aaa38605bdfde0c14d5040d304b169e23f047931a70fbe8e8a102c3b760",
+  "food-s12-random.ndjson": "cdfdba59011636b5f3adf85c347998479b4ef1312b8cce15fd80aaf156ebe1ea",
+  "food-s12-scrambled.ndjson": "6693278a497a00dfd6ec81b206a09adee859d530521ef777deafa53c3430b1e3",
+  "food-s12-shared.ndjson": "de58aaa7fe0379ed483a2a7782526e45d58b0166117f020bbeb3ea36b7a76ad4",
+  "food-s13-aa.ndjson": "dddc65f872aa6940f66d85652f2e4b63b5eaadf073133a75dc7a1ce02717fcda",
+  "food-s13-aligned.ndjson": "41ab53c69ad79c7d0b08c87ab80b916bdce71b8714f2609a3c4dbad212c58143",
+  "food-s13-random.ndjson": "1d771b81ada4e32411160559cfd9ee09f693f8157470a9ff4901f57e121e68b0",
+  "food-s13-scrambled.ndjson": "3cdfd8b08d8121a472879dbfaccf7a941f274f5bc76447d3776b5e119f616c74",
+  "food-s13-shared.ndjson": "d5baa1ac016f3eeb1bed9721a12d103f85e0a134ac14e1b0bad6846590345a2c",
+  "food-s14-aa.ndjson": "d02d263f50fd41abeffdba99360dd0293529d7a2b935b5a628c626a7f0219417",
+  "food-s14-aligned.ndjson": "0491f75acb22d9ecb99c120b08354d10a381d8f4c4449c76edc56bceb8f28bad",
+  "food-s14-random.ndjson": "29fa321b144943c2cf91706d6958a6d544941d1cea0f3c29c914e441963a6a5c",
+  "food-s14-scrambled.ndjson": "2007da598b7495cb729e23a25e7a9245b1ecfe39ba56ecb227a3754577488583",
+  "food-s14-shared.ndjson": "4701f2638e8b3b1cf9ff976440076400d2f2a753a7848b272a592298aea4c177",
+  "food-s15-aa.ndjson": "47fa979efdfed3ab4e89728564b10e55ae1d010cf7100659715e6fd11791da4c",
+  "food-s15-aligned.ndjson": "51bef3ce1c3aa74d5807dda82dbd5f30410f0a43d252b7f2df7418b3febc516e",
+  "food-s15-random.ndjson": "26bf8a3429cbe2aa07a8a09df92e9155f1b2e99eca13000370fe25bde7448338",
+  "food-s15-scrambled.ndjson": "1ae5743d855b75c16e1a621d3109f6ef071e0be50a1d04a5b0146d07b730fc62",
+  "food-s15-shared.ndjson": "1d2fc2269fcd88282befca54842d5ed4cf85ce342cf727d7ebdf9a7d5dbee6e7",
+  "food-s2-aa.ndjson": "1dc802ac572fc600b6d59c9d5ff25ed4c1fb0915786292e562fd80ba957be204",
+  "food-s2-aligned.ndjson": "e4401e9250f3ff4b7c6758876a26d2beec84f7405b61bdac899a7bc15b9ee840",
+  "food-s2-random.ndjson": "b76848374e06da33eb0d9847b6e5e793b66b5c12bcbc442c1df135ae34406edb",
+  "food-s2-scrambled.ndjson": "fc7cd08637f673a574727a86c5a6713366ebe16141ab1e9a5ded73c78de75df1",
+  "food-s2-shared.ndjson": "2d2a716e02e3be4be4db0eb92a1b0144643bfde6cd0f063d5f17fc6b4bb5d127",
+  "food-s3-aa.ndjson": "9a0b44500d08a1adadfc403f57f487cf3e98fc4e20e3eb54ef14875b517b8a6c",
+  "food-s3-aligned.ndjson": "62e2022123d2ef2b9c0e8377e6001ef05027b032097014f9038a7489c7a50e33",
+  "food-s3-random.ndjson": "23deb2d3e6530368c6414d238a83b1ceb8e965a12077ed7bea31e90b2132c998",
+  "food-s3-scrambled.ndjson": "ab543c1232e0fe8aaface14525c5e23685869e4cb3d046973aa44b552741eb10",
+  "food-s3-shared.ndjson": "14b5df783a2ad34c6b8c29f9daa565003286d5549dfc14a6672957097d953a8f",
+  "food-s4-aa.ndjson": "e1f4e7e6a9fd87cece004966b5cce7cd87aa47a8f4df1bd614921b24ff6fd885",
+  "food-s4-aligned.ndjson": "b0848a3ab6c2ae86209055b219ec6254d6151047727e28142304ac97debd9ca7",
+  "food-s4-random.ndjson": "89887c1550184d6de0e12ed71636894460895ed055165f91ad364d428ed1999f",
+  "food-s4-scrambled.ndjson": "758c90bad131bab8d5afe42b5fc09ea3a2c1e287a36674dddaf9513e8552bdd5",
+  "food-s4-shared.ndjson": "ffef70658604a78d54cce635bb16af3e4669f5ebf66cc4a41939d976174592f2",
+  "food-s5-aa.ndjson": "a101ba79834f47cd1803bb945b6e7e96b104c9a751b369c409ae203b117e53ea",
+  "food-s5-aligned.ndjson": "2b7ad7d4fc6241b1b60814f57ba88a56a1e48f8e33ad04a2917929bea713fcfe",
+  "food-s5-random.ndjson": "dbec9dc8cd3e47e08b97f37b7431940a0f2bf1baacbeceb40f7835315b7c2b64",
+  "food-s5-scrambled.ndjson": "2c74d2754158b132a45069bb9b3d989200d9e799365d2317152ee69eb84f4db6",
+  "food-s5-shared.ndjson": "92e82bd3cc0e3ee169088ab15ce9926d18545d2683f229b1e1904e1d3ab8ac85",
+  "food-s6-aa.ndjson": "b11e9fd1b07894eeba6e6c5a0bf17b6d0ab8ebb2716b3f563a85a176c110e89a",
+  "food-s6-aligned.ndjson": "5a9c1c2d4ae944c2560618796f547ee810f3381d39c5b36269059a3d9e69d717",
+  "food-s6-random.ndjson": "83092055b9ebfe0fc3c211dfb14221fdd0bdb43c904446db42d9d694e367d2fb",
+  "food-s6-scrambled.ndjson": "6d15bb27d3c71ac4a5dff373d66abb70aa3d272a3c5373a92a140cb6c78adc67",
+  "food-s6-shared.ndjson": "9aa26f0c55bebd8af553db8ef00ee38ea89b4f8d456f9f342b1ba68add555eaf",
+  "food-s7-aa.ndjson": "c2464a73e1366fec5bbf80cc5beda85ec484b40b3563985f85119c95530bde66",
+  "food-s7-aligned.ndjson": "fee65b381db6174b4e329ae5a135ad8c4188988d2fe73cf4d420d6b8a18e3810",
+  "food-s7-random.ndjson": "d062a5cbb427a39dfd48534804f15be5ceeaf22f00fadd1195b9e8f59e5b3a24",
+  "food-s7-scrambled.ndjson": "bd0b278249322a1988a46380e441348bfa4c9b3a9abbc7a412f8cf0cf35be37c",
+  "food-s7-shared.ndjson": "098ea6180203931291868d1e80b7c804ade997970a57c3973b245202eb663e0e",
+  "food-s8-aa.ndjson": "8fb5b97105f529e65751663867e370dfd994c98b727ae3bcf9587aaf5162a3c4",
+  "food-s8-aligned.ndjson": "ae990d70f5067278a179fcf3c3dc156fe50e694a23cb7ca5f1a7ff66c829ec90",
+  "food-s8-random.ndjson": "1f69c575bdfac67ee5ba729a977303db0ac8c7ed7630592b647dd0a9ba525dd7",
+  "food-s8-scrambled.ndjson": "cafb9d3bb562e92cfa3bb7b0002bce380f03a20235d51ae00dcbab4710c5a9e4",
+  "food-s8-shared.ndjson": "a8dd8af1c0896d2e5c20627507df94df4de8cf6e9f8cc703c56db39480b894a1",
+  "food-s9-aa.ndjson": "23a91ce47f7da68349e2498a137367000744f316cc9d76fab7b71ebf0d157253",
+  "food-s9-aligned.ndjson": "e4346121ec238c95974ef685862a1610b768a46cb0f49cf0660c8b5935c2848e",
+  "food-s9-random.ndjson": "8a74fe050a02c427f9e63bbdbf6f4c412eb880089373cd94d08bb9f931866d8c",
+  "food-s9-scrambled.ndjson": "f9112702806ce980ff4a78f30d09c216d95c64a3df6bc450cf467d28089822d1",
+  "food-s9-shared.ndjson": "d4f5bc21258ecdc60d336096b00f24b3ca2b589435355d01c1889f67a8bcad9b",
+  "wall-s0-aa.ndjson": "cc8efb96230781ac0b4af821214015d50c16ccde3790a4463ffbc794e3b4d8bc",
+  "wall-s0-aligned.ndjson": "a4103c63e18a5fd27fbf9b55292fc7519a0b6599155131f67ddf24e9ea5f353c",
+  "wall-s0-random.ndjson": "edddb47ade7b8f30f173c1ee1798260c4251defa8e8e284dd3eaaed4d5ae856f",
+  "wall-s0-scrambled.ndjson": "78b6d8e67ec59f0aa6fb381a727a021cee02a1b4e5350633c77af408d15a7ce7",
+  "wall-s0-shared.ndjson": "6bcb087a0cb99849a989dcaa720dace73b09525ca9d4e72af59a9fcb4c864770",
+  "wall-s1-aa.ndjson": "527c3cd18aa86b36420cabc891ebf26582d376501bc16082896bcfe58a96eb68",
+  "wall-s1-aligned.ndjson": "0b5fb38347809b2463176bc9386ef6143fe5ba81dde590c7a8fc15d05a7a8897",
+  "wall-s1-random.ndjson": "7adae01e1b721e2e8df6a0a92f2802131a25f49dd8c38ca13cfad341a1da84d6",
+  "wall-s1-scrambled.ndjson": "d61027371778b3c59bf11a76949cd9d34e6a3740b98c5ecfb34f7ddf5d0dec07",
+  "wall-s1-shared.ndjson": "0c284e2837554fa79ebfbaa2b469a18e4b0cde6da75cd78b1efab24ab4806860",
+  "wall-s10-aa.ndjson": "1ce4a20ebb68f10ee78968b6802e627292847fb5592bbeb04f0b1851168c51ac",
+  "wall-s10-aligned.ndjson": "df9a5bce523137d1ad08433434e515843ecf7044de997ee22cde17e141e71978",
+  "wall-s10-random.ndjson": "ddc3607d69e0ac192c1151824420af38a5a3a8b5bd060ba30665c85150ed0055",
+  "wall-s10-scrambled.ndjson": "524d5e3715db0dc79e000d977f9bd10cb608628c8fa442a9819d6b682ca6b11e",
+  "wall-s10-shared.ndjson": "59b22c0cd5d6dcec81b1c4d236c401a0eb0a4a10a83584c08a3475cb7ce1b4df",
+  "wall-s11-aa.ndjson": "66705e7cae9fce369be21acea98cff4bbb6a88778c1b687d33a0853f7477adfc",
+  "wall-s11-aligned.ndjson": "753070c2c240fa59ecb05776f22c1f9e2ddf5ea19420da0fd323d269fc08eccb",
+  "wall-s11-random.ndjson": "a2bd9e17f4be5d424bf98b7a823db9c7d8907872e0db3557bdcb6b92d3ae486c",
+  "wall-s11-scrambled.ndjson": "6fe907d202940a37538249e8e7afd19e14c51fef470b08229f0f4eebcda41910",
+  "wall-s11-shared.ndjson": "10ab299908c3c445f28779ea2c301044f0247a46edcb1ed7dd8155746f9bcb8e",
+  "wall-s12-aa.ndjson": "899b0e5d259d00757b52b8432b227f8263de5217f490f65a8d20e622c7d555db",
+  "wall-s12-aligned.ndjson": "a4e85c5ee6db84c6a6be539531ea651ced15cebece727cd971e2399e046cf11c",
+  "wall-s12-random.ndjson": "6085a10a64af576a106e8f015acf7ef07163c03ba72d9543a224b0676f752a26",
+  "wall-s12-scrambled.ndjson": "57f4a150061a7aa169386db1d77df38f99035f808a921552cff5da0af9934de8",
+  "wall-s12-shared.ndjson": "d09267548fa50a239683520b77e7c0d449f68c9e4c993e271ad5802eef058afd",
+  "wall-s13-aa.ndjson": "75d341ae0a45fc7c019092bd26ee7bbabf1567bf6fa19224d04a06c09d196069",
+  "wall-s13-aligned.ndjson": "b1285378f116a3366d0179ff9d46f65cc2eadd18a65586f4cb181cb6101a36d1",
+  "wall-s13-random.ndjson": "8e9acd17bcb88501f086b2dd627bbee348654734cd776e4a8cbe07af43486421",
+  "wall-s13-scrambled.ndjson": "b4a5f47ff8a01b9afcaad413e3767cb8d5564403894bd44ce0c33f123c1a6e79",
+  "wall-s13-shared.ndjson": "13d5ef7e440fce0872824f4a6e7d26476bef753b1688cfd75b998a28f80dd0f7",
+  "wall-s14-aa.ndjson": "51740670159b991f00a5209ed839948511051cc619eb6634ac1b8f53d58b9f93",
+  "wall-s14-aligned.ndjson": "86aaabf01f059bdec83f989b5308ac05311362a2088eb77349cfd69bfd703831",
+  "wall-s14-random.ndjson": "d8fa7497a97f44736efa910fe3d0f883ccb8144bb13bb884c944ceb5feb7322e",
+  "wall-s14-scrambled.ndjson": "83fdec69261cad6affb410ee1a1f952280d9f662d6be5f383aa2544a3f08c56c",
+  "wall-s14-shared.ndjson": "2a39e76272dceeda70472ac90ab92d52d9a04f2050adf9f250fdf9fff73047d1",
+  "wall-s15-aa.ndjson": "38252bca4efef6980689855878fa0fa750987a824ca04823c6f97532b74bab23",
+  "wall-s15-aligned.ndjson": "763abccbe0eb6b3cc45aaf7d3d48b686fc8fea1c09f5e6ed0e6840a589efffbb",
+  "wall-s15-random.ndjson": "45bc99a05911d19975a0b31bc4149f5e38455c7071a7636bdb6bbbb2876f5000",
+  "wall-s15-scrambled.ndjson": "feb3394cb4a742b0c4c18140ac24f7131ecbe940b60ab255b6c556d3a4eb5718",
+  "wall-s15-shared.ndjson": "78db26db88389a517112090991b91e807f1b7e291bdfd4b6d5aac429fb50c23e",
+  "wall-s2-aa.ndjson": "25db401c84e56419c0e3320e5398c692f0e696a0c85852e8420d41d2d09f499a",
+  "wall-s2-aligned.ndjson": "704b96dcd68c0ddfd9f118ba820a3a55147d02a54bb3fad20c3566d7af19c4fa",
+  "wall-s2-random.ndjson": "876dc15511e962613dc6e6e78167157ceaf296d1a931857f358986d3eabd301a",
+  "wall-s2-scrambled.ndjson": "7e7f29e0867ff6faedd07f47a7f8844037917c7d1bb562b2dce82b2d657637a1",
+  "wall-s2-shared.ndjson": "47673abfeebbdeee07f63ceba2e5b9500c12c448d65df6d4110c402552ed76de",
+  "wall-s3-aa.ndjson": "cc531c28985b081f84e5ed5b494b0422bcaa55ef4e4495a4ffaaadff3762f59d",
+  "wall-s3-aligned.ndjson": "62eca99ff0b0f30653a4d495c5f36ba4640d9699918169af869f2a7a3b99ce3b",
+  "wall-s3-random.ndjson": "bc9adb79016cec77675129be91590a155eb208495bb6f0b17f91eedd0b16c98a",
+  "wall-s3-scrambled.ndjson": "63e9d19b293b163f18c0e4c33bf3bd67b31aa2aec3e29e49b6650ce98e17553a",
+  "wall-s3-shared.ndjson": "90c627bc7817539d1316e2a14ed3e62ed4c17705059e6ddec728ad26567a3502",
+  "wall-s4-aa.ndjson": "4f1f6d404d344de82ae7467d8195276da67d3ee6318176189e229cfb9af4b94e",
+  "wall-s4-aligned.ndjson": "95a909148b177d5c4a3a673b1995df6adffcd65e938bbf3abe05edacce1298f4",
+  "wall-s4-random.ndjson": "7ae11fc43a50e51446f8dfa52b6250a1f8149692a586cc477659ef7e1dacb614",
+  "wall-s4-scrambled.ndjson": "a75f50719df236460eb11e962c6c150a75cdc77f50c5b0ea88114f19eb1dc7c0",
+  "wall-s4-shared.ndjson": "fa9d5365783608523899f17041650a0f1dafc02f9da63367f731d8c6930fbb8a",
+  "wall-s5-aa.ndjson": "190f30f042aedb957caafd35241dbfab7a48bb6a3fa77b2d47b42e98ab80dc45",
+  "wall-s5-aligned.ndjson": "39cb155700cbc5f70701e37b202c1cf62fae5b4d4c37ed4bab50831bb388aa07",
+  "wall-s5-random.ndjson": "12af7b60cd8dd72ab8d5e9a9cd0e2a8f51af5b4d01e934ece8c3dcfbd2dae853",
+  "wall-s5-scrambled.ndjson": "7f8dca869f444309801b7b2e74c4174137a62b04ab5d51304f28ea9cedeea3d8",
+  "wall-s5-shared.ndjson": "db07b6cee2c4b01ef5d2000cb6fa04729cbf7419001d80f04ac1d8a84ef002d1",
+  "wall-s6-aa.ndjson": "815b36c19a92c758634e8b1d9a76156264be2e5a6225d29d7211c0a1b111b4ab",
+  "wall-s6-aligned.ndjson": "4717f946198e9035fb89b965077b1c967507cdf7972767d50cc3989485e26e60",
+  "wall-s6-random.ndjson": "7f0ddf39fd23419bd06e272e556cefe68cb80a3b61f081937527aaf392e50134",
+  "wall-s6-scrambled.ndjson": "3bb7deb04dfa7f45194d1328106358d1105c1cc9fb2f3a5819acdbd492029536",
+  "wall-s6-shared.ndjson": "f13bfa700005bcd658dc95462d6079a82ba3b3108e54a2983cf2711dc153576a",
+  "wall-s7-aa.ndjson": "51f3a5dbe96b50173f774fe446fdaded0e7ed65a5f7edebb7c899c2411ecabf2",
+  "wall-s7-aligned.ndjson": "17250470434d89f84cfff3bb6491109a638fd1818bb1c479dd9f83cfa12d4051",
+  "wall-s7-random.ndjson": "14300f46f5bfcf1a608f4aeafc3f51d89a2558a707e09cf6123c5260ab316c56",
+  "wall-s7-scrambled.ndjson": "00754c61d054685924b2f0cfd020ce599639af3692b8fe397dab8c8ab8570dc1",
+  "wall-s7-shared.ndjson": "0e9d1eeda452479b6e1da4c4b5133b58a21dd516f1a2f5fcfabadf68fb25f01f",
+  "wall-s8-aa.ndjson": "c6b54689807e76c71d04d05d26413a2087cca5adcd2c43d32cad1248b0397c78",
+  "wall-s8-aligned.ndjson": "3b35896ae49c2db49fd65b80dea6d8f6d1feb99d8bf12d620ee9d81725c8cf17",
+  "wall-s8-random.ndjson": "199bd26812f7ad5faafde5936049b785a7d634883bf0b02e8864d5b6897b48c8",
+  "wall-s8-scrambled.ndjson": "b3d8ce4fbf59458039ced6f58bbdcdd427388ad6a1c3babdcff0b5408ee6ec66",
+  "wall-s8-shared.ndjson": "eb002aaee82974a8d8f94796d57e29405d43ecbd0c54fdcd01422f4c0b22bfcb",
+  "wall-s9-aa.ndjson": "953465389f1633e1cd21a6f21b8c2c5922422d984f287d904d659db6cefba8b2",
+  "wall-s9-aligned.ndjson": "7bf28a9912061a0adb257755d7683b77096ef62cbeee8d10e2a879b759ca50c1",
+  "wall-s9-random.ndjson": "98e2246ed87e8882f1c63014eebcc4995c6a75e61286853163b1cfb33c412938",
+  "wall-s9-scrambled.ndjson": "43da393dee9c83f0ef02e39eafb75cfea29096c3d7db4c34e8b6a89bea250974",
+  "wall-s9-shared.ndjson": "01d768cdc30a774b5979d741976fe920a1a4057a8f6bf2c2eddf4a7357396b0c"
+ },
+ "reader_sha256": "6ca3c2fef8963821f3a8ebe9df4dca96cc5d945e506d01a24ce1f1db07c3433a",
+ "intervals": "Clopper-Pearson two-sided 0.9917 (Bonferroni over six contrasts)"
+}
