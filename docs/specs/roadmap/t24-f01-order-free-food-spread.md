@@ -174,7 +174,7 @@ persistence samples of each goal case and the gate (T01.F11 cadence, every
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       survivor list stays here.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t24-f01-order-free-food-spread.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
       series entries point to the summaries, no new full report staged.
@@ -205,8 +205,30 @@ make bench PROFILE=gate FEATURE=t24-f01-order-free-food-spread
 make bench PROFILE=goal FEATURE=t24-f01-order-free-food-spread
 ```
 
-**Measured verdict.** One line per profile after the runs: exit statuses, the
-`severe` flag, thresholds crossed, and whether the epoch re-pinned.
+**Measured verdict** (2026-10-07, code 924ef77b, production diff confined to
+`ecology.rs`, host load 12–15, `bench-wait` not blocking). The predeclaration
+above is unedited; each row applies its rules to the stored summaries.
+
+| Profile | Result |
+| --- | --- |
+| Gate | CLI exit 0, outer exit 0, `severe` false vs T11.F25 and T24.F03. `vm_steps` flagged +33.87% (0.048411 vs 0.036163): a band miss on a non-severe counter, recorded. `decided_passes` 0 on both sides (zero-baseline case not triggered). Wall −0.58% per creature-tick; `food_growth_ms` per tick +0.9% to +3.3% (within ±10%). Epoch kept at T11.F25; summary appended to `closed`. |
+| Goal | CLI exit 3 (severe), outer exit 0, `severe` true vs T11.F27 and T24.F03: `plasticity_updates` +89.19% (0.852171 vs 0.450435), predeclared as possibly severe; `pass_cap_hits` flagged +40.55%, predeclared; `vm_steps` −58.24% (1.004918 vs 2.406467), a band miss on a non-severe counter (a fall is never severe), recorded; the other four counters within ±25%. Wall −16.59% per creature-tick with `creature_ticks` up 20–29%; `food_growth_ms` per tick −3.8% to −4.6% (within ±10%): the wall rule's (a) holds and (b) explains the ratio. Severe accepted under the acceptance scope (diff confined to the one accumulate, reviewer-checked): `goal_worlds` `epoch_baseline` re-pins to this feature's goal summary in the closing commit, before the mutation gate. |
+| Forecast bands | Hits: no extinction anywhere; gate persistence +3.5% to +5.2%; gate food seed 22 +10.9%; Orchards final population +21.8% and plateau +30.9%; Confluence plateau +19.3%; type-1 food unchanged (saturated). Misses, recorded under the miss rule and not blocking: goal type-0 food at the final sample Orchards −17.9%, Canyon −43.9%, Confluence −4.1%; gate food seeds 11 −12.9% and 33 −8.4%; final population Canyon +61.9% and Confluence +67.4%; plateau Canyon +110.5% (all above the +50% band). Reading, not a claim: the forecast took "more kept spread" to mean more standing food, but the kept regrowth is eaten; populations rose 22–67% and standing type-0 food fell in step, the direction the plateau rise implies. The paired per-world readings are the reference T24.F02 holds its trajectories against. |
+
+The user decision clauses of the predeclaration (extinction in a persisting
+world, a phase-cost rise beyond +10%, a severe with any other production
+change) were not reached; no user decision was needed at closure.
+
+- Gate: `make bench` exit 0, `severe=false` vs T11.F25 and T24.F03; flag `vm_steps` +33.87%
+  (outside the +-25% band, recorded); no wall flag. Epoch T11.F25 kept; summary appended to `closed`.
+- Goal: `make bench` make 2 (v3-cli exit 3), `severe=true` vs T11.F27 and T24.F03; severe
+  `plasticity_updates` +89.19% (predeclared), flag `pass_cap_hits` +40.55%, `vm_steps` -58.24%
+  (outside the +-25% band, recorded); no wall flag. Goal-worlds epoch not yet re-pinned (orchestrator
+  step, after the reviewer confirms the production change is confined to the accumulate).
+- Bands: food misses (decreases) Orchards -17.9%, Canyon -43.9%, Confluence -4.1%, gate seeds 11 and 33
+  -12.9% and -8.4%; persistence misses Canyon final +61.9% and plateau +110.5%, Confluence final +67.4%;
+  all other persistence readings hit; `extinction_tick` null everywhere (hit).
+- Wall: `food_growth_ms` per tick within +-10% on every seed (gate +0.9% to +3.3%, goal -3.8% to -4.6%).
 
 - Summaries: [gate](../../progress/features/t24-f01-order-free-food-spread.json),
   [goal](../../progress/features/t24-f01-order-free-food-spread-goal.json).
