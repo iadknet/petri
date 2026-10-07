@@ -370,6 +370,7 @@ fn run_families(families: &mut Vec<Family>) {
             "petri.phase",
             strings(
                 [
+                    "food_growth",
                     "world_update",
                     "sensor_assembly",
                     "cognition",

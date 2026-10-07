@@ -1147,12 +1147,16 @@ pub struct SeedFinalStateObservation {
     pub wall_clock_ms: f64,
 }
 
-/// One seed's cumulative wall-clock split across the five timed tick phases.
+/// One seed's cumulative wall-clock split across the six timed tick phases.
 /// The turn-queue build and the priority sort are untimed: they are the
 /// remainder against that seed's `wall_clock_ms`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct SeedPhaseWallClock {
     pub seed: u64,
+    /// Food growth (T24.F03); zero in reports made before it, whose
+    /// `world_update_ms` still includes food growth.
+    #[serde(default)]
+    pub food_growth_ms: f64,
     pub world_update_ms: f64,
     pub sensor_assembly_ms: f64,
     pub cognition_ms: f64,

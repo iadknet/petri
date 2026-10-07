@@ -253,6 +253,14 @@ mutation gate under the same reviewed no-behavior-change claim, and the same
 three track checks stand in; T23's additions sit behind the reference build's
 switch with T21's.
 
+On 2026-10-07 the user ruled that telemetry checks use the existing
+production `petri-telemetry` stack, the one that captures every run, instead
+of temporary scratch stacks. The dashboards and overhead checks now start it
+as `make telemetry-up` does when it is down, never stop it, and isolate their
+data by the run IDs they create; the overhead check lost its stopped-stack
+and idle-stack states and T21.F05's one-time qualify mode, and measures one
+state, the stack up for both sides of every pair.
+
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
 the [archived PRDs](prds/archive/README.md), the

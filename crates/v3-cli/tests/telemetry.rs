@@ -375,14 +375,39 @@ fn snapshots_every_10_ms_end_at_the_final_tick_sample() {
     }
 }
 
-/// Six spans, `tick` then the phases, with IDs derived from the run and the
-/// tick, the identity attributes and `petri.phase` on each, and the sample
-/// policy the tick's snapshot implies.
+/// `tick`, the six phases, then the food growth passes under `food_growth`
+/// (T24.F03), with IDs derived from the run and the tick, the identity
+/// attributes and `petri.phase` on each, and the sample policy the tick's
+/// snapshot implies.
 fn assert_trace_shape(trace: &ReceivedTrace, run_id: &str, tick: u64, last_tick: u64) {
+    const FOOD_PASSES: [&str; 8] = [
+        "depletion_recovery",
+        "grazing_recovery",
+        "inhibition_sums",
+        "density_total",
+        "growth_spread",
+        "recovery_spawns",
+        "write_back",
+        "inhibited_count",
+    ];
     let names: Vec<&str> = trace.spans.iter().map(|span| span.name.as_str()).collect();
     let mut expected = vec!["tick"];
     expected.extend(v3_telemetry::PHASES);
-    assert_eq!(names, expected);
+    assert_eq!(names[..expected.len()], expected);
+    let passes = &trace.spans[expected.len()..];
+    assert!(!passes.is_empty(), "the food growth passes are traced");
+    let food_growth = &trace.spans[1];
+    for pass in passes {
+        assert!(FOOD_PASSES.contains(&pass.name.as_str()), "{}", pass.name);
+        assert_eq!(pass.parent_span_id, food_growth.span_id, "{}", pass.name);
+        assert_eq!(pass.attribute("petri.phase"), Some("food_growth"));
+        assert!(
+            pass.start_time_unix_nano >= food_growth.start_time_unix_nano
+                && pass.end_time_unix_nano <= food_growth.end_time_unix_nano,
+            "{} nests in food_growth",
+            pass.name
+        );
+    }
     let trace_id = format!("{}{tick:016x}", &run_id[..16]);
     let policy = if tick == last_tick {
         ["interval", "run_end"].as_slice()
@@ -392,10 +417,10 @@ fn assert_trace_shape(trace: &ReceivedTrace, run_id: &str, tick: u64, last_tick:
     for (index, span) in trace.spans.iter().enumerate() {
         assert_eq!(span.trace_id, trace_id);
         assert_eq!(span.span_id, format!("{:016x}", index + 1));
-        let parent = if index == 0 {
-            String::new()
-        } else {
-            format!("{:016x}", 1)
+        let parent = match index {
+            0 => String::new(),
+            1..=6 => format!("{:016x}", 1),
+            _ => format!("{:016x}", 2),
         };
         assert_eq!(span.parent_span_id, parent);
         assert_eq!(span.attribute("petri.run_id"), Some(run_id));
@@ -408,7 +433,9 @@ fn assert_trace_shape(trace: &ReceivedTrace, run_id: &str, tick: u64, last_tick:
         assert!(span.attribute("petri.recipe").is_some());
         assert_eq!(span.attribute("petri.world"), Some("64x64"));
         assert!(policy.contains(&span.attribute("petri.sample_policy").unwrap()));
-        assert_eq!(span.attribute("petri.phase"), Some(names[index]));
+        if index <= 6 {
+            assert_eq!(span.attribute("petri.phase"), Some(names[index]));
+        }
         assert!(span.start_time_unix_nano <= span.end_time_unix_nano);
     }
     let root = &trace.spans[0];

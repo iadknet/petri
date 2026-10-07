@@ -220,8 +220,8 @@ fn a_window_encodes_predicted_ids_parents_times_names_and_attributes() {
             .attribute("petri.neighbor_food")
             .unwrap()
             .starts_with('['));
-        let cognition = ns(&run, seam.started + seam.phases[2].offset);
-        let actions = ns(&run, seam.started + seam.phases[3].offset);
+        let cognition = ns(&run, seam.started + seam.phases[3].offset);
+        let actions = ns(&run, seam.started + seam.phases[4].offset);
         assert_eq!(span.events_named("hop").count(), record.hops.len());
         assert_eq!(span.events_named("pass").count(), record.passes.len());
         let applied = record.outcome.as_ref().unwrap().applied.len();

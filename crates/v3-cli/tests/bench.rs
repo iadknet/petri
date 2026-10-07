@@ -922,7 +922,12 @@ fn thread_count_changes_the_environment_but_not_the_deterministic_block() {
         let phases = &report.environment.phase_wall_clock_ms_per_seed;
         assert_eq!(phases.len(), params.seeds.len());
         assert_eq!(phases[0].seed, params.seeds[0]);
-        let phase_total = phases[0].world_update_ms
+        assert!(
+            phases[0].food_growth_ms > 0.0,
+            "food growth is timed as its own phase"
+        );
+        let phase_total = phases[0].food_growth_ms
+            + phases[0].world_update_ms
             + phases[0].sensor_assembly_ms
             + phases[0].cognition_ms
             + phases[0].actions_ms

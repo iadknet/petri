@@ -164,12 +164,34 @@ pub(crate) fn phase_0_energy_charge(
 /// 3. Energy decay (subtract `energy_decay_per_tick` plus the genome carrying
 ///    cost `genome_carry_cost_per_unit * cached_genome_size`, as one charge)
 /// 4. Death removal (remove creatures where energy <= 0 from slotmap + world occupancy)
+///
+/// `run_tick` runs the same two halves with a clock between them: step 1 is
+/// the `food_growth` phase, steps 2 to 4 the `world_update` phase (T24.F03).
 pub fn run_phase_0(sim: &mut Simulation) {
-    use super::energy_accounting::{decay_partition, DeathCause};
-    // Step 1: Food growth
+    run_phase_0_food_growth(sim);
+    run_phase_0_creatures(sim);
+}
+
+/// Phase 0 step 1: food growth. Under `telemetry-seams` it returns the timed
+/// grid passes for the tick-trace seam.
+#[cfg(feature = "telemetry-seams")]
+fn run_phase_0_food_growth(sim: &mut Simulation) -> crate::kernel::FoodPasses {
+    let mut food_growth = sim.world.grow_food(sim.tick, &mut sim.rng);
+    let passes = food_growth.take_passes();
+    sim.stats.record_food_growth_summary(food_growth);
+    passes
+}
+
+/// Phase 0 step 1: food growth.
+#[cfg(not(feature = "telemetry-seams"))]
+fn run_phase_0_food_growth(sim: &mut Simulation) {
     let food_growth = sim.world.grow_food(sim.tick, &mut sim.rng);
     sim.stats.record_food_growth_summary(food_growth);
+}
 
+/// Phase 0 steps 2 to 4: aging, energy decay, death removal.
+fn run_phase_0_creatures(sim: &mut Simulation) {
+    use super::energy_accounting::{decay_partition, DeathCause};
     // Steps 2 & 3: Age, energy decay, and shared memory snapshot + decay
     let decay_rate = sim.config.shared_memory.decay_rate;
     let lifecycle = &sim.config.energy.lifecycle;
@@ -1284,7 +1306,8 @@ fn run_reward_learning(sim: &mut Simulation, outcome_acc: &OutcomeAccumulator) {
 /// Run one full simulation tick per v3-tick-orchestration-spec.md.
 ///
 /// Two-phase model:
-/// 1. Phase 0: world updates (food growth, aging, decay, death removal)
+/// 1. Phase 0: food growth (timed as `food_growth`), then aging, decay and
+///    death removal (timed as `world_update`)
 /// 2. Build turn queue: sort all creature IDs then shuffle
 /// 3. Phase 1 — Batch cognition: all creatures see the frozen post-Phase-0 world snapshot
 /// 4. Phase 2 — Sequential action execution: apply decisions in queue order
@@ -1305,7 +1328,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
     #[cfg(feature = "telemetry-seams")]
     let population_start = sim.creatures.len();
     #[cfg(feature = "telemetry-seams")]
-    let mut phases = [crate::simulation::stats::PhaseTiming::default(); 5];
+    let mut phases = [crate::simulation::stats::PhaseTiming::default(); 6];
     let phase_started = Instant::now();
     #[cfg(feature = "telemetry-seams")]
     let tick_started = phase_started;
@@ -1320,10 +1343,20 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
     };
     #[cfg(not(feature = "telemetry-seams"))]
     let record = |_: usize, _: Instant, _: std::time::Duration| {};
-    run_phase_0(sim);
+    // ── Phase 0: food growth, then aging, energy decay and death removal ──
+    #[cfg(feature = "telemetry-seams")]
+    let food_passes = run_phase_0_food_growth(sim);
+    #[cfg(not(feature = "telemetry-seams"))]
+    run_phase_0_food_growth(sim);
+    let elapsed = phase_started.elapsed();
+    sim.stats.phase_wall_clock.food_growth += elapsed;
+    record(0, phase_started, elapsed);
+
+    let phase_started = Instant::now();
+    run_phase_0_creatures(sim);
     let elapsed = phase_started.elapsed();
     sim.stats.phase_wall_clock.world_update += elapsed;
-    record(0, phase_started, elapsed);
+    record(1, phase_started, elapsed);
 
     // Snapshot surviving creature energies for Phase 2.5 reward learning.
     let mut outcome_acc = OutcomeAccumulator::default();
@@ -1363,13 +1396,13 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
     let inputs = assemble_sensor_inputs(sim, &queue);
     let elapsed = phase_started.elapsed();
     sim.stats.phase_wall_clock.sensor_assembly += elapsed;
-    record(1, phase_started, elapsed);
+    record(2, phase_started, elapsed);
 
     let phase_started = Instant::now();
     let mut decisions = run_cognition(sim, &inputs, trace, trace_target);
     let elapsed = phase_started.elapsed();
     sim.stats.phase_wall_clock.cognition += elapsed;
-    record(2, phase_started, elapsed);
+    record(3, phase_started, elapsed);
 
     // Sort decisions by priority bid descending. Stable sort preserves the
     // pre-existing random shuffle order among creatures with equal bids.
@@ -1383,14 +1416,14 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
     compute.commit(&mut sim.stats);
     let elapsed = phase_started.elapsed();
     sim.stats.phase_wall_clock.actions += elapsed;
-    record(3, phase_started, elapsed);
+    record(4, phase_started, elapsed);
 
     // ── Phase 2.5: Reward-modulated learning pass ────────────────────────
     let phase_started = Instant::now();
     run_reward_learning(sim, &outcome_acc);
     let elapsed = phase_started.elapsed();
     sim.stats.phase_wall_clock.reward_learning += elapsed;
-    record(4, phase_started, elapsed);
+    record(5, phase_started, elapsed);
 
     sim.tick += 1;
     #[cfg(feature = "telemetry-seams")]
@@ -1403,6 +1436,18 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
             elapsed: tick_started.elapsed(),
             phases,
         });
+        // Same-size elements: `collect` reuses `grow`'s buffer in place.
+        sim.stats.last_tick_food_passes = food_passes
+            .into_iter()
+            .map(|pass| crate::simulation::stats::FoodPassSpan {
+                pass: pass.pass,
+                food_type: pass.food_type,
+                timing: crate::simulation::stats::PhaseTiming {
+                    offset: pass.started.duration_since(tick_started),
+                    elapsed: pass.elapsed,
+                },
+            })
+            .collect();
         window_seam::finish_tick(sim, trace, &outcome_acc, sim.tick - 1);
     }
 }

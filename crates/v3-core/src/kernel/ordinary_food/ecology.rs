@@ -9,6 +9,7 @@ use crate::kernel::fertility;
 use crate::kernel::Grid;
 
 use super::catalog::OrdinaryFoodCatalog;
+use super::pass_clock::{FoodPass, PassClock};
 use super::state::OrdinaryFoodState;
 
 const RECOVERY_PER_TICK: f32 = 0.03;
@@ -36,6 +37,17 @@ pub struct FoodGrowthSummary {
     /// Non-barrier cells: the denominator of each type's grazed-cell share.
     pub passable_cells: u32,
     pub per_type: Vec<FoodTypeTelemetry>,
+    /// The grid passes this call ran, in execution order (T24.F03).
+    #[cfg(feature = "telemetry-seams")]
+    pub passes: super::pass_clock::FoodPasses,
+}
+
+impl FoodGrowthSummary {
+    /// Moves the pass timings out for the tick-trace seam.
+    #[cfg(feature = "telemetry-seams")]
+    pub fn take_passes(&mut self) -> super::pass_clock::FoodPasses {
+        std::mem::take(&mut self.passes)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -367,17 +379,22 @@ pub(super) fn grow<T: Clone>(
         return FoodGrowthSummary::default();
     }
 
+    let mut clock = PassClock::new(catalog.len());
+    let start = PassClock::start();
     let depletion_summary =
         occupancy_depletion.recover_and_deposit(barriers, occupancy, &shared.occupancy_depletion);
+    clock.stop(start, FoodPass::DepletionRecovery, None);
     // Grazing heals before any fertility read, on every passable cell: the
     // grazed cell is empty by construction and the growth loop below skips
     // empty cells.
+    let start = PassClock::start();
     let (grazing_summaries, passable_cells) =
         state.grazing_mut().recover(barriers, &shared.grazing);
+    clock.stop(start, FoodPass::GrazingRecovery, None);
 
     let max_density = shared.max_density.max(0.0);
     if max_density <= 0.0 || catalog.is_empty() {
-        return FoodGrowthSummary::default();
+        return clock.finish(FoodGrowthSummary::default());
     }
 
     let spread_threshold = max_density * shared.spread_threshold_ratio.clamp(0.0, 1.0);
@@ -396,8 +413,10 @@ pub(super) fn grow<T: Clone>(
         (1.0, 1.0)
     };
 
+    let start = PassClock::start();
     let inhibition_weighted_sums = build_type_inhibition_weighted_sums(state, catalog, max_density);
     let mut inhibited_cell_flags = vec![false; total_cells];
+    clock.stop(start, FoodPass::InhibitionSums, None);
     let mut suppressed_by_occupancy_total = 0.0;
     let mut suppressed_by_inhibition_total = 0.0;
     let mut per_type: Vec<FoodTypeTelemetry> = catalog
@@ -426,7 +445,9 @@ pub(super) fn grow<T: Clone>(
             .clamp(0.0, 1.0);
         let type_inhibitor = entry.config.growth_inhibitor.clamp(0.0, 1.0);
         let type_density_ratio = {
+            let start = PassClock::start();
             let type_total = state.total_food_by_type(type_idx);
+            clock.stop(start, FoodPass::DensityTotal, Some(type_idx));
             let type_capacity = total_cells as f32 * max_density;
             if type_capacity <= 0.0 {
                 0.0
@@ -434,6 +455,7 @@ pub(super) fn grow<T: Clone>(
                 (type_total / type_capacity).clamp(0.0, 1.0)
             }
         };
+        let start = PassClock::start();
         let mut next_density = vec![0.0; total_cells];
 
         for y in 0..state.height() {
@@ -526,8 +548,10 @@ pub(super) fn grow<T: Clone>(
                     (next_density[target_idx] + spread_delta).clamp(0.0, max_density);
             }
         }
+        clock.stop(start, FoodPass::GrowthSpread, Some(type_idx));
 
         if type_density_ratio < recovery_floor && recovery_spawn_rate > 0.0 {
+            let start = PassClock::start();
             let spawn_attempts = (total_cells as f32 * recovery_spawn_rate).round() as usize;
             let spawn_delta = max_density * growth_rate;
 
@@ -572,6 +596,7 @@ pub(super) fn grow<T: Clone>(
                     (recovery_after_inhibition - recovery_delta).max(0.0);
                 next_density[idx] = (next_density[idx] + recovery_delta).clamp(0.0, max_density);
             }
+            clock.stop(start, FoodPass::RecoverySpawns, Some(type_idx));
         }
 
         let grazing_summary = grazing_summaries
@@ -585,6 +610,7 @@ pub(super) fn grow<T: Clone>(
             mean_grazing_modifier: grazing_summary.mean_modifier,
             grazed_cells: grazing_summary.grazed_cells,
         };
+        let start = PassClock::start();
         for y in 0..state.height() {
             for x in 0..state.width() {
                 let idx = y as usize * state.width() as usize + x as usize;
@@ -597,11 +623,14 @@ pub(super) fn grow<T: Clone>(
             }
         }
         per_type[usize::from(type_idx.get())] = telemetry;
+        clock.stop(start, FoodPass::WriteBack, Some(type_idx));
     }
 
+    let start = PassClock::start();
     let inhibited_cells = inhibited_cell_flags.iter().filter(|flag| **flag).count() as u32;
+    clock.stop(start, FoodPass::InhibitedCount, None);
 
-    FoodGrowthSummary {
+    clock.finish(FoodGrowthSummary {
         mean_occupancy_depletion: depletion_summary.mean_depletion,
         occupied_cells_with_depletion: depletion_summary.occupied_cells,
         growth_suppressed_by_occupancy_depletion: suppressed_by_occupancy_total,
@@ -609,7 +638,9 @@ pub(super) fn grow<T: Clone>(
         growth_suppressed_by_type_inhibition: suppressed_by_inhibition_total,
         passable_cells,
         per_type,
-    }
+        #[cfg(feature = "telemetry-seams")]
+        passes: Vec::new(),
+    })
 }
 
 #[cfg(test)]

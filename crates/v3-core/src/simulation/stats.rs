@@ -171,7 +171,11 @@ impl RunningStats {
 /// wall-clock.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PhaseWallClock {
-    /// Phase 0: food growth, aging, energy decay, death removal.
+    /// Phase 0, first part: food growth (`World::grow_food`, T24.F03).
+    pub food_growth: Duration,
+    /// Phase 0, the rest: creature aging, energy decay with shared-memory
+    /// decay and `begin_tick`, and death removal. Before T24.F03 it also held
+    /// food growth.
     pub world_update: Duration,
     /// Phase 1a: sequential sensor-input assembly.
     pub sensor_assembly: Duration,
@@ -207,9 +211,19 @@ pub struct TickPhaseTimings {
     pub started: std::time::Instant,
     /// From the tick's start to the end of its last phase's bookkeeping.
     pub elapsed: Duration,
-    /// `world_update`, `sensor_assembly`, `cognition`, `actions`,
-    /// `reward_learning`, in order.
-    pub phases: [PhaseTiming; 5],
+    /// `food_growth`, `world_update`, `sensor_assembly`, `cognition`,
+    /// `actions`, `reward_learning`, in order.
+    pub phases: [PhaseTiming; 6],
+}
+
+/// One grid pass of food growth on the tick: which pass, its food type for a
+/// per-type pass, and its timing relative to the tick's start (T24.F03).
+#[cfg(feature = "telemetry-seams")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FoodPassSpan {
+    pub pass: crate::kernel::FoodPass,
+    pub food_type: Option<OrdinaryFoodTypeId>,
+    pub timing: PhaseTiming,
 }
 
 /// Observability counters for the simulation.
@@ -355,6 +369,11 @@ pub struct SimStats {
     /// The last tick's phase timings (T21.F03); `None` before the first tick.
     #[cfg(feature = "telemetry-seams")]
     pub last_tick_phases: Option<TickPhaseTimings>,
+    /// The last tick's food growth passes that ran, in execution order, each
+    /// inside its `food_growth` phase (T24.F03); for tick traces only, never
+    /// carried into a creature window.
+    #[cfg(feature = "telemetry-seams")]
+    pub last_tick_food_passes: Vec<FoodPassSpan>,
     /// The creature a trace records (T21.F04): set by `run_tick` at each
     /// tick's start (`None` untraced) or by `Simulation::observe_creature`
     /// when a sample starts between ticks, and kept until the next.
@@ -674,6 +693,8 @@ mod tests {
                     grazed_cells: 0,
                 },
             ],
+            #[cfg(feature = "telemetry-seams")]
+            passes: Vec::new(),
         });
 
         assert!((stats.last_tick_food_occupancy_depletion_mean - 0.12).abs() < 1e-6);

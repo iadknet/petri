@@ -1,0 +1,66 @@
+#!/bin/sh
+# Docker-free tests of scripts/telemetry-stack.sh, the production-stack helper
+# of telemetry-overhead and telemetry-dashboards-check: stub `docker` and
+# `curl` on PATH record every call and answer ready at once. The helper starts
+# petri-telemetry as `make telemetry-up` does and never stops it, takes it
+# down or removes its volume.
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+root=$(dirname -- "$script_dir")
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-telemetry-stack-test.XXXXXX")
+trap 'rm -rf "$test_root"' 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+export STACK_TEST_FIXTURE="$test_root"
+mkdir "$test_root/bin"
+
+# `volume inspect` fails unless the fixture's volume file exists.
+cat >"$test_root/bin/docker" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$*" >>"$STACK_TEST_FIXTURE/docker-calls"
+case "$*" in
+  'volume inspect '*) [ -f "$STACK_TEST_FIXTURE/volume" ] ;;
+esac
+STUB
+printf '#!/bin/sh\nexit 0\n' >"$test_root/bin/curl"
+chmod +x "$test_root/bin/docker" "$test_root/bin/curl"
+
+fail() { printf 'telemetry-stack-test: %s\n' "$*" >&2; exit 1; }
+
+run_helper() {
+  rm -f "$test_root/docker-calls"
+  status=0
+  PATH="$test_root/bin:$PATH" PETRI_TELEMETRY_VOLUME='' PETRI_TELEMETRY_PROJECT='' sh -c '
+    compose_file=$1/telemetry/compose.yaml
+    . "$1/scripts/telemetry-stack.sh"
+    stack_up
+  ' helper "$root" >"$test_root/output" 2>&1 || status=$?
+  [ "$status" -eq 0 ] || { cat "$test_root/output" >&2; fail "stack_up failed (status $status)"; }
+  if grep -Eq '(^| )(down|stop|pause|restart|rm)( |$)|petri-telemetry-|(^| )-p ' "$test_root/docker-calls"; then
+    fail "stopped, removed or renamed the stack: $(cat "$test_root/docker-calls")"
+  fi
+  grep -q "^compose -f $root/telemetry/compose.yaml up -d " "$test_root/docker-calls" ||
+    fail 'did not start the stack from telemetry/compose.yaml'
+}
+
+# A missing production volume is created, as make telemetry-up does.
+run_helper
+grep -qx 'volume create petri-telemetry' "$test_root/docker-calls" || fail 'missing volume not created'
+
+# An existing volume is used as it is.
+: >"$test_root/volume"
+run_helper
+if grep -q '^volume create' "$test_root/docker-calls"; then fail 'created a volume that exists'; fi
+
+# Both checks use the helper, and no telemetry script selects a scratch stack.
+for script in overhead dashboards-check; do
+  grep -q '/scripts/telemetry-stack.sh"$' "$root/scripts/telemetry-$script" ||
+    fail "telemetry-$script does not source telemetry-stack.sh"
+  grep -q '^stack_up$' "$root/scripts/telemetry-$script" || fail "telemetry-$script does not call stack_up"
+  if grep -Eq 'compose (down|stop|pause|restart)|volume rm' "$root/scripts/telemetry-$script"; then
+    fail "telemetry-$script stops or removes the stack"
+  fi
+done
+
+printf 'telemetry-stack-test: ok\n'

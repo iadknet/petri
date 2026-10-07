@@ -969,6 +969,7 @@ impl Active {
             run,
             &trace::Capture {
                 seam: &seam,
+                food_passes: &sim.stats.last_tick_food_passes,
                 stats: &sim.stats,
                 config: &sim.config,
                 population: sim.creatures.len(),
