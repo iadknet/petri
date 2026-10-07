@@ -1,6 +1,6 @@
 # T24 — Simulation Throughput
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-10-06
 **Master**: [Program Roadmap](../roadmap.md)
 
