@@ -20,7 +20,7 @@ rewrite builds on the documented rule rather than on a loop-order artifact.
 - [x] Food growth's time per tick is exported apart from creature aging, energy
   decay and death removal, its grid passes appear as child spans in sampled
   tick traces, and Petri / Performance shows both.
-- [ ] Every food-spread contribution reaches its target whatever order cells are
+- [x] Every food-spread contribution reaches its target whatever order cells are
   visited in, as `docs/reference/v3-world-grid-spec.md` §5 already specifies,
   and the repair's ecological effect is read on the gate and goal profiles on
   its own.
@@ -39,7 +39,7 @@ rewrite builds on the documented rule rather than on a loop-order artifact.
 
 - [x] **T24.F03 — Food Growth Phase Timing** — Depends on: None
   - Goal: The microscope sees inside world update: food growth is timed apart from creature aging, energy decay and death removal in the phase metric and the sampled tick traces, each of its grid passes is a child span on sampled ticks, and Petri / Performance shows them.
-- [ ] **T24.F01 — Order-Free Food Spread** — Depends on: None
+- [x] **T24.F01 — Order-Free Food Spread** — Depends on: None
   - Goal: Seeds disperse evenly in every direction: food spreading from a dense cell keeps its share whichever neighbour it lands on, so a cell that already holds food no longer drops spread from its north and west neighbours, and food inside patches no longer drifts north-west.
 - [ ] **T24.F02 — Parallel Food Regrowth** — Depends on: T24.F01, T24.F03
   - Goal: Food regrows by the repaired rules on every core at once: `World::grow_food` runs on the rayon pool with its own seeded per-cell stream, so a goal run spends at most half as long per tick on regrowth at 8 threads and still reproduces byte-for-byte at any thread count.

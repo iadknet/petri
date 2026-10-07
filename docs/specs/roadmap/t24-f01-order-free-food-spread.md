@@ -1,6 +1,6 @@
 # T24.F01 — Order-Free Food Spread
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-07
 **Feature**: T24.F01
 **Track**: [T24 — Simulation Throughput](../../roadmaps/t24-simulation-throughput.md)
@@ -155,7 +155,7 @@ persistence samples of each goal case and the gate (T01.F11 cadence, every
       and the readings record the new seed and how many of the 26 seeds go
       extinct or end on one cell under the repaired rule (5 and 11 at
       T19.F04); no assertion, horizon or world size changes.
-- [ ] Benchmark gate and goal profiles, the readings table (food totals and
+- [x] Benchmark gate and goal profiles, the readings table (food totals and
       persistence per world against T24.F03), the series entry and the epoch
       step of the Performance table, then the mutation gate.
 
@@ -237,8 +237,8 @@ change) were not reached; no user decision was needed at closure.
   (outside the +-25% band, recorded); no wall flag. Epoch T11.F25 kept; summary appended to `closed`.
 - Goal: `make bench` make 2 (v3-cli exit 3), `severe=true` vs T11.F27 and T24.F03; severe
   `plasticity_updates` +89.19% (predeclared), flag `pass_cap_hits` +40.55%, `vm_steps` -58.24%
-  (outside the +-25% band, recorded); no wall flag. Goal-worlds epoch not yet re-pinned (orchestrator
-  step, after the reviewer confirms the production change is confined to the accumulate).
+  (outside the +-25% band, recorded); no wall flag. Goal-worlds epoch re-pinned to this summary at d9cada52
+  (Codex review task-muyit10t-j4ioop: confinement confirmed).
 - Bands: food misses (decreases) Orchards -17.9%, Canyon -43.9%, Confluence -4.1%, gate seeds 11 and 33
   -12.9% and -8.4%; persistence misses Canyon final +61.9% and plateau +110.5%, Confluence final +67.4%;
   all other persistence readings hit; `extinction_tick` null everywhere (hit).
@@ -250,15 +250,15 @@ change) were not reached; no user decision was needed at closure.
 
 ## Success Criteria
 
-- [ ] `grow` implements invariant 1: the fixture, the per-cell oracle test
+- [x] `grow` implements invariant 1: the fixture, the per-cell oracle test
       and the property test pass, and the two orientations of the fixture
       agree.
-- [ ] Draws, config digests and the reference spec are unchanged (invariants
+- [x] Draws, config digests and the reference spec are unchanged (invariants
       3 and 5); reproducibility and viability tests pass.
-- [ ] Gate and goal summaries are stored with the readings against T24.F03,
+- [x] Gate and goal summaries are stored with the readings against T24.F03,
       the epoch step is applied as predeclared, and `make check` and the
       mutation gate pass on the closing commit.
-- [ ] Track criterion 2 holds: every spread contribution reaches its target
+- [x] Track criterion 2 holds: every spread contribution reaches its target
       whatever order cells are visited in, and the ecological effect is read
       on both profiles on its own.
 
@@ -266,3 +266,5 @@ change) were not reached; no user decision was needed at closure.
 
 - Decision: the user ordered T24 as T24.F03, then T24.F01, then T24.F02
   (2026-10-06); T24.F02 builds its gather form on this repaired rule.
+- Decision: spec owner Q1: the four further food-grid pins re-pin under each file's own rule (task 5); Q2: band misses are recorded under the miss rule, no user decision.
+- Cost: /usage awaits the user; 2 implementer passes (advisor 2, 2), 2 spec-owner resumes, 3 challenge rounds (ready), review 0 P1/1 P2/0 P3.
