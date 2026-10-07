@@ -101,7 +101,9 @@ opposing signs across a family's channels (cancellation), or neither?
   `frontend-check`, `dependency-audit` and `skill-check` all exited 0. The
   prototypes' results therefore count.
 - **Branch and commits.** Branch `worktree-evolvability-diagnosis-2` from
-  `d4bc4a98`: `chore(deps)` `056df5a8`; `proto:` `dcbee45e` (both
+  `d4bc4a98`: `chore(deps)` `056df5a8` (which also carries the note's first
+  predeclaration text, staged before the refused commit and committed with
+  the lock file); `proto:` `dcbee45e` (both
   prototypes); `instr:` `368e4cb8` (census probe options, vote-delta
   reading, the one-event proposals' decay exclusion); `lab:` `de579cdf` (the
   E4 probe with the decay reading); `proto+instr+lab:` `0dd4c7d0` (rustfmt
