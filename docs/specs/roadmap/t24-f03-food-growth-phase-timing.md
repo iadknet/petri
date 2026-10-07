@@ -1,6 +1,6 @@
 # T24.F03 — Food Growth Phase Timing
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-06
 **Feature**: T24.F03
 **Track**: [T24 — Simulation Throughput](../../roadmaps/t24-simulation-throughput.md)
@@ -299,28 +299,30 @@ make bench PROFILE=gate FEATURE=t24-f03-food-growth-phase-timing
 make bench PROFILE=goal FEATURE=t24-f03-food-growth-phase-timing
 ```
 
-**Measured verdict (2026-10-07, rerun c14a6b9e, code as c57ee5db).** Gate and goal: exit 0, `severe` false, every
-delta 0 vs T11.F25/T11.F27 and T20.F05, as predeclared. Wall vs T20.F05: gate -0.1%, goal +10.6%; the +25%
-flag does not persist (first loaded run superseded). Host not idle (load 17-43); goal +10.6% unattributed.
-Tables: readings, "Wall-flag investigation".
-
-- Summaries: [gate](../../progress/features/t24-f03-food-growth-phase-timing.json),
-  [goal](../../progress/features/t24-f03-food-growth-phase-timing-goal.json).
-- Full readings: [`docs/progress/readings/t24-f03.md`](../../progress/readings/t24-f03.md).
+| Measured verdict (2026-10-07, rerun c14a6b9e, code as c57ee5db) | Result |
+| --- | --- |
+| Gate and goal | exit 0, `severe` false, every delta 0 vs T11.F25/T11.F27 and T20.F05, as predeclared |
+| Wall vs T20.F05 | gate -0.1%, goal +10.6%; the +25% flag does not persist (first loaded run superseded); host not idle (load 17-43), goal +10.6% unattributed; readings, "Wall-flag investigation" |
+| Summaries | [gate](../../progress/features/t24-f03-food-growth-phase-timing.json), [goal](../../progress/features/t24-f03-food-growth-phase-timing-goal.json), readings [`t24-f03.md`](../../progress/readings/t24-f03.md) |
 
 ## Success Criteria
 
-- [ ] A run with telemetry on exports `petri.run.phase_wall_clock` with six
+- [x] A run with telemetry on exports `petri.run.phase_wall_clock` with six
       phase keys, `food_growth` among them, and `world_update` no longer
       includes food growth.
-- [ ] Every sampled tick trace has six phase spans under `tick` and, under
+- [x] Every sampled tick trace has six phase spans under `tick` and, under
       `food_growth`, one span per food pass that ran, named from the pass
       table, with `petri.food_type` on per-type passes.
-- [ ] Petri / Performance shows `food_growth` in its phase panels and lists
+- [x] Petri / Performance shows `food_growth` in its phase panels and lists
       the pass spans of sampled ticks; `scripts/telemetry-dashboards-check`
       passes with the new span set.
-- [ ] Benchmark reports and summaries carry `food_growth_ms` per seed.
-- [ ] Seeded output is byte-identical to the merge base with telemetry off
+- [x] Benchmark reports and summaries carry `food_growth_ms` per seed.
+- [x] Seeded output is byte-identical to the merge base with telemetry off
       and on, and the gate and goal deterministic readings equal T20.F05.
 
 ## Notes for AI Agents
+
+- Exception: overhead check inconclusive on all four attempts (loaded host); user accepted it 2026-10-07.
+- Exception: mutation runs 1–2 void (pre-existing test failures, fixed test-only); user authorized run 3.
+- Decision: user ruling 2026-10-07: telemetry checks use the existing stack; scratch and verify scripts deleted.
+- Cost: /usage awaits the user; 9 implementer passes, 2 spec-owner resumes, 3 challenge rounds (ready), review 2 P1/3 P2/1 P3.

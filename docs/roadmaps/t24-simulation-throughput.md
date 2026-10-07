@@ -17,7 +17,7 @@ rewrite builds on the documented rule rather than on a loop-order artifact.
 
 ## Track Success Criteria
 
-- [ ] Food growth's time per tick is exported apart from creature aging, energy
+- [x] Food growth's time per tick is exported apart from creature aging, energy
   decay and death removal, its grid passes appear as child spans in sampled
   tick traces, and Petri / Performance shows both.
 - [ ] Every food-spread contribution reaches its target whatever order cells are
@@ -37,7 +37,7 @@ rewrite builds on the documented rule rather than on a loop-order artifact.
 
 ## Executable Features
 
-- [ ] **T24.F03 — Food Growth Phase Timing** — Depends on: None
+- [x] **T24.F03 — Food Growth Phase Timing** — Depends on: None
   - Goal: The microscope sees inside world update: food growth is timed apart from creature aging, energy decay and death removal in the phase metric and the sampled tick traces, each of its grid passes is a child span on sampled ticks, and Petri / Performance shows them.
 - [ ] **T24.F01 — Order-Free Food Spread** — Depends on: None
   - Goal: Seeds disperse evenly in every direction: food spreading from a dense cell keeps its share whichever neighbour it lands on, so a cell that already holds food no longer drops spread from its north and west neighbours, and food inside patches no longer drifts north-west.
