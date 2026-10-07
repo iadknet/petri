@@ -4,8 +4,8 @@
 # one every run exports to (user decision, 2026-10-07): a check isolates its
 # data by the run IDs it creates, never by an empty store. Project and volume
 # are pinned whatever COMPOSE_PROJECT_NAME, PETRI_TELEMETRY_PROJECT or
-# PETRI_TELEMETRY_VOLUME the caller inherits (those select
-# scripts/telemetry-verify's scratch stack). Nothing here, and no caller,
+# PETRI_TELEMETRY_VOLUME the caller inherits.
+# Nothing here, and no caller,
 # stops, pauses, restarts, recreates or takes down the stack or removes its
 # volume.
 # The caller sets compose_file (telemetry/compose.yaml).

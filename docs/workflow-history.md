@@ -259,7 +259,10 @@ of temporary scratch stacks. The dashboards and overhead checks now start it
 as `make telemetry-up` does when it is down, never stop it, and isolate their
 data by the run IDs they create; the overhead check lost its stopped-stack
 and idle-stack states and T21.F05's one-time qualify mode, and measures one
-state, the stack up for both sides of every pair.
+state, the stack up for both sides of every pair. `scripts/telemetry-scratch.sh`
+and T21.F01's destructive `scripts/telemetry-verify` (with `telemetry/verify/`)
+were deleted at the user's direction the same day; its record stays in
+`docs/progress/readings/t21-f01.md`.
 
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),

@@ -9,11 +9,6 @@
 #
 # Uses only the pinned image, through `docker compose exec` and `docker
 # compose run`, against a running stack (`make telemetry-up`).
-#
-# Environment:
-#   PETRI_TELEMETRY_PROJECT  Compose project (petri-telemetry) and
-#   PETRI_TELEMETRY_VOLUME   its volume; scripts/telemetry-verify points both
-#                            at its own stack, petri-telemetry-verify.
 set -eu
 
 usage() {
@@ -61,7 +56,7 @@ parsed=$("$aqua_root/bin/node" -e '
 cutoff=${parsed% *}
 cutoff_ms=${parsed#* }
 
-project=${PETRI_TELEMETRY_PROJECT:-petri-telemetry}
+project=petri-telemetry
 
 compose() {
   docker compose -p "$project" -f "$root/telemetry/compose.yaml" "$@"

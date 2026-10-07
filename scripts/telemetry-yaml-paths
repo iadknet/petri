@@ -1,7 +1,7 @@
 #!/bin/sh
 # Prints `dotted.path value` for every scalar key of the block-style YAML on
 # stdin (Tempo's /status/config); list items are skipped. Used by
-# scripts/telemetry-cleanup and scripts/telemetry-verify (T21.F01).
+# scripts/telemetry-cleanup (T21.F01).
 set -eu
 
 [ "$#" -eq 0 ] || { printf 'Usage: scripts/telemetry-yaml-paths < config.yaml\n' >&2; exit 2; }
