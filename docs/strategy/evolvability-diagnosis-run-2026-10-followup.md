@@ -100,6 +100,16 @@ opposing signs across a family's channels (cancellation), or neither?
   `rust-test-lab`, `rust-test-telemetry`, `rust-test-doc`, `rust-clippy`,
   `frontend-check`, `dependency-audit` and `skill-check` all exited 0. The
   prototypes' results therefore count.
+- **Landing (recorded on `main`).** At closing `main` had advanced from
+  `d4bc4a98` to `4fcf4cd3` by two commits of the user's: `2ceabea4`, their
+  own upgrade of `source-map-js` to 1.2.2 (the same lock-file change as the
+  branch's `056df5a8`), and the T24 Simulation Throughput track. The picks
+  applied on top of it without conflict; the `chore(deps)` pick therefore
+  added only the note's first predeclaration text on `main` (its lock-file
+  change was already there), and the docs part of `c4de89e1` was extracted
+  by `cherry-pick -n` with the branch-only crate file dropped from the
+  index. The landing proceeded rather than stopping, since the advance was
+  docs plus the same dependency fix and no pick touched what it changed.
 - **Branch and commits.** Branch `worktree-evolvability-diagnosis-2` from
   `d4bc4a98`: `chore(deps)` `056df5a8` (which also carries the note's first
   predeclaration text, staged before the refused commit and committed with
