@@ -134,15 +134,15 @@ use crate::FIRST_UNTRACED_TICK;
 
 #[test]
 fn a_window_encodes_predicted_ids_parents_times_names_and_attributes() {
-    let started = Instant::now();
+    // The sample starts before its ticks run, so the root (max of its start
+    // and the tick ends) always ends with the last tick; the run starts 1 ms
+    // earlier so the root start is a nonzero offset from the run start.
+    let sample_started = Instant::now();
+    let run = run(sample_started
+        .checked_sub(Duration::from_millis(1))
+        .unwrap());
     let (trace, creature_id) = recorded(3);
-    let run = run(started);
-    let mut meta = meta(
-        5,
-        Policy::Window,
-        creature_id,
-        started + Duration::from_millis(1),
-    );
+    let mut meta = meta(5, Policy::Window, creature_id, sample_started);
     meta.tick_digests = vec!["d1".into(), "d2".into(), "d3".into()];
     let mut config_attrs = Attributes::default();
     trace::cognition(&mut config_attrs, &config());
