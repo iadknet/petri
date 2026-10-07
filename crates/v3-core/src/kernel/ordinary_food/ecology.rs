@@ -1255,4 +1255,37 @@ mod tests {
         let expected = 1.0 + 1.0 * 0.5 * 0.5 * MIN_GROWTH_MULTIPLIER;
         assert!((state.food_at_type(pos, type_idx) - expected).abs() < 1e-5);
     }
+
+    /// Without density headroom `grow` stops after the two recovery calls:
+    /// no type is grown or written back, so no per-type telemetry and no
+    /// passable-cell count leave the call (T24.F03 mutation gate).
+    #[test]
+    fn grow_without_max_density_returns_before_the_per_type_passes() {
+        let mut config = FoodConfig::default();
+        config.shared.max_density = 0.0;
+        config.types.push(crate::config::FoodTypeConfig::default());
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let mut state = OrdinaryFoodState::new(4, 3, catalog.len());
+        let barriers = barrier_grid(4, 3);
+        let occupancy = occupancy_grid::<()>(4, 3);
+
+        let summary = grow(
+            &mut state,
+            &catalog,
+            &config.shared,
+            &config,
+            &mut OccupancyDepletionLayer::new(4, 3),
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &barriers,
+            &occupancy,
+            WorldEdgeMode::Wrap,
+            0,
+            &mut StdRng::seed_from_u64(5),
+        );
+
+        assert!(summary.per_type.is_empty(), "{:?}", summary.per_type);
+        assert_eq!(summary.passable_cells, 0);
+    }
 }
