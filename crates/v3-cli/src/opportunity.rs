@@ -732,18 +732,52 @@ mod tests {
             .all(|family| family.competence.violations == 0));
     }
 
+    /// A throwaway Git checkout with one commit, so default output paths
+    /// resolve without depending on the source tree being a repository
+    /// (cargo-mutants runs tests from a plain copy of the tree).
+    fn git_checkout(dir: &Temp) -> PathBuf {
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(&dir.0)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        git(&["init", "--quiet"]);
+        git(&[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            "fixture",
+        ]);
+        dir.0.clone()
+    }
+
     /// A pilot must never overwrite the full run's raw record (or the
     /// reverse): each default raw path is named after its own run.
     #[test]
     fn pilot_and_full_runs_resolve_to_distinct_raw_paths() {
-        let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let full = Options::new("t20-f01-x", checkout);
+        let dir = Temp::new();
+        let full = Options::new("t20-f01-x", git_checkout(&dir));
         let pilot = Options {
             pilot: true,
             ..full.clone()
         };
         let full = output_paths(&full).unwrap();
         let pilot = output_paths(&pilot).unwrap();
+        assert_ne!(full.raw, pilot.raw);
         assert!(full
             .raw
             .ends_with(".bench-artifacts/t20-f01-x/input-opportunity.json"));
