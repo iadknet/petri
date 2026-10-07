@@ -1,7 +1,7 @@
 # Diverse Ecosystems and Complex Cognition
 
 **Status**: Active
-**Last updated**: 2026-09-29
+**Last updated**: 2026-10-06
 
 ## Success Definition
 
@@ -39,6 +39,7 @@ feature whose closure moved it.
 - [x] **T21 — Run Observability and Execution Tracing** — [Roadmap](roadmaps/t21-run-observability-and-execution-tracing.md) — Depends on: None
 - [ ] **T22 — Capability Assays and Evolvability Lab** — [Roadmap](roadmaps/t22-capability-assays-and-evolvability-lab.md) — Depends on: None
 - [ ] **T23 — Behavior and Cognition Readings** — [Roadmap](roadmaps/t23-behavior-and-cognition-readings.md) — Depends on: None
+- [ ] **T24 — Simulation Throughput** — [Roadmap](roadmaps/t24-simulation-throughput.md) — Depends on: None
 
 ## Final Success Criteria
 
@@ -52,6 +53,7 @@ feature whose closure moved it.
 
 ## Notes for AI Agents
 
+- T24 — Simulation Throughput was added on 2026-10-06 at the user's direction after a GPU-offload question. On the only goal-length phase breakdown, world update (food regrowth, one thread) takes 65–72% of tick time and cognition 12–14%, already parallel. T24.F01 first repairs a spread bug found while drafting (a cell holding food overwrites spread from its north and west neighbours, against reference spec §5), with its ecological effect read on its own. T24.F02 then parallelizes food regrowth on the CPU with its own seeded per-cell stream and keeps runs byte-identical across thread counts. GPU offload is deferred, with the evidence in the track notes. Optimization rows are engineering features outside the natural-analog rule; the ordinary gates apply, and trajectory moves close under the epoch re-pin rule. **T24's rows are not in the order of new starts below; their placement is the user's decision.**
 - T23 — Behavior and Cognition Readings was drafted on 2026-09-30 after the user found the T21 dashboards answered nothing about how creatures live, what they do or whether they use their senses. It turns the [live survey](strategy/live-survey-2026-09-16.md) readings into continuous, chance-baselined dashboard readings (movement against chance, sensor reactivity, brain use, life histories, selection on sensing, lineages) and lays the dashboards out by question. Measurement tooling under T21's rules: not closure evidence, not an objective. Draft; open decisions D1 to D3 are in the track notes, and it is not yet in the order of new starts.
 - Action-parameter storage cleanup, 2026-09-24 (user-approved): add T11.F27 — Compact Action-Parameter Storage directly after T11.F25 and before T11.F26, so the mutation-effect readings and T20 are taken on a surface with no undecoded parameter fields. T11.F25 made fresh parameter-target draws select decoded fields; T11.F27 removes the fields and the inherited wiring to them (audit M3's storage alternative). T11.F26 now depends on T11.F27; T20 inherits it through T11.F26.
 - Mutation-effect diagnostics, 2026-09-24 (user-approved): add T11.F26 — Mutation-Effect Attribution and Observation Coverage directly after T11.F25 and before T20.F01, which now depends on its observation handoff. The [bounded follow-up experiments](strategy/drift-silence-followup-2026-09-24.md) support distinguishing mutation exposure, already-actionless parents, state/cost effects and battery coverage before choosing a repair; they do not establish that T11 harmed cognition. Reuse existing instruments and selected-genome sampling, with unresolved causes and failed samples retained. Earlier priorities, including T11.F10/F13, remain in place; this decision adds measurement, not a mutation-policy change.
