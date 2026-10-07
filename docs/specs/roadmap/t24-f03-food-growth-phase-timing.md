@@ -15,21 +15,20 @@ phase metric, the sampled tick traces and the benchmark reports show
 Petri / Performance shows the new phase in its phase panels and lists the
 pass spans of sampled ticks. Nothing a run computes changes: seeded output is
 byte-identical to the parent build, telemetry on or off. T24.F02 reads this
-phase's time per tick as its speedup instrument and the pass spans for its
-decomposition.
+phase's time per tick and its pass spans as its instrument.
 
 ## Non-Goals
 
 - No change to what `grow_food` computes, in what order, or which RNG draws
   it makes; T24.F01 (spread repair) and T24.F02 (parallel regrowth) are
   separate rows.
-- No per-pass cumulative metric: passes are trace material on sampled ticks
-  only. No finer timing inside a pass, no per-cell or per-row span.
-- No new `SimulationConfig` or `RuntimeConfig` field, no telemetry setting,
-  no preset change, no change to the trace caps or the snapshot cadence.
-- No frontend change: Petri / Performance is the Grafana dashboard.
-- No timing of the untimed remainder (energy snapshot, queue shuffle,
-  priority sort); it stays the gap between phases.
+- No per-pass cumulative metric (passes are sampled-tick trace material
+  only), no timing inside a pass.
+- No new config field, telemetry setting, preset change, trace cap or
+  snapshot cadence change.
+- No frontend change (the dashboard is Grafana).
+- The untimed remainder (energy snapshot, queue shuffle, priority sort)
+  stays untimed.
 
 ## Inputs and Invariants
 
@@ -208,16 +207,13 @@ introduced; the food values a pass depends on are on the `food_growth` span.
       a zero-cell grid, and only the two recovery spans when `max_density`
       is zero (the empty-catalog branch of that return is unreachable, since
       `OrdinaryFoodCatalog::new` substitutes a default type); the window seam
-      carries the phases and no pass. 2026-10-07: `phase_timing` 2 passed;
-      `phase_seam` 9 passed (7 kernel fixtures in
-      `pass_clock/phase_seam_tests.rs`, 2 tick tests); `window_seam` 20
-      passed.
+      carries the phases and no pass. 2026-10-07: `phase_timing` 2, `phase_seam` 9
+      (7 kernel, 2 tick), `window_seam` 20 passed.
 - [x] No behavior change: `cargo test -p v3-core --test reproducibility` and
       the telemetry-neutrality test inside `make check` -> pass;
       `scripts/telemetry-parent-compare 9aa0c5a5` -> identical canonical
-      NDJSON against the merge base. 2026-10-07: `reproducibility` 3 passed,
-      `viability` 28 passed and the neutrality test passed inside `make
-      check`; the parent compare: identical (3 canonical lines).
+      NDJSON against the merge base. 2026-10-07: `reproducibility` 3, `viability` 28 and the
+      neutrality test passed; parent compare identical (3 canonical lines).
 - [x] Telemetry: `cargo test -p v3-telemetry` -> the expected families carry
       `food_growth`; the trace test pins `tick`, six phases and every pass
       span with IDs 1 to 7 and 8 upward, parents, names and key sets; with
@@ -234,14 +230,13 @@ introduced; the food values a pass depends on are on the `food_growth` span.
       it, the only stack) -> every check it runs passes: its workload run
       and its own tiny bench sweep export to that stack, so check 3 answers
       every panel query, `petri-runs / Measurements` from the sweep; check 2
-      finds the `food_growth` series and check 6 the new span set. The runs
-      stay in the stack's stores as ordinary runs; the pass lines go in the
+      finds the `food_growth` series and check 6 the new span set. The pass lines are in the
       readings. 2026-10-07: exit 0, 14 PASS.
 - [x] `make check` -> exit 0 (2026-10-07; workspace and `-p v3-core`
       clippy `-D warnings` clean).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t24-f03-food-growth-phase-timing.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
       series entries point to the summaries, no new full report staged.
@@ -270,7 +265,10 @@ make bench PROFILE=gate FEATURE=t24-f03-food-growth-phase-timing
 make bench PROFILE=goal FEATURE=t24-f03-food-growth-phase-timing
 ```
 
-**Measured verdict.** Not yet run.
+**Measured verdict (2026-10-07, c57ee5db).** Gate and goal: exit 0 (outer and CLI), `severe` false, every
+delta 0.000000 against T11.F25/T11.F27 and T20.F05: matches the predeclaration. Wall +26% (gate), +48%
+(goal, 666 s) vs T20.F05 on a loaded host, no CLI wall verdict, no idle rerun: for the orchestrator's
+investigation. Hashes, loads and phase tables: readings.
 
 - Summaries: [gate](../../progress/features/t24-f03-food-growth-phase-timing.json),
   [goal](../../progress/features/t24-f03-food-growth-phase-timing-goal.json).
