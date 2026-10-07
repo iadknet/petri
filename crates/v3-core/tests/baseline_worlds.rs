@@ -99,6 +99,9 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// sinks; restoring that draw alone restores the old hash). T11.F27 re-pinned
 /// it for the genome's `Debug` shape alone (three `ActionParam` field sinks,
 /// 94 sinks per graph); the hash without genome text is unchanged.
+/// T24.F01 re-pinned it: `grow` keeps spread into occupied cells (the
+/// accumulate at ecology.rs line 495); restoring the assignment alone restores
+/// the old hash.
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -126,7 +129,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 9485529022557498135);
+    assert_eq!(hash.finish(), 2028530170870542862);
 }
 
 use proptest::prelude::*;

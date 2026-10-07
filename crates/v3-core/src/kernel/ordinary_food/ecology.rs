@@ -492,7 +492,8 @@ pub(super) fn grow<T: Clone>(
                 }
                 suppressed_by_inhibition_total += (local_base - local_after_inhibition).max(0.0);
                 suppressed_by_occupancy_total += (local_after_inhibition - local_delta).max(0.0);
-                next_density[idx] = (source + local_delta).clamp(0.0, max_density);
+                next_density[idx] =
+                    (next_density[idx] + source + local_delta).clamp(0.0, max_density);
 
                 if source < spread_threshold || local_after_inhibition <= 0.0 {
                     continue;
@@ -1287,5 +1288,331 @@ mod tests {
 
         assert!(summary.per_type.is_empty(), "{:?}", summary.per_type);
         assert_eq!(summary.passable_cells, 0);
+    }
+
+    /// Food config with every growth modifier off (fertility, inhibition,
+    /// occupancy depletion, grazing), so local growth is `source × g`, a
+    /// spread is `source × g × spread_density_ratio`, and a recovery spawn is
+    /// `max_density × g` (T24.F01).
+    fn plain_growth_config(type_count: usize) -> FoodConfig {
+        let mut config = FoodConfig::default();
+        config.fertility.enabled = false;
+        config.shared.occupancy_depletion.enabled = false;
+        config.shared.grazing.enabled = false;
+        config.shared.recovery_spawn_rate = 0.0;
+        config.shared.recovery_floor_ratio = 0.0;
+        config.types = vec![
+            crate::config::FoodTypeConfig {
+                growth_inhibitor: 0.0,
+                ..crate::config::FoodTypeConfig::default()
+            };
+            type_count
+        ];
+        config
+    }
+
+    /// One growth pass with no occupancy and no grazing ledgers, the
+    /// world size taken from `barriers`.
+    fn grow_once(
+        state: &mut OrdinaryFoodState,
+        catalog: &OrdinaryFoodCatalog,
+        config: &FoodConfig,
+        barriers: &Grid<bool>,
+        edge_mode: WorldEdgeMode,
+        seed: u64,
+    ) {
+        let (width, height) = (barriers.width(), barriers.height());
+        grow(
+            state,
+            catalog,
+            &config.shared,
+            config,
+            &mut OccupancyDepletionLayer::new(width, height),
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut Vec::new(),
+            barriers,
+            &occupancy_grid::<()>(width, height),
+            edge_mode,
+            0,
+            &mut StdRng::seed_from_u64(seed),
+        );
+    }
+
+    /// One growth pass on a `Bounded` 2x1 world with a dense cell spreading
+    /// into an occupied cell below the spread threshold; returns the
+    /// occupied cell's density.
+    fn two_cell_spread_into_occupied(dense: Position, occupied: Position) -> f32 {
+        let mut config = plain_growth_config(1);
+        config.shared.growth_rate = 0.5;
+        config.shared.spread_density_ratio = 1.0;
+        config.shared.spread_threshold_ratio = 0.08;
+        config.shared.max_density = 10.0;
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let type_idx = OrdinaryFoodTypeId::new(0);
+        let mut state = OrdinaryFoodState::new(2, 1, catalog.len());
+        state.set_food_type_density(dense, type_idx, 1.0);
+        state.set_food_type_density(occupied, type_idx, 0.5);
+
+        grow_once(
+            &mut state,
+            &catalog,
+            &config,
+            &barrier_grid(2, 1),
+            WorldEdgeMode::Bounded,
+            5,
+        );
+        state.food_at_type(occupied, type_idx)
+    }
+
+    #[test]
+    fn spread_into_an_occupied_cell_adds_to_its_growth_in_both_orientations() {
+        // target × (1 + g) + source × g × spread_density_ratio
+        let expected = 0.5 * 1.5 + 1.0 * 0.5 * 1.0;
+        let west_dense = two_cell_spread_into_occupied(Position::new(0, 0), Position::new(1, 0));
+        let east_dense = two_cell_spread_into_occupied(Position::new(1, 0), Position::new(0, 0));
+        assert!(
+            (west_dense - expected).abs() < 1e-6,
+            "west dense: {west_dense}"
+        );
+        assert!(
+            (east_dense - expected).abs() < 1e-6,
+            "east dense: {east_dense}"
+        );
+    }
+
+    /// What the per-cell oracle saw while gathering one growth pass.
+    struct PerCellGather {
+        /// Expected density per type, per cell (row-major).
+        expected: Vec<Vec<f32>>,
+        /// A spread crossed a wrapped edge.
+        wrapped_delivery: bool,
+        /// Some cell's unclamped sum exceeded `max_density`.
+        clamp_bound: bool,
+        /// A spread landed on an occupied, higher-index target with headroom
+        /// after its own growth: the delivery the assignment rule discarded.
+        delivery_lost_to_assignment: bool,
+    }
+
+    /// Test-side gather of invariant 1 on a `Wrap` grid with every growth
+    /// modifier off: replays the draws `grow` makes (per type in catalog
+    /// order, one `gen_range(0..count)` per spreading cell in row-major
+    /// order, then that type's recovery draws) and sums each cell's own
+    /// growth, received spread and recovery spawns before one clamp.
+    fn gather_per_cell_rule(
+        before: &[Vec<f32>],
+        barriers: &Grid<bool>,
+        shared: &FoodResourceConfig,
+        rng: &mut StdRng,
+    ) -> PerCellGather {
+        let (width, height) = (barriers.width() as usize, barriers.height() as usize);
+        let cells = width * height;
+        let g = shared.growth_rate;
+        let max = shared.max_density;
+        let threshold = max * shared.spread_threshold_ratio;
+        let mut gather = PerCellGather {
+            expected: Vec::new(),
+            wrapped_delivery: false,
+            clamp_bound: false,
+            delivery_lost_to_assignment: false,
+        };
+        let is_barrier = |idx: usize| *barriers.get((idx % width) as u16, (idx / width) as u16);
+
+        for density in before {
+            let mut own = vec![0.0f32; cells];
+            let mut sum = vec![0.0f32; cells];
+            let mut deliveries = Vec::new();
+            for idx in 0..cells {
+                let source = density[idx];
+                if is_barrier(idx) || source <= 0.0 {
+                    continue;
+                }
+                own[idx] = source + source * g;
+                sum[idx] += own[idx];
+                if source < threshold {
+                    continue;
+                }
+                let (x, y) = ((idx % width) as i32, (idx / width) as i32);
+                let neighbors: Vec<usize> =
+                    [Direction::N, Direction::E, Direction::S, Direction::W]
+                        .into_iter()
+                        .map(|dir| {
+                            let (dx, dy) = dir.delta();
+                            let tx = (x + dx).rem_euclid(width as i32) as usize;
+                            let ty = (y + dy).rem_euclid(height as i32) as usize;
+                            ty * width + tx
+                        })
+                        .filter(|&target| !is_barrier(target))
+                        .collect();
+                if neighbors.is_empty() {
+                    continue;
+                }
+                let target = neighbors[rng.gen_range(0..neighbors.len())];
+                sum[target] += source * g * shared.spread_density_ratio;
+                deliveries.push((idx, target));
+                let (tx, ty) = (target % width, target / width);
+                if (x as usize).abs_diff(tx) > 1 || (y as usize).abs_diff(ty) > 1 {
+                    gather.wrapped_delivery = true;
+                }
+            }
+            let type_total: f32 = density.iter().sum();
+            if type_total / (cells as f32 * max) < shared.recovery_floor_ratio
+                && shared.recovery_spawn_rate > 0.0
+            {
+                let attempts = (cells as f32 * shared.recovery_spawn_rate).round() as usize;
+                for _ in 0..attempts {
+                    let idx = rng.gen_range(0..cells);
+                    if !is_barrier(idx) {
+                        sum[idx] += max * g;
+                    }
+                }
+            }
+            gather.delivery_lost_to_assignment |= deliveries.iter().any(|&(source, target)| {
+                target > source && density[target] > 0.0 && own[target] < max
+            });
+            gather.clamp_bound |= sum.iter().any(|&value| value > max);
+            gather
+                .expected
+                .push(sum.into_iter().map(|value| value.clamp(0.0, max)).collect());
+        }
+        gather
+    }
+
+    #[test]
+    fn growth_pass_writes_the_per_cell_sum_of_own_growth_spread_and_recovery() {
+        const WIDTH: u16 = 4;
+        const HEIGHT: u16 = 3;
+        let mut config = plain_growth_config(2);
+        config.shared.growth_rate = 0.5;
+        config.shared.spread_density_ratio = 0.5;
+        config.shared.spread_threshold_ratio = 0.5;
+        config.shared.max_density = 1.0;
+        config.shared.recovery_spawn_rate = 0.25;
+        config.shared.recovery_floor_ratio = 1.0;
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let mut barriers = barrier_grid(WIDTH, HEIGHT);
+        barriers.set(1, 1, true);
+        #[rustfmt::skip]
+        let before = vec![
+            vec![
+                0.9, 0.3, 0.0, 0.9,
+                0.3, 0.0, 0.9, 0.3,
+                0.9, 0.3, 0.3, 0.6,
+            ],
+            vec![
+                0.3, 0.9, 0.3, 0.0,
+                0.6, 0.0, 0.3, 0.9,
+                0.0, 0.3, 0.9, 0.3,
+            ],
+        ];
+        let mut state = OrdinaryFoodState::new(WIDTH, HEIGHT, catalog.len());
+        for (type_number, density) in before.iter().enumerate() {
+            for (idx, &value) in density.iter().enumerate() {
+                let pos = Position::new(idx as u16 % WIDTH, idx as u16 / WIDTH);
+                state.set_food_type_density(
+                    pos,
+                    OrdinaryFoodTypeId::new(type_number as u16),
+                    value,
+                );
+            }
+        }
+        let seed = 7;
+        let gather = gather_per_cell_rule(
+            &before,
+            &barriers,
+            &config.shared,
+            &mut StdRng::seed_from_u64(seed),
+        );
+
+        grow_once(
+            &mut state,
+            &catalog,
+            &config,
+            &barriers,
+            WorldEdgeMode::Wrap,
+            seed,
+        );
+
+        assert!(
+            gather.wrapped_delivery,
+            "fixture must deliver across a wrapped edge"
+        );
+        assert!(
+            gather.clamp_bound,
+            "fixture must bind the max_density clamp"
+        );
+        assert!(
+            gather.delivery_lost_to_assignment,
+            "fixture must spread onto an occupied later-visited cell with headroom"
+        );
+        for (type_number, expected) in gather.expected.iter().enumerate() {
+            for (idx, &want) in expected.iter().enumerate() {
+                let pos = Position::new(idx as u16 % WIDTH, idx as u16 / WIDTH);
+                let got = state.food_at_type(pos, OrdinaryFoodTypeId::new(type_number as u16));
+                assert!(
+                    (got - want).abs() < 1e-6,
+                    "type {type_number} cell ({}, {}): got {got}, want {want}",
+                    pos.x,
+                    pos.y
+                );
+            }
+        }
+    }
+
+    proptest::proptest! {
+        /// With no clamp binding and no modifier, one growth pass conserves
+        /// `Σ source × (1 + g) + Σ_{source ≥ threshold} source × g × ratio`
+        /// whatever targets the spreading cells draw.
+        #[test]
+        fn growth_pass_total_keeps_every_spread_contribution(
+            width in 2u16..=6,
+            height in 2u16..=6,
+            densities in proptest::collection::vec(0.0f32..=10.0, 36),
+            growth_rate in 0.01f32..=1.0,
+            spread_density_ratio in 0.0f32..=1.0,
+            bounded in proptest::bool::ANY,
+            seed in proptest::num::u64::ANY,
+        ) {
+            let mut config = plain_growth_config(1);
+            config.shared.growth_rate = growth_rate;
+            config.shared.spread_density_ratio = spread_density_ratio;
+            config.shared.max_density = 1000.0;
+            config.shared.spread_threshold_ratio = 0.005;
+            let threshold = f64::from(config.shared.max_density * config.shared.spread_threshold_ratio);
+            let catalog = OrdinaryFoodCatalog::new(&config);
+            let type_idx = OrdinaryFoodTypeId::new(0);
+            let mut state = OrdinaryFoodState::new(width, height, catalog.len());
+            let mut expected = 0.0f64;
+            for y in 0..height {
+                for x in 0..width {
+                    let source = densities[usize::from(y * width + x)];
+                    state.set_food_type_density(Position::new(x, y), type_idx, source);
+                    let (source, g) = (f64::from(source), f64::from(growth_rate));
+                    expected += source * (1.0 + g);
+                    if source >= threshold {
+                        expected += source * g * f64::from(spread_density_ratio);
+                    }
+                }
+            }
+            let edge_mode = if bounded { WorldEdgeMode::Bounded } else { WorldEdgeMode::Wrap };
+
+            grow_once(
+                &mut state,
+                &catalog,
+                &config,
+                &barrier_grid(width, height),
+                edge_mode,
+                seed,
+            );
+
+            let total: f64 = (0..height)
+                .flat_map(|y| (0..width).map(move |x| Position::new(x, y)))
+                .map(|pos| f64::from(state.food_at_type(pos, type_idx)))
+                .sum();
+            proptest::prop_assert!(
+                (total - expected).abs() <= 1e-5 * expected.max(1.0),
+                "total {total} vs expected {expected}"
+            );
+        }
     }
 }
