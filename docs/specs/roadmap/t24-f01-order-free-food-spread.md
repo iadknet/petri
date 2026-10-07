@@ -171,9 +171,23 @@ persistence samples of each goal case and the gate (T01.F11 cadence, every
 - [x] `make check` exits 0 (2026-10-07, after the goal-worlds epoch re-pin), including
       `gate_profile_has_no_severe_regression_against_series_references`
       against the series as left by the epoch step below.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
-      survivor list stays here.
+      survivor list stays here. Fresh run 2026-10-07 at d9cada52:
+      `9 mutants tested in 5m: 4 missed, 5 caught`, output
+      `~/.local/share/petri-tools/mutants/t24-f01/mutants.out`. All four
+      survivors sit on the unchanged occupancy-suppression accounting line
+      next to the fix; `occupancy_depletion_multiplies_beside_grazing` now
+      asserts `growth_suppressed_by_occupancy_depletion`, and the
+      `MUTANTS_ITERATE=1` feedback pass caught all four. No second fresh run:
+      production code, test selection and tool configuration are unchanged.
+
+      | Survivor (`ecology.rs`, `grow`) | Resolution |
+      | --- | --- |
+      | 494:47 replace `+=` with `*=` | killed (strengthened test) |
+      | 494:47 replace `+=` with `-=` | killed (strengthened test) |
+      | 494:74 replace `-` with `+` | killed (strengthened test) |
+      | 494:74 replace `-` with `/` | killed (strengthened test) |
 - [x] Benchmark summaries stored at
       `docs/progress/features/t24-f01-order-free-food-spread.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
