@@ -1,0 +1,44 @@
+{
+ "gate": "G2",
+ "n3": ".bench-artifacts/lab/diagnosis2/n3/census-confluence.ndjson",
+ "e2": "/Users/istefanek/projects/petri/.bench-artifacts/lab/diagnosis/e2/census-confluence.ndjson",
+ "checks": [
+  {
+   "tick": 20000,
+   "block": "input_use",
+   "n3_present": true,
+   "e2_present": true,
+   "n3_sha256": "f2586746f135eb084e970ac2e06d6659e31bf25268168b19eac49847fcccd52b",
+   "e2_sha256": "f2586746f135eb084e970ac2e06d6659e31bf25268168b19eac49847fcccd52b",
+   "equal": true
+  },
+  {
+   "tick": 50000,
+   "block": "input_use",
+   "n3_present": true,
+   "e2_present": true,
+   "n3_sha256": "c1ed96206ff17edc123906e1d23c61e8b54a23b33b701566607aa8690cade8d8",
+   "e2_sha256": "c1ed96206ff17edc123906e1d23c61e8b54a23b33b701566607aa8690cade8d8",
+   "equal": true
+  },
+  {
+   "tick": 20000,
+   "block": "e6",
+   "n3_present": true,
+   "e2_present": true,
+   "n3_sha256": "a6d02a2b810c0644c5273137e8014aa8e66e0cfc1e4a0db4feeecbe6bfcecf70",
+   "e2_sha256": "a6d02a2b810c0644c5273137e8014aa8e66e0cfc1e4a0db4feeecbe6bfcecf70",
+   "equal": true
+  }
+ ],
+ "pass": true,
+ "n3_checkpoints": [
+  20000,
+  50000
+ ],
+ "e2_checkpoints": [
+  10000,
+  20000,
+  50000
+ ]
+}

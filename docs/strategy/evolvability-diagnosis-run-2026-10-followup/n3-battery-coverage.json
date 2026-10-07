@@ -1,0 +1,140 @@
+{
+ "reading": "battery_nonzero_coverage_of_target_channels",
+ "battery": "neighborhood-v1 (Battery::generate(2))",
+ "scenarios": 80,
+ "rows": [
+  {
+   "family": "AreaFoodSummary:0",
+   "channel": 0,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:0",
+   "channel": 1,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:0",
+   "channel": 2,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:0",
+   "channel": 3,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:0",
+   "channel": 4,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:0",
+   "channel": 5,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:0",
+   "channel": 6,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:1",
+   "channel": 0,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:1",
+   "channel": 1,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:1",
+   "channel": 2,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:1",
+   "channel": 3,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:1",
+   "channel": 4,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:1",
+   "channel": 5,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "AreaFoodSummary:1",
+   "channel": 6,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "NeighborBarrierRing",
+   "channel": 0,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "NeighborBarrierRing",
+   "channel": 1,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "NeighborBarrierRing",
+   "channel": 2,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "NeighborBarrierRing",
+   "channel": 3,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "NeighborBarrierRing",
+   "channel": 4,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "NeighborBarrierRing",
+   "channel": 5,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "NeighborBarrierRing",
+   "channel": 6,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  },
+  {
+   "family": "NeighborBarrierRing",
+   "channel": 7,
+   "nonzero_scenarios": 0,
+   "scenarios": 80
+  }
+ ],
+ "note": "nonzero_scenarios counts battery snapshots and sequence ticks where resolve_input returns a nonzero value for the channel"
+}

@@ -1,0 +1,349 @@
+{
+ "row": "N3",
+ "world": "Confluence",
+ "seed": 33,
+ "threads": 8,
+ "horizon": 50000,
+ "checkpoints_requested": [
+  20000,
+  50000
+ ],
+ "vote_delta_version": "vote-delta-v1",
+ "complete": true,
+ "extinct": null,
+ "footer": {
+  "census_secs": 7.203438959,
+  "elapsed_secs": 15567.272733584,
+  "extinct": false,
+  "kind": "footer",
+  "sim_secs": 15547.612383638998,
+  "threads": 8,
+  "ticks": 50000
+ },
+ "trajectory": [
+  {
+   "tick": 2500,
+   "population": 4026,
+   "mean_genome_size": 272.94485842026825,
+   "mean_generation": 83.61251862891207,
+   "mean_age": 21.861897665176354,
+   "mean_energy": 37.56811463080487
+  },
+  {
+   "tick": 5000,
+   "population": 3364,
+   "mean_genome_size": 323.929548156956,
+   "mean_generation": 147.6911414982164,
+   "mean_age": 28.70630202140309,
+   "mean_energy": 33.03720531307435
+  },
+  {
+   "tick": 7500,
+   "population": 3041,
+   "mean_genome_size": 399.31272607694837,
+   "mean_generation": 214.70897731009535,
+   "mean_age": 27.405129891483064,
+   "mean_energy": 32.643199214890025
+  },
+  {
+   "tick": 10000,
+   "population": 3582,
+   "mean_genome_size": 497.99022892238975,
+   "mean_generation": 294.6711334450028,
+   "mean_age": 24.769402568397542,
+   "mean_energy": 33.24981133910213
+  },
+  {
+   "tick": 12500,
+   "population": 3133,
+   "mean_genome_size": 609.0791573571656,
+   "mean_generation": 366.5729332907756,
+   "mean_age": 26.77338014682413,
+   "mean_energy": 37.149634483306315
+  },
+  {
+   "tick": 15000,
+   "population": 3164,
+   "mean_genome_size": 881.1261061946902,
+   "mean_generation": 436.24715549936786,
+   "mean_age": 24.990202275600506,
+   "mean_energy": 42.985244019774136
+  },
+  {
+   "tick": 17500,
+   "population": 2742,
+   "mean_genome_size": 1285.7833698030634,
+   "mean_generation": 529.6688548504741,
+   "mean_age": 24.484682713347922,
+   "mean_energy": 43.836567268851546
+  },
+  {
+   "tick": 20000,
+   "population": 3769,
+   "mean_genome_size": 1914.2260546564075,
+   "mean_generation": 620.4544972141151,
+   "mean_age": 25.45794640488193,
+   "mean_energy": 54.37023172948809
+  },
+  {
+   "tick": 22500,
+   "population": 2492,
+   "mean_genome_size": 2278.5212680577847,
+   "mean_generation": 670.8932584269663,
+   "mean_age": 27.37239165329053,
+   "mean_energy": 49.35988590994141
+  },
+  {
+   "tick": 25000,
+   "population": 3258,
+   "mean_genome_size": 3024.064456721915,
+   "mean_generation": 729.8357888275016,
+   "mean_age": 28.130448127685696,
+   "mean_energy": 55.83416634082721
+  },
+  {
+   "tick": 27500,
+   "population": 2906,
+   "mean_genome_size": 3672.6727460426705,
+   "mean_generation": 788.5075705437027,
+   "mean_age": 29.339986235375086,
+   "mean_energy": 57.574938189246
+  },
+  {
+   "tick": 30000,
+   "population": 2260,
+   "mean_genome_size": 4451.841150442478,
+   "mean_generation": 834.7796460176991,
+   "mean_age": 32.13274336283186,
+   "mean_energy": 58.55428509242767
+  },
+  {
+   "tick": 32500,
+   "population": 2065,
+   "mean_genome_size": 6068.664891041162,
+   "mean_generation": 892.9041162227603,
+   "mean_age": 31.00677966101695,
+   "mean_energy": 64.83045264987622
+  },
+  {
+   "tick": 35000,
+   "population": 1560,
+   "mean_genome_size": 5443.053205128205,
+   "mean_generation": 938.1121794871794,
+   "mean_age": 35.241025641025644,
+   "mean_energy": 59.26313640310978
+  },
+  {
+   "tick": 37500,
+   "population": 2876,
+   "mean_genome_size": 3859.1846314325453,
+   "mean_generation": 985.3143254520166,
+   "mean_age": 35.96835883171071,
+   "mean_energy": 43.153823741744056
+  },
+  {
+   "tick": 40000,
+   "population": 2483,
+   "mean_genome_size": 4256.903342730568,
+   "mean_generation": 1043.9935561820378,
+   "mean_age": 39.07692307692308,
+   "mean_energy": 44.213272234700256
+  },
+  {
+   "tick": 42500,
+   "population": 4068,
+   "mean_genome_size": 5952.191740412979,
+   "mean_generation": 1094.4454277286136,
+   "mean_age": 38.831612586037366,
+   "mean_energy": 49.351757991160405
+  },
+  {
+   "tick": 45000,
+   "population": 2630,
+   "mean_genome_size": 6875.980608365019,
+   "mean_generation": 1156.015969581749,
+   "mean_age": 41.5680608365019,
+   "mean_energy": 56.14610839445895
+  },
+  {
+   "tick": 47500,
+   "population": 2124,
+   "mean_genome_size": 8660.639830508475,
+   "mean_generation": 1205.903483992467,
+   "mean_age": 53.26129943502825,
+   "mean_energy": 61.1626843588774
+  },
+  {
+   "tick": 50000,
+   "population": 1545,
+   "mean_genome_size": 11485.124271844661,
+   "mean_generation": 1254.3967637540452,
+   "mean_age": 58.79676375404531,
+   "mean_energy": 74.52742132464466
+  }
+ ],
+ "checkpoints": {
+  "20000": {
+   "parents": 20,
+   "parents_with_executed_target_channels": 8,
+   "executed_target_channels": 9,
+   "channels_with_any_delta": 5,
+   "channels_with_margined_passes": 5,
+   "per_channel": {
+    "ratio_median_of_medians": 0.4763364354363347,
+    "ratio_max": 5.072554443526712,
+    "max_abs_delta_median": 0.3514334261417389,
+    "max_abs_delta_max": 0.37699222564697266,
+    "within_kind_margin_median_of_medians": 0.0743199959397316,
+    "decision_margin_median_of_medians": 0.5,
+    "delta_passes_total": 5975,
+    "margined_passes_total": 2317,
+    "zero_margin_passes_total": 3228,
+    "singleton_kind_passes_total": 430,
+    "kindless_passes_total": 0,
+    "delta_reaches_margin_passes_total": 4028,
+    "divergent_passes_total": 3170,
+    "unmatched_passes_total": 0,
+    "guarded_passes_total": 0,
+    "no_commit_passes_total": 0,
+    "committed_differs_passes_total": 60,
+    "channels_with_action_queue_change": 2,
+    "channels_action_change_without_vote_delta": 2,
+    "channels_vote_delta_without_action_change": 5,
+    "channels_graph_consumers_only": 1,
+    "channels_vm_consumers_only": 8,
+    "channels_both_consumer_kinds": 0,
+    "channels_no_delta_no_change": 2,
+    "consumers_graph_median": 0,
+    "consumers_graph_abs_weight_median": 0.0,
+    "most_moved_kind_counts": {
+     "Move": 1,
+     "StealEnergy": 4
+    }
+   },
+   "per_family": {
+    "families": 9,
+    "families_with_any_delta": 5,
+    "ratio_median_of_medians": 0.4763364354363347,
+    "subadditivity_ratio_median": 1.0,
+    "additive_residual_ratio_median": 0.0,
+    "families_with_opposing_signs_on_most_moved": 0,
+    "families_cancelling": 0,
+    "families_with_action_queue_change": 2,
+    "divergent_passes_total": 3170
+   },
+   "classification": "mixed",
+   "funnel_target_rows": {
+    "NeighborBarrierRing": {
+     "declared": "4",
+     "connected": "2",
+     "executed": "1",
+     "causal": "0"
+    },
+    "AreaFoodSummary:0": {
+     "declared": "7",
+     "connected": "6",
+     "executed": "3",
+     "causal": "1"
+    },
+    "AreaFoodSummary:1": {
+     "declared": "6",
+     "connected": "6",
+     "executed": "5",
+     "causal": "1"
+    }
+   },
+   "parents_evaluated": 20,
+   "agreement": {
+    "funnel_causal_incidences": 2,
+    "channels_with_action_queue_change": 2
+   },
+   "vote_delta_secs": 0.110754667,
+   "census_secs": 1.054059084,
+   "living": 3769
+  },
+  "50000": {
+   "parents": 20,
+   "parents_with_executed_target_channels": 16,
+   "executed_target_channels": 35,
+   "channels_with_any_delta": 1,
+   "channels_with_margined_passes": 1,
+   "per_channel": {
+    "ratio_median_of_medians": 2.5317827331276073,
+    "ratio_max": 27.079373207257326,
+    "max_abs_delta_median": 0.3719480037689209,
+    "max_abs_delta_max": 0.3719480037689209,
+    "within_kind_margin_median_of_medians": 0.14691150188446045,
+    "decision_margin_median_of_medians": 0.43547162413597107,
+    "delta_passes_total": 28,
+    "margined_passes_total": 28,
+    "zero_margin_passes_total": 0,
+    "singleton_kind_passes_total": 0,
+    "kindless_passes_total": 0,
+    "delta_reaches_margin_passes_total": 28,
+    "divergent_passes_total": 18,
+    "unmatched_passes_total": 0,
+    "guarded_passes_total": 0,
+    "no_commit_passes_total": 7,
+    "committed_differs_passes_total": 0,
+    "channels_with_action_queue_change": 0,
+    "channels_action_change_without_vote_delta": 0,
+    "channels_vote_delta_without_action_change": 1,
+    "channels_graph_consumers_only": 22,
+    "channels_vm_consumers_only": 10,
+    "channels_both_consumer_kinds": 3,
+    "channels_no_delta_no_change": 34,
+    "consumers_graph_median": 1,
+    "consumers_graph_abs_weight_median": 0.9298700094223022,
+    "most_moved_kind_counts": {
+     "Move": 1
+    }
+   },
+   "per_family": {
+    "families": 20,
+    "families_with_any_delta": 1,
+    "ratio_median_of_medians": 2.5317827331276073,
+    "subadditivity_ratio_median": 1.0,
+    "additive_residual_ratio_median": 0.0,
+    "families_with_opposing_signs_on_most_moved": 0,
+    "families_cancelling": 0,
+    "families_with_action_queue_change": 0,
+    "divergent_passes_total": 18
+   },
+   "classification": "neither",
+   "funnel_target_rows": {
+    "NeighborBarrierRing": {
+     "declared": "11",
+     "connected": "9",
+     "executed": "9",
+     "causal": "0"
+    },
+    "AreaFoodSummary:0": {
+     "declared": "8",
+     "connected": "7",
+     "executed": "7",
+     "causal": "0"
+    },
+    "AreaFoodSummary:1": {
+     "declared": "4",
+     "connected": "4",
+     "executed": "4",
+     "causal": "0"
+    }
+   },
+   "parents_evaluated": 20,
+   "agreement": {
+    "funnel_causal_incidences": 0,
+    "channels_with_action_queue_change": 0
+   },
+   "vote_delta_secs": 0.509879,
+   "census_secs": 6.149379875,
+   "living": 1545
+  }
+ },
+ "provenance": {
+  "census_sha256": "3de80e7776ef0ffcf27fd8b7dda31f60eef446e6fdd03df3a90da419205b86d0",
+  "samples_sha256": "215516525eaa90c2feda7929c10b042fc2fb0cf2e99a73f1fae1ef7644d598e8",
+  "reader": "n3read.py"
+ }
+}
