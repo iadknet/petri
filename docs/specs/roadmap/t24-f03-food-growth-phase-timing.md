@@ -88,12 +88,13 @@ Invariants:
    keeps its name, so a cross-run panel comparing runs from before and after
    this feature compares different `world_update` contents.
 3. Seam. Under `telemetry-seams` only, `TickPhaseTimings.phases` becomes
-   `[PhaseTiming; 6]` in the order of invariant 2, and the seam gains the
-   tick's food passes: for each pass that ran, its name from the table, its
-   food type index for a per-type pass, and its offset from the tick start
-   and its elapsed time, in execution order. Pass timing is captured inside
-   the kernel by clock reads around each pass and carried out through
-   `FoodGrowthSummary` or a seam argument, compiled out with the feature;
+   `[PhaseTiming; 6]` in the order of invariant 2, and
+   `SimStats.last_tick_food_passes` carries the tick's food passes: for each
+   pass that ran, its name from the table, its food type index for a
+   per-type pass, and its offset from the tick start and its elapsed time,
+   in execution order. Pass timing is captured inside the kernel by clock
+   reads around each pass and carried out through `FoodGrowthSummary`,
+   compiled out with the feature;
    `v3-core` still takes no dependency and holds no exporter state. The
    passes nest inside `food_growth`: each starts at or after the phase's
    start, ends at or before its end, and the next starts at or after the
@@ -173,8 +174,9 @@ introduced; the food values a pass depends on are on the `food_growth` span.
       `run_phase_0` keeps its signature and calls the two halves `run_tick`
       times; `kernel/ordinary_food/pass_clock.rs` holds `FoodPass` and the
       clock (zero-sized without the feature); the passes leave `grow` in
-      `FoodGrowthSummary.passes` and reach `TickPhaseTimings.food_passes`
-      as offsets from the tick start, so the seam is `Clone`, not `Copy`.
+      `FoodGrowthSummary.passes` and reach `SimStats.last_tick_food_passes`
+      as tick-start offsets; `TickPhaseTimings` stays `Copy`; the tick
+      trace reads them via `trace::Capture.food_passes`.
 - [x] `v3-telemetry`: export the sixth metric key; encode six phase spans and
       the pass spans with the IDs, parents, names and attribute groups of
       invariants 5 and 6; fix `windows.rs` indexes; update the expected
@@ -227,11 +229,11 @@ introduced; the food values a pass depends on are on the `food_growth` span.
       test loads both T20.F05 summaries' `environment`.
 - [x] Dashboard: `scripts/telemetry-dashboards-check` against the existing
       `petri-telemetry` stack (user ruling, 2026-10-07: every run exports to
-      it, the only stack) -> every check it runs passes: its workload run
-      and its own tiny bench sweep export to that stack, so check 3 answers
+      it, the only stack) -> every check passes: its workload run and
+      tiny bench sweep export there, so check 3 answers
       every panel query, `petri-runs / Measurements` from the sweep; check 2
-      finds the `food_growth` series and check 6 the new span set. The pass lines are in the
-      readings. 2026-10-07: exit 0, 14 PASS.
+      finds the `food_growth` series and check 6 the new span set. Pass lines:
+      readings. 2026-10-07: exit 0, 15 PASS.
 - [x] `make check` -> exit 0 (2026-10-07; workspace and `-p v3-core`
       clippy `-D warnings` clean).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
