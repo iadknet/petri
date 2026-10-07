@@ -1236,7 +1236,7 @@ mod tests {
         let barriers = barrier_grid(1, 1);
         let occupancy = Grid::new(1, 1, Some(()));
         let mut rng = StdRng::seed_from_u64(1);
-        grow(
+        let summary = grow(
             &mut state,
             &catalog,
             &config.shared,
@@ -1255,6 +1255,14 @@ mod tests {
         // (MIN_GROWTH_MULTIPLIER at full depletion).
         let expected = 1.0 + 1.0 * 0.5 * 0.5 * MIN_GROWTH_MULTIPLIER;
         assert!((state.food_at_type(pos, type_idx) - expected).abs() < 1e-5);
+        // The occupancy-suppressed share of the local growth is reported
+        // (T24.F01 mutation gate).
+        let suppressed = 1.0 * 0.5 * 0.5 * (1.0 - MIN_GROWTH_MULTIPLIER);
+        assert!(
+            (summary.growth_suppressed_by_occupancy_depletion - suppressed).abs() < 1e-6,
+            "suppressed by occupancy: {}",
+            summary.growth_suppressed_by_occupancy_depletion
+        );
     }
 
     /// Without density headroom `grow` stops after the two recovery calls:
