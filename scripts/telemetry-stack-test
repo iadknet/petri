@@ -1,9 +1,12 @@
 #!/bin/sh
 # Docker-free tests of scripts/telemetry-stack.sh, the production-stack helper
 # of telemetry-overhead and telemetry-dashboards-check: stub `docker` and
-# `curl` on PATH record every call and answer ready at once. The helper starts
-# petri-telemetry as `make telemetry-up` does and never stops it, takes it
-# down or removes its volume.
+# `curl` on PATH record every call and answer ready at once. Every case runs
+# with inherited COMPOSE_PROJECT_NAME, PETRI_TELEMETRY_PROJECT and
+# PETRI_TELEMETRY_VOLUME naming another stack: the helper still addresses
+# project and volume petri-telemetry, makes no `up` call when every service
+# runs, starts missing or stopped services with `up -d --no-recreate`, and
+# never stops the stack, takes it down or removes its volume.
 set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -15,12 +18,21 @@ trap 'exit 143' HUP TERM
 export STACK_TEST_FIXTURE="$test_root"
 mkdir "$test_root/bin"
 
-# `volume inspect` fails unless the fixture's volume file exists.
+# `volume inspect` fails unless the fixture's volume file exists; `compose ...
+# config --services` names the two services and `compose ... ps` answers the
+# fixture's running file. A compose call logs its PETRI_TELEMETRY_VOLUME.
 cat >"$test_root/bin/docker" <<'STUB'
 #!/bin/sh
 printf '%s\n' "$*" >>"$STACK_TEST_FIXTURE/docker-calls"
 case "$*" in
   'volume inspect '*) [ -f "$STACK_TEST_FIXTURE/volume" ] ;;
+  compose*)
+    printf '%s\n' "${PETRI_TELEMETRY_VOLUME-unset}" >>"$STACK_TEST_FIXTURE/compose-volumes"
+    case "$*" in
+      *' config --services') printf 'lgtm\nwindow-store\n' ;;
+      *' ps '*) cat "$STACK_TEST_FIXTURE/running" 2>/dev/null || : ;;
+    esac
+    ;;
 esac
 STUB
 printf '#!/bin/sh\nexit 0\n' >"$test_root/bin/curl"
@@ -29,29 +41,45 @@ chmod +x "$test_root/bin/docker" "$test_root/bin/curl"
 fail() { printf 'telemetry-stack-test: %s\n' "$*" >&2; exit 1; }
 
 run_helper() {
-  rm -f "$test_root/docker-calls"
+  rm -f "$test_root/docker-calls" "$test_root/compose-volumes"
   status=0
-  PATH="$test_root/bin:$PATH" PETRI_TELEMETRY_VOLUME='' PETRI_TELEMETRY_PROJECT='' sh -c '
+  PATH="$test_root/bin:$PATH" PETRI_TELEMETRY_VOLUME=other-volume PETRI_TELEMETRY_PROJECT=other-project \
+    COMPOSE_PROJECT_NAME=other-project sh -c '
     compose_file=$1/telemetry/compose.yaml
     . "$1/scripts/telemetry-stack.sh"
     stack_up
   ' helper "$root" >"$test_root/output" 2>&1 || status=$?
   [ "$status" -eq 0 ] || { cat "$test_root/output" >&2; fail "stack_up failed (status $status)"; }
-  if grep -Eq '(^| )(down|stop|pause|restart|rm)( |$)|petri-telemetry-|(^| )-p ' "$test_root/docker-calls"; then
+  if grep -Eq '(^| )(down|stop|pause|restart|rm)( |$)|petri-telemetry-|other-' "$test_root/docker-calls"; then
     fail "stopped, removed or renamed the stack: $(cat "$test_root/docker-calls")"
   fi
-  grep -q "^compose -f $root/telemetry/compose.yaml up -d " "$test_root/docker-calls" ||
-    fail 'did not start the stack from telemetry/compose.yaml'
+  if grep '^compose ' "$test_root/docker-calls" |
+    grep -qv "^compose -p petri-telemetry -f $root/telemetry/compose.yaml "; then
+    fail "a compose call is not on project petri-telemetry: $(cat "$test_root/docker-calls")"
+  fi
+  [ "$(sort -u "$test_root/compose-volumes")" = petri-telemetry ] ||
+    fail "a compose call is not on volume petri-telemetry: $(sort -u "$test_root/compose-volumes")"
 }
+up_call="compose -p petri-telemetry -f $root/telemetry/compose.yaml up -d --no-recreate"
 
-# A missing production volume is created, as make telemetry-up does.
+# Nothing runs and the volume is missing: the volume is created, as make
+# telemetry-up does, and the services start without recreation.
 run_helper
 grep -qx 'volume create petri-telemetry' "$test_root/docker-calls" || fail 'missing volume not created'
+grep -q "^$up_call" "$test_root/docker-calls" || fail 'did not start a stopped stack with up -d --no-recreate'
 
-# An existing volume is used as it is.
+# One service stopped and the volume exists: the volume is used as it is and
+# the stopped service starts without recreation.
 : >"$test_root/volume"
+printf 'lgtm\n' >"$test_root/running"
 run_helper
 if grep -q '^volume create' "$test_root/docker-calls"; then fail 'created a volume that exists'; fi
+grep -q "^$up_call" "$test_root/docker-calls" || fail 'did not start a stopped service with up -d --no-recreate'
+
+# Every service runs: no up call at all.
+printf 'window-store\nlgtm\n' >"$test_root/running"
+run_helper
+if grep -q ' up ' "$test_root/docker-calls"; then fail "ran up on a running stack: $(cat "$test_root/docker-calls")"; fi
 
 # Both checks use the helper, and no telemetry script selects a scratch stack.
 for script in overhead dashboards-check; do

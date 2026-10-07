@@ -54,9 +54,10 @@
 #      petri.genome_hash;
 #  12. the run's Loki run.started line carries petri_creature_windows,
 #      petri_window_ticks and petri_window_interval_ms;
-#  13. the Measurements panel's query (petri-runs) returns the sweep's
-#      measurement: its run ID, from the sweep's `telemetry: on` line, is in
-#      the answer with both measurement.started and measurement.ended.
+#  13. the Measurements panel's query (petri-runs), filtered in Loki to the
+#      sweep's measurement ID (from its `telemetry: on` line) so unrelated
+#      records cannot fill the answer, returns that ID with both
+#      measurement.started and measurement.ended.
 # Prints one PASS or FAIL line per check and exits 1 when any check fails.
 #
 # Environment:
@@ -332,23 +333,26 @@ to_ms=$(($(date -u +%s) * 1000))
 # shellcheck disable=SC2016 # JavaScript template literals.
 "$node" -e '
   const fs = require("fs");
-  const [, dir, runId, from, to] = process.argv;
+  const [, dir, runId, measurementId, from, to] = process.argv;
   for (const file of ["petri-runs.json", "petri-run.json", "petri-compare.json", "petri-performance.json"]) {
     const d = JSON.parse(fs.readFileSync(`${dir}/${file}`, "utf8"));
     for (const panel of d.panels) {
+      // The Measurements panel lists every measurement; check 13 reads only the sweep.
+      const measurements = d.uid === "petri-runs" && panel.title === "Measurements";
       for (const t of panel.targets || []) {
         const tempo = t.queryType === "traceql";
         const query = tempo
           ? { refId: t.refId, datasource: t.datasource, queryType: t.queryType, tableType: t.tableType,
               limit: t.limit, query: t.query.replaceAll("$run_id", runId) }
-          : { ...t, expr: t.expr.replaceAll("$runs", runId).replaceAll("$run_id", runId), intervalMs: 1000,
-              maxDataPoints: 500 };
+          : { ...t, expr: t.expr.replaceAll("$runs", runId).replaceAll("$run_id", runId) +
+                (measurements ? ` | petri_run_id="${measurementId}"` : ""),
+              intervalMs: 1000, maxDataPoints: 500 };
         const body = { queries: [query], from: String(from), to: String(to) };
         console.log([tempo ? "tempo" : "prometheus", d.uid, panel.title, t.refId, JSON.stringify(body)].join("\t"));
       }
     }
   }
-' "$root/telemetry/grafana/dashboards" "$run_id" "$from_ms" "$to_ms" >"$scratch/queries.tsv"
+' "$root/telemetry/grafana/dashboards" "$run_id" "$measurement_id" "$from_ms" "$to_ms" >"$scratch/queries.tsv"
 # rows ANSWER REF: the answer's row count for REF; 0 for an error or an
 # answer that does not parse.
 rows() {
