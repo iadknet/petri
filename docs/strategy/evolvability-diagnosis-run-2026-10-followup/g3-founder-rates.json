@@ -138,6 +138,46 @@
   "of": 1000000,
   "rate": 0.004942
  },
+ "useful_connect_founder_declared": {
+  "off": {
+   "count": 7,
+   "cp95": [
+    2.8143675468439433e-06,
+    1.4422621833320992e-05
+   ],
+   "of": 1000000,
+   "rate": 7e-06
+  },
+  "on": {
+   "count": 7,
+   "cp95": [
+    2.8143675468439433e-06,
+    1.4422621833320992e-05
+   ],
+   "of": 1000000,
+   "rate": 7e-06
+  },
+  "e4_rate_10e7": 5.5e-06
+ },
+ "lose_to_useful_connect_ratio": {
+  "off": {
+   "point": 2668.4285714285716,
+   "bounds": [
+    1276.781571940215,
+    6731.9762064182605
+   ],
+   "on_e4_denominator": 3396.1818181818185
+  },
+  "on": {
+   "point": 706.0,
+   "bounds": [
+    333.19130198505485,
+    1805.5166114635817
+   ],
+   "on_e4_denominator": 898.5454545454546
+  }
+ },
+ "decay_route_note": "decay.by_operator is the whole-child decay-route mix over every silent entry visited (the watched declaration, the founder's own ring entry and entries created within the birth); the summaries do not attribute routes to the watched entry",
  "on_integrated_loss_founder_declared_by_ops": {
   "InputRefAdd": 102,
   "InputRefAdd+InputRefRawFieldMutation": 5,

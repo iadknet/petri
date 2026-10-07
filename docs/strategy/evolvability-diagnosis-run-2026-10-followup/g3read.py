@@ -79,6 +79,21 @@ def main():
         "checks": checks,
         "pass": all(c["pass"] for c in checks),
         "on_integrated_loss_founder_declared": on["founder+declared"]["lost_declaration"],
+        "useful_connect_founder_declared": {
+            "off": off["founder+declared"]["connect_useful_signed"],
+            "on": on["founder+declared"]["connect_useful_signed"],
+            "e4_rate_10e7": 5.5e-6,
+        },
+        "lose_to_useful_connect_ratio": {
+            arm: {
+                "point": p["lost_declaration"]["rate"] / p["connect_useful_signed"]["rate"] if p["connect_useful_signed"]["rate"] else None,
+                "bounds": [p["lost_declaration"]["cp95"][0] / p["connect_useful_signed"]["cp95"][1] if p["connect_useful_signed"]["cp95"][1] else None,
+                           p["lost_declaration"]["cp95"][1] / p["connect_useful_signed"]["cp95"][0] if p["connect_useful_signed"]["cp95"][0] else None],
+                "on_e4_denominator": p["lost_declaration"]["rate"] / 5.5e-6,
+            }
+            for arm, p in (("off", off["founder+declared"]), ("on", on["founder+declared"]))
+        },
+        "decay_route_note": "decay.by_operator is the whole-child decay-route mix over every silent entry visited (the watched declaration, the founder's own ring entry and entries created within the birth); the summaries do not attribute routes to the watched entry",
         "on_integrated_loss_founder_declared_by_ops": on["founder+declared"]["lost_declaration_by_ops"],
         "on_decay_founder_declared": on["founder+declared"]["decay"],
         "on_decay_founder": on["founder"]["decay"],
