@@ -11,9 +11,10 @@ use super::super::run_tick;
 use super::support::*;
 use crate::simulation::stats::PhaseWallClock;
 
-/// The five timed phases, so each assertion below names the field it failed on.
-fn phases(clock: &PhaseWallClock) -> [(&'static str, Duration); 5] {
+/// The six timed phases, so each assertion below names the field it failed on.
+fn phases(clock: &PhaseWallClock) -> [(&'static str, Duration); 6] {
     [
+        ("food_growth", clock.food_growth),
         ("world_update", clock.world_update),
         ("sensor_assembly", clock.sensor_assembly),
         ("cognition", clock.cognition),
@@ -23,7 +24,7 @@ fn phases(clock: &PhaseWallClock) -> [(&'static str, Duration); 5] {
 }
 
 /// Running ticks accumulates a nonzero, non-decreasing duration in every one
-/// of the five timed phases.
+/// of the six timed phases.
 #[test]
 fn run_tick_accumulates_every_phase_wall_clock_field() {
     let (mut sim, _id) = make_sim_with_one_creature(10_000.0);

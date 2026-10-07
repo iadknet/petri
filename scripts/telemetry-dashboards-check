@@ -4,9 +4,10 @@
 #
 # Usage: scripts/telemetry-dashboards-check
 #
-# Starts the stack under the scratch Compose project and volume
-# petri-telemetry-dashboards (never petri-telemetry, and it refuses while
-# petri-telemetry is up: same host ports), runs the F01 workload
+# Runs on the production stack petri-telemetry, starting it as
+# `make telemetry-up` does when it is not running and never stopping it
+# (scripts/telemetry-stack.sh); every check reads only the run and the
+# measurement it creates. Runs the F01 workload
 #   v3-cli run --telemetry on --seed 7 --ticks T --sample-every T
 #     --config telemetry/overhead-world.json
 # under scripts/bench-wait, then the tiny sweep
@@ -17,7 +18,9 @@
 #   1. the four dashboards (petri-runs, petri-run, petri-compare,
 #      petri-performance) are provisioned in folder Petri;
 #   2. every scalar family, and every map family with a key on the workload,
-#      is stored under its Prometheus name (the lists below);
+#      is stored for the run under its Prometheus name (the lists below,
+#      matched against the names of the run's series), and the run has
+#      a petri_phase="food_growth" phase series (T24.F03);
 #   3. every panel query of the four dashboards, read from the JSON with node
 #      and evaluated through /api/ds/query with $run_id and $runs set to the
 #      run, returns data: a Prometheus target by its expr, a Tempo target by
@@ -30,10 +33,13 @@
 #   4. petri_run_tick of the run has at least three samples with distinct,
 #      non-decreasing timestamps, the last at T;
 #   5. the run's Loki run.started line carries petri_metrics_interval_ms;
-#   6. the first Tick traces row's trace, from Tempo's /api/v2/traces, has six
-#      spans, tick and the five phases, each with petri.run_id, petri.tick
-#      and petri.sample_policy; the trace ID composed from the run ID and that
-#      tick answers with the same spans;
+#   6. the first Tick traces row's trace, from Tempo's /api/v2/traces, has
+#      tick, the six phases (food_growth first) and food growth pass spans
+#      (T24.F03) whose names are all in food_pass_names below, with one
+#      growth_spread and one write_back per food type (the food_growth span's
+#      petri.config.world.food.types); every span carries petri.run_id,
+#      petri.tick and petri.sample_policy; the trace ID composed from the run
+#      ID and that tick answers with the same spans;
 #   7. that trace's petri.tick is one of the run's petri_run_tick values;
 #   8. the run's Loki run.started line carries petri_tick_traces;
 #   9. the first Creature windows row's trace has one creature_window span and
@@ -50,11 +56,8 @@
 #      petri_window_ticks and petri_window_interval_ms;
 #  13. the Measurements panel's query (petri-runs) returns the sweep's
 #      measurement: its run ID, from the sweep's `telemetry: on` line, is in
-#      the answer with both measurement.started and measurement.ended;
-#  14. after the scratch stack's own `down -v`, the external petri-telemetry
-#      volume still exists when it existed at the start.
-# Prints one PASS or FAIL line per check, removes the scratch stack and volume
-# (scripts/telemetry-scratch.sh), and exits 1 when any check fails.
+#      the answer with both measurement.started and measurement.ended.
+# Prints one PASS or FAIL line per check and exits 1 when any check fails.
 #
 # Environment:
 #   TELEMETRY_TICKS  the workload's T; default the `- Workload ticks T: N`
@@ -80,19 +83,11 @@ case "$ticks" in
   '' | *[!0-9]*) printf 'telemetry-dashboards-check: no workload T (set TELEMETRY_TICKS)\n' >&2; exit 2 ;;
 esac
 
-. "$root/scripts/telemetry-scratch.sh"
-scratch_stack petri-telemetry-dashboards
-compose() {
-  docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" "$@"
-}
+. "$root/scripts/telemetry-stack.sh"
 note() { printf 'telemetry-dashboards-check: %s\n' "$*"; }
 
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/petri-dashboards.XXXXXX")
-cleanup() {
-  scratch_stack_remove
-  rm -rf "$scratch"
-}
-trap cleanup 0
+trap 'rm -rf "$scratch"' 0
 trap 'exit 130' INT
 trap 'exit 143' HUP TERM
 
@@ -245,12 +240,8 @@ get() {
 }
 
 # ── stack ─────────────────────────────────────────────────────────────────────
-production_volume=absent
-if docker volume inspect petri-telemetry >/dev/null 2>&1; then production_volume=present; fi
-scratch_volume_create
-note "starting the scratch stack $PETRI_TELEMETRY_PROJECT"
-compose up -d --quiet-pull >/dev/null 2>&1
-scratch_stack_ready
+note 'starting the petri-telemetry stack, or using it when it runs'
+stack_up
 
 # ── workload ──────────────────────────────────────────────────────────────────
 note 'building v3-cli (release)'
@@ -305,7 +296,8 @@ status=0
 check 'dashboards provisioned' "$status" "petri-runs, petri-run, petri-compare and petri-performance in folder Petri${missing:+; missing$missing}"
 
 # ── 2. metric names ───────────────────────────────────────────────────────────
-get /api/datasources/proxy/uid/prometheus/api/v1/label/__name__/values >"$scratch/names.json"
+get "/api/datasources/proxy/uid/prometheus/api/v1/label/__name__/values?match%5B%5D=%7Bpetri_run_id%3D%22$run_id%22%7D&start=$((from_ms / 1000))" \
+  >"$scratch/names.json"
 "$node" -e '
   const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
   for (const name of r.data || []) if (name.startsWith("petri_")) console.log(name);
@@ -324,7 +316,15 @@ check_names() {
 }
 check_names 'scalar and fixed-key families' "$always_names"
 check_names 'map families keyed on the workload' "$keyed_names"
-printf 'Stored petri_ names (%s):\n' "$(grep -c . "$scratch/names.txt")"
+# The run's food_growth phase series (T24.F03).
+get "/api/datasources/proxy/uid/prometheus/api/v1/query?query=petri_run_phase_wall_clock_seconds_total%7Bpetri_run_id%3D%22$run_id%22%2Cpetri_phase%3D%22food_growth%22%7D" \
+  >"$scratch/food-growth.json" || true
+"$node" -e '
+  const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+  process.exit(((r.data || {}).result || []).length > 0 ? 0 : 1);
+' "$scratch/food-growth.json" 2>/dev/null && status=0 || status=1
+check 'food_growth phase series' "$status" "petri_run_phase_wall_clock_seconds_total{petri_phase=\"food_growth\"} on run $run_id"
+printf 'Stored petri_ names of run %s (%s):\n' "$run_id" "$(grep -c . "$scratch/names.txt")"
 sed 's/^/  /' "$scratch/names.txt"
 
 # ── 3. panel queries ──────────────────────────────────────────────────────────
@@ -466,6 +466,30 @@ spans() {
     process.exit(lines.length > 0 ? 0 : 1);
   ' "$1" 2>/dev/null
 }
+# food_types FILE: the food_growth span's petri.config.world.food.types.
+food_types() {
+  "$node" -e '
+    const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    const t = r.trace || r;
+    for (const batch of t.resourceSpans || t.batches || []) {
+      for (const scope of batch.scopeSpans || batch.instrumentationLibrarySpans || []) {
+        for (const span of scope.spans || []) {
+          if (span.name !== "food_growth") continue;
+          for (const kv of span.attributes || []) {
+            const v = (kv.value || {}).intValue;
+            if (kv.key === "petri.config.world.food.types" && v !== undefined) {
+              console.log(v);
+              process.exit(0);
+            }
+          }
+        }
+      }
+    }
+    process.exit(1);
+  ' "$1" 2>/dev/null
+}
+# The food growth pass spans' names (T24.F03), children of food_growth.
+food_pass_names='depletion_recovery grazing_recovery inhibition_sums density_total growth_spread recovery_spawns write_back inhibited_count'
 status=1
 detail="no trace ID in the Tick traces answer"
 trace_tick=
@@ -473,11 +497,18 @@ if [ -n "$trace_id" ]; then
   get "/api/datasources/proxy/uid/tempo/api/v2/traces/$trace_id" >"$scratch/trace.json" || true
   spans "$scratch/trace.json" >"$scratch/trace.txt" || true
   trace_tick=$(sed -n 's/^tick \([0-9][0-9]*\) .*$/\1/p' "$scratch/trace.txt" | head -n 1)
-  expected=$(printf '%s\n' tick world_update sensor_assembly cognition actions reward_learning | sort)
-  names=$(cut -d ' ' -f 1 "$scratch/trace.txt")
+  expected=$(printf '%s\n' tick food_growth world_update sensor_assembly cognition actions reward_learning | sort)
+  # shellcheck disable=SC2086 # One name per line.
+  printf '%s\n' $food_pass_names >"$scratch/pass-names.txt"
+  names=$(cut -d ' ' -f 1 "$scratch/trace.txt" | grep -vxF -f "$scratch/pass-names.txt") || names=
+  total=$(grep -c . "$scratch/trace.txt") || true
   complete=$(awk -v run="$run_id" 'NF == 4 && $4 == run { n++ } END { print n + 0 }' "$scratch/trace.txt")
-  detail="trace $trace_id: $(grep -c . "$scratch/trace.txt") span(s), tick ${trace_tick:-absent}"
-  if [ "$names" = "$expected" ] && [ "$complete" -eq 6 ] && [ -n "$trace_tick" ]; then
+  types=$(food_types "$scratch/trace.json") || types=
+  spreads=$(cut -d ' ' -f 1 "$scratch/trace.txt" | grep -cx growth_spread) || true
+  write_backs=$(cut -d ' ' -f 1 "$scratch/trace.txt" | grep -cx write_back) || true
+  detail="trace $trace_id: $total span(s), $((total - 7)) food pass(es), ${types:-unknown} food type(s), tick ${trace_tick:-absent}"
+  if [ "$names" = "$expected" ] && [ "$complete" -eq "$total" ] && [ -n "$trace_tick" ] &&
+    [ -n "$types" ] && [ "$spreads" -eq "$types" ] && [ "$write_backs" -eq "$types" ]; then
     composed=$(printf '%s%016x' "$(printf '%s' "$run_id" | cut -c 1-16)" "$trace_tick")
     get "/api/datasources/proxy/uid/tempo/api/v2/traces/$composed" >"$scratch/composed.json" || true
     spans "$scratch/composed.json" >"$scratch/composed.txt" || true
@@ -652,15 +683,6 @@ detail=$("$node" -e '
 check 'Measurements panel returns the sweep' "$status" "$detail"
 
 compose exec -T lgtm du -s /data/prometheus /data/loki /data/tempo || true
-
-# ── 14. volume survives ───────────────────────────────────────────────────────
-scratch_stack_remove
-if [ "$production_volume" = present ]; then
-  docker volume inspect petri-telemetry >/dev/null 2>&1 && status=0 || status=1
-  check 'petri-telemetry volume survives' "$status" "present at the start and after the scratch stack's down -v"
-else
-  note 'petri-telemetry volume absent at the start; survival not checked'
-fi
 
 if [ "$failures" -eq 0 ]; then
   note 'all checks passed'

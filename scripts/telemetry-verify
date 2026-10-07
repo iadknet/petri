@@ -3,10 +3,13 @@
 #
 # Usage: scripts/telemetry-verify
 #
-# Runs on the scratch Compose project and volume petri-telemetry-verify, never
-# on petri-telemetry, and creates and removes the scratch volume itself
-# (scripts/telemetry-scratch.sh).
-# Refuses while petri-telemetry is up (same host ports). Layers
+# T21.F01's one-time verification of an image change and a cleanup rehearsal.
+# It changes the image, restarts the stack and retires everything before a
+# cutoff taken minutes earlier, so it cannot run on petri-telemetry: it runs
+# on its own Compose project and volume petri-telemetry-verify, created and
+# removed here, and refuses while petri-telemetry is up (same host ports).
+# Every other telemetry check runs on petri-telemetry
+# (scripts/telemetry-stack.sh). Layers
 # telemetry/verify/compose.yaml over the production file to mount
 # telemetry/verify/tempo-config.yaml, the production Tempo file with a 1m
 # compaction window, so blocks from different minutes are never merged.
@@ -42,8 +45,11 @@ compose_file=$root/telemetry/compose.yaml
 old_image=${TELEMETRY_VERIFY_OLD_IMAGE:-grafana/otel-lgtm:0.33.1}
 new_image=${TELEMETRY_VERIFY_NEW_IMAGE:-grafana/otel-lgtm:0.34.0}
 loki_wait=${TELEMETRY_VERIFY_LOKI_WAIT:-900}
-. "$root/scripts/telemetry-scratch.sh"
-scratch_stack petri-telemetry-verify
+export PETRI_TELEMETRY_PROJECT=petri-telemetry-verify PETRI_TELEMETRY_VOLUME=petri-telemetry-verify
+if [ -n "$(docker compose -p petri-telemetry -f "$compose_file" ps -q --status running lgtm 2>/dev/null)" ]; then
+  printf 'telemetry-verify: rewrites and retires stored data, so it never runs while petri-telemetry is up (same host ports)\n' >&2
+  exit 1
+fi
 compose() {
   docker compose -p "$PETRI_TELEMETRY_PROJECT" -f "$compose_file" \
     -f "$root/telemetry/verify/compose.yaml" "$@"
@@ -52,8 +58,13 @@ in_stack() {
   compose exec -T lgtm "$@"
 }
 note() { printf 'telemetry-verify: %s\n' "$*"; }
+# verify_stack_remove: this stack's `down -v`, then its volume.
+verify_stack_remove() {
+  compose down -v --remove-orphans >/dev/null 2>&1 || true
+  docker volume rm -f "$PETRI_TELEMETRY_VOLUME" >/dev/null 2>&1 || true
+}
 
-trap scratch_stack_remove 0
+trap verify_stack_remove 0
 trap 'exit 130' INT
 trap 'exit 143' HUP TERM
 
@@ -229,7 +240,8 @@ trace_after=$(printf '%08x%024x' "$run_id" 4)
 log_before=petri-verify-before-$run_id
 log_after=petri-verify-after-$run_id
 
-scratch_volume_create
+verify_stack_remove
+docker volume create "$PETRI_TELEMETRY_VOLUME" >/dev/null
 note "phase 1: samples under $old_image"
 up "$old_image"
 write_span "$trace_before"

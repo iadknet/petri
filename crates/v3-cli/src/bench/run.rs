@@ -312,6 +312,7 @@ pub(super) fn run_one_seed(
         throughput,
         phase_wall_clock: SeedPhaseWallClock {
             seed,
+            food_growth_ms: millis(phases.food_growth),
             world_update_ms: millis(phases.world_update),
             sensor_assembly_ms: millis(phases.sensor_assembly),
             cognition_ms: millis(phases.cognition),

@@ -564,6 +564,7 @@ fn energy(f: &mut Families, s: &SimStats) {
         Kind::Sum,
         "s",
         [
+            ("food_growth", phases.food_growth),
             ("world_update", phases.world_update),
             ("sensor_assembly", phases.sensor_assembly),
             ("cognition", phases.cognition),

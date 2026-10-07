@@ -475,8 +475,11 @@ workload and the reading is the median ratio. The spec predeclares the method
 before any run: the workload, the pair count chosen from a short measurement
 of the workload's run-to-run spread, and the result that counts as
 inconclusive. The routine check is cheap by rule: all timed runs for one
-closure, including the spread measurement, every stack state and one
-permitted rerun, fit inside 5 minutes of measured time. T21.F05's qualifying
+closure, including the spread measurement and one permitted rerun, fit
+inside 5 minutes of measured time. Every telemetry check runs on the
+production `petri-telemetry` stack, started as `make telemetry-up` does when
+it is down and never stopped by a check; the overhead check has one state,
+that stack up for both sides of every pair. T21.F05's qualifying
 measurement is the one longer allowance, 60 minutes, taken once. When a cap
 is reached the result is inconclusive. An inconclusive result is reported to
 the user and is never rounded to a pass or extended with more runs. Wrap
@@ -487,7 +490,7 @@ orchestrator delegates them to the implementer's verification pass.
 **Record.** The spec's Performance and Goal Impact section records
 `Not applicable: observability feature` for the profiles, then each check
 that ran with its method, the measured time used, the ratio against the
-reference in each stack state and telemetry's self-timed cost per tick, or
+reference with the stack up and telemetry's self-timed cost per tick, or
 `<check> not applicable: <reason>`. Its Verification section records
 `Not applicable: observability feature` for the mutation item.
 

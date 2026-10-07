@@ -154,7 +154,7 @@ quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
 	@sh scripts/dev-sh-test
 	@sh scripts/skill-check-test
 	@sh scripts/telemetry-cleanup-test
-	@sh scripts/telemetry-scratch-test
+	@sh scripts/telemetry-stack-test
 	@sh scripts/telemetry-window-store-test
 
 dependency-audit: ## Scan Cargo and npm dependency locks with OSV.

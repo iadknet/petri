@@ -3,10 +3,12 @@
 //! A tick trace is taken with an interval snapshot, or with the CLI's
 //! completion snapshot, right after the `run_tick` that produced the seam
 //! (`SimStats::last_tick_phases`). It is one `tick` span with a child span per
-//! timed phase, encoded here on the simulation thread as one
+//! timed phase and, under the `food_growth` span, a child span per food growth
+//! grid pass that ran (`SimStats::last_tick_food_passes`, T24.F03), encoded here on the simulation thread as one
 //! `ExportTraceServiceRequest` and posted by the queue's worker. IDs carry no
 //! entropy: the trace ID is the run key's high 64 bits followed by the tick,
-//! and the span IDs are `1` for `tick` and `2` to `6` for the phases in order.
+//! and the span IDs are `1` for `tick`, `2` to `7` for the phases in order and
+//! `8` upward for the food passes in execution order.
 //! Timestamps are the run's start plus monotonic offsets from it.
 
 use std::time::Duration;
@@ -18,7 +20,7 @@ use opentelemetry_proto::tonic::common::v1::{
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::{span::SpanKind, ResourceSpans, ScopeSpans, Span};
 use v3_core::config::SimulationConfig;
-use v3_core::simulation::stats::TickPhaseTimings;
+use v3_core::simulation::stats::{FoodPassSpan, TickPhaseTimings};
 use v3_core::simulation::SimStats;
 
 use crate::{saturating_nanos, RunHandle, Switch, RUN_ID_KEY};
@@ -31,7 +33,8 @@ pub const MAX_TICK_TRACES_PER_RUN: u64 = 65_536;
 /// belong to creature windows (T21.F04).
 pub const FIRST_UNTRACED_TICK: u64 = 1 << 63;
 /// The phase spans' names, in `run_tick`'s order.
-pub const PHASES: [&str; 5] = [
+pub const PHASES: [&str; 6] = [
+    "food_growth",
     "world_update",
     "sensor_assembly",
     "cognition",
@@ -77,7 +80,8 @@ pub(crate) fn trace_id(run_key: u128, tick: u64) -> [u8; 16] {
     id
 }
 
-/// Span ID `index`: `1` for `tick`, `2` to `6` for the phases.
+/// Span ID `index`: `1` for `tick`, `2` to `7` for the phases, `8` upward for
+/// the food passes.
 pub(crate) fn span_id(index: u64) -> [u8; 8] {
     index.to_be_bytes()
 }
@@ -222,8 +226,9 @@ fn tick_attributes(
 fn phase_attributes(a: &mut Attributes, index: usize, config: &SimulationConfig, ran: u64) {
     a.text("petri.phase", PHASES[index]);
     match index {
-        0 => world_update(a, config),
-        1 => {
+        0 => food_growth(a, config),
+        1 => world_update(a, config),
+        2 => {
             a.int(
                 config_key("runtime.perception.vision_radius"),
                 config.runtime.perception.vision_radius,
@@ -235,8 +240,8 @@ fn phase_attributes(a: &mut Attributes, index: usize, config: &SimulationConfig,
                 a.text(config_key("world.edge_mode"), edge_mode);
             }
         }
-        2 => cognition(a, config),
-        3 => {
+        3 => cognition(a, config),
+        4 => {
             a.double(
                 "petri.failed_action_penalty",
                 config.failed_action_penalty_for_tick(ran),
@@ -252,7 +257,6 @@ fn phase_attributes(a: &mut Attributes, index: usize, config: &SimulationConfig,
 
 fn world_update(a: &mut Attributes, config: &SimulationConfig) {
     let lifecycle = &config.energy.lifecycle;
-    let shared = &config.world.food.shared;
     a.double(
         config_key("energy.lifecycle.energy_decay_per_tick"),
         lifecycle.energy_decay_per_tick,
@@ -265,6 +269,10 @@ fn world_update(a: &mut Attributes, config: &SimulationConfig) {
         config_key("shared_memory.decay_rate"),
         config.shared_memory.decay_rate,
     );
+}
+
+fn food_growth(a: &mut Attributes, config: &SimulationConfig) {
+    let shared = &config.world.food.shared;
     a.double(
         config_key("world.food.shared.growth_rate"),
         shared.growth_rate,
@@ -421,6 +429,8 @@ pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
 /// What one tick trace is made of, read on the simulation thread.
 pub(crate) struct Capture<'a> {
     pub(crate) seam: &'a TickPhaseTimings,
+    /// The tick's food growth passes, inside `seam`'s `food_growth` phase.
+    pub(crate) food_passes: &'a [FoodPassSpan],
     pub(crate) stats: &'a SimStats,
     pub(crate) config: &'a SimulationConfig,
     /// The population at capture.
@@ -477,6 +487,22 @@ pub(crate) fn encode(
             tick_start_ns.saturating_add(saturating_nanos(phase.offset)),
             phase.elapsed,
             root.clone(),
+            attributes,
+        ));
+    }
+    let food_growth = span_id(2).to_vec();
+    for (index, pass) in capture.food_passes.iter().enumerate() {
+        let mut attributes = identity(run, seam.tick, capture.sample);
+        attributes.text("petri.phase", PHASES[0]);
+        if let Some(food_type) = pass.food_type {
+            attributes.int("petri.food_type", food_type.get());
+        }
+        spans.push(span(
+            index as u64 + 8,
+            pass.pass.name(),
+            tick_start_ns.saturating_add(saturating_nanos(pass.timing.offset)),
+            pass.timing.elapsed,
+            food_growth.clone(),
             attributes,
         ));
     }

@@ -800,3 +800,22 @@ fn the_outcome_holds_distinct_per_type_food_banks() {
     assert_eq!(outcome.typed_area_food.len(), 2);
     assert_ne!(outcome.typed_area_food[0], outcome.typed_area_food[1]);
 }
+
+/// The window seam carries the tick's phases but never its food passes
+/// (T24.F03 invariant 3): those reach the tick-trace path only.
+#[test]
+fn a_recorded_tick_outcome_carries_the_phases_without_the_food_passes() {
+    let (mut sim, id) = budget_sim();
+    let mut trace = Some(ActiveTrace::budgeted(id, 1, WINDOW_BUDGET));
+    run_tick(&mut sim, &mut trace);
+    let recorded = &trace.as_ref().unwrap().ticks[0];
+    let phases = recorded.outcome.as_ref().unwrap().phases;
+    assert_eq!(phases, sim.stats.last_tick_phases);
+    assert!(!sim.stats.last_tick_food_passes.is_empty());
+}
+
+/// The phase seam owns no heap buffer a window record would have to count.
+const _: () = {
+    const fn is_copy<T: Copy>() {}
+    is_copy::<crate::simulation::stats::TickPhaseTimings>();
+};

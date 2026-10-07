@@ -30,7 +30,6 @@ decomposition.
 - No frontend change: Petri / Performance is the Grafana dashboard.
 - No timing of the untimed remainder (energy snapshot, queue shuffle,
   priority sort); it stays the gap between phases.
-- No change to how benchmark comparison flags wall-clock or normalized work.
 
 ## Inputs and Invariants
 
@@ -87,8 +86,8 @@ Invariants:
    part of the tick as before. On the reference build (`--no-default-features`)
    the split adds one `Instant::now()` and one `.elapsed()` per tick, in the
    pattern of the other five phases, and nothing else. `world_update`
-   keeps its name, so a cross-run panel that compares a run from before this
-   feature with one after it compares different `world_update` contents.
+   keeps its name, so a cross-run panel comparing runs from before and after
+   this feature compares different `world_update` contents.
 3. Seam. Under `telemetry-seams` only, `TickPhaseTimings.phases` becomes
    `[PhaseTiming; 6]` in the order of invariant 2, and the seam gains the
    tick's food passes: for each pass that ran, its name from the table, its
@@ -100,7 +99,7 @@ Invariants:
    passes nest inside `food_growth`: each starts at or after the phase's
    start, ends at or before its end, and the next starts at or after the
    previous ends. Every reader that indexes `phases` (`windows.rs`) is
-   updated with the order.
+   updated with the order; the window seam does not carry the passes.
 4. Metric. `petri.run.phase_wall_clock` exports the six keys; `food_growth`
    is `Duration` → monotonic sum in seconds like the others, with no other
    attribute. The expected-families test lists it. No per-pass family.
@@ -167,29 +166,36 @@ introduced; the food values a pass depends on are on the `food_growth` span.
 
 ## Implementation Tasks
 
-- [ ] `v3-core`: add `PhaseWallClock.food_growth`, split phase 0's timing in
+- [x] `v3-core`: add `PhaseWallClock.food_growth`, split phase 0's timing in
       `run_tick` (food growth first, then the creature loop and death removal
       as `world_update`), extend the seam to six phases and the food pass
       timings, and record the passes inside `grow` behind `telemetry-seams`;
       update the phase-timing and seam tests and the doc comments.
-- [ ] `v3-telemetry`: export the sixth metric key; encode six phase spans and
+      `run_phase_0` keeps its signature and calls the two halves `run_tick`
+      times; `kernel/ordinary_food/pass_clock.rs` holds `FoodPass` and the
+      clock (zero-sized without the feature); the passes leave `grow` in
+      `FoodGrowthSummary.passes` and reach `TickPhaseTimings.food_passes`
+      as offsets from the tick start, so the seam is `Clone`, not `Copy`.
+- [x] `v3-telemetry`: export the sixth metric key; encode six phase spans and
       the pass spans with the IDs, parents, names and attribute groups of
       invariants 5 and 6; fix `windows.rs` indexes; update the expected
       families and trace tests.
-- [ ] `v3-cli`: `SeedPhaseWallClock.food_growth_ms` (`serde(default)`), filled
+- [x] `v3-cli`: `SeedPhaseWallClock.food_growth_ms` (`serde(default)`), filled
       in `run.rs`; the phase-total assertion; the recipe digest pins must not
-      move (no config field is added).
-- [ ] Dashboard and check: the Phase spans regex, the pass table, check 6 and
+      move (no config field is added). `tests/telemetry.rs`
+      `assert_trace_shape` expects the pass spans under `food_growth`.
+- [x] Dashboard and check: the Phase spans regex, the pass table, check 6 and
       check 2 of `scripts/telemetry-dashboards-check`; the script's header
-      comment.
-- [ ] Docs: `docs/reference/v3-tick-orchestration-spec.md` needs no rule
+      comment. The two phase-panel descriptions that named food growth
+      inside world update now name it as its own phase.
+- [x] Docs: `docs/reference/v3-tick-orchestration-spec.md` needs no rule
       change; the T21 conventions table in `_feature-template.md` names the
       `world_update` group in `phase_attributes` and is updated to name
       `food_growth` beside it.
 
 ## Verification
 
-- [ ] Phase clock: `cargo test -p v3-core phase_timing` and
+- [x] Phase clock: `cargo test -p v3-core phase_timing` and
       `cargo test -p v3-core --features telemetry-seams phase_seam` (the
       seam tests compile only with the feature; a zero-test run does not
       satisfy this item) -> every one of six phases accumulates and survives
@@ -200,25 +206,39 @@ introduced; the food values a pass depends on are on the `food_growth` span.
       (a fixture below the floor and one above), the depletion and grazing
       spans present whether or not those mechanisms are enabled, no pass on
       a zero-cell grid, and only the two recovery spans when `max_density`
-      is zero or the catalog is empty.
-- [ ] No behavior change: `cargo test -p v3-core --test reproducibility` and
+      is zero (the empty-catalog branch of that return is unreachable, since
+      `OrdinaryFoodCatalog::new` substitutes a default type); the window seam
+      carries the phases and no pass. 2026-10-07: `phase_timing` 2 passed;
+      `phase_seam` 9 passed (7 kernel fixtures in
+      `pass_clock/phase_seam_tests.rs`, 2 tick tests); `window_seam` 20
+      passed.
+- [x] No behavior change: `cargo test -p v3-core --test reproducibility` and
       the telemetry-neutrality test inside `make check` -> pass;
       `scripts/telemetry-parent-compare 9aa0c5a5` -> identical canonical
-      NDJSON against the merge base.
-- [ ] Telemetry: `cargo test -p v3-telemetry` -> the expected families carry
+      NDJSON against the merge base. 2026-10-07: `reproducibility` 3 passed,
+      `viability` 28 passed and the neutrality test passed inside `make
+      check`; the parent compare: identical (3 canonical lines).
+- [x] Telemetry: `cargo test -p v3-telemetry` -> the expected families carry
       `food_growth`; the trace test pins `tick`, six phases and every pass
       span with IDs 1 to 7 and 8 upward, parents, names and key sets; with
       every pass present and realistic identity lengths, the two-type
       encoding stays under 16 KiB and the eight-type encoding under 32 KiB.
-- [ ] Benchmark report: `cargo test -p v3-cli --test bench` -> `food_growth_ms`
+      2026-10-07: 72 passed; `v3-cli --test telemetry` 13 passed.
+- [x] Benchmark report: `cargo test -p v3-cli --test bench` -> `food_growth_ms`
       present and in the phase total; the profile runs below load T20.F05's
-      summaries, which lack the field.
-- [ ] Dashboard: `scripts/telemetry-dashboards-check` -> checks 1, 2, 3 and 6
-      pass with the new span set and the `food_growth` series. It needs the
-      production stack down (`make telemetry-down`); if the user keeps the
-      stack running, the same reads are made against it after one
-      `v3-cli run --telemetry on` and recorded in the readings file.
-- [ ] `make check` -> exit 0.
+      summaries, which lack the field. 2026-10-06: 20 passed; the
+      `stored_t20_f05_summary_environments_load_without_food_growth_ms` lib
+      test loads both T20.F05 summaries' `environment`.
+- [x] Dashboard: `scripts/telemetry-dashboards-check` against the existing
+      `petri-telemetry` stack (user ruling, 2026-10-07: every run exports to
+      it, the only stack) -> every check it runs passes: its workload run
+      and its own tiny bench sweep export to that stack, so check 3 answers
+      every panel query, `petri-runs / Measurements` from the sweep; check 2
+      finds the `food_growth` series and check 6 the new span set. The runs
+      stay in the stack's stores as ordinary runs; the pass lines go in the
+      readings. 2026-10-07: exit 0, 14 PASS.
+- [x] `make check` -> exit 0 (2026-10-07; workspace and `-p v3-core`
+      clippy `-D warnings` clean).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred.
 - [ ] Benchmark summaries stored at
@@ -240,7 +260,7 @@ no mechanism, no natural analog, no environmental pressure, no indicator.
 | Compute | Estimate, not a measurement: on the telemetry build the profiles run, each tick gains two clock reads for the phase split and, under the seam, two clock reads and one small store per food pass (at most 2 × (4 + 4 × types), 24 for the two-type default), tens of nanoseconds each, plus the seam's per-tick overwrite: on the order of 1 µs per tick against 0.4 ms of world update per gate tick and 41–68 ms per goal-profile tick (track Notes). Trace encoding is not on the profiles' timed path: `bench` captures at region boundaries only. The normalized-work flags (+10% / +50%) cannot move, since no counter changes. A wall flag (+25% / +100%) is not accepted on this estimate: it is investigated as the gate requires (rerun under `scripts/bench-wait` on an idle host, host and build attribution in the readings), and a severe compute verdict that survives investigation is a blocker, not a cost this spec predeclares. No epoch re-pin is sought or authorized. |
 | New fields | `food_growth_ms` appears in both summaries' `environment.phase_wall_clock_ms_per_seed`, and `world_update_ms` now measures aging, decay and death removal only. Both are host-dependent wall time: they are never compared for equality with T20.F05; within each run the six phases sum to a positive part of `wall_clock_ms_total` (the `tests/bench.rs` assertion), and the readings report `food_growth_ms` per tick as the instrument T24.F02 inherits. Neither is a comparison input. |
 | Observation caps | Unchanged: founder neighborhood 10 s; evolved neighborhood 180 s; read 10 s; mutation effects 60 s; input use 60 s; goal end-to-end 900 s. |
-| Overhead check | Runs, because the feature adds work to a run (template conventions, "Ceiling"): `scripts/telemetry-overhead` in routine mode on the T21 workload (`v3-cli run --seed 7 --ticks 6908 --sample-every 6908 --config telemetry/overhead-world.json`, preset `standard`), states a (stack healthy) and b (stack stopped), pair count from the five-run spread rule (16, 24 or 32), under the 300 s cap; pass when the 90% upper bound of the median ratio is below 1.10 in both states, fail when the lower bound is at or above it, else inconclusive and reported as such. Expected: both states well below 1.10, since the seam adds about 1 µs per tick to a ~0.5 ms tick. The script refuses while the production stack holds its ports; stopping that stack is the user's decision and a refusal is reported under the blocker rule, not waived. |
+| Overhead check | Runs, because the feature adds work to a run (template conventions, "Ceiling"): `scripts/telemetry-overhead` in routine mode on the T21 workload (`v3-cli run --seed 7 --ticks 6908 --sample-every 6908 --config telemetry/overhead-world.json`, preset `standard`), against the existing `petri-telemetry` stack (user ruling, 2026-10-07): the stack stays up for both sides of every pair, the telemetry run exports to it and the reference build (`--no-default-features`, same commit) runs beside it, so the one state measured is "on, stack healthy"; the stack-stopped state is not run, since stopping that stack is excluded by the ruling. Pair count from the five-run spread rule (16, 24 or 32), under the 300 s cap; pass when the 90% upper bound of the median ratio is below 1.10, fail when the lower bound is at or above it, else inconclusive and reported as such, with the table in the readings. Expected: well below 1.10, since the seam adds about 1 µs per tick to a ~0.5 ms tick. Measured 2026-10-07: inconclusive on both permitted attempts, no pair run: spread 0.0948 then 0.0815 set 24 pairs, which at 7.1 s and 6.5 s per run (3.9 s at T21.F01 calibration; host load 6–12) do not fit the 300 s cap; table in the readings. |
 
 Run sequentially after benchmark-affecting work is final, without competing
 builds, tests, servers or measurements:

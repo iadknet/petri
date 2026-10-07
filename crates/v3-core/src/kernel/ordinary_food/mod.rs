@@ -1,6 +1,7 @@
 mod catalog;
 mod ecology;
 mod grazing;
+mod pass_clock;
 mod state;
 
 use rand::Rng;
@@ -14,6 +15,9 @@ use self::ecology::{
     apply_config_transition, grow, seed_density, seed_fertility_maps, OccupancyDepletionLayer,
 };
 pub use self::ecology::{FoodGrowthSummary, FoodTypeTelemetry};
+pub use self::pass_clock::FoodPass;
+#[cfg(feature = "telemetry-seams")]
+pub use self::pass_clock::{FoodPassTiming, FoodPasses};
 use self::state::OrdinaryFoodState;
 
 #[derive(Debug)]

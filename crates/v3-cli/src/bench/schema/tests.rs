@@ -22,6 +22,26 @@ fn comparison_level_displays_as_its_serialized_string() {
     assert_eq!(ComparisonLevel::Severe.to_string(), "severe");
 }
 
+/// Summaries stored before T24.F03 lack `food_growth_ms`; their
+/// `environment` still loads, with food growth read as zero.
+#[test]
+fn stored_t20_f05_summary_environments_load_without_food_growth_ms() {
+    for summary in [
+        include_str!("../../../../../docs/progress/features/t20-f05-structured-heritable-refinement.json"),
+        include_str!(
+            "../../../../../docs/progress/features/t20-f05-structured-heritable-refinement-goal.json"
+        ),
+    ] {
+        let value: serde_json::Value = serde_json::from_str(summary).unwrap();
+        let environment: Environment =
+            serde_json::from_value(value["environment"].clone()).unwrap();
+        let phases = &environment.phase_wall_clock_ms_per_seed;
+        assert!(!phases.is_empty());
+        assert!(phases.iter().all(|seed| seed.food_growth_ms == 0.0));
+        assert!(phases.iter().all(|seed| seed.world_update_ms > 0.0));
+    }
+}
+
 #[test]
 fn historical_goal_indicators_default_temporal_memory_to_undefined() {
     let report: Report = serde_json::from_str(include_str!(

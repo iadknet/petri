@@ -3,10 +3,11 @@
 # (gRPC) and 127.0.0.1:4318 (HTTP). Data lives in the external volume
 # petri-telemetry, which `make telemetry-up` creates and no `docker compose
 # down -v` removes; nothing expires by age; retire it with
-# `make telemetry-clean CUTOFF=<date or RFC3339>`. PETRI_LGTM_IMAGE,
-# PETRI_TELEMETRY_VOLUME and PETRI_TELEMETRY_PROJECT exist for the scripts'
-# scratch stacks (scripts/telemetry-scratch.sh), which create and remove their
-# own volumes. The window-store service (T23.F10) runs
+# `make telemetry-clean CUTOFF=<date or RFC3339>`. Every run and every
+# telemetry check exports to this stack (scripts/telemetry-stack.sh);
+# PETRI_LGTM_IMAGE, PETRI_TELEMETRY_VOLUME and PETRI_TELEMETRY_PROJECT exist
+# for scripts/telemetry-verify, whose destructive rehearsal runs on its own
+# project and volume. The window-store service (T23.F10) runs
 # scripts/telemetry-window-store in the same image: every
 # PETRI_WINDOW_STORE_PASS_S seconds it thins each run's creature.window records
 # in Loki by age in window indexes (all of the newest 300, the even ones of the

@@ -571,8 +571,8 @@ fn tick_times(run: &RunHandle, record: &TickTrace) -> Option<[u64; 4]> {
     Some([
         start,
         start.saturating_add(saturating_nanos(seam.elapsed)),
-        start.saturating_add(saturating_nanos(seam.phases[2].offset)),
         start.saturating_add(saturating_nanos(seam.phases[3].offset)),
+        start.saturating_add(saturating_nanos(seam.phases[4].offset)),
     ])
 }
 

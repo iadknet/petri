@@ -13,7 +13,7 @@
 # Environment:
 #   PETRI_TELEMETRY_PROJECT  Compose project (petri-telemetry) and
 #   PETRI_TELEMETRY_VOLUME   its volume; scripts/telemetry-verify points both
-#                            at its scratch stack.
+#                            at its own stack, petri-telemetry-verify.
 set -eu
 
 usage() {
