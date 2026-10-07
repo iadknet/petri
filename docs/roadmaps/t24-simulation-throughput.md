@@ -10,19 +10,23 @@ The world runs by the same rules in less wall-clock time, so a default-size run
 reaches a given tick sooner and every goal-profile closure costs less. Each
 optimization targets a measured hot phase of the tick, keeps every world rule,
 default and config field, and keeps seeded runs byte-identical across processes
-and thread counts. The one rule change is a repair: food spread is first made to
-match its reference spec, so the parallel rewrite builds on the documented rule
-rather than on a loop-order artifact.
+and thread counts. Measurement comes first: food growth is timed apart from the
+rest of world update before anything is changed. The one rule change is a
+repair: food spread is then made to match its reference spec, so the parallel
+rewrite builds on the documented rule rather than on a loop-order artifact.
 
 ## Track Success Criteria
 
+- [ ] Food growth's time per tick is exported apart from creature aging, energy
+  decay and death removal, its grid passes appear as child spans in sampled
+  tick traces, and Petri / Performance shows both.
 - [ ] Every food-spread contribution reaches its target whatever order cells are
   visited in, as `docs/reference/v3-world-grid-spec.md` §5 already specifies,
   and the repair's ecological effect is read on the gate and goal profiles on
   its own.
 - [ ] Food regrowth on the default 1600-by-1600 world runs on the rayon pool,
-  and at 8 threads its world-update time per tick is at most half the parent
-  build's on the same host.
+  and at 8 threads its food-growth time per tick (T24.F03's phase) is at most
+  half the parent build's on the same host.
 - [ ] Seeded runs stay byte-identical across processes and thread counts with
   every parallel path the track adds exercised by
   `crates/v3-core/tests/reproducibility.rs`.
@@ -33,9 +37,11 @@ rather than on a loop-order artifact.
 
 ## Executable Features
 
+- [ ] **T24.F03 — Food Growth Phase Timing** — Depends on: None
+  - Goal: The microscope sees inside world update: food growth is timed apart from creature aging, energy decay and death removal in the phase metric and the sampled tick traces, each of its grid passes is a child span on sampled ticks, and Petri / Performance shows them.
 - [ ] **T24.F01 — Order-Free Food Spread** — Depends on: None
   - Goal: Seeds disperse evenly in every direction: food spreading from a dense cell keeps its share whichever neighbour it lands on, so a cell that already holds food no longer drops spread from its north and west neighbours, and food inside patches no longer drifts north-west.
-- [ ] **T24.F02 — Parallel Food Regrowth** — Depends on: T24.F01
+- [ ] **T24.F02 — Parallel Food Regrowth** — Depends on: T24.F01, T24.F03
   - Goal: Food regrows by the repaired rules on every core at once: `World::grow_food` runs on the rayon pool with its own seeded per-cell stream, so a goal run spends at most half as long per tick on regrowth at 8 threads and still reproduces byte-for-byte at any thread count.
 
 ## Notes for AI Agents
@@ -52,6 +58,31 @@ rather than on a loop-order artifact.
   regrowth at 3.4×, and regrowth about 6× faster on 8 cores gives about 2.4×.
   The gate profile (128 by 128, 75 ticks) spends 0.4 ms per tick in world
   update, so the speedup shows in the goal profile, not the gate.
+- Order: T24.F03, then T24.F01, then T24.F02. T24.F03 was added on 2026-10-06
+  out of ID order at the user's direction, as the track's first feature.
+  T24.F01 does not depend on it; T24.F02 depends on both.
+- T24.F03 origin and state, 2026-10-06. T21 already exports the five coarse
+  phases two ways:
+  - the cumulative metric `petri.run.phase_wall_clock` (Prometheus
+    `petri_run_phase_wall_clock_seconds_total{petri_phase}`);
+  - sampled `tick` traces with one child span per phase.
+
+  The Petri / Performance dashboard
+  (`telemetry/grafana/dashboards/petri-performance.json`) was added the same day
+  outside the roadmap. It shows time per tick by phase, phase share, tick rate,
+  cognition cost per creature-tick, run means, the slowest sampled phase spans,
+  and a per-run comparison. Food growth cannot be separated from aging, energy
+  decay and death removal inside `world_update`; T24.F03 fills that gap. A live
+  `v3-server` run on 2026-10-01 spent 116 ms per tick in world update, against
+  15 ms in cognition. When implementing T24.F03:
+  - Panels that group by `petri_phase` pick up a new label without edits. The
+    Phase spans table's name regex, the check script's span count (check 6:
+    "tick and the five phases") and its `always_names` list must change.
+  - A new `PhaseWallClock` field reaches `phase_wall_clock_ms_per_seed` in
+    benchmark reports, so the spec checks the summary keep-list.
+  - The observability exemption is keyed to T21 and T23 by track. T24.F03
+    therefore runs the ordinary gate and goal profiles and the mutation gate,
+    unless the user extends the exemption to it.
 - T24.F01, the spread bug, was found while drafting this track and the user
   chose to fix it first (2026-10-06). The code is `grow` in
   `crates/v3-core/src/kernel/ordinary_food/ecology.rs`, unchanged since
@@ -91,12 +122,13 @@ rather than on a loop-order artifact.
      per-row partials summed in row order) and keep their current meaning.
   4. Recovery spawns are few (cells × `recovery_spawn_rate`, about 2,560 at
      0.001) and may stay sequential on the food stream.
-- No profile inside world update exists. `grow_food` makes about seven
-  full-grid passes for two food types: depletion recovery, grazing recovery,
-  inhibition sums, then growth and write-back for each type. The pass is not
-  memory-bandwidth bound (single-digit GB/s on the measured run). T24.F02's spec
-  reads a profile with `crates/v3-core/src/bin/profile_ticks.rs` before fixing
-  the decomposition, and measures the speedup as interleaved pairs on a short
+- `grow_food` makes about seven full-grid passes for two food types:
+  depletion recovery, grazing recovery, inhibition sums, then growth and
+  write-back for each type. The pass is not memory-bandwidth bound
+  (single-digit GB/s on the measured run). Before T24.F03 closes, no profile
+  inside world update exists. T24.F02's spec reads T24.F03's per-pass spans,
+  or a profile from `crates/v3-core/src/bin/profile_ticks.rs`, before fixing
+  the decomposition. It measures the speedup as interleaved pairs on a short
   default-size seeded workload against the parent build, under
   `scripts/bench-wait`.
 - GPU offload was considered on 2026-10-06 and deferred. The GPU-shaped work,
@@ -117,10 +149,10 @@ rather than on a loop-order artifact.
   only if world update still dominates after T24.F02.
 - Candidates that are not yet rows: sensor assembly (sequential, 8–11%). Actions
   are sequential by design, because execution order decides conflicts.
-- T24.F02 and later optimization rows are engineering features. The
-  natural-analog rule does not apply because they add no mechanism, sensor,
-  default or config field. T24.F01 is a correctness repair of an existing
-  mechanism and names its analog. Every T24 feature runs the ordinary gate and
-  goal profiles, mutation gate and Codex review; no Benchmark gate exemption
-  covers T24.
+- T24.F03 is measurement and T24.F02 and later optimization rows are
+  engineering features. The natural-analog rule does not apply to either kind,
+  because they add no mechanism, sensor, default or config field. T24.F01 is a
+  correctness repair of an existing mechanism and names its analog. Every T24
+  feature runs the ordinary gate and goal profiles, mutation gate and Codex
+  review; no Benchmark gate exemption covers T24.
 - Priority: not in the order of new starts until the user places it.

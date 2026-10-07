@@ -103,6 +103,10 @@
                     "url": "/d/petri-compare?var-runs=${__value.raw}&from=${__value.time}&to=now"
                   },
                   {
+                    "title": "Open run performance",
+                    "url": "/d/petri-performance?var-run_id=${__value.raw}&from=${__value.time}&to=now"
+                  },
+                  {
                     "title": "Creature window report",
                     "url": "/public/petri/creature-windows.html?run=${__value.raw}",
                     "targetBlank": true
@@ -198,6 +202,10 @@
                     "url": "/d/petri-compare?var-runs=${__value.raw}&${__url_time_range}"
                   },
                   {
+                    "title": "Open run performance",
+                    "url": "/d/petri-performance?var-run_id=${__value.raw}&${__url_time_range}"
+                  },
+                  {
                     "title": "Creature window report",
                     "url": "/public/petri/creature-windows.html?run=${__value.raw}",
                     "targetBlank": true
@@ -278,6 +286,10 @@
                   {
                     "title": "Compare runs (add more in the Runs picker)",
                     "url": "/d/petri-compare?var-runs=${__value.raw}&${__url_time_range}"
+                  },
+                  {
+                    "title": "Open run performance",
+                    "url": "/d/petri-performance?var-run_id=${__value.raw}&${__url_time_range}"
                   },
                   {
                     "title": "Creature window report",

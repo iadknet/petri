@@ -14,11 +14,11 @@
 #     --founders 16 --seeds 11,22 --ticks 20 --feature t21-f06-dashboards
 # with its outputs in a scratch directory, then through Grafana on 127.0.0.1:3300, with the
 # query range from one minute before the run to now, checks that:
-#   1. the three dashboards (petri-runs, petri-run, petri-compare) are
-#      provisioned in folder Petri;
+#   1. the four dashboards (petri-runs, petri-run, petri-compare,
+#      petri-performance) are provisioned in folder Petri;
 #   2. every scalar family, and every map family with a key on the workload,
 #      is stored under its Prometheus name (the lists below);
-#   3. every panel query of the three dashboards, read from the JSON with node
+#   3. every panel query of the four dashboards, read from the JSON with node
 #      and evaluated through /api/ds/query with $run_id and $runs set to the
 #      run, returns data: a Prometheus target by its expr, a Tempo target by
 #      its query, queryType, tableType and limit, polled up to 120 s after the
@@ -293,7 +293,7 @@ sleep 5
 
 # ── 1. provisioning ───────────────────────────────────────────────────────────
 missing=
-for uid in petri-runs petri-run petri-compare; do
+for uid in petri-runs petri-run petri-compare petri-performance; do
   get "/api/dashboards/uid/$uid" >"$scratch/$uid.json" || true
   "$node" -e '
     const d = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
@@ -302,7 +302,7 @@ for uid in petri-runs petri-run petri-compare; do
 done
 status=0
 [ -z "$missing" ] || status=1
-check 'dashboards provisioned' "$status" "petri-runs, petri-run and petri-compare in folder Petri${missing:+; missing$missing}"
+check 'dashboards provisioned' "$status" "petri-runs, petri-run, petri-compare and petri-performance in folder Petri${missing:+; missing$missing}"
 
 # ── 2. metric names ───────────────────────────────────────────────────────────
 get /api/datasources/proxy/uid/prometheus/api/v1/label/__name__/values >"$scratch/names.json"
@@ -333,7 +333,7 @@ to_ms=$(($(date -u +%s) * 1000))
 "$node" -e '
   const fs = require("fs");
   const [, dir, runId, from, to] = process.argv;
-  for (const file of ["petri-runs.json", "petri-run.json", "petri-compare.json"]) {
+  for (const file of ["petri-runs.json", "petri-run.json", "petri-compare.json", "petri-performance.json"]) {
     const d = JSON.parse(fs.readFileSync(`${dir}/${file}`, "utf8"));
     for (const panel of d.panels) {
       for (const t of panel.targets || []) {
@@ -380,7 +380,7 @@ while IFS="$tab" read -r kind uid title ref body; do
   if [ "$kind" = tempo ]; then
     case "$title" in
       'Creature windows') cp "$scratch/answer.json" "$scratch/windows.json"; window_rows=$count ;;
-      *) cp "$scratch/answer.json" "$scratch/tick-traces.json"; trace_rows=$count ;;
+      'Tick traces') cp "$scratch/answer.json" "$scratch/tick-traces.json"; trace_rows=$count ;;
     esac
     note "$title: $count row(s) after ${waited} s"
   fi
