@@ -236,13 +236,40 @@ introduced; the food values a pass depends on are on the `food_growth` span.
       readings. 2026-10-07: exit 0, 15 PASS.
 - [x] `make check` -> exit 0 (2026-10-07; workspace and `-p v3-core`
       clippy `-D warnings` clean).
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       every survivor resolved as killed, equivalent, or deferred.
 
-| Fresh run (2026-10-07), output `~/.local/share/petri-tools/mutants/t24-f03/mutants.out`; a third run needs the user | Result | Baseline failure |
+| Fresh run (2026-10-07), output `~/.local/share/petri-tools/mutants/t24-f03/mutants.out`; run 3 authorized by the user 2026-10-07 | Result | Baseline failure |
 |---|---|---|
 | 1, before b9af1c10 | 58 mutants, exit 4, none tested | `opportunity::tests::pilot_and_full_runs_resolve_to_distinct_raw_paths` needed a git checkout; fixed test-only at b9af1c10 |
 | 2, at b9af1c10 | 58 mutants, exit 4, none tested | `windows::tests::a_window_encodes_predicted_ids_parents_times_names_and_attributes` line 238 `root.end == last.end`: root starts at `started + 1 ms`, so it fails when seeding plus three ticks finish within 1 ms (1 of 6 local `--profile mutants` suite runs) |
+| 3, at c2b64a1a | `58 mutants tested in 14m: 22 missed, 28 caught, 8 unviable`, exit 0, no timeouts; 3 killed, 19 equivalent (below) | none (baseline passed) |
+
+| Run 3 survivor (output now `mutants.out.old`; the gate builds without `telemetry-seams`; "feature-on run" is feedback `cargo mutants --features telemetry-seams` on the 19 equivalents: 10 caught, 7 unviable, 2 missed) | Resolution |
+|---|---|
+| Kills confirmed | `MUTANTS_ITERATE=1 make rust-mutants`: 22 tested, 3 caught, 19 missed (the equivalents); no skip, `exclude_re` or production edit, so no second fresh run |
+| `ecology.rs:396:27` `\|\|` with `&&` in `grow` | killed: `ecology::tests::grow_without_max_density_returns_before_the_per_type_passes` |
+| `pass_clock.rs:42:9` `FoodPass::name` with `""` | killed: `pass_clock::tests::food_pass_names_are_the_span_table_names` |
+| `pass_clock.rs:42:9` `FoodPass::name` with `"xyzzy"` | killed: same test |
+| `tick.rs:179:5` `run_phase_0_food_growth -> FoodPasses` with `Default::default()` | equivalent: the function exists only under `telemetry-seams`, so the gate's build compiles the same code; feature-on run caught it |
+| `ecology.rs:49:9` `take_passes` with `Default::default()` | equivalent: `telemetry-seams`-only, same reason; feature-on run caught it |
+| `pass_clock.rs:107:9` `PassClock::stop` with `()` | equivalent: the body is empty without `telemetry-seams`, so the mutant is the gate build's code; feature-on run caught it |
+| `tick/phase_seam_tests.rs:12:5` `increments` with `[Default::default(); 6]` | equivalent: test helper compiled only under `cfg(all(test, feature = "telemetry-seams"))`, absent from the gate build; feature-on run caught it |
+| `tick/phase_seam_tests.rs:13:27` `-` with `+` in `increments` | equivalent: same; feature-on run caught it |
+| `tick/phase_seam_tests.rs:13:27` `-` with `/` in `increments` | equivalent: same; unviable with the feature on |
+| `pass_clock/phase_seam_tests.rs:15:5` `grow_once` with `Default::default()` | equivalent: feature-gated test helper; feature-on run caught it |
+| `pass_clock/phase_seam_tests.rs:22:5` `passes` with `vec![]` | equivalent: same; feature-on run caught it |
+| `pass_clock/phase_seam_tests.rs:22:5` `passes` with `vec![(Default::default(), None)]` | equivalent: same; unviable with the feature on |
+| `pass_clock/phase_seam_tests.rs:22:5` `passes` with `vec![(Default::default(), Some(0))]` | equivalent: same; unviable with the feature on |
+| `pass_clock/phase_seam_tests.rs:22:5` `passes` with `vec![(Default::default(), Some(1))]` | equivalent: same; unviable with the feature on |
+| `pass_clock/phase_seam_tests.rs:33:5` `two_types` with `Default::default()` | equivalent: same; feature-on run caught it |
+| `pass_clock/phase_seam_tests.rs:34:9` delete field `types` in `two_types` | equivalent: same; feature-on run caught it |
+| `pass_clock/phase_seam_tests.rs:36:17` delete field `name` in `two_types` | equivalent: feature-gated test fixture, and `grow` never reads a type's name, so no pass changes |
+| `pass_clock/phase_seam_tests.rs:37:17` delete field `recovery_spawn_rate` in `two_types` | equivalent: feature-gated test fixture whose value `None` is the field's default, so the struct is identical |
+| `pass_clock/phase_seam_tests.rs:49:5` `expected` with `vec![]` | equivalent: feature-gated test helper; feature-on run caught it |
+| `pass_clock/phase_seam_tests.rs:49:5` `expected` with `vec![(Default::default(), None)]` | equivalent: same; unviable with the feature on |
+| `pass_clock/phase_seam_tests.rs:49:5` `expected` with `vec![(Default::default(), Some(0))]` | equivalent: same; unviable with the feature on |
+| `pass_clock/phase_seam_tests.rs:49:5` `expected` with `vec![(Default::default(), Some(1))]` | equivalent: same; unviable with the feature on |
 - [x] Benchmark summaries stored at
       `docs/progress/features/t24-f03-food-growth-phase-timing.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,

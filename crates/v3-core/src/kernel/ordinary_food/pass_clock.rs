@@ -126,3 +126,37 @@ impl PassClock {
 
 #[cfg(all(test, feature = "telemetry-seams"))]
 mod phase_seam_tests;
+
+#[cfg(test)]
+mod tests {
+    use super::FoodPass;
+
+    /// The span names hold in every build, not only under `telemetry-seams`.
+    #[test]
+    fn food_pass_names_are_the_span_table_names() {
+        let names = [
+            FoodPass::DepletionRecovery,
+            FoodPass::GrazingRecovery,
+            FoodPass::InhibitionSums,
+            FoodPass::DensityTotal,
+            FoodPass::GrowthSpread,
+            FoodPass::RecoverySpawns,
+            FoodPass::WriteBack,
+            FoodPass::InhibitedCount,
+        ]
+        .map(FoodPass::name);
+        assert_eq!(
+            names,
+            [
+                "depletion_recovery",
+                "grazing_recovery",
+                "inhibition_sums",
+                "density_total",
+                "growth_spread",
+                "recovery_spawns",
+                "write_back",
+                "inhibited_count",
+            ]
+        );
+    }
+}
