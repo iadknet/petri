@@ -237,7 +237,12 @@ introduced; the food values a pass depends on are on the `food_growth` span.
 - [x] `make check` -> exit 0 (2026-10-07; workspace and `-p v3-core`
       clippy `-D warnings` clean).
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
-      and every survivor resolved as killed, equivalent, or deferred.
+      every survivor resolved as killed, equivalent, or deferred.
+
+| Fresh run (2026-10-07), output `~/.local/share/petri-tools/mutants/t24-f03/mutants.out`; a third run needs the user | Result | Baseline failure |
+|---|---|---|
+| 1, before b9af1c10 | 58 mutants, exit 4, none tested | `opportunity::tests::pilot_and_full_runs_resolve_to_distinct_raw_paths` needed a git checkout; fixed test-only at b9af1c10 |
+| 2, at b9af1c10 | 58 mutants, exit 4, none tested | `windows::tests::a_window_encodes_predicted_ids_parents_times_names_and_attributes` line 238 `root.end == last.end`: root starts at `started + 1 ms`, so it fails when seeding plus three ticks finish within 1 ms (1 of 6 local `--profile mutants` suite runs) |
 - [x] Benchmark summaries stored at
       `docs/progress/features/t24-f03-food-growth-phase-timing.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
