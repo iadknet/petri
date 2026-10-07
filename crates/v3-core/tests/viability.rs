@@ -1060,7 +1060,10 @@ fn ordinary_food_alone_replenishes_energy_and_reproduces() {
 /// `docs/progress/readings/t19-f04.md`. Re-pinned by the food-fixture fix
 /// (`docs/specs/fix-food-test-fixtures.md`): `viability_config`'s full initial
 /// food coverage now reaches the seeder, so 323 births became 199; dropping
-/// the two `types[0]` lines restores the previous pins.
+/// the two `types[0]` lines restores the previous pins. Re-pinned by T24.F01
+/// (spread into an occupied cell is kept, not overwritten): 199 births became
+/// 192; before/after in `docs/progress/readings/t24-f01.md`, measured on macOS
+/// aarch64 only.
 /// At the old 0.54 coverage GNU/Linux needed a separate pin because
 /// fertility generation's `f32::exp` rounds differently from macOS (identical
 /// positions and births, different digests). Under full coverage macOS aarch64
@@ -1102,8 +1105,8 @@ fn founder_only_trajectory_digest_is_pinned() {
         }
     }
     let digest = hex::encode(hash.finalize());
-    // Same value on macOS aarch64 and GNU/Linux aarch64 (Rust 1.93.0).
-    let expected_digest = "ad2f93e100d1f7962b68dcb6f35b65d3d6b4972ef0efee15de5b0e4df06dfc52";
+    // Measured on macOS aarch64 (T24.F01); the previous pin also matched GNU/Linux aarch64.
+    let expected_digest = "c8a0e6d70da4d59b77c5e00cdd9a25d4e657842a7d8193e88961543bcb5533bf";
 
     assert_eq!(sim.stats.mutation_events_applied_total, 0);
     assert_eq!(
@@ -1112,6 +1115,6 @@ fn founder_only_trajectory_digest_is_pinned() {
             sim.creatures.len(),
             digest.as_str()
         ),
-        (199, 0, expected_digest)
+        (192, 0, expected_digest)
     );
 }

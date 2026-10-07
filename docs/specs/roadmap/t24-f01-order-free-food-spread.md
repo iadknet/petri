@@ -47,6 +47,7 @@ profiles on its own, before T24.F02 parallelizes the pass.
 | Comparison rule | T10 track Notes (thresholds: flag above +10% work per creature-tick or +25% wall; severe above +50% work or a doubling of wall; a predeclared, justified cost re-pins the epoch in the closing commit); `crates/v3-cli/src/bench/comparison.rs` (`COUNTER_NAMES`, only counters can be severe); `crates/v3-cli/tests/bench.rs` `gate_profile_has_no_severe_regression_against_series_references` (inside `make check`) | The Performance predeclaration and the closure order (re-pin before the mutation gate). |
 | References | Previous closure T24.F03: `docs/progress/features/t24-f03-food-growth-phase-timing.json` (gate: seeds 11/22/33 final population 2226/2170/2163) and `-goal.json` (Orchards 11: final 4088, plateau 3706.5, minimum 18; Canyon 22: 3221; Confluence 33: 1219; no extinction); epochs T11.F25 (gate) and T11.F27 (goal) in `docs/progress/benchmark-series.json` | The readings this feature's summaries are compared with. |
 | Determinism and viability tests | `crates/v3-core/tests/reproducibility.rs` (two seeded runs byte-identical, with operator-coverage assertions `paired > 0`, `backward + forward > 0`, `compared_mutated_descendant`; terrain across thread counts), `tests/viability.rs` (header rule: fix the config or behavior, never the tests; `founder_only_trajectory_digest_is_pinned` hashes the founder trajectory and the food grid and pins `(199, 0, digest)`) | Byte-identity and survival assertions are unchanged; the trajectory digest is expected to change and is re-pinned once with evidence (task 1); the operator-coverage assertions may need a new seed or horizon. |
+| Trajectory pins | `crates/v3-core/tests/applied_trajectory.rs` (`accounting_preserves_pre_feature_sampled_trajectories_and_actions`, `mutation_on_applied_trajectory_guard_is_pinned`), `tests/baseline_worlds.rs` (`legacy_default_short_run_identity`), `crates/v3-cli/src/bench/tests.rs` (`the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint`: seed 1, horizon 250, 32-by-32, 8 founders) | Each file's own rule: a pin is updated only after an intentional behavior change has been reproduced across two agreeing runs; the bench fixture reselects its seed by its comment's rule (the lowest seed in 0..=25 that keeps at least 2 creatures over at least 2 cells at the horizon). All four move with the repaired rule and are re-pinned once (task 5). |
 
 Invariants:
 
@@ -98,7 +99,7 @@ persistence samples of each goal case and the gate (T01.F11 cadence, every
 
 ## Implementation Tasks
 
-- [ ] Run `cargo test -p v3-core --test viability` first (tick-loop mechanics
+- [x] Run `cargo test -p v3-core --test viability` first (tick-loop mechanics
       change) and record its result. The survival tests keep their seeds,
       horizons and assertions under the file's header rule; a survival
       failure on the repaired rule is a behavior finding reported under the
@@ -107,7 +108,7 @@ persistence samples of each goal case and the gate (T01.F11 cadence, every
       grid: after the fixture, oracle and property tests are green it is
       re-pinned once, with the before and after `(births, population, digest)`
       triples in the readings.
-- [ ] TDD in `ecology.rs` tests, with fertility, inhibition
+- [x] TDD in `ecology.rs` tests, with fertility, inhibition
       (`growth_inhibitor` 0), depletion, grazing and recovery off and
       `max_density` leaving headroom (the `spread_target_delta_with_grazing`
       helper's settings): a growth pass on a `Bounded` 2-by-1 world where the
@@ -116,7 +117,7 @@ persistence samples of each goal case and the gate (T01.F11 cadence, every
       passes after the fix (`target × (1 + g) + source × g ×
       spread_density_ratio`); the mirrored layout (dense east cell, occupied
       west cell) gives the same target value, so the two orientations agree.
-- [ ] Per-cell oracle test in `ecology.rs` tests: on a `Wrap` world with two
+- [x] Per-cell oracle test in `ecology.rs` tests: on a `Wrap` world with two
       food types, a barrier cell and recovery spawns enabled, and fertility,
       inhibition, depletion and grazing off so the contributions are the
       plain `source × g`, `source × g × ratio` and `max_density × g` terms,
@@ -127,7 +128,7 @@ persistence samples of each goal case and the gate (T01.F11 cadence, every
       clamp; the fixture is chosen so that a delivery
       across the wrapped edge and a binding clamp occur, and the test asserts
       that they did. Fails today on the lost deliveries.
-- [ ] Property test (proptest, v3-core): with fertility, depletion, grazing,
+- [x] Property test (proptest, v3-core): with fertility, depletion, grazing,
       inhibition and recovery off, `max_density` large enough that no clamp
       binds, and a spread threshold some drawn densities exceed, one growth
       pass on a random grid (at least 2 by 2, no barriers) with random
@@ -136,27 +137,37 @@ persistence samples of each goal case and the gate (T01.F11 cadence, every
       for each spreading cell's target; its assertions do not depend on which
       cases were drawn. The property fails today whenever a draw lands on an
       occupied higher-index target (one visited later).
-- [ ] Fix: at line 495 accumulate, `next_density[idx] = (next_density[idx] +
+- [x] Fix: at line 495 accumulate, `next_density[idx] = (next_density[idx] +
       source + local_delta).clamp(0.0, max_density)`; nothing else in the loop
       changes. Existing growth tests in `world.rs` and `ecology.rs` keep
       passing or have their expected values re-derived from the §5 rule, never
       loosened. The operator-coverage assertions in `reproducibility.rs` are
       re-seeded or given a longer horizon only if the repaired trajectory no
       longer satisfies them; the byte-identity assertions are never weakened,
-      and any such change is recorded in the readings.
+      and any such change is recorded in the readings. The three trajectory
+      hashes in `applied_trajectory.rs` and `baseline_worlds.rs` are re-pinned
+      once to the value two runs on the repaired rule agree on, with the
+      before and after values in the readings and a one-line note in each
+      file's pin comment naming T24.F01 as the move. The bench fixture
+      `the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint`
+      reselects its seed by its comment's rule (lowest seed in 0..=25 keeping
+      at least 2 creatures over at least 2 cells at horizon 250), its comment
+      and the readings record the new seed and how many of the 26 seeds go
+      extinct or end on one cell under the repaired rule (5 and 11 at
+      T19.F04); no assertion, horizon or world size changes.
 - [ ] Benchmark gate and goal profiles, the readings table (food totals and
       persistence per world against T24.F03), the series entry and the epoch
       step of the Performance table, then the mutation gate.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` passes before any edit and,
+- [x] `cargo test -p v3-core --test viability` passes before any edit and,
       after the one digest re-pin, after the fix; both results and the
       before/after pin triples in the readings.
-- [ ] The 2-by-1 fixture, the per-cell oracle test and the property test
+- [x] The 2-by-1 fixture, the per-cell oracle test and the property test
       each fail before the fix and pass after; `cargo test -p v3-core` passes.
       Recorded outputs in [`docs/progress/readings/t24-f01.md`](../../progress/readings/t24-f01.md).
-- [ ] `cargo test -p v3-core --test reproducibility` passes.
+- [x] `cargo test -p v3-core --test reproducibility` passes.
 - [ ] `make check` exits 0, including
       `gate_profile_has_no_severe_regression_against_series_references`
       against the series as left by the epoch step below.

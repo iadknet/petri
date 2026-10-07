@@ -16,6 +16,9 @@
 //! genome shape alone (three `ActionParam(ActionParamField)` sinks, 94 sinks
 //! per graph); the digest recomputed without genome bytes matches the
 //! food-fixture tree, so T11.F27 did not move the simulation.
+//! T24.F01 re-pinned both digests: `grow` keeps spread into occupied cells
+//! (the accumulate at ecology.rs line 495); restoring the assignment alone
+//! restores both old digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -80,7 +83,7 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "6ee41ec18b3f8cae35d8158e77eba4508ac1001e9208ef6891e5bae845e7a6d8"
+        "40336feeb8d6770da20feabb2bac78c1a8d1dacc9b97c8f7d6f9a71b5b86c0b4"
     );
 }
 
@@ -119,6 +122,6 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "44ead4e700027eb43138d562a88a3581beb84f002432e37f98bc12b0f97d67f0"
+        "a59d240c3d98a8187214c4bb91781e55b0e1019bf2fc5142f124f04df062a059"
     );
 }
