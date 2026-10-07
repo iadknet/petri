@@ -4,21 +4,20 @@
 # petri-telemetry, which `make telemetry-up` creates and no `docker compose
 # down -v` removes; nothing expires by age; retire it with
 # `make telemetry-clean CUTOFF=<date or RFC3339>`. Every run and every
-# telemetry check exports to this stack (scripts/telemetry-stack.sh);
-# PETRI_LGTM_IMAGE, PETRI_TELEMETRY_VOLUME and PETRI_TELEMETRY_PROJECT exist
-# for scripts/telemetry-verify, whose destructive rehearsal runs on its own
-# project and volume. The window-store service (T23.F10) runs
+# telemetry check exports to this stack (scripts/telemetry-stack.sh).
+# The project, volume and image are fixed.
+# The window-store service (T23.F10) runs
 # scripts/telemetry-window-store in the same image: every
 # PETRI_WINDOW_STORE_PASS_S seconds it thins each run's creature.window records
 # in Loki by age in window indexes (all of the newest 300, the even ones of the
 # next 300, every tenth beyond) and holds a run's stored record bytes at
 # PETRI_WINDOW_STORE_CAP_BYTES; `docker compose logs window-store` shows each
 # pass.
-name: ${PETRI_TELEMETRY_PROJECT:-petri-telemetry}
+name: petri-telemetry
 
 services:
   lgtm:
-    image: ${PETRI_LGTM_IMAGE:-grafana/otel-lgtm:0.34.0}
+    image: grafana/otel-lgtm:0.34.0
     ports:
       - "127.0.0.1:3300:3000"
       - "127.0.0.1:4317:4317"
@@ -52,7 +51,7 @@ services:
           memory: 2g
 
   window-store:
-    image: ${PETRI_LGTM_IMAGE:-grafana/otel-lgtm:0.34.0}
+    image: grafana/otel-lgtm:0.34.0
     entrypoint: ["sh", "/petri/telemetry-window-store"]
     environment:
       PETRI_WINDOW_STORE_PASS_S: ${PETRI_WINDOW_STORE_PASS_S:-600}
@@ -71,5 +70,5 @@ services:
 
 volumes:
   data:
-    name: ${PETRI_TELEMETRY_VOLUME:-petri-telemetry}
+    name: petri-telemetry
     external: true
