@@ -210,7 +210,7 @@ Genome replication cost:
   minus the charge; an attempt those gates reject burns nothing. On a birth
   the whole charge lands in `energy_flows.action_charges.reproduce` and none
   of it reaches the offspring, whose transfer is unchanged.
-- At the default rate a 386-unit genome (275 above the founder) pays 28.5x the
+- At the default rate a 386-unit genome (289 above the founder) pays 29.9x the
   base charge per birth.
 
 Gestation:
