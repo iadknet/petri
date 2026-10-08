@@ -7,17 +7,17 @@
 
 ## Goal
 
-Copying a longer genome takes longer. A `Reproduce` that passes every gate at
-tick *T* conceives a litter instead of spawning a child: the parent pays the
-charge and the litter's energy at *T*, commits nothing further from that
-moment through tick *T*+h (its brain runs and is charged), and the child is
-born at the parent's Phase 2 slot on tick *T*+h, where
+Copying a longer genome takes longer. A `Reproduce` that spawns a child at
+tick *T* holds the parent afterwards: on ticks *T*+1 … *T*+h its brain runs
+and is charged but it commits no action, where
 h = ⌈`genome_size()` × rate / `FOUNDER_GENOME_SIZE_UNITS`⌉. At the default
-rate 1.0 the 97-unit founder gestates one tick and a genome twice its size two.
-A parent that dies before *T*+h leaves no child. Natural analog: genome size
-sets cell-cycle time through replication (Gregory 2001) and Avida's gestation
-time, where the offspring exists only when the serial copy completes and a
-partial copy dies with its parent. It reaches creatures through the body only:
+rate 1.0 the 97-unit founder is held one tick and a genome twice its size two.
+This is the N1 post-birth hold the follow-up diagnosis run validated, the
+form the spec's predeclared retreat named; the pre-birth gestation form was
+built and measured first and failed the goal population floor on Canyon
+(Non-Goals). Natural analog: genome size sets cell-cycle time through
+replication (Gregory 2001) and Avida's gestation time, where a longer serial
+copy occupies the organism longer. It reaches creatures through the body only:
 time not spent eating, moving or reproducing, and no sensor. Intended outcome:
 a smaller mean genome size over a goal run than the T03.F11 surcharge alone
 leaves, with the population kept.
@@ -28,9 +28,12 @@ leaves, with the population kept.
   rejected-`Reproduce` path, or a penalty decision for one.
 - An additional energy drain during the span; the existing decay, carrying and
   cognition charges continue and are the only drain.
-- A gestation sensor, input, or score; the brain's input set is unchanged.
-- Concurrent gestations; a held parent commits nothing, so a second commit
-  cannot happen.
+- A hold sensor, input, or score; the brain's input set is unchanged.
+- The pre-birth gestation form (conception at *T*, delivery at *T*+h, litters
+  lost on death, no cell or cap): built and measured at `f380899e`, retired
+  by the predeclared retreat when Canyon's final population read 0.441× the
+  previous closure's; not kept behind a config switch. Its readings stay in
+  the readings file as the form-B record.
 - Changes to T03.F08, T03.F10 or T03.F11 rates, to the age gate, the litter
   sizing (T17.F01) or the goal recipes; every standard world carries the
   feature through the default.
@@ -78,8 +81,11 @@ ticks: size 4.57× and 9.14× the founder against 7.09× and 22.38×, population
 state and adds what N1 did not test: the litter lost with a dying parent (the
 Avida analog exactly), the litter lost to crowding at delivery, and the end
 of the commit tick's queue at conception. C, a reduced action rate, is untested and
-weaker by construction. B is adopted as the user's framing with A as the
-predeclared retreat; the span's drain is the existing metabolism (decay plus
+weaker by construction. B was built first as the user's framing with A as the
+predeclared retreat; its goal run (`f380899e`, 2026-10-08) read Canyon's
+final population at 4,042 against T24.F02's 9,165 (0.441×, under the half
+floor; plateau 0.862×), so the retreat fired and A is the form in force. The
+span's drain is the existing metabolism (decay plus
 carry over the span is 2% of a Canyon birth at founder size, 70% at 22×,
 smaller than the surcharge at every measured size above the founder, yet the hold bounded size
 where the surcharge, 91% of a birth's energy at 22×, did not; that the channel
@@ -89,25 +95,22 @@ Fixed design, decided before implementation:
 
 | Decision | Value |
 | --- | --- |
-| Rate | `energy.lifecycle.gestation_ticks_per_founder_genome`, `f32`, default `1.0` through `#[serde(default = "default_gestation_ticks_per_founder_genome")]` (a bare `#[serde(default)]` would read a missing field as `0.0` and disable the span; a test deserializes a lifecycle without the field and asserts `1.0`); finite and non-negative, invalid values fall back to `1.0`; `0.0` disables the span. Enters `config_digest`. |
-| Span | `gestation_ticks(size, rate) = ((f64::from(size) * f64::from(rate)) / f64::from(FOUNDER_GENOME_SIZE_UNITS)).ceil() as u64`, one helper beside `genome_replication_cost_multiplier`, read from `cached_genome_size`. At rate 1.0 it equals `size.div_ceil(97)` for every `u32` size (proptest): founder 1, 98 to 194 units 2. Non-decreasing in size at a fixed rate. `deliver_tick = T.saturating_add(h)` and delivery fires when `sim.tick >= deliver_tick`, so a rate large enough to saturate the cast holds the parent for the rest of its life instead of wrapping (a configuration pathology, documented in the config spec; the frontend row caps at 10). Not a config field for the anchor: the founder's size is a property of the founder (T03.F11). |
-| Commit, tick *T* | Steps 1 to 8 of `apply_reproduce` run as today, so a rejected attempt and its stats, penalty and action-log entry are unchanged. When both gates pass the parent stores one pending birth on `CreatureState`: the chosen `Direction`, the litter energy (`transfer`, `f32`) and `deliver_tick = T + h`. The result variant `Spawned` is renamed `Conceived` (`as_key` `"Conceived"`); the action log records `Success`; `record_action_result(true)` is recorded at commit as the action's outcome for Phase 2.5, while `record_offspring` is recorded at delivery, since `OutcomeAccumulator.offspring_spawned` and the window seam's `offspring_spawned` count children that exist (the parent is alive and holds a decision slot on the delivery tick). `reproduction_actions_attempted_total`, `last_tick_reproduce` and the per-creature attempt counts are unchanged. `gestations_started_total += 1`. When h is at least 1 the conception ends the parent's action queue for tick *T*: the remaining queued actions are discarded with no penalty and no log entry, so a second `Reproduce` in the same queue cannot conceive concurrently (N1 let the rest of the queue run; its child already existed). When h is 0 the delivery step runs at once inside `apply_reproduce` and the queue continues, so rate `0.0` is the pre-feature engine. |
-| Hold, ticks *T*+1 … *T*+h | At the top of the parent's Phase 2 slot, after `compute.record` and `record_cognition` and after the `contains_key` check, a creature with a pending birth whose energy is at or below zero is removed there through `remove_creature_if_dead` (its litter lost; today Phase 1 charges can exhaust a creature without removing it, and an acting creature is removed after its first action, which a held one never takes); otherwise it delivers the birth if `sim.tick >= deliver_tick` (below) and then skips its whole action queue (`continue`, the N1 prototype's site), `gestation_creature_ticks_total += 1`; so the parent commits nothing on *T*+1 through *T*+h inclusive and acts again from *T*+h+1, exactly N1's span (the founder: one tick). Phase 0 decay and carrying, Phase 1 cognition and its charges, and Phase 2.5 run as today; no action-log entry is written for a held tick. |
-| Delivery, tick *T*+h | At the parent's Phase 2 slot, before the skip: if `creatures.len() >= max_creatures` the birth is lost (`gestations_lost_population_cap_total`); else the stored direction is resolved from the parent's position (unchanged since the commit, since a held parent cannot move; the cell's occupancy can have changed); if that cell is not a valid target, the first valid cell in `Direction::ALL` order from the parent's position is taken; none valid loses the birth (`gestations_lost_no_cell_total`). A delivered birth runs Steps 9 to 14 as today, every inherited field read from the parent at delivery (genome, shared memory, plasticity weights, phenotype, identity, `generation + 1`), mutations drawn from `reproduce_rng` at this point, the child's energy the stored litter energy; `offspring_spawned_count`, `offspring_energy_credit`, `reproduction_actions_spawned_total`, `birth_mutation_operators` and the mutation funnel keep their birth-time meaning; the delivered cell joins `successful_spawn_targets`. `gestations_delivered_total += 1`; the pending birth is cleared; the parent is never held past *T*+h by crowding or anything else. |
-| Loss | `Simulation::remove_creature` on a creature with a pending birth adds the litter energy to `energy_flows.gestation_lost` and `gestations_lost_parent_death_total += 1`; the two delivery losses add to the same flow. A lost birth is not a death: no `DeathCause`, no mortality record, no child. |
-| Energy identity | `parental_transfer_debit` equals `offspring_energy_credit + gestation_lost + Σ pending litter energy over living creatures` at every tick boundary up to the Step 8 rounding: the debit is the realized `f32` difference while the litter carries the nominal `transfer`, so each birth contributes at most one `f32` ulp of the parent's energy at Step 8. That energy is at most `max(E_max, C_max)`, where `E_max` is the largest creature energy observed at any tick boundary of the run and `C_max` the largest `max_energy` in force at any time during it (within a tick energy rises only through eat, steal and the kill bonus, which clamp to the cap then in force; a runtime patch that lowers the cap does not re-clamp living creatures, and a parent that gains energy, conceives and spends it before the boundary is covered by `C_max`). A fixture with births, deaths during gestation and crowded deliveries records `E_max` and `C_max`, asserts the identity within `gestations_started × max(E_max, C_max) × 2^-23`, repeats it in a variant that lowers `max_energy` through `sim.config` mid-run and asserts at the lowering tick that some creature holding a pending birth has energy above the new cap (a held parent only loses energy, so it conceived above the lowered cap before the lowering: the B6 sequence) and that some creature holds energy above the new cap, and asserts the count identities exactly. |
-| Count identities | `reproduction_actions_attempted_total == reproduction_actions_rejected_total + gestations_started_total` replaces today's `attempted == spawned + rejected` (births are delayed and can be lost), and `gestations_started_total == gestations_delivered_total + the three lost counters + pending births`. `stats_accounting_invariant_holds_over_50_ticks` in `crates/v3-core/tests/viability.rs` and `v3-reproduction-spec.md` Section 7 state the new identities; at rate `0.0` started equals spawned, so the old identity is implied. |
+| Rate | `energy.lifecycle.reproductive_hold_ticks_per_founder_genome`, `f32`, default `1.0` through `#[serde(default = "default_reproductive_hold_ticks_per_founder_genome")]` (a bare `#[serde(default)]` would read a missing field as `0.0` and disable the span; a test deserializes a lifecycle without the field and asserts `1.0`); finite and non-negative, invalid values fall back to `1.0`; `0.0` disables the span. Enters `config_digest`. Renamed from the form-B `gestation_ticks_per_founder_genome` because nothing gestates: the child exists at *T*. |
+| Span | `reproductive_hold_ticks(size, rate) = ((f64::from(size) * f64::from(rate)) / f64::from(FOUNDER_GENOME_SIZE_UNITS)).ceil() as u64`, one helper beside `genome_replication_cost_multiplier`, read from `cached_genome_size`. At rate 1.0 it equals `size.div_ceil(97)` for every `u32` size (proptest): founder 1, 98 to 194 units 2. Non-decreasing in size at a fixed rate. `held_until_tick = (T + 1).saturating_add(h)`, so a rate large enough to saturate the cast holds the parent for the rest of its life instead of wrapping (a configuration pathology, documented in the config spec; the frontend row caps at 10). Not a config field for the anchor: the founder's size is a property of the founder (T03.F11). |
+| Birth, tick *T* | `apply_reproduce` runs Steps 1 to 14 exactly as before this feature: the child is spawned at *T*, `Spawned` keeps its name, `record_action_result` and `record_offspring` are recorded at *T*, and every reproduction statistic, flow and rejection path is untouched. After a `Spawned` result with h at least 1, `execute_reproduce` sets `held_until_tick = (T + 1).saturating_add(h)` on the parent (a `u64` on `CreatureState`, 0 at birth) and `reproductive_holds_started_total += 1`. The rest of the tick's queue runs as today (N1): a later spawning `Reproduce` in the same queue overwrites `held_until_tick` with its own deadline. With h equal to 0 nothing is set, so rate `0.0` is the pre-feature engine. |
+| Hold, ticks *T*+1 … *T*+h | At the top of the parent's Phase 2 slot, after `compute.record` and `record_cognition` and after the `contains_key` check, a creature with `held_until_tick > sim.tick` skips its whole action queue (`continue`, the N1 prototype's site) and `reproductive_hold_creature_ticks_total += 1`; so the parent commits nothing on *T*+1 through *T*+h inclusive and acts again from *T*+h+1, exactly N1's span (the founder: one tick). Before the skip, a held creature whose energy is at or below zero is removed through `remove_creature_if_dead`, the one deviation from N1: Phase 1 charges can exhaust a creature without removing it, and an acting creature is removed after its first action, which a held one never takes. Phase 0 decay and carrying, Phase 1 cognition and its charges, and Phase 2.5 run as today; no action-log entry is written for a held tick. |
+| Count identities | `attempted == spawned + rejected` holds as today (`stats_accounting_invariant_holds_over_50_ticks`, `v3-reproduction-spec.md` Section 7, both restored to the pre-feature statement). `reproductive_holds_started_total == reproduction_actions_spawned_total` whenever the rate is above zero (h is at least 1 for every genome of at least one unit) and is 0 at rate `0.0`; a fixture asserts both. No in-flight energy exists, so no energy identity is added; the form-B identity fixture and its cap-lowering variant are removed with the form. |
 | Natural-analog rule | No input, sensor or score reads the span; the parent feels it through energy and age only. The held parent's cognition outputs are discarded, so reward learning sees no action outcomes on held ticks (the prototype's behavior). |
-| Determinism | Delivery runs at the parent's slot in the tick's decision order and draws from `reproduce_rng` there, so cross-process reproducibility is untouched and thread counts do not matter. Every birth moves by h ticks, so the gate and goal `deterministic` blocks differ from every prior report; the founder-neighborhood, drift-walk and `recruitment_paths` blocks run no reproduction action and are predeclared byte-identical to T24.F02's. The new field enters every `config_digest`: the goal recipe digests in `crates/v3-cli/tests/bench_artifacts.rs`, the `applied_trajectory` digests, the `baseline_worlds` short-run identity hash and the viability suite's `founder_only_trajectory_digest_is_pinned` are re-pinned once after two agreeing runs (the T03.F11 procedure), in the first implementer brief. At rate `0.0` each of these fixtures reproduces its pre-feature digest exactly; this is the equivalence evidence and a kept test. Existing reproduction fixtures that assert the immediate-spawn sequence (`tick/tests/support.rs` and `actions/mod.rs` `small_config`, the `reproduction.rs` newborn-credit test, `neutral_connection_tests/refinement.rs`) set the rate to `0.0` deliberately; the gestation tests and the viability suite run at the default. |
-| Viability | `cargo test -p v3-core --test viability` runs first. The founder's first delivery lands one tick after its first commit, so the suite's 20-tick birth horizons become `BIRTH_HORIZON_TICKS = 21` (the founder's gestation) wherever a test counts births within the horizon (`population_survives_and_reproduces_20_ticks`, `high_coverage_economics_survive_and_reproduce_short_horizon`, the two `viability_still_passes_with_*_mutations` tests), and `founder_reproduces_when_energy_allows_and_target_is_open` checks the pending birth after tick 1 and the child after tick 2; no assertion is weakened, and the moves are recorded in the readings. |
-| Telemetry and reports | Six `u64` counters on `SimStats` and one `f64` flow, exported per the wiring convention (Telemetry table); the rate reaches `run.started` with no edit and joins the `actions` phase group in `crates/v3-telemetry/src/trace.rs` beside `genome_replication_cost_per_unit`. `SimStats` is not serialized: the goal report projects counters and flows explicitly (`crates/v3-cli/src/bench/tracking.rs`, `WorldTracking`, `EnergyFlowTracking`), so the flow joins `EnergyFlowTracking` (the `energy_flows` case block is already kept whole in the summary) and the six counters plus the end-of-run `pending_births` and `pending_litter_energy` form a `gestation` block on `WorldTracking`, which `GoalCaseObservation` flattens so the JSON key is `gestation` on the case, added to `KEPT_CASE_BLOCKS` in `crates/v3-cli/src/bench/artifacts.rs` so the committed summary carries them. |
-| Frontend | `LifecycleEnergyConfig` gains the field; `EnergyLifecycleSection.tsx` gains one row beside "Replication Cost / Unit" (label "Gestation Ticks / Founder Genome", min 0, max 10, step 0.1, default 1, tooltip naming the span); `test/fixtures.ts` and the `ControlBar.test.tsx` fixture carry it. |
-| Reference docs | `v3-runtime-config-spec.md` Section 4 gains the row and a "Gestation" note (formula, anchor, commit/hold/delivery, losses), and its existing replication-surcharge text stops naming the founder as 111 units (97 since T19.F04; `FOUNDER_GENOME_SIZE_UNITS`), so the two anchors in one document agree; `v3-reproduction-spec.md` Section 6 gains the commit, hold and delivery steps, the `Conceived` variant and the loss rule. |
-| Retreat (predeclared) | If the goal population floor below fails on any world under this form, the form becomes A, exactly N1: Steps 9 to 14 run at *T* as today, the rest of the commit tick's queue runs (a second spawning `Reproduce` in it resets the hold to its own deadline), the parent is held *T*+1 … *T*+h, no pending state, loss counters or loss flow exist, and the count identity is today's. The pins, fixtures, telemetry rows, reference docs and both profiles are refreshed for the form in force and this spec is edited to record it. The retreat needs no new decision; a failure under A is a blocker for the user. |
+| Determinism | The hold is a per-creature `u64` compared with `sim.tick` at the creature's Phase 2 slot, so cross-process reproducibility is untouched and thread counts do not matter. Held parents commit nothing, so the gate and goal `deterministic` blocks differ from every prior report and from the form-B run; the founder-neighborhood, drift-walk and `recruitment_paths` blocks run no reproduction action and are predeclared byte-identical to T24.F02's. The new field enters every `config_digest`: the goal recipe digests in `crates/v3-cli/tests/bench_artifacts.rs`, the `applied_trajectory` digests, the `baseline_worlds` short-run identity hash and the viability suite's `founder_only_trajectory_digest_is_pinned` are re-pinned once after two agreeing runs (the T03.F11 procedure) in the retreat brief, since they moved for form B and move again for A. At rate `0.0` each of these fixtures reproduces its pre-feature digest exactly; this is the equivalence evidence and a kept test. Existing reproduction fixtures that run several ticks and assert on later actions may set the rate to `0.0` deliberately where the hold would change what they assert (`tick/tests/support.rs` and `actions/mod.rs` `small_config`, `neutral_connection_tests/refinement.rs`); the hold tests and the viability suite run at the default. |
+| Viability | `cargo test -p v3-core --test viability` runs first. Births happen at *T* as before this feature, so the suite's 20-tick birth horizons and the founder's one-tick reproduction check are restored to their pre-feature values (the form-B `BIRTH_HORIZON_TICKS = 21` is removed); no assertion is weakened. |
+| Telemetry and reports | Two `u64` counters on `SimStats`, exported per the wiring convention (Telemetry table); the rate reaches `run.started` with no edit and joins the `actions` phase group in `crates/v3-telemetry/src/trace.rs` beside `genome_replication_cost_per_unit`. `SimStats` is not serialized: the goal report projects counters explicitly (`crates/v3-cli/src/bench/tracking.rs`, `WorldTracking`), so the two counters form a `reproductive_hold` block on `WorldTracking`, which `GoalCaseObservation` flattens so the JSON key is `reproductive_hold` on the case, kept in `KEPT_CASE_BLOCKS` in `crates/v3-cli/src/bench/artifacts.rs`. The form-B `gestation` block, its six counters and the `gestation_lost` flow are removed from `SimStats`, `EnergyFlows`, `EnergyFlowTracking`, the metrics families, their test rows and `always_names`. |
+| Frontend | `LifecycleEnergyConfig` carries the renamed field; `EnergyLifecycleSection.tsx` has one row beside "Replication Cost / Unit" (label "Reproductive Hold Ticks / Founder Genome", min 0, max 10, step 0.1, default 1, tooltip naming the post-birth hold); `test/fixtures.ts` and the `ControlBar.test.tsx` fixture carry it. |
+| Reference docs | `v3-runtime-config-spec.md` Section 4 carries the renamed row and a "Reproductive hold" note (formula, anchor, hold semantics, the dead-held-creature removal), and its replication-surcharge text names the founder as 97 units (`FOUNDER_GENOME_SIZE_UNITS`, since T19.F04); `v3-reproduction-spec.md` Section 6 adds the post-spawn hold step and Section 7 keeps `attempted = spawned + rejected`; the form-B commit, delivery, `Conceived` and loss text is removed from both. |
+| Retreat (executed) | The predeclared retreat fired on the form-B goal run (`f380899e`: Canyon final 4,042 against T24.F02's 9,165, 0.441×). The form above is A, exactly N1 except the dead-held-creature removal. The pins, fixtures, telemetry rows, reference docs, both profiles, the long Canyon run, the overhead check and the mutation gate are refreshed for it. A floor failure under A is a blocker for the user, not a further retreat. |
 
-Invariants: energy is conserved and behavior-backed (the identity above);
-the genome is immutable after birth, so `cached_genome_size` is current and no
-path walks a genome; a creature holds at most one pending birth; a held parent
+Invariants: energy is conserved and behavior-backed (no new flow; the hold
+moves no energy); the genome is immutable after birth, so
+`cached_genome_size` is current and no path walks a genome; a held parent
 commits no action; the span is a function of size and rate only, never of
 crowding; rate `0.0` is byte-identical to the pre-feature engine.
 
@@ -115,20 +118,14 @@ crowding; rate `0.0` is byte-identical to the pre-feature engine.
 
 | Signal | Kind | Source | Context carried |
 | --- | --- | --- | --- |
-| `petri.run.gestations_started` | counter | `SimStats.gestations_started_total`, one per commit | `energy.lifecycle.gestation_ticks_per_founder_genome` |
-| `petri.run.gestations_delivered` | counter | `SimStats.gestations_delivered_total`, one per birth at *T*+h | same |
-| `petri.run.gestations_lost_parent_death` | counter | `SimStats.gestations_lost_parent_death_total`, from `remove_creature` | same |
-| `petri.run.gestations_lost_no_cell` | counter | `SimStats.gestations_lost_no_cell_total`, delivery with no valid cell | same |
-| `petri.run.gestations_lost_population_cap` | counter | `SimStats.gestations_lost_population_cap_total`, delivery at the cap | same, `population.max_creatures` |
-| `petri.run.gestation_creature_ticks` | counter | `SimStats.gestation_creature_ticks_total`, one per held Phase 2 slot | same |
-| `petri.run.energy_flow{petri.flow="gestation_lost"}` | `f64` non-monotonic sum | `EnergyFlows.gestation_lost`, the litter energy of every lost birth | same |
-| `energy.lifecycle.gestation_ticks_per_founder_genome` | recorded configuration | `run.started` body (no edit); `petri.config.energy.lifecycle.gestation_ticks_per_founder_genome` on the `actions` phase span | — |
+| `petri.run.reproductive_holds_started` | counter | `SimStats.reproductive_holds_started_total`, one per spawning birth with h at least 1 | `energy.lifecycle.reproductive_hold_ticks_per_founder_genome` |
+| `petri.run.reproductive_hold_creature_ticks` | counter | `SimStats.reproductive_hold_creature_ticks_total`, one per held Phase 2 slot | same |
+| `energy.lifecycle.reproductive_hold_ticks_per_founder_genome` | recorded configuration | `run.started` body (no edit); `petri.config.energy.lifecycle.reproductive_hold_ticks_per_founder_genome` on the `actions` phase span | — |
 
-Each of the six counters is a family in `crates/v3-telemetry/src/metrics.rs`,
-a row in the expected families of `metrics/tests.rs`, and a name in
-`scripts/telemetry-dashboards-check` `always_names`; the flow joins the
-existing `petri.run.energy_flow` family's point list and its test row. The
-implicit drain is an estimate, not a stored flow: `gestation_creature_ticks` ×
+Each counter is a family in `crates/v3-telemetry/src/metrics.rs`, a row in
+the expected families of `metrics/tests.rs`, and a name in
+`scripts/telemetry-dashboards-check` `always_names`. The
+implicit drain is an estimate, not a stored flow: `reproductive_hold_creature_ticks` ×
 (`energy_decay_per_tick` + `genome_carry_cost_per_unit` × the terminal
 population mean genome size), read beside `lifecycle_decay` and
 `genome_carrying`; it ignores the correlation between size and held exposure
@@ -136,60 +133,68 @@ and the charges on parents removed in Phase 0 before a held slot.
 
 ## Implementation Tasks
 
-- [x] Config field, `normalize`, `gestation_ticks` helper and its tests
-      (unit, proptest equality to `div_ceil(97)` at rate 1.0, monotone,
-      rate `0.0` gives 0); the `Conceived` rename; recipe-digest,
-      `applied_trajectory` and `baseline_worlds` pins moved after two agreeing
-      runs.
-- [x] Pending birth on `CreatureState`; commit, hold, delivery and loss in
-      `reproduction.rs`, `tick.rs` and `simulation.rs`; the six counters, the
-      flow, the `gestation` report block and the viability count identity;
-      TDD fixtures for the hold, the delivery (moved parent,
-      fallback cell, no cell, cap), the loss on death, the identity, and
-      rate `0.0` equivalence.
-- [x] Telemetry wiring (families, test rows, dashboards-check names, the
-      `actions` phase attribute).
-- [x] Frontend row and fixtures; `v3-runtime-config-spec.md` and
-      `v3-reproduction-spec.md`.
-- [ ] Verification runs below: viability first, `make check`, gate and goal
-      profiles, the long Canyon run, the mutation gate.
+- [ ] Config field renamed to `reproductive_hold_ticks_per_founder_genome`
+      (default function, `normalize`, missing-field test); the span helper
+      renamed with its tests (unit, proptest equality to `div_ceil(97)` at
+      rate 1.0, monotone, rate `0.0` gives 0); `Spawned` restored; the four
+      pin sets re-pinned after two agreeing runs, each reproducing its
+      pre-feature digest at rate `0.0`.
+- [ ] Form A in `tick.rs` and `creature/state.rs`: `held_until_tick` set in
+      `execute_reproduce` after a spawn, the skip at the top of the Phase 2
+      slot with the dead-held-creature removal, the two counters; the pending
+      birth, delivery, loss paths, six counters, `gestation_lost` flow and
+      `gestation` block removed; TDD fixtures for the hold span (founder one
+      tick, two-founder genome two), the same-queue reset, cognition charged
+      while held, no action log while held, the dead-held removal, the count
+      identity, and rate `0.0` equivalence.
+- [ ] Telemetry wiring for the two counters (families, test rows,
+      dashboards-check names, the `actions` phase attribute renamed); the
+      `reproductive_hold` report block in `tracking.rs` and
+      `KEPT_CASE_BLOCKS`.
+- [ ] Frontend row and fixtures renamed; `v3-runtime-config-spec.md` and
+      `v3-reproduction-spec.md` rewritten for the hold (97-unit founder text).
+- [ ] Verification runs below on the form-A code: viability first,
+      `make check`, gate and goal profiles, the long Canyon run, the overhead
+      check, the mutation gate.
 
 ## Verification
 
-- [x] `cargo test -p v3-core --test viability` (first) -> result in
+Every item below is read on the form-A code; the form-B results
+(`f380899e`) are the "Build verification" and "Benchmark readings (form B)"
+sections of the readings file and verify nothing here.
+
+- [ ] `cargo test -p v3-core --test viability` (first) -> result in
       [`docs/progress/readings/t03-f12.md`](../../progress/readings/t03-f12.md).
-- [x] Focused tests: `cargo test -p v3-core --lib gestation` (16 tests,
-      including the identity fixture on seed 165 and its cap-lowering variant
-      with the B6 pending-parent assertion at tick 50) -> names and results in
-      the readings file.
-- [x] `cargo test -p v3-core --test applied_trajectory` twice (digests agree,
+- [ ] Focused tests: `cargo test -p v3-core --lib reproductive_hold` and the
+      fixtures named above -> names and results in the readings file.
+- [ ] `cargo test -p v3-core --test applied_trajectory` twice (digests agree,
       re-pinned; the rate-`0.0` case reproduces the pre-feature digests),
-      `--test baseline_worlds`, `cargo test -p v3-cli --test bench_artifacts`
-      -> readings file.
+      `--test baseline_worlds`, `--test viability` founder-only digest,
+      `cargo test -p v3-cli --test bench_artifacts` -> readings file.
 - [ ] `make check` -> exit 0; `scripts/telemetry-dashboards-check` passes
-      with the six new counter names; `scripts/telemetry-overhead` on the existing
-      stack under the 1.10 ceiling -> readings file. `make check` exits 0.
-      Benchmark specialist, 2026-10-08: `scripts/telemetry-dashboards-check`
-      exit 0, "all checks passed"; `scripts/telemetry-overhead` exit 0 with
-      verdict **inconclusive** (spread 0.1971 sets 32 pairs at 5,378 ms per
-      run, which do not fit the 300 s cap; 0 pairs run, 24.1 s used; not
-      rerun). The ceiling is unmeasured and is reported to the user.
-- [x] Long Canyon run (predeclaration below): raw `canyon.ndjson` and
-      `canyon-config.json` under the main checkout's ignored
-      `.bench-artifacts/t03-f12-genome-length-dependent-reproductive-time/canyon/`;
-      committed under `docs/progress/sweeps/t03-f12/` only `run.sh`,
-      `timing.txt` and `canyon-samples.md` (population, `mean_genome_size`,
-      `mean_generation`, `mean_mesh_nodes` at every 2,500th tick and at the
-      first sample past 36,652, with the raw file's SHA-256 and byte count).
-      Run 2026-10-08: exit 0, 1,604 s wall of 14,400 s, population above zero
-      at all 80 samples (minimum 1,110, final 1,122); raw 332,377 bytes,
-      SHA-256 `b674b579…8c14`; evidence `docs/progress/sweeps/t03-f12/canyon-samples.md`.
+      with the two counter names and without the six removed ones;
+      `scripts/telemetry-overhead` on the existing stack under the 1.10
+      ceiling, run once more on a host whose load allows the pair count the
+      spread demands (the form-B attempt was inconclusive at spread 0.1971:
+      32 pairs at 5.4 s each exceed the 300 s cap); a second inconclusive
+      verdict is recorded as such and reported to the user, never rounded to
+      a pass -> readings file.
+- [ ] Long Canyon run (predeclaration below) on the form-A code: raw
+      `canyon.ndjson` and `canyon-config.json` under the main checkout's
+      ignored `.bench-artifacts/t03-f12-genome-length-dependent-reproductive-time/canyon/`
+      (the form-B raw files move to a `form-b/` sibling); committed under
+      `docs/progress/sweeps/t03-f12/` only `run.sh`, `timing.txt` and
+      `canyon-samples.md` (population, `mean_genome_size`, `mean_generation`,
+      `mean_mesh_nodes` at every 2,500th tick and at the first sample past
+      36,652, with the raw file's SHA-256 and byte count), the form-B table
+      kept in the same file under its own heading as a reference.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       full survivor list stays here.
-- [x] Benchmark summaries stored at
+- [ ] Benchmark summaries stored at
       `docs/progress/features/t03-f12-genome-length-dependent-reproductive-time.json`
-      and `-goal.json`, local raw hash/byte count and verification time
+      and `-goal.json` (overwriting the form-B summaries, whose readings stay
+      in the readings file), local raw hash/byte count and verification time
       checked, series entries point to the summaries, no new full report
       staged.
 
@@ -198,9 +203,10 @@ and the charges on parents removed in Phase 0 before a held slot.
 **Predeclaration — written before the run.** Natural analog: replication time
 proportional to genome length (Avida's gestation time; the nucleotypic effect
 on cell-cycle time), reaching creatures through the body as ticks on which a
-parent commits nothing and takes in nothing, and through the loss of a litter
-whose parent dies first. Expected compute cost: one `u64` comparison per
-creature per Phase 2 slot and one small struct per commit; wall time per
+parent commits nothing and takes in nothing (the form-B litter loss is gone
+with the retreat; the thresholds, references and directions below stand
+unchanged for the form-A re-run). Expected compute cost: one `u64` comparison
+per creature per Phase 2 slot and one store per spawn; wall time per
 creature-tick flat; no compute severe and no epoch re-pin budgeted for either
 profile. Gate reference: the T24.F02 gate, the gate epoch. Goal references: the
 T24.F01 goal (the pinned goal-worlds epoch, for the comparator) and the T24.F02
@@ -222,37 +228,20 @@ indicator not in the table is reported with no direction.
 | Long Canyon run, goal seed 22 | E2 default (pre-T24 binary): extinct at tick 36,652; 16× the founder at 20,000 | `target/release/v3-cli run --ticks 40000 --sample-every 500 --seed 22 --config experiments/worlds/canyon-country.json --save-config <raw dir>/canyon-config.json > <raw dir>/canyon.ndjson`, release binary under `scripts/bench-wait`, alone, wall seconds to `timing.txt`. **Decisive check:** population above zero at every sample through 40,000; evidence is the committed `canyon-samples.md` with the raw file's SHA-256. `mean_genome_size` at 20,000 reported against E2's 16× descriptively (different substrate, no same-binary control). Budget 4 hours wall (N1's 20,000-tick Canyon arms ran about 1,400 s each); a run over budget is stopped and reported with its last sample, and the check is then unmet, not waived. |
 | `neighborhood_read.changed_per_all_births` | Standing floors 0.146400 / 0.130000 / 0.143400 (T14.F12, strict not-below); T24.F02 read 0.142800 / 0.161800 / 0.156600 | Not below the standing floor on any world. T24.F02's Orchards reading already sat below its floor with no recorded disposition; that pre-existing breach is reported to the user with this closure. An Orchards reading below the floor here is a breach of a standing indicator and goes to the user under the blocker rule; the spec owner neither waives nor rebases it. |
 | `neighborhood_read.mean_executed_nodes`, `dead_per_all_births` (raw report) | T24.F02 2.76 / 3.72 / 2.68; 0.0048 / 0.0092 / 0.0038 | Reported; a world below 2.5 executed nodes whose size is also below T24.F02's is investigated as core shrinkage. T14.F12's funnel read descriptively, as the row says. |
-| Gestation counters per world | none | `gestations_started` above zero on every world (the applied-behavior evidence the span is on); delivered, the three lost counters and their shares of started, `gestation_creature_ticks / creature_ticks` (expected 2% to 5%), and the derived implicit drain reported. |
+| Hold counters per world | form B read held share 2.69% / 2.69% / 2.96% | `reproductive_holds_started` above zero and equal to `births` on every world (the applied-behavior evidence the span is on); `reproductive_hold_creature_ticks / creature_ticks` (expected 2% to 5%) and the derived implicit drain reported. |
 | `action_charges.reproduce`, `lifecycle_decay`, `genome_carrying` | T24.F02 59,965 / 57,430 / 70,984; 8,195,361 / 6,435,707 / 8,972,820; 174,756 / 144,410 / 195,049 | Reported, no direction (the per-attempt charge is unchanged). |
 | Gate (75 ticks, founders) | T24.F02 gate | Founders' births shift one tick; counters within flag thresholds; `deterministic` differs; no severe budgeted. |
 | Founder neighborhood, drift walk, `recruitment_paths` blocks | T24.F02 goal | Byte-identical, field for field. |
 | Observation budgets | Workflow caps (`measurement_evidence.wall_caps`) | Founder neighborhood below 10 s; summed evolved below 180 s; neighborhood read below 10 s summed; drift walk below 30 s; `recruitment_paths` below 120 s per report (T24.F02 measured 240.2 s against it with no recorded disposition, T24.F01 13.0 s; the breach is reported to the user with this closure and this run's value is read against host load); goal run below 15 minutes. |
 
-**Measured verdict (benchmark specialist, 2026-10-08, HEAD f380899e; numbers in
-the readings file, "Benchmark readings").**
-
-- Gate: `make bench PROFILE=gate ...` make exit 0, CLI exit 0, `severe` false
-  against the T24.F02 gate, all nine counters `ok`; raw 101,867 bytes.
-- Goal (run once): make exit 2 wrapping v3-cli exit 3 (severe, not success),
-  `severe` **true** against both T24.F01 and T24.F02 (vs T24.F02: vm_steps
-  +145.40%, plasticity_updates +262.49%, decided_passes +73.33%; vs T24.F01:
-  decided_passes +126.09%); raw 643,010,302 bytes. A severe, reported to the
-  user for decision, not absorbed.
-- **Predeclared triggers fired:** (1) Canyon final population 4,042 is under
-  half of T24.F02's 9,165 (retreat to form A and goal re-run); no world
-  extinct, Orchards minimum 28. (2) Canyon `mean_genome_size` at tick 2,000
-  158.14 is above T24.F02's 151.54 (contrary size result), and its units per
-  generation 1.270 are higher than 0.957; Orchards and Confluence are below on
-  both. (3) `neighborhood_read.changed_per_all_births` below the standing floor
-  on Orchards (0.1192 against 0.1464) and Confluence (0.1398 against 0.1434).
-  (4) Orchards `mean_executed_nodes` 2.38 with its size below T24.F02's (core
-  shrinkage investigation). (5) `recruitment_paths` 230.84 s over the 120 s
-  budget (T24.F02 240.2 s). `actions_applied` read up, not down (+11.06%).
-- Gestation started above zero on every world; held share 2.69% / 2.69% /
-  2.96%. Long Canyon: decisive check met (1,604 s of 14,400 s); size 6.91x the
-  founder at 20,000 against E2's 16x. Overhead: inconclusive. Founder
-  neighborhood and drift blocks equal T24.F02's; `recruitment_paths` differs
-  only in the added config leaf and `config_digest`.
+**Measured verdict.** Form B (`f380899e`, 2026-10-08, run once): gate exit 0
+not severe; goal CLI exit 3, severe against both references; the persistence
+floor failed on Canyon (final 0.441×), so the predeclared retreat fired and
+every other form-B reading (contrary Canyon size, Orchards and Confluence
+neighborhood-read floors, Orchards executed nodes 2.38, `recruitment_paths`
+230.8 s, overhead inconclusive, long Canyon run persisting at all 80 samples)
+is the form-B record in the readings file, superseded by the form-A re-run and
+not put to the user. Form A: pending.
 
 - Summaries: [gate](../../progress/features/t03-f12-genome-length-dependent-reproductive-time.json),
   [goal](../../progress/features/t03-f12-genome-length-dependent-reproductive-time-goal.json).
@@ -260,20 +249,19 @@ the readings file, "Benchmark readings").**
 
 ## Success Criteria
 
-- [ ] A parent whose `Reproduce` passes the gates at *T* commits no action on
-      *T*+1 … *T*+h while its cognition runs and is charged, and its child
-      appears at *T*+h with the litter energy paid at *T*; a parent that dies
-      first leaves no child and the litter energy is in `gestation_lost`.
-- [ ] Rate `0.0` reproduces the pre-feature trajectory digests; the energy
-      identity and the gestation count identity hold in the fixture.
+- [ ] A parent whose `Reproduce` spawns at *T* commits no action on
+      *T*+1 … *T*+h while its cognition runs and is charged, and acts again
+      from *T*+h+1; the founder is held one tick, a 194-unit genome two.
+- [ ] Rate `0.0` reproduces the pre-feature trajectory digests; the count
+      identities hold in the fixture.
 - [ ] Viability passes first; gate and goal profiles run; the population floor
       holds on every world (or the retreat is recorded); the long Canyon run
       persists past tick 36,652; the tick-2,000 genome size is a smaller
       multiple of the founder than T24.F02's on every world, or the contrary
       world is recorded as a user decision.
-- [ ] The six counters and the flow are exported, checked and carried in the
-      goal summary, the rate is recorded configuration, the frontend row and
-      the two reference docs exist.
+- [ ] The two counters are exported, checked and carried in the goal
+      summary, the rate is recorded configuration, the frontend row and the
+      two reference docs describe the hold.
 
 ## Notes for AI Agents
 
@@ -281,7 +269,10 @@ the readings file, "Benchmark readings").**
   form is a pre-birth gestation with the N1 post-birth hold as the predeclared
   retreat; cognition is charged during the span; the span is anchored on
   `FOUNDER_GENOME_SIZE_UNITS`; there is no additional energy drain; there are
-  no concurrent gestations.
-- Exception: (user, 2026-10-08) the spec is committed with challenge finding B6
-  upheld after round 3; the fix adopted is Codex's own round-3 proposal, not
-  confirmed by a further round (record in `docs/progress/readings/t03-f12.md`).
+  no concurrent spans.
+- Decision: (predeclared retreat, fired 2026-10-08 on the form-B goal run at
+  `f380899e`: Canyon final 4,042 = 0.441× T24.F02's 9,165) the form in force is
+  the N1 post-birth hold; the gestation form is retired, not kept behind
+  config, and its readings, the challenge finding B6 that concerned its energy
+  identity, and the B6 exception the user accepted stay in
+  `docs/progress/readings/t03-f12.md` as the form-B record.
