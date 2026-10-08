@@ -82,7 +82,7 @@ Fixed design, decided before implementation:
 | Energy identity | `parental_transfer_debit` equals `offspring_energy_credit + gestation_lost + Σ pending litter energy over living creatures` at every tick boundary up to the Step 8 rounding: the debit is the realized `f32` difference while the litter carries the nominal `transfer`, so each birth contributes at most one `f32` ulp of the parent's energy at Step 8. That energy is at most `max(E_max, C_max)`, where `E_max` is the largest creature energy observed at any tick boundary of the run and `C_max` the largest `max_energy` in force at any time during it (within a tick energy rises only through eat, steal and the kill bonus, which clamp to the cap then in force; a runtime patch that lowers the cap does not re-clamp living creatures, and a parent that gains energy, conceives and spends it before the boundary is covered by `C_max`). A fixture with births, deaths during gestation and crowded deliveries records `E_max` and `C_max`, asserts the identity within `gestations_started × max(E_max, C_max) × 2^-23`, repeats it in a variant that lowers `max_energy` through `sim.config` mid-run and asserts at the lowering tick that some creature holding a pending birth has energy above the new cap (a held parent only loses energy, so it conceived above the lowered cap before the lowering: the B6 sequence) and that some creature holds energy above the new cap, and asserts the count identities exactly. |
 | Count identities | `reproduction_actions_attempted_total == reproduction_actions_rejected_total + gestations_started_total` replaces today's `attempted == spawned + rejected` (births are delayed and can be lost), and `gestations_started_total == gestations_delivered_total + the three lost counters + pending births`. `stats_accounting_invariant_holds_over_50_ticks` in `crates/v3-core/tests/viability.rs` and `v3-reproduction-spec.md` Section 7 state the new identities; at rate `0.0` started equals spawned, so the old identity is implied. |
 | Natural-analog rule | No input, sensor or score reads the span; the parent feels it through energy and age only. The held parent's cognition outputs are discarded, so reward learning sees no action outcomes on held ticks (the prototype's behavior). |
-| Determinism | Delivery runs at the parent's slot in the tick's decision order and draws from `reproduce_rng` there, so cross-process reproducibility is untouched and thread counts do not matter. Every birth moves by h ticks, so the gate and goal `deterministic` blocks differ from every prior report; the founder-neighborhood, drift-walk and `recruitment_paths` blocks run no reproduction action and are predeclared byte-identical to T24.F02's. The new field enters every `config_digest`: the goal recipe digests in `crates/v3-cli/tests/bench_artifacts.rs`, the `applied_trajectory` digests, the `baseline_worlds` short-run identity hash and the viability suite's `founder_only_trajectory_digest_is_pinned` are re-pinned once after two agreeing runs (the T03.F11 procedure), in the first implementer brief. At rate `0.0` each of these fixtures reproduces its pre-feature digest exactly; this is the equivalence evidence and a kept test. Existing reproduction fixtures that assert the immediate-spawn sequence (`tick/tests/support.rs` and `actions/mod.rs` `small_config`, the `reproduction.rs` newborn-credit test, `neutral_connection_tests/refinement.rs`) set the rate to `0.0` deliberately; the gestation tests and the viability suite run at the default. |
+| Determinism | Delivery runs at the parent's slot in the tick's decision order and draws from `reproduce_rng` there, so cross-process reproducibility is untouched and thread counts do not matter. Every birth moves by h ticks, so the gate and goal `deterministic` blocks differ from every prior report; the founder-neighborhood, drift-walk and `recruitment_paths` blocks run no reproduction action and are predeclared byte-identical to T24.F02's. The new field enters every `config_digest`: the goal recipe digests in `crates/v3-cli/tests/bench_artifacts.rs`, the `applied_trajectory` digests, the `baseline_worlds` short-run identity hash and the viability suite's `founder_only_trajectory_digest_is_pinned` are re-pinned once after two agreeing runs (the T03.F11 procedure), in the first implementer brief. The equivalence evidence differs by kind: the three trajectory fixtures (`applied_trajectory`, `baseline_worlds`, the viability founder-only digest) reproduce their pre-feature digests exactly at rate `0.0`, kept as tests; the recipe `config_digest` includes the new key whatever its value, so `bench_artifacts.rs` instead asserts that removing only `energy.lifecycle.gestation_ticks_per_founder_genome` from the resolved recipes recovers the T20.F05 digests (the key-removal guard the test already applies to earlier keys). Existing reproduction fixtures that assert the immediate-spawn sequence (`tick/tests/support.rs` and `actions/mod.rs` `small_config`, the `reproduction.rs` newborn-credit test, `neutral_connection_tests/refinement.rs`) set the rate to `0.0` deliberately; the gestation tests and the viability suite run at the default. |
 | Viability | `cargo test -p v3-core --test viability` runs first. The founder's first delivery lands one tick after its first commit, so the suite's 20-tick birth horizons become `BIRTH_HORIZON_TICKS = 21` (the founder's gestation) wherever a test counts births within the horizon (`population_survives_and_reproduces_20_ticks`, `high_coverage_economics_survive_and_reproduce_short_horizon`, the two `viability_still_passes_with_*_mutations` tests), and `founder_reproduces_when_energy_allows_and_target_is_open` checks the pending birth after tick 1 and the child after tick 2; no assertion is weakened, and the moves are recorded in the readings. |
 | Telemetry and reports | Six `u64` counters on `SimStats` and one `f64` flow, exported per the wiring convention (Telemetry table); the rate reaches `run.started` with no edit and joins the `actions` phase group in `crates/v3-telemetry/src/trace.rs` beside `genome_replication_cost_per_unit`. `SimStats` is not serialized: the goal report projects counters and flows explicitly (`crates/v3-cli/src/bench/tracking.rs`, `WorldTracking`, `EnergyFlowTracking`), so the flow joins `EnergyFlowTracking` (the `energy_flows` case block is already kept whole in the summary) and the six counters plus the end-of-run `pending_births` and `pending_litter_energy` form a `gestation` block on `WorldTracking`, which `GoalCaseObservation` flattens so the JSON key is `gestation` on the case, added to `KEPT_CASE_BLOCKS` in `crates/v3-cli/src/bench/artifacts.rs` so the committed summary carries them. |
 | Frontend | `LifecycleEnergyConfig` gains the field; `EnergyLifecycleSection.tsx` gains one row beside "Replication Cost / Unit" (label "Gestation Ticks / Founder Genome", min 0, max 10, step 0.1, default 1, tooltip naming the span); `test/fixtures.ts` and the `ControlBar.test.tsx` fixture carry it. |
@@ -146,9 +146,9 @@ Phase 0 charges on parents removed before a held slot.
       with the B6 pending-parent assertion at tick 50) -> names and results in
       the readings file.
 - [x] `cargo test -p v3-core --test applied_trajectory` twice (digests agree,
-      re-pinned; the rate-`0.0` case reproduces the pre-feature digests),
-      `--test baseline_worlds`, `cargo test -p v3-cli --test bench_artifacts`
-      -> readings file.
+      re-pinned; rate `0.0` reproduces the pre-feature digests), `--test
+      baseline_worlds` (same), `cargo test -p v3-cli --test bench_artifacts`
+      (key removal recovers the T20.F05 digests) -> readings file.
 - [x] `make check` -> exit 0 on `f380899e` and on the restored code;
       `scripts/telemetry-dashboards-check` exit 0 with the six counter names;
       `scripts/telemetry-overhead` on the existing stack **inconclusive**
@@ -225,7 +225,8 @@ f380899e)").**
   Orchards executed nodes 2.38, `recruitment_paths` over budget,
   `actions_applied` up +11.06%, overhead inconclusive twice.
 - Gestation started above zero on every world; delivered 95% to 99.9% of
-  started; held share 2.69% / 2.69% / 2.96%. Long Canyon: decisive check met
+  started; held share 2.69% / 2.69% / 2.96%; implicit drain per world in the
+  readings. Long Canyon: decisive check met
   (1,604 s); 6.91× the founder at 20,000 against E2's 16×. Founder
   neighborhood and drift blocks equal T24.F02's; `recruitment_paths` differs
   only in the added config leaf and `config_digest`.
@@ -256,11 +257,10 @@ f380899e)").**
 
 ## Notes for AI Agents
 
-- Decision: (user, 2026-10-06, via the track note and the research note) the
-  form is a pre-birth gestation with the N1 post-birth hold as the predeclared
-  retreat; cognition is charged during the span; the span is anchored on
-  `FOUNDER_GENOME_SIZE_UNITS`; there is no additional energy drain; there are
-  no concurrent gestations.
+- Decision: (user, 2026-10-06, via the track note and the research note)
+  pre-birth gestation with the N1 post-birth hold as the predeclared retreat;
+  cognition charged during the span; anchored on `FOUNDER_GENOME_SIZE_UNITS`;
+  no additional energy drain; no concurrent gestations.
 - Exception: (user, 2026-10-08) the spec is committed with challenge finding B6
   upheld after round 3; the fix adopted is Codex's own round-3 proposal, not
   confirmed by a further round (record in `docs/progress/readings/t03-f12.md`).
