@@ -1105,8 +1105,8 @@ fn founder_only_trajectory_digest_is_pinned() {
         }
     }
     let digest = hex::encode(hash.finalize());
-    // Measured on macOS aarch64 (T24.F01); the previous pin also matched GNU/Linux aarch64.
-    let expected_digest = "c8a0e6d70da4d59b77c5e00cdd9a25d4e657842a7d8193e88961543bcb5533bf";
+    // Measured on macOS aarch64 (T24.F02, keyed food stream); earlier pins also matched GNU/Linux aarch64.
+    let expected_digest = "bd04b0e429e199fcb673b57f44ecfab53a56251da61889d4f39945e2ddf09015";
 
     assert_eq!(sim.stats.mutation_events_applied_total, 0);
     assert_eq!(
@@ -1115,6 +1115,6 @@ fn founder_only_trajectory_digest_is_pinned() {
             sim.creatures.len(),
             digest.as_str()
         ),
-        (192, 0, expected_digest)
+        (199, 0, expected_digest)
     );
 }

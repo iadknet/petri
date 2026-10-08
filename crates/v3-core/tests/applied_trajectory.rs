@@ -19,6 +19,8 @@
 //! T24.F01 re-pinned both digests: `grow` keeps spread into occupied cells
 //! (the accumulate at ecology.rs line 495); restoring the assignment alone
 //! restores both old digests.
+//! T24.F02 re-pinned both digests: food draws come from the keyed per-cell
+//! stream instead of the run RNG, so every later run-RNG draw shifts.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -83,7 +85,7 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "40336feeb8d6770da20feabb2bac78c1a8d1dacc9b97c8f7d6f9a71b5b86c0b4"
+        "73790bc499eb1d3941be67f16c291e59083f4d8351b7c18d49a5f4fba13f80d5"
     );
 }
 
@@ -122,6 +124,6 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
     let digest = hex::encode(hash.finalize());
     assert_eq!(
         digest,
-        "a59d240c3d98a8187214c4bb91781e55b0e1019bf2fc5142f124f04df062a059"
+        "f354e86b450383f57c647c86bd90ac7419b74341db02608b9356ea05bef03e51"
     );
 }

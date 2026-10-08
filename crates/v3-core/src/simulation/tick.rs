@@ -176,7 +176,7 @@ pub fn run_phase_0(sim: &mut Simulation) {
 /// grid passes for the tick-trace seam.
 #[cfg(feature = "telemetry-seams")]
 fn run_phase_0_food_growth(sim: &mut Simulation) -> crate::kernel::FoodPasses {
-    let mut food_growth = sim.world.grow_food(sim.tick, &mut sim.rng);
+    let mut food_growth = sim.world.grow_food(sim.tick, sim.food_stream_key);
     let passes = food_growth.take_passes();
     sim.stats.record_food_growth_summary(food_growth);
     passes
@@ -185,7 +185,7 @@ fn run_phase_0_food_growth(sim: &mut Simulation) -> crate::kernel::FoodPasses {
 /// Phase 0 step 1: food growth.
 #[cfg(not(feature = "telemetry-seams"))]
 fn run_phase_0_food_growth(sim: &mut Simulation) {
-    let food_growth = sim.world.grow_food(sim.tick, &mut sim.rng);
+    let food_growth = sim.world.grow_food(sim.tick, sim.food_stream_key);
     sim.stats.record_food_growth_summary(food_growth);
 }
 

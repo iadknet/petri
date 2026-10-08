@@ -7,7 +7,7 @@ pub mod paint;
 mod world;
 
 pub use grid::Grid;
-pub use ordinary_food::{FoodGrowthSummary, FoodPass, FoodResource};
+pub use ordinary_food::{FoodGrowthSummary, FoodPass, FoodResource, FoodStreamKey};
 #[cfg(feature = "telemetry-seams")]
 pub use ordinary_food::{FoodPassTiming, FoodPasses};
 pub use world::{PassableConnectivity, WorldState};

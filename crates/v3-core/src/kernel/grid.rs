@@ -50,6 +50,11 @@ impl<T: Clone> Grid<T> {
         &self.cells
     }
 
+    /// Borrow the underlying flat storage as a mutable slice (row-major).
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        &mut self.cells
+    }
+
     /// Iterate over all cells as (x, y, value) tuples.
     pub fn iter(&self) -> impl Iterator<Item = (u16, u16, &T)> {
         self.cells.iter().enumerate().map(move |(i, v)| {

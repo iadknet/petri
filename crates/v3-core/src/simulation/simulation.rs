@@ -7,7 +7,7 @@ use crate::creature::action_log::ActionLog;
 use crate::creature::genome::structural_companions;
 use crate::creature::state::CreatureState;
 use crate::kernel::paint::{PaintPoint, PaintStats, PaintTool};
-use crate::kernel::WorldState;
+use crate::kernel::{FoodStreamKey, WorldState};
 use crate::simulation::reproductive_success::CognitiveClass;
 use crate::simulation::stats::{MutationOutcomeObservation, SimStats};
 
@@ -27,8 +27,11 @@ pub struct Simulation {
     pub tick: u64,
     pub config: SimulationConfig,
     pub stats: SimStats,
-    /// Private RNG seeded at startup; used for food growth, turn-queue shuffling, etc.
+    /// Private RNG seeded at startup; used for turn-queue shuffling, reproduction, etc.
     pub(crate) rng: SmallRng,
+    /// The food growth stream key, derived from the run seed (T24.F02); food
+    /// growth never draws from `rng`.
+    pub(crate) food_stream_key: FoodStreamKey,
 }
 
 impl Simulation {
@@ -56,6 +59,7 @@ impl Simulation {
             config,
             stats,
             rng: SmallRng::seed_from_u64(seed),
+            food_stream_key: FoodStreamKey::from_run_seed(seed),
         }
     }
 

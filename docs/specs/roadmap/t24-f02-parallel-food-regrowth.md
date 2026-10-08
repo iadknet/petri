@@ -27,11 +27,10 @@ summation order and is predeclared below.
 - No Philox or other RNG crate; no new dependency (track Notes).
 - No parallelization outside `grow_food`: sensor assembly, actions, creature
   aging and death removal stay as they are.
-- No GPU path (deferred by the track).
 - No change to the `food_growth` phase, its pass spans, the metric family,
   the dashboard or the benchmark report fields that T24.F03 defined.
-- No sequential fallback switch, thread-count setting or grid-size
-  configuration: the pass runs on whatever pool is in effect, as cognition does.
+- No sequential fallback, thread-count or grid-size setting: the pass runs
+  on the pool in effect, as cognition does.
 
 ## Inputs and Invariants
 
@@ -46,7 +45,7 @@ summation order and is predeclared below.
 | Keyed hash | `crates/v3-core/src/creature/identity.rs` `splitmix64` (private finalizer, a 64-bit bijection); T24 Notes: a small in-tree keyed hash, no Philox crate | The stream is the splitmix64 finalizer over a mixed key: a per-tick-per-type word hoisted out of the loop, one finalizer round per cell. |
 | Rayon in `v3-core` | `tick.rs` Phase 1b `par_iter_mut`; `neighborhood/*` `into_par_iter`; `crates/v3-cli/src/bench/run.rs` runs a profile inside a private pool under `--threads` and records `environment.threads`; `tests/reproducibility.rs` builds pools of 1 and 4 threads | The pool in effect is whatever the caller installed; `--threads 8` on this host (8 logical cores, 6 performance and 2 efficiency) equals the global pool. |
 | Scratch plumbing | `ordinary_food/mod.rs` `FoodResource` fields `claim_scratch`, `owner_snapshot`, `density_snapshot` (allocated, unused, passed to `grow` as `_claim_scratch`, `_owner_snapshot`, `_density_snapshot`) | The home for the per-cell buffers this feature keeps between ticks. |
-| Constructors | `simulation/simulation.rs` `Simulation::new(world, creatures, tick, config, seed)` seeds `rng` from `seed` and calls `world.reconfigure_food`; `seed_simulation` and every other constructor go through it; `v3-server` patches config mid-run | The food stream key is a `Simulation` field derived from `seed` in `Simulation::new`, so it exists for every constructor and survives `reconfigure_food`. |
+| Constructors | `simulation/simulation.rs` `Simulation::new(world, creatures, tick, config, seed)` seeds `rng` from `seed` and calls `world.reconfigure_food`; `seed_simulation` builds the struct literal directly (`seeding.rs:117`), as do ten test fixtures; `v3-server` patches config mid-run | The food stream key is a `Simulation` field (`food_stream_key: FoodStreamKey::from_run_seed(seed)`) set from the run seed at every construction site (`Simulation::new`, the `seed_simulation` literal, each test fixture), so it survives `reconfigure_food`. |
 | Pass spans (T24.F03) | `pass_clock.rs` `FoodPass` (eight names), `PassClock::stop` around each region; T24.F03 invariants 3, 5 and 8 (span set, order, check 6 of `scripts/telemetry-dashboards-check`) | Unchanged: a span wraps its region whatever runs inside; `growth_spread` covers the claim and gather passes of one type. |
 | Comparison rule | T10 track Notes (flag above +10% work per creature-tick or +25% wall; severe above +50% work or a doubling of wall; a predeclared, justified cost re-pins the epoch in the closing commit); `crates/v3-cli/src/bench/comparison.rs` (nine `COUNTER_NAMES`, zero-baseline rule at `:542`, wall per creature-tick at `:565`) | The Performance predeclaration and the closure order (re-pin before the mutation gate). |
 | References | T24.F01 summaries `docs/progress/features/t24-f01-order-free-food-spread.json` (gate) and `-goal.json` (goal: its paired per-world readings are the reference this feature holds trajectories against); epochs: gate T11.F25, `goal_worlds` T24.F01, in `docs/progress/benchmark-series.json`. Measured at T24.F01: `food_growth_ms` per tick about 0.36 ms (gate), Orchards 62.7, Canyon 37.1, Confluence 54.0 ms (goal) | The comparison and the speedup context. |
@@ -58,11 +57,9 @@ pass over rows (`par_chunks`/`par_chunks_mut` of `width` cells, or an
 equivalent whose unit of work is a row); a pass writes only the cell it
 visits; anything a pass sums is a per-row partial reduced in row order; the
 spread is claim then gather on the keyed stream. The region-by-region plan
-below is provisional until the pass readings of implementation task 1 exist
-(the track Notes ask for the reading before the decomposition is fixed; the
-fresh worktree has no build, so the spec could not take it): the readings may
-fuse passes or change buffers inside the T24.F03 span boundaries, and the
-readings file records what they changed and why.
+below is provisional until the pass readings of implementation task 1 exist:
+the readings may fuse passes or change buffers inside the T24.F03 span
+boundaries, and the readings file records what they changed and why.
 
 | Region (T24.F03 span) | Form after F02 | Thread-independent because |
 | --- | --- | --- |
@@ -88,13 +85,17 @@ Invariants:
    with an empty list sends none. The telemetry fields keep their
    definitions (`growth_suppressed_by_*`, `cells_with_type_inhibition`,
    grazing and depletion fields, `occupied_cells`, `total_density`).
-2. Keyed stream. Every draw `grow` makes is a pure function
-   `food_draw(key, tick, type, purpose, index) -> u64` of the simulation's
-   food stream key (`splitmix64(seed ^ FOOD_STREAM_TAG)`, a `Simulation`
-   field set in `Simulation::new` from the run `seed`, never from
-   `world_seed`), the tick, the food type index, a purpose tag (spread
-   target, recovery cell) and the cell index or attempt index, built from the
-   splitmix64 finalizer. A draw is mapped to a range `n` by the 64-bit
+2. Keyed stream. Every draw `grow` makes is a pure function of the
+   simulation's food stream key (`FoodStreamKey::from_run_seed(seed)` =
+   `splitmix64(seed ^ FOOD_STREAM_TAG)`, a `Simulation` field set from the
+   run `seed` at every construction site, never from `world_seed`), the
+   tick, the food type index, a purpose tag (spread target, recovery cell)
+   and the cell index or attempt index, built from the splitmix64 finalizer:
+   `FoodStream::new(key, tick, type, purpose)` is the word hoisted once per
+   pass and `.draw(index)` one finalizer round per cell
+   (`ordinary_food/stream.rs`); the test-only `food_draw(key, tick, type,
+   purpose, index)` is the reference form equal to it, and no production
+   wrapper duplicates it. A draw is mapped to a range `n` by the 64-bit
    multiply-shift (`(draw as u128 * n as u128) >> 64`), whose bucket bias is
    below `n · 2^-64` (below `2^-42` for the 1600² recovery range, below
    `2^-61` for four neighbours): uniform for every purpose here, with no
@@ -130,8 +131,7 @@ Invariants:
 No new signal. The `food_growth` phase and its pass spans (T24.F03) are the
 instrument; the benchmark report's `environment.threads` and
 `phase_wall_clock_ms_per_seed[].food_growth_ms` carry the reading. No
-mechanism switch or config value is added, so nothing new reaches
-`run.started` or a phase group.
+mechanism switch or config value is added.
 
 | Signal | Kind | Source | Context carried |
 | --- | --- | --- | --- |
@@ -139,7 +139,7 @@ mechanism switch or config value is added, so nothing new reaches
 
 ## Implementation Tasks
 
-- [ ] Read the pass decomposition on the 3b904894 build before changing it:
+- [x] Read the pass decomposition on the 3b904894 build before changing it:
       per-pass durations of one default-size tick (`v3-cli run` at 1600² with
       tick traces on the running `petri-telemetry` stack, or the
       `telemetry-seams` `last_tick_food_passes` seam), recorded as a table in
@@ -148,7 +148,7 @@ mechanism switch or config value is added, so nothing new reaches
       implementer may then fuse passes or change buffers inside the T24.F03
       span boundaries (the form of the decomposition stays fixed) and records
       each change and its reason next to the table.
-- [ ] Keyed stream: `food_draw` and the range mapping in
+- [x] Keyed stream: `food_draw` and the range mapping in
       `ordinary_food/` (reusing `creature::identity::splitmix64` at
       `pub(crate)` visibility, one definition; no new crate);
       `food_stream_key` on `Simulation`; `grow`/`FoodResource::grow`/
@@ -158,7 +158,7 @@ mechanism switch or config value is added, so nothing new reaches
       argument differ; a test that spread targets on a uniform saturated
       patch are shared across the four directions within a bound (a
       fixed-seed count, not a distribution proof).
-- [ ] Claim and gather: the growth-and-spread loop becomes the two
+- [x] Claim and gather: the growth-and-spread loop becomes the two
       row-parallel passes of the decomposition table, with the retained
       buffers of invariant 5. TDD: the conservation proptest
       (`growth_pass_total_keeps_every_spread_contribution`) stays as it is
@@ -171,26 +171,32 @@ mechanism switch or config value is added, so nothing new reaches
       exceeds `max_density`; wrapped 1×1, 1×2, 2×2 and 1×N grids where a
       source is two of a target's neighbours or its own target; a cell with
       an empty candidate list.
-- [ ] The other passes: depletion recovery, grazing recovery, inhibition
+- [x] The other passes: depletion recovery, grazing recovery, inhibition
       sums, density total, write-back and the inhibited count become
       row-parallel with row-order reductions; recovery spawns stay
       sequential on the keyed stream.
-- [ ] Reproducibility: a `tests/reproducibility.rs` test runs a seeded
+- [x] Reproducibility: a `tests/reproducibility.rs` test runs a seeded
       simulation with barriers, grazing, depletion, an inhibiting type, a
       spreading patch and a type below its recovery floor (so every pass of
       the table runs) for 20 ticks inside pools of 1, 4 and 8 threads and
       asserts per tick that the world fingerprint (every type's density,
-      grazing and depletion grids by bits, fertility, barriers), the food
-      growth summary fields by bits (pass timings excluded) and the
+      grazing and depletion grids by bits, fertility, barriers), every
+      type's `World::total_food_by_type` by bits, the food growth summary
+      fields by bits (pass timings excluded) and the
       population and accounting fingerprints are equal, with coverage
       assertions that spread, recovery spawns, grazing suppression and
-      depletion suppression each occurred (`> 0`) in the run; the existing
+      depletion suppression each occurred (`> 0`) in the run. The
+      `density_total` reduction (`row_ordered_total`) feeds only the
+      recovery-floor comparison, so no run-level assertion can see its last
+      bit: an `ecology.rs` unit test calls it on a grid of mixed-magnitude
+      values inside pools of 1 and 4 threads and asserts equal bits (a
+      `par_iter().sum()` in its place must fail that test). The existing
       same-seed identity and terrain thread-count tests keep passing, and
       cross-process identity is the pinned digests reproducing.
-- [ ] Pins: re-pin the five trajectory pins and the operator-coverage seed
+- [x] Pins: re-pin the five trajectory pins and the operator-coverage seed
       or horizon if needed, each after two agreeing runs; the bench fixture
       reselects its seed by its comment's rule.
-- [ ] `phase_seam` tests, check 6 and the trace tests pass unchanged.
+- [x] `phase_seam` tests, check 6 and the trace tests pass unchanged.
 
 ## Verification
 
@@ -201,13 +207,27 @@ mechanism switch or config value is added, so nothing new reaches
       named above), `cargo test -p v3-core --features telemetry-seams
       phase_seam`, and `cargo test -p v3-cli --test bench` -> results and
       the re-pinned values in `docs/progress/readings/t24-f02.md`.
-- [ ] Speedup pairs (track criterion 3): the method, the per-pair
+      Run 2026-10-07: viability 28/28 before the change and 28/28 after the
+      one digest re-pin; `cargo test -p v3-core --tests --no-fail-fast` all
+      green after the re-pins (lib 1,856 passed, `reproducibility` 4 passed
+      including `food_growth_is_identical_across_thread_counts`); `phase_seam`
+      9 passed; `cargo test -p v3-cli --lib` 145 passed; `cargo test -p v3-cli
+      --test bench` 19 passed, 1 failed:
+      `gate_profile_has_no_severe_regression_against_series_references`
+      (`pass_cap_hits` 0.000971 against T24.F01's 0.000405, +139.8%, severe). `scripts/telemetry-dashboards-check`
+      all checks passed (check 6: 7 food passes on a trace). Re-pinned values
+      are in the readings file.
+- [x] Speedup pairs (track criterion 3): the method, the per-pair
       `food_growth_ms` readings, the median ratio, the cap use and the
       verdict in `docs/progress/readings/t24-f02.md`; the Performance section
       states the method and the verdict.
 - [ ] `make check` -> exit 0 (includes
       `gate_profile_has_no_severe_regression_against_series_references`,
       green at the mutation baseline after any re-pin).
+      Run 2026-10-07 (build pass): exit 2, stopped at `rust-test-cli` on the
+      gate severity test above; every target after it (`rust-test-server`,
+      `-lab`, `-telemetry`, `-doc`, `rust-clippy`, `frontend-check`,
+      `dependency-audit`, `skill-check`) then passed under `make -k`.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       full survivor list stays here.
@@ -231,7 +251,7 @@ T24.F01 summaries and the epochs T11.F25 (gate) and T24.F01 (`goal_worlds`).
 | Secondary readings | Not verdicts: the goal summary's `food_growth_ms` per tick per world against T24.F01's 62.7 / 37.1 / 54.0 ms (unpaired, host load differs), and the gate's against 0.36 ms. |
 | What moves and why | Both trajectories move from tick 0: spread targets come from the keyed stream instead of `sim.rng`, every later run-RNG draw (turn-queue shuffle, `reproduce_rng`) shifts, and the density total and telemetry sums round in row order. No rule changes, so the move is a different sample of the same distribution, not a direction. |
 | Forecast bands | Against T24.F01's paired per-world readings. Persistence: plateau and final population per goal world and gate seed within −30% to +50%; `minimum_population` not read against a band; `extinction_tick` null in all three worlds. Food: `food_density_total` per type at the final sample within −30% to +30%. Miss rule: a reading outside its band is recorded in the Measured verdict and the readings and does not block; an extinction in a world that persisted at T24.F01 is a world-compatibility question for the user under the blocker rule. |
-| Counters | The diff touches no creature code path, so every `per_creature_tick` move is a population-composition effect of the moved trajectory. Expected: `mesh_hops`, `vm_steps`, `graph_relax_iters`, `actions_applied`, `passes` within ±25% of T24.F01 on both profiles; `births`, `plasticity_updates`, `decided_passes`, `pass_cap_hits` may flag or go severe on either profile (small denominators, evolved-lineage share; `plasticity_updates` went severe at T24.F01, T19.F02, T11.F19, T17.F02); the gate's `decided_passes` (0 at T24.F01) goes severe under the zero-baseline rule if the moved gate run makes any decided pass. **Acceptance scope and epoch step:** a severe level on any counter, named above or not, is this feature's predeclared and justified cost only when all three hold: (a) the closing diff's production change is confined to the food kernel (`crates/v3-core/src/kernel/ordinary_food/`), the key plumbing (`simulation/simulation.rs`, `simulation/tick.rs`, `kernel/world.rs`, the `splitmix64` helper's home) and tests, pins, summaries and documents, which the reviewer checks against the diff; (b) the rule-equivalence evidence is green: the per-cell oracle with every mechanism enabled, the conservation proptest and the narrow-grid fixtures (Implementation Tasks), which pin the §5 rule under the keyed picks independently of the implementation, and the reviewer spot-checks that the gather's `spread_delta`, suppression and flag terms are the scatter's formulas (Spread term row); (c) the readings record, per severe counter, its attribution to the moved trajectory's composition (`creature_ticks`, `births`, the evolved-lineage share, the per-world persistence readings against the bands). With (a)–(c) that profile's `epoch_baseline` re-pins to this feature's summary in the closing commit, before the mutation gate. A severe level with (a) or (b) failing is unexplained and a blocker under the gate's P1 rule; (c) missing blocks closure until written. A profile with no severe level keeps its epoch and its summary is appended to `closed`. No user decision is needed on either branch. |
+| Counters | The diff touches no creature code path, so every `per_creature_tick` move is a population-composition effect of the moved trajectory. Expected: `mesh_hops`, `vm_steps`, `graph_relax_iters`, `actions_applied`, `passes` within ±25% of T24.F01 on both profiles; `births`, `plasticity_updates`, `decided_passes`, `pass_cap_hits` may flag or go severe on either profile (small denominators, evolved-lineage share; `plasticity_updates` went severe at T24.F01, T19.F02, T11.F19, T17.F02); the gate's `decided_passes` (0 at T24.F01) goes severe under the zero-baseline rule if the moved gate run makes any decided pass. **Acceptance scope and epoch step:** a severe level on any counter, named above or not, is this feature's predeclared and justified cost only when all three hold: (a) the closing diff's production change is confined to the food kernel (`crates/v3-core/src/kernel/ordinary_food/`), the key plumbing (`simulation/simulation.rs`, `simulation/seeding.rs`, `simulation/tick.rs`, `kernel/world.rs`, `kernel/mod.rs` re-exports, `kernel/grid.rs` `as_mut_slice`, the `splitmix64` visibility in `creature/identity.rs`) and tests, pins, summaries and documents, which the reviewer checks against the diff; (b) the rule-equivalence evidence is green: the per-cell oracle with every mechanism enabled, the conservation proptest and the narrow-grid fixtures (Implementation Tasks), which pin the §5 rule under the keyed picks independently of the implementation, and the reviewer spot-checks that the gather's `spread_delta`, suppression and flag terms are the scatter's formulas (Spread term row); (c) the readings record, per severe counter, its attribution to the moved trajectory's composition (`creature_ticks`, `births`, the evolved-lineage share, the per-world persistence readings against the bands). With (a)–(c) that profile's `epoch_baseline` re-pins to this feature's summary in the closing commit, before the mutation gate. A severe level with (a) or (b) failing is unexplained and a blocker under the gate's P1 rule; (c) missing blocks closure until written. A profile with no severe level keeps its epoch and its summary is appended to `closed`. No user decision is needed on either branch. |
 | Wall clock | Goal: `food_growth_ms` per tick is expected at or below half of T24.F01's per world on a comparable host, so wall per creature-tick falls (food was 55% of the goal tick); a fall is never a flag. A goal wall flag or doubling (wall severity is separate from the counter-only `severe` flag, `comparison.rs:565–598`) is attributed before it is classified: with `food_growth_ms` per tick per world at or below T24.F01's and `creature_ticks` per world accounting for the ratio, it is the moved trajectory's denominator or host load, recorded as this feature's justified cost, and an accepted doubling re-pins the `goal_worlds` epoch in the closing commit under the T10 rule even when every counter is non-severe; with `food_growth_ms` per tick above T24.F01's in any world, the goal profile is rerun once under `scripts/bench-wait` when the 1-minute load has been below 10 for 60 s, and a phase rise that persists is a blocker, not a predeclared cost. Gate (128 by 128, 16,384 cells): rayon dispatch of about ten row-parallel regions per tick is of the same order as the 0.36 ms pass, so `food_growth_ms` per tick is expected between 0.5× and 1.5× of T24.F01's; the gate's wall per creature-tick is expected within +25% (food is 14% of the gate tick). A gate wall flag is attributed before it is classified: with `food_growth_ms` per tick within 1.5× it is the trajectory's denominator or host load, recorded; above 1.5× the implementer sets a minimum rows-per-job (`with_min_len`, a constant, not a config) and the gate is rerun under `scripts/bench-wait`; a gate wall doubling that persists is a blocker, not a predeclared cost. |
 | Indicators | No diversity or cognition measure is introduced; none remains `Undefined` because of this feature. Observation caps unchanged. |
 | Overhead check | Not run: T24 is exempt from nothing; the gate and goal profiles measure this feature's cost directly, and the ceiling ratio compares two builds of the same commit that both carry the change. |
@@ -244,7 +264,13 @@ make bench PROFILE=gate FEATURE=t24-f02-parallel-food-regrowth
 make bench PROFILE=goal FEATURE=t24-f02-parallel-food-regrowth
 ```
 
-**Measured verdict.** Pending.
+**Measured verdict.**
+
+| Check | Result |
+| --- | --- |
+| Speedup pairs (2026-10-07, host load 4.5–5.7) | Pass, criterion 3 met: 6 of 6 interleaved pairs under `scripts/bench-wait` (sweep 1600², 10,000 founders, 100 ticks, seed 11, 8 threads, telemetry off; parent 3b904894 from a scratch worktree, since removed); ratios 0.3985, 0.3183, 0.3330, 0.3238, 0.3213, 0.3239, median 0.3239 ≤ 0.45; parent 40.2–41.4 ms per tick, feature 12.9–16.1; 243.8 s of the 900 s cap; first attempt, no rerun. |
+| Gate | Pending. |
+| Goal | Pending. |
 
 - Summaries: [gate](../../progress/features/t24-f02-parallel-food-regrowth.json),
   [goal](../../progress/features/t24-f02-parallel-food-regrowth-goal.json).
@@ -260,7 +286,7 @@ make bench PROFILE=goal FEATURE=t24-f02-parallel-food-regrowth
       every pass exercised, asserted by
       `crates/v3-core/tests/reproducibility.rs`, and across processes, the
       pinned digests reproducing (track criterion 4).
-- [ ] The speedup pairs pass: median `food_growth_ms` per tick at 8 threads
+- [x] The speedup pairs pass: median `food_growth_ms` per tick at 8 threads
       on the default 1600-by-1600 world at most 0.50 of the 3b904894 build's
       on this host (track criterion 3), recorded in the readings.
 - [ ] The pass spans, the phase metric and the benchmark report fields are
@@ -274,3 +300,6 @@ make bench PROFILE=goal FEATURE=t24-f02-parallel-food-regrowth
 - Decision: the speedup reference is `main` at 3b904894 (T24.F03 and T24.F01
   closed), per the user's goal; the parent binary is built from a scratch
   worktree of that commit, never from an older parent.
+- Exception: TDD order in brief 1 — the per-cell oracle and the thread-count
+  reproducibility test were written after the rewrite (three deliberate
+  breaks caught); for the user to acknowledge at closure as at T19.F06.

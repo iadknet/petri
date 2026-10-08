@@ -1,21 +1,19 @@
 //! Food growth pass timings (T24.F03): which grid passes `grow` records for
 //! the tick-trace seam, in what order, and that they nest in time.
 
-use rand::{rngs::StdRng, SeedableRng};
-
 use super::FoodPass::{
     self, DensityTotal, DepletionRecovery, GrazingRecovery, GrowthSpread, InhibitedCount,
     InhibitionSums, RecoverySpawns, WriteBack,
 };
 use crate::config::{FoodConfig, FoodTypeConfig, WorldEdgeMode};
-use crate::kernel::ordinary_food::{FoodGrowthSummary, FoodResource};
+use crate::kernel::ordinary_food::{FoodGrowthSummary, FoodResource, FoodStreamKey};
 use crate::kernel::Grid;
 
 fn grow_once(width: u16, height: u16, config: FoodConfig) -> FoodGrowthSummary {
     let mut food = FoodResource::new(width, height, config, WorldEdgeMode::Wrap);
     let barriers = Grid::new(width, height, false);
     let occupancy: Grid<Option<()>> = Grid::new(width, height, None);
-    food.grow(&barriers, &occupancy, 0, &mut StdRng::seed_from_u64(1))
+    food.grow(&barriers, &occupancy, 0, FoodStreamKey::from_run_seed(1))
 }
 
 fn passes(summary: &FoodGrowthSummary) -> Vec<(FoodPass, Option<u16>)> {

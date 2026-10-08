@@ -1,4 +1,5 @@
 use rand::Rng;
+use rayon::prelude::*;
 
 use crate::config::{
     FertilityConfig, FertilityLayerTarget, FoodConfig, FoodResourceConfig,
@@ -11,9 +12,13 @@ use crate::kernel::Grid;
 use super::catalog::OrdinaryFoodCatalog;
 use super::pass_clock::{FoodPass, PassClock};
 use super::state::OrdinaryFoodState;
+use super::stream::{DrawPurpose, FoodStream, FoodStreamKey};
 
 const RECOVERY_PER_TICK: f32 = 0.03;
 const MIN_GROWTH_MULTIPLIER: f32 = 0.35;
+/// The candidate-list order of a spreading cell and the gather order of a
+/// target's sources.
+const SPREAD_DIRECTIONS: [Direction; 4] = [Direction::N, Direction::E, Direction::S, Direction::W];
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FoodTypeTelemetry {
@@ -69,11 +74,7 @@ impl OccupancyDepletionLayer {
     }
 
     pub(super) fn reset(&mut self) {
-        for y in 0..self.grid.height() {
-            for x in 0..self.grid.width() {
-                self.grid.set(x, y, 0.0);
-            }
-        }
+        self.grid.as_mut_slice().fill(0.0);
     }
 
     #[must_use]
@@ -81,7 +82,10 @@ impl OccupancyDepletionLayer {
         &self.grid
     }
 
-    pub(super) fn recover_and_deposit<T: Clone>(
+    /// Decay, deposit and the mean in one row-parallel pass: each cell's
+    /// value depends only on itself, and the per-row sums are reduced in row
+    /// order, so the result does not depend on the pool.
+    pub(super) fn recover_and_deposit<T: Clone + Sync>(
         &mut self,
         barriers: &Grid<bool>,
         occupancy: &Grid<Option<T>>,
@@ -91,46 +95,42 @@ impl OccupancyDepletionLayer {
             return DepletionTickSummary::default();
         }
 
-        for y in 0..self.grid.height() {
-            for x in 0..self.grid.width() {
-                if *barriers.get(x, y) {
-                    self.grid.set(x, y, 0.0);
-                    continue;
-                }
-                let current = *self.grid.get(x, y);
-                self.grid.set(x, y, (current - RECOVERY_PER_TICK).max(0.0));
-            }
-        }
-
+        let width = usize::from(self.grid.width());
         let deposit_per_occupied_tick = config.deposit_per_occupied_tick.clamp(0.0, 1.0);
-        let mut occupied_cells = 0u32;
-        for y in 0..self.grid.height() {
-            for x in 0..self.grid.width() {
-                if *barriers.get(x, y)
-                    || occupancy.get(x, y).is_none()
-                    || deposit_per_occupied_tick <= 0.0
+        let rows: Vec<(f32, u32, u32)> = self
+            .grid
+            .as_mut_slice()
+            .par_chunks_mut(width)
+            .zip(barriers.as_slice().par_chunks(width))
+            .zip(occupancy.as_slice().par_chunks(width))
+            .map(|((cells, barrier_row), occupancy_row)| {
+                let (mut sum, mut passable, mut occupied) = (0.0f32, 0u32, 0u32);
+                for ((cell, &barrier), occupant) in
+                    cells.iter_mut().zip(barrier_row).zip(occupancy_row)
                 {
-                    continue;
+                    if barrier {
+                        *cell = 0.0;
+                        continue;
+                    }
+                    let mut value = (*cell - RECOVERY_PER_TICK).max(0.0);
+                    if occupant.is_some() && deposit_per_occupied_tick > 0.0 {
+                        occupied += 1;
+                        value = (value + deposit_per_occupied_tick).clamp(0.0, 1.0);
+                    }
+                    *cell = value;
+                    passable += 1;
+                    sum += value;
                 }
-                occupied_cells += 1;
-                let current = *self.grid.get(x, y);
-                self.grid
-                    .set(x, y, (current + deposit_per_occupied_tick).clamp(0.0, 1.0));
-            }
-        }
+                (sum, passable, occupied)
+            })
+            .collect();
 
-        let mut sum = 0.0;
-        let mut passable_cells = 0u32;
-        for y in 0..self.grid.height() {
-            for x in 0..self.grid.width() {
-                if *barriers.get(x, y) {
-                    continue;
-                }
-                passable_cells += 1;
-                sum += *self.grid.get(x, y);
-            }
+        let (mut sum, mut passable_cells, mut occupied_cells) = (0.0f32, 0u32, 0u32);
+        for (row_sum, row_passable, row_occupied) in rows {
+            sum += row_sum;
+            passable_cells += row_passable;
+            occupied_cells += row_occupied;
         }
-
         DepletionTickSummary {
             mean_depletion: if passable_cells == 0 {
                 0.0
@@ -139,15 +139,6 @@ impl OccupancyDepletionLayer {
             },
             occupied_cells,
         }
-    }
-
-    #[must_use]
-    pub(super) fn multiplier_at(&self, x: u16, y: u16, enabled: bool) -> f32 {
-        if !enabled {
-            return 1.0;
-        }
-        let depletion = *self.grid.get(x, y);
-        1.0 - depletion * (1.0 - MIN_GROWTH_MULTIPLIER)
     }
 }
 
@@ -235,7 +226,6 @@ pub(super) fn seed_density(
     catalog: &OrdinaryFoodCatalog,
     config: &FoodConfig,
     occupancy_depletion: &mut OccupancyDepletionLayer,
-    _claim_scratch: &mut Vec<Vec<(OrdinaryFoodTypeId, f32)>>,
     barriers: &Grid<bool>,
     rng: &mut impl Rng,
 ) {
@@ -295,30 +285,88 @@ pub(super) fn seed_density(
     }
 }
 
-fn build_type_inhibition_weighted_sums(
-    state: &OrdinaryFoodState,
-    catalog: &OrdinaryFoodCatalog,
-    max_density: f32,
-) -> Vec<f32> {
-    let total_cells = state.width() as usize * state.height() as usize;
-    let mut weighted_sums = vec![0.0; total_cells];
+/// `ClaimCell::pick` of a cell that sends no spread.
+const NO_PICK: u32 = u32::MAX;
 
-    for entry in catalog.entries() {
-        let inhibitor = entry.config.growth_inhibitor.clamp(0.0, 1.0);
-        if inhibitor <= 0.0 {
-            continue;
-        }
-        for y in 0..state.height() {
-            for x in 0..state.width() {
-                let idx = y as usize * state.width() as usize + x as usize;
-                let pos = Position::new(x, y);
-                let density = state.food_at_type(pos, entry.id).clamp(0.0, max_density);
-                weighted_sums[idx] += density * inhibitor;
-            }
+/// One cell's claim for the type being grown (T24.F02): its own term, the
+/// two local growth terms a target needs to finish a spread term, and the
+/// cell its one spread contribution goes to.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct ClaimCell {
+    /// `source + local_delta`; 0 for a barrier or an empty cell.
+    own: f32,
+    local_base: f32,
+    local_after_inhibition: f32,
+    /// The drawn target's cell index, or [`NO_PICK`].
+    pick: u32,
+}
+
+impl ClaimCell {
+    const EMPTY: Self = Self {
+        own: 0.0,
+        local_base: 0.0,
+        local_after_inhibition: 0.0,
+        pick: NO_PICK,
+    };
+}
+
+/// The per-cell buffers of `grow`, kept between ticks so the timed path
+/// allocates nothing grid-sized (spec invariant 5). Every pass that reads a
+/// buffer is preceded in the same call by a pass that writes all of it.
+#[derive(Default)]
+pub(super) struct GrowthScratch {
+    claims: Vec<ClaimCell>,
+    next_density: Vec<f32>,
+    inhibited: Vec<bool>,
+    inhibition_sums: Vec<f32>,
+}
+
+/// Prints the buffer size, not millions of scratch values, when a world is
+/// debug-printed.
+impl std::fmt::Debug for GrowthScratch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GrowthScratch")
+            .field("cells", &self.claims.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl GrowthScratch {
+    /// Sizes every buffer to `cells`; a no-op unless the grid changed.
+    fn fit(&mut self, cells: usize) {
+        if self.claims.len() != cells {
+            self.claims = vec![ClaimCell::EMPTY; cells];
+            self.next_density = vec![0.0; cells];
+            self.inhibited = vec![false; cells];
+            self.inhibition_sums = vec![0.0; cells];
         }
     }
 
-    weighted_sums
+    /// The claims the last growth pass left, for tests.
+    #[cfg(test)]
+    fn picks(&self) -> impl Iterator<Item = Option<usize>> + '_ {
+        self.claims
+            .iter()
+            .map(|claim| (claim.pick != NO_PICK).then_some(claim.pick as usize))
+    }
+}
+
+/// The growth suppressed by occupancy depletion and by type inhibition, as
+/// one row's or one pass's partial sum.
+#[derive(Debug, Clone, Copy, Default)]
+struct Suppression {
+    occupancy: f32,
+    inhibition: f32,
+}
+
+impl Suppression {
+    /// Add `partials` in their order (row order).
+    fn absorb(&mut self, partials: impl IntoIterator<Item = Self>) {
+        for partial in partials {
+            self.occupancy += partial.occupancy;
+            self.inhibition += partial.inhibition;
+        }
+    }
 }
 
 #[inline]
@@ -326,58 +374,244 @@ fn inhibition_penalty(weighted_sum: f32, own_density: f32, own_inhibitor: f32) -
     (weighted_sum - own_density * own_inhibitor).max(0.0)
 }
 
-/// The fertility multiplier growth applies at one cell: the annealed habitat
-/// fertility (1.0 when fertility is disabled or the type has no grid) times
-/// the cell's grazing modifier.
+/// Read-only per-cell inputs of one food type's growth, as flat slices.
+struct CellTerms<'a> {
+    width: u16,
+    height: u16,
+    edge_mode: WorldEdgeMode,
+    barriers: &'a [bool],
+    density: &'a [f32],
+    /// The raw fertility grid and the annealed range, when fertility applies.
+    habitat: Option<(&'a [f32], f32, f32)>,
+    /// The grazing modifiers, when grazing is enabled.
+    grazing: Option<&'a [f32]>,
+    /// The occupancy-depletion grid, when depletion is enabled.
+    depletion: Option<&'a [f32]>,
+    inhibition_sums: &'a [f32],
+    max_density: f32,
+    type_inhibitor: f32,
+}
+
+impl CellTerms<'_> {
+    #[inline]
+    fn source(&self, idx: usize) -> f32 {
+        self.density[idx].clamp(0.0, self.max_density)
+    }
+
+    /// The annealed habitat fertility (1.0 when fertility is disabled or the
+    /// type has no grid) times the cell's grazing modifier.
+    #[inline]
+    fn base_fertility(&self, idx: usize) -> f32 {
+        let habitat = self.habitat.map_or(1.0, |(raw, min, max)| {
+            fertility::map_fertility(raw[idx], min, max)
+        });
+        habitat * self.grazing.map_or(1.0, |modifiers| modifiers[idx])
+    }
+
+    #[inline]
+    fn penalty(&self, idx: usize, source: f32) -> f32 {
+        inhibition_penalty(self.inhibition_sums[idx], source, self.type_inhibitor)
+    }
+
+    #[inline]
+    fn multiplier(&self, idx: usize) -> f32 {
+        self.depletion.map_or(1.0, |depletion| {
+            1.0 - depletion[idx] * (1.0 - MIN_GROWTH_MULTIPLIER)
+        })
+    }
+
+    /// The cell index of `idx`'s neighbour in `dir` under the edge mode.
+    #[inline]
+    fn neighbor(&self, idx: usize, dir: Direction) -> Option<usize> {
+        let width = usize::from(self.width);
+        let pos = Position::new((idx % width) as u16, (idx / width) as u16);
+        resolve_neighbor_static(pos, dir, self.width, self.height, self.edge_mode)
+            .map(|target| usize::from(target.y) * width + usize::from(target.x))
+    }
+}
+
+/// Per-type growth parameters shared by the claim, gather and recovery passes.
+#[derive(Clone, Copy)]
+struct TypeRates {
+    growth_rate: f32,
+    spread_threshold: f32,
+    spread_density_ratio: f32,
+}
+
+/// The claim of cell `idx`: own term, local terms, own inhibited flag, and
+/// the drawn spread target (one uniformly chosen entry of the N, E, S, W
+/// candidates that resolve and are passable, repeats included).
 #[inline]
-fn grazed_habitat_fertility(
-    state: &OrdinaryFoodState,
-    full_config: &FoodConfig,
-    type_idx: OrdinaryFoodTypeId,
-    x: u16,
-    y: u16,
-    (eff_min, eff_max): (f32, f32),
+fn claim_cell(
+    terms: &CellTerms<'_>,
+    rates: TypeRates,
+    stream: FoodStream,
+    idx: usize,
+    inhibited: &mut bool,
+    suppression: &mut Suppression,
+) -> ClaimCell {
+    if terms.barriers[idx] {
+        return ClaimCell::EMPTY;
+    }
+    let source = terms.source(idx);
+    if source <= 0.0 {
+        return ClaimCell::EMPTY;
+    }
+    let base_cell_fertility = terms.base_fertility(idx);
+    let cell_inhibition_penalty = terms.penalty(idx, source);
+    let cell_fertility = (base_cell_fertility - cell_inhibition_penalty).max(0.0);
+    let local_base = source * rates.growth_rate * base_cell_fertility;
+    let local_after_inhibition = source * rates.growth_rate * cell_fertility;
+    let local_delta = local_after_inhibition * terms.multiplier(idx);
+    if local_base > local_after_inhibition && cell_inhibition_penalty > 0.0 {
+        *inhibited = true;
+    }
+    suppression.inhibition += (local_base - local_after_inhibition).max(0.0);
+    suppression.occupancy += (local_after_inhibition - local_delta).max(0.0);
+
+    let mut pick = NO_PICK;
+    if source >= rates.spread_threshold && local_after_inhibition > 0.0 {
+        let mut candidates = [0usize; 4];
+        let mut count = 0;
+        for dir in SPREAD_DIRECTIONS {
+            if let Some(target) = terms.neighbor(idx, dir) {
+                if !terms.barriers[target] {
+                    candidates[count] = target;
+                    count += 1;
+                }
+            }
+        }
+        if count > 0 {
+            pick = candidates[stream.below(idx as u64, count)] as u32;
+        }
+    }
+    ClaimCell {
+        own: source + local_delta,
+        local_base,
+        local_after_inhibition,
+        pick,
+    }
+}
+
+/// The density written for cell `t`: `clamp(own(t) + Σ spread_delta(s, t))`
+/// over the distinct N, E, S, W neighbours `s` (first occurrence) whose pick
+/// is `t`, each counted once; barrier cells get 0. The target-side terms are
+/// computed only when some source delivers.
+#[inline]
+fn gather_cell(
+    terms: &CellTerms<'_>,
+    rates: TypeRates,
+    claims: &[ClaimCell],
+    t: usize,
+    inhibited: &mut bool,
+    suppression: &mut Suppression,
 ) -> f32 {
-    let habitat = if full_config.fertility.enabled {
-        state
-            .fertility_grid(type_idx)
-            .map(|grid| fertility::map_fertility(*grid.get(x, y), eff_min, eff_max))
-            .unwrap_or(1.0)
-    } else {
-        1.0
-    };
-    habitat
-        * state
-            .grazing()
-            .multiplier_at(x, y, type_idx, full_config.shared.grazing.enabled)
+    if terms.barriers[t] {
+        return 0.0;
+    }
+    let mut next = claims[t].own.clamp(0.0, terms.max_density);
+    let mut sources = [usize::MAX; 4];
+    let mut target_terms: Option<(f32, f32, f32)> = None;
+    for (slot, dir) in SPREAD_DIRECTIONS.into_iter().enumerate() {
+        let Some(s) = terms.neighbor(t, dir) else {
+            continue;
+        };
+        if sources[..slot].contains(&s) {
+            continue;
+        }
+        sources[slot] = s;
+        let claim = claims[s];
+        if claim.pick as usize != t {
+            continue;
+        }
+        let (base_neighbor_fertility, neighbor_penalty, target_multiplier) = *target_terms
+            .get_or_insert_with(|| {
+                (
+                    terms.base_fertility(t),
+                    terms.penalty(t, terms.source(t)),
+                    terms.multiplier(t),
+                )
+            });
+        let neighbor_fertility = (base_neighbor_fertility - neighbor_penalty).max(0.0);
+        let spread_base = claim.local_base * rates.spread_density_ratio * base_neighbor_fertility;
+        let spread_after_inhibition =
+            claim.local_after_inhibition * rates.spread_density_ratio * neighbor_fertility;
+        let spread_delta = spread_after_inhibition * target_multiplier;
+        if spread_base > spread_after_inhibition && neighbor_penalty > 0.0 {
+            *inhibited = true;
+        }
+        suppression.inhibition += (spread_base - spread_after_inhibition).max(0.0);
+        suppression.occupancy += (spread_after_inhibition - spread_delta).max(0.0);
+        next = (next + spread_delta).clamp(0.0, terms.max_density);
+    }
+    next
+}
+
+/// The weighted density of every inhibiting type per cell, summed in catalog
+/// order, into `sums`; one row-parallel pass.
+fn build_type_inhibition_weighted_sums(
+    sums: &mut [f32],
+    state: &OrdinaryFoodState,
+    catalog: &OrdinaryFoodCatalog,
+    max_density: f32,
+) {
+    let inhibitors: Vec<(&[f32], f32)> = catalog
+        .entries()
+        .iter()
+        .filter_map(|entry| {
+            let inhibitor = entry.config.growth_inhibitor.clamp(0.0, 1.0);
+            (inhibitor > 0.0)
+                .then(|| state.density_slice(entry.id).map(|grid| (grid, inhibitor)))
+                .flatten()
+        })
+        .collect();
+    let width = usize::from(state.width());
+    sums.par_chunks_mut(width).enumerate().for_each(|(y, row)| {
+        for (x, cell) in row.iter_mut().enumerate() {
+            let idx = y * width + x;
+            let mut sum = 0.0;
+            for &(density, inhibitor) in &inhibitors {
+                sum += density[idx].clamp(0.0, max_density) * inhibitor;
+            }
+            *cell = sum;
+        }
+    });
+}
+
+/// The type's total density: per-row sums reduced in row order.
+fn row_ordered_total(density: &[f32], width: usize) -> f32 {
+    density
+        .par_chunks(width)
+        .map(|row| row.iter().sum::<f32>())
+        .collect::<Vec<f32>>()
+        .into_iter()
+        .sum()
 }
 
 #[allow(clippy::too_many_arguments)]
 #[allow(
     clippy::too_many_lines,
-    reason = "one food growth pass over the grid; the per-cell claim, spread, \
-              recovery, and inhibition stages share scratch buffers that would \
-              have to be threaded through helpers"
+    reason = "one food growth pass over the grid: the eight timed regions of \
+              T24.F03 share the per-type terms and the retained buffers"
 )]
-pub(super) fn grow<T: Clone>(
+pub(super) fn grow<T: Clone + Sync>(
     state: &mut OrdinaryFoodState,
     catalog: &OrdinaryFoodCatalog,
     shared: &FoodResourceConfig,
     full_config: &FoodConfig,
     occupancy_depletion: &mut OccupancyDepletionLayer,
-    _claim_scratch: &mut Vec<Vec<(OrdinaryFoodTypeId, f32)>>,
-    _owner_snapshot: &mut Vec<Option<OrdinaryFoodTypeId>>,
-    _density_snapshot: &mut Vec<f32>,
+    scratch: &mut GrowthScratch,
     barriers: &Grid<bool>,
     occupancy: &Grid<Option<T>>,
     edge_mode: WorldEdgeMode,
     tick: u64,
-    rng: &mut impl Rng,
+    key: FoodStreamKey,
 ) -> FoodGrowthSummary {
     let total_cells = state.width() as usize * state.height() as usize;
     if total_cells == 0 {
         return FoodGrowthSummary::default();
     }
+    let width = usize::from(state.width());
 
     let mut clock = PassClock::new(catalog.len());
     let start = PassClock::start();
@@ -385,7 +619,7 @@ pub(super) fn grow<T: Clone>(
         occupancy_depletion.recover_and_deposit(barriers, occupancy, &shared.occupancy_depletion);
     clock.stop(start, FoodPass::DepletionRecovery, None);
     // Grazing heals before any fertility read, on every passable cell: the
-    // grazed cell is empty by construction and the growth loop below skips
+    // grazed cell is empty by construction and the growth passes below skip
     // empty cells.
     let start = PassClock::start();
     let (grazing_summaries, passable_cells) =
@@ -400,7 +634,6 @@ pub(super) fn grow<T: Clone>(
     let spread_threshold = max_density * shared.spread_threshold_ratio.clamp(0.0, 1.0);
     let spread_density_ratio = shared.spread_density_ratio.clamp(0.0, 1.0);
     let recovery_floor = shared.recovery_floor_ratio.clamp(0.0, 1.0);
-    let occupancy_enabled = shared.occupancy_depletion.enabled;
 
     let (eff_min, eff_max) = if full_config.fertility.enabled {
         fertility::effective_fertility_range(
@@ -413,12 +646,19 @@ pub(super) fn grow<T: Clone>(
         (1.0, 1.0)
     };
 
+    scratch.fit(total_cells);
+    let GrowthScratch {
+        claims,
+        next_density,
+        inhibited,
+        inhibition_sums,
+    } = scratch;
+
     let start = PassClock::start();
-    let inhibition_weighted_sums = build_type_inhibition_weighted_sums(state, catalog, max_density);
-    let mut inhibited_cell_flags = vec![false; total_cells];
+    build_type_inhibition_weighted_sums(inhibition_sums, state, catalog, max_density);
+    inhibited.par_iter_mut().for_each(|flag| *flag = false);
     clock.stop(start, FoodPass::InhibitionSums, None);
-    let mut suppressed_by_occupancy_total = 0.0;
-    let mut suppressed_by_inhibition_total = 0.0;
+    let mut suppressed = Suppression::default();
     let mut per_type: Vec<FoodTypeTelemetry> = catalog
         .entries()
         .iter()
@@ -433,20 +673,52 @@ pub(super) fn grow<T: Clone>(
 
     for entry in catalog.entries() {
         let type_idx = entry.id;
-        let growth_rate = entry
-            .config
-            .growth_rate
-            .unwrap_or(shared.growth_rate)
-            .max(0.0);
+        let rates = TypeRates {
+            growth_rate: entry
+                .config
+                .growth_rate
+                .unwrap_or(shared.growth_rate)
+                .max(0.0),
+            spread_threshold,
+            spread_density_ratio,
+        };
         let recovery_spawn_rate = entry
             .config
             .recovery_spawn_rate
             .unwrap_or(shared.recovery_spawn_rate)
             .clamp(0.0, 1.0);
-        let type_inhibitor = entry.config.growth_inhibitor.clamp(0.0, 1.0);
+        let Some(density) = state.density_slice(type_idx) else {
+            continue;
+        };
+        let terms = CellTerms {
+            width: state.width(),
+            height: state.height(),
+            edge_mode,
+            barriers: barriers.as_slice(),
+            density,
+            habitat: full_config
+                .fertility
+                .enabled
+                .then(|| state.fertility_grid(type_idx))
+                .flatten()
+                .map(|grid| (grid.as_slice(), eff_min, eff_max)),
+            grazing: shared
+                .grazing
+                .enabled
+                .then(|| state.grazing().type_slice(type_idx))
+                .flatten(),
+            depletion: shared
+                .occupancy_depletion
+                .enabled
+                .then(|| occupancy_depletion.grid().as_slice()),
+            inhibition_sums: inhibition_sums.as_slice(),
+            max_density,
+            type_inhibitor: entry.config.growth_inhibitor.clamp(0.0, 1.0),
+        };
+
         let type_density_ratio = {
             let start = PassClock::start();
-            let type_total = state.total_food_by_type(type_idx);
+            let type_total = row_ordered_total(density, width);
             clock.stop(start, FoodPass::DensityTotal, Some(type_idx));
             let type_capacity = total_cells as f32 * max_density;
             if type_capacity <= 0.0 {
@@ -455,146 +727,64 @@ pub(super) fn grow<T: Clone>(
                 (type_total / type_capacity).clamp(0.0, 1.0)
             }
         };
+
         let start = PassClock::start();
-        let mut next_density = vec![0.0; total_cells];
-
-        for y in 0..state.height() {
-            for x in 0..state.width() {
-                let pos = Position::new(x, y);
-                let idx = y as usize * state.width() as usize + x as usize;
-                if *barriers.get(x, y) {
-                    state.set_food_type_density(pos, type_idx, 0.0);
-                    continue;
+        let spread_stream = FoodStream::new(key, tick, type_idx, DrawPurpose::SpreadTarget);
+        let claim_rows: Vec<Suppression> = claims
+            .par_chunks_mut(width)
+            .zip(inhibited.par_chunks_mut(width))
+            .enumerate()
+            .map(|(y, (claim_row, flag_row))| {
+                let mut row = Suppression::default();
+                for (x, (claim, flag)) in claim_row.iter_mut().zip(flag_row).enumerate() {
+                    *claim =
+                        claim_cell(&terms, rates, spread_stream, y * width + x, flag, &mut row);
                 }
-
-                let source = state.food_at_type(pos, type_idx).clamp(0.0, max_density);
-                if source <= 0.0 {
-                    continue;
+                row
+            })
+            .collect();
+        suppressed.absorb(claim_rows);
+        let claims_read: &[ClaimCell] = claims;
+        let gather_rows: Vec<Suppression> = next_density
+            .par_chunks_mut(width)
+            .zip(inhibited.par_chunks_mut(width))
+            .enumerate()
+            .map(|(y, (next_row, flag_row))| {
+                let mut row = Suppression::default();
+                for (x, (next, flag)) in next_row.iter_mut().zip(flag_row).enumerate() {
+                    *next = gather_cell(&terms, rates, claims_read, y * width + x, flag, &mut row);
                 }
-
-                let base_cell_fertility = grazed_habitat_fertility(
-                    state,
-                    full_config,
-                    type_idx,
-                    x,
-                    y,
-                    (eff_min, eff_max),
-                );
-                let cell_inhibition_penalty =
-                    inhibition_penalty(inhibition_weighted_sums[idx], source, type_inhibitor);
-                let cell_fertility = (base_cell_fertility - cell_inhibition_penalty).max(0.0);
-                let cell_multiplier = occupancy_depletion.multiplier_at(x, y, occupancy_enabled);
-                let local_base = source * growth_rate * base_cell_fertility;
-                let local_after_inhibition = source * growth_rate * cell_fertility;
-                let local_delta = local_after_inhibition * cell_multiplier;
-                if local_base > local_after_inhibition && cell_inhibition_penalty > 0.0 {
-                    inhibited_cell_flags[idx] = true;
-                }
-                suppressed_by_inhibition_total += (local_base - local_after_inhibition).max(0.0);
-                suppressed_by_occupancy_total += (local_after_inhibition - local_delta).max(0.0);
-                next_density[idx] =
-                    (next_density[idx] + source + local_delta).clamp(0.0, max_density);
-
-                if source < spread_threshold || local_after_inhibition <= 0.0 {
-                    continue;
-                }
-
-                let mut neighbors = [Position::new(0, 0); 4];
-                let mut count = 0;
-                for dir in [Direction::N, Direction::E, Direction::S, Direction::W] {
-                    let Some(target) =
-                        resolve_neighbor_static(pos, dir, state.width(), state.height(), edge_mode)
-                    else {
-                        continue;
-                    };
-                    if *barriers.get(target.x, target.y) {
-                        continue;
-                    }
-                    neighbors[count] = target;
-                    count += 1;
-                }
-                if count == 0 {
-                    continue;
-                }
-
-                let target = neighbors[rng.gen_range(0..count)];
-                let target_multiplier =
-                    occupancy_depletion.multiplier_at(target.x, target.y, occupancy_enabled);
-                let target_idx = target.y as usize * state.width() as usize + target.x as usize;
-                let base_neighbor_fertility = grazed_habitat_fertility(
-                    state,
-                    full_config,
-                    type_idx,
-                    target.x,
-                    target.y,
-                    (eff_min, eff_max),
-                );
-                let target_source = state.food_at_type(target, type_idx).clamp(0.0, max_density);
-                let neighbor_penalty = inhibition_penalty(
-                    inhibition_weighted_sums[target_idx],
-                    target_source,
-                    type_inhibitor,
-                );
-                let neighbor_fertility = (base_neighbor_fertility - neighbor_penalty).max(0.0);
-                let spread_base = local_base * spread_density_ratio * base_neighbor_fertility;
-                let spread_after_inhibition =
-                    local_after_inhibition * spread_density_ratio * neighbor_fertility;
-                let spread_delta = spread_after_inhibition * target_multiplier;
-                if spread_base > spread_after_inhibition && neighbor_penalty > 0.0 {
-                    inhibited_cell_flags[target_idx] = true;
-                }
-                suppressed_by_inhibition_total += (spread_base - spread_after_inhibition).max(0.0);
-                suppressed_by_occupancy_total += (spread_after_inhibition - spread_delta).max(0.0);
-                next_density[target_idx] =
-                    (next_density[target_idx] + spread_delta).clamp(0.0, max_density);
-            }
-        }
+                row
+            })
+            .collect();
+        suppressed.absorb(gather_rows);
         clock.stop(start, FoodPass::GrowthSpread, Some(type_idx));
 
         if type_density_ratio < recovery_floor && recovery_spawn_rate > 0.0 {
             let start = PassClock::start();
             let spawn_attempts = (total_cells as f32 * recovery_spawn_rate).round() as usize;
-            let spawn_delta = max_density * growth_rate;
+            let spawn_delta = max_density * rates.growth_rate;
+            let recovery_stream = FoodStream::new(key, tick, type_idx, DrawPurpose::RecoveryCell);
 
-            for _ in 0..spawn_attempts {
+            for attempt in 0..spawn_attempts {
                 if spawn_delta <= 0.0 {
                     break;
                 }
-                let idx = rng.gen_range(0..total_cells);
-                let x = (idx % state.width() as usize) as u16;
-                let y = (idx / state.width() as usize) as u16;
-                if *barriers.get(x, y) {
+                let idx = recovery_stream.below(attempt as u64, total_cells);
+                if terms.barriers[idx] {
                     continue;
                 }
-
-                let base_cell_fertility = grazed_habitat_fertility(
-                    state,
-                    full_config,
-                    type_idx,
-                    x,
-                    y,
-                    (eff_min, eff_max),
-                );
-                let recovery_source = state
-                    .food_at_type(Position::new(x, y), type_idx)
-                    .clamp(0.0, max_density);
-                let recovery_inhibition_penalty = inhibition_penalty(
-                    inhibition_weighted_sums[idx],
-                    recovery_source,
-                    type_inhibitor,
-                );
+                let base_cell_fertility = terms.base_fertility(idx);
+                let recovery_inhibition_penalty = terms.penalty(idx, terms.source(idx));
                 let cell_fertility = (base_cell_fertility - recovery_inhibition_penalty).max(0.0);
-                let cell_multiplier = occupancy_depletion.multiplier_at(x, y, occupancy_enabled);
                 let recovery_base = spawn_delta * base_cell_fertility;
                 let recovery_after_inhibition = spawn_delta * cell_fertility;
-                let recovery_delta = recovery_after_inhibition * cell_multiplier;
+                let recovery_delta = recovery_after_inhibition * terms.multiplier(idx);
                 if recovery_base > recovery_after_inhibition && recovery_inhibition_penalty > 0.0 {
-                    inhibited_cell_flags[idx] = true;
+                    inhibited[idx] = true;
                 }
-                suppressed_by_inhibition_total +=
-                    (recovery_base - recovery_after_inhibition).max(0.0);
-                suppressed_by_occupancy_total +=
-                    (recovery_after_inhibition - recovery_delta).max(0.0);
+                suppressed.inhibition += (recovery_base - recovery_after_inhibition).max(0.0);
+                suppressed.occupancy += (recovery_after_inhibition - recovery_delta).max(0.0);
                 next_density[idx] = (next_density[idx] + recovery_delta).clamp(0.0, max_density);
             }
             clock.stop(start, FoodPass::RecoverySpawns, Some(type_idx));
@@ -612,31 +802,42 @@ pub(super) fn grow<T: Clone>(
             grazed_cells: grazing_summary.grazed_cells,
         };
         let start = PassClock::start();
-        for y in 0..state.height() {
-            for x in 0..state.width() {
-                let idx = y as usize * state.width() as usize + x as usize;
-                let density = next_density[idx];
-                state.set_food_type_density(Position::new(x, y), type_idx, density);
-                if density > 0.0 {
-                    telemetry.occupied_cells += 1;
-                    telemetry.total_density += density;
+        let written = state
+            .density_slice_mut(type_idx)
+            .expect("the type's density grid was read above");
+        let write_rows: Vec<(u32, f32)> = written
+            .par_chunks_mut(width)
+            .zip(next_density.par_chunks(width))
+            .map(|(row, next_row)| {
+                row.copy_from_slice(next_row);
+                let (mut occupied, mut total) = (0u32, 0.0f32);
+                for &density in next_row {
+                    if density > 0.0 {
+                        occupied += 1;
+                        total += density;
+                    }
                 }
-            }
+                (occupied, total)
+            })
+            .collect();
+        for (occupied, total) in write_rows {
+            telemetry.occupied_cells += occupied;
+            telemetry.total_density += total;
         }
         per_type[usize::from(type_idx.get())] = telemetry;
         clock.stop(start, FoodPass::WriteBack, Some(type_idx));
     }
 
     let start = PassClock::start();
-    let inhibited_cells = inhibited_cell_flags.iter().filter(|flag| **flag).count() as u32;
+    let inhibited_cells = inhibited.par_iter().filter(|flag| **flag).count() as u32;
     clock.stop(start, FoodPass::InhibitedCount, None);
 
     clock.finish(FoodGrowthSummary {
         mean_occupancy_depletion: depletion_summary.mean_depletion,
         occupied_cells_with_depletion: depletion_summary.occupied_cells,
-        growth_suppressed_by_occupancy_depletion: suppressed_by_occupancy_total,
+        growth_suppressed_by_occupancy_depletion: suppressed.occupancy,
         cells_with_type_inhibition: inhibited_cells,
-        growth_suppressed_by_type_inhibition: suppressed_by_inhibition_total,
+        growth_suppressed_by_type_inhibition: suppressed.inhibition,
         passable_cells,
         per_type,
         #[cfg(feature = "telemetry-seams")]
@@ -646,6 +847,7 @@ pub(super) fn grow<T: Clone>(
 
 #[cfg(test)]
 mod tests {
+    use super::super::stream::{food_draw, in_range};
     use super::*;
 
     use rand::{rngs::StdRng, SeedableRng};
@@ -656,6 +858,43 @@ mod tests {
 
     fn occupancy_grid<T: Clone>(width: u16, height: u16) -> Grid<Option<T>> {
         Grid::new(width, height, None)
+    }
+
+    #[test]
+    fn row_ordered_total_bits_match_row_by_row_sum_in_every_thread_pool() {
+        let (width, height) = (7_usize, 37_usize);
+        let mut rng = StdRng::seed_from_u64(0x7240_f002);
+        let density: Vec<f32> = (0..width * height)
+            .map(|_| {
+                if rng.gen_bool(0.3) {
+                    rng.gen_range(1.0e6_f32..1.0e7)
+                } else {
+                    rng.gen_range(0.1_f32..1.0)
+                }
+            })
+            .collect();
+        let reference = density
+            .chunks(width)
+            .map(|row| row.iter().sum::<f32>())
+            .sum::<f32>();
+        assert_ne!(
+            density.iter().sum::<f32>().to_bits(),
+            reference.to_bits(),
+            "fixture must be sensitive to summation order"
+        );
+
+        for threads in [1, 4] {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .expect("thread pool");
+            let total = pool.install(|| row_ordered_total(&density, width));
+            assert_eq!(
+                total.to_bits(),
+                reference.to_bits(),
+                "{threads}-thread pool total {total} != row-by-row {reference}"
+            );
+        }
     }
 
     #[test]
@@ -679,7 +918,6 @@ mod tests {
                 &catalog,
                 &config,
                 &mut OccupancyDepletionLayer::new(7, 6),
-                &mut Vec::new(),
                 &barriers,
                 &mut actual_rng,
             );
@@ -725,7 +963,6 @@ mod tests {
         let catalog = OrdinaryFoodCatalog::new(&config);
         let mut state = OrdinaryFoodState::new(1, 1, catalog.len());
         let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
-        let mut claim_scratch = Vec::new();
         let barriers = barrier_grid(1, 1);
         let mut rng = StdRng::seed_from_u64(7);
 
@@ -734,7 +971,6 @@ mod tests {
             &catalog,
             &config,
             &mut occupancy_depletion,
-            &mut claim_scratch,
             &barriers,
             &mut rng,
         );
@@ -755,7 +991,6 @@ mod tests {
         let catalog = OrdinaryFoodCatalog::new(&config);
         let mut state = OrdinaryFoodState::new(8, 1, catalog.len());
         let mut occupancy_depletion = OccupancyDepletionLayer::new(8, 1);
-        let mut claim_scratch = Vec::new();
         let barriers = barrier_grid(8, 1);
         let mut rng = StdRng::seed_from_u64(0xC0FFEE);
 
@@ -764,7 +999,6 @@ mod tests {
             &catalog,
             &config,
             &mut occupancy_depletion,
-            &mut claim_scratch,
             &barriers,
             &mut rng,
         );
@@ -810,12 +1044,9 @@ mod tests {
         state.set_food_type_density(pos, OrdinaryFoodTypeId::new(1), 4.0);
 
         let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
-        let mut claim_scratch = Vec::new();
-        let mut owner_snapshot = Vec::new();
-        let mut density_snapshot = Vec::new();
         let barriers = barrier_grid(1, 1);
         let occupancy = occupancy_grid::<()>(1, 1);
-        let mut rng = StdRng::seed_from_u64(11);
+        let key = FoodStreamKey::from_run_seed(11);
 
         let summary = grow(
             &mut state,
@@ -823,14 +1054,12 @@ mod tests {
             &config.shared,
             &config,
             &mut occupancy_depletion,
-            &mut claim_scratch,
-            &mut owner_snapshot,
-            &mut density_snapshot,
+            &mut GrowthScratch::default(),
             &barriers,
             &occupancy,
             WorldEdgeMode::Wrap,
             0,
-            &mut rng,
+            key,
         );
 
         assert_eq!(state.food_at_type(pos, OrdinaryFoodTypeId::new(0)), 3.0);
@@ -869,12 +1098,9 @@ mod tests {
         state.set_food_type_density(pos, OrdinaryFoodTypeId::new(1), 1.0);
 
         let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
-        let mut claim_scratch = Vec::new();
-        let mut owner_snapshot = Vec::new();
-        let mut density_snapshot = Vec::new();
         let barriers = barrier_grid(1, 1);
         let occupancy = occupancy_grid::<()>(1, 1);
-        let mut rng = StdRng::seed_from_u64(23);
+        let key = FoodStreamKey::from_run_seed(23);
 
         let summary = grow(
             &mut state,
@@ -882,14 +1108,12 @@ mod tests {
             &config.shared,
             &config,
             &mut occupancy_depletion,
-            &mut claim_scratch,
-            &mut owner_snapshot,
-            &mut density_snapshot,
+            &mut GrowthScratch::default(),
             &barriers,
             &occupancy,
             WorldEdgeMode::Wrap,
             0,
-            &mut rng,
+            key,
         );
 
         assert_eq!(state.food_at_type(pos, OrdinaryFoodTypeId::new(0)), 1.0);
@@ -920,12 +1144,9 @@ mod tests {
         state.set_food_type_density(pos, OrdinaryFoodTypeId::new(0), 1.0);
 
         let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
-        let mut claim_scratch = Vec::new();
-        let mut owner_snapshot = Vec::new();
-        let mut density_snapshot = Vec::new();
         let barriers = barrier_grid(1, 1);
         let occupancy = occupancy_grid::<()>(1, 1);
-        let mut rng = StdRng::seed_from_u64(37);
+        let key = FoodStreamKey::from_run_seed(37);
 
         let summary = grow(
             &mut state,
@@ -933,14 +1154,12 @@ mod tests {
             &config.shared,
             &config,
             &mut occupancy_depletion,
-            &mut claim_scratch,
-            &mut owner_snapshot,
-            &mut density_snapshot,
+            &mut GrowthScratch::default(),
             &barriers,
             &occupancy,
             WorldEdgeMode::Wrap,
             0,
-            &mut rng,
+            key,
         );
 
         assert_eq!(summary.cells_with_type_inhibition, 0);
@@ -976,12 +1195,9 @@ mod tests {
         state.set_food_type_density(pos, OrdinaryFoodTypeId::new(1), 1.0);
 
         let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
-        let mut claim_scratch = Vec::new();
-        let mut owner_snapshot = Vec::new();
-        let mut density_snapshot = Vec::new();
         let barriers = barrier_grid(1, 1);
         let occupancy = occupancy_grid::<()>(1, 1);
-        let mut rng = StdRng::seed_from_u64(31);
+        let key = FoodStreamKey::from_run_seed(31);
 
         grow(
             &mut state,
@@ -989,14 +1205,12 @@ mod tests {
             &config.shared,
             &config,
             &mut occupancy_depletion,
-            &mut claim_scratch,
-            &mut owner_snapshot,
-            &mut density_snapshot,
+            &mut GrowthScratch::default(),
             &barriers,
             &occupancy,
             WorldEdgeMode::Wrap,
             0,
-            &mut rng,
+            key,
         );
 
         assert!(state.food_at_type(pos, OrdinaryFoodTypeId::new(0)) > 0.0);
@@ -1036,21 +1250,19 @@ mod tests {
         let mut occupancy_depletion = OccupancyDepletionLayer::new(2, 1);
         let barriers = barrier_grid(2, 1);
         let occupancy = occupancy_grid::<()>(2, 1);
-        let mut rng = StdRng::seed_from_u64(5);
+        let key = FoodStreamKey::from_run_seed(5);
         let summary = grow(
             &mut state,
             &catalog,
             &config.shared,
             &config,
             &mut occupancy_depletion,
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut Vec::new(),
+            &mut GrowthScratch::default(),
             &barriers,
             &occupancy,
             WorldEdgeMode::Bounded,
             0,
-            &mut rng,
+            key,
         );
         (state.food_at_type(target, type_idx), summary)
     }
@@ -1115,7 +1327,7 @@ mod tests {
         let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
         let barriers = barrier_grid(1, 1);
         let occupancy = occupancy_grid::<()>(1, 1);
-        let mut rng = StdRng::seed_from_u64(1);
+        let key = FoodStreamKey::from_run_seed(1);
         let mut readings = Vec::new();
         for tick in 0..3 {
             let summary = grow(
@@ -1124,14 +1336,12 @@ mod tests {
                 &config.shared,
                 &config,
                 &mut occupancy_depletion,
-                &mut Vec::new(),
-                &mut Vec::new(),
-                &mut Vec::new(),
+                &mut GrowthScratch::default(),
                 &barriers,
                 &occupancy,
                 WorldEdgeMode::Wrap,
                 tick,
-                &mut rng,
+                key,
             );
             readings.push((
                 state.grazing().modifier_at(0, 0, type_idx),
@@ -1235,21 +1445,19 @@ mod tests {
         let mut occupancy_depletion = OccupancyDepletionLayer::new(1, 1);
         let barriers = barrier_grid(1, 1);
         let occupancy = Grid::new(1, 1, Some(()));
-        let mut rng = StdRng::seed_from_u64(1);
+        let key = FoodStreamKey::from_run_seed(1);
         let summary = grow(
             &mut state,
             &catalog,
             &config.shared,
             &config,
             &mut occupancy_depletion,
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut Vec::new(),
+            &mut GrowthScratch::default(),
             &barriers,
             &occupancy,
             WorldEdgeMode::Wrap,
             0,
-            &mut rng,
+            key,
         );
         // local delta = source * rate * grazing (0.5) * occupancy multiplier
         // (MIN_GROWTH_MULTIPLIER at full depletion).
@@ -1284,14 +1492,12 @@ mod tests {
             &config.shared,
             &config,
             &mut OccupancyDepletionLayer::new(4, 3),
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut Vec::new(),
+            &mut GrowthScratch::default(),
             &barriers,
             &occupancy,
             WorldEdgeMode::Wrap,
             0,
-            &mut StdRng::seed_from_u64(5),
+            FoodStreamKey::from_run_seed(5),
         );
 
         assert!(summary.per_type.is_empty(), "{:?}", summary.per_type);
@@ -1336,14 +1542,12 @@ mod tests {
             &config.shared,
             config,
             &mut OccupancyDepletionLayer::new(width, height),
-            &mut Vec::new(),
-            &mut Vec::new(),
-            &mut Vec::new(),
+            &mut GrowthScratch::default(),
             barriers,
             &occupancy_grid::<()>(width, height),
             edge_mode,
             0,
-            &mut StdRng::seed_from_u64(seed),
+            FoodStreamKey::from_run_seed(seed),
         );
     }
 
@@ -1389,101 +1593,358 @@ mod tests {
         );
     }
 
-    /// What the per-cell oracle saw while gathering one growth pass.
-    struct PerCellGather {
-        /// Expected density per type, per cell (row-major).
+    /// A growth-pass fixture for the per-cell oracle: the pre-growth state a
+    /// test builds, run once through `grow` and once through the oracle.
+    struct OracleFixture {
+        width: u16,
+        height: u16,
+        edge_mode: WorldEdgeMode,
+        config: FoodConfig,
+        /// Pre-growth density per type, row-major.
+        densities: Vec<Vec<f32>>,
+        barriers: Vec<usize>,
+        occupied: Vec<usize>,
+        /// `(cell, type, bites)` applied to the grazing layer before the pass.
+        bites: Vec<(usize, u16, u32)>,
+        seed: u64,
+        tick: u64,
+    }
+
+    impl OracleFixture {
+        fn new(width: u16, height: u16, edge_mode: WorldEdgeMode, config: FoodConfig) -> Self {
+            let cells = usize::from(width) * usize::from(height);
+            Self {
+                width,
+                height,
+                edge_mode,
+                densities: vec![vec![0.0; cells]; config.types.len()],
+                config,
+                barriers: Vec::new(),
+                occupied: Vec::new(),
+                bites: Vec::new(),
+                seed: 1,
+                tick: 0,
+            }
+        }
+
+        fn cells(&self) -> usize {
+            usize::from(self.width) * usize::from(self.height)
+        }
+
+        fn position(&self, idx: usize) -> Position {
+            let width = usize::from(self.width);
+            Position::new((idx % width) as u16, (idx / width) as u16)
+        }
+    }
+
+    /// What the oracle computed and saw for one growth pass.
+    #[derive(Debug, Default)]
+    struct OracleReport {
+        /// Expected density per type, per cell.
         expected: Vec<Vec<f32>>,
-        /// A spread crossed a wrapped edge.
+        inhibited_cells: u32,
+        suppressed_by_inhibition: f32,
+        suppressed_by_occupancy: f32,
+        /// A delivery crossed a wrapped edge.
         wrapped_delivery: bool,
         /// Some cell's unclamped sum exceeded `max_density`.
         clamp_bound: bool,
+        /// Two distinct sources delivered to one target.
+        shared_target: bool,
+        /// A source delivered to a cell that is two of its neighbours, or to itself.
+        repeated_candidate_delivery: bool,
+        /// A delivery was reduced by the target's grazing, inhibition or depletion.
+        modified_delivery: bool,
+        /// A spreading cell had an empty candidate list.
+        empty_candidate_list: bool,
+        /// A recovery spawn landed on a passable cell.
+        recovery_spawned: bool,
         /// A spread landed on an occupied, higher-index target with headroom
-        /// after its own growth: the delivery the assignment rule discarded.
-        delivery_lost_to_assignment: bool,
+        /// after its own growth (T24.F01's lost delivery).
+        delivery_to_later_occupied_cell: bool,
     }
 
-    /// Test-side gather of invariant 1 on a `Wrap` grid with every growth
-    /// modifier off: replays the draws `grow` makes (per type in catalog
-    /// order, one `gen_range(0..count)` per spreading cell in row-major
-    /// order, then that type's recovery draws) and sums each cell's own
-    /// growth, received spread and recovery spawns before one clamp.
-    fn gather_per_cell_rule(
-        before: &[Vec<f32>],
-        barriers: &Grid<bool>,
-        shared: &FoodResourceConfig,
-        rng: &mut StdRng,
-    ) -> PerCellGather {
-        let (width, height) = (barriers.width() as usize, barriers.height() as usize);
-        let cells = width * height;
-        let g = shared.growth_rate;
+    /// Test-side scatter of spec invariant 1 with grazing, occupancy
+    /// depletion and type inhibition applied (fertility off): each spreading
+    /// cell sends one contribution to the candidate-list entry `food_draw`
+    /// picks; each cell's own growth, received spread and recovery spawns are
+    /// summed before one clamp. Grazing and depletion recover first, as in `grow`.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one independent scatter of the whole growth rule, kept in one place to read against \
+                  the spec"
+    )]
+    fn per_cell_oracle(fixture: &OracleFixture) -> OracleReport {
+        let shared = &fixture.config.shared;
+        let cells = fixture.cells();
         let max = shared.max_density;
         let threshold = max * shared.spread_threshold_ratio;
-        let mut gather = PerCellGather {
-            expected: Vec::new(),
-            wrapped_delivery: false,
-            clamp_bound: false,
-            delivery_lost_to_assignment: false,
-        };
-        let is_barrier = |idx: usize| *barriers.get((idx % width) as u16, (idx / width) as u16);
+        let key = FoodStreamKey::from_run_seed(fixture.seed);
+        let is_barrier = |idx: usize| fixture.barriers.contains(&idx);
+        let mut report = OracleReport::default();
 
-        for density in before {
-            let mut own = vec![0.0f32; cells];
-            let mut sum = vec![0.0f32; cells];
-            let mut deliveries = Vec::new();
-            for idx in 0..cells {
-                let source = density[idx];
-                if is_barrier(idx) || source <= 0.0 {
-                    continue;
+        let depletion: Vec<f32> = (0..cells)
+            .map(|idx| {
+                let deposit = shared.occupancy_depletion.deposit_per_occupied_tick;
+                if is_barrier(idx) || !fixture.occupied.contains(&idx) {
+                    0.0
+                } else {
+                    deposit.clamp(0.0, 1.0)
                 }
-                own[idx] = source + source * g;
-                sum[idx] += own[idx];
-                if source < threshold {
-                    continue;
-                }
-                let (x, y) = ((idx % width) as i32, (idx / width) as i32);
-                let neighbors: Vec<usize> =
-                    [Direction::N, Direction::E, Direction::S, Direction::W]
-                        .into_iter()
-                        .map(|dir| {
-                            let (dx, dy) = dir.delta();
-                            let tx = (x + dx).rem_euclid(width as i32) as usize;
-                            let ty = (y + dy).rem_euclid(height as i32) as usize;
-                            ty * width + tx
-                        })
-                        .filter(|&target| !is_barrier(target))
-                        .collect();
-                if neighbors.is_empty() {
-                    continue;
-                }
-                let target = neighbors[rng.gen_range(0..neighbors.len())];
-                sum[target] += source * g * shared.spread_density_ratio;
-                deliveries.push((idx, target));
-                let (tx, ty) = (target % width, target / width);
-                if (x as usize).abs_diff(tx) > 1 || (y as usize).abs_diff(ty) > 1 {
-                    gather.wrapped_delivery = true;
-                }
+            })
+            .collect();
+        let multiplier = |idx: usize| {
+            if shared.occupancy_depletion.enabled {
+                1.0 - depletion[idx] * (1.0 - MIN_GROWTH_MULTIPLIER)
+            } else {
+                1.0
             }
-            let type_total: f32 = density.iter().sum();
-            if type_total / (cells as f32 * max) < shared.recovery_floor_ratio
-                && shared.recovery_spawn_rate > 0.0
-            {
-                let attempts = (cells as f32 * shared.recovery_spawn_rate).round() as usize;
-                for _ in 0..attempts {
-                    let idx = rng.gen_range(0..cells);
-                    if !is_barrier(idx) {
-                        sum[idx] += max * g;
+        };
+        let grazing = |idx: usize, type_number: u16| {
+            if !shared.grazing.enabled || is_barrier(idx) {
+                return 1.0;
+            }
+            let mut modifier = 1.0f32;
+            for &(cell, bitten_type, bites) in &fixture.bites {
+                if cell == idx && bitten_type == type_number {
+                    for _ in 0..bites {
+                        modifier = (modifier * shared.grazing.factor).max(shared.grazing.floor);
                     }
                 }
             }
-            gather.delivery_lost_to_assignment |= deliveries.iter().any(|&(source, target)| {
-                target > source && density[target] > 0.0 && own[target] < max
-            });
-            gather.clamp_bound |= sum.iter().any(|&value| value > max);
-            gather
+            (modifier + 1.0 / shared.grazing.recovery_ticks.max(1) as f32).min(1.0)
+        };
+        let inhibitors: Vec<f32> = fixture
+            .config
+            .types
+            .iter()
+            .map(|food_type| food_type.growth_inhibitor.clamp(0.0, 1.0))
+            .collect();
+        let weighted_sum = |idx: usize| {
+            let mut sum = 0.0f32;
+            for (density, &inhibitor) in fixture.densities.iter().zip(&inhibitors) {
+                if inhibitor > 0.0 {
+                    sum += density[idx].clamp(0.0, max) * inhibitor;
+                }
+            }
+            sum
+        };
+        let neighbors = |idx: usize| -> Vec<usize> {
+            let pos = fixture.position(idx);
+            SPREAD_DIRECTIONS
+                .into_iter()
+                .filter_map(|dir| {
+                    resolve_neighbor_static(
+                        pos,
+                        dir,
+                        fixture.width,
+                        fixture.height,
+                        fixture.edge_mode,
+                    )
+                })
+                .map(|p| usize::from(p.y) * usize::from(fixture.width) + usize::from(p.x))
+                .filter(|&target| !is_barrier(target))
+                .collect()
+        };
+        let mut inhibited = vec![false; cells];
+
+        for (type_number, density) in fixture.densities.iter().enumerate() {
+            let type_raw = type_number as u16;
+            let type_idx = OrdinaryFoodTypeId::new(type_raw);
+            let food_type = &fixture.config.types[type_number];
+            let g = food_type.growth_rate.unwrap_or(shared.growth_rate);
+            let inhibitor = inhibitors[type_number];
+            // (base fertility, penalty) at a cell for this type.
+            let fertility_terms = |idx: usize| {
+                let base = grazing(idx, type_raw);
+                let penalty =
+                    (weighted_sum(idx) - density[idx].clamp(0.0, max) * inhibitor).max(0.0);
+                (base, penalty)
+            };
+            let mut own = vec![0.0f32; cells];
+            let mut sum = vec![0.0f32; cells];
+            let mut senders: Vec<Vec<usize>> = vec![Vec::new(); cells];
+            for idx in 0..cells {
+                let source = density[idx].clamp(0.0, max);
+                if is_barrier(idx) || source <= 0.0 {
+                    continue;
+                }
+                let (base, penalty) = fertility_terms(idx);
+                let fertility = (base - penalty).max(0.0);
+                let local_base = source * g * base;
+                let local_after = source * g * fertility;
+                let local_delta = local_after * multiplier(idx);
+                if local_base > local_after && penalty > 0.0 {
+                    inhibited[idx] = true;
+                }
+                report.suppressed_by_inhibition += (local_base - local_after).max(0.0);
+                report.suppressed_by_occupancy += (local_after - local_delta).max(0.0);
+                own[idx] = source + local_delta;
+                sum[idx] += own[idx];
+                if source < threshold || local_after <= 0.0 {
+                    continue;
+                }
+                let candidates = neighbors(idx);
+                if candidates.is_empty() {
+                    report.empty_candidate_list = true;
+                    continue;
+                }
+                let draw = food_draw(
+                    key,
+                    fixture.tick,
+                    type_idx,
+                    DrawPurpose::SpreadTarget,
+                    idx as u64,
+                );
+                let target = candidates[in_range(draw, candidates.len())];
+                let (target_base, target_penalty) = fertility_terms(target);
+                let target_fertility = (target_base - target_penalty).max(0.0);
+                let spread_base = local_base * shared.spread_density_ratio * target_base;
+                let spread_after = local_after * shared.spread_density_ratio * target_fertility;
+                let spread_delta = spread_after * multiplier(target);
+                if spread_base > spread_after && target_penalty > 0.0 {
+                    inhibited[target] = true;
+                }
+                report.suppressed_by_inhibition += (spread_base - spread_after).max(0.0);
+                report.suppressed_by_occupancy += (spread_after - spread_delta).max(0.0);
+                report.modified_delivery |=
+                    spread_delta < local_after * shared.spread_density_ratio;
+                sum[target] += spread_delta;
+                senders[target].push(idx);
+                report.repeated_candidate_delivery |= target == idx
+                    || candidates.iter().filter(|&&entry| entry == target).count() > 1;
+                let (source_pos, target_pos) = (fixture.position(idx), fixture.position(target));
+                if source_pos.x.abs_diff(target_pos.x) > 1
+                    || source_pos.y.abs_diff(target_pos.y) > 1
+                {
+                    report.wrapped_delivery = true;
+                }
+                report.delivery_to_later_occupied_cell |=
+                    target > idx && density[target] > 0.0 && own[target] < max;
+            }
+            let type_total: f32 = density.iter().sum();
+            let spawn_rate = food_type
+                .recovery_spawn_rate
+                .unwrap_or(shared.recovery_spawn_rate);
+            if type_total / (cells as f32 * max) < shared.recovery_floor_ratio && spawn_rate > 0.0 {
+                let attempts = (cells as f32 * spawn_rate).round() as usize;
+                for attempt in 0..attempts {
+                    let draw = food_draw(
+                        key,
+                        fixture.tick,
+                        type_idx,
+                        DrawPurpose::RecoveryCell,
+                        attempt as u64,
+                    );
+                    let idx = in_range(draw, cells);
+                    if is_barrier(idx) {
+                        continue;
+                    }
+                    let (base, penalty) = fertility_terms(idx);
+                    let recovery_base = max * g * base;
+                    let recovery_after = max * g * (base - penalty).max(0.0);
+                    let recovery_delta = recovery_after * multiplier(idx);
+                    if recovery_base > recovery_after && penalty > 0.0 {
+                        inhibited[idx] = true;
+                    }
+                    report.suppressed_by_inhibition += (recovery_base - recovery_after).max(0.0);
+                    report.suppressed_by_occupancy += (recovery_after - recovery_delta).max(0.0);
+                    report.recovery_spawned = true;
+                    sum[idx] += recovery_delta;
+                }
+            }
+            report.shared_target |= senders.iter().any(|from| from.len() > 1);
+            report.clamp_bound |= sum.iter().any(|&value| value > max);
+            report
                 .expected
                 .push(sum.into_iter().map(|value| value.clamp(0.0, max)).collect());
         }
-        gather
+        report.inhibited_cells = inhibited.iter().filter(|flag| **flag).count() as u32;
+        report
+    }
+
+    /// Runs `fixture` through `grow` and the oracle; asserts every cell's
+    /// density, the inhibited-cell count and both suppression totals agree.
+    fn assert_grow_matches_oracle(fixture: &OracleFixture) -> OracleReport {
+        let catalog = OrdinaryFoodCatalog::new(&fixture.config);
+        let mut state = OrdinaryFoodState::new(fixture.width, fixture.height, catalog.len());
+        let mut barriers = barrier_grid(fixture.width, fixture.height);
+        for &idx in &fixture.barriers {
+            let pos = fixture.position(idx);
+            barriers.set(pos.x, pos.y, true);
+        }
+        let mut occupancy = occupancy_grid::<()>(fixture.width, fixture.height);
+        for &idx in &fixture.occupied {
+            let pos = fixture.position(idx);
+            occupancy.set(pos.x, pos.y, Some(()));
+        }
+        for &(idx, type_raw, bites) in &fixture.bites {
+            let pos = fixture.position(idx);
+            for _ in 0..bites {
+                state.grazing_mut().bite(
+                    pos.x,
+                    pos.y,
+                    OrdinaryFoodTypeId::new(type_raw),
+                    &fixture.config.shared.grazing,
+                );
+            }
+        }
+        for (type_number, density) in fixture.densities.iter().enumerate() {
+            for (idx, &value) in density.iter().enumerate() {
+                state.set_food_type_density(
+                    fixture.position(idx),
+                    OrdinaryFoodTypeId::new(type_number as u16),
+                    value,
+                );
+            }
+        }
+        let report = per_cell_oracle(fixture);
+
+        let summary = grow(
+            &mut state,
+            &catalog,
+            &fixture.config.shared,
+            &fixture.config,
+            &mut OccupancyDepletionLayer::new(fixture.width, fixture.height),
+            &mut GrowthScratch::default(),
+            &barriers,
+            &occupancy,
+            fixture.edge_mode,
+            fixture.tick,
+            FoodStreamKey::from_run_seed(fixture.seed),
+        );
+
+        for (type_number, expected) in report.expected.iter().enumerate() {
+            for (idx, &want) in expected.iter().enumerate() {
+                let pos = fixture.position(idx);
+                let got = state.food_at_type(pos, OrdinaryFoodTypeId::new(type_number as u16));
+                assert!(
+                    (got - want).abs() <= 1e-5 * want.max(1.0),
+                    "type {type_number} cell ({}, {}): got {got}, want {want}",
+                    pos.x,
+                    pos.y
+                );
+            }
+        }
+        assert_eq!(summary.cells_with_type_inhibition, report.inhibited_cells);
+        for (got, want, what) in [
+            (
+                summary.growth_suppressed_by_type_inhibition,
+                report.suppressed_by_inhibition,
+                "inhibition",
+            ),
+            (
+                summary.growth_suppressed_by_occupancy_depletion,
+                report.suppressed_by_occupancy,
+                "occupancy",
+            ),
+        ] {
+            assert!(
+                (got - want).abs() <= 1e-5 * want.max(1.0),
+                "suppressed by {what}: got {got}, want {want}"
+            );
+        }
+        report
     }
 
     #[test]
@@ -1497,11 +1958,10 @@ mod tests {
         config.shared.max_density = 1.0;
         config.shared.recovery_spawn_rate = 0.25;
         config.shared.recovery_floor_ratio = 1.0;
-        let catalog = OrdinaryFoodCatalog::new(&config);
-        let mut barriers = barrier_grid(WIDTH, HEIGHT);
-        barriers.set(1, 1, true);
+        let mut fixture = OracleFixture::new(WIDTH, HEIGHT, WorldEdgeMode::Wrap, config);
+        fixture.barriers = vec![5];
         #[rustfmt::skip]
-        let before = vec![
+        let densities = vec![
             vec![
                 0.9, 0.3, 0.0, 0.9,
                 0.3, 0.0, 0.9, 0.3,
@@ -1513,57 +1973,207 @@ mod tests {
                 0.0, 0.3, 0.9, 0.3,
             ],
         ];
-        let mut state = OrdinaryFoodState::new(WIDTH, HEIGHT, catalog.len());
-        for (type_number, density) in before.iter().enumerate() {
-            for (idx, &value) in density.iter().enumerate() {
-                let pos = Position::new(idx as u16 % WIDTH, idx as u16 / WIDTH);
-                state.set_food_type_density(
-                    pos,
-                    OrdinaryFoodTypeId::new(type_number as u16),
-                    value,
-                );
-            }
-        }
-        let seed = 7;
-        let gather = gather_per_cell_rule(
-            &before,
-            &barriers,
-            &config.shared,
-            &mut StdRng::seed_from_u64(seed),
-        );
+        fixture.densities = densities;
+        fixture.seed = 7;
 
-        grow_once(
-            &mut state,
-            &catalog,
-            &config,
-            &barriers,
-            WorldEdgeMode::Wrap,
-            seed,
-        );
+        let report = assert_grow_matches_oracle(&fixture);
 
         assert!(
-            gather.wrapped_delivery,
+            report.wrapped_delivery,
             "fixture must deliver across a wrapped edge"
         );
         assert!(
-            gather.clamp_bound,
+            report.clamp_bound,
             "fixture must bind the max_density clamp"
         );
+        assert!(report.recovery_spawned, "fixture must spawn recovery");
         assert!(
-            gather.delivery_lost_to_assignment,
+            report.delivery_to_later_occupied_cell,
             "fixture must spread onto an occupied later-visited cell with headroom"
         );
-        for (type_number, expected) in gather.expected.iter().enumerate() {
-            for (idx, &want) in expected.iter().enumerate() {
-                let pos = Position::new(idx as u16 % WIDTH, idx as u16 / WIDTH);
-                let got = state.food_at_type(pos, OrdinaryFoodTypeId::new(type_number as u16));
-                assert!(
-                    (got - want).abs() < 1e-6,
-                    "type {type_number} cell ({}, {}): got {got}, want {want}",
-                    pos.x,
-                    pos.y
-                );
+    }
+
+    /// Every mechanism the gather reads on: grazing (bitten cells), occupancy
+    /// depletion (occupied cells), two inhibiting types, a barrier, a type
+    /// below its recovery floor, on a wrapped grid.
+    #[test]
+    fn growth_pass_matches_the_per_cell_oracle_with_every_mechanism_enabled() {
+        let mut config = plain_growth_config(2);
+        config.shared.grazing = crate::config::GrazingConfig {
+            recovery_ticks: 50,
+            ..crate::config::GrazingConfig::default()
+        };
+        config.shared.occupancy_depletion.enabled = true;
+        config.shared.occupancy_depletion.deposit_per_occupied_tick = 0.6;
+        config.shared.growth_rate = 0.4;
+        config.shared.spread_density_ratio = 0.8;
+        config.shared.spread_threshold_ratio = 0.5;
+        config.shared.max_density = 1.0;
+        config.shared.recovery_floor_ratio = 0.2;
+        config.types[0].growth_inhibitor = 0.3;
+        config.types[1].growth_inhibitor = 0.6;
+        config.types[1].recovery_spawn_rate = Some(0.3);
+        let mut fixture = OracleFixture::new(6, 5, WorldEdgeMode::Wrap, config);
+        let cells = fixture.cells();
+        fixture.densities[0] = (0..cells)
+            .map(|idx| [0.95, 0.7, 0.0, 0.55, 0.2][idx % 5])
+            .collect();
+        // Type 1 sits below its recovery floor but still inhibits type 0.
+        fixture.densities[1] = (0..cells)
+            .map(|idx| if idx % 7 == 0 { 0.6 } else { 0.0 })
+            .collect();
+        fixture.barriers = vec![8, 21];
+        fixture.occupied = (0..cells).filter(|idx| idx % 3 == 1).collect();
+        fixture.bites = (0..cells)
+            .filter(|idx| idx % 4 == 2)
+            .map(|idx| (idx, 0, 1 + (idx % 3) as u32))
+            .collect();
+
+        let mut seen = OracleReport::default();
+        for (seed, tick) in [(3, 0), (5, 1), (8, 17)] {
+            fixture.seed = seed;
+            fixture.tick = tick;
+            let report = assert_grow_matches_oracle(&fixture);
+            seen.modified_delivery |= report.modified_delivery;
+            seen.recovery_spawned |= report.recovery_spawned;
+            seen.shared_target |= report.shared_target;
+            seen.wrapped_delivery |= report.wrapped_delivery;
+            seen.inhibited_cells += report.inhibited_cells;
+            seen.suppressed_by_occupancy += report.suppressed_by_occupancy;
+        }
+        assert!(
+            seen.modified_delivery,
+            "a delivery must be reduced at its target"
+        );
+        assert!(seen.recovery_spawned, "recovery must spawn");
+        assert!(seen.shared_target, "two sources must deliver to one target");
+        assert!(
+            seen.wrapped_delivery,
+            "a delivery must cross a wrapped edge"
+        );
+        assert!(seen.inhibited_cells > 0, "inhibition must bind");
+        assert!(seen.suppressed_by_occupancy > 0.0, "depletion must bind");
+    }
+
+    /// Two neighbours that can only pick the middle cell, whose own growth
+    /// plus both contributions exceeds `max_density`.
+    #[test]
+    fn two_sources_overflowing_one_target_clamp_once() {
+        let mut config = plain_growth_config(1);
+        config.shared.growth_rate = 0.5;
+        config.shared.spread_density_ratio = 1.0;
+        config.shared.spread_threshold_ratio = 0.5;
+        config.shared.max_density = 1.0;
+        let mut fixture = OracleFixture::new(3, 1, WorldEdgeMode::Bounded, config);
+        fixture.densities[0] = vec![0.8, 0.4, 0.8];
+        // Cell 1 is below the threshold, so it spreads nowhere.
+        let report = assert_grow_matches_oracle(&fixture);
+        assert!(report.shared_target && report.clamp_bound);
+        assert_eq!(report.expected[0][1], 1.0);
+    }
+
+    /// Narrow wrapped grids where a cell is two of its neighbour's
+    /// neighbours, or its own neighbour: the source's candidate list keeps
+    /// the repeats and the target counts the one contribution once.
+    #[test]
+    fn narrow_wrapped_grids_count_a_repeated_source_once() {
+        for (width, height) in [(1, 1), (1, 2), (2, 1), (2, 2), (1, 5), (5, 1)] {
+            let mut config = plain_growth_config(1);
+            config.shared.growth_rate = 0.25;
+            config.shared.spread_density_ratio = 0.5;
+            config.shared.spread_threshold_ratio = 0.1;
+            config.shared.max_density = 10.0;
+            let mut fixture = OracleFixture::new(width, height, WorldEdgeMode::Wrap, config);
+            let cells = fixture.cells();
+            fixture.densities[0] = (0..cells).map(|idx| 1.0 + idx as f32 * 0.5).collect();
+            let mut repeated = false;
+            for seed in 0..16 {
+                fixture.seed = seed;
+                repeated |= assert_grow_matches_oracle(&fixture).repeated_candidate_delivery;
             }
+            assert!(
+                repeated,
+                "{width}x{height}: no delivery to a repeated candidate"
+            );
+        }
+    }
+
+    /// A spreading cell with no passable neighbour sends nothing and keeps
+    /// its own growth: a bounded 1x1 world and a wrapped cell walled in by barriers.
+    #[test]
+    fn a_cell_with_an_empty_candidate_list_keeps_only_its_own_growth() {
+        let mut config = plain_growth_config(1);
+        config.shared.growth_rate = 0.5;
+        config.shared.spread_density_ratio = 1.0;
+        config.shared.spread_threshold_ratio = 0.1;
+        config.shared.max_density = 10.0;
+        let mut single = OracleFixture::new(1, 1, WorldEdgeMode::Bounded, config.clone());
+        single.densities[0] = vec![2.0];
+        let report = assert_grow_matches_oracle(&single);
+        assert!(report.empty_candidate_list);
+        assert_eq!(report.expected[0][0], 3.0);
+
+        let mut walled = OracleFixture::new(3, 3, WorldEdgeMode::Wrap, config);
+        walled.densities[0][4] = 2.0;
+        walled.barriers = vec![1, 3, 5, 7];
+        let report = assert_grow_matches_oracle(&walled);
+        assert!(report.empty_candidate_list);
+        assert_eq!(report.expected[0][4], 3.0);
+        assert_eq!(report.expected[0].iter().sum::<f32>(), 3.0);
+    }
+
+    /// On a uniform saturated wrapped patch every cell spreads; the keyed
+    /// picks share the four directions (fixed seed, a count bound, not a
+    /// distribution proof).
+    #[test]
+    fn spread_targets_on_a_saturated_patch_share_the_four_directions() {
+        const SIDE: u16 = 64;
+        let mut config = plain_growth_config(1);
+        config.shared.max_density = 1.0;
+        config.shared.spread_threshold_ratio = 0.5;
+        config.shared.growth_rate = 0.1;
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let mut state = OrdinaryFoodState::new(SIDE, SIDE, catalog.len());
+        for y in 0..SIDE {
+            for x in 0..SIDE {
+                state.set_food_type_density(Position::new(x, y), OrdinaryFoodTypeId::new(0), 1.0);
+            }
+        }
+        let mut scratch = GrowthScratch::default();
+        grow(
+            &mut state,
+            &catalog,
+            &config.shared,
+            &config,
+            &mut OccupancyDepletionLayer::new(SIDE, SIDE),
+            &mut scratch,
+            &barrier_grid(SIDE, SIDE),
+            &occupancy_grid::<()>(SIDE, SIDE),
+            WorldEdgeMode::Wrap,
+            3,
+            FoodStreamKey::from_run_seed(11),
+        );
+        let mut by_direction = [0u32; 4];
+        for (idx, pick) in scratch.picks().enumerate() {
+            let target = pick.expect("every saturated cell spreads");
+            let source = Position::new(idx as u16 % SIDE, idx as u16 / SIDE);
+            let direction = SPREAD_DIRECTIONS
+                .into_iter()
+                .position(|dir| {
+                    resolve_neighbor_static(source, dir, SIDE, SIDE, WorldEdgeMode::Wrap)
+                        .is_some_and(|p| {
+                            usize::from(p.y) * usize::from(SIDE) + usize::from(p.x) == target
+                        })
+                })
+                .expect("the pick is a neighbour");
+            by_direction[direction] += 1;
+        }
+        let cells = u32::from(SIDE) * u32::from(SIDE);
+        for (direction, count) in by_direction.into_iter().enumerate() {
+            assert!(
+                (cells * 22 / 100..=cells * 28 / 100).contains(&count),
+                "direction {direction}: {count} of {cells} ({by_direction:?})"
+            );
         }
     }
 

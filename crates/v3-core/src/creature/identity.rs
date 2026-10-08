@@ -46,7 +46,8 @@ impl CreatureIdentityState {
 }
 
 /// splitmix64 finalizer — deterministic hash for seed derivation.
-fn splitmix64(mut x: u64) -> u64 {
+/// Also the per-cell hash of the food stream (T24.F02).
+pub(crate) fn splitmix64(mut x: u64) -> u64 {
     x = x.wrapping_add(0x9e3779b97f4a7c15);
     x = (x ^ (x >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
     x = (x ^ (x >> 27)).wrapping_mul(0x94d049bb133111eb);

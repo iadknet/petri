@@ -204,6 +204,7 @@ mod tests {
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(42),
+            food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(42),
         };
         (sim, id)
     }
@@ -417,6 +418,7 @@ mod tests {
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(0),
+            food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(0),
         };
         {
             let creature = sim.creatures.get_mut(id1).unwrap();
@@ -599,6 +601,7 @@ mod tests {
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(0),
+            food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(0),
         };
         let mut rng = rand::rngs::SmallRng::seed_from_u64(2);
         let result = apply_reproduce(parent, &mut sim, Direction::N, 0.5, &mut rng);
@@ -1250,6 +1253,7 @@ mod tests {
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(0),
+            food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(0),
         };
         let creature = sim.creatures.get_mut(id1).unwrap();
         let result = apply_move(
@@ -1384,6 +1388,7 @@ mod tests {
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(42),
+            food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(42),
         };
         (sim, id)
     }
