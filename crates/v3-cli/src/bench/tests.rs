@@ -76,9 +76,10 @@ fn companion_reports_share_final_population_and_do_not_change_comparisons() {
 fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // Arrange: a 32x32 world with 8 founders over 250 ticks, past the
     // founding crash near tick 150, so the horizon population is a
-    // recovered one whose readings differ from tick 100's. Seed 13 was
-    // measured to survive the horizon.
-    const SEED: u64 = 13;
+    // recovered one whose readings differ from tick 100's. Seed 1 was
+    // measured to survive the horizon; T03.F12 moved it from 13, which its
+    // reproductive hold sends extinct before tick 250.
+    const SEED: u64 = 1;
     const HORIZON: u64 = 250;
     let config = build_config(&ProfileParams {
         recipe: None,
@@ -159,7 +160,9 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
 
 #[test]
 fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpoint() {
-    const SEED: u64 = 13;
+    // T03.F12 moved this from seed 13, extinct before the horizon under the
+    // reproductive hold.
+    const SEED: u64 = 1;
     const HORIZON: u64 = 250;
     let config = build_config(&ProfileParams {
         recipe: None,
@@ -279,14 +282,17 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
 
 #[test]
 fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
-    // Evolved-trajectory pin. T24.F02 moves this pin from seed 2 to 0: with
+    // Evolved-trajectory pin. T03.F12 moves this pin from seed 0 to 1: under
+    // the reproductive hold seed 0 goes extinct, while seed 1 keeps 3
+    // creatures over 3 cells (the lowest seed that keeps at least 2 over at
+    // least 2; 7 of seeds 0..=40 go extinct). T24.F02 moved it from seed 2 to 0: with
     // food on the keyed stream seed 2 ends with 1 creature on one cell, while
     // seed 0 keeps 6 creatures over 5 cells (the lowest seed that keeps at
     // least 2 over at least 2; 9 of seeds 0..=25 go extinct and 6 end on one
     // cell). T24.F01 had moved it from seed 1 to 2, T19.F04 from 3 to 1 (its
     // vote founder sent seed 3 extinct), T11.F23 from 1 to 3, T16.F01 from 18
     // to 1, T11.F21 from 13 to 18.
-    const SEED: u64 = 0;
+    const SEED: u64 = 1;
     const HORIZON: u64 = 250;
     let config = build_config(&ProfileParams {
         recipe: None,

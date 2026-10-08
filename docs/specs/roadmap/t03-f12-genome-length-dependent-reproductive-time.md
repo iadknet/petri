@@ -133,13 +133,13 @@ and the charges on parents removed in Phase 0 before a held slot.
 
 ## Implementation Tasks
 
-- [ ] Config field renamed to `reproductive_hold_ticks_per_founder_genome`
+- [x] Config field renamed to `reproductive_hold_ticks_per_founder_genome`
       (default function, `normalize`, missing-field test); the span helper
       renamed with its tests (unit, proptest equality to `div_ceil(97)` at
       rate 1.0, monotone, rate `0.0` gives 0); `Spawned` restored; the four
       pin sets re-pinned after two agreeing runs, each reproducing its
       pre-feature digest at rate `0.0`.
-- [ ] Form A in `tick.rs` and `creature/state.rs`: `held_until_tick` set in
+- [x] Form A in `tick.rs` and `creature/state.rs`: `held_until_tick` set in
       `execute_reproduce` after a spawn, the skip at the top of the Phase 2
       slot with the dead-held-creature removal, the two counters; the pending
       birth, delivery, loss paths, six counters, `gestation_lost` flow and
@@ -147,11 +147,11 @@ and the charges on parents removed in Phase 0 before a held slot.
       tick, two-founder genome two), the same-queue reset, cognition charged
       while held, no action log while held, the dead-held removal, the count
       identity, and rate `0.0` equivalence.
-- [ ] Telemetry wiring for the two counters (families, test rows,
+- [x] Telemetry wiring for the two counters (families, test rows,
       dashboards-check names, the `actions` phase attribute renamed); the
       `reproductive_hold` report block in `tracking.rs` and
       `KEPT_CASE_BLOCKS`.
-- [ ] Frontend row and fixtures renamed; `v3-runtime-config-spec.md` and
+- [x] Frontend row and fixtures renamed; `v3-runtime-config-spec.md` and
       `v3-reproduction-spec.md` rewritten for the hold (97-unit founder text).
 - [ ] Verification runs below on the form-A code: viability first,
       `make check`, gate and goal profiles, the long Canyon run, the overhead
@@ -160,14 +160,16 @@ and the charges on parents removed in Phase 0 before a held slot.
 ## Verification
 
 Every item below is read on the form-A code; the form-B results
-(`f380899e`) are the "Build verification" and "Benchmark readings (form B)"
-sections of the readings file and verify nothing here.
+(`f380899e`) are the "Build verification (form B)" and "Benchmark readings
+(form B)" sections of the readings file and verify nothing here. `make check`
+fails one test, the gate series check, against the form-B gate summary still
+in the series (readings, "Build verification (form A)").
 
-- [ ] `cargo test -p v3-core --test viability` (first) -> result in
+- [x] `cargo test -p v3-core --test viability` (first) -> result in
       [`docs/progress/readings/t03-f12.md`](../../progress/readings/t03-f12.md).
-- [ ] Focused tests: `cargo test -p v3-core --lib reproductive_hold` and the
+- [x] Focused tests: `cargo test -p v3-core --lib reproductive_hold` and the
       fixtures named above -> names and results in the readings file.
-- [ ] `cargo test -p v3-core --test applied_trajectory` twice (digests agree,
+- [x] `cargo test -p v3-core --test applied_trajectory` twice (digests agree,
       re-pinned; the rate-`0.0` case reproduces the pre-feature digests),
       `--test baseline_worlds`, `--test viability` founder-only digest,
       `cargo test -p v3-cli --test bench_artifacts` -> readings file.

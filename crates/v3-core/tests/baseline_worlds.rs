@@ -103,22 +103,24 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// accumulate at ecology.rs line 495); restoring the assignment alone restores
 /// the old hash. T24.F02 re-pinned it: food draws come from the keyed
 /// per-cell stream instead of the run RNG. T03.F12 re-pinned it after two
-/// agreeing runs (every birth delivered one founder gestation later); at
-/// gestation rate 0.0 the T24.F02 hash holds, the kept equivalence check.
+/// agreeing runs (every spawning parent held for its reproductive hold); at
+/// hold rate 0.0 the T24.F02 hash holds, the kept equivalence check.
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 1086311951226638661);
+    assert_eq!(short_run_identity(None), 3434879671542179552);
     assert_eq!(short_run_identity(Some(0.0)), 8324800200600234214);
 }
 
-/// The short-run identity hash at the default gestation rate or `rate`.
-fn short_run_identity(gestation_rate: Option<f32>) -> u64 {
+/// The short-run identity hash at the default reproductive hold rate or `rate`.
+fn short_run_identity(hold_rate: Option<f32>) -> u64 {
     use std::hash::{Hash, Hasher};
     use v3_core::contracts::Position;
     use v3_core::simulation::{run_tick, seed_simulation};
     let mut cfg = SimulationConfig::default();
-    if let Some(rate) = gestation_rate {
-        cfg.energy.lifecycle.gestation_ticks_per_founder_genome = rate;
+    if let Some(rate) = hold_rate {
+        cfg.energy
+            .lifecycle
+            .reproductive_hold_ticks_per_founder_genome = rate;
     }
     cfg.world.width = 48;
     cfg.world.height = 48;

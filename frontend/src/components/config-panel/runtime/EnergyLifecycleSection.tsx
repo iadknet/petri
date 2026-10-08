@@ -40,14 +40,14 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 			"Per-birth multiplier on the parent's reproduce charge: 1 + rate \u00d7 units of genome_size() above the founder's 97",
 	},
 	{
-		path: "energy.lifecycle.gestation_ticks_per_founder_genome",
-		label: "Gestation Ticks / Founder Genome",
+		path: "energy.lifecycle.reproductive_hold_ticks_per_founder_genome",
+		label: "Reproductive Hold Ticks / Founder Genome",
 		min: 0,
 		max: 10,
 		step: 0.1,
 		defaultValue: 1.0,
 		tooltip:
-			"Ticks a parent gestates before its child is born: ceil(rate \u00d7 genome_size() / 97); it acts on none of them and a death loses the litter. 0 delivers at once",
+			"Ticks a parent is held after each birth: ceil(rate \u00d7 genome_size() / 97); it acts on none of them. 0 disables the hold",
 	},
 	{
 		path: "energy.lifecycle.min_reproduce_energy",
