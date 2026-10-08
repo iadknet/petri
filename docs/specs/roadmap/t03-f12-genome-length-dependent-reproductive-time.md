@@ -162,7 +162,7 @@ and the charges on parents removed in Phase 0 before a held slot.
 Every item below is read on the form-A code; the form-B results
 (`f380899e`) are the "Build verification (form B)" and "Benchmark readings
 (form B)" sections of the readings file and verify nothing here. `make check`
-fails one test, the gate series check, against the form-B gate summary still
+(rerun after the self-review refactor) fails one test, the gate series check, against the form-B gate summary still
 in the series (readings, "Build verification (form A)").
 
 - [x] `cargo test -p v3-core --test viability` (first) -> result in

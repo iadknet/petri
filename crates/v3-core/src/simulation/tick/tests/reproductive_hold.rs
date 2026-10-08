@@ -7,8 +7,7 @@ use crate::contracts::{CreatureId, Direction, WorldAction};
 use crate::creature::action_log::ActionLog;
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
 use crate::creature::genome::OutcomeChannel;
-use crate::runtime::trace::domain::TerminationReason;
-use crate::runtime::types::{ComputeCostReport, MeshOutput};
+use crate::runtime::types::MeshOutput;
 use crate::simulation::energy_accounting::CognitionEnergyObservation;
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::tick::{run_phase_2, run_tick};
@@ -21,18 +20,6 @@ const fn reproduce(direction: Direction) -> WorldAction {
     WorldAction::Reproduce {
         direction,
         energy_transfer_fraction: 0.25,
-    }
-}
-
-fn decision(actions: Vec<WorldAction>, cognition: CognitionEnergyObservation) -> MeshOutput {
-    MeshOutput {
-        actions,
-        cost_report: ComputeCostReport::default(),
-        priority_bid: 0.0,
-        work_counters: Default::default(),
-        energy_observation: cognition,
-        termination_reason: TerminationReason::NoDecision,
-        commit_counts: Default::default(),
     }
 }
 
@@ -75,7 +62,13 @@ fn slot_with(
     }
     run_phase_2(
         sim,
-        vec![(id, decision(actions, cognition))],
+        vec![(
+            id,
+            MeshOutput {
+                energy_observation: cognition,
+                ..decision(actions)
+            },
+        )],
         &mut outcomes,
         &mut SmallRng::seed_from_u64(tick),
     );
