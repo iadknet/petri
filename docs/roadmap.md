@@ -39,7 +39,7 @@ feature whose closure moved it.
 - [x] **T21 — Run Observability and Execution Tracing** — [Roadmap](roadmaps/t21-run-observability-and-execution-tracing.md) — Depends on: None
 - [ ] **T22 — Capability Assays and Evolvability Lab** — [Roadmap](roadmaps/t22-capability-assays-and-evolvability-lab.md) — Depends on: None
 - [ ] **T23 — Behavior and Cognition Readings** — [Roadmap](roadmaps/t23-behavior-and-cognition-readings.md) — Depends on: None
-- [ ] **T24 — Simulation Throughput** — [Roadmap](roadmaps/t24-simulation-throughput.md) — Depends on: None
+- [x] **T24 — Simulation Throughput** — [Roadmap](roadmaps/t24-simulation-throughput.md) — Depends on: None
 
 ## Final Success Criteria
 

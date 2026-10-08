@@ -1,7 +1,7 @@
 # T24 — Simulation Throughput
 
-**Status**: In Progress
-**Last updated**: 2026-10-06
+**Status**: Complete
+**Last updated**: 2026-10-07
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -24,13 +24,13 @@ rewrite builds on the documented rule rather than on a loop-order artifact.
   visited in, as `docs/reference/v3-world-grid-spec.md` §5 already specifies,
   and the repair's ecological effect is read on the gate and goal profiles on
   its own.
-- [ ] Food regrowth on the default 1600-by-1600 world runs on the rayon pool,
+- [x] Food regrowth on the default 1600-by-1600 world runs on the rayon pool,
   and at 8 threads its food-growth time per tick (T24.F03's phase) is at most
   half the parent build's on the same host.
-- [ ] Seeded runs stay byte-identical across processes and thread counts with
+- [x] Seeded runs stay byte-identical across processes and thread counts with
   every parallel path the track adds exercised by
   `crates/v3-core/tests/reproducibility.rs`.
-- [ ] Apart from T24.F01's repair, no T24 closure changes a world rule, default
+- [x] Apart from T24.F01's repair, no T24 closure changes a world rule, default
   or config field. A trajectory move comes only from a changed random stream or
   summation order, is predeclared in the feature spec, and closes under the
   epoch re-pin rule.
@@ -156,3 +156,18 @@ rewrite builds on the documented rule rather than on a loop-order artifact.
   feature runs the ordinary gate and goal profiles, mutation gate and Codex
   review; no Benchmark gate exemption covers T24.
 - Priority: not in the order of new starts until the user places it.
+- Closure, 2026-10-07: all three rows closed in order (T24.F03 at 4743416a,
+  T24.F01 at 3b904894, T24.F02 at 4763a1ec); `grow` is no longer the code the
+  ad1f97f0 note above describes. Criterion 3: interleaved pairs at 8 threads on
+  the default world against main 3b904894, median food-growth ratio 0.324
+  (6 of 6 pairs; readings `docs/progress/readings/t24-f02.md`); goal-profile
+  food growth fell to 0.31–0.37× of T24.F01 per tick. Criterion 4:
+  `reproducibility.rs` runs the keyed, row-parallel food path in 1-, 4- and
+  8-thread pools with bit-equal grids and per-type totals, the pinned
+  trajectory digests cover cross-process identity, and the `density_total`
+  reduction's thread independence is checked by an `ecology.rs` unit test,
+  since no run-level output reads it. Criterion 5: the Codex reviews confirmed
+  no rule, default or config change beyond T24.F01's repair; T24.F01 re-pinned
+  the goal-worlds epoch and T24.F02 the gate epoch, both predeclared. Recorded
+  exceptions: T24.F03's overhead check was inconclusive (accepted by the user),
+  and T24.F02's tests followed its rewrite (TDD order accepted by the user).
