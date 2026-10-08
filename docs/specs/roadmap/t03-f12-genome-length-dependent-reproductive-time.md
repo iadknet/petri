@@ -168,19 +168,26 @@ and the charges on parents removed in Phase 0 before a held slot.
       -> readings file.
 - [ ] `make check` -> exit 0; `scripts/telemetry-dashboards-check` passes
       with the six new counter names; `scripts/telemetry-overhead` on the existing
-      stack under the 1.10 ceiling -> readings file. `make check` exits 0;
-      the two telemetry scripts are not yet run.
-- [ ] Long Canyon run (predeclaration below): raw `canyon.ndjson` and
+      stack under the 1.10 ceiling -> readings file. `make check` exits 0.
+      Benchmark specialist, 2026-10-08: `scripts/telemetry-dashboards-check`
+      exit 0, "all checks passed"; `scripts/telemetry-overhead` exit 0 with
+      verdict **inconclusive** (spread 0.1971 sets 32 pairs at 5,378 ms per
+      run, which do not fit the 300 s cap; 0 pairs run, 24.1 s used; not
+      rerun). The ceiling is unmeasured and is reported to the user.
+- [x] Long Canyon run (predeclaration below): raw `canyon.ndjson` and
       `canyon-config.json` under the main checkout's ignored
       `.bench-artifacts/t03-f12-genome-length-dependent-reproductive-time/canyon/`;
       committed under `docs/progress/sweeps/t03-f12/` only `run.sh`,
       `timing.txt` and `canyon-samples.md` (population, `mean_genome_size`,
       `mean_generation`, `mean_mesh_nodes` at every 2,500th tick and at the
       first sample past 36,652, with the raw file's SHA-256 and byte count).
+      Run 2026-10-08: exit 0, 1,604 s wall of 14,400 s, population above zero
+      at all 80 samples (minimum 1,110, final 1,122); raw 332,377 bytes,
+      SHA-256 `b674b579…8c14`; evidence `docs/progress/sweeps/t03-f12/canyon-samples.md`.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       full survivor list stays here.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t03-f12-genome-length-dependent-reproductive-time.json`
       and `-goal.json`, local raw hash/byte count and verification time
       checked, series entries point to the summaries, no new full report
@@ -221,7 +228,31 @@ indicator not in the table is reported with no direction.
 | Founder neighborhood, drift walk, `recruitment_paths` blocks | T24.F02 goal | Byte-identical, field for field. |
 | Observation budgets | Workflow caps (`measurement_evidence.wall_caps`) | Founder neighborhood below 10 s; summed evolved below 180 s; neighborhood read below 10 s summed; drift walk below 30 s; `recruitment_paths` below 120 s per report (T24.F02 measured 240.2 s against it with no recorded disposition, T24.F01 13.0 s; the breach is reported to the user with this closure and this run's value is read against host load); goal run below 15 minutes. |
 
-**Measured verdict.** Pending.
+**Measured verdict (benchmark specialist, 2026-10-08, HEAD f380899e; numbers in
+the readings file, "Benchmark readings").**
+
+- Gate: `make bench PROFILE=gate ...` make exit 0, CLI exit 0, `severe` false
+  against the T24.F02 gate, all nine counters `ok`; raw 101,867 bytes.
+- Goal (run once): make exit 2 wrapping v3-cli exit 3 (severe, not success),
+  `severe` **true** against both T24.F01 and T24.F02 (vs T24.F02: vm_steps
+  +145.40%, plasticity_updates +262.49%, decided_passes +73.33%; vs T24.F01:
+  decided_passes +126.09%); raw 643,010,302 bytes. A severe, reported to the
+  user for decision, not absorbed.
+- **Predeclared triggers fired:** (1) Canyon final population 4,042 is under
+  half of T24.F02's 9,165 (retreat to form A and goal re-run); no world
+  extinct, Orchards minimum 28. (2) Canyon `mean_genome_size` at tick 2,000
+  158.14 is above T24.F02's 151.54 (contrary size result), and its units per
+  generation 1.270 are higher than 0.957; Orchards and Confluence are below on
+  both. (3) `neighborhood_read.changed_per_all_births` below the standing floor
+  on Orchards (0.1192 against 0.1464) and Confluence (0.1398 against 0.1434).
+  (4) Orchards `mean_executed_nodes` 2.38 with its size below T24.F02's (core
+  shrinkage investigation). (5) `recruitment_paths` 230.84 s over the 120 s
+  budget (T24.F02 240.2 s). `actions_applied` read up, not down (+11.06%).
+- Gestation started above zero on every world; held share 2.69% / 2.69% /
+  2.96%. Long Canyon: decisive check met (1,604 s of 14,400 s); size 6.91x the
+  founder at 20,000 against E2's 16x. Overhead: inconclusive. Founder
+  neighborhood and drift blocks equal T24.F02's; `recruitment_paths` differs
+  only in the added config leaf and `config_digest`.
 
 - Summaries: [gate](../../progress/features/t03-f12-genome-length-dependent-reproductive-time.json),
   [goal](../../progress/features/t03-f12-genome-length-dependent-reproductive-time-goal.json).

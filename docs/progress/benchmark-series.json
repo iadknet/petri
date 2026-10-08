@@ -65,7 +65,8 @@
       "docs/progress/features/t20-f05-structured-heritable-refinement.json",
       "docs/progress/features/t24-f03-food-growth-phase-timing.json",
       "docs/progress/features/t24-f01-order-free-food-spread.json",
-      "docs/progress/features/t24-f02-parallel-food-regrowth.json"
+      "docs/progress/features/t24-f02-parallel-food-regrowth.json",
+      "docs/progress/features/t03-f12-genome-length-dependent-reproductive-time.json"
     ]
   },
   "goal": {
@@ -150,7 +151,8 @@
       "docs/progress/features/t20-f05-structured-heritable-refinement-goal.json",
       "docs/progress/features/t24-f03-food-growth-phase-timing-goal.json",
       "docs/progress/features/t24-f01-order-free-food-spread-goal.json",
-      "docs/progress/features/t24-f02-parallel-food-regrowth-goal.json"
+      "docs/progress/features/t24-f02-parallel-food-regrowth-goal.json",
+      "docs/progress/features/t03-f12-genome-length-dependent-reproductive-time-goal.json"
     ]
   }
 }
