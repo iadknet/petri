@@ -109,7 +109,7 @@ fn population_fingerprint(sim: &Simulation) -> Vec<CreatureFingerprint<'_>> {
 
 /// The deterministic work counters a report carries: the six compute counters
 /// the benchmark harness compares, plus terminal cognition and exhaustion totals.
-fn work_counters(sim: &Simulation) -> [(&'static str, u64); 18] {
+fn work_counters(sim: &Simulation) -> [(&'static str, u64); 19] {
     [
         ("mesh_hops", sim.stats.mesh_hops_total),
         ("vm_steps", sim.stats.vm_steps_total),
@@ -132,13 +132,16 @@ fn work_counters(sim: &Simulation) -> [(&'static str, u64); 18] {
         ),
         ("actions_applied", sim.stats.actions_applied_total),
         ("births", sim.stats.reproduction_actions_spawned_total),
+        ("gestations_started", sim.stats.gestations_started_total),
         (
-            "reproductive_holds_started",
-            sim.stats.reproductive_holds_started_total,
+            "gestations_lost",
+            sim.stats.gestations_lost_parent_death_total
+                + sim.stats.gestations_lost_no_cell_total
+                + sim.stats.gestations_lost_population_cap_total,
         ),
         (
-            "reproductive_hold_creature_ticks",
-            sim.stats.reproductive_hold_creature_ticks_total,
+            "gestation_creature_ticks",
+            sim.stats.gestation_creature_ticks_total,
         ),
         (
             "mesh_dispatches_energy_exhausted",
@@ -202,6 +205,7 @@ fn accounting_fingerprint(sim: &Simulation) -> Vec<u64> {
             f.maximum_energy_clamp_loss,
             f.zero_floor_credit,
             f.external_removal_loss,
+            f.gestation_lost,
         ]
         .map(f64::to_bits),
     );

@@ -240,11 +240,19 @@ pub struct SimStats {
     pub reproduction_actions_attempted_total: u64,
     pub reproduction_actions_spawned_total: u64,
     pub reproduction_actions_rejected_total: u64,
-    /// Spawning births that started a reproductive hold (T03.F12); equals
-    /// `reproduction_actions_spawned_total` at any hold rate above zero.
-    pub reproductive_holds_started_total: u64,
-    /// Phase 2 slots a held parent spent committing nothing (T03.F12).
-    pub reproductive_hold_creature_ticks_total: u64,
+    /// Conceptions (T03.F12): every `Reproduce` that passed every gate.
+    /// `attempted == rejected + gestations_started`.
+    pub gestations_started_total: u64,
+    /// Conceptions delivered as a child (equals `reproduction_actions_spawned_total`).
+    pub gestations_delivered_total: u64,
+    /// Litters lost because the parent was removed before delivery.
+    pub gestations_lost_parent_death_total: u64,
+    /// Litters lost because delivery found no valid adjacent cell.
+    pub gestations_lost_no_cell_total: u64,
+    /// Litters lost because delivery found the population at its cap.
+    pub gestations_lost_population_cap_total: u64,
+    /// Phase 2 slots a gestating parent spent held, committing nothing.
+    pub gestation_creature_ticks_total: u64,
     pub mutation_events_attempted_total: u64,
     pub mutation_events_applied_total: u64,
     pub mutation_events_skipped_total: u64,

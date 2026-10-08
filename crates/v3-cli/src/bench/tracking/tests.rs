@@ -782,7 +782,7 @@ fn checkpoint_tracking_omits_every_transferred_block() {
         "predation",
         "mortality",
         "energy_flows",
-        "reproductive_hold",
+        "gestation",
         "cognition",
         "reproductive_success_by_cognitive_class",
         "surviving_clade_profiles",
@@ -811,32 +811,42 @@ fn checkpoint_tracking_omits_every_transferred_block() {
     );
 }
 
-/// The `reproductive_hold` block (T03.F12) copies both hold counters.
+/// The `gestation` block (T03.F12) partitions every conception into
+/// delivered, lost and still-carried litters.
 #[test]
-fn reproductive_hold_block_copies_both_counters() {
+fn gestation_block_partitions_every_conception() {
     let mut cfg = SimulationConfig::default();
     cfg.world.width = 32;
     cfg.world.height = 32;
     cfg.world.food.types[0].initial_coverage = 1.0;
     cfg.population.initial_creatures = 40;
-    let mut sim = v3_core::simulation::seed_simulation(cfg, 7);
+    let mut sim = seed_simulation(cfg, 7);
     for _ in 0..60 {
         v3_core::simulation::run_tick(&mut sim, &mut None);
     }
     let block = WorldTracking::observe(&sim)
         .with_transferred_counters(&sim)
-        .reproductive_hold
+        .gestation
         .expect("end-of-run block");
-    assert!(block.reproductive_holds_started_total > 0);
+    assert!(block.gestations_delivered_total > 0);
     assert_eq!(
-        block,
-        ReproductiveHoldTracking {
-            reproductive_holds_started_total: sim.stats.reproductive_holds_started_total,
-            reproductive_hold_creature_ticks_total: sim
-                .stats
-                .reproductive_hold_creature_ticks_total,
-        }
+        block.gestations_started_total,
+        block.gestations_delivered_total
+            + block.gestations_lost_parent_death_total
+            + block.gestations_lost_no_cell_total
+            + block.gestations_lost_population_cap_total
+            + block.pending_births
     );
+    assert_eq!(
+        block.gestation_creature_ticks_total,
+        sim.stats.gestation_creature_ticks_total
+    );
+    let carried: f64 = sim
+        .creatures
+        .values()
+        .filter_map(|c| c.pending_birth.map(|p| f64::from(p.litter_energy)))
+        .sum();
+    assert_eq!(block.pending_litter_energy, six(carried.abs()));
 }
 
 #[test]
@@ -871,6 +881,7 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
         maximum_energy_clamp_loss: 20.0,
         zero_floor_credit: 21.0,
         external_removal_loss: 22.0,
+        gestation_lost: 23.0,
     };
     let tracking = WorldTracking::observe(&sim).with_transferred_counters(&sim);
     let mortality = tracking.mortality.unwrap();
@@ -913,6 +924,7 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
             "predation_victim_debit": "-17.000000", "predation_attacker_credit": "-18.000000",
             "predation_kill_bonus_credit": "19.000000", "maximum_energy_clamp_loss": "20.000000",
             "zero_floor_credit": "21.000000", "external_removal_loss": "22.000000",
+            "gestation_lost": "23.000000",
         })
     );
 }
@@ -1185,7 +1197,7 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
             mortality: None,
             reproductive_success_by_cognitive_class: None,
             energy_flows: None,
-            reproductive_hold: None,
+            gestation: None,
             cognition: None,
             surviving_clade_profiles: Some(SurvivingCladeProfiles {
                 definition: "surviving-clade-profile-v1".into(),

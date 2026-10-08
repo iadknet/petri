@@ -159,7 +159,7 @@ config still carrying the field fails to load until it is removed.
 | `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. Cap on the child's starting energy (`transfer = min(fraction * after_cost, cap)`); it clamps, never rejects. A cap under `initial_energy` puts every litter under the floor, so such a config refuses every birth (free, counted as `RejectedEnergyConstraints`) and is not rejected or normalized at load. |
 | `energy.lifecycle.genome_carry_cost_per_unit` | `f32` | `1e-4` | Must be finite and `>= 0.0`; invalid values fall back to `1e-4`. A missing field defaults to `1e-4`. `0.0` is allowed and disables the charge. Energy charged per tick per unit of total genome size. |
 | `energy.lifecycle.genome_replication_cost_per_unit` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. A missing field defaults to `0.1`. `0.0` is allowed and disables the surcharge. Per-birth multiplier on the parent's reproduce charge per unit of total genome size above the founder's 97. |
-| `energy.lifecycle.reproductive_hold_ticks_per_founder_genome` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. A missing field defaults to `1.0`. `0.0` is allowed and disables the hold (the pre-feature engine). Post-birth reproductive hold per founder genome (T03.F12); see Reproductive hold below. |
+| `energy.lifecycle.gestation_ticks_per_founder_genome` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. A missing field defaults to `1.0`. `0.0` is allowed and delivers every birth at conception (the pre-feature engine). Gestation span per founder genome (T03.F12); see Gestation below. |
 | `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
 | `energy.costs.eat_reward_per_food` | `f32` | `5.0` | Live shared reward per consumed density for ordinary food types whose `energy_per_unit` is absent/null. Must be finite and `>= 0.0`; invalid values fall back to `5.0`. |
@@ -213,21 +213,27 @@ Genome replication cost:
 - At the default rate a 386-unit genome (275 above the founder) pays 28.5x the
   base charge per birth.
 
-Reproductive hold:
-- A `Reproduce` that spawns a child at tick T holds the parent for
-  `h = ceil(genome_size() * reproductive_hold_ticks_per_founder_genome / FOUNDER_GENOME_SIZE_UNITS)`
-  ticks, read from the parent's cached `genome_size()`; `FOUNDER_GENOME_SIZE_UNITS`
-  is 97, the founder's size (`crates/v3-core/src/creature/founder.rs`). At the
-  default rate the founder is held one tick, 98 to 194 units two.
-- The birth itself is unchanged: the child is spawned at T, the rest of the
-  parent's tick-T queue runs, and a later spawning `Reproduce` in that queue
-  overwrites the deadline `held_until_tick = (T + 1) + h` (saturating).
-- On ticks T+1 through T+h the parent commits no action and writes no log
-  entry: its Phase 2 slot is skipped after cognition is recorded. A held parent
-  whose energy is at or below zero is removed at that slot. Phase 0, Phase 1
-  and Phase 2.5 run as for any creature; no extra drain applies.
-- A rate large enough to saturate the span holds the parent for the rest of
-  its life (a configuration pathology; the UI caps the rate at 10).
+Gestation:
+- A `Reproduce` that passes every gate at tick T conceives: the parent pays the
+  charge and the litter's energy at T and carries one pending birth (the chosen
+  direction, the litter energy, `deliver_tick = T + h`), where
+  `h = ceil(genome_size() * gestation_ticks_per_founder_genome / FOUNDER_GENOME_SIZE_UNITS)`
+  (97, the founder's size, `crates/v3-core/src/creature/founder.rs`) from the
+  parent's cached `genome_size()`. At the default rate the founder gestates one
+  tick, 98 to 194 units two.
+- The conception ends the parent's action queue for tick T. On ticks T+1
+  through T+h the parent commits nothing: at its Phase 2 slot it is removed if
+  its energy is at or below zero, otherwise on T+h its child is born there
+  (Steps 9 to 14 of `v3-reproduction-spec.md` Section 6, inherited fields read
+  at delivery), and its queue is skipped. Phase 0, Phase 1 and Phase 2.5 run
+  as for any creature; no extra drain applies.
+- The litter is lost, into `energy_flows.gestation_lost`, when the parent is
+  removed before delivery, when delivery finds the population at
+  `max_creatures`, or when neither the stored direction nor any direction in
+  `Direction::ALL` order gives a valid cell. A lost birth is not a death.
+- `deliver_tick` saturates, and delivery fires on `tick >= deliver_tick`; a
+  rate large enough to saturate the span holds the parent for the rest of its
+  life (a configuration pathology; the UI caps the rate at 10).
 
 Complexity energy cost:
 - When enabled, all action energy costs (noop, eat, move, reproduce, steal, and

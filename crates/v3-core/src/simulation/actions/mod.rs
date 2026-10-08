@@ -3,8 +3,8 @@ mod predation;
 mod reproduction;
 
 pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRecord};
-pub(crate) use reproduction::reproductive_hold_ticks;
 pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
+pub(crate) use reproduction::{deliver_pending_birth, BirthDelivery};
 
 use crate::config::OrdinaryFoodTypeId;
 use crate::config::SimulationConfig;
@@ -163,6 +163,9 @@ mod tests {
         cfg.world.width = 10;
         cfg.world.height = 10;
         cfg.population.initial_creatures = 1;
+        // Births here are checked at `apply_reproduce`'s return; rate 0.0
+        // delivers at conception (T03.F12), the pre-gestation sequence.
+        cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
         cfg
     }
 
@@ -235,7 +238,7 @@ mod tests {
         let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
         assert_eq!(
             apply_reproduce(id, &mut sim, Direction::N, 0.5, &mut rng),
-            ReproductionActionResult::Spawned
+            ReproductionActionResult::Conceived
         );
     }
 
@@ -448,7 +451,7 @@ mod tests {
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
-        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(result, ReproductionActionResult::Conceived);
         assert_eq!(sim.creatures.len(), 2);
         let child = sim.creatures.values().find(|c| c.id != parent_id).unwrap();
         assert_eq!(child.generation, 1);
@@ -474,7 +477,7 @@ mod tests {
 
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, fraction, &mut rng);
 
-        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(result, ReproductionActionResult::Conceived);
         (
             child_energy(&sim, parent_id),
             sim.creatures[parent_id].energy,
@@ -553,7 +556,7 @@ mod tests {
 
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, fraction, &mut rng);
 
-        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(result, ReproductionActionResult::Conceived);
         assert_eq!(child_energy(&sim, parent_id).to_bits(), transfer.to_bits());
     }
 
@@ -755,7 +758,7 @@ mod tests {
 
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, fraction, &mut rng);
 
-        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(result, ReproductionActionResult::Conceived);
         assert_eq!(sim.creatures.len(), 2, "one child should be spawned");
         assert_eq!(
             sim.creatures[parent_id].energy.to_bits(),
@@ -782,7 +785,7 @@ mod tests {
 
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, fraction, &mut rng);
 
-        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(result, ReproductionActionResult::Conceived);
         assert_eq!(
             sim.creatures[parent_id].energy.to_bits(),
             expected_energy.to_bits(),
@@ -815,7 +818,7 @@ mod tests {
         sim.creatures[parent_id].age = 20;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(33);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
-        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(result, ReproductionActionResult::Conceived);
         assert_eq!(sim.creatures.len(), 2, "one child should be spawned");
     }
 
@@ -828,7 +831,7 @@ mod tests {
         let energy_before = sim.creatures[parent_id].energy;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(4);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
-        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(result, ReproductionActionResult::Conceived);
         // Parent should have lost at least reproduce_cost.
         assert!(
             sim.creatures[parent_id].energy < energy_before - cost + f32::EPSILON,
@@ -854,7 +857,7 @@ mod tests {
         let parent_gen = sim.creatures[parent_id].generation;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(6);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
-        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(result, ReproductionActionResult::Conceived);
         let child = sim
             .creatures
             .values()
@@ -874,7 +877,7 @@ mod tests {
         let parent_gen = sim.creatures[parent_id].generation;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(7);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
-        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(result, ReproductionActionResult::Conceived);
         let child = sim
             .creatures
             .values()
@@ -907,7 +910,7 @@ mod tests {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
 
-            if result == ReproductionActionResult::Spawned
+            if result == ReproductionActionResult::Conceived
                 && sim.stats.mutation_events_applied_total > 0
             {
                 let child = sim
@@ -963,7 +966,7 @@ mod tests {
             let parent_generation = sim.creatures[parent_id].generation;
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
-            if result == ReproductionActionResult::Spawned
+            if result == ReproductionActionResult::Conceived
                 && sim.stats.mutation_events_applied_total == 0
                 && sim.stats.mutation_events_skipped_total > 0
             {
@@ -1007,7 +1010,7 @@ mod tests {
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
         assert_eq!(
             apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng),
-            ReproductionActionResult::Spawned
+            ReproductionActionResult::Conceived
         );
         let after_first = sim.stats.mutation_executed_target_total;
         assert!(
@@ -1017,7 +1020,7 @@ mod tests {
 
         assert_eq!(
             apply_reproduce(parent_id, &mut sim, Direction::S, 0.5, &mut rng),
-            ReproductionActionResult::Spawned
+            ReproductionActionResult::Conceived
         );
         assert!(
             sim.stats.mutation_executed_target_total > after_first,
@@ -1046,7 +1049,7 @@ mod tests {
         // Act
         assert_eq!(
             apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng),
-            ReproductionActionResult::Spawned
+            ReproductionActionResult::Conceived
         );
 
         // Assert: the first birth's applied events are in the funnel.
@@ -1057,7 +1060,7 @@ mod tests {
         // Act: a second birth from the same parent.
         assert_eq!(
             apply_reproduce(parent_id, &mut sim, Direction::S, 0.5, &mut rng),
-            ReproductionActionResult::Spawned
+            ReproductionActionResult::Conceived
         );
 
         // Assert: the stage carries the sum over both births.
@@ -1087,7 +1090,7 @@ mod tests {
         // Act
         assert_eq!(
             apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng),
-            ReproductionActionResult::Spawned
+            ReproductionActionResult::Conceived
         );
 
         // Assert: the rejected events are counted, and nothing applied.
@@ -1099,7 +1102,7 @@ mod tests {
         // Act: a second birth from the same parent.
         assert_eq!(
             apply_reproduce(parent_id, &mut sim, Direction::S, 0.5, &mut rng),
-            ReproductionActionResult::Spawned
+            ReproductionActionResult::Conceived
         );
 
         // Assert: the stage carries the sum over both births.
@@ -1127,7 +1130,7 @@ mod tests {
 
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
-        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(result, ReproductionActionResult::Conceived);
 
         let attempted_by_domain: u64 = sim
             .stats
@@ -1828,7 +1831,7 @@ mod tests {
             proptest::prop_assert!(age >= sim.config.energy.lifecycle.min_reproduce_age);
             sim.creatures[id].age = age;
             let result = apply_reproduce(id, &mut sim, Direction::N, policy.transfer_fraction, &mut rand::rngs::SmallRng::seed_from_u64(7));
-            proptest::prop_assert_eq!(result, ReproductionActionResult::Spawned, "{:?} energy={} age={}", profile, energy, age);
+            proptest::prop_assert_eq!(result, ReproductionActionResult::Conceived, "{:?} energy={} age={}", profile, energy, age);
             let child = child_energy(&sim, id);
             proptest::prop_assert!(child >= sim.config.energy.lifecycle.initial_energy);
             proptest::prop_assert!(child <= sim.config.energy.lifecycle.default_offspring_energy);
@@ -1934,7 +1937,7 @@ mod tests {
                 1.0,
                 &mut rand::rngs::SmallRng::seed_from_u64(1)
             ),
-            ReproductionActionResult::Spawned
+            ReproductionActionResult::Conceived
         );
         assert!((sim.creatures[id].energy - (180.0 - cost - 100.0)).abs() < 1e-5);
         assert_eq!(
@@ -1964,7 +1967,7 @@ mod tests {
     proptest::proptest! {
         #[test]
         fn reproduction_result_keys_match_public_contract((result, key) in proptest::sample::select(vec![
-            (ReproductionActionResult::Spawned, "Spawned"),
+            (ReproductionActionResult::Conceived, "Conceived"),
             (ReproductionActionResult::RejectedInvalidTarget, "RejectedInvalidTarget"),
             (ReproductionActionResult::RejectedAgeConstraints, "RejectedAgeConstraints"),
             (ReproductionActionResult::RejectedEnergyConstraints, "RejectedEnergyConstraints"),

@@ -21,10 +21,10 @@
 //! restores both old digests.
 //! T24.F02 re-pinned both digests: food draws come from the keyed per-cell
 //! stream instead of the run RNG, so every later run-RNG draw shifts.
-//! T03.F12 re-pinned both digests after two agreeing runs: every spawning
-//! parent is held for its reproductive hold. Each test also runs the fixture
-//! at hold rate 0.0 and asserts the T24.F02 digests, the kept equivalence
-//! evidence that rate 0.0 is the pre-feature engine.
+//! T03.F12 re-pinned both digests after two agreeing runs: every birth is
+//! delivered one founder gestation later. Each test also runs the fixture at
+//! gestation rate 0.0 and asserts the T24.F02 digests, the kept equivalence
+//! evidence that rate 0.0 is the pre-gestation engine.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -36,7 +36,7 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "3b8da9bee494f9ea16eca955818fc0a49d61d0aad254f50aed2057affb75861a"
+        "fecc3666eae1f1deb5096925d5854fe1bf32e5264ea599b1d19223bf2f246aa0"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
@@ -44,16 +44,13 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     );
 }
 
-/// The sampled-trajectory digest at the default reproductive hold rate or `rate`.
-fn sampled_trajectory_digest(hold_rate: Option<f32>) -> String {
+/// The sampled-trajectory digest at the default gestation rate or `rate`.
+fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
     let mut hash = Sha256::new();
     for seed in [7, 19] {
         let mut config = SimulationConfig::default();
-        if let Some(rate) = hold_rate {
-            config
-                .energy
-                .lifecycle
-                .reproductive_hold_ticks_per_founder_genome = rate;
+        if let Some(rate) = gestation_rate {
+            config.energy.lifecycle.gestation_ticks_per_founder_genome = rate;
         }
         config.world.width = 24;
         config.world.height = 24;
@@ -116,7 +113,7 @@ fn sampled_trajectory_digest(hold_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "b27db3c7cfb7bec4185f969b1ba97c6266596d48f60a0234dc680676b48043f6"
+        "a47711760af1b3c1f87d3f688522aadc0fee791cdf3233b981ffa50b231b6a8b"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
@@ -124,16 +121,13 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
     );
 }
 
-/// The applied-behavior guard digest at the default reproductive hold rate or `rate`.
-fn applied_guard_digest(hold_rate: Option<f32>) -> String {
+/// The applied-behavior guard digest at the default gestation rate or `rate`.
+fn applied_guard_digest(gestation_rate: Option<f32>) -> String {
     let mut hash = Sha256::new();
     for seed in [7, 19] {
         let mut config = SimulationConfig::default();
-        if let Some(rate) = hold_rate {
-            config
-                .energy
-                .lifecycle
-                .reproductive_hold_ticks_per_founder_genome = rate;
+        if let Some(rate) = gestation_rate {
+            config.energy.lifecycle.gestation_ticks_per_founder_genome = rate;
         }
         config.world.width = 24;
         config.world.height = 24;

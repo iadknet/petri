@@ -1,5 +1,4 @@
 use crate::config::SimulationConfig;
-use crate::contracts::WorldAction;
 use crate::contracts::{CreatureId, NodeId, Position};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::{
@@ -8,8 +7,6 @@ use crate::creature::genome::{
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
-use crate::runtime::trace::domain::TerminationReason;
-use crate::runtime::types::{ComputeCostReport, MeshOutput};
 use crate::simulation::Simulation;
 use rand::SeedableRng;
 use slotmap::SlotMap;
@@ -19,21 +16,10 @@ pub(super) fn small_config() -> SimulationConfig {
     cfg.world.width = 20;
     cfg.world.height = 20;
     cfg.population.initial_creatures = 5;
+    // Fixtures here read a birth on the tick of its `Reproduce`; rate 0.0
+    // delivers at conception (T03.F12). Gestation tests set the rate.
+    cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
     cfg
-}
-
-/// A Phase 2 decision committing `actions` with zero priority and no
-/// recorded cognition.
-pub(super) fn decision(actions: Vec<WorldAction>) -> MeshOutput {
-    MeshOutput {
-        actions,
-        cost_report: ComputeCostReport::default(),
-        priority_bid: 0.0,
-        work_counters: Default::default(),
-        energy_observation: Default::default(),
-        termination_reason: TerminationReason::NoDecision,
-        commit_counts: Default::default(),
-    }
 }
 
 /// A one-node VM genome running `program` exactly as given, with no

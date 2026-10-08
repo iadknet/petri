@@ -140,7 +140,7 @@ export interface LifecycleEnergyConfig {
 	default_offspring_energy: number;
 	genome_carry_cost_per_unit: number;
 	genome_replication_cost_per_unit: number;
-	reproductive_hold_ticks_per_founder_genome: number;
+	gestation_ticks_per_founder_genome: number;
 }
 
 export interface CostsConfig {
