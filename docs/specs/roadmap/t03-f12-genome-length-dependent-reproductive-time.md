@@ -161,9 +161,7 @@ and the charges on parents removed in Phase 0 before a held slot.
 
 Every item below is read on the form-A code; the form-B results
 (`f380899e`) are the "Build verification (form B)" and "Benchmark readings
-(form B)" sections of the readings file and verify nothing here. `make check`
-(rerun after the self-review refactor) fails one test, the gate series check, against the form-B gate summary still
-in the series (readings, "Build verification (form A)").
+(form B)" sections of the readings file and verify nothing here. `make check` is the spec owner's.
 
 - [x] `cargo test -p v3-core --test viability` (first) -> result in
       [`docs/progress/readings/t03-f12.md`](../../progress/readings/t03-f12.md).
@@ -180,8 +178,8 @@ in the series (readings, "Build verification (form A)").
       spread demands (the form-B attempt was inconclusive at spread 0.1971:
       32 pairs at 5.4 s each exceed the 300 s cap); a second inconclusive
       verdict is recorded as such and reported to the user, never rounded to
-      a pass -> readings file.
-- [ ] Long Canyon run (predeclaration below) on the form-A code: raw
+      a pass -> readings file. Form A: overhead **inconclusive again**, not a pass.
+- [x] Long Canyon run (predeclaration below) on the form-A code: raw
       `canyon.ndjson` and `canyon-config.json` under the main checkout's
       ignored `.bench-artifacts/t03-f12-genome-length-dependent-reproductive-time/canyon/`
       (the form-B raw files move to a `form-b/` sibling); committed under
@@ -189,11 +187,11 @@ in the series (readings, "Build verification (form A)").
       `canyon-samples.md` (population, `mean_genome_size`, `mean_generation`,
       `mean_mesh_nodes` at every 2,500th tick and at the first sample past
       36,652, with the raw file's SHA-256 and byte count), the form-B table
-      kept in the same file under its own heading as a reference.
+      kept in the same file under its own heading as a reference. Form A: exit 0.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       full survivor list stays here.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t03-f12-genome-length-dependent-reproductive-time.json`
       and `-goal.json` (overwriting the form-B summaries, whose readings stay
       in the readings file), local raw hash/byte count and verification time
@@ -236,14 +234,19 @@ indicator not in the table is reported with no direction.
 | Founder neighborhood, drift walk, `recruitment_paths` blocks | T24.F02 goal | Byte-identical, field for field. |
 | Observation budgets | Workflow caps (`measurement_evidence.wall_caps`) | Founder neighborhood below 10 s; summed evolved below 180 s; neighborhood read below 10 s summed; drift walk below 30 s; `recruitment_paths` below 120 s per report (T24.F02 measured 240.2 s against it with no recorded disposition, T24.F01 13.0 s; the breach is reported to the user with this closure and this run's value is read against host load); goal run below 15 minutes. |
 
-**Measured verdict.** Form B (`f380899e`, 2026-10-08, run once): gate exit 0
-not severe; goal CLI exit 3, severe against both references; the persistence
-floor failed on Canyon (final 0.441×), so the predeclared retreat fired and
-every other form-B reading (contrary Canyon size, Orchards and Confluence
-neighborhood-read floors, Orchards executed nodes 2.38, `recruitment_paths`
-230.8 s, overhead inconclusive, long Canyon run persisting at all 80 samples)
-is the form-B record in the readings file, superseded by the form-A re-run and
-not put to the user. Form A: pending.
+**Form B** (`f380899e`) failed the Canyon floor (0.441x); superseded.
+
+**Measured verdict: Form A** (`0436dbf6`; numbers in the readings file). Gate exit 0, not severe. Goal
+CLI exit 3, severe (vm_steps, plasticity_updates, decided_passes);
+`actions_applied` read up. For the user (blocker rule):
+
+- **Persistence floor failed:** Canyon final 2,596 is 0.283x of
+  9,165 (plateau 0.716x). A blocker, not a retreat.
+- **Contrary size result:** Orchards size 140.77 against 127.06.
+- Canyon `changed_per_all_births` 0.1248 is under its 0.1300 floor;
+  `recruitment_paths` 241.2 s over its cap; overhead **inconclusive** again.
+
+The long Canyon run persisted at all 80 samples.
 
 - Summaries: [gate](../../progress/features/t03-f12-genome-length-dependent-reproductive-time.json),
   [goal](../../progress/features/t03-f12-genome-length-dependent-reproductive-time-goal.json).

@@ -1,6 +1,7 @@
 #!/bin/sh
 # T03.F12 long Canyon run (seed 22, 40,000 ticks); run from the feature worktree
 # with the release binary built. Raw output stays in the main checkout's ignored tree.
+# Form A rerun: the form-B raw files were first moved to "$raw/form-b/".
 set -eu
 raw=.bench-artifacts/t03-f12-genome-length-dependent-reproductive-time/canyon
 mkdir -p "$raw"
