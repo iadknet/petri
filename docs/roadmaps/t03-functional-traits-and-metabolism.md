@@ -43,7 +43,7 @@ fitness bonuses.
 - [x] **T03.F11 — Genome Replication Cost** — Depends on: T03.F08, T14.F12, T11.F19
   - Goal: Copying a longer genome costs more, as in Avida and Tierra. Every unit of brain structure beyond the founder's raises the parent's energy cost to reproduce, so a large genome pays at every birth as well as every tick, and structure that does not earn its copy is bred out.
 
-- [ ] **T03.F12 — Genome-Length-Dependent Reproductive Time** — Depends on: T03.F11, T14.F12
+- [x] **T03.F12 — Genome-Length-Dependent Reproductive Time** — Depends on: T03.F11, T14.F12
   - Goal: Copying a longer genome takes longer, as in Avida's replication time. A parent that has just reproduced is occupied for a span that grows with its genome's length, so a large genome pays in reproductive time at every birth, the quantity selection counts, beside the token surcharge it already pays; the intended outcome is a smaller mean genome size over a goal run than the surcharge alone leaves.
 
 ## Notes for AI Agents
