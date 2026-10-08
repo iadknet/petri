@@ -2172,31 +2172,21 @@ mod tests {
 
     #[test]
     fn normalize_hold_rate_falls_back_on_invalid_and_keeps_valid_values() {
-        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.5] {
-            let mut cfg = SimulationConfig::default();
-            cfg.energy
-                .lifecycle
-                .reproductive_hold_ticks_per_founder_genome = bad;
-            cfg.normalize();
-            assert_eq!(
-                cfg.energy
-                    .lifecycle
-                    .reproductive_hold_ticks_per_founder_genome,
-                1.0
-            );
-        }
-        for rate in [0.0, 0.5, 2.5] {
+        let normalized = |rate: f32| {
             let mut cfg = SimulationConfig::default();
             cfg.energy
                 .lifecycle
                 .reproductive_hold_ticks_per_founder_genome = rate;
             cfg.normalize();
-            assert_eq!(
-                cfg.energy
-                    .lifecycle
-                    .reproductive_hold_ticks_per_founder_genome,
-                rate
-            );
+            cfg.energy
+                .lifecycle
+                .reproductive_hold_ticks_per_founder_genome
+        };
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.5] {
+            assert_eq!(normalized(bad), 1.0, "{bad} falls back");
+        }
+        for rate in [0.0, 0.5, 2.5] {
+            assert_eq!(normalized(rate), rate);
         }
     }
 
