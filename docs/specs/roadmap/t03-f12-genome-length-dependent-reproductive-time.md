@@ -162,9 +162,15 @@ Phase 0 charges on parents removed before a held slot.
       36,652, raw SHA-256 and bytes; the form-A table under its own heading).
       Form B: exit 0, 1,604 s, population above zero at all 80 samples
       (minimum 1,110); raw 332,377 bytes, SHA-256 `b674b579…8c14`.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` on the restored form-B
-      code: summary line, output path, and every survivor resolved as killed,
-      equivalent, or deferred. The full survivor list stays here.
+- [x] `MUTANTS_ITERATE=0 make rust-mutants` (mode `fresh`) on form-B code:
+      `55 mutants tested in 38m: 3 missed, 47 caught, 5 unviable`; output
+      `~/.local/share/petri-tools/mutants/t03-f12/mutants.out`.
+
+| Survivor (`crates/v3-cli/src/bench/tracking.rs`, `GestationTracking::observe`) | Resolution |
+| --- | --- |
+| `106:36` replace `+` with `-` | Killed: `gestation_block_counts_and_sums_carried_litters` |
+| `106:36` replace `+` with `*` | Killed: same test |
+| `106:24` replace `+` with `*` | Killed: same test |
 - [x] Benchmark summaries stored at
       `docs/progress/features/t03-f12-genome-length-dependent-reproductive-time.json`
       and `-goal.json`, restored byte-for-byte from commit `a762b494`; series
