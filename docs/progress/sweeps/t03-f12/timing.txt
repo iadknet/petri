@@ -1,6 +1,6 @@
-wall_seconds 1669
+wall_seconds 1604
 exit_status 0
 budget_seconds 14400
 command target/release/v3-cli run --ticks 40000 --sample-every 500 --seed 22 --config experiments/worlds/canyon-country.json --save-config <raw dir>/canyon-config.json > <raw dir>/canyon.ndjson
-note form A (0436dbf6) under scripts/bench-wait, alone, telemetry on (the CLI default, stack petri-telemetry up); wall_seconds is the outer process wall of the run only
-form_b_wall_seconds 1604 (f380899e, exit_status 0, superseded)
+note form B (f380899e, shipped) under scripts/bench-wait, alone, telemetry on (the CLI default, stack petri-telemetry up); wall_seconds is the outer process wall of the run only; raw files in <raw dir> (canyon/)
+form_a_wall_seconds 1669 (0436dbf6, exit_status 0, executed retreat, reverted by user decision 2026-10-08; same command, raw files in <raw dir>/form-a/)

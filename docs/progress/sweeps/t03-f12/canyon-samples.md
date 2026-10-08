@@ -1,15 +1,49 @@
 # T03.F12 long Canyon run, goal seed 22
 
-Command and timing: `run.sh`, `timing.txt` (form A, 1,669 s wall of a 14,400 s budget; exit status 0). The form-B
-timing was 1,604 s, exit status 0. The raw form-B files sit in the ignored `form-b/` sibling of the raw directory.
+Command and timing: `run.sh`, `timing.txt`. Shipped form B (`f380899e`): 1,604 s wall of a 14,400 s budget, exit status
+0. The executed retreat, form A (`0436dbf6`, reverted by user decision 2026-10-08): 1,669 s, exit status 0. The raw files
+sit in the main checkout's ignored `.bench-artifacts/t03-f12-genome-length-dependent-reproductive-time/canyon/`: form B
+directly in `canyon/`, form A in `canyon/form-a/`.
 
 Founder `mean_genome_size` is 97 in both runs.
 
-## Form A (post-birth reproductive hold), source revision 0436dbf6
+## Form B (pre-birth gestation, shipped), source revision f380899e
 
 Release binary, `scripts/bench-wait`, alone, telemetry on (the CLI default, `petri-telemetry` stack up).
 
-- Raw file: `.bench-artifacts/t03-f12-genome-length-dependent-reproductive-time/canyon/canyon.ndjson` in the main
+Raw file (ignored): `.bench-artifacts/t03-f12-genome-length-dependent-reproductive-time/canyon/canyon.ndjson` in the
+main checkout, 332,377 bytes, SHA-256 `b674b57905550bc1c3295229b5af622df44f31a6b51c24ba89a1cfb1f2a08c14`; its
+`canyon-config.json` is 4,661 bytes.
+80 `tick_sample` events, `final_population` 1122; minimum over the 80 samples 1,110 (tick 2,500); extinction never
+occurred.
+
+| tick | population | mean_genome_size | x founder | mean_generation | mean_mesh_nodes |
+| --- | --- | --- | --- | --- | --- |
+| 2500 | 1110 | 159.53 | 1.64 | 56.53 | 5.56 |
+| 5000 | 2225 | 179.97 | 1.86 | 109.44 | 7.06 |
+| 7500 | 3170 | 221.35 | 2.28 | 169.71 | 12.31 |
+| 10000 | 2081 | 286.82 | 2.96 | 227.99 | 15.74 |
+| 12500 | 2861 | 333.82 | 3.44 | 294.47 | 18.98 |
+| 15000 | 2139 | 361.80 | 3.73 | 351.23 | 21.85 |
+| 17500 | 1491 | 480.79 | 4.96 | 418.19 | 30.35 |
+| 20000 | 1405 | 670.57 | 6.91 | 488.73 | 42.60 |
+| 22500 | 1753 | 785.99 | 8.10 | 551.57 | 49.88 |
+| 25000 | 1528 | 911.17 | 9.39 | 594.89 | 55.57 |
+| 27500 | 1753 | 973.96 | 10.04 | 646.71 | 62.49 |
+| 30000 | 1637 | 1212.49 | 12.50 | 689.30 | 77.50 |
+| 32500 | 1505 | 1257.97 | 12.97 | 737.97 | 86.02 |
+| 35000 | 1422 | 1490.79 | 15.37 | 779.45 | 98.19 |
+| 37000 (first sample past 36,652) | 1286 | 1321.03 | 13.62 | 809.29 | 93.09 |
+| 40000 | 1122 | 1288.87 | 13.29 | 858.43 | 96.10 |
+
+Descriptive only (different substrate, no same-binary control): `mean_genome_size` at 20,000 is 6.91x the founder against
+E2's 16x; the largest table value is 15.37x at 35,000.
+
+## Form A (post-birth reproductive hold; executed retreat, reverted by user decision 2026-10-08), source revision 0436dbf6
+
+Release binary, `scripts/bench-wait`, alone, telemetry on (the CLI default, `petri-telemetry` stack up).
+
+- Raw file: `.bench-artifacts/t03-f12-genome-length-dependent-reproductive-time/canyon/form-a/canyon.ndjson` in the main
   checkout (ignored), 330,750 bytes, SHA-256 `c6bc909d49bedddde5065adf6ae4a5cd2d871ac8919f9e74e82ac2574da68b6a`; its
   `canyon-config.json` is 4,669 bytes.
 - 80 `tick_sample` events (every 500 ticks, 500 to 40,000), then `run_completed` with `ticks_executed` 40000,
@@ -38,31 +72,3 @@ Release binary, `scripts/bench-wait`, alone, telemetry on (the CLI default, `pet
 
 Descriptive only (different substrate, no same-binary control): `mean_genome_size` at 20,000 is 4.36x the founder against
 E2's 16x; the largest sample value is 11.02x at 35,500.
-
-## Form B (pre-birth gestation, superseded), source revision f380899e
-
-Raw file (ignored, now under `canyon/form-b/`): 332,377 bytes, SHA-256
-`b674b57905550bc1c3295229b5af622df44f31a6b51c24ba89a1cfb1f2a08c14`; its `canyon-config.json` is 4,661 bytes.
-80 `tick_sample` events, `final_population` 1122; minimum over the 80 samples 1,110 (tick 2,500); extinction never
-occurred.
-
-| tick | population | mean_genome_size | x founder | mean_generation | mean_mesh_nodes |
-| --- | --- | --- | --- | --- | --- |
-| 2500 | 1110 | 159.53 | 1.64 | 56.53 | 5.56 |
-| 5000 | 2225 | 179.97 | 1.86 | 109.44 | 7.06 |
-| 7500 | 3170 | 221.35 | 2.28 | 169.71 | 12.31 |
-| 10000 | 2081 | 286.82 | 2.96 | 227.99 | 15.74 |
-| 12500 | 2861 | 333.82 | 3.44 | 294.47 | 18.98 |
-| 15000 | 2139 | 361.80 | 3.73 | 351.23 | 21.85 |
-| 17500 | 1491 | 480.79 | 4.96 | 418.19 | 30.35 |
-| 20000 | 1405 | 670.57 | 6.91 | 488.73 | 42.60 |
-| 22500 | 1753 | 785.99 | 8.10 | 551.57 | 49.88 |
-| 25000 | 1528 | 911.17 | 9.39 | 594.89 | 55.57 |
-| 27500 | 1753 | 973.96 | 10.04 | 646.71 | 62.49 |
-| 30000 | 1637 | 1212.49 | 12.50 | 689.30 | 77.50 |
-| 32500 | 1505 | 1257.97 | 12.97 | 737.97 | 86.02 |
-| 35000 | 1422 | 1490.79 | 15.37 | 779.45 | 98.19 |
-| 37000 (first sample past 36,652) | 1286 | 1321.03 | 13.62 | 809.29 | 93.09 |
-| 40000 | 1122 | 1288.87 | 13.29 | 858.43 | 96.10 |
-
-Form-B `mean_genome_size` at 20,000 was 6.91x the founder; the largest table value 15.37x at 35,000.
