@@ -1915,6 +1915,7 @@ mod tests {
         );
 
         for (type_number, expected) in report.expected.iter().enumerate() {
+            let mut written_occupied = 0u32;
             for (idx, &want) in expected.iter().enumerate() {
                 let pos = fixture.position(idx);
                 let got = state.food_at_type(pos, OrdinaryFoodTypeId::new(type_number as u16));
@@ -1924,7 +1925,12 @@ mod tests {
                     pos.x,
                     pos.y
                 );
+                written_occupied += u32::from(got > 0.0);
             }
+            assert_eq!(
+                summary.per_type[type_number].occupied_cells, written_occupied,
+                "type {type_number}: occupied cells counts only cells with food"
+            );
         }
         assert_eq!(summary.cells_with_type_inhibition, report.inhibited_cells);
         for (got, want, what) in [
@@ -2120,6 +2126,141 @@ mod tests {
         assert!(report.empty_candidate_list);
         assert_eq!(report.expected[0][4], 3.0);
         assert_eq!(report.expected[0].iter().sum::<f32>(), 3.0);
+    }
+
+    /// A type that cannot grow loses no growth to inhibition, so the other
+    /// type's penalty on its cells marks none of them inhibited.
+    #[test]
+    fn a_type_with_zero_growth_rate_marks_no_cell_inhibited() {
+        let mut config = plain_growth_config(2);
+        config.shared.max_density = 1.0;
+        config.shared.spread_threshold_ratio = 0.5;
+        config.types[0].growth_rate = Some(0.0);
+        config.types[1].growth_inhibitor = 0.5;
+        let mut fixture = OracleFixture::new(3, 1, WorldEdgeMode::Bounded, config);
+        // Type 1 puts a positive penalty on both type-0 cells.
+        fixture.densities[0] = vec![0.8, 0.4, 0.0];
+        fixture.densities[1] = vec![0.6, 0.6, 0.0];
+
+        let report = assert_grow_matches_oracle(&fixture);
+
+        assert_eq!(report.inhibited_cells, 0);
+    }
+
+    /// A dense cell whose inhibition penalty consumes all its fertility has
+    /// no growth to share: it spreads nothing, so its neighbour records no
+    /// suppressed spread.
+    #[test]
+    fn a_fully_inhibited_dense_cell_spreads_nothing() {
+        let mut config = plain_growth_config(2);
+        config.shared.growth_rate = 0.5;
+        config.shared.spread_density_ratio = 0.5;
+        config.shared.spread_threshold_ratio = 0.5;
+        config.shared.max_density = 1.0;
+        config.types[1].growth_inhibitor = 1.0;
+        let mut fixture = OracleFixture::new(2, 1, WorldEdgeMode::Bounded, config);
+        // Type 1 at full density makes type 0's penalty at cell 0 equal its fertility.
+        fixture.densities[0] = vec![0.9, 0.0];
+        fixture.densities[1] = vec![1.0, 0.0];
+
+        let report = assert_grow_matches_oracle(&fixture);
+
+        assert_eq!(report.expected[0], vec![0.9, 0.0]);
+        assert!((report.suppressed_by_inhibition - 0.45).abs() < 1e-6);
+    }
+
+    /// With a zero spread ratio a delivery carries no growth, so the
+    /// target's inhibition penalty suppresses nothing and marks no cell.
+    #[test]
+    fn a_zero_spread_ratio_delivery_marks_no_target_inhibited() {
+        let mut config = plain_growth_config(2);
+        config.shared.growth_rate = 0.5;
+        config.shared.spread_density_ratio = 0.0;
+        config.shared.spread_threshold_ratio = 0.5;
+        config.shared.max_density = 1.0;
+        config.types[1].growth_inhibitor = 0.5;
+        let mut fixture = OracleFixture::new(2, 1, WorldEdgeMode::Bounded, config);
+        // Type 0 spreads from cell 0 onto cell 1, where type 1 puts a penalty.
+        fixture.densities[0] = vec![0.9, 0.0];
+        fixture.densities[1] = vec![0.0, 0.6];
+
+        let report = assert_grow_matches_oracle(&fixture);
+
+        assert_eq!(report.inhibited_cells, 0);
+    }
+
+    /// A recovery spawn on a cell whose habitat fertility is zero adds
+    /// nothing, and the other type's penalty there suppresses nothing and
+    /// marks no cell, because there was no growth to lose.
+    #[test]
+    fn a_recovery_spawn_on_zero_fertility_records_no_inhibition() {
+        let mut config = plain_growth_config(2);
+        config.fertility.enabled = true;
+        config.fertility.min_fertility = 0.0;
+        config.fertility.max_fertility = 1.0;
+        config.annealing.enabled = false;
+        config.shared.growth_rate = 0.5;
+        config.shared.max_density = 1.0;
+        config.shared.recovery_floor_ratio = 1.0;
+        config.types[0].recovery_spawn_rate = Some(1.0);
+        config.types[1].growth_inhibitor = 1.0;
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let (barren, inhibitor) = (OrdinaryFoodTypeId::new(0), OrdinaryFoodTypeId::new(1));
+        let cell = Position::new(0, 0);
+        let mut state = OrdinaryFoodState::new(1, 1, catalog.len());
+        // Raw -1 maps to min_fertility 0 for the empty type 0.
+        state.set_fertility_grid(barren, Grid::new(1, 1, -1.0));
+        state.set_fertility_grid(inhibitor, Grid::new(1, 1, 1.0));
+        state.set_food_type_density(cell, inhibitor, 1.0);
+
+        let summary = grow(
+            &mut state,
+            &catalog,
+            &config.shared,
+            &config,
+            &mut OccupancyDepletionLayer::new(1, 1),
+            &mut GrowthScratch::default(),
+            &barrier_grid(1, 1),
+            &occupancy_grid::<()>(1, 1),
+            WorldEdgeMode::Bounded,
+            0,
+            FoodStreamKey::from_run_seed(3),
+        );
+
+        assert_eq!(state.food_at_type(cell, barren), 0.0);
+        assert_eq!(summary.cells_with_type_inhibition, 0);
+        assert_eq!(summary.growth_suppressed_by_type_inhibition, 0.0);
+    }
+
+    /// With a zero deposit, occupancy adds no depletion and no cell counts
+    /// as an occupied depletion cell.
+    #[test]
+    fn a_zero_deposit_counts_no_occupied_depletion_cell() {
+        let config = OccupancyDepletionConfig {
+            enabled: true,
+            deposit_per_occupied_tick: 0.0,
+        };
+        let mut layer = OccupancyDepletionLayer::new(2, 1);
+        let mut occupancy = occupancy_grid::<()>(2, 1);
+        occupancy.set(0, 0, Some(()));
+
+        let summary = layer.recover_and_deposit(&barrier_grid(2, 1), &occupancy, &config);
+
+        assert_eq!(
+            summary,
+            DepletionTickSummary {
+                mean_depletion: 0.0,
+                occupied_cells: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn growth_scratch_debug_prints_its_cell_count_not_its_buffers() {
+        let mut scratch = GrowthScratch::default();
+        scratch.fit(6);
+
+        assert_eq!(format!("{scratch:?}"), "GrowthScratch { cells: 6, .. }");
     }
 
     /// On a uniform saturated wrapped patch every cell spreads; the keyed

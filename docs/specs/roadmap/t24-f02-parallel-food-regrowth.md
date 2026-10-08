@@ -228,9 +228,35 @@ mechanism switch or config value is added.
       gate severity test above; every target after it (`rust-test-server`,
       `-lab`, `-telemetry`, `-doc`, `rust-clippy`, `frontend-check`,
       `dependency-audit`, `skill-check`) then passed under `make -k`.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       full survivor list stays here.
+
+| Fresh run 2026-10-07 at d4dfe4c1 | Value |
+| --- | --- |
+| Summary | `252 mutants tested in 3h: 16 missed, 232 caught, 4 unviable` (0 timeouts) |
+| Output | `~/.local/share/petri-tools/mutants/t24-f02/mutants.out.old` (fresh; `mutants.out` is the `MUTANTS_ITERATE=1` feedback pass: 16 tested, 10 caught, 6 missed, the equivalents below) |
+| Feature-on feedback | `cargo mutants --features telemetry-seams` on the two gated survivors: both caught |
+| Tests | `ordinary_food/ecology.rs`: six tests added; `assert_grow_matches_oracle` now checks per-type `occupied_cells` |
+
+| Survivor (`ordinary_food/ecology.rs` unless named) | Resolution |
+| --- | --- |
+| `simulation/tick.rs:179:5` `run_phase_0_food_growth -> FoodPasses` with `Default::default()` | equivalent: exists only under `telemetry-seams`, so the gate build compiles unchanged code; feature-on run caught it |
+| `116:72` `>` to `>=` in `recover_and_deposit` | killed: `a_zero_deposit_counts_no_occupied_depletion_cell` |
+| `328:9` `GrowthScratch` `Debug::fmt` with `Ok(Default::default())` | killed: `growth_scratch_debug_prints_its_cell_count_not_its_buffers` |
+| `466:44` `&&` to `\|\|` in `claim_cell` | killed: `a_type_with_zero_growth_rate_marks_no_cell_inhibited` |
+| `466:19` `>` to `>=` in `claim_cell` | killed: same test |
+| `466:71` `>` to `>=` in `claim_cell` | equivalent: the penalty is clamped at 0, and at 0 `local_base == local_after_inhibition`, so the first conjunct is already false |
+| `473:67` `>` to `>=` in `claim_cell` | killed: `a_fully_inhibited_dense_cell_spreads_nothing` |
+| `484:18` `>` to `>=` in `claim_cell` | equivalent: with no candidates `in_range(_, 0)` picks cell 0, which cannot gather it: neighbours are symmetric, so a passable cell 0 next to the source would itself be a candidate |
+| `540:24` `>` to `>=` in `gather_cell` | killed: `a_zero_spread_ratio_delivery_marks_no_target_inhibited` |
+| `563:24` `>` to `>=` in `build_type_inhibition_weighted_sums` | equivalent: a zero-inhibitor type adds exactly `+0.0` to every sum |
+| `780:49` `*` to `/` in `grow` | killed: `a_recovery_spawn_on_zero_fertility_records_no_inhibition` |
+| `783:62` `&&` to `\|\|` in `grow` | killed: same test |
+| `783:34` `>` to `>=` in `grow` | killed: same test |
+| `783:93` `>` to `>=` in `grow` | equivalent: same clamp argument as `466:71` |
+| `815:32` `>` to `>=` in `grow` | killed: the oracle helper's per-type `occupied_cells` check (barrier and empty cells) |
+| `pass_clock/phase_seam_tests.rs:13:5` `grow_once` with `Default::default()` | equivalent: test helper compiled only with `telemetry-seams`, absent from the gate build; feature-on run caught it |
 - [ ] Benchmark summaries stored at
       `docs/progress/features/t24-f02-parallel-food-regrowth.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
