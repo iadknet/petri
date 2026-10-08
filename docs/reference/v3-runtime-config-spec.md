@@ -158,7 +158,7 @@ config still carrying the field fails to load until it is removed.
 | `energy.lifecycle.age_reference_ticks` | `u64` | `500` | Span over which the brain's `AgeTicks` read rises from `0.0` to `1.0` (`min(age / age_reference_ticks, 1)`, T17.F02). A missing field defaults to `500`; `0` normalizes to `500`. The founder's age gate is derived from it at seeding and is exact only while `min_reproduce_age <= age_reference_ticks`; above that the threshold exceeds the saturated `1.0` read and the founder never attempts a birth. |
 | `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. Cap on the child's starting energy (`transfer = min(fraction * after_cost, cap)`); it clamps, never rejects. A cap under `initial_energy` puts every litter under the floor, so such a config refuses every birth (free, counted as `RejectedEnergyConstraints`) and is not rejected or normalized at load. |
 | `energy.lifecycle.genome_carry_cost_per_unit` | `f32` | `1e-4` | Must be finite and `>= 0.0`; invalid values fall back to `1e-4`. A missing field defaults to `1e-4`. `0.0` is allowed and disables the charge. Energy charged per tick per unit of total genome size. |
-| `energy.lifecycle.genome_replication_cost_per_unit` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. A missing field defaults to `0.1`. `0.0` is allowed and disables the surcharge. Per-birth multiplier on the parent's reproduce charge per unit of total genome size above the founder's 111. |
+| `energy.lifecycle.genome_replication_cost_per_unit` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. A missing field defaults to `0.1`. `0.0` is allowed and disables the surcharge. Per-birth multiplier on the parent's reproduce charge per unit of total genome size above the founder's 97. |
 | `energy.lifecycle.gestation_ticks_per_founder_genome` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. A missing field defaults to `1.0`. `0.0` is allowed and delivers every birth at conception (the pre-feature engine). Gestation span per founder genome (T03.F12); see Gestation below. |
 | `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
@@ -189,18 +189,18 @@ Genome carrying cost:
   action cost.
 - Is independent of `energy.complexity_cost`, which multiplies action costs by
   the reachability-aware `complexity()` and is disabled at canonical defaults.
-- At the default rate the canonical founder genome (111 units) pays 0.0111 per
-  tick, 2.22% of the default 0.5 decay.
+- At the default rate the canonical founder genome (97 units) pays 0.0097 per
+  tick, 1.94% of the default 0.5 decay.
 
 Genome replication cost:
 - At reproduction step 5 (`v3-reproduction-spec.md`) the parent's charge is
   `adjusted_action_cost(reproduce_cost, complexity, age) *
-  (1 + genome_replication_cost_per_unit * max(genome_size() - 111, 0))`,
+  (1 + genome_replication_cost_per_unit * max(genome_size() - 97, 0))`,
   computed at the charge site in
   `crates/v3-core/src/simulation/actions/reproduction.rs` from the parent's
-  cached `genome_size()` and `FOUNDER_GENOME_SIZE_UNITS` (111, the canonical
+  cached `genome_size()` and `FOUNDER_GENOME_SIZE_UNITS` (97, the canonical
   V3Alpha1 founder's size, pinned in `crates/v3-core/src/creature/founder.rs`).
-- The factor is exactly `1.0` for every genome of 111 units or fewer and at
+- The factor is exactly `1.0` for every genome of 97 units or fewer and at
   rate `0.0`, so the founder's charge and a rate-0.0 world are bit-identical to
   the pre-feature engine; it is non-decreasing in genome size.
 - Composes multiplicatively with the complexity and age action multipliers
@@ -286,7 +286,7 @@ defined in `v3-reproduction-spec.md`.
 1. Enforce `energy.lifecycle.min_reproduce_age` gate on parent age.
 2. Compute `cost = energy.costs.reproduce_cost`, scaled by the complexity and
    age multipliers and by the genome replication cost factor
-   `1 + energy.lifecycle.genome_replication_cost_per_unit * max(genome_size() - 111, 0)`,
+   `1 + energy.lifecycle.genome_replication_cost_per_unit * max(genome_size() - 97, 0)`,
    and `after_cost = parent energy - cost`. Nothing is charged yet.
 3. Enforce `energy.lifecycle.min_reproduce_energy` gate on `after_cost`.
 4. Compute

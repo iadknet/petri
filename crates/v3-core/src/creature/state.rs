@@ -317,7 +317,7 @@ impl CreatureState {
         }
     }
 
-    ///Create a new creature with pre-computed cached fields.
+    /// Create a new creature with pre-computed cached fields.
     /// Used in the no-mutation reproduction fast path where the offspring
     /// genome is identical to the parent's.
     #[allow(clippy::too_many_arguments)]

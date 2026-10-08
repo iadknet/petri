@@ -158,15 +158,18 @@ and the charges on parents removed in Phase 0 before a held slot.
 
 - [x] `cargo test -p v3-core --test viability` (first) -> result in
       [`docs/progress/readings/t03-f12.md`](../../progress/readings/t03-f12.md).
-- [x] Focused tests: `cargo test -p v3-core gestation` and the fixtures named
-      above -> names and results in the readings file.
+- [x] Focused tests: `cargo test -p v3-core --lib gestation` (16 tests,
+      including the identity fixture on seed 165 and its cap-lowering variant
+      with the B6 pending-parent assertion at tick 50) -> names and results in
+      the readings file.
 - [x] `cargo test -p v3-core --test applied_trajectory` twice (digests agree,
       re-pinned; the rate-`0.0` case reproduces the pre-feature digests),
       `--test baseline_worlds`, `cargo test -p v3-cli --test bench_artifacts`
       -> readings file.
 - [ ] `make check` -> exit 0; `scripts/telemetry-dashboards-check` passes
       with the six new counter names; `scripts/telemetry-overhead` on the existing
-      stack under the 1.10 ceiling -> readings file.
+      stack under the 1.10 ceiling -> readings file. `make check` exits 0;
+      the two telemetry scripts are not yet run.
 - [ ] Long Canyon run (predeclaration below): raw `canyon.ndjson` and
       `canyon-config.json` under the main checkout's ignored
       `.bench-artifacts/t03-f12-genome-length-dependent-reproductive-time/canyon/`;
