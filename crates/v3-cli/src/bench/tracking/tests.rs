@@ -849,6 +849,27 @@ fn gestation_block_partitions_every_conception() {
     assert_eq!(block.pending_litter_energy, six(carried.abs()));
 }
 
+/// Litters still carried at the end of the run are counted and their energy
+/// summed in the `gestation` block (T03.F12).
+#[test]
+fn gestation_block_counts_and_sums_carried_litters() {
+    use v3_core::contracts::Direction;
+    use v3_core::creature::state::PendingBirth;
+    let mut sim = seed_simulation(SimulationConfig::default(), 7);
+    for (creature, litter_energy) in sim.creatures.values_mut().zip([1.5_f32, 2.25]) {
+        creature.pending_birth = Some(PendingBirth {
+            direction: Direction::N,
+            litter_energy,
+            deliver_tick: 99,
+        });
+    }
+
+    let block = GestationTracking::observe(&sim);
+
+    assert_eq!(block.pending_births, 2);
+    assert_eq!(block.pending_litter_energy, six(3.75));
+}
+
 #[test]
 fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     use v3_core::simulation::energy_accounting::{ActionCharges, DeathCause, EnergyFlows};
