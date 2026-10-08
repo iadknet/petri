@@ -891,7 +891,7 @@ fn charged_reproduction(genome: CreatureGenome, rate: f32) -> (f32, f32, f32) {
         CAPPED_TRANSFER
     );
     let result = apply_reproduce(parent, &mut sim, Direction::N, 1.0, &mut rng);
-    assert_eq!(result, ReproductionActionResult::Conceived);
+    assert_eq!(result, ReproductionActionResult::Spawned);
     let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
     (
         sim.creatures[parent].energy,

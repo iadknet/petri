@@ -196,7 +196,7 @@ fn a_child_starts_at_zero_while_its_parent_keeps_its_counters() {
 
     let mut rng = SmallRng::seed_from_u64(42);
     let result = apply_reproduce(parent, &mut sim, Direction::N, 10.0, &mut rng);
-    assert_eq!(result, ReproductionActionResult::Conceived);
+    assert_eq!(result, ReproductionActionResult::Spawned);
     let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
 
     assert_eq!(child.lifetime_actions_attempted_by_type, [0; 5]);

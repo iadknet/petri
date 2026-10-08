@@ -159,7 +159,7 @@ fn populated() -> SimStats {
             .insert(operator, MutationValueTotals::default());
     }
     for result in [
-        ReproductionActionResult::Conceived,
+        ReproductionActionResult::Spawned,
         ReproductionActionResult::RejectedInvalidTarget,
         ReproductionActionResult::RejectedAgeConstraints,
         ReproductionActionResult::RejectedEnergyConstraints,
@@ -277,12 +277,8 @@ fn run_families(families: &mut Vec<Family>) {
         "reproduction_actions_attempted",
         "reproduction_actions_spawned",
         "reproduction_actions_rejected",
-        "gestations_started",
-        "gestations_delivered",
-        "gestations_lost_parent_death",
-        "gestations_lost_no_cell",
-        "gestations_lost_population_cap",
-        "gestation_creature_ticks",
+        "reproductive_holds_started",
+        "reproductive_hold_creature_ticks",
         "mutation_events_attempted",
         "mutation_events_applied",
         "mutation_events_skipped",
@@ -353,7 +349,6 @@ fn run_families(families: &mut Vec<Family>) {
             "maximum_energy_clamp_loss",
             "zero_floor_credit",
             "external_removal_loss",
-            "gestation_lost",
             "action_charge.noop",
             "action_charge.eat",
             "action_charge.move",
@@ -532,7 +527,7 @@ fn outcome_families(families: &mut Vec<Family>) {
             "petri.reason",
             strings(
                 [
-                    "Conceived",
+                    "Spawned",
                     "RejectedInvalidTarget",
                     "RejectedAgeConstraints",
                     "RejectedEnergyConstraints",

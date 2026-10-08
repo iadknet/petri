@@ -73,7 +73,7 @@ fn a_newborn_starts_from_its_own_dispatches_not_its_parents() {
 
     let mut rng = SmallRng::seed_from_u64(3);
     let result = apply_reproduce(parent, &mut sim, Direction::N, 20.0, &mut rng);
-    assert_eq!(result, ReproductionActionResult::Conceived);
+    assert_eq!(result, ReproductionActionResult::Spawned);
     let child = sim
         .creatures
         .values()
