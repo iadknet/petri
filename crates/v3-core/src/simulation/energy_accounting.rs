@@ -160,6 +160,10 @@ pub struct EnergyFlows {
     pub maximum_energy_clamp_loss: f64,
     pub zero_floor_credit: f64,
     pub external_removal_loss: f64,
+    /// Litter energy of every conceived birth that never became a child
+    /// (T03.F12): the parent died during gestation, or delivery found no
+    /// valid cell or the population at its cap.
+    pub gestation_lost: f64,
 }
 
 impl EnergyFlows {

@@ -195,7 +195,9 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
 /// T20.F05 adds `mutation.structured_heritable_refinement: false`; removing only
 /// that key must recover F04's digests. Then removing F04's
 /// `mutation.neutral_input_recruitment: Off` must recover the pre-F04 digests,
-/// preserving both historical precision guards.
+/// preserving both historical precision guards. T03.F12 re-pinned all three
+/// after two agreeing runs for `energy.lifecycle.gestation_ticks_per_founder_genome:
+/// 1.0`; removing only that key recovers the T20.F05 digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     let configs = GOAL_RECIPE_NAMES.map(resolve_checked_in_recipe);
@@ -211,14 +213,38 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
+            "sha256:b8be15d0615cd7f70edba6073025abf9412de28a3fc5debed35f79db87428620",
+            "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6",
+            "sha256:441f348222578888e41be99c4f4924a91809b4ef50c55dcd6de80b91cc37586d",
+        ]
+    );
+
+    let f05_values = configs.map(|config| {
+        let mut value = serde_json::to_value(config).unwrap();
+        assert_eq!(
+            value["energy"]["lifecycle"]
+                .as_object_mut()
+                .unwrap()
+                .remove("gestation_ticks_per_founder_genome"),
+            Some(json!(1.0))
+        );
+        value
+    });
+    let f05 = f05_values.each_ref().map(|value| {
+        let canonical =
+            serde_json::to_vec(&v3_core::config::sort_json_keys_recursive(value.clone())).unwrap();
+        format!("sha256:{}", artifacts::sha256(&canonical))
+    });
+    assert_eq!(
+        f05,
+        [
             "sha256:916c9ffd3dfd0de0577217711c993f40846262ea0e189320706d307d3874693d",
             "sha256:2dac898152631d05ad357c4c3dca29ab8dcdcdd37a332cb6d9d95e42d4a85204",
             "sha256:813a1bc206d1d1f8b04935607d38f6c63a0a87d97133cbc7583fa0e5ff34432e",
         ]
     );
 
-    let f04_values = configs.map(|config| {
-        let mut value = serde_json::to_value(config).unwrap();
+    let f04_values = f05_values.map(|mut value| {
         assert_eq!(
             value["mutation"]
                 .as_object_mut()

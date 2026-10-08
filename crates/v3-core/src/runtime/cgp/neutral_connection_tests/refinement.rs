@@ -230,6 +230,7 @@ fn structured_coefficients_and_deleted_positions_survive_native_offspring_constr
         let mut config = crate::config::SimulationConfig::default();
         config.population.initial_creatures = 1;
         config.mutation.per_unit_rate = 0.0;
+        config.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
         let mut sim = seed_simulation(config, 83);
         let parent_id = sim.creatures.keys().next().unwrap();
         let parent = &mut sim.creatures[parent_id];
@@ -247,7 +248,7 @@ fn structured_coefficients_and_deleted_positions_survive_native_offspring_constr
             .unwrap();
         assert_eq!(
             apply_reproduce(parent_id, &mut sim, direction, 1.0, &mut rng),
-            ReproductionActionResult::Spawned
+            ReproductionActionResult::Conceived
         );
         let child = sim
             .creatures

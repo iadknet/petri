@@ -1,12 +1,12 @@
 use rand::Rng;
 
 use super::cgp_reproduction;
-use crate::contracts::{CreatureId, Direction};
+use crate::contracts::{CreatureId, Direction, Position};
 use crate::creature::action_log::ActionLog;
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::identity::CreatureIdentityState;
-use crate::creature::state::CreatureState;
+use crate::creature::state::{CreatureState, PendingBirth};
 use crate::mutation::phenotype::mutate_phenotype;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
@@ -52,10 +52,33 @@ pub(crate) fn genome_replication_cost_multiplier(rate: f32, genome_size: u32) ->
     1.0 + rate * units_above_founder as f32
 }
 
+/// Gestation span in ticks for a parent of `genome_size` units (T03.F12):
+/// `ceil(genome_size * rate / FOUNDER_GENOME_SIZE_UNITS)`.
+///
+/// At rate `1.0` the founder gestates one tick and a genome twice its size
+/// two; `rate == 0.0` gives `0` (delivery at conception). Non-decreasing in
+/// `genome_size` at a fixed rate. A rate large enough to exceed `u64`
+/// saturates the cast.
+#[inline]
+#[must_use]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "the operand is a finite non-negative ceiling; `as` saturates \
+              past u64::MAX, which holds the parent for the rest of its life"
+)]
+pub(crate) fn gestation_ticks(genome_size: u32, rate: f32) -> u64 {
+    ((f64::from(genome_size) * f64::from(rate)) / f64::from(FOUNDER_GENOME_SIZE_UNITS)).ceil()
+        as u64
+}
+
 /// Result of an attempted reproduction action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReproductionActionResult {
-    Spawned,
+    /// Every gate passed: the parent paid the charge and the litter and
+    /// carries a pending birth, or (at gestation rate `0.0`) the child was
+    /// born at once (T03.F12).
+    Conceived,
     RejectedInvalidTarget,
     RejectedAgeConstraints,
     RejectedEnergyConstraints,
@@ -67,7 +90,7 @@ impl ReproductionActionResult {
     #[must_use]
     pub const fn as_key(self) -> &'static str {
         match self {
-            Self::Spawned => "Spawned",
+            Self::Conceived => "Conceived",
             Self::RejectedInvalidTarget => "RejectedInvalidTarget",
             Self::RejectedAgeConstraints => "RejectedAgeConstraints",
             Self::RejectedEnergyConstraints => "RejectedEnergyConstraints",
@@ -104,14 +127,13 @@ impl ReproductionInvalidTargetCause {
 /// the child starts with, in [0, 1] (T17.F01); the litter is capped at
 /// `default_offspring_energy` and refused under `initial_energy`.
 ///
-/// Returns the outcome indicating whether offspring was spawned or why it was rejected.
+/// Steps 1 to 8 run at conception. When every gate passes the parent carries
+/// a pending birth delivered after `gestation_ticks` (T03.F12) by
+/// [`deliver_pending_birth`]; a span of `0` (rate `0.0`) runs Steps 9 to 14
+/// at once, the pre-feature engine.
+///
+/// Returns `Conceived` or why the attempt was rejected.
 #[must_use]
-#[allow(
-    clippy::too_many_lines,
-    reason = "the unified reproduction sequence in v3-reproduction-spec.md \
-              Section 6 is ordered end to end; splitting it would obscure the \
-              spec-mandated gate order"
-)]
 pub fn apply_reproduce(
     parent_id: CreatureId,
     sim: &mut Simulation,
@@ -225,6 +247,93 @@ pub fn apply_reproduce(
         crate::simulation::energy_accounting::DeathCause::ParentalTransfer,
     );
 
+    // Conception (T03.F12): the litter is carried for the gestation span and
+    // born at the parent's Phase 2 slot on its last tick. A span of 0 is
+    // delivered here, at the validated target, exactly as before the feature.
+    sim.stats.gestations_started_total += 1;
+    let span = gestation_ticks(
+        sim.creatures[parent_id].cached_genome_size,
+        sim.config
+            .energy
+            .lifecycle
+            .gestation_ticks_per_founder_genome,
+    );
+    if span == 0 {
+        spawn_child(parent_id, sim, target, transfer, rng);
+    } else {
+        sim.creatures[parent_id].pending_birth = Some(PendingBirth {
+            direction: dir,
+            litter_energy: transfer,
+            deliver_tick: sim.tick.saturating_add(span),
+        });
+    }
+    ReproductionActionResult::Conceived
+}
+
+/// Outcome of delivering a pending birth (T03.F12).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BirthDelivery {
+    /// The child was born on this cell.
+    Delivered(Position),
+    /// No valid cell adjacent to the parent: the litter is lost.
+    LostNoCell,
+    /// The population was at its cap: the litter is lost.
+    LostPopulationCap,
+}
+
+/// Deliver `parent_id`'s pending birth at its Phase 2 slot (T03.F12).
+///
+/// At the population cap the litter is lost; otherwise the stored direction
+/// is resolved from the parent's position, falling back to the first valid
+/// cell in `Direction::ALL` order, and no valid cell loses the litter. A
+/// delivered birth runs Steps 9 to 14 with the stored litter energy. The
+/// pending birth is cleared in every case. Callers check the parent holds a
+/// pending birth.
+pub(crate) fn deliver_pending_birth(
+    parent_id: CreatureId,
+    sim: &mut Simulation,
+    rng: &mut impl Rng,
+) -> BirthDelivery {
+    let pending = sim.creatures[parent_id]
+        .pending_birth
+        .take()
+        .expect("delivery requires a pending birth");
+    if sim.creatures.len() >= sim.config.population.max_creatures as usize {
+        sim.stats.energy_flows.gestation_lost += f64::from(pending.litter_energy);
+        sim.stats.gestations_lost_population_cap_total += 1;
+        return BirthDelivery::LostPopulationCap;
+    }
+    let parent_pos = sim.creatures[parent_id].position;
+    let valid_cell = |dir: Direction| {
+        sim.world
+            .resolve_neighbor(parent_pos, dir)
+            .filter(|&cell| sim.world.is_valid_target_cell(cell))
+    };
+    let Some(target) =
+        valid_cell(pending.direction).or_else(|| Direction::ALL.into_iter().find_map(valid_cell))
+    else {
+        sim.stats.energy_flows.gestation_lost += f64::from(pending.litter_energy);
+        sim.stats.gestations_lost_no_cell_total += 1;
+        return BirthDelivery::LostNoCell;
+    };
+    spawn_child(parent_id, sim, target, pending.litter_energy, rng);
+    BirthDelivery::Delivered(target)
+}
+
+/// Steps 9 to 14: clone and mutate the parent's genome and state at this
+/// moment and place the child on `target` with `litter_energy`.
+#[allow(
+    clippy::too_many_lines,
+    reason = "Steps 9 to 14 of the unified reproduction sequence in \
+              v3-reproduction-spec.md Section 6 are ordered end to end"
+)]
+fn spawn_child(
+    parent_id: CreatureId,
+    sim: &mut Simulation,
+    target: Position,
+    transfer: f32,
+    rng: &mut impl Rng,
+) {
     // Step 9: Build offspring draft (clone parent genome + state).
     let child_genome = sim.creatures[parent_id].genome.clone();
     let child_shared_memory = sim.creatures[parent_id].shared_memory;
@@ -420,7 +529,7 @@ pub fn apply_reproduce(
     }
 
     sim.stats.reproduction_actions_spawned_total += 1;
-    ReproductionActionResult::Spawned
+    sim.stats.gestations_delivered_total += 1;
 }
 
 #[cfg(test)]
@@ -550,6 +659,44 @@ mod tests {
         ) {
             proptest::prop_assert_eq!(genome_replication_cost_multiplier(rate, size), 1.0);
         }
+
+        #[test]
+        fn gestation_ticks_at_rate_one_is_size_div_ceil_founder(
+            size in proptest::prelude::any::<u32>(),
+        ) {
+            proptest::prop_assert_eq!(
+                gestation_ticks(size, 1.0),
+                u64::from(size.div_ceil(FOUNDER_GENOME_SIZE_UNITS))
+            );
+        }
+
+        #[test]
+        fn gestation_ticks_is_non_decreasing_in_size(
+            rate in 0.0f32..10.0,
+            a in proptest::prelude::any::<u32>(),
+            b in proptest::prelude::any::<u32>(),
+        ) {
+            let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
+            proptest::prop_assert!(gestation_ticks(lo, rate) <= gestation_ticks(hi, rate));
+        }
+
+        #[test]
+        fn gestation_ticks_is_zero_at_rate_zero(size in proptest::prelude::any::<u32>()) {
+            proptest::prop_assert_eq!(gestation_ticks(size, 0.0), 0);
+        }
+    }
+
+    #[test]
+    fn gestation_ticks_hold_the_founder_one_tick_and_twice_its_size_two() {
+        assert_eq!(gestation_ticks(FOUNDER_GENOME_SIZE_UNITS, 1.0), 1);
+        assert_eq!(gestation_ticks(1, 1.0), 1);
+        assert_eq!(gestation_ticks(0, 1.0), 0);
+        assert_eq!(gestation_ticks(98, 1.0), 2);
+        assert_eq!(gestation_ticks(194, 1.0), 2);
+        assert_eq!(gestation_ticks(195, 1.0), 3);
+        assert_eq!(gestation_ticks(FOUNDER_GENOME_SIZE_UNITS, 2.0), 2);
+        assert_eq!(gestation_ticks(FOUNDER_GENOME_SIZE_UNITS, 0.5), 1);
+        assert_eq!(gestation_ticks(u32::MAX, f32::MAX), u64::MAX);
     }
 
     #[test]
@@ -820,6 +967,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.population.initial_creatures = 1;
         cfg.mutation.per_unit_rate = 0.0;
+        cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
         let mut sim = seed_simulation(cfg, 83);
         let parent_id = sim.creatures.keys().next().unwrap();
         let genome = genome_with_cgp_compute_nodes(vec![ComputeNode {
@@ -864,7 +1012,7 @@ mod tests {
                 10.0,
                 &mut rand::rngs::SmallRng::seed_from_u64(2)
             ),
-            ReproductionActionResult::Spawned
+            ReproductionActionResult::Conceived
         );
         let child = sim
             .creatures

@@ -225,8 +225,24 @@ runtime config contract: `v3-runtime-config-spec.md`.
         or transfer < energy.lifecycle.initial_energy
      -> [reject RejectedEnergyConstraints; return]
   8. pay cost from parent, then deduct transfer from parent, as two successive
-     subtractions; the extra cost energy is burned, not transferred; build
-     OffspringDraft with initial_energy = transfer
+     subtractions; the extra cost energy is burned, not transferred
+     -> result Conceived; the parent stores one pending birth
+        (direction, litter energy = transfer, deliver_tick = T + h,
+         h = ceil(genome_size() * gestation_ticks_per_founder_genome / 97))
+     -> h >= 1 : the rest of the parent's action queue for tick T is
+        discarded (no penalty, no log entry); steps 9-12 run at delivery
+     -> h == 0 : delivery runs now at the validated target and the queue
+        continues (rate 0.0, the pre-gestation engine)
+  [hold, ticks T+1 .. T+h, at the parent's Phase 2 slot]
+     -> parent energy <= 0 : remove it; the litter is lost
+     -> tick >= deliver_tick : deliver (below), then clear the pending birth
+     -> the parent's action queue is skipped
+  [delivery]
+     -> population at max_creatures : litter lost
+     -> cell = resolve(stored direction) if valid, else the first valid cell
+        in Direction::ALL order from the parent's position; none : litter lost
+     -> build OffspringDraft with initial_energy = litter energy, reading
+        every inherited field from the parent now
   9. call MutationEngine unconditionally on child genome -> MutationSummary
      (MutationEngine internally draws the requested event count;
       see v3-mutation-spec.md Section 4.1)
@@ -276,6 +292,18 @@ litter floor):
   parent's energy is unchanged and `energy_flows.action_charges.reproduce`
   does not move.
 
+### Gestation loss rule (T03.F12)
+
+A conceived litter that never becomes a child is lost: its energy is added to
+`energy_flows.gestation_lost` and one of `gestations_lost_parent_death_total`
+(the parent was removed by any path before delivery),
+`gestations_lost_no_cell_total` or `gestations_lost_population_cap_total` is
+incremented. A lost birth is not a death: no `DeathCause`, no mortality
+record, no child. The parent is never held past T+h. The action's outcome
+(`ActionSuccess`) is recorded at conception; `OffspringSuccess`,
+`offspring_spawned_count` and `reproduction_actions_spawned_total` at
+delivery.
+
 ### Ownership boundary
 
 - Action ordering/arbitration is owned by `v3-tick-orchestration-spec.md`.
@@ -291,7 +319,7 @@ litter floor):
 
 ### `ReproductionActionResult` minimum enum
 
-- `Spawned`
+- `Conceived`
 - `RejectedInvalidTarget`
 - `RejectedAgeConstraints`
 - `RejectedEnergyConstraints`
@@ -306,9 +334,14 @@ Reproduction processing must emit required minimal data defined in
 At minimum:
 - Reproduction action attempt count (increment once per emitted reproduce action,
   regardless of later target/energy/mutation/spawn outcome).
-- Spawned count.
+- Spawned (delivered) count.
 - Rejected count by `ReproductionActionResult` reason.
-- Accounting invariant: `attempted = spawned + rejected`.
+- Gestation counts: started, delivered, lost by parent death, lost for no
+  cell, lost at the population cap, and held creature-ticks.
+- Accounting invariants: `attempted = rejected + gestations_started` and
+  `gestations_started = gestations_delivered + the three lost counts +
+  pending births`; `gestations_delivered = spawned`. At gestation rate `0.0`
+  started equals spawned, so `attempted = spawned + rejected` holds.
 - Optional per-action event records for debugging.
 
 ---

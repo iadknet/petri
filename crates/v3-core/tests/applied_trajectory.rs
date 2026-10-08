@@ -21,6 +21,10 @@
 //! restores both old digests.
 //! T24.F02 re-pinned both digests: food draws come from the keyed per-cell
 //! stream instead of the run RNG, so every later run-RNG draw shifts.
+//! T03.F12 re-pinned both digests after two agreeing runs: every birth is
+//! delivered one founder gestation later. Each test also runs the fixture at
+//! gestation rate 0.0 and asserts the T24.F02 digests, the kept equivalence
+//! evidence that rate 0.0 is the pre-gestation engine.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -30,9 +34,24 @@ use v3_core::simulation::{run_tick, seed_simulation};
 
 #[test]
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
+    assert_eq!(
+        sampled_trajectory_digest(None),
+        "fecc3666eae1f1deb5096925d5854fe1bf32e5264ea599b1d19223bf2f246aa0"
+    );
+    assert_eq!(
+        sampled_trajectory_digest(Some(0.0)),
+        "73790bc499eb1d3941be67f16c291e59083f4d8351b7c18d49a5f4fba13f80d5"
+    );
+}
+
+/// The sampled-trajectory digest at the default gestation rate or `rate`.
+fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
     let mut hash = Sha256::new();
     for seed in [7, 19] {
         let mut config = SimulationConfig::default();
+        if let Some(rate) = gestation_rate {
+            config.energy.lifecycle.gestation_ticks_per_founder_genome = rate;
+        }
         config.world.width = 24;
         config.world.height = 24;
         config.population.initial_creatures = 24;
@@ -82,11 +101,7 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
         assert!(sim.stats.reproduction_actions_spawned_total > 0);
         assert!(sim.stats.mutation_events_applied_total > 0);
     }
-    let digest = hex::encode(hash.finalize());
-    assert_eq!(
-        digest,
-        "73790bc499eb1d3941be67f16c291e59083f4d8351b7c18d49a5f4fba13f80d5"
-    );
+    hex::encode(hash.finalize())
 }
 
 /// Applied-behavior guard: a mutation-on short run digested over positions,
@@ -96,9 +111,24 @@ fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
 /// T19.F05 re-pins both digests here for the 27-entry input-reference draw.
 #[test]
 fn mutation_on_applied_trajectory_guard_is_pinned() {
+    assert_eq!(
+        applied_guard_digest(None),
+        "a47711760af1b3c1f87d3f688522aadc0fee791cdf3233b981ffa50b231b6a8b"
+    );
+    assert_eq!(
+        applied_guard_digest(Some(0.0)),
+        "f354e86b450383f57c647c86bd90ac7419b74341db02608b9356ea05bef03e51"
+    );
+}
+
+/// The applied-behavior guard digest at the default gestation rate or `rate`.
+fn applied_guard_digest(gestation_rate: Option<f32>) -> String {
     let mut hash = Sha256::new();
     for seed in [7, 19] {
         let mut config = SimulationConfig::default();
+        if let Some(rate) = gestation_rate {
+            config.energy.lifecycle.gestation_ticks_per_founder_genome = rate;
+        }
         config.world.width = 24;
         config.world.height = 24;
         config.population.initial_creatures = 24;
@@ -121,9 +151,5 @@ fn mutation_on_applied_trajectory_guard_is_pinned() {
         assert!(sim.stats.reproduction_actions_spawned_total > 0);
         assert!(sim.stats.mutation_events_applied_total > 0);
     }
-    let digest = hex::encode(hash.finalize());
-    assert_eq!(
-        digest,
-        "f354e86b450383f57c647c86bd90ac7419b74341db02608b9356ea05bef03e51"
-    );
+    hex::encode(hash.finalize())
 }
