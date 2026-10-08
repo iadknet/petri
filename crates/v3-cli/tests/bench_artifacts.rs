@@ -196,7 +196,7 @@ fn resolve_checked_in_recipe(name: &str) -> v3_core::config::SimulationConfig {
 /// that key must recover F04's digests. Then removing F04's
 /// `mutation.neutral_input_recruitment: Off` must recover the pre-F04 digests,
 /// preserving both historical precision guards. T03.F12 re-pinned all three
-/// after two agreeing runs for `energy.lifecycle.reproductive_hold_ticks_per_founder_genome:
+/// after two agreeing runs for `energy.lifecycle.gestation_ticks_per_founder_genome:
 /// 1.0`; removing only that key recovers the T20.F05 digests.
 #[test]
 fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
@@ -213,9 +213,9 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
     assert_eq!(
         actual,
         [
-            "sha256:cc0dc1114df67974ae673b244ce7beb57c75c15c064f8ea7098b00afa71ea532",
-            "sha256:34db56cec10072e8596b82363942391b1fa2903924b9e2f4862665d01ad9d2ec",
-            "sha256:889e3840c9c95e4d76c8794d20557a35c388d5c75e616b7193ced9f8483ad18e",
+            "sha256:b8be15d0615cd7f70edba6073025abf9412de28a3fc5debed35f79db87428620",
+            "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6",
+            "sha256:441f348222578888e41be99c4f4924a91809b4ef50c55dcd6de80b91cc37586d",
         ]
     );
 
@@ -225,7 +225,7 @@ fn checked_in_goal_recipe_identities_are_unchanged_by_json_precision() {
             value["energy"]["lifecycle"]
                 .as_object_mut()
                 .unwrap()
-                .remove("reproductive_hold_ticks_per_founder_genome"),
+                .remove("gestation_ticks_per_founder_genome"),
             Some(json!(1.0))
         );
         value

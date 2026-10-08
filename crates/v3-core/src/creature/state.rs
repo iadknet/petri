@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::mem::size_of;
 
-use crate::contracts::{CreatureId, OrdinaryFoodTypeId, Position, WorldInputKey};
+use crate::contracts::{CreatureId, Direction, OrdinaryFoodTypeId, Position, WorldInputKey};
 use crate::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::mesh_annotations::{
@@ -138,6 +138,20 @@ impl Default for GraphRuntimeState {
     }
 }
 
+/// A litter conceived and not yet delivered (T03.F12). The parent paid the
+/// charge and the litter's energy at conception; the child is born at the
+/// parent's Phase 2 slot on `deliver_tick`, or the litter is lost.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PendingBirth {
+    /// The direction the parent chose at conception, resolved again from its
+    /// position at delivery.
+    pub direction: Direction,
+    /// The child's starting energy, already debited from the parent.
+    pub litter_energy: f32,
+    /// First tick on which the birth is delivered.
+    pub deliver_tick: u64,
+}
+
 /// Full runtime state of a creature in the simulation.
 pub struct CreatureState {
     pub id: CreatureId,
@@ -206,10 +220,9 @@ pub struct CreatureState {
     /// `OutcomeChannel` discriminant (T19.F05). Written once per tick in
     /// Phase 2.5; zeros until the first full tick, never inherited.
     pub previous_outcome: [f32; OUTCOME_CHANNEL_COUNT],
-    /// First tick on which this creature acts again after a spawning
-    /// `Reproduce` (T03.F12); it commits nothing while
-    /// `held_until_tick > tick`. 0 at birth.
-    pub held_until_tick: u64,
+    /// The litter this creature carries (T03.F12); `None` when not
+    /// gestating. A gestating creature commits no action.
+    pub pending_birth: Option<PendingBirth>,
 }
 
 impl CreatureState {
@@ -300,7 +313,7 @@ impl CreatureState {
             lifetime_energy_sum: 0.0,
             lifetime_energy_sample_count: 0,
             previous_outcome: [0.0; OUTCOME_CHANNEL_COUNT],
-            held_until_tick: 0,
+            pending_birth: None,
         }
     }
 
@@ -359,7 +372,7 @@ impl CreatureState {
             lifetime_energy_sum: 0.0,
             lifetime_energy_sample_count: 0,
             previous_outcome: [0.0; OUTCOME_CHANNEL_COUNT],
-            held_until_tick: 0,
+            pending_birth: None,
         }
     }
 }

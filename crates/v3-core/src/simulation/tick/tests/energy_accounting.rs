@@ -1,12 +1,25 @@
 use super::support::*;
 use crate::contracts::Direction;
 use crate::contracts::{OrdinaryFoodTypeId, WorldAction};
-use crate::runtime::types::ComputeCostReport;
+use crate::runtime::trace::domain::TerminationReason;
+use crate::runtime::types::{ComputeCostReport, MeshOutput};
 use crate::simulation::actions::apply_steal_energy;
 use crate::simulation::energy_accounting::DeathCause;
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::tick::run_phase_0;
 use rand::{rngs::SmallRng, SeedableRng};
+
+fn decision(actions: Vec<WorldAction>) -> MeshOutput {
+    MeshOutput {
+        actions,
+        cost_report: ComputeCostReport::default(),
+        priority_bid: 0.0,
+        work_counters: Default::default(),
+        energy_observation: Default::default(),
+        termination_reason: TerminationReason::NoDecision,
+        commit_counts: Default::default(),
+    }
+}
 
 fn execute(
     sim: &mut crate::simulation::Simulation,

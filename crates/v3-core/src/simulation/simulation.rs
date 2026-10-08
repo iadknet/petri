@@ -111,6 +111,11 @@ impl Simulation {
                     .unwrap_or(DeathCause::Unattributed)
             };
             self.stats.mortality.record(cause);
+            // A litter dies with its parent (T03.F12): no child, no death.
+            if let Some(pending) = creature.pending_birth {
+                self.stats.energy_flows.gestation_lost += f64::from(pending.litter_energy);
+                self.stats.gestations_lost_parent_death_total += 1;
+            }
             #[cfg(feature = "telemetry-seams")]
             if self.stats.observed_creature == Some(id) {
                 self.stats.observed_removal = Some((id, cause));

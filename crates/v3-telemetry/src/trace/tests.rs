@@ -244,7 +244,7 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "energy.lifecycle.min_reproduce_energy",
         "energy.lifecycle.min_reproduce_age",
         "energy.lifecycle.genome_replication_cost_per_unit",
-        "energy.lifecycle.reproductive_hold_ticks_per_founder_genome",
+        "energy.lifecycle.gestation_ticks_per_founder_genome",
         "population.max_creatures",
         "mutation.per_unit_rate",
         "mutation.genome_size_cap",

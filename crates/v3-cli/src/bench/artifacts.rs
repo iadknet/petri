@@ -603,7 +603,7 @@ const KEPT_CASE_BLOCKS: [&str; 21] = [
     "case",
     "cognition",
     "energy_flows",
-    "reproductive_hold",
+    "gestation",
     "mortality",
     "predation",
     "reproductive_success_by_cognitive_class",

@@ -172,7 +172,7 @@ fn reproductive_success_counts_successful_births_when_the_parent_is_removed() {
     let mut rng = SmallRng::seed_from_u64(17);
     assert_eq!(
         apply_reproduce(parent, &mut sim, Direction::N, 4.0, &mut rng),
-        ReproductionActionResult::Spawned
+        ReproductionActionResult::Conceived
     );
     assert_eq!(
         apply_reproduce(parent, &mut sim, Direction::N, 4.0, &mut rng),

@@ -90,6 +90,11 @@ fn creature_positions(sim: &Simulation) -> HashMap<CreatureId, Position> {
         .collect()
 }
 
+/// Horizon of the short "survives and reproduces" checks: 20 ticks plus the
+/// founder's one-tick gestation (T03.F12), so a birth conceived on tick 20
+/// is still delivered inside it.
+const BIRTH_HORIZON_TICKS: usize = 21;
+
 fn run_ticks_with_metrics(sim: &mut Simulation, ticks: usize) -> Vec<TickMetrics> {
     let mut prev_positions = creature_positions(sim);
     let mut metrics = Vec::with_capacity(ticks);
@@ -160,7 +165,7 @@ fn sim_runs_40_ticks_without_panic() {
 #[test]
 fn population_survives_and_reproduces_20_ticks() {
     let mut sim = seed_simulation(viability_config(), 42);
-    let metrics = run_ticks_with_metrics(&mut sim, 20);
+    let metrics = run_ticks_with_metrics(&mut sim, BIRTH_HORIZON_TICKS);
     let births_total: usize = metrics.iter().map(|m| m.newborns).sum();
     let max_generation = metrics.iter().map(|m| m.max_generation).max().unwrap_or(0);
 
@@ -197,7 +202,7 @@ fn population_survives_reference_seeds() {
 fn high_coverage_economics_survive_and_reproduce_short_horizon() {
     for seed in [1_u64, 7, 42] {
         let mut sim = seed_simulation(high_coverage_economics_probe_config(), seed);
-        let metrics = run_ticks_with_metrics(&mut sim, 20);
+        let metrics = run_ticks_with_metrics(&mut sim, BIRTH_HORIZON_TICKS);
         let births_total: usize = metrics.iter().map(|m| m.newborns).sum();
         let max_generation = metrics.iter().map(|m| m.max_generation).max().unwrap_or(0);
 
@@ -472,6 +477,14 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
     world.place_creature(pos, parent_id);
 
     let mut sim = Simulation::new(world, creatures, 0, cfg, 7);
+    // T03.F12: the founder conceives on this tick and gestates one tick.
+    run_tick(&mut sim, &mut None);
+    assert_eq!(
+        sim.creature_count(),
+        1,
+        "the child is not born at conception"
+    );
+    assert!(sim.creatures[parent_id].pending_birth.is_some());
     run_tick(&mut sim, &mut None);
 
     let generation_one = sim
@@ -826,7 +839,7 @@ fn viability_still_passes_with_real_mutations() {
     cfg.mutation.per_unit_rate = 0.02;
 
     let mut sim = seed_simulation(cfg, 42);
-    let metrics = run_ticks_with_metrics(&mut sim, 20);
+    let metrics = run_ticks_with_metrics(&mut sim, BIRTH_HORIZON_TICKS);
     let births_total: usize = metrics.iter().map(|m| m.newborns).sum();
 
     assert!(
@@ -850,7 +863,7 @@ fn viability_still_passes_with_per_unit_mutations() {
     cfg.mutation.per_unit_rate = 0.05;
 
     let mut sim = seed_simulation(cfg, 42);
-    let metrics = run_ticks_with_metrics(&mut sim, 20);
+    let metrics = run_ticks_with_metrics(&mut sim, BIRTH_HORIZON_TICKS);
     let births_total: usize = metrics.iter().map(|m| m.newborns).sum();
 
     assert!(
@@ -920,8 +933,30 @@ fn stats_accounting_invariant_holds_over_50_ticks() {
     let s = &sim.stats;
     assert_eq!(
         s.reproduction_actions_attempted_total,
-        s.reproduction_actions_spawned_total + s.reproduction_actions_rejected_total,
-        "accounting invariant: attempted == spawned + rejected"
+        s.reproduction_actions_rejected_total + s.gestations_started_total,
+        "accounting invariant: attempted == rejected + gestations_started"
+    );
+    let pending = sim
+        .creatures
+        .values()
+        .filter(|c| c.pending_birth.is_some())
+        .count() as u64;
+    assert_eq!(
+        s.gestations_started_total,
+        s.gestations_delivered_total
+            + s.gestations_lost_parent_death_total
+            + s.gestations_lost_no_cell_total
+            + s.gestations_lost_population_cap_total
+            + pending,
+        "gestation partition: started == delivered + lost + pending"
+    );
+    assert_eq!(
+        s.gestations_delivered_total,
+        s.reproduction_actions_spawned_total
+    );
+    assert!(
+        s.gestations_delivered_total > 0,
+        "the run must deliver births"
     );
 }
 
@@ -1073,15 +1108,14 @@ fn ordinary_food_alone_replenishes_energy_and_reproduces() {
 /// `docs/reference/v3-startup-seeding-spec.md`.
 #[test]
 fn founder_only_trajectory_digest_is_pinned() {
-    // Re-pinned by T03.F12 after two agreeing runs (one-tick founder
-    // reproductive hold): 199 births became 288; rate 0.0 reproduces the
-    // pre-feature pin.
+    // Re-pinned by T03.F12 (one-tick founder gestation): 199 births became
+    // 229 at the default rate; rate 0.0 reproduces the pre-feature pin.
     assert_eq!(
         founder_only_trajectory(None),
         (
-            288,
+            229,
             0,
-            "b41b0297bbbd2e86819290007a18df44ca7f639f5b773fbefc2a070c813ab17d".to_owned()
+            "14ad665bdac20920d65824d7457a13207a19051c1990997d9925b0402e6ec105".to_owned()
         )
     );
     // Measured on macOS aarch64 (T24.F02, keyed food stream); earlier pins also matched GNU/Linux aarch64.
@@ -1096,17 +1130,15 @@ fn founder_only_trajectory_digest_is_pinned() {
 }
 
 /// Births, final population and trajectory digest of the founder-only run,
-/// at the default reproductive hold rate or the given one.
-fn founder_only_trajectory(hold_rate: Option<f32>) -> (u64, usize, String) {
+/// at the default gestation rate or the given one.
+fn founder_only_trajectory(gestation_rate: Option<f32>) -> (u64, usize, String) {
     use sha2::{Digest, Sha256};
     use slotmap::Key;
 
     let mut cfg = viability_config();
     cfg.mutation.per_unit_rate = 0.0;
-    if let Some(rate) = hold_rate {
-        cfg.energy
-            .lifecycle
-            .reproductive_hold_ticks_per_founder_genome = rate;
+    if let Some(rate) = gestation_rate {
+        cfg.energy.lifecycle.gestation_ticks_per_founder_genome = rate;
     }
     let mut sim = seed_simulation(cfg, 2026);
     let mut hash = Sha256::new();
