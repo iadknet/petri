@@ -393,6 +393,17 @@ pub struct EnergyLifecycleConfig {
     /// copy. `0.0` disables the surcharge.
     #[serde(default = "default_genome_replication_cost_per_unit")]
     pub genome_replication_cost_per_unit: f32,
+    /// Pre-birth gestation span per founder genome (T03.F12): a conceiving
+    /// parent of `genome_size()` units is held for
+    /// `ceil(genome_size() * rate / founder size)` ticks and its child is
+    /// born at the end of the span. `0.0` delivers at conception (the
+    /// pre-feature engine).
+    #[serde(default = "default_gestation_ticks_per_founder_genome")]
+    pub gestation_ticks_per_founder_genome: f32,
+}
+
+fn default_gestation_ticks_per_founder_genome() -> f32 {
+    1.0
 }
 
 fn default_min_reproduce_age() -> u64 {
@@ -423,6 +434,7 @@ impl Default for EnergyLifecycleConfig {
             default_offspring_energy: 100.0,
             genome_carry_cost_per_unit: default_genome_carry_cost_per_unit(),
             genome_replication_cost_per_unit: default_genome_replication_cost_per_unit(),
+            gestation_ticks_per_founder_genome: default_gestation_ticks_per_founder_genome(),
         }
     }
 }
@@ -1026,6 +1038,10 @@ impl SimulationConfig {
         el.genome_replication_cost_per_unit = normalize_f32_finite_nonneg(
             el.genome_replication_cost_per_unit,
             default_genome_replication_cost_per_unit(),
+        );
+        el.gestation_ticks_per_founder_genome = normalize_f32_finite_nonneg(
+            el.gestation_ticks_per_founder_genome,
+            default_gestation_ticks_per_founder_genome(),
         );
 
         let ec = &mut self.energy.costs;
@@ -2140,6 +2156,36 @@ mod tests {
             cfg.energy.lifecycle.genome_replication_cost_per_unit = rate;
             cfg.normalize();
             assert_eq!(cfg.energy.lifecycle.genome_replication_cost_per_unit, rate);
+        }
+    }
+
+    #[test]
+    fn energy_lifecycle_serde_defaults_gestation_rate_to_one_when_missing() {
+        let json = r#"{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":30.0,"default_offspring_energy":100.0}"#;
+        let lifecycle: EnergyLifecycleConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(lifecycle.gestation_ticks_per_founder_genome, 1.0);
+        assert_eq!(
+            EnergyLifecycleConfig::default().gestation_ticks_per_founder_genome,
+            1.0
+        );
+    }
+
+    #[test]
+    fn normalize_gestation_rate_falls_back_on_invalid_and_keeps_valid_values() {
+        for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.5] {
+            let mut cfg = SimulationConfig::default();
+            cfg.energy.lifecycle.gestation_ticks_per_founder_genome = bad;
+            cfg.normalize();
+            assert_eq!(cfg.energy.lifecycle.gestation_ticks_per_founder_genome, 1.0);
+        }
+        for rate in [0.0, 0.5, 2.5] {
+            let mut cfg = SimulationConfig::default();
+            cfg.energy.lifecycle.gestation_ticks_per_founder_genome = rate;
+            cfg.normalize();
+            assert_eq!(
+                cfg.energy.lifecycle.gestation_ticks_per_founder_genome,
+                rate
+            );
         }
     }
 

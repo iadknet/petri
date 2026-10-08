@@ -35,8 +35,8 @@ use crate::sensors::visibility::{
 };
 use crate::simulation::actions::{
     apply_move, apply_noop, apply_reproduce, apply_steal_energy, apply_typed_eat,
-    BarrierReaderState, MoveBlockedCause, PredationActionResult, ReproductionActionResult,
-    ReproductionInvalidTargetCause,
+    deliver_pending_birth, BarrierReaderState, BirthDelivery, MoveBlockedCause,
+    PredationActionResult, ReproductionActionResult, ReproductionInvalidTargetCause,
 };
 use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::simulation::Simulation;
@@ -1031,9 +1031,17 @@ fn execute_reproduce(
     if let Some(creature) = sim.creatures.get_mut(ctx.id) {
         creature.record_action_attempt(ActionType::Reproduce);
     }
-    let succeeded = result == ReproductionActionResult::Spawned;
+    let succeeded = result == ReproductionActionResult::Conceived;
     outcome_acc.record_action_result(ctx.id, succeeded);
-    if succeeded {
+    // A conception with no pending birth left was delivered at once (span 0,
+    // T03.F12) on the validated target; a carried litter is recorded at its
+    // delivery instead.
+    let born_now = succeeded
+        && sim
+            .creatures
+            .get(ctx.id)
+            .is_some_and(|parent| parent.pending_birth.is_none());
+    if born_now {
         if let Some(target) = reproduction_target {
             successful_spawn_targets.insert(target);
         }
@@ -1067,7 +1075,7 @@ fn execute_reproduce(
         }
     }
     let action_result = match result {
-        ReproductionActionResult::Spawned => ActionResult::Success,
+        ReproductionActionResult::Conceived => ActionResult::Success,
         ReproductionActionResult::RejectedInvalidTarget => ActionResult::InvalidTarget,
         ReproductionActionResult::RejectedAgeConstraints => ActionResult::AgeConstraints,
         ReproductionActionResult::RejectedEnergyConstraints => ActionResult::EnergyConstraints,
@@ -1166,6 +1174,25 @@ fn run_phase_2(
             continue;
         }
 
+        // Gestation hold (T03.F12): a parent carrying a litter commits
+        // nothing; on the span's last tick its child is born here first.
+        if let Some(pending) = sim.creatures[id].pending_birth {
+            // Phase 1 charges can exhaust a creature without removing it.
+            if remove_creature_if_dead(sim, id) {
+                continue;
+            }
+            if sim.tick >= pending.deliver_tick {
+                if let BirthDelivery::Delivered(cell) =
+                    deliver_pending_birth(id, sim, reproduce_rng)
+                {
+                    successful_spawn_targets.insert(cell);
+                    outcome_acc.record_offspring(id);
+                }
+            }
+            sim.stats.gestation_creature_ticks_total += 1;
+            continue;
+        }
+
         // Apply each queued action sequentially, recording to action log.
         let current_tick = sim.tick;
         let priority_bid = output.priority_bid;
@@ -1222,6 +1249,12 @@ fn run_phase_2(
             }
 
             if remove_creature_if_dead(sim, id) {
+                break;
+            }
+            // A conception ends the queue: the rest is discarded with no
+            // penalty and no log entry (T03.F12). Held creatures never reach
+            // this loop, so a pending birth here was conceived just now.
+            if sim.creatures[id].pending_birth.is_some() {
                 break;
             }
         }

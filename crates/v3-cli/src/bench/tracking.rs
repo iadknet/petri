@@ -79,6 +79,45 @@ pub struct PredationTracking {
     pub actions_by_result: BTreeMap<String, u64>,
 }
 
+/// What the population's conceptions became (T03.F12): `started` equals
+/// `delivered` plus the three losses plus `pending_births`, the litters
+/// still carried at the end of the run.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GestationTracking {
+    pub gestations_started_total: u64,
+    pub gestations_delivered_total: u64,
+    pub gestations_lost_parent_death_total: u64,
+    pub gestations_lost_no_cell_total: u64,
+    pub gestations_lost_population_cap_total: u64,
+    pub gestation_creature_ticks_total: u64,
+    pub pending_births: u64,
+    pub pending_litter_energy: String,
+}
+
+impl GestationTracking {
+    fn observe(sim: &v3_core::simulation::Simulation) -> Self {
+        let stats = &sim.stats;
+        let (pending_births, pending_litter_energy) = sim
+            .creatures
+            .values()
+            .filter_map(|creature| creature.pending_birth)
+            .fold((0, 0.0), |(count, energy), pending| {
+                (count + 1, energy + f64::from(pending.litter_energy))
+            });
+        Self {
+            gestations_started_total: stats.gestations_started_total,
+            gestations_delivered_total: stats.gestations_delivered_total,
+            gestations_lost_parent_death_total: stats.gestations_lost_parent_death_total,
+            gestations_lost_no_cell_total: stats.gestations_lost_no_cell_total,
+            gestations_lost_population_cap_total: stats.gestations_lost_population_cap_total,
+            gestation_creature_ticks_total: stats.gestation_creature_ticks_total,
+            pending_births,
+            pending_litter_energy: six(pending_litter_energy),
+        }
+    }
+}
+
 /// Every successful removal, partitioned by the first applied exhausting sink.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MortalityTracking {
@@ -148,6 +187,10 @@ pub struct EnergyFlowTracking {
     pub maximum_energy_clamp_loss: String,
     pub zero_floor_credit: String,
     pub external_removal_loss: String,
+    /// Litter energy of lost conceptions (T03.F12); absent from reports
+    /// stored before it.
+    #[serde(default)]
+    pub gestation_lost: String,
 }
 
 impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTracking {
@@ -180,6 +223,7 @@ impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTr
             maximum_energy_clamp_loss: six(flows.maximum_energy_clamp_loss),
             zero_floor_credit: six(flows.zero_floor_credit),
             external_removal_loss: six(flows.external_removal_loss),
+            gestation_lost: six(flows.gestation_lost),
         }
     }
 }
@@ -271,6 +315,9 @@ pub struct WorldTracking {
     /// Terminal-only applied energy flows; absent means unmeasured.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub energy_flows: Option<EnergyFlowTracking>,
+    /// Terminal-only conception outcomes (T03.F12); absent means unmeasured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gestation: Option<GestationTracking>,
     /// Terminal-only applied learning and changed-memory-write events.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cognition: Option<CognitionTracking>,
@@ -502,6 +549,7 @@ impl WorldTracking {
             mortality: None,
             reproductive_success_by_cognitive_class: None,
             energy_flows: None,
+            gestation: None,
             cognition: None,
             surviving_clade_profiles: None,
         }
@@ -549,6 +597,7 @@ impl WorldTracking {
                 },
             ),
             energy_flows: Some((&stats.energy_flows).into()),
+            gestation: Some(GestationTracking::observe(sim)),
             typed_eats_failed_total: Some(by_food_type(
                 sim,
                 &stats.eat_actions_failed_total_by_type,

@@ -1,0 +1,330 @@
+//! Pre-birth gestation (T03.F12): conception, the hold, delivery and loss.
+
+use super::support::*;
+use crate::config::SimulationConfig;
+use crate::contracts::{CreatureId, Direction, Position, WorldAction};
+use crate::creature::action_log::{ActionLog, ActionResult};
+use crate::creature::genome::OutcomeChannel;
+use crate::runtime::trace::domain::TerminationReason;
+use crate::runtime::types::{ComputeCostReport, MeshOutput};
+use crate::simulation::outcomes::OutcomeAccumulator;
+use crate::simulation::tick::{run_phase_0, run_phase_2, run_tick};
+use crate::simulation::{seed_simulation, Simulation};
+use rand::{rngs::SmallRng, SeedableRng};
+
+const PARENT_ENERGY: f32 = 100.0;
+const REPRODUCE: WorldAction = WorldAction::Reproduce {
+    direction: Direction::N,
+    energy_transfer_fraction: 0.5,
+};
+
+fn decision(actions: Vec<WorldAction>) -> MeshOutput {
+    MeshOutput {
+        actions,
+        cost_report: ComputeCostReport::default(),
+        priority_bid: 0.0,
+        work_counters: Default::default(),
+        energy_observation: Default::default(),
+        termination_reason: TerminationReason::NoDecision,
+        commit_counts: Default::default(),
+    }
+}
+
+/// One founder (97 units) at (5, 5) on free, ungated economics, gestating
+/// at `rate` ticks per founder genome.
+fn gestating_sim(rate: f32) -> (Simulation, CreatureId) {
+    let (mut sim, id) = make_sim_with_one_creature(PARENT_ENERGY);
+    let config = &mut sim.config;
+    config.energy.lifecycle.gestation_ticks_per_founder_genome = rate;
+    config.energy.complexity_cost.enabled = false;
+    config.energy.costs.reproduce_cost = 1.0;
+    config.energy.costs.noop_cost = 0.0;
+    config.energy.costs.failed_action_penalty = 0.0;
+    config.startup.ramps.failed_action_penalty.enabled = false;
+    config.energy.lifecycle.min_reproduce_age = 0;
+    config.energy.lifecycle.min_reproduce_energy = 0.0;
+    config.mutation.per_unit_rate = 0.0;
+    sim.action_logs
+        .insert(id, ActionLog::new(sim.config.action_log.capacity));
+    (sim, id)
+}
+
+/// Run one Phase 2 slot for `id` at `tick` and return its outcome record.
+fn slot(sim: &mut Simulation, id: CreatureId, tick: u64, actions: Vec<WorldAction>) -> u32 {
+    sim.tick = tick;
+    let mut outcomes = OutcomeAccumulator::default();
+    outcomes.snapshot_energy(id, sim.creatures[id].energy);
+    run_phase_2(
+        sim,
+        vec![(id, decision(actions))],
+        &mut outcomes,
+        &mut SmallRng::seed_from_u64(tick),
+    );
+    let bank = outcomes.compute_signal_bank(id, 0.0).unwrap();
+    bank.signals[OutcomeChannel::OffspringSuccess as usize] as u32
+}
+
+fn log_len(sim: &Simulation, id: CreatureId) -> usize {
+    sim.action_logs[id].len()
+}
+
+/// After `Reproduce` at tick 0 with fraction 0.5: the charge (1.0) and the
+/// litter (49.5) are paid; the litter is what a delivered child starts with.
+const LITTER: f32 = (PARENT_ENERGY - 1.0) * 0.5;
+
+fn conceive(sim: &mut Simulation, id: CreatureId) {
+    let offspring = slot(sim, id, 0, vec![REPRODUCE, WorldAction::NoOp]);
+    assert_eq!(offspring, 0, "no child exists at conception");
+}
+
+fn children(sim: &Simulation, parent: CreatureId) -> Vec<Position> {
+    sim.creatures
+        .iter()
+        .filter(|(id, _)| *id != parent)
+        .map(|(_, c)| c.position)
+        .collect()
+}
+
+#[test]
+fn gestation_conception_ends_the_queue_and_holds_the_founder_one_tick() {
+    let (mut sim, id) = gestating_sim(1.0);
+    conceive(&mut sim, id);
+
+    let pending = sim.creatures[id].pending_birth.expect("conceived");
+    assert_eq!(pending.deliver_tick, 1);
+    assert_eq!(pending.litter_energy, LITTER);
+    assert_eq!(pending.direction, Direction::N);
+    assert_eq!(sim.creatures[id].energy, PARENT_ENERGY - 1.0 - LITTER);
+    assert_eq!(sim.creature_count(), 1);
+    assert_eq!(sim.stats.gestations_started_total, 1);
+    assert_eq!(sim.stats.gestations_delivered_total, 0);
+    assert_eq!(sim.stats.reproduction_actions_spawned_total, 0);
+    // The queued NoOp after the conception is discarded with no log entry.
+    assert_eq!(sim.stats.last_tick_noop, 0);
+    assert_eq!(log_len(&sim, id), 1);
+    let entry = sim.action_logs[id].entries()[0];
+    assert_eq!(entry.result, ActionResult::Success);
+
+    // Tick 1 (T + h): delivered at the parent's slot, which commits nothing.
+    let offspring = slot(&mut sim, id, 1, vec![WorldAction::NoOp]);
+    assert_eq!(
+        offspring, 1,
+        "the delivery counts as the parent's offspring"
+    );
+    assert_eq!(children(&sim, id), vec![Position::new(5, 4)]);
+    let child = sim.creatures.values().find(|c| c.generation == 1).unwrap();
+    assert_eq!(child.energy, LITTER);
+    assert!(sim.creatures[id].pending_birth.is_none());
+    assert_eq!(sim.creatures[id].offspring_spawned_count, 1);
+    assert_eq!(sim.stats.gestations_delivered_total, 1);
+    assert_eq!(sim.stats.reproduction_actions_spawned_total, 1);
+    assert_eq!(sim.stats.gestation_creature_ticks_total, 1);
+    assert_eq!(
+        f64::from(LITTER),
+        sim.stats.energy_flows.offspring_energy_credit
+    );
+    assert_eq!(sim.stats.last_tick_noop, 0);
+    assert_eq!(log_len(&sim, id), 1, "a held tick writes no log entry");
+
+    // Tick 2 (T + h + 1): the parent acts again.
+    slot(&mut sim, id, 2, vec![WorldAction::NoOp]);
+    assert_eq!(sim.stats.last_tick_noop, 1);
+    assert_eq!(log_len(&sim, id), 2);
+    assert_eq!(sim.stats.gestation_creature_ticks_total, 1);
+}
+
+#[test]
+fn gestation_span_scales_with_rate_and_holds_every_tick_of_it() {
+    // Rate 2.0 on the founder: ceil(97 * 2 / 97) = 2 held ticks.
+    let (mut sim, id) = gestating_sim(2.0);
+    conceive(&mut sim, id);
+    assert_eq!(sim.creatures[id].pending_birth.unwrap().deliver_tick, 2);
+
+    assert_eq!(slot(&mut sim, id, 1, vec![WorldAction::NoOp]), 0);
+    assert!(children(&sim, id).is_empty());
+    assert_eq!(log_len(&sim, id), 1);
+
+    assert_eq!(slot(&mut sim, id, 2, vec![WorldAction::NoOp]), 1);
+    assert_eq!(children(&sim, id).len(), 1);
+    assert_eq!(sim.stats.gestation_creature_ticks_total, 2);
+    assert_eq!(log_len(&sim, id), 1);
+}
+
+#[test]
+fn gestation_delivers_on_the_first_valid_cell_when_the_chosen_one_closed() {
+    let (mut sim, id) = gestating_sim(1.0);
+    conceive(&mut sim, id);
+    sim.world.set_barrier(Position::new(5, 4), true);
+
+    slot(&mut sim, id, 1, vec![]);
+    // N is barred; NE is next in `Direction::ALL` order.
+    assert_eq!(children(&sim, id), vec![Position::new(6, 4)]);
+    assert_eq!(sim.stats.gestations_delivered_total, 1);
+}
+
+#[test]
+fn gestation_with_no_valid_cell_loses_the_litter_and_still_holds_the_parent() {
+    let (mut sim, id) = gestating_sim(1.0);
+    conceive(&mut sim, id);
+    for dir in Direction::ALL {
+        let cell = sim
+            .world
+            .resolve_neighbor(Position::new(5, 5), dir)
+            .unwrap();
+        sim.world.set_barrier(cell, true);
+    }
+
+    assert_eq!(slot(&mut sim, id, 1, vec![WorldAction::NoOp]), 0);
+    assert!(children(&sim, id).is_empty());
+    assert!(sim.creatures[id].pending_birth.is_none());
+    assert_eq!(sim.stats.gestations_lost_no_cell_total, 1);
+    assert_eq!(sim.stats.energy_flows.gestation_lost, f64::from(LITTER));
+    assert_eq!(sim.stats.gestations_delivered_total, 0);
+    assert_eq!(sim.stats.gestation_creature_ticks_total, 1);
+    assert_eq!(
+        sim.stats.mortality.deaths_total, 0,
+        "a lost birth is not a death"
+    );
+    assert_eq!(log_len(&sim, id), 1);
+}
+
+#[test]
+fn gestation_at_the_population_cap_loses_the_litter() {
+    let (mut sim, id) = gestating_sim(1.0);
+    conceive(&mut sim, id);
+    sim.config.population.max_creatures = 1;
+
+    slot(&mut sim, id, 1, vec![]);
+    assert!(children(&sim, id).is_empty());
+    assert!(sim.creatures[id].pending_birth.is_none());
+    assert_eq!(sim.stats.gestations_lost_population_cap_total, 1);
+    assert_eq!(sim.stats.energy_flows.gestation_lost, f64::from(LITTER));
+}
+
+#[test]
+fn gestation_litter_dies_with_a_parent_removed_in_phase_0() {
+    let (mut sim, id) = gestating_sim(1.0);
+    conceive(&mut sim, id);
+    sim.creatures[id].energy = 0.1;
+    run_phase_0(&mut sim);
+
+    assert!(!sim.creatures.contains_key(id));
+    assert_eq!(sim.creature_count(), 0, "no child");
+    assert_eq!(sim.stats.gestations_lost_parent_death_total, 1);
+    assert_eq!(sim.stats.energy_flows.gestation_lost, f64::from(LITTER));
+    assert_eq!(sim.stats.mortality.deaths_total, 1, "only the parent dies");
+}
+
+#[test]
+fn gestation_parent_exhausted_before_its_slot_is_removed_there_without_delivery() {
+    let (mut sim, id) = gestating_sim(1.0);
+    conceive(&mut sim, id);
+    // Phase 1 charges can leave a creature at or below zero unremoved.
+    sim.creatures[id].energy = -0.25;
+
+    assert_eq!(slot(&mut sim, id, 1, vec![WorldAction::NoOp]), 0);
+    assert!(!sim.creatures.contains_key(id));
+    assert_eq!(sim.creature_count(), 0);
+    assert_eq!(sim.stats.gestations_lost_parent_death_total, 1);
+    assert_eq!(sim.stats.gestations_delivered_total, 0);
+    assert_eq!(sim.stats.gestation_creature_ticks_total, 0);
+}
+
+#[test]
+fn gestation_rate_zero_delivers_at_conception_and_the_queue_continues() {
+    let (mut sim, id) = gestating_sim(0.0);
+    let offspring = slot(&mut sim, id, 0, vec![REPRODUCE, WorldAction::NoOp]);
+
+    assert_eq!(offspring, 1);
+    assert_eq!(children(&sim, id), vec![Position::new(5, 4)]);
+    assert!(sim.creatures[id].pending_birth.is_none());
+    assert_eq!(sim.stats.last_tick_noop, 1);
+    assert_eq!(log_len(&sim, id), 2);
+    assert_eq!(sim.stats.gestations_started_total, 1);
+    assert_eq!(sim.stats.gestations_delivered_total, 1);
+    assert_eq!(sim.stats.gestation_creature_ticks_total, 0);
+}
+
+/// Count identities and the energy identity of the spec's "Energy identity"
+/// row over a run with births, losses on death and crowded deliveries.
+/// `lower_cap_at` lowers `max_energy` mid-run without re-clamping creatures.
+fn assert_gestation_identities(lower_cap_at: Option<u64>) {
+    let mut cfg = SimulationConfig::default();
+    cfg.world.width = 32;
+    cfg.world.height = 32;
+    cfg.world.food.types[0].initial_coverage = 1.0;
+    cfg.world.food.types[0].initial_density = 1.0;
+    cfg.population.initial_creatures = 40;
+    cfg.population.max_creatures = 50;
+    // A long span and a steep decay expose litters to parent death; the cap
+    // to crowded deliveries.
+    cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 8.0;
+    cfg.energy.lifecycle.energy_decay_per_tick = 2.0;
+    let mut sim = seed_simulation(cfg, 2026);
+    let mut e_max = sim.creatures.values().map(|c| c.energy).fold(0.0, f32::max);
+    let mut c_max = sim.config.energy.lifecycle.max_energy;
+    for tick in 0..250 {
+        if lower_cap_at == Some(tick) {
+            sim.config.energy.lifecycle.max_energy = 60.0;
+            assert!(
+                sim.creatures.values().any(|c| c.energy > 60.0),
+                "creatures must hold energy above the lowered cap"
+            );
+        }
+        c_max = c_max.max(sim.config.energy.lifecycle.max_energy);
+        run_tick(&mut sim, &mut None);
+        e_max = sim
+            .creatures
+            .values()
+            .map(|c| c.energy)
+            .fold(e_max, f32::max);
+
+        let s = &sim.stats;
+        let pending: Vec<f32> = sim
+            .creatures
+            .values()
+            .filter_map(|c| c.pending_birth.map(|p| p.litter_energy))
+            .collect();
+        assert_eq!(
+            s.reproduction_actions_attempted_total,
+            s.reproduction_actions_rejected_total + s.gestations_started_total
+        );
+        assert_eq!(
+            s.gestations_started_total,
+            s.gestations_delivered_total
+                + s.gestations_lost_parent_death_total
+                + s.gestations_lost_no_cell_total
+                + s.gestations_lost_population_cap_total
+                + pending.len() as u64
+        );
+        let flows = &s.energy_flows;
+        let carried: f64 = pending.iter().copied().map(f64::from).sum();
+        let residual = (flows.parental_transfer_debit
+            - (flows.offspring_energy_credit + flows.gestation_lost + carried))
+            .abs();
+        let bound = s.gestations_started_total as f64
+            * f64::from(e_max.max(c_max))
+            * f64::from(2.0f32.powi(-23));
+        assert!(
+            residual <= bound,
+            "tick {tick}: residual {residual} exceeds {bound}"
+        );
+    }
+    let s = &sim.stats;
+    assert!(s.gestations_delivered_total > 0, "{s:?}");
+    assert!(s.gestations_lost_parent_death_total > 0, "{s:?}");
+    assert!(
+        s.gestations_lost_no_cell_total + s.gestations_lost_population_cap_total > 0,
+        "crowded deliveries must lose some litters"
+    );
+}
+
+#[test]
+fn gestation_energy_and_count_identities_hold_every_tick() {
+    assert_gestation_identities(None);
+}
+
+#[test]
+fn gestation_energy_identity_holds_when_the_cap_is_lowered_mid_run() {
+    assert_gestation_identities(Some(40));
+}

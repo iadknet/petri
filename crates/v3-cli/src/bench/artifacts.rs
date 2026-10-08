@@ -599,10 +599,11 @@ const KEPT_SAMPLE_FIELDS: [&str; 12] = [
 ];
 /// Case blocks the page reads, each kept whole, and `input_use` (T20.F01),
 /// which the page does not read but the readings do.
-const KEPT_CASE_BLOCKS: [&str; 20] = [
+const KEPT_CASE_BLOCKS: [&str; 21] = [
     "case",
     "cognition",
     "energy_flows",
+    "gestation",
     "mortality",
     "predation",
     "reproductive_success_by_cognitive_class",

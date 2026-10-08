@@ -397,6 +397,10 @@ pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
         config_key("energy.lifecycle.genome_replication_cost_per_unit"),
         lifecycle.genome_replication_cost_per_unit,
     );
+    a.double(
+        config_key("energy.lifecycle.gestation_ticks_per_founder_genome"),
+        lifecycle.gestation_ticks_per_founder_genome,
+    );
     a.int(
         config_key("population.max_creatures"),
         config.population.max_creatures,

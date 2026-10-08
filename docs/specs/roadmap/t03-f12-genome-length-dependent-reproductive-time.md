@@ -136,31 +136,31 @@ and the charges on parents removed in Phase 0 before a held slot.
 
 ## Implementation Tasks
 
-- [ ] Config field, `normalize`, `gestation_ticks` helper and its tests
+- [x] Config field, `normalize`, `gestation_ticks` helper and its tests
       (unit, proptest equality to `div_ceil(97)` at rate 1.0, monotone,
       rate `0.0` gives 0); the `Conceived` rename; recipe-digest,
       `applied_trajectory` and `baseline_worlds` pins moved after two agreeing
       runs.
-- [ ] Pending birth on `CreatureState`; commit, hold, delivery and loss in
+- [x] Pending birth on `CreatureState`; commit, hold, delivery and loss in
       `reproduction.rs`, `tick.rs` and `simulation.rs`; the six counters, the
       flow, the `gestation` report block and the viability count identity;
       TDD fixtures for the hold, the delivery (moved parent,
       fallback cell, no cell, cap), the loss on death, the identity, and
       rate `0.0` equivalence.
-- [ ] Telemetry wiring (families, test rows, dashboards-check names, the
+- [x] Telemetry wiring (families, test rows, dashboards-check names, the
       `actions` phase attribute).
-- [ ] Frontend row and fixtures; `v3-runtime-config-spec.md` and
+- [x] Frontend row and fixtures; `v3-runtime-config-spec.md` and
       `v3-reproduction-spec.md`.
 - [ ] Verification runs below: viability first, `make check`, gate and goal
       profiles, the long Canyon run, the mutation gate.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` (first) -> result in
+- [x] `cargo test -p v3-core --test viability` (first) -> result in
       [`docs/progress/readings/t03-f12.md`](../../progress/readings/t03-f12.md).
-- [ ] Focused tests: `cargo test -p v3-core gestation` and the fixtures named
+- [x] Focused tests: `cargo test -p v3-core gestation` and the fixtures named
       above -> names and results in the readings file.
-- [ ] `cargo test -p v3-core --test applied_trajectory` twice (digests agree,
+- [x] `cargo test -p v3-core --test applied_trajectory` twice (digests agree,
       re-pinned; the rate-`0.0` case reproduces the pre-feature digests),
       `--test baseline_worlds`, `cargo test -p v3-cli --test bench_artifacts`
       -> readings file.

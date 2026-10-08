@@ -16,6 +16,9 @@ pub(super) fn small_config() -> SimulationConfig {
     cfg.world.width = 20;
     cfg.world.height = 20;
     cfg.population.initial_creatures = 5;
+    // Fixtures here read a birth on the tick of its `Reproduce`; rate 0.0
+    // delivers at conception (T03.F12). Gestation tests set the rate.
+    cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
     cfg
 }
 
