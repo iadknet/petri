@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t11-f25-meaningful-action-parameter-targets.json",
+    "epoch_baseline": "docs/progress/features/t24-f02-parallel-food-regrowth.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
