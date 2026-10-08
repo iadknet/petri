@@ -967,6 +967,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.population.initial_creatures = 1;
         cfg.mutation.per_unit_rate = 0.0;
+        // Rate 0.0 delivers at conception (T03.F12): the child exists at return.
         cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 0.0;
         let mut sim = seed_simulation(cfg, 83);
         let parent_id = sim.creatures.keys().next().unwrap();

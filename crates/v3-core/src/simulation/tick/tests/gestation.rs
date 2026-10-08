@@ -260,7 +260,7 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     // to crowded deliveries.
     cfg.energy.lifecycle.gestation_ticks_per_founder_genome = 8.0;
     cfg.energy.lifecycle.energy_decay_per_tick = 2.0;
-    let mut sim = seed_simulation(cfg, 2026);
+    let mut sim = seed_simulation(cfg, 165);
     let mut e_max = sim.creatures.values().map(|c| c.energy).fold(0.0, f32::max);
     let mut c_max = sim.config.energy.lifecycle.max_energy;
     for tick in 0..250 {
@@ -269,6 +269,14 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
             assert!(
                 sim.creatures.values().any(|c| c.energy > 60.0),
                 "creatures must hold energy above the lowered cap"
+            );
+            // B6: a held parent only loses energy, so one above the new cap
+            // conceived above it before the lowering.
+            assert!(
+                sim.creatures
+                    .values()
+                    .any(|c| c.pending_birth.is_some() && c.energy > 60.0),
+                "a gestating parent must hold energy above the lowered cap"
             );
         }
         c_max = c_max.max(sim.config.energy.lifecycle.max_energy);
@@ -326,5 +334,5 @@ fn gestation_energy_and_count_identities_hold_every_tick() {
 
 #[test]
 fn gestation_energy_identity_holds_when_the_cap_is_lowered_mid_run() {
-    assert_gestation_identities(Some(40));
+    assert_gestation_identities(Some(50));
 }
