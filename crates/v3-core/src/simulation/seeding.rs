@@ -122,6 +122,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
         config,
         stats,
         rng,
+        food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(seed),
     }
 }
 

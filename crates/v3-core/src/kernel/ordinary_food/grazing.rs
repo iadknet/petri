@@ -3,6 +3,7 @@
 
 use crate::config::{GrazingConfig, OrdinaryFoodTypeId};
 use crate::kernel::Grid;
+use rayon::prelude::*;
 
 /// The modifier after one consuming bite: multiplied by `factor`, never below
 /// `floor`.
@@ -119,15 +120,24 @@ impl GrazingLayer {
         }
     }
 
+    /// One type's modifier grid as a row-major slice.
+    #[must_use]
+    pub(super) fn type_slice(&self, type_idx: OrdinaryFoodTypeId) -> Option<&[f32]> {
+        self.by_type
+            .get(usize::from(type_idx.get()))
+            .map(Grid::as_slice)
+    }
+
     /// Advance every passable cell of every type one tick toward 1.0 and read
     /// the per-type summary. Barrier cells are held at 1.0. Disabled grazing
-    /// leaves the grids untouched and reports the ungrazed reading.
+    /// leaves the grids untouched and reports the ungrazed reading. Each type
+    /// is one row-parallel pass whose per-row sums are reduced in row order.
     pub(super) fn recover(
         &mut self,
         barriers: &Grid<bool>,
         config: &GrazingConfig,
     ) -> (Vec<GrazingTypeSummary>, u32) {
-        let passable_cells = barriers.as_slice().iter().filter(|b| !**b).count() as u32;
+        let passable_cells = barriers.as_slice().par_iter().filter(|b| !**b).count() as u32;
         if !config.enabled {
             return (
                 vec![GrazingTypeSummary::default(); self.by_type.len()],
@@ -135,25 +145,35 @@ impl GrazingLayer {
             );
         }
         let step = recovery_step(config.recovery_ticks);
+        let width = usize::from(self.width);
         let summaries = self
             .by_type
             .iter_mut()
             .map(|grid| {
-                let mut sum = 0.0f32;
-                let mut grazed_cells = 0u32;
-                for y in 0..grid.height() {
-                    for x in 0..grid.width() {
-                        if *barriers.get(x, y) {
-                            grid.set(x, y, 1.0);
-                            continue;
+                let rows: Vec<(f32, u32)> = grid
+                    .as_mut_slice()
+                    .par_chunks_mut(width)
+                    .zip(barriers.as_slice().par_chunks(width))
+                    .map(|(cells, barrier_row)| {
+                        let (mut sum, mut grazed_cells) = (0.0f32, 0u32);
+                        for (cell, &barrier) in cells.iter_mut().zip(barrier_row) {
+                            if barrier {
+                                *cell = 1.0;
+                                continue;
+                            }
+                            *cell = recover_modifier(*cell, step);
+                            sum += *cell;
+                            if *cell < 1.0 {
+                                grazed_cells += 1;
+                            }
                         }
-                        let cell = grid.get_mut(x, y);
-                        *cell = recover_modifier(*cell, step);
-                        sum += *cell;
-                        if *cell < 1.0 {
-                            grazed_cells += 1;
-                        }
-                    }
+                        (sum, grazed_cells)
+                    })
+                    .collect();
+                let (mut sum, mut grazed_cells) = (0.0f32, 0u32);
+                for (row_sum, row_grazed) in rows {
+                    sum += row_sum;
+                    grazed_cells += row_grazed;
                 }
                 GrazingTypeSummary {
                     mean_modifier: if passable_cells == 0 {

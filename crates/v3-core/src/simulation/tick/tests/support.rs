@@ -111,6 +111,7 @@ pub(super) fn make_sim_two_creatures(
         config: cfg,
         stats: crate::simulation::stats::SimStats::default(),
         rng: rand::rngs::SmallRng::seed_from_u64(42),
+        food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(42),
     };
     (sim, a_id, b_id)
 }
@@ -147,6 +148,7 @@ pub(super) fn make_sim_with_one_creature(energy: f32) -> (Simulation, CreatureId
         config: cfg,
         stats: crate::simulation::stats::SimStats::default(),
         rng: rand::rngs::SmallRng::seed_from_u64(42),
+        food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(42),
     };
     (sim, id)
 }
@@ -186,6 +188,7 @@ pub(super) fn make_sim_with_custom_genome(
         config: cfg,
         stats: crate::simulation::stats::SimStats::default(),
         rng: rand::rngs::SmallRng::seed_from_u64(42),
+        food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(42),
     };
     (sim, id)
 }

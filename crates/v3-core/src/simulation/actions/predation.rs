@@ -260,6 +260,7 @@ mod tests {
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(42),
+            food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(42),
         };
         (sim, attacker_id, victim_id)
     }
@@ -298,6 +299,7 @@ mod tests {
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(42),
+            food_stream_key: crate::kernel::FoodStreamKey::from_run_seed(42),
         };
         (sim, id)
     }

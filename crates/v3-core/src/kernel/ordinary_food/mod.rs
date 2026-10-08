@@ -3,6 +3,7 @@ mod ecology;
 mod grazing;
 mod pass_clock;
 mod state;
+mod stream;
 
 use rand::Rng;
 
@@ -12,13 +13,15 @@ use crate::kernel::Grid;
 
 pub use self::catalog::{OrdinaryFoodCatalog, OrdinaryFoodTypeEntry};
 use self::ecology::{
-    apply_config_transition, grow, seed_density, seed_fertility_maps, OccupancyDepletionLayer,
+    apply_config_transition, grow, seed_density, seed_fertility_maps, GrowthScratch,
+    OccupancyDepletionLayer,
 };
 pub use self::ecology::{FoodGrowthSummary, FoodTypeTelemetry};
 pub use self::pass_clock::FoodPass;
 #[cfg(feature = "telemetry-seams")]
 pub use self::pass_clock::{FoodPassTiming, FoodPasses};
 use self::state::OrdinaryFoodState;
+pub use self::stream::FoodStreamKey;
 
 #[derive(Debug)]
 pub struct FoodResource {
@@ -27,9 +30,8 @@ pub struct FoodResource {
     state: OrdinaryFoodState,
     occupancy_depletion: OccupancyDepletionLayer,
     edge_mode: WorldEdgeMode,
-    claim_scratch: Vec<Vec<(OrdinaryFoodTypeId, f32)>>,
-    owner_snapshot: Vec<Option<OrdinaryFoodTypeId>>,
-    density_snapshot: Vec<f32>,
+    /// The per-cell buffers growth keeps between ticks (T24.F02).
+    growth_scratch: GrowthScratch,
     fertility_seed: Option<u64>,
 }
 
@@ -38,7 +40,6 @@ impl FoodResource {
     pub fn new(width: u16, height: u16, config: FoodConfig, edge_mode: WorldEdgeMode) -> Self {
         let catalog = OrdinaryFoodCatalog::new(&config);
         let type_count = catalog.len();
-        let total_cells = width as usize * height as usize;
 
         Self {
             config,
@@ -46,9 +47,7 @@ impl FoodResource {
             state: OrdinaryFoodState::new(width, height, type_count),
             occupancy_depletion: OccupancyDepletionLayer::new(width, height),
             edge_mode,
-            claim_scratch: Vec::with_capacity(total_cells),
-            owner_snapshot: Vec::with_capacity(total_cells),
-            density_snapshot: Vec::with_capacity(total_cells),
+            growth_scratch: GrowthScratch::default(),
             fertility_seed: None,
         }
     }
@@ -239,12 +238,14 @@ impl FoodResource {
         seed_fertility_maps(&mut self.state, &self.catalog, &self.config, world_seed);
     }
 
-    pub fn grow<T: Clone>(
+    /// One growth pass; every random choice comes from `key`'s stream for
+    /// `tick`, so the result does not depend on the rayon pool.
+    pub fn grow<T: Clone + Sync>(
         &mut self,
         barriers: &Grid<bool>,
         occupancy: &Grid<Option<T>>,
         tick: u64,
-        rng: &mut impl Rng,
+        key: FoodStreamKey,
     ) -> FoodGrowthSummary {
         grow(
             &mut self.state,
@@ -252,14 +253,12 @@ impl FoodResource {
             &self.config.shared,
             &self.config,
             &mut self.occupancy_depletion,
-            &mut self.claim_scratch,
-            &mut self.owner_snapshot,
-            &mut self.density_snapshot,
+            &mut self.growth_scratch,
             barriers,
             occupancy,
             self.edge_mode,
             tick,
-            rng,
+            key,
         )
     }
 
@@ -269,7 +268,6 @@ impl FoodResource {
             &self.catalog,
             &self.config,
             &mut self.occupancy_depletion,
-            &mut self.claim_scratch,
             barriers,
             rng,
         );

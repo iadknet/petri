@@ -2,7 +2,7 @@ use rand::Rng;
 
 use crate::config::{FoodConfig, FoodResourceConfig, OrdinaryFoodTypeId, WorldEdgeMode};
 use crate::contracts::{CreatureId, Direction, Position};
-use crate::kernel::food_resource::{FoodGrowthSummary, FoodResource};
+use crate::kernel::food_resource::{FoodGrowthSummary, FoodResource, FoodStreamKey};
 use crate::kernel::Grid;
 
 /// Central world state: food density, barriers, and creature occupancy.
@@ -122,9 +122,10 @@ impl WorldState {
 
     /// Grow food phase (transitional delegate).
     ///
-    /// Reads barriers internally so callers do not need to pass them.
-    pub fn grow_food(&mut self, tick: u64, rng: &mut impl Rng) -> FoodGrowthSummary {
-        self.food.grow(&self.barriers, &self.creature_at, tick, rng)
+    /// Reads barriers internally so callers do not need to pass them. Every
+    /// food draw comes from `key`'s stream for `tick` (T24.F02).
+    pub fn grow_food(&mut self, tick: u64, key: FoodStreamKey) -> FoodGrowthSummary {
+        self.food.grow(&self.barriers, &self.creature_at, tick, key)
     }
 
     /// Consume all food on a cell. Returns the amount consumed (0 if empty).
@@ -337,8 +338,7 @@ mod tests {
             }
         }
         let before = w.total_food();
-        let mut rng = SmallRng::seed_from_u64(42);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(42));
         assert!(w.total_food() > before);
     }
 
@@ -352,8 +352,7 @@ mod tests {
         };
         let mut w = world_with_food_config(1, 1, WorldEdgeMode::Wrap, food_cfg);
         w.set_food(Position::new(0, 0), 0.9);
-        let mut rng = SmallRng::seed_from_u64(0);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(0));
         assert!((w.food_at(Position::new(0, 0)) - 1.0).abs() < 1e-6);
     }
 
@@ -371,8 +370,7 @@ mod tests {
         w.set_food(pos, 0.8);
         w.place_creature(pos, id);
 
-        let mut rng = SmallRng::seed_from_u64(0);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(0));
 
         assert!((w.food_at(pos) - 1.0).abs() < 1e-6);
     }
@@ -435,8 +433,7 @@ mod tests {
         let mut w = world_with_food_config(2, 1, WorldEdgeMode::Bounded, food_cfg);
         w.set_food(Position::new(0, 0), 0.2);
         w.set_food(Position::new(1, 0), 0.4);
-        let mut rng = SmallRng::seed_from_u64(0);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(0));
         assert!((w.food_at(Position::new(0, 0)) - 0.3).abs() < 1e-6);
         assert!((w.food_at(Position::new(1, 0)) - 0.6).abs() < 1e-6);
     }
@@ -452,8 +449,7 @@ mod tests {
         };
         let mut w = world_with_food_config(2, 1, WorldEdgeMode::Bounded, food_cfg);
         w.set_food(Position::new(0, 0), 0.75);
-        let mut rng = SmallRng::seed_from_u64(1);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(1));
         assert!((w.food_at(Position::new(0, 0)) - 0.9).abs() < 1e-6);
         assert!((w.food_at(Position::new(1, 0)) - 0.15).abs() < 1e-6);
     }
@@ -474,8 +470,7 @@ mod tests {
         w.set_food(Position::new(0, 0), 0.9);
         w.place_creature(occupied, id);
 
-        let mut rng = SmallRng::seed_from_u64(3);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(3));
 
         assert!(w.food_at(occupied) > 0.0);
     }
@@ -494,8 +489,7 @@ mod tests {
         };
         let mut w = world_with_food_config(2, 1, WorldEdgeMode::Bounded, food_cfg);
         w.set_food(Position::new(0, 0), 0.75);
-        let mut rng = SmallRng::seed_from_u64(1);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(1));
         // Source gets local growth: 0.75 + 0.15 = 0.9
         assert!((w.food_at(Position::new(0, 0)) - 0.9).abs() < 1e-6);
         // Neighbor gets spread deposit: 0.15 * 0.25 = 0.0375
@@ -513,8 +507,7 @@ mod tests {
         };
         let mut w = world_with_food_config(2, 1, WorldEdgeMode::Bounded, food_cfg);
         w.set_food(Position::new(0, 0), 0.9);
-        let mut rng = SmallRng::seed_from_u64(1);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(1));
         // Source gets local growth
         assert!(w.food_at(Position::new(0, 0)) > 0.9);
         // Neighbor gets nothing because ratio is 0
@@ -533,8 +526,7 @@ mod tests {
         let mut w = world_with_food_config(4, 1, WorldEdgeMode::Wrap, food_cfg);
         w.set_food(Position::new(0, 0), 0.01);
         let before = w.total_food();
-        let mut rng = SmallRng::seed_from_u64(2);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(2));
         assert!(w.total_food() > before);
     }
 
@@ -553,8 +545,7 @@ mod tests {
         let pos = Position::new(0, 0);
         w.place_creature(pos, id);
 
-        let mut rng = SmallRng::seed_from_u64(4);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(4));
 
         assert!(w.food_at(pos) > 0.0);
     }
@@ -568,8 +559,7 @@ mod tests {
         let occupied = Position::new(0, 0);
         w.place_creature(occupied, id);
 
-        let mut rng = SmallRng::seed_from_u64(9);
-        let summary = w.grow_food(0, &mut rng);
+        let summary = w.grow_food(0, FoodStreamKey::from_run_seed(9));
 
         assert!(summary.mean_occupancy_depletion > 0.0);
         assert_eq!(summary.occupied_cells_with_depletion, 1);
@@ -588,8 +578,7 @@ mod tests {
         let pos = Position::new(0, 0);
         w.place_creature(pos, id);
 
-        let mut rng = SmallRng::seed_from_u64(13);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(13));
         assert!(w.occupancy_depletion_at(pos) > 0.0);
 
         config.occupancy_depletion.enabled = false;
@@ -609,8 +598,7 @@ mod tests {
         let pos = Position::new(0, 0);
         w.place_creature(pos, id);
 
-        let mut rng = SmallRng::seed_from_u64(21);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(21));
         let before = w.occupancy_depletion_at(pos);
 
         config.occupancy_depletion.deposit_per_occupied_tick = 0.25;
@@ -630,8 +618,7 @@ mod tests {
         w.set_food(pos, 0.5);
         w.place_creature(pos, id);
 
-        let mut rng = SmallRng::seed_from_u64(34);
-        let _ = w.grow_food(0, &mut rng);
+        let _ = w.grow_food(0, FoodStreamKey::from_run_seed(34));
 
         assert_eq!(w.food_at(pos), 0.0);
         assert_eq!(w.occupancy_depletion_at(pos), 0.0);

@@ -100,6 +100,21 @@ impl OrdinaryFoodState {
             .unwrap_or(0.0)
     }
 
+    /// One type's density grid as a row-major slice.
+    #[must_use]
+    pub fn density_slice(&self, type_idx: OrdinaryFoodTypeId) -> Option<&[f32]> {
+        self.density_by_type
+            .get(usize::from(type_idx.get()))
+            .map(Grid::as_slice)
+    }
+
+    /// One type's density grid as a mutable row-major slice.
+    pub fn density_slice_mut(&mut self, type_idx: OrdinaryFoodTypeId) -> Option<&mut [f32]> {
+        self.density_by_type
+            .get_mut(usize::from(type_idx.get()))
+            .map(Grid::as_mut_slice)
+    }
+
     pub fn set_food_type_density(
         &mut self,
         pos: Position,

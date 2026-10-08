@@ -399,3 +399,170 @@ fn fixed_map_seed_isolates_maps_from_run_seeded_placement() {
         population_fingerprint(&second)
     );
 }
+
+/// The food-growth fixture of T24.F02: `terrain_config`'s barriers and its
+/// fertile second type, default grazing and occupancy depletion, the default
+/// inhibiting first type spreading from full coverage, and a third type that
+/// starts empty, so it sits below its recovery floor and spawns.
+fn food_growth_config() -> SimulationConfig {
+    let mut cfg = terrain_config();
+    cfg.world.food.types.push(v3_core::config::FoodTypeConfig {
+        initial_coverage: 0.0,
+        recovery_spawn_rate: Some(0.01),
+        ..v3_core::config::FoodTypeConfig::default()
+    });
+    cfg
+}
+
+/// Every food grid by bits: per cell the barrier, the primary fertility, and
+/// per type the density and grazing modifier, then the depletion value.
+fn food_world_fingerprint(sim: &Simulation) -> Vec<u32> {
+    let food = sim.world.food();
+    let types: Vec<_> = food.food_types().iter().map(|entry| entry.id).collect();
+    let mut bits = Vec::new();
+    for y in 0..sim.world.height {
+        for x in 0..sim.world.width {
+            let p = Position::new(x, y);
+            bits.push(u32::from(sim.world.is_barrier(p)));
+            bits.push(food.fertility().get(x, y).to_bits());
+            for &type_idx in &types {
+                bits.push(sim.world.food_at_type(p, type_idx).to_bits());
+                bits.push(food.grazing_modifier_at(p, type_idx).to_bits());
+            }
+            bits.push(food.occupancy_depletion().get(x, y).to_bits());
+        }
+    }
+    bits
+}
+
+/// Every type's `World::total_food_by_type`, by bits.
+fn food_type_totals(sim: &Simulation) -> Vec<u32> {
+    sim.world
+        .food()
+        .food_types()
+        .iter()
+        .map(|entry| sim.world.total_food_by_type(entry.id).to_bits())
+        .collect()
+}
+
+/// The food growth summary the tick recorded, by bits (pass timings excluded).
+fn food_summary_fingerprint(sim: &Simulation) -> Vec<u32> {
+    let s = &sim.stats;
+    let mut bits = vec![
+        s.last_tick_food_occupancy_depletion_mean.to_bits(),
+        s.last_tick_food_occupancy_depletion_occupied_cells,
+        s.last_tick_food_growth_suppressed_by_occupancy_depletion
+            .to_bits(),
+        s.last_tick_food_cells_with_type_inhibition,
+        s.last_tick_food_growth_suppressed_by_type_inhibition
+            .to_bits(),
+    ];
+    for per_type in [
+        &s.last_tick_food_total_density_by_type,
+        &s.last_tick_food_grazing_modifier_mean_by_type,
+        &s.last_tick_food_grazed_cell_share_by_type,
+    ] {
+        bits.extend(per_type.iter().map(|value| value.to_bits()));
+    }
+    bits
+}
+
+/// T24.F02: food growth runs its grid passes on the rayon pool in effect and
+/// draws from the keyed stream, so a seeded run is byte-identical in pools
+/// of 1, 4 and 8 threads, with every pass of the growth table exercised.
+#[test]
+fn food_growth_is_identical_across_thread_counts() {
+    const FOOD_TICKS: u64 = 20;
+    let primary = v3_core::config::OrdinaryFoodTypeId::new(0);
+    let spawning = v3_core::config::OrdinaryFoodTypeId::new(2);
+    let pools: Vec<_> = [1, 4, 8]
+        .into_iter()
+        .map(|threads| {
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .unwrap()
+        })
+        .collect();
+    let mut sims: Vec<_> = pools
+        .iter()
+        .map(|pool| pool.install(|| seed_simulation(food_growth_config(), SEED)))
+        .collect();
+    let (mut spread_cells, mut spawned, mut grazed, mut depletion_suppressed) =
+        (0usize, false, false, false);
+    for tick in 0..=FOOD_TICKS {
+        let reference = &sims[0];
+        for (other, threads) in sims[1..].iter().zip([4, 8]) {
+            assert_eq!(
+                food_world_fingerprint(reference),
+                food_world_fingerprint(other),
+                "food grids, {threads} threads, tick {tick}"
+            );
+            assert_eq!(
+                food_type_totals(reference),
+                food_type_totals(other),
+                "food type totals, {threads} threads, tick {tick}"
+            );
+            assert_eq!(
+                food_summary_fingerprint(reference),
+                food_summary_fingerprint(other),
+                "food summary, {threads} threads, tick {tick}"
+            );
+            assert_eq!(
+                population_fingerprint(reference),
+                population_fingerprint(other),
+                "population, {threads} threads, tick {tick}"
+            );
+            assert_eq!(
+                accounting_fingerprint(reference),
+                accounting_fingerprint(other),
+                "accounting, {threads} threads, tick {tick}"
+            );
+        }
+        if tick == FOOD_TICKS {
+            break;
+        }
+        let empty_before: Vec<bool> = (0..reference.world.height)
+            .flat_map(|y| (0..reference.world.width).map(move |x| Position::new(x, y)))
+            .map(|p| reference.world.food_at_type(p, primary) <= 0.0)
+            .collect();
+        let spawning_before = reference.world.food().total_food_by_type(spawning);
+        for (sim, pool) in sims.iter_mut().zip(&pools) {
+            pool.install(|| run_tick(sim, &mut None));
+        }
+        let reference = &sims[0];
+        // The primary type stays above its recovery floor, so an empty cell
+        // that gains primary food was reached by spread.
+        spread_cells += (0..reference.world.height)
+            .flat_map(|y| (0..reference.world.width).map(move |x| Position::new(x, y)))
+            .zip(&empty_before)
+            .filter(|(p, &was_empty)| {
+                was_empty
+                    && !reference.world.is_barrier(*p)
+                    && reference.world.food_at_type(*p, primary) > 0.0
+            })
+            .count();
+        spawned |=
+            spawning_before <= 0.0 && reference.world.food().total_food_by_type(spawning) > 0.0;
+        grazed |= reference.stats.last_tick_food_grazed_cell_share_by_type[0] > 0.0;
+        depletion_suppressed |= reference
+            .stats
+            .last_tick_food_growth_suppressed_by_occupancy_depletion
+            > 0.0;
+    }
+    eprintln!(
+        "food growth fixture: spread into {spread_cells} emptied cells, recovery spawned \
+         {spawned}, grazing {grazed}, depletion suppression {depletion_suppressed}"
+    );
+    assert!(spread_cells > 0, "no spread into an emptied cell");
+    assert!(spawned, "the empty type never spawned by recovery");
+    assert!(grazed, "no grazed cell");
+    assert!(
+        depletion_suppressed,
+        "occupancy depletion never suppressed growth"
+    );
+    assert!(
+        sims[0].stats.last_tick_food_cells_with_type_inhibition > 0,
+        "type inhibition never bound"
+    );
+}

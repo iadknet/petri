@@ -101,7 +101,8 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// 94 sinks per graph); the hash without genome text is unchanged.
 /// T24.F01 re-pinned it: `grow` keeps spread into occupied cells (the
 /// accumulate at ecology.rs line 495); restoring the assignment alone restores
-/// the old hash.
+/// the old hash. T24.F02 re-pinned it: food draws come from the keyed
+/// per-cell stream instead of the run RNG.
 #[test]
 fn legacy_default_short_run_identity() {
     use std::hash::{Hash, Hasher};
@@ -129,7 +130,7 @@ fn legacy_default_short_run_identity() {
             run_tick(&mut sim, &mut None);
         }
     }
-    assert_eq!(hash.finish(), 2028530170870542862);
+    assert_eq!(hash.finish(), 8324800200600234214);
 }
 
 use proptest::prelude::*;
@@ -269,10 +270,9 @@ fn typed_rewards_inherit_live_values_and_apply_cap_before_cost() {
 
 #[test]
 fn per_type_growth_and_recovery_keep_inherited_updates_live() {
-    use rand::{rngs::SmallRng, SeedableRng};
     use v3_core::{
         config::{FoodConfig, WorldEdgeMode},
-        kernel::WorldState,
+        kernel::{FoodStreamKey, WorldState},
     };
     let mut food = FoodConfig::default();
     food.fertility.enabled = false;
@@ -293,14 +293,13 @@ fn per_type_growth_and_recovery_keep_inherited_updates_live() {
     let mut world = WorldState::new(1, 1, WorldEdgeMode::Bounded);
     world.reconfigure_food(food.clone());
     let pos = Position::new(0, 0);
-    let mut rng = SmallRng::seed_from_u64(4);
     for shared in [0.1, 0.3] {
         food.shared.growth_rate = shared;
         world.reconfigure_food(food.clone());
         for idx in 0..2 {
             world.set_food_type(pos, OrdinaryFoodTypeId::new(idx), 0.5);
         }
-        let summary = world.grow_food(0, &mut rng);
+        let summary = world.grow_food(0, FoodStreamKey::from_run_seed(4));
         assert_eq!(
             world.food_at_type(pos, OrdinaryFoodTypeId::new(0)),
             0.5 + 0.5 * shared
@@ -314,12 +313,12 @@ fn per_type_growth_and_recovery_keep_inherited_updates_live() {
     food.types[0].growth_rate = Some(0.0);
     food.types[1].recovery_spawn_rate = Some(0.0);
     world.reconfigure_food(food.clone());
-    world.grow_food(0, &mut rng);
+    world.grow_food(0, FoodStreamKey::from_run_seed(4));
     assert_eq!(world.food_at(pos), 0.0);
     food.types[0].growth_rate = Some(0.25);
     food.types[1].recovery_spawn_rate = Some(1.0);
     world.reconfigure_food(food);
-    world.grow_food(0, &mut rng);
+    world.grow_food(0, FoodStreamKey::from_run_seed(4));
     assert_eq!(world.food_at_type(pos, OrdinaryFoodTypeId::new(0)), 0.25);
     assert_eq!(world.food_at_type(pos, OrdinaryFoodTypeId::new(1)), 0.2);
 }
