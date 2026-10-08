@@ -41,7 +41,7 @@ rewrite builds on the documented rule rather than on a loop-order artifact.
   - Goal: The microscope sees inside world update: food growth is timed apart from creature aging, energy decay and death removal in the phase metric and the sampled tick traces, each of its grid passes is a child span on sampled ticks, and Petri / Performance shows them.
 - [x] **T24.F01 — Order-Free Food Spread** — Depends on: None
   - Goal: Seeds disperse evenly in every direction: food spreading from a dense cell keeps its share whichever neighbour it lands on, so a cell that already holds food no longer drops spread from its north and west neighbours, and food inside patches no longer drifts north-west.
-- [ ] **T24.F02 — Parallel Food Regrowth** — Depends on: T24.F01, T24.F03
+- [x] **T24.F02 — Parallel Food Regrowth** — Depends on: T24.F01, T24.F03
   - Goal: Food regrows by the repaired rules on every core at once: `World::grow_food` runs on the rayon pool with its own seeded per-cell stream, so a goal run spends at most half as long per tick on regrowth at 8 threads and still reproduces byte-for-byte at any thread count.
 
 ## Notes for AI Agents
