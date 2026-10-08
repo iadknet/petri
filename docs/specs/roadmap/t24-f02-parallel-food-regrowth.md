@@ -269,8 +269,8 @@ make bench PROFILE=goal FEATURE=t24-f02-parallel-food-regrowth
 | Check | Result |
 | --- | --- |
 | Speedup pairs (2026-10-07, host load 4.5–5.7) | Pass, criterion 3 met: 6 of 6 interleaved pairs under `scripts/bench-wait` (sweep 1600², 10,000 founders, 100 ticks, seed 11, 8 threads, telemetry off; parent 3b904894 from a scratch worktree, since removed); ratios 0.3985, 0.3183, 0.3330, 0.3238, 0.3213, 0.3239, median 0.3239 ≤ 0.45; parent 40.2–41.4 ms per tick, feature 12.9–16.1; 243.8 s of the 900 s cap; first attempt, no rerun. |
-| Gate | Pending. |
-| Goal | Pending. |
+| Gate | `make bench PROFILE=gate ...` make exit 2, CLI exit 3, `severe` false against the T11.F25 epoch and true against T24.F01: `pass_cap_hits` 0.000971 vs 0.000405 (+139.75%, predeclared may-go-severe; 277 hits vs 115, seed 33 holds 232), `plasticity_updates` +31.65% flag; the five work counters inside ±25%; `decided_passes` 0 both. Wall per creature-tick +1.73% (ok); `food_growth_ms` per tick 0.530 / 0.578 / 0.533 vs 0.363 / 0.361 / 0.356 (1.46× / 1.60× / 1.50×, seed 22 above 1.5×, no wall flag). Persistence in band all seeds, food seed 11 +33.2% (miss), extinction null. Epoch rule: re-pin the gate epoch to this summary in the closing commit if (a) and (b) hold. |
+| Goal | make exit 0, CLI exit 0, `severe` false against T24.F01: `pass_cap_hits` +18.91% and `decided_passes` +30.43% flag; `vm_steps` -49.97% (outside ±25%, miss); `plasticity_updates` -85.52%. Wall per creature-tick 0.005688 vs 0.010656 ms (-46.62%); `food_growth_ms` per tick 23.05 / 11.39 / 17.58 vs 62.74 / 37.14 / 54.04 (0.37× / 0.31× / 0.33×, at or below half). Final population misses in all three worlds (-43.1% / +75.7% / +99.1%), plateau and food in band, extinction null. No severe level, no wall flag: goal epochs keep (`goal_worlds` stays T24.F01), summary appended to `goal_worlds.closed`. |
 
 - Summaries: [gate](../../progress/features/t24-f02-parallel-food-regrowth.json),
   [goal](../../progress/features/t24-f02-parallel-food-regrowth-goal.json).
