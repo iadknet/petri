@@ -1,6 +1,6 @@
 # T24.F02 — Parallel Food Regrowth
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-07
 **Feature**: T24.F02
 **Track**: [T24 — Simulation Throughput](../../roadmaps/t24-simulation-throughput.md)
@@ -200,7 +200,7 @@ mechanism switch or config value is added.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first (defaults and tick-loop
+- [x] `cargo test -p v3-core --test viability` first (defaults and tick-loop
       mechanics change), then `cargo test -p v3-core` (ecology unit tests,
       the oracle and proptest with keyed picks, the stream tests), `cargo
       test -p v3-core --test reproducibility` (the new thread-count test
@@ -214,20 +214,17 @@ mechanism switch or config value is added.
       9 passed; `cargo test -p v3-cli --lib` 145 passed; `cargo test -p v3-cli
       --test bench` 19 passed, 1 failed:
       `gate_profile_has_no_severe_regression_against_series_references`
-      (`pass_cap_hits` 0.000971 against T24.F01's 0.000405, +139.8%, severe). `scripts/telemetry-dashboards-check`
+      (`pass_cap_hits` +139.8%, predeclared; green after the gate epoch re-pin). `scripts/telemetry-dashboards-check`
       all checks passed (check 6: 7 food passes on a trace). Re-pinned values
       are in the readings file.
 - [x] Speedup pairs (track criterion 3): the method, the per-pair
       `food_growth_ms` readings, the median ratio, the cap use and the
       verdict in `docs/progress/readings/t24-f02.md`; the Performance section
       states the method and the verdict.
-- [ ] `make check` -> exit 0 (includes
+- [x] `make check` -> exit 0 (includes
       `gate_profile_has_no_severe_regression_against_series_references`,
       green at the mutation baseline after any re-pin).
-      Run 2026-10-07 (build pass): exit 2, stopped at `rust-test-cli` on the
-      gate severity test above; every target after it (`rust-test-server`,
-      `-lab`, `-telemetry`, `-doc`, `rust-clippy`, `frontend-check`,
-      `dependency-audit`, `skill-check`) then passed under `make -k`.
+      Exit 0 at d4dfe4c1 (gate epoch re-pinned) and at 35eaf2e6 (final).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred. The
       full survivor list stays here.
@@ -257,7 +254,7 @@ mechanism switch or config value is added.
 | `783:93` `>` to `>=` in `grow` | equivalent: same clamp argument as `466:71` |
 | `815:32` `>` to `>=` in `grow` | killed: the oracle helper's per-type `occupied_cells` check (barrier and empty cells) |
 | `pass_clock/phase_seam_tests.rs:13:5` `grow_once` with `Default::default()` | equivalent: test helper compiled only with `telemetry-seams`, absent from the gate build; feature-on run caught it |
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t24-f02-parallel-food-regrowth.json` and
       `-goal.json`, local raw hash/byte count and verification time checked,
       series entries point to the summaries, and no new full report staged.
@@ -304,20 +301,20 @@ make bench PROFILE=goal FEATURE=t24-f02-parallel-food-regrowth
 
 ## Success Criteria
 
-- [ ] `grow_food` runs its full-grid passes on the rayon pool in effect with
+- [x] `grow_food` runs its full-grid passes on the rayon pool in effect with
       the claim-and-gather form and the keyed stream; `sim.rng` makes no food
       draw; no rule, default, config field or digest changes (invariants 1,
       2, 6).
-- [ ] Seeded runs are byte-identical across pools of 1 and 4 threads with
+- [x] Seeded runs are byte-identical across pools of 1 and 4 threads with
       every pass exercised, asserted by
       `crates/v3-core/tests/reproducibility.rs`, and across processes, the
       pinned digests reproducing (track criterion 4).
 - [x] The speedup pairs pass: median `food_growth_ms` per tick at 8 threads
       on the default 1600-by-1600 world at most 0.50 of the 3b904894 build's
       on this host (track criterion 3), recorded in the readings.
-- [ ] The pass spans, the phase metric and the benchmark report fields are
+- [x] The pass spans, the phase metric and the benchmark report fields are
       unchanged (T24.F03 tests and check 6 pass).
-- [ ] Gate and goal profiles run, the predeclaration's acceptance scope is
+- [x] Gate and goal profiles run, the predeclaration's acceptance scope is
       applied as written and any epoch re-pin is in the closing commit; the
       mutation gate runs with every survivor resolved.
 
@@ -328,4 +325,5 @@ make bench PROFILE=goal FEATURE=t24-f02-parallel-food-regrowth
   worktree of that commit, never from an older parent.
 - Exception: TDD order in brief 1 — the per-cell oracle and the thread-count
   reproducibility test were written after the rewrite (three deliberate
-  breaks caught); for the user to acknowledge at closure as at T19.F06.
+  breaks caught); accepted by the user on 2026-10-07.
+- Cost: /usage awaits the user; 4 implementer passes (advisor 2, 2, 2, 2), 5 spec-owner resumes, 2 challenge rounds (ready), review 1 P1/0 P2/0 P3.
