@@ -1,6 +1,6 @@
 # T03.F12 — Genome-Length-Dependent Reproductive Time
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-08
 **Feature**: T03.F12
 **Track**: [T03 — Functional Traits and Metabolism](../../roadmaps/t03-functional-traits-and-metabolism.md)
@@ -133,7 +133,7 @@ Phase 0 charges on parents removed before a held slot.
       `actions` phase attribute).
 - [x] Frontend row and fixtures; `v3-runtime-config-spec.md` and
       `v3-reproduction-spec.md`.
-- [ ] Verification runs below: viability first, `make check`, gate and goal
+- [x] Verification runs below: viability first, `make check`, gate and goal
       profiles, the long Canyon run (done on `f380899e`); the mutation gate on
       the restored code.
 
@@ -154,12 +154,10 @@ Phase 0 charges on parents removed before a held slot.
       `scripts/telemetry-overhead` on the existing stack **inconclusive**
       twice (form B: spread 0.1971 needs 32 pairs at 5,378 ms, over the 300 s
       cap; form A: host load 7 to 9); ceiling unmeasured (Exception, Notes).
-- [x] Long Canyon run (predeclaration below): raw files under the main
-      checkout's ignored `.bench-artifacts/<id>/canyon/` (form B moved back
-      from `canyon/form-b/`, form A to `canyon/form-a/`); committed under
-      `docs/progress/sweeps/t03-f12/` only `run.sh`, `timing.txt` and
-      `canyon-samples.md` (samples at every 2,500th tick and the first past
-      36,652, raw SHA-256 and bytes; the form-A table under its own heading).
+- [x] Long Canyon run (predeclaration below): raw under the main checkout's
+      ignored `.bench-artifacts/<id>/canyon/` (form A in `canyon/form-a/`);
+      committed under `docs/progress/sweeps/t03-f12/` only `run.sh`,
+      `timing.txt` and `canyon-samples.md` (both forms, raw SHA-256 and bytes).
       Form B: exit 0, 1,604 s, population above zero at all 80 samples
       (minimum 1,110); raw 332,377 bytes, SHA-256 `b674b579…8c14`.
 - [x] `MUTANTS_ITERATE=0 make rust-mutants` (mode `fresh`) on form-B code:
@@ -171,12 +169,11 @@ Phase 0 charges on parents removed before a held slot.
 | `106:36` replace `+` with `-` | Killed: `gestation_block_counts_and_sums_carried_litters` |
 | `106:36` replace `+` with `*` | Killed: same test |
 | `106:24` replace `+` with `*` | Killed: same test |
-- [x] Benchmark summaries stored at
+- [x] Summaries
       `docs/progress/features/t03-f12-genome-length-dependent-reproductive-time.json`
-      and `-goal.json`, restored byte-for-byte from commit `a762b494`; series
-      entries point to them; goal epoch re-pinned to the goal summary; no new
-      full report staged; the raw reports are no longer on disk (Exception,
-      Notes).
+      and `-goal.json`, restored byte-for-byte from `a762b494`; series entries
+      point to them; goal epoch re-pinned to the goal summary; no full report
+      staged; raw reports not on disk (Exception).
 
 ## Performance and Goal Impact
 
@@ -247,17 +244,17 @@ f380899e)").**
 
 ## Success Criteria
 
-- [ ] A parent whose `Reproduce` passes the gates at *T* commits no action on
+- [x] A parent whose `Reproduce` passes the gates at *T* commits no action on
       *T*+1 … *T*+h while its cognition runs and is charged, and its child
       appears at *T*+h with the litter energy paid at *T*; a parent that dies
       first leaves no child and the litter energy is in `gestation_lost`.
-- [ ] Rate `0.0` reproduces the pre-feature trajectory digests; the energy
+- [x] Rate `0.0` reproduces the pre-feature trajectory digests; the energy
       identity and the gestation count identity hold in the fixture.
-- [ ] Viability passes first; gate and goal profiles run; the long Canyon run
+- [x] Viability passes first; gate and goal profiles run; the long Canyon run
       persists past tick 36,652; the population floor, the tick-2,000 genome
       size and the neighborhood-read floors hold on every world, or each miss
       is recorded as a user-accepted exception in Notes.
-- [ ] The six counters and the flow are exported, checked and carried in the
+- [x] The six counters and the flow are exported, checked and carried in the
       goal summary, the rate is recorded configuration, the frontend row and
       the two reference docs exist.
 
@@ -267,17 +264,16 @@ f380899e)").**
   pre-birth gestation with the N1 post-birth hold as the predeclared retreat;
   cognition charged during the span; anchored on `FOUNDER_GENOME_SIZE_UNITS`;
   no additional energy drain; no concurrent gestations.
-- Exception: (user, 2026-10-08) the spec is committed with challenge finding B6
-  upheld after round 3; the fix adopted is Codex's own round-3 proposal, not
-  confirmed by a further round (record in `docs/progress/readings/t03-f12.md`).
+- Exception: (user, 2026-10-08) committed with challenge finding B6 upheld
+  after round 3; Codex's own round-3 fix adopted, unconfirmed (readings table).
 - Decision: (user, 2026-10-08, after comparing both forms) the shipped form is
-  the pre-birth gestation at `f380899e`; the predeclared retreat to the N1
-  post-birth hold was executed at `0436dbf6`, failed the Canyon floor harder
-  (0.283×), and was reverted; the goal-worlds epoch is re-pinned to this
-  feature's form-B goal summary; the gate epoch stays T24.F02.
+  the pre-birth gestation (`f380899e`); the predeclared N1 hold retreat ran at
+  `0436dbf6`, failed the Canyon floor harder (0.283×), and was reverted;
+  goal-worlds epoch re-pinned to this feature's goal summary; gate epoch stays
+  T24.F02.
 - Exception: (user, 2026-10-08) the Canyon persistence floor miss under form B
-  (final 4,042 = 0.441× T24.F02's 9,165; plateau 0.862×) is accepted; no
-  world extinct.
+  (final 4,042 = 0.441× T24.F02's 9,165; plateau 0.862×) accepted; no world
+  extinct.
 - Exception: (user, 2026-10-08) severe goal counters accepted as composition
   (vs T24.F02 vm_steps +145.4%, plasticity_updates +262.5%, decided_passes
   +73.3%; vs T24.F01 decided_passes +126.1%; `actions_applied` +11.1%).
@@ -290,7 +286,12 @@ f380899e)").**
   2.38 under 2.5, accepted for this closure; the T14.F12 floors stand.
 - Exception: (user, 2026-10-08) `recruitment_paths` 230.8 s against its 120 s
   cap (pre-existing: T24.F02 240.2 s) and the overhead check inconclusive
-  twice (host load) accepted; the 1.10 ceiling is unmeasured here.
+  twice (host load) accepted; the 1.10 ceiling is unmeasured.
 - Exception: (user, 2026-10-08) the form-B raw `gate.json` and `goal.json`
   were overwritten by the form-A run; the summaries restored from `a762b494`
   carry the raw SHA-256 and byte counts as the only provenance.
+- Cost: `/usage` at closure: awaiting the user; implementer passes 6 (consults
+  2, 2, 3, 2, 1, 1); spec-owner resumes after Plan 4; Codex rounds 3, verdict
+  `not-ready` (B6, user-committed); reviewer P1 2, P2 0, P3 1, all fixed;
+  orchestrator Fable 5.1 from the final review on (user `/model`), Codex roles
+  on `gpt-6.1-sol` high (2026-09-29 decision).
