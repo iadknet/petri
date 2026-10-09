@@ -1,0 +1,5354 @@
+{
+ "row": "W1",
+ "world": "Canyon country",
+ "window_ticks": [
+  15000,
+  20000
+ ],
+ "founder_units": 97,
+ "runs": {
+  "default-s1022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "born_connected_destinations": "votes",
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.005
+   },
+   "config_digest": "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6",
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 2875.7272727272725,
+   "mean_energy": 28.309498334273542,
+   "mean_genome_size": 535.7115829138618,
+   "mean_genome_size_founder_units": 5.522799823854245,
+   "mean_generation": 372.6596129711966,
+   "size_per_generation": 1.4375359289477598,
+   "births_per_creature_tick": 0.019939652758331,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 3065,
+    "mean_genome_size": 631.0345840130506,
+    "mean_generation": 412.63034257748774,
+    "reproduction_actions_spawned_total": 1215044
+   },
+   "min_population_sample": [
+    1509,
+    3000
+   ],
+   "trajectory": [
+    [
+     2500,
+     171.2,
+     2707
+    ],
+    [
+     5000,
+     228.6,
+     2457
+    ],
+    [
+     7500,
+     260.4,
+     2720
+    ],
+    [
+     10000,
+     311.5,
+     2986
+    ],
+    [
+     12500,
+     353.3,
+     3670
+    ],
+    [
+     15000,
+     454.4,
+     2788
+    ],
+    [
+     17500,
+     540.9,
+     2392
+    ],
+    [
+     20000,
+     631.0,
+     3065
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 2986,
+     "selected_parents": 20,
+     "selected_generations": [
+      236,
+      264,
+      238,
+      183,
+      248,
+      253,
+      264,
+      155,
+      261,
+      262,
+      264,
+      236,
+      252,
+      261,
+      251,
+      263,
+      239,
+      261,
+      252,
+      270
+     ],
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 10,
+       "family_connected": 10,
+       "family_executed": 10,
+       "family_causal": 8,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 3,
+       "family_connected": 2,
+       "family_executed": 2,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "vote_side_causal": 8,
+     "executed_plus_causal": 20,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 10,
+      "executed_target_channels": 14,
+      "channels_with_action_queue_change": 8,
+      "channels_with_any_vote_delta": 12,
+      "channels_vote_delta_without_action_change": 4,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "NeighborBarrierRing": [
+        1,
+        3,
+        4,
+        10,
+        29,
+        30,
+        37,
+        44
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "NeighborBarrierRing#5": [
+        1,
+        4,
+        30,
+        44
+       ],
+       "NeighborBarrierRing#4": [
+        3,
+        29
+       ],
+       "NeighborBarrierRing#7": [
+        10,
+        37
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 1,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "scenes_actions_differ": 23,
+        "delta_passes": 166,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.4914,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 3,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "scenes_actions_differ": 8,
+        "delta_passes": 22,
+        "consumers_graph": 2,
+        "consumers_graph_abs_weight": 0.7706,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 4,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "scenes_actions_differ": 23,
+        "delta_passes": 166,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.4914,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 10,
+        "family": "NeighborBarrierRing",
+        "channel": 7,
+        "scenes_actions_differ": 5,
+        "delta_passes": 156,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.5826,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 29,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "scenes_actions_differ": 8,
+        "delta_passes": 22,
+        "consumers_graph": 2,
+        "consumers_graph_abs_weight": 0.7706,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 30,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "scenes_actions_differ": 23,
+        "delta_passes": 166,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.4914,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 37,
+        "family": "NeighborBarrierRing",
+        "channel": 7,
+        "scenes_actions_differ": 5,
+        "delta_passes": 156,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.5826,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 44,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "scenes_actions_differ": 23,
+        "delta_passes": 230,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.4914,
+        "consumers_vm": 0
+       }
+      ],
+      "distinct_action_change_readings": [
+       [
+        "NeighborBarrierRing",
+        4,
+        2,
+        0,
+        0.7706,
+        22
+       ],
+       [
+        "NeighborBarrierRing",
+        5,
+        1,
+        0,
+        0.4914,
+        166
+       ],
+       [
+        "NeighborBarrierRing",
+        5,
+        1,
+        0,
+        0.4914,
+        230
+       ],
+       [
+        "NeighborBarrierRing",
+        7,
+        1,
+        0,
+        0.5826,
+        156
+       ]
+      ],
+      "distinct_action_change_parents": 8
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 8,
+        "vote_delta_parents": 8,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "NeighborBarrierRing#4": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "NeighborBarrierRing#5": {
+        "funnel_causal": 4,
+        "vote_delta_parents": 4,
+        "agree": true
+       },
+       "NeighborBarrierRing#7": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected_destinations": "votes",
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 311,
+       "changed_per_all_births": 0.1555,
+       "changed_per_mutated_births": 0.22119487908961594,
+       "dead": 3,
+       "dead_per_all_births": 0.0015,
+       "dead_per_mutated_births": 0.0021337126600284497,
+       "mutated_births": 1406,
+       "mutated_births_check": 1406,
+       "silent": 1092,
+       "silent_per_all_births": 0.546,
+       "silent_per_mutated_births": 0.7766714082503556,
+       "zero_event_births": 594
+      }
+     },
+     "sink_use": {
+      "version": "sink-use-v1",
+      "parents_evaluated": 20,
+      "kinds": {
+       "CustomOutput": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "RouterGate": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "WriteSlot": {
+        "parents_wired": 8,
+        "parents_executed": 8,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ClearSlot": {
+        "parents_wired": 2,
+        "parents_executed": 2,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ActionVote": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "ActionParam": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       }
+      },
+      "joint_vs_any_slot_disagreements": [],
+      "slots_causal": [
+       {
+        "kind": "CustomOutput",
+        "slot": "0",
+        "wired": 20,
+        "executed": 20,
+        "causal": 14
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "1",
+        "wired": 20,
+        "executed": 20,
+        "causal": 17
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "2",
+        "wired": 20,
+        "executed": 20,
+        "causal": 14
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "3",
+        "wired": 20,
+        "executed": 20,
+        "causal": 4
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "4",
+        "wired": 20,
+        "executed": 20,
+        "causal": 18
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "5",
+        "wired": 20,
+        "executed": 20,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Decide",
+        "wired": 7,
+        "executed": 7,
+        "causal": 4
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Eat",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(3)",
+        "wired": 5,
+        "executed": 5,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 18
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(5)",
+        "wired": 11,
+        "executed": 11,
+        "causal": 7
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 16
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(7)",
+        "wired": 18,
+        "executed": 18,
+        "causal": 10
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 14
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(1)",
+        "wired": 2,
+        "executed": 2,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 6
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 7
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(5)",
+        "wired": 5,
+        "executed": 5,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 5
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(2)",
+        "wired": 2,
+        "executed": 2,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(3)",
+        "wired": 16,
+        "executed": 16,
+        "causal": 7
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(4)",
+        "wired": 2,
+        "executed": 2,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(5)",
+        "wired": 5,
+        "executed": 5,
+        "causal": 4
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Terminate",
+        "wired": 20,
+        "executed": 20,
+        "causal": 3
+       },
+       {
+        "kind": "ActionParam",
+        "slot": "ReproduceTransferFraction",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       }
+      ],
+      "slots_wired_count": 41,
+      "wired_sinks_per_parent": [
+       25,
+       24,
+       25,
+       25,
+       24,
+       24,
+       22,
+       26,
+       23,
+       22,
+       24,
+       25,
+       25,
+       22,
+       24,
+       24,
+       25,
+       25,
+       22,
+       25
+      ],
+      "reachable_graph_nodes_per_parent": [
+       7,
+       6,
+       7,
+       3,
+       6,
+       3,
+       4,
+       4,
+       5,
+       4,
+       6,
+       6,
+       3,
+       4,
+       6,
+       7,
+       8,
+       6,
+       3,
+       13
+      ],
+      "scene_executions": 264,
+      "memory_loop": {
+       "loops_causal": 0,
+       "loops_executed": 8,
+       "loops_wired": 9,
+       "parents_with_causal_loop": 0,
+       "parents_with_clear": 2,
+       "parents_with_dynamic_read": 5,
+       "parents_with_dynamic_write": 1,
+       "parents_with_executed_loop": 7,
+       "parents_with_graph_read": 14,
+       "parents_with_graph_write": 8,
+       "parents_with_loop": 8,
+       "parents_with_vm_read": 12,
+       "parents_with_vm_write": 2
+      }
+     },
+     "memory": {
+      "final_creature_count": 2986,
+      "different_from_zeroed_count": 1,
+      "different_from_scrambled_count": 41,
+      "different_from_either_count": 41,
+      "temporal": {
+       "previous_slots": {
+        "final_creature_count": 2986,
+        "different_from_either_count": 0
+       },
+       "persisted_outputs": {
+        "final_creature_count": 2986,
+        "different_from_either_count": 374
+       },
+       "operator_state": {
+        "final_creature_count": 2986,
+        "different_from_either_count": 2
+       }
+      }
+     },
+     "e6_gradient_informative": 0.3667113194909578,
+     "secs": {
+      "census_secs": 1.295872917,
+      "vote_delta_secs": 0.049411291,
+      "births_secs": 0.272959542,
+      "sink_use_secs": 0.304585916,
+      "memory_secs": 0.362965417
+     }
+    },
+    "20000": {
+     "living": 3065,
+     "selected_parents": 20,
+     "selected_generations": [
+      461,
+      484,
+      457,
+      342,
+      334,
+      452,
+      330,
+      481,
+      355,
+      454,
+      311,
+      309,
+      313,
+      482,
+      463,
+      466,
+      445,
+      466,
+      338,
+      465
+     ],
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 10,
+       "family_connected": 9,
+       "family_executed": 9,
+       "family_causal": 3,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 8,
+       "family_connected": 6,
+       "family_executed": 5,
+       "family_causal": 5,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 2
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "vote_side_causal": 8,
+     "executed_plus_causal": 22,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 12,
+      "executed_target_channels": 18,
+      "channels_with_action_queue_change": 8,
+      "channels_with_any_vote_delta": 12,
+      "channels_vote_delta_without_action_change": 4,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "NeighborBarrierRing": [
+        3,
+        29,
+        34
+       ],
+       "AreaFoodSummary:0": [
+        30,
+        31,
+        37,
+        43,
+        44
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "NeighborBarrierRing#2": [
+        3,
+        34
+       ],
+       "NeighborBarrierRing#6": [
+        29
+       ],
+       "AreaFoodSummary:0#3": [
+        30,
+        31
+       ],
+       "AreaFoodSummary:0#1": [
+        37,
+        43
+       ],
+       "AreaFoodSummary:0#0": [
+        44
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 3,
+        "family": "NeighborBarrierRing",
+        "channel": 2,
+        "scenes_actions_differ": 8,
+        "delta_passes": 18,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.5249,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 29,
+        "family": "NeighborBarrierRing",
+        "channel": 6,
+        "scenes_actions_differ": 17,
+        "delta_passes": 106,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.3264,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 30,
+        "family": "AreaFoodSummary:0",
+        "channel": 3,
+        "scenes_actions_differ": 37,
+        "delta_passes": 207,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.794,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 31,
+        "family": "AreaFoodSummary:0",
+        "channel": 3,
+        "scenes_actions_differ": 37,
+        "delta_passes": 207,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.794,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 34,
+        "family": "NeighborBarrierRing",
+        "channel": 2,
+        "scenes_actions_differ": 8,
+        "delta_passes": 23,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.5249,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 37,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 12,
+        "delta_passes": 640,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.7243,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 43,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 16,
+        "delta_passes": 144,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.7243,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 44,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "scenes_actions_differ": 5,
+        "delta_passes": 1630,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.2866,
+        "consumers_vm": 0
+       }
+      ],
+      "distinct_action_change_readings": [
+       [
+        "AreaFoodSummary:0",
+        0,
+        1,
+        0,
+        0.2866,
+        1630
+       ],
+       [
+        "AreaFoodSummary:0",
+        1,
+        1,
+        0,
+        0.7243,
+        144
+       ],
+       [
+        "AreaFoodSummary:0",
+        1,
+        1,
+        0,
+        0.7243,
+        640
+       ],
+       [
+        "AreaFoodSummary:0",
+        3,
+        1,
+        0,
+        0.794,
+        207
+       ],
+       [
+        "NeighborBarrierRing",
+        2,
+        1,
+        0,
+        0.5249,
+        18
+       ],
+       [
+        "NeighborBarrierRing",
+        2,
+        1,
+        0,
+        0.5249,
+        23
+       ],
+       [
+        "NeighborBarrierRing",
+        6,
+        1,
+        0,
+        0.3264,
+        106
+       ]
+      ],
+      "distinct_action_change_parents": 8
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 3,
+        "vote_delta_parents": 3,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 5,
+        "vote_delta_parents": 5,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "NeighborBarrierRing#2": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "NeighborBarrierRing#6": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "AreaFoodSummary:0#0": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "AreaFoodSummary:0#1": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0#3": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected_destinations": "votes",
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 468,
+       "changed_per_all_births": 0.234,
+       "changed_per_mutated_births": 0.2525634106853751,
+       "dead": 1,
+       "dead_per_all_births": 0.0005,
+       "dead_per_mutated_births": 0.0005396654074473826,
+       "mutated_births": 1853,
+       "mutated_births_check": 1853,
+       "silent": 1384,
+       "silent_per_all_births": 0.692,
+       "silent_per_mutated_births": 0.7468969239071775,
+       "zero_event_births": 147
+      }
+     },
+     "sink_use": {
+      "version": "sink-use-v1",
+      "parents_evaluated": 20,
+      "kinds": {
+       "CustomOutput": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "RouterGate": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 2,
+        "parents_causal_kind": 2
+       },
+       "WriteSlot": {
+        "parents_wired": 17,
+        "parents_executed": 17,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ClearSlot": {
+        "parents_wired": 9,
+        "parents_executed": 7,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ActionVote": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "ActionParam": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       }
+      },
+      "joint_vs_any_slot_disagreements": [],
+      "slots_causal": [
+       {
+        "kind": "CustomOutput",
+        "slot": "0",
+        "wired": 20,
+        "executed": 20,
+        "causal": 4
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "1",
+        "wired": 20,
+        "executed": 20,
+        "causal": 11
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "2",
+        "wired": 20,
+        "executed": 20,
+        "causal": 15
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "3",
+        "wired": 19,
+        "executed": 19,
+        "causal": 7
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "4",
+        "wired": 20,
+        "executed": 20,
+        "causal": 18
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "5",
+        "wired": 20,
+        "executed": 20,
+        "causal": 11
+       },
+       {
+        "kind": "RouterGate",
+        "slot": "1",
+        "wired": 20,
+        "executed": 20,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Eat",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(1)",
+        "wired": 7,
+        "executed": 7,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 17
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(3)",
+        "wired": 13,
+        "executed": 13,
+        "causal": 4
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(5)",
+        "wired": 8,
+        "executed": 8,
+        "causal": 4
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 17
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(7)",
+        "wired": 17,
+        "executed": 17,
+        "causal": 7
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 13
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 7
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 8
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(5)",
+        "wired": 9,
+        "executed": 9,
+        "causal": 5
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 11
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(7)",
+        "wired": 5,
+        "executed": 5,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(0)",
+        "wired": 4,
+        "executed": 4,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(1)",
+        "wired": 10,
+        "executed": 10,
+        "causal": 3
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(2)",
+        "wired": 12,
+        "executed": 12,
+        "causal": 5
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(3)",
+        "wired": 17,
+        "executed": 17,
+        "causal": 3
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(4)",
+        "wired": 1,
+        "executed": 1,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(5)",
+        "wired": 5,
+        "executed": 5,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(6)",
+        "wired": 12,
+        "executed": 12,
+        "causal": 3
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(7)",
+        "wired": 9,
+        "executed": 9,
+        "causal": 2
+       },
+       {
+        "kind": "ActionParam",
+        "slot": "ReproduceTransferFraction",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       }
+      ],
+      "slots_wired_count": 64,
+      "wired_sinks_per_parent": [
+       28,
+       30,
+       26,
+       32,
+       27,
+       30,
+       28,
+       30,
+       31,
+       26,
+       30,
+       27,
+       27,
+       30,
+       31,
+       30,
+       39,
+       28,
+       34,
+       30
+      ],
+      "reachable_graph_nodes_per_parent": [
+       8,
+       8,
+       2,
+       6,
+       3,
+       2,
+       4,
+       13,
+       3,
+       4,
+       2,
+       7,
+       8,
+       9,
+       11,
+       11,
+       5,
+       9,
+       7,
+       7
+      ],
+      "scene_executions": 264,
+      "memory_loop": {
+       "loops_causal": 0,
+       "loops_executed": 31,
+       "loops_wired": 33,
+       "parents_with_causal_loop": 0,
+       "parents_with_clear": 9,
+       "parents_with_dynamic_read": 0,
+       "parents_with_dynamic_write": 1,
+       "parents_with_executed_loop": 14,
+       "parents_with_graph_read": 20,
+       "parents_with_graph_write": 17,
+       "parents_with_loop": 14,
+       "parents_with_vm_read": 14,
+       "parents_with_vm_write": 11
+      }
+     },
+     "memory": {
+      "final_creature_count": 3065,
+      "different_from_zeroed_count": 6,
+      "different_from_scrambled_count": 6,
+      "different_from_either_count": 6,
+      "temporal": {
+       "previous_slots": {
+        "final_creature_count": 3065,
+        "different_from_either_count": 17
+       },
+       "persisted_outputs": {
+        "final_creature_count": 3065,
+        "different_from_either_count": 224
+       },
+       "operator_state": {
+        "final_creature_count": 3065,
+        "different_from_either_count": 70
+       }
+      }
+     },
+     "e6_gradient_informative": 0.20228384991843393,
+     "secs": {
+      "census_secs": 1.814585208,
+      "vote_delta_secs": 0.054323292,
+      "births_secs": 0.407670667,
+      "sink_use_secs": 0.480778708,
+      "memory_secs": 0.408146291
+     }
+    }
+   },
+   "footer": {
+    "census_secs": 3.110458125,
+    "elapsed_secs": 692.483829959,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 688.656942462,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "cfca1911afe0e858d29f0fa1e48e3dafe0126b6d9b004ef01d7d4a4d96f0d782",
+   "sha256_census": "dc3c62733c0bc36ed0eacb058f445fc9208e118daa3ef5d0de2f08c12866e385"
+  },
+  "default-s2022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "born_connected_destinations": "votes",
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.005
+   },
+   "config_digest": "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6",
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 2681.090909090909,
+   "mean_energy": 34.51934347833633,
+   "mean_genome_size": 589.5726161646604,
+   "mean_genome_size_founder_units": 6.078068207883097,
+   "mean_generation": 457.3142162332157,
+   "size_per_generation": 1.2892068412410718,
+   "births_per_creature_tick": 0.02069271811828361,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 2878,
+    "mean_genome_size": 750.9815844336345,
+    "mean_generation": 508.59659485753997,
+    "reproduction_actions_spawned_total": 1067711
+   },
+   "min_population_sample": [
+    10,
+    4500
+   ],
+   "trajectory": [
+    [
+     2500,
+     112.5,
+     1138
+    ],
+    [
+     5000,
+     155.1,
+     952
+    ],
+    [
+     7500,
+     180.6,
+     1547
+    ],
+    [
+     10000,
+     284.7,
+     2685
+    ],
+    [
+     12500,
+     379.8,
+     2809
+    ],
+    [
+     15000,
+     475.8,
+     2835
+    ],
+    [
+     17500,
+     574.5,
+     2814
+    ],
+    [
+     20000,
+     751.0,
+     2878
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 2685,
+     "selected_parents": 20,
+     "selected_generations": [
+      282,
+      281,
+      270,
+      263,
+      289,
+      282,
+      290,
+      268,
+      284,
+      273,
+      280,
+      281,
+      291,
+      283,
+      280,
+      288,
+      267,
+      267,
+      278,
+      254
+     ],
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 4,
+       "family_connected": 4,
+       "family_executed": 1,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 5,
+       "family_connected": 5,
+       "family_executed": 3,
+       "family_causal": 3,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "vote_side_causal": 3,
+     "executed_plus_causal": 7,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 3,
+      "executed_target_channels": 6,
+      "channels_with_action_queue_change": 5,
+      "channels_with_any_vote_delta": 6,
+      "channels_vote_delta_without_action_change": 1,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "AreaFoodSummary:0": [
+        8,
+        20,
+        39
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "AreaFoodSummary:0#6": [
+        8
+       ],
+       "AreaFoodSummary:0#4": [
+        20,
+        39
+       ],
+       "AreaFoodSummary:0#0": [
+        39
+       ],
+       "AreaFoodSummary:0#1": [
+        39
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 8,
+        "family": "AreaFoodSummary:0",
+        "channel": 6,
+        "scenes_actions_differ": 32,
+        "delta_passes": 1084,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.5065,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 20,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "scenes_actions_differ": 7,
+        "delta_passes": 432,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.9973,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 39,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "scenes_actions_differ": 1,
+        "delta_passes": 1450,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.0726,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 39,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 24,
+        "delta_passes": 754,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 1.0,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 39,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "scenes_actions_differ": 2,
+        "delta_passes": 555,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.2761,
+        "consumers_vm": 0
+       }
+      ],
+      "distinct_action_change_readings": [
+       [
+        "AreaFoodSummary:0",
+        0,
+        1,
+        0,
+        0.0726,
+        1450
+       ],
+       [
+        "AreaFoodSummary:0",
+        1,
+        1,
+        0,
+        1.0,
+        754
+       ],
+       [
+        "AreaFoodSummary:0",
+        4,
+        1,
+        0,
+        0.2761,
+        555
+       ],
+       [
+        "AreaFoodSummary:0",
+        4,
+        1,
+        0,
+        0.9973,
+        432
+       ],
+       [
+        "AreaFoodSummary:0",
+        6,
+        1,
+        0,
+        0.5065,
+        1084
+       ]
+      ],
+      "distinct_action_change_parents": 3
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 3,
+        "vote_delta_parents": 3,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "AreaFoodSummary:0#0": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "AreaFoodSummary:0#1": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "AreaFoodSummary:0#4": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0#6": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected_destinations": "votes",
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 247,
+       "changed_per_all_births": 0.1235,
+       "changed_per_mutated_births": 0.17345505617977527,
+       "dead": 6,
+       "dead_per_all_births": 0.003,
+       "dead_per_mutated_births": 0.004213483146067416,
+       "mutated_births": 1424,
+       "mutated_births_check": 1424,
+       "silent": 1171,
+       "silent_per_all_births": 0.5855,
+       "silent_per_mutated_births": 0.8223314606741573,
+       "zero_event_births": 576
+      }
+     },
+     "sink_use": {
+      "version": "sink-use-v1",
+      "parents_evaluated": 20,
+      "kinds": {
+       "CustomOutput": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 18,
+        "parents_causal_kind": 18
+       },
+       "RouterGate": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 11,
+        "parents_causal_kind": 10
+       },
+       "WriteSlot": {
+        "parents_wired": 2,
+        "parents_executed": 2,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ClearSlot": {
+        "parents_wired": 6,
+        "parents_executed": 5,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ActionVote": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "ActionParam": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       }
+      },
+      "joint_vs_any_slot_disagreements": [
+       "RouterGate"
+      ],
+      "slots_causal": [
+       {
+        "kind": "CustomOutput",
+        "slot": "0",
+        "wired": 19,
+        "executed": 19,
+        "causal": 4
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "13",
+        "wired": 1,
+        "executed": 1,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "2",
+        "wired": 17,
+        "executed": 17,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "4",
+        "wired": 20,
+        "executed": 20,
+        "causal": 6
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "5",
+        "wired": 19,
+        "executed": 19,
+        "causal": 12
+       },
+       {
+        "kind": "RouterGate",
+        "slot": "1",
+        "wired": 20,
+        "executed": 20,
+        "causal": 11
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Decide",
+        "wired": 19,
+        "executed": 19,
+        "causal": 17
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Eat",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 12
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(1)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 14
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 12
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(3)",
+        "wired": 7,
+        "executed": 7,
+        "causal": 4
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 14
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(7)",
+        "wired": 2,
+        "executed": 2,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 3
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 18
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(3)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 3
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(0)",
+        "wired": 1,
+        "executed": 1,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(4)",
+        "wired": 4,
+        "executed": 4,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(6)",
+        "wired": 4,
+        "executed": 4,
+        "causal": 4
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(7)",
+        "wired": 7,
+        "executed": 7,
+        "causal": 1
+       },
+       {
+        "kind": "ActionParam",
+        "slot": "ReproduceTransferFraction",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       }
+      ],
+      "slots_wired_count": 40,
+      "wired_sinks_per_parent": [
+       24,
+       24,
+       23,
+       23,
+       22,
+       24,
+       25,
+       23,
+       24,
+       23,
+       22,
+       22,
+       24,
+       24,
+       25,
+       26,
+       23,
+       24,
+       20,
+       23
+      ],
+      "reachable_graph_nodes_per_parent": [
+       4,
+       3,
+       8,
+       8,
+       3,
+       2,
+       7,
+       9,
+       7,
+       8,
+       4,
+       4,
+       6,
+       4,
+       13,
+       4,
+       6,
+       2,
+       2,
+       6
+      ],
+      "scene_executions": 264,
+      "memory_loop": {
+       "loops_causal": 0,
+       "loops_executed": 5,
+       "loops_wired": 5,
+       "parents_with_causal_loop": 0,
+       "parents_with_clear": 6,
+       "parents_with_dynamic_read": 2,
+       "parents_with_dynamic_write": 0,
+       "parents_with_executed_loop": 4,
+       "parents_with_graph_read": 14,
+       "parents_with_graph_write": 2,
+       "parents_with_loop": 4,
+       "parents_with_vm_read": 10,
+       "parents_with_vm_write": 5
+      }
+     },
+     "memory": {
+      "final_creature_count": 2685,
+      "different_from_zeroed_count": 0,
+      "different_from_scrambled_count": 0,
+      "different_from_either_count": 0,
+      "temporal": {
+       "previous_slots": {
+        "final_creature_count": 2685,
+        "different_from_either_count": 0
+       },
+       "persisted_outputs": {
+        "final_creature_count": 2685,
+        "different_from_either_count": 13
+       },
+       "operator_state": {
+        "final_creature_count": 2685,
+        "different_from_either_count": 371
+       }
+      }
+     },
+     "e6_gradient_informative": 0.28640595903165733,
+     "secs": {
+      "census_secs": 1.611250583,
+      "vote_delta_secs": 0.04784825,
+      "births_secs": 0.328734084,
+      "sink_use_secs": 0.329816833,
+      "memory_secs": 0.397670084
+     }
+    },
+    "20000": {
+     "living": 2878,
+     "selected_parents": 20,
+     "selected_generations": [
+      534,
+      512,
+      507,
+      529,
+      523,
+      494,
+      515,
+      522,
+      505,
+      495,
+      520,
+      509,
+      505,
+      505,
+      511,
+      503,
+      518,
+      495,
+      507,
+      507
+     ],
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 6,
+       "family_connected": 6,
+       "family_executed": 6,
+       "family_causal": 2,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 7,
+       "family_connected": 7,
+       "family_executed": 7,
+       "family_causal": 4,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "vote_side_causal": 6,
+     "executed_plus_causal": 19,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 10,
+      "executed_target_channels": 16,
+      "channels_with_action_queue_change": 6,
+      "channels_with_any_vote_delta": 14,
+      "channels_vote_delta_without_action_change": 8,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "AreaFoodSummary:0": [
+        30,
+        34,
+        46,
+        49
+       ],
+       "NeighborBarrierRing": [
+        46,
+        49
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "AreaFoodSummary:0#1": [
+        30,
+        46,
+        49
+       ],
+       "AreaFoodSummary:0#4": [
+        34
+       ],
+       "NeighborBarrierRing#4": [
+        46,
+        49
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 30,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 79,
+        "delta_passes": 1177,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.8873,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 34,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "scenes_actions_differ": 11,
+        "delta_passes": 292,
+        "consumers_graph": 2,
+        "consumers_graph_abs_weight": 1.5095,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 46,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "scenes_actions_differ": 28,
+        "delta_passes": 197,
+        "consumers_graph": 2,
+        "consumers_graph_abs_weight": 0.9529,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 46,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 68,
+        "delta_passes": 1231,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.8873,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 49,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "scenes_actions_differ": 28,
+        "delta_passes": 197,
+        "consumers_graph": 2,
+        "consumers_graph_abs_weight": 0.9529,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 49,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 73,
+        "delta_passes": 1231,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.8873,
+        "consumers_vm": 0
+       }
+      ],
+      "distinct_action_change_readings": [
+       [
+        "AreaFoodSummary:0",
+        1,
+        1,
+        0,
+        0.8873,
+        1177
+       ],
+       [
+        "AreaFoodSummary:0",
+        1,
+        1,
+        0,
+        0.8873,
+        1231
+       ],
+       [
+        "AreaFoodSummary:0",
+        4,
+        2,
+        0,
+        1.5095,
+        292
+       ],
+       [
+        "NeighborBarrierRing",
+        4,
+        2,
+        0,
+        0.9529,
+        197
+       ]
+      ],
+      "distinct_action_change_parents": 4
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 4,
+        "vote_delta_parents": 4,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "NeighborBarrierRing#4": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0#1": {
+        "funnel_causal": 3,
+        "vote_delta_parents": 3,
+        "agree": true
+       },
+       "AreaFoodSummary:0#4": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected_destinations": "votes",
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 564,
+       "changed_per_all_births": 0.282,
+       "changed_per_mutated_births": 0.2966859547606523,
+       "dead": 2,
+       "dead_per_all_births": 0.001,
+       "dead_per_mutated_births": 0.0010520778537611783,
+       "mutated_births": 1901,
+       "mutated_births_check": 1901,
+       "silent": 1335,
+       "silent_per_all_births": 0.6675,
+       "silent_per_mutated_births": 0.7022619673855865,
+       "zero_event_births": 99
+      }
+     },
+     "sink_use": {
+      "version": "sink-use-v1",
+      "parents_evaluated": 20,
+      "kinds": {
+       "CustomOutput": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "RouterGate": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 7,
+        "parents_causal_kind": 6
+       },
+       "WriteSlot": {
+        "parents_wired": 1,
+        "parents_executed": 1,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ClearSlot": {
+        "parents_wired": 7,
+        "parents_executed": 7,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ActionVote": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "ActionParam": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       }
+      },
+      "joint_vs_any_slot_disagreements": [
+       "RouterGate"
+      ],
+      "slots_causal": [
+       {
+        "kind": "CustomOutput",
+        "slot": "0",
+        "wired": 20,
+        "executed": 20,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "1",
+        "wired": 19,
+        "executed": 19,
+        "causal": 2
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "2",
+        "wired": 20,
+        "executed": 20,
+        "causal": 5
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "20",
+        "wired": 1,
+        "executed": 1,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "4",
+        "wired": 20,
+        "executed": 20,
+        "causal": 17
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "5",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "RouterGate",
+        "slot": "0",
+        "wired": 15,
+        "executed": 15,
+        "causal": 3
+       },
+       {
+        "kind": "RouterGate",
+        "slot": "1",
+        "wired": 20,
+        "executed": 20,
+        "causal": 7
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Decide",
+        "wired": 20,
+        "executed": 20,
+        "causal": 14
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Eat",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 14
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(1)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 14
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 15
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(3)",
+        "wired": 17,
+        "executed": 17,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(5)",
+        "wired": 17,
+        "executed": 17,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(7)",
+        "wired": 7,
+        "executed": 7,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 15
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(5)",
+        "wired": 15,
+        "executed": 15,
+        "causal": 3
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 16
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(1)",
+        "wired": 3,
+        "executed": 3,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(3)",
+        "wired": 6,
+        "executed": 5,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(4)",
+        "wired": 15,
+        "executed": 15,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(7)",
+        "wired": 15,
+        "executed": 15,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Terminate",
+        "wired": 20,
+        "executed": 20,
+        "causal": 4
+       },
+       {
+        "kind": "ActionParam",
+        "slot": "ReproduceTransferFraction",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       }
+      ],
+      "slots_wired_count": 51,
+      "wired_sinks_per_parent": [
+       31,
+       31,
+       29,
+       29,
+       31,
+       29,
+       25,
+       31,
+       31,
+       31,
+       30,
+       29,
+       32,
+       29,
+       32,
+       28,
+       34,
+       29,
+       29,
+       29
+      ],
+      "reachable_graph_nodes_per_parent": [
+       2,
+       10,
+       7,
+       2,
+       10,
+       6,
+       6,
+       9,
+       7,
+       6,
+       8,
+       10,
+       8,
+       8,
+       8,
+       4,
+       11,
+       7,
+       6,
+       5
+      ],
+      "scene_executions": 264,
+      "memory_loop": {
+       "loops_causal": 0,
+       "loops_executed": 34,
+       "loops_wired": 34,
+       "parents_with_causal_loop": 0,
+       "parents_with_clear": 7,
+       "parents_with_dynamic_read": 0,
+       "parents_with_dynamic_write": 0,
+       "parents_with_executed_loop": 11,
+       "parents_with_graph_read": 20,
+       "parents_with_graph_write": 1,
+       "parents_with_loop": 11,
+       "parents_with_vm_read": 17,
+       "parents_with_vm_write": 11
+      }
+     },
+     "memory": {
+      "final_creature_count": 2878,
+      "different_from_zeroed_count": 5,
+      "different_from_scrambled_count": 12,
+      "different_from_either_count": 12,
+      "temporal": {
+       "previous_slots": {
+        "final_creature_count": 2878,
+        "different_from_either_count": 34
+       },
+       "persisted_outputs": {
+        "final_creature_count": 2878,
+        "different_from_either_count": 158
+       },
+       "operator_state": {
+        "final_creature_count": 2878,
+        "different_from_either_count": 135
+       }
+      }
+     },
+     "e6_gradient_informative": 0.17720639332870047,
+     "secs": {
+      "census_secs": 2.7912199170000003,
+      "vote_delta_secs": 0.073078,
+      "births_secs": 0.6299135,
+      "sink_use_secs": 0.602509417,
+      "memory_secs": 0.625456041
+     }
+    }
+   },
+   "footer": {
+    "census_secs": 4.4024705,
+    "elapsed_secs": 657.025931167,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 652.0190658429998,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "5470fbb0946d37ff4d599aefadb85f24d283bdbfaca812bc36a1e8cfc4d88390",
+   "sha256_census": "21ae9c82ef37cc6df3f6ea0fdd7152943312e02f9aec340df769f0b52ad2f536"
+  },
+  "wide-s1022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "born_connected_destinations": "non_clear",
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.005
+   },
+   "config_digest": "sha256:d9adc550d6efbd525cb25d27408e0ef918c4b56e2ee32f7c621c516d79c0d0f8",
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 1852.0,
+   "mean_energy": 42.099743044575725,
+   "mean_genome_size": 524.7046017510103,
+   "mean_genome_size_founder_units": 5.409325791247529,
+   "mean_generation": 405.1755417263794,
+   "size_per_generation": 1.295005615381766,
+   "births_per_creature_tick": 0.02268325669461726,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 1887,
+    "mean_genome_size": 716.1457339692633,
+    "mean_generation": 454.72760996290407,
+    "reproduction_actions_spawned_total": 1000039
+   },
+   "min_population_sample": [
+    881,
+    2500
+   ],
+   "trajectory": [
+    [
+     2500,
+     107.3,
+     881
+    ],
+    [
+     5000,
+     122.9,
+     1300
+    ],
+    [
+     7500,
+     190.2,
+     3070
+    ],
+    [
+     10000,
+     251.8,
+     2184
+    ],
+    [
+     12500,
+     275.4,
+     2493
+    ],
+    [
+     15000,
+     360.2,
+     2416
+    ],
+    [
+     17500,
+     513.0,
+     1991
+    ],
+    [
+     20000,
+     716.1,
+     1887
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 2184,
+     "selected_parents": 20,
+     "selected_generations": [
+      228,
+      267,
+      267,
+      224,
+      234,
+      248,
+      257,
+      227,
+      215,
+      222,
+      256,
+      256,
+      259,
+      251,
+      267,
+      282,
+      254,
+      283,
+      267,
+      265
+     ],
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 10,
+       "family_connected": 9,
+       "family_executed": 9,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 1,
+       "family_connected": 1,
+       "family_executed": 1,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "vote_side_causal": 0,
+     "executed_plus_causal": 10,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 9,
+      "executed_target_channels": 11,
+      "channels_with_action_queue_change": 0,
+      "channels_with_any_vote_delta": 1,
+      "channels_vote_delta_without_action_change": 1,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {},
+      "distinct_parents_with_action_change_by_channel": {},
+      "action_change_channels": [],
+      "distinct_action_change_readings": [],
+      "distinct_action_change_parents": 0
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {},
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected_destinations": "non_clear",
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 329,
+       "changed_per_all_births": 0.1645,
+       "changed_per_mutated_births": 0.23703170028818443,
+       "dead": 5,
+       "dead_per_all_births": 0.0025,
+       "dead_per_mutated_births": 0.0036023054755043226,
+       "mutated_births": 1388,
+       "mutated_births_check": 1388,
+       "silent": 1054,
+       "silent_per_all_births": 0.527,
+       "silent_per_mutated_births": 0.7593659942363112,
+       "zero_event_births": 612
+      }
+     },
+     "sink_use": {
+      "version": "sink-use-v1",
+      "parents_evaluated": 20,
+      "kinds": {
+       "CustomOutput": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "RouterGate": {
+        "parents_wired": 18,
+        "parents_executed": 16,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "WriteSlot": {
+        "parents_wired": 18,
+        "parents_executed": 18,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ClearSlot": {
+        "parents_wired": 8,
+        "parents_executed": 8,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ActionVote": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "ActionParam": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       }
+      },
+      "joint_vs_any_slot_disagreements": [],
+      "slots_causal": [
+       {
+        "kind": "CustomOutput",
+        "slot": "0",
+        "wired": 20,
+        "executed": 20,
+        "causal": 14
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "1",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "2",
+        "wired": 20,
+        "executed": 20,
+        "causal": 18
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "3",
+        "wired": 20,
+        "executed": 20,
+        "causal": 16
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "4",
+        "wired": 20,
+        "executed": 20,
+        "causal": 3
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "5",
+        "wired": 20,
+        "executed": 20,
+        "causal": 12
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Eat",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 17
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 9
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 17
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 10
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 11
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Terminate",
+        "wired": 20,
+        "executed": 20,
+        "causal": 3
+       },
+       {
+        "kind": "ActionParam",
+        "slot": "ReproduceTransferFraction",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       }
+      ],
+      "slots_wired_count": 52,
+      "wired_sinks_per_parent": [
+       22,
+       25,
+       24,
+       19,
+       22,
+       23,
+       26,
+       22,
+       23,
+       20,
+       24,
+       24,
+       26,
+       25,
+       26,
+       21,
+       24,
+       22,
+       25,
+       23
+      ],
+      "reachable_graph_nodes_per_parent": [
+       4,
+       5,
+       4,
+       3,
+       3,
+       5,
+       2,
+       4,
+       9,
+       3,
+       3,
+       2,
+       2,
+       4,
+       5,
+       5,
+       2,
+       3,
+       4,
+       5
+      ],
+      "scene_executions": 264,
+      "memory_loop": {
+       "loops_causal": 0,
+       "loops_executed": 14,
+       "loops_wired": 14,
+       "parents_with_causal_loop": 0,
+       "parents_with_clear": 8,
+       "parents_with_dynamic_read": 0,
+       "parents_with_dynamic_write": 0,
+       "parents_with_executed_loop": 11,
+       "parents_with_graph_read": 20,
+       "parents_with_graph_write": 18,
+       "parents_with_loop": 11,
+       "parents_with_vm_read": 13,
+       "parents_with_vm_write": 5
+      }
+     },
+     "memory": {
+      "final_creature_count": 2184,
+      "different_from_zeroed_count": 0,
+      "different_from_scrambled_count": 20,
+      "different_from_either_count": 20,
+      "temporal": {
+       "previous_slots": {
+        "final_creature_count": 2184,
+        "different_from_either_count": 2
+       },
+       "persisted_outputs": {
+        "final_creature_count": 2184,
+        "different_from_either_count": 154
+       },
+       "operator_state": {
+        "final_creature_count": 2184,
+        "different_from_either_count": 517
+       }
+      }
+     },
+     "e6_gradient_informative": 0.4075091575091575,
+     "secs": {
+      "census_secs": 0.973594125,
+      "vote_delta_secs": 0.041077208,
+      "births_secs": 0.226938125,
+      "sink_use_secs": 0.264182834,
+      "memory_secs": 0.213322
+     }
+    },
+    "20000": {
+     "living": 1887,
+     "selected_parents": 20,
+     "selected_generations": [
+      457,
+      472,
+      453,
+      395,
+      441,
+      476,
+      451,
+      468,
+      453,
+      441,
+      467,
+      459,
+      453,
+      456,
+      463,
+      454,
+      449,
+      465,
+      453,
+      453
+     ],
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 12,
+       "family_connected": 12,
+       "family_executed": 12,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 6,
+       "family_connected": 6,
+       "family_executed": 6,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "vote_side_causal": 0,
+     "executed_plus_causal": 18,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 13,
+      "executed_target_channels": 26,
+      "channels_with_action_queue_change": 0,
+      "channels_with_any_vote_delta": 3,
+      "channels_vote_delta_without_action_change": 3,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {},
+      "distinct_parents_with_action_change_by_channel": {},
+      "action_change_channels": [],
+      "distinct_action_change_readings": [],
+      "distinct_action_change_parents": 0
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {},
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected_destinations": "non_clear",
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 550,
+       "changed_per_all_births": 0.275,
+       "changed_per_mutated_births": 0.28526970954356845,
+       "dead": 3,
+       "dead_per_all_births": 0.0015,
+       "dead_per_mutated_births": 0.0015560165975103733,
+       "mutated_births": 1928,
+       "mutated_births_check": 1928,
+       "silent": 1375,
+       "silent_per_all_births": 0.6875,
+       "silent_per_mutated_births": 0.7131742738589212,
+       "zero_event_births": 72
+      }
+     },
+     "sink_use": {
+      "version": "sink-use-v1",
+      "parents_evaluated": 20,
+      "kinds": {
+       "CustomOutput": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "RouterGate": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 3,
+        "parents_causal_kind": 3
+       },
+       "WriteSlot": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ClearSlot": {
+        "parents_wired": 20,
+        "parents_executed": 19,
+        "parents_causal_any_slot": 2,
+        "parents_causal_kind": 2
+       },
+       "ActionVote": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "ActionParam": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       }
+      },
+      "joint_vs_any_slot_disagreements": [],
+      "slots_causal": [
+       {
+        "kind": "CustomOutput",
+        "slot": "0",
+        "wired": 20,
+        "executed": 20,
+        "causal": 7
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "1",
+        "wired": 20,
+        "executed": 20,
+        "causal": 18
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "12",
+        "wired": 5,
+        "executed": 5,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "13",
+        "wired": 11,
+        "executed": 11,
+        "causal": 4
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "15",
+        "wired": 7,
+        "executed": 7,
+        "causal": 3
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "17",
+        "wired": 15,
+        "executed": 15,
+        "causal": 8
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "19",
+        "wired": 2,
+        "executed": 2,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "2",
+        "wired": 20,
+        "executed": 20,
+        "causal": 13
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "3",
+        "wired": 20,
+        "executed": 20,
+        "causal": 7
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "4",
+        "wired": 16,
+        "executed": 16,
+        "causal": 2
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "5",
+        "wired": 16,
+        "executed": 16,
+        "causal": 4
+       },
+       {
+        "kind": "RouterGate",
+        "slot": "0",
+        "wired": 15,
+        "executed": 15,
+        "causal": 1
+       },
+       {
+        "kind": "RouterGate",
+        "slot": "1",
+        "wired": 19,
+        "executed": 19,
+        "causal": 2
+       },
+       {
+        "kind": "ClearSlot",
+        "slot": "15",
+        "wired": 6,
+        "executed": 6,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Eat",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 16
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(3)",
+        "wired": 13,
+        "executed": 13,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(5)",
+        "wired": 7,
+        "executed": 7,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 10
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(1)",
+        "wired": 2,
+        "executed": 2,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 10
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 5
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 8
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(7)",
+        "wired": 2,
+        "executed": 2,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(4)",
+        "wired": 6,
+        "executed": 6,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(6)",
+        "wired": 1,
+        "executed": 1,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Terminate",
+        "wired": 20,
+        "executed": 20,
+        "causal": 3
+       },
+       {
+        "kind": "ActionParam",
+        "slot": "ReproduceTransferFraction",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       }
+      ],
+      "slots_wired_count": 75,
+      "wired_sinks_per_parent": [
+       31,
+       33,
+       29,
+       33,
+       25,
+       27,
+       32,
+       36,
+       33,
+       25,
+       31,
+       34,
+       33,
+       31,
+       34,
+       35,
+       33,
+       31,
+       31,
+       32
+      ],
+      "reachable_graph_nodes_per_parent": [
+       4,
+       6,
+       7,
+       20,
+       12,
+       3,
+       6,
+       8,
+       8,
+       9,
+       4,
+       6,
+       6,
+       8,
+       6,
+       6,
+       9,
+       8,
+       7,
+       6
+      ],
+      "scene_executions": 264,
+      "memory_loop": {
+       "loops_causal": 0,
+       "loops_executed": 56,
+       "loops_wired": 64,
+       "parents_with_causal_loop": 0,
+       "parents_with_clear": 20,
+       "parents_with_dynamic_read": 1,
+       "parents_with_dynamic_write": 4,
+       "parents_with_executed_loop": 19,
+       "parents_with_graph_read": 20,
+       "parents_with_graph_write": 20,
+       "parents_with_loop": 19,
+       "parents_with_vm_read": 19,
+       "parents_with_vm_write": 15
+      }
+     },
+     "memory": {
+      "final_creature_count": 1887,
+      "different_from_zeroed_count": 0,
+      "different_from_scrambled_count": 5,
+      "different_from_either_count": 5,
+      "temporal": {
+       "previous_slots": {
+        "final_creature_count": 1887,
+        "different_from_either_count": 3
+       },
+       "persisted_outputs": {
+        "final_creature_count": 1887,
+        "different_from_either_count": 105
+       },
+       "operator_state": {
+        "final_creature_count": 1887,
+        "different_from_either_count": 1116
+       }
+      }
+     },
+     "e6_gradient_informative": 0.29305776364599895,
+     "secs": {
+      "census_secs": 2.111168125,
+      "vote_delta_secs": 0.073461,
+      "births_secs": 0.483783625,
+      "sink_use_secs": 0.620845084,
+      "memory_secs": 0.415292167
+     }
+    }
+   },
+   "footer": {
+    "census_secs": 3.08476225,
+    "elapsed_secs": 540.69211,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 537.0915755810009,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "c2b9b3a8cd48c827420927daf116bffa4d9bcafa8b96c2cb6616ec2eb3dbd606",
+   "sha256_census": "3aa4daaa12fb16ad8f51f21af59ba360d3903058b315ad1e64cd98846e7f789e"
+  },
+  "wide-s2022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "born_connected_destinations": "non_clear",
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.005
+   },
+   "config_digest": "sha256:d9adc550d6efbd525cb25d27408e0ef918c4b56e2ee32f7c621c516d79c0d0f8",
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 2072.4545454545455,
+   "mean_energy": 38.176048107307516,
+   "mean_genome_size": 1184.9811225296028,
+   "mean_genome_size_founder_units": 12.216300232263945,
+   "mean_generation": 373.1434509809213,
+   "size_per_generation": 3.1756717675588804,
+   "births_per_creature_tick": 0.01871006783465912,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 2306,
+    "mean_genome_size": 1326.4575021682567,
+    "mean_generation": 412.98699045967044,
+    "reproduction_actions_spawned_total": 929866
+   },
+   "min_population_sample": [
+    384,
+    2500
+   ],
+   "trajectory": [
+    [
+     2500,
+     142.3,
+     384
+    ],
+    [
+     5000,
+     302.7,
+     4733
+    ],
+    [
+     7500,
+     570.9,
+     2483
+    ],
+    [
+     10000,
+     810.9,
+     1724
+    ],
+    [
+     12500,
+     967.9,
+     2369
+    ],
+    [
+     15000,
+     1050.2,
+     2081
+    ],
+    [
+     17500,
+     1175.6,
+     1815
+    ],
+    [
+     20000,
+     1326.5,
+     2306
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 1724,
+     "selected_parents": 20,
+     "selected_generations": [
+      225,
+      224,
+      230,
+      256,
+      239,
+      245,
+      223,
+      252,
+      225,
+      233,
+      246,
+      224,
+      223,
+      256,
+      223,
+      223,
+      252,
+      252,
+      249,
+      235
+     ],
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 3,
+       "family_connected": 3,
+       "family_executed": 3,
+       "family_causal": 1,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 15,
+       "family_connected": 15,
+       "family_executed": 15,
+       "family_causal": 3,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "vote_side_causal": 4,
+     "executed_plus_causal": 22,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 16,
+      "executed_target_channels": 21,
+      "channels_with_action_queue_change": 4,
+      "channels_with_any_vote_delta": 4,
+      "channels_vote_delta_without_action_change": 0,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "AreaFoodSummary:0": [
+        1,
+        30,
+        38
+       ],
+       "NeighborBarrierRing": [
+        34
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "AreaFoodSummary:0#0": [
+        1,
+        38
+       ],
+       "AreaFoodSummary:0#4": [
+        30
+       ],
+       "NeighborBarrierRing#5": [
+        34
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 1,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "scenes_actions_differ": 30,
+        "delta_passes": 520,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.167,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 30,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "scenes_actions_differ": 5,
+        "delta_passes": 5,
+        "consumers_graph": 2,
+        "consumers_graph_abs_weight": 1.7595,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 34,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "scenes_actions_differ": 28,
+        "delta_passes": 136,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.277,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 38,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "scenes_actions_differ": 15,
+        "delta_passes": 683,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.167,
+        "consumers_vm": 0
+       }
+      ],
+      "distinct_action_change_readings": [
+       [
+        "AreaFoodSummary:0",
+        0,
+        1,
+        0,
+        0.167,
+        520
+       ],
+       [
+        "AreaFoodSummary:0",
+        0,
+        1,
+        0,
+        0.167,
+        683
+       ],
+       [
+        "AreaFoodSummary:0",
+        4,
+        2,
+        0,
+        1.7595,
+        5
+       ],
+       [
+        "NeighborBarrierRing",
+        5,
+        1,
+        0,
+        0.277,
+        136
+       ]
+      ],
+      "distinct_action_change_parents": 4
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 3,
+        "vote_delta_parents": 3,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "NeighborBarrierRing#5": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "AreaFoodSummary:0#0": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0#4": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected_destinations": "non_clear",
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 734,
+       "changed_per_all_births": 0.367,
+       "changed_per_mutated_births": 0.37372708757637474,
+       "dead": 8,
+       "dead_per_all_births": 0.004,
+       "dead_per_mutated_births": 0.004073319755600814,
+       "mutated_births": 1964,
+       "mutated_births_check": 1964,
+       "silent": 1222,
+       "silent_per_all_births": 0.611,
+       "silent_per_mutated_births": 0.6221995926680245,
+       "zero_event_births": 36
+      }
+     },
+     "sink_use": {
+      "version": "sink-use-v1",
+      "parents_evaluated": 20,
+      "kinds": {
+       "CustomOutput": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "RouterGate": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 16,
+        "parents_causal_kind": 16
+       },
+       "WriteSlot": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 1,
+        "parents_causal_kind": 1
+       },
+       "ClearSlot": {
+        "parents_wired": 16,
+        "parents_executed": 14,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ActionVote": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "ActionParam": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       }
+      },
+      "joint_vs_any_slot_disagreements": [],
+      "slots_causal": [
+       {
+        "kind": "CustomOutput",
+        "slot": "0",
+        "wired": 20,
+        "executed": 20,
+        "causal": 11
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "1",
+        "wired": 20,
+        "executed": 20,
+        "causal": 16
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "12",
+        "wired": 7,
+        "executed": 6,
+        "causal": 2
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "17",
+        "wired": 2,
+        "executed": 2,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "19",
+        "wired": 8,
+        "executed": 8,
+        "causal": 3
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "2",
+        "wired": 20,
+        "executed": 20,
+        "causal": 8
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "22",
+        "wired": 2,
+        "executed": 2,
+        "causal": 2
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "23",
+        "wired": 6,
+        "executed": 6,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "3",
+        "wired": 20,
+        "executed": 20,
+        "causal": 18
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "4",
+        "wired": 20,
+        "executed": 20,
+        "causal": 9
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "5",
+        "wired": 20,
+        "executed": 20,
+        "causal": 18
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "8",
+        "wired": 8,
+        "executed": 8,
+        "causal": 3
+       },
+       {
+        "kind": "RouterGate",
+        "slot": "1",
+        "wired": 20,
+        "executed": 20,
+        "causal": 16
+       },
+       {
+        "kind": "WriteSlot",
+        "slot": "8",
+        "wired": 16,
+        "executed": 16,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Eat",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 18
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 10
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(1)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 16
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 8
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 4
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(0)",
+        "wired": 18,
+        "executed": 17,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(1)",
+        "wired": 1,
+        "executed": 1,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(2)",
+        "wired": 9,
+        "executed": 9,
+        "causal": 7
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(3)",
+        "wired": 14,
+        "executed": 11,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(6)",
+        "wired": 4,
+        "executed": 4,
+        "causal": 4
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Terminate",
+        "wired": 20,
+        "executed": 20,
+        "causal": 2
+       },
+       {
+        "kind": "ActionParam",
+        "slot": "ReproduceTransferFraction",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionParam",
+        "slot": "StealEnergyAmount",
+        "wired": 6,
+        "executed": 6,
+        "causal": 1
+       }
+      ],
+      "slots_wired_count": 69,
+      "wired_sinks_per_parent": [
+       28,
+       31,
+       26,
+       35,
+       31,
+       32,
+       29,
+       41,
+       28,
+       27,
+       32,
+       29,
+       29,
+       34,
+       28,
+       30,
+       34,
+       39,
+       33,
+       29
+      ],
+      "reachable_graph_nodes_per_parent": [
+       9,
+       9,
+       8,
+       12,
+       18,
+       10,
+       11,
+       18,
+       16,
+       13,
+       10,
+       13,
+       12,
+       13,
+       8,
+       11,
+       8,
+       13,
+       15,
+       10
+      ],
+      "scene_executions": 264,
+      "memory_loop": {
+       "loops_causal": 1,
+       "loops_executed": 28,
+       "loops_wired": 48,
+       "parents_with_causal_loop": 1,
+       "parents_with_clear": 16,
+       "parents_with_dynamic_read": 0,
+       "parents_with_dynamic_write": 1,
+       "parents_with_executed_loop": 16,
+       "parents_with_graph_read": 19,
+       "parents_with_graph_write": 20,
+       "parents_with_loop": 17,
+       "parents_with_vm_read": 19,
+       "parents_with_vm_write": 19
+      }
+     },
+     "memory": {
+      "final_creature_count": 1724,
+      "different_from_zeroed_count": 1,
+      "different_from_scrambled_count": 2,
+      "different_from_either_count": 2,
+      "temporal": {
+       "previous_slots": {
+        "final_creature_count": 1724,
+        "different_from_either_count": 8
+       },
+       "persisted_outputs": {
+        "final_creature_count": 1724,
+        "different_from_either_count": 45
+       },
+       "operator_state": {
+        "final_creature_count": 1724,
+        "different_from_either_count": 33
+       }
+      }
+     },
+     "e6_gradient_informative": 0.2470997679814385,
+     "secs": {
+      "census_secs": 2.4172192089999998,
+      "vote_delta_secs": 0.088302583,
+      "births_secs": 0.614401083,
+      "sink_use_secs": 0.65930975,
+      "memory_secs": 0.332988167
+     }
+    },
+    "20000": {
+     "living": 2306,
+     "selected_parents": 20,
+     "selected_generations": [
+      369,
+      419,
+      371,
+      368,
+      410,
+      411,
+      420,
+      420,
+      399,
+      403,
+      451,
+      379,
+      413,
+      396,
+      396,
+      401,
+      458,
+      395,
+      419,
+      408
+     ],
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 12,
+       "family_connected": 12,
+       "family_executed": 8,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 17,
+       "family_connected": 17,
+       "family_executed": 17,
+       "family_causal": 4,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "vote_side_causal": 4,
+     "executed_plus_causal": 29,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 17,
+      "executed_target_channels": 33,
+      "channels_with_action_queue_change": 4,
+      "channels_with_any_vote_delta": 4,
+      "channels_vote_delta_without_action_change": 0,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "AreaFoodSummary:0": [
+        7,
+        35,
+        36,
+        49
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "AreaFoodSummary:0#3": [
+        7,
+        35
+       ],
+       "AreaFoodSummary:0#4": [
+        36,
+        49
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 7,
+        "family": "AreaFoodSummary:0",
+        "channel": 3,
+        "scenes_actions_differ": 37,
+        "delta_passes": 345,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.2367,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 35,
+        "family": "AreaFoodSummary:0",
+        "channel": 3,
+        "scenes_actions_differ": 19,
+        "delta_passes": 579,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.2367,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 36,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "scenes_actions_differ": 3,
+        "delta_passes": 26,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.8466,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 49,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "scenes_actions_differ": 7,
+        "delta_passes": 57,
+        "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.8466,
+        "consumers_vm": 0
+       }
+      ],
+      "distinct_action_change_readings": [
+       [
+        "AreaFoodSummary:0",
+        3,
+        1,
+        0,
+        0.2367,
+        345
+       ],
+       [
+        "AreaFoodSummary:0",
+        3,
+        1,
+        0,
+        0.2367,
+        579
+       ],
+       [
+        "AreaFoodSummary:0",
+        4,
+        1,
+        0,
+        0.8466,
+        26
+       ],
+       [
+        "AreaFoodSummary:0",
+        4,
+        1,
+        0,
+        0.8466,
+        57
+       ]
+      ],
+      "distinct_action_change_parents": 4
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 4,
+        "vote_delta_parents": 4,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "AreaFoodSummary:0#3": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0#4": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected_destinations": "non_clear",
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 820,
+       "changed_per_all_births": 0.41,
+       "changed_per_mutated_births": 0.41102756892230574,
+       "dead": 7,
+       "dead_per_all_births": 0.0035,
+       "dead_per_mutated_births": 0.0035087719298245615,
+       "mutated_births": 1995,
+       "mutated_births_check": 1995,
+       "silent": 1168,
+       "silent_per_all_births": 0.584,
+       "silent_per_mutated_births": 0.5854636591478697,
+       "zero_event_births": 5
+      }
+     },
+     "sink_use": {
+      "version": "sink-use-v1",
+      "parents_evaluated": 20,
+      "kinds": {
+       "CustomOutput": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "RouterGate": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 18,
+        "parents_causal_kind": 18
+       },
+       "WriteSlot": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 5,
+        "parents_causal_kind": 6
+       },
+       "ClearSlot": {
+        "parents_wired": 18,
+        "parents_executed": 18,
+        "parents_causal_any_slot": 0,
+        "parents_causal_kind": 0
+       },
+       "ActionVote": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 20,
+        "parents_causal_kind": 20
+       },
+       "ActionParam": {
+        "parents_wired": 20,
+        "parents_executed": 20,
+        "parents_causal_any_slot": 19,
+        "parents_causal_kind": 19
+       }
+      },
+      "joint_vs_any_slot_disagreements": [
+       "WriteSlot"
+      ],
+      "slots_causal": [
+       {
+        "kind": "CustomOutput",
+        "slot": "0",
+        "wired": 15,
+        "executed": 15,
+        "causal": 6
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "1",
+        "wired": 18,
+        "executed": 18,
+        "causal": 8
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "11",
+        "wired": 8,
+        "executed": 6,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "13",
+        "wired": 9,
+        "executed": 9,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "14",
+        "wired": 6,
+        "executed": 6,
+        "causal": 2
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "15",
+        "wired": 7,
+        "executed": 7,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "16",
+        "wired": 3,
+        "executed": 3,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "17",
+        "wired": 3,
+        "executed": 3,
+        "causal": 1
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "2",
+        "wired": 20,
+        "executed": 20,
+        "causal": 5
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "20",
+        "wired": 8,
+        "executed": 8,
+        "causal": 2
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "21",
+        "wired": 6,
+        "executed": 6,
+        "causal": 2
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "3",
+        "wired": 19,
+        "executed": 19,
+        "causal": 15
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "4",
+        "wired": 20,
+        "executed": 20,
+        "causal": 14
+       },
+       {
+        "kind": "CustomOutput",
+        "slot": "5",
+        "wired": 20,
+        "executed": 20,
+        "causal": 13
+       },
+       {
+        "kind": "RouterGate",
+        "slot": "0",
+        "wired": 11,
+        "executed": 10,
+        "causal": 2
+       },
+       {
+        "kind": "RouterGate",
+        "slot": "1",
+        "wired": 20,
+        "executed": 20,
+        "causal": 17
+       },
+       {
+        "kind": "WriteSlot",
+        "slot": "2",
+        "wired": 10,
+        "executed": 10,
+        "causal": 1
+       },
+       {
+        "kind": "WriteSlot",
+        "slot": "4",
+        "wired": 10,
+        "executed": 10,
+        "causal": 3
+       },
+       {
+        "kind": "WriteSlot",
+        "slot": "8",
+        "wired": 18,
+        "executed": 18,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Decide",
+        "wired": 2,
+        "executed": 2,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Eat",
+        "wired": 20,
+        "executed": 20,
+        "causal": 20
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 19
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(3)",
+        "wired": 4,
+        "executed": 4,
+        "causal": 4
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 17
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Move(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 16
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 5
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(1)",
+        "wired": 19,
+        "executed": 19,
+        "causal": 11
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(2)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 6
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(3)",
+        "wired": 11,
+        "executed": 11,
+        "causal": 3
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(4)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 5
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(6)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Reproduce(7)",
+        "wired": 9,
+        "executed": 7,
+        "causal": 2
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(0)",
+        "wired": 20,
+        "executed": 20,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(2)",
+        "wired": 10,
+        "executed": 10,
+        "causal": 7
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(3)",
+        "wired": 5,
+        "executed": 5,
+        "causal": 3
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "StealEnergy(7)",
+        "wired": 6,
+        "executed": 6,
+        "causal": 1
+       },
+       {
+        "kind": "ActionVote",
+        "slot": "Terminate",
+        "wired": 20,
+        "executed": 20,
+        "causal": 4
+       },
+       {
+        "kind": "ActionParam",
+        "slot": "ReproduceTransferFraction",
+        "wired": 20,
+        "executed": 20,
+        "causal": 18
+       },
+       {
+        "kind": "ActionParam",
+        "slot": "StealEnergyAmount",
+        "wired": 5,
+        "executed": 5,
+        "causal": 3
+       }
+      ],
+      "slots_wired_count": 85,
+      "wired_sinks_per_parent": [
+       38,
+       42,
+       35,
+       38,
+       31,
+       38,
+       41,
+       41,
+       35,
+       30,
+       53,
+       40,
+       38,
+       31,
+       39,
+       34,
+       54,
+       38,
+       42,
+       33
+      ],
+      "reachable_graph_nodes_per_parent": [
+       9,
+       11,
+       10,
+       10,
+       10,
+       12,
+       15,
+       11,
+       11,
+       4,
+       7,
+       9,
+       15,
+       9,
+       16,
+       11,
+       4,
+       12,
+       11,
+       11
+      ],
+      "scene_executions": 264,
+      "memory_loop": {
+       "loops_causal": 6,
+       "loops_executed": 100,
+       "loops_wired": 120,
+       "parents_with_causal_loop": 5,
+       "parents_with_clear": 18,
+       "parents_with_dynamic_read": 2,
+       "parents_with_dynamic_write": 3,
+       "parents_with_executed_loop": 19,
+       "parents_with_graph_read": 20,
+       "parents_with_graph_write": 20,
+       "parents_with_loop": 20,
+       "parents_with_vm_read": 19,
+       "parents_with_vm_write": 19
+      }
+     },
+     "memory": {
+      "final_creature_count": 2306,
+      "different_from_zeroed_count": 14,
+      "different_from_scrambled_count": 54,
+      "different_from_either_count": 54,
+      "temporal": {
+       "previous_slots": {
+        "final_creature_count": 2306,
+        "different_from_either_count": 107
+       },
+       "persisted_outputs": {
+        "final_creature_count": 2306,
+        "different_from_either_count": 170
+       },
+       "operator_state": {
+        "final_creature_count": 2306,
+        "different_from_either_count": 345
+       }
+      }
+     },
+     "e6_gradient_informative": 0.16608846487424112,
+     "secs": {
+      "census_secs": 3.147959667,
+      "vote_delta_secs": 0.103293041,
+      "births_secs": 0.753111625,
+      "sink_use_secs": 0.739898333,
+      "memory_secs": 0.552862
+     }
+    }
+   },
+   "footer": {
+    "census_secs": 5.565178875999999,
+    "elapsed_secs": 746.902273167,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 740.5063135299977,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "7adbd53257fba9587a87b60e5bee3dad6215db18fcd33d2f1d9bbf803c0f7bd5",
+   "sha256_census": "e4cb40b666c6f5b8dff70337634cc385ba0e62749108560559e16082ca9ec029"
+  },
+  "default-mutoff-s1022": {
+   "completed": true,
+   "extinct_tick": 5557,
+   "prototypes": {
+    "born_connected_destinations": "votes",
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.0
+   },
+   "config_digest": "sha256:40dd6f296b56009673d350332674ed2b72a19b89be171a9e1bc8a3cfd0f52a6a",
+   "samples": 11,
+   "last_tick": 5500,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "size_per_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    5500,
+    5557
+   ],
+   "final": {
+    "tick": 5500,
+    "population": 5,
+    "mean_genome_size": 97.0,
+    "mean_generation": 160.0,
+    "reproduction_actions_spawned_total": 288169
+   },
+   "min_population_sample": [
+    5,
+    5500
+   ],
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     2935
+    ],
+    [
+     5000,
+     97.0,
+     146
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 96.021558167,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 96.00034530099998,
+    "threads": 8,
+    "ticks": 5557
+   },
+   "sha256_samples": "e6f870a7a9bb6e557be70f99cf8e7f6ed905a44476a0bc60dedfde35896dc7ae",
+   "sha256_census": "60d8cabe2b4a9c48ca6b6f5e41700981e8168a4ce5aaffa4e19ae8f2c2e2a617"
+  },
+  "default-mutoff-s2022": {
+   "completed": true,
+   "extinct_tick": 7509,
+   "prototypes": {
+    "born_connected_destinations": "votes",
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.0
+   },
+   "config_digest": "sha256:40dd6f296b56009673d350332674ed2b72a19b89be171a9e1bc8a3cfd0f52a6a",
+   "samples": 15,
+   "last_tick": 7500,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "size_per_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    7500,
+    7509
+   ],
+   "final": {
+    "tick": 7500,
+    "population": 1,
+    "mean_genome_size": 97.0,
+    "mean_generation": 225.0,
+    "reproduction_actions_spawned_total": 317164
+   },
+   "min_population_sample": [
+    1,
+    7500
+   ],
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     5530
+    ],
+    [
+     5000,
+     97.0,
+     691
+    ],
+    [
+     7500,
+     97.0,
+     1
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 117.944760916,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 117.92096400199996,
+    "threads": 8,
+    "ticks": 7509
+   },
+   "sha256_samples": "b16d1037157a8537b407f9679a8e2d16e194b830b93695740eb8dfdf494498e0",
+   "sha256_census": "893a97d960e3e1fe1965ac3d900a765f8022228e8781d287320d9117c18f5741"
+  },
+  "wide-mutoff-s1022": {
+   "completed": true,
+   "extinct_tick": 5557,
+   "prototypes": {
+    "born_connected_destinations": "non_clear",
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.0
+   },
+   "config_digest": "sha256:5a14be15a1028720b3777418ae4b4d2a2a1079bbdc2fe7e910ee62cfa0e174ee",
+   "samples": 11,
+   "last_tick": 5500,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "size_per_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    5500,
+    5557
+   ],
+   "final": {
+    "tick": 5500,
+    "population": 5,
+    "mean_genome_size": 97.0,
+    "mean_generation": 160.0,
+    "reproduction_actions_spawned_total": 288169
+   },
+   "min_population_sample": [
+    5,
+    5500
+   ],
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     2935
+    ],
+    [
+     5000,
+     97.0,
+     146
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 96.338736041,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 96.31967084100008,
+    "threads": 8,
+    "ticks": 5557
+   },
+   "sha256_samples": "b5111463186974ae7addb7760ff3d97262893ed15790601ff048d2ede61e0a09",
+   "sha256_census": "d766fc07751204824060511e345b8a4c33bc16d93c18d50bcd9852aabafc2ae3"
+  },
+  "wide-mutoff-s2022": {
+   "completed": true,
+   "extinct_tick": 7509,
+   "prototypes": {
+    "born_connected_destinations": "non_clear",
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.0
+   },
+   "config_digest": "sha256:5a14be15a1028720b3777418ae4b4d2a2a1079bbdc2fe7e910ee62cfa0e174ee",
+   "samples": 15,
+   "last_tick": 7500,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "size_per_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    7500,
+    7509
+   ],
+   "final": {
+    "tick": 7500,
+    "population": 1,
+    "mean_genome_size": 97.0,
+    "mean_generation": 225.0,
+    "reproduction_actions_spawned_total": 317164
+   },
+   "min_population_sample": [
+    1,
+    7500
+   ],
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     5530
+    ],
+    [
+     5000,
+     97.0,
+     691
+    ],
+    [
+     7500,
+     97.0,
+     1
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 120.300769958,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 120.2781095239998,
+    "threads": 8,
+    "ticks": 7509
+   },
+   "sha256_samples": "c0a1b16052e09052a451a2a87c626dc19836a9c9b9f026975f158a543b72cdfd",
+   "sha256_census": "3eb87a6a70bca12f31d905883234a2fc67d6f10e19d84702a525f77668a2a550"
+  }
+ },
+ "rule": {
+  "per_seed": {
+   "1022": {
+    "wide_reaches_20000": true,
+    "default_reaches_20000": true,
+    "default_defined_in_window": true,
+    "population_ratio": 0.6440110011696646,
+    "population_at_least_half": true,
+    "non_vote_causal_where_default_none": false,
+    "non_vote_clause_fails_by_construction": false,
+    "kinds_at_20000": {
+     "CustomOutput": {
+      "default": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      }
+     },
+     "RouterGate": {
+      "default": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 2,
+       "parents_causal_kind": 2
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 3,
+       "parents_causal_kind": 3
+      }
+     },
+     "WriteSlot": {
+      "default": {
+       "parents_wired": 17,
+       "parents_executed": 17,
+       "parents_causal_any_slot": 0,
+       "parents_causal_kind": 0
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 0,
+       "parents_causal_kind": 0
+      }
+     },
+     "ClearSlot": {
+      "default": {
+       "parents_wired": 9,
+       "parents_executed": 7,
+       "parents_causal_any_slot": 0,
+       "parents_causal_kind": 0
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 19,
+       "parents_causal_any_slot": 2,
+       "parents_causal_kind": 2
+      }
+     },
+     "ActionVote": {
+      "default": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      }
+     },
+     "ActionParam": {
+      "default": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      }
+     }
+    },
+    "vote_side_target_causal": {
+     "default": 8,
+     "wide": 0,
+     "holds": false
+    },
+    "parents_evaluated_20": true,
+    "agreement_default": true,
+    "agreement_wide": true,
+    "size_default": 5.522799823854245,
+    "size_wide": 5.409325791247529,
+    "births_default": 0.019939652758331,
+    "births_wide": 0.02268325669461726,
+    "pair": {
+     "default_mutoff_extinction": [
+      5500,
+      5557
+     ],
+     "wide_mutoff_extinction": [
+      5500,
+      5557
+     ]
+    },
+    "agreement_holds": true,
+    "seed_validates": false
+   },
+   "2022": {
+    "wide_reaches_20000": true,
+    "default_reaches_20000": true,
+    "default_defined_in_window": true,
+    "population_ratio": 0.7729892852298929,
+    "population_at_least_half": true,
+    "non_vote_causal_where_default_none": true,
+    "non_vote_clause_fails_by_construction": false,
+    "kinds_at_20000": {
+     "CustomOutput": {
+      "default": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      }
+     },
+     "RouterGate": {
+      "default": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 7,
+       "parents_causal_kind": 6
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 18,
+       "parents_causal_kind": 18
+      }
+     },
+     "WriteSlot": {
+      "default": {
+       "parents_wired": 1,
+       "parents_executed": 1,
+       "parents_causal_any_slot": 0,
+       "parents_causal_kind": 0
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 5,
+       "parents_causal_kind": 6
+      }
+     },
+     "ClearSlot": {
+      "default": {
+       "parents_wired": 7,
+       "parents_executed": 7,
+       "parents_causal_any_slot": 0,
+       "parents_causal_kind": 0
+      },
+      "wide": {
+       "parents_wired": 18,
+       "parents_executed": 18,
+       "parents_causal_any_slot": 0,
+       "parents_causal_kind": 0
+      }
+     },
+     "ActionVote": {
+      "default": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      }
+     },
+     "ActionParam": {
+      "default": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 20,
+       "parents_causal_kind": 20
+      },
+      "wide": {
+       "parents_wired": 20,
+       "parents_executed": 20,
+       "parents_causal_any_slot": 19,
+       "parents_causal_kind": 19
+      }
+     }
+    },
+    "vote_side_target_causal": {
+     "default": 6,
+     "wide": 4,
+     "holds": true
+    },
+    "parents_evaluated_20": true,
+    "agreement_default": true,
+    "agreement_wide": true,
+    "size_default": 6.078068207883097,
+    "size_wide": 12.216300232263945,
+    "births_default": 0.02069271811828361,
+    "births_wide": 0.01871006783465912,
+    "pair": {
+     "default_mutoff_extinction": [
+      7500,
+      7509
+     ],
+     "wide_mutoff_extinction": [
+      7500,
+      7509
+     ]
+    },
+    "agreement_holds": true,
+    "seed_validates": true
+   }
+  },
+  "validated": false,
+  "agreement_holds_on_both": true,
+  "note": "lead-selection screen on 20 parents per cohort; every clause on both seeds; the non-vote clause reads the joint kind-ablation count per kind among CustomOutput, RouterGate, WriteSlot, ActionParam; the vote-side count is the all-surface target-input causal proxy (sum of family_causal), trivially held when default's is 0"
+ },
+ "horizon": {
+  "per_seed": {
+   "1022": {
+    "valid": true,
+    "memory_sensitivity_either": 6,
+    "final_creature_count": 3065,
+    "loops_present": true,
+    "parents_with_loop": 14,
+    "parents_with_causal_loop": 0,
+    "memory_at_10000": 41,
+    "temporal": {
+     "previous_slots": {
+      "final_creature_count": 3065,
+      "different_from_either_count": 17
+     },
+     "persisted_outputs": {
+      "final_creature_count": 3065,
+      "different_from_either_count": 224
+     },
+     "operator_state": {
+      "final_creature_count": 3065,
+      "different_from_either_count": 70
+     }
+    }
+   },
+   "2022": {
+    "valid": true,
+    "memory_sensitivity_either": 12,
+    "final_creature_count": 2878,
+    "loops_present": true,
+    "parents_with_loop": 11,
+    "parents_with_causal_loop": 0,
+    "memory_at_10000": 0,
+    "temporal": {
+     "previous_slots": {
+      "final_creature_count": 2878,
+      "different_from_either_count": 34
+     },
+     "persisted_outputs": {
+      "final_creature_count": 2878,
+      "different_from_either_count": 158
+     },
+     "operator_state": {
+      "final_creature_count": 2878,
+      "different_from_either_count": 135
+     }
+    }
+   }
+  },
+  "reading": "horizon"
+ }
+}
