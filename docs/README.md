@@ -10,6 +10,7 @@
 - [Depth research, 2026-09-07](strategy/mesh-depth-research-2026-09-07.md) (companion to the T11 track; why a 281,405-tick run stalled, and the evidence for T11.F16 and T11.F17)
 - [Neutral module recruitment roadmap](roadmaps/t13-neutral-module-recruitment.md) and [research, 2026-09-08](strategy/neutral-module-recruitment-research-2026-09-08.md) (T13: observe silent modules becoming useful, then repair and qualify recruitment)
 - [Reproductive time design research, 2026-10-06](strategy/reproductive-time-research-2026-10-06.md) (T03.F12: gestation form, energy drain and concurrency questions answered with Avida, Tierra and cell-biology evidence)
+- [Born-connected prototype run, 2026-10](strategy/born-connected-run-2026-10.md) (T20.F16: a declaration that arrives connected, validated as a lead-selection screen on Canyon seeds 1022 and 2022; gates B0, B0.2 and B0.3; the draft row, the amendment sentences and the goal command)
 - [Runtime config panel apply audit, 2026-09-07](strategy/config-panel-runtime-apply-audit-2026-09-07.md) (why runtime config settings silently fail to save, and the fix plan)
 - [Reference specifications](reference/)
 

@@ -116,7 +116,15 @@ Limits of the evidence: two fresh seeds of one world over 20,000 ticks, a
 presenting the target channels. Natural analog: expression inherited with a
 duplication motivates immediate integration into an existing cascade; the
 mechanism approximates it by a fresh random connection and models neither
-duplication nor pathway inheritance.
+duplication nor pathway inheritance. Reference material for the spec and the
+implementer, on the kept branch `worktree-born-connected` (never merged): the
+prototype `proto:` `765e429c` and `a172c734` (`mutation.born_connected`,
+`born_connect` in `crates/v3-core/src/mutation/input_ref/mod.rs`, its seven
+unit tests and proptest invariant in `born_connected_tests.rs`), the census
+probe with its births block (`instr:` `24d0f553`) and the E4 probe with its
+single-event-`Add` tallies (`lab:` `3abc1b70`), the two T22 instrument
+candidates; the run's raw evidence under the main checkout's
+`.bench-artifacts/lab/born/`.
 
 **F09 restart on the lab, 2026-09-28 (user decision).** The first F09 execution was reverted on 2026-09-27 (`a26c1cf0`); its readings, one-tick binary scenes and 0/32 results in every arm including the baseline are historical and not pooled. The restart depends on T22.F01 and runs its discovery question on the [capability lab](t22-capability-assays-and-evolvability-lab.md): many-tick graded scenes, the lab's calibration gate, native-variation fidelity checklist and controls, with the F09 row's scientific contract (native mutator, fresh lineages, learning off, access versus coordination arms, two family shapes, one non-ring) unchanged. No new assay module is added inside `v3-core`, and the recording follows the telemetry commit rule. Under the T22 rule of the same date, F09's verdict may block or unblock F10, the other measurement rows and F03 (an opt-in mechanism row that stays unqualified until F09 favors it) and may retire opt-in, unqualified candidate code as this track's disposal rule already says; it never sets a default, founder, mutation policy or closure threshold, and F12's production availability still rests on F10/F11 goal-world evidence recorded in F12's own spec.
 
@@ -220,8 +228,11 @@ T18 founder redesign and unrelated audit findings are not silently absorbed.
 → F12, entirely Graph and inherited. F03 may start after positive F09 discovery
 and does not gate Graph rollout. F13 consumes valid F09 comparison evidence;
 F06–F08 and F14–F15 stay conditional and outside the master priority order until
-F13 justifies them. Each feature includes its necessary inspection, serialization
-and applied accounting, without a separate observability framework.
+F13 justifies them. F16 is a mechanism row outside this path: it changes the
+Graph-node declaration operator for every family and is read by the goal
+profile in three worlds, under the exception in the Notes (2026-10-09). Each
+feature includes its necessary inspection, serialization and applied
+accounting, without a separate observability framework.
 
 | Feature | Bounded deliverable and verification boundary |
 | --- | --- |
@@ -240,6 +251,7 @@ and applied accounting, without a separate observability framework.
 | F08 | Add bounded heritable sharing only over F05's justified correspondences, with independent/full/partial cases, local exceptions and no regrowth of pruned coefficients. Match the focal contribution's total update across sharing arms. Test wrong correspondence, asymmetric structure and irrelevant input controls; 25% is one experimental setting. Restrict claims to qualified layouts; scalar and heterogeneous channels do not acquire invented symmetry. |
 | F14 | Separately qualify the incremental Graph learner against the frozen inherited candidate and T09.F03's native-plasticity comparator. Reuse the discovery, retention and ecological protocols with fresh lineages, reachable learning parameters, actual birth/reset/inheritance, paid credit/update work and matched initial competence. Supplied-learner success alone is insufficient. Report supported families, live/frozen/reset effects and a distinct positive/negative/inconclusive verdict; inherited production availability is unaffected. |
 | F15 | Enable only the positively qualified Graph learning scope, with off and independent alternatives, verified ordinary-birth access, priced behavior and default/epoch records. Do not infer VM learning support from F03 or from Graph success. |
+| F16 | Make the ordinary `InputRef.Add` on a Graph node arrive connected into that node's existing pathway and live, for every legal input family, with the destination class and the weight law decided in the spec from the tested realization (one edge from the appended reference at a uniform sub-value into one uniform `ActionVote` sink at the new-edge law's weight); VM nodes unchanged; the requested-supply law, operator weights and summary accounting unchanged. Amend the mutation spec's growth-versus-connection taxonomy sentence and its InputRef-domain `Add` paragraph explicitly; decide whether F04's `RecruitNeutralInput` stays beside it. TDD with `cargo test -p v3-core --test viability` first; the ordinary gate and goal profiles under the epoch re-pin rule, reading the target rows' declared, connected, executed and causal counts at the goal checkpoints in all three worlds (connected tracking declared), population not under half the previous closure's, Canyon's goal-seed persistence as the decisive risk, genome size and dead-per-birth as recorded indicators. No new sensor, no correspondence between sources and sinks, no score in any draw; the branch `worktree-born-connected` holds the tested prototype, its tests and the instruments, as reference only. |
 
 **Evidence gates and exits.** Prospective feature specs freeze family/scene
 selection, source cohorts, independent units, seeds, horizons, cost treatment,
