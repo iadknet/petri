@@ -98,9 +98,9 @@ by the changed births.
 
 ## Implementation Tasks
 
-- [ ] `cargo test -p v3-core --test viability` passes before any edit and after
+- [x] `cargo test -p v3-core --test viability` passes before any edit and after
       every production edit (the feature touches every birth).
-- [ ] Write the failing tests first, then change `apply_add` in
+- [x] Write the failing tests first, then change `apply_add` in
       `crates/v3-core/src/mutation/input_ref/mod.rs` to the Boundary table:
       Graph node appends one reference and one vote edge (source the appended
       index, `sub_idx` under the width, weight in [−1, 1], every other node,
@@ -110,7 +110,7 @@ by the changed births.
       connected reference is not prunable; over many seeds the born edge reaches
       all 27 sinks and all 8 sub-values of a ring; a proptest holds the
       one-reference, at-most-one-edge, source and untouched-node invariants.
-- [ ] Rewrite `add_input_ref_to_graph_node_wires_nothing` to the new contract
+- [x] Rewrite `add_input_ref_to_graph_node_wires_nothing` to the new contract
       and `add_input_ref_to_graph_node_leaves_existing_edges_untouched` to
       compare incumbent structure (every pre-existing edge, weight, compute node
       and sink) rather than the whole backend, on a populated fixture with
@@ -143,7 +143,7 @@ by the changed births.
       their per-step `neutral()` flip on the `Add` step and the
       `recruitment_paths` block deltas are a recorded finding in the readings,
       not a re-pin; `MAX_PATH_EVENTS` stays 6.
-- [ ] Amend the five documents the Taxonomy row names, preserving the VM
+- [x] Amend the five documents the Taxonomy row names, preserving the VM
       wording; no other reference document changes.
 - [ ] `make check` exits 0 in the worktree.
 - [ ] Gate and goal profiles by the benchmark specialist, then the mutation gate
@@ -151,10 +151,15 @@ by the changed births.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> exit 0, before and after.
-- [ ] Focused tests: `cargo test -p v3-core input_ref` -> exit 0, with the test
-      names and the re-pinned digests listed in
-      [readings](../../progress/readings/t20-f16.md).
+- [x] `cargo test -p v3-core --test viability` -> exit 0, before and after
+      (28 passed each run).
+- [x] Focused tests: `cargo test -p v3-core input_ref` -> exit 0 (54 passed),
+      with the test names and the re-pinned digests listed in
+      [readings](../../progress/readings/t20-f16.md) ("Re-pinned values" and
+      "Build verification"). `cargo test --workspace --no-fail-fast` -> 2,703
+      passed, 1 failed: only the user-accepted `decided_passes` severe in
+      `gate_profile_has_no_severe_regression_against_series_references`,
+      cleared by the gate-epoch re-pin of the benchmark stage.
 - [ ] `make check` -> exit 0, recorded in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred, listed here.

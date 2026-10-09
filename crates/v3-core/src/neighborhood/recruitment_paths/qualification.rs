@@ -570,17 +570,10 @@ fn vm_unprepared_plan() -> Vec<StepSpec> {
     ]
 }
 
-/// The ring cue's leaf on the unprepared copy: the table entry `Add`
-/// appended after the copied `FoodHere`, at the east sub-index.
-const RING_EAST: GraphSource = GraphSource::InputLeaf {
-    ref_idx: 1,
-    sub_idx: 2,
-};
-
-/// The Task B-correct Graph copy: the ring added to the table, the sensing
-/// edge to its east sub-index, the `Move(N)` vote edge removed and a
-/// `Move(E)` vote edge added, activation: five events. The copied
-/// `FoodHere` entry stays, unread.
+/// The Task B-correct Graph copy: the ring added beside the copied
+/// `FoodHere` with its born edge from the east sub-index into `Move(E)`, the
+/// `Move(N)` vote edge removed, activation: three events (T20.F16). The
+/// copied sensing node goes dead beside the direct ring edge.
 fn graph_unprepared_plan() -> Vec<StepSpec> {
     let north_removed = step(
         "north_vote_removed",
@@ -597,33 +590,14 @@ fn graph_unprepared_plan() -> Vec<StepSpec> {
                     .all(|(x, y)| x.kind == OutputSinkKind::ActionVote(VoteSink::Move(0)) || x == y)
         },
     );
-    vec![
-        ring_added(),
-        step(
-            "cue_edge_retargeted",
-            "Graph.RetargetGraphEdge: the sensing node's leaf edge to the ring entry, sub-index 2 (east)",
-            ProductionEvent::Graph(GraphOperator::RetargetGraphEdge),
-            |before, after| {
-                let (b, a) = (graph(before), graph(after));
-                only_scaffold_backend_changed(before, after)
-                    && a.compute_nodes[0].inputs.len() == 1
-                    && a.compute_nodes[0].inputs[0].source == RING_EAST
-                    && a.compute_nodes[0].inputs[0].weight == b.compute_nodes[0].inputs[0].weight
-                    && a.compute_nodes[1..] == b.compute_nodes[1..]
-                    && a.output_sinks == b.output_sinks
-            },
-        ),
-        north_removed,
-        east_vote_edge_added(vec![GraphSource::ComputeNode(0), RING_EAST]),
-        swap_activation(),
-    ]
+    vec![ring_added(), north_removed, swap_activation()]
 }
 
-/// Blank Graph tissue: the sensor, then one vote edge from the cue into
-/// `Move(E)`. A dispatched detour is exposed by the edge (two events);
-/// undispatched blank tissue also needs the route swap (three).
+/// Blank Graph tissue: the cue declared with its born edge into `Move(E)`
+/// (T20.F16). A dispatched detour is exposed by that one event;
+/// undispatched blank tissue also needs the route swap (two).
 fn graph_blank_plan(dispatched: bool) -> Vec<StepSpec> {
-    let mut plan = vec![cue_added(), east_vote_edge_added(vec![cue_leaf(Task::A)])];
+    let mut plan = vec![cue_added()];
     if !dispatched {
         plan.push(swap_activation());
     }
@@ -643,43 +617,69 @@ const VOTE_EAST: VmInstruction = VmInstruction::AddVote { sink: 3, src: 2 };
 const _: () = assert!(VoteSink::Move(EAST).index() == 3);
 
 /// `InputRef.Add` on the scaffold, accepted when the table becomes exactly
-/// `expected` and nothing else on the node changes: the entry is wired into
-/// nothing yet, so the step is neutral.
+/// `expected` and nothing else on the node changes but, on a Graph scaffold,
+/// the born edge (T20.F16): `Move(E)` gains exactly one appended edge from
+/// the appended entry at `sub_idx` with a positive weight, every compute node
+/// and every other sink unchanged. A VM scaffold's backend stays unchanged.
 fn input_ref_added(
     name: &'static str,
     edits: &'static str,
     expected: Vec<InputReference>,
+    sub_idx: u16,
 ) -> StepSpec {
+    let born = GraphSource::InputLeaf {
+        ref_idx: u16::try_from(expected.len() - 1).expect("a small fixture table"),
+        sub_idx,
+    };
     step(
         name,
         edits,
         ProductionEvent::InputRef(InputRefOperator::Add),
         move |before, after| {
             let delta = GenomeDelta::between(before, after);
+            let (b, a) = (node(before, SCAFFOLD), node(after, SCAFFOLD));
             delta.nodes.len() == 1
                 && delta.nodes[0].node == SCAFFOLD
-                && node(after, SCAFFOLD).input_refs == expected
-                && node(after, SCAFFOLD).backend_def == node(before, SCAFFOLD).backend_def
+                && a.input_refs == expected
+                && a.targets == b.targets
+                && match (&b.backend_def, &a.backend_def) {
+                    (BackendDef::Vm(_), _) => a.backend_def == b.backend_def,
+                    (BackendDef::Graph(b), BackendDef::Graph(a)) => {
+                        a.compute_nodes == b.compute_nodes
+                            && a.output_sinks.len() == b.output_sinks.len()
+                            && a.output_sinks.iter().zip(&b.output_sinks).all(|(x, y)| {
+                                x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST))
+                                    || x == y
+                            })
+                            && appended(&move_sink(b, EAST).inputs, &move_sink(a, EAST).inputs)
+                                .is_some_and(|edge| edge.source == born && edge.weight > 0.0)
+                    }
+                    (BackendDef::Graph(_), BackendDef::Vm(_)) => false,
+                }
         },
     )
 }
 
+/// The cue, born at its Task A sub-index on a Graph scaffold.
 fn cue_added() -> StepSpec {
     input_ref_added(
         "cue_added",
-        "InputRef.Add on the scaffold: FoodHere (type 0)",
+        "InputRef.Add on the scaffold: FoodHere (type 0), born into Move(E) on a Graph scaffold",
         vec![cue(Task::A)],
+        0,
     )
 }
 
 /// T11.F22: `Swap` stays within a kind, so the copied `FoodHere` entry
-/// cannot become the ring in one event; the ring is added beside it and each
-/// consumer moves to it on its own.
+/// cannot become the ring in one event; the ring is added beside it. On a
+/// Graph copy its born edge reads the east sub-index (T20.F16); on a VM copy
+/// each consumer moves to it on its own.
 fn ring_added() -> StepSpec {
     input_ref_added(
         "ring_added",
-        "InputRef.Add on the copy: NeighborFoodRing (type 0) beside the copied FoodHere",
+        "InputRef.Add on the copy: NeighborFoodRing (type 0) beside the copied FoodHere, born from east into Move(E) on a Graph copy",
         vec![cue(Task::A), cue(Task::B)],
+        2,
     )
 }
 
@@ -795,15 +795,19 @@ fn cue_valued_compute_sources(graph: &CgpGraphBackendDef) -> Vec<GraphSource> {
 // Re-pinned by T11.F25: the edge-surface draw skips the five undecoded
 // parameter sinks, which moves every `vote_edge_added` seed (57 -> 102,
 // 103 -> 743).
+// Re-pinned by T20.F16: Graph-node `Add` draws three more numbers and
+// appends a vote edge; the three Graph plans that declare a reference are
+// re-expressed on the born edge (`cue_added` 201 -> 2873, `ring_added`
+// 1 -> 12673, `north_vote_removed` 5 -> 0). VM and copy/split seeds hold.
 
 const SWAP: u64 = 0;
-const GRAPH_BLANK_SEEDS: &[u64] = &[201, 102, SWAP];
-const GRAPH_DETOUR_SEEDS: &[u64] = &[201, 102];
+const GRAPH_BLANK_SEEDS: &[u64] = &[2873, SWAP];
+const GRAPH_DETOUR_SEEDS: &[u64] = &[2873];
 const GRAPH_COPY_SEEDS: &[u64] = &[743, SWAP];
 const GRAPH_SPLIT_SEEDS: &[u64] = &[743, SWAP];
 const VM_COPY_SEEDS: &[u64] = &[1, SWAP];
-/// Ring, retarget, remove north, add east, swap.
-const GRAPH_UNPREPARED_SEEDS: &[u64] = &[1, 32, 5, 743, SWAP];
+/// Ring born into `Move(E)`, remove north, swap.
+const GRAPH_UNPREPARED_SEEDS: &[u64] = &[12_673, 0, SWAP];
 /// Ring, ref_idx, sub_idx, sub_idx, vote to east, swap.
 const VM_UNPREPARED_SEEDS: &[u64] = &[1, 18, 25, 25, 66_421, SWAP];
 /// Cue, read, vote, swap.
@@ -926,11 +930,87 @@ mod tests {
         }
     }
 
+    /// `graph_unprepared`'s `ring_added` step: the accepting predicate, the
+    /// genome before it and the born result it accepts.
+    fn born_ring_step() -> (Accept, CreatureGenome, CreatureGenome) {
+        let (mut specs, genomes) = replay("graph_unprepared");
+        let index = step_index(&specs, "ring_added");
+        let accept = specs.swap_remove(index).accept;
+        let (before, after) = (genomes[index].clone(), genomes[index + 1].clone());
+        assert!(accept(&before, &after));
+        (accept, before, after)
+    }
+
+    fn born_edge_mut(genome: &mut CreatureGenome) -> &mut GraphEdge {
+        scaffold_graph_mut(genome)
+            .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(EAST)))
+            .expect("the fixed catalog holds every Move sink")
+            .inputs
+            .last_mut()
+            .expect("the born step appended an edge")
+    }
+
+    /// The born edge must carry a strictly positive weight: the same edge at
+    /// weight zero is rejected.
+    #[test]
+    fn input_ref_added_rejects_a_zero_weight_born_edge() {
+        // Arrange
+        let (accept, before, mut zero_weight) = born_ring_step();
+
+        // Act
+        born_edge_mut(&mut zero_weight).weight = 0.0;
+
+        // Assert
+        assert!(!accept(&before, &zero_weight));
+    }
+
+    /// The born edge must land in `Move(E)`: the same edge moved into
+    /// another vote sink is rejected.
+    #[test]
+    fn input_ref_added_rejects_a_born_edge_into_another_sink() {
+        // Arrange
+        let (accept, before, mut elsewhere) = born_ring_step();
+
+        // Act
+        let graph = scaffold_graph_mut(&mut elsewhere);
+        let edge = graph
+            .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(EAST)))
+            .expect("the fixed catalog holds every Move sink")
+            .inputs
+            .pop()
+            .expect("the born step appended an edge");
+        graph
+            .sink_mut(OutputSinkKind::ActionVote(VoteSink::Move(0)))
+            .expect("the fixed catalog holds every Move sink")
+            .inputs
+            .push(edge);
+
+        // Assert
+        assert!(!accept(&before, &elsewhere));
+    }
+
+    /// The born edge must read the task's sub-index of the appended entry:
+    /// the same edge at another sub-index is rejected.
+    #[test]
+    fn input_ref_added_rejects_a_born_edge_at_another_sub_index() {
+        // Arrange
+        let (accept, before, mut other_sub) = born_ring_step();
+
+        // Act
+        born_edge_mut(&mut other_sub).source = GraphSource::InputLeaf {
+            ref_idx: 1,
+            sub_idx: 1,
+        };
+
+        // Assert
+        assert!(!accept(&before, &other_sub));
+    }
+
     /// The added `Move(E)` vote edge must carry a strictly positive weight:
     /// the same edge at weight zero is rejected.
     #[test]
     fn east_vote_edge_added_rejects_a_zero_weight_edge() {
-        let (specs, genomes) = replay("graph_unprepared");
+        let (specs, genomes) = replay("graph_copy");
         let index = step_index(&specs, "vote_edge_added");
         let accept = &specs[index].accept;
         let (before, after) = (&genomes[index], &genomes[index + 1]);

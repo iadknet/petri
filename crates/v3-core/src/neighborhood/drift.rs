@@ -861,19 +861,23 @@ mod tests {
         // grows from 22 to 27 entries, so every input-reference event draws
         // differently. Re-pinned by T11.F20 (drift-depth-v4): every walk
         // birth draws Binomial(97, 0.005) instead of the retired per-birth
-        // rule, so the lineages and their module dates change.
+        // rule, so the lineages and their module dates change. Re-pinned by
+        // T20.F16: Graph-node `Add` draws three more numbers and appends a
+        // vote edge, so the walk's lineages diverge at their first Graph-node
+        // `Add` (dispatched 7 -> 4; dispatch reached 7 -> 5, median 7 -> 6;
+        // internal change median 1 -> 9).
         assert_eq!(reading.cohort.created, 9);
-        assert_eq!(reading.cohort.dispatched(), 7);
-        // Seven cohort modules reached dispatch, the median seven generations
+        assert_eq!(reading.cohort.dispatched(), 4);
+        // Five cohort modules reached dispatch, the median six generations
         // after the birth that created them: later births, or a dispatch date
         // taken only at the closing checkpoint, would both read higher.
         assert_eq!(
             reading.time_to_first(CohortFact::Dispatch),
             &TimeToFirst {
-                reached: 7,
-                median_generations: Some(7),
+                reached: 5,
+                median_generations: Some(6),
                 censored_deleted: 0,
-                censored_present: 2,
+                censored_present: 4,
             },
         );
         // T11.F22 re-pin: the within-kind `Swap` and consumer-preserving
@@ -883,12 +887,12 @@ mod tests {
         // three reach an internal change, still a median five generations
         // after birth; on the T19.F04 vote founder six do, at the same
         // median. On the T11.F20 walk three do, a median one generation
-        // after birth.
+        // after birth; on the T20.F16 walk three do, a median nine.
         assert_eq!(
             reading.time_to_first(CohortFact::InternalChange),
             &TimeToFirst {
                 reached: 3,
-                median_generations: Some(1),
+                median_generations: Some(9),
                 censored_deleted: 0,
                 censored_present: 6,
             },
