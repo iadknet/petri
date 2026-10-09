@@ -141,6 +141,7 @@ pub enum MutationOperator {
     TopologyRemoveNode,
     TopologyRetargetNodeTarget,
     TopologyAddRouteTarget,
+    TopologyAddFeedbackRoute,
     TopologyRemoveRouteTarget,
     TopologyChangeEntryNode,
     TopologySwapNodeBackend,
@@ -205,6 +206,7 @@ impl MutationOperator {
             Self::TopologyRemoveNode => "Topology.RemoveNode",
             Self::TopologyRetargetNodeTarget => "Topology.RetargetNodeTarget",
             Self::TopologyAddRouteTarget => "Topology.AddRouteTarget",
+            Self::TopologyAddFeedbackRoute => "Topology.AddFeedbackRoute",
             Self::TopologyRemoveRouteTarget => "Topology.RemoveRouteTarget",
             Self::TopologyChangeEntryNode => "Topology.ChangeEntryNode",
             Self::TopologySwapNodeBackend => "Topology.SwapNodeBackend",
@@ -266,6 +268,7 @@ impl MutationOperator {
             | Self::TopologyRemoveNode
             | Self::TopologyRetargetNodeTarget
             | Self::TopologyAddRouteTarget
+            | Self::TopologyAddFeedbackRoute
             | Self::TopologyRemoveRouteTarget
             | Self::TopologyChangeEntryNode
             | Self::TopologySwapNodeBackend
@@ -330,7 +333,8 @@ impl MutationOperator {
             | Self::TopologyCopyMeshForwardSlice
             | Self::TopologySpliceNode
             | Self::TopologySwapNodeBackend
-            | Self::TopologyAddRouteTarget => ComplexityEffect::Increasing,
+            | Self::TopologyAddRouteTarget
+            | Self::TopologyAddFeedbackRoute => ComplexityEffect::Increasing,
             // Topology: structural removals
             Self::TopologyRemoveNode | Self::TopologyRemoveRouteTarget => {
                 ComplexityEffect::Decreasing
@@ -391,12 +395,13 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 55] {
+    pub const fn all() -> [Self; 56] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
             Self::TopologyRetargetNodeTarget,
             Self::TopologyAddRouteTarget,
+            Self::TopologyAddFeedbackRoute,
             Self::TopologyRemoveRouteTarget,
             Self::TopologyChangeEntryNode,
             Self::TopologySwapNodeBackend,

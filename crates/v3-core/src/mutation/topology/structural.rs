@@ -9,8 +9,7 @@ use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 use super::birth;
-use super::routing::{lowest_unused_slot, static_incumbent, writes_gate};
-use crate::contracts::MAX_GATE_SLOTS;
+use super::routing::{free_gate_slot, lowest_unused_slot, static_incumbent, writes_gate};
 
 /// Find an unused identity even when the largest existing ID wraps.
 pub(super) fn next_node_id(genome: &CreatureGenome) -> NodeId {
@@ -124,10 +123,7 @@ fn safe_predecessors(genome: &CreatureGenome, source: usize) -> Vec<(usize, u8, 
             {
                 return None;
             }
-            let slot = (0..MAX_GATE_SLOTS as u8).find(|&slot| {
-                !node.targets.iter().any(|t| t.slot == slot)
-                    && !writes_gate(&node.backend_def, slot)
-            })?;
+            let slot = free_gate_slot(node)?;
             Some((idx, slot, incumbent.gate_bias))
         })
         .collect();

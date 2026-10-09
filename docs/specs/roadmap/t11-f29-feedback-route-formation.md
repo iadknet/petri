@@ -113,7 +113,9 @@ reading of 15 loop-carrying creatures in 390. Options and prior art:
    `WriteRouteGate { slot, src }` inserted before the first `Halt` (or at the
    end) with reference repair; Graph one weight-1 edge into the
    `RouterGate(slot)` sink. The backend is cloned, edited and committed with
-   the target, so a failed insertion skips atomically. Proven: under zero
+   the target, so a failed insertion skips atomically (propagated as
+   `NoApplicableTarget`, as in `AddRouteTarget`, not an eligibility
+   pre-check). Proven: under zero
    gate scores the incumbent wins (`resolve_gated_route`, strict `>`), and
    with its slot unwritten its runtime score is its bias, so (f32 addition
    being monotonic) the branch loses on every input whose gate value on the
@@ -175,7 +177,7 @@ field or switch); a run shows existing signals moved by the changed draws.
 
 ## Implementation Tasks
 
-- [ ] TDD: tests first for the properties below.
+- [x] TDD: tests first for the properties below.
 
 | Property | Cases |
 | --- | --- |
@@ -185,12 +187,12 @@ field or switch); a run shows existing signals moved by the changed draws.
 | Atomic skips | Zero-register VM, missing `RouterGate` sink, no free slot, no candidates, non-finite incumbent bias, written incumbent slot: `NoApplicableTarget`, genome unchanged |
 | Founder | Node 0 eligible with destination set `{0}`; node 1 ineligible |
 | Loop and replay | `mesh_cycle_nodes` empty before and non-empty after one event; identical offspring and RNG continuation for identical inputs |
-- [ ] Implement `apply_add_feedback_route` in `mutation/topology/routing.rs`
-      reusing `lowest_unused_slot`, `static_incumbent`,
-      `insert_new_instruction_with_reference_repair`, `random_graph_source`
-      and `mesh_reachable_nodes`; wire the operator through every consumer in
+- [x] Implement `apply_add_feedback_route` in `mutation/topology/routing.rs`
+      reusing `static_incumbent`, `writes_gate` (invariant 2's slot rule, not
+      `lowest_unused_slot`), `insert_new_instruction_with_reference_repair`
+      and `random_graph_source`; wire the operator through every consumer in
       invariant 7.
-- [ ] One battery fixture: a production `AddFeedbackRoute` on T11.F15's
+- [x] One battery fixture: a production `AddFeedbackRoute` on T11.F15's
       conditional fixture leaves the battery's actions identical and makes it
       `cycle_carrying` but not `revisiting`; production follow-up events
       (`MutateGateBias` on the branch or incumbent, seeded as needed, or a gate
@@ -202,12 +204,14 @@ field or switch); a run shows existing signals moved by the changed draws.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` -> exit status, before and
-      after.
+- [x] `cargo test -p v3-core --test viability` -> exit status, before and
+      after. Exit 0 both (28 passed).
 - [ ] Focused tests: `cargo test -p v3-core topology` -> exit status and
       count, test names in [readings](../../progress/readings/t11-f29.md);
       `cargo test --workspace --no-fail-fast` -> result, with any series-test
-      failure attributed to a user-accepted re-pin.
+      failure attributed to a user-accepted re-pin. Topology: exit 0, 101
+      passed. Workspace: exit 101, only the gate series test (`pass_cap_hits`
+      +271%, severe) awaits the user; eleven seeded pins re-pinned (readings).
 - [ ] `make check` -> exit 0, tested commit in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed

@@ -118,6 +118,7 @@ impl EditSurface {
         match operator {
             MutationOperator::TopologyRetargetNodeTarget
             | MutationOperator::TopologyAddRouteTarget
+            | MutationOperator::TopologyAddFeedbackRoute
             | MutationOperator::TopologyRemoveRouteTarget
             | MutationOperator::TopologySwapRouteTargets
             | MutationOperator::TopologyMutateGateBias

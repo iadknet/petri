@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 75a5c8aabab74d02040b575d7ce212f90be14cbf218dbff481f8decc22cf57ae # shrinks to incumbent = 0.1, gate_value = 0.0
+cc 6ee069001fe485120f59d966038db687860cc96c147310e16156c11fb4336d6e # shrinks to g = CreatureGenome { entry_node_id: NodeId(0), nodes: [NodeGenome { node_id: NodeId(1), input_refs: [], backend_def: Vm(VmBackendDef { register_count: 1, constants: [], program: [Halt] }), targets: [] }] }, executed_mask = 0, source_pick = 0

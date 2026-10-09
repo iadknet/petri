@@ -292,6 +292,13 @@ impl<'a> TargetSelector<'a> {
         self.first_pick
     }
 
+    /// The parent's executed node set, sorted ascending child indices
+    /// (T11.F17); empty when the birth holds no dispatch record.
+    #[must_use]
+    pub const fn executed(&self) -> &'a [usize] {
+        self.executed
+    }
+
     /// How many targets this selector picked from the executed set.
     #[must_use]
     pub const fn executed_hits(&self) -> u32 {

@@ -1156,6 +1156,10 @@ fn every_operator_has_exactly_one_edit_surface() {
         EditSurface::Split
     );
     assert_eq!(
+        EditSurface::of(Op::TopologyAddFeedbackRoute),
+        EditSurface::Split
+    );
+    assert_eq!(
         EditSurface::of(Op::TopologyChangeEntryNode),
         EditSurface::Split
     );

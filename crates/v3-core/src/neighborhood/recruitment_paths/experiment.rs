@@ -1268,20 +1268,24 @@ mod tests {
     /// Graph-node `Add` draws three more numbers and appends a vote edge, so
     /// the Graph rows move (Drift `[20, 14, 13, 7]` -> `[20, 15, 14, 7]`,
     /// Selection 19 -> 20 throughout); the VM rows and the discard counts
-    /// are unchanged. The T13.F06 progress record stays historical.
+    /// are unchanged. Re-pinned by T11.F29: the `AddFeedbackRoute` entry
+    /// remaps every topology draw (Graph Drift `[20, 15, 14, 7]` ->
+    /// `[19, 15, 14, 5]`, Selection `[20; 4]` -> `[19, 19, 19, 18]`; VM Drift
+    /// `[25, 18, 18, 12]` -> `[24, 18, 18, 11]`, Selection `[25; 4]` ->
+    /// `[24, 24, 24, 23]`). The T13.F06 progress record stays historical.
     #[test]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [20, 15, 14, 7], [0, 0]),
+            ("graph_prepared", Policy::Drift, [19, 15, 14, 5], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [20, 20, 20, 20],
+                [19, 19, 19, 18],
                 [0, 0],
             ),
-            ("vm_prepared", Policy::Drift, [25, 18, 18, 12], [0, 0]),
-            ("vm_prepared", Policy::Selection, [25, 25, 25, 25], [0, 0]),
+            ("vm_prepared", Policy::Drift, [24, 18, 18, 11], [0, 0]),
+            ("vm_prepared", Policy::Selection, [24, 24, 24, 23], [0, 0]),
         ];
         for (name, policy, expected, expected_discards) in cases {
             let start = starts.iter().find(|start| start.name == name).unwrap();
@@ -1397,12 +1401,15 @@ mod tests {
     /// retained discoveries remain useful. Re-pinned by T20.F16: Graph-node
     /// `Add` draws three more numbers and appends a vote edge; 20/20 graph
     /// (censored 13 -> 12) and 23/23 VM retained discoveries remain useful.
+    /// Re-pinned by T11.F29 (the `AddFeedbackRoute` entry remaps every
+    /// topology draw): 19/19 graph (censored 12 -> 13) and 24/24 VM
+    /// (censored 9 -> 8) retained discoveries remain useful.
     #[test]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
-            ("graph_prepared", [20, 20, 20, 20], 12),
-            ("vm_prepared", [23, 23, 23, 23], 9),
+            ("graph_prepared", [19, 19, 19, 19], 13),
+            ("vm_prepared", [24, 24, 24, 24], 8),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();
             let lineages = production_lineages(start, Policy::CostSelection);
