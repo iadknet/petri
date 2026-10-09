@@ -147,6 +147,16 @@ causal target-family reads in a natural world without costing persistence?
   comparison) are recorded, not gating, as the gate text says; the 5 %
   rules and the on-path checks are the gate. The driver stops before the
   gates unless `make check` exited 0 on the branch.
+- **Amendment A3 (reader corrections at gate B0.3, after the pairs ran,
+  before anything was read from them).** `identity.py` failed the first
+  B0.3 comparison on two checks that were the reader's, not the runs': the
+  header's `world` field is the run's label (`PETRI_E2_NAME`, which names
+  the arm), so it is an allowed difference beside `config_digest`,
+  `prototypes` and `recipe`; and the births-flag comparison was vacuous
+  for a pair extinct before its first checkpoint (no `births` block
+  exists) and now says so instead of failing. Every compared quantity
+  (samples, extinction, footer, blocks) had passed; the driver stopped as
+  designed and was relaunched after the correction, re-running the checks.
 - **Landing scope.** Only `docs:` commits land on `main`; `proto:`, `instr:`
   and `lab:` stay on the branch, which is kept. T22 instrument candidates
   from this run (on the branch): the census probe's `births` block beside
@@ -311,6 +321,27 @@ census header's `config_digest` equals the run's `run_started` digest;
 the checkpoints at 1,000 and 2,000 took 0.17 s and 0.20 s with the births
 block at 0.07 s and 0.10 s (774 and 900 event-bearing births of 2,000; dead
 1 and 0) and no executed target channel among the sampled parents.
+**Frozen references** (the frozen instrument, `census-frozen`, 8 threads):
+`default-mutoff` extinct at 5,557 (seed 1022) and 7,509 (seed 2022) in
+105 s and 121 s; `default` complete at 20,000 in 697 s and 637 s (T24's
+regrowth repairs make a 20,000-tick Canyon run about twice as fast as the
+follow-up's), window-mean population 2,486 and 3,007, genome size 7.58 ×
+and 3.89 × the founder, lowest samples 795 (tick 2,500) and 815 (3,000):
+the default persists on both seeds under T03.F12's gestation, so the row's
+resolution (iii) is not triggered. **B0.3 passed on both seeds** (after
+amendment A3; [`b03-s1022.json`](born-connected-run-2026-10/b03-s1022.json),
+[`b03-s2022.json`](born-connected-run-2026-10/b03-s2022.json), checker
+[`identity.py`](born-connected-run-2026-10/identity.py)): `born-mutoff`
+equals `default-mutoff` on every sample field at every tick (11 and 15
+samples), the extinction tick (5,557 and 7,509), the footer and the
+checkpoint sets (none reached: both pairs die in the founder trough before
+10,000, as E8's and N1's pairs did), the header differing only in
+`config_digest` (the flag serializes when true), `prototypes.born_connected`
+(`false` against `true`), `recipe` and `world`. **B0.2 (ii) on the
+mutation-off runs passed on both seeds** (`b02-mutoff-s*.json`): the
+prototype binary's `default-mutoff` runs equal the frozen instrument's on
+every compared field, the extinction tick, the footer and the header
+entirely. **B0.2 (ii) on the `default` runs:** **passed on both seeds** ([`b02-default-s1022.json`](born-connected-run-2026-10/b02-default-s1022.json), [`b02-default-s2022.json`](born-connected-run-2026-10/b02-default-s2022.json)): the prototype binary's `default` runs (692 s and 627 s) equal the frozen instrument's on every sample field at all 40 ticks, the footer, and every timing-free checkpoint block at 10,000 and 20,000 (`input_use`, `e6`, `vote_deltas`, `births`, the cohort and decile fields) by hash, the header entirely: the prototype binary with the flag off is the instrument built without the prototype, reading for reading, and the `born` arms may be read.
 **`make check` on the branch**: a first run at `765e429c` stopped at
 `rust-clippy` (dead code: `apply_to_node` had become test-only), fixed by
 `a172c734` (`#[cfg(test)]`); the rerun at `a172c734` exited 0 with every
@@ -412,3 +443,6 @@ diagnosis question; (5) cost.
 | Builds (reference binary, frozen instrument, prototype twice) and `make check` twice | about 45 min in all |
 | B0 | 40 s (off), 35 s (on), 347 s (on, 10⁷) |
 | Census smoke | 5 s |
+| B0.2 (i) smoke (census run and `v3-cli-main` run) | 60 s and 60 s |
+| Frozen references (`default-mutoff`, `default`, both seeds) | 105, 697, 121, 637 s awake |
+| Pairs (`default-mutoff`, `born-mutoff`, both seeds) | 100, 95, 120, 121 s awake |

@@ -1,0 +1,276 @@
+{
+ "mode": "equal",
+ "ref": {
+  "dir": "/Users/istefanek/projects/petri/.claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/frozen/default-s2022",
+  "name": "default-s2022",
+  "sha256": {
+   "samples": "adf2dd69c33280036c313a0c11963612fff8611b62d892ce16ca1beaec2cef76",
+   "census": "52fbf8ab79336e1c653cc62c6d09db17bb07641020b724a5b7e1243af4c0eebf"
+  }
+ },
+ "cand": {
+  "dir": "/Users/istefanek/projects/petri/.claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/default-s2022",
+  "name": "default-s2022",
+  "sha256": {
+   "samples": "082c6c2b863817881264f56c4ff94177e8966ec4ce7a979fa20d0c5424fd8867",
+   "census": "bffcd2f5a2ca7d08413ba4f738bf501c311a58b8c6b27f354fb01060ca8adb75"
+  }
+ },
+ "checks": [
+  {
+   "check": "sample tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500,
+     6000,
+     6500,
+     7000,
+     7500,
+     8000,
+     8500,
+     9000,
+     9500,
+     10000,
+     10500,
+     11000,
+     11500,
+     12000,
+     12500,
+     13000,
+     13500,
+     14000,
+     14500,
+     15000,
+     15500,
+     16000,
+     16500,
+     17000,
+     17500,
+     18000,
+     18500,
+     19000,
+     19500,
+     20000
+    ],
+    "cand": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500,
+     6000,
+     6500,
+     7000,
+     7500,
+     8000,
+     8500,
+     9000,
+     9500,
+     10000,
+     10500,
+     11000,
+     11500,
+     12000,
+     12500,
+     13000,
+     13500,
+     14000,
+     14500,
+     15000,
+     15500,
+     16000,
+     16500,
+     17000,
+     17500,
+     18000,
+     18500,
+     19000,
+     19500,
+     20000
+    ]
+   }
+  },
+  {
+   "check": "every sample field equal at every tick",
+   "pass": true,
+   "detail": {
+    "mismatches": [],
+    "count": 0
+   }
+  },
+  {
+   "check": "extinction tick equal",
+   "pass": true,
+   "detail": {
+    "ref": null,
+    "cand": null
+   }
+  },
+  {
+   "check": "footer ticks and extinct equal",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "ticks": 20000,
+     "extinct": false
+    },
+    "cand": {
+     "ticks": 20000,
+     "extinct": false
+    }
+   }
+  },
+  {
+   "check": "checkpoint tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [
+     10000,
+     20000
+    ],
+    "cand": [
+     10000,
+     20000
+    ]
+   }
+  },
+  {
+   "check": "every timing-free checkpoint block hash-equal (births counts without mutation_config)",
+   "pass": true,
+   "detail": {
+    "differing": []
+   }
+  },
+  {
+   "check": "births block mutation_config.born_connected equal at every checkpoint",
+   "pass": true,
+   "detail": [
+    {
+     "tick": 10000,
+     "ref": false,
+     "cand": false
+    },
+    {
+     "tick": 20000,
+     "ref": false,
+     "cand": false
+    }
+   ]
+  },
+  {
+   "check": "header equal outside the allowed keys",
+   "pass": true,
+   "detail": {
+    "differing": [],
+    "disallowed": []
+   }
+  },
+  {
+   "check": "header allowed keys equal too (same binary policy, same recipe)",
+   "pass": true,
+   "detail": {
+    "differing": []
+   }
+  }
+ ],
+ "pass": true,
+ "block_hashes": {
+  "10000:living": {
+   "ref": "3a892eea646c4e4fc44df3a264545ce2e51f4bdc752cbd996dae588e5c839602",
+   "cand": "3a892eea646c4e4fc44df3a264545ce2e51f4bdc752cbd996dae588e5c839602"
+  },
+  "10000:selected_parents": {
+   "ref": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b",
+   "cand": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b"
+  },
+  "10000:selected_generations": {
+   "ref": "70f90673354a98ca6af341623a29d2acd422fcf064bd11dc24ea530f4ef11d5f",
+   "cand": "70f90673354a98ca6af341623a29d2acd422fcf064bd11dc24ea530f4ef11d5f"
+  },
+  "10000:age_deciles": {
+   "ref": "b0432bfa1af4cfbac6b61e92d0fca07a28e83fce47b953959817b96b35c7ab07",
+   "cand": "b0432bfa1af4cfbac6b61e92d0fca07a28e83fce47b953959817b96b35c7ab07"
+  },
+  "10000:energy_deciles": {
+   "ref": "1d93ebf3043529d788faf0f9e982138422e156872f5c320998180cc721e75639",
+   "cand": "1d93ebf3043529d788faf0f9e982138422e156872f5c320998180cc721e75639"
+  },
+  "10000:sample": {
+   "ref": "f63932650935b3a93176c4b919edf4efc9843ea5ffc15e326a83259061e97bcc",
+   "cand": "f63932650935b3a93176c4b919edf4efc9843ea5ffc15e326a83259061e97bcc"
+  },
+  "10000:input_use": {
+   "ref": "3a1b335a7c1347aa35680ec174cc422d417988ba1bd1b32c8a4089b0b73d0496",
+   "cand": "3a1b335a7c1347aa35680ec174cc422d417988ba1bd1b32c8a4089b0b73d0496"
+  },
+  "10000:e6": {
+   "ref": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+   "cand": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+  },
+  "10000:vote_deltas": {
+   "ref": "1359eaac00ab62eb81c1f3725fefb9c838f6018e26bbde4dffe8bda9841ac031",
+   "cand": "1359eaac00ab62eb81c1f3725fefb9c838f6018e26bbde4dffe8bda9841ac031"
+  },
+  "10000:births": {
+   "ref": "acd9c05dd310ca2168f2623cb989e913b8fd700bb507629412bbfc3fea613dfe",
+   "cand": "acd9c05dd310ca2168f2623cb989e913b8fd700bb507629412bbfc3fea613dfe"
+  },
+  "20000:living": {
+   "ref": "933b7d8e3c4f07686e7273808220e9977439f7181df6c559ec15dcfe4efda282",
+   "cand": "933b7d8e3c4f07686e7273808220e9977439f7181df6c559ec15dcfe4efda282"
+  },
+  "20000:selected_parents": {
+   "ref": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b",
+   "cand": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b"
+  },
+  "20000:selected_generations": {
+   "ref": "6e8e9f162016068a57cb54ac9b8655cc8ddbf90d1636fa9d292dad87165ec759",
+   "cand": "6e8e9f162016068a57cb54ac9b8655cc8ddbf90d1636fa9d292dad87165ec759"
+  },
+  "20000:age_deciles": {
+   "ref": "eba789b69855d32d44f10ad78b81a8acd7218173cd4e4f6e3457168044647696",
+   "cand": "eba789b69855d32d44f10ad78b81a8acd7218173cd4e4f6e3457168044647696"
+  },
+  "20000:energy_deciles": {
+   "ref": "e5566eee7e200bf8ff116c01f3777ec05ce7be1b40ed9edbc054c935ca672629",
+   "cand": "e5566eee7e200bf8ff116c01f3777ec05ce7be1b40ed9edbc054c935ca672629"
+  },
+  "20000:sample": {
+   "ref": "db7af5f61fe9aecf3d112e79cfe72f214f586e11f9dcb5296d859ef59c44e2c3",
+   "cand": "db7af5f61fe9aecf3d112e79cfe72f214f586e11f9dcb5296d859ef59c44e2c3"
+  },
+  "20000:input_use": {
+   "ref": "6bf769de056aaa529f8290dff5ca981b20121b548b0c30bceed3bb34dea0a900",
+   "cand": "6bf769de056aaa529f8290dff5ca981b20121b548b0c30bceed3bb34dea0a900"
+  },
+  "20000:e6": {
+   "ref": "047820e742bea701907838833b06963e412863e2f500af8f016e2ab1dadc4e0a",
+   "cand": "047820e742bea701907838833b06963e412863e2f500af8f016e2ab1dadc4e0a"
+  },
+  "20000:vote_deltas": {
+   "ref": "ec579cf022a3a504bb8280c2713a9c471ca6e9b7a327524d94cb342b8ec6cbea",
+   "cand": "ec579cf022a3a504bb8280c2713a9c471ca6e9b7a327524d94cb342b8ec6cbea"
+  },
+  "20000:births": {
+   "ref": "906546580e24cde7ed8a36e68061954d29fb8b5ad540f1a8b7016fde46d505a7",
+   "cand": "906546580e24cde7ed8a36e68061954d29fb8b5ad540f1a8b7016fde46d505a7"
+  }
+ }
+}

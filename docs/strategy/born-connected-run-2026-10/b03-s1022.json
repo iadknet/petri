@@ -1,0 +1,145 @@
+{
+ "mode": "flag-differs",
+ "ref": {
+  "dir": "/Users/istefanek/projects/petri/.claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/default-mutoff-s1022",
+  "name": "default-mutoff-s1022",
+  "sha256": {
+   "samples": "0a7277c4546e34fa3330c2518cc34865985e47ff34f46de29c64dd188dfe6545",
+   "census": "8a87717c59a83505f3217193ea9cff38aac69381730f72a8024d263dbf14d0fc"
+  }
+ },
+ "cand": {
+  "dir": "/Users/istefanek/projects/petri/.claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/born-mutoff-s1022",
+  "name": "born-mutoff-s1022",
+  "sha256": {
+   "samples": "a23d5de364263060f46ac4098246b418c2163700f2b9b706bd65b7dec5876ff3",
+   "census": "f8c24b1e87c6ce8b5646c4229c35eab531b8a9614099cdef0c5211fb7678232e"
+  }
+ },
+ "checks": [
+  {
+   "check": "sample tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500
+    ],
+    "cand": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500
+    ]
+   }
+  },
+  {
+   "check": "every sample field equal at every tick",
+   "pass": true,
+   "detail": {
+    "mismatches": [],
+    "count": 0
+   }
+  },
+  {
+   "check": "extinction tick equal",
+   "pass": true,
+   "detail": {
+    "ref": 5557,
+    "cand": 5557
+   }
+  },
+  {
+   "check": "footer ticks and extinct equal",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "ticks": 5557,
+     "extinct": true
+    },
+    "cand": {
+     "ticks": 5557,
+     "extinct": true
+    }
+   }
+  },
+  {
+   "check": "checkpoint tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [],
+    "cand": []
+   }
+  },
+  {
+   "check": "every timing-free checkpoint block hash-equal (births counts without mutation_config)",
+   "pass": true,
+   "detail": {
+    "differing": []
+   }
+  },
+  {
+   "check": "births block mutation_config.born_connected: no checkpoint reached on either run (vacuous)",
+   "pass": true,
+   "detail": {
+    "ref_extinct": 5557,
+    "cand_extinct": 5557
+   }
+  },
+  {
+   "check": "header equal outside the allowed keys",
+   "pass": true,
+   "detail": {
+    "differing": [
+     "config_digest",
+     "prototypes",
+     "recipe",
+     "world"
+    ],
+    "disallowed": []
+   }
+  },
+  {
+   "check": "config_digest differs (the flag serializes when true)",
+   "pass": true,
+   "detail": {
+    "ref": "sha256:40dd6f296b56009673d350332674ed2b72a19b89be171a9e1bc8a3cfd0f52a6a",
+    "cand": "sha256:f173c41111cbba529ab78907f86a5e03210e5a69c6c1c21c5424a2efe7da2077"
+   }
+  },
+  {
+   "check": "prototypes.born_connected differs",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "born_connected": false,
+     "gestation_ticks_per_founder_genome": 1.0,
+     "per_unit_rate": 0.0
+    },
+    "cand": {
+     "born_connected": true,
+     "gestation_ticks_per_founder_genome": 1.0,
+     "per_unit_rate": 0.0
+    }
+   }
+  }
+ ],
+ "pass": true,
+ "block_hashes": {}
+}
