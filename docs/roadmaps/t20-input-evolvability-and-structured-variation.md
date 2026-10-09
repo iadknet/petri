@@ -1,7 +1,7 @@
 # T20 — Input Evolvability and Structured Variation
 
 **Status**: In Progress
-**Last updated**: 2026-09-28
+**Last updated**: 2026-10-09
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -71,8 +71,52 @@ and rollout gates, not a prerequisite for inherited improvements.
   - Goal: Measure whether native lifetime learning adds useful input behavior and reproductive benefit beyond inherited competence under ordinary mutation, birth and ecological costs.
 - [ ] **T20.F15 — Qualified Learning Availability (Conditional)** — Depends on: T20.F14
   - Goal: Experience-dependent adaptation: ordinary Graph lineages can acquire only the positively qualified learning mechanisms while retaining learning-off and independent alternatives.
+- [ ] **T20.F16 — Born-Connected Input Declaration** — Depends on: T20.F04, T14.F12
+  - Goal: A new sensory input is expressed into an existing pathway rather than into nothing, as a receptor gene duplicated with its parent's expression enters the parent's cascade. When ordinary variation declares a new input reference on a Graph node, the declaration arrives already wired into that node's existing pathway and live, so it is exposed to selection at once instead of waiting, silent, for a separate connection event; VM nodes are unchanged. The intended outcome is more executed and causal sensor reads of the target families at the goal checkpoints without a persistence or population cost.
 
 ## Notes for AI Agents
+
+**F16 born-connected declaration, 2026-10-09 (user decision).** T20.F16 comes
+from the [born-connected prototype run](../strategy/born-connected-run-2026-10.md),
+row B1, which validated the lead on Canyon seeds 1022 and 2022 over 20,000
+ticks by its predeclared rule (executed plus causal target-family reads on the
+selected cohort 22 against 6 and 19 against 6 at 20,000, a causal row where the
+default has none on each seed, 8 and 6 target channels whose ablation changes a
+committed action, the funnel and vote-delta readings agreeing 24 of 24), after
+gate B0 showed the mechanism on the founder (every sampled single-event
+declaration arrives connected; the useful signed share 19 of 1,393 contains
+2/189) and gates B0.2 and B0.3 showed the instrument identical with the
+prototype off. A lead-selection screen on 20 parents: recorded against it a
+near-extinction trough under the arm on seed 2022 (10 living at tick 4,500),
+genome size one seed each way, and five contradicted predictions (the note's B1
+cell). The tested realization, recorded in the note and not prescribed here:
+one edge per `InputRef.Add` on a Graph node, from the appended reference at a
+uniformly drawn sub-value into one uniformly drawn `ActionVote` sink at the
+new-edge law's weight (uniform on [−1, 1]); the destination class and the
+weight law are the spec's questions, with whether F04's `RecruitNeutralInput`
+(Off, never qualified) is retired, and VM nodes stay unchanged until F03.
+**Exception to this track's boundaries (user decision, 2026-10-09):** F16 is a
+general mutation-policy feature outside the F09 to F12 candidate chain, which
+it leaves intact for qualified candidates; the sentence "Candidate Graph
+creation stays opt-in until F12" below applies to those candidates and not to
+F16, and F04's separate-path contract ("`InputRef.Add` stays unwired declaration
+on both backends", preserved in the F04 row's sentence amended below) is
+superseded for Graph nodes by F16 when it closes. The feature amends the
+mutation spec's growth-versus-connection taxonomy sentence and its
+InputRef-domain `Add` paragraph explicitly, preserving the VM behavior.
+Verification: `cargo test -p v3-core --test viability` first (the feature
+touches every birth); the goal profile reads the target rows' connected,
+executed and causal counts at the goal checkpoints in all three worlds, with
+connected tracking declared and `family_declared` up as a consequence of
+pruning protection, population not under half the previous closure's, Canyon's
+goal-seed persistence as the decisive risk (T03.F12 closed at 0.441 × its floor
+there), genome size not reliably different and dead-per-birth not reliably up.
+Limits of the evidence: two fresh seeds of one world over 20,000 ticks, a
+20-parent cohort, no edge provenance in the census, and the battery never
+presenting the target channels. Natural analog: expression inherited with a
+duplication motivates immediate integration into an existing cascade; the
+mechanism approximates it by a fresh random connection and models neither
+duplication nor pathway inheritance.
 
 **F09 restart on the lab, 2026-09-28 (user decision).** The first F09 execution was reverted on 2026-09-27 (`a26c1cf0`); its readings, one-tick binary scenes and 0/32 results in every arm including the baseline are historical and not pooled. The restart depends on T22.F01 and runs its discovery question on the [capability lab](t22-capability-assays-and-evolvability-lab.md): many-tick graded scenes, the lab's calibration gate, native-variation fidelity checklist and controls, with the F09 row's scientific contract (native mutator, fresh lineages, learning off, access versus coordination arms, two family shapes, one non-ring) unchanged. No new assay module is added inside `v3-core`, and the recording follows the telemetry commit rule. Under the T22 rule of the same date, F09's verdict may block or unblock F10, the other measurement rows and F03 (an opt-in mechanism row that stays unqualified until F09 favors it) and may retire opt-in, unqualified candidate code as this track's disposal rule already says; it never sets a default, founder, mutation policy or closure threshold, and F12's production availability still rests on F10/F11 goal-world evidence recorded in F12's own spec.
 
@@ -183,7 +227,7 @@ and applied accounting, without a separate observability framework.
 | --- | --- |
 | F01 | Reuse T11.F26's mutation-effect and coverage handoff; extend/version existing probes for family/channel declaration → connection → executed read → causal applied effect → retention, with nonzero barrier, extended and outcome scenes (S2/S3); retain structural census semantics. On 2–3 predeclared family shapes, compare competent authored use against founders and representative incumbents, plus matched ablations, in the standard worlds at native costs. Measure actual offspring and preserve competence; test exposure and controller adequacy before interpreting a null. Record Graph feasibility using ordinary edges, perception/carrying/work costs, the current two-step discovery baseline, and positive/negative/inconclusive opportunity by family. Preserve source identities; historical pre-repair results are not pooled into the baseline. Record VM cost concerns for F03 without making VM feasibility a gate. No new ecology or production mutation policy. |
 | F02 | Establish the general Graph neutral-consumer contract with authored/property fixtures, stable references, copying, deletion, round trips and independent coefficient access. Use current Graph edges; representation changes are conditional on a demonstrated failure and require a prospective scope amendment. Exclude unsafe zero-write sinks unless the chosen semantics prove neutrality. Account for capacity/budget failure and extra work. This feature can close on validated existing behavior and fixtures; it does not require a new projection object or evaluator. |
-| F04 | Add an explicit, bounded declare-and-connect mutation for any legal input family, using F02's eligible consumers. Preserve `InputRef.Add` as neutral declaration and the existing separate connection path; do not silently redefine either. Predeclare single-channel versus whole-family bundle arms and bounded destination selection, preserve present coefficients, and fail atomically. Existing shared-memory sources need only connection; new nodes remain subject to T13's routing contract and are not automatically wired to everything. Pruning persists until an explicit later recruitment event. Keep supply policy fixed and report actual target exposure, genomic growth and costs. |
+| F04 | Add an explicit, bounded declare-and-connect mutation for any legal input family, using F02's eligible consumers. Preserve `InputRef.Add` as neutral declaration and the existing separate connection path; do not silently redefine either (F16 redefines the Graph-node declaration explicitly, under the exception in the Notes, 2026-10-09). Predeclare single-channel versus whole-family bundle arms and bounded destination selection, preserve present coefficients, and fail atomically. Existing shared-memory sources need only connection; new nodes remain subject to T13's routing contract and are not automatically wired to everything. Pruning persists until an explicit later recruitment event. Keep supply policy fixed and report actual target exposure, genomic growth and costs. |
 | F05 | Add coordinated inherited steps over declared repeated meanings using ordinary coefficients, with independent residual refinement and deletion. Candidate cases include cyclic direction relationships and homologous fields across the four nearby-creature slots, without treating rank as direction. Compare scalar/additive versus coordinated steps under declared event and vector-step bounds, recording coefficients touched and costs. No new learner or generic pattern language. Verify applicable and inapplicable shapes; F09 decides the empirical scope that qualifies. |
 | F09 | Use the native mutator and fresh independent lineages with learning off. Compare current two-step growth, one-event access alone, and access plus structured variation; keep matched additive controls and all source/sink targeting assumptions explicit. Starts may have incumbent competence but no authored new-input solution. Qualify added causal behavior, relevant channel coverage, mixed-scene usefulness and preserved competence on at least two family shapes, one non-ring. Report exposure, discovery time, costs and the backend carrying each contribution in mixed meshes. Give separate verdicts for access and coordinated variation, freeze supported candidates, and keep authored controls separate from discovery. |
 | F10 | Test frozen inherited candidates in bounded finite populations with native births/mutation and actual reproductive outcomes. Use T13's ancestry/retention definitions and ancestral-payload/ablation controls across parent-to-child depth. Separate loss by deletion, extinction and inadequate exposure; do not count copied old computation as a new ability. Qualify retention separately from one successful lifetime. |
@@ -234,8 +278,9 @@ the existing progress record and roadmap notes without marking biological
 success criteria complete. A later revival needs a prospective scope and
 priority decision, not rewritten historical evidence or relaxed thresholds.
 
-Candidate Graph creation stays opt-in until F12, VM until F03's own positive
-qualification, and new learning until F15. Disabled candidates consume no extra
+Candidate Graph creation stays opt-in until F12 (F16, a general mutation-policy
+feature outside the candidate chain, is excepted in the Notes), VM until F03's
+own positive qualification, and new learning until F15. Disabled candidates consume no extra
 mutation RNG draws or alter defaults. Enabled candidates pay their declared
 costs; default zero prices must be disclosed rather than presented as measured
 economic costs. Flat specs are written just in time, and all execution uses
