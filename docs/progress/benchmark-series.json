@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t24-f02-parallel-food-regrowth.json",
+    "epoch_baseline": "docs/progress/features/t20-f16-born-connected-input-declaration.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -66,7 +66,8 @@
       "docs/progress/features/t24-f03-food-growth-phase-timing.json",
       "docs/progress/features/t24-f01-order-free-food-spread.json",
       "docs/progress/features/t24-f02-parallel-food-regrowth.json",
-      "docs/progress/features/t03-f12-genome-length-dependent-reproductive-time.json"
+      "docs/progress/features/t03-f12-genome-length-dependent-reproductive-time.json",
+      "docs/progress/features/t20-f16-born-connected-input-declaration.json"
     ]
   },
   "goal": {
@@ -152,7 +153,8 @@
       "docs/progress/features/t24-f03-food-growth-phase-timing-goal.json",
       "docs/progress/features/t24-f01-order-free-food-spread-goal.json",
       "docs/progress/features/t24-f02-parallel-food-regrowth-goal.json",
-      "docs/progress/features/t03-f12-genome-length-dependent-reproductive-time-goal.json"
+      "docs/progress/features/t03-f12-genome-length-dependent-reproductive-time-goal.json",
+      "docs/progress/features/t20-f16-born-connected-input-declaration-goal.json"
     ]
   }
 }

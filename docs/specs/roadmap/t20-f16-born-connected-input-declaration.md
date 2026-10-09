@@ -169,10 +169,8 @@ by the changed births.
 - [ ] `make check` -> exit 0, recorded in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred, listed here.
-- [ ] Benchmark summaries stored at `docs/progress/features/t20-f16-born-connected-input-declaration.json`
-      and `...-goal.json`, local raw hash/byte count and verification time
-      checked, series entries point to the summaries, no full report staged;
-      the goal profile is run once (workflow, 2026-09-05).
+- [x] Benchmark summaries stored at the two paths below, series entries added,
+      raw hashes in the readings, goal run once.
 
 ## Performance and Goal Impact
 
@@ -249,7 +247,11 @@ the summary unedited. The benchmark stage reports the gate's
 `decided_passes_total` beside the count of founder births that applied a
 Graph-node `Add`.
 
-**Measured verdict.** Pending.
+**Measured verdict ([readings](../../progress/readings/t20-f16.md)).** Both
+profiles ran once, CLI exit 3 (severe). Gate: only the accepted
+`decided_passes`; epoch re-pinned. Goal: `decided_passes` severe. Persistence
+floor met. Contrary: Confluence executed and causal, its read floor, Canyon
+drift depth 22.
 
 - Summaries: [gate](../../progress/features/t20-f16-born-connected-input-declaration.json),
   [goal](../../progress/features/t20-f16-born-connected-input-declaration-goal.json).
