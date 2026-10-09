@@ -1,0 +1,1224 @@
+{
+ "gate": "W0",
+ "frozen": {
+  "path": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w0/e4-frozen.json",
+  "sha256": "32976206402903beadd0a5c3889e7124352e0f0ccdd9c982295152326e923a16",
+  "config": {
+   "born_connected_destinations": "votes",
+   "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+   "executed_bias": 0.9,
+   "executed_window_ticks": 100,
+   "food_types": 2,
+   "mesh_layer_probability": 0.2,
+   "neutral_input_recruitment": "Off",
+   "per_unit_rate": 0.005,
+   "scene_seed": 239455822
+  }
+ },
+ "votes": {
+  "path": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w0/e4-votes.json",
+  "sha256": "97a5e66f522fe1f22147f7434a738c49a8fafa1b53d82fa532e9c2b7809ac3b1",
+  "config": {
+   "born_connected_destinations": "votes",
+   "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+   "executed_bias": 0.9,
+   "executed_window_ticks": 100,
+   "food_types": 2,
+   "mesh_layer_probability": 0.2,
+   "neutral_input_recruitment": "Off",
+   "per_unit_rate": 0.005,
+   "scene_seed": 239455822
+  }
+ },
+ "non_clear": {
+  "path": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w0/e4-wide.json",
+  "sha256": "24a23e712ffb83e3b83cd563a6c821b718d254ac77edf9cde34efcc2668bfae9",
+  "config": {
+   "born_connected_destinations": "non_clear",
+   "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+   "executed_bias": 0.9,
+   "executed_window_ticks": 100,
+   "food_types": 2,
+   "mesh_layer_probability": 0.2,
+   "neutral_input_recruitment": "Off",
+   "per_unit_rate": 0.005,
+   "scene_seed": 239455822
+  }
+ },
+ "non_clear_10m": {
+  "path": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w0/e4-wide-10m.json",
+  "sha256": "0fa205cad7a36d54a26307563a54be93f56f6e1c70b813fdb55d8af9d01c5826",
+  "config": {
+   "born_connected_destinations": "non_clear",
+   "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+   "executed_bias": 0.9,
+   "executed_window_ticks": 100,
+   "food_types": 2,
+   "mesh_layer_probability": 0.2,
+   "neutral_input_recruitment": "Off",
+   "per_unit_rate": 0.005,
+   "scene_seed": 239455822
+  }
+ },
+ "checks": [
+  {
+   "check": "votes founder genome_size/executed_resolved/frozen_age equal frozen",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "frozen": [
+     97,
+     [
+      0,
+      1
+     ],
+     149
+    ],
+    "votes": [
+     97,
+     [
+      0,
+      1
+     ],
+     149
+    ]
+   }
+  },
+  {
+   "check": "votes founder deterministic projection equals frozen",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "differing_keys": [],
+    "keys_only_in_frozen": [],
+    "keys_only_in_votes": []
+   }
+  },
+  {
+   "check": "votes founder+declared genome_size/executed_resolved/frozen_age equal frozen",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "frozen": [
+     98,
+     [
+      0,
+      1
+     ],
+     149
+    ],
+    "votes": [
+     98,
+     [
+      0,
+      1
+     ],
+     149
+    ]
+   }
+  },
+  {
+   "check": "votes founder+declared deterministic projection equals frozen",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "differing_keys": [],
+    "keys_only_in_frozen": [],
+    "keys_only_in_votes": []
+   }
+  },
+  {
+   "check": "votes founder+declared+zero-edge genome_size/executed_resolved/frozen_age equal frozen",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "frozen": [
+     99,
+     [
+      0,
+      1
+     ],
+     149
+    ],
+    "votes": [
+     99,
+     [
+      0,
+      1
+     ],
+     149
+    ]
+   }
+  },
+  {
+   "check": "votes founder+declared+zero-edge deterministic projection equals frozen",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "differing_keys": [],
+    "keys_only_in_frozen": [],
+    "keys_only_in_votes": []
+   }
+  },
+  {
+   "check": "non_clear (1) founder single-Add connect_any_given_declared exactly 1",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "declared": {
+     "count": 132,
+     "cp95": [
+      0.0073094304835947255,
+      0.010344441274104776
+     ],
+     "of": 15120,
+     "rate": 0.00873015873015873
+    },
+    "connect_any": {
+     "count": 132,
+     "cp95": [
+      0.9724408222765546,
+      1.0
+     ],
+     "of": 132,
+     "rate": 1.0
+    }
+   }
+  },
+  {
+   "check": "non_clear (1) founder single-Add destinations all non-clear sinks",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "locations": {
+     "sink:ActionParam(EatFoodType)": 2,
+     "sink:ActionParam(StealEnergyAmount)": 1,
+     "sink:ActionVote(Eat)": 3,
+     "sink:ActionVote(Move(0))": 1,
+     "sink:ActionVote(Move(1))": 2,
+     "sink:ActionVote(Move(3))": 1,
+     "sink:ActionVote(Move(4))": 3,
+     "sink:ActionVote(Move(5))": 2,
+     "sink:ActionVote(Move(7))": 2,
+     "sink:ActionVote(Reproduce(0))": 2,
+     "sink:ActionVote(Reproduce(1))": 2,
+     "sink:ActionVote(Reproduce(2))": 3,
+     "sink:ActionVote(Reproduce(4))": 1,
+     "sink:ActionVote(Reproduce(5))": 2,
+     "sink:ActionVote(Reproduce(6))": 1,
+     "sink:ActionVote(Reproduce(7))": 2,
+     "sink:ActionVote(StealEnergy(0))": 1,
+     "sink:ActionVote(StealEnergy(1))": 2,
+     "sink:ActionVote(StealEnergy(2))": 3,
+     "sink:ActionVote(StealEnergy(3))": 4,
+     "sink:ActionVote(StealEnergy(4))": 1,
+     "sink:ActionVote(StealEnergy(5))": 1,
+     "sink:ActionVote(StealEnergy(6))": 1,
+     "sink:ActionVote(StealEnergy(7))": 3,
+     "sink:ActionVote(Terminate)": 3,
+     "sink:CustomOutput(0)": 2,
+     "sink:CustomOutput(1)": 2,
+     "sink:CustomOutput(10)": 1,
+     "sink:CustomOutput(11)": 3,
+     "sink:CustomOutput(12)": 2,
+     "sink:CustomOutput(16)": 1,
+     "sink:CustomOutput(18)": 1,
+     "sink:CustomOutput(19)": 1,
+     "sink:CustomOutput(2)": 2,
+     "sink:CustomOutput(21)": 3,
+     "sink:CustomOutput(22)": 1,
+     "sink:CustomOutput(4)": 1,
+     "sink:CustomOutput(5)": 1,
+     "sink:CustomOutput(6)": 2,
+     "sink:CustomOutput(7)": 3,
+     "sink:CustomOutput(8)": 3,
+     "sink:CustomOutput(9)": 2,
+     "sink:RouterGate(0)": 1,
+     "sink:RouterGate(1)": 3,
+     "sink:RouterGate(2)": 1,
+     "sink:RouterGate(3)": 2,
+     "sink:RouterGate(4)": 1,
+     "sink:RouterGate(5)": 1,
+     "sink:RouterGate(6)": 2,
+     "sink:RouterGate(7)": 3,
+     "sink:WriteSlot(0)": 4,
+     "sink:WriteSlot(1)": 2,
+     "sink:WriteSlot(10)": 1,
+     "sink:WriteSlot(11)": 2,
+     "sink:WriteSlot(12)": 6,
+     "sink:WriteSlot(13)": 3,
+     "sink:WriteSlot(14)": 2,
+     "sink:WriteSlot(15)": 4,
+     "sink:WriteSlot(2)": 1,
+     "sink:WriteSlot(3)": 1,
+     "sink:WriteSlot(4)": 3,
+     "sink:WriteSlot(5)": 1,
+     "sink:WriteSlot(6)": 2,
+     "sink:WriteSlot(7)": 4,
+     "sink:WriteSlot(8)": 2
+    }
+   }
+  },
+  {
+   "check": "non_clear (1) founder single-Add sub-values in 0..6",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "subs": {
+     "0": 17,
+     "1": 26,
+     "2": 22,
+     "3": 16,
+     "4": 21,
+     "5": 15,
+     "6": 15
+    }
+   }
+  },
+  {
+   "check": "non_clear (1) founder all-birth connect_any CP contains declared point",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "connect_any": {
+     "count": 194,
+     "cp95": [
+      0.00016766211964486244,
+      0.00022330063690084723
+     ],
+     "of": 1000000,
+     "rate": 0.000194
+    },
+    "declared": {
+     "count": 194,
+     "cp95": [
+      0.00016766211964486244,
+      0.00022330063690084723
+     ],
+     "of": 1000000,
+     "rate": 0.000194
+    }
+   }
+  },
+  {
+   "check": "non_clear (2) 10^7 founder single-Add destinations hit all 78 non-clear sinks",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "distinct_sinks": 78,
+    "total": 1394,
+    "clear_or_compute_keys": []
+   }
+  },
+  {
+   "check": "non_clear (2) 10^7 founder single-Add ActionVote share CP contains 27/78",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "votes": 500,
+    "total": 1394,
+    "share": 0.3586800573888092,
+    "cp95": [
+     0.33346434977478473,
+     0.38449298768753176
+    ],
+    "predicted": 0.34615384615384615
+   }
+  },
+  {
+   "check": "non_clear (3) founder attempted_events_per_birth equal to votes",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "non_clear": 0.484315,
+    "votes": 0.484315
+   }
+  },
+  {
+   "check": "non_clear (4) founder InputRefAdd applied per birth within 5 % of votes",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "non_clear": 0.021549,
+    "votes": 0.021533
+   }
+  },
+  {
+   "check": "non_clear (3) founder+declared attempted_events_per_birth equal to votes",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "non_clear": 0.489357,
+    "votes": 0.489357
+   }
+  },
+  {
+   "check": "non_clear (4) founder+declared InputRefAdd applied per birth within 5 % of votes",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "non_clear": 0.02152,
+    "votes": 0.021513
+   }
+  },
+  {
+   "check": "non_clear (3) founder+declared+zero-edge attempted_events_per_birth equal to votes",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "non_clear": 0.495378,
+    "votes": 0.495378
+   }
+  },
+  {
+   "check": "non_clear (4) founder+declared+zero-edge InputRefAdd applied per birth within 5 % of votes",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "non_clear": 0.021994,
+    "votes": 0.02197
+   }
+  },
+  {
+   "check": "non_clear (5) founder+declared integrated lost_declaration within 5 % of votes",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "non_clear": {
+     "count": 18711,
+     "cp95": [
+      0.01844631481137432,
+      0.01897847813441217
+     ],
+     "of": 1000000,
+     "rate": 0.018711
+    },
+    "votes": {
+     "count": 18691,
+     "cp95": [
+      0.01842645414049754,
+      0.01895833892498272
+     ],
+     "of": 1000000,
+     "rate": 0.018691
+    },
+    "routes_non_clear": {
+     "InputRefAdd": 1,
+     "InputRefAdd+InputRefPrune": 208,
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation": 5,
+     "InputRefAdd+InputRefPrune+InputRefSwap": 8,
+     "InputRefAdd+InputRefRawFieldMutation": 87,
+     "InputRefAdd+InputRefRawFieldMutation+InputRefSwap": 9,
+     "InputRefAdd+InputRefSwap": 69,
+     "InputRefPrune": 9950,
+     "InputRefPrune+InputRefRawFieldMutation": 503,
+     "InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 27,
+     "InputRefPrune+InputRefSwap": 428,
+     "InputRefRawFieldMutation": 4400,
+     "InputRefRawFieldMutation+InputRefSwap": 300,
+     "InputRefSwap": 2713,
+     "none": 3
+    },
+    "routes_votes": {
+     "InputRefAdd": 1,
+     "InputRefAdd+InputRefPrune": 197,
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation": 10,
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 1,
+     "InputRefAdd+InputRefPrune+InputRefSwap": 11,
+     "InputRefAdd+InputRefRawFieldMutation": 71,
+     "InputRefAdd+InputRefRawFieldMutation+InputRefSwap": 8,
+     "InputRefAdd+InputRefSwap": 68,
+     "InputRefPrune": 9950,
+     "InputRefPrune+InputRefRawFieldMutation": 503,
+     "InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 27,
+     "InputRefPrune+InputRefSwap": 428,
+     "InputRefRawFieldMutation": 4400,
+     "InputRefRawFieldMutation+InputRefSwap": 300,
+     "InputRefSwap": 2713,
+     "none": 3
+    }
+   }
+  },
+  {
+   "check": "non_clear (5) founder+declared+zero-edge integrated lost_declaration within 5 % of votes",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "non_clear": {
+     "count": 7907,
+     "cp95": [
+      0.007734334257106734,
+      0.008082525146626496
+     ],
+     "of": 1000000,
+     "rate": 0.007907
+    },
+    "votes": {
+     "count": 7909,
+     "cp95": [
+      0.007736312473252183,
+      0.00808454691749777
+     ],
+     "of": 1000000,
+     "rate": 0.007909
+    },
+    "routes_non_clear": {
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation": 4,
+     "InputRefAdd+InputRefPrune+InputRefSwap": 1,
+     "InputRefAdd+InputRefRawFieldMutation": 84,
+     "InputRefAdd+InputRefRawFieldMutation+InputRefSwap": 6,
+     "InputRefAdd+InputRefSwap": 73,
+     "InputRefPrune": 5,
+     "InputRefPrune+InputRefRawFieldMutation": 120,
+     "InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 14,
+     "InputRefPrune+InputRefSwap": 47,
+     "InputRefRawFieldMutation": 4368,
+     "InputRefRawFieldMutation+InputRefSwap": 311,
+     "InputRefSwap": 2868,
+     "none": 6
+    },
+    "routes_votes": {
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation": 6,
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 1,
+     "InputRefAdd+InputRefPrune+InputRefSwap": 2,
+     "InputRefAdd+InputRefRawFieldMutation": 86,
+     "InputRefAdd+InputRefRawFieldMutation+InputRefSwap": 7,
+     "InputRefAdd+InputRefSwap": 68,
+     "InputRefPrune": 5,
+     "InputRefPrune+InputRefRawFieldMutation": 120,
+     "InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 14,
+     "InputRefPrune+InputRefSwap": 47,
+     "InputRefRawFieldMutation": 4368,
+     "InputRefRawFieldMutation+InputRefSwap": 311,
+     "InputRefSwap": 2868,
+     "none": 6
+    }
+   }
+  }
+ ],
+ "pass": true,
+ "non_clear_10m_kind_shares_descriptive": {
+  "CustomOutput": {
+   "count": 416,
+   "share": 0.2984218077474892,
+   "cp95": [
+    0.2744890260048255,
+    0.323207213792195
+   ],
+   "predicted": 0.3076923076923077,
+   "cp_contains": true
+  },
+  "RouterGate": {
+   "count": 128,
+   "share": 0.09182209469153516,
+   "cp95": [
+    0.07717687997803872,
+    0.10821293943419569
+   ],
+   "predicted": 0.10256410256410256,
+   "cp_contains": true
+  },
+  "WriteSlot": {
+   "count": 308,
+   "share": 0.22094691535150646,
+   "cp95": [
+    0.19941530505234512,
+    0.2436611637178073
+   ],
+   "predicted": 0.20512820512820512,
+   "cp_contains": true
+  },
+  "ActionVote": {
+   "count": 500,
+   "share": 0.3586800573888092,
+   "cp95": [
+    0.33346434977478473,
+    0.38449298768753176
+   ],
+   "predicted": 0.34615384615384615,
+   "cp_contains": true
+  },
+  "ActionParam": {
+   "count": 42,
+   "share": 0.03012912482065997,
+   "cp95": [
+    0.021798875536220116,
+    0.040509239675876996
+   ],
+   "predicted": 0.038461538461538464,
+   "cp_contains": true
+  }
+ },
+ "non_clear_10m_useful_signed_descriptive": {
+  "share": {
+   "count": 7,
+   "cp95": [
+    0.0020212234310867383,
+    0.01031872392564076
+   ],
+   "of": 1394,
+   "rate": 0.005021520803443328
+  },
+  "predicted": 0.0036630036630036626,
+  "cp_contains": true
+ },
+ "non_clear_founder_single_add": {
+  "births": 15120,
+  "connect_any_given_declared": {
+   "count": 132,
+   "cp95": [
+    0.9724408222765546,
+    1.0
+   ],
+   "of": 132,
+   "rate": 1.0
+  },
+  "connect_by_location": {
+   "sink:ActionParam(EatFoodType)": 2,
+   "sink:ActionParam(StealEnergyAmount)": 1,
+   "sink:ActionVote(Eat)": 3,
+   "sink:ActionVote(Move(0))": 1,
+   "sink:ActionVote(Move(1))": 2,
+   "sink:ActionVote(Move(3))": 1,
+   "sink:ActionVote(Move(4))": 3,
+   "sink:ActionVote(Move(5))": 2,
+   "sink:ActionVote(Move(7))": 2,
+   "sink:ActionVote(Reproduce(0))": 2,
+   "sink:ActionVote(Reproduce(1))": 2,
+   "sink:ActionVote(Reproduce(2))": 3,
+   "sink:ActionVote(Reproduce(4))": 1,
+   "sink:ActionVote(Reproduce(5))": 2,
+   "sink:ActionVote(Reproduce(6))": 1,
+   "sink:ActionVote(Reproduce(7))": 2,
+   "sink:ActionVote(StealEnergy(0))": 1,
+   "sink:ActionVote(StealEnergy(1))": 2,
+   "sink:ActionVote(StealEnergy(2))": 3,
+   "sink:ActionVote(StealEnergy(3))": 4,
+   "sink:ActionVote(StealEnergy(4))": 1,
+   "sink:ActionVote(StealEnergy(5))": 1,
+   "sink:ActionVote(StealEnergy(6))": 1,
+   "sink:ActionVote(StealEnergy(7))": 3,
+   "sink:ActionVote(Terminate)": 3,
+   "sink:CustomOutput(0)": 2,
+   "sink:CustomOutput(1)": 2,
+   "sink:CustomOutput(10)": 1,
+   "sink:CustomOutput(11)": 3,
+   "sink:CustomOutput(12)": 2,
+   "sink:CustomOutput(16)": 1,
+   "sink:CustomOutput(18)": 1,
+   "sink:CustomOutput(19)": 1,
+   "sink:CustomOutput(2)": 2,
+   "sink:CustomOutput(21)": 3,
+   "sink:CustomOutput(22)": 1,
+   "sink:CustomOutput(4)": 1,
+   "sink:CustomOutput(5)": 1,
+   "sink:CustomOutput(6)": 2,
+   "sink:CustomOutput(7)": 3,
+   "sink:CustomOutput(8)": 3,
+   "sink:CustomOutput(9)": 2,
+   "sink:RouterGate(0)": 1,
+   "sink:RouterGate(1)": 3,
+   "sink:RouterGate(2)": 1,
+   "sink:RouterGate(3)": 2,
+   "sink:RouterGate(4)": 1,
+   "sink:RouterGate(5)": 1,
+   "sink:RouterGate(6)": 2,
+   "sink:RouterGate(7)": 3,
+   "sink:WriteSlot(0)": 4,
+   "sink:WriteSlot(1)": 2,
+   "sink:WriteSlot(10)": 1,
+   "sink:WriteSlot(11)": 2,
+   "sink:WriteSlot(12)": 6,
+   "sink:WriteSlot(13)": 3,
+   "sink:WriteSlot(14)": 2,
+   "sink:WriteSlot(15)": 4,
+   "sink:WriteSlot(2)": 1,
+   "sink:WriteSlot(3)": 1,
+   "sink:WriteSlot(4)": 3,
+   "sink:WriteSlot(5)": 1,
+   "sink:WriteSlot(6)": 2,
+   "sink:WriteSlot(7)": 4,
+   "sink:WriteSlot(8)": 2
+  },
+  "connect_by_sub": {
+   "0": 17,
+   "1": 26,
+   "2": 22,
+   "3": 16,
+   "4": 21,
+   "5": 15,
+   "6": 15
+  },
+  "connect_cardinal_move_given_declared": {
+   "count": 4,
+   "cp95": [
+    0.008317052477146814,
+    0.07576977122434264
+   ],
+   "of": 132,
+   "rate": 0.030303030303030304
+  },
+  "connect_useful_signed_given_declared": {
+   "count": 0,
+   "cp95": [
+    0.0,
+    0.027559177723457562
+   ],
+   "of": 132,
+   "rate": 0.0
+  },
+  "connect_useful_wrong_sign_given_declared": {
+   "count": 0,
+   "cp95": [
+    0.0,
+    0.027559177723457562
+   ],
+   "of": 132,
+   "rate": 0.0
+  },
+  "declared_vote_node_target": {
+   "count": 132,
+   "cp95": [
+    0.0073094304835947255,
+    0.010344441274104776
+   ],
+   "of": 15120,
+   "rate": 0.00873015873015873
+  },
+  "note": "births whose only applied event is an InputRefAdd: the direct mechanism check; shares over the births that declared the target on the vote node"
+ },
+ "non_clear_10m_founder_single_add": {
+  "births": 151558,
+  "connect_any_given_declared": {
+   "count": 1394,
+   "cp95": [
+    0.9973572432576776,
+    1.0
+   ],
+   "of": 1394,
+   "rate": 1.0
+  },
+  "connect_by_location": {
+   "sink:ActionParam(EatFoodType)": 15,
+   "sink:ActionParam(ReproduceTransferFraction)": 14,
+   "sink:ActionParam(StealEnergyAmount)": 13,
+   "sink:ActionVote(Decide)": 9,
+   "sink:ActionVote(Eat)": 24,
+   "sink:ActionVote(Move(0))": 20,
+   "sink:ActionVote(Move(1))": 19,
+   "sink:ActionVote(Move(2))": 20,
+   "sink:ActionVote(Move(3))": 19,
+   "sink:ActionVote(Move(4))": 15,
+   "sink:ActionVote(Move(5))": 18,
+   "sink:ActionVote(Move(6))": 21,
+   "sink:ActionVote(Move(7))": 14,
+   "sink:ActionVote(Reproduce(0))": 16,
+   "sink:ActionVote(Reproduce(1))": 18,
+   "sink:ActionVote(Reproduce(2))": 20,
+   "sink:ActionVote(Reproduce(3))": 17,
+   "sink:ActionVote(Reproduce(4))": 13,
+   "sink:ActionVote(Reproduce(5))": 33,
+   "sink:ActionVote(Reproduce(6))": 19,
+   "sink:ActionVote(Reproduce(7))": 21,
+   "sink:ActionVote(StealEnergy(0))": 14,
+   "sink:ActionVote(StealEnergy(1))": 18,
+   "sink:ActionVote(StealEnergy(2))": 24,
+   "sink:ActionVote(StealEnergy(3))": 22,
+   "sink:ActionVote(StealEnergy(4))": 18,
+   "sink:ActionVote(StealEnergy(5))": 14,
+   "sink:ActionVote(StealEnergy(6))": 13,
+   "sink:ActionVote(StealEnergy(7))": 17,
+   "sink:ActionVote(Terminate)": 24,
+   "sink:CustomOutput(0)": 19,
+   "sink:CustomOutput(1)": 20,
+   "sink:CustomOutput(10)": 21,
+   "sink:CustomOutput(11)": 16,
+   "sink:CustomOutput(12)": 20,
+   "sink:CustomOutput(13)": 16,
+   "sink:CustomOutput(14)": 21,
+   "sink:CustomOutput(15)": 16,
+   "sink:CustomOutput(16)": 16,
+   "sink:CustomOutput(17)": 10,
+   "sink:CustomOutput(18)": 17,
+   "sink:CustomOutput(19)": 25,
+   "sink:CustomOutput(2)": 20,
+   "sink:CustomOutput(20)": 17,
+   "sink:CustomOutput(21)": 17,
+   "sink:CustomOutput(22)": 15,
+   "sink:CustomOutput(23)": 15,
+   "sink:CustomOutput(3)": 15,
+   "sink:CustomOutput(4)": 14,
+   "sink:CustomOutput(5)": 19,
+   "sink:CustomOutput(6)": 17,
+   "sink:CustomOutput(7)": 15,
+   "sink:CustomOutput(8)": 15,
+   "sink:CustomOutput(9)": 20,
+   "sink:RouterGate(0)": 23,
+   "sink:RouterGate(1)": 16,
+   "sink:RouterGate(2)": 14,
+   "sink:RouterGate(3)": 12,
+   "sink:RouterGate(4)": 15,
+   "sink:RouterGate(5)": 16,
+   "sink:RouterGate(6)": 14,
+   "sink:RouterGate(7)": 18,
+   "sink:WriteSlot(0)": 22,
+   "sink:WriteSlot(1)": 27,
+   "sink:WriteSlot(10)": 14,
+   "sink:WriteSlot(11)": 17,
+   "sink:WriteSlot(12)": 22,
+   "sink:WriteSlot(13)": 21,
+   "sink:WriteSlot(14)": 18,
+   "sink:WriteSlot(15)": 27,
+   "sink:WriteSlot(2)": 13,
+   "sink:WriteSlot(3)": 14,
+   "sink:WriteSlot(4)": 16,
+   "sink:WriteSlot(5)": 15,
+   "sink:WriteSlot(6)": 21,
+   "sink:WriteSlot(7)": 24,
+   "sink:WriteSlot(8)": 20,
+   "sink:WriteSlot(9)": 17
+  },
+  "connect_by_sub": {
+   "0": 239,
+   "1": 209,
+   "2": 197,
+   "3": 177,
+   "4": 209,
+   "5": 180,
+   "6": 183
+  },
+  "connect_cardinal_move_given_declared": {
+   "count": 76,
+   "cp95": [
+    0.04319225972616708,
+    0.06776686662320769
+   ],
+   "of": 1394,
+   "rate": 0.054519368723098996
+  },
+  "connect_useful_signed_given_declared": {
+   "count": 7,
+   "cp95": [
+    0.0020212234310867383,
+    0.01031872392564076
+   ],
+   "of": 1394,
+   "rate": 0.005021520803443328
+  },
+  "connect_useful_wrong_sign_given_declared": {
+   "count": 3,
+   "cp95": [
+    0.00044403078297011733,
+    0.006276293691423185
+   ],
+   "of": 1394,
+   "rate": 0.002152080344332855
+  },
+  "declared_vote_node_target": {
+   "count": 1394,
+   "cp95": [
+    0.008723295701653255,
+    0.009691217687843812
+   ],
+   "of": 151558,
+   "rate": 0.00919779886248169
+  },
+  "note": "births whose only applied event is an InputRefAdd: the direct mechanism check; shares over the births that declared the target on the vote node"
+ },
+ "non_clear_10m_founder_all_birth": {
+  "declared_vote_node_target": {
+   "count": 2012,
+   "cp95": [
+    0.0001925044402711351,
+    0.00021018705028114093
+   ],
+   "of": 10000000,
+   "rate": 0.0002012
+  },
+  "connect_any": {
+   "count": 2012,
+   "cp95": [
+    0.0001925044402711351,
+    0.00021018705028114093
+   ],
+   "of": 10000000,
+   "rate": 0.0002012
+  },
+  "connect_cardinal_move": {
+   "count": 113,
+   "cp95": [
+    9.312808033123954e-06,
+    1.3585700992913008e-05
+   ],
+   "of": 10000000,
+   "rate": 1.13e-05
+  },
+  "connect_useful_component_move": {
+   "count": 20,
+   "cp95": [
+    1.2216523552210923e-06,
+    3.088836107500992e-06
+   ],
+   "of": 10000000,
+   "rate": 2e-06
+  },
+  "connect_useful_signed": {
+   "count": 12,
+   "cp95": [
+    6.20057672595653e-07,
+    2.0961575622480133e-06
+   ],
+   "of": 10000000,
+   "rate": 1.2e-06
+  },
+  "connect_useful_wrong_sign": {
+   "count": 8,
+   "cp95": [
+    3.453832986832772e-07,
+    1.5763183081607401e-06
+   ],
+   "of": 10000000,
+   "rate": 8e-07
+  },
+  "attempted_events_per_birth": 0.4851153,
+  "applied_events_per_birth": 0.3576517,
+  "births": 10000000,
+  "wall_secs": 22.210634875
+ },
+ "votes_founder_all_birth": {
+  "declared_vote_node_target": {
+   "count": 194,
+   "cp95": [
+    0.00016766211964486244,
+    0.00022330063690084723
+   ],
+   "of": 1000000,
+   "rate": 0.000194
+  },
+  "connect_any": {
+   "count": 194,
+   "cp95": [
+    0.00016766211964486244,
+    0.00022330063690084723
+   ],
+   "of": 1000000,
+   "rate": 0.000194
+  },
+  "connect_useful_signed": {
+   "count": 6,
+   "cp95": [
+    2.201897344400461e-06,
+    1.3059427927120115e-05
+   ],
+   "of": 1000000,
+   "rate": 6e-06
+  },
+  "attempted_events_per_birth": 0.484315,
+  "applied_events_per_birth": 0.356773,
+  "births": 1000000
+ },
+ "pooled_destinations_descriptive": {
+  "founder": {
+   "sink:ActionParam(EatFoodType)": 2,
+   "sink:ActionParam(ReproduceTransferFraction)": 1,
+   "sink:ActionParam(StealEnergyAmount)": 2,
+   "sink:ActionVote(Eat)": 5,
+   "sink:ActionVote(Move(0))": 1,
+   "sink:ActionVote(Move(1))": 2,
+   "sink:ActionVote(Move(2))": 2,
+   "sink:ActionVote(Move(3))": 2,
+   "sink:ActionVote(Move(4))": 3,
+   "sink:ActionVote(Move(5))": 3,
+   "sink:ActionVote(Move(6))": 1,
+   "sink:ActionVote(Move(7))": 2,
+   "sink:ActionVote(Reproduce(0))": 4,
+   "sink:ActionVote(Reproduce(1))": 2,
+   "sink:ActionVote(Reproduce(2))": 3,
+   "sink:ActionVote(Reproduce(3))": 2,
+   "sink:ActionVote(Reproduce(4))": 1,
+   "sink:ActionVote(Reproduce(5))": 2,
+   "sink:ActionVote(Reproduce(6))": 1,
+   "sink:ActionVote(Reproduce(7))": 2,
+   "sink:ActionVote(StealEnergy(0))": 1,
+   "sink:ActionVote(StealEnergy(1))": 3,
+   "sink:ActionVote(StealEnergy(2))": 3,
+   "sink:ActionVote(StealEnergy(3))": 5,
+   "sink:ActionVote(StealEnergy(4))": 2,
+   "sink:ActionVote(StealEnergy(5))": 3,
+   "sink:ActionVote(StealEnergy(6))": 2,
+   "sink:ActionVote(StealEnergy(7))": 6,
+   "sink:ActionVote(Terminate)": 3,
+   "sink:CustomOutput(0)": 2,
+   "sink:CustomOutput(1)": 2,
+   "sink:CustomOutput(10)": 1,
+   "sink:CustomOutput(11)": 4,
+   "sink:CustomOutput(12)": 2,
+   "sink:CustomOutput(13)": 1,
+   "sink:CustomOutput(14)": 2,
+   "sink:CustomOutput(15)": 1,
+   "sink:CustomOutput(16)": 2,
+   "sink:CustomOutput(17)": 1,
+   "sink:CustomOutput(18)": 2,
+   "sink:CustomOutput(19)": 1,
+   "sink:CustomOutput(2)": 2,
+   "sink:CustomOutput(21)": 5,
+   "sink:CustomOutput(22)": 4,
+   "sink:CustomOutput(3)": 1,
+   "sink:CustomOutput(4)": 2,
+   "sink:CustomOutput(5)": 1,
+   "sink:CustomOutput(6)": 2,
+   "sink:CustomOutput(7)": 4,
+   "sink:CustomOutput(8)": 4,
+   "sink:CustomOutput(9)": 3,
+   "sink:RouterGate(0)": 3,
+   "sink:RouterGate(1)": 4,
+   "sink:RouterGate(2)": 1,
+   "sink:RouterGate(3)": 2,
+   "sink:RouterGate(4)": 2,
+   "sink:RouterGate(5)": 3,
+   "sink:RouterGate(6)": 3,
+   "sink:RouterGate(7)": 3,
+   "sink:WriteSlot(0)": 5,
+   "sink:WriteSlot(1)": 2,
+   "sink:WriteSlot(10)": 3,
+   "sink:WriteSlot(11)": 6,
+   "sink:WriteSlot(12)": 6,
+   "sink:WriteSlot(13)": 4,
+   "sink:WriteSlot(14)": 4,
+   "sink:WriteSlot(15)": 4,
+   "sink:WriteSlot(2)": 1,
+   "sink:WriteSlot(3)": 1,
+   "sink:WriteSlot(4)": 4,
+   "sink:WriteSlot(5)": 1,
+   "sink:WriteSlot(6)": 3,
+   "sink:WriteSlot(7)": 6,
+   "sink:WriteSlot(8)": 3
+  },
+  "founder+declared": {
+   "compute:0": 2,
+   "compute:1": 5,
+   "compute:10": 27,
+   "compute:2": 77,
+   "compute:3": 79,
+   "compute:4": 5,
+   "compute:5": 15,
+   "compute:6": 6,
+   "compute:7": 12,
+   "compute:8": 12,
+   "compute:9": 3,
+   "sink:ActionParam(EatFoodType)": 5,
+   "sink:ActionParam(ReproduceTransferFraction)": 5,
+   "sink:ActionParam(StealEnergyAmount)": 3,
+   "sink:ActionVote(Decide)": 6,
+   "sink:ActionVote(Eat)": 20,
+   "sink:ActionVote(Move(0))": 18,
+   "sink:ActionVote(Move(1))": 7,
+   "sink:ActionVote(Move(2))": 26,
+   "sink:ActionVote(Move(3))": 4,
+   "sink:ActionVote(Move(4))": 23,
+   "sink:ActionVote(Move(5))": 10,
+   "sink:ActionVote(Move(6))": 23,
+   "sink:ActionVote(Move(7))": 3,
+   "sink:ActionVote(Reproduce(0))": 14,
+   "sink:ActionVote(Reproduce(1))": 4,
+   "sink:ActionVote(Reproduce(2))": 17,
+   "sink:ActionVote(Reproduce(3))": 6,
+   "sink:ActionVote(Reproduce(4))": 10,
+   "sink:ActionVote(Reproduce(5))": 8,
+   "sink:ActionVote(Reproduce(6))": 9,
+   "sink:ActionVote(Reproduce(7))": 5,
+   "sink:ActionVote(StealEnergy(0))": 4,
+   "sink:ActionVote(StealEnergy(1))": 3,
+   "sink:ActionVote(StealEnergy(2))": 7,
+   "sink:ActionVote(StealEnergy(3))": 5,
+   "sink:ActionVote(StealEnergy(4))": 5,
+   "sink:ActionVote(StealEnergy(5))": 3,
+   "sink:ActionVote(StealEnergy(6))": 3,
+   "sink:ActionVote(StealEnergy(7))": 3,
+   "sink:ActionVote(Terminate)": 17,
+   "sink:ClearSlot(0)": 3,
+   "sink:ClearSlot(1)": 5,
+   "sink:ClearSlot(10)": 2,
+   "sink:ClearSlot(11)": 3,
+   "sink:ClearSlot(12)": 1,
+   "sink:ClearSlot(13)": 2,
+   "sink:ClearSlot(14)": 1,
+   "sink:ClearSlot(15)": 1,
+   "sink:ClearSlot(2)": 5,
+   "sink:ClearSlot(4)": 1,
+   "sink:ClearSlot(5)": 2,
+   "sink:ClearSlot(6)": 1,
+   "sink:ClearSlot(7)": 3,
+   "sink:CustomOutput(0)": 4,
+   "sink:CustomOutput(1)": 3,
+   "sink:CustomOutput(10)": 9,
+   "sink:CustomOutput(11)": 1,
+   "sink:CustomOutput(12)": 1,
+   "sink:CustomOutput(13)": 6,
+   "sink:CustomOutput(14)": 1,
+   "sink:CustomOutput(15)": 3,
+   "sink:CustomOutput(16)": 2,
+   "sink:CustomOutput(17)": 2,
+   "sink:CustomOutput(18)": 9,
+   "sink:CustomOutput(19)": 4,
+   "sink:CustomOutput(2)": 3,
+   "sink:CustomOutput(20)": 1,
+   "sink:CustomOutput(21)": 2,
+   "sink:CustomOutput(22)": 4,
+   "sink:CustomOutput(23)": 8,
+   "sink:CustomOutput(3)": 6,
+   "sink:CustomOutput(4)": 2,
+   "sink:CustomOutput(5)": 1,
+   "sink:CustomOutput(6)": 3,
+   "sink:CustomOutput(7)": 7,
+   "sink:CustomOutput(8)": 6,
+   "sink:CustomOutput(9)": 7,
+   "sink:RouterGate(0)": 6,
+   "sink:RouterGate(1)": 3,
+   "sink:RouterGate(2)": 6,
+   "sink:RouterGate(3)": 6,
+   "sink:RouterGate(4)": 4,
+   "sink:RouterGate(5)": 3,
+   "sink:RouterGate(6)": 4,
+   "sink:RouterGate(7)": 6,
+   "sink:WriteSlot(0)": 5,
+   "sink:WriteSlot(1)": 6,
+   "sink:WriteSlot(10)": 2,
+   "sink:WriteSlot(11)": 2,
+   "sink:WriteSlot(12)": 7,
+   "sink:WriteSlot(13)": 6,
+   "sink:WriteSlot(14)": 4,
+   "sink:WriteSlot(15)": 1,
+   "sink:WriteSlot(2)": 4,
+   "sink:WriteSlot(3)": 2,
+   "sink:WriteSlot(4)": 4,
+   "sink:WriteSlot(5)": 2,
+   "sink:WriteSlot(6)": 3,
+   "sink:WriteSlot(7)": 7,
+   "sink:WriteSlot(8)": 2,
+   "sink:WriteSlot(9)": 5
+  },
+  "founder+declared+zero-edge": {
+   "compute:0": 2,
+   "compute:1": 5,
+   "compute:10": 36,
+   "compute:11": 1,
+   "compute:2": 77,
+   "compute:3": 77,
+   "compute:4": 9,
+   "compute:5": 12,
+   "compute:6": 13,
+   "compute:7": 14,
+   "compute:8": 7,
+   "compute:9": 4,
+   "sink:ActionParam(EatFoodType)": 5,
+   "sink:ActionParam(ReproduceTransferFraction)": 2,
+   "sink:ActionParam(StealEnergyAmount)": 7,
+   "sink:ActionVote(Decide)": 7,
+   "sink:ActionVote(Eat)": 20,
+   "sink:ActionVote(Move(0))": 17,
+   "sink:ActionVote(Move(1))": 6,
+   "sink:ActionVote(Move(2))": 171,
+   "sink:ActionVote(Move(3))": 4,
+   "sink:ActionVote(Move(4))": 14,
+   "sink:ActionVote(Move(5))": 4,
+   "sink:ActionVote(Move(6))": 24,
+   "sink:ActionVote(Move(7))": 5,
+   "sink:ActionVote(Reproduce(0))": 10,
+   "sink:ActionVote(Reproduce(1))": 3,
+   "sink:ActionVote(Reproduce(2))": 10,
+   "sink:ActionVote(Reproduce(3))": 4,
+   "sink:ActionVote(Reproduce(4))": 11,
+   "sink:ActionVote(Reproduce(5))": 3,
+   "sink:ActionVote(Reproduce(6))": 12,
+   "sink:ActionVote(Reproduce(7))": 7,
+   "sink:ActionVote(StealEnergy(0))": 6,
+   "sink:ActionVote(StealEnergy(1))": 2,
+   "sink:ActionVote(StealEnergy(2))": 5,
+   "sink:ActionVote(StealEnergy(3))": 6,
+   "sink:ActionVote(StealEnergy(4))": 3,
+   "sink:ActionVote(StealEnergy(5))": 1,
+   "sink:ActionVote(StealEnergy(6))": 4,
+   "sink:ActionVote(StealEnergy(7))": 2,
+   "sink:ActionVote(Terminate)": 6,
+   "sink:ClearSlot(0)": 1,
+   "sink:ClearSlot(1)": 1,
+   "sink:ClearSlot(10)": 1,
+   "sink:ClearSlot(12)": 1,
+   "sink:ClearSlot(15)": 3,
+   "sink:ClearSlot(2)": 2,
+   "sink:ClearSlot(4)": 2,
+   "sink:ClearSlot(5)": 2,
+   "sink:ClearSlot(7)": 3,
+   "sink:ClearSlot(8)": 1,
+   "sink:CustomOutput(0)": 5,
+   "sink:CustomOutput(1)": 3,
+   "sink:CustomOutput(10)": 4,
+   "sink:CustomOutput(11)": 5,
+   "sink:CustomOutput(12)": 3,
+   "sink:CustomOutput(13)": 6,
+   "sink:CustomOutput(14)": 3,
+   "sink:CustomOutput(15)": 9,
+   "sink:CustomOutput(16)": 6,
+   "sink:CustomOutput(17)": 5,
+   "sink:CustomOutput(18)": 3,
+   "sink:CustomOutput(19)": 1,
+   "sink:CustomOutput(2)": 1,
+   "sink:CustomOutput(20)": 8,
+   "sink:CustomOutput(21)": 5,
+   "sink:CustomOutput(23)": 2,
+   "sink:CustomOutput(3)": 4,
+   "sink:CustomOutput(4)": 4,
+   "sink:CustomOutput(5)": 6,
+   "sink:CustomOutput(6)": 5,
+   "sink:CustomOutput(7)": 3,
+   "sink:CustomOutput(8)": 4,
+   "sink:CustomOutput(9)": 4,
+   "sink:RouterGate(0)": 2,
+   "sink:RouterGate(1)": 3,
+   "sink:RouterGate(2)": 8,
+   "sink:RouterGate(3)": 2,
+   "sink:RouterGate(4)": 3,
+   "sink:RouterGate(5)": 3,
+   "sink:RouterGate(6)": 4,
+   "sink:RouterGate(7)": 3,
+   "sink:WriteSlot(0)": 5,
+   "sink:WriteSlot(1)": 4,
+   "sink:WriteSlot(10)": 4,
+   "sink:WriteSlot(11)": 7,
+   "sink:WriteSlot(12)": 4,
+   "sink:WriteSlot(14)": 1,
+   "sink:WriteSlot(15)": 11,
+   "sink:WriteSlot(2)": 1,
+   "sink:WriteSlot(3)": 4,
+   "sink:WriteSlot(4)": 1,
+   "sink:WriteSlot(5)": 5,
+   "sink:WriteSlot(6)": 7,
+   "sink:WriteSlot(7)": 4,
+   "sink:WriteSlot(8)": 8,
+   "sink:WriteSlot(9)": 4
+  }
+ },
+ "wall_secs": {
+  "frozen": {
+   "founder": 2.376322083,
+   "founder+declared": 2.369286416,
+   "founder+declared+zero-edge": 2.446526625
+  },
+  "votes": {
+   "founder": 2.321501125,
+   "founder+declared": 2.1514705,
+   "founder+declared+zero-edge": 2.130954459
+  },
+  "non_clear": {
+   "founder": 2.415514167,
+   "founder+declared": 2.522886208,
+   "founder+declared+zero-edge": 2.623050666
+  },
+  "non_clear_10m": {
+   "founder": 22.210634875,
+   "founder+declared": 21.512548375,
+   "founder+declared+zero-edge": 20.468558375
+  }
+ }
+}

@@ -337,7 +337,63 @@ check blocks the interpretation of its causal and vote-delta readings.
 | W0.2 | Instrument identity: the census probe on the prototype binary at `votes` against (i) the launch-revision production binary `v3-cli-main` and (ii) the frozen instrument built without the prototype | (i) **Smoke:** a 2,000-tick run of the census probe (`default` recipe, seed 1022, checkpoints 1,000 and 2,000, every reading on) against `v3-cli-main --telemetry off run --ticks 2000 --sample-every 500 --seed 1022 --config default.json`: the sample tick sets equal (500, 1,000, 1,500, 2,000, both sides), every compared field present on both sides, `population`, `mean_genome_size`, `mean_generation` and `reproduction_actions_spawned_total` equal at every tick, both runs completed to 2,000, and the census header's `config_digest` equal to the run's `run_started` digest; `b02check.py` fails on any missing tick, field or completion record. The smoke blocks the pairs and the main arms. (ii) **Full comparison:** the frozen instrument runs `default` and `default-mutoff` on both seeds (20,000 ticks; the reference runs); the prototype binary's `default` and `default-mutoff` runs must equal them on every sample row (the fields above plus `mutation_events_applied_total` and `mean_energy`, each **required present**), the extinction tick, the footer (required present; `ticks` and `extinct`), and every scheduled checkpoint block (`input_use`, `e6`, `vote_deltas`, `births`, **`sink_use`, `memory_loop`, `memory_sensitivity`, `temporal_memory_sensitivity`**, `living`, `selected_parents`, `selected_generations`, `age_deciles`, `energy_deciles`; each required present, not null, at every reached checkpoint), each serialized once with sorted keys and compact separators and hashed; the expected sample ticks and checkpoints are derived from the header's horizon, sampling interval and checkpoint list and the run's own completion or extinction record, so matching omissions cannot pass (finding 5). The header is compared on every nested value, **including `config_digest` and the whole `prototypes` entry, which must be equal** (finding 6); only the recipe path and the run label may differ; the timing fields are excluded and listed. A full-run inequality blocks the `wide` arms from being read until explained and fixed |
 | W0.3 | The mutation-off pair is identical by construction: with `per_unit_rate` 0 no event is requested, so no `Add` fires and the destination field is never read | `wide-mutoff` and `default-mutoff` on each seed: the same sample fields, extinction tick, footer and timing-free checkpoint blocks as W0.2 (ii) equal. The header's `config_digest` **differs** (the field serializes when `non_clear`) and `prototypes.born_connected_destinations` is `votes` against `non_clear`; both are verified, every other nested value of `prototypes` and every other header key but the recipe path and the run label must be equal (finding 6). The births block's `mutation_config` entry is compared apart (every key but the destination field equal). The block comparison is vacuous only when both runs are **verified extinct before the first scheduled checkpoint** (the extinction record on both, no checkpoint row on either); any other absence fails (finding 5). An inequality is a defect in the prototype's `votes` path and blocks the `wide` arms |
 
-**Gate results.** Recorded as they land.
+**Gate results.** **Binaries.** Reference `v3-cli-main` built at `e847ec8b`
+(sha256 in `v3-cli-main.sha256`); frozen `census-frozen` `fb23883a…` and
+`probe-frozen` `df8cd836…` built at the frozen revision `d2100d8b`;
+prototype `census-proto` `baa57aaf…` and `probe-proto` `f2ae3e8e…` built at
+`06623dc4` (the branch head, docs commits after the last code commit); each
+binary lists its test. **`make check` on the branch exited 0** at `06623dc4`
+(log `make-check-branch.log`; the `v3-cli` recipe-digest pin test included,
+since the `votes` field is not serialized); `make check-docs` exited 0 on
+the branch; the driver started only on that exit line. **W0 passed** (20 of
+20 checks; summary [`w0.json`](output-wiring-run-2026-10/w0.json), reader
+[`w0read.py`](output-wiring-run-2026-10/w0read.py); raw `w0/e4-frozen.json`
+sha256 `32976206…`, `e4-votes.json` `97a5e66f…`, `e4-wide.json`
+`24a23e71…`, `e4-wide-10m.json` `0fa205ca…`; 10⁶ births per parent in 2.1
+to 2.6 s on every binary, 10⁷ in 20 to 22 s). **`votes` path:** the
+prototype probe's output equals the frozen probe's in the deterministic
+projection on all three parents, `genome_size`, `executed_resolved` and
+`frozen_age` included: `default` is byte-identical to T20.F16's engine on
+the founder (declared 194 of 10⁶, every one connected, useful signed 6 of
+10⁶, attempted events 0.484315 per birth, as the born run's on path read).
+**`non_clear` path.** (1) On the founder, 15,120 of 10⁶ births were
+single-event `InputRefAdd` births and 132 of them declared `AreaFoodSummary(0)`
+on the vote node; every one of the 132 carried the born edge
+(`connect_any_given_declared` 1.0, CP 0.972 to 1), every destination a
+`sink:` key of a non-clear kind, every sub-value in 0..6; over all births
+`connect_any` equals `declared_vote_node_target` exactly (194 = 194). (2)
+At 10⁷, 1,394 single-`Add` declarations hit **all 78** non-clear sinks
+(coverage), and the `ActionVote` share 500 of 1,394 = 0.3587 (CP 0.3335 to
+0.3845) contains 27/78 = 0.3462 (compatibility); per kind, descriptively,
+`CustomOutput` 416 (0.298 against 24/78 = 0.308), `RouterGate` 128 (0.092
+against 0.103), `WriteSlot` 308 (0.221 against 0.205), `ActionParam` 42
+(0.030 against 0.038), every CP interval containing its predicted share;
+the useful-signed share among single-`Add` declarations 7 of 1,394 = 0.0050
+(CP 0.0020 to 0.0103) contains 2/189 × 27/78 = 0.0037. (3) The requested
+supply is identical between `votes` and `non_clear` on every parent
+(0.484315, 0.489357, 0.495378). (4) `InputRefAdd` applied per birth
+0.021549 against 0.021533, 0.021520 against 0.021513, 0.021994 against
+0.021970 (within 0.2 %). (5) Integrated loss 0.018711 against 0.018691 on
+(b) and 0.007907 against 0.007909 on (c) (within 0.2 %); the operator-class
+tallies differ as a fired birth's later draws differ (on (b)
+`InputRefAdd+InputRefPrune` 208 against 197, `InputRefAdd+InputRefRawFieldMutation`
+87 against 71). **Census smoke passed** (`smoke/small.json`, the 200 × 200
+Canyon recipe with 400 founders, seed 33, 300 ticks, checkpoint 300, every
+reading on, the prototype binary at `votes`): exit 0 in 5 s, 148 living at
+the checkpoint, census 0.21 s, of which the sink-use funnel 0.09 s (S = 17
+or 18 wired sinks on every parent: the founder's catalog), the memory
+readings 0.004 s, vote deltas 0.006 s, births 0.05 s; on the founder-scale
+cohort `CustomOutput` is wired on 20 parents and causal on 19 under both
+the per-slot and the joint reading, `ActionParam` wired on 20 and causal on
+18, `ActionVote` wired on 20 and causal on 19, `RouterGate`, `WriteSlot` and
+`ClearSlot` unwired; no memory loop (3 parents with a VM write, no read);
+`memory_sensitivity` 0 of 148. So the founder's own custom outputs and
+action parameters are causal on the panels: resolution (ii)'s
+by-construction failure is expected on those two kinds, and the clause rests
+on `RouterGate` and `WriteSlot`. The cost formula with S = 17 gives 20 × 264
+× 24 ≈ 127,000 executions in 0.09 s; at a 20,000-tick genome's S the block
+is projected at seconds per checkpoint (read at the first checkpoint).
+Further gate results recorded as they land.
 
 ## Ledger
 
