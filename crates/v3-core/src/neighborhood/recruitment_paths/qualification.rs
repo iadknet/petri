@@ -501,16 +501,30 @@ fn east_vote_edge_added(sources: Vec<GraphSource>) -> StepSpec {
         "Graph.AddGraphEdge onto the Move(E) vote sink from a cue-valued source, positive weight",
         ProductionEvent::Graph(GraphOperator::AddGraphEdge),
         move |before, after| {
-            let (b, a) = (graph(before), graph(after));
             only_scaffold_backend_changed(before, after)
-                && a.compute_nodes == b.compute_nodes
-                && a.output_sinks.iter().zip(&b.output_sinks).all(|(x, y)| {
-                    x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST)) || x == y
+                && only_east_edge_appended(graph(before), graph(after), |source| {
+                    sources.contains(source)
                 })
-                && appended(&move_sink(b, EAST).inputs, &move_sink(a, EAST).inputs)
-                    .is_some_and(|edge| sources.contains(&edge.source) && edge.weight > 0.0)
         },
     )
+}
+
+/// Compute nodes and every sink but `Move(E)` unchanged, and `Move(E)` gains
+/// exactly one appended edge with a positive weight from a source `accept`
+/// admits.
+fn only_east_edge_appended(
+    b: &CgpGraphBackendDef,
+    a: &CgpGraphBackendDef,
+    accept: impl Fn(&GraphSource) -> bool,
+) -> bool {
+    a.compute_nodes == b.compute_nodes
+        && a.output_sinks.len() == b.output_sinks.len()
+        && a.output_sinks
+            .iter()
+            .zip(&b.output_sinks)
+            .all(|(x, y)| x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST)) || x == y)
+        && appended(&move_sink(b, EAST).inputs, &move_sink(a, EAST).inputs)
+            .is_some_and(|edge| accept(&edge.source) && edge.weight > 0.0)
 }
 
 /// The Task B-correct VM copy: the ring added to the table, the read's
@@ -645,13 +659,7 @@ fn input_ref_added(
                 && match (&b.backend_def, &a.backend_def) {
                     (BackendDef::Vm(_), _) => a.backend_def == b.backend_def,
                     (BackendDef::Graph(b), BackendDef::Graph(a)) => {
-                        a.compute_nodes == b.compute_nodes
-                            && a.output_sinks.len() == b.output_sinks.len()
-                            && a.output_sinks.iter().zip(&b.output_sinks).all(|(x, y)| {
-                                x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST)) || x == y
-                            })
-                            && appended(&move_sink(b, EAST).inputs, &move_sink(a, EAST).inputs)
-                                .is_some_and(|edge| edge.source == born && edge.weight > 0.0)
+                        only_east_edge_appended(b, a, |source| *source == born)
                     }
                     (BackendDef::Graph(_), BackendDef::Vm(_)) => false,
                 }

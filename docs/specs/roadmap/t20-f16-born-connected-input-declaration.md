@@ -160,6 +160,12 @@ by the changed births.
       passed, 1 failed: only the user-accepted `decided_passes` severe in
       `gate_profile_has_no_severe_regression_against_series_references`,
       cleared by the gate-epoch re-pin of the benchmark stage.
+- [x] Self-review (`simplify` on the crates diff; the Graph `Add` acceptance
+      shares `only_east_edge_appended` with `vote_edge_added`), then
+      `cargo fmt --all`, `cargo check --workspace --all-targets` -> exit 0;
+      viability -> 28 passed; `cargo test -p v3-core --lib recruitment_paths`
+      -> 71 passed, 1 ignored; `cargo test -p v3-core --lib input_ref` -> 54
+      passed. Pins unchanged.
 - [ ] `make check` -> exit 0, recorded in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
       every survivor resolved as killed, equivalent, or deferred, listed here.

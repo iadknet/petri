@@ -852,8 +852,8 @@ fn recruitment_paths_wilson_midpoint_has_the_predeclared_interval() {
 }
 
 /// The one-off seed search behind every pinned seed: the first accepted
-/// seed per step in `0..SEARCH_RANGE`. It walks about 70,000 applied
-/// events (the largest pinned seed is 31,060) in under two seconds, and it
+/// seed per step in `0..SEARCH_RANGE`. It walks about 94,000 applied
+/// events (the largest pinned seed is 66,421) in under two seconds, and it
 /// is the only reading of each step's acceptance predicate: a weakened
 /// predicate accepts an earlier seed, a broken one exhausts the range.
 #[test]
@@ -1047,7 +1047,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     assert_eq!(
         record,
         [
-            ("graph_blank", vec![(InputRefAdd, 2873), swap], None,),
+            ("graph_blank", vec![(InputRefAdd, 2873), swap], None),
             ("graph_copy", vec![(GraphAddGraphEdge, 743), swap], None),
             ("graph_split", vec![(GraphAddGraphEdge, 743), swap], None),
             (
