@@ -75,7 +75,7 @@ not decide the destination class or the gain for this substrate.
 | Afterwards | The born edge is an ordinary edge: `AlterGraphEdgeWeight`, `RetargetGraphEdge`, `RemoveGraphEdge`, `CopyEdgeBundle`, copies, serialization and the T11.F22 `Prune` and `Swap` rules apply to it as to any other; no provenance is recorded. The connected reference leaves `prunable_indices` until `RemoveGraphEdge` or retargeting removes its last consumer. |
 | Accounting | One applied `InputRefAdd` event with the same skip reasons, target reachability, `mutation_supply` counters and neighborhood operator identity as today; the requested-supply law `Binomial(genome_size, per_unit_rate)` is unchanged. Within a birth, later events may differ from the old path's because the draw stream and the edge pools moved; that is the mechanism, not a defect. |
 | Taxonomy | `Add` on a Graph node is a connection event, no longer a neutral growth operator; the mutation spec's growth-versus-connection sentence, its InputRef-domain `Add` paragraph, the graph backend spec's "unwired push" clause, the `apply_add` doc comment and the T20.F04 spec's `Separate paths` row say so explicitly, preserving the VM wording. |
-| Determinism | Three production RNG draws per Graph-node `Add`, in the pinned order; every pin that covers a mutated Graph-node `Add` moves once and is re-pinned in this feature with the reason in its comment: trajectory digests (`applied_trajectory`, `baseline_worlds` legacy identity, drift-walk counts), the founder mutation hash of `recruitment_off_preserves_pre_feature_genomes_events_and_rng` (recruitment `Off` still adds no draw relative to the current path), the `recruitment_paths` seeded step plans and their accepted seeds (as T19.F04, T19.F05 and T11.F25 re-selected them), the `experiment.rs` recorded lineage counts (the T13.F06 progress record stays historical and is not rewritten), and tiny-fixture seeds whose population no longer reaches a sampled horizon, each with the fixture's extinction tick before and after stated in the readings. Founder-only and zero-mutation pins and every config digest are unchanged. |
+| Determinism | Three production RNG draws per Graph-node `Add`, in the pinned order; every pin that covers a mutated Graph-node `Add` moves once and is re-pinned in this feature with the reason in its comment: trajectory digests (`applied_trajectory`, `baseline_worlds` legacy identity, drift-walk counts), the founder mutation hash of `recruitment_off_preserves_pre_feature_genomes_events_and_rng` (recruitment `Off` still adds no draw relative to the current path), the `recruitment_paths` seeded step plans and their accepted seeds (VM plans re-seed only; the three Graph plans that declare a reference are re-expressed on the born edge per the Implementation Task below, as T19.F04 re-expressed them on votes), the `experiment.rs` recorded lineage counts (the T13.F06 progress record stays historical and is not rewritten), and tiny-fixture seeds whose population no longer reaches a sampled horizon, each with the fixture's extinction tick before and after stated in the readings. Founder-only and zero-mutation pins and every config digest are unchanged. |
 
 **Natural analog and what variation still discovers.** Expression inherited
 with a receptor duplication motivates immediate integration into an existing
@@ -119,6 +119,30 @@ by the changed births.
       exercised; keep
       `add_input_ref_to_vm_node_leaves_program_unchanged` passing; re-pin the
       trajectory digests the Determinism row names, each with its reason.
+- [ ] Re-express the three `recruitment_paths` Graph plans that declare a
+      reference (`crates/v3-core/src/neighborhood/recruitment_paths/qualification.rs`)
+      on the born edge; VM plans and `graph_copy`/`graph_split` only re-seed.
+      `input_ref_added` accepts an `InputRef.Add` on the scaffold when the
+      table becomes exactly `expected`, `targets` and every compute node are
+      unchanged, every sink other than `Move(E)` is unchanged, and `Move(E)`
+      gained exactly one appended edge whose source is
+      `InputLeaf { ref_idx: expected.len() - 1, sub_idx }` at the task's
+      sub-index (0 for the cue, 2 for the ring's east) with weight > 0: the
+      born edge is the activation edge, so `east_vote_edge_added` leaves
+      `graph_blank` (3 to 2 events), `graph_detour` (2 to 1) and
+      `graph_unprepared` (5 to 3: `ring_added`, `north_vote_removed`,
+      `activated`; `cue_edge_retargeted` also leaves, the copied sensing
+      node going dead beside the direct ring edge); if the 3-event path does
+      not satisfy `qualified()` on the readings, keep `cue_edge_retargeted`
+      (4 events) and record why. New first seeds per step via `search_seeds`;
+      `SWAP` stays 0. Negative assertions kept: `north_vote_removed_rejects_a_changed_compute_node`
+      on `graph_unprepared`; `east_vote_edge_added_rejects_a_zero_weight_edge`
+      replays `graph_copy`, whose `vote_edge_added` step is unchanged. Added
+      mirrors on the born step: a born edge at weight 0, into a sink other than
+      `Move(E)`, or at another sub-index is rejected. The shortened paths,
+      their per-step `neutral()` flip on the `Add` step and the
+      `recruitment_paths` block deltas are a recorded finding in the readings,
+      not a re-pin; `MAX_PATH_EVENTS` stays 6.
 - [ ] Amend the five documents the Taxonomy row names, preserving the VM
       wording; no other reference document changes.
 - [ ] `make check` exits 0 in the worktree.
