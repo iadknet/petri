@@ -332,7 +332,10 @@ pub(crate) fn connect_declared_input(
     width: u16,
     rng: &mut impl Rng,
 ) {
-    debug_assert!(width > 0, "every input reference has at least one sub-value");
+    debug_assert!(
+        width > 0,
+        "every input reference has at least one sub-value"
+    );
     let sub_idx = rng.gen_range(0..width);
     let sink = VoteSink::from_index(rng.gen_range(0..VOTE_SINK_COUNT));
     let weight = rng.gen_range(-1.0f32..=1.0);
