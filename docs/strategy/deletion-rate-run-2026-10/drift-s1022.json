@@ -1,0 +1,9 @@
+{
+ "wiring": "/Users/istefanek/projects/petri/.bench-artifacts/lab/wiring/w1/default-s1022/samples-default-s1022.ndjson",
+ "frozen": "/Users/istefanek/projects/petri/.claude/worktrees/deletion-rate/.bench-artifacts/lab/delrate/s1/frozen/default-s1022/samples-default-s1022.ndjson",
+ "ticks_compared": 40,
+ "tick_sets_equal": true,
+ "differences": [],
+ "difference_count": 0,
+ "equal": true
+}

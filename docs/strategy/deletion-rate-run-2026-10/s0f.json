@@ -1,0 +1,591 @@
+{
+ "gate": "S0-F",
+ "checks": [
+  {
+   "check": "E4 frozen: parent names unique",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": []
+  },
+  {
+   "check": "E4 proto: parent names unique",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": []
+  },
+  {
+   "check": "(1) E4 parent sets are the three named parents on both probes",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "(1) E4 at None: prototype equals frozen in the deterministic projection on every parent",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": []
+  },
+  {
+   "check": "(1) E4 config blocks equal",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": {
+    "frozen": {
+     "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+     "deletion_keep_probability": null,
+     "executed_bias": 0.9,
+     "executed_window_ticks": 100,
+     "food_types": 2,
+     "mesh_layer_probability": 0.2,
+     "neutral_input_recruitment": "Off",
+     "per_unit_rate": 0.005,
+     "scene_seed": 239455822
+    },
+    "proto": {
+     "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+     "deletion_keep_probability": null,
+     "executed_bias": 0.9,
+     "executed_window_ticks": 100,
+     "food_types": 2,
+     "mesh_layer_probability": 0.2,
+     "neutral_input_recruitment": "Off",
+     "per_unit_rate": 0.005,
+     "scene_seed": 239455822
+    }
+   }
+  },
+  {
+   "check": "S0 frozen: parent names unique",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": []
+  },
+  {
+   "check": "S0 None: parent names unique",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": []
+  },
+  {
+   "check": "S0 0.03: parent names unique",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": []
+  },
+  {
+   "check": "(1) S0 parent set is the founder alone at every setting",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "(1) S0 founder at None: prototype equals frozen in the deterministic projection",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "(1) S0 config blocks equal at None",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": {
+    "frozen": {
+     "births_per_parent": 1000000,
+     "child_seed": "0x5000000000 + 100000000 * parent_index + i",
+     "deletion_keep_probability": null,
+     "executed_bias": 0.9,
+     "executed_window_ticks": 100,
+     "food_types": 1,
+     "founder_executed": "E4's frozen lab-scene dispatch record at its age",
+     "line_births": 400,
+     "per_unit_rate": 0.005
+    },
+    "proto": {
+     "births_per_parent": 1000000,
+     "child_seed": "0x5000000000 + 100000000 * parent_index + i",
+     "deletion_keep_probability": null,
+     "executed_bias": 0.9,
+     "executed_window_ticks": 100,
+     "food_types": 1,
+     "founder_executed": "E4's frozen lab-scene dispatch record at its age",
+     "line_births": 400,
+     "per_unit_rate": 0.005
+    }
+   }
+  },
+  {
+   "check": "S0 0.03 config differs from None's only in the keep field",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "(2) founder+declared lost_declaration contains E4's 0.018643",
+   "kind": "statistical",
+   "state": "pass",
+   "pass": true,
+   "detail": {
+    "k": 18691,
+    "n": 1000000,
+    "rate": 0.018691,
+    "cp95": [
+     0.018426454140243242,
+     0.018958338925064877
+    ],
+    "target": 0.018643,
+    "p": 0.7246781778106095
+   }
+  },
+  {
+   "check": "(a) the same parents at both settings",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "(a) requested events equal to None's for every parent",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": []
+  },
+  {
+   "check": "births per parent equal at both settings",
+   "kind": "exact",
+   "state": "pass",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "(b) InputRefPrune kept share contains 0.03",
+   "kind": "statistical",
+   "state": "pass",
+   "pass": true,
+   "detail": {
+    "k": 656,
+    "n": 21396,
+    "rate": 0.030659936436717144,
+    "cp95": [
+     0.028390549045107065,
+     0.033057988619381196
+    ],
+    "target": 0.03,
+    "p": 0.5821541861750321
+   }
+  },
+  {
+   "check": "(b) GraphRemoveGraphEdge kept share contains 0.03",
+   "kind": "statistical",
+   "state": "pass",
+   "pass": true,
+   "detail": {
+    "k": 313,
+    "n": 9672,
+    "rate": 0.03236145574855252,
+    "cp95": [
+     0.02892454703888611,
+     0.036083598702601305
+    ],
+    "target": 0.03,
+    "p": 0.18524163240276217
+   }
+  },
+  {
+   "check": "(b) GraphRemoveInternalGraphNode kept share contains 0.03",
+   "kind": "statistical",
+   "state": "pass",
+   "pass": true,
+   "detail": {
+    "k": 128,
+    "n": 4688,
+    "rate": 0.027303754266211604,
+    "cp95": [
+     0.02282839449105055,
+     0.032380069278619306
+    ],
+    "target": 0.03,
+    "p": 0.2979719958575533
+   }
+  },
+  {
+   "check": "(b) GraphDisableHebbian kept share contains 0.03",
+   "kind": "statistical",
+   "state": "pass",
+   "pass": true,
+   "detail": {
+    "k": 0,
+    "n": 8,
+    "rate": 0.0,
+    "cp95": [
+     0.0,
+     0.369416647552819
+    ],
+    "target": 0.03,
+    "p": 1.0
+   }
+  },
+  {
+   "check": "(b) TopologyRemoveNode kept share contains 0.03",
+   "kind": "statistical",
+   "state": "pass",
+   "pass": true,
+   "detail": {
+    "k": 6,
+    "n": 134,
+    "rate": 0.04477611940298507,
+    "cp95": [
+     0.016606859902360882,
+     0.09491031471463901
+    ],
+    "target": 0.03,
+    "p": 0.43125765283220624
+   }
+  },
+  {
+   "check": "(b) TopologyRemoveRouteTarget kept share contains 0.03",
+   "kind": "statistical",
+   "state": "pass",
+   "pass": true,
+   "detail": {
+    "k": 6,
+    "n": 222,
+    "rate": 0.02702702702702703,
+    "cp95": [
+     0.00998165732869915,
+     0.0578952854772245
+    ],
+    "target": 0.03,
+    "p": 0.9998699282619126
+   }
+  },
+  {
+   "check": "(d) every other operator with >= 4000 applied at None within 5%",
+   "kind": "tolerance",
+   "state": "pass",
+   "pass": true,
+   "detail": {}
+  }
+ ],
+ "pooled": {
+  "decreasing": {
+   "InputRefPrune": {
+    "applied_none": 21167,
+    "applied_keep": 656,
+    "not_kept": 20740,
+    "ratio": 0.03099163792696178,
+    "kept_share_state": "pass"
+   },
+   "GraphRemoveGraphEdge": {
+    "applied_none": 9656,
+    "applied_keep": 313,
+    "not_kept": 9359,
+    "ratio": 0.03241507870753935,
+    "kept_share_state": "pass"
+   },
+   "GraphRemoveInternalGraphNode": {
+    "applied_none": 4701,
+    "applied_keep": 128,
+    "not_kept": 4560,
+    "ratio": 0.02722824930865773,
+    "kept_share_state": "pass"
+   },
+   "GraphDisableHebbian": {
+    "applied_none": 8,
+    "applied_keep": 0,
+    "not_kept": 8,
+    "ratio": 0.0,
+    "kept_share_state": "pass"
+   },
+   "GraphDisableRewardModulation": {
+    "applied_none": 0,
+    "applied_keep": 0,
+    "not_kept": 0,
+    "ratio": null
+   },
+   "TopologyRemoveNode": {
+    "applied_none": 135,
+    "applied_keep": 6,
+    "not_kept": 128,
+    "ratio": 0.044444444444444446,
+    "kept_share_state": "pass"
+   },
+   "TopologyRemoveRouteTarget": {
+    "applied_none": 222,
+    "applied_keep": 6,
+    "not_kept": 216,
+    "ratio": 0.02702702702702703,
+    "kept_share_state": "pass"
+   },
+   "VmDeleteInstruction": {
+    "applied_none": 0,
+    "applied_keep": 0,
+    "not_kept": 0,
+    "ratio": null
+   }
+  },
+  "other": {
+   "GraphAddGraphEdge": {
+    "applied_none": 9591,
+    "applied_keep": 9585,
+    "relative": -0.0006255864873318737,
+    "checked": true
+   },
+   "GraphAddInternalGraphNode": {
+    "applied_none": 4728,
+    "applied_keep": 4726,
+    "relative": -0.00042301184433164127,
+    "checked": true
+   },
+   "GraphAlterGraphEdgeWeight": {
+    "applied_none": 19279,
+    "applied_keep": 19270,
+    "relative": -0.00046682919238549717,
+    "checked": true
+   },
+   "GraphCopyEdgeBundle": {
+    "applied_none": 9586,
+    "applied_keep": 9556,
+    "relative": -0.0031295639474233257,
+    "checked": true
+   },
+   "GraphCopyInternalNode": {
+    "applied_none": 4840,
+    "applied_keep": 4815,
+    "relative": -0.005165289256198347,
+    "checked": true
+   },
+   "GraphCopySubgraph": {
+    "applied_none": 4841,
+    "applied_keep": 4838,
+    "relative": -0.0006197066721751704,
+    "checked": true
+   },
+   "GraphEnableHebbian": {
+    "applied_none": 4741,
+    "applied_keep": 4721,
+    "relative": -0.004218519299725796,
+    "checked": true
+   },
+   "GraphEnableRewardModulation": {
+    "applied_none": 9,
+    "applied_keep": 8,
+    "relative": -0.1111111111111111,
+    "checked": false
+   },
+   "GraphMutateGraphOperatorParam": {
+    "applied_none": 19111,
+    "applied_keep": 19071,
+    "relative": -0.0020930354246245617,
+    "checked": true
+   },
+   "GraphMutateHebbianRate": {
+    "applied_none": 31,
+    "applied_keep": 32,
+    "relative": 0.03225806451612903,
+    "checked": false
+   },
+   "GraphMutateHebbianRule": {
+    "applied_none": 15,
+    "applied_keep": 14,
+    "relative": -0.06666666666666667,
+    "checked": false
+   },
+   "GraphRawFieldMutation": {
+    "applied_none": 19194,
+    "applied_keep": 19244,
+    "relative": 0.002604980723142649,
+    "checked": true
+   },
+   "GraphRetargetGraphEdge": {
+    "applied_none": 9556,
+    "applied_keep": 9523,
+    "relative": -0.0034533277521975724,
+    "checked": true
+   },
+   "GraphSwapGraphOperator": {
+    "applied_none": 9716,
+    "applied_keep": 9689,
+    "relative": -0.0027789213668176203,
+    "checked": true
+   },
+   "GraphToggleHebbianLamarckian": {
+    "applied_none": 20,
+    "applied_keep": 23,
+    "relative": 0.15,
+    "checked": false
+   },
+   "InputRefAdd": {
+    "applied_none": 21813,
+    "applied_keep": 21748,
+    "relative": -0.0029798743868335396,
+    "checked": true
+   },
+   "InputRefRawFieldMutation": {
+    "applied_none": 43348,
+    "applied_keep": 43274,
+    "relative": -0.0017071145150872012,
+    "checked": true
+   },
+   "InputRefSwap": {
+    "applied_none": 43184,
+    "applied_keep": 43199,
+    "relative": 0.0003473508706928492,
+    "checked": true
+   },
+   "TopologyAddNode": {
+    "applied_none": 9739,
+    "applied_keep": 9735,
+    "relative": -0.00041071978642571105,
+    "checked": true
+   },
+   "TopologyAddRouteTarget": {
+    "applied_none": 19364,
+    "applied_keep": 19382,
+    "relative": 0.0009295600082627557,
+    "checked": true
+   },
+   "TopologyChangeEntryNode": {
+    "applied_none": 992,
+    "applied_keep": 997,
+    "relative": 0.005040322580645161,
+    "checked": false
+   },
+   "TopologyCopyMeshBackwardSlice": {
+    "applied_none": 2497,
+    "applied_keep": 2509,
+    "relative": 0.004805766920304365,
+    "checked": false
+   },
+   "TopologyCopyMeshForwardSlice": {
+    "applied_none": 2500,
+    "applied_keep": 2504,
+    "relative": 0.0016,
+    "checked": false
+   },
+   "TopologyCopyNode": {
+    "applied_none": 2348,
+    "applied_keep": 2340,
+    "relative": -0.0034071550255536627,
+    "checked": false
+   },
+   "TopologyMutateGateBias": {
+    "applied_none": 38996,
+    "applied_keep": 38980,
+    "relative": -0.0004102984921530413,
+    "checked": true
+   },
+   "TopologyRetargetNodeTarget": {
+    "applied_none": 309,
+    "applied_keep": 308,
+    "relative": -0.003236245954692557,
+    "checked": false
+   },
+   "TopologySpliceNode": {
+    "applied_none": 9902,
+    "applied_keep": 9919,
+    "relative": 0.0017168248838618462,
+    "checked": true
+   },
+   "TopologySwapNodeBackend": {
+    "applied_none": 9656,
+    "applied_keep": 9651,
+    "relative": -0.0005178127589063795,
+    "checked": true
+   },
+   "TopologySwapRouteTargets": {
+    "applied_none": 391,
+    "applied_keep": 391,
+    "relative": 0.0,
+    "checked": false
+   },
+   "VmConstantMutation": {
+    "applied_none": 572,
+    "applied_keep": 570,
+    "relative": -0.0034965034965034965,
+    "checked": false
+   },
+   "VmCopyConstantBlock": {
+    "applied_none": 1,
+    "applied_keep": 1,
+    "relative": 0.0,
+    "checked": false
+   },
+   "VmCopyGeneBackwardSlice": {
+    "applied_none": 1,
+    "applied_keep": 1,
+    "relative": 0.0,
+    "checked": false
+   },
+   "VmCopyInstructionBlock": {
+    "applied_none": 140,
+    "applied_keep": 142,
+    "relative": 0.014285714285714285,
+    "checked": false
+   },
+   "VmCopyInstructionBlockRemapped": {
+    "applied_none": 130,
+    "applied_keep": 132,
+    "relative": 0.015384615384615385,
+    "checked": false
+   },
+   "VmInsertLoadCompareMotif": {
+    "applied_none": 265,
+    "applied_keep": 263,
+    "relative": -0.007547169811320755,
+    "checked": false
+   },
+   "VmInsertReadBidMotif": {
+    "applied_none": 77,
+    "applied_keep": 78,
+    "relative": 0.012987012987012988,
+    "checked": false
+   },
+   "VmInsertReadStoreMotif": {
+    "applied_none": 92,
+    "applied_keep": 90,
+    "relative": -0.021739130434782608,
+    "checked": false
+   },
+   "VmInstructionMutation": {
+    "applied_none": 314,
+    "applied_keep": 304,
+    "relative": -0.03184713375796178,
+    "checked": false
+   },
+   "VmInstructionRawFieldMutation": {
+    "applied_none": 7,
+    "applied_keep": 7,
+    "relative": 0.0,
+    "checked": false
+   },
+   "VmMutateSlotAddress": {
+    "applied_none": 2,
+    "applied_keep": 2,
+    "relative": 0.0,
+    "checked": false
+   },
+   "VmRegisterCountMutation": {
+    "applied_none": 272,
+    "applied_keep": 275,
+    "relative": 0.011029411764705883,
+    "checked": false
+   }
+  }
+ },
+ "blocking": [],
+ "to_record": [],
+ "pass": true
+}
