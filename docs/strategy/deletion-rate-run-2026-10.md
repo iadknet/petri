@@ -316,6 +316,78 @@ is bit-identical on this path. That run's `default` readings, and through it
 the born run's `born` arm, are today's production: 3,065 and 2,878 living at
 20,000, P 22 and 19 at 20,000 by the S1 reader.
 
+**S0: go** (summary [`s0.json`](deletion-rate-run-2026-10/s0.json), reader
+[`s0read.py`](deletion-rate-run-2026-10/s0read.py); every check passed,
+nothing to record).
+
+**Birth count: the predeclared fallback, 10⁵ per parent.** The timing smoke
+used the largest dumped genome (1,790 units, seed 1022's cohort). It took
+12.7 s for 10⁵ births, which projects 5,195 s per setting at 10⁶, past the
+3,000 s line. The choice was written to `s0/births.txt` before either setting
+ran.
+
+**Inputs.** The founder plus 40 evolved parents, 20 from each of
+`default-s1022` and `default-s2022` at tick 20,000, all checked. The median
+evolved genome is 616 units (6.4 × the founder), requesting 3.08 events per
+birth.
+
+**Hazards at `None`** (median over carriers, with the medians of the per-parent
+interval bounds):
+
+| Class (operator) | Carriers of 40 | Median sites | Median h per site-birth | Median L₄₀₀ [bounds] | Quartiles of L | Founder L |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| Silent input entry (`Prune`) | 29 | 13 | 0.0115 | **0.990** [0.989, 0.991] | 0.947, 0.990, 0.999 | 0.9998 (1 site) |
+| Graph edge (`RemoveGraphEdge`) | 40 | 193.5 | 0.00022 | 0.085 [0.083, 0.088] | 0.075, 0.085, 0.105 | 0.071 |
+| Compute node (`RemoveInternalGraphNode`) | 40 | 49.5 | 0.00042 | 0.156 [0.148, 0.163] | 0.143, 0.156, 0.175 | 0.128 |
+| Plasticity config (`DisableHebbian`) | 36 | 6 | 0.0032 | **0.718** [0.702, 0.732] | 0.592, 0.718, 0.980 | none |
+| Reward config (`DisableRewardModulation`) | 20 | 2 | 0.0115 | **0.990** [0.988, 0.992] | 0.914, 0.990, 0.997 | none |
+| Mesh node (`RemoveNode`, inventory) | 40 | 37 | 0.00085 | 0.290 [0.280, 0.299] | 0.265, 0.290, 0.330 | 0.092 |
+| Route target (`RemoveRouteTarget`) | 40 | 14 | 0.0054 | **0.883** [0.878, 0.888] | 0.830, 0.883, 0.956 | none |
+| VM instruction (`VmDeleteInstruction`) | 40 | 154 | 0.00017 | 0.064 [0.062, 0.067] | 0.053, 0.064, 0.093 | none |
+
+Four classes qualify with a median L ≥ 0.5: silent input entries, reward
+configs, route targets and plasticity configs. By the plan's rule that is a
+**go**. The hypothesis's own class, the silent input entry, triggers it on
+its own. The other three are named, as A1 finding 14 requires: a go on them
+alone would establish their average hazard and nothing about sensor
+structure.
+
+The silent-entry sites are every unaddressed entry on every node, Graph and
+VM alike. The probe does not split them by backend or origin. Under T20.F16 a
+Graph `Add` arrives wired, so these entries are VM-node declarations (a VM
+`Add` is unwired), entries orphaned by `RemoveGraphEdge` or
+`RetargetGraphEdge`, and inherited ones: exactly the cases the plan's reading
+1 said the race would survive in. S0 measures those cases as common: 29 of 40
+evolved parents, median 13 entries.
+
+**The manipulation check at 0.03 passed**, pooled over the 41 parents:
+
+- (a) Requested events equal `None`'s for every parent, and the input checks
+  are exact.
+- (b) Every `Decreasing` operator's kept share contains 0.03, with p from
+  0.25 to 0.99 (for example `Prune` 13,619 of 449,936 and `RemoveRouteTarget`
+  8,462 of 283,180).
+- (c) Descriptive: the applied ratio to `None` is 0.0294 to 0.0305 for every
+  operator, and every interval contains its target.
+- (d) No other operator with at least 4,000 applied events moved by more than
+  5 %.
+
+**Descriptive readings.**
+
+- **`RemoveNode` hits the unreachable tier.** 139,196 of its 141,993 applied
+  events at `None` (98 %) removed an unreachable node. Every evolved parent
+  carries unreachable non-entry nodes (median 25, against 11 reachable). The
+  mesh-node class's inventory average therefore overstates what a reachable,
+  spliced-in node faces, as Advice 1 point 2 anticipated.
+- **R for edges** (re-weights and retargets per removal) has a median of 3.0:
+  an edge is edited about three times before it is deleted.
+- **R for entries** (`Swap` and retype per entry, over `Prune` per silent
+  entry) has a median of 0.90. A silent entry is about as likely to be lost
+  as to receive its first edit (0.9 / 1.9 ≈ 0.47). That is the plan's
+  declare-then-prune race, on evolved genomes after T20.F16.
+- **The founder row** agrees with S0-F's rates (h = 0.021 for its lone silent
+  entry at both counts, 10⁵ and 10⁶ births).
+
 ## Ledger
 
 One row. No authored genome enters a natural-world arm; S0's prepared parents
@@ -334,6 +406,7 @@ raised.
 
 | # | Rule 8 point | Advice (summary) | Dispositions |
 | --- | --- | --- | --- |
+| 2 | After S0's reading was drafted, before it was recorded (rule 8), while the treatment arms ran | The go follows the rule; three wording fixes and process points. (1) Say what the silent-entry class contains (every unaddressed entry, Graph and VM, unsplit; under T20.F16 these are VM declarations, orphaned and inherited entries, the plan's reading 1 cases, measured as common). (2) R for entries 0.90 is a coin flip (about 0.47 for one edit before loss), not "typically lost before its first edit". (3) The founder row agrees with S0-F's rates, not its counts (10⁵ against 10⁶ births). (4) Stop re-arming the monitor; the chain's own completion wakes the session. (5) Use the wait for fixed text: the plan forward's two branches, the three conditions met by design, the Codex (b) brief, the cost rows; the frozen runs' wall times survive only in `chain.log`. (6) Watch for the predeclared genome-size contradiction at S1 and read size per generation and the lowest sample beside P. (7) At closing: Status, the S1 cells, the Order's tense, the turns row; remove the nested frozen tree before `ExitWorktree`; verify each docs commit by path; confirm `main`'s head before the first pick | All adopted: (1) to (3) in S0's record; (4) and (5) followed; (6) at the S1 reading; (7) at closing |
 | 1 | Before anything was built, after the contract, the branch code and the engine were read: the approach to the run | Approach sound; eight points. (1) State the keep realization as a deviation from "before it is applied", put it in the four `apply_*_event` wrappers (after `Ok`, before the parseability gate; restore the snapshot; `Err(DeletionNotKept)`; no engine-loop edit) and predeclare its invariants (`None` no new path; `Some(1.0)` stream-perturbed by one `f64` per applied `Decreasing` event; the kept-share denominator; the request drawn before the loop). (2) `RemoveNode` is two-tier (unreachable first), so the mesh-node class's averaged hazard overstates what spliced-in new nodes face: keep the class and rule, report the split by reachability. (3) Run the founder-level check against E4 and the manipulation check right after the builds, as a mechanism gate before the world chain; the go/no-go on evolved parents keeps the user's order; record it under rule 9. (4) Predeclare S0's birth count with its fallback. (5) Record the advisor-model facts (settings say `fable`, the goal says Opus 5.5, the confirmation is the user's). (6) The free bit-identity check of `default` against the output-wiring run's samples. (7) The cohort dump as a separate file with the world's reachable and executed sets, out of the census row, hashed under S0.2. (8) Turn economy: one runner script with phases, readers adapted from the output-wiring ones, the summaries folder before `make check-docs`, `npm ci` before `make check`, viability before the `proto:` commit, Codex (a) in the background after the predeclaration commit; plain git commands | All adopted: (1) the prototype section; (2) S0's descriptive readings; (3) gate S0-F and the Order; (4) S0's birth count; (5) Run setup; (6) Run setup's drift check; (7) the instrument changes and S0.2; (8) the Order and Run setup |
 
 ## Codex reviews
