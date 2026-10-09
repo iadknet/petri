@@ -1,0 +1,339 @@
+{
+ "mode": "equal",
+ "ref": {
+  "dir": ".claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w1/frozen/default-mutoff-s1022",
+  "name": "default-mutoff-s1022",
+  "sha256": {
+   "samples": "c759c8c7c23c15c0e116af73c1a0fc2a52cec4f40221899ad6bd927af50a107a",
+   "census": "c6c2f6281f6179126d2892673ff01eafbb1b0bb7520750b3cfd94a33efcb1987"
+  }
+ },
+ "cand": {
+  "dir": ".claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w1/default-mutoff-s1022",
+  "name": "default-mutoff-s1022",
+  "sha256": {
+   "samples": "e6f870a7a9bb6e557be70f99cf8e7f6ed905a44476a0bc60dedfde35896dc7ae",
+   "census": "60d8cabe2b4a9c48ca6b6f5e41700981e8168a4ce5aaffa4e19ae8f2c2e2a617"
+  }
+ },
+ "expected": {
+  "ref": {
+   "samples": [
+    500,
+    1000,
+    1500,
+    2000,
+    2500,
+    3000,
+    3500,
+    4000,
+    4500,
+    5000,
+    5500
+   ],
+   "checkpoints": [],
+   "terminal": 5557
+  },
+  "cand": {
+   "samples": [
+    500,
+    1000,
+    1500,
+    2000,
+    2500,
+    3000,
+    3500,
+    4000,
+    4500,
+    5000,
+    5500
+   ],
+   "checkpoints": [],
+   "terminal": 5557
+  }
+ },
+ "checks": [
+  {
+   "check": "header present on both runs",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "footer present on both runs",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "census_secs": 0.0,
+     "elapsed_secs": 107.005871125,
+     "extinct": true,
+     "kind": "footer",
+     "sim_secs": 106.98410465799984,
+     "threads": 8,
+     "ticks": 5557
+    },
+    "cand": {
+     "census_secs": 0.0,
+     "elapsed_secs": 96.021558167,
+     "extinct": true,
+     "kind": "footer",
+     "sim_secs": 96.00034530099998,
+     "threads": 8,
+     "ticks": 5557
+    }
+   }
+  },
+  {
+   "check": "expected tick sets determinable on both runs",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "samples": [
+      500,
+      1000,
+      1500,
+      2000,
+      2500,
+      3000,
+      3500,
+      4000,
+      4500,
+      5000,
+      5500
+     ],
+     "checkpoints": [],
+     "terminal": 5557
+    },
+    "cand": {
+     "samples": [
+      500,
+      1000,
+      1500,
+      2000,
+      2500,
+      3000,
+      3500,
+      4000,
+      4500,
+      5000,
+      5500
+     ],
+     "checkpoints": [],
+     "terminal": 5557
+    }
+   }
+  },
+  {
+   "check": "ref samples are exactly its expected ticks",
+   "pass": true,
+   "detail": {
+    "have": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500
+    ],
+    "expected": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500
+    ]
+   }
+  },
+  {
+   "check": "cand samples are exactly its expected ticks",
+   "pass": true,
+   "detail": {
+    "have": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500
+    ],
+    "expected": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500
+    ]
+   }
+  },
+  {
+   "check": "ref checkpoints are exactly its expected ticks",
+   "pass": true,
+   "detail": {
+    "have": [],
+    "expected": []
+   }
+  },
+  {
+   "check": "cand checkpoints are exactly its expected ticks",
+   "pass": true,
+   "detail": {
+    "have": [],
+    "expected": []
+   }
+  },
+  {
+   "check": "sample tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500
+    ],
+    "cand": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500
+    ]
+   }
+  },
+  {
+   "check": "every sample field present on both sides at every tick",
+   "pass": true,
+   "detail": {
+    "missing": [],
+    "count": 0
+   }
+  },
+  {
+   "check": "every sample field equal at every tick",
+   "pass": true,
+   "detail": {
+    "mismatches": [],
+    "count": 0
+   }
+  },
+  {
+   "check": "extinction tick equal",
+   "pass": true,
+   "detail": {
+    "ref": 5557,
+    "cand": 5557
+   }
+  },
+  {
+   "check": "footer ticks and extinct present and equal",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "ticks": 5557,
+     "extinct": true
+    },
+    "cand": {
+     "ticks": 5557,
+     "extinct": true
+    }
+   }
+  },
+  {
+   "check": "checkpoint tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [],
+    "cand": []
+   }
+  },
+  {
+   "check": "every scheduled block present (not null) on both sides at every reached checkpoint",
+   "pass": true,
+   "detail": {
+    "absent": []
+   }
+  },
+  {
+   "check": "every timing-free checkpoint block hash-equal (births counts without mutation_config)",
+   "pass": true,
+   "detail": {
+    "differing": []
+   }
+  },
+  {
+   "check": "births mutation_config comparison vacuous only because both runs are verified extinct before the first checkpoint 10000",
+   "pass": true,
+   "detail": {
+    "ref_extinct": 5557,
+    "cand_extinct": 5557,
+    "first_checkpoint": 10000
+   }
+  },
+  {
+   "check": "header equal outside the allowed keys (every other nested value compared)",
+   "pass": true,
+   "detail": {
+    "differing": [],
+    "disallowed": []
+   }
+  },
+  {
+   "check": "config_digest and prototypes equal (same binary policy, same recipe)",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "config_digest": "sha256:40dd6f296b56009673d350332674ed2b72a19b89be171a9e1bc8a3cfd0f52a6a",
+     "prototypes": {
+      "born_connected_destinations": "votes",
+      "gestation_ticks_per_founder_genome": 1.0,
+      "per_unit_rate": 0.0
+     }
+    },
+    "cand": {
+     "config_digest": "sha256:40dd6f296b56009673d350332674ed2b72a19b89be171a9e1bc8a3cfd0f52a6a",
+     "prototypes": {
+      "born_connected_destinations": "votes",
+      "gestation_ticks_per_founder_genome": 1.0,
+      "per_unit_rate": 0.0
+     }
+    }
+   }
+  }
+ ],
+ "pass": true,
+ "block_hashes": {}
+}

@@ -393,7 +393,53 @@ by-construction failure is expected on those two kinds, and the clause rests
 on `RouterGate` and `WriteSlot`. The cost formula with S = 17 gives 20 × 264
 × 24 ≈ 127,000 executions in 0.09 s; at a 20,000-tick genome's S the block
 is projected at seconds per checkpoint (read at the first checkpoint).
-Further gate results recorded as they land.
+**W0.2 (i) smoke passed** (7 of 7 checks,
+[`w02-smoke.json`](output-wiring-run-2026-10/w02-smoke.json), checker
+[`b02check.py`](output-wiring-run-2026-10/b02check.py)): the prototype
+binary's census run (`g1-default-s1022`, 2,000 ticks, 8 threads, 75 s) and
+`v3-cli-main`'s run (80 s) carry the same four sample ticks, every compared
+field present and equal at every tick, both completed, and the census
+header's `config_digest` equals the run's `run_started` digest. **Frozen
+references** (`census-frozen`, 8 threads): `default-mutoff` extinct at 5,557
+(seed 1022) and 7,509 (seed 2022) in 111 s and 126 s; `default` complete at
+20,000 in 742 s and 657 s. **W0.3 passed on both seeds**
+([`w03-s1022.json`](output-wiring-run-2026-10/w03-s1022.json),
+[`w03-s2022.json`](output-wiring-run-2026-10/w03-s2022.json), checker
+[`identity.py`](output-wiring-run-2026-10/identity.py)): `wide-mutoff`
+equals `default-mutoff` on every sample field at every expected tick (11 and
+15 samples), the extinction tick (5,557 and 7,509), the footer, and the
+checkpoint sets (none reached: both pairs die in the founder trough before
+10,000, verified extinct before the first checkpoint on both runs, so the
+block comparison is vacuous by the strict rule), the header differing only
+in `config_digest`, `prototypes.born_connected_destinations` (`votes`
+against `non_clear`, every other `prototypes` value equal), `recipe` and
+`world`. **W0.2 (ii) passed on both seeds for both control arms**
+([`w02-mutoff-s1022.json`](output-wiring-run-2026-10/w02-mutoff-s1022.json),
+[`w02-mutoff-s2022.json`](output-wiring-run-2026-10/w02-mutoff-s2022.json),
+[`w02-default-s1022.json`](output-wiring-run-2026-10/w02-default-s1022.json),
+[`w02-default-s2022.json`](output-wiring-run-2026-10/w02-default-s2022.json)):
+the prototype binary's `default-mutoff` runs (100 s and 121 s) and `default`
+runs (698 s and 662 s) equal the frozen instrument's on every sample field
+at every expected tick (40 samples for `default`), the extinction tick, the
+footer, every scheduled timing-free checkpoint block at 10,000 and 20,000
+(`input_use`, `e6`, `vote_deltas`, `births`, `sink_use`, `memory_loop`,
+`memory_sensitivity`, `temporal_memory_sensitivity`, the cohort and decile
+fields, every block present) by hash, and the header entirely
+(`config_digest` and `prototypes` included): the prototype binary at `votes`
+is the instrument built without the prototype, reading for reading, and
+the `wide` arms may be read. Every launch from the frozen references on was
+on AC (81 % charging at the first, 100 % by the pairs). **Block costs at
+20,000-tick genomes** (`default`, both seeds, per checkpoint): the sink-use
+funnel 0.30 to 0.60 s, the memory readings 0.36 to 0.63 s over 2,685 to
+3,065 living, vote deltas 0.05 to 0.07 s, births 0.27 to 0.63 s, the whole
+census 1.3 to 2.8 s. **Reproduction of the born run:** this run's `default`
+(T20.F16 production on `main` `e847ec8b`) reproduces the born run's `born`
+arm reading for reading on both seeds (window-mean population 2,876 and
+2,681, genome size 5.52 × and 6.08 ×, the typed funnel rows 10/9/9/3 and
+8/6/5/5 at 20,000 on seed 1022, 6/6/6/2 and 7/7/7/4 on seed 2022, the
+action-changing target channels 8 and 6), as the feature's draw-for-draw
+re-expression of the prototype predicts; the control pairs die at the born
+run's ticks (5,557 and 7,509).
 
 ## Ledger
 

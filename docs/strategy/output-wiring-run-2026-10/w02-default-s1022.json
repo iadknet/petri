@@ -1,0 +1,781 @@
+{
+ "mode": "equal",
+ "ref": {
+  "dir": ".claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w1/frozen/default-s1022",
+  "name": "default-s1022",
+  "sha256": {
+   "samples": "0cf35b59a673783ec3294d16a04d4a42be09da3ed1d6483d05df731db6f1cc40",
+   "census": "379ff8737c4cfc2241271ee4bbf3717d0a1c28a93441ce2bbc3c0b71ac2b67a0"
+  }
+ },
+ "cand": {
+  "dir": ".claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w1/default-s1022",
+  "name": "default-s1022",
+  "sha256": {
+   "samples": "cfca1911afe0e858d29f0fa1e48e3dafe0126b6d9b004ef01d7d4a4d96f0d782",
+   "census": "dc3c62733c0bc36ed0eacb058f445fc9208e118daa3ef5d0de2f08c12866e385"
+  }
+ },
+ "expected": {
+  "ref": {
+   "samples": [
+    500,
+    1000,
+    1500,
+    2000,
+    2500,
+    3000,
+    3500,
+    4000,
+    4500,
+    5000,
+    5500,
+    6000,
+    6500,
+    7000,
+    7500,
+    8000,
+    8500,
+    9000,
+    9500,
+    10000,
+    10500,
+    11000,
+    11500,
+    12000,
+    12500,
+    13000,
+    13500,
+    14000,
+    14500,
+    15000,
+    15500,
+    16000,
+    16500,
+    17000,
+    17500,
+    18000,
+    18500,
+    19000,
+    19500,
+    20000
+   ],
+   "checkpoints": [
+    10000,
+    20000
+   ],
+   "terminal": 20000
+  },
+  "cand": {
+   "samples": [
+    500,
+    1000,
+    1500,
+    2000,
+    2500,
+    3000,
+    3500,
+    4000,
+    4500,
+    5000,
+    5500,
+    6000,
+    6500,
+    7000,
+    7500,
+    8000,
+    8500,
+    9000,
+    9500,
+    10000,
+    10500,
+    11000,
+    11500,
+    12000,
+    12500,
+    13000,
+    13500,
+    14000,
+    14500,
+    15000,
+    15500,
+    16000,
+    16500,
+    17000,
+    17500,
+    18000,
+    18500,
+    19000,
+    19500,
+    20000
+   ],
+   "checkpoints": [
+    10000,
+    20000
+   ],
+   "terminal": 20000
+  }
+ },
+ "checks": [
+  {
+   "check": "header present on both runs",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "footer present on both runs",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "census_secs": 3.237780291,
+     "elapsed_secs": 738.04420725,
+     "extinct": false,
+     "kind": "footer",
+     "sim_secs": 734.0983518829975,
+     "threads": 8,
+     "ticks": 20000
+    },
+    "cand": {
+     "census_secs": 3.110458125,
+     "elapsed_secs": 692.483829959,
+     "extinct": false,
+     "kind": "footer",
+     "sim_secs": 688.656942462,
+     "threads": 8,
+     "ticks": 20000
+    }
+   }
+  },
+  {
+   "check": "expected tick sets determinable on both runs",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "samples": [
+      500,
+      1000,
+      1500,
+      2000,
+      2500,
+      3000,
+      3500,
+      4000,
+      4500,
+      5000,
+      5500,
+      6000,
+      6500,
+      7000,
+      7500,
+      8000,
+      8500,
+      9000,
+      9500,
+      10000,
+      10500,
+      11000,
+      11500,
+      12000,
+      12500,
+      13000,
+      13500,
+      14000,
+      14500,
+      15000,
+      15500,
+      16000,
+      16500,
+      17000,
+      17500,
+      18000,
+      18500,
+      19000,
+      19500,
+      20000
+     ],
+     "checkpoints": [
+      10000,
+      20000
+     ],
+     "terminal": 20000
+    },
+    "cand": {
+     "samples": [
+      500,
+      1000,
+      1500,
+      2000,
+      2500,
+      3000,
+      3500,
+      4000,
+      4500,
+      5000,
+      5500,
+      6000,
+      6500,
+      7000,
+      7500,
+      8000,
+      8500,
+      9000,
+      9500,
+      10000,
+      10500,
+      11000,
+      11500,
+      12000,
+      12500,
+      13000,
+      13500,
+      14000,
+      14500,
+      15000,
+      15500,
+      16000,
+      16500,
+      17000,
+      17500,
+      18000,
+      18500,
+      19000,
+      19500,
+      20000
+     ],
+     "checkpoints": [
+      10000,
+      20000
+     ],
+     "terminal": 20000
+    }
+   }
+  },
+  {
+   "check": "ref samples are exactly its expected ticks",
+   "pass": true,
+   "detail": {
+    "have": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500,
+     6000,
+     6500,
+     7000,
+     7500,
+     8000,
+     8500,
+     9000,
+     9500,
+     10000,
+     10500,
+     11000,
+     11500,
+     12000,
+     12500,
+     13000,
+     13500,
+     14000,
+     14500,
+     15000,
+     15500,
+     16000,
+     16500,
+     17000,
+     17500,
+     18000,
+     18500,
+     19000,
+     19500,
+     20000
+    ],
+    "expected": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500,
+     6000,
+     6500,
+     7000,
+     7500,
+     8000,
+     8500,
+     9000,
+     9500,
+     10000,
+     10500,
+     11000,
+     11500,
+     12000,
+     12500,
+     13000,
+     13500,
+     14000,
+     14500,
+     15000,
+     15500,
+     16000,
+     16500,
+     17000,
+     17500,
+     18000,
+     18500,
+     19000,
+     19500,
+     20000
+    ]
+   }
+  },
+  {
+   "check": "cand samples are exactly its expected ticks",
+   "pass": true,
+   "detail": {
+    "have": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500,
+     6000,
+     6500,
+     7000,
+     7500,
+     8000,
+     8500,
+     9000,
+     9500,
+     10000,
+     10500,
+     11000,
+     11500,
+     12000,
+     12500,
+     13000,
+     13500,
+     14000,
+     14500,
+     15000,
+     15500,
+     16000,
+     16500,
+     17000,
+     17500,
+     18000,
+     18500,
+     19000,
+     19500,
+     20000
+    ],
+    "expected": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500,
+     6000,
+     6500,
+     7000,
+     7500,
+     8000,
+     8500,
+     9000,
+     9500,
+     10000,
+     10500,
+     11000,
+     11500,
+     12000,
+     12500,
+     13000,
+     13500,
+     14000,
+     14500,
+     15000,
+     15500,
+     16000,
+     16500,
+     17000,
+     17500,
+     18000,
+     18500,
+     19000,
+     19500,
+     20000
+    ]
+   }
+  },
+  {
+   "check": "ref checkpoints are exactly its expected ticks",
+   "pass": true,
+   "detail": {
+    "have": [
+     10000,
+     20000
+    ],
+    "expected": [
+     10000,
+     20000
+    ]
+   }
+  },
+  {
+   "check": "cand checkpoints are exactly its expected ticks",
+   "pass": true,
+   "detail": {
+    "have": [
+     10000,
+     20000
+    ],
+    "expected": [
+     10000,
+     20000
+    ]
+   }
+  },
+  {
+   "check": "sample tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500,
+     6000,
+     6500,
+     7000,
+     7500,
+     8000,
+     8500,
+     9000,
+     9500,
+     10000,
+     10500,
+     11000,
+     11500,
+     12000,
+     12500,
+     13000,
+     13500,
+     14000,
+     14500,
+     15000,
+     15500,
+     16000,
+     16500,
+     17000,
+     17500,
+     18000,
+     18500,
+     19000,
+     19500,
+     20000
+    ],
+    "cand": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500,
+     6000,
+     6500,
+     7000,
+     7500,
+     8000,
+     8500,
+     9000,
+     9500,
+     10000,
+     10500,
+     11000,
+     11500,
+     12000,
+     12500,
+     13000,
+     13500,
+     14000,
+     14500,
+     15000,
+     15500,
+     16000,
+     16500,
+     17000,
+     17500,
+     18000,
+     18500,
+     19000,
+     19500,
+     20000
+    ]
+   }
+  },
+  {
+   "check": "every sample field present on both sides at every tick",
+   "pass": true,
+   "detail": {
+    "missing": [],
+    "count": 0
+   }
+  },
+  {
+   "check": "every sample field equal at every tick",
+   "pass": true,
+   "detail": {
+    "mismatches": [],
+    "count": 0
+   }
+  },
+  {
+   "check": "extinction tick equal",
+   "pass": true,
+   "detail": {
+    "ref": null,
+    "cand": null
+   }
+  },
+  {
+   "check": "footer ticks and extinct present and equal",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "ticks": 20000,
+     "extinct": false
+    },
+    "cand": {
+     "ticks": 20000,
+     "extinct": false
+    }
+   }
+  },
+  {
+   "check": "checkpoint tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [
+     10000,
+     20000
+    ],
+    "cand": [
+     10000,
+     20000
+    ]
+   }
+  },
+  {
+   "check": "every scheduled block present (not null) on both sides at every reached checkpoint",
+   "pass": true,
+   "detail": {
+    "absent": []
+   }
+  },
+  {
+   "check": "every timing-free checkpoint block hash-equal (births counts without mutation_config)",
+   "pass": true,
+   "detail": {
+    "differing": []
+   }
+  },
+  {
+   "check": "births block mutation_config entirely equal at every checkpoint",
+   "pass": true,
+   "detail": [
+    {
+     "tick": 10000,
+     "ref": "votes",
+     "cand": "votes",
+     "rest_equal": true
+    },
+    {
+     "tick": 20000,
+     "ref": "votes",
+     "cand": "votes",
+     "rest_equal": true
+    }
+   ]
+  },
+  {
+   "check": "header equal outside the allowed keys (every other nested value compared)",
+   "pass": true,
+   "detail": {
+    "differing": [],
+    "disallowed": []
+   }
+  },
+  {
+   "check": "config_digest and prototypes equal (same binary policy, same recipe)",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "config_digest": "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6",
+     "prototypes": {
+      "born_connected_destinations": "votes",
+      "gestation_ticks_per_founder_genome": 1.0,
+      "per_unit_rate": 0.005
+     }
+    },
+    "cand": {
+     "config_digest": "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6",
+     "prototypes": {
+      "born_connected_destinations": "votes",
+      "gestation_ticks_per_founder_genome": 1.0,
+      "per_unit_rate": 0.005
+     }
+    }
+   }
+  }
+ ],
+ "pass": true,
+ "block_hashes": {
+  "10000:living": {
+   "ref": "41b241da3723567782becdfe87b2425ac6bcdf92ff2d2025de42067af61b9096",
+   "cand": "41b241da3723567782becdfe87b2425ac6bcdf92ff2d2025de42067af61b9096"
+  },
+  "10000:selected_parents": {
+   "ref": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b",
+   "cand": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b"
+  },
+  "10000:selected_generations": {
+   "ref": "62befb18ed43f9bdcbaa775419d2ee0cc7b8348b82fc8dab4610bffbc073ac2d",
+   "cand": "62befb18ed43f9bdcbaa775419d2ee0cc7b8348b82fc8dab4610bffbc073ac2d"
+  },
+  "10000:age_deciles": {
+   "ref": "d4a5f8b305f0a07c563cd32380958cf0dc7bf793618212719fd84b281b5ac1c3",
+   "cand": "d4a5f8b305f0a07c563cd32380958cf0dc7bf793618212719fd84b281b5ac1c3"
+  },
+  "10000:energy_deciles": {
+   "ref": "095506bb9b0e8600b352ba92adaf558636229915c3bb172a4e14d79b144486f3",
+   "cand": "095506bb9b0e8600b352ba92adaf558636229915c3bb172a4e14d79b144486f3"
+  },
+  "10000:sample": {
+   "ref": "43ad85bb49f93c220c81650fb69083c8b5ac3887cc6d6a758ac0a2ac01fc9746",
+   "cand": "43ad85bb49f93c220c81650fb69083c8b5ac3887cc6d6a758ac0a2ac01fc9746"
+  },
+  "10000:input_use": {
+   "ref": "8b9338e652ce46aee4501962d50f138568ae036c87bdbdb3638bbad5788cf71c",
+   "cand": "8b9338e652ce46aee4501962d50f138568ae036c87bdbdb3638bbad5788cf71c"
+  },
+  "10000:e6": {
+   "ref": "06ba4bd9a4c5182cc1e18f528e8732f0dbbdb859c452b61378703101e23a60a3",
+   "cand": "06ba4bd9a4c5182cc1e18f528e8732f0dbbdb859c452b61378703101e23a60a3"
+  },
+  "10000:vote_deltas": {
+   "ref": "565ce2631f7769e74c59a31dc10c9f89a45ba0f5f0183ab8d73da4bbd06603a0",
+   "cand": "565ce2631f7769e74c59a31dc10c9f89a45ba0f5f0183ab8d73da4bbd06603a0"
+  },
+  "10000:births": {
+   "ref": "ba0a8f2ec8556044a1ef35d18073f895bf18b15900202a5a6d6a667976c6322c",
+   "cand": "ba0a8f2ec8556044a1ef35d18073f895bf18b15900202a5a6d6a667976c6322c"
+  },
+  "10000:sink_use": {
+   "ref": "63c045841ab55b50dc854ec9b7899f3d9867d9c989ce0f661a641fc910912c04",
+   "cand": "63c045841ab55b50dc854ec9b7899f3d9867d9c989ce0f661a641fc910912c04"
+  },
+  "10000:memory_loop": {
+   "ref": "5d26520cd4cf9b92ecb04e0ebca1d127d9213cce48dfecd1fde7e31d853f5f8d",
+   "cand": "5d26520cd4cf9b92ecb04e0ebca1d127d9213cce48dfecd1fde7e31d853f5f8d"
+  },
+  "10000:memory_sensitivity": {
+   "ref": "dbb6968c08ec95c25cab5b2e784485530bf99d29fc16cee229755a33b9239e04",
+   "cand": "dbb6968c08ec95c25cab5b2e784485530bf99d29fc16cee229755a33b9239e04"
+  },
+  "10000:temporal_memory_sensitivity": {
+   "ref": "0480f531d80581ff53ec3758c52f582548f3bedb9daced6e509c6557fee10d61",
+   "cand": "0480f531d80581ff53ec3758c52f582548f3bedb9daced6e509c6557fee10d61"
+  },
+  "20000:living": {
+   "ref": "bedd4ae332286cc06b4b9a899afb25b7c07d7a0022b35329472f87a235cb292d",
+   "cand": "bedd4ae332286cc06b4b9a899afb25b7c07d7a0022b35329472f87a235cb292d"
+  },
+  "20000:selected_parents": {
+   "ref": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b",
+   "cand": "f5ca38f748a1d6eaf726b8a42fb575c3c71f1864a8143301782de13da2d9202b"
+  },
+  "20000:selected_generations": {
+   "ref": "fb7477a145a1d0fd6ad2309ced74e9e6b2280c220662cfe05cd446fa819ac786",
+   "cand": "fb7477a145a1d0fd6ad2309ced74e9e6b2280c220662cfe05cd446fa819ac786"
+  },
+  "20000:age_deciles": {
+   "ref": "34097717625afda3148fc40369511763239106f326d0dc4eec6bbecb4e248446",
+   "cand": "34097717625afda3148fc40369511763239106f326d0dc4eec6bbecb4e248446"
+  },
+  "20000:energy_deciles": {
+   "ref": "4d3692d69794a1a578ab17ee04278719f0a5049f925a500edea6b2fa0905a902",
+   "cand": "4d3692d69794a1a578ab17ee04278719f0a5049f925a500edea6b2fa0905a902"
+  },
+  "20000:sample": {
+   "ref": "3bb94b54369bdc0a0303acf294ee42597d2b8a75ce480f2c9df7800322249062",
+   "cand": "3bb94b54369bdc0a0303acf294ee42597d2b8a75ce480f2c9df7800322249062"
+  },
+  "20000:input_use": {
+   "ref": "55d5d203baa09228b0decc78a07270bc266e80deed73eac4ee2d2294bae718be",
+   "cand": "55d5d203baa09228b0decc78a07270bc266e80deed73eac4ee2d2294bae718be"
+  },
+  "20000:e6": {
+   "ref": "04b98eb5fdf01f651a0c6ffed691f24f39d2485e7687f1332094ff38547d566d",
+   "cand": "04b98eb5fdf01f651a0c6ffed691f24f39d2485e7687f1332094ff38547d566d"
+  },
+  "20000:vote_deltas": {
+   "ref": "9f18ca9d14c4bc38c3ed17f18096b0960c77c64cc593a59af0752b25ad97709b",
+   "cand": "9f18ca9d14c4bc38c3ed17f18096b0960c77c64cc593a59af0752b25ad97709b"
+  },
+  "20000:births": {
+   "ref": "7b6d05162cdfab12a03befbdb2cfe94577891433cacf92150a2dac1455703155",
+   "cand": "7b6d05162cdfab12a03befbdb2cfe94577891433cacf92150a2dac1455703155"
+  },
+  "20000:sink_use": {
+   "ref": "ea112120dc4fd2f1df4a1951b6fec4b1ea9c6f91f9c6644b1b59c9d3723b1e2b",
+   "cand": "ea112120dc4fd2f1df4a1951b6fec4b1ea9c6f91f9c6644b1b59c9d3723b1e2b"
+  },
+  "20000:memory_loop": {
+   "ref": "f9be79d3e20551bc4d627613695c6cb4236788e1ce38a4b1e34176f09d69c395",
+   "cand": "f9be79d3e20551bc4d627613695c6cb4236788e1ce38a4b1e34176f09d69c395"
+  },
+  "20000:memory_sensitivity": {
+   "ref": "2b07f2a73edbcf157a28942e3a22842a0b39a8da5feb1824c680e48731e7a8ee",
+   "cand": "2b07f2a73edbcf157a28942e3a22842a0b39a8da5feb1824c680e48731e7a8ee"
+  },
+  "20000:temporal_memory_sensitivity": {
+   "ref": "00892ad11fa221f44b0f11a55e2f2c9ad80c8b072a83205b8d6a408b4b2268bd",
+   "cand": "00892ad11fa221f44b0f11a55e2f2c9ad80c8b072a83205b8d6a408b4b2268bd"
+  }
+ }
+}
