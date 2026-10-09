@@ -461,6 +461,7 @@ point raised.
 
 | # | Rule 8 point | Advice (summary) | Dispositions |
 | --- | --- | --- | --- |
+| 4 | After the plan forward was drafted (rule 8) | The three user items answered right and the verdict follows the rule; four fixes and two sentences. (1) Part 1's "deeper troughs on both seeds" contradicts the cell: one seed each way. (2) The write-side hypothesis is contradicted by seed 1022 (Graph writes on 17 and 20 parents, loops on 14 and 19, causal 0 on both arms) and part 4's distinguisher was wrong: state the counterexample, make C's reason "loops are not scarce and Graph writes alone do not make them causal". (3) Part 5's "half right" understates: one of four kinds right. (4) `ActionParam` is 19 of 20 on one cohort; carry the finding 4 caveat once in part 1 (a) and say the founder's wiring is load-bearing by construction. Add: `ClearSlot(15)` causal on 2 parents as a memory-content dependence the rule excludes; the lab's horizon is generations, so the natural-world checkpoints are a calibration point. Then the batched finish: this commit with the Codex (b) brief launched, the artifacts copied, the memory written and the docs commit list verified by path while it runs; dispositions commit, Advice 5, the closing commit, the close order. Correction to Advice 3: the "premise reproduced" reading holds under production with Graph writes present, which is why the fingerprint must not become a mechanism claim | All adopted in this commit: (1) to (4) in parts 1, 3, 4 and 5; the two sentences in part 3; the process followed |
 | 3 | After the W1 reading was drafted, before it was recorded; the contradiction consultation (`memory_sensitivity` above 0 on `default`, genome size doubled on one seed, a causal loop at 10,000, the vote surface up on seed 2022, `family_declared` up); the plan-forward sketch presented (neither feature nor amendment; T11.F10 reads later checkpoints; C not next) | Numbers reconcile with the summary and the verdict is right by resolution (i); six fixes. (1) "Scrambled leads zeroed on every arm and seed" is false at one point (0 = 0): say "leads or equals", explain the two components, report zeroed as the floor. (2) Genome size is not one seed each way: equal within noise on one seed, doubled on the other, read against the sink-activation alternative. (3) Attach the finding 4 caveat to the causal `WriteSlot` incidences and loops; give the fingerprint (Graph writes on 1 against 20 parents on seed 2022; seed 1022's 17 wired and 0 causal is the premise reproduced). (4) Name the validating cohort's Graph-heavy exposure in the decision line. (5) The operator-state temporal reading under `wide` seed 1022 (59 %) is unpredicted and large: report descriptively, flag as the largest unexplained reading, no instrument work. (6) Add the 41 → 6 non-monotone sensitivity beside the horizon verdict. Plan forward: neither feature nor amendment (not validated; seed 1022 loses the whole T20.F16 gain); T11.F10 reads later checkpoints with zeroed and scrambled apart and may test a write-side arm (the Graph write side as the limiting step is a hypothesis from one seed); option C not next by the plan's rule and weakened by the data (loops are not scarce); no W2 unless it decides something W1 did not. Then the process to the finish with the docs commit list verified by path | All adopted: (1) to (6) in the W1 cell before it was recorded; the plan forward's parts 2 to 4 follow the sketch; the process in the Order |
 | 2 | Before the gates and the world chain (the phase's approach), after amendment A1, the `instr:`, `lab:` and `proto:` commits, the frozen tree and the readers; the first call returned an overload error and the second succeeded | Chain correctly sequenced and the A1 fixes right; six points. (1) `make check-docs` on the branch now: the note links a summaries folder that does not exist; create it with the readers (closing work anyway). (2) When the frozen and proto builds finish, check both hashes files have two lines and both binaries list their test (the first frozen attempt silently produced only the probe). (3) Record this consultation and fill the Run setup's branch commits, viability result and the frozen revision's composition before W0 starts. (4) Remove the nested frozen-tree worktree (and prune) before `ExitWorktree`, once the binaries are hashed. (5) Turn economy: three waiters (W0, the identity gates, DONE/STOP), three note commits, draft the plan-forward skeleton while `wide` runs. (6) Watch, not change: a `votes` projection failure at W0 is a build or tree question, rebuild and rerun; a lone CP failure with coverage passing is the predeclared statistical case; at the smoke read `sink_use_secs` and S and project with S from 20,000-tick genomes; at the W1 reading lead with the per-kind `parents_causal_kind` table, since the by-construction failure of (ii) is decided there first. Retracted from Advice 1: the sed-rename suggestion (fresh scripts were right; the born script's cargo path would have rebuilt mid-chain) | (1) The folder created with `identity.py`, `b02check.py`, `w0read.py`, `w1read.py` and `make check-docs` run on the branch (exit recorded in Gate results); (2) checked at both wakeups; (3) this commit (Run setup: branch commits, viability, frozen revision); (4) and (5) in the close order and the waiters; (6) read at the wakeups |
 | 1 | Before anything was built: the approach to the run after the contract, the branch code and the engine were read | Shape right; ten points. (1) The base moved: T20.F16 is production, so take only the census probe, the vote-delta reading and the E4 probe as file state, rework the flag semantics (`born_connected_destinations` through the serialized config, `PETRI_E4_WIDE`), and make W0's `votes` identity the frozen probe against the prototype probe, not the born run's raw output; check the draw-path diff first. (2) Read `recruitment_paths` on main for born-edge assumptions before writing the proto; predeclare the 78-index map, `votes` draw for draw production, `non_clear` one `gen_range(0..78)` in the sink's place, `skip_serializing_if` so the default digest is main's. (3) The sink ablation is clearing the sink's edges, not the funnel's `ablated`; record executed nodes through a `MeshExecutionMode` that keeps `node_idx`; report per kind and per (kind, slot) with `ActionVote` as a comparison row. (4) The memory read side has no causal instrument: predeclare loop-causal as the write sink causal under the sink ablation with a read of slot k present. (5) `memory_sensitivity` and the temporal readings are reachable from the census (`pub(super)` in `bench::indicators`); run them over all living at both checkpoints; record the final-action limit. (6) Fix the rule's resolutions: per sink kind; `default` likely has causal `WriteSlot` and `CustomOutput` already, so predeclare the by-construction failure as a finding about the rule; define the vote-side count as Σ `family_causal`, trivially true when the default's is 0; carry B1's resolutions; the default's trough on seed 2022 is live. (7) Grow W0.2's hash list with the new blocks; keep the pairs' check non-vacuous; carry the B0.2 (i) smoke against a `v3-cli` built at `e847ec8b`. (8) State the deviated contracts: the T20.F16 spec Non-Goal, T20.F02's unsupported destinations, the mutation spec's `Add` paragraph; the born run's three sentences are amended on main. (9) Battery: say it once, record power at every launch, builds and W0 first. (10) Turn economy: copy the born run's scripts with `sed` renames, one waiter per milestone, batched commits, the note in one write; the Codex-takes-every-role memory is stale; confirm the head, `npm ci`, viability first | All adopted in this predeclaration: (1) Run setup (code taken, draw-path drift) and gate W0; (2) the prototype section (index map, the recruitment-path fixtures) ; (3) and (4) the instrument extension; (5) block 3; (6) resolutions (ii) to (vi); (7) gates W0.2 and W0.3; (8) "Contracts it deviates from"; (9) Run setup (host) and the Order; (10) the scripts under `.bench-artifacts/lab/wiring/`, the Order |
@@ -537,9 +538,12 @@ channels, and the trough is deeper (881 against 1,509). Every gate passed:
 the born run's `born` arm reading for reading; the prototype binary at
 `votes` is the frozen instrument in every sample and block. What the run
 established beyond the rule: (a) on this substrate the founder's own custom
-outputs and action parameters are causal on every parent of every arm, and
-`RouterGate` is causal on 2 to 18 parents, so the bus, the gates and the
-parameters are **wired and used**, not inert; (b) memory writes are wired
+outputs and action parameters are causal on every parent of every arm (19
+of 20 for `ActionParam` on `wide` seed 2022), and `RouterGate` is causal on
+2 to 18 parents, so the bus, the gates and the parameters are **wired and
+used**, not inert: causal under sink clearing on these panels (the finding 4
+caveat), and the founder's own wiring, which the smoke showed at founder
+scale, so load-bearing by construction rather than evolved use; (b) memory writes are wired
 on 17 parents and causal on none under production on seed 1022 (the plan's
 "wired but inert" premise reproduced), and Graph writes are wired on 1
 parent of 20 on seed 2022, where the loops are VM-written and none is
@@ -551,9 +555,10 @@ caveat, no provenance); (d) **the horizon question resolves to horizon**:
 (zeroed 6 and 5), 0 of 18,053 at 2,000 in the T20.F16 goal, a quarter at
 281,000 in the live survey. Recorded against the arm: the vote-side loss on
 seed 1022, genome size doubled on seed 2022 (12.22 × against 6.08 ×, with
-sink activation as the named alternative), deeper troughs on both seeds,
-and the unexplained operator-state temporal reading under `wide` on seed
-1022 (59 % of creatures at 20,000).
+sink activation as the named alternative), the trough one seed each way
+(deeper on seed 1022, 881 against 1,509; shallower on seed 2022, 384 against
+the default's 10), and the unexplained operator-state temporal reading
+under `wide` on seed 1022 (59 % of creatures at 20,000).
 
 ### 2. The widened destination class: neither a roadmap feature nor a T20.F16 spec amendment
 
@@ -590,10 +595,22 @@ on production seed 2022 memory reads are wired on 20 parents and Graph
 writes on 1, the loops are VM-written and none is causal, while under
 `wide` 20 parents carry Graph writes and six loops are causal within 20,000
 ticks; so the **Graph write side** is a candidate for the limiting step, a
-hypothesis from 20 parents on one seed, which a write-side arm in the
-memory-motif assay could test. The largest open reading, the operator-state
-sensitivity under `wide` on seed 1022, is a question for that assay's
-temporal readings, not a finding.
+hypothesis from 20 parents on one seed **with a counterexample on the
+other**: on seed 1022 `default` has Graph writes on 17 parents and `wide` on
+20, loops on 14 and 19, and neither has a causal loop, so Graph writes alone
+do not make loops causal, and a write-side arm in the memory-motif assay
+would be testing a hypothesis the natural world already contradicts once.
+Two more things for the assay: `ClearSlot(15)` is causal on 2 parents under
+`wide` seed 1022, a clear whose removal changes an action, so that slot's
+uncleared content would change the action, a memory-content dependence the
+rule excludes (a clear carries no sensor) but the sensitivity counts do not
+show; and the lab's horizon is assay generations, not world ticks, so "read
+later checkpoints" translates to an assay horizon long enough to see a
+late-horizon phenomenon, with the natural-world checkpoints at 10,000 and
+20,000 as the calibration point the lab compares against, not its own
+units. The largest open reading, the operator-state sensitivity under
+`wide` on seed 1022, is a question for that assay's temporal readings, not
+a finding.
 
 ### 4. Option C is not next
 
@@ -601,9 +618,11 @@ By the plan's own rule, option C (a born-closed memory loop) comes next only
 if the horizon reading is 0 on both seeds with loops present; it is above 0
 on both, so C is not next. The data also weaken C's premise: loops are
 present on 11 to 20 parents of every arm at 20,000 (33 to 120 loops), so
-pairing a write with a read of the same slot is not scarce; what
-distinguishes the one arm with causal loops is who wires the writes (Graph
-writes on every parent), not whether reads find them. Option D (T11.F10)
+pairing a write with a read of the same slot is not scarce, and Graph writes
+are present on 17 to 20 parents in three of the four cohorts with zero
+causal loops; the six causal loops coincide with the one cohort that is also
+the most Graph-heavy (208 reachable Graph nodes) and size-doubled, so
+neither pairing nor the write side alone explains them. Option D (T11.F10)
 stays the roadmap's next feature, informed as above; option A's instruments
 (the sink-use funnel, the memory-loop census, the memory sensitivities at a
 checkpoint) are T22 instrument candidates on the branch.
@@ -619,9 +638,10 @@ checkpoint) are T22 instrument candidates on the branch.
 - **The plan's premise that the other surfaces are "wired and inert"**
   holds for memory under production and is **refuted for the bus, the
   gates and the parameters**, which are causal on most parents.
-- **The plan's prediction that `default` has causal `WriteSlot` or
-  `CustomOutput` on few or none** is half right: `WriteSlot` 0, `CustomOutput`
-  20.
+- **The plan's prediction that `default` has the four non-vote kinds causal
+  on few or none at 10,000** is one of four right: `WriteSlot` 0 as
+  predicted; `CustomOutput` and `ActionParam` causal on every parent;
+  `RouterGate` on 0 to 11 parents at 10,000 and 2 to 6 at 20,000.
 - **Not weakened:** the born run's B1 verdict (its `born` arm reproduced
   reading for reading as production); the T20.F16 vote-only destination.
 
