@@ -84,6 +84,19 @@ def main():
         checks.append({"check": name, "pass": bool(ok), "detail": detail})
 
     check("header present on both runs", bool(ref["header"]) and bool(cand["header"]))
+    # Amendment A1 (review (a) finding 7): the policy metadata is required
+    # present, so matching omissions cannot compare equal, and the cohort
+    # dump must be on in both runs.
+    for label, run in (("ref", ref), ("cand", cand)):
+        h = run["header"] or {}
+        check(f"{label} header carries config_digest and prototypes.{FIELD}",
+              bool(h.get("config_digest")) and isinstance(h.get("prototypes"), dict) and FIELD in h["prototypes"],
+              {"config_digest": h.get("config_digest"), "prototypes": h.get("prototypes")})
+        check(f"{label} header has the cohort dump on", h.get("cohort_dump") is True, h.get("cohort_dump"))
+        for t, row in run["checkpoints"].items():
+            mc = (row.get("births") or {}).get("mutation_config")
+            if not (isinstance(mc, dict) and FIELD in mc and "per_unit_rate" in mc):
+                check(f"{label} births mutation_config populated at {t}", False, mc)
     check("footer present on both runs", bool(ref["footer"]) and bool(cand["footer"]),
           {"ref": ref["footer"], "cand": cand["footer"]})
     er, ec = expected(ref), expected(cand)
@@ -149,7 +162,7 @@ def main():
     check("every scheduled block present (not null) on both sides at every reached checkpoint", not absent, {"absent": absent})
     check("every timing-free checkpoint block hash-equal (births counts without mutation_config)", not bad, {"differing": bad})
     dumps = {}
-    if (ref["header"] or {}).get("cohort_dump") or (cand["header"] or {}).get("cohort_dump"):
+    if True:
         for t in sorted(set(ref["checkpoints"]) | set(cand["checkpoints"])):
             pr, pc = f"{rd}/cohort-{rn}-t{t}.json", f"{cd}/cohort-{cn}-t{t}.json"
             try:

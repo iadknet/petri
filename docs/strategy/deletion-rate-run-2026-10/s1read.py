@@ -47,7 +47,7 @@ def family_rows(cohort):
             out[parts[0]] = dict(zip(FAMILY_FIELDS, map(num, parts[1:])))
     for name in TARGET_ROWS:
         out.setdefault(name, {k: 0 for k in FAMILY_FIELDS})
-    return out
+    return out  # an absent row counts 0 (the predeclaration)
 
 
 def vote_reading(block):
@@ -80,7 +80,11 @@ def read_run(d, name):
     header = next((r for r in all_rows if r.get("kind") == "header"), None)
     extinct = next((r for r in all_rows if r.get("kind") == "extinct"), None)
     win = [s for s in samples if WINDOW[0] <= s["tick"] <= WINDOW[1]]
-    alive = [s for s in win if s["population"] > 0]
+    # Amendment A1 (review (a) finding 8): window readings need every
+    # scheduled sample (ticks 15,000 to 20,000 every 500, all alive).
+    scheduled = list(range(WINDOW[0], WINDOW[1] + 1, 500))
+    full_window = sorted(s["tick"] for s in win if s["population"] > 0) == scheduled
+    alive = [s for s in win if s["population"] > 0] if full_window else []
     births = None
     if len(alive) >= 2:
         d_spawn = alive[-1]["reproduction_actions_spawned_total"] - alive[0]["reproduction_actions_spawned_total"]
@@ -95,7 +99,11 @@ def read_run(d, name):
                 typed = family_rows(selected) if selected else None
                 vote = vote_reading(r.get("vote_deltas"))
                 evaluated = selected.get("parents_evaluated") if selected else None
-                p = sum((v["family_executed"] or 0) + (v["family_causal"] or 0) for v in typed.values()) if typed else None
+                # A1 finding 8: a present row with an unavailable count
+                # ("-") makes P undefined; an absent row counts 0.
+                numeric = bool(typed) and all(isinstance(v["family_executed"], int) and isinstance(v["family_causal"], int)
+                                              and 0 <= v["family_executed"] <= 20 and 0 <= v["family_causal"] <= 20 for v in typed.values())
+                p = sum(v["family_executed"] + v["family_causal"] for v in typed.values()) if numeric else None
                 agree = None
                 if typed:
                     agree = {f: {"funnel_family_causal": typed[f]["family_causal"] or 0,
@@ -118,7 +126,7 @@ def read_run(d, name):
     killed = footer is None
     mg, mgen = mean("mean_genome_size"), mean("mean_generation")
     return {
-        "completed": footer is not None, "killed_or_incomplete": killed, "reaches_20000": reaches,
+        "completed": footer is not None, "killed_or_incomplete": killed, "reaches_20000": reaches, "full_window": full_window,
         "extinct_tick": extinct["tick"] if extinct else None,
         "prototypes": header.get("prototypes") if header else None,
         "config_digest": header.get("config_digest") if header else None,
@@ -193,7 +201,9 @@ def main():
             "min_population_del_0_03": (low or {}).get("min_population_sample"),
         }
     supporting = [s for s, v in per_seed.items() if v["supports"]]
-    complete = all(f"{a}-s{s}" in runs for a in ARMS for s in SEEDS)
+    # A1 finding 9: execution completeness is reported apart and is not a
+    # clause of the rule.
+    complete = all(f"{a}-s{s}" in runs and runs[f"{a}-s{s}"]["completed"] for a in ARMS for s in SEEDS)
     clauses = {
         "s0_go": s0_go,
         "persists_all_four_with_half_population": all(v["del_0_03_persists"] and v["population_at_least_half"] for v in per_seed.values()),
@@ -201,7 +211,7 @@ def main():
         "dose_order_3_of_4": sum(1 for v in per_seed.values() if v["dose_order_20000"]) >= 3,
         "vote_clause_on_every_supporting_seed": all(per_seed[s]["vote_clause"] for s in supporting),
     }
-    validated = bool(complete and s0_go and clauses["persists_all_four_with_half_population"] and clauses["at_least_3_of_4_support"]
+    validated = bool(s0_go and clauses["persists_all_four_with_half_population"] and clauses["at_least_3_of_4_support"]
                      and clauses["dose_order_3_of_4"] and clauses["vote_clause_on_every_supporting_seed"])
     result = {"row": "S1", "world": "Canyon country", "window_ticks": list(WINDOW), "founder_units": FOUNDER, "min_effect": MIN_EFFECT,
               "complete": complete, "runs": runs, "per_seed": per_seed, "clauses": clauses, "validated": validated,
