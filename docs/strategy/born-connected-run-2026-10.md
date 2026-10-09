@@ -13,8 +13,9 @@ the Codex review command, the close order), inside the
 The idea's earlier readings: the [diagnosis run](evolvability-diagnosis-run-2026-10.md)'s
 rows E4 (the two-step rates this prototype shortens), E5 (the projection
 operator, not advanced) and E10 (run 6's ALT arm, the idea's lab form,
-unresolved at 8 pairs). Status: **in progress** (predeclared, amended after
-Codex review (a), the prototype built; the gate and world chain launched
+unresolved at 8 pairs). Status: **in progress** (gates B0, the census smoke
+and B0.2 (i) passed; the frozen references, the pairs and the main arms are
+running; predeclared, amended after Codex review (a), the chain launched
 after Advice 2).
 
 ## Question
@@ -245,6 +246,80 @@ vote-delta readings (review (a) finding 10).
 | B0.2 | Instrument identity (the inherited contract's "the unchanged-policy reference arm must match `main`'s output before a prototype arm is read"; the follow-up's G1 form, strengthened after finding 4): the census probe on the prototype binary with the flag off against (i) the launch-revision production binary `v3-cli-main` and (ii) the frozen instrument built without the prototype | (i) **Smoke:** a 2,000-tick run of the census probe (`default` recipe, seed 1022, checkpoints 1,000 and 2,000, vote deltas and the births block on) against `v3-cli-main --telemetry off run --ticks 2000 --sample-every 500 --seed 1022 --config default.json`: the sample tick sets equal (500, 1,000, 1,500, 2,000, both sides, no missing tick), every compared field present on both sides, `population`, `mean_genome_size`, `mean_generation` and `reproduction_actions_spawned_total` equal at every tick, both runs completed to 2,000 (the probe's footer, the run's completion record), and the census header's `config_digest` equal to the run's `run_started` digest (free, since the off flag is not serialized); the checker `b02check.py` fails on any missing tick, field or completion record (finding 5: the follow-up's `g1check.py` compared common ticks only). The smoke blocks the pairs and the main arms. (ii) **Full comparison:** the frozen instrument runs `default` and `default-mutoff` on both seeds (20,000 ticks; the reference runs); the prototype binary's `default` and `default-mutoff` runs must equal them on every sample row (the fields above plus `mutation_events_applied_total` and `mean_energy`), the extinction tick, the footer's `ticks` and `extinct`, and every checkpoint block (`input_use`, `e6`, `vote_deltas`, `births`, `living`, `selected_parents`, `selected_generations`, `age_deciles`, `energy_deciles`), each serialized once with sorted keys and compact separators and hashed; the header's `prototypes` entry, `config_digest` and the timing fields are excluded and listed. A full-run inequality blocks the `born` arms from being read until explained and fixed |
 | B0.3 | The mutation-off pair is identical by construction: with `per_unit_rate` 0 no event is requested, so no `Add` fires and the flag is never read | `born-mutoff` and `default-mutoff` on each seed: the same sample fields, extinction tick, footer and timing-free checkpoint blocks as B0.2 (ii) equal. The header's `config_digest` **differs** (the flag serializes when true) and `prototypes.born_connected` differs; both differences are verified, and nothing else in the header but the recipe path may differ (finding 9). The diagnostic blocks' policies under this pair: the funnel's retention proposals use the forced one-event supply with the flag dropped (so they are the default's); the births block uses the arm's actual zero-rate policy (every birth zero-event, so the flag never fires there either); the vote-delta reading draws no mutation. An inequality is a defect in the prototype's off path and blocks the `born` arms |
 
+**Gate results.** **B0 passed** (every gating check, 24 of 24, on the
+prototype binary at `a172c734`; summary
+[`b0.json`](born-connected-run-2026-10/b0.json), reader
+[`b0read.py`](born-connected-run-2026-10/b0read.py); raw `b0/e4-off.json`
+sha256 `74d8861e…`, `e4-on.json` `7539a870…`, `e4-on-10m.json` `1dfaa6bb…`;
+10⁶ births per parent in 40 s and 35 s, 10⁷ in 347 s). **Off path:
+identical to G3's raw off output** (`07b639db…`) in the deterministic
+projection on all three parents, `genome_size`, `executed_resolved` and
+`frozen_age` included, so the frozen dispatch record is the same under
+T03.F12's tick loop and every compared rate agrees to the last digit
+(attempted events 0.484315, 0.489357, 0.495378 per birth; `InputRefAdd`
+0.021523, 0.021520, 0.021984; `lost_declaration` 0.018679 and 0.007911;
+useful signed 0, 7 and 6 of 10⁶). **On path.** (1) On the founder, 15,121 of
+10⁶ births were single-event `InputRefAdd` births and 138 of them declared
+`AreaFoodSummary(0)` on the vote node; every one of the 138 carried the
+born edge (`connect_any_given_declared` 1.0, CP 0.974 to 1), and at 10⁷
+1,393 of 1,393 (CP 0.9974 to 1); every destination an `ActionVote` sink
+(all 27 kinds hit at 10⁷, 37 to 63 each) and every sub-value in 0..6 (175
+to 240 each); over all births `connect_any` equals
+`declared_vote_node_target` exactly (194 = 194 at 10⁶, 2,019 = 2,019 at
+10⁷), and the pooled final-child destinations of the founder's new leaf
+are `ActionVote` sinks only at both sizes (no later ordinary edge from it
+in these samples). (2) Useful signed: the direct check at 10⁷, 19 of 1,393
+single-`Add` declarations = 0.01364 (CP 0.00823 to 0.02122), contains
+2/189 = 0.01058; the all-birth rate 26 of 10⁷ = 2.6 × 10⁻⁶ (CP 1.70 to
+3.81 × 10⁻⁶) contains the predicted 2/189 × 2.019 × 10⁻⁴ = 2.14 × 10⁻⁶, and
+the chain's other links sit at their arithmetic too: a cardinal `Move` 295
+(2.95 × 10⁻⁵ against 4/27 × declared = 2.99 × 10⁻⁵), a nearest component
+onto its cardinal `Move` 44 (4.4 × 10⁻⁶ against 4.27 × 10⁻⁶), wrong sign
+18 (1.8 × 10⁻⁶); at 10⁶ the all-birth count was 6 (CP 2.2 × 10⁻⁶ to
+1.3 × 10⁻⁵) and the single-`Add` share 2 of 138, reported only. The
+founder's same-birth useful signed rate therefore moves from 0 of 10⁷ (E4)
+to 2.6 × 10⁻⁶ per birth, about half of parent (b)'s two-step rate per birth
+(5.5 × 10⁻⁶), which presupposes a surviving declaration. (3) The requested
+supply is identical on and off on every parent. (4) `InputRefAdd` applied
+per birth 0.021533 against 0.021523, 0.021513 against 0.021520, 0.021970
+against 0.021984 (within 0.1 %). (5) Integrated loss 0.018691 against
+0.018679 on (b) and 0.007909 against 0.007911 on (c) (within 0.1 %), the
+route classes as the off path's (`lost_declaration_by_ops` in the summary).
+**Census smoke passed** (`smoke/small.json`, the follow-up's 200 × 200
+Canyon recipe with 400 founders, seed 33, 300 ticks, checkpoint 300, vote
+deltas and the births block on, the prototype binary with the flag off):
+exit 0 in 5 s, 213 living at the checkpoint, census 0.15 s, vote-delta
+reading 0.010 s, births block 0.066 s (20 parents × 100 births: 653
+event-bearing births; dead 4, silent 358, changed 291, that is 0.6 %,
+54.8 % and 44.6 % of the mutated births), no executed target channel among
+the 20 sampled parents (so the ablation branches rest on their unit tests
+until the main runs, as in the follow-up's smoke), 8 threads,
+`config_digest` `cf5a12f8…` under the off flag; the block timings project
+to seconds per checkpoint at 20,000-tick genome sizes (Advice 2 point 6).
+On parents (b) and (c) the pooled connections of the declared reference
+rise under the on path (744 and 852 against 532 and 658 at 10⁶) because a
+duplicate `AreaFoodSummary(0)` declaration now arrives with its edge and the
+probe matches edges by reference value; the ordinary route's count
+underneath is the off path's within the declaration count, and the
+single-`Add` tallies are the clean reading. **B0.2 (i) smoke passed** (7 of
+7 checks, [`b02-smoke.json`](born-connected-run-2026-10/b02-smoke.json),
+checker [`b02check.py`](born-connected-run-2026-10/b02check.py)): the
+prototype binary's census run (`g1-default-s1022`, 2,000 ticks, 8 threads,
+60 s) and `v3-cli-main`'s run (60 s) carry the same four sample ticks, every
+compared field present and equal at every tick, both completed, and the
+census header's `config_digest` equals the run's `run_started` digest;
+the checkpoints at 1,000 and 2,000 took 0.17 s and 0.20 s with the births
+block at 0.07 s and 0.10 s (774 and 900 event-bearing births of 2,000; dead
+1 and 0) and no executed target channel among the sampled parents.
+**`make check` on the branch**: a first run at `765e429c` stopped at
+`rust-clippy` (dead code: `apply_to_node` had become test-only), fixed by
+`a172c734` (`#[cfg(test)]`); the rerun at `a172c734` exited 0 with every
+step passing, the `v3-cli` recipe-digest pin test included (the off flag
+is not serialized), log `make-check-branch.log`; the prototype binaries
+were rebuilt and re-hashed after the fix (`census-proto` `55ad8560…`,
+`probe-proto` `892dcd44…`, superseding the hashes under Branch and
+commits), and the driver started only on that exit line.
+
 ## Ledger
 
 One row. No diagnostic (authored-genome) arm is used, and no authored genome
@@ -334,3 +409,6 @@ diagnosis question; (5) cost.
 | Item | Wall |
 | --- | --- |
 | Predeclaration, Codex review (a), amendment A1 | session time; the review remote |
+| Builds (reference binary, frozen instrument, prototype twice) and `make check` twice | about 45 min in all |
+| B0 | 40 s (off), 35 s (on), 347 s (on, 10⁷) |
+| Census smoke | 5 s |
