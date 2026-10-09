@@ -172,6 +172,7 @@ fn topology_after_each_operator_passes_parseability_gate() {
         TopologyOperator::RemoveNode,
         TopologyOperator::RetargetNodeTarget,
         TopologyOperator::AddRouteTarget,
+        TopologyOperator::AddFeedbackRoute,
         TopologyOperator::RemoveRouteTarget,
         TopologyOperator::ChangeEntryNode,
         TopologyOperator::SwapNodeBackend,
@@ -891,7 +892,7 @@ fn change_entry_node_is_a_rare_topology_draw() {
     // other weight is scaled, so it is drawn in well under 1% of topology
     // events (1 of TOPOLOGY_TOTAL_WEIGHT) instead of 1 in 22.
     assert_eq!(TopologyOperator::ChangeEntryNode.weight(), 1);
-    assert_eq!(TopologyOperator::TOTAL_WEIGHT, 211);
+    assert_eq!(TopologyOperator::TOTAL_WEIGHT, 221);
     let mut rng = SmallRng::seed_from_u64(0xC0DE);
     let draws = 200_000u32;
     let entry_draws = (0..draws)
@@ -909,7 +910,7 @@ fn topology_operator_weights_are_positive() {
     let all = TopologyOperator::ALL;
     assert_eq!(
         all.len(),
-        13,
+        14,
         "ALL must cover every TopologyOperator variant"
     );
     for &op in &all {

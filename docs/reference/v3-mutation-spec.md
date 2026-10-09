@@ -78,6 +78,7 @@ Core rule:
 - `RemoveNode`
 - `RetargetNodeTarget`
 - `AddRouteTarget`
+- `AddFeedbackRoute`
 - `RemoveRouteTarget`
 - `ChangeEntryNode`
 - `SwapNodeBackend`
@@ -116,6 +117,20 @@ Topology connection semantics (T11.F15, T11.F18):
   Missing gate sinks, zero-register VMs and failed insertion skip atomically.
   Existing orphan gate writes remain. Equal bids retain the old earlier target;
   a varying new bid can immediately select the equivalent detour.
+- `AddFeedbackRoute` (T11.F29) appends a back edge as a losing branch. The
+  source's static incumbent must name an existing node with a finite bias and
+  an unwritten slot; the branch takes the first slot unused by targets and
+  backend writes and needs a possible gate write (VM registers, Graph
+  `RouterGate(slot)` sink). Destinations are the source itself plus, when the
+  parent executed the source, the executed nodes with a target naming it and
+  the executed nodes naming one of those, minus the source's current targets,
+  in node-index order; a parent without a dispatch record self-loops only.
+  The branch bias is the incumbent's minus 1.0, stepped down one ulp until
+  `bias + 1.0 <= incumbent` in `f32`, so a gate value of at most 1.0 on the
+  new slot never selects it; larger VM, compute or memory gate values can.
+  The gate write follows `AddRouteTarget`'s construction; draws are the
+  source, the gate source, then the destination. Ineligible sources skip
+  atomically.
 - `CopyNode` faithfully copies inputs, backend and outgoing targets. Self IDs
   follow the copy; external destinations, memory and output addresses stay.
   Attach as a tied later alternative at an existing predecessor whose static
@@ -148,7 +163,8 @@ Topology connection semantics (T11.F15, T11.F18):
 - `RewriteNodeId` is retired from the live catalog. `ChangeEntryNode` remains
   an explicit whole-brain macro with weight 1. Since 2026-09-18 every other
   topology weight is scaled by ten (refinement 40, moderate 20, structural
-  10), so the macro is drawn in 1 of 211 topology events rather than 1 of 22:
+  10), so the macro is drawn in 1 of 221 topology events (211 before T11.F29's
+  `AddFeedbackRoute` at weight 10) rather than 1 of 22:
   on a chain-shaped founder an entry moved past the action nodes queues
   nothing, the one topology edit that still reads dead after T11.F15.
   Eligibility skips are reported as skips, never counted as applied silent
@@ -326,7 +342,7 @@ Graph node (T20.F16), `InputRef.Swap`, and `InputRef.RawFieldMutation` are all
 in this class. Topology connection operators
 are `RetargetNodeTarget`, `RemoveRouteTarget`, `RemoveNode`, `MutateGateBias`,
 `SwapRouteTargets`, and the explicit macro `ChangeEntryNode`, all owned by
-T11.F15. The retired identity rename is outside this live taxonomy. `CopyEdgeBundle` remains an
+T11.F15, and `AddFeedbackRoute`, owned by T11.F29. The retired identity rename is outside this live taxonomy. `CopyEdgeBundle` remains an
 explicit multi-edge macro, as the VM's paired-slot-address operator is. A
 grown node still costs `graph_node_base_cost` per visit; growth neutrality
 does not extend to energy exhaustion.

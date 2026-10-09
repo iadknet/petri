@@ -108,10 +108,13 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// Re-pinned by T20.F16 after two agreeing runs: Graph-node `Add` draws three
 /// more numbers and appends a vote edge (default 1086311951226638661 ->
 /// 5289048635937395426, rate 0.0 8324800200600234214 -> 9818715947896128091).
+/// Re-pinned by T11.F29 after two agreeing runs: the `AddFeedbackRoute`
+/// entry remaps every topology draw (default 5289048635937395426 ->
+/// 860634653294650084, rate 0.0 9818715947896128091 -> 7790766295895291063).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 5289048635937395426);
-    assert_eq!(short_run_identity(Some(0.0)), 9818715947896128091);
+    assert_eq!(short_run_identity(None), 860634653294650084);
+    assert_eq!(short_run_identity(Some(0.0)), 7790766295895291063);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

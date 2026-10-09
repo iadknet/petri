@@ -27,6 +27,8 @@
 //! pre-gestation engine (the T24.F02 digests until T20.F16).
 //! Re-pinned by T20.F16 after two agreeing runs: Graph-node `Add` draws three
 //! more numbers and appends a vote edge, which moves all four digests.
+//! Re-pinned by T11.F29 after two agreeing runs: the `AddFeedbackRoute`
+//! entry remaps every topology draw, which moves all four digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -38,11 +40,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "2d6ee1e918d9050de5c3d811d253e64f57c7a9029f7cb3240afdff391eff5c1e"
+        "aaf4c417c0c1f7ff043aaeeecb19610c559684d1bf975ca28c05d51c82fc9bde"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "ea0d44121ad1d3db0852aed8d2328e1f62c86266705dda224d34c49a1a72f144"
+        "ca8569d22a023229006324318e6c1af68ac28888ef13ae516b8919e303cb55fa"
     );
 }
 
@@ -115,11 +117,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "c9f3b37bab39f6eadc23d17f881fbc179d6dec68e5b0e81b1c9f104b74bebbfd"
+        "0aa9d015f58e92e294088435e8decc9dfd9a712a2bf01668fdf11179b200c679"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "885326b1177672ad431e4c727387f647cc7706d09b262d216fa1a1b80ed36551"
+        "a43abf80658509e6d7df3271038669a43f3b5d6c3e7047352c4d3f57df5f59fb"
     );
 }
 

@@ -700,6 +700,7 @@ pub(crate) fn topology_operator_key(op: TopologyOperator) -> MutationOperator {
         TopologyOperator::RemoveNode => MutationOperator::TopologyRemoveNode,
         TopologyOperator::RetargetNodeTarget => MutationOperator::TopologyRetargetNodeTarget,
         TopologyOperator::AddRouteTarget => MutationOperator::TopologyAddRouteTarget,
+        TopologyOperator::AddFeedbackRoute => MutationOperator::TopologyAddFeedbackRoute,
         TopologyOperator::RemoveRouteTarget => MutationOperator::TopologyRemoveRouteTarget,
         TopologyOperator::ChangeEntryNode => MutationOperator::TopologyChangeEntryNode,
         TopologyOperator::SwapNodeBackend => MutationOperator::TopologySwapNodeBackend,

@@ -30,8 +30,10 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
     // Recruitment `Off` adds no draw relative to the current production path.
     // Re-pinned by T20.F16: Graph-node `Add` draws three more numbers and
     // appends a vote edge (3980442848510747838 -> 13774101911075560278).
+    // Re-pinned by T11.F29: the `AddFeedbackRoute` entry remaps every
+    // topology draw (13774101911075560278 -> 3281291995176387451).
     assert_eq!(
-        hash, 13774101911075560278,
+        hash, 3281291995176387451,
         "pin of the recruitment-Off production path"
     );
 }

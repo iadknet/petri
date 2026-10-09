@@ -1,10 +1,10 @@
 use rand::Rng;
 
 use super::{birth, structural::next_node_id};
-use crate::contracts::{NodeId, RouteTarget, MAX_GATE_SLOTS};
+use crate::contracts::{InputReference, NodeId, RouteTarget, MAX_GATE_SLOTS};
 use crate::creature::genome::cgp::{GraphEdge, OutputSinkKind};
 use crate::creature::genome::CreatureGenome;
-use crate::creature::genome::{BackendDef, VmInstruction};
+use crate::creature::genome::{BackendDef, NodeGenome, VmInstruction};
 use crate::mutation::graph::operators::random_graph_source;
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
@@ -31,6 +31,56 @@ pub(super) fn writes_gate(backend: &BackendDef, slot: u8) -> bool {
     match backend {
         BackendDef::Vm(vm) => vm.program.iter().any(|instruction| matches!(instruction, VmInstruction::WriteRouteGate { slot: written, .. } if *written == slot)),
         BackendDef::Graph(graph) => graph.output_sinks.iter().any(|sink| matches!(sink.kind, OutputSinkKind::RouterGate(written) if written == slot) && !sink.inputs.is_empty()),
+    }
+}
+
+/// The first slot neither used by `node`'s targets nor written by its
+/// backend, so an orphan write never feeds a new branch.
+pub(super) fn free_gate_slot(node: &NodeGenome) -> Option<u8> {
+    (0..MAX_GATE_SLOTS as u8).find(|&slot| {
+        !node.targets.iter().any(|t| t.slot == slot) && !writes_gate(&node.backend_def, slot)
+    })
+}
+
+/// Give `backend` its own write to `slot` (T11.F15's construction): VM
+/// `WriteRouteGate` from a uniform register before the first `Halt`, with
+/// reference repair; Graph one weight-1 edge from `random_graph_source` into
+/// the `RouterGate(slot)` sink.
+fn add_gate_write(
+    backend: &mut BackendDef,
+    input_refs: &[InputReference],
+    slot: u8,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    match backend {
+        BackendDef::Vm(vm) => {
+            if vm.register_count == 0 {
+                return Err(MutationSkipReason::NoApplicableTarget);
+            }
+            let at = vm
+                .program
+                .iter()
+                .position(|i| matches!(i, VmInstruction::Halt))
+                .unwrap_or(vm.program.len());
+            let instruction = VmInstruction::WriteRouteGate {
+                slot,
+                src: rng.gen_range(0..vm.register_count),
+            };
+            insert_new_instruction_with_reference_repair(&mut vm.program, at, instruction)
+        }
+        BackendDef::Graph(graph) => {
+            let sink = graph
+                .output_sinks
+                .iter()
+                .position(|s| matches!(s.kind, OutputSinkKind::RouterGate(s) if s == slot))
+                .ok_or(MutationSkipReason::NoApplicableTarget)?;
+            let source = random_graph_source(graph.compute_nodes.len() as u16, input_refs, rng);
+            graph.output_sinks[sink].inputs.push(GraphEdge {
+                source,
+                weight: 1.0,
+            });
+            Ok(())
+        }
     }
 }
 
@@ -101,39 +151,7 @@ pub(super) fn apply_add_route_target(
     let slot = lowest_unused_slot(&genome.nodes[idx].targets)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let mut backend = genome.nodes[idx].backend_def.clone();
-    match &mut backend {
-        BackendDef::Vm(vm) => {
-            if vm.register_count == 0 {
-                return Err(MutationSkipReason::NoApplicableTarget);
-            }
-            let at = vm
-                .program
-                .iter()
-                .position(|i| matches!(i, VmInstruction::Halt))
-                .unwrap_or(vm.program.len());
-            let instruction = VmInstruction::WriteRouteGate {
-                slot,
-                src: rng.gen_range(0..vm.register_count),
-            };
-            insert_new_instruction_with_reference_repair(&mut vm.program, at, instruction)?;
-        }
-        BackendDef::Graph(graph) => {
-            let sink = graph
-                .output_sinks
-                .iter()
-                .position(|s| matches!(s.kind, OutputSinkKind::RouterGate(s) if s == slot))
-                .ok_or(MutationSkipReason::NoApplicableTarget)?;
-            let source = random_graph_source(
-                graph.compute_nodes.len() as u16,
-                &genome.nodes[idx].input_refs,
-                rng,
-            );
-            graph.output_sinks[sink].inputs.push(GraphEdge {
-                source,
-                weight: 1.0,
-            });
-        }
-    }
+    add_gate_write(&mut backend, &genome.nodes[idx].input_refs, slot, rng)?;
     let old = genome.nodes[idx].targets[0];
     let new_id = next_node_id(genome);
     genome.nodes[idx].backend_def = backend;
@@ -143,6 +161,117 @@ pub(super) fn apply_add_route_target(
         gate_bias: old.gate_bias,
     });
     genome.nodes.push(birth::detour(new_id, old.target_id, rng));
+    Ok(reachability)
+}
+
+/// The node ids a feedback branch from `source` may route to (T11.F29):
+/// the source itself, plus, when the parent executed the source, the
+/// executed nodes with a target naming it (`P1`) and the executed nodes with
+/// a target naming a node of `P1` (`P2`). `executed` is the selector's sorted
+/// executed set. Ids already among the source's targets are excluded; the
+/// rest follow node-index order, deduplicated by `NodeId`.
+pub(super) fn feedback_destinations(
+    genome: &CreatureGenome,
+    executed: &[usize],
+    source: usize,
+) -> Vec<NodeId> {
+    let nodes = &genome.nodes;
+    let naming = |ids: &[NodeId]| -> Vec<usize> {
+        executed
+            .iter()
+            .copied()
+            .filter(|&i| {
+                nodes
+                    .get(i)
+                    .is_some_and(|n| n.targets.iter().any(|t| ids.contains(&t.target_id)))
+            })
+            .collect()
+    };
+    let mut indices = vec![source];
+    if executed.binary_search(&source).is_ok() {
+        let p1 = naming(&[nodes[source].node_id]);
+        let p1_ids: Vec<NodeId> = p1.iter().map(|&i| nodes[i].node_id).collect();
+        indices.extend(naming(&p1_ids));
+        indices.extend(p1);
+    }
+    indices.sort_unstable();
+    indices.dedup();
+    let current = &nodes[source].targets;
+    let mut destinations: Vec<NodeId> = Vec::with_capacity(indices.len());
+    for id in indices.into_iter().map(|i| nodes[i].node_id) {
+        if !current.iter().any(|t| t.target_id == id) && !destinations.contains(&id) {
+            destinations.push(id);
+        }
+    }
+    destinations
+}
+
+/// A bias one unit below `incumbent`, stepped down one ulp at a time until a
+/// gate value of 1.0 on top of it cannot exceed `incumbent` in `f32`
+/// arithmetic (T11.F29). No clamp: biases are not range-validated.
+pub(super) fn losing_bias(incumbent: f32) -> f32 {
+    let mut bias = incumbent - 1.0;
+    while bias + 1.0 > incumbent {
+        bias = bias.next_down();
+    }
+    bias
+}
+
+/// The slot a feedback branch from node `idx` would use, or `None` when the
+/// node is ineligible: its static incumbent must name an existing node, carry
+/// a finite bias and have an unwritten slot; a free unwritten slot must exist
+/// with a possible gate write; and the destination set must be non-empty.
+fn feedback_slot(genome: &CreatureGenome, executed: &[usize], idx: usize) -> Option<u8> {
+    let node = &genome.nodes[idx];
+    let incumbent = node.targets.get(static_incumbent(&node.targets)?)?;
+    if !incumbent.gate_bias.is_finite()
+        || writes_gate(&node.backend_def, incumbent.slot)
+        || !genome
+            .nodes
+            .iter()
+            .any(|n| n.node_id == incumbent.target_id)
+    {
+        return None;
+    }
+    let slot = free_gate_slot(node)?;
+    let writable = match &node.backend_def {
+        BackendDef::Vm(vm) => vm.register_count > 0,
+        BackendDef::Graph(graph) => graph
+            .output_sinks
+            .iter()
+            .any(|s| matches!(s.kind, OutputSinkKind::RouterGate(written) if written == slot)),
+    };
+    (writable && !feedback_destinations(genome, executed, idx).is_empty()).then_some(slot)
+}
+
+pub(super) fn apply_add_feedback_route(
+    genome: &mut CreatureGenome,
+    targets: &mut TargetSelector<'_>,
+    rng: &mut impl Rng,
+) -> Result<TargetReachability, MutationSkipReason> {
+    let executed = targets.executed();
+    let eligible: Vec<_> = (0..genome.nodes.len())
+        .filter(|&i| feedback_slot(genome, executed, i).is_some())
+        .collect();
+    let (idx, reachability) = targets
+        .select(&eligible, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+    let slot =
+        feedback_slot(genome, executed, idx).ok_or(MutationSkipReason::NoApplicableTarget)?;
+    let node = &genome.nodes[idx];
+    let incumbent = static_incumbent(&node.targets).expect("eligible source has an incumbent");
+    let gate_bias = losing_bias(node.targets[incumbent].gate_bias);
+    let mut backend = node.backend_def.clone();
+    add_gate_write(&mut backend, &node.input_refs, slot, rng)?;
+    let candidates = feedback_destinations(genome, executed, idx);
+    let target_id = candidates[rng.gen_range(0..candidates.len())];
+    let node = &mut genome.nodes[idx];
+    node.backend_def = backend;
+    node.targets.push(RouteTarget {
+        target_id,
+        slot,
+        gate_bias,
+    });
     Ok(reachability)
 }
 

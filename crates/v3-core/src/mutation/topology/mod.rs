@@ -22,6 +22,7 @@ pub enum TopologyOperator {
     RemoveNode,
     RetargetNodeTarget,
     AddRouteTarget,
+    AddFeedbackRoute,
     RemoveRouteTarget,
     ChangeEntryNode,
     SwapNodeBackend,
@@ -34,11 +35,12 @@ pub enum TopologyOperator {
 }
 
 impl TopologyOperator {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::AddNode,
         Self::RemoveNode,
         Self::RetargetNodeTarget,
         Self::AddRouteTarget,
+        Self::AddFeedbackRoute,
         Self::RemoveRouteTarget,
         Self::ChangeEntryNode,
         Self::SwapNodeBackend,
@@ -52,7 +54,7 @@ impl TopologyOperator {
 
     /// Per-operator weight reflecting impact tier.
     /// 40 = refinement, 20 = moderate, 10 = structural; `ChangeEntryNode`
-    /// stays at 1 so the whole-brain macro is a rare event (1 in 211) rather
+    /// stays at 1 so the whole-brain macro is a rare event (1 in 221) rather
     /// than 1 in 22: on a chain-shaped founder an entry moved past the
     /// action nodes queues nothing, the one topology edit that still reads
     /// dead after T11.F15.
@@ -63,6 +65,7 @@ impl TopologyOperator {
             Self::RemoveNode => 10,
             Self::RetargetNodeTarget => 20,
             Self::AddRouteTarget => 20,
+            Self::AddFeedbackRoute => 10,
             Self::RemoveRouteTarget => 20,
             Self::ChangeEntryNode => 1,
             Self::SwapNodeBackend => 10,
@@ -76,7 +79,7 @@ impl TopologyOperator {
     }
 
     /// Integer weights in hundredths keep small weights exact, including at 1%.
-    /// The base total is 211, so the tuned total never exceeds 21,100.
+    /// The base total is 221, so the tuned total never exceeds 22,100.
     #[must_use]
     pub fn tuned_weight(self, large_copy_weight_percent: u8) -> u16 {
         let factor = match self {
@@ -93,7 +96,7 @@ impl TopologyOperator {
         // weight() will still compile (exhaustive match), but ALL will be incomplete.
         // This assertion catches that at compile time.
         assert!(
-            Self::ALL.len() == 13,
+            Self::ALL.len() == 14,
             "ALL must cover every TopologyOperator variant"
         );
         let mut sum = 0u16;
@@ -116,7 +119,8 @@ impl TopologyOperator {
             | Self::CopyMeshForwardSlice
             | Self::SpliceNode
             | Self::SwapNodeBackend
-            | Self::AddRouteTarget => ComplexityEffect::Increasing,
+            | Self::AddRouteTarget
+            | Self::AddFeedbackRoute => ComplexityEffect::Increasing,
             Self::RemoveNode | Self::RemoveRouteTarget => ComplexityEffect::Decreasing,
             Self::RetargetNodeTarget
             | Self::ChangeEntryNode
@@ -191,6 +195,9 @@ impl TopologyMutator {
             }
             TopologyOperator::AddRouteTarget => {
                 routing::apply_add_route_target(genome, targets, rng)
+            }
+            TopologyOperator::AddFeedbackRoute => {
+                routing::apply_add_feedback_route(genome, targets, rng)
             }
             TopologyOperator::RemoveRouteTarget => {
                 routing::apply_remove_route_target(genome, targets, rng)
