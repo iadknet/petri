@@ -1047,11 +1047,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     assert_eq!(
         record,
         [
-            (
-                "graph_blank",
-                vec![(InputRefAdd, 2873), swap],
-                None,
-            ),
+            ("graph_blank", vec![(InputRefAdd, 2873), swap], None,),
             ("graph_copy", vec![(GraphAddGraphEdge, 743), swap], None),
             ("graph_split", vec![(GraphAddGraphEdge, 743), swap], None),
             (

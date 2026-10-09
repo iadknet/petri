@@ -648,8 +648,7 @@ fn input_ref_added(
                         a.compute_nodes == b.compute_nodes
                             && a.output_sinks.len() == b.output_sinks.len()
                             && a.output_sinks.iter().zip(&b.output_sinks).all(|(x, y)| {
-                                x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST))
-                                    || x == y
+                                x.kind == OutputSinkKind::ActionVote(VoteSink::Move(EAST)) || x == y
                             })
                             && appended(&move_sink(b, EAST).inputs, &move_sink(a, EAST).inputs)
                                 .is_some_and(|edge| edge.source == born && edge.weight > 0.0)

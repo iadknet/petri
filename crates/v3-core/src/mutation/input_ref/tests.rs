@@ -836,8 +836,14 @@ fn add_input_ref_to_graph_node_wires_one_vote_edge() {
             panic!("seed {seed}: the born edge reads the new reference, not {source:?}");
         };
         assert_eq!(ref_idx, 0, "seed {seed}");
-        assert!(sub_idx < sub_value_count(&after.input_refs[0]), "seed {seed}");
-        assert!((-1.0..=1.0).contains(&weight), "seed {seed}: weight {weight}");
+        assert!(
+            sub_idx < sub_value_count(&after.input_refs[0]),
+            "seed {seed}"
+        );
+        assert!(
+            (-1.0..=1.0).contains(&weight),
+            "seed {seed}: weight {weight}"
+        );
     }
 }
 
@@ -884,14 +890,25 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
         apply_add_to_node(&mut genome, 1, &mut r, 2);
         assert_eq!(genome.nodes[0], base.nodes[0], "seed {seed}: other node");
         let after_def = graph_def(&genome.nodes[1]);
-        assert_eq!(after_def.compute_nodes, before_def.compute_nodes, "seed {seed}");
-        assert_eq!(after_def.birth_weights, before_def.birth_weights, "seed {seed}");
+        assert_eq!(
+            after_def.compute_nodes, before_def.compute_nodes,
+            "seed {seed}"
+        );
+        assert_eq!(
+            after_def.birth_weights, before_def.birth_weights,
+            "seed {seed}"
+        );
         assert_eq!(after_def.output_sinks.len(), before_def.output_sinks.len());
         let mut grown = 0;
-        for (after_sink, before_sink) in after_def.output_sinks.iter().zip(&before_def.output_sinks) {
+        for (after_sink, before_sink) in after_def.output_sinks.iter().zip(&before_def.output_sinks)
+        {
             assert_eq!(after_sink.kind, before_sink.kind, "seed {seed}");
             let kept = before_sink.inputs.len();
-            assert_eq!(after_sink.inputs[..kept], before_sink.inputs[..], "seed {seed}");
+            assert_eq!(
+                after_sink.inputs[..kept],
+                before_sink.inputs[..],
+                "seed {seed}"
+            );
             match after_sink.inputs.len() - kept {
                 0 => {}
                 1 => {
@@ -903,7 +920,10 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
         }
         assert_eq!(grown, 1, "seed {seed}: exactly one vote sink grew");
         let len = base.nodes[1].input_refs.len();
-        assert_eq!(genome.nodes[1].input_refs[..len], base.nodes[1].input_refs[..]);
+        assert_eq!(
+            genome.nodes[1].input_refs[..len],
+            base.nodes[1].input_refs[..]
+        );
         assert_eq!(genome.nodes[1].input_refs.len(), len + 1);
     }
 }
@@ -926,10 +946,21 @@ fn add_input_ref_on_graph_draws_sub_value_then_sink_then_weight() {
         assert_eq!(genome.nodes[0].input_refs, vec![reference], "seed {seed}");
         assert_eq!(
             vote_edges(&genome.nodes[0]),
-            vec![(sink, GraphSource::InputLeaf { ref_idx: 0, sub_idx }, weight)],
+            vec![(
+                sink,
+                GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx
+                },
+                weight
+            )],
             "seed {seed}"
         );
-        assert_eq!(r.gen::<u64>(), replay.gen::<u64>(), "seed {seed}: nothing else drawn");
+        assert_eq!(
+            r.gen::<u64>(),
+            replay.gen::<u64>(),
+            "seed {seed}: nothing else drawn"
+        );
     }
 }
 
@@ -978,7 +1009,11 @@ fn add_input_ref_with_a_truncated_catalog_stays_a_declaration() {
         let mut full = graph_node_genome_full_catalog();
         let mut replay = rng(seed);
         apply_add_to_node(&mut full, 0, &mut replay, 1);
-        assert_eq!(r.gen::<u64>(), replay.gen::<u64>(), "seed {seed}: same draws");
+        assert_eq!(
+            r.gen::<u64>(),
+            replay.gen::<u64>(),
+            "seed {seed}: same draws"
+        );
     }
 }
 
@@ -1002,7 +1037,10 @@ fn add_input_ref_connects_only_while_the_index_fits_u16() {
     assert_eq!(edges.len(), 1);
     assert!(matches!(
         edges[0].1,
-        GraphSource::InputLeaf { ref_idx: 65_535, .. }
+        GraphSource::InputLeaf {
+            ref_idx: 65_535,
+            ..
+        }
     ));
     assert_eq!(overflows.nodes[0].input_refs.len(), 65_537);
     assert_eq!(edge_count(&overflows.nodes[0]), 0, "a plain declaration");
@@ -1025,9 +1063,9 @@ fn add_input_ref_on_graph_leaves_the_new_reference_unprunable() {
 /// its whole range, named by index, never by meaning.
 #[test]
 fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
-    let ring = InputReference::World(WorldInputKey::neighbor_food_ring(
-        OrdinaryFoodTypeId::new(0),
-    ));
+    let ring = InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
+        0,
+    )));
     let width = sub_value_count(&ring);
     assert_eq!(width, 8);
     let mut sinks = std::collections::BTreeSet::new();
@@ -1037,16 +1075,21 @@ fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let mut r = rng(seed);
         connect_declared_input(&mut def, Some(7), width, &mut r);
-        let mut edges = def.output_sinks.iter().flat_map(|sink| {
-            sink.inputs.iter().map(move |edge| (sink.kind, *edge))
-        });
+        let mut edges = def
+            .output_sinks
+            .iter()
+            .flat_map(|sink| sink.inputs.iter().map(move |edge| (sink.kind, *edge)));
         let (kind, edge) = edges.next().expect("one edge");
         assert!(edges.next().is_none(), "seed {seed}: only one edge");
         let OutputSinkKind::ActionVote(vote) = kind else {
             panic!("seed {seed}: {kind:?} is not a vote sink");
         };
         sinks.insert(vote.index());
-        let GraphSource::InputLeaf { ref_idx: 7, sub_idx } = edge.source else {
+        let GraphSource::InputLeaf {
+            ref_idx: 7,
+            sub_idx,
+        } = edge.source
+        else {
             panic!("seed {seed}: {:?}", edge.source);
         };
         subs.insert(sub_idx);
@@ -1058,7 +1101,10 @@ fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
     }
     assert_eq!(sinks.len(), VOTE_SINK_COUNT);
     assert_eq!(subs.len(), usize::from(width));
-    assert!(negative > 1500 && positive > 1500, "{negative} negative, {positive} positive");
+    assert!(
+        negative > 1500 && positive > 1500,
+        "{negative} negative, {positive} positive"
+    );
 }
 
 proptest! {
