@@ -307,7 +307,7 @@ and T11.F08's): a growth operator adds structure and must be neutral at the
 moment it fires — identical action, output-slot, and shared-memory behavior
 when both executions have enough energy. Growth
 operators: `AddComputeNode` (all three forms below), `CopyComputeNode`,
-`CopySubgraph`, `InputRef.Add`, the VM `VmCopyInstructionBlock`,
+`CopySubgraph`, `InputRef.Add` on a VM node, the VM `VmCopyInstructionBlock`,
 `VmCopyGeneBackwardSlice`, and `VmCopyGeneForwardSlice`,
 and the topology `AddNode`, `CopyNode`, mesh slices, `SpliceNode`,
 `AddRouteTarget`, and `SwapNodeBackend`. `VmCopyInstructionBlockRemapped` is
@@ -321,8 +321,9 @@ guarantees; F08 owns copy placement and post-activation qualification on
 every backend. A connection or parameter operator may change
 behavior, and must do so in one small step: `AddGraphEdge`,
 `RetargetGraphEdge`, `RemoveGraphEdge`, `CopyEdgeBundle`, `SwapGraphOperator`,
-`MutateGraphOperatorParam`, `GraphRawFieldMutation`, `InputRef.Swap`, and
-`InputRef.RawFieldMutation` are all in this class. Topology connection operators
+`MutateGraphOperatorParam`, `GraphRawFieldMutation`, `InputRef.Add` on a
+Graph node (T20.F16), `InputRef.Swap`, and `InputRef.RawFieldMutation` are all
+in this class. Topology connection operators
 are `RetargetNodeTarget`, `RemoveRouteTarget`, `RemoveNode`, `MutateGateBias`,
 `SwapRouteTargets`, and the explicit macro `ChangeEntryNode`, all owned by
 T11.F15. The retired identity rename is outside this live taxonomy. `CopyEdgeBundle` remains an
@@ -537,12 +538,20 @@ added/removed/retyped — only their edges are evolvable.
 
 ### InputRef domain
 
-- `Add` — a growth operator; pushes to `input_refs` and wires nothing on
-  either backend (no VM `ReadInput` auto-insertion, no graph edge). The new
-  `GraphSource::InputLeaf` source, or VM `ReadInput { ref_idx }` reference,
-  becomes addressable only by a later connection operator (`AddGraphEdge` or
-  `RetargetGraphEdge` on the graph backend; the VM operators that construct
-  `ReadInput` on the VM backend).
+- `Add` — pushes one reference to `input_refs`. On a VM node it is a growth
+  operator and wires nothing (no `ReadInput` auto-insertion, no further draw);
+  the VM `ReadInput { ref_idx }` reference becomes addressable only by the VM
+  operators that construct `ReadInput`. On a Graph node it is a connection
+  operator (T20.F16, born-connected input declaration): after the reference
+  draw it draws `sub_idx = gen_range(0..width)` (`width` the reference's
+  sub-value count), a vote sink `VoteSink::from_index(gen_range(0..27))` and a
+  weight `gen_range(-1.0f32..=1.0)` (`AddGraphEdge`'s new-edge law), in that
+  order, and appends one `GraphEdge { source: InputLeaf { ref_idx, sub_idx },
+  weight }` to that `ActionVote` sink's inputs, `ref_idx` the appended index.
+  The draws are always taken; when the index does not fit `u16` or the node
+  lacks the drawn sink, no edge is pushed and the event stays a plain
+  declaration. The born edge is an ordinary edge with no provenance; the
+  connected reference is not prunable while the edge consumes it.
 
   The new reference is one `gen_range(0..27)` key draw (T19.F05):
 
