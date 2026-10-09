@@ -936,16 +936,6 @@
        }
       },
       "by_channel": {
-       "NeighborBarrierRing#2": {
-        "funnel_causal": 2,
-        "vote_delta_parents": 2,
-        "agree": true
-       },
-       "NeighborBarrierRing#6": {
-        "funnel_causal": 1,
-        "vote_delta_parents": 1,
-        "agree": true
-       },
        "AreaFoodSummary:0#0": {
         "funnel_causal": 1,
         "vote_delta_parents": 1,
@@ -959,6 +949,16 @@
        "AreaFoodSummary:0#3": {
         "funnel_causal": 2,
         "vote_delta_parents": 2,
+        "agree": true
+       },
+       "NeighborBarrierRing#2": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "NeighborBarrierRing#6": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
         "agree": true
        }
       },
@@ -2194,11 +2194,6 @@
        }
       },
       "by_channel": {
-       "NeighborBarrierRing#4": {
-        "funnel_causal": 2,
-        "vote_delta_parents": 2,
-        "agree": true
-       },
        "AreaFoodSummary:0#1": {
         "funnel_causal": 3,
         "vote_delta_parents": 3,
@@ -2207,6 +2202,11 @@
        "AreaFoodSummary:0#4": {
         "funnel_causal": 1,
         "vote_delta_parents": 1,
+        "agree": true
+       },
+       "NeighborBarrierRing#4": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
         "agree": true
        }
       },
@@ -3769,17 +3769,17 @@
        }
       },
       "by_channel": {
-       "NeighborBarrierRing#5": {
-        "funnel_causal": 1,
-        "vote_delta_parents": 1,
-        "agree": true
-       },
        "AreaFoodSummary:0#0": {
         "funnel_causal": 2,
         "vote_delta_parents": 2,
         "agree": true
        },
        "AreaFoodSummary:0#4": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "NeighborBarrierRing#5": {
         "funnel_causal": 1,
         "vote_delta_parents": 1,
         "agree": true
@@ -5173,6 +5173,10 @@
       5557
      ]
     },
+    "agreement_10000": {
+     "default": true,
+     "wide": true
+    },
     "agreement_holds": true,
     "seed_validates": false
    },
@@ -5291,6 +5295,10 @@
       7500,
       7509
      ]
+    },
+    "agreement_10000": {
+     "default": true,
+     "wide": true
     },
     "agreement_holds": true,
     "seed_validates": true

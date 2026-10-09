@@ -117,6 +117,8 @@ def main():
               {"differing_keys": [k for k in projection(f) if projection(f)[k] != projection(v).get(k)],
                "keys_only_in_frozen": sorted(set(projection(f)) - set(projection(v))),
                "keys_only_in_votes": sorted(set(projection(v)) - set(projection(f)))})
+    check("votes config metadata equals frozen config metadata", frozen_doc["config"] == votes_doc["config"],
+          {"frozen": frozen_doc["config"], "votes": votes_doc["config"]})
     a = wide["founder"]
     sa = a["single_add_births"]
     check("non_clear (1) founder single-Add connect_any_given_declared exactly 1",

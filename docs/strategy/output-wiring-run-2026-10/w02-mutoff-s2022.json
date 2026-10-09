@@ -1,7 +1,7 @@
 {
  "mode": "equal",
  "ref": {
-  "dir": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w1/frozen/default-mutoff-s2022",
+  "dir": ".bench-artifacts/lab/wiring/w1/frozen/default-mutoff-s2022",
   "name": "default-mutoff-s2022",
   "sha256": {
    "samples": "df4783639905b234b0f747e3d131bc8e23a35e1d1dbf39533d60e24ef313d6b8",
@@ -9,7 +9,7 @@
   }
  },
  "cand": {
-  "dir": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w1/default-mutoff-s2022",
+  "dir": ".bench-artifacts/lab/wiring/w1/default-mutoff-s2022",
   "name": "default-mutoff-s2022",
   "sha256": {
    "samples": "b16d1037157a8537b407f9679a8e2d16e194b830b93695740eb8dfdf494498e0",
@@ -232,6 +232,24 @@
    "detail": {
     "have": [],
     "expected": []
+   }
+  },
+  {
+   "check": "ref extinction record, footer ticks and extinct flag agree",
+   "pass": true,
+   "detail": {
+    "footer_ticks": 7509,
+    "extinct_record": 7509,
+    "extinct_flag": true
+   }
+  },
+  {
+   "check": "cand extinction record, footer ticks and extinct flag agree",
+   "pass": true,
+   "detail": {
+    "footer_ticks": 7509,
+    "extinct_record": 7509,
+    "extinct_flag": true
    }
   },
   {

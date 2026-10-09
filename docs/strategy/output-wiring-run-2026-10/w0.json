@@ -1,7 +1,7 @@
 {
  "gate": "W0",
  "frozen": {
-  "path": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w0/e4-frozen.json",
+  "path": ".bench-artifacts/lab/wiring/w0/e4-frozen.json",
   "sha256": "32976206402903beadd0a5c3889e7124352e0f0ccdd9c982295152326e923a16",
   "config": {
    "born_connected_destinations": "votes",
@@ -16,7 +16,7 @@
   }
  },
  "votes": {
-  "path": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w0/e4-votes.json",
+  "path": ".bench-artifacts/lab/wiring/w0/e4-votes.json",
   "sha256": "97a5e66f522fe1f22147f7434a738c49a8fafa1b53d82fa532e9c2b7809ac3b1",
   "config": {
    "born_connected_destinations": "votes",
@@ -31,7 +31,7 @@
   }
  },
  "non_clear": {
-  "path": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w0/e4-wide.json",
+  "path": ".bench-artifacts/lab/wiring/w0/e4-wide.json",
   "sha256": "24a23e712ffb83e3b83cd563a6c821b718d254ac77edf9cde34efcc2668bfae9",
   "config": {
    "born_connected_destinations": "non_clear",
@@ -46,7 +46,7 @@
   }
  },
  "non_clear_10m": {
-  "path": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w0/e4-wide-10m.json",
+  "path": ".bench-artifacts/lab/wiring/w0/e4-wide-10m.json",
   "sha256": "0fa205cad7a36d54a26307563a54be93f56f6e1c70b813fdb55d8af9d01c5826",
   "config": {
    "born_connected_destinations": "non_clear",
@@ -158,6 +158,35 @@
     "differing_keys": [],
     "keys_only_in_frozen": [],
     "keys_only_in_votes": []
+   }
+  },
+  {
+   "check": "votes config metadata equals frozen config metadata",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "frozen": {
+     "born_connected_destinations": "votes",
+     "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+     "executed_bias": 0.9,
+     "executed_window_ticks": 100,
+     "food_types": 2,
+     "mesh_layer_probability": 0.2,
+     "neutral_input_recruitment": "Off",
+     "per_unit_rate": 0.005,
+     "scene_seed": 239455822
+    },
+    "votes": {
+     "born_connected_destinations": "votes",
+     "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+     "executed_bias": 0.9,
+     "executed_window_ticks": 100,
+     "food_types": 2,
+     "mesh_layer_probability": 0.2,
+     "neutral_input_recruitment": "Off",
+     "per_unit_rate": 0.005,
+     "scene_seed": 239455822
+    }
    }
   },
   {
