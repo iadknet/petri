@@ -1,0 +1,90 @@
+{
+ "gate": "B0.2 (i) smoke",
+ "probe_samples": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w02/samples-g1-default-s1022.ndjson",
+ "run": "/Users/istefanek/projects/petri/.claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w02/main-run-s1022.ndjson",
+ "last_tick": 2000,
+ "sha256": {
+  "probe_samples": "032c415450d3a33163f8a521b61edb797ea801d156dd44e720e8590cd91a98d1",
+  "probe_census": "5a17231f3e6ee51724b55b1e0b44704cb361551bf11966dbb47af1f60101f551",
+  "run": "e7489c4d7d3df0cc375aeffd7dcaf60ce2e7254b4abc2fbd0b569996a5f40a29"
+ },
+ "checks": [
+  {
+   "check": "probe tick set equals expected",
+   "pass": true,
+   "detail": {
+    "probe": [
+     500,
+     1000,
+     1500,
+     2000
+    ],
+    "expected": [
+     500,
+     1000,
+     1500,
+     2000
+    ]
+   }
+  },
+  {
+   "check": "run tick set equals expected",
+   "pass": true,
+   "detail": {
+    "run": [
+     500,
+     1000,
+     1500,
+     2000
+    ]
+   }
+  },
+  {
+   "check": "every compared field present on both sides",
+   "pass": true,
+   "detail": {
+    "missing": []
+   }
+  },
+  {
+   "check": "every compared value equal at every tick",
+   "pass": true,
+   "detail": {
+    "mismatches": []
+   }
+  },
+  {
+   "check": "probe completed to the last tick",
+   "pass": true,
+   "detail": {
+    "census_secs": 1.021185251,
+    "elapsed_secs": 73.457966083,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 72.12817617000003,
+    "threads": 8,
+    "ticks": 2000
+   }
+  },
+  {
+   "check": "run completed",
+   "pass": true,
+   "detail": {
+    "protocol_version": "v3alpha1",
+    "event_type": "run_completed",
+    "ticks_executed": 2000,
+    "final_population": 5232,
+    "final_mean_energy": 31.845392
+   }
+  },
+  {
+   "check": "config digests equal",
+   "pass": true,
+   "detail": {
+    "probe": "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6",
+    "run": "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6"
+   }
+  }
+ ],
+ "pass": true
+}
