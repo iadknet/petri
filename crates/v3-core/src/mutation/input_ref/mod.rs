@@ -7,8 +7,9 @@ use crate::config::{MutationConfig, OrdinaryFoodTypeId};
 use crate::contracts::{
     DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
 };
-use crate::creature::genome::cgp::GraphSource;
+use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
 use crate::creature::genome::mesh_annotations::{classify_input_ref, MeshReadClass};
+use crate::creature::genome::vote::{VoteSink, VOTE_SINK_COUNT};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
 use crate::creature::sensor_census::world_input_key_universe;
 use crate::mutation::compound::sub_value_count;
@@ -291,20 +292,59 @@ impl InputRefMutator {
     }
 }
 
-/// Push a new input reference onto the target node. It is wired into
-/// nothing on either backend: a fresh `InputReference` is a growth step, not
-/// a connection, so it must be neutral at the moment it fires
-/// (`docs/reference/v3-mutation-spec.md`'s node-type contract). The
-/// reference becomes addressable by later connection operators
-/// (`AddGraphEdge`, `RetargetGraphEdge` on the graph backend; VM operators
-/// that reference `input_refs` on the VM backend).
+/// Push a new input reference onto the target node.
+///
+/// On a VM node the reference is wired into nothing: no `ReadInput` is
+/// inserted, nothing else is drawn, and the reference becomes addressable
+/// only by the VM operators that construct `ReadInput`, so the event is a
+/// neutral growth step.
+///
+/// On a Graph node the event is a connection (T20.F16, born-connected input
+/// declaration): the reference is declared already wired into one of the
+/// node's `ActionVote` sinks by [`connect_declared_input`], so it is live and
+/// exposed to selection at birth (`docs/reference/v3-mutation-spec.md`'s
+/// InputRef domain).
 fn apply_add(node: &mut NodeGenome, rng: &mut impl Rng, food_type_count: usize) {
     let new_ref = if food_type_count <= 1 {
         sampling::random_input_reference(rng)
     } else {
         sampling::random_input_reference_for_food_types(rng, food_type_count)
     };
+    let width = sub_value_count(&new_ref);
     node.input_refs.push(new_ref);
+    let ref_idx = u16::try_from(node.input_refs.len() - 1).ok();
+    if let BackendDef::Graph(def) = &mut node.backend_def {
+        connect_declared_input(def, ref_idx, width, rng);
+    }
+}
+
+/// Wire the just-declared reference `ref_idx` into one `ActionVote` sink.
+///
+/// Three draws in this order: the sub-value uniformly under `width`, the
+/// sink uniformly by index over all `VOTE_SINK_COUNT`, and the weight from
+/// `AddGraphEdge`'s new-edge law (uniform on [-1, 1]). The draws are always
+/// taken; the edge is pushed only when the index fits `u16` (`ref_idx` is
+/// `Some`) and the node carries the drawn sink, otherwise the event stays a
+/// plain declaration with the same draw stream.
+pub(crate) fn connect_declared_input(
+    def: &mut CgpGraphBackendDef,
+    ref_idx: Option<u16>,
+    width: u16,
+    rng: &mut impl Rng,
+) {
+    debug_assert!(width > 0, "every input reference has at least one sub-value");
+    let sub_idx = rng.gen_range(0..width);
+    let sink = VoteSink::from_index(rng.gen_range(0..VOTE_SINK_COUNT));
+    let weight = rng.gen_range(-1.0f32..=1.0);
+    let (Some(ref_idx), Some(sink)) = (ref_idx, sink) else {
+        return;
+    };
+    if let Some(sink) = def.sink_mut(OutputSinkKind::ActionVote(sink)) {
+        sink.inputs.push(GraphEdge {
+            source: GraphSource::InputLeaf { ref_idx, sub_idx },
+            weight,
+        });
+    }
 }
 
 /// Delete one entry drawn uniformly among those no consumer addresses, then

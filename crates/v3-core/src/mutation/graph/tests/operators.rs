@@ -410,13 +410,14 @@ proptest! {
         }
     }
 
-    /// Pushing a new input reference (unwired) never changes graph-backend
-    /// behavior: no edge references the new index, and growing
-    /// `input_refs` cannot invalidate an existing edge because every
-    /// existing `InputLeaf.ref_idx` is already within the old, smaller
-    /// bound.
+    /// An appended input reference that no edge consumes never changes
+    /// graph-backend behavior: growing `input_refs` cannot invalidate an
+    /// existing edge because every existing `InputLeaf.ref_idx` is already
+    /// within the old, smaller bound. This is not `InputRef::Add` on a Graph
+    /// node, which wires the reference into a vote sink (T20.F16); it covers
+    /// unconsumed references such as one whose last edge was removed.
     #[test]
-    fn unwired_input_ref_add_is_neutral_on_graph_node(seed in any::<u64>()) {
+    fn unconsumed_input_ref_append_is_neutral_on_graph_node(seed in any::<u64>()) {
         use crate::mutation::sampling::random_input_reference;
 
         for (label, parent, parent_refs) in fixtures() {
@@ -424,10 +425,10 @@ proptest! {
             let mut child_refs = parent_refs.clone();
             child_refs.push(random_input_reference(&mut rng));
             assert_neutral(
-                &format!("unwired_input_ref_add_graph[{label}]"),
+                &format!("unconsumed_input_ref_append_graph[{label}]"),
                 &parent,
                 &parent_refs,
-                &parent, // def itself is untouched by InputRef::Add
+                &parent, // def untouched: no edge consumes the appended reference
                 &child_refs,
                 &ample_runtime_config(),
             );

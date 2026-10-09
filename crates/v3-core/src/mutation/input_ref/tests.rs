@@ -6,7 +6,7 @@ use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
-use crate::creature::genome::vote::{ActionParamField, VoteSink};
+use crate::creature::genome::vote::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -731,71 +731,92 @@ fn complexity_effect_consistent_with_types() {
     }
 }
 
-// ── InputRef::Add wires nothing (T11.F03) ───────────────────────────────────
+// ── InputRef::Add declares a born-connected input on Graph (T20.F16) ───────
 
-fn graph_node_genome_zero_refs() -> CreatureGenome {
+/// One Graph node with the full fixed sink catalog and no references.
+fn graph_node_genome_full_catalog() -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef {
-                birth_weights: None,
-                compute_nodes: vec![ComputeNode {
-                    kind: ComputeNodeKind::Add,
-                    inputs: vec![],
-                    plasticity: None,
-                }],
-                output_sinks: vec![
-                    OutputSink {
-                        kind: OutputSinkKind::CustomOutput(0),
-                        inputs: vec![],
-                    },
-                    OutputSink {
-                        kind: OutputSinkKind::ActionVote(VoteSink::Eat),
-                        inputs: vec![],
-                    },
-                ],
-            }),
+            backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
             targets: vec![],
         }],
     }
 }
 
-fn count_input_leaf_edges_for_ref(genome: &CreatureGenome, node_idx: usize, ref_idx: u16) -> usize {
-    let BackendDef::Graph(ref def) = genome.nodes[node_idx].backend_def else {
-        return 0;
+fn graph_def(node: &NodeGenome) -> &CgpGraphBackendDef {
+    let BackendDef::Graph(def) = &node.backend_def else {
+        panic!("expected graph backend");
     };
-    let mut count = 0;
-    for node in &def.compute_nodes {
-        count += node
-            .inputs
-            .iter()
-            .filter(
-                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx),
-            )
-            .count();
-    }
-    for sink in &def.output_sinks {
-        count += sink
-            .inputs
-            .iter()
-            .filter(
-                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx),
-            )
-            .count();
-    }
-    count
+    def
 }
 
-/// `InputRef::Add` is a growth operator: it must be neutral at fire time
-/// (`docs/reference/v3-mutation-spec.md`'s node-type contract), so it wires
-/// the new reference into nothing on the graph backend, no matter how many
-/// sub-values the sampled reference has.
+/// Every edge on the node's `ActionVote` sinks as (sink, source, weight).
+fn vote_edges(node: &NodeGenome) -> Vec<(VoteSink, GraphSource, f32)> {
+    let BackendDef::Graph(def) = &node.backend_def else {
+        return Vec::new();
+    };
+    def.output_sinks
+        .iter()
+        .filter_map(|sink| match sink.kind {
+            OutputSinkKind::ActionVote(vote) => Some((vote, sink)),
+            _ => None,
+        })
+        .flat_map(|(vote, sink)| {
+            sink.inputs
+                .iter()
+                .map(move |edge| (vote, edge.source, edge.weight))
+        })
+        .collect()
+}
+
+fn edge_count(node: &NodeGenome) -> usize {
+    match &node.backend_def {
+        BackendDef::Graph(def) => def.edges().count(),
+        BackendDef::Vm(_) => 0,
+    }
+}
+
+/// The vote edges `after` carries beyond `before`'s, as a multiset
+/// difference; panics when an old vote edge is gone.
+fn new_vote_edges(before: &NodeGenome, after: &NodeGenome) -> Vec<(VoteSink, GraphSource, f32)> {
+    let mut new = vote_edges(after);
+    for edge in vote_edges(before) {
+        let pos = new
+            .iter()
+            .position(|candidate| *candidate == edge)
+            .expect("every old vote edge kept");
+        new.remove(pos);
+    }
+    new
+}
+
+fn apply_add_to_node(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut SmallRng,
+    food_type_count: usize,
+) {
+    InputRefMutator::apply_to_node(
+        genome,
+        InputRefOperator::Add,
+        node_idx,
+        rng,
+        food_type_count,
+    )
+    .expect("Add always applies");
+}
+
+/// `InputRef::Add` on a Graph node is a connection event: it appends one
+/// reference and one edge from it into one `ActionVote` sink of the same
+/// node, at a sub-value under the reference's width and a weight in [-1, 1].
 #[test]
-fn add_input_ref_to_graph_node_wires_nothing() {
+fn add_input_ref_to_graph_node_wires_one_vote_edge() {
     for seed in 0u64..200 {
-        let mut genome = graph_node_genome_zero_refs();
+        let base = graph_node_genome_full_catalog();
+        let mut genome = base.clone();
         let mut r = rng(seed);
         InputRefMutator::apply(
             &mut genome,
@@ -805,44 +826,303 @@ fn add_input_ref_to_graph_node_wires_nothing() {
             &default_config(),
         )
         .unwrap();
-        assert_eq!(genome.nodes[0].input_refs.len(), 1, "seed {seed}");
-        assert_eq!(
-            count_input_leaf_edges_for_ref(&genome, 0, 0),
-            0,
-            "seed {seed}: InputRef::Add must not wire the new reference into any edge"
-        );
+        let after = &genome.nodes[0];
+        assert_eq!(after.input_refs.len(), 1, "seed {seed}");
+        assert_eq!(edge_count(after), 1, "seed {seed}: exactly one edge");
+        let new = new_vote_edges(&base.nodes[0], after);
+        assert_eq!(new.len(), 1, "seed {seed}: the edge is on a vote sink");
+        let (_, source, weight) = new[0];
+        let GraphSource::InputLeaf { ref_idx, sub_idx } = source else {
+            panic!("seed {seed}: the born edge reads the new reference, not {source:?}");
+        };
+        assert_eq!(ref_idx, 0, "seed {seed}");
+        assert!(sub_idx < sub_value_count(&after.input_refs[0]), "seed {seed}");
+        assert!((-1.0..=1.0).contains(&weight), "seed {seed}: weight {weight}");
     }
 }
 
+/// A populated founder decision node with plasticity and `birth_weights`:
+/// every incumbent compute node, plasticity entry, sink, edge and weight is
+/// kept, and the one new edge is the last input of one vote sink.
 #[test]
 fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
-    let mut genome = graph_node_genome_zero_refs();
-    genome.nodes[0]
-        .input_refs
-        .push(InputReference::World(WorldInputKey::food_here(
-            OrdinaryFoodTypeId::default(),
-        )));
-    let before = genome.clone();
-    let mut r = rng(99);
-    InputRefMutator::apply(
-        &mut genome,
-        InputRefOperator::Add,
-        &mut TargetSelector::reachable_only(&[], 0.0),
-        &mut r,
-        &default_config(),
-    )
-    .unwrap();
-    assert_eq!(genome.nodes[0].input_refs.len(), 2);
-    let BackendDef::Graph(ref before_def) = before.nodes[0].backend_def else {
-        panic!("expected graph backend");
-    };
-    let BackendDef::Graph(ref after_def) = genome.nodes[0].backend_def else {
-        panic!("expected graph backend");
-    };
-    assert_eq!(
-        before_def, after_def,
-        "InputRef::Add must not touch any existing edge"
+    let mut base = v3alpha1_founder_genome();
+    {
+        let BackendDef::Graph(def) = &mut base.nodes[1].backend_def else {
+            panic!("the founder decision node is a Graph node");
+        };
+        def.compute_nodes[0].plasticity = Some(crate::creature::genome::PlasticityConfig {
+            rule: crate::creature::genome::HebbianRule::Classic,
+            learning_rate: 0.1,
+            weight_clamp: 5.0,
+            lamarckian: false,
+            modulation: None,
+        });
+        def.birth_weights = Some(
+            def.compute_nodes
+                .iter()
+                .map(|node| vec![Some(0.25); node.inputs.len()])
+                .collect(),
+        );
+    }
+    let before_def = graph_def(&base.nodes[1]).clone();
+    assert_eq!(before_def.output_sinks.len(), 94, "a full sink catalog");
+    assert!(
+        before_def
+            .compute_nodes
+            .iter()
+            .any(|node| node.inputs.iter().any(|edge| edge.weight != 0.0)),
+        "the fixture carries weighted compute edges"
     );
+    assert!(
+        vote_edges(&base.nodes[1]).iter().any(|edge| edge.2 != 0.0),
+        "the fixture carries weighted vote edges"
+    );
+    for seed in 0u64..32 {
+        let mut genome = base.clone();
+        let mut r = rng(seed);
+        apply_add_to_node(&mut genome, 1, &mut r, 2);
+        assert_eq!(genome.nodes[0], base.nodes[0], "seed {seed}: other node");
+        let after_def = graph_def(&genome.nodes[1]);
+        assert_eq!(after_def.compute_nodes, before_def.compute_nodes, "seed {seed}");
+        assert_eq!(after_def.birth_weights, before_def.birth_weights, "seed {seed}");
+        assert_eq!(after_def.output_sinks.len(), before_def.output_sinks.len());
+        let mut grown = 0;
+        for (after_sink, before_sink) in after_def.output_sinks.iter().zip(&before_def.output_sinks) {
+            assert_eq!(after_sink.kind, before_sink.kind, "seed {seed}");
+            let kept = before_sink.inputs.len();
+            assert_eq!(after_sink.inputs[..kept], before_sink.inputs[..], "seed {seed}");
+            match after_sink.inputs.len() - kept {
+                0 => {}
+                1 => {
+                    assert!(matches!(after_sink.kind, OutputSinkKind::ActionVote(_)));
+                    grown += 1;
+                }
+                extra => panic!("seed {seed}: {extra} edges appended to one sink"),
+            }
+        }
+        assert_eq!(grown, 1, "seed {seed}: exactly one vote sink grew");
+        let len = base.nodes[1].input_refs.len();
+        assert_eq!(genome.nodes[1].input_refs[..len], base.nodes[1].input_refs[..]);
+        assert_eq!(genome.nodes[1].input_refs.len(), len + 1);
+    }
+}
+
+/// The three draws after the reference are, in order: the sub-value under
+/// the width, the vote sink by index over all 27, the weight on [-1, 1].
+/// Replaying them by hand reproduces the edge and leaves the stream at the
+/// same position.
+#[test]
+fn add_input_ref_on_graph_draws_sub_value_then_sink_then_weight() {
+    for seed in 0u64..64 {
+        let mut genome = graph_node_genome_full_catalog();
+        let mut r = rng(seed);
+        apply_add_to_node(&mut genome, 0, &mut r, 1);
+        let mut replay = rng(seed);
+        let reference = random_input_reference(&mut replay);
+        let sub_idx = replay.gen_range(0..sub_value_count(&reference));
+        let sink = VoteSink::from_index(replay.gen_range(0..VOTE_SINK_COUNT)).unwrap();
+        let weight = replay.gen_range(-1.0f32..=1.0);
+        assert_eq!(genome.nodes[0].input_refs, vec![reference], "seed {seed}");
+        assert_eq!(
+            vote_edges(&genome.nodes[0]),
+            vec![(sink, GraphSource::InputLeaf { ref_idx: 0, sub_idx }, weight)],
+            "seed {seed}"
+        );
+        assert_eq!(r.gen::<u64>(), replay.gen::<u64>(), "seed {seed}: nothing else drawn");
+    }
+}
+
+/// On a VM node `Add` is the old path draw for draw: one reference, no
+/// extra random number.
+#[test]
+fn add_input_ref_on_vm_draws_only_the_reference() {
+    for food_type_count in [1usize, 3] {
+        for seed in 0u64..64 {
+            let mut genome = single_node_genome_with_input_ref(InputReference::ActionQueue);
+            let before = genome.clone();
+            let mut r = rng(seed);
+            apply_add_to_node(&mut genome, 0, &mut r, food_type_count);
+            let mut replay = rng(seed);
+            let reference = if food_type_count <= 1 {
+                random_input_reference(&mut replay)
+            } else {
+                random_input_reference_for_food_types(&mut replay, food_type_count)
+            };
+            assert_eq!(
+                genome.nodes[0].input_refs,
+                vec![InputReference::ActionQueue, reference]
+            );
+            assert_eq!(genome.nodes[0].backend_def, before.nodes[0].backend_def);
+            assert_eq!(r.gen::<u64>(), replay.gen::<u64>(), "seed {seed}");
+        }
+    }
+}
+
+/// A drawn sink the node lacks leaves the event a plain declaration, with
+/// the three draws still taken.
+#[test]
+fn add_input_ref_with_a_truncated_catalog_stays_a_declaration() {
+    for seed in 0u64..64 {
+        let mut genome = graph_node_genome_full_catalog();
+        let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
+            unreachable!()
+        };
+        def.output_sinks
+            .retain(|sink| !matches!(sink.kind, OutputSinkKind::ActionVote(_)));
+        let before = genome.clone();
+        let mut r = rng(seed);
+        apply_add_to_node(&mut genome, 0, &mut r, 1);
+        assert_eq!(genome.nodes[0].input_refs.len(), 1, "seed {seed}");
+        assert_eq!(genome.nodes[0].backend_def, before.nodes[0].backend_def);
+        let mut full = graph_node_genome_full_catalog();
+        let mut replay = rng(seed);
+        apply_add_to_node(&mut full, 0, &mut replay, 1);
+        assert_eq!(r.gen::<u64>(), replay.gen::<u64>(), "seed {seed}: same draws");
+    }
+}
+
+/// The appended index 65,535 still fits `u16` and connects; 65,536 does not,
+/// so the event stays a declaration, and both take the same three draws.
+#[test]
+fn add_input_ref_connects_only_while_the_index_fits_u16() {
+    let filler = InputReference::ActionQueue;
+    let mut fits = graph_node_genome_full_catalog();
+    fits.nodes[0].input_refs = vec![filler.clone(); 65_535];
+    let mut overflows = graph_node_genome_full_catalog();
+    overflows.nodes[0].input_refs = vec![filler; 65_536];
+
+    let mut r_fits = rng(7);
+    apply_add_to_node(&mut fits, 0, &mut r_fits, 1);
+    let mut r_overflows = rng(7);
+    apply_add_to_node(&mut overflows, 0, &mut r_overflows, 1);
+
+    assert_eq!(fits.nodes[0].input_refs.len(), 65_536);
+    let edges = vote_edges(&fits.nodes[0]);
+    assert_eq!(edges.len(), 1);
+    assert!(matches!(
+        edges[0].1,
+        GraphSource::InputLeaf { ref_idx: 65_535, .. }
+    ));
+    assert_eq!(overflows.nodes[0].input_refs.len(), 65_537);
+    assert_eq!(edge_count(&overflows.nodes[0]), 0, "a plain declaration");
+    assert_eq!(r_fits.gen::<u64>(), r_overflows.gen::<u64>(), "same draws");
+}
+
+/// The born edge consumes the new reference, so `Prune` cannot take it.
+#[test]
+fn add_input_ref_on_graph_leaves_the_new_reference_unprunable() {
+    for seed in 0u64..32 {
+        let mut genome = graph_node_genome_full_catalog();
+        let mut r = rng(seed);
+        apply_add_to_node(&mut genome, 0, &mut r, 1);
+        assert!(prunable_indices(&genome.nodes[0]).is_empty(), "seed {seed}");
+    }
+}
+
+/// Over many seeds the born edge reaches every one of the 27 vote sinks and
+/// all 8 sub-values of a ring, with both signs: every draw is uniform over
+/// its whole range, named by index, never by meaning.
+#[test]
+fn born_edge_reaches_every_vote_sink_and_ring_sub_value() {
+    let ring = InputReference::World(WorldInputKey::neighbor_food_ring(
+        OrdinaryFoodTypeId::new(0),
+    ));
+    let width = sub_value_count(&ring);
+    assert_eq!(width, 8);
+    let mut sinks = std::collections::BTreeSet::new();
+    let mut subs = std::collections::BTreeSet::new();
+    let (mut negative, mut positive) = (0u32, 0u32);
+    for seed in 0u64..4096 {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        let mut r = rng(seed);
+        connect_declared_input(&mut def, Some(7), width, &mut r);
+        let mut edges = def.output_sinks.iter().flat_map(|sink| {
+            sink.inputs.iter().map(move |edge| (sink.kind, *edge))
+        });
+        let (kind, edge) = edges.next().expect("one edge");
+        assert!(edges.next().is_none(), "seed {seed}: only one edge");
+        let OutputSinkKind::ActionVote(vote) = kind else {
+            panic!("seed {seed}: {kind:?} is not a vote sink");
+        };
+        sinks.insert(vote.index());
+        let GraphSource::InputLeaf { ref_idx: 7, sub_idx } = edge.source else {
+            panic!("seed {seed}: {:?}", edge.source);
+        };
+        subs.insert(sub_idx);
+        if edge.weight < 0.0 {
+            negative += 1;
+        } else {
+            positive += 1;
+        }
+    }
+    assert_eq!(sinks.len(), VOTE_SINK_COUNT);
+    assert_eq!(subs.len(), usize::from(width));
+    assert!(negative > 1500 && positive > 1500, "{negative} negative, {positive} positive");
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(48))]
+
+    /// Over generated genomes, `Add` appends exactly one reference to the
+    /// target node and keeps every earlier one; on a VM node the backend is
+    /// unchanged; on a Graph node at most one edge is added (exactly one with
+    /// the full vote catalog), on a vote sink, sourced from the appended index
+    /// at a sub-value under its width, with a weight in [-1, 1], and the
+    /// compute nodes are unchanged; every other node is unchanged.
+    #[test]
+    fn add_declares_one_reference_and_at_most_one_vote_edge(
+        seed in any::<u64>(),
+        sizes in prop::collection::vec(module_size(), 1..4),
+        food_type_count in 1usize..4,
+    ) {
+        let base = generated_genome(seed, &sizes);
+        for node_idx in 0..base.nodes.len() {
+            let mut genome = base.clone();
+            let mut r = rng(seed ^ node_idx as u64);
+            InputRefMutator::apply_to_node(
+                &mut genome, InputRefOperator::Add, node_idx, &mut r, food_type_count,
+            )
+            .expect("Add always applies");
+            for (idx, node) in genome.nodes.iter().enumerate() {
+                if idx != node_idx {
+                    prop_assert_eq!(node, &base.nodes[idx], "an untargeted node changed");
+                }
+            }
+            let before = &base.nodes[node_idx];
+            let after = &genome.nodes[node_idx];
+            prop_assert_eq!(after.input_refs.len(), before.input_refs.len() + 1);
+            prop_assert_eq!(&after.input_refs[..before.input_refs.len()], &before.input_refs[..]);
+            let width = sub_value_count(&after.input_refs[before.input_refs.len()]);
+            match (&before.backend_def, &after.backend_def) {
+                (BackendDef::Vm(b), BackendDef::Vm(a)) => prop_assert_eq!(a, b),
+                (BackendDef::Graph(b), BackendDef::Graph(a)) => {
+                    prop_assert_eq!(&a.compute_nodes, &b.compute_nodes);
+                    let vote_sinks = b
+                        .output_sinks
+                        .iter()
+                        .filter(|sink| matches!(sink.kind, OutputSinkKind::ActionVote(_)))
+                        .count();
+                    let new = new_vote_edges(before, after);
+                    if vote_sinks == VOTE_SINK_COUNT {
+                        prop_assert_eq!(new.len(), 1, "a full catalog receives the edge");
+                    } else {
+                        prop_assert!(new.len() <= 1);
+                    }
+                    prop_assert_eq!(edge_count(after), edge_count(before) + new.len());
+                    if let Some(&(_, source, weight)) = new.first() {
+                        let GraphSource::InputLeaf { ref_idx, sub_idx } = source else {
+                            return Err(TestCaseError::fail(format!("born edge source {source:?}")));
+                        };
+                        prop_assert_eq!(usize::from(ref_idx), before.input_refs.len());
+                        prop_assert!(sub_idx < width);
+                        prop_assert!((-1.0..=1.0).contains(&weight));
+                    }
+                }
+                _ => prop_assert!(false, "the backend kind changed"),
+            }
+        }
+    }
 }
 
 /// The VM `ReadInput` auto-insertion is removed: `InputRef::Add` on a VM
