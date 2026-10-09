@@ -75,7 +75,7 @@ not decide the destination class or the gain for this substrate.
 | Afterwards | The born edge is an ordinary edge: `AlterGraphEdgeWeight`, `RetargetGraphEdge`, `RemoveGraphEdge`, `CopyEdgeBundle`, copies, serialization and the T11.F22 `Prune` and `Swap` rules apply to it as to any other; no provenance is recorded. The connected reference leaves `prunable_indices` until `RemoveGraphEdge` or retargeting removes its last consumer. |
 | Accounting | One applied `InputRefAdd` event with the same skip reasons, target reachability, `mutation_supply` counters and neighborhood operator identity as today; the requested-supply law `Binomial(genome_size, per_unit_rate)` is unchanged. Within a birth, later events may differ from the old path's because the draw stream and the edge pools moved; that is the mechanism, not a defect. |
 | Taxonomy | `Add` on a Graph node is a connection event, no longer a neutral growth operator; the mutation spec's growth-versus-connection sentence, its InputRef-domain `Add` paragraph, the graph backend spec's "unwired push" clause, the `apply_add` doc comment and the T20.F04 spec's `Separate paths` row say so explicitly, preserving the VM wording. |
-| Determinism | Three production RNG draws per Graph-node `Add`, in the pinned order; trajectory digests that cover a mutated Graph-node `Add` move once and are re-pinned in this feature with the reason in their comment; founder-only and zero-mutation pins and every config digest are unchanged. |
+| Determinism | Three production RNG draws per Graph-node `Add`, in the pinned order; every pin that covers a mutated Graph-node `Add` moves once and is re-pinned in this feature with the reason in its comment: trajectory digests (`applied_trajectory`, `baseline_worlds` legacy identity, drift-walk counts), the founder mutation hash of `recruitment_off_preserves_pre_feature_genomes_events_and_rng` (recruitment `Off` still adds no draw relative to the current path), the `recruitment_paths` seeded step plans and their accepted seeds (as T19.F04, T19.F05 and T11.F25 re-selected them), the `experiment.rs` recorded lineage counts (the T13.F06 progress record stays historical and is not rewritten), and tiny-fixture seeds whose population no longer reaches a sampled horizon, each with the fixture's extinction tick before and after stated in the readings. Founder-only and zero-mutation pins and every config digest are unchanged. |
 
 **Natural analog and what variation still discovers.** Expression inherited
 with a receptor duplication motivates immediate integration into an existing
@@ -192,6 +192,20 @@ builds, tests, servers or measurements:
 make bench PROFILE=gate FEATURE=t20-f16-born-connected-input-declaration
 make bench PROFILE=goal FEATURE=t20-f16-born-connected-input-declaration
 ```
+
+**Contradiction recorded before the gate run (2026-10-09, implementation
+brief 1; the predeclaration above is not edited).** The gate profile's
+`decided_passes` reads 0.000034 per creature-tick against 0.000000 in both gate
+references (T24.F02 and T03.F12), which the comparison classifies severe
+because the reference is zero, where the predeclaration budgeted no severe.
+A born vote edge lets a founder pass decide within the 75-tick gate; the goal
+references already read nonzero (T03.F12 0.000104). This is the mechanism's
+behavioral signature in the founder gate, not a compute cost; the threshold is
+not weakened and no stored baseline is edited; acceptance and the gate-epoch
+re-pin are the user's decision under the blocker rule, as at T11.F04 and
+T19.F04, and `make check`'s series test cannot pass before that decision. The
+benchmark stage reports the gate's `decided_passes_total` beside the count of
+founder births that applied a Graph-node `Add`.
 
 **Measured verdict.** Pending.
 
