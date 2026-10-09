@@ -13,9 +13,9 @@ parent's cascade. The ordinary `InputRef.Add` event on a Graph node appends the
 reference and, in the same event, one ordinary edge from that reference into one
 of the node's `ActionVote` sinks, so the declaration is live and exposed to
 selection at birth instead of waiting, silent, for a separate connection event.
-VM nodes are unchanged. The intended outcome, read by the goal profile in all
-three worlds, is more executed and causal reads of the target families on the
-selected cohort, with population not under half the previous closure's.
+VM nodes are unchanged. The intended outcome, read by the goal profile in three
+worlds, is more executed and causal target-family reads on the selected cohort
+with population not under half the previous closure's.
 
 ## Non-Goals
 
@@ -28,7 +28,7 @@ selected cohort, with population not under half the previous closure's.
   no multi-edge projection, no smaller gain than the new-edge law.
 - No discovery, usefulness or retention verdict, no floor rebased, no change to
   the F09 to F12 candidate chain, no matched control separating immediate
-  connection from the changes coupled to it (a recorded limit of the evidence).
+  connection from the changes coupled to it.
 
 ## Inputs and Invariants
 
@@ -44,17 +44,15 @@ the [born-connected run note](../../strategy/born-connected-run-2026-10.md)
 Section 3 and the [graph backend spec](../../reference/v3-graph-backend-spec.md);
 the [T20.F04](t20-f04-general-neutral-input-recruitment.md) and
 [T14.F12](t14-f12-neighborhood-read-of-selected-genomes.md) specs; the previous
-closure's goal summary (T03.F12, the pinned goal-worlds epoch). Reference only,
-never merged: the kept branch `worktree-born-connected`, `765e429c` and
-`a172c734` (`born_connect`, `born_connected_tests.rs`, seven unit tests and one
-proptest invariant).
+closure's goal summary (T03.F12). Reference only, never merged: the kept
+branch `worktree-born-connected`, `765e429c` and `a172c734` (`born_connect`,
+`born_connected_tests.rs`).
 
 **Evidence and choice.** The realization is the one B1 validated and B0 showed
 on the founder; every alternative below is untested and is rejected for that
-reason, not on principle. NEAT's add-connection operator (Stanley and
-Miikkulainen 2002, Section 3.1) is the nearest prior art: a new link with a
-random weight, exposed to selection at once; it supports the direction and does
-not decide the destination class or the gain for this substrate.
+reason, not on principle. NEAT's add-connection (Stanley and Miikkulainen 2002,
+Section 3.1), a random-weight link exposed to selection at once, is the nearest
+prior art and decides neither destination class nor gain here.
 
 | Question | Decision | Alternatives considered and why not |
 | --- | --- | --- |
@@ -77,18 +75,16 @@ not decide the destination class or the gain for this substrate.
 | Taxonomy | `Add` on a Graph node is a connection event, no longer a neutral growth operator; the mutation spec's growth-versus-connection sentence, its InputRef-domain `Add` paragraph, the graph backend spec's "unwired push" clause, the `apply_add` doc comment and the T20.F04 spec's `Separate paths` row say so explicitly, preserving the VM wording. |
 | Determinism | Three production RNG draws per Graph-node `Add`, in the pinned order; every pin that covers a mutated Graph-node `Add` moves once and is re-pinned in this feature with the reason in its comment: trajectory digests (`applied_trajectory`, `baseline_worlds` legacy identity, drift-walk counts), the founder mutation hash of `recruitment_off_preserves_pre_feature_genomes_events_and_rng` (recruitment `Off` still adds no draw relative to the current path), the `recruitment_paths` seeded step plans and their accepted seeds (VM plans re-seed only; the three Graph plans that declare a reference are re-expressed on the born edge per the Implementation Task below, as T19.F04 re-expressed them on votes), the `experiment.rs` recorded lineage counts (the T13.F06 progress record stays historical and is not rewritten), and tiny-fixture seeds whose population no longer reaches a sampled horizon, each with the fixture's extinction tick before and after stated in the readings. Founder-only and zero-mutation pins and every config digest are unchanged. |
 
-**Natural analog and what variation still discovers.** Expression inherited
-with a receptor duplication motivates immediate integration into an existing
-cascade (opsin and olfactory receptor duplications); the mechanism approximates
-it by a fresh random connection and models neither duplication nor pathway
-inheritance. After it, ordinary variation still discovers the reference itself,
-the right sink among 27, the sign and the weight.
+**Natural analog.** Expression inherited with a receptor duplication (opsin,
+olfactory receptors) motivates immediate integration into an existing cascade;
+the mechanism approximates it by a fresh random connection, modelling neither
+duplication nor pathway inheritance. Variation still discovers the reference,
+the sink among 27, the sign and the weight.
 
 ## Telemetry
 
-No new signal and no new configuration: the diff adds no counter, gauge, span
-attribute, config field or switch. What a person sees is existing signals moved
-by the changed births.
+No new signal or configuration (no counter, gauge, span attribute, config
+field or switch); a run shows existing signals moved by the changed births.
 
 | Signal | Kind | Source | Context carried |
 | --- | --- | --- | --- |
@@ -223,26 +219,20 @@ make bench PROFILE=gate FEATURE=t20-f16-born-connected-input-declaration
 make bench PROFILE=goal FEATURE=t20-f16-born-connected-input-declaration
 ```
 
-**Readings outside the predeclaration (the predeclaration is not edited;
-each is a blocker-rule item for the user, none absorbed or rejected by the
-spec owner; decisions go in Notes verbatim).** Gate: `decided_passes`
-0.000034 against 0.000000 in both gate references, severe because the
-reference is zero; a born vote edge lets a founder pass decide inside 75
-ticks, not a compute cost. Accepted by the user (Notes), gate epoch re-pinned
-by setting `gate.epoch_baseline` in `docs/progress/benchmark-series.json` to
-this feature's stored gate summary before `make check`; the stored severe
-comparison is unedited; `decided_passes_total` 9, all on seed 11; the gate
-report has no per-operator birth tally, so the founder Graph-`Add` birth count
-is not recordable. Goal: (1) `decided_passes` 0.008151 against 0.000104
-(+7,737%), severe, not a compute cost (`vm_steps` −11.8%, `pass_cap_hits`
-+11.3% flag only); (2) Confluence has no target row in the selected cohort
-(Σ executed and Σ causal 0 against 0), the named contrary result, while its
-drift cohort fingerprint holds (22/23); (3) Confluence
-`neighborhood_read.changed_per_all_births` 0.1396 under its 0.1434 floor and
-one birth in 5,000 under T03.F12's 0.1398; (4) Canyon drift depth 22 0.1120
-against 0.1130 (two births in 2,000), the only reading below the previous
-closure. Persistence, Orchards and Canyon target rows (4/4, 3/3 against 0/0),
-the other floors and every other drift reading meet the predeclaration.
+**Readings outside the predeclaration (not edited above; each went to the
+user under the blocker rule and is decided in Notes).** Gate `decided_passes`
+severe against a zero reference (a born vote edge lets a founder pass decide
+inside 75 ticks; `decided_passes_total` 9, all seed 11; the gate report has
+no per-operator birth tally, so the founder Graph-`Add` birth count is not
+recordable); goal `decided_passes` severe; Confluence's selected cohort
+without a target row; Confluence's read floor; Canyon drift depth 22. None is
+a compute cost (`vm_steps` −11.8%, `pass_cap_hits` +11.3% flag only). Both
+epochs are re-pinned to this feature's summaries in
+`docs/progress/benchmark-series.json` (`gate.epoch_baseline` before
+`make check`, `goal_worlds.epoch_baseline` after the goal run); the stored
+severe comparisons are unedited. Persistence, Orchards and Canyon target rows
+(4/4, 3/3 against 0/0), the other floors and every other drift reading meet
+the predeclaration.
 
 **Measured verdict ([readings](../../progress/readings/t20-f16.md)).** Both
 profiles ran once, CLI exit 3 (severe). Gate: only the accepted
@@ -281,3 +271,19 @@ drift depth 22.
   behavioral signature, and the gate epoch is re-pinned to this feature's gate
   summary before the mutation gate, as at T19.F04; thresholds and the stored
   severe comparison are unchanged.
+- Decision: (user, 2026-10-09) the goal `decided_passes` severe (0.008151 per
+  creature-tick against T03.F12's 0.000104, +7,737%; born vote edges make
+  more passes decide, not a compute cost) is accepted and the goal-worlds
+  epoch is re-pinned to this feature's goal summary, as at T03.F12;
+  thresholds and the stored severe comparison are unchanged.
+- Exception: (user, 2026-10-09) Confluence's selected cohort holds no target
+  row at tick 2,000 (Σ executed 0, Σ causal 0 against 0), the predeclared
+  contrary result, accepted as recorded; the row's intended outcome is met on
+  Orchards (4/4) and Canyon (3/3) only, and Confluence's drift-cohort
+  fingerprint (22/23) holds.
+- Exception: (user, 2026-10-09) Confluence `neighborhood_read.changed_per_all_births`
+  0.1396 under its 0.1434 standing floor and one birth in 5,000 under
+  T03.F12's 0.1398, accepted for this closure; the T14.F12 floors stand.
+- Exception: (user, 2026-10-09) Canyon drift-walk depth 22 0.1120 against
+  T03.F12's 0.1130 (two births in 2,000), accepted as sampling noise and
+  recorded; the walk's regression rule stands.
