@@ -13,9 +13,9 @@ the Codex review command, the close order), inside the
 The idea's earlier readings: the [diagnosis run](evolvability-diagnosis-run-2026-10.md)'s
 rows E4 (the two-step rates this prototype shortens), E5 (the projection
 operator, not advanced) and E10 (run 6's ALT arm, the idea's lab form,
-unresolved at 8 pairs). Status: **in progress** (every gate passed; B1
-completed and validated by its predeclared rule; the plan forward drafted;
-Codex review (b) disposed; closing).
+unresolved at 8 pairs). Status: **complete** (every gate passed; B1 completed and validated by
+its predeclared rule; Codex reviews (a) and (b) disposed; landed on `main`
+as docs only, the prototype, instrument and probe kept on the branch).
 
 ## Question
 
@@ -133,8 +133,13 @@ causal target-family reads in a natural world without costing persistence?
   invariant wrote on a generated genome with a truncated sink catalog); then
   this run's `docs:` commits. The prototype's release test binaries built
   at `765e429c`: `census-proto` sha256 `5cb7857f…`, `probe-proto`
-  `fbc71263…`. `cargo test -p v3-core --test viability` 28 passed before the
-  prototype was committed; the seven born-connected unit tests pass.
+  `fbc71263…` (rebuilt at `a172c734` after the clippy fix: `55ad8560…`,
+  `892dcd44…`). `cargo test -p v3-core --test viability` 28 passed before
+  the prototype was committed; the seven born-connected unit tests pass.
+  The `docs:` commits that land on `main`, in order: `338b0f23`,
+  `71216a57`, `ee131937`, `849d8808`, `098e3533`, `009e8b1e`, `f8dfa62d`,
+  `a931077e` and this closing commit; the `proto:` fix `a172c734` stays on
+  the branch with the rest.
 - **Amendment A2 (pre-data, Advice 2, before any gate ran).** The census's
   `births` block embeds the arm's `mutation_config` (the flag itself), so
   the identity checkers hash the block's counts without that entry and
@@ -386,10 +391,13 @@ the whole run, after the contract was read), Advice 1; before the gate and
 world chain was launched (after review (a) was disposed and the prototype
 committed), Advice 2; after the B1 reading was drafted and before it was
 recorded, with its four contradicted predictions, and before the plan
-forward was drafted, Advice 3; after the plan forward was drafted, Advice 4.
+forward was drafted, Advice 3; after the plan forward was drafted, Advice 4;
+before closing, with the fifth contradicted prediction put explicitly,
+Advice 5.
 
 | # | Rule 8 point | Advice (summary) | Dispositions |
 | --- | --- | --- | --- |
+| 5 | Before closing (rule 8), after the review (b) dispositions were committed; also the consultation on the fifth contradicted prediction (the 10,000 funnel exceptions on seed 2022: food-summary connected 5 = 5 and executed 3 < 5 with causal 3 > 0, the barrier ring executed 1 > 0), which Advice 3's brief had not named | (1) Record the fifth contradiction as a contradicted prediction at one checkpoint on one seed, beside the checkpoint-sampling alternative named in advance (N1's default 14 → 1, this run's 8 → 3 on seed 1022), one more reason the row is a lead-selection screen; it touches nothing in parts 1 and 2. (2) One closing commit, note only: this row, Status complete, the docs commit list for the pick, the cost's closing row. (3) The close order with its checks: no run process left (the `cxc-` broker is another session's, not to be killed; the reviews ran through `codex exec`); `ExitWorktree` keep; `main` at `b0f47dd5` and clean before the first pick, stop and report if it advanced; purity of the nine docs commits verified by path, then one cherry-pick in order; `make check-docs`; worktree removed (`--force` acceptable on ignored files since every commit is on the branch and the evidence copy diffed clean), branch kept. (4) The report's items: the verdict, what is recorded against it, the recommendation with its condition, the three user items with the draft row quoted | (1) Recorded: it changes nothing in the verdict or the recommendation; (2) this commit; (3) and (4) followed |
 | 4 | After the plan forward was drafted (rule 8) | Structure and recommendation right (T20, the named tension, route (a)); five fixes. (1) The agreement count is 24 of 24 (four runs × two checkpoints × three typed rows), not 12 of 12, in the B1 cell and part 1. (2) The draft row prescribes the realization (the follow-up's review (b) finding 9 struck the same from the T03.F12 row): keep the Goal to the phenomenon and the analog, move the sink, sub-value and weight law to the Notes as the tested realization. (3) Part 2 lacks two parts of the format: the evidence rows and what ordinary variation still has to discover. (4) The F04 sentence is a roadmap edit the user makes at row-addition time; (1) and (2) are the spec's. (5) T11.F21 came from a research note; T03.F12 is the exact precedent, cite it alone. Then the batched process to the finish: launch Codex (b) now, write the memory while it runs (`MEMORY.md` at its limit: a short line, shorten an existing one), one dispositions commit, Advice 5, the closing commit, the close order with the pick list verified by path | All adopted in this commit: (1) both places; (2) the row and its Notes; (3) the two parts added; (4) stated under the amendment sentences; (5) reworded; the process followed |
 | 3 | After the B1 reading was drafted, before it was recorded; the contradiction consultation (population not lower on seed 1022, size one seed each way, `family_declared` up, the births block without direction); before the plan forward was drafted, with its sketch presented | Reading right on the rule and the arithmetic; five fixes and one tension. (1) Count the lineages from the stored tuples instead of estimating: group action-changing channels by (family, channel, consumers, weight, delta passes), report the number per seed as an upper bound on lineages. (2) Do not attribute the causal edges to the mechanism: the census records no provenance and the default's causal read is also one Graph edge; the live fingerprint is `family_connected` tracking `family_declared` under `born`. (3) The trough needs its sample sequence, the sampling limit, the default's own trough and `born`'s shallower one on the other seed: one seed each way, a recorded risk; frame size the same way. (4) Flag the 10,000 → 20,000 swing on seed 1022 and the moved default base (two and three causal parents under T03.F12 where N1's default had none); on the row where the default is causal `born` is higher but that row cannot satisfy the default-has-none clause. (5) The births block is contradicted and underpowered; take the 2 % from the summary or drop it. Plan forward: name the tension with T20's qualification chain (F12 enables only qualified opportunities; F04's non-goal is no availability switch), state the two routes (an ordinary mechanism row read by the goal profile, or an opt-in arm for F09's lab question), recommend the row with the reason, carry the goal-profile risks, draft the row with the amended analog, T20 over T13 by the ownership line; then the process to the finish in order with batched commits | All adopted: (1) to (5) in the B1 cell before it was recorded (the lineage counts later recast as phenotype-summary groups, review (b) finding 2); the plan forward's part 2 names the tension, the routes and the reason; the close follows the listed order. Coverage gap (review (b) finding 3): the brief named four contradicted predictions and not the 10,000-checkpoint funnel exceptions on seed 2022, which are put to the advisor in Advice 5 |
 | 2 | Before the gates and the world chain (the phase's approach), after amendment A1, the `instr:`, `lab:` and `proto:` commits, the frozen build and the readers | Chain correctly sequenced, predeclaration sound; six points. (1) `b0read.py` would fail B0 by construction: the projection compares whole parent objects, but the reference carries a `decay` block and this probe `single_add_births`; and the identity readings sat in the gate's `all(...)` although the note calls them recorded; drop each version's block before comparing and make both identity checks non-gating. (2) `identity.py` would fail B0.3 on the `births` block, which embeds `mutation_config.born_connected`; strip it before hashing and compare it apart with the expected value per mode; record as a pre-data amendment A2. (3) Gate the driver on `make check` exiting 0 (prototype results count only after clippy passes). (4) Record Advice 2 before launching, with the commit hashes, the four binary hashes, the viability result and A2. (5) Turn economy: one background waiter per milestone (B0, smoke, B0.3, B0.2 (ii), DONE/STOP), batched note commits after B0, after the identity gates and with the B1 reading. (6) Watch, not change: the smoke's `births_secs` and `vote_delta_secs` projected to 20,000-tick genomes; a lone `config_digest` failure in B0.2 (i) with equal samples is a question about what `run_started` hashes, to amend, not a stop; B0 (2) at 10⁷ is a 95 % containment with a one-in-twenty false failure, so a lone failure near 0.0106 is investigated before anything is concluded | All adopted: (1) and (2) in the readers before launch, (2) also as amendment A2 (Run setup); (3) in the driver; (4) this commit (the `make check` line follows in the next); (5) the waiters; (6) read at the smoke and gate wakeups |
@@ -640,7 +648,8 @@ swapped):
 
 ### 5. Cost
 
-The Cost table below; the turn count in the closing row.
+The Cost table below, with the turn count in its closing row; the session's
+cost line awaits `/usage`.
 
 ## Cost
 
@@ -655,3 +664,5 @@ The Cost table below; the turn count in the closing row.
 | Pairs (`default-mutoff`, `born-mutoff`, both seeds) | 100, 95, 120, 121 s awake |
 | Main arms (`default`, `born`, both seeds) | 692, 627, 693, 642 s awake (about 45 min in all) |
 | Census readings (funnel, vote delta, births block) | under 2 s per checkpoint |
+| Codex reviews (a), (b) | remote; no host time |
+| Turns | about 126 of 150 at the closing commit; the final count is in the final report |
