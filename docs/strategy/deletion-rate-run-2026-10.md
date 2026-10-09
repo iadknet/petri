@@ -242,6 +242,80 @@ before any treatment arm runs.
 | S0.2 | **Identity**: the census probe on the prototype binary at `None` against the frozen instrument built without the prototype, as W0.2 (ii) | The frozen census runs `default` on seeds 1022 and 2022 (20,000 ticks, checkpoints 10,000 and 20,000, every reading on, cohort dump on): the references. The prototype binary's `default` runs on the same seeds must equal them on every sample row (`population`, `mean_genome_size`, `mean_generation`, `mean_age`, `mean_energy`, `births_total`, `reproduction_actions_spawned_total`, `mutation_events_applied_total`, each required present), the extinction tick, the footer, every scheduled timing-free checkpoint block (`input_use`, `e6`, `vote_deltas`, `births`, `sink_use`, `memory_loop`, `memory_sensitivity`, `temporal_memory_sensitivity`, the cohort and decile fields; required present and not null) by hash of the sorted-key compact serialization, the whole header but the recipe path and run label (`config_digest` and `prototypes` included), and both cohort dump files by file hash. Expected ticks and checkpoints are derived from the header and the run's completion or extinction record (the output-wiring `identity.py`, field renamed). A failure blocks every treatment arm's reading until explained and fixed |
 | S0 | **Does deletion still matter on `main`?** (go/no-go). Parents: the founder plus the 20-parent selected cohort of the prototype binary's `default` at 20,000 on seeds 1022 and 2022 (40 evolved parents, from the cohort dumps). The prototype probe's `s0_deletion_hazards` at `None` and at 0.03 (`PETRI_E4_KEEP=0.03`). **Birth count, predeclared with its fallback:** 10⁶ per parent per setting; before either setting runs, one smoke at 10⁵ births on the dump's largest genome at `None` is timed, and if 41 parents × 10⁶ births projected from it exceed 50 minutes per setting, both settings run at 10⁵ per parent with every CP interval reported; the choice is recorded before any hazard is read. **Classes and sites** (each the site its `Decreasing` operator draws over, counted on the parent): silent input entry (`Prune`; every node's `prunable_indices`), graph edge (`RemoveGraphEdge`; every edge of every Graph node, compute inputs and sink inputs), compute node (`RemoveInternalGraphNode`), plasticity config (`DisableHebbian`; compute nodes with plasticity), reward config (`DisableRewardModulation`; modulated compute nodes), mesh node (`RemoveNode`; non-entry nodes), route target (`RemoveRouteTarget`; the non-incumbent targets of nodes with two or more), VM instruction (`VmDeleteInstruction`; instructions of programs longer than one) | **Per parent and class at `None`:** h_c = applied deletions of the class ÷ (sites × births); L_c = 1 − (1 − h_c)^400. **Go** if some class has a median L_c ≥ 0.5 at `None`, the median taken over the evolved parents that carry the class (sites ≥ 1), a class counting only if at least 10 of the 40 carry it. **No-go** otherwise: the note records that deletion is not the block at a 20,000-tick horizon on `main`, lists the hazards, and S1's treatment arms do not run. **Manipulation check at 0.03**, pooled over the 41 parents per operator: (a) requested events equal to `None`'s for every parent exactly; (b) each `Decreasing` operator's kept share has a CP interval containing 0.03; (c) the plan's form: each `Decreasing` operator's applied count at 0.03 has an interval (over all births) containing 0.03 × its applied count at `None` per birth; (d) every other operator with at least 4,000 applied events at `None` (pooled) within 5 % of `None`'s count, smaller ones reported. **Amendment A1 (findings 2, 4 to 6 and 11):** (c) counts events, not births, so its interval treats the 0.03 count as Poisson (the binomial at n = births as a large-n approximation) and kept deletions change later applicability, so (c) is **descriptive** and never blocks; (b), conditional on an applied keep trial, is the mechanism invariant. (a) and the input checks are exact and block: unique parent names, exactly the founder plus 20 parents from each of the two named dumps at tick 20,000, one birth count for every parent at both settings, configs differing only in the keep field. (b) follows S0-F's disposition: a defect only at p < 0.001 (eight checks), otherwise a recorded statistical miss. Any statistical miss, (c) miss or (d) failure stops the runner before the treatment arms until its disposition is committed; a (b) defect or an exact failure blocks the arms until fixed. Per parent and class the reader reports an interval on h (applied events over site-births) and its transform to L; the medians of the lower and upper bounds are reported beside the median L. **Descriptive, not decision inputs:** the founder row; R for edges ((`AlterGraphEdgeWeight` + `RetargetGraphEdge`) ÷ `RemoveGraphEdge`, `GraphRawFieldMutation` beside) and for entries ((`Swap` + `RawFieldMutation`) per entry ÷ `Prune` per silent entry), medians over carriers; `RemoveNode` applied by target reachability beside the reachable and unreachable non-entry site counts (Advice 1 point 2: `RemoveNode` draws unreachable nodes first, so the mesh-node class's per-site average overstates what a new, spliced-in, reachable node faces; the class definition and the rule stay as the plan wrote them). **Interpretation limits, predeclared (A1, findings 12 to 14):** the mesh-node sites are an inventory count (non-entry nodes), not `RemoveNode`'s current draw set, which is the unreachable tier when one exists and otherwise the nodes with a bypass successor (that exclusion is not counted), so its h is an inventory-average hazard; h's numerator includes deletions of sites created earlier in the same birth, and L extrapolates one parent's average per-site event intensity over 400 births with sites, targeting and eligibility held fixed, so it is not a measured survival of an original site; a go establishes the triggering class's average hazard (named in the result) and licenses the treatment arms by the plan's rule, not that this class is the sensor-refinement bottleneck (a route-target or mesh-node go is read as such); a no-go is this fixed screen's negative result, not a general refutation of slow refinement |
 
+**Gate results.**
+
+**Binaries.** The first builds, at `339eb2ce` (frozen) and `d6e9a82e`
+(prototype), were superseded before any output was produced. The first branch
+`make check` stopped at `rust-clippy`: the cohort dump pushed the census run
+to 177 of 167 lines. The `instr:` fix `fc24ffa0` adds a reasoned
+`allow(clippy::too_many_lines)`. It was applied to the detached frozen tree as
+a patch, so the frozen state is `339eb2ce` plus `fc24ffa0`'s diff, with no
+`proto:`. The rebuilt binaries and their sha256:
+
+- frozen, built at that state: `census-frozen` `f7773602…`, `probe-frozen`
+  `4a89e4b6…`;
+- prototype, built at `a6a54dc5`: `census-proto` `3e1656ae…`, `probe-proto`
+  `2d58c345…`.
+
+Both probe hashes match the first build: the fix touched the census only. Each
+binary lists its test. **`make check` on the branch exited 0** at `a6a54dc5`
+(log `make-check-branch.log`; the `v3-cli` recipe-digest pin test included).
+The runner verifies these hashes and the recipes before every phase.
+
+**S0-F passed** (every check in the pass state, nothing to record; summary
+[`s0f.json`](deletion-rate-run-2026-10/s0f.json); 10⁶ births per parent, 1.7 to
+2.0 s per parent).
+
+1. At `None` the prototype probe's E4 output equals the frozen probe's in the
+   deterministic projection on all three parents, and so does its S0 founder
+   row. The `config` blocks are equal. So the unset path is `main`'s draw for
+   draw on the founder. The E4 numbers are the output-wiring run's `votes`
+   path: declared 194, useful signed 6.
+2. Parent (b)'s integrated loss is 18,691 of 10⁶ (CP 0.018426 to 0.018958),
+   which contains E4's 0.018643 (p 0.72).
+3. At 0.03 on the founder the requested events equal `None`'s exactly. Every
+   `Decreasing` operator with a keep trial has a kept share whose CP interval
+   contains 0.03:
+
+   | Operator | Kept | p |
+   | --- | --- | ---: |
+   | `Prune` | 656 of 21,396 (0.0307) | 0.58 |
+   | `RemoveGraphEdge` | 313 of 9,672 | 0.19 |
+   | `RemoveInternalGraphNode` | 128 of 4,688 | 0.30 |
+   | `DisableHebbian` | 0 of 8 | 1.0 |
+   | `RemoveNode` | 6 of 134 | 0.43 |
+   | `RemoveRouteTarget` | 6 of 222 | 1.0 |
+
+   `DisableRewardModulation` and `VmDeleteInstruction` have no site on the
+   founder. No other operator with at least 4,000 applied events moved by more
+   than 5 %.
+
+The founder's lone silent entry takes 21,167 `Prune` events per 10⁶ births:
+h = 0.021 per birth, so L over 400 births is about 1.
+
+**S0.2 passed on both seeds** (25 of 25 checks each;
+[`s02-s1022.json`](deletion-rate-run-2026-10/s02-s1022.json),
+[`s02-s2022.json`](deletion-rate-run-2026-10/s02-s2022.json); checker
+[`identity.py`](deletion-rate-run-2026-10/identity.py)). Against the frozen
+references (727 s on seed 2022, the same scale on 1022), the prototype
+binary's `default` runs equal them on:
+
+- every sample field at every expected tick (40 samples each);
+- the footer;
+- every scheduled timing-free checkpoint block at 10,000 and 20,000, by hash
+  (28 block hashes each);
+- the header in full, `config_digest` and `prototypes` included;
+- both cohort dumps, by file hash.
+
+So the prototype binary at `None` is the instrument built without the
+prototype, reading for reading. **Drift check, descriptive:** the frozen
+`default` samples equal the output-wiring run's `default` samples at all 40
+ticks on both seeds ([`drift-s1022.json`](deletion-rate-run-2026-10/drift-s1022.json),
+[`drift-s2022.json`](deletion-rate-run-2026-10/drift-s2022.json)). `38ba9906`
+is bit-identical on this path. That run's `default` readings, and through it
+the born run's `born` arm, are today's production: 3,065 and 2,878 living at
+20,000, P 22 and 19 at 20,000 by the S1 reader.
+
 ## Ledger
 
 One row. No authored genome enters a natural-world arm; S0's prepared parents
