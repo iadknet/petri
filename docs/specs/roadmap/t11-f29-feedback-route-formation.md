@@ -211,8 +211,7 @@ field or switch); a run shows existing signals moved by the changed draws.
       `cargo test --workspace --no-fail-fast` -> result, with any series-test
       failure attributed to a user-accepted re-pin. Topology: exit 0, 101
       passed. Workspace: exit 101, only the gate series test (`pass_cap_hits`
-      +271%, severe) awaits the user; eleven seeded pins re-pinned (readings).
-- [ ] `make check` -> exit 0, tested commit in the readings.
+      +271%, severe) awaits the user; eleven seeded pins re-pinned (readings).- [ ] `make check` -> exit 0, tested commit in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed
       here.
