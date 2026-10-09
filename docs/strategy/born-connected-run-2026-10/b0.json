@@ -1,0 +1,1129 @@
+{
+ "gate": "B0",
+ "reference": {
+  "path": "/Users/istefanek/projects/petri/.bench-artifacts/lab/diagnosis2/n12/g3/e4-off.json",
+  "sha256": "07b639db22fd8d913ecf339f12899528ebb1ebace66377aea921936efa8140a3",
+  "config": {
+   "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+   "executed_bias": 0.9,
+   "executed_window_ticks": 100,
+   "food_types": 2,
+   "mesh_layer_probability": 0.2,
+   "neutral_input_recruitment": "Off",
+   "per_unit_rate": 0.005,
+   "scene_seed": 239455822,
+   "silent_entry_decay_rate": null
+  }
+ },
+ "off": {
+  "path": "/Users/istefanek/projects/petri/.claude/worktrees/born-connected/.bench-artifacts/lab/born/b0/e4-off.json",
+  "sha256": "74d8861e47bb5af78e5ae02ec9ef8e026707f236c6b55fa9d480e726b4d9092b",
+  "config": {
+   "born_connected": false,
+   "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+   "executed_bias": 0.9,
+   "executed_window_ticks": 100,
+   "food_types": 2,
+   "mesh_layer_probability": 0.2,
+   "neutral_input_recruitment": "Off",
+   "per_unit_rate": 0.005,
+   "scene_seed": 239455822
+  }
+ },
+ "on": {
+  "path": "/Users/istefanek/projects/petri/.claude/worktrees/born-connected/.bench-artifacts/lab/born/b0/e4-on.json",
+  "sha256": "7539a8708a8c108d53f7ca5738f015a3a59e4d1bcedc5ebabe1ce3dde4e942d3",
+  "config": {
+   "born_connected": true,
+   "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+   "executed_bias": 0.9,
+   "executed_window_ticks": 100,
+   "food_types": 2,
+   "mesh_layer_probability": 0.2,
+   "neutral_input_recruitment": "Off",
+   "per_unit_rate": 0.005,
+   "scene_seed": 239455822
+  }
+ },
+ "on_10m": {
+  "path": "/Users/istefanek/projects/petri/.claude/worktrees/born-connected/.bench-artifacts/lab/born/b0/e4-on-10m.json",
+  "sha256": "1dfaa6bb574179c2ae0a7ad659ba7c797757b738526b5775c920a5dd757ab60c",
+  "config": {
+   "born_connected": true,
+   "child_seed": "0xe400000000 + 100000000 * parent_index + i",
+   "executed_bias": 0.9,
+   "executed_window_ticks": 100,
+   "food_types": 2,
+   "mesh_layer_probability": 0.2,
+   "neutral_input_recruitment": "Off",
+   "per_unit_rate": 0.005,
+   "scene_seed": 239455822
+  }
+ },
+ "checks": [
+  {
+   "check": "off founder genome_size/executed_resolved/frozen_age equal G3 off (recorded)",
+   "pass": true,
+   "gating": false,
+   "detail": {
+    "ref": [
+     97,
+     [
+      0,
+      1
+     ],
+     149
+    ],
+    "off": [
+     97,
+     [
+      0,
+      1
+     ],
+     149
+    ]
+   }
+  },
+  {
+   "check": "off founder deterministic projection equals G3 off (recorded)",
+   "pass": true,
+   "gating": false,
+   "detail": {
+    "differing_keys": [],
+    "keys_only_in_ref": [],
+    "keys_only_in_off": []
+   }
+  },
+  {
+   "check": "off founder declared_vote_node_target within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.000197,
+    "ref": 0.000197
+   }
+  },
+  {
+   "check": "off founder attempted_events_per_birth within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.484315,
+    "ref": 0.484315
+   }
+  },
+  {
+   "check": "off founder InputRefAdd applied per birth within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.021523,
+    "ref": 0.021523
+   }
+  },
+  {
+   "check": "off founder+declared genome_size/executed_resolved/frozen_age equal G3 off (recorded)",
+   "pass": true,
+   "gating": false,
+   "detail": {
+    "ref": [
+     98,
+     [
+      0,
+      1
+     ],
+     149
+    ],
+    "off": [
+     98,
+     [
+      0,
+      1
+     ],
+     149
+    ]
+   }
+  },
+  {
+   "check": "off founder+declared deterministic projection equals G3 off (recorded)",
+   "pass": true,
+   "gating": false,
+   "detail": {
+    "differing_keys": [],
+    "keys_only_in_ref": [],
+    "keys_only_in_off": []
+   }
+  },
+  {
+   "check": "off founder+declared lost_declaration within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.018679,
+    "ref": 0.018679
+   }
+  },
+  {
+   "check": "off founder+declared declared_vote_node_target within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.00021,
+    "ref": 0.00021
+   }
+  },
+  {
+   "check": "off founder+declared attempted_events_per_birth within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.489357,
+    "ref": 0.489357
+   }
+  },
+  {
+   "check": "off founder+declared InputRefAdd applied per birth within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.02152,
+    "ref": 0.02152
+   }
+  },
+  {
+   "check": "off founder+declared+zero-edge genome_size/executed_resolved/frozen_age equal G3 off (recorded)",
+   "pass": true,
+   "gating": false,
+   "detail": {
+    "ref": [
+     99,
+     [
+      0,
+      1
+     ],
+     149
+    ],
+    "off": [
+     99,
+     [
+      0,
+      1
+     ],
+     149
+    ]
+   }
+  },
+  {
+   "check": "off founder+declared+zero-edge deterministic projection equals G3 off (recorded)",
+   "pass": true,
+   "gating": false,
+   "detail": {
+    "differing_keys": [],
+    "keys_only_in_ref": [],
+    "keys_only_in_off": []
+   }
+  },
+  {
+   "check": "off founder+declared+zero-edge lost_declaration within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.007911,
+    "ref": 0.007911
+   }
+  },
+  {
+   "check": "off founder+declared+zero-edge declared_vote_node_target within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.000188,
+    "ref": 0.000188
+   }
+  },
+  {
+   "check": "off founder+declared+zero-edge attempted_events_per_birth within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.495378,
+    "ref": 0.495378
+   }
+  },
+  {
+   "check": "off founder+declared+zero-edge InputRefAdd applied per birth within 5 %",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "off": 0.021984,
+    "ref": 0.021984
+   }
+  },
+  {
+   "check": "on (1) founder single-Add connect_any_given_declared exactly 1",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "declared": {
+     "count": 138,
+     "cp95": [
+      0.007672633237759963,
+      0.010773395411317221
+     ],
+     "of": 15121,
+     "rate": 0.009126380530388202
+    },
+    "connect_any": {
+     "count": 138,
+     "cp95": [
+      0.9736231006590335,
+      1.0
+     ],
+     "of": 138,
+     "rate": 1.0
+    }
+   }
+  },
+  {
+   "check": "on (1) founder single-Add destinations all ActionVote sinks",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "locations": {
+     "sink:ActionVote(Decide)": 4,
+     "sink:ActionVote(Eat)": 3,
+     "sink:ActionVote(Move(0))": 3,
+     "sink:ActionVote(Move(1))": 8,
+     "sink:ActionVote(Move(2))": 4,
+     "sink:ActionVote(Move(3))": 2,
+     "sink:ActionVote(Move(4))": 4,
+     "sink:ActionVote(Move(5))": 3,
+     "sink:ActionVote(Move(6))": 7,
+     "sink:ActionVote(Move(7))": 7,
+     "sink:ActionVote(Reproduce(0))": 4,
+     "sink:ActionVote(Reproduce(1))": 4,
+     "sink:ActionVote(Reproduce(2))": 9,
+     "sink:ActionVote(Reproduce(3))": 4,
+     "sink:ActionVote(Reproduce(4))": 9,
+     "sink:ActionVote(Reproduce(5))": 2,
+     "sink:ActionVote(Reproduce(6))": 9,
+     "sink:ActionVote(Reproduce(7))": 9,
+     "sink:ActionVote(StealEnergy(0))": 2,
+     "sink:ActionVote(StealEnergy(1))": 5,
+     "sink:ActionVote(StealEnergy(2))": 6,
+     "sink:ActionVote(StealEnergy(3))": 3,
+     "sink:ActionVote(StealEnergy(4))": 4,
+     "sink:ActionVote(StealEnergy(5))": 9,
+     "sink:ActionVote(StealEnergy(6))": 5,
+     "sink:ActionVote(StealEnergy(7))": 4,
+     "sink:ActionVote(Terminate)": 5
+    }
+   }
+  },
+  {
+   "check": "on (1) founder single-Add sub-values in 0..6",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "subs": {
+     "0": 18,
+     "1": 26,
+     "2": 23,
+     "3": 18,
+     "4": 22,
+     "5": 15,
+     "6": 16
+    }
+   }
+  },
+  {
+   "check": "on (1) founder all-birth connect_any CP contains declared point",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "connect_any": {
+     "count": 194,
+     "cp95": [
+      0.00016766211964486244,
+      0.00022330063690084723
+     ],
+     "of": 1000000,
+     "rate": 0.000194
+    },
+    "declared": {
+     "count": 194,
+     "cp95": [
+      0.00016766211964486244,
+      0.00022330063690084723
+     ],
+     "of": 1000000,
+     "rate": 0.000194
+    }
+   }
+  },
+  {
+   "check": "on (2) 10^7 founder single-Add useful-signed share CP contains 2/189",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "share": {
+     "count": 19,
+     "cp95": [
+      0.00823138450325206,
+      0.021218330787496742
+     ],
+     "of": 1393,
+     "rate": 0.013639626704953339
+    },
+    "predicted": 0.010582010582010581
+   }
+  },
+  {
+   "check": "on (2) 10^7 founder all-birth useful-signed CP contains 2/189 x declared (compatibility)",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "all_birth": {
+     "count": 26,
+     "cp95": [
+      1.6984069816650127e-06,
+      3.8096001024334747e-06
+     ],
+     "of": 10000000,
+     "rate": 2.6e-06
+    },
+    "predicted": 2.1365079365079362e-06,
+    "declared": {
+     "count": 2019,
+     "cp95": [
+      0.0001931891639851968,
+      0.00021090232239523443
+     ],
+     "of": 10000000,
+     "rate": 0.0002019
+    }
+   }
+  },
+  {
+   "check": "on (3) founder attempted_events_per_birth within 5 % of off",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "on": 0.484315,
+    "off": 0.484315
+   }
+  },
+  {
+   "check": "on (4) founder InputRefAdd applied per birth within 5 % of off",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "on": 0.021533,
+    "off": 0.021523
+   }
+  },
+  {
+   "check": "on (3) founder+declared attempted_events_per_birth within 5 % of off",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "on": 0.489357,
+    "off": 0.489357
+   }
+  },
+  {
+   "check": "on (4) founder+declared InputRefAdd applied per birth within 5 % of off",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "on": 0.021513,
+    "off": 0.02152
+   }
+  },
+  {
+   "check": "on (3) founder+declared+zero-edge attempted_events_per_birth within 5 % of off",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "on": 0.495378,
+    "off": 0.495378
+   }
+  },
+  {
+   "check": "on (4) founder+declared+zero-edge InputRefAdd applied per birth within 5 % of off",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "on": 0.02197,
+    "off": 0.021984
+   }
+  },
+  {
+   "check": "on (5) founder+declared integrated lost_declaration within 5 % of off",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "on": {
+     "count": 18691,
+     "cp95": [
+      0.01842645414049754,
+      0.01895833892498272
+     ],
+     "of": 1000000,
+     "rate": 0.018691
+    },
+    "off": {
+     "count": 18679,
+     "cp95": [
+      0.01841453777584684,
+      0.018946255361469155
+     ],
+     "of": 1000000,
+     "rate": 0.018679
+    },
+    "routes_on": {
+     "InputRefAdd": 1,
+     "InputRefAdd+InputRefPrune": 197,
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation": 10,
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 1,
+     "InputRefAdd+InputRefPrune+InputRefSwap": 11,
+     "InputRefAdd+InputRefRawFieldMutation": 71,
+     "InputRefAdd+InputRefRawFieldMutation+InputRefSwap": 8,
+     "InputRefAdd+InputRefSwap": 68,
+     "InputRefPrune": 9950,
+     "InputRefPrune+InputRefRawFieldMutation": 503,
+     "InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 27,
+     "InputRefPrune+InputRefSwap": 428,
+     "InputRefRawFieldMutation": 4400,
+     "InputRefRawFieldMutation+InputRefSwap": 300,
+     "InputRefSwap": 2713,
+     "none": 3
+    },
+    "routes_off": {
+     "InputRefAdd": 1,
+     "InputRefAdd+InputRefPrune": 170,
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation": 13,
+     "InputRefAdd+InputRefPrune+InputRefSwap": 7,
+     "InputRefAdd+InputRefRawFieldMutation": 88,
+     "InputRefAdd+InputRefRawFieldMutation+InputRefSwap": 7,
+     "InputRefAdd+InputRefSwap": 69,
+     "InputRefPrune": 9950,
+     "InputRefPrune+InputRefRawFieldMutation": 503,
+     "InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 27,
+     "InputRefPrune+InputRefSwap": 428,
+     "InputRefRawFieldMutation": 4400,
+     "InputRefRawFieldMutation+InputRefSwap": 300,
+     "InputRefSwap": 2713,
+     "none": 3
+    }
+   }
+  },
+  {
+   "check": "on (5) founder+declared+zero-edge integrated lost_declaration within 5 % of off",
+   "pass": true,
+   "gating": true,
+   "detail": {
+    "on": {
+     "count": 7909,
+     "cp95": [
+      0.007736312473252183,
+      0.00808454691749777
+     ],
+     "of": 1000000,
+     "rate": 0.007909
+    },
+    "off": {
+     "count": 7911,
+     "cp95": [
+      0.007738290692209604,
+      0.008086568685549966
+     ],
+     "of": 1000000,
+     "rate": 0.007911
+    },
+    "routes_on": {
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation": 6,
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 1,
+     "InputRefAdd+InputRefPrune+InputRefSwap": 2,
+     "InputRefAdd+InputRefRawFieldMutation": 86,
+     "InputRefAdd+InputRefRawFieldMutation+InputRefSwap": 7,
+     "InputRefAdd+InputRefSwap": 68,
+     "InputRefPrune": 5,
+     "InputRefPrune+InputRefRawFieldMutation": 120,
+     "InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 14,
+     "InputRefPrune+InputRefSwap": 47,
+     "InputRefRawFieldMutation": 4368,
+     "InputRefRawFieldMutation+InputRefSwap": 311,
+     "InputRefSwap": 2868,
+     "none": 6
+    },
+    "routes_off": {
+     "InputRefAdd+InputRefPrune+InputRefRawFieldMutation": 1,
+     "InputRefAdd+InputRefPrune+InputRefSwap": 1,
+     "InputRefAdd+InputRefRawFieldMutation": 90,
+     "InputRefAdd+InputRefRawFieldMutation+InputRefSwap": 7,
+     "InputRefAdd+InputRefSwap": 73,
+     "InputRefPrune": 5,
+     "InputRefPrune+InputRefRawFieldMutation": 120,
+     "InputRefPrune+InputRefRawFieldMutation+InputRefSwap": 14,
+     "InputRefPrune+InputRefSwap": 47,
+     "InputRefRawFieldMutation": 4368,
+     "InputRefRawFieldMutation+InputRefSwap": 311,
+     "InputRefSwap": 2868,
+     "none": 6
+    }
+   }
+  }
+ ],
+ "pass": true,
+ "recorded_identity_checks_pass": true,
+ "useful_signed_off_vs_reference": {
+  "founder": {
+   "off": {
+    "count": 0,
+    "cp95": [
+     0.0,
+     3.688872650176034e-06
+    ],
+    "of": 1000000,
+    "rate": 0.0
+   },
+   "ref": {
+    "count": 0,
+    "cp95": [
+     0.0,
+     3.688872650176034e-06
+    ],
+    "of": 1000000,
+    "rate": 0.0
+   }
+  },
+  "founder+declared": {
+   "off": {
+    "count": 7,
+    "cp95": [
+     2.8143675468439433e-06,
+     1.4422621833320992e-05
+    ],
+    "of": 1000000,
+    "rate": 7e-06
+   },
+   "ref": {
+    "count": 7,
+    "cp95": [
+     2.8143675468439433e-06,
+     1.4422621833320992e-05
+    ],
+    "of": 1000000,
+    "rate": 7e-06
+   }
+  },
+  "founder+declared+zero-edge": {
+   "off": {
+    "count": 6,
+    "cp95": [
+     2.201897344400461e-06,
+     1.3059427927120115e-05
+    ],
+    "of": 1000000,
+    "rate": 6e-06
+   },
+   "ref": {
+    "count": 6,
+    "cp95": [
+     2.201897344400461e-06,
+     1.3059427927120115e-05
+    ],
+    "of": 1000000,
+    "rate": 6e-06
+   }
+  }
+ },
+ "useful_signed_on_1m_founder": {
+  "all_birth": {
+   "count": 6,
+   "cp95": [
+    2.201897344400461e-06,
+    1.3059427927120115e-05
+   ],
+   "of": 1000000,
+   "rate": 6e-06
+  },
+  "predicted": 2.052910052910053e-06,
+  "single_add_share": {
+   "count": 2,
+   "cp95": [
+    0.0017599840211348083,
+    0.051371076036190455
+   ],
+   "of": 138,
+   "rate": 0.014492753623188406
+  }
+ },
+ "on_founder_single_add": {
+  "births": 15121,
+  "connect_any_given_declared": {
+   "count": 138,
+   "cp95": [
+    0.9736231006590335,
+    1.0
+   ],
+   "of": 138,
+   "rate": 1.0
+  },
+  "connect_by_location": {
+   "sink:ActionVote(Decide)": 4,
+   "sink:ActionVote(Eat)": 3,
+   "sink:ActionVote(Move(0))": 3,
+   "sink:ActionVote(Move(1))": 8,
+   "sink:ActionVote(Move(2))": 4,
+   "sink:ActionVote(Move(3))": 2,
+   "sink:ActionVote(Move(4))": 4,
+   "sink:ActionVote(Move(5))": 3,
+   "sink:ActionVote(Move(6))": 7,
+   "sink:ActionVote(Move(7))": 7,
+   "sink:ActionVote(Reproduce(0))": 4,
+   "sink:ActionVote(Reproduce(1))": 4,
+   "sink:ActionVote(Reproduce(2))": 9,
+   "sink:ActionVote(Reproduce(3))": 4,
+   "sink:ActionVote(Reproduce(4))": 9,
+   "sink:ActionVote(Reproduce(5))": 2,
+   "sink:ActionVote(Reproduce(6))": 9,
+   "sink:ActionVote(Reproduce(7))": 9,
+   "sink:ActionVote(StealEnergy(0))": 2,
+   "sink:ActionVote(StealEnergy(1))": 5,
+   "sink:ActionVote(StealEnergy(2))": 6,
+   "sink:ActionVote(StealEnergy(3))": 3,
+   "sink:ActionVote(StealEnergy(4))": 4,
+   "sink:ActionVote(StealEnergy(5))": 9,
+   "sink:ActionVote(StealEnergy(6))": 5,
+   "sink:ActionVote(StealEnergy(7))": 4,
+   "sink:ActionVote(Terminate)": 5
+  },
+  "connect_by_sub": {
+   "0": 18,
+   "1": 26,
+   "2": 23,
+   "3": 18,
+   "4": 22,
+   "5": 15,
+   "6": 16
+  },
+  "connect_cardinal_move_given_declared": {
+   "count": 18,
+   "cp95": [
+    0.07917143163780599,
+    0.19829019242264218
+   ],
+   "of": 138,
+   "rate": 0.13043478260869565
+  },
+  "connect_useful_signed_given_declared": {
+   "count": 2,
+   "cp95": [
+    0.0017599840211348083,
+    0.051371076036190455
+   ],
+   "of": 138,
+   "rate": 0.014492753623188406
+  },
+  "connect_useful_wrong_sign_given_declared": {
+   "count": 0,
+   "cp95": [
+    0.0,
+    0.02637689934096149
+   ],
+   "of": 138,
+   "rate": 0.0
+  },
+  "declared_vote_node_target": {
+   "count": 138,
+   "cp95": [
+    0.007672633237759963,
+    0.010773395411317221
+   ],
+   "of": 15121,
+   "rate": 0.009126380530388202
+  },
+  "note": "births whose only applied event is an InputRefAdd: the direct mechanism check; shares over the births that declared the target on the vote node"
+ },
+ "on_10m_founder_single_add": {
+  "births": 151563,
+  "connect_any_given_declared": {
+   "count": 1393,
+   "cp95": [
+    0.9973553485993687,
+    1.0
+   ],
+   "of": 1393,
+   "rate": 1.0
+  },
+  "connect_by_location": {
+   "sink:ActionVote(Decide)": 46,
+   "sink:ActionVote(Eat)": 62,
+   "sink:ActionVote(Move(0))": 47,
+   "sink:ActionVote(Move(1))": 52,
+   "sink:ActionVote(Move(2))": 55,
+   "sink:ActionVote(Move(3))": 52,
+   "sink:ActionVote(Move(4))": 53,
+   "sink:ActionVote(Move(5))": 45,
+   "sink:ActionVote(Move(6))": 44,
+   "sink:ActionVote(Move(7))": 53,
+   "sink:ActionVote(Reproduce(0))": 46,
+   "sink:ActionVote(Reproduce(1))": 40,
+   "sink:ActionVote(Reproduce(2))": 60,
+   "sink:ActionVote(Reproduce(3))": 51,
+   "sink:ActionVote(Reproduce(4))": 62,
+   "sink:ActionVote(Reproduce(5))": 45,
+   "sink:ActionVote(Reproduce(6))": 58,
+   "sink:ActionVote(Reproduce(7))": 61,
+   "sink:ActionVote(StealEnergy(0))": 60,
+   "sink:ActionVote(StealEnergy(1))": 51,
+   "sink:ActionVote(StealEnergy(2))": 52,
+   "sink:ActionVote(StealEnergy(3))": 48,
+   "sink:ActionVote(StealEnergy(4))": 63,
+   "sink:ActionVote(StealEnergy(5))": 59,
+   "sink:ActionVote(StealEnergy(6))": 48,
+   "sink:ActionVote(StealEnergy(7))": 43,
+   "sink:ActionVote(Terminate)": 37
+  },
+  "connect_by_sub": {
+   "0": 240,
+   "1": 202,
+   "2": 196,
+   "3": 183,
+   "4": 210,
+   "5": 175,
+   "6": 187
+  },
+  "connect_cardinal_move_given_declared": {
+   "count": 199,
+   "cp95": [
+    0.12489032803217875,
+    0.16234452357442414
+   ],
+   "of": 1393,
+   "rate": 0.14285714285714285
+  },
+  "connect_useful_signed_given_declared": {
+   "count": 19,
+   "cp95": [
+    0.00823138450325206,
+    0.021218330787496742
+   ],
+   "of": 1393,
+   "rate": 0.013639626704953339
+  },
+  "connect_useful_wrong_sign_given_declared": {
+   "count": 11,
+   "cp95": [
+    0.0039483669978384595,
+    0.01408522514805527
+   ],
+   "of": 1393,
+   "rate": 0.007896625987078248
+  },
+  "declared_vote_node_target": {
+   "count": 1393,
+   "cp95": [
+    0.008716580886647896,
+    0.009684129509912542
+   ],
+   "of": 151563,
+   "rate": 0.009190897514564901
+  },
+  "note": "births whose only applied event is an InputRefAdd: the direct mechanism check; shares over the births that declared the target on the vote node"
+ },
+ "on_10m_founder_all_birth": {
+  "declared_vote_node_target": {
+   "count": 2019,
+   "cp95": [
+    0.0001931891639851968,
+    0.00021090232239523443
+   ],
+   "of": 10000000,
+   "rate": 0.0002019
+  },
+  "connect_any": {
+   "count": 2019,
+   "cp95": [
+    0.0001931891639851968,
+    0.00021090232239523443
+   ],
+   "of": 10000000,
+   "rate": 0.0002019
+  },
+  "connect_cardinal_move": {
+   "count": 295,
+   "cp95": [
+    2.6229385374609837e-05,
+    3.3065684018229735e-05
+   ],
+   "of": 10000000,
+   "rate": 2.95e-05
+  },
+  "connect_useful_component_move": {
+   "count": 44,
+   "cp95": [
+    3.1970483932997062e-06,
+    5.906790176035681e-06
+   ],
+   "of": 10000000,
+   "rate": 4.4e-06
+  },
+  "connect_useful_signed": {
+   "count": 26,
+   "cp95": [
+    1.6984069816650127e-06,
+    3.8096001024334747e-06
+   ],
+   "of": 10000000,
+   "rate": 2.6e-06
+  },
+  "connect_useful_wrong_sign": {
+   "count": 18,
+   "cp95": [
+    1.0667943945441571e-06,
+    2.8447745404336366e-06
+   ],
+   "of": 10000000,
+   "rate": 1.8e-06
+  },
+  "attempted_events_per_birth": 0.4851153,
+  "applied_events_per_birth": 0.3576474,
+  "births": 10000000,
+  "wall_secs": 22.05795175
+ },
+ "on_pooled_destinations_descriptive": {
+  "founder": {
+   "sink:ActionVote(Decide)": 6,
+   "sink:ActionVote(Eat)": 3,
+   "sink:ActionVote(Move(0))": 6,
+   "sink:ActionVote(Move(1))": 11,
+   "sink:ActionVote(Move(2))": 5,
+   "sink:ActionVote(Move(3))": 4,
+   "sink:ActionVote(Move(4))": 5,
+   "sink:ActionVote(Move(5))": 4,
+   "sink:ActionVote(Move(6))": 11,
+   "sink:ActionVote(Move(7))": 10,
+   "sink:ActionVote(Reproduce(0))": 6,
+   "sink:ActionVote(Reproduce(1))": 7,
+   "sink:ActionVote(Reproduce(2))": 11,
+   "sink:ActionVote(Reproduce(3))": 5,
+   "sink:ActionVote(Reproduce(4))": 12,
+   "sink:ActionVote(Reproduce(5))": 5,
+   "sink:ActionVote(Reproduce(6))": 11,
+   "sink:ActionVote(Reproduce(7))": 12,
+   "sink:ActionVote(StealEnergy(0))": 4,
+   "sink:ActionVote(StealEnergy(1))": 7,
+   "sink:ActionVote(StealEnergy(2))": 7,
+   "sink:ActionVote(StealEnergy(3))": 4,
+   "sink:ActionVote(StealEnergy(4))": 5,
+   "sink:ActionVote(StealEnergy(5))": 9,
+   "sink:ActionVote(StealEnergy(6))": 9,
+   "sink:ActionVote(StealEnergy(7))": 9,
+   "sink:ActionVote(Terminate)": 6
+  },
+  "founder+declared": {
+   "compute:0": 2,
+   "compute:1": 5,
+   "compute:10": 27,
+   "compute:2": 77,
+   "compute:3": 79,
+   "compute:4": 5,
+   "compute:5": 15,
+   "compute:6": 6,
+   "compute:7": 12,
+   "compute:8": 12,
+   "compute:9": 3,
+   "sink:ActionParam(EatFoodType)": 3,
+   "sink:ActionParam(ReproduceTransferFraction)": 4,
+   "sink:ActionParam(StealEnergyAmount)": 2,
+   "sink:ActionVote(Decide)": 7,
+   "sink:ActionVote(Eat)": 25,
+   "sink:ActionVote(Move(0))": 25,
+   "sink:ActionVote(Move(1))": 10,
+   "sink:ActionVote(Move(2))": 33,
+   "sink:ActionVote(Move(3))": 9,
+   "sink:ActionVote(Move(4))": 33,
+   "sink:ActionVote(Move(5))": 13,
+   "sink:ActionVote(Move(6))": 23,
+   "sink:ActionVote(Move(7))": 9,
+   "sink:ActionVote(Reproduce(0))": 18,
+   "sink:ActionVote(Reproduce(1))": 8,
+   "sink:ActionVote(Reproduce(2))": 20,
+   "sink:ActionVote(Reproduce(3))": 9,
+   "sink:ActionVote(Reproduce(4))": 16,
+   "sink:ActionVote(Reproduce(5))": 8,
+   "sink:ActionVote(Reproduce(6))": 16,
+   "sink:ActionVote(Reproduce(7))": 13,
+   "sink:ActionVote(StealEnergy(0))": 14,
+   "sink:ActionVote(StealEnergy(1))": 4,
+   "sink:ActionVote(StealEnergy(2))": 8,
+   "sink:ActionVote(StealEnergy(3))": 6,
+   "sink:ActionVote(StealEnergy(4))": 14,
+   "sink:ActionVote(StealEnergy(5))": 8,
+   "sink:ActionVote(StealEnergy(6))": 11,
+   "sink:ActionVote(StealEnergy(7))": 9,
+   "sink:ActionVote(Terminate)": 20,
+   "sink:ClearSlot(0)": 3,
+   "sink:ClearSlot(1)": 5,
+   "sink:ClearSlot(10)": 2,
+   "sink:ClearSlot(11)": 3,
+   "sink:ClearSlot(12)": 1,
+   "sink:ClearSlot(13)": 2,
+   "sink:ClearSlot(14)": 1,
+   "sink:ClearSlot(15)": 1,
+   "sink:ClearSlot(2)": 5,
+   "sink:ClearSlot(4)": 1,
+   "sink:ClearSlot(5)": 2,
+   "sink:ClearSlot(6)": 1,
+   "sink:ClearSlot(7)": 3,
+   "sink:CustomOutput(0)": 3,
+   "sink:CustomOutput(1)": 1,
+   "sink:CustomOutput(10)": 5,
+   "sink:CustomOutput(13)": 1,
+   "sink:CustomOutput(15)": 2,
+   "sink:CustomOutput(17)": 1,
+   "sink:CustomOutput(18)": 5,
+   "sink:CustomOutput(19)": 1,
+   "sink:CustomOutput(2)": 2,
+   "sink:CustomOutput(20)": 1,
+   "sink:CustomOutput(23)": 2,
+   "sink:CustomOutput(3)": 4,
+   "sink:CustomOutput(5)": 1,
+   "sink:CustomOutput(7)": 2,
+   "sink:CustomOutput(8)": 4,
+   "sink:CustomOutput(9)": 1,
+   "sink:RouterGate(0)": 3,
+   "sink:RouterGate(1)": 1,
+   "sink:RouterGate(2)": 2,
+   "sink:RouterGate(3)": 3,
+   "sink:RouterGate(4)": 1,
+   "sink:RouterGate(5)": 1,
+   "sink:RouterGate(6)": 3,
+   "sink:RouterGate(7)": 2,
+   "sink:WriteSlot(0)": 3,
+   "sink:WriteSlot(10)": 2,
+   "sink:WriteSlot(11)": 1,
+   "sink:WriteSlot(12)": 2,
+   "sink:WriteSlot(13)": 2,
+   "sink:WriteSlot(14)": 1,
+   "sink:WriteSlot(15)": 1,
+   "sink:WriteSlot(2)": 1,
+   "sink:WriteSlot(4)": 2,
+   "sink:WriteSlot(5)": 2,
+   "sink:WriteSlot(6)": 1,
+   "sink:WriteSlot(7)": 2,
+   "sink:WriteSlot(8)": 1,
+   "sink:WriteSlot(9)": 1
+  },
+  "founder+declared+zero-edge": {
+   "compute:0": 2,
+   "compute:1": 5,
+   "compute:10": 36,
+   "compute:11": 1,
+   "compute:2": 77,
+   "compute:3": 77,
+   "compute:4": 9,
+   "compute:5": 12,
+   "compute:6": 13,
+   "compute:7": 14,
+   "compute:8": 7,
+   "compute:9": 4,
+   "sink:ActionParam(EatFoodType)": 1,
+   "sink:ActionParam(ReproduceTransferFraction)": 2,
+   "sink:ActionParam(StealEnergyAmount)": 3,
+   "sink:ActionVote(Decide)": 12,
+   "sink:ActionVote(Eat)": 26,
+   "sink:ActionVote(Move(0))": 24,
+   "sink:ActionVote(Move(1))": 7,
+   "sink:ActionVote(Move(2))": 180,
+   "sink:ActionVote(Move(3))": 8,
+   "sink:ActionVote(Move(4))": 21,
+   "sink:ActionVote(Move(5))": 7,
+   "sink:ActionVote(Move(6))": 30,
+   "sink:ActionVote(Move(7))": 5,
+   "sink:ActionVote(Reproduce(0))": 12,
+   "sink:ActionVote(Reproduce(1))": 4,
+   "sink:ActionVote(Reproduce(2))": 14,
+   "sink:ActionVote(Reproduce(3))": 7,
+   "sink:ActionVote(Reproduce(4))": 15,
+   "sink:ActionVote(Reproduce(5))": 7,
+   "sink:ActionVote(Reproduce(6))": 18,
+   "sink:ActionVote(Reproduce(7))": 9,
+   "sink:ActionVote(StealEnergy(0))": 8,
+   "sink:ActionVote(StealEnergy(1))": 7,
+   "sink:ActionVote(StealEnergy(2))": 8,
+   "sink:ActionVote(StealEnergy(3))": 15,
+   "sink:ActionVote(StealEnergy(4))": 8,
+   "sink:ActionVote(StealEnergy(5))": 10,
+   "sink:ActionVote(StealEnergy(6))": 9,
+   "sink:ActionVote(StealEnergy(7))": 6,
+   "sink:ActionVote(Terminate)": 12,
+   "sink:ClearSlot(0)": 1,
+   "sink:ClearSlot(1)": 1,
+   "sink:ClearSlot(10)": 1,
+   "sink:ClearSlot(12)": 1,
+   "sink:ClearSlot(15)": 3,
+   "sink:ClearSlot(2)": 2,
+   "sink:ClearSlot(4)": 2,
+   "sink:ClearSlot(5)": 2,
+   "sink:ClearSlot(7)": 3,
+   "sink:ClearSlot(8)": 1,
+   "sink:CustomOutput(1)": 2,
+   "sink:CustomOutput(10)": 3,
+   "sink:CustomOutput(11)": 3,
+   "sink:CustomOutput(12)": 2,
+   "sink:CustomOutput(13)": 3,
+   "sink:CustomOutput(15)": 7,
+   "sink:CustomOutput(16)": 4,
+   "sink:CustomOutput(17)": 3,
+   "sink:CustomOutput(18)": 1,
+   "sink:CustomOutput(19)": 1,
+   "sink:CustomOutput(20)": 3,
+   "sink:CustomOutput(21)": 1,
+   "sink:CustomOutput(23)": 1,
+   "sink:CustomOutput(3)": 3,
+   "sink:CustomOutput(4)": 2,
+   "sink:CustomOutput(6)": 1,
+   "sink:CustomOutput(7)": 2,
+   "sink:CustomOutput(8)": 3,
+   "sink:CustomOutput(9)": 1,
+   "sink:RouterGate(0)": 1,
+   "sink:RouterGate(1)": 1,
+   "sink:RouterGate(2)": 5,
+   "sink:RouterGate(5)": 1,
+   "sink:RouterGate(6)": 1,
+   "sink:RouterGate(7)": 2,
+   "sink:WriteSlot(1)": 1,
+   "sink:WriteSlot(10)": 4,
+   "sink:WriteSlot(11)": 4,
+   "sink:WriteSlot(14)": 1,
+   "sink:WriteSlot(15)": 4,
+   "sink:WriteSlot(3)": 1,
+   "sink:WriteSlot(5)": 2,
+   "sink:WriteSlot(6)": 4,
+   "sink:WriteSlot(7)": 1,
+   "sink:WriteSlot(8)": 4,
+   "sink:WriteSlot(9)": 2
+  }
+ },
+ "wall_secs": {
+  "off": {
+   "founder": 2.260535542,
+   "founder+declared": 2.20818925,
+   "founder+declared+zero-edge": 2.232909292
+  },
+  "on": {
+   "founder": 2.142839334,
+   "founder+declared": 2.185393375,
+   "founder+declared+zero-edge": 2.236716667
+  },
+  "on_10m": {
+   "founder": 22.05795175,
+   "founder+declared": 21.391851958,
+   "founder+declared+zero-edge": 21.20812675
+  }
+ }
+}
