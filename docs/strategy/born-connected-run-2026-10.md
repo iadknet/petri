@@ -13,8 +13,9 @@ the Codex review command, the close order), inside the
 The idea's earlier readings: the [diagnosis run](evolvability-diagnosis-run-2026-10.md)'s
 rows E4 (the two-step rates this prototype shortens), E5 (the projection
 operator, not advanced) and E10 (run 6's ALT arm, the idea's lab form,
-unresolved at 8 pairs). Status: **in progress** (predeclared and amended
-after Codex review (a); no gate or row has run).
+unresolved at 8 pairs). Status: **in progress** (predeclared, amended after
+Codex review (a), the prototype built; the gate and world chain launched
+after Advice 2).
 
 ## Question
 
@@ -116,13 +117,35 @@ causal target-family reads in a natural world without costing persistence?
   commit hash): the pinned production binary of the launch revision (gate
   B0.2's smoke).
 - **Frozen instrument.** The census test binary built from the `instr:` +
-  `lab:` state without the `proto:` commit, copied to
-  `.bench-artifacts/lab/born/census-frozen` with its sha256: it runs the
+  `lab:` state without the `proto:` commit (both built there, exit 0),
+  copied to `.bench-artifacts/lab/born/census-frozen` (sha256 `41b5413e…`;
+  the probe built there too, `probe-frozen` `eecb3a5d…`): it runs the
   control recipes (`default` and `default-mutoff`, both seeds, 20,000 ticks)
   and the prototype binary's off arms must reproduce its samples and its
   timing-free checkpoint blocks (gate B0.2's full comparison; the inherited
   contract's "the unchanged-policy reference arm must match `main`'s output
   before a prototype arm is read", finding 4).
+- **Branch and commits.** Branch `worktree-born-connected` from `b0f47dd5`:
+  `docs:` `338b0f23` (the predeclaration), `71216a57` (amendment A1);
+  `instr:` `24d0f553`; `lab:` `3abc1b70`; `proto:` `765e429c` (the prototype
+  with its unit tests, draw-coverage test, serialization test and proptest
+  invariant, plus the proptest regression file the first run of that
+  invariant wrote on a generated genome with a truncated sink catalog); then
+  this run's `docs:` commits. The prototype's release test binaries built
+  at `765e429c`: `census-proto` sha256 `5cb7857f…`, `probe-proto`
+  `fbc71263…`. `cargo test -p v3-core --test viability` 28 passed before the
+  prototype was committed; the seven born-connected unit tests pass.
+- **Amendment A2 (pre-data, Advice 2, before any gate ran).** The census's
+  `births` block embeds the arm's `mutation_config` (the flag itself), so
+  the identity checkers hash the block's counts without that entry and
+  compare the entry apart: equal under B0.2 (ii), `false` against `true` at
+  every checkpoint under B0.3, beside the predeclared header differences.
+  The B0 reader's two identity readings of the off path (the deterministic
+  projection against G3's raw output, with each probe version's own block
+  dropped, and the `genome_size`, `executed_resolved` and `frozen_age`
+  comparison) are recorded, not gating, as the gate text says; the 5 %
+  rules and the on-path checks are the gate. The driver stops before the
+  gates unless `make check` exited 0 on the branch.
 - **Landing scope.** Only `docs:` commits land on `main`; `proto:`, `instr:`
   and `lab:` stay on the branch, which is kept. T22 instrument candidates
   from this run (on the branch): the census probe's `births` block beside
@@ -237,10 +260,13 @@ extinction is a finding.
 
 Every Fable advisor consultation rule 8 lists, with the disposition of each
 point raised. Coverage so far: before anything was built (the approach to
-the whole run, after the contract was read), Advice 1.
+the whole run, after the contract was read), Advice 1; before the gate and
+world chain was launched (after review (a) was disposed and the prototype
+committed), Advice 2.
 
 | # | Rule 8 point | Advice (summary) | Dispositions |
 | --- | --- | --- | --- |
+| 2 | Before the gates and the world chain (the phase's approach), after amendment A1, the `instr:`, `lab:` and `proto:` commits, the frozen build and the readers | Chain correctly sequenced, predeclaration sound; six points. (1) `b0read.py` would fail B0 by construction: the projection compares whole parent objects, but the reference carries a `decay` block and this probe `single_add_births`; and the identity readings sat in the gate's `all(...)` although the note calls them recorded; drop each version's block before comparing and make both identity checks non-gating. (2) `identity.py` would fail B0.3 on the `births` block, which embeds `mutation_config.born_connected`; strip it before hashing and compare it apart with the expected value per mode; record as a pre-data amendment A2. (3) Gate the driver on `make check` exiting 0 (prototype results count only after clippy passes). (4) Record Advice 2 before launching, with the commit hashes, the four binary hashes, the viability result and A2. (5) Turn economy: one background waiter per milestone (B0, smoke, B0.3, B0.2 (ii), DONE/STOP), batched note commits after B0, after the identity gates and with the B1 reading. (6) Watch, not change: the smoke's `births_secs` and `vote_delta_secs` projected to 20,000-tick genomes; a lone `config_digest` failure in B0.2 (i) with equal samples is a question about what `run_started` hashes, to amend, not a stop; B0 (2) at 10⁷ is a 95 % containment with a one-in-twenty false failure, so a lone failure near 0.0106 is investigated before anything is concluded | All adopted: (1) and (2) in the readers before launch, (2) also as amendment A2 (Run setup); (3) in the driver; (4) this commit (the `make check` line follows in the next); (5) the waiters; (6) read at the smoke and gate wakeups |
 | 1 | Before phase 0: the approach to the run after the contract, the branch code and the engine were read | Shape right; eight points. (1) The useful-signed criterion cannot be evaluated at 10⁶ births: the probe's `useful_sign` accepts four pairings, so the prediction is rate × 2/189 (the task's one-pairing arithmetic × 4); write both, name which the CP test is against, predeclare the 10⁷ on-path run for this one criterion, record 5.5 × 10⁻⁶ as parent (b)'s two-step rate and 0 of 10⁷ as the same-birth founder figure; use `single_*` denominators for exact equality and the all-births CP containment for (1); check `connect_by_location` and `connect_by_sub`. (2) The default arm may not persist under T03.F12 on these seeds: predeclare the verdict path. (3) The prototype breaks two committed sentences (the mutation spec's neutral-growth taxonomy and the T20.F04 row): say so in the predeclaration and name them in the plan forward, with T20.F04's zero-weight operator as the contrast. (4) Predeclare both one-event choices (funnel frozen, the births reading under the arm), smoke the extended census on the small recipe first, predeclare dead-per-birth as descriptive with a direction. (5) The main checkout's `v3-cli` is dated before `b0f47dd5`: build the reference binary at the launch revision, hash it, `--telemetry off`; add the `config_digest` equality as a free check. (6) Verify the byte-identity premise on the mutation, creature and lab paths before predeclaring it. (7) Commit the predeclaration, launch Codex (a) in the background through a scratchpad `sh` wrapper, build the prototype under TDD while it runs, no gate before (a) is disposed; pure `docs:` commits; `npm ci`, `aqua policy allow`, head check; say the battery state once; add the note to the docs index; check the channel JSON against 1 MiB. (8) Write the validation rule verbatim and resolve its two ambiguities (both seeds; funnel causal = action-queue change) | All adopted in the predeclaration: (1) gate B0 on-path (1) and (2), with the single-event-`Add` tallies after review (a); (2) the row's resolution (iii); (3) "Contracts it deviates from" and the plan forward's part 2, with a third sentence after review (a) finding 18; (4) Run setup (instrument extension) and the row's prediction, the source corrected after review (a) finding 1; (5) Run setup (reference binary) and gate B0.2 (i); (6) the diff touches only `creature/identity.rs` and `creature/state.rs`, recorded in gate B0; (7) the Order below; the docs index lists companion notes only (the follow-up note is not in it), so no entry is added; (8) the row's rule and resolutions (i) and (ii), the agreement check strengthened after review (a) finding 3 |
 
 ## Codex reviews
