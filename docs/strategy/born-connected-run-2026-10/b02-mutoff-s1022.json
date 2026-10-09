@@ -1,0 +1,123 @@
+{
+ "mode": "equal",
+ "ref": {
+  "dir": ".claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/frozen/default-mutoff-s1022",
+  "name": "default-mutoff-s1022",
+  "sha256": {
+   "samples": "487a37d1eac67a2f31978d07e8ec1389c613b72574d7dfe0fb66c6507d26c641",
+   "census": "8df89936fce49d1a3b1174376c95cde2ec994ab5816736882acd026808d8509f"
+  }
+ },
+ "cand": {
+  "dir": ".claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/default-mutoff-s1022",
+  "name": "default-mutoff-s1022",
+  "sha256": {
+   "samples": "0a7277c4546e34fa3330c2518cc34865985e47ff34f46de29c64dd188dfe6545",
+   "census": "8a87717c59a83505f3217193ea9cff38aac69381730f72a8024d263dbf14d0fc"
+  }
+ },
+ "checks": [
+  {
+   "check": "sample tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500
+    ],
+    "cand": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500
+    ]
+   }
+  },
+  {
+   "check": "every sample field equal at every tick",
+   "pass": true,
+   "detail": {
+    "mismatches": [],
+    "count": 0
+   }
+  },
+  {
+   "check": "extinction tick equal",
+   "pass": true,
+   "detail": {
+    "ref": 5557,
+    "cand": 5557
+   }
+  },
+  {
+   "check": "footer ticks and extinct equal",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "ticks": 5557,
+     "extinct": true
+    },
+    "cand": {
+     "ticks": 5557,
+     "extinct": true
+    }
+   }
+  },
+  {
+   "check": "checkpoint tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [],
+    "cand": []
+   }
+  },
+  {
+   "check": "every timing-free checkpoint block hash-equal (births counts without mutation_config)",
+   "pass": true,
+   "detail": {
+    "differing": []
+   }
+  },
+  {
+   "check": "births block mutation_config.born_connected: no checkpoint reached on either run (vacuous)",
+   "pass": true,
+   "detail": {
+    "ref_extinct": 5557,
+    "cand_extinct": 5557
+   }
+  },
+  {
+   "check": "header equal outside the allowed keys",
+   "pass": true,
+   "detail": {
+    "differing": [],
+    "disallowed": []
+   }
+  },
+  {
+   "check": "header allowed keys equal too (same binary policy, same recipe)",
+   "pass": true,
+   "detail": {
+    "differing": []
+   }
+  }
+ ],
+ "pass": true,
+ "block_hashes": {}
+}

@@ -1,0 +1,131 @@
+{
+ "mode": "equal",
+ "ref": {
+  "dir": ".claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/frozen/default-mutoff-s2022",
+  "name": "default-mutoff-s2022",
+  "sha256": {
+   "samples": "d9a850d928f0d3499d0ec653d0f1695e34e1869f83eb215e445d4cd27adcde07",
+   "census": "dd5d10271577b581c9b7f16a18f26f3219a2ec97f6d733e3b05d415d5afa21ec"
+  }
+ },
+ "cand": {
+  "dir": ".claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/default-mutoff-s2022",
+  "name": "default-mutoff-s2022",
+  "sha256": {
+   "samples": "7f811acec1ba45687da4d401ae172f68afed5922677922a4367cd42c3b4dfa9f",
+   "census": "ac7e8e42d641e20d9cca78621872a3ad378b2539af892a7a2efb9094b9884f5e"
+  }
+ },
+ "checks": [
+  {
+   "check": "sample tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500,
+     6000,
+     6500,
+     7000,
+     7500
+    ],
+    "cand": [
+     500,
+     1000,
+     1500,
+     2000,
+     2500,
+     3000,
+     3500,
+     4000,
+     4500,
+     5000,
+     5500,
+     6000,
+     6500,
+     7000,
+     7500
+    ]
+   }
+  },
+  {
+   "check": "every sample field equal at every tick",
+   "pass": true,
+   "detail": {
+    "mismatches": [],
+    "count": 0
+   }
+  },
+  {
+   "check": "extinction tick equal",
+   "pass": true,
+   "detail": {
+    "ref": 7509,
+    "cand": 7509
+   }
+  },
+  {
+   "check": "footer ticks and extinct equal",
+   "pass": true,
+   "detail": {
+    "ref": {
+     "ticks": 7509,
+     "extinct": true
+    },
+    "cand": {
+     "ticks": 7509,
+     "extinct": true
+    }
+   }
+  },
+  {
+   "check": "checkpoint tick sets equal",
+   "pass": true,
+   "detail": {
+    "ref": [],
+    "cand": []
+   }
+  },
+  {
+   "check": "every timing-free checkpoint block hash-equal (births counts without mutation_config)",
+   "pass": true,
+   "detail": {
+    "differing": []
+   }
+  },
+  {
+   "check": "births block mutation_config.born_connected: no checkpoint reached on either run (vacuous)",
+   "pass": true,
+   "detail": {
+    "ref_extinct": 7509,
+    "cand_extinct": 7509
+   }
+  },
+  {
+   "check": "header equal outside the allowed keys",
+   "pass": true,
+   "detail": {
+    "differing": [],
+    "disallowed": []
+   }
+  },
+  {
+   "check": "header allowed keys equal too (same binary policy, same recipe)",
+   "pass": true,
+   "detail": {
+    "differing": []
+   }
+  }
+ ],
+ "pass": true,
+ "block_hashes": {}
+}
