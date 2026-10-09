@@ -91,7 +91,15 @@ def vote_reading(block):
         "distinct_parents_with_action_change_by_family": {f: sorted(v) for f, v in by_family_action.items()},
         "distinct_parents_with_action_change_by_channel": {f"{f}#{ch}": sorted(v) for (f, ch), v in by_channel_action.items()},
         "action_change_channels": [{"parent": pi, "family": c["family"], "channel": c["channel"], "scenes_actions_differ": s(c, "scenes_actions_differ"),
-                                    "delta_passes": s(c, "delta_passes"), "consumers_graph": c["consumers_graph"], "consumers_vm": c["consumers_vm"]} for pi, c in action],
+                                    "delta_passes": s(c, "delta_passes"), "consumers_graph": c["consumers_graph"],
+                                    "consumers_graph_abs_weight": round(c["consumers_graph_abs_weight"], 4), "consumers_vm": c["consumers_vm"]} for pi, c in action],
+        # Distinct readings among the action-changing channels, grouped by
+        # (family, channel, consumer counts, summed |weight|, delta passes):
+        # phenotype-summary groups; shared ancestry is a hypothesis, not a bound
+        # (review (b) findings 2 and 13).
+        "distinct_action_change_readings": sorted({(norm_family(c["family"]), c["channel"], c["consumers_graph"], c["consumers_vm"],
+                                                   round(c["consumers_graph_abs_weight"], 4), s(c, "delta_passes")) for pi, c in action}),
+        "distinct_action_change_parents": len({pi for pi, c in action}),
         "vote_delta_channels": [{"parent": pi, "family": c["family"], "channel": c["channel"], "delta_passes": s(c, "delta_passes"),
                                  "max_abs_delta": s(c, "max_abs_delta"), "most_moved_kind": s(c, "most_moved_kind")} for pi, c in delta],
     }
@@ -238,9 +246,11 @@ def main():
             "pair": {"default_mutoff_extinction": val("default-mutoff", s, "extinction_interval"),
                      "born_mutoff_extinction": val("born-mutoff", s, "extinction_interval")},
         }
-        per["seed_validates"] = bool(per["born_reaches_20000"] and default_defined and per["population_at_least_half"] and exc
-                                     and causal_where_default_none and vote_cond and per["parents_evaluated_20"])
         per["agreement_holds"] = bool(per["agreement_default"] and per["agreement_born"])
+        # The agreement check is blocking (resolution (ii)): no validated
+        # verdict without it (review (b) finding 14).
+        per["seed_validates"] = bool(per["born_reaches_20000"] and default_defined and per["population_at_least_half"] and exc
+                                     and causal_where_default_none and vote_cond and per["parents_evaluated_20"] and per["agreement_holds"])
         rule["per_seed"][str(s)] = per
     both = len(rule["per_seed"]) == 2
     rule["validated"] = (all(v["seed_validates"] for v in rule["per_seed"].values()) if both else None)
@@ -261,6 +271,9 @@ def main():
                   "agree", (c["agreement"] or {}).get("pass"),
                   "births", {k: (c["births"]["pooled"] or {}).get(k) for k in ("dead_per_all_births", "dead_per_mutated_births", "changed_per_mutated_births", "silent_per_mutated_births")} if c["births"].get("pooled") else None)
     print("B1 validated:", rule["validated"], "agreement on both:", rule["agreement_holds_on_both"])
+    if rule["agreement_holds_on_both"] is False:
+        print("AGREEMENT FAILURE: the funnel's causal counts and the vote-delta action changes disagree; no verdict is read")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

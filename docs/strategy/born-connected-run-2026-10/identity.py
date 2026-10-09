@@ -77,9 +77,12 @@ def main():
                 # itself); it is compared apart (amendment A2), the counts hashed.
                 vr = {k: v for k, v in (vr or {}).items() if k != "mutation_config"}
                 vc = {k: v for k, v in (vc or {}).items() if k != "mutation_config"}
-                fr = ((ref["checkpoints"][t].get("births") or {}).get("mutation_config") or {}).get("born_connected")
-                fc = ((cand["checkpoints"][t].get("births") or {}).get("mutation_config") or {}).get("born_connected")
-                flags.append({"tick": t, "ref": fr, "cand": fc})
+                mr = (ref["checkpoints"][t].get("births") or {}).get("mutation_config") or {}
+                mc = (cand["checkpoints"][t].get("births") or {}).get("mutation_config") or {}
+                # The whole removed entry is compared apart (review (b) finding
+                # 15): every key but the flag must be equal in both modes.
+                flags.append({"tick": t, "ref": mr.get("born_connected"), "cand": mc.get("born_connected"),
+                              "rest_equal": {k: v for k, v in mr.items() if k != "born_connected"} == {k: v for k, v in mc.items() if k != "born_connected"}})
             hr, hc = canon(vr), canon(vc)
             block_hashes[f"{t}:{b}"] = {"ref": hr, "cand": hc}
             if hr != hc:
@@ -94,10 +97,10 @@ def main():
         check("births block mutation_config.born_connected: no checkpoint reached on either run (vacuous)",
               not ref["checkpoints"] and not cand["checkpoints"], {"ref_extinct": ref["extinct"], "cand_extinct": cand["extinct"]})
     elif mode == "equal":
-        check("births block mutation_config.born_connected equal at every checkpoint", all(f["ref"] == f["cand"] for f in flags), flags)
+        check("births block mutation_config entirely equal at every checkpoint", all(f["ref"] == f["cand"] and f["rest_equal"] for f in flags), flags)
     else:
-        check("births block mutation_config.born_connected differs (false vs true) at every checkpoint",
-              all(f["ref"] is False and f["cand"] is True for f in flags), flags)
+        check("births block mutation_config differs only in born_connected (false vs true) at every checkpoint",
+              all(f["ref"] is False and f["cand"] is True and f["rest_equal"] for f in flags), flags)
     rh, ch = ref["header"] or {}, cand["header"] or {}
     diff = sorted(k for k in set(rh) | set(ch) if rh.get(k) != ch.get(k))
     disallowed = [k for k in diff if k not in ALLOWED_HEADER]

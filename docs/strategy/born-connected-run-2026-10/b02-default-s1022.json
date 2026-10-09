@@ -1,7 +1,7 @@
 {
  "mode": "equal",
  "ref": {
-  "dir": "/Users/istefanek/projects/petri/.claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/frozen/default-s1022",
+  "dir": ".bench-artifacts/lab/born/b1/frozen/default-s1022",
   "name": "default-s1022",
   "sha256": {
    "samples": "077e5dd69c39a72e2adcce38a1084eab148c0427f1217bfd231d3f2287543449",
@@ -9,7 +9,7 @@
   }
  },
  "cand": {
-  "dir": "/Users/istefanek/projects/petri/.claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/default-s1022",
+  "dir": ".bench-artifacts/lab/born/b1/default-s1022",
   "name": "default-s1022",
   "sha256": {
    "samples": "3e0a122239fecbc011d8e08667ac61cf7725d34184c93e876538b80b5b6a12ea",
@@ -159,18 +159,20 @@
    }
   },
   {
-   "check": "births block mutation_config.born_connected equal at every checkpoint",
+   "check": "births block mutation_config entirely equal at every checkpoint",
    "pass": true,
    "detail": [
     {
      "tick": 10000,
      "ref": false,
-     "cand": false
+     "cand": false,
+     "rest_equal": true
     },
     {
      "tick": 20000,
      "ref": false,
-     "cand": false
+     "cand": false,
+     "rest_equal": true
     }
    ]
   },

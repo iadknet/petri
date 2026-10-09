@@ -126,6 +126,8 @@
       "distinct_parents_with_action_change_by_family": {},
       "distinct_parents_with_action_change_by_channel": {},
       "action_change_channels": [],
+      "distinct_action_change_readings": [],
+      "distinct_action_change_parents": 0,
       "vote_delta_channels": []
      },
      "agreement": {
@@ -241,6 +243,7 @@
         "scenes_actions_differ": 4,
         "delta_passes": 116,
         "consumers_graph": 0,
+        "consumers_graph_abs_weight": 0.0,
         "consumers_vm": 7
        },
        {
@@ -250,9 +253,29 @@
         "scenes_actions_differ": 22,
         "delta_passes": 176,
         "consumers_graph": 0,
+        "consumers_graph_abs_weight": 0.0,
         "consumers_vm": 2
        }
       ],
+      "distinct_action_change_readings": [
+       [
+        "NeighborBarrierRing",
+        0,
+        0,
+        2,
+        0.0,
+        176
+       ],
+       [
+        "NeighborBarrierRing",
+        0,
+        0,
+        7,
+        0.0,
+        116
+       ]
+      ],
+      "distinct_action_change_parents": 2,
       "vote_delta_channels": [
        {
         "parent": 8,
@@ -461,6 +484,8 @@
       "distinct_parents_with_action_change_by_family": {},
       "distinct_parents_with_action_change_by_channel": {},
       "action_change_channels": [],
+      "distinct_action_change_readings": [],
+      "distinct_action_change_parents": 0,
       "vote_delta_channels": []
      },
      "agreement": {
@@ -578,6 +603,7 @@
         "scenes_actions_differ": 20,
         "delta_passes": 1080,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 1.0,
         "consumers_vm": 0
        },
        {
@@ -587,6 +613,7 @@
         "scenes_actions_differ": 20,
         "delta_passes": 1080,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 1.0,
         "consumers_vm": 0
        },
        {
@@ -596,9 +623,21 @@
         "scenes_actions_differ": 20,
         "delta_passes": 1080,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 1.0,
         "consumers_vm": 0
        }
       ],
+      "distinct_action_change_readings": [
+       [
+        "AreaFoodSummary:0",
+        2,
+        1,
+        0,
+        1.0,
+        1080
+       ]
+      ],
+      "distinct_action_change_parents": 3,
       "vote_delta_channels": [
        {
         "parent": 1,
@@ -848,6 +887,7 @@
         "scenes_actions_differ": 23,
         "delta_passes": 166,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.4914,
         "consumers_vm": 0
        },
        {
@@ -857,6 +897,7 @@
         "scenes_actions_differ": 8,
         "delta_passes": 22,
         "consumers_graph": 2,
+        "consumers_graph_abs_weight": 0.7706,
         "consumers_vm": 0
        },
        {
@@ -866,6 +907,7 @@
         "scenes_actions_differ": 23,
         "delta_passes": 166,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.4914,
         "consumers_vm": 0
        },
        {
@@ -875,6 +917,7 @@
         "scenes_actions_differ": 5,
         "delta_passes": 156,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.5826,
         "consumers_vm": 0
        },
        {
@@ -884,6 +927,7 @@
         "scenes_actions_differ": 8,
         "delta_passes": 22,
         "consumers_graph": 2,
+        "consumers_graph_abs_weight": 0.7706,
         "consumers_vm": 0
        },
        {
@@ -893,6 +937,7 @@
         "scenes_actions_differ": 23,
         "delta_passes": 166,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.4914,
         "consumers_vm": 0
        },
        {
@@ -902,6 +947,7 @@
         "scenes_actions_differ": 5,
         "delta_passes": 156,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.5826,
         "consumers_vm": 0
        },
        {
@@ -911,9 +957,45 @@
         "scenes_actions_differ": 23,
         "delta_passes": 230,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.4914,
         "consumers_vm": 0
        }
       ],
+      "distinct_action_change_readings": [
+       [
+        "NeighborBarrierRing",
+        4,
+        2,
+        0,
+        0.7706,
+        22
+       ],
+       [
+        "NeighborBarrierRing",
+        5,
+        1,
+        0,
+        0.4914,
+        166
+       ],
+       [
+        "NeighborBarrierRing",
+        5,
+        1,
+        0,
+        0.4914,
+        230
+       ],
+       [
+        "NeighborBarrierRing",
+        7,
+        1,
+        0,
+        0.5826,
+        156
+       ]
+      ],
+      "distinct_action_change_parents": 8,
       "vote_delta_channels": [
        {
         "parent": 1,
@@ -1164,6 +1246,7 @@
         "scenes_actions_differ": 8,
         "delta_passes": 18,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.5249,
         "consumers_vm": 0
        },
        {
@@ -1173,6 +1256,7 @@
         "scenes_actions_differ": 17,
         "delta_passes": 106,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.3264,
         "consumers_vm": 0
        },
        {
@@ -1182,6 +1266,7 @@
         "scenes_actions_differ": 37,
         "delta_passes": 207,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.794,
         "consumers_vm": 0
        },
        {
@@ -1191,6 +1276,7 @@
         "scenes_actions_differ": 37,
         "delta_passes": 207,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.794,
         "consumers_vm": 0
        },
        {
@@ -1200,6 +1286,7 @@
         "scenes_actions_differ": 8,
         "delta_passes": 23,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.5249,
         "consumers_vm": 0
        },
        {
@@ -1209,6 +1296,7 @@
         "scenes_actions_differ": 12,
         "delta_passes": 640,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.7243,
         "consumers_vm": 0
        },
        {
@@ -1218,6 +1306,7 @@
         "scenes_actions_differ": 16,
         "delta_passes": 144,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.7243,
         "consumers_vm": 0
        },
        {
@@ -1227,9 +1316,69 @@
         "scenes_actions_differ": 5,
         "delta_passes": 1630,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.2866,
         "consumers_vm": 0
        }
       ],
+      "distinct_action_change_readings": [
+       [
+        "AreaFoodSummary:0",
+        0,
+        1,
+        0,
+        0.2866,
+        1630
+       ],
+       [
+        "AreaFoodSummary:0",
+        1,
+        1,
+        0,
+        0.7243,
+        144
+       ],
+       [
+        "AreaFoodSummary:0",
+        1,
+        1,
+        0,
+        0.7243,
+        640
+       ],
+       [
+        "AreaFoodSummary:0",
+        3,
+        1,
+        0,
+        0.794,
+        207
+       ],
+       [
+        "NeighborBarrierRing",
+        2,
+        1,
+        0,
+        0.5249,
+        18
+       ],
+       [
+        "NeighborBarrierRing",
+        2,
+        1,
+        0,
+        0.5249,
+        23
+       ],
+       [
+        "NeighborBarrierRing",
+        6,
+        1,
+        0,
+        0.3264,
+        106
+       ]
+      ],
+      "distinct_action_change_parents": 8,
       "vote_delta_channels": [
        {
         "parent": 3,
@@ -1565,6 +1714,7 @@
         "scenes_actions_differ": 32,
         "delta_passes": 1084,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.5065,
         "consumers_vm": 0
        },
        {
@@ -1574,6 +1724,7 @@
         "scenes_actions_differ": 7,
         "delta_passes": 432,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.9973,
         "consumers_vm": 0
        },
        {
@@ -1583,6 +1734,7 @@
         "scenes_actions_differ": 1,
         "delta_passes": 1450,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.0726,
         "consumers_vm": 0
        },
        {
@@ -1592,6 +1744,7 @@
         "scenes_actions_differ": 24,
         "delta_passes": 754,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 1.0,
         "consumers_vm": 0
        },
        {
@@ -1601,9 +1754,53 @@
         "scenes_actions_differ": 2,
         "delta_passes": 555,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.2761,
         "consumers_vm": 0
        }
       ],
+      "distinct_action_change_readings": [
+       [
+        "AreaFoodSummary:0",
+        0,
+        1,
+        0,
+        0.0726,
+        1450
+       ],
+       [
+        "AreaFoodSummary:0",
+        1,
+        1,
+        0,
+        1.0,
+        754
+       ],
+       [
+        "AreaFoodSummary:0",
+        4,
+        1,
+        0,
+        0.2761,
+        555
+       ],
+       [
+        "AreaFoodSummary:0",
+        4,
+        1,
+        0,
+        0.9973,
+        432
+       ],
+       [
+        "AreaFoodSummary:0",
+        6,
+        1,
+        0,
+        0.5065,
+        1084
+       ]
+      ],
+      "distinct_action_change_parents": 3,
       "vote_delta_channels": [
        {
         "parent": 8,
@@ -1803,6 +2000,7 @@
         "scenes_actions_differ": 79,
         "delta_passes": 1177,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.8873,
         "consumers_vm": 0
        },
        {
@@ -1812,6 +2010,7 @@
         "scenes_actions_differ": 11,
         "delta_passes": 292,
         "consumers_graph": 2,
+        "consumers_graph_abs_weight": 1.5095,
         "consumers_vm": 0
        },
        {
@@ -1821,6 +2020,7 @@
         "scenes_actions_differ": 28,
         "delta_passes": 197,
         "consumers_graph": 2,
+        "consumers_graph_abs_weight": 0.9529,
         "consumers_vm": 0
        },
        {
@@ -1830,6 +2030,7 @@
         "scenes_actions_differ": 68,
         "delta_passes": 1231,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.8873,
         "consumers_vm": 0
        },
        {
@@ -1839,6 +2040,7 @@
         "scenes_actions_differ": 28,
         "delta_passes": 197,
         "consumers_graph": 2,
+        "consumers_graph_abs_weight": 0.9529,
         "consumers_vm": 0
        },
        {
@@ -1848,9 +2050,45 @@
         "scenes_actions_differ": 73,
         "delta_passes": 1231,
         "consumers_graph": 1,
+        "consumers_graph_abs_weight": 0.8873,
         "consumers_vm": 0
        }
       ],
+      "distinct_action_change_readings": [
+       [
+        "AreaFoodSummary:0",
+        1,
+        1,
+        0,
+        0.8873,
+        1177
+       ],
+       [
+        "AreaFoodSummary:0",
+        1,
+        1,
+        0,
+        0.8873,
+        1231
+       ],
+       [
+        "AreaFoodSummary:0",
+        4,
+        2,
+        0,
+        1.5095,
+        292
+       ],
+       [
+        "NeighborBarrierRing",
+        4,
+        2,
+        0,
+        0.9529,
+        197
+       ]
+      ],
+      "distinct_action_change_parents": 4,
       "vote_delta_channels": [
        {
         "parent": 21,
@@ -2323,8 +2561,8 @@
       5557
      ]
     },
-    "seed_validates": true,
-    "agreement_holds": true
+    "agreement_holds": true,
+    "seed_validates": true
    },
    "2022": {
     "born_reaches_20000": true,
@@ -2354,8 +2592,8 @@
       7509
      ]
     },
-    "seed_validates": true,
-    "agreement_holds": true
+    "agreement_holds": true,
+    "seed_validates": true
    }
   },
   "validated": true,
