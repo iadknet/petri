@@ -1,7 +1,7 @@
 {
  "mode": "equal",
  "ref": {
-  "dir": ".claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/frozen/default-mutoff-s2022",
+  "dir": ".bench-artifacts/lab/born/b1/frozen/default-mutoff-s2022",
   "name": "default-mutoff-s2022",
   "sha256": {
    "samples": "d9a850d928f0d3499d0ec653d0f1695e34e1869f83eb215e445d4cd27adcde07",
@@ -9,7 +9,7 @@
   }
  },
  "cand": {
-  "dir": ".claude/worktrees/born-connected/.bench-artifacts/lab/born/b1/default-mutoff-s2022",
+  "dir": ".bench-artifacts/lab/born/b1/default-mutoff-s2022",
   "name": "default-mutoff-s2022",
   "sha256": {
    "samples": "7f811acec1ba45687da4d401ae172f68afed5922677922a4367cd42c3b4dfa9f",
