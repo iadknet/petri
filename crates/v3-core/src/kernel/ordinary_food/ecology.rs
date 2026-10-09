@@ -398,14 +398,25 @@ impl CellTerms<'_> {
         self.density[idx].clamp(0.0, self.max_density)
     }
 
-    /// The annealed habitat fertility (1.0 when fertility is disabled or the
-    /// type has no grid) times the cell's grazing modifier.
+    /// The annealed habitat fertility: 1.0 when fertility is disabled or the
+    /// type has no grid.
+    #[inline]
+    fn habitat_fertility(&self, idx: usize) -> f32 {
+        self.habitat.map_or(1.0, |(raw, min, max)| {
+            fertility::map_fertility(raw[idx], min, max)
+        })
+    }
+
+    /// The cell's grazing modifier: 1.0 while grazing is disabled.
+    #[inline]
+    fn grazing_modifier(&self, idx: usize) -> f32 {
+        self.grazing.map_or(1.0, |modifiers| modifiers[idx])
+    }
+
+    /// The habitat fertility times the grazing modifier.
     #[inline]
     fn base_fertility(&self, idx: usize) -> f32 {
-        let habitat = self.habitat.map_or(1.0, |(raw, min, max)| {
-            fertility::map_fertility(raw[idx], min, max)
-        });
-        habitat * self.grazing.map_or(1.0, |modifiers| modifiers[idx])
+        self.habitat_fertility(idx) * self.grazing_modifier(idx)
     }
 
     #[inline]
@@ -545,6 +556,56 @@ fn gather_cell(
         next = (next + spread_delta).clamp(0.0, terms.max_density);
     }
     next
+}
+
+/// One recovery attempt on the passable cell `idx`: adds
+/// `spawn_delta × fertility × multiplier` to the cell's next density under
+/// one clamp, and records the inhibited flag and the suppressed growth.
+///
+/// When `spawn_delta` is finite, a cell whose habitat fertility, or habitat
+/// times grazing modifier, is an exact zero is skipped: every growth term is
+/// then a zero of either sign, the flag condition is false, the suppression
+/// sums add a zero, and the clamped write returns the stored value, so the
+/// skip is bit-identical to the full evaluation. (`+0.0` added to `-0.0`
+/// would give `+0.0`, but `next_density` holds the gather's output, which
+/// writes an empty source as `claim_cell`'s `+0.0` `EMPTY` and otherwise a
+/// clamped positive sum, so no `-0.0` reaches this step.) The comparison is
+/// exact on purpose: a positive fertility, however small, must take the full
+/// path.
+/// The skip saves the random reads of the other grids, which dominate this
+/// pass on recipes whose fertility map is mostly empty, such as a type
+/// spawning at rate 1.0 onto a few small blobs. An infinite `spawn_delta`
+/// takes the full path, where `∞ × 0` is NaN. The property test
+/// `recovery_attempt_matches_the_full_evaluation` pins the identity.
+#[inline]
+fn recovery_attempt(
+    terms: &CellTerms<'_>,
+    spawn_delta: f32,
+    idx: usize,
+    inhibited: &mut bool,
+    suppression: &mut Suppression,
+    next_density: &mut f32,
+) {
+    let skip_zero_fertility = spawn_delta.is_finite();
+    let habitat_fertility = terms.habitat_fertility(idx);
+    if skip_zero_fertility && habitat_fertility == 0.0 {
+        return;
+    }
+    let base_cell_fertility = habitat_fertility * terms.grazing_modifier(idx);
+    if skip_zero_fertility && base_cell_fertility == 0.0 {
+        return;
+    }
+    let recovery_inhibition_penalty = terms.penalty(idx, terms.source(idx));
+    let cell_fertility = (base_cell_fertility - recovery_inhibition_penalty).max(0.0);
+    let recovery_base = spawn_delta * base_cell_fertility;
+    let recovery_after_inhibition = spawn_delta * cell_fertility;
+    let recovery_delta = recovery_after_inhibition * terms.multiplier(idx);
+    if recovery_base > recovery_after_inhibition && recovery_inhibition_penalty > 0.0 {
+        *inhibited = true;
+    }
+    suppression.inhibition += (recovery_base - recovery_after_inhibition).max(0.0);
+    suppression.occupancy += (recovery_after_inhibition - recovery_delta).max(0.0);
+    *next_density = (*next_density + recovery_delta).clamp(0.0, terms.max_density);
 }
 
 /// The weighted density of every inhibiting type per cell, summed in catalog
@@ -774,18 +835,14 @@ pub(super) fn grow<T: Clone + Sync>(
                 if terms.barriers[idx] {
                     continue;
                 }
-                let base_cell_fertility = terms.base_fertility(idx);
-                let recovery_inhibition_penalty = terms.penalty(idx, terms.source(idx));
-                let cell_fertility = (base_cell_fertility - recovery_inhibition_penalty).max(0.0);
-                let recovery_base = spawn_delta * base_cell_fertility;
-                let recovery_after_inhibition = spawn_delta * cell_fertility;
-                let recovery_delta = recovery_after_inhibition * terms.multiplier(idx);
-                if recovery_base > recovery_after_inhibition && recovery_inhibition_penalty > 0.0 {
-                    inhibited[idx] = true;
-                }
-                suppressed.inhibition += (recovery_base - recovery_after_inhibition).max(0.0);
-                suppressed.occupancy += (recovery_after_inhibition - recovery_delta).max(0.0);
-                next_density[idx] = (next_density[idx] + recovery_delta).clamp(0.0, max_density);
+                recovery_attempt(
+                    &terms,
+                    spawn_delta,
+                    idx,
+                    &mut inhibited[idx],
+                    &mut suppressed,
+                    &mut next_density[idx],
+                );
             }
             clock.stop(start, FoodPass::RecoverySpawns, Some(type_idx));
         }
@@ -2230,6 +2287,295 @@ mod tests {
         assert_eq!(state.food_at_type(cell, barren), 0.0);
         assert_eq!(summary.cells_with_type_inhibition, 0);
         assert_eq!(summary.growth_suppressed_by_type_inhibition, 0.0);
+    }
+
+    /// Recovery attempts on zero-fertility cells change nothing, bit for
+    /// bit, while attempts on fertile cells add `max_density × g` per hit
+    /// under one clamp each (the attempt loop's skip must match the full
+    /// evaluation). A 4x1 world: cells 0 and 1 barren (raw -1 maps to 0),
+    /// cells 2 and 3 fertile; four attempts per pass. The seed is the first
+    /// whose draws hit both a barren and a fertile cell, so both branches
+    /// run.
+    #[test]
+    fn recovery_attempts_on_zero_fertility_cells_leave_them_unchanged() {
+        let mut config = plain_growth_config(1);
+        config.fertility.enabled = true;
+        config.fertility.min_fertility = 0.0;
+        config.fertility.max_fertility = 1.0;
+        config.annealing.enabled = false;
+        config.shared.growth_rate = 0.5;
+        config.shared.max_density = 1.0;
+        config.shared.recovery_floor_ratio = 1.0;
+        config.types[0].recovery_spawn_rate = Some(1.0);
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let type_idx = OrdinaryFoodTypeId::new(0);
+        let (width, height, cells) = (4u16, 1u16, 4usize);
+        let barren = |idx: usize| idx < 2;
+
+        let mut chosen = None;
+        for seed in 0..64u64 {
+            let key = FoodStreamKey::from_run_seed(seed);
+            let hits: Vec<usize> = (0..cells as u64)
+                .map(|attempt| {
+                    in_range(
+                        food_draw(key, 0, type_idx, DrawPurpose::RecoveryCell, attempt),
+                        cells,
+                    )
+                })
+                .collect();
+            if hits.iter().any(|&idx| barren(idx)) && hits.iter().any(|&idx| !barren(idx)) {
+                chosen = Some((seed, hits));
+                break;
+            }
+        }
+        let (seed, hits) =
+            chosen.expect("some seed in 0..64 hits both a barren and a fertile cell");
+
+        let mut fertility = Grid::new(width, height, 1.0);
+        fertility.set(0, 0, -1.0);
+        fertility.set(1, 0, -1.0);
+        let mut state = OrdinaryFoodState::new(width, height, catalog.len());
+        state.set_fertility_grid(type_idx, fertility);
+        // Below the spread threshold, so cell 0 can change only through recovery.
+        state.set_food_type_density(Position::new(0, 0), type_idx, 0.25);
+
+        let summary = grow(
+            &mut state,
+            &catalog,
+            &config.shared,
+            &config,
+            &mut OccupancyDepletionLayer::new(width, height),
+            &mut GrowthScratch::default(),
+            &barrier_grid(width, height),
+            &occupancy_grid::<()>(width, height),
+            WorldEdgeMode::Bounded,
+            0,
+            FoodStreamKey::from_run_seed(seed),
+        );
+
+        let spawn_delta = config.shared.max_density * config.shared.growth_rate;
+        let expected: Vec<f32> = (0..cells)
+            .map(|idx| {
+                let start = if idx == 0 { 0.25f32 } else { 0.0 };
+                if barren(idx) {
+                    return start;
+                }
+                hits.iter()
+                    .filter(|&&hit| hit == idx)
+                    .fold(start, |density, _| {
+                        (density + spawn_delta).clamp(0.0, config.shared.max_density)
+                    })
+            })
+            .collect();
+        for (idx, want) in expected.iter().enumerate() {
+            let got = state.food_at_type(Position::new(idx as u16, 0), type_idx);
+            assert_eq!(
+                got.to_bits(),
+                want.to_bits(),
+                "cell {idx}: got {got}, want {want}"
+            );
+        }
+        let expected_total = expected
+            .iter()
+            .fold(0.0f32, |total, &density| total + density);
+        assert_eq!(
+            summary.per_type[0].total_density.to_bits(),
+            expected_total.to_bits()
+        );
+        assert_eq!(summary.cells_with_type_inhibition, 0);
+        assert_eq!(
+            summary.growth_suppressed_by_type_inhibition.to_bits(),
+            0.0f32.to_bits()
+        );
+        assert_eq!(
+            summary.growth_suppressed_by_occupancy_depletion.to_bits(),
+            0.0f32.to_bits()
+        );
+    }
+
+    /// The recovery attempt before the zero-fertility skip, kept verbatim as
+    /// the reference `recovery_attempt` must match bit for bit.
+    fn recovery_attempt_unskipped(
+        terms: &CellTerms<'_>,
+        spawn_delta: f32,
+        idx: usize,
+        inhibited: &mut bool,
+        suppression: &mut Suppression,
+        next_density: &mut f32,
+    ) {
+        let base_cell_fertility = terms.base_fertility(idx);
+        let recovery_inhibition_penalty = terms.penalty(idx, terms.source(idx));
+        let cell_fertility = (base_cell_fertility - recovery_inhibition_penalty).max(0.0);
+        let recovery_base = spawn_delta * base_cell_fertility;
+        let recovery_after_inhibition = spawn_delta * cell_fertility;
+        let recovery_delta = recovery_after_inhibition * terms.multiplier(idx);
+        if recovery_base > recovery_after_inhibition && recovery_inhibition_penalty > 0.0 {
+            *inhibited = true;
+        }
+        suppression.inhibition += (recovery_base - recovery_after_inhibition).max(0.0);
+        suppression.occupancy += (recovery_after_inhibition - recovery_delta).max(0.0);
+        *next_density = (*next_density + recovery_delta).clamp(0.0, terms.max_density);
+    }
+
+    proptest::proptest! {
+        /// One recovery attempt with the zero-fertility skip gives the same
+        /// bits as the full evaluation, whatever the cell's inputs: raw
+        /// fertility at the exact -1.0 that maps to zero, just above it, or
+        /// anywhere in range; grazing modifiers at exact zero, subnormal, or
+        /// in range (so habitat × grazing can underflow to zero); depletion,
+        /// inhibition and a positive source; every modifier on or off; a
+        /// spawn delta from the smallest subnormal to infinite; and
+        /// accumulated suppression and flag state.
+        #[test]
+        fn recovery_attempt_matches_the_full_evaluation(
+            raw in proptest::prop_oneof![
+                proptest::strategy::Just(-1.0f32),
+                proptest::strategy::Just(-1.0f32 + f32::EPSILON),
+                proptest::strategy::Just(-0.999f32),
+                -1.0f32..=1.0,
+                proptest::strategy::Just(1.0f32),
+            ],
+            min_fertility in proptest::prop_oneof![
+                proptest::strategy::Just(0.0f32),
+                0.0f32..=0.5,
+            ],
+            max_fertility in 0.5f32..=2.0,
+            grazing in proptest::prop_oneof![
+                proptest::strategy::Just(0.0f32),
+                proptest::strategy::Just(1e-40f32),
+                proptest::strategy::Just(f32::MIN_POSITIVE),
+                0.0f32..=1.0,
+            ],
+            depletion in 0.0f32..=1.0,
+            inhibition_sum in 0.0f32..=1.0,
+            type_inhibitor in 0.0f32..=1.0,
+            density in 0.0f32..=1.0,
+            next in 0.0f32..=1.0,
+            spawn_delta in proptest::prop_oneof![
+                proptest::strategy::Just(f32::from_bits(1)),
+                proptest::strategy::Just(5e-42f32),
+                proptest::strategy::Just(f32::MIN_POSITIVE),
+                proptest::strategy::Just(1e-30f32),
+                1e-6f32..=1.0,
+                proptest::strategy::Just(f32::INFINITY),
+            ],
+            suppression_start in (0.0f32..=10.0, 0.0f32..=10.0),
+            inhibited_start in proptest::bool::ANY,
+            fertility_enabled in proptest::bool::ANY,
+            grazing_enabled in proptest::bool::ANY,
+            depletion_enabled in proptest::bool::ANY,
+        ) {
+            let (raw, grazing, depletion, inhibition_sums, barriers, densities) =
+                ([raw], [grazing], [depletion], [inhibition_sum], [false], [density]);
+            let terms = CellTerms {
+                width: 1,
+                height: 1,
+                edge_mode: WorldEdgeMode::Bounded,
+                barriers: &barriers,
+                density: &densities,
+                habitat: fertility_enabled.then_some((&raw[..], min_fertility, max_fertility)),
+                grazing: grazing_enabled.then_some(&grazing[..]),
+                depletion: depletion_enabled.then_some(&depletion[..]),
+                inhibition_sums: &inhibition_sums,
+                max_density: 1.0,
+                type_inhibitor,
+            };
+            let start = Suppression {
+                occupancy: suppression_start.0,
+                inhibition: suppression_start.1,
+            };
+
+            let (mut want_next, mut want_flag, mut want_suppression) =
+                (next, inhibited_start, start);
+            recovery_attempt_unskipped(
+                &terms,
+                spawn_delta,
+                0,
+                &mut want_flag,
+                &mut want_suppression,
+                &mut want_next,
+            );
+            let (mut got_next, mut got_flag, mut got_suppression) =
+                (next, inhibited_start, start);
+            recovery_attempt(
+                &terms,
+                spawn_delta,
+                0,
+                &mut got_flag,
+                &mut got_suppression,
+                &mut got_next,
+            );
+
+            proptest::prop_assert_eq!(got_next.to_bits(), want_next.to_bits());
+            proptest::prop_assert_eq!(got_flag, want_flag);
+            proptest::prop_assert_eq!(
+                got_suppression.inhibition.to_bits(),
+                want_suppression.inhibition.to_bits()
+            );
+            proptest::prop_assert_eq!(
+                got_suppression.occupancy.to_bits(),
+                want_suppression.occupancy.to_bits()
+            );
+        }
+    }
+
+    /// A subnormal spawn delta on a fertile but heavily grazed cell still
+    /// grows the cell: `spawn_delta × grazing` alone rounds to zero, so a
+    /// shortcut keyed on that product would wrongly skip it. The skip keys
+    /// on fertility only, and matches the full evaluation here.
+    #[test]
+    fn recovery_attempt_keeps_subnormal_growth_on_a_grazed_fertile_cell() {
+        let (raw, grazing, inhibition_sums, barriers, densities) =
+            ([1.0f32], [1e-4f32], [0.0f32], [false], [0.0f32]);
+        let terms = CellTerms {
+            width: 1,
+            height: 1,
+            edge_mode: WorldEdgeMode::Bounded,
+            barriers: &barriers,
+            density: &densities,
+            // Raw 1.0 maps to the top of the [0, 2] range: fertility 2.0.
+            habitat: Some((&raw[..], 0.0, 2.0)),
+            grazing: Some(&grazing[..]),
+            depletion: None,
+            inhibition_sums: &inhibition_sums,
+            max_density: 1.0,
+            type_inhibitor: 0.0,
+        };
+        let spawn_delta = 5e-42f32;
+        assert_eq!(spawn_delta * grazing[0], 0.0, "the product must underflow");
+
+        let (mut want_next, mut want_flag, mut want_suppression) =
+            (0.0f32, false, Suppression::default());
+        recovery_attempt_unskipped(
+            &terms,
+            spawn_delta,
+            0,
+            &mut want_flag,
+            &mut want_suppression,
+            &mut want_next,
+        );
+        let (mut got_next, mut got_flag, mut got_suppression) =
+            (0.0f32, false, Suppression::default());
+        recovery_attempt(
+            &terms,
+            spawn_delta,
+            0,
+            &mut got_flag,
+            &mut got_suppression,
+            &mut got_next,
+        );
+
+        assert!(want_next > 0.0, "the full evaluation grows the cell");
+        assert_eq!(got_next.to_bits(), want_next.to_bits());
+        assert_eq!(got_flag, want_flag);
+        assert_eq!(
+            got_suppression.occupancy.to_bits(),
+            want_suppression.occupancy.to_bits()
+        );
+        assert_eq!(
+            got_suppression.inhibition.to_bits(),
+            want_suppression.inhibition.to_bits()
+        );
     }
 
     /// With a zero deposit, occupancy adds no depletion and no cell counts
