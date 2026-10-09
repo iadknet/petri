@@ -160,8 +160,11 @@ field or switch); a run shows existing signals moved by the changed births.
       -> 71 passed, 1 ignored; `cargo test -p v3-core --lib input_ref` -> 54
       passed. Pins unchanged.
 - [ ] `make check` -> exit 0, recorded in the readings.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path, and
-      every survivor resolved as killed, equivalent, or deferred, listed here.
+- [x] Fresh mutation gate at 91ef2e48, exit 0, no survivors:
+
+      | Command | Summary line | Output |
+      | --- | --- | --- |
+      | `MUTANTS_ITERATE=0 make rust-mutants` | 39 mutants tested in 29m: 33 caught, 6 unviable | `~/.local/share/petri-tools/mutants/t20-f16/mutants.out` |
 - [x] Benchmark summaries stored at the two paths below, series entries added,
       raw hashes in the readings, goal run once.
 
