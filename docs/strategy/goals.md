@@ -10,7 +10,8 @@ Use these goal IDs when connecting roadmap work to strategy and architecture.
 
 - Why this matters: The project is centered on improving creature cognition and behavior quality over time.
 - Non-goals:
-  - Preserving transitional multi-action tick semantics as the long-term model.
+  - Reducing the multi-action tick to one action per tick. The tick is required: it is the
+    mechanism that rewards a creature for building a successful multi-step plan.
   - Deferring cognition-focused semantics until after downstream feature work.
 
 ### GP-02 Maintain Clean Architecture Boundaries
