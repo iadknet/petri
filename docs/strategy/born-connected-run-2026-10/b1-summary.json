@@ -1,0 +1,2365 @@
+{
+ "row": "B1",
+ "world": "Canyon country",
+ "window_ticks": [
+  15000,
+  20000
+ ],
+ "founder_units": 97,
+ "runs": {
+  "default-s1022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "born_connected": false,
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.005
+   },
+   "config_digest": "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6",
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 2485.7272727272725,
+   "mean_energy": 32.90129271874119,
+   "mean_genome_size": 735.1346243879215,
+   "mean_genome_size_founder_units": 7.578707467916716,
+   "mean_generation": 345.7088807623777,
+   "size_per_generation": 2.126455712583255,
+   "births_per_creature_tick": 0.02063966728579504,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 2577,
+    "mean_genome_size": 816.5591773379899,
+    "mean_generation": 388.1885913853318,
+    "reproduction_actions_spawned_total": 1082813
+   },
+   "min_population_sample": [
+    795,
+    2500
+   ],
+   "trajectory": [
+    [
+     2500,
+     144.4,
+     795
+    ],
+    [
+     5000,
+     221.5,
+     2450
+    ],
+    [
+     7500,
+     506.3,
+     2941
+    ],
+    [
+     10000,
+     489.5,
+     3048
+    ],
+    [
+     12500,
+     602.2,
+     2688
+    ],
+    [
+     15000,
+     680.0,
+     2878
+    ],
+    [
+     17500,
+     705.3,
+     1924
+    ],
+    [
+     20000,
+     816.6,
+     2577
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 3048,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 3,
+       "family_connected": 0,
+       "family_executed": 2,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 3
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 1,
+       "family_connected": 1,
+       "family_executed": 1,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "executed_plus_causal": 3,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 3,
+      "executed_target_channels": 3,
+      "channels_with_action_queue_change": 0,
+      "channels_with_any_vote_delta": 0,
+      "channels_vote_delta_without_action_change": 0,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {},
+      "distinct_parents_with_action_change_by_channel": {},
+      "action_change_channels": [],
+      "vote_delta_channels": []
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {},
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected": false,
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 480,
+       "changed_per_all_births": 0.24,
+       "changed_per_mutated_births": 0.2638812534359538,
+       "dead": 1,
+       "dead_per_all_births": 0.0005,
+       "dead_per_mutated_births": 0.0005497526113249038,
+       "mutated_births": 1819,
+       "mutated_births_check": 1819,
+       "silent": 1338,
+       "silent_per_all_births": 0.669,
+       "silent_per_mutated_births": 0.7355689939527212,
+       "zero_event_births": 181
+      }
+     },
+     "e6_gradient_informative": null,
+     "secs": {
+      "census_secs": 0.774660375,
+      "vote_delta_secs": 0.035616167,
+      "births_secs": 0.44198975
+     }
+    },
+    "20000": {
+     "living": 2577,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 5,
+       "family_connected": 4,
+       "family_executed": 4,
+       "family_causal": 2,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "executed_plus_causal": 6,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 4,
+      "executed_target_channels": 5,
+      "channels_with_action_queue_change": 2,
+      "channels_with_any_vote_delta": 2,
+      "channels_vote_delta_without_action_change": 0,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "NeighborBarrierRing": [
+        8,
+        45
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "NeighborBarrierRing#0": [
+        8,
+        45
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 8,
+        "family": "NeighborBarrierRing",
+        "channel": 0,
+        "scenes_actions_differ": 4,
+        "delta_passes": 116,
+        "consumers_graph": 0,
+        "consumers_vm": 7
+       },
+       {
+        "parent": 45,
+        "family": "NeighborBarrierRing",
+        "channel": 0,
+        "scenes_actions_differ": 22,
+        "delta_passes": 176,
+        "consumers_graph": 0,
+        "consumers_vm": 2
+       }
+      ],
+      "vote_delta_channels": [
+       {
+        "parent": 8,
+        "family": "NeighborBarrierRing",
+        "channel": 0,
+        "delta_passes": 116,
+        "max_abs_delta": 0.04786968231201172,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 45,
+        "family": "NeighborBarrierRing",
+        "channel": 0,
+        "delta_passes": 176,
+        "max_abs_delta": 0.40000003576278687,
+        "most_moved_kind": "Reproduce"
+       }
+      ]
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "NeighborBarrierRing#0": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected": false,
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 564,
+       "changed_per_all_births": 0.282,
+       "changed_per_mutated_births": 0.29102167182662536,
+       "dead": 2,
+       "dead_per_all_births": 0.001,
+       "dead_per_mutated_births": 0.0010319917440660474,
+       "mutated_births": 1938,
+       "mutated_births_check": 1938,
+       "silent": 1372,
+       "silent_per_all_births": 0.686,
+       "silent_per_mutated_births": 0.7079463364293086,
+       "zero_event_births": 62
+      }
+     },
+     "e6_gradient_informative": 0.1796662786185487,
+     "secs": {
+      "census_secs": 1.459643209,
+      "vote_delta_secs": 0.078467792,
+      "births_secs": 0.785045041
+     }
+    }
+   },
+   "footer": {
+    "census_secs": 2.234303584,
+    "elapsed_secs": 688.974190375,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 686.2367111770058,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "3e0a122239fecbc011d8e08667ac61cf7725d34184c93e876538b80b5b6a12ea",
+   "sha256_census": "b0fd3d3eb53c2905fdb26d19024185840dd1e9c1cee498fa0858793c40fced43"
+  },
+  "default-s2022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "born_connected": false,
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.005
+   },
+   "config_digest": "sha256:5375dc20a714a9e73397ca492bf155c4e4be6c0b23d8bb70bddec3b9bfc5d5c6",
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 3006.7272727272725,
+   "mean_energy": 30.168815499500894,
+   "mean_genome_size": 377.7152234639935,
+   "mean_genome_size_founder_units": 3.8939713759174586,
+   "mean_generation": 355.8720733664931,
+   "size_per_generation": 1.0613792194786953,
+   "births_per_creature_tick": 0.020451005708072845,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 3642,
+    "mean_genome_size": 405.0711147721032,
+    "mean_generation": 402.8193300384404,
+    "reproduction_actions_spawned_total": 1248714
+   },
+   "min_population_sample": [
+    815,
+    3000
+   ],
+   "trajectory": [
+    [
+     2500,
+     132.2,
+     1021
+    ],
+    [
+     5000,
+     141.4,
+     3477
+    ],
+    [
+     7500,
+     213.7,
+     3563
+    ],
+    [
+     10000,
+     278.0,
+     3140
+    ],
+    [
+     12500,
+     287.0,
+     3557
+    ],
+    [
+     15000,
+     355.4,
+     2765
+    ],
+    [
+     17500,
+     360.5,
+     3363
+    ],
+    [
+     20000,
+     405.1,
+     3642
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 3140,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 3,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 3
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 9,
+       "family_connected": 5,
+       "family_executed": 5,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 4
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "executed_plus_causal": 5,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 5,
+      "executed_target_channels": 5,
+      "channels_with_action_queue_change": 0,
+      "channels_with_any_vote_delta": 0,
+      "channels_vote_delta_without_action_change": 0,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {},
+      "distinct_parents_with_action_change_by_channel": {},
+      "action_change_channels": [],
+      "vote_delta_channels": []
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {},
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected": false,
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 340,
+       "changed_per_all_births": 0.17,
+       "changed_per_mutated_births": 0.24478041756659466,
+       "dead": 15,
+       "dead_per_all_births": 0.0075,
+       "dead_per_mutated_births": 0.01079913606911447,
+       "mutated_births": 1389,
+       "mutated_births_check": 1389,
+       "silent": 1034,
+       "silent_per_all_births": 0.517,
+       "silent_per_mutated_births": 0.7444204463642908,
+       "zero_event_births": 611
+      }
+     },
+     "e6_gradient_informative": null,
+     "secs": {
+      "census_secs": 0.431056083,
+      "vote_delta_secs": 0.024587917,
+      "births_secs": 0.213126542
+     }
+    },
+    "20000": {
+     "living": 3642,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 4,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 4
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 6,
+       "family_connected": 3,
+       "family_executed": 3,
+       "family_causal": 3,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 3
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "executed_plus_causal": 6,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 3,
+      "executed_target_channels": 3,
+      "channels_with_action_queue_change": 3,
+      "channels_with_any_vote_delta": 3,
+      "channels_vote_delta_without_action_change": 0,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "AreaFoodSummary:0": [
+        1,
+        37,
+        49
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "AreaFoodSummary:0#2": [
+        1,
+        37,
+        49
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 1,
+        "family": "AreaFoodSummary:0",
+        "channel": 2,
+        "scenes_actions_differ": 20,
+        "delta_passes": 1080,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 37,
+        "family": "AreaFoodSummary:0",
+        "channel": 2,
+        "scenes_actions_differ": 20,
+        "delta_passes": 1080,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 49,
+        "family": "AreaFoodSummary:0",
+        "channel": 2,
+        "scenes_actions_differ": 20,
+        "delta_passes": 1080,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       }
+      ],
+      "vote_delta_channels": [
+       {
+        "parent": 1,
+        "family": "AreaFoodSummary:0",
+        "channel": 2,
+        "delta_passes": 1080,
+        "max_abs_delta": 0.3272416293621063,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 37,
+        "family": "AreaFoodSummary:0",
+        "channel": 2,
+        "delta_passes": 1080,
+        "max_abs_delta": 0.3272416293621063,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 49,
+        "family": "AreaFoodSummary:0",
+        "channel": 2,
+        "delta_passes": 1080,
+        "max_abs_delta": 0.3272416293621063,
+        "most_moved_kind": "Move"
+       }
+      ]
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 3,
+        "vote_delta_parents": 3,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "AreaFoodSummary:0#2": {
+        "funnel_causal": 3,
+        "vote_delta_parents": 3,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected": false,
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 363,
+       "changed_per_all_births": 0.1815,
+       "changed_per_mutated_births": 0.2204007285974499,
+       "dead": 1,
+       "dead_per_all_births": 0.0005,
+       "dead_per_mutated_births": 0.0006071645415907711,
+       "mutated_births": 1647,
+       "mutated_births_check": 1647,
+       "silent": 1283,
+       "silent_per_all_births": 0.6415,
+       "silent_per_mutated_births": 0.7789921068609593,
+       "zero_event_births": 353
+      }
+     },
+     "e6_gradient_informative": 0.1987918725974739,
+     "secs": {
+      "census_secs": 0.830121709,
+      "vote_delta_secs": 0.035136959,
+      "births_secs": 0.422562125
+     }
+    }
+   },
+   "footer": {
+    "census_secs": 1.261177792,
+    "elapsed_secs": 626.833993,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 625.2119347069984,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "082c6c2b863817881264f56c4ff94177e8966ec4ce7a979fa20d0c5424fd8867",
+   "sha256_census": "bffcd2f5a2ca7d08413ba4f738bf501c311a58b8c6b27f354fb01060ca8adb75"
+  },
+  "born-s1022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "born_connected": true,
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.005
+   },
+   "config_digest": "sha256:158350b1674d715793d10768afdab563653936884804cc2626382bc578466245",
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 2875.7272727272725,
+   "mean_energy": 28.309498334273542,
+   "mean_genome_size": 535.7115829138618,
+   "mean_genome_size_founder_units": 5.522799823854245,
+   "mean_generation": 372.6596129711966,
+   "size_per_generation": 1.4375359289477598,
+   "births_per_creature_tick": 0.019939652758331,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 3065,
+    "mean_genome_size": 631.0345840130506,
+    "mean_generation": 412.63034257748774,
+    "reproduction_actions_spawned_total": 1215044
+   },
+   "min_population_sample": [
+    1509,
+    3000
+   ],
+   "trajectory": [
+    [
+     2500,
+     171.2,
+     2707
+    ],
+    [
+     5000,
+     228.6,
+     2457
+    ],
+    [
+     7500,
+     260.4,
+     2720
+    ],
+    [
+     10000,
+     311.5,
+     2986
+    ],
+    [
+     12500,
+     353.3,
+     3670
+    ],
+    [
+     15000,
+     454.4,
+     2788
+    ],
+    [
+     17500,
+     540.9,
+     2392
+    ],
+    [
+     20000,
+     631.0,
+     3065
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 2986,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 10,
+       "family_connected": 10,
+       "family_executed": 10,
+       "family_causal": 8,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 3,
+       "family_connected": 2,
+       "family_executed": 2,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "executed_plus_causal": 20,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 10,
+      "executed_target_channels": 14,
+      "channels_with_action_queue_change": 8,
+      "channels_with_any_vote_delta": 12,
+      "channels_vote_delta_without_action_change": 4,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "NeighborBarrierRing": [
+        1,
+        3,
+        4,
+        10,
+        29,
+        30,
+        37,
+        44
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "NeighborBarrierRing#5": [
+        1,
+        4,
+        30,
+        44
+       ],
+       "NeighborBarrierRing#4": [
+        3,
+        29
+       ],
+       "NeighborBarrierRing#7": [
+        10,
+        37
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 1,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "scenes_actions_differ": 23,
+        "delta_passes": 166,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 3,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "scenes_actions_differ": 8,
+        "delta_passes": 22,
+        "consumers_graph": 2,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 4,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "scenes_actions_differ": 23,
+        "delta_passes": 166,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 10,
+        "family": "NeighborBarrierRing",
+        "channel": 7,
+        "scenes_actions_differ": 5,
+        "delta_passes": 156,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 29,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "scenes_actions_differ": 8,
+        "delta_passes": 22,
+        "consumers_graph": 2,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 30,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "scenes_actions_differ": 23,
+        "delta_passes": 166,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 37,
+        "family": "NeighborBarrierRing",
+        "channel": 7,
+        "scenes_actions_differ": 5,
+        "delta_passes": 156,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 44,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "scenes_actions_differ": 23,
+        "delta_passes": 230,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       }
+      ],
+      "vote_delta_channels": [
+       {
+        "parent": 1,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "delta_passes": 166,
+        "max_abs_delta": 2.6661362648010254,
+        "most_moved_kind": null
+       },
+       {
+        "parent": 3,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "delta_passes": 22,
+        "max_abs_delta": 0.6285085678100586,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 4,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "delta_passes": 166,
+        "max_abs_delta": 1.599998950958252,
+        "most_moved_kind": "Eat"
+       },
+       {
+        "parent": 10,
+        "family": "NeighborBarrierRing",
+        "channel": 7,
+        "delta_passes": 156,
+        "max_abs_delta": 0.5825855731964111,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 10,
+        "family": "AreaFoodSummary:0",
+        "channel": 5,
+        "delta_passes": 698,
+        "max_abs_delta": 0.49140751361846924,
+        "most_moved_kind": null
+       },
+       {
+        "parent": 18,
+        "family": "NeighborBarrierRing",
+        "channel": 3,
+        "delta_passes": 48,
+        "max_abs_delta": 0.2309936285018921,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 29,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "delta_passes": 22,
+        "max_abs_delta": 0.6285085678100586,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 30,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "delta_passes": 166,
+        "max_abs_delta": 2.679945945739746,
+        "most_moved_kind": null
+       },
+       {
+        "parent": 31,
+        "family": "NeighborBarrierRing",
+        "channel": 3,
+        "delta_passes": 48,
+        "max_abs_delta": 0.2309936285018921,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 37,
+        "family": "NeighborBarrierRing",
+        "channel": 7,
+        "delta_passes": 156,
+        "max_abs_delta": 0.5825855731964111,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 37,
+        "family": "AreaFoodSummary:0",
+        "channel": 5,
+        "delta_passes": 698,
+        "max_abs_delta": 0.49140751361846924,
+        "most_moved_kind": null
+       },
+       {
+        "parent": 44,
+        "family": "NeighborBarrierRing",
+        "channel": 5,
+        "delta_passes": 230,
+        "max_abs_delta": 5.0,
+        "most_moved_kind": "Move"
+       }
+      ]
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 8,
+        "vote_delta_parents": 8,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "NeighborBarrierRing#4": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "NeighborBarrierRing#5": {
+        "funnel_causal": 4,
+        "vote_delta_parents": 4,
+        "agree": true
+       },
+       "NeighborBarrierRing#7": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected": true,
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 311,
+       "changed_per_all_births": 0.1555,
+       "changed_per_mutated_births": 0.22119487908961594,
+       "dead": 3,
+       "dead_per_all_births": 0.0015,
+       "dead_per_mutated_births": 0.0021337126600284497,
+       "mutated_births": 1406,
+       "mutated_births_check": 1406,
+       "silent": 1092,
+       "silent_per_all_births": 0.546,
+       "silent_per_mutated_births": 0.7766714082503556,
+       "zero_event_births": 594
+      }
+     },
+     "e6_gradient_informative": null,
+     "secs": {
+      "census_secs": 0.621210458,
+      "vote_delta_secs": 0.052835583,
+      "births_secs": 0.274062
+     }
+    },
+    "20000": {
+     "living": 3065,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 10,
+       "family_connected": 9,
+       "family_executed": 9,
+       "family_causal": 3,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 1
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 8,
+       "family_connected": 6,
+       "family_executed": 5,
+       "family_causal": 5,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 2
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "executed_plus_causal": 22,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 12,
+      "executed_target_channels": 18,
+      "channels_with_action_queue_change": 8,
+      "channels_with_any_vote_delta": 12,
+      "channels_vote_delta_without_action_change": 4,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "NeighborBarrierRing": [
+        3,
+        29,
+        34
+       ],
+       "AreaFoodSummary:0": [
+        30,
+        31,
+        37,
+        43,
+        44
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "NeighborBarrierRing#2": [
+        3,
+        34
+       ],
+       "NeighborBarrierRing#6": [
+        29
+       ],
+       "AreaFoodSummary:0#3": [
+        30,
+        31
+       ],
+       "AreaFoodSummary:0#1": [
+        37,
+        43
+       ],
+       "AreaFoodSummary:0#0": [
+        44
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 3,
+        "family": "NeighborBarrierRing",
+        "channel": 2,
+        "scenes_actions_differ": 8,
+        "delta_passes": 18,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 29,
+        "family": "NeighborBarrierRing",
+        "channel": 6,
+        "scenes_actions_differ": 17,
+        "delta_passes": 106,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 30,
+        "family": "AreaFoodSummary:0",
+        "channel": 3,
+        "scenes_actions_differ": 37,
+        "delta_passes": 207,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 31,
+        "family": "AreaFoodSummary:0",
+        "channel": 3,
+        "scenes_actions_differ": 37,
+        "delta_passes": 207,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 34,
+        "family": "NeighborBarrierRing",
+        "channel": 2,
+        "scenes_actions_differ": 8,
+        "delta_passes": 23,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 37,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 12,
+        "delta_passes": 640,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 43,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 16,
+        "delta_passes": 144,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 44,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "scenes_actions_differ": 5,
+        "delta_passes": 1630,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       }
+      ],
+      "vote_delta_channels": [
+       {
+        "parent": 3,
+        "family": "NeighborBarrierRing",
+        "channel": 2,
+        "delta_passes": 18,
+        "max_abs_delta": 0.5248866081237793,
+        "most_moved_kind": "Reproduce"
+       },
+       {
+        "parent": 23,
+        "family": "NeighborBarrierRing",
+        "channel": 1,
+        "delta_passes": 27,
+        "max_abs_delta": 0.5873071551322937,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 27,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "delta_passes": 108,
+        "max_abs_delta": 0.1561044454574585,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 29,
+        "family": "NeighborBarrierRing",
+        "channel": 6,
+        "delta_passes": 106,
+        "max_abs_delta": 0.32638442888855934,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 30,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "delta_passes": 568,
+        "max_abs_delta": 0.6515313386917114,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 30,
+        "family": "AreaFoodSummary:0",
+        "channel": 3,
+        "delta_passes": 207,
+        "max_abs_delta": 0.694151446223259,
+        "most_moved_kind": "Reproduce"
+       },
+       {
+        "parent": 31,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "delta_passes": 568,
+        "max_abs_delta": 0.6515313386917114,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 31,
+        "family": "AreaFoodSummary:0",
+        "channel": 3,
+        "delta_passes": 207,
+        "max_abs_delta": 0.694151446223259,
+        "most_moved_kind": "Reproduce"
+       },
+       {
+        "parent": 34,
+        "family": "NeighborBarrierRing",
+        "channel": 2,
+        "delta_passes": 23,
+        "max_abs_delta": 0.5248866081237793,
+        "most_moved_kind": "Reproduce"
+       },
+       {
+        "parent": 37,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "delta_passes": 640,
+        "max_abs_delta": 0.5210592746734619,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 43,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "delta_passes": 144,
+        "max_abs_delta": 0.45163577795028687,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 44,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "delta_passes": 1630,
+        "max_abs_delta": 8.27669906616211,
+        "most_moved_kind": "Move"
+       }
+      ]
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 3,
+        "vote_delta_parents": 3,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 5,
+        "vote_delta_parents": 5,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "NeighborBarrierRing#2": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "NeighborBarrierRing#6": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "AreaFoodSummary:0#0": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "AreaFoodSummary:0#1": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0#3": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected": true,
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 468,
+       "changed_per_all_births": 0.234,
+       "changed_per_mutated_births": 0.2525634106853751,
+       "dead": 1,
+       "dead_per_all_births": 0.0005,
+       "dead_per_mutated_births": 0.0005396654074473826,
+       "mutated_births": 1853,
+       "mutated_births_check": 1853,
+       "silent": 1384,
+       "silent_per_all_births": 0.692,
+       "silent_per_mutated_births": 0.7468969239071775,
+       "zero_event_births": 147
+      }
+     },
+     "e6_gradient_informative": 0.20228384991843393,
+     "secs": {
+      "census_secs": 0.946640208,
+      "vote_delta_secs": 0.057750667,
+      "births_secs": 0.420933833
+     }
+    }
+   },
+   "footer": {
+    "census_secs": 1.567850666,
+    "elapsed_secs": 689.037761,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 686.9774865720003,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "2d4d8958e1f133295f11c9e59d9cf7a30d2717042d9bac2df558f2fb361b32ac",
+   "sha256_census": "04e6898b59b57d3b974749986ad1acbc37840dc0440506abd7d62118b4966651"
+  },
+  "born-s2022": {
+   "completed": true,
+   "extinct_tick": null,
+   "prototypes": {
+    "born_connected": true,
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.005
+   },
+   "config_digest": "sha256:158350b1674d715793d10768afdab563653936884804cc2626382bc578466245",
+   "samples": 40,
+   "last_tick": 20000,
+   "window_alive_samples": 11,
+   "mean_population": 2681.090909090909,
+   "mean_energy": 34.51934347833633,
+   "mean_genome_size": 589.5726161646604,
+   "mean_genome_size_founder_units": 6.078068207883097,
+   "mean_generation": 457.3142162332157,
+   "size_per_generation": 1.2892068412410718,
+   "births_per_creature_tick": 0.02069271811828361,
+   "extinction_interval": null,
+   "final": {
+    "tick": 20000,
+    "population": 2878,
+    "mean_genome_size": 750.9815844336345,
+    "mean_generation": 508.59659485753997,
+    "reproduction_actions_spawned_total": 1067711
+   },
+   "min_population_sample": [
+    10,
+    4500
+   ],
+   "trajectory": [
+    [
+     2500,
+     112.5,
+     1138
+    ],
+    [
+     5000,
+     155.1,
+     952
+    ],
+    [
+     7500,
+     180.6,
+     1547
+    ],
+    [
+     10000,
+     284.7,
+     2685
+    ],
+    [
+     12500,
+     379.8,
+     2809
+    ],
+    [
+     15000,
+     475.8,
+     2835
+    ],
+    [
+     17500,
+     574.5,
+     2814
+    ],
+    [
+     20000,
+     751.0,
+     2878
+    ]
+   ],
+   "checkpoints": {
+    "10000": {
+     "living": 2685,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 4,
+       "family_connected": 4,
+       "family_executed": 1,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 5,
+       "family_connected": 5,
+       "family_executed": 3,
+       "family_causal": 3,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "executed_plus_causal": 7,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 3,
+      "executed_target_channels": 6,
+      "channels_with_action_queue_change": 5,
+      "channels_with_any_vote_delta": 6,
+      "channels_vote_delta_without_action_change": 1,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "AreaFoodSummary:0": [
+        8,
+        20,
+        39
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "AreaFoodSummary:0#6": [
+        8
+       ],
+       "AreaFoodSummary:0#4": [
+        20,
+        39
+       ],
+       "AreaFoodSummary:0#0": [
+        39
+       ],
+       "AreaFoodSummary:0#1": [
+        39
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 8,
+        "family": "AreaFoodSummary:0",
+        "channel": 6,
+        "scenes_actions_differ": 32,
+        "delta_passes": 1084,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 20,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "scenes_actions_differ": 7,
+        "delta_passes": 432,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 39,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "scenes_actions_differ": 1,
+        "delta_passes": 1450,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 39,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 24,
+        "delta_passes": 754,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 39,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "scenes_actions_differ": 2,
+        "delta_passes": 555,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       }
+      ],
+      "vote_delta_channels": [
+       {
+        "parent": 8,
+        "family": "AreaFoodSummary:0",
+        "channel": 6,
+        "delta_passes": 1084,
+        "max_abs_delta": 0.5065038204193115,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 20,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "delta_passes": 432,
+        "max_abs_delta": 0.44372037053108215,
+        "most_moved_kind": "Reproduce"
+       },
+       {
+        "parent": 39,
+        "family": "NeighborBarrierRing",
+        "channel": 0,
+        "delta_passes": 110,
+        "max_abs_delta": 0.9757521152496338,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 39,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "delta_passes": 1450,
+        "max_abs_delta": 0.04898111894726753,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 39,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "delta_passes": 754,
+        "max_abs_delta": 3.996786117553711,
+        "most_moved_kind": "Reproduce"
+       },
+       {
+        "parent": 39,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "delta_passes": 555,
+        "max_abs_delta": 0.12286316230893135,
+        "most_moved_kind": "Move"
+       }
+      ]
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 3,
+        "vote_delta_parents": 3,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "AreaFoodSummary:0#0": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "AreaFoodSummary:0#1": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       },
+       "AreaFoodSummary:0#4": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0#6": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected": true,
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 247,
+       "changed_per_all_births": 0.1235,
+       "changed_per_mutated_births": 0.17345505617977527,
+       "dead": 6,
+       "dead_per_all_births": 0.003,
+       "dead_per_mutated_births": 0.004213483146067416,
+       "mutated_births": 1424,
+       "mutated_births_check": 1424,
+       "silent": 1171,
+       "silent_per_all_births": 0.5855,
+       "silent_per_mutated_births": 0.8223314606741573,
+       "zero_event_births": 576
+      }
+     },
+     "e6_gradient_informative": null,
+     "secs": {
+      "census_secs": 0.91958525,
+      "vote_delta_secs": 0.060064958,
+      "births_secs": 0.3396565
+     }
+    },
+    "20000": {
+     "living": 2878,
+     "selected_parents": 20,
+     "parents_evaluated": 20,
+     "target_rows": {
+      "NeighborBarrierRing": {
+       "family_declared": 6,
+       "family_connected": 6,
+       "family_executed": 6,
+       "family_causal": 2,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:0": {
+       "family_declared": 7,
+       "family_connected": 7,
+       "family_executed": 7,
+       "family_causal": 4,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      },
+      "AreaFoodSummary:1": {
+       "family_declared": 0,
+       "family_connected": 0,
+       "family_executed": 0,
+       "family_causal": 0,
+       "family_causal_original": 0,
+       "out_of_width_consumers": 0,
+       "declared_unconnected": 0
+      }
+     },
+     "executed_plus_causal": 19,
+     "vote_deltas": {
+      "parents": 20,
+      "parents_with_executed_target_channels": 10,
+      "executed_target_channels": 16,
+      "channels_with_action_queue_change": 6,
+      "channels_with_any_vote_delta": 14,
+      "channels_vote_delta_without_action_change": 8,
+      "channels_action_change_without_vote_delta": 0,
+      "distinct_parents_with_action_change_by_family": {
+       "AreaFoodSummary:0": [
+        30,
+        34,
+        46,
+        49
+       ],
+       "NeighborBarrierRing": [
+        46,
+        49
+       ]
+      },
+      "distinct_parents_with_action_change_by_channel": {
+       "AreaFoodSummary:0#1": [
+        30,
+        46,
+        49
+       ],
+       "AreaFoodSummary:0#4": [
+        34
+       ],
+       "NeighborBarrierRing#4": [
+        46,
+        49
+       ]
+      },
+      "action_change_channels": [
+       {
+        "parent": 30,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 79,
+        "delta_passes": 1177,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 34,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "scenes_actions_differ": 11,
+        "delta_passes": 292,
+        "consumers_graph": 2,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 46,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "scenes_actions_differ": 28,
+        "delta_passes": 197,
+        "consumers_graph": 2,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 46,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 68,
+        "delta_passes": 1231,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 49,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "scenes_actions_differ": 28,
+        "delta_passes": 197,
+        "consumers_graph": 2,
+        "consumers_vm": 0
+       },
+       {
+        "parent": 49,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "scenes_actions_differ": 73,
+        "delta_passes": 1231,
+        "consumers_graph": 1,
+        "consumers_vm": 0
+       }
+      ],
+      "vote_delta_channels": [
+       {
+        "parent": 21,
+        "family": "AreaFoodSummary:0",
+        "channel": 5,
+        "delta_passes": 357,
+        "max_abs_delta": 0.5696831941604614,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 30,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "delta_passes": 197,
+        "max_abs_delta": 0.947490930557251,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 30,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "delta_passes": 1078,
+        "max_abs_delta": 0.5612888336181641,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 30,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "delta_passes": 1177,
+        "max_abs_delta": 0.8544079065322876,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 34,
+        "family": "AreaFoodSummary:0",
+        "channel": 4,
+        "delta_passes": 292,
+        "max_abs_delta": 1.0,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 36,
+        "family": "AreaFoodSummary:0",
+        "channel": 6,
+        "delta_passes": 1186,
+        "max_abs_delta": 0.13587415218353271,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 37,
+        "family": "NeighborBarrierRing",
+        "channel": 3,
+        "delta_passes": 82,
+        "max_abs_delta": 0.943962574005127,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 38,
+        "family": "AreaFoodSummary:0",
+        "channel": 6,
+        "delta_passes": 1064,
+        "max_abs_delta": 0.13587415218353271,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 46,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "delta_passes": 197,
+        "max_abs_delta": 0.947490930557251,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 46,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "delta_passes": 1233,
+        "max_abs_delta": 0.5612888336181641,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 46,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "delta_passes": 1231,
+        "max_abs_delta": 0.8544079065322876,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 49,
+        "family": "NeighborBarrierRing",
+        "channel": 4,
+        "delta_passes": 197,
+        "max_abs_delta": 0.947490930557251,
+        "most_moved_kind": "StealEnergy"
+       },
+       {
+        "parent": 49,
+        "family": "AreaFoodSummary:0",
+        "channel": 0,
+        "delta_passes": 1233,
+        "max_abs_delta": 0.5612888336181641,
+        "most_moved_kind": "Move"
+       },
+       {
+        "parent": 49,
+        "family": "AreaFoodSummary:0",
+        "channel": 1,
+        "delta_passes": 1231,
+        "max_abs_delta": 0.8544079065322876,
+        "most_moved_kind": "Move"
+       }
+      ]
+     },
+     "agreement": {
+      "by_family": {
+       "NeighborBarrierRing": {
+        "funnel_family_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0": {
+        "funnel_family_causal": 4,
+        "vote_delta_parents": 4,
+        "agree": true
+       },
+       "AreaFoodSummary:1": {
+        "funnel_family_causal": 0,
+        "vote_delta_parents": 0,
+        "agree": true
+       }
+      },
+      "by_channel": {
+       "NeighborBarrierRing#4": {
+        "funnel_causal": 2,
+        "vote_delta_parents": 2,
+        "agree": true
+       },
+       "AreaFoodSummary:0#1": {
+        "funnel_causal": 3,
+        "vote_delta_parents": 3,
+        "agree": true
+       },
+       "AreaFoodSummary:0#4": {
+        "funnel_causal": 1,
+        "vote_delta_parents": 1,
+        "agree": true
+       }
+      },
+      "pass": true
+     },
+     "births": {
+      "parents": 20,
+      "births_per_parent": 100,
+      "mutation_config": {
+       "born_connected": true,
+       "per_unit_rate": 0.005
+      },
+      "pooled": {
+       "births_total": 2000,
+       "changed": 564,
+       "changed_per_all_births": 0.282,
+       "changed_per_mutated_births": 0.2966859547606523,
+       "dead": 2,
+       "dead_per_all_births": 0.001,
+       "dead_per_mutated_births": 0.0010520778537611783,
+       "mutated_births": 1901,
+       "mutated_births_check": 1901,
+       "silent": 1335,
+       "silent_per_all_births": 0.6675,
+       "silent_per_mutated_births": 0.7022619673855865,
+       "zero_event_births": 99
+      }
+     },
+     "e6_gradient_informative": 0.17720639332870047,
+     "secs": {
+      "census_secs": 1.5771930840000001,
+      "vote_delta_secs": 0.078077917,
+      "births_secs": 0.637126708
+     }
+    }
+   },
+   "footer": {
+    "census_secs": 2.496778334,
+    "elapsed_secs": 638.455388292,
+    "extinct": false,
+    "kind": "footer",
+    "sim_secs": 635.5716448670004,
+    "threads": 8,
+    "ticks": 20000
+   },
+   "sha256_samples": "a2883e349c69819591207b823c889d787dd9fbf0cc8ca9b885a591a62a76fe28",
+   "sha256_census": "2b87899f471863dfbe657584a3c191dbc9a669857a1f428f4cf74a999efa6331"
+  },
+  "default-mutoff-s1022": {
+   "completed": true,
+   "extinct_tick": 5557,
+   "prototypes": {
+    "born_connected": false,
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.0
+   },
+   "config_digest": "sha256:40dd6f296b56009673d350332674ed2b72a19b89be171a9e1bc8a3cfd0f52a6a",
+   "samples": 11,
+   "last_tick": 5500,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "size_per_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    5500,
+    5557
+   ],
+   "final": {
+    "tick": 5500,
+    "population": 5,
+    "mean_genome_size": 97.0,
+    "mean_generation": 160.0,
+    "reproduction_actions_spawned_total": 288169
+   },
+   "min_population_sample": [
+    5,
+    5500
+   ],
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     2935
+    ],
+    [
+     5000,
+     97.0,
+     146
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 96.707790541,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 96.68662132299951,
+    "threads": 8,
+    "ticks": 5557
+   },
+   "sha256_samples": "0a7277c4546e34fa3330c2518cc34865985e47ff34f46de29c64dd188dfe6545",
+   "sha256_census": "8a87717c59a83505f3217193ea9cff38aac69381730f72a8024d263dbf14d0fc"
+  },
+  "default-mutoff-s2022": {
+   "completed": true,
+   "extinct_tick": 7509,
+   "prototypes": {
+    "born_connected": false,
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.0
+   },
+   "config_digest": "sha256:40dd6f296b56009673d350332674ed2b72a19b89be171a9e1bc8a3cfd0f52a6a",
+   "samples": 15,
+   "last_tick": 7500,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "size_per_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    7500,
+    7509
+   ],
+   "final": {
+    "tick": 7500,
+    "population": 1,
+    "mean_genome_size": 97.0,
+    "mean_generation": 225.0,
+    "reproduction_actions_spawned_total": 317164
+   },
+   "min_population_sample": [
+    1,
+    7500
+   ],
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     5530
+    ],
+    [
+     5000,
+     97.0,
+     691
+    ],
+    [
+     7500,
+     97.0,
+     1
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 117.670663667,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 117.64483326800007,
+    "threads": 8,
+    "ticks": 7509
+   },
+   "sha256_samples": "7f811acec1ba45687da4d401ae172f68afed5922677922a4367cd42c3b4dfa9f",
+   "sha256_census": "ac7e8e42d641e20d9cca78621872a3ad378b2539af892a7a2efb9094b9884f5e"
+  },
+  "born-mutoff-s1022": {
+   "completed": true,
+   "extinct_tick": 5557,
+   "prototypes": {
+    "born_connected": true,
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.0
+   },
+   "config_digest": "sha256:f173c41111cbba529ab78907f86a5e03210e5a69c6c1c21c5424a2efe7da2077",
+   "samples": 11,
+   "last_tick": 5500,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "size_per_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    5500,
+    5557
+   ],
+   "final": {
+    "tick": 5500,
+    "population": 5,
+    "mean_genome_size": 97.0,
+    "mean_generation": 160.0,
+    "reproduction_actions_spawned_total": 288169
+   },
+   "min_population_sample": [
+    5,
+    5500
+   ],
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     2935
+    ],
+    [
+     5000,
+     97.0,
+     146
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 95.026585792,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 95.0052014260001,
+    "threads": 8,
+    "ticks": 5557
+   },
+   "sha256_samples": "a23d5de364263060f46ac4098246b418c2163700f2b9b706bd65b7dec5876ff3",
+   "sha256_census": "f8c24b1e87c6ce8b5646c4229c35eab531b8a9614099cdef0c5211fb7678232e"
+  },
+  "born-mutoff-s2022": {
+   "completed": true,
+   "extinct_tick": 7509,
+   "prototypes": {
+    "born_connected": true,
+    "gestation_ticks_per_founder_genome": 1.0,
+    "per_unit_rate": 0.0
+   },
+   "config_digest": "sha256:f173c41111cbba529ab78907f86a5e03210e5a69c6c1c21c5424a2efe7da2077",
+   "samples": 15,
+   "last_tick": 7500,
+   "window_alive_samples": 0,
+   "mean_population": null,
+   "mean_energy": null,
+   "mean_genome_size": null,
+   "mean_genome_size_founder_units": null,
+   "mean_generation": null,
+   "size_per_generation": null,
+   "births_per_creature_tick": null,
+   "extinction_interval": [
+    7500,
+    7509
+   ],
+   "final": {
+    "tick": 7500,
+    "population": 1,
+    "mean_genome_size": 97.0,
+    "mean_generation": 225.0,
+    "reproduction_actions_spawned_total": 317164
+   },
+   "min_population_sample": [
+    1,
+    7500
+   ],
+   "trajectory": [
+    [
+     2500,
+     97.0,
+     5530
+    ],
+    [
+     5000,
+     97.0,
+     691
+    ],
+    [
+     7500,
+     97.0,
+     1
+    ]
+   ],
+   "checkpoints": {},
+   "footer": {
+    "census_secs": 0.0,
+    "elapsed_secs": 117.578345792,
+    "extinct": true,
+    "kind": "footer",
+    "sim_secs": 117.55193146799989,
+    "threads": 8,
+    "ticks": 7509
+   },
+   "sha256_samples": "e948d4bf55319bfcd5c93674591bd5828cc1909abf960adaa22e5b383e52941d",
+   "sha256_census": "33e5f4f5db9c772976fa4234b0ea5bf41d7a44837a7df7b74fc75322c34eb57d"
+  }
+ },
+ "rule": {
+  "per_seed": {
+   "1022": {
+    "born_reaches_20000": true,
+    "default_reaches_20000": true,
+    "default_defined_in_window": true,
+    "population_ratio": 1.1568957319972204,
+    "population_at_least_half": true,
+    "executed_plus_causal_default": 6,
+    "executed_plus_causal_born": 22,
+    "executed_plus_causal_exceeds": true,
+    "causal_incidence_where_default_none": true,
+    "vote_delta_action_change_channel": true,
+    "parents_evaluated_20": true,
+    "agreement_default": true,
+    "agreement_born": true,
+    "size_default": 7.578707467916716,
+    "size_born": 5.522799823854245,
+    "births_default": 0.02063966728579504,
+    "births_born": 0.019939652758331,
+    "pair": {
+     "default_mutoff_extinction": [
+      5500,
+      5557
+     ],
+     "born_mutoff_extinction": [
+      5500,
+      5557
+     ]
+    },
+    "seed_validates": true,
+    "agreement_holds": true
+   },
+   "2022": {
+    "born_reaches_20000": true,
+    "default_reaches_20000": true,
+    "default_defined_in_window": true,
+    "population_ratio": 0.8916974058172583,
+    "population_at_least_half": true,
+    "executed_plus_causal_default": 6,
+    "executed_plus_causal_born": 19,
+    "executed_plus_causal_exceeds": true,
+    "causal_incidence_where_default_none": true,
+    "vote_delta_action_change_channel": true,
+    "parents_evaluated_20": true,
+    "agreement_default": true,
+    "agreement_born": true,
+    "size_default": 3.8939713759174586,
+    "size_born": 6.078068207883097,
+    "births_default": 0.020451005708072845,
+    "births_born": 0.02069271811828361,
+    "pair": {
+     "default_mutoff_extinction": [
+      7500,
+      7509
+     ],
+     "born_mutoff_extinction": [
+      7500,
+      7509
+     ]
+    },
+    "seed_validates": true,
+    "agreement_holds": true
+   }
+  },
+  "validated": true,
+  "agreement_holds_on_both": true,
+  "note": "lead-selection screen on 20 parents per cohort; the rule needs every clause on both seeds; a default extinct or empty in the window leaves the seed undefined and the row not validated by the rule (resolution iii)"
+ }
+}
