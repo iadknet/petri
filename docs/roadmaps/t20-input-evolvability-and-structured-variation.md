@@ -71,7 +71,7 @@ and rollout gates, not a prerequisite for inherited improvements.
   - Goal: Measure whether native lifetime learning adds useful input behavior and reproductive benefit beyond inherited competence under ordinary mutation, birth and ecological costs.
 - [ ] **T20.F15 — Qualified Learning Availability (Conditional)** — Depends on: T20.F14
   - Goal: Experience-dependent adaptation: ordinary Graph lineages can acquire only the positively qualified learning mechanisms while retaining learning-off and independent alternatives.
-- [ ] **T20.F16 — Born-Connected Input Declaration** — Depends on: T20.F04, T14.F12
+- [x] **T20.F16 — Born-Connected Input Declaration** — Depends on: T20.F04, T14.F12
   - Goal: A new sensory input is expressed into an existing pathway rather than into nothing, as a receptor gene duplicated with its parent's expression enters the parent's cascade. When ordinary variation declares a new input reference on a Graph node, the declaration arrives already wired into that node's existing pathway and live, so it is exposed to selection at once instead of waiting, silent, for a separate connection event; VM nodes are unchanged. The intended outcome is more executed and causal sensor reads of the target families at the goal checkpoints without a persistence or population cost.
 
 ## Notes for AI Agents

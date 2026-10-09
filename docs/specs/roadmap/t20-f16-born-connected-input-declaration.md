@@ -1,6 +1,6 @@
 # T20.F16 — Born-Connected Input Declaration
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-08
 **Feature**: T20.F16
 **Track**: [T20 — Input Evolvability and Structured Variation](../../roadmaps/t20-input-evolvability-and-structured-variation.md)
@@ -115,7 +115,7 @@ field or switch); a run shows existing signals moved by the changed births.
       exercised; keep
       `add_input_ref_to_vm_node_leaves_program_unchanged` passing; re-pin the
       trajectory digests the Determinism row names, each with its reason.
-- [ ] Re-express the three `recruitment_paths` Graph plans that declare a
+- [x] Re-express the three `recruitment_paths` Graph plans that declare a
       reference (`crates/v3-core/src/neighborhood/recruitment_paths/qualification.rs`)
       on the born edge; VM plans and `graph_copy`/`graph_split` only re-seed.
       `input_ref_added` accepts when the table becomes exactly `expected`,
@@ -138,8 +138,8 @@ field or switch); a run shows existing signals moved by the changed births.
       T03.F12's raw report is gone.
 - [x] Amend the five documents the Taxonomy row names, preserving the VM
       wording; no other reference document changes.
-- [ ] `make check` exits 0 in the worktree.
-- [ ] Gate and goal profiles by the benchmark specialist, then the mutation gate
+- [x] `make check` exits 0 in the worktree.
+- [x] Gate and goal profiles by the benchmark specialist, then the mutation gate
       by the mutation specialist, sequentially and alone.
 
 ## Verification
@@ -159,7 +159,7 @@ field or switch); a run shows existing signals moved by the changed births.
       viability -> 28 passed; `cargo test -p v3-core --lib recruitment_paths`
       -> 71 passed, 1 ignored; `cargo test -p v3-core --lib input_ref` -> 54
       passed. Pins unchanged.
-- [ ] `make check` -> exit 0, recorded in the readings.
+- [x] `make check` -> exit 0, recorded in the readings (tested commit 3d7fdf89).
 - [x] Fresh mutation gate at 91ef2e48, exit 0, no survivors:
 
       | Command | Summary line | Output |
@@ -249,15 +249,15 @@ drift depth 22.
 
 ## Success Criteria
 
-- [ ] An `InputRef.Add` on a Graph node appends one reference and one vote-sink
+- [x] An `InputRef.Add` on a Graph node appends one reference and one vote-sink
       edge per the Boundary table; a VM node is unchanged draw for draw; the
       tests named in Verification pass.
-- [ ] The five documents the Taxonomy row names state the Graph-node behavior
+- [x] The five documents the Taxonomy row names state the Graph-node behavior
       and preserve the VM behavior.
-- [ ] Gate and goal profiles stored with the predeclared readings taken; every
+- [x] Gate and goal profiles stored with the predeclared readings taken; every
       floor miss or contrary result in the table is a recorded user decision,
       never a silent omission.
-- [ ] Mutation gate recorded with every survivor resolved.
+- [x] Mutation gate recorded with every survivor resolved.
 
 ## Notes for AI Agents
 
