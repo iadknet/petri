@@ -219,6 +219,10 @@ field or switch); a run shows existing signals moved by the changed draws.
       `docs/progress/features/t11-f29-feedback-route-formation.json` and
       `-goal.json`, local raw hash and byte count and verification time in the
       readings, series entries point to the summaries, no full report staged.
+      Stored: gate `make bench` CLI exit 3, severe (summary 20,422 B, raw
+      102,484 B); goal CLI exit 3, severe (summary 334,176 B, raw 667,053,373 B);
+      hashes and `make` statuses in the readings. Series entries still pending
+      the user's severe decision.
 
 ## Performance and Goal Impact
 
@@ -275,7 +279,19 @@ make bench PROFILE=gate FEATURE=t11-f29-feedback-route-formation
 make bench PROFILE=goal FEATURE=t11-f29-feedback-route-formation
 ```
 
-**Measured verdict.** Pending.
+**Measured verdict (2026-10-09, `0b039a32`, host matches; one run each).** Both profiles
+severe, CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2; the goal's echoed shell
+status was lost, so its `make` status is inferred from `Error 3`. Gate: `pass_cap_hits` +271%
+and `decided_passes` +482% (severe; seed 11 holds 136 of 200 hits), `plasticity_updates`
++16.96% (flag), `mesh_hops` +0.50% and the other counters ok, wall +14.5% ok. Goal:
+`pass_cap_hits` +124.3% (severe; 0.0028 / 0.0039 / 0.0027 per tick, under the 0.10 ceiling),
+every other counter and wall (+21.3%) ok. Predeclared rows: pass on goal `mesh_hops`, cap
+ceiling, evolved `pass_cap_fraction` (0 everywhere), silent share (0.6355), `changed_per_all_births`,
+founder row (50 applied, silent 1.0, founder dead 0), drift loop share (rises at 250, 1,000 and 2,000
+on both walks), digests, budgets. **Fail:** Canyon `mesh_ramp` deaths 2.06x; pooled dead per
+birth 0.007983 over 0.007295; cycle-carrying dead per applied birth at Orchards (4/287) and
+Confluence (11/119) and, on the drift walk, Canyon depth 250 (1/322); Canyon final population
+3,098 under the half-reference floor (7,582). Goes to the user, none remediated.
 
 - Summaries: [gate](../../progress/features/t11-f29-feedback-route-formation.json),
   [goal](../../progress/features/t11-f29-feedback-route-formation-goal.json).
