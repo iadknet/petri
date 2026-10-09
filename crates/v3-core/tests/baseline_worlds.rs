@@ -104,11 +104,14 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// the old hash. T24.F02 re-pinned it: food draws come from the keyed
 /// per-cell stream instead of the run RNG. T03.F12 re-pinned it after two
 /// agreeing runs (every birth delivered one founder gestation later); at
-/// gestation rate 0.0 the T24.F02 hash holds, the kept equivalence check.
+/// gestation rate 0.0 the T24.F02 hash held, the kept equivalence check.
+/// Re-pinned by T20.F16 after two agreeing runs: Graph-node `Add` draws three
+/// more numbers and appends a vote edge (default 1086311951226638661 ->
+/// 5289048635937395426, rate 0.0 8324800200600234214 -> 9818715947896128091).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 1086311951226638661);
-    assert_eq!(short_run_identity(Some(0.0)), 8324800200600234214);
+    assert_eq!(short_run_identity(None), 5289048635937395426);
+    assert_eq!(short_run_identity(Some(0.0)), 9818715947896128091);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

@@ -279,14 +279,15 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
 
 #[test]
 fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
-    // Evolved-trajectory pin. T24.F02 moves this pin from seed 2 to 0: with
-    // food on the keyed stream seed 2 ends with 1 creature on one cell, while
-    // seed 0 keeps 6 creatures over 5 cells (the lowest seed that keeps at
-    // least 2 over at least 2; 9 of seeds 0..=25 go extinct and 6 end on one
-    // cell). T24.F01 had moved it from seed 1 to 2, T19.F04 from 3 to 1 (its
-    // vote founder sent seed 3 extinct), T11.F23 from 1 to 3, T16.F01 from 18
-    // to 1, T11.F21 from 13 to 18.
-    const SEED: u64 = 0;
+    // Evolved-trajectory pin: the lowest seed in 0..=25 that keeps at least
+    // 2 creatures over at least 2 cells at the horizon. Re-pinned by T20.F16
+    // from seed 0 to 1: Graph-node `Add` draws three more numbers and appends
+    // a vote edge, and seed 0 goes extinct at tick 210; seed 1 keeps 3
+    // creatures over 3 cells (7 of seeds 0..=25 go extinct and 3 end on one
+    // cell). T24.F02 had moved it from seed 2 to 0, T24.F01 from 1 to 2,
+    // T19.F04 from 3 to 1 (its vote founder sent seed 3 extinct), T11.F23
+    // from 1 to 3, T16.F01 from 18 to 1, T11.F21 from 13 to 18.
+    const SEED: u64 = 1;
     const HORIZON: u64 = 250;
     let config = build_config(&ProfileParams {
         recipe: None,

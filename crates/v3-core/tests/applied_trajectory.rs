@@ -23,8 +23,10 @@
 //! stream instead of the run RNG, so every later run-RNG draw shifts.
 //! T03.F12 re-pinned both digests after two agreeing runs: every birth is
 //! delivered one founder gestation later. Each test also runs the fixture at
-//! gestation rate 0.0 and asserts the T24.F02 digests, the kept equivalence
-//! evidence that rate 0.0 is the pre-gestation engine.
+//! gestation rate 0.0, the kept equivalence evidence that rate 0.0 is the
+//! pre-gestation engine (the T24.F02 digests until T20.F16).
+//! Re-pinned by T20.F16 after two agreeing runs: Graph-node `Add` draws three
+//! more numbers and appends a vote edge, which moves all four digests.
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -36,11 +38,11 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None),
-        "fecc3666eae1f1deb5096925d5854fe1bf32e5264ea599b1d19223bf2f246aa0"
+        "2d6ee1e918d9050de5c3d811d253e64f57c7a9029f7cb3240afdff391eff5c1e"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0)),
-        "73790bc499eb1d3941be67f16c291e59083f4d8351b7c18d49a5f4fba13f80d5"
+        "ea0d44121ad1d3db0852aed8d2328e1f62c86266705dda224d34c49a1a72f144"
     );
 }
 
@@ -113,11 +115,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>) -> String {
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "a47711760af1b3c1f87d3f688522aadc0fee791cdf3233b981ffa50b231b6a8b"
+        "c9f3b37bab39f6eadc23d17f881fbc179d6dec68e5b0e81b1c9f104b74bebbfd"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "f354e86b450383f57c647c86bd90ac7419b74341db02608b9356ea05bef03e51"
+        "885326b1177672ad431e4c727387f647cc7706d09b262d216fa1a1b80ed36551"
     );
 }
 

@@ -27,9 +27,12 @@ fn recruitment_off_preserves_pre_feature_genomes_events_and_rng() {
             hash = (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3);
         }
     }
+    // Recruitment `Off` adds no draw relative to the current production path.
+    // Re-pinned by T20.F16: Graph-node `Add` draws three more numbers and
+    // appends a vote edge (3980442848510747838 -> 13774101911075560278).
     assert_eq!(
-        hash, 3980442848510747838,
-        "pin captured before recruitment implementation"
+        hash, 13774101911075560278,
+        "pin of the recruitment-Off production path"
     );
 }
 

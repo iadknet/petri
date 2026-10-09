@@ -1264,16 +1264,20 @@ mod tests {
     /// before/after in `docs/progress/readings/t19-f04.md`); the discard
     /// counts stay zero. Re-pinned by T11.F20: the legacy panel's proposals
     /// draw Binomial(97, 0.005) on the founder's units instead of the retired
-    /// per-birth rule; the discard counts stay zero.
+    /// per-birth rule; the discard counts stay zero. Re-pinned by T20.F16:
+    /// Graph-node `Add` draws three more numbers and appends a vote edge, so
+    /// the Graph rows move (Drift `[20, 14, 13, 7]` -> `[20, 15, 14, 7]`,
+    /// Selection 19 -> 20 throughout); the VM rows and the discard counts
+    /// are unchanged. The T13.F06 progress record stays historical.
     #[test]
     fn production_prepared_lineages_match_the_recorded_baseline_and_metadata() {
         let starts = starting_forms();
         let cases = [
-            ("graph_prepared", Policy::Drift, [20, 14, 13, 7], [0, 0]),
+            ("graph_prepared", Policy::Drift, [20, 15, 14, 7], [0, 0]),
             (
                 "graph_prepared",
                 Policy::Selection,
-                [19, 19, 19, 19],
+                [20, 20, 20, 20],
                 [0, 0],
             ),
             ("vm_prepared", Policy::Drift, [25, 18, 18, 12], [0, 0]),
@@ -1390,12 +1394,14 @@ mod tests {
     /// Re-pinned by T19.F04 (vote sinks): 16/16 graph and 21/21 VM retained
     /// discoveries remain useful. Re-pinned by T11.F20 (proposals draw
     /// Binomial(97, 0.005) on the founder's units): 19/19 graph and 23/23 VM
-    /// retained discoveries remain useful.
+    /// retained discoveries remain useful. Re-pinned by T20.F16: Graph-node
+    /// `Add` draws three more numbers and appends a vote edge; 20/20 graph
+    /// (censored 13 -> 12) and 23/23 VM retained discoveries remain useful.
     #[test]
     fn production_cost_selection_lineages_pin_the_first_reading() {
         let starts = starting_forms();
         for (name, expected, censored) in [
-            ("graph_prepared", [19, 19, 19, 19], 13),
+            ("graph_prepared", [20, 20, 20, 20], 12),
             ("vm_prepared", [23, 23, 23, 23], 9),
         ] {
             let start = starts.iter().find(|start| start.name == name).unwrap();

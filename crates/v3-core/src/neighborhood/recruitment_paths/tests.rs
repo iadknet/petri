@@ -1022,7 +1022,11 @@ fn recruitment_paths_qualified_paths_replay_through_deltas() {
 /// `VmInstructionMutation`. T19.F05 moved the `InputRef.Add` seeds: the
 /// input-reference draw grows from 22 to 27 entries. T11.F25 moved the
 /// `GraphAddGraphEdge` seeds (57 -> 102, 103 -> 743): the edge-surface draw
-/// skips the undecoded parameter sinks.
+/// skips the undecoded parameter sinks. T20.F16 re-expressed the Graph plans
+/// that declare a reference on the born edge: `InputRef.Add` on a Graph
+/// scaffold appends the activating `Move(E)` vote edge, so `graph_blank`
+/// shortens 3 -> 2 events, `graph_detour` 2 -> 1 and `graph_unprepared`
+/// 5 -> 3.
 #[test]
 fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
     use MutationOperator::*;
@@ -1045,7 +1049,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
         [
             (
                 "graph_blank",
-                vec![(InputRefAdd, 201), (GraphAddGraphEdge, 102), swap],
+                vec![(InputRefAdd, 2873), swap],
                 None,
             ),
             ("graph_copy", vec![(GraphAddGraphEdge, 743), swap], None),
@@ -1063,13 +1067,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
             ("vm_copy", vec![(VmDeleteInstruction, 1), swap], None),
             (
                 "graph_unprepared",
-                vec![
-                    (InputRefAdd, 1),
-                    (GraphRetargetGraphEdge, 32),
-                    (GraphRemoveGraphEdge, 5),
-                    (GraphAddGraphEdge, 743),
-                    swap,
-                ],
+                vec![(InputRefAdd, 12_673), (GraphRemoveGraphEdge, 0), swap],
                 None,
             ),
             (
@@ -1084,11 +1082,7 @@ fn recruitment_paths_qualified_outcomes_and_seeds_are_pinned() {
                 ],
                 None,
             ),
-            (
-                "graph_detour",
-                vec![(InputRefAdd, 201), (GraphAddGraphEdge, 102)],
-                None,
-            ),
+            ("graph_detour", vec![(InputRefAdd, 2873)], None),
             (
                 "vm_detour",
                 vec![
@@ -1139,12 +1133,35 @@ fn recruitment_paths_qualified_last_step_is_one_bounded_edit_on_a_dispatched_mod
             change.before.as_ref().unwrap(),
             change.after.as_ref().unwrap(),
         );
-        assert_eq!(
-            before_node.input_refs, after_node.input_refs,
+        let table_grew = after_node.input_refs.len() == before_node.input_refs.len() + 1
+            && after_node.input_refs[..before_node.input_refs.len()] == before_node.input_refs[..];
+        let is_add = last.event.operator() == MutationOperator::InputRefAdd;
+        assert!(
+            if is_add {
+                table_grew
+            } else {
+                before_node.input_refs == after_node.input_refs
+            },
             "{}",
             path.form
         );
         match last.event.operator() {
+            // T20.F16: a Graph-node `Add` exposes a dispatched detour with
+            // its born `Move(E)` vote edge.
+            MutationOperator::InputRefAdd => {
+                assert_eq!(change.node, NodeId::new(2));
+                assert_eq!(before_node.targets, after_node.targets);
+                let (BackendDef::Graph(b), BackendDef::Graph(a)) =
+                    (&before_node.backend_def, &after_node.backend_def)
+                else {
+                    panic!()
+                };
+                assert_eq!(a.compute_nodes, b.compute_nodes);
+                assert_eq!(
+                    fixtures::move_sink(a, fixtures::EAST).inputs.len(),
+                    fixtures::move_sink(b, fixtures::EAST).inputs.len() + 1
+                );
+            }
             MutationOperator::TopologySwapRouteTargets => {
                 assert_eq!(change.node, NodeId::new(0));
                 assert_eq!(before_node.backend_def, after_node.backend_def);
