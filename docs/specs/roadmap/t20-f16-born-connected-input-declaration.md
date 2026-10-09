@@ -122,27 +122,24 @@ by the changed births.
 - [ ] Re-express the three `recruitment_paths` Graph plans that declare a
       reference (`crates/v3-core/src/neighborhood/recruitment_paths/qualification.rs`)
       on the born edge; VM plans and `graph_copy`/`graph_split` only re-seed.
-      `input_ref_added` accepts an `InputRef.Add` on the scaffold when the
-      table becomes exactly `expected`, `targets` and every compute node are
-      unchanged, every sink other than `Move(E)` is unchanged, and `Move(E)`
-      gained exactly one appended edge whose source is
+      `input_ref_added` accepts when the table becomes exactly `expected`,
+      `targets`, compute nodes and every sink but `Move(E)` are unchanged, and
+      `Move(E)` gained exactly one edge from
       `InputLeaf { ref_idx: expected.len() - 1, sub_idx }` at the task's
-      sub-index (0 for the cue, 2 for the ring's east) with weight > 0: the
-      born edge is the activation edge, so `east_vote_edge_added` leaves
-      `graph_blank` (3 to 2 events), `graph_detour` (2 to 1) and
-      `graph_unprepared` (5 to 3: `ring_added`, `north_vote_removed`,
-      `activated`; `cue_edge_retargeted` also leaves, the copied sensing
-      node going dead beside the direct ring edge); if the 3-event path does
-      not satisfy `qualified()` on the readings, keep `cue_edge_retargeted`
-      (4 events) and record why. New first seeds per step via `search_seeds`;
-      `SWAP` stays 0. Negative assertions kept: `north_vote_removed_rejects_a_changed_compute_node`
-      on `graph_unprepared`; `east_vote_edge_added_rejects_a_zero_weight_edge`
-      replays `graph_copy`, whose `vote_edge_added` step is unchanged. Added
-      mirrors on the born step: a born edge at weight 0, into a sink other than
-      `Move(E)`, or at another sub-index is rejected. The shortened paths,
-      their per-step `neutral()` flip on the `Add` step and the
-      `recruitment_paths` block deltas are a recorded finding in the readings,
-      not a re-pin; `MAX_PATH_EVENTS` stays 6.
+      sub-index (cue 0, ring east 2) with weight > 0. The born edge is the
+      activation edge, so `east_vote_edge_added` leaves `graph_blank` (3 to 2
+      events) and `graph_detour` (2 to 1), and `graph_unprepared` becomes
+      `ring_added`, `north_vote_removed`, `activated` (5 to 3; keep
+      `cue_edge_retargeted` only if the 3-event path fails `qualified()`, and
+      record why). New first seeds via `search_seeds`, `SWAP` 0,
+      `MAX_PATH_EVENTS` 6. Negative assertions kept:
+      `north_vote_removed_rejects_a_changed_compute_node` on `graph_unprepared`
+      and `east_vote_edge_added_rejects_a_zero_weight_edge` replaying
+      `graph_copy`; added mirrors reject a born edge at weight 0, into another
+      sink, or at another sub-index. Shortened paths, the `Add` step's
+      `neutral()` flip and the `recruitment_paths` block are a recorded finding
+      in the readings, with this run's headline as the reference because
+      T03.F12's raw report is gone.
 - [x] Amend the five documents the Taxonomy row names, preserving the VM
       wording; no other reference document changes.
 - [ ] `make check` exits 0 in the worktree.
@@ -226,26 +223,26 @@ make bench PROFILE=gate FEATURE=t20-f16-born-connected-input-declaration
 make bench PROFILE=goal FEATURE=t20-f16-born-connected-input-declaration
 ```
 
-**Contradiction recorded before the gate run (2026-10-09, implementation
-brief 1; the predeclaration above is not edited).** The gate profile's
-`decided_passes` reads 0.000034 per creature-tick against 0.000000 in both gate
-references (T24.F02 and T03.F12), which the comparison classifies severe
-because the reference is zero, where the predeclaration budgeted no severe.
-A born vote edge lets a founder pass decide within the 75-tick gate; the goal
-references already read nonzero (T03.F12 0.000104). This is the mechanism's
-behavioral signature in the founder gate, not a compute cost; the threshold is
-not weakened and no stored baseline is edited. **User decision (2026-10-08):
-accepted, and the gate epoch is re-pinned to this feature's gate summary
-before the mutation gate, as at T19.F04** (the Decision bullet in Notes). The
-re-pin is the benchmark specialist's edit of `docs/progress/benchmark-series.json`
-after the gate summary is stored: `gate.epoch_baseline` set to
-`docs/progress/features/t20-f16-born-connected-input-declaration.json`, which
-the series step also appends to `gate.closed`, so the in-`make check` series
-test compares against this feature's own summary; `make check` cannot pass
-before it. The stored severe comparison against T24.F02 and T03.F12 stays in
-the summary unedited. The benchmark stage reports the gate's
-`decided_passes_total` beside the count of founder births that applied a
-Graph-node `Add`.
+**Readings outside the predeclaration (the predeclaration is not edited;
+each is a blocker-rule item for the user, none absorbed or rejected by the
+spec owner; decisions go in Notes verbatim).** Gate: `decided_passes`
+0.000034 against 0.000000 in both gate references, severe because the
+reference is zero; a born vote edge lets a founder pass decide inside 75
+ticks, not a compute cost. Accepted by the user (Notes), gate epoch re-pinned
+by setting `gate.epoch_baseline` in `docs/progress/benchmark-series.json` to
+this feature's stored gate summary before `make check`; the stored severe
+comparison is unedited; `decided_passes_total` 9, all on seed 11; the gate
+report has no per-operator birth tally, so the founder Graph-`Add` birth count
+is not recordable. Goal: (1) `decided_passes` 0.008151 against 0.000104
+(+7,737%), severe, not a compute cost (`vm_steps` −11.8%, `pass_cap_hits`
++11.3% flag only); (2) Confluence has no target row in the selected cohort
+(Σ executed and Σ causal 0 against 0), the named contrary result, while its
+drift cohort fingerprint holds (22/23); (3) Confluence
+`neighborhood_read.changed_per_all_births` 0.1396 under its 0.1434 floor and
+one birth in 5,000 under T03.F12's 0.1398; (4) Canyon drift depth 22 0.1120
+against 0.1130 (two births in 2,000), the only reading below the previous
+closure. Persistence, Orchards and Canyon target rows (4/4, 3/3 against 0/0),
+the other floors and every other drift reading meet the predeclaration.
 
 **Measured verdict ([readings](../../progress/readings/t20-f16.md)).** Both
 profiles ran once, CLI exit 3 (severe). Gate: only the accepted
