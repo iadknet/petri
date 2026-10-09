@@ -201,11 +201,18 @@ because the reference is zero, where the predeclaration budgeted no severe.
 A born vote edge lets a founder pass decide within the 75-tick gate; the goal
 references already read nonzero (T03.F12 0.000104). This is the mechanism's
 behavioral signature in the founder gate, not a compute cost; the threshold is
-not weakened and no stored baseline is edited; acceptance and the gate-epoch
-re-pin are the user's decision under the blocker rule, as at T11.F04 and
-T19.F04, and `make check`'s series test cannot pass before that decision. The
-benchmark stage reports the gate's `decided_passes_total` beside the count of
-founder births that applied a Graph-node `Add`.
+not weakened and no stored baseline is edited. **User decision (2026-10-08):
+accepted, and the gate epoch is re-pinned to this feature's gate summary
+before the mutation gate, as at T19.F04** (the Decision bullet in Notes). The
+re-pin is the benchmark specialist's edit of `docs/progress/benchmark-series.json`
+after the gate summary is stored: `gate.epoch_baseline` set to
+`docs/progress/features/t20-f16-born-connected-input-declaration.json`, which
+the series step also appends to `gate.closed`, so the in-`make check` series
+test compares against this feature's own summary; `make check` cannot pass
+before it. The stored severe comparison against T24.F02 and T03.F12 stays in
+the summary unedited. The benchmark stage reports the gate's
+`decided_passes_total` beside the count of founder births that applied a
+Graph-node `Add`.
 
 **Measured verdict.** Pending.
 
@@ -234,3 +241,9 @@ founder births that applied a Graph-node `Add`.
 - Decision: (spec owner, 2026-10-08, from the tested realization) destination
   one uniform `ActionVote` sink, weight the new-edge law, no configuration
   switch, `RecruitNeutralInput` kept untouched.
+- Decision: (user, 2026-10-08) the gate `decided_passes` severe (0.000034 per
+  creature-tick against 0.000000 in both the T24.F02 epoch and the T03.F12
+  previous-closure gate, a zero reference) is accepted as the mechanism's
+  behavioral signature, and the gate epoch is re-pinned to this feature's gate
+  summary before the mutation gate, as at T19.F04; thresholds and the stored
+  severe comparison are unchanged.
