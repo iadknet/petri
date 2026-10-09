@@ -107,9 +107,12 @@ def agreement(typed, chans, vote):
         v = len(vote["distinct_parents_with_action_change_by_family"].get(fam, []))
         out["by_family"][fam] = {"funnel_family_causal": funnel, "vote_delta_parents": v, "agree": funnel == v}
         out["pass"] &= funnel == v
-    for (fam, ch), row in chans.items():
+    keys = set(f"{fam}#{ch}" for (fam, ch) in chans) | set(vote["distinct_parents_with_action_change_by_channel"])
+    for key in sorted(keys):
+        fam, ch = key.rsplit("#", 1)
+        row = chans.get((fam, int(ch)), {"causal": 0})
         funnel = row["causal"] or 0
-        v = len(vote["distinct_parents_with_action_change_by_channel"].get(f"{fam}#{ch}", []))
+        v = len(vote["distinct_parents_with_action_change_by_channel"].get(key, []))
         if funnel or v:
             out["by_channel"][f"{fam}#{ch}"] = {"funnel_causal": funnel, "vote_delta_parents": v, "agree": funnel == v}
             out["pass"] &= funnel == v
@@ -286,14 +289,21 @@ def main():
             "pair": {"default_mutoff_extinction": val("default-mutoff", s, "extinction_interval"),
                      "wide_mutoff_extinction": val("wide-mutoff", s, "extinction_interval")},
         }
-        per["agreement_holds"] = bool(per["agreement_default"] and per["agreement_wide"])
+        d10, w10 = cp("default", s, "10000"), cp("wide", s, "10000")
+        per["agreement_10000"] = {"default": (d10 or {}).get("agreement", {}).get("pass") if d10 else None,
+                                  "wide": (w10 or {}).get("agreement", {}).get("pass") if w10 else None}
+        per["agreement_holds"] = bool(per["agreement_default"] and per["agreement_wide"]
+                                      and per["agreement_10000"]["default"] and per["agreement_10000"]["wide"])
         per["seed_validates"] = bool(per["wide_reaches_20000"] and default_defined and per["population_at_least_half"] and non_vote
                                      and vote_side and vote_side["holds"] and per["parents_evaluated_20"] and per["agreement_holds"])
         rule["per_seed"][str(s)] = per
         # Horizon reading (vi), default alone.
         mem = (d20 or {}).get("memory")
         loops = ((d20 or {}).get("sink_use") or {}).get("memory_loop")
-        valid = bool(reaches("default", s) and mem and mem.get("final_creature_count") and (d20 or {}).get("sink_use", {}).get("parents_evaluated") == 20)
+        counts_ok = bool(mem) and all(isinstance(mem.get(k), int) and 0 <= mem[k] <= (mem.get("final_creature_count") or 0)
+                                      for k in ("different_from_zeroed_count", "different_from_scrambled_count", "different_from_either_count"))
+        valid = bool(reaches("default", s) and counts_ok and mem.get("final_creature_count") == (d20 or {}).get("living")
+                     and (d20 or {}).get("sink_use", {}).get("parents_evaluated") == 20)
         horizon["per_seed"][str(s)] = {
             "valid": valid,
             "memory_sensitivity_either": mem.get("different_from_either_count") if mem else None,

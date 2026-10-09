@@ -95,6 +95,14 @@ def main():
               {"have": sorted(ref["checkpoints"]), "expected": er["checkpoints"]})
         check("cand checkpoints are exactly its expected ticks", sorted(cand["checkpoints"]) == ec["checkpoints"],
               {"have": sorted(cand["checkpoints"]), "expected": ec["checkpoints"]})
+    for label, run in (("ref", ref), ("cand", cand)):
+        h, f = run["header"] or {}, run["footer"] or {}
+        if run["extinct"] is None:
+            check(f"{label} non-extinct footer reaches the header horizon", f.get("ticks") == h.get("horizon") and f.get("extinct") is False,
+                  {"footer_ticks": f.get("ticks"), "horizon": h.get("horizon"), "extinct_flag": f.get("extinct")})
+        else:
+            check(f"{label} extinction record, footer ticks and extinct flag agree", f.get("ticks") == run["extinct"] and f.get("extinct") is True,
+                  {"footer_ticks": f.get("ticks"), "extinct_record": run["extinct"], "extinct_flag": f.get("extinct")})
     check("sample tick sets equal", set(ref["samples"]) == set(cand["samples"]),
           {"ref": sorted(ref["samples"]), "cand": sorted(cand["samples"])})
     mism, missing = [], []

@@ -1,7 +1,7 @@
 {
  "mode": "equal",
  "ref": {
-  "dir": ".claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w1/frozen/default-s2022",
+  "dir": ".bench-artifacts/lab/wiring/w1/frozen/default-s2022",
   "name": "default-s2022",
   "sha256": {
    "samples": "e543412d302c2c95c3ce9677fa482af2e0bbedefa572bece1b95196d3bf4e2b3",
@@ -9,7 +9,7 @@
   }
  },
  "cand": {
-  "dir": ".claude/worktrees/output-wiring/.bench-artifacts/lab/wiring/w1/default-s2022",
+  "dir": ".bench-artifacts/lab/wiring/w1/default-s2022",
   "name": "default-s2022",
   "sha256": {
    "samples": "5470fbb0946d37ff4d599aefadb85f24d283bdbfaca812bc36a1e8cfc4d88390",
@@ -456,6 +456,24 @@
      10000,
      20000
     ]
+   }
+  },
+  {
+   "check": "ref non-extinct footer reaches the header horizon",
+   "pass": true,
+   "detail": {
+    "footer_ticks": 20000,
+    "horizon": 20000,
+    "extinct_flag": false
+   }
+  },
+  {
+   "check": "cand non-extinct footer reaches the header horizon",
+   "pass": true,
+   "detail": {
+    "footer_ticks": 20000,
+    "horizon": 20000,
+    "extinct_flag": false
    }
   },
   {
