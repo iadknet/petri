@@ -8,7 +8,11 @@ nothing. It gives the evidence, the candidates, and a recommendation; the
 executable form is the
 [experiment plan](action-choice-pressure-experiment-plan-2026-10-09.md), whose
 gates govern everything here. Revised after a Codex adversarial review the
-same day (Section 8).
+same day (Section 8). **Update 2026-10-10:** the user chose to skip the lab
+and build the two pressures as roadmap features, T16.F02 (amended: every
+committed action costs at least its effort) and then T19.F07 (a failed step
+ends the tick's remaining plan); the plan is superseded and Section 6's
+deference to its gates no longer applies.
 
 ## 1. Problem and criteria
 

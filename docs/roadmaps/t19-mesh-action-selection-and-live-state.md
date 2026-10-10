@@ -1,7 +1,7 @@
 # T19 — Mesh Action Selection and Live State
 
 **Status**: In Progress
-**Last updated**: 2026-09-23
+**Last updated**: 2026-10-10
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -62,6 +62,11 @@ of the worked cases in its Section 2.3.
   claim that the interface was a block on evolvable behavior is answered by
   measurement, either way.
 
+- [ ] A failed step ends the tick's remaining plan (T19.F07) without changing
+  the multi-action tick's cap or the per-kind bar, and the goal reports carry
+  queued length, executed prefix and discarded tail, so a cleaner plan can be
+  told apart from a shorter one.
+
 ## Executable Features
 
 - [x] **T19.F01 — Per-Tick Hop Ramp** — Depends on: None
@@ -76,10 +81,19 @@ of the worked cases in its Section 2.3.
   - Goal: Corollary discharge, a brain sensing what it just decided and how tired it is, so the current and previous pass's votes, the per-kind commit counts, hops this tick, and the previous tick's outcome channels become drawable inputs.
 - [x] **T19.F06 — Retirement and Observability** — Depends on: T19.F04, T19.F05
   - Goal: Removal of a rule with no natural analog, so one execution model remains, the bank's last config field and readings are retired or marked historical, and the inspector shows passes.
+- [ ] **T19.F07 — Failed Step Ends the Plan** — Depends on: T19.F06, T16.F02
+  - Goal: A motor program stops when the world contradicts it. Analog: an animal that bumps into an obstacle or misses a grab stops and re-orients before acting again; it does not finish the rest of the sequence blind. From a configurable start tick, an action whose result is a failure discards the rest of that creature's queued actions for the tick, with no charge and no log entry. A plan whose steps all succeed runs in full; the multi-action tick (required, GP-01), its cap and the per-kind bar are unchanged, and cognition still builds the whole queue before any action executes. A failure is every result other than success, except a population-cap rejection, which is not the creature's error. New counters, exported to the gate and goal reports: queued length before execution, executed prefix, discarded tail by cause (plan break, conception, death) and the position of the break. The spec predeclares the start tick's default and a later start as the fallback if a goal world's trough collapses. Predeclared readings: the share of multi-action ticks whose steps all succeed rises against T16.F02's goal reading while mean queued length holds; a fall in mean queued length is the "do less" shortcut and is reported as such, never as success; the goal worlds' trough population is read; the gate and goal trajectories move and an epoch re-pin is expected and recorded. Evidence: the [action-choice pressure note](../strategy/action-choice-pressure-research-2026-10-09.md) Section 2.2 (in one live viewport, 1% of multi-action ticks had every step succeed, and steps after a failure earned about half of food intake) and the superseded [experiment plan](../strategy/action-choice-pressure-experiment-plan-2026-10-09.md) (its window counters and shortcut rule).
 
 ## Notes for AI Agents
 
-- All six implementation features are closed. The track remains In Progress
+- T19.F07 was added on 2026-10-10 at the user's direction: a failed step ends
+  the tick's remaining plan, the pressure that makes a multi-step plan pay
+  only when its steps were chosen to succeed. The user chose to build it as a
+  feature without a lab run, after T16.F02 so every step, the last one
+  included, carries its effort. Its analog is stated in its goal line, and
+  the multi-action tick is required (GP-01), so no spec may shorten or cap
+  plans to satisfy it.
+- T19.F01 to T19.F06 are closed. The track also remains In Progress
   because T11.F10's comparative discovery/retention protocol is still pending;
   the closed F02/F04/F06 specs explicitly leave that measurement to F10.
   Completed runtime work does not establish that empirical success criterion.
