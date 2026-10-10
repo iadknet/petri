@@ -1,6 +1,12 @@
 # Effective-action pressure: experiment plan (2026-10-09)
 
-Date: 2026-10-09. Status: plan, parked by the user behind the evolution
+Date: 2026-10-09. Status: **superseded on 2026-10-10**: the user chose to
+build both pressures as roadmap features without a lab run (T16.F02, amended
+so every committed action costs at least its effort, then T19.F07, a failed
+step ends the tick's remaining plan). This plan stays as the design record;
+its readings (queued length, clean-plan share, the "do less" shortcut, the
+survival guard) moved into those rows. Its goal command below is not to be
+run. Earlier status: plan, parked by the user behind the evolution
 framework work (the deletion-rate run and the vote-margin read), not yet
 run; revised the same day after a Codex adversarial review (Section "Review
 dispositions"). Question raised by the user: creatures spam actions (61% of
