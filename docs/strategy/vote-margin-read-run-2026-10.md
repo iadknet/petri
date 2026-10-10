@@ -9,8 +9,9 @@ frozen-instrument pattern and Advice table as the precedent, extending the
 [diagnosis follow-up run](evolvability-diagnosis-run-2026-10-followup.md)'s
 row N3 instrument, inside the
 [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
-Status: **V1 completed** (gates V0.2 and V0 passed; D run on both Canyon
-seeds); plan forward drafted; Codex review (b) disposed.
+Status: **complete** (gates V0.2 and V0 passed; V1 completed to 50,000; D
+run beside on both Canyon seeds; Codex reviews (a) and (b) disposed; landed
+on `main` as docs only, the `instr:` commits kept on the branch).
 
 ## Question
 
@@ -61,6 +62,12 @@ instrument work only. N3's readings are the prior, not an identity target.
   readers beside this note under
   [`vote-margin-read-run-2026-10/`](vote-margin-read-run-2026-10/), each under
   the 1 MiB ceiling.
+- **Branch and commits.** `worktree-vote-margin` from `785dc18e`:
+  `instr:` `09f91f13` (v1 file state), `813c1ea0` (v2), `ca4796c8` (the
+  header line); `docs:` `4d5975b7` (predeclaration), `35808cb2` (A1),
+  `d92c75ab` (gates), `a21d6547` (V1 and the plan forward), `c338614d`
+  (review (b) dispositions) and the closing commit, each touching only
+  paths under `docs/`, cherry-picked to `main` in that order.
 - **Commit kinds.** `docs:` (this note and its folder) and `instr:`
   (observation only). No `proto:` and no `lab:` code beyond the taken probe.
   Only `docs:` lands on `main`; the branch is kept.
@@ -295,6 +302,7 @@ each point raised.
 
 | # | Point | Advice (summary) | Dispositions |
 | --- | --- | --- | --- |
+| 5 | Before closing, after the review (b) dispositions were committed | Nothing blocks closing. One closing commit (this row, Status complete, the branch commits, the turns row); the close order with the nested tree removed first, the evidence copied, `ExitWorktree` keep, `main` checked clean (advanced but clean: pick anyway), purity checked per commit, the picks, `make check-docs` on `main`, the worktree removed and pruned; no second Codex round; the plan's status line untouched (outside this run's docs scope); the report answer first, with the advisor-model deviation | Followed |
 | 4 | After the plan forward was drafted and committed, while Codex review (b) ran (the Roles section's after-draft point) | Right in substance; four text fixes. (1) Section 1 contradicts the routing: the plan's `masked` bullet has no "mostly", so T19 receives the hypothesis at minority scale; the "mostly" branches and `param-causal` do not fire. (2) Close the plan's fourth criterion: what stays unresolved for T22. (3) Prediction 2's prior: N3's sink-share suppression did not become kind suppression. (4) A second fingerprint: every funnel row declared = connected = executed, the born edge's recorded signature, still a hypothesis. Process: fold into the review (b) dispositions commit; remove the nested tree before copying the evidence and before `ExitWorktree`; verify each picked commit touches only `docs/`; leave the plan's status line; write the memory before the report | All adopted: (1) to (4) in the plan forward and the V1 cell, in the dispositions commit; the close order followed; the memory written |
 | 3 | After the V1 reading and the plan forward were drafted, before they were recorded; also the contradiction consultation (prediction 3 failed) and the before-plan-forward point, batched into one call | Verdict and "no feature" right; the plan's outcome branches all fail to fire, say so. (1) Name the N3 → now shift's candidate cause as a hypothesis: check whether causal reads' consumers are sink leaves (T20.F16's born edge shape). (2) Lineage: report distinct signatures beside counts; read the census's funnel typed rows and N3's agreement rule. (3) Tighten: "exposed on the panels", world exposure stays T20's; "failed: every action-changing channel is vote-causal"; "no longer blocks on this cohort; the Variation verdict untouched"; prediction 1 "on 10 channels". Process: one Python pass, commit, Codex (b) in the same turn, Cost while it runs; if `main` advanced but is clean, cherry-pick anyway and record the base | All adopted: (1) every exposed consumer of a causal read is a sink leaf (44 `ActionVote`, 1 `RouterGate`), recorded as a hypothesis; (2) signatures and funnel rows in the V1 cell (agreement 6 of 6); (3) the plan forward; the close contingency below |
 | 2 | After the V0.2 and V0 readings were drafted, before they were recorded (one batched consultation, as Advice 1 suggested); whether to report V0's v2 reading at 10,000; what to watch in V1 | Gate paragraph right. (1) Quote both V0 run times from the footers; say the population and cost comparison is across engines and that 15.26 is N3's profile, so a budget kill reads as predeclared; run `smokecheck.py` on V0's v2 output, the only check of record counts against `delta_passes`. (2) Report the 10,000 reading as a V0 by-product with no prediction read; the "dilution" label rests on one channel that is `vote-causal`, so carry contributing channels beside every label (`channels_with_margined_passes` in the reader); define v1's `most_moved_sink` against v2's per-pass moved sink after a spot check; include C's agreement, the battery's zero exposure and the consistency counts. (3) V1: do not poll; pre-write the Codex (b) brief, the row cell, the cost table and the plan-forward skeleton; at 20,000 compare elapsed with N3's 2,320 s; a `vote-causal` channel failing prediction 3 is a result; name `Terminate`-only movers when they recur; split the reader's rows into a channels file before 1 MiB; update the Status line | All adopted: (1) and (2) in Gate results above and `v1read.py`; (3) the Status line, the waits and the summaries split |
@@ -453,4 +461,4 @@ action-changing channels over the four Canyon checkpoints `vote-causal`).
 | V1 | 8,086.7 s elapsed, 8,093 s awake, 8,048 s of simulation, 11.0 s of censuses |
 | D | Canyon seed 1022 608 s, seed 2022 851 s |
 | Codex | review (a) one job; review (b) one job |
-| Session | Opus 5.5 `xhigh`; the cost line awaits `/usage` |
+| Session | Opus 5.5 `xhigh`, about 140 of the 150 turns; the cost line awaits `/usage` |
