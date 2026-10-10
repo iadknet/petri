@@ -1,0 +1,752 @@
+{
+ "world": "Confluence",
+ "seed": 33,
+ "horizon": 50000,
+ "checkpoints_scheduled": [
+  20000,
+  50000
+ ],
+ "checkpoints_reached": [
+  20000,
+  50000
+ ],
+ "footer": {
+  "census_secs": 10.955217625,
+  "elapsed_secs": 8086.714792708,
+  "extinct": false,
+  "kind": "footer",
+  "sim_secs": 8048.47498891498,
+  "threads": 8,
+  "ticks": 50000
+ },
+ "extinct": null,
+ "vote_delta_version": "vote-delta-v2",
+ "row_status": "completed",
+ "every_executed_target_channel_classed": true,
+ "predictions": {
+  "1": {
+   "checkpoint": 50000,
+   "classes_4_8": 10,
+   "unexposed_or_intermediate": 10,
+   "silent_local_decision": 0,
+   "outcome": "met",
+   "most_silent_local_decision": false
+  },
+  "2": [
+   {
+    "checkpoint": 20000,
+    "classes_9_11": 1,
+    "masked": 0,
+    "outcome": "met"
+   },
+   {
+    "checkpoint": 50000,
+    "classes_9_11": 41,
+    "masked": 7,
+    "outcome": "met"
+   }
+  ],
+  "3": [
+   {
+    "checkpoint": 20000,
+    "action_changing": 10,
+    "param_causal_one_field": 0,
+    "failing": [
+     {
+      "parent": 1,
+      "family": "AreaFoodSummary:1",
+      "channel": 0,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 3,
+      "family": "NeighborBarrierRing",
+      "channel": 2,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     },
+     {
+      "parent": 20,
+      "family": "AreaFoodSummary:1",
+      "channel": 0,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 37,
+      "family": "AreaFoodSummary:1",
+      "channel": 3,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 37,
+      "family": "AreaFoodSummary:1",
+      "channel": 5,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     },
+     {
+      "parent": 44,
+      "family": "AreaFoodSummary:1",
+      "channel": 3,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 44,
+      "family": "AreaFoodSummary:1",
+      "channel": 5,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     },
+     {
+      "parent": 45,
+      "family": "NeighborBarrierRing",
+      "channel": 0,
+      "class": "vote-causal",
+      "fields_differ": [
+       "ReproduceTransferFraction"
+      ]
+     },
+     {
+      "parent": 47,
+      "family": "AreaFoodSummary:1",
+      "channel": 3,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 47,
+      "family": "AreaFoodSummary:1",
+      "channel": 5,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     }
+    ],
+    "outcome": "failed"
+   },
+   {
+    "checkpoint": 50000,
+    "action_changing": 38,
+    "param_causal_one_field": 0,
+    "failing": [
+     {
+      "parent": 1,
+      "family": "AreaFoodSummary:1",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 2,
+      "family": "NeighborBarrierRing",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 3,
+      "family": "NeighborBarrierRing",
+      "channel": 4,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     },
+     {
+      "parent": 3,
+      "family": "AreaFoodSummary:0",
+      "channel": 2,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     },
+     {
+      "parent": 3,
+      "family": "AreaFoodSummary:1",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 5,
+      "family": "NeighborBarrierRing",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 5,
+      "family": "AreaFoodSummary:0",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     },
+     {
+      "parent": 5,
+      "family": "AreaFoodSummary:1",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     },
+     {
+      "parent": 7,
+      "family": "NeighborBarrierRing",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 7,
+      "family": "NeighborBarrierRing",
+      "channel": 5,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 7,
+      "family": "AreaFoodSummary:0",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 7,
+      "family": "AreaFoodSummary:0",
+      "channel": 3,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 10,
+      "family": "NeighborBarrierRing",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 10,
+      "family": "NeighborBarrierRing",
+      "channel": 5,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 10,
+      "family": "AreaFoodSummary:1",
+      "channel": 4,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 20,
+      "family": "AreaFoodSummary:0",
+      "channel": 6,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 21,
+      "family": "NeighborBarrierRing",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     },
+     {
+      "parent": 21,
+      "family": "AreaFoodSummary:1",
+      "channel": 0,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 21,
+      "family": "AreaFoodSummary:1",
+      "channel": 5,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 25,
+      "family": "AreaFoodSummary:0",
+      "channel": 3,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 26,
+      "family": "AreaFoodSummary:0",
+      "channel": 3,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 27,
+      "family": "NeighborBarrierRing",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 33,
+      "family": "NeighborBarrierRing",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 33,
+      "family": "AreaFoodSummary:0",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 33,
+      "family": "AreaFoodSummary:1",
+      "channel": 5,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 34,
+      "family": "AreaFoodSummary:0",
+      "channel": 6,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 34,
+      "family": "AreaFoodSummary:1",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 36,
+      "family": "AreaFoodSummary:1",
+      "channel": 0,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     },
+     {
+      "parent": 36,
+      "family": "AreaFoodSummary:1",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 36,
+      "family": "AreaFoodSummary:1",
+      "channel": 5,
+      "class": "vote-causal",
+      "fields_differ": [
+       "EatFoodType"
+      ]
+     },
+     {
+      "parent": 37,
+      "family": "NeighborBarrierRing",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 37,
+      "family": "AreaFoodSummary:0",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 44,
+      "family": "AreaFoodSummary:0",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 44,
+      "family": "AreaFoodSummary:1",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 45,
+      "family": "NeighborBarrierRing",
+      "channel": 2,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 45,
+      "family": "AreaFoodSummary:0",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 47,
+      "family": "NeighborBarrierRing",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 47,
+      "family": "NeighborBarrierRing",
+      "channel": 2,
+      "class": "vote-causal",
+      "fields_differ": []
+     }
+    ],
+    "outcome": "failed"
+   }
+  ]
+ },
+ "checkpoints": [
+  {
+   "tick": 20000,
+   "living": 6606,
+   "parents": 20,
+   "parents_with_executed_target_channels": 7,
+   "channels": 13,
+   "class_counts": {
+    "vote-causal": 10,
+    "param-causal": 0,
+    "action-unresolved": 0,
+    "unexposed": 0,
+    "vm-unresolved": 1,
+    "silent-local-decision": 0,
+    "silent-local-intermediate": 1,
+    "silent-mixed": 0,
+    "masked": 0,
+    "suppressing": 0,
+    "moving-residual": 1
+   },
+   "class_counts_by_family": {
+    "AreaFoodSummary:1": {
+     "vote-causal": 8,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 0
+    },
+    "NeighborBarrierRing": {
+     "vote-causal": 2,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 1,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 1,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 0
+    },
+    "AreaFoodSummary:0": {
+     "vote-causal": 0,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 1
+    }
+   },
+   "routing": {
+    "vote-causal": {
+     "channels": 10,
+     "routed_to": "the funnel's existing causal"
+    },
+    "param-causal": {
+     "channels": 0,
+     "routed_to": "T11.F27 action-parameter surface (a second causality route)"
+    },
+    "action-unresolved": {
+     "channels": 0,
+     "routed_to": "T22 instrument"
+    },
+    "unexposed": {
+     "channels": 0,
+     "routed_to": "T22 instrument (panel exposure per consumer); world exposure to T20"
+    },
+    "vm-unresolved": {
+     "channels": 1,
+     "routed_to": "T22 instrument (VM read-to-write attribution)"
+    },
+    "silent-local-decision": {
+     "channels": 0,
+     "routed_to": "T22 first (weight, saturation, unconsumed parameter), then T19/T11"
+    },
+    "silent-local-intermediate": {
+     "channels": 1,
+     "routed_to": "T22 first (cross-node path tracing), then T20"
+    },
+    "silent-mixed": {
+     "channels": 0,
+     "routed_to": "reported with the split"
+    },
+    "masked": {
+     "channels": 0,
+     "routed_to": "T19 (pass-end rule, incumbent) with per-pass shortfalls"
+    },
+    "suppressing": {
+     "channels": 0,
+     "routed_to": "reported: inert suppression of a non-winner"
+    },
+    "moving-residual": {
+     "channels": 1,
+     "routed_to": "reported, neutral"
+    }
+   },
+   "pooled_ratio_median": 0.66330359885063,
+   "pooled_ratio_passes": 3696,
+   "n3_labels_on_pooled": {
+    "label": "neither",
+    "channels_with_margined_passes": 11,
+    "family_ratio_median_of_medians": 1.0,
+    "subadditivity_median": 1.0,
+    "additive_residual_median": 0.0,
+    "families": 9,
+    "families_cancelling": 0,
+    "families_defined_subadditivity": 8
+   },
+   "consumers": {
+    "total": 19,
+    "graph": 14,
+    "vm": 5,
+    "executed": 15,
+    "exposed": 15,
+    "exposed_endpoint_classes": {
+     "decision": 10,
+     "intermediate": 4,
+     "none": 0,
+     "dynamic": 1
+    }
+   },
+   "consistency": {
+    "unexposed_with_effect": 0,
+    "selection_not_reconstructed_passes": 0
+   },
+   "silent_channels": 2,
+   "moving_channels": 1,
+   "action_changing_channels": 10,
+   "exposure_contexts": {
+    "c_candidates": 13,
+    "c_class_counts": {
+     "vote-causal": 10,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 1,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 1,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 1
+    },
+    "original_candidates_in_c_candidates": 13,
+    "original_consumers": {
+     "exposed": 15,
+     "executed_zero": 0,
+     "coverage_unresolved": 4
+    }
+   }
+  },
+  {
+   "tick": 50000,
+   "living": 12013,
+   "parents": 20,
+   "parents_with_executed_target_channels": 20,
+   "channels": 89,
+   "class_counts": {
+    "vote-causal": 38,
+    "param-causal": 0,
+    "action-unresolved": 0,
+    "unexposed": 1,
+    "vm-unresolved": 0,
+    "silent-local-decision": 0,
+    "silent-local-intermediate": 9,
+    "silent-mixed": 0,
+    "masked": 7,
+    "suppressing": 1,
+    "moving-residual": 33
+   },
+   "class_counts_by_family": {
+    "NeighborBarrierRing": {
+     "vote-causal": 14,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 1,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 6,
+     "silent-mixed": 0,
+     "masked": 7,
+     "suppressing": 1,
+     "moving-residual": 23
+    },
+    "AreaFoodSummary:1": {
+     "vote-causal": 12,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 1,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 3
+    },
+    "AreaFoodSummary:0": {
+     "vote-causal": 12,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 2,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 7
+    }
+   },
+   "routing": {
+    "vote-causal": {
+     "channels": 38,
+     "routed_to": "the funnel's existing causal"
+    },
+    "param-causal": {
+     "channels": 0,
+     "routed_to": "T11.F27 action-parameter surface (a second causality route)"
+    },
+    "action-unresolved": {
+     "channels": 0,
+     "routed_to": "T22 instrument"
+    },
+    "unexposed": {
+     "channels": 1,
+     "routed_to": "T22 instrument (panel exposure per consumer); world exposure to T20"
+    },
+    "vm-unresolved": {
+     "channels": 0,
+     "routed_to": "T22 instrument (VM read-to-write attribution)"
+    },
+    "silent-local-decision": {
+     "channels": 0,
+     "routed_to": "T22 first (weight, saturation, unconsumed parameter), then T19/T11"
+    },
+    "silent-local-intermediate": {
+     "channels": 9,
+     "routed_to": "T22 first (cross-node path tracing), then T20"
+    },
+    "silent-mixed": {
+     "channels": 0,
+     "routed_to": "reported with the split"
+    },
+    "masked": {
+     "channels": 7,
+     "routed_to": "T19 (pass-end rule, incumbent) with per-pass shortfalls"
+    },
+    "suppressing": {
+     "channels": 1,
+     "routed_to": "reported: inert suppression of a non-winner"
+    },
+    "moving-residual": {
+     "channels": 33,
+     "routed_to": "reported, neutral"
+    }
+   },
+   "pooled_ratio_median": 0.9439771919612276,
+   "pooled_ratio_passes": 11491,
+   "n3_labels_on_pooled": {
+    "label": "neither",
+    "channels_with_margined_passes": 77,
+    "family_ratio_median_of_medians": 1.071639249010649,
+    "subadditivity_median": 1.0,
+    "additive_residual_median": 0.0,
+    "families": 47,
+    "families_cancelling": 1,
+    "families_defined_subadditivity": 45
+   },
+   "consumers": {
+    "total": 108,
+    "graph": 105,
+    "vm": 3,
+    "executed": 106,
+    "exposed": 105,
+    "exposed_endpoint_classes": {
+     "decision": 86,
+     "intermediate": 12,
+     "none": 4,
+     "dynamic": 3
+    }
+   },
+   "consistency": {
+    "unexposed_with_effect": 0,
+    "selection_not_reconstructed_passes": 0
+   },
+   "silent_channels": 10,
+   "moving_channels": 41,
+   "action_changing_channels": 38,
+   "exposure_contexts": {
+    "c_candidates": 89,
+    "c_class_counts": {
+     "vote-causal": 43,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 9,
+     "silent-mixed": 0,
+     "masked": 4,
+     "suppressing": 0,
+     "moving-residual": 33
+    },
+    "original_candidates_in_c_candidates": 89,
+    "original_consumers": {
+     "exposed": 106,
+     "executed_zero": 0,
+     "coverage_unresolved": 2
+    }
+   }
+  }
+ ]
+}
