@@ -467,11 +467,11 @@ fn reward_modulated_node_genome(reward_source: OutcomeChannel) -> CreatureGenome
 /// [`reward_modulated_node_genome`], but with no vote wiring and no route
 /// targets of its own. With no route target, the mesh
 /// soft-default terminates the tick with `vec![WorldAction::NoOp]`, and
-/// Phase 2 charges `noop_cost` (0.05, `crates/v3-core/src/config/
+/// Phase 2 charges `noop_cost` (0.4, `crates/v3-core/src/config/
 /// simulation.rs:390`) — an order of magnitude larger than the VM/graph
 /// opcode costs it sits on top of (1e-6 to 1e-5 scale), so it dominates the
 /// tick's `EnergyDelta` and gives a clean, always-nonzero (negative) reward
-/// signal (about -0.05 per tick) independent of food placement.
+/// signal (about -0.4 per tick) independent of food placement.
 fn reward_modulated_node_genome_inert(reward_source: OutcomeChannel) -> CreatureGenome {
     reward_modulated_node_genome_impl(reward_source, false)
 }
@@ -1210,7 +1210,7 @@ fn e3_skipped_module_visits() {
     assert!(
         signal_1.abs() > 1e-3,
         "tick1 signal should be nonzero (the mesh soft-default NoOp's noop_cost, about \
-         -0.05) so the weight-moved-by-eta*signal*trace claim below is not vacuous; got \
+         -0.4) so the weight-moved-by-eta*signal*trace claim below is not vacuous; got \
          {signal_1}"
     );
 
@@ -1247,7 +1247,7 @@ fn e3_skipped_module_visits() {
         assert!(
             signal.abs() > 1e-3,
             "skipped tick {skipped_tick} signal should be nonzero (the soft-default \
-             NoOp's noop_cost, about -0.05) so the weight-still-moved claim below is not \
+             NoOp's noop_cost, about -0.4) so the weight-still-moved claim below is not \
              vacuous; got {signal}"
         );
 

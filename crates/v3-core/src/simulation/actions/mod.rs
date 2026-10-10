@@ -331,8 +331,8 @@ mod tests {
         );
 
         assert!(succeeded);
-        // T16.F02: the eat pays its 0.05 effort after the credit.
-        assert!((sim.creatures[id].energy - (before + 0.25 * 5.0 - 0.05)).abs() < 1e-5);
+        // Effort-cost defaults, 2026-10-10: the eat pays the 0.4 effort floor after the credit.
+        assert!((sim.creatures[id].energy - (before + 0.25 * 5.0 - 0.4)).abs() < 1e-5);
     }
 
     // ── apply_move ─────────────────────────────────────────────────────────────
@@ -1845,11 +1845,41 @@ mod tests {
             "old attacker should have higher net cost: young={cost_young}, old={cost_old}"
         );
     }
+    /// The oldest age at which T17.F01 invariant 5 is guaranteed. Effort-cost
+    /// defaults, user 2026-10-10: guaranteed before senescence; older founders
+    /// may waste attempts (fertility declines with age). The tightest profile
+    /// (V3Alpha1, gate 32, fraction 2/3) needs `32 - (1.0 + 0.1) * m >= 30`,
+    /// so `m <= 1.818`; with `m = 1 + 9 * ((age - 100) / 100)^2` that holds
+    /// through age 130 (`m = 1.81`) and fails at 131 (`m = 1.865`).
+    const FOUNDER_MARGIN_MAX_AGE: u64 = 130;
+
+    /// The boundary of [`FOUNDER_MARGIN_MAX_AGE`]: one tick past it, a
+    /// V3Alpha1 founder just above its gate is refused on energy.
+    #[test]
+    fn founder_past_the_margin_age_is_refused_at_its_gate() {
+        let profile = FounderProfile::V3Alpha1;
+        let policy = founder_reproduce_policy(profile);
+        let max_energy = SimulationConfig::default().energy.lifecycle.max_energy;
+        let energy = (policy.energy_threshold * max_energy).next_up();
+        let (mut sim, id) =
+            make_sim_one_founder(founder_genome(profile), Position::new(5, 5), energy);
+        sim.creatures[id].age = FOUNDER_MARGIN_MAX_AGE + 1;
+        let result = apply_reproduce(
+            id,
+            &mut sim,
+            Direction::N,
+            policy.transfer_fraction,
+            &mut rand::rngs::SmallRng::seed_from_u64(7),
+        );
+        assert_eq!(result, ReproductionActionResult::RejectedEnergyConstraints);
+    }
+
     proptest::proptest! {
         /// T17.F01 invariant 5: every founder profile, at any energy strictly
-        /// above its gate up to `max_energy` and any age at or above
-        /// `min_reproduce_age`, is accepted by `apply_reproduce` on default
-        /// economics when it emits its own transfer fraction.
+        /// above its gate up to `max_energy` and any age from
+        /// `min_reproduce_age` through [`FOUNDER_MARGIN_MAX_AGE`], is accepted
+        /// by `apply_reproduce` on default economics when it emits its own
+        /// transfer fraction.
         #[test]
         fn founder_profiles_are_accepted_at_every_energy_above_their_gate(
             profile in proptest::sample::select(vec![
@@ -1860,7 +1890,7 @@ mod tests {
                 FounderProfile::ForageFirstSparseBalanced,
             ]),
             unit in 0.0f32..=1.0,
-            age in 20u64..=10_000,
+            age in 20u64..=FOUNDER_MARGIN_MAX_AGE,
         ) {
             let policy = founder_reproduce_policy(profile);
             let max_energy = SimulationConfig::default().energy.lifecycle.max_energy;
@@ -1891,7 +1921,7 @@ mod tests {
                 for index in 0..2 { sim.world.set_food_type(pos, OrdinaryFoodTypeId::new(index), density); }
                 let applied = apply_typed_eat(&mut sim.creatures[id], &mut sim.world, &sim.config, OrdinaryFoodTypeId::new(selected), &mut sim.stats.energy_flows);
                 proptest::prop_assert!(applied);
-                proptest::prop_assert!((sim.creatures[id].energy - (10.0 + density * reward - 0.05)).abs() < 1e-5);
+                proptest::prop_assert!((sim.creatures[id].energy - (10.0 + density * reward - 0.4)).abs() < 1e-5);
                 proptest::prop_assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(selected)), 0.0);
                 proptest::prop_assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(1-selected)), density);
             }

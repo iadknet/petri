@@ -160,12 +160,12 @@ config still carrying the field fails to load until it is removed.
 | `energy.lifecycle.genome_carry_cost_per_unit` | `f32` | `1e-4` | Must be finite and `>= 0.0`; invalid values fall back to `1e-4`. A missing field defaults to `1e-4`. `0.0` is allowed and disables the charge. Energy charged per tick per unit of total genome size. |
 | `energy.lifecycle.genome_replication_cost_per_unit` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. A missing field defaults to `0.1`. `0.0` is allowed and disables the surcharge. Per-birth multiplier on the parent's reproduce charge per unit of total genome size above the founder's 97. |
 | `energy.lifecycle.gestation_ticks_per_founder_genome` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. A missing field defaults to `1.0`. `0.0` is allowed and delivers every birth at conception (the pre-feature engine). Gestation span per founder genome (T03.F12); see Gestation below. |
-| `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
+| `energy.costs.move_cost` | `f32` | `1.6` | Must be finite and `>= 0.0`; invalid values fall back to `1.6`. |
 | `energy.costs.eat_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. Effort base of every `Eat` attempt; see Action effort below. |
 | `energy.costs.eat_reward_per_food` | `f32` | `5.0` | Live shared reward per consumed density for ordinary food types whose `energy_per_unit` is absent/null. Must be finite and `>= 0.0`; invalid values fall back to `5.0`. |
-| `energy.costs.noop_cost` | `f32` | `0.05` | Must be finite and `> 0.0`; invalid values fall back to `0.05`. The floor of every action's effort. |
+| `energy.costs.noop_cost` | `f32` | `0.4` | Must be finite and `> 0.0`; invalid values fall back to `0.4`. The floor of every action's effort. |
 | `energy.costs.reproduce_cost` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. The replication cost, paid only on a conception (Genome replication cost below). |
-| `energy.costs.reproduce_attempt_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. A missing field defaults to `0.05`. Effort base of every `Reproduce` attempt, paid before any gate (T16.F02). |
+| `energy.costs.reproduce_attempt_cost` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. A missing field defaults to `1.0`. Effort base of every `Reproduce` attempt, paid before any gate (T16.F02). |
 | `energy.complexity_cost.enabled` | `bool` | `false` | When `true`, genome complexity scales action energy costs via a linear multiplier. |
 | `energy.complexity_cost.threshold` | `u32` | `50` | Complexity at or below this value incurs no extra cost (multiplier = 1.0). |
 | `energy.complexity_cost.scaling_factor` | `f32` | `0.002` | Must be finite and `>= 0.0`; invalid values fall back to `0.002`. Linear scaling: multiplier = `1.0 + max(0, complexity - threshold) * scaling_factor`. |

@@ -75,7 +75,8 @@ fn labels(shape: &Shape) -> Vec<&str> {
 
 #[test]
 fn the_founder_shape_reads_its_food_energy_and_age_inputs() {
-    let setup = setup(100, 100.0);
+    // Effort-cost defaults, 2026-10-10: start at 200 so the founder survives both scenes.
+    let setup = setup(100, 200.0);
     let genome = founder(&setup);
     let scenes = scenes(2);
     let run = observe(&setup, &genome, &scenes);

@@ -876,6 +876,9 @@ mod tests {
         const LIFETIME: u32 = 150;
         let mut setup = setup(LIFETIME, 200.0);
         setup.config.energy.costs.eat_cost = 0.7;
+        // Effort-cost defaults, 2026-10-10: a move base above the 0.4 floor that the
+        // actor survives for the lifetime (the 1.6 default kills it at 96).
+        setup.config.energy.costs.move_cost = 0.5;
         let size = setup.config.world.width;
         let start = centre(size);
         let mut world = WorldState::new(size, size, setup.config.world.edge_mode);
@@ -1157,7 +1160,8 @@ mod tests {
     /// random-walk step with its one draw every tick.
     #[test]
     fn unreachable_food_falls_back_to_the_random_walk() {
-        let setup = setup(60, 100.0);
+        // Effort-cost defaults, 2026-10-10: start at 200 so 60 moves at 1.6 stay affordable.
+        let setup = setup(60, 200.0);
         let size = setup.config.world.width;
         let start = centre(size);
         let food = Position::new(start.x + 10, start.y);

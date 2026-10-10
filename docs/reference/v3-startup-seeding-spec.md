@@ -216,8 +216,10 @@ wiring are shared by every profile. The energy threshold is the founder's own
 constant on the unit scale (it gates on fullness and is not recomputed from
 `max_energy`); at the default `max_energy` (200) each sits at least 2.0 above
 `min_reproduce_energy`, and every fraction clears the `initial_energy` litter
-floor at its own threshold after the age-1.0 reproduce cost, so a founder
-attempt at or above its gate is never refused on energy. A lifecycle where
+floor at its own threshold after the age-1.0 attempt effort and reproduce
+cost, so before senescence (through age 130 at default economics) a founder
+attempt above its gate is never refused on energy; older founders may waste
+attempts as the age multiplier grows. A lifecycle where
 `threshold * max_energy - 1.0 < min_reproduce_energy` pins the founder at its
 gate (`v3-runtime-config-spec.md` Section 4).
 

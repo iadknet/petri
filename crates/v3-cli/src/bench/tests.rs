@@ -105,10 +105,11 @@ fn small_sweep_config(seed: u64, horizon: u64) -> v3_core::config::SimulationCon
 fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // Arrange: a 32x32 world with 8 founders over 250 ticks, past the
     // founding crash near tick 150, so the horizon population is a
-    // recovered one whose readings differ from tick 100's. Seed 16 was
-    // measured to survive the horizon (T11.F29 moved it from 13, extinct at
-    // tick 246 once `AddFeedbackRoute` remapped the topology draws).
-    const SEED: u64 = 16;
+    // recovered one whose readings differ from tick 100's. Seed 22 was
+    // measured to survive the horizon: effort-cost defaults, 2026-10-10
+    // (floor 0.4, attempt 1.0, move 1.6) sent seed 16 extinct at tick 150,
+    // and only seeds 22 and 50 of 0..=60 survive (T11.F29 moved it from 13).
+    const SEED: u64 = 22;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -176,7 +177,9 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
 
 #[test]
 fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpoint() {
-    const SEED: u64 = 16;
+    // Effort-cost defaults, 2026-10-10: seed 16 goes extinct at tick 150;
+    // seed 22 survives the horizon.
+    const SEED: u64 = 22;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -284,7 +287,10 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
 #[test]
 fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // Evolved-trajectory pin: the lowest seed in 0..=25 that keeps at least
-    // 2 creatures over at least 2 cells at the horizon. Re-pinned by T16.F02
+    // 2 creatures over at least 2 cells at the horizon. Re-pinned by the
+    // effort-cost defaults, 2026-10-10 (floor 0.4, attempt 1.0, move 1.6),
+    // from seed 2 to 22: seed 2 goes extinct at tick 153; seed 22 keeps 6
+    // creatures over 6 cells (22 of seeds 0..=22 go extinct). Re-pinned by T16.F02
     // from seed 0 to 2: the effort prices move every trajectory, and seed 0
     // goes extinct at tick 240; seed 2 keeps 3 creatures over 3 cells (6 of
     // seeds 0..=25 go extinct and 10 end on one cell). Re-pinned by T11.F29
@@ -298,7 +304,7 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // cell). T24.F02 had moved it from seed 2 to 0, T24.F01 from 1 to 2,
     // T19.F04 from 3 to 1 (its vote founder sent seed 3 extinct), T11.F23
     // from 1 to 3, T16.F01 from 18 to 1, T11.F21 from 13 to 18.
-    const SEED: u64 = 2;
+    const SEED: u64 = 22;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

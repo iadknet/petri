@@ -22,7 +22,7 @@ describe("effort-priced action costs (T16.F02)", () => {
 		expect(fieldFor("energy.costs.reproduce_attempt_cost")).toMatchObject({
 			label: "Reproduce Attempt Cost",
 			min: 0,
-			defaultValue: 0.05,
+			defaultValue: 1.0,
 			testId: "config-field-energy-costs-reproduce-attempt-cost",
 		});
 	});
@@ -30,7 +30,11 @@ describe("effort-priced action costs (T16.F02)", () => {
 	it("keeps Noop Cost above zero", () => {
 		const noop = fieldFor("energy.costs.noop_cost");
 		expect(noop.min).toBeGreaterThan(0);
-		expect(noop.defaultValue).toBe(0.05);
+		expect(noop.defaultValue).toBe(0.4);
+	});
+
+	it("shows the move cost default", () => {
+		expect(fieldFor("energy.costs.move_cost").defaultValue).toBe(1.6);
 	});
 
 	it.each([

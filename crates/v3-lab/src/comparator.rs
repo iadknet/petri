@@ -148,10 +148,12 @@ mod tests {
         let scene = spec
             .draw(&mut rand::rngs::SmallRng::seed_from_u64(4))
             .unwrap();
-        let setup = Setup::new(arena_config(64), 100.0, 100)
+        // Effort-cost defaults, 2026-10-10: start 200 and lifetime 50 so the comparator
+        // lives the horizon (at 100 and 100 it died at tick 53).
+        let setup = Setup::new(arena_config(64), 200.0, 50)
             .with_scoring(Assay::BarrierNavigation.scoring());
         let (score, _) = evaluate_genome(&setup, &barrier_comparator(&founder), &scene);
-        assert_eq!(score.ticks, 100);
+        assert_eq!(score.ticks, 50);
         assert!(score.moves_attempted > 0);
     }
 }
