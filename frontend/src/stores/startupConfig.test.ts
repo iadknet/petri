@@ -101,12 +101,7 @@ describe("StartupConfigStore", () => {
 				},
 			},
 		]);
-		expect(preset.startup.ramps.failed_action_penalty).toEqual({
-			enabled: true,
-			start: 0.0,
-			end: 1.0,
-			target_tick: 62680,
-		});
+		expect(preset).not.toHaveProperty("startup");
 	});
 
 	it("serializes one primary food for restart", () => {
@@ -138,23 +133,9 @@ describe("StartupConfigStore", () => {
 		expect(after).toBe(Math.floor(0.123456 * 2 ** 32));
 	});
 
-	it("buildStartupRequest includes startup failed action penalty ramp settings", () => {
-		useStartupConfigStore
-			.getState()
-			.updatePreset("startup.ramps.failed_action_penalty.enabled", true);
-		useStartupConfigStore.getState().updatePreset("startup.ramps.failed_action_penalty.start", 5);
-		useStartupConfigStore.getState().updatePreset("startup.ramps.failed_action_penalty.end", 30);
-		useStartupConfigStore
-			.getState()
-			.updatePreset("startup.ramps.failed_action_penalty.target_tick", 1000);
-
+	it("buildStartupRequest sends no retired startup ramp section", () => {
 		const req = buildStartupRequest(useStartupConfigStore.getState().preset);
-		expect(req.startup?.ramps?.failed_action_penalty).toEqual({
-			enabled: true,
-			start: 5,
-			end: 30,
-			target_tick: 1000,
-		});
+		expect(req).not.toHaveProperty("startup");
 	});
 
 	it("hydrates fertility and annealing values from server config", () => {

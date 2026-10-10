@@ -38,9 +38,9 @@ fn gestating_sim(rate: f32) -> (Simulation, CreatureId) {
     config.energy.lifecycle.gestation_ticks_per_founder_genome = rate;
     config.energy.complexity_cost.enabled = false;
     config.energy.costs.reproduce_cost = 1.0;
+    // A zero effort floor isolates the replication charge (T16.F02).
     config.energy.costs.noop_cost = 0.0;
-    config.energy.costs.failed_action_penalty = 0.0;
-    config.startup.ramps.failed_action_penalty.enabled = false;
+    config.energy.costs.reproduce_attempt_cost = 0.0;
     config.energy.lifecycle.min_reproduce_age = 0;
     config.energy.lifecycle.min_reproduce_energy = 0.0;
     config.mutation.per_unit_rate = 0.0;

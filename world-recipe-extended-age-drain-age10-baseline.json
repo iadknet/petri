@@ -16,7 +16,6 @@
     "costs": {
       "eat_cost": 0.0,
       "eat_reward_per_food": 5.0,
-      "failed_action_penalty": 0.0,
       "move_cost": 0.10000000149011612,
       "noop_cost": 0.05000000074505806,
       "reproduce_cost": 1.0
@@ -80,16 +79,6 @@
   },
   "shared_memory": {
     "decay_rate": 0.0
-  },
-  "startup": {
-    "ramps": {
-      "failed_action_penalty": {
-        "enabled": false,
-        "end": 0.0,
-        "start": 0.0,
-        "target_tick": 62680
-      }
-    }
   },
   "world": {
     "edge_mode": "Wrap",

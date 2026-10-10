@@ -64,7 +64,6 @@ fn noop_counts_in_its_own_type_slot() {
 #[test]
 fn a_failed_eat_counts_the_attempt_but_no_applied_eat() {
     let (mut sim, id) = make_sim_with_one_creature(8.0);
-    sim.config.energy.costs.failed_action_penalty = 0.0;
     execute(
         &mut sim,
         id,
@@ -96,7 +95,6 @@ fn an_applied_eat_counts_under_the_food_type_it_named() {
 #[test]
 fn a_blocked_move_counts_in_the_move_slot() {
     let (mut sim, id) = make_sim_with_one_creature(8.0);
-    sim.config.energy.costs.failed_action_penalty = 0.0;
     let pos = sim.creatures[id].position;
     sim.world.set_barrier(Position::new(pos.x, pos.y - 1), true);
     execute(&mut sim, id, vec![WorldAction::Move(Direction::N)]);
@@ -107,7 +105,6 @@ fn a_blocked_move_counts_in_the_move_slot() {
 #[test]
 fn a_rejected_reproduce_counts_in_the_reproduce_slot() {
     let (mut sim, id) = make_sim_with_one_creature(8.0);
-    sim.config.energy.costs.failed_action_penalty = 0.0;
     sim.config.energy.lifecycle.min_reproduce_age = 1_000;
     execute(
         &mut sim,
@@ -123,7 +120,6 @@ fn a_rejected_reproduce_counts_in_the_reproduce_slot() {
 #[test]
 fn a_rejected_steal_counts_the_attempt_and_no_kill_or_hit() {
     let (mut sim, id) = make_sim_with_one_creature(8.0);
-    sim.config.energy.costs.failed_action_penalty = 0.0;
     execute(
         &mut sim,
         id,
@@ -140,7 +136,6 @@ fn a_rejected_steal_counts_the_attempt_and_no_kill_or_hit() {
 #[test]
 fn a_mixed_sequence_keeps_the_by_type_sum_equal_to_the_attempt_count() {
     let (mut sim, id) = make_sim_with_one_creature(100.0);
-    sim.config.energy.costs.failed_action_penalty = 0.0;
     sim.config.energy.lifecycle.min_reproduce_age = 1_000;
     let pos = sim.creatures[id].position;
     sim.world

@@ -124,7 +124,6 @@ pub(super) fn record_limit(active: &ActiveTrace, config: &SimulationConfig) -> O
 #[derive(Clone, Copy)]
 pub(super) struct FlowMarks {
     charge: f64,
-    penalty: f64,
     reward: f64,
 }
 
@@ -137,7 +136,6 @@ impl FlowMarks {
                 + charges.r#move
                 + charges.reproduce
                 + charges.steal_energy,
-            penalty: flows.failed_action_penalty,
             reward: flows.food_intake_by_type.iter().sum::<f64>()
                 + flows.predation_attacker_credit
                 + flows.predation_kill_bonus_credit,
@@ -150,7 +148,6 @@ impl FlowMarks {
         AppliedAction {
             entry,
             charge: now.charge - self.charge,
-            penalty: now.penalty - self.penalty,
             reward: now.reward - self.reward,
         }
     }

@@ -175,20 +175,24 @@ Constraints:
 
 ## 5. Energy Transfer Contract
 
-Reproduction action semantics:
-- After target validity succeeds, parent must satisfy minimum reproduction age
-  before any reproduce action cost is charged.
-- After age succeeds, the reproduce action cost is computed according to energy
-  config, and the minimum reproduction energy gate is evaluated on the parent's
-  energy minus that cost. Nothing is charged yet.
+Reproduction action semantics (T16.F02):
+- Every reproduce attempt first pays its effort,
+  `action_effort(energy.costs.reproduce_attempt_cost, complexity, age)`, never
+  below `NoOp`'s, before any gate (target, population cap, age, energy,
+  litter). Every later step reads the post-effort energy.
+- After target validity and age succeed, the replication cost is computed
+  according to energy config, and the minimum reproduction energy gate is
+  evaluated on the parent's post-effort energy minus that cost. Nothing more
+  is charged yet.
 - The child transfer is the action's `energy_transfer_fraction` (a value in
-  [0, 1] after decode) times the parent's energy minus the cost, clamped by
-  the configured offspring transfer cap; a litter under
+  [0, 1] after decode) times the parent's post-effort energy minus the cost,
+  clamped by the configured offspring transfer cap; a litter under
   `energy.lifecycle.initial_energy` is not conceived.
-- If parent cannot satisfy the energy gate or the litter floor,
-  reproduction fails, no child is spawned, and the parent pays nothing.
-- Only after both gates pass does the parent pay the reproduce action cost and
-  then the transfer.
+- A rejection on any branch spawns no child and the parent pays the attempt
+  effort and nothing more: never the replication cost or a transfer.
+- Only after both gates pass does the parent pay the replication cost and
+  then the transfer, so a conception pays effort, cost and transfer as three
+  successive subtractions.
 - Energy/lifecycle config values are continuous scalar units (`f32`) as defined
   in `v3-runtime-config-spec.md`.
 
@@ -203,6 +207,11 @@ runtime config contract: `v3-runtime-config-spec.md`.
 
 ```text
 [reproduce action emitted]
+  0. pay effort = action_effort(energy.costs.reproduce_attempt_cost,
+     complexity, age) from parent (sink ActionReproduce, flow
+     action_charges.reproduce; on a rejection also
+     failed_action_effort.reproduce); every later step reads the
+     post-effort energy
   1. resolve target with resolve_neighbor(parent_position, direction, edge_mode)
      -> unresolved : [reject RejectedInvalidTarget; return]
   2. check is_valid_spawn_cell(target, current_world_state)
@@ -214,8 +223,8 @@ runtime config contract: `v3-runtime-config-spec.md`.
   5. compute cost = energy.costs.reproduce_cost scaled by the complexity and
      age multipliers and by the genome replication cost factor
      (1 + energy.lifecycle.genome_replication_cost_per_unit
-        * max(genome_size() - 111, 0)), and after_cost = parent energy - cost;
-     nothing is deducted yet
+        * max(genome_size() - 97, 0)), and after_cost = post-effort parent
+     energy - cost; nothing more is deducted yet
   6. enforce energy.lifecycle.min_reproduce_energy gate on after_cost
      -> below threshold : [reject RejectedEnergyConstraints; return]
   7. compute transfer = min(energy_transfer_fraction * after_cost,
@@ -224,6 +233,7 @@ runtime config contract: `v3-runtime-config-spec.md`.
      -> reject if transfer <= 0.0
         or transfer < energy.lifecycle.initial_energy
      -> [reject RejectedEnergyConstraints; return]
+        (counted in reproduction_actions_rejected_litter_total too)
   8. pay cost from parent, then deduct transfer from parent, as two successive
      subtractions; the extra cost energy is burned, not transferred
      -> result Conceived; the parent stores one pending birth
@@ -277,20 +287,25 @@ Same-tick contention is handled by normal action ordering: if an earlier
 processed action has already changed occupancy, later reproduce actions observe
 that updated state and fail the same invalid-target gate.
 
+Every rejected attempt has already paid its step-0 effort and pays nothing
+more: no replication cost and no transfer.
+
 If target validation fails:
 - No `OffspringDraft` is created.
 - No mutation event is attempted for that failed reproduce action.
 
 If minimum-age validation fails:
 - Reproduce is rejected as `RejectedAgeConstraints`.
-- No reproduce action cost is charged for that attempt.
+- No replication cost is charged for that attempt.
 
-If the energy gate fails (step 6 on `energy - cost`, or step 7 on the
-litter floor):
+If the energy gate fails (step 6 on post-effort `energy - cost`, or step 7 on
+the litter floor):
 - Reproduce is rejected as `RejectedEnergyConstraints`.
-- No reproduce action cost and no transfer is charged for that attempt; the
-  parent's energy is unchanged and `energy_flows.action_charges.reproduce`
-  does not move.
+- No replication cost and no transfer is charged for that attempt; the
+  parent's energy is its post-effort energy, and
+  `energy_flows.action_charges.reproduce` and
+  `energy_flows.failed_action_effort.reproduce` each rise by the effort's
+  applied debit only.
 
 ### Gestation loss rule (T03.F12)
 

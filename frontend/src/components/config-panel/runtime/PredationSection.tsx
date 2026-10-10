@@ -1,4 +1,5 @@
 import type { FieldDef } from "../shared/types.ts";
+import { EFFORT_RULE } from "./EnergyCostsSection.tsx";
 
 export const PREDATION_FIELDS: FieldDef[] = [
 	{
@@ -9,7 +10,7 @@ export const PREDATION_FIELDS: FieldDef[] = [
 		step: 0.01,
 		testId: "config-field-predation-steal-cost-rate",
 		defaultValue: 0.05,
-		tooltip: "Fraction of attempted steal amount paid as attacker energy cost",
+		tooltip: `Fraction of the requested steal amount the attacker pays, before the target resolves. ${EFFORT_RULE}; a steal with no victim pays it and nothing more`,
 	},
 	{
 		path: "predation.kill_complexity_bonus_multiplier",

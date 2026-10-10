@@ -440,7 +440,6 @@ fn action_event(index: usize, applied: &AppliedAction, time: u64) -> Event {
     a.double("petri.energy_before", entry.energy_before);
     a.double("petri.energy_after", entry.energy_after);
     a.double("petri.charge", applied.charge);
-    a.double("petri.penalty", applied.penalty);
     a.double("petri.reward", applied.reward);
     event("action", time, a)
 }
@@ -516,7 +515,6 @@ fn outcome_attributes(a: &mut Attributes, outcome: &TickOutcome) {
         [i64::from(outcome.position.x), i64::from(outcome.position.y)],
     );
     a.int("petri.age", outcome.age);
-    a.double("petri.failed_action_penalty", outcome.failed_action_penalty);
     a.count("petri.actions_applied", outcome.applied.len());
     a.double("petri.damage_received", outcome.damage_received);
     a.int("petri.offspring_spawned", outcome.offspring_spawned);

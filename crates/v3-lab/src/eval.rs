@@ -8,8 +8,8 @@
 //! state is the previous snapshot. The action log is never read.
 //!
 //! Scripted instruments run on a lab stepper over the production appliers
-//! (`apply_typed_eat`, `apply_move`) plus `energy_decay_per_tick`; they pay
-//! no brain compute, carrying or penalty charge.
+//! (`apply_typed_eat`, `apply_move`, which charge the action effort) plus
+//! `energy_decay_per_tick`; they pay no brain compute or carrying charge.
 //!
 //! Every genome evaluation runs an expression-masked copy ([`expressed`]):
 //! lifetime learning is off, so improvement across generations is inherited
@@ -32,6 +32,11 @@ use crate::geodesic::{step_toward, Field, Terrain};
 use crate::scene::{nearest, Scene};
 
 const FOOD: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
+
+/// World tick every scene starts at. It was the retired failed-action
+/// penalty ramp's endpoint; T16.F02 keeps it as a lab constant so no other
+/// tick-dependent input moves.
+pub const SCENE_START_TICK: u64 = 62_680;
 
 /// The founder phenotype triple, read from one production-seeded founder
 /// (`seeding.rs` keeps the constants private).
@@ -71,8 +76,7 @@ pub struct Setup {
     pub config: SimulationConfig,
     pub start_energy: f32,
     pub lifetime: u32,
-    /// World tick each scene starts at: the failed-action penalty ramp's
-    /// endpoint, so the penalty is at its production value.
+    /// World tick each scene starts at, [`SCENE_START_TICK`].
     pub start_tick: u64,
     pub phenotype: Phenotype,
     pub scoring: Scoring,
@@ -119,13 +123,12 @@ impl Scoring {
 impl Setup {
     #[must_use]
     pub fn new(config: SimulationConfig, start_energy: f32, lifetime: u32) -> Self {
-        let start_tick = config.startup.ramps.failed_action_penalty.target_tick;
         let phenotype = Phenotype::founder(&config);
         Self {
             config,
             start_energy,
             lifetime,
-            start_tick,
+            start_tick: SCENE_START_TICK,
             phenotype,
             scoring: Scoring::BITES_AND_PROGRESS,
         }
@@ -160,8 +163,8 @@ impl Setup {
     }
 }
 
-/// Last living energy. A scripted instrument pays no compute, carrying or
-/// penalty charge, so its energy serializes as the label `"scripted"`.
+/// Last living energy. A scripted instrument pays no compute or carrying
+/// charge, so its energy serializes as the label `"scripted"`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EnergyEnd {
     Living(f32),
@@ -204,7 +207,6 @@ pub struct SceneScore {
     pub efficiency: f64,
     pub moves_attempted: u64,
     pub moves_blocked: u64,
-    pub penalty_charged: f64,
     /// Last living energy (`scripted` for instruments: no compute charges).
     pub energy_end: EnergyEnd,
     /// Scene-relative tick (1-based) of removal.
@@ -377,7 +379,6 @@ struct Counters {
     intake: f64,
     moves: u64,
     blocked: u64,
-    penalty: f64,
 }
 
 impl Counters {
@@ -387,7 +388,6 @@ impl Counters {
             intake: stats.energy_flows.food_intake_by_type.iter().sum(),
             moves: stats.move_actions_attempted_total,
             blocked: stats.move_actions_blocked_total_by_cause.values().sum(),
-            penalty: stats.energy_flows.failed_action_penalty,
         }
     }
 }
@@ -400,7 +400,6 @@ struct Tally {
     first: Option<u32>,
     moves: u64,
     blocked: u64,
-    penalty: f64,
 }
 
 impl Tally {
@@ -425,7 +424,6 @@ impl Tally {
             efficiency,
             moves_attempted: self.moves,
             moves_blocked: self.blocked,
-            penalty_charged: self.penalty,
             energy_end,
             death_tick: death,
             ticks,
@@ -521,7 +519,6 @@ fn evaluate_observed(
         tally.intake += now.intake - counters.intake;
         tally.moves += now.moves - counters.moves;
         tally.blocked += now.blocked - counters.blocked;
-        tally.penalty += now.penalty - counters.penalty;
         counters = now;
         if bites > 0 && tally.first.is_none() {
             tally.first = Some(tick);
@@ -999,7 +996,6 @@ mod tests {
             first,
             moves: end.moves - initial.moves,
             blocked: end.blocked - initial.blocked,
-            penalty: end.penalty - initial.penalty,
         }
         .finish(
             &progress,
@@ -1014,7 +1010,7 @@ mod tests {
     fn genome_tallies_match_the_runs_cumulative_counters() {
         let setup = setup(200, 100.0);
         let founder = founder(&setup);
-        let (mut bites, mut penalty, mut partial) = (0, 0.0, false);
+        let (mut bites, mut partial) = (0, false);
         for seed in 0..4 {
             let scene = scene(seed);
             let (score, _) = evaluate_genome(&setup, &founder, &scene);
@@ -1025,17 +1021,12 @@ mod tests {
             assert_eq!(score.ticks_to_first_food, expected.ticks_to_first_food);
             assert_eq!(score.moves_attempted, expected.moves_attempted);
             assert_eq!(score.moves_blocked, expected.moves_blocked);
-            assert!(close(score.penalty_charged, expected.penalty_charged));
             assert_eq!(score.progress, expected.progress, "seed {seed}");
             assert_eq!(score.death_tick, expected.death_tick);
             bites += score.food_eaten;
-            penalty += score.penalty_charged;
             partial |= score.progress > 0.0 && score.progress < 1.0;
         }
-        assert!(
-            bites > 1 && penalty > 0.0 && partial,
-            "{bites} {penalty} {partial}"
-        );
+        assert!(bites > 1 && partial, "{bites} {partial}");
     }
 
     /// Off the lab arena (a bounded 8² world) the founder walks into the

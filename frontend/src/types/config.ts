@@ -149,7 +149,7 @@ export interface CostsConfig {
 	eat_reward_per_food: number;
 	noop_cost: number;
 	reproduce_cost: number;
-	failed_action_penalty: number;
+	reproduce_attempt_cost: number;
 }
 
 export interface ComplexityEnergyCostConfig {
@@ -233,26 +233,10 @@ export interface SharedMemoryConfig {
 	decay_rate: number;
 }
 
-export interface FailedActionPenaltyRampConfig {
-	enabled: boolean;
-	start: number;
-	end: number;
-	target_tick: number;
-}
-
-export interface StartupRampsConfig {
-	failed_action_penalty: FailedActionPenaltyRampConfig;
-}
-
-export interface StartupConfig {
-	ramps: StartupRampsConfig;
-}
-
 export interface SimulationConfig {
 	population: PopulationConfig;
 	world: WorldConfig;
 	energy: EnergyConfig;
-	startup: StartupConfig;
 	runtime: RuntimeConfig;
 	mutation: MutationConfig;
 	predation: PredationConfig;

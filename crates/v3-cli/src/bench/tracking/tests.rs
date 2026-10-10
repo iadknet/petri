@@ -893,7 +893,6 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
             reproduce: 0.25,
             steal_energy: 4.5,
         },
-        failed_action_penalty: 6.0,
         vm_compute: 7.0,
         priority_bid: 8.0,
         graph_compute: 9.0,
@@ -915,7 +914,7 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     };
     let tracking = WorldTracking::observe(&sim).with_transferred_counters(&sim);
     let mortality = tracking.mortality.unwrap();
-    assert_eq!(mortality.definition, "applied-mortality-v1");
+    assert_eq!(mortality.definition, "applied-mortality-v2");
     assert_eq!(mortality.deaths_total, 1);
     let expected_keys = [
         "lifecycle_decay",
@@ -931,7 +930,6 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
         "action_move",
         "action_reproduce",
         "action_steal_energy",
-        "failed_action_penalty",
         "parental_transfer",
         "predation",
         "external_removal",
@@ -948,7 +946,7 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
             "food_intake_by_type": ["0.123457", "-2.000000", "0.000000"],
             "action_charges": {"noop": "1.000000", "eat": "2.000000", "move": "3.000000", "reproduce": "4.000000", "steal_energy": "5.000000"},
             "failed_action_effort": {"move": "2.500000", "eat": "1.500000", "reproduce": "0.250000", "steal_energy": "4.500000"},
-            "failed_action_penalty": "6.000000", "vm_compute": "7.000000", "priority_bid": "8.000000",
+            "vm_compute": "7.000000", "priority_bid": "8.000000",
             "graph_compute": "9.000000", "mesh_ramp": "9.500000", "hebbian_learning": "10.000000", "reward_learning": "11.000000",
             "lifecycle_decay": "12.000000", "genome_carrying": "13.000000", "genome_size_creature_ticks": 14,
             "parental_transfer_debit": "15.000000", "offspring_energy_credit": "16.000000",
@@ -1696,4 +1694,32 @@ fn a_census_without_decision_rows_still_loads() {
     let loaded: SensorCensus = serde_json::from_value(value).expect("loads");
     assert!(loaded.decision_inputs.is_empty());
     assert_eq!(loaded.world_inputs, census_for(4).world_inputs);
+}
+
+/// T16.F02 retired the `failed_action_penalty` flow and mortality cause;
+/// a summary stored before it (T11.F29's, which carries both) still parses
+/// through the bench types, and its absent `failed_action_effort` reads as
+/// absent, never zero.
+#[test]
+fn stored_reports_with_retired_penalty_keys_still_parse() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../docs/progress/features/t11-f29-feedback-route-formation-goal.json"
+    );
+    let stored: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let cases = stored["deterministic"]["goal_indicators"]["cases"]
+        .as_array()
+        .unwrap();
+    assert!(!cases.is_empty());
+    for case in cases {
+        assert!(case["energy_flows"]["failed_action_penalty"].is_string());
+        assert!(case["mortality"]["by_cause"]["failed_action_penalty"].is_u64());
+        let flows: EnergyFlowTracking =
+            serde_json::from_value(case["energy_flows"].clone()).unwrap();
+        assert_eq!(flows.failed_action_effort, None);
+        let mortality: MortalityTracking =
+            serde_json::from_value(case["mortality"].clone()).unwrap();
+        assert!(mortality.by_cause.contains_key("failed_action_penalty"));
+    }
 }

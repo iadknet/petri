@@ -1,6 +1,5 @@
 import type {
 	CostsConfig,
-	FailedActionPenaltyRampConfig,
 	LifecycleEnergyConfig,
 	MutationConfig,
 	PhenotypeConfig,
@@ -66,11 +65,6 @@ export interface StartupRequest {
 	};
 	mutation?: Partial<Omit<MutationConfig, "phenotype">> & {
 		phenotype?: Partial<PhenotypeConfig>;
-	};
-	startup?: {
-		ramps?: {
-			failed_action_penalty?: Partial<FailedActionPenaltyRampConfig>;
-		};
 	};
 }
 

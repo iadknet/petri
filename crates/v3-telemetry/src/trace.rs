@@ -221,9 +221,8 @@ fn tick_attributes(
     }
 }
 
-/// The config values governing phase `index`, and the penalty in force for
-/// the tick that ran as `sim.tick` = `ran`.
-fn phase_attributes(a: &mut Attributes, index: usize, config: &SimulationConfig, ran: u64) {
+/// The config values governing phase `index`.
+fn phase_attributes(a: &mut Attributes, index: usize, config: &SimulationConfig) {
     a.text("petri.phase", PHASES[index]);
     match index {
         0 => food_growth(a, config),
@@ -241,13 +240,7 @@ fn phase_attributes(a: &mut Attributes, index: usize, config: &SimulationConfig,
             }
         }
         3 => cognition(a, config),
-        4 => {
-            a.double(
-                "petri.failed_action_penalty",
-                config.failed_action_penalty_for_tick(ran),
-            );
-            actions(a, config);
-        }
+        4 => actions(a, config),
         _ => a.double(
             config_key("runtime.reward_learning_cost"),
             config.runtime.reward_learning_cost,
@@ -360,6 +353,7 @@ pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
         ("eat_reward_per_food", costs.eat_reward_per_food),
         ("noop_cost", costs.noop_cost),
         ("reproduce_cost", costs.reproduce_cost),
+        ("reproduce_attempt_cost", costs.reproduce_attempt_cost),
     ] {
         a.double(config_key(&format!("energy.costs.{field}")), value);
     }
@@ -481,10 +475,9 @@ pub(crate) fn encode(
         Vec::new(),
         attributes,
     )];
-    let ran = seam.tick.saturating_sub(1);
     for (index, phase) in seam.phases.iter().enumerate() {
         let mut attributes = identity(run, seam.tick, capture.sample);
-        phase_attributes(&mut attributes, index, capture.config, ran);
+        phase_attributes(&mut attributes, index, capture.config);
         spans.push(span(
             index as u64 + 2,
             PHASES[index],

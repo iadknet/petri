@@ -63,7 +63,9 @@ fn tiny(out: &Path) -> RunParams {
         assay: Assay::FoodSeeking,
         arena: None,
         layout: None,
-        seed: 7,
+        // 8 since T16.F02: at seed 7 the effort prices leave the tiny
+        // grid uncalibrated (seeds 7-14: 8, 9 and 14 calibrate).
+        seed: 8,
         replicates: 1,
         generations: 2,
         population: 2,
@@ -214,7 +216,7 @@ fn same_seed_rows_are_byte_identical_across_threads_and_processes() {
     // arms carry no readings.
     for line in rows.lines() {
         let row: serde_json::Value = serde_json::from_str(line).unwrap();
-        assert_eq!(row["row_version"], 3);
+        assert_eq!(row["row_version"], 4);
         let evolving = ["native", "mutation-off", "shuffled-score", "hot"]
             .contains(&row["arm"].as_str().unwrap());
         assert_eq!(row["ladder"].is_object(), evolving, "{}", row["arm"]);
@@ -1040,7 +1042,7 @@ fn tiny_argv(subcommand: &str, out: &Path) -> Vec<String> {
     let mut argv: Vec<String> = [
         subcommand,
         "--seed",
-        "7",
+        "8",
         "--replicates",
         "1",
         "--generations",
@@ -1096,7 +1098,7 @@ fn execute_returns_the_measurement_of_the_written_summary() {
         let summary = read_summary(&out.join(SUMMARY)).unwrap();
         assert_eq!(measurement.command, subcommand);
         assert_eq!(measurement.assay, "food-seeking");
-        assert_eq!(measurement.seed, 7);
+        assert_eq!(measurement.seed, 8);
         assert_eq!(
             measurement.summary_path,
             out.join(SUMMARY).canonicalize().unwrap()
@@ -1181,7 +1183,7 @@ fn the_lab_command_records_one_measurement_after_its_run() {
     assert_eq!(started.resource["service.name"], "v3-lab");
     assert_eq!(started.attribute("petri.command"), Some("run"));
     assert_eq!(started.attribute("petri.assay"), Some("food-seeking"));
-    assert_eq!(started.attribute("petri.seed"), Some("7"));
+    assert_eq!(started.attribute("petri.seed"), Some("8"));
     assert_eq!(started.attribute("petri.threads"), Some("1"));
     let code = on.status.code().unwrap().to_string();
     assert_eq!(ended.attribute("petri.exit_code"), Some(code.as_str()));

@@ -496,10 +496,6 @@ fn energy(f: &mut Families, s: &SimStats) {
     let charges = &flows.action_charges;
     let failed = &flows.failed_action_effort;
     let mut flow_points: Vec<(String, f64)> = vec![
-        (
-            "failed_action_penalty".to_owned(),
-            flows.failed_action_penalty,
-        ),
         ("vm_compute".to_owned(), flows.vm_compute),
         ("priority_bid".to_owned(), flows.priority_bid),
         ("graph_compute".to_owned(), flows.graph_compute),

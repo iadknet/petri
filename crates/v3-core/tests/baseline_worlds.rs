@@ -111,10 +111,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// Re-pinned by T11.F29 after two agreeing runs: the `AddFeedbackRoute`
 /// entry remaps every topology draw (default 5289048635937395426 ->
 /// 860634653294650084, rate 0.0 9818715947896128091 -> 7790766295895291063).
+/// Re-pinned by T16.F02 after two agreeing runs: every Eat pays the 0.05
+/// effort, a reproduce attempt pays its effort before the gates, and the
+/// failed-action penalty is gone (default 860634653294650084 ->
+/// 11682689850618140524, rate 0.0 7790766295895291063 ->
+/// 17199981815595828116).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 860634653294650084);
-    assert_eq!(short_run_identity(Some(0.0)), 7790766295895291063);
+    assert_eq!(short_run_identity(None), 11682689850618140524);
+    assert_eq!(short_run_identity(Some(0.0)), 17199981815595828116);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

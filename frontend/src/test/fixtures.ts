@@ -64,11 +64,11 @@ export const MOCK_CONFIG: SimulationConfig = {
 		},
 		costs: {
 			move_cost: 0.02,
-			eat_cost: 0,
+			eat_cost: 0.05,
 			eat_reward_per_food: 5,
-			noop_cost: 0,
+			noop_cost: 0.05,
 			reproduce_cost: 0.12,
-			failed_action_penalty: 5,
+			reproduce_attempt_cost: 0.05,
 		},
 		complexity_cost: {
 			enabled: true,
@@ -123,15 +123,5 @@ export const MOCK_CONFIG: SimulationConfig = {
 	},
 	shared_memory: {
 		decay_rate: 0.0,
-	},
-	startup: {
-		ramps: {
-			failed_action_penalty: {
-				enabled: false,
-				start: 5,
-				end: 5,
-				target_tick: 1000,
-			},
-		},
 	},
 };

@@ -267,7 +267,7 @@ pub fn render_preview(sim: &Simulation) -> Vec<u8> {
 /// config, exactly as the goal profile resolves a baseline world's recipe.
 ///
 /// [`v3_core::config::resolve_config`] is the whole chain: deep-merge over the
-/// defaults, `normalize`, then `apply_startup_overrides`. The goal profile then
+/// defaults, then `normalize`. The goal profile then
 /// forces its own world size and founder count onto the result; the checked-in
 /// baseline recipes set neither, so what this returns is the map that profile
 /// runs. A recipe that did set them would be inspected as written.

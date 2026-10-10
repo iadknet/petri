@@ -724,7 +724,6 @@ fn scene(progress: f64) -> SceneScore {
         efficiency: 0.0,
         moves_attempted: 0,
         moves_blocked: 0,
-        penalty_charged: 0.0,
         energy_end: crate::eval::EnergyEnd::Living(0.0),
         death_tick: None,
         ticks: 0,

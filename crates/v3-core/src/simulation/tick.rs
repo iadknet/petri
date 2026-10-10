@@ -6,7 +6,7 @@ use rand::seq::SliceRandom;
 use rand::{RngCore, SeedableRng};
 use rayon::prelude::*;
 
-use crate::config::{EnergyConfig, OrdinaryFoodTypeId};
+use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{CreatureId, Direction, Position, WorldAction};
 use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType, NO_DIRECTION};
 use crate::creature::genome::{BackendDef, OUTCOME_CHANNEL_COUNT};
@@ -498,8 +498,6 @@ fn run_cognition(
     let runtime_config = sim.config.runtime.clone();
     let tick_number = sim.tick;
     #[cfg(feature = "telemetry-seams")]
-    let failed_action_penalty = sim.config.failed_action_penalty_for_tick(sim.tick);
-    #[cfg(feature = "telemetry-seams")]
     let limit = trace
         .as_ref()
         .and_then(|active| record_limit(active, &sim.config));
@@ -594,7 +592,6 @@ fn run_cognition(
                         typed_area_food: ss.perception.typed_area_food.clone(),
                         uses_typed_local_food: genome_uses_typed_local_food(&creature.genome),
                         uses_extended_perception: genome_uses_extended_perception(&creature.genome),
-                        failed_action_penalty,
                         applied: Vec::with_capacity(runtime_config.max_actions_per_turn),
                         damage_received: 0.0,
                         offspring_spawned: 0,
@@ -791,7 +788,6 @@ struct ActionContext {
     priority_bid: f32,
     /// Creature energy captured before this action was applied.
     energy_before: f32,
-    failed_action_penalty: f32,
 }
 
 /// Append one entry to a creature's action log, reading energy after the action.
@@ -820,17 +816,6 @@ fn push_action_log(
         log.push(entry);
     }
     entry
-}
-
-/// Charge the complexity- and age-adjusted penalty for a failed action.
-fn debit_failed_action(creature: &mut CreatureState, energy: &EnergyConfig, penalty: f32) -> f64 {
-    let before = creature.energy;
-    creature.energy -=
-        energy.adjusted_action_cost(penalty, creature.cached_complexity, creature.age);
-    creature.observe_energy(
-        before,
-        super::energy_accounting::DeathCause::FailedActionPenalty,
-    )
 }
 
 /// Barrier-awareness telemetry captured before a move or reproduce attempt.
@@ -865,7 +850,7 @@ impl BarrierContext {
     }
 }
 
-/// NoOp cannot fail; no `failed_action_penalty` is possible.
+/// NoOp cannot fail; its effort is the floor every action's effort is held to.
 fn execute_noop(
     sim: &mut Simulation,
     ctx: &ActionContext,
@@ -921,8 +906,6 @@ fn execute_eat(
                 .eat_actions_failed_total_by_type
                 .entry(type_idx)
                 .or_insert(0) += 1;
-            sim.stats.energy_flows.failed_action_penalty +=
-                debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
         }
     }
     push_action_log(
@@ -969,8 +952,6 @@ fn execute_move(
             creature.lifetime_blocked_move_count += 1;
             blocked_cause = Some(classify_move_blocked_cause(&sim.world, from, dir));
             action_result = ActionResult::Blocked;
-            sim.stats.energy_flows.failed_action_penalty +=
-                debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
         }
     }
     if let Some(cause) = blocked_cause {
@@ -1081,12 +1062,6 @@ fn execute_reproduce(
         ReproductionActionResult::RejectedEnergyConstraints => ActionResult::EnergyConstraints,
         ReproductionActionResult::RejectedPopulationCap => ActionResult::PopulationCap,
     };
-    if !succeeded {
-        if let Some(creature) = sim.creatures.get_mut(ctx.id) {
-            sim.stats.energy_flows.failed_action_penalty +=
-                debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
-        }
-    }
     push_action_log(
         sim,
         ctx,
@@ -1131,13 +1106,7 @@ fn execute_steal_energy(
     let action_result = match result {
         PredationActionResult::Transferred => ActionResult::Success,
         PredationActionResult::TransferredAndKilled => ActionResult::TransferredAndKilled,
-        PredationActionResult::RejectedNoVictim => {
-            if let Some(creature) = sim.creatures.get_mut(ctx.id) {
-                sim.stats.energy_flows.failed_action_penalty +=
-                    debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
-            }
-            ActionResult::NoVictim
-        }
+        PredationActionResult::RejectedNoVictim => ActionResult::NoVictim,
     };
     push_action_log(
         sim,
@@ -1161,7 +1130,6 @@ fn run_phase_2(
 ) -> TickComputeStats {
     let mut compute = TickComputeStats::default();
     let mut successful_spawn_targets: HashSet<Position> = HashSet::new();
-    let failed_action_penalty = sim.config.failed_action_penalty_for_tick(sim.tick);
 
     for (id, output) in decisions {
         compute.record(&output);
@@ -1207,7 +1175,6 @@ fn run_phase_2(
                 tick: current_tick,
                 priority_bid,
                 energy_before,
-                failed_action_penalty,
             };
 
             #[cfg(feature = "telemetry-seams")]
@@ -1252,7 +1219,7 @@ fn run_phase_2(
                 break;
             }
             // A conception ends the queue: the rest is discarded with no
-            // penalty and no log entry (T03.F12). Held creatures never reach
+            // charge and no log entry (T03.F12). Held creatures never reach
             // this loop, so a pending birth here was conceived just now.
             if sim.creatures[id].pending_birth.is_some() {
                 break;

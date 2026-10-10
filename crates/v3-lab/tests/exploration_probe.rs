@@ -358,7 +358,7 @@ fn child_of(setup: &Setup, parent: &CreatureGenome, frozen: &Frozen, seed: u64) 
 /// Parent: E1's `native-1` elite (`PETRI_E4_ELITES`). Up to 32 genome-changed,
 /// bank-silent children (zero delta on every bank scene) each get 16
 /// grandchildren; the matched control is as many further direct children.
-/// Also prints founder and plateau bank totals of food, moves and penalty.
+/// Also prints founder and plateau bank totals of food and moves.
 #[test]
 #[ignore = "exploration probe; minutes in release"]
 fn e7_two_step_and_sterility() {
@@ -383,7 +383,6 @@ fn e7_two_step_and_sterility() {
             "score": s.iter().map(|x| x.score).sum::<f64>() / 32.0,
             "food_eaten": s.iter().map(|x| x.food_eaten).sum::<u32>(),
             "moves_attempted": s.iter().map(|x| x.moves_attempted).sum::<u64>(),
-            "penalty_charged": s.iter().map(|x| x.penalty_charged).sum::<f64>(),
             "deaths": s.iter().filter(|x| x.death_tick.is_some()).count()})
         );
     }
@@ -506,7 +505,7 @@ fn restored(plateau: &CreatureGenome) -> CreatureGenome {
     repointed(&g, &[(1, 1)])
 }
 
-/// Bank totals for one genome: mean score, food, moves, penalty, deaths.
+/// Bank totals for one genome: mean score, food, moves, deaths.
 fn bank_row(
     setup: &Setup,
     name: &str,
@@ -521,7 +520,6 @@ fn bank_row(
         "score": s.iter().map(|x| x.score).sum::<f64>() / s.len() as f64,
         "food_eaten": s.iter().map(|x| x.food_eaten).sum::<u32>(),
         "moves_attempted": s.iter().map(|x| x.moves_attempted).sum::<u64>(),
-        "penalty_charged": s.iter().map(|x| x.penalty_charged).sum::<f64>(),
         "deaths": s.iter().filter(|x| x.death_tick.is_some()).count(),
         "scores": s.iter().map(|x| x.score).collect::<Vec<_>>()})
 }
@@ -609,7 +607,8 @@ enum Rule {
     Base,
     /// R1: start energy 20 (production `initial_energy`), nothing else.
     Start20,
-    /// R2: refused-reproduce penalty refunded, reproduce-attempt ticks paused.
+    /// R2: refused-reproduce charge refunded (the retired penalty before
+    /// T16.F02, the attempt effort since), reproduce-attempt ticks paused.
     RefundPause,
     /// R3: reproduction accepted, offspring removed at birth, ticks paused.
     AcceptPause,
@@ -618,16 +617,16 @@ enum Rule {
     /// R5: start 20, energy reset to 20 after every tick.
     Held20,
     /// R6 (plan designs 2 + 3 within the fixed lifetime): refused-reproduce
-    /// penalty refunded, score graded per foraging opportunity (scaled by
+    /// charge refunded as R2, score graded per foraging opportunity (scaled by
     /// lifetime over the ticks without a reproduce attempt).
     RateRefund,
     /// R7 (plan designs 1 + 2 within the fixed lifetime): reproduction
     /// accepted, offspring removed at birth, score graded per foraging
     /// opportunity as R6.
     RateAccept,
-    /// R6b (P2e): R6 with every failed-action penalty zero in the config, so
-    /// a reproduce attempt is never charged (exact for genomes whose only
-    /// failed actions are reproduce attempts).
+    /// R6b (P2e): R6 with every failed-action penalty zero in the config.
+    /// T16.F02 retired the penalty: R6b now pays each refused attempt's
+    /// effort, which R6 refunds.
     RateZero,
     /// R6c (P2e): R6b with only food scaled per opportunity (progress kept).
     RateZeroFood,
@@ -698,10 +697,6 @@ fn eval_rule(
             .lifecycle
             .min_reproduce_energy;
     }
-    if matches!(rule, Rule::RateZero | Rule::RateZeroFood) {
-        config.energy.costs.failed_action_penalty = 0.0;
-        config.startup.ramps.failed_action_penalty.end = 0.0;
-    }
     let size = config.world.width;
     let mut world = WorldState::new(size, size, config.world.edge_mode);
     for &cell in &scene.barriers {
@@ -739,7 +734,7 @@ fn eval_rule(
                 .move_actions_blocked_total_by_cause
                 .values()
                 .sum::<u64>(),
-            sim.stats.energy_flows.failed_action_penalty,
+            sim.stats.energy_flows.failed_action_effort.reproduce,
         )
     };
     let mut progress = Progress::new(
@@ -768,7 +763,7 @@ fn eval_rule(
         food += bites;
         moves += now.1 - before.1;
         blocked += now.2 - before.2;
-        let penalty = now.3 - before.3;
+        let refused_effort = now.3 - before.3;
         before = now;
         if rule.accepts() {
             let others: Vec<CreatureId> = sim.creatures.keys().filter(|k| *k != id).collect();
@@ -794,7 +789,7 @@ fn eval_rule(
             creature.lifetime_actions_attempted_by_type[ActionType::Reproduce as usize] > attempts;
         if rule.refunds() && attempted {
             #[allow(clippy::cast_possible_truncation)]
-            let refund = penalty as f32;
+            let refund = refused_effort as f32;
             creature.energy =
                 (creature.energy + refund).min(sim.config.energy.lifecycle.max_energy);
         }

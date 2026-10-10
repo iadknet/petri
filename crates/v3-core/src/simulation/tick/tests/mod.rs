@@ -1,6 +1,7 @@
 mod actions;
 mod clade_profile;
 mod dispatch_record;
+mod effort;
 mod energy_accounting;
 mod full_sensor_inputs;
 mod gestation;

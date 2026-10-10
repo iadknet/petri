@@ -7,8 +7,8 @@ use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::simulation::actions::{
-    apply_move, apply_reproduce, apply_steal_energy, apply_typed_eat, BarrierReaderState,
-    MoveBlockedCause, ReproductionActionResult, ReproductionInvalidTargetCause,
+    apply_reproduce, apply_steal_energy, BarrierReaderState, MoveBlockedCause,
+    ReproductionActionResult, ReproductionInvalidTargetCause,
 };
 use crate::simulation::seeding::seed_simulation;
 use rand::SeedableRng;
@@ -82,15 +82,11 @@ fn queued_actions_stop_once_action_exhausts_creature_energy() {
     ]);
     let (mut sim, id) = make_sim_with_custom_genome(1.0, genome);
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
-    sim.config.startup.ramps.failed_action_penalty.enabled = false;
+    sim.config.energy.costs.eat_cost = 1.0;
 
     let creature = &sim.creatures[id];
-    let fatal_eat_cost = sim.config.energy.adjusted_action_cost(
+    let fatal_eat_cost = sim.config.energy.action_effort(
         sim.config.energy.costs.eat_cost,
-        creature.cached_complexity,
-        creature.age,
-    ) + sim.config.energy.adjusted_action_cost(
-        sim.config.energy.costs.failed_action_penalty,
         creature.cached_complexity,
         creature.age,
     );
@@ -197,189 +193,6 @@ fn tick_action_log_records_applied_food_type_amount_and_result() {
     );
     assert!((entry.amount - 0.35).abs() < 1e-6);
     assert_eq!(entry.result, ActionResult::Success);
-}
-
-#[test]
-fn failed_move_deducts_penalty_in_tick() {
-    let (mut sim, id) = make_sim_with_one_creature(100.0);
-    sim.config.energy.costs.failed_action_penalty = 7.5;
-    sim.world.set_barrier(Position::new(5, 4), true);
-
-    let energy_before = sim.creatures[id].energy;
-    let complexity = sim.creatures[id].cached_complexity;
-    let age = sim.creatures[id].age;
-    let adjusted_move_cost =
-        sim.config
-            .energy
-            .adjusted_action_cost(sim.config.energy.costs.move_cost, complexity, age);
-    let adjusted_penalty = sim.config.energy.adjusted_action_cost(
-        sim.config.energy.costs.failed_action_penalty,
-        complexity,
-        age,
-    );
-
-    let creature = sim.creatures.get_mut(id).unwrap();
-    let succeeded = apply_move(
-        id,
-        creature,
-        &mut sim.world,
-        Direction::N,
-        &sim.config,
-        &mut sim.stats.energy_flows,
-    );
-    assert!(!succeeded, "move into barrier should fail");
-    if !succeeded {
-        sim.creatures.get_mut(id).unwrap().energy -= adjusted_penalty;
-    }
-
-    let expected = energy_before - adjusted_move_cost - adjusted_penalty;
-    assert!(
-        (sim.creatures[id].energy - expected).abs() < 1e-4,
-        "energy {} should be {} (start {} - move {} - penalty {})",
-        sim.creatures[id].energy,
-        expected,
-        energy_before,
-        adjusted_move_cost,
-        adjusted_penalty
-    );
-
-    let energy_before_eat = sim.creatures[id].energy;
-    let adjusted_eat_cost =
-        sim.config
-            .energy
-            .adjusted_action_cost(sim.config.energy.costs.eat_cost, complexity, age);
-    let creature = sim.creatures.get_mut(id).unwrap();
-    let eat_succeeded = apply_typed_eat(
-        creature,
-        &mut sim.world,
-        &sim.config,
-        crate::config::OrdinaryFoodTypeId::default(),
-        &mut sim.stats.energy_flows,
-    );
-    assert!(!eat_succeeded, "eat on empty cell should fail");
-    if !eat_succeeded {
-        sim.creatures.get_mut(id).unwrap().energy -= adjusted_penalty;
-    }
-    let expected_eat = energy_before_eat - adjusted_eat_cost - adjusted_penalty;
-    assert!(
-        (sim.creatures[id].energy - expected_eat).abs() < 1e-4,
-        "energy {} should be {} after failed eat",
-        sim.creatures[id].energy,
-        expected_eat
-    );
-}
-
-#[test]
-fn failed_action_penalty_zero_preserves_old_behavior() {
-    let (mut sim, id) = make_sim_with_one_creature(100.0);
-    sim.config.energy.costs.failed_action_penalty = 0.0;
-    let energy_after_decay = 100.0 - sim.config.energy.lifecycle.energy_decay_per_tick;
-    run_tick(&mut sim, &mut None);
-    if sim.creatures.contains_key(id) {
-        let energy = sim.creatures[id].energy;
-        assert!(energy > 0.0, "creature should survive with zero penalty");
-        assert!(
-            energy >= energy_after_decay - 50.0,
-            "energy {} should not drop excessively with zero penalty",
-            energy
-        );
-    }
-}
-
-#[test]
-fn failed_action_penalty_increases_with_age() {
-    let (mut sim_young, id_young) = make_sim_with_one_creature(100.0);
-    sim_young.world.set_barrier(Position::new(5, 4), true);
-    let adjusted_penalty_young = sim_young.config.energy.adjusted_action_cost(
-        sim_young.config.energy.costs.failed_action_penalty,
-        sim_young.creatures[id_young].cached_complexity,
-        0,
-    );
-    let energy_before_young = sim_young.creatures[id_young].energy;
-    {
-        let creature = sim_young.creatures.get_mut(id_young).unwrap();
-        let _ = apply_move(
-            id_young,
-            creature,
-            &mut sim_young.world,
-            Direction::N,
-            &sim_young.config,
-            &mut sim_young.stats.energy_flows,
-        );
-    }
-    sim_young.creatures[id_young].energy -= adjusted_penalty_young;
-    let cost_young = energy_before_young - sim_young.creatures[id_young].energy;
-
-    let (mut sim_old, id_old) = make_sim_with_one_creature(100.0);
-    sim_old.world.set_barrier(Position::new(5, 4), true);
-    sim_old.creatures[id_old].age = 400;
-    let adjusted_penalty_old = sim_old.config.energy.adjusted_action_cost(
-        sim_old.config.energy.costs.failed_action_penalty,
-        sim_old.creatures[id_old].cached_complexity,
-        400,
-    );
-    let energy_before_old = sim_old.creatures[id_old].energy;
-    {
-        let creature = sim_old.creatures.get_mut(id_old).unwrap();
-        let _ = apply_move(
-            id_old,
-            creature,
-            &mut sim_old.world,
-            Direction::N,
-            &sim_old.config,
-            &mut sim_old.stats.energy_flows,
-        );
-    }
-    sim_old.creatures[id_old].energy -= adjusted_penalty_old;
-    let cost_old = energy_before_old - sim_old.creatures[id_old].energy;
-
-    assert!(
-        cost_old > cost_young,
-        "old creature should pay more for failed action: young={cost_young}, old={cost_old}"
-    );
-}
-
-#[test]
-fn failed_action_penalty_ramp_uses_effective_tick_value() {
-    let genome = vm_program_genome(vec![
-        crate::creature::genome::VmInstruction::AddVote { sink: 1, src: 0 },
-        crate::creature::genome::VmInstruction::Halt,
-    ]);
-    let (mut sim, id) = make_sim_with_custom_genome(100.0, genome);
-    sim.world.set_barrier(Position::new(5, 4), true);
-    sim.config.energy.costs.move_cost = 0.0;
-    sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
-    sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.0;
-    sim.config.energy.age_cost.enabled = false;
-    sim.config.energy.complexity_cost.enabled = false;
-
-    sim.config.startup.ramps.failed_action_penalty.enabled = true;
-    sim.config.startup.ramps.failed_action_penalty.start = 5.0;
-    sim.config.startup.ramps.failed_action_penalty.end = 30.0;
-    sim.config.startup.ramps.failed_action_penalty.target_tick = 2;
-    sim.config.apply_startup_overrides();
-
-    let e0 = sim.creatures[id].energy;
-    run_tick(&mut sim, &mut None);
-    let e1 = sim.creatures[id].energy;
-    assert!(
-        (e0 - e1 - 5.0).abs() < 1e-4,
-        "tick 0 penalty should be ramp start"
-    );
-
-    run_tick(&mut sim, &mut None);
-    let e2 = sim.creatures[id].energy;
-    assert!(
-        (e1 - e2 - 17.5).abs() < 1e-4,
-        "tick 1 penalty should be midpoint interpolation"
-    );
-
-    run_tick(&mut sim, &mut None);
-    let e3 = sim.creatures[id].energy;
-    assert!(
-        (e2 - e3 - 30.0).abs() < 1e-4,
-        "tick 2 penalty should match ramp end/runtime"
-    );
 }
 
 #[test]
@@ -757,10 +570,10 @@ fn priority_bid_stats_tracked_after_tick() {
 
 #[test]
 fn energy_floor_at_zero_after_action_execution() {
-    // Bug: the tick loop's Phase 2 action costs (move_cost + failed_action_penalty)
-    // can drive energy deeply negative before the death check fires. With a high
-    // age multiplier (10x at age 500), a creature with 3.0 energy paying 60.0 in
-    // costs ends up at -57.0.
+    // Bug: the tick loop's Phase 2 action costs can drive energy deeply
+    // negative before the death check fires. With a high age multiplier (10x
+    // at age 500), a creature with 3.0 energy paying a 60.0 move effort ends
+    // up at -57.0.
     //
     // The tick loop must floor energy at 0.0 after each action so that stored
     // energy never goes negative. We test this by queuing TWO failed moves.
@@ -780,7 +593,7 @@ fn energy_floor_at_zero_after_action_execution() {
     sim.creatures[id].age = 500;
     // Disable energy decay so it doesn't confound the test.
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
-    sim.config.startup.ramps.failed_action_penalty.enabled = false;
+    sim.config.energy.costs.move_cost = 6.0;
 
     // Place barrier directly north of creature at (5,5) so moves fail.
     sim.world.set_barrier(Position::new(5, 4), true);
@@ -884,6 +697,9 @@ fn charged_reproduction(genome: CreatureGenome, rate: f32) -> (f32, f32, f32) {
     let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
     sim.config.energy.lifecycle.genome_replication_cost_per_unit = rate;
     sim.config.mutation.per_unit_rate = 0.0;
+    // A zero effort floor isolates the replication charge (T16.F02).
+    sim.config.energy.costs.noop_cost = 0.0;
+    sim.config.energy.costs.reproduce_attempt_cost = 0.0;
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
     assert_eq!(

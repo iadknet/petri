@@ -28,10 +28,6 @@ fn canonicalize_patch(
     ))
 }
 
-fn patch_touches_startup(patch: &serde_json::Value) -> bool {
-    patch.get("startup").is_some()
-}
-
 /// Founders are seeded only by `POST /v3/simulation/startup`, which merges the
 /// request over the server's startup baseline rather than the live config, so a
 /// patched founder count would be stored but never read.
@@ -49,14 +45,6 @@ fn patch_touches_founder_profile(patch: &serde_json::Value) -> bool {
     patch
         .get("population")
         .and_then(|p| p.get("founder_profile"))
-        .is_some()
-}
-
-fn patch_touches_failed_action_penalty(patch: &serde_json::Value) -> bool {
-    patch
-        .get("energy")
-        .and_then(|e| e.get("costs"))
-        .and_then(|c| c.get("failed_action_penalty"))
         .is_some()
 }
 
@@ -142,15 +130,6 @@ pub async fn patch_config(
     let patch: serde_json::Value = serde_json::from_slice(&body)
         .map_err(|e| AppError::InvalidRequest(format!("invalid JSON: {e}")))?;
 
-    if patch_touches_startup(&patch) {
-        return Err(AppError::ValidationRejected {
-            field_errors: vec![FieldError {
-                field: "startup".into(),
-                reason: "startup config is restart-only and cannot be patched".into(),
-            }],
-            endpoint: "patch_config",
-        });
-    }
     if patch_touches_initial_creatures(&patch) {
         return Err(AppError::ValidationRejected {
             field_errors: vec![FieldError {
@@ -207,21 +186,6 @@ pub async fn patch_config(
     }
 
     let mut handle = app.sim.lock().await;
-
-    if patch_touches_failed_action_penalty(&patch)
-        && handle
-            .sim
-            .config
-            .failed_action_penalty_ramp_active(handle.sim.tick)
-    {
-        return Err(AppError::ValidationRejected {
-            field_errors: vec![FieldError {
-                field: "energy.costs.failed_action_penalty".into(),
-                reason: "startup failed-action-penalty ramp is still active".into(),
-            }],
-            endpoint: "patch_config",
-        });
-    }
 
     // Merge patch into current config. The stored config is already canonical,
     // so a difference after normalization is attributable to the patch.
