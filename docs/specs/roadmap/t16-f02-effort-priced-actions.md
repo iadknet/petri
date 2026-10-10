@@ -232,7 +232,26 @@ make bench PROFILE=gate FEATURE=t16-f02-effort-priced-actions
 make bench PROFILE=goal FEATURE=t16-f02-effort-priced-actions
 ```
 
-**Measured verdict.** Pending.
+**Measured verdict (2026-10-10, revision `561c1454`; values per world in the
+readings).** Gate and goal both exit 3 (`make` 2) with `severe` true against
+T11.F29, so the blocker rule applies before any re-pin: gate `pass_cap_hits`
++59.1%; goal `vm_steps` +129.9% and `decided_passes` +1262.8%, with flags on
+`plasticity_updates` +37.3%, `pass_cap_hits` +34.3%, `graph_relax_iters`
++12.5%, `mesh_hops` +12.3% and `actions_applied` +10.0%; wall ok (-4.3%,
+-8.6%). Met: founder `steering-v1` and `mesh_execution` byte-identical;
+penalty flow and mortality cause absent in every world; every per-attempt
+price at least its floor (eat 0.0510 to 0.0524, steal 0.0507 to 0.0514,
+rejected reproduce 0.0509 to 0.0548, blocked move 0.2017 to 0.2124); penalty
+component of the failed-action share 0; action energy per creature-tick up in
+all three worlds; persistence floor (no extinction; final 5,092 / 2,056 /
+5,248 and plateau 4,263 / 4,233 / 5,142 against half of T11.F29's); digests
+changed. Read, no direction: failed-action share down in every world
+(0.187 / 0.429 / 0.398 against 0.196 / 0.459 / 0.418), blocked-move fractions,
+parent-energy rejection fraction (0.257 / 0.244 / 0.248 against 0.294 / 0.234
+/ 0.223) and litter share, `steering-v1` pooled, `mesh_summary`, and mortality
+by `action_eat` / `action_reproduce` / `action_steal_energy` (now nonzero).
+Overhead check: inconclusive before any pair (24 pairs at 7,826 ms do not fit
+the 300 s cap; 37.5 s used), not rounded to a pass.
 
 - Summaries: [gate](../../progress/features/t16-f02-effort-priced-actions.json),
   [goal](../../progress/features/t16-f02-effort-priced-actions-goal.json).
