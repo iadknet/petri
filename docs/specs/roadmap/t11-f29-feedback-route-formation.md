@@ -1,6 +1,6 @@
 # T11.F29 — Feedback Route Formation
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-09
 **Feature**: T11.F29
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -212,7 +212,7 @@ field or switch); a run shows existing signals moved by the changed draws.
       failure attributed to a user-accepted re-pin. Topology: exit 0, 101
       passed. Workspace: exit 0, 2,720 passed, 0 failed (series test passes
       after the re-pin); eleven seeded pins re-pinned (readings).
-- [ ] `make check` -> exit 0, tested commit in the readings.
+- [x] `make check` -> exit 0, tested commit in the readings. Exit 0 at caa10963.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed
       here.
@@ -300,14 +300,14 @@ depth 250), Canyon final population. Readings:
 
 ## Success Criteria
 
-- [ ] `AddFeedbackRoute` is in the live catalog at weight 10 with its key in
+- [x] `AddFeedbackRoute` is in the live catalog at weight 10 with its key in
       every operator-keyed row, and one applied event closes a loop onto the
       source or an executed upstream node while the static incumbent keeps
       the route (tests in Verification).
-- [ ] The drift walk's cycle-carrying share rises at depths 250, 1,000 and
+- [x] The drift walk's cycle-carrying share rises at depths 250, 1,000 and
       2,000 on both walks; every other predeclared bound holds or its excess
       carries a recorded user decision.
-- [ ] `make check` exits 0, the mutation gate has no unresolved survivor, both
+- [x] `make check` exits 0, the mutation gate has no unresolved survivor, both
       summaries are stored, and `v3-mutation-spec.md` describes the operator.
 
 ## Notes for AI Agents
