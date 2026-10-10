@@ -1,6 +1,6 @@
 # T16.F02 — Effort-Priced Actions
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-10
 **Feature**: T16.F02
 **Track**: [T16 — Cost and Cue Fidelity](../../roadmaps/t16-cost-and-cue-fidelity.md)
@@ -172,8 +172,10 @@ reported under the blocker rule, never rounded to a pass.
       `-goal.json`, local raw hash, bytes and verification time in the
       readings, series entries pointing to them, no full report staged; both
       epochs re-pinned at the point the Performance section names.
-- [ ] Overhead check (Telemetry): verdict, median ratio and interval, pairs,
+- [x] Overhead check (Telemetry): verdict, median ratio and interval, pairs,
       measured time and telemetry's self-timed cost per tick in the readings.
+      Inconclusive (24 pairs do not fit the 300 s cap; 0 pairs run), recorded
+      under the Exception in Notes for AI Agents.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after the re-pin: summary
       line, output path, and every survivor resolved as killed, equivalent or
       deferred, listed here.
@@ -293,16 +295,16 @@ the 300 s cap; 37.5 s used), not rounded to a pass.
 
 ## Success Criteria
 
-- [ ] Every committed action pays at least `NoOp`'s nonzero effort on every
+- [x] Every committed action pays at least `NoOp`'s nonzero effort on every
       attempt; a failure pays only its effort; a reproduce attempt pays its
       effort before the gates and the replication cost only on conception.
-- [ ] `failed_action_penalty`, its ramp and the `startup` section are gone
+- [x] `failed_action_penalty`, its ramp and the `startup` section are gone
       from engine, config, server, panel, telemetry, lab and reference
       documents; retired keys fail to resolve by name; the tracked recipes load.
-- [ ] The goal report carries `failed_action_effort` and `action_attempts`, and
+- [x] The goal report carries `failed_action_effort` and `action_attempts`, and
       every reading in the predeclaration table is recorded against its
       reference, the control's included.
-- [ ] Both epochs re-pinned after the readings and before the mutation gate;
+- [x] Both epochs re-pinned after the readings and before the mutation gate;
       the mutation gate resolved.
 
 ## Notes for AI Agents
@@ -342,3 +344,9 @@ the 300 s cap; 37.5 s used), not rounded to a pass.
 - Deferred: final Codex review `task-mv2nwx9t-wbgkt1` at `8a304450`: 0 P1,
   1 P2 (the Telemetry table omitted the `action_attempts` block; fixed by
   adding its row), 0 P3.
+- Cost: closure tested commit `163d9785` (`make check` exit 0); `/usage`
+  totals not collected (the user is not consulted under the standing
+  instruction of 2026-10-10); implementer passes 5 (observation, build stopped
+  at viability, build, self-review, epoch re-pin) with advisor consults
+  2/2/3/2/1; spec-owner resumes after Plan 4; Codex challenge rounds 3, final
+  `ready`; final review 0 P1, 1 P2, 0 P3; mutation fresh runs 2 (run 1 void).
