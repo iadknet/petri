@@ -19,13 +19,13 @@ cannot yet avoid or a record they cannot see.
 
 ## Track Success Criteria
 
-- [ ] Every committed action costs at least its effort, success or not, and
+- [x] Every committed action costs at least its effort, success or not, and
   no action costs less than idling (`NoOp`); a failed move, eat, reproduce or
   steal costs exactly what the attempt cost; `failed_action_penalty` and its
   startup ramp are gone from the engine, the config, the panel, and the
   reference specs, and the penalized-failure share of action energy in the
   goal reports is the effort cost alone.
-- [ ] A reproduce attempt that fails its energy or transfer gate pays the
+- [x] A reproduce attempt that fails its energy or transfer gate pays the
   attempt's effort and never the replication cost; a successful birth pays
   the attempt's effort plus what it pays today. (Amended 2026-10-10 from
   "leaves the parent's energy unchanged" at the user's direction: every
@@ -41,7 +41,7 @@ cannot yet avoid or a record they cannot see.
 
 - [x] **T16.F01 — Gate Before Charge in Reproduction** — Depends on: None
   - Goal: An animal that cannot afford a litter does not conceive. The reproduce energy gate (`energy - cost >= min_reproduce_energy`) and the transfer feasibility check are evaluated before any charge is taken, so a rejected attempt costs the parent nothing and a successful birth costs what it costs today; a TDD test on the `RejectedEnergyConstraints` path asserts zero energy change. Evidence: [antipattern review](../strategy/antipattern-review-2026-09-16.md) Section 3 (109 rejections at -10.8 each against 315 births in the sampled logs).
-- [ ] **T16.F02 — Effort-Priced Actions** — Depends on: T16.F01
+- [x] **T16.F02 — Effort-Priced Actions** — Depends on: T16.F01
   - Goal: Every act costs its effort, and failing costs nothing extra. Analog: a muscle burns energy whether or not the act succeeds (Polyworld charges activation, not outcome), and a courtship is spent whether or not a mate results (Wang et al. 2025). Every committed action (`Move`, `Eat`, `Reproduce`, `StealEnergy`, `NoOp`) charges a nonzero effort on every attempt, whatever the outcome, and none charges less than `NoOp`: the `eat_cost` default rises from 0; a reproduce attempt charges a new attempt effort before the gates (the replication cost is still charged only on a birth, in T16.F01's order); `StealEnergy` charges at least the floor when its requested amount is zero. A blocked move, an eat on an empty cell and a rejected reproduce or steal then charge only that effort; `failed_action_penalty`, its ramp, and their config, panel, and spec surface are retired. The spec predeclares each effort value. Predeclared readings: the failed-action share of action energy in the goal reports falls to the effort cost; the blocked-move fraction and the fraction of reproduce attempts rejected on parent energy are read before and after; the gate and goal trajectories move and an epoch re-pin is expected and recorded. Evidence: review Section 2 (7,196 of 23,460 action energy on penalized failures with 0 of 12,501 avoidances); the [action-choice pressure note](../strategy/action-choice-pressure-research-2026-10-09.md) Section 2 (in one live viewport at a 0.02 penalty, reproduce was a third of logged actions and 68% of attempts fell under the energy gate the founder respects).
 - [ ] **T16.F03 — Phenotypic Kin Recognition** — Depends on: None
   - Goal: Kin are recognized by cues they carry (a tag, a color, a scent), not by an ancestry record. The `lineage_match` field of `NearbyCreatureIdentity` no longer reads `lineage_id`; the identity bank keeps its width so existing genomes stay valid, and the slot reports tag identity (`kin_tag` equality) beside the existing `kin_affinity` and `phenotype_similarity`. Predeclared: the identity block of any report that carries the field is re-pinned; the sensor census and the survey's identity perturbation are read before and after. Evidence: review Section 4; precedent Riolo, Cohen and Axelrod 2001 and Polyworld's color cue.
