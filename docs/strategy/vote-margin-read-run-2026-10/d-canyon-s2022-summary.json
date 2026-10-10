@@ -1,0 +1,383 @@
+{
+ "world": "canyon-s2022",
+ "seed": 2022,
+ "horizon": 20000,
+ "checkpoints_scheduled": [
+  10000,
+  20000
+ ],
+ "checkpoints_reached": [
+  10000,
+  20000
+ ],
+ "footer": {
+  "census_secs": 3.625753,
+  "elapsed_secs": 851.341720208,
+  "extinct": false,
+  "kind": "footer",
+  "sim_secs": 844.6080397180004,
+  "threads": 8,
+  "ticks": 20000
+ },
+ "extinct": null,
+ "vote_delta_version": "vote-delta-v2",
+ "row_status": "completed",
+ "every_executed_target_channel_classed": true,
+ "predictions": {
+  "1": {
+   "outcome": "not reached",
+   "checkpoint": 50000
+  },
+  "2": [
+   {
+    "checkpoint": 10000,
+    "classes_9_11": 3,
+    "masked": 0,
+    "outcome": "met"
+   },
+   {
+    "checkpoint": 20000,
+    "classes_9_11": 1,
+    "masked": 1,
+    "outcome": "failed"
+   }
+  ],
+  "3": [
+   {
+    "checkpoint": 10000,
+    "action_changing": 1,
+    "param_causal_one_field": 0,
+    "failing": [
+     {
+      "parent": 34,
+      "family": "AreaFoodSummary:0",
+      "channel": 1,
+      "class": "vote-causal",
+      "fields_differ": []
+     }
+    ],
+    "outcome": "failed"
+   },
+   {
+    "checkpoint": 20000,
+    "action_changing": 2,
+    "param_causal_one_field": 0,
+    "failing": [
+     {
+      "parent": 38,
+      "family": "NeighborBarrierRing",
+      "channel": 3,
+      "class": "vote-causal",
+      "fields_differ": []
+     },
+     {
+      "parent": 46,
+      "family": "AreaFoodSummary:0",
+      "channel": 0,
+      "class": "vote-causal",
+      "fields_differ": []
+     }
+    ],
+    "outcome": "failed"
+   }
+  ]
+ },
+ "checkpoints": [
+  {
+   "tick": 10000,
+   "living": 3393,
+   "parents": 20,
+   "parents_with_executed_target_channels": 4,
+   "channels": 4,
+   "class_counts": {
+    "vote-causal": 1,
+    "param-causal": 0,
+    "action-unresolved": 0,
+    "unexposed": 0,
+    "vm-unresolved": 0,
+    "silent-local-decision": 0,
+    "silent-local-intermediate": 0,
+    "silent-mixed": 0,
+    "masked": 0,
+    "suppressing": 0,
+    "moving-residual": 3
+   },
+   "class_counts_by_family": {
+    "NeighborBarrierRing": {
+     "vote-causal": 0,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 1
+    },
+    "AreaFoodSummary:0": {
+     "vote-causal": 1,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 2
+    }
+   },
+   "routing": {
+    "vote-causal": {
+     "channels": 1,
+     "routed_to": "the funnel's existing causal"
+    },
+    "param-causal": {
+     "channels": 0,
+     "routed_to": "T11.F27 action-parameter surface (a second causality route)"
+    },
+    "action-unresolved": {
+     "channels": 0,
+     "routed_to": "T22 instrument"
+    },
+    "unexposed": {
+     "channels": 0,
+     "routed_to": "T22 instrument (panel exposure per consumer); world exposure to T20"
+    },
+    "vm-unresolved": {
+     "channels": 0,
+     "routed_to": "T22 instrument (VM read-to-write attribution)"
+    },
+    "silent-local-decision": {
+     "channels": 0,
+     "routed_to": "T22 first (weight, saturation, unconsumed parameter), then T19/T11"
+    },
+    "silent-local-intermediate": {
+     "channels": 0,
+     "routed_to": "T22 first (cross-node path tracing), then T20"
+    },
+    "silent-mixed": {
+     "channels": 0,
+     "routed_to": "reported with the split"
+    },
+    "masked": {
+     "channels": 0,
+     "routed_to": "T19 (pass-end rule, incumbent) with per-pass shortfalls"
+    },
+    "suppressing": {
+     "channels": 0,
+     "routed_to": "reported: inert suppression of a non-winner"
+    },
+    "moving-residual": {
+     "channels": 3,
+     "routed_to": "reported, neutral"
+    }
+   },
+   "pooled_ratio_median": 0.1515413740246855,
+   "pooled_ratio_passes": 3445,
+   "n3_labels_on_pooled": {
+    "label": "mixed",
+    "channels_with_margined_passes": 4,
+    "family_ratio_median_of_medians": 0.5316844935907485,
+    "subadditivity_median": 1.0,
+    "additive_residual_median": 0.0,
+    "families": 4,
+    "families_cancelling": 0,
+    "families_defined_subadditivity": 4
+   },
+   "consumers": {
+    "total": 5,
+    "graph": 5,
+    "vm": 0,
+    "executed": 4,
+    "exposed": 4,
+    "exposed_endpoint_classes": {
+     "decision": 4,
+     "intermediate": 0,
+     "none": 0,
+     "dynamic": 0
+    }
+   },
+   "consistency": {
+    "unexposed_with_effect": 0,
+    "selection_not_reconstructed_passes": 0
+   },
+   "silent_channels": 0,
+   "moving_channels": 3,
+   "action_changing_channels": 1,
+   "exposure_contexts": {
+    "c_candidates": 4,
+    "c_class_counts": {
+     "vote-causal": 2,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 2
+    },
+    "original_candidates_in_c_candidates": 4,
+    "original_consumers": {
+     "exposed": 4,
+     "executed_zero": 0,
+     "coverage_unresolved": 1
+    }
+   }
+  },
+  {
+   "tick": 20000,
+   "living": 5165,
+   "parents": 20,
+   "parents_with_executed_target_channels": 2,
+   "channels": 3,
+   "class_counts": {
+    "vote-causal": 2,
+    "param-causal": 0,
+    "action-unresolved": 0,
+    "unexposed": 0,
+    "vm-unresolved": 0,
+    "silent-local-decision": 0,
+    "silent-local-intermediate": 0,
+    "silent-mixed": 0,
+    "masked": 1,
+    "suppressing": 0,
+    "moving-residual": 0
+   },
+   "class_counts_by_family": {
+    "NeighborBarrierRing": {
+     "vote-causal": 1,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 1,
+     "suppressing": 0,
+     "moving-residual": 0
+    },
+    "AreaFoodSummary:0": {
+     "vote-causal": 1,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 0
+    }
+   },
+   "routing": {
+    "vote-causal": {
+     "channels": 2,
+     "routed_to": "the funnel's existing causal"
+    },
+    "param-causal": {
+     "channels": 0,
+     "routed_to": "T11.F27 action-parameter surface (a second causality route)"
+    },
+    "action-unresolved": {
+     "channels": 0,
+     "routed_to": "T22 instrument"
+    },
+    "unexposed": {
+     "channels": 0,
+     "routed_to": "T22 instrument (panel exposure per consumer); world exposure to T20"
+    },
+    "vm-unresolved": {
+     "channels": 0,
+     "routed_to": "T22 instrument (VM read-to-write attribution)"
+    },
+    "silent-local-decision": {
+     "channels": 0,
+     "routed_to": "T22 first (weight, saturation, unconsumed parameter), then T19/T11"
+    },
+    "silent-local-intermediate": {
+     "channels": 0,
+     "routed_to": "T22 first (cross-node path tracing), then T20"
+    },
+    "silent-mixed": {
+     "channels": 0,
+     "routed_to": "reported with the split"
+    },
+    "masked": {
+     "channels": 1,
+     "routed_to": "T19 (pass-end rule, incumbent) with per-pass shortfalls"
+    },
+    "suppressing": {
+     "channels": 0,
+     "routed_to": "reported: inert suppression of a non-winner"
+    },
+    "moving-residual": {
+     "channels": 0,
+     "routed_to": "reported, neutral"
+    }
+   },
+   "pooled_ratio_median": 2.0155021054885447,
+   "pooled_ratio_passes": 607,
+   "n3_labels_on_pooled": {
+    "label": "neither",
+    "channels_with_margined_passes": 3,
+    "family_ratio_median_of_medians": 2.126950212201305,
+    "subadditivity_median": 1.0,
+    "additive_residual_median": 0.0,
+    "families": 2,
+    "families_cancelling": 0,
+    "families_defined_subadditivity": 2
+   },
+   "consumers": {
+    "total": 12,
+    "graph": 3,
+    "vm": 9,
+    "executed": 10,
+    "exposed": 10,
+    "exposed_endpoint_classes": {
+     "decision": 3,
+     "intermediate": 0,
+     "none": 0,
+     "dynamic": 7
+    }
+   },
+   "consistency": {
+    "unexposed_with_effect": 0,
+    "selection_not_reconstructed_passes": 0
+   },
+   "silent_channels": 0,
+   "moving_channels": 1,
+   "action_changing_channels": 2,
+   "exposure_contexts": {
+    "c_candidates": 2,
+    "c_class_counts": {
+     "vote-causal": 1,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 1,
+     "suppressing": 0,
+     "moving-residual": 0
+    },
+    "original_candidates_in_c_candidates": 2,
+    "original_consumers": {
+     "exposed": 3,
+     "executed_zero": 0,
+     "coverage_unresolved": 9
+    }
+   }
+  }
+ ]
+}

@@ -9,9 +9,8 @@ frozen-instrument pattern and Advice table as the precedent, extending the
 [diagnosis follow-up run](evolvability-diagnosis-run-2026-10-followup.md)'s
 row N3 instrument, inside the
 [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
-Status: **gates V0.2 and V0 passed; row V1 running** since 04:34Z
-2026-10-10 under an awake kill of 21,638 s (amendment A1 after Codex review
-(a) applied before any gate ran).
+Status: **V1 completed** (gates V0.2 and V0 passed; D run on both Canyon
+seeds); plan forward drafted; Codex review (b) pending.
 
 ## Question
 
@@ -287,7 +286,7 @@ reconstructed selection disagrees with the trace).
 
 | ID | Question | Method, instrument, sizes | Prediction / decision rule | Status | Result |
 | --- | --- | --- | --- | --- | --- |
-| V1 | On current production, for each executed target channel: was each consumer exposed when it executed and where does its output land locally; is a vote-moving read masked, suppressing or neither; which parameter field carries a zero-vote action change? | `census-v2`, `PETRI_E2_VOTE_DELTAS=1`, Confluence goal world seed 33, 50,000 ticks, checkpoints 20,000 and 50,000 (`PETRI_E2_E6_TICK=20000`), eight threads, the original panels plus C's exposure contexts in their own block; awake kill per V0's budget. **Readings:** the plan's class table per channel and checkpoint with counts; per consumer exposure and local endpoint; the per-pass effective-kind record summarized per channel (S, raising, lowering, shortfalls); `param_fields_differ` and `param_fields_consumed` per action-changing channel; the pooled per-pass median with N3's labels; the family readings; C's block beside, never merged. **Optional D:** Canyon goal world seeds 1022 and 2022 (`PETRI_E2_WORLD=canyon`, `PETRI_E2_RECIPE` unset; the goal recipe as the census resolves it), 20,000 ticks, checkpoints 10,000 and 20,000, 3 h awake kill each, run after V1 only if the host is free | **The plan's predictions, verbatim:** "1. At the 50,000 checkpoint, at least half of the channels in classes 4 to 8 are `unexposed` or `silent-local-intermediate`. Fails if fewer than half. 2. Among the vote-moving channels (classes 9 to 11) at each checkpoint, `masked` is a minority. Fails if `masked` is half or more. (N3's positive sink shares show sink suppression; they do not prove a kind was suppressed, so this is a prior, not a reading.) 3. Every action-changing channel is `param-causal` with exactly one differing field. Fails on any `vote-causal` or `action-unresolved` channel, or any `param-causal` channel with two or more fields. If instead most of classes 4 to 8 are `silent-local-decision`, the stall sits downstream of a decision endpoint and the routing changes accordingly." Prediction 1 reads 50,000 only; 2 each checkpoint; 3 every checkpoint reached; a prediction whose channel set is empty at a checkpoint is recorded **vacuous** there, not met. **Disposition:** descriptive; the row succeeds when V0 passed and every executed target channel carries a class at every checkpoint reached. **Stopping rule:** on a kill or an extinction the checkpoints reached are kept, the row is `incomplete` and the note closes on what was reached; no rerun unless the kill was a host failure, then one rerun under the same limit. D's classes are reported beside V1's, never pooled with them | pending | |
+| V1 | On current production, for each executed target channel: was each consumer exposed when it executed and where does its output land locally; is a vote-moving read masked, suppressing or neither; which parameter field carries a zero-vote action change? | `census-v2`, `PETRI_E2_VOTE_DELTAS=1`, Confluence goal world seed 33, 50,000 ticks, checkpoints 20,000 and 50,000 (`PETRI_E2_E6_TICK=20000`), eight threads, the original panels plus C's exposure contexts in their own block; awake kill per V0's budget. **Readings:** the plan's class table per channel and checkpoint with counts; per consumer exposure and local endpoint; the per-pass effective-kind record summarized per channel (S, raising, lowering, shortfalls); `param_fields_differ` and `param_fields_consumed` per action-changing channel; the pooled per-pass median with N3's labels; the family readings; C's block beside, never merged. **Optional D:** Canyon goal world seeds 1022 and 2022 (`PETRI_E2_WORLD=canyon`, `PETRI_E2_RECIPE` unset; the goal recipe as the census resolves it), 20,000 ticks, checkpoints 10,000 and 20,000, 3 h awake kill each, run after V1 only if the host is free | **The plan's predictions, verbatim:** "1. At the 50,000 checkpoint, at least half of the channels in classes 4 to 8 are `unexposed` or `silent-local-intermediate`. Fails if fewer than half. 2. Among the vote-moving channels (classes 9 to 11) at each checkpoint, `masked` is a minority. Fails if `masked` is half or more. (N3's positive sink shares show sink suppression; they do not prove a kind was suppressed, so this is a prior, not a reading.) 3. Every action-changing channel is `param-causal` with exactly one differing field. Fails on any `vote-causal` or `action-unresolved` channel, or any `param-causal` channel with two or more fields. If instead most of classes 4 to 8 are `silent-local-decision`, the stall sits downstream of a decision endpoint and the routing changes accordingly." Prediction 1 reads 50,000 only; 2 each checkpoint; 3 every checkpoint reached; a prediction whose channel set is empty at a checkpoint is recorded **vacuous** there, not met. **Disposition:** descriptive; the row succeeds when V0 passed and every executed target channel carries a class at every checkpoint reached. **Stopping rule:** on a kill or an extinction the checkpoints reached are kept, the row is `incomplete` and the note closes on what was reached; no rerun unless the kill was a host failure, then one rerun under the same limit. D's classes are reported beside V1's, never pooled with them | **completed** (50,000 reached; V0 passed; every executed target channel classed at both checkpoints) | Census complete: 50,000 ticks, 8,048 s of simulation, 11.0 s of censuses, 8 threads, exit 0, 8,087 s elapsed (8,093 s awake) inside the 21,638 s kill, on AC; summary [`v1-summary.json`](vote-margin-read-run-2026-10/v1-summary.json), per-channel rows [`v1-channels.json`](vote-margin-read-run-2026-10/v1-channels.json), reader [`v1read.py`](vote-margin-read-run-2026-10/v1read.py). Population 6,606 at 20,000 and 12,013 at 50,000. **At 20,000** (7 of 20 parents, 13 channels): `vote-causal` 10 (`AreaFoodSummary:1` 8, `NeighborBarrierRing` 2), `vm-unresolved` 1 (a barrier-ring direction read by 5 VM instructions), `silent-local-intermediate` 1, `moving-residual` 1 (`AreaFoodSummary:0` channel 5 moving a `Reproduce` sink and no kind's effective vote); 19 consumers (14 Graph, 5 VM), 15 executed, 15 exposed (endpoints: decision 10, intermediate 4, dynamic 1); pooled per-pass median 0.663 over 3,696 margined passes of 11 channels, N3's label **neither**. **At 50,000** (20 of 20 parents, 89 channels): `vote-causal` **38** (`AreaFoodSummary:0` 12, `:1` 12, `NeighborBarrierRing` 14), `moving-residual` **33** (barrier ring 23), `silent-local-intermediate` **9** (two with `none` endpoints only), `masked` **7** (all barrier-ring reads: six of direction 5 raising `Reproduce`, one of direction 2 raising `StealEnergy`; shortfall medians 0.69 to 18.0), `suppressing` 1, `unexposed` 1 (a barrier-ring direction-4 read whose one Graph consumer never executed with the channel nonzero), and **0** `param-causal`, `action-unresolved`, `vm-unresolved`, `silent-local-decision` and `silent-mixed`; 108 consumers (105 Graph, 3 VM), 106 executed, 105 exposed (decision 86, intermediate 12, none 4, dynamic 3); pooled per-pass median 0.944 over 11,491 margined passes of 77 channels, label **neither** (one of 47 families cancelling). Of the 33 `moving-residual` channels, 19 move a raw sink on every delta pass without any kind's effective vote moving. `EatFoodType` also differs on 7 of the 38 `vote-causal` channels at 50,000 (consumed on 6) and on 4 of 10 at 20,000 (`ReproduceTransferFraction` on one more): a parameter difference alongside a vote difference, whose share in the action change the census does not separate. **Exposure:** no consumer is exposed on the `neighborhood-v1` battery at either checkpoint (N3's coverage finding holds on this engine); exposure comes from the recorded contexts, their sequences and the authored contexts. **Option C** (own block): its own discovery finds the same 13 and 89 channels; classes on C at 50,000 `vote-causal` 43, `silent-local-intermediate` 9, `masked` 4, `moving-residual` 33; original consumers `coverage-unresolved` on C 4 of 19 at 20,000 and 2 of 108 at 50,000, `executed-zero` 0. **Consistency:** 0 channels unexposed with an effect and 0 passes whose reconstructed selection disagrees with the trace, at both checkpoints. **Lineage proxy** (the counts are channels, not lineages): at 50,000 the 38 `vote-causal` channels carry 38 distinct (family, channel, delta passes, action-changing executions, consumers) signatures, the 7 `masked` 3, the 33 `moving-residual` 32, the 9 `silent-local-intermediate` 8; at 20,000 the 10 `vote-causal` carry 7 (parents 37, 44 and 47 share `AreaFoodSummary:1` channel 3 and 5 readings). **Funnel rows and agreement:** the census's own `input_use` typed rows on the selected cohort (declared / connected / executed / causal distinct parents) are `NeighborBarrierRing` 3/3/3/2, `AreaFoodSummary:0` 1/1/1/0, `:1` 5/5/5/5 at 20,000 and 20/20/20/**11**, 15/15/15/**11**, 12/12/12/**9** at 50,000 (N3 at 50,000: 11/9/9/0, 8/7/7/0, 4/4/4/0), `causal_original` 0 throughout; the funnel's `causal` equals the distinct parents with an action-changing vote-delta channel of that family in 6 of 6 comparisons. **Consumer sites:** every exposed consumer of a `vote-causal` channel is a Graph sink edge, none a compute node (50,000: 44 on `ActionVote` sinks, 1 on a `RouterGate`; 20,000: 9 `ActionVote`, 3 `CustomOutput`): a leaf directly on a vote sink, the shape of T20.F16's born vote edge, which N3's engine did not have; that the born edge carries these reads is **a hypothesis**, the census recording no edge provenance. **Predictions:** (1) **met** at 50,000 on 10 channels: the 10 channels in classes 4 to 8 are all `unexposed` (1) or `silent-local-intermediate` (9); `silent-local-decision` 0; the prediction's premise that most executed channels are silent is gone (10 of 89). (2) **met** at both checkpoints: `masked` 0 of 1 at 20,000 and 7 of 41 at 50,000. (3) **failed** at both checkpoints: every action-changing channel is `vote-causal` (10 of 10 and 38 of 38), none `param-causal`. **Against N3's prior** (engine of `d4bc4a98`, 34 of 35 channels with zero delta at 50,000): on today's production 79 of 89 executed target channels move a vote and 38 change a committed action at 50,000; the cohort, engine and population differ, so this is a new baseline, not a refutation of N3 on its own engine. **D (Canyon, beside V1, never pooled):** seed 1022 complete (608 s), 4 channels at 10,000 (3 `vote-causal`, 1 `moving-residual`) and 24 at 20,000 (13 `vote-causal`, 11 `moving-residual`); seed 2022 complete (851 s), 4 at 10,000 (1 `vote-causal`, 3 `moving-residual`) and 3 at 20,000 (2 `vote-causal`, 1 `masked`; 9 VM consumers `coverage-unresolved` on C); consistency 0 and 0 on both; read in the predictions' form, every D checkpoint has action-changing channels that are all `vote-causal`, and seed 2022 at 20,000 has `masked` 1 of 1 ([`d-canyon-s1022-summary.json`](vote-margin-read-run-2026-10/d-canyon-s1022-summary.json), [`d-canyon-s2022-summary.json`](vote-margin-read-run-2026-10/d-canyon-s2022-summary.json), with their channel files) |
 
 ## Advice
 
@@ -296,6 +295,7 @@ each point raised.
 
 | # | Point | Advice (summary) | Dispositions |
 | --- | --- | --- | --- |
+| 3 | After the V1 reading and the plan forward were drafted, before they were recorded; also the contradiction consultation (prediction 3 failed) and the before-plan-forward point, batched into one call | Verdict and "no feature" right; the plan's outcome branches all fail to fire, say so. (1) Name the N3 → now shift's candidate cause as a hypothesis: check whether causal reads' consumers are sink leaves (T20.F16's born edge shape). (2) Lineage: report distinct signatures beside counts; read the census's funnel typed rows and N3's agreement rule. (3) Tighten: "exposed on the panels", world exposure stays T20's; "failed: every action-changing channel is vote-causal"; "no longer blocks on this cohort; the Variation verdict untouched"; prediction 1 "on 10 channels". Process: one Python pass, commit, Codex (b) in the same turn, Cost while it runs; if `main` advanced but is clean, cherry-pick anyway and record the base | All adopted: (1) every exposed consumer of a causal read is a sink leaf (44 `ActionVote`, 1 `RouterGate`), recorded as a hypothesis; (2) signatures and funnel rows in the V1 cell (agreement 6 of 6); (3) the plan forward; the close contingency below |
 | 2 | After the V0.2 and V0 readings were drafted, before they were recorded (one batched consultation, as Advice 1 suggested); whether to report V0's v2 reading at 10,000; what to watch in V1 | Gate paragraph right. (1) Quote both V0 run times from the footers; say the population and cost comparison is across engines and that 15.26 is N3's profile, so a budget kill reads as predeclared; run `smokecheck.py` on V0's v2 output, the only check of record counts against `delta_passes`. (2) Report the 10,000 reading as a V0 by-product with no prediction read; the "dilution" label rests on one channel that is `vote-causal`, so carry contributing channels beside every label (`channels_with_margined_passes` in the reader); define v1's `most_moved_sink` against v2's per-pass moved sink after a spot check; include C's agreement, the battery's zero exposure and the consistency counts. (3) V1: do not poll; pre-write the Codex (b) brief, the row cell, the cost table and the plan-forward skeleton; at 20,000 compare elapsed with N3's 2,320 s; a `vote-causal` channel failing prediction 3 is a result; name `Terminate`-only movers when they recur; split the reader's rows into a channels file before 1 MiB; update the Status line | All adopted: (1) and (2) in Gate results above and `v1read.py`; (3) the Status line, the waits and the summaries split |
 | 1 | Before the first gate: the approach to the whole run, after the contract, the taken code and the executor were read | Approach sound; ten points. (0) The advisor cannot state its model; record the settings and the missing `/advisor opus` as a setup deviation, tell the user once, continue (no credit error, so no Codex fallback). (1) Dispose Codex (a) before the hashed v2 binary and V0, not after V0. (2) Masked and suppressing on per-kind effective-vote read effects (any kind), not through the moved sink's kind; moved sink beside. (3) Walk the genome for consumer identity, sinks by kind; predeclare `none` endpoints, `ClearSlot` as intermediate, an order-safe compute walk. (4) V0's header may differ in `vote_delta_version` and v2's new keys only; hash the other blocks and report. (5) Run copied, hashed binaries, never `cargo test` mid-chain; fresh scripts; `pgrep` and power at every launch; define "host free" for D now. (6) Load `rust-skills`; fixtures first; create the summaries folder before the first `make check-docs`. (7) Predeclare V1's kill formula and automate the extension rule. (8) Per-pass records for delta passes only; read the block size at the smoke and at V0. (9) Turn economy: one note write, one driver, batched consultations. (10) Predeclare the close checklist | All adopted in this predeclaration: (0) Run setup; (1) the Order; (2) instrument item 4; (3) items 1 and 2; (4) gate V0; (5) Run setup and the driver; (6) done before code; (7) gate V0; (8) item 3 and gate V0.2; (9) the Order; (10) the Order |
 
@@ -341,13 +341,80 @@ before `ExitWorktree` with `keep`; `.bench-artifacts/lab/votemargin/`
 copied to the main checkout; `main` still at `785dc18e` and clean (stop
 and report otherwise, since other sessions run on this host); the `docs:`
 commits cherry-picked in order, each verified to touch only paths under
-`docs/`; `make check-docs` on `main` with its exit recorded; the worktree
+`docs/` (if `main` has advanced but is clean, the commits are picked onto
+it anyway, since every one touches only this note's paths, and the new
+base is recorded; a dirty `main` or a conflict stops the close); `make
+check-docs` on `main` with its exit recorded; the worktree
 removed and pruned, the branch listed; `git status` clean.
 
 ## Plan forward
 
-Pending: drafted after V1 is read, with consultations before and after.
+Draft (consultations before and after; Codex review (b) before closing).
+
+### 1. Verdict
+
+The lead the plan was written for, "reads execute but never decide", does
+not describe current production on these panels. On Confluence at 50,000,
+38 of 89 executed target channels on the selected cohort (38 distinct
+signatures, 11, 11 and 9 distinct parents per family in the funnel's own
+`causal` row against N3's 0, 0 and 0) change a committed action through the
+vote path, 41 more move a vote without changing one, and 10 are silent. The
+three predictions: (1) met, on 10 channels; (2) met; (3) failed: every
+action-changing channel is `vote-causal`, none `param-causal`. Every
+exposed consumer of a causal read is a leaf on a sink, the shape of
+T20.F16's born vote edge (production since after N3): a hypothesis for the
+shift from N3, not a measured attribution. None of the plan's "what each
+outcome means" branches fires: the silent channels are not most of the
+executed ones (10 of 89), `silent-local-decision` is 0, `masked` is a
+minority (7 of 41), and no `param-causal` channel exists; so no branch
+hands a question to T19, T11 or T20. The Canyon readings beside point the same way (all 19
+action-changing channels over the four Canyon checkpoints `vote-causal`).
+
+### 2. Routing by class, with counts (V1 at 50,000; at 20,000 in brackets)
+
+| Class | Channels | Routed to (the plan's table) | What it asks |
+| --- | --- | --- | --- |
+| `vote-causal` | 38 [10] | the funnel's existing `causal` | nothing new: these reads decide |
+| `param-causal` | 0 [0] | T11.F27 parameter surface | no second causality route seen alone; `EatFoodType` co-differs on 7 [4] vote-causal channels, unseparated |
+| `action-unresolved` | 0 [0] | T22 instrument | none |
+| `unexposed` | 1 [0] | T22 instrument; world exposure to T20 | one channel: no row |
+| `vm-unresolved` | 0 [1] | T22 instrument (VM attribution) | one channel at 20,000: no row |
+| `silent-local-decision` | 0 [0] | T22, then T19/T11 | none: no arithmetic question for T19/T11 |
+| `silent-local-intermediate` | 9 [1] | T22 (cross-node tracing), then T20 | 9 reads landing on bus, memory or gate sinks (2 dead-end leaves) |
+| `silent-mixed` | 0 [0] | reported | none |
+| `masked` | 7 [0] | T19 with shortfalls | 6 of 7 are one barrier-ring direction raising `Reproduce` on different parents (shared ancestry is a hypothesis) |
+| `suppressing` | 1 [0] | reported | none |
+| `moving-residual` | 33 [1] | reported | 19 move a non-maximal raw sink only |
+
+### 3. What follows
+
+- The N3 follow-up questions are answered for current production: 105 of
+  108 consumers are exposed on the panels (the 32 recorded production
+  snapshots, their sequences and the authored contexts; world exposure is
+  unmeasured and stays T20's question); masking is a minority reading (7 of
+  41 vote-moving channels); the parameter surface is not a separate route in
+  this cohort. The executed → causal stage no longer blocks these families
+  on this cohort; the diagnosis run's Variation verdict is untouched by
+  this run.
+- **T22 instrument candidates** (lab, not production): the per-consumer
+  exposure record and local endpoints (the battery still presents zero for
+  these families, so the funnel's `causal` stage rests on recorded and
+  authored contexts), and a cross-node trace for the 9
+  `silent-local-intermediate` reads before T20 is handed any wiring
+  question.
+- **T19:** the 7 `masked` channels are a small, likely related set; they
+  support no pass-end feature on their own.
+- **No roadmap feature and no mechanism prototype** follows from this run.
 
 ## Cost
 
-Pending.
+| Step | Time |
+| --- | --- |
+| Builds | `census-v1` release test build in the nested tree; `census-v2` 300 s |
+| `make check` | twice on the branch (the first stopped at clippy `too_many_lines`), about 10 min each |
+| V0.2 smoke | 9.2 s |
+| V0 | `census-v1` 701.8 s, `census-v2` 709.0 s (footers) |
+| V1 | 8,086.7 s elapsed, 8,093 s awake, 8,048 s of simulation, 11.0 s of censuses |
+| D | Canyon seed 1022 608 s, seed 2022 851 s |
+| Codex | review (a) one job; review (b) one job |
+| Session | Opus 5.5 `xhigh`; the cost line awaits `/usage` |
