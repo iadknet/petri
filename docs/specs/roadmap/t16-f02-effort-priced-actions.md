@@ -285,3 +285,23 @@ the 300 s cap; 37.5 s used), not rounded to a pass.
   run of the observation-only commit, because no stored report carries
   reproduce rejections by reason or the effort of failed attempts; the
   control is local evidence, not a summary or series entry.
+- Decision: (spec owner's recommendation, accepted without consultation
+  under the user's standing instruction of 2026-10-10) the severes are
+  accepted as the predeclared trajectory move: gate `pass_cap_hits` +59.1%
+  (113 extra hits in about 260,000 creature-ticks, seeds 22 and 33), goal
+  `vm_steps` +129.9% and `decided_passes` +1262.8% (87% of decided passes in
+  Orchards, which ends as one lineage of 5,092; actions per creature-tick
+  there +27.1%). The diff adds no VM, mesh or pass work, founder in-vitro
+  readings are identical and wall fell, so the moves are the genotypes the
+  new prices selected ([readings](../../progress/readings/t16-f02.md),
+  "Severe attribution"). Both epochs re-pin to this feature's summaries, with
+  both `closed` entries, before the mutation gate; thresholds unchanged.
+- Exception: (spec owner's recommendation, accepted without consultation
+  under the user's standing instruction of 2026-10-10) the overhead check is
+  inconclusive before any pair (24 pairs at 7,826 ms per run exceed the 300 s
+  cap; a rerun sets the same count) and the 1.10 ceiling is unmeasured for
+  this feature, as at T03.F12; the diff's export change is a few data points
+  per snapshot.
+- Deferred: the goal summary records `dirty: true` from the gate's untracked
+  summary file present at the run; the tracked tree was clean at `561c1454`,
+  and no deterministic value depends on it (as at T16.F01).
