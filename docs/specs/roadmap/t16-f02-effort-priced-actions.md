@@ -150,11 +150,12 @@ reported under the blocker rule, never rounded to a pass.
       engine change.
 - [x] Focused tests (`v3-core` actions, tick and config, `v3-server`,
       `v3-cli` bench, `v3-telemetry`, `v3-lab`, frontend): commands and
-      counts in the readings.
+      counts in the readings, current working tree.
 - [ ] `make check` exits 0; tested commit in the readings. Before the
       re-pin, a failure of the series test
       `gate_profile_has_no_severe_regression_against_series_references` is
       recorded and attributed to the predeclared trajectory move, not fixed.
+      Current: `make -k check` exits 2 on that test alone (readings).
 - [x] Control: one goal run built from the observation commit,
       `make bench PROFILE=goal FEATURE=t16-f02-effort-priced-actions-control
       SUMMARY_OUT=<main>/.bench-artifacts/t16-f02-effort-priced-actions-control/summary.json`

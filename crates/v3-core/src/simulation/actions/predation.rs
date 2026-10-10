@@ -62,15 +62,12 @@ pub fn apply_steal_energy(
 
     // Step 2: Deduct the effort (based on attempted amount, not actual;
     // floored at NoOp's; scaled by genome complexity and age).
-    let cost = sim.config.energy.action_effort(
+    let effort = super::pay_effort(
+        &mut sim.creatures[attacker_id],
+        &sim.config.energy,
         sim.config.predation.steal_cost_rate * requested_amount,
-        sim.creatures[attacker_id].cached_complexity,
-        sim.creatures[attacker_id].age,
+        DeathCause::ActionStealEnergy,
     );
-    let attacker = &mut sim.creatures[attacker_id];
-    let before = attacker.energy;
-    attacker.energy -= cost;
-    let effort = attacker.observe_energy(before, DeathCause::ActionStealEnergy);
     sim.stats.energy_flows.action_charges.steal_energy += effort;
 
     // Steps 3 and 4: resolve the target cell and its victim, guarding

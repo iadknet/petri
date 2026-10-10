@@ -1,5 +1,5 @@
 use crate::config::SimulationConfig;
-use crate::contracts::{CreatureId, NodeId, Position};
+use crate::contracts::{CreatureId, NodeId, Position, WorldAction};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
@@ -7,9 +7,40 @@ use crate::creature::genome::{
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
+use crate::runtime::trace::domain::TerminationReason;
+use crate::runtime::types::{ComputeCostReport, MeshOutput};
+use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::Simulation;
 use rand::SeedableRng;
 use slotmap::SlotMap;
+
+/// A cognition result committing `actions` with no compute charge.
+pub(super) fn decision(actions: Vec<WorldAction>) -> MeshOutput {
+    MeshOutput {
+        actions,
+        cost_report: ComputeCostReport::default(),
+        priority_bid: 0.0,
+        work_counters: Default::default(),
+        energy_observation: Default::default(),
+        termination_reason: TerminationReason::NoDecision,
+        commit_counts: Default::default(),
+    }
+}
+
+/// Run Phase 2 on creature `id` committing `actions`, on a fixed RNG.
+pub(super) fn run_actions(sim: &mut Simulation, id: CreatureId, actions: Vec<WorldAction>) {
+    super::super::run_phase_2(
+        sim,
+        vec![(id, decision(actions))],
+        &mut OutcomeAccumulator::default(),
+        &mut rand::rngs::SmallRng::seed_from_u64(11),
+    );
+}
+
+/// Run Phase 2 on creature `id` committing the single `action`.
+pub(super) fn execute(sim: &mut Simulation, id: CreatureId, action: WorldAction) {
+    run_actions(sim, id, vec![action]);
+}
 
 pub(super) fn small_config() -> SimulationConfig {
     let mut cfg = SimulationConfig::default();
