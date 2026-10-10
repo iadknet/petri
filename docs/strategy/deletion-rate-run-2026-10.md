@@ -13,7 +13,16 @@ pattern, Advice table, Codex reviews), under the
 [diagnosis plan](evolvability-diagnosis-plan-2026-10-05.md)'s rules 1 to 9 as
 far as they apply to a one-row run, and inside the
 [T22 exploration contract](../roadmaps/t22-capability-assays-and-evolvability-lab.md).
-Status: **predeclared** (nothing has run).
+Status: **stopped by user decision** (2026-10-09, about 20:05). Gates S0-F
+and S0.2 passed and S0 was a go (recorded below). S1 ran 15 of 16 runs; the
+last one, `del-0.03` on seed 4022, was stopped before completing. S1 was not
+formally read, and Codex review (b) did not run. The user decided to implement
+a deletion-rate feature without waiting for supporting evidence. A partial
+reading by the S1 reader, before the stop: seeds 1022 and 3022 do not support
+(at 10,000 on seed 1022 E = 3 < 5; on 3022 E = −16 and −15), so at most 2 of 4
+could support, and the dose order failed on the three complete seeds. The rule
+could not have validated. The `del-1.0` control differed from `default` by up
+to 36 in P at 20,000 (seed 3022: 13 against 49).
 
 ## Question
 
@@ -471,4 +480,11 @@ Written after the row is read.
 
 ## Cost
 
-Recorded at closing.
+| Item | Wall |
+| --- | --- |
+| Predeclaration, Codex review (a), amendment A1 | session time; the review remote |
+| Builds (frozen twice, prototype twice) and `make check` twice | about 45 min in all, beside the session |
+| S0-F | E4 35 s per binary; S0 founder 5 s per run |
+| S0.2 frozen references (`default`, seeds 1022 and 2022) | 772 and 727 s awake |
+| `default` on the prototype binary (seeds 1022, 2022, 3022, 4022) | 797, 752, 938, 878 s awake (one launch held 20 min by another session's job) |
+| S0 (timing smoke, `None`, 0.03; 41 parents at 10⁵ births) | 15, 131, 115 s awake |
