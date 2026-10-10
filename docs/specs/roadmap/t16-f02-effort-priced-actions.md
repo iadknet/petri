@@ -152,7 +152,7 @@ reported under the blocker rule, never rounded to a pass.
       re-pin, a failure of the series test
       `gate_profile_has_no_severe_regression_against_series_references` is
       recorded and attributed to the predeclared trajectory move, not fixed.
-- [ ] Control: one goal run built from the observation commit,
+- [x] Control: one goal run built from the observation commit,
       `make bench PROFILE=goal FEATURE=t16-f02-effort-priced-actions-control
       SUMMARY_OUT=<main>/.bench-artifacts/t16-f02-effort-priced-actions-control/summary.json`
       (raw and summary stay local; no committed summary, no series entry).
