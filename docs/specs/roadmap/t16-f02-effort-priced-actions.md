@@ -151,11 +151,12 @@ reported under the blocker rule, never rounded to a pass.
 - [x] Focused tests (`v3-core` actions, tick and config, `v3-server`,
       `v3-cli` bench, `v3-telemetry`, `v3-lab`, frontend): commands and
       counts in the readings, current working tree.
-- [ ] `make check` exits 0; tested commit in the readings. Before the
+- [x] `make check` exits 0; tested commit in the readings. Before the
       re-pin, a failure of the series test
       `gate_profile_has_no_severe_regression_against_series_references` is
       recorded and attributed to the predeclared trajectory move, not fixed.
-      Current: `make -k check` exits 2 on that test alone (readings).
+      After the epoch re-pin, `make check` exits 0 on the working tree over
+      `3d6b5865` (readings, "Epoch re-pin").
 - [x] Control: one goal run built from the observation commit,
       `make bench PROFILE=goal FEATURE=t16-f02-effort-priced-actions-control
       SUMMARY_OUT=<main>/.bench-artifacts/t16-f02-effort-priced-actions-control/summary.json`
@@ -165,7 +166,7 @@ reported under the blocker rule, never rounded to a pass.
       behavior-neutral); its new blocks give the
       "before" of the failed-action share and the reproduce rejection fraction.
       Path, hash, bytes and per-world values in the readings.
-- [ ] Benchmark summaries at
+- [x] Benchmark summaries at
       `docs/progress/features/t16-f02-effort-priced-actions.json` and
       `-goal.json`, local raw hash, bytes and verification time in the
       readings, series entries pointing to them, no full report staged; both
