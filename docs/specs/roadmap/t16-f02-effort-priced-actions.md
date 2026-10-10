@@ -108,6 +108,7 @@ Invariants; invariant 8, the retirement of every surface, is the second table:
 | `petri.run.energy_flow` with `petri.flow` = `failed_action_effort.move`, `.eat`, `.reproduce`, `.steal_energy` | counter (sum), new keys in the existing family; `metrics/tests.rs`'s expected flow set updated | applied effort debits on failed attempts (invariant 5) | `run.started` body carries `energy.costs` and `predation` |
 | `energy.costs.reproduce_attempt_cost` | recorded configuration | `SimulationConfig` | `run.started` body (no edit) and `petri.config.energy.costs.reproduce_attempt_cost` in the actions phase group (`trace.rs` `actions`) |
 | `petri.run.reproduction_actions_rejected_litter` | counter (monotonic sum), new: a family in `metrics.rs`, its row in `metrics/tests.rs`, its Prometheus name in `scripts/telemetry-dashboards-check` `always_names` | Step 7 rejections (invariant 6) | `energy.lifecycle` in the `run.started` body |
+| Goal case block `action_attempts`: `eat_attempted_total`, `eat_failed_total`, `reproduce_attempted_total`, `reproduce_rejected_by_reason`, `reproduce_rejected_litter_total` | measurement record (goal report and summary keep-list; no metric family beyond the litter counter's) | `SimStats` `eat_actions_applied_total_by_type` plus `eat_actions_failed_total_by_type` summed over every food-type key (attempted), the failed map alone (failed), `reproduction_actions_attempted_total`, `reproduction_actions_rejected_by_reason`, the new litter counter (invariant 6) | the case's `config_digest` |
 | `petri.run.reproduction_actions_attempted`, `_rejected_by_reason` | counter, existing | the same counters, now counting effort-paying attempts | — |
 | `failed_action_penalty` flow and mortality keys, `petri.failed_action_penalty`, `petri.penalty` | retired | — | series and attributes absent from this feature on, never zero |
 
@@ -306,3 +307,6 @@ the 300 s cap; 37.5 s used), not rounded to a pass.
 - Deferred: the goal summary records `dirty: true` from the gate's untracked
   summary file present at the run; the tracked tree was clean at `561c1454`,
   and no deterministic value depends on it (as at T16.F01).
+- Deferred: final Codex review `task-mv2nwx9t-wbgkt1` at `8a304450`: 0 P1,
+  1 P2 (the Telemetry table omitted the `action_attempts` block; fixed by
+  adding its row), 0 P3.
