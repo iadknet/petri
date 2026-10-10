@@ -103,8 +103,13 @@ pub fn apply_typed_eat(
         creature.cached_complexity,
         creature.age,
     );
-    flows.action_charges.eat += creature.observe_energy(before, DeathCause::ActionEat);
-    food > 0.0
+    let effort = creature.observe_energy(before, DeathCause::ActionEat);
+    flows.action_charges.eat += effort;
+    let succeeded = food > 0.0;
+    if !succeeded {
+        flows.failed_action_effort.eat += effort;
+    }
+    succeeded
 }
 
 /// Apply a Move action: move one step in `dir` if the target is valid.
@@ -139,7 +144,11 @@ pub fn apply_move(
         creature.cached_complexity,
         creature.age,
     );
-    flows.action_charges.r#move += creature.observe_energy(before, DeathCause::ActionMove);
+    let effort = creature.observe_energy(before, DeathCause::ActionMove);
+    flows.action_charges.r#move += effort;
+    if !succeeded {
+        flows.failed_action_effort.r#move += effort;
+    }
     succeeded
 }
 

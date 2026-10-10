@@ -1452,6 +1452,48 @@ fn world_mutation_effects_keeps_page_reads() {
         .is_none());
 }
 
+/// A world's `action_attempts` block (T16.F02) is kept whole by both summary
+/// projections, and a source without it projects none, never zeros.
+#[test]
+fn world_action_attempts_block_is_kept_whole_and_absent_when_unmeasured() {
+    let block = json!({
+        "eat_attempted_total": 10,
+        "eat_failed_total": 4,
+        "reproduce_attempted_total": 7,
+        "reproduce_rejected_by_reason": {
+            "RejectedAgeConstraints": 1,
+            "RejectedEnergyConstraints": 3,
+            "RejectedInvalidTarget": 2,
+            "RejectedPopulationCap": 0,
+        },
+        "reproduce_rejected_litter_total": 2,
+    });
+    let dir = Temp::new();
+    let path = dir.0.join("raw.json");
+    let mut source = world_source();
+    source["deterministic"]["goal_indicators"]["cases"][0]["action_attempts"] = block.clone();
+    let raw = serde_json::to_vec(&source).unwrap();
+    std::fs::write(&path, &raw).unwrap();
+
+    let v1 = artifacts::summarize_v1(&raw, &path, &provenance()).unwrap();
+    let summary = artifacts::summarize(&raw, &path, &provenance()).unwrap();
+
+    assert_eq!(
+        v1.deterministic["goal_indicators"]["cases"][0]["action_attempts"],
+        block
+    );
+    assert_eq!(
+        summary.deterministic["goal_indicators"]["cases"][0]["action_attempts"],
+        block
+    );
+    let historical = serde_json::to_vec(&world_source()).unwrap();
+    std::fs::write(&path, &historical).unwrap();
+    let summary = artifacts::summarize(&historical, &path, &provenance()).unwrap();
+    assert!(summary.deterministic["goal_indicators"]["cases"][0]
+        .get("action_attempts")
+        .is_none());
+}
+
 /// A world's `neighborhood_read` block (T14.F12) keeps its rates, its birth
 /// counts and the count of its genome rows, and a source without it projects
 /// none rather than an empty or zero block.

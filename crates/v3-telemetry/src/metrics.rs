@@ -415,6 +415,7 @@ fn counters(f: &mut Families, s: &SimStats) {
         reproduction_actions_attempted_total,
         reproduction_actions_spawned_total,
         reproduction_actions_rejected_total,
+        reproduction_actions_rejected_litter_total,
         gestations_started_total,
         gestations_delivered_total,
         gestations_lost_parent_death_total,
@@ -493,6 +494,7 @@ fn counters(f: &mut Families, s: &SimStats) {
 fn energy(f: &mut Families, s: &SimStats) {
     let flows = &s.energy_flows;
     let charges = &flows.action_charges;
+    let failed = &flows.failed_action_effort;
     let mut flow_points: Vec<(String, f64)> = vec![
         (
             "failed_action_penalty".to_owned(),
@@ -543,6 +545,16 @@ fn energy(f: &mut Families, s: &SimStats) {
         (
             "action_charge.steal_energy".to_owned(),
             charges.steal_energy,
+        ),
+        ("failed_action_effort.move".to_owned(), failed.r#move),
+        ("failed_action_effort.eat".to_owned(), failed.eat),
+        (
+            "failed_action_effort.reproduce".to_owned(),
+            failed.reproduce,
+        ),
+        (
+            "failed_action_effort.steal_energy".to_owned(),
+            failed.steal_energy,
         ),
     ];
     flow_points.extend(

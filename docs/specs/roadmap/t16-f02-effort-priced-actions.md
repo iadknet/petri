@@ -119,7 +119,7 @@ reported under the blocker rule, never rounded to a pass.
 
 ## Implementation Tasks
 
-- [ ] Observation commit first, behavior-neutral and committed alone:
+- [x] Observation commit first, behavior-neutral and committed alone:
       `failed_action_effort` (flows token v2), the litter counter and the
       goal `action_attempts` block through `v3-core`, the bench tracking, the
       summary keep-list and telemetry, with every trajectory pin unchanged.

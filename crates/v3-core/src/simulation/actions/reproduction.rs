@@ -86,6 +86,14 @@ pub enum ReproductionActionResult {
 }
 
 impl ReproductionActionResult {
+    /// Every rejection result, in declaration order.
+    pub const REJECTIONS: [Self; 4] = [
+        Self::RejectedInvalidTarget,
+        Self::RejectedAgeConstraints,
+        Self::RejectedEnergyConstraints,
+        Self::RejectedPopulationCap,
+    ];
+
     /// Stable string key used by transport/API boundaries.
     #[must_use]
     pub const fn as_key(self) -> &'static str {
@@ -226,6 +234,7 @@ pub fn apply_reproduce(
 
     if transfer <= 0.0 || transfer < sim.config.energy.lifecycle.initial_energy {
         sim.stats.reproduction_actions_rejected_total += 1;
+        sim.stats.reproduction_actions_rejected_litter_total += 1;
         *sim.stats
             .reproduction_actions_rejected_by_reason
             .entry(ReproductionActionResult::RejectedEnergyConstraints)
