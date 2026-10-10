@@ -780,6 +780,7 @@ fn checkpoint_tracking_omits_every_transferred_block() {
         "mutation_outcome_summary",
         "mutation_value_totals_by_operator",
         "predation",
+        "action_attempts",
         "mortality",
         "energy_flows",
         "gestation",
@@ -872,7 +873,9 @@ fn gestation_block_counts_and_sums_carried_litters() {
 
 #[test]
 fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
-    use v3_core::simulation::energy_accounting::{ActionCharges, DeathCause, EnergyFlows};
+    use v3_core::simulation::energy_accounting::{
+        ActionCharges, DeathCause, EnergyFlows, FailedActionEffort,
+    };
     let mut sim = seed_simulation(SimulationConfig::default(), 7);
     sim.stats.mortality.record(DeathCause::RewardLearning);
     sim.stats.energy_flows = EnergyFlows {
@@ -883,6 +886,12 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
             r#move: 3.0,
             reproduce: 4.0,
             steal_energy: 5.0,
+        },
+        failed_action_effort: FailedActionEffort {
+            r#move: 2.5,
+            eat: 1.5,
+            reproduce: 0.25,
+            steal_energy: 4.5,
         },
         failed_action_penalty: 6.0,
         vm_compute: 7.0,
@@ -935,9 +944,10 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
     assert_eq!(
         serde_json::to_value(tracking.energy_flows.unwrap()).unwrap(),
         serde_json::json!({
-            "definition": "applied-energy-flows-v1",
+            "definition": "applied-energy-flows-v2",
             "food_intake_by_type": ["0.123457", "-2.000000", "0.000000"],
             "action_charges": {"noop": "1.000000", "eat": "2.000000", "move": "3.000000", "reproduce": "4.000000", "steal_energy": "5.000000"},
+            "failed_action_effort": {"move": "2.500000", "eat": "1.500000", "reproduce": "0.250000", "steal_energy": "4.500000"},
             "failed_action_penalty": "6.000000", "vm_compute": "7.000000", "priority_bid": "8.000000",
             "graph_compute": "9.000000", "mesh_ramp": "9.500000", "hebbian_learning": "10.000000", "reward_learning": "11.000000",
             "lifecycle_decay": "12.000000", "genome_carrying": "13.000000", "genome_size_creature_ticks": 14,
@@ -948,6 +958,74 @@ fn applied_accounting_report_copies_every_source_field_and_stable_cause_key() {
             "gestation_lost": "23.000000",
         })
     );
+}
+
+/// T16.F02 invariant 6: the end-of-run case block counts eat attempts over
+/// every food-type key (an unconfigured type included), and reproduce
+/// rejections by all four reasons plus Step 7's litter branch; checkpoint
+/// samples never carry it.
+#[test]
+fn action_attempts_sum_every_eat_key_and_report_every_rejection_reason() {
+    use v3_core::config::OrdinaryFoodTypeId;
+    use v3_core::simulation::actions::ReproductionActionResult;
+    let mut sim = seed_simulation(SimulationConfig::default(), 7);
+    let stats = &mut sim.stats;
+    stats
+        .eat_actions_applied_total_by_type
+        .insert(OrdinaryFoodTypeId::new(0), 5);
+    stats
+        .eat_actions_failed_total_by_type
+        .insert(OrdinaryFoodTypeId::new(0), 3);
+    stats
+        .eat_actions_failed_total_by_type
+        .insert(OrdinaryFoodTypeId::new(9), 2);
+    stats.reproduction_actions_attempted_total = 11;
+    stats
+        .reproduction_actions_rejected_by_reason
+        .insert(ReproductionActionResult::RejectedEnergyConstraints, 6);
+    stats
+        .reproduction_actions_rejected_by_reason
+        .insert(ReproductionActionResult::RejectedInvalidTarget, 1);
+    stats.reproduction_actions_rejected_litter_total = 4;
+
+    let sampled = WorldTracking::observe(&sim);
+    let tracking = sampled.clone().with_transferred_counters(&sim);
+
+    assert_eq!(sampled.action_attempts, None);
+    assert_eq!(
+        serde_json::to_value(tracking.action_attempts.unwrap()).unwrap(),
+        serde_json::json!({
+            "eat_attempted_total": 10,
+            "eat_failed_total": 5,
+            "reproduce_attempted_total": 11,
+            "reproduce_rejected_by_reason": {
+                "RejectedAgeConstraints": 0,
+                "RejectedEnergyConstraints": 6,
+                "RejectedInvalidTarget": 1,
+                "RejectedPopulationCap": 0,
+            },
+            "reproduce_rejected_litter_total": 4,
+        })
+    );
+}
+
+/// A case stored before T16.F02 reads its new blocks as absent, never zero.
+#[test]
+fn reports_stored_before_effort_pricing_read_the_new_blocks_as_absent() {
+    let mut sim = seed_simulation(SimulationConfig::default(), 7);
+    sim.stats.energy_flows.action_charges.r#move = 1.0;
+    let mut stored =
+        serde_json::to_value(WorldTracking::observe(&sim).with_transferred_counters(&sim)).unwrap();
+    stored.as_object_mut().unwrap().remove("action_attempts");
+    stored["energy_flows"]
+        .as_object_mut()
+        .unwrap()
+        .remove("failed_action_effort");
+
+    let read: WorldTracking = serde_json::from_value(stored).unwrap();
+
+    assert_eq!(read.action_attempts, None);
+    assert_eq!(read.energy_flows.unwrap().failed_action_effort, None);
 }
 
 /// The world-set tracking fractions read against the totals they came
@@ -1215,6 +1293,7 @@ fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
                 kills_total: 1,
                 actions_by_result: BTreeMap::from([("Transferred".to_string(), 3)]),
             }),
+            action_attempts: None,
             mortality: None,
             reproductive_success_by_cognitive_class: None,
             energy_flows: None,

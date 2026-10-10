@@ -68,34 +68,25 @@ pub fn apply_steal_energy(
     let attacker = &mut sim.creatures[attacker_id];
     let before = attacker.energy;
     attacker.energy -= cost;
-    sim.stats.energy_flows.action_charges.steal_energy +=
-        attacker.observe_energy(before, DeathCause::ActionStealEnergy);
+    let effort = attacker.observe_energy(before, DeathCause::ActionStealEnergy);
+    sim.stats.energy_flows.action_charges.steal_energy += effort;
 
-    // Step 3: Resolve target cell.
+    // Steps 3 and 4: resolve the target cell and its victim, guarding
+    // against self-predation in degenerate worlds.
     let attacker_pos = sim.creatures[attacker_id].position;
-    let target_pos = match sim.world.resolve_neighbor(attacker_pos, dir) {
-        Some(p) => p,
-        None => {
-            sim.stats.predation_actions_rejected_total += 1;
-            *sim.stats
-                .predation_actions_by_result
-                .entry(PredationActionResult::RejectedNoVictim)
-                .or_insert(0) += 1;
-            return PredationActionResult::RejectedNoVictim;
-        }
-    };
-
-    // Step 4: Look up victim (guard against self-predation in degenerate worlds).
-    let victim_id = match sim.world.creature_at(target_pos) {
-        Some(id) if id != attacker_id => id,
-        _ => {
-            sim.stats.predation_actions_rejected_total += 1;
-            *sim.stats
-                .predation_actions_by_result
-                .entry(PredationActionResult::RejectedNoVictim)
-                .or_insert(0) += 1;
-            return PredationActionResult::RejectedNoVictim;
-        }
+    let victim_id = sim
+        .world
+        .resolve_neighbor(attacker_pos, dir)
+        .and_then(|target_pos| sim.world.creature_at(target_pos))
+        .filter(|&id| id != attacker_id);
+    let Some(victim_id) = victim_id else {
+        sim.stats.predation_actions_rejected_total += 1;
+        *sim.stats
+            .predation_actions_by_result
+            .entry(PredationActionResult::RejectedNoVictim)
+            .or_insert(0) += 1;
+        sim.stats.energy_flows.failed_action_effort.steal_energy += effort;
+        return PredationActionResult::RejectedNoVictim;
     };
 
     // Step 5: Compute actual steal (capped at victim's current energy).

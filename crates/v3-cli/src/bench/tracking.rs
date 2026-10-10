@@ -161,12 +161,68 @@ pub struct ActionChargeTracking {
     pub steal_energy: String,
 }
 
+/// The share of [`ActionChargeTracking`] paid by failed attempts (T16.F02).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FailedActionEffortTracking {
+    pub r#move: String,
+    pub eat: String,
+    pub reproduce: String,
+    pub steal_energy: String,
+}
+
+/// How the population's eat and reproduce attempts ended (T16.F02). Moves
+/// and steals are read from the `moves_*` and `predation` blocks instead.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionAttemptsTracking {
+    /// Every Eat, summed over every food-type key the action named
+    /// (unconfigured types included).
+    pub eat_attempted_total: u64,
+    /// The Eats among them that found no food.
+    pub eat_failed_total: u64,
+    pub reproduce_attempted_total: u64,
+    /// Every rejection reason keyed by `ReproductionActionResult::as_key`,
+    /// zeros included.
+    pub reproduce_rejected_by_reason: BTreeMap<String, u64>,
+    /// The Step 7 rejections (a litter of zero or under `initial_energy`)
+    /// within `RejectedEnergyConstraints`.
+    pub reproduce_rejected_litter_total: u64,
+}
+
+impl ActionAttemptsTracking {
+    fn observe(stats: &v3_core::simulation::stats::SimStats) -> Self {
+        use v3_core::simulation::actions::ReproductionActionResult;
+        let applied: u64 = stats.eat_actions_applied_total_by_type.values().sum();
+        let failed: u64 = stats.eat_actions_failed_total_by_type.values().sum();
+        Self {
+            eat_attempted_total: applied + failed,
+            eat_failed_total: failed,
+            reproduce_attempted_total: stats.reproduction_actions_attempted_total,
+            reproduce_rejected_by_reason: ReproductionActionResult::REJECTIONS
+                .into_iter()
+                .map(|reason| {
+                    let count = stats
+                        .reproduction_actions_rejected_by_reason
+                        .get(&reason)
+                        .copied()
+                        .unwrap_or_default();
+                    (reason.as_key().to_string(), count)
+                })
+                .collect(),
+            reproduce_rejected_litter_total: stats.reproduction_actions_rejected_litter_total,
+        }
+    }
+}
+
 /// Applied signed energy changes, rounded only at the report boundary.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnergyFlowTracking {
     pub definition: String,
     pub food_intake_by_type: Vec<String>,
     pub action_charges: ActionChargeTracking,
+    /// Failed attempts' share of `action_charges` (T16.F02,
+    /// `applied-energy-flows-v2`); absent from reports stored before it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failed_action_effort: Option<FailedActionEffortTracking>,
     pub failed_action_penalty: String,
     pub vm_compute: String,
     pub priority_bid: String,
@@ -196,7 +252,7 @@ pub struct EnergyFlowTracking {
 impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTracking {
     fn from(flows: &v3_core::simulation::energy_accounting::EnergyFlows) -> Self {
         Self {
-            definition: "applied-energy-flows-v1".into(),
+            definition: "applied-energy-flows-v2".into(),
             food_intake_by_type: flows.food_intake_by_type.iter().copied().map(six).collect(),
             action_charges: ActionChargeTracking {
                 noop: six(flows.action_charges.noop),
@@ -205,6 +261,12 @@ impl From<&v3_core::simulation::energy_accounting::EnergyFlows> for EnergyFlowTr
                 reproduce: six(flows.action_charges.reproduce),
                 steal_energy: six(flows.action_charges.steal_energy),
             },
+            failed_action_effort: Some(FailedActionEffortTracking {
+                r#move: six(flows.failed_action_effort.r#move),
+                eat: six(flows.failed_action_effort.eat),
+                reproduce: six(flows.failed_action_effort.reproduce),
+                steal_energy: six(flows.failed_action_effort.steal_energy),
+            }),
             failed_action_penalty: six(flows.failed_action_penalty),
             vm_compute: six(flows.vm_compute),
             priority_bid: six(flows.priority_bid),
@@ -305,6 +367,9 @@ pub struct WorldTracking {
     /// What the population's predation attempts did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predation: Option<PredationTracking>,
+    /// How eat and reproduce attempts ended (T16.F02).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_attempts: Option<ActionAttemptsTracking>,
     /// Terminal-only applied death attribution; absent means unmeasured.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mortality: Option<MortalityTracking>,
@@ -546,6 +611,7 @@ impl WorldTracking {
             mutation_outcome_summary: None,
             mutation_value_totals_by_operator: None,
             predation: None,
+            action_attempts: None,
             mortality: None,
             reproductive_success_by_cognitive_class: None,
             energy_flows: None,
@@ -633,6 +699,7 @@ impl WorldTracking {
                     .map(|(result, count)| (result.as_key().to_string(), *count))
                     .collect(),
             }),
+            action_attempts: Some(ActionAttemptsTracking::observe(stats)),
             surviving_clade_profiles: Some(SurvivingCladeProfiles {
                 definition: "surviving-clade-profile-v1".into(),
                 rows: bucket_surviving_clades(

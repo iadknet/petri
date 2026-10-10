@@ -638,3 +638,145 @@ fn tick_compute_passes_and_decided_passes_accumulate_across_creatures_and_ticks(
     assert_eq!(stats.passes_total, 14);
     assert_eq!(stats.decided_passes_total, 6);
 }
+
+/// T16.F02 invariant 5: `failed_action_effort.k` adds the very debit
+/// `action_charges.k` records whenever the attempt failed. A rejected
+/// reproduce pays no effort before the engine change, so its subset stays
+/// equal to its (zero) charge.
+#[test]
+fn failed_action_effort_is_the_action_charge_of_each_failed_attempt() {
+    use crate::simulation::energy_accounting::{ActionCharges, FailedActionEffort};
+    let failing = [
+        WorldAction::Move(Direction::N),
+        WorldAction::eat(OrdinaryFoodTypeId::default()),
+        WorldAction::eat(OrdinaryFoodTypeId::new(7)),
+        WorldAction::Reproduce {
+            direction: Direction::N,
+            energy_transfer_fraction: 0.5,
+        },
+        WorldAction::StealEnergy {
+            direction: Direction::N,
+            amount: 1.0,
+        },
+    ];
+    for action in failing {
+        // Arrange
+        let (mut sim, id) = make_sim_with_one_creature(100.0);
+        sim.world
+            .set_barrier(crate::contracts::Position::new(5, 4), true);
+        sim.config.energy.costs.eat_cost = 0.5;
+        sim.config.energy.lifecycle.min_reproduce_age = 0;
+        sim.config.predation.steal_cost_rate = 0.5;
+
+        // Act
+        execute(&mut sim, id, action);
+
+        // Assert
+        let ActionCharges {
+            noop,
+            eat,
+            r#move,
+            reproduce,
+            steal_energy,
+        } = sim.stats.energy_flows.action_charges;
+        assert_eq!(noop, 0.0, "{action:?}");
+        assert_eq!(
+            sim.stats.energy_flows.failed_action_effort,
+            FailedActionEffort {
+                r#move,
+                eat,
+                reproduce,
+                steal_energy,
+            },
+            "{action:?}"
+        );
+        let reproducing = matches!(action, WorldAction::Reproduce { .. });
+        assert!(
+            reproducing || r#move + eat + steal_energy > 0.0,
+            "{action:?} must have paid an effort"
+        );
+        assert!(sim.creatures.contains_key(id), "{action:?}");
+    }
+}
+
+#[test]
+fn successful_attempts_add_no_failed_action_effort() {
+    let (mut sim, id) = make_sim_with_one_creature(100.0);
+    sim.config.energy.costs.eat_cost = 0.5;
+    sim.world.set_food_type(
+        crate::contracts::Position::new(5, 5),
+        OrdinaryFoodTypeId::default(),
+        1.0,
+    );
+    execute(
+        &mut sim,
+        id,
+        WorldAction::eat(OrdinaryFoodTypeId::default()),
+    );
+    execute(&mut sim, id, WorldAction::NoOp);
+    execute(&mut sim, id, WorldAction::Move(Direction::S));
+    assert!(sim.stats.energy_flows.action_charges.eat > 0.0);
+    assert!(sim.stats.energy_flows.action_charges.r#move > 0.0);
+    assert_eq!(
+        sim.stats.energy_flows.failed_action_effort,
+        Default::default()
+    );
+
+    let (mut sim, attacker, _victim) = make_sim_two_creatures(100.0, 50.0);
+    sim.config.predation.steal_cost_rate = 0.5;
+    execute(
+        &mut sim,
+        attacker,
+        WorldAction::StealEnergy {
+            direction: Direction::N,
+            amount: 1.0,
+        },
+    );
+    assert!(sim.stats.energy_flows.action_charges.steal_energy > 0.0);
+    assert_eq!(
+        sim.stats.energy_flows.failed_action_effort,
+        Default::default()
+    );
+}
+
+/// T16.F02 invariant 6: only Step 7's branch (a litter of zero or under
+/// `initial_energy`) is a litter rejection, and it stays an
+/// `EnergyConstraints` rejection like Step 6's.
+#[test]
+fn litter_rejections_are_counted_apart_from_other_rejections() {
+    use crate::simulation::actions::ReproductionActionResult;
+    let reproduce = |direction, energy_transfer_fraction| WorldAction::Reproduce {
+        direction,
+        energy_transfer_fraction,
+    };
+    // (parent energy, action, litter rejections expected)
+    let cases = [
+        (100.0, reproduce(Direction::S, 0.0), 1),
+        (100.0, reproduce(Direction::S, 0.01), 1),
+        (0.5, reproduce(Direction::S, 1.0), 0),
+        (100.0, reproduce(Direction::N, 0.5), 0),
+    ];
+    for (energy, action, litter) in cases {
+        let (mut sim, id) = make_sim_with_one_creature(energy);
+        sim.world
+            .set_barrier(crate::contracts::Position::new(5, 4), true);
+        sim.config.energy.lifecycle.min_reproduce_age = 0;
+        sim.config.energy.lifecycle.min_reproduce_energy = 1.0;
+        execute(&mut sim, id, action);
+        assert_eq!(
+            sim.stats.reproduction_actions_rejected_total, 1,
+            "{action:?}"
+        );
+        assert_eq!(
+            sim.stats.reproduction_actions_rejected_litter_total, litter,
+            "{action:?}"
+        );
+        if litter == 1 {
+            assert_eq!(
+                sim.stats.reproduction_actions_rejected_by_reason
+                    [&ReproductionActionResult::RejectedEnergyConstraints],
+                1
+            );
+        }
+    }
+}

@@ -136,12 +136,25 @@ pub struct ActionCharges {
     pub steal_energy: f64,
 }
 
+/// The share of [`ActionCharges`] paid by attempts that failed (T16.F02): a
+/// blocked move, an eat that found no food, a rejected reproduce and a steal
+/// with no victim. A subset, not a sink (`failed_action_effort.k <=
+/// action_charges.k`); `NoOp` cannot fail.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct FailedActionEffort {
+    pub r#move: f64,
+    pub eat: f64,
+    pub reproduce: f64,
+    pub steal_energy: f64,
+}
+
 /// Cumulative signed f64 changes of the stored f32 energy at each applied site.
 /// Food slots are dense in configured type order; initial founder stock is excluded.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EnergyFlows {
     pub food_intake_by_type: Vec<f64>,
     pub action_charges: ActionCharges,
+    pub failed_action_effort: FailedActionEffort,
     pub failed_action_penalty: f64,
     pub vm_compute: f64,
     pub priority_bid: f64,

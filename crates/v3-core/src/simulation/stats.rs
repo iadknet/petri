@@ -240,6 +240,10 @@ pub struct SimStats {
     pub reproduction_actions_attempted_total: u64,
     pub reproduction_actions_spawned_total: u64,
     pub reproduction_actions_rejected_total: u64,
+    /// Rejections at Step 7, a litter of zero or under `initial_energy`
+    /// (T16.F02); counted inside `RejectedEnergyConstraints`, so Step 6's
+    /// parent-energy rejections are that reason's count less this one.
+    pub reproduction_actions_rejected_litter_total: u64,
     /// Conceptions (T03.F12): every `Reproduce` that passed every gate.
     /// `attempted == rejected + gestations_started`.
     pub gestations_started_total: u64,
