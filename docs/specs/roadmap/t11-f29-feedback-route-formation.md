@@ -212,7 +212,7 @@ field or switch); a run shows existing signals moved by the changed draws.
       failure attributed to a user-accepted re-pin. Topology: exit 0, 101
       passed. Workspace: exit 0, 2,720 passed, 0 failed (series test passes
       after the re-pin); eleven seeded pins re-pinned (readings).
-- [x] `make check` -> exit 0, tested commit in the readings. Exit 0 at caa10963.
+- [x] `make check` -> exit 0, tested commit in the readings. Exit 0 at 03b890e6 (rebased).
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed
       here.
