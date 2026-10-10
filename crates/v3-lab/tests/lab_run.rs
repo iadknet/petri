@@ -58,6 +58,31 @@ impl Drop for Scratch {
     }
 }
 
+/// Run git in `dir` with a child-only identity and no user or system config.
+#[cfg(feature = "telemetry")]
+fn scratch_git(dir: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .current_dir(dir)
+        .args([
+            "-c",
+            "user.name=lab",
+            "-c",
+            "user.email=lab@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(args)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .output()
+        .expect("git runs");
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 fn tiny(out: &Path) -> RunParams {
     RunParams {
         assay: Assay::FoodSeeking,
@@ -1126,23 +1151,22 @@ fn execute_returns_the_measurement_of_the_written_summary() {
 fn the_lab_command_records_one_measurement_after_its_run() {
     use v3_telemetry::testing::Receiver;
 
-    let crate_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let lab = crate_dir.join("../../.bench-artifacts/lab");
-    let off_dir = lab.join(format!("t21-f06-off-{}", std::process::id()));
-    let on_dir = lab.join(format!("t21-f06-on-{}", std::process::id()));
-    struct Remove(Vec<PathBuf>);
-    impl Drop for Remove {
-        fn drop(&mut self) {
-            for dir in &self.0 {
-                let _ = std::fs::remove_dir_all(dir);
-            }
-        }
-    }
-    let _cleanup = Remove(vec![off_dir.clone(), on_dir.clone()]);
+    // A throwaway checkout with `.bench-artifacts/` ignored, so the CLI's
+    // checkout resolution works from any source copy (cargo-mutants copies
+    // the tree outside git) and both runs see the same clean provenance.
+    let scratch = Scratch::new("t21-f06-checkout");
+    std::fs::write(scratch.root.join(".gitignore"), ".bench-artifacts/\n").unwrap();
+    scratch_git(&scratch.root, &["init", "-q"]);
+    scratch_git(&scratch.root, &["add", ".gitignore"]);
+    scratch_git(&scratch.root, &["commit", "-q", "-m", "init"]);
+    let off_dir = scratch.lab.join("t21-f06-off");
+    let on_dir = scratch.lab.join("t21-f06-on");
     let lab_cli = |switch: &str, out: &Path, endpoint: Option<&str>| {
         let mut command = Command::new(env!("CARGO_BIN_EXE_v3-lab"));
         command
-            .current_dir(crate_dir)
+            .current_dir(&scratch.root)
+            // Stop git's discovery at the temp directory even if it sits in a repo.
+            .env("GIT_CEILING_DIRECTORIES", std::env::temp_dir())
             .args(["--telemetry", switch])
             .args(tiny_argv("run", out))
             .env_remove(v3_telemetry::SWITCH_ENV)

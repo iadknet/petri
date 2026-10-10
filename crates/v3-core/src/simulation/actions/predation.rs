@@ -450,6 +450,14 @@ mod tests {
             "cost should still be deducted: got {}",
             sim.creatures[attacker_id].energy
         );
+        // The rejection is counted once, in the total and by result.
+        assert_eq!(sim.stats.predation_actions_rejected_total, 1);
+        assert_eq!(
+            sim.stats
+                .predation_actions_by_result
+                .get(&PredationActionResult::RejectedNoVictim),
+            Some(&1)
+        );
     }
 
     #[test]

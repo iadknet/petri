@@ -64,6 +64,35 @@ fn companion_reports_share_final_population_and_do_not_change_comparisons() {
     assert!(unmeasured.goal_indicators.structural_companions.is_none());
 }
 
+/// The 32x32, 8-founder sweep config the real-run-path tests share. It
+/// asserts the world it built first, so a config that ignored the params
+/// fails here at once instead of running a full-size world to the horizon.
+fn small_sweep_config(seed: u64, horizon: u64) -> v3_core::config::SimulationConfig {
+    let config = build_config(&ProfileParams {
+        recipe: None,
+        name: "sweep".to_string(),
+        width: 32,
+        height: 32,
+        founders: 8,
+        seeds: vec![seed],
+        ticks: horizon,
+        food_coverage: None,
+        neighborhood: NeighborhoodSizes::default(),
+        drift: Default::default(),
+        recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
+        mutation_effects: Default::default(),
+    });
+    assert_eq!(
+        (
+            config.world.width,
+            config.world.height,
+            config.population.initial_creatures
+        ),
+        (32, 32, 8)
+    );
+    config
+}
+
 /// The synthetic-series test above drives the accumulator directly; this
 /// one binds the composition inside `run_one_seed`, the call site T14.F08,
 /// T14.F09 and T14.F10 hang their own series off. The oracle is an
@@ -81,20 +110,7 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // tick 246 once `AddFeedbackRoute` remapped the topology draws).
     const SEED: u64 = 16;
     const HORIZON: u64 = 250;
-    let config = build_config(&ProfileParams {
-        recipe: None,
-        name: "sweep".to_string(),
-        width: 32,
-        height: 32,
-        founders: 8,
-        seeds: vec![SEED],
-        ticks: HORIZON,
-        food_coverage: None,
-        neighborhood: NeighborhoodSizes::default(),
-        drift: Default::default(),
-        recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
-        mutation_effects: Default::default(),
-    });
+    let config = small_sweep_config(SEED, HORIZON);
 
     // Act
     let run = run_one_seed(&config, SEED, HORIZON, false, None, None);
@@ -162,20 +178,7 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
 fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpoint() {
     const SEED: u64 = 16;
     const HORIZON: u64 = 250;
-    let config = build_config(&ProfileParams {
-        recipe: None,
-        name: "sweep".to_string(),
-        width: 32,
-        height: 32,
-        founders: 8,
-        seeds: vec![SEED],
-        ticks: HORIZON,
-        food_coverage: None,
-        neighborhood: NeighborhoodSizes::default(),
-        drift: Default::default(),
-        recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
-        mutation_effects: Default::default(),
-    });
+    let config = small_sweep_config(SEED, HORIZON);
 
     // Act
     let run = run_one_seed(&config, SEED, HORIZON, false, None, None);
@@ -297,20 +300,7 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // from 1 to 3, T16.F01 from 18 to 1, T11.F21 from 13 to 18.
     const SEED: u64 = 2;
     const HORIZON: u64 = 250;
-    let config = build_config(&ProfileParams {
-        recipe: None,
-        name: "sweep".to_string(),
-        width: 32,
-        height: 32,
-        founders: 8,
-        seeds: vec![SEED],
-        ticks: HORIZON,
-        food_coverage: None,
-        neighborhood: NeighborhoodSizes::default(),
-        drift: Default::default(),
-        recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
-        mutation_effects: Default::default(),
-    });
+    let config = small_sweep_config(SEED, HORIZON);
 
     // Act
     let run = run_one_seed(&config, SEED, HORIZON, false, None, None);
