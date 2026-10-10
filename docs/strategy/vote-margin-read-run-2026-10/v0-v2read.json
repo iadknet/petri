@@ -1,0 +1,642 @@
+{
+ "world": "Confluence",
+ "seed": 33,
+ "horizon": 10000,
+ "checkpoints_scheduled": [
+  10000
+ ],
+ "checkpoints_reached": [
+  10000
+ ],
+ "footer": {
+  "census_secs": 2.631227,
+  "elapsed_secs": 708.955744333,
+  "extinct": false,
+  "kind": "footer",
+  "sim_secs": 704.495792548002,
+  "threads": 8,
+  "ticks": 10000
+ },
+ "extinct": null,
+ "vote_delta_version": "vote-delta-v2",
+ "row_status": "completed",
+ "every_executed_target_channel_classed": true,
+ "predictions": {
+  "1": {
+   "outcome": "not reached",
+   "checkpoint": 50000
+  },
+  "2": [
+   {
+    "checkpoint": 10000,
+    "classes_9_11": 2,
+    "masked": 0,
+    "outcome": "met"
+   }
+  ],
+  "3": [
+   {
+    "checkpoint": 10000,
+    "action_changing": 1,
+    "param_causal_one_field": 0,
+    "failing": [
+     {
+      "parent": 3,
+      "family": "AreaFoodSummary:1",
+      "channel": 2,
+      "class": "vote-causal",
+      "fields_differ": []
+     }
+    ],
+    "outcome": "failed"
+   }
+  ]
+ },
+ "checkpoints": [
+  {
+   "tick": 10000,
+   "living": 7197,
+   "parents": 20,
+   "parents_with_executed_target_channels": 2,
+   "channels": 3,
+   "class_counts": {
+    "vote-causal": 1,
+    "param-causal": 0,
+    "action-unresolved": 0,
+    "unexposed": 0,
+    "vm-unresolved": 0,
+    "silent-local-decision": 0,
+    "silent-local-intermediate": 0,
+    "silent-mixed": 0,
+    "masked": 0,
+    "suppressing": 0,
+    "moving-residual": 2
+   },
+   "class_counts_by_family": {
+    "AreaFoodSummary:0": {
+     "vote-causal": 0,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 2
+    },
+    "AreaFoodSummary:1": {
+     "vote-causal": 1,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 0
+    }
+   },
+   "routing": {
+    "vote-causal": {
+     "channels": 1,
+     "routed_to": "the funnel's existing causal"
+    },
+    "param-causal": {
+     "channels": 0,
+     "routed_to": "T11.F27 action-parameter surface (a second causality route)"
+    },
+    "action-unresolved": {
+     "channels": 0,
+     "routed_to": "T22 instrument"
+    },
+    "unexposed": {
+     "channels": 0,
+     "routed_to": "T22 instrument (panel exposure per consumer); world exposure to T20"
+    },
+    "vm-unresolved": {
+     "channels": 0,
+     "routed_to": "T22 instrument (VM read-to-write attribution)"
+    },
+    "silent-local-decision": {
+     "channels": 0,
+     "routed_to": "T22 first (weight, saturation, unconsumed parameter), then T19/T11"
+    },
+    "silent-local-intermediate": {
+     "channels": 0,
+     "routed_to": "T22 first (cross-node path tracing), then T20"
+    },
+    "silent-mixed": {
+     "channels": 0,
+     "routed_to": "reported with the split"
+    },
+    "masked": {
+     "channels": 0,
+     "routed_to": "T19 (pass-end rule, incumbent) with per-pass shortfalls"
+    },
+    "suppressing": {
+     "channels": 0,
+     "routed_to": "reported: inert suppression of a non-winner"
+    },
+    "moving-residual": {
+     "channels": 2,
+     "routed_to": "reported, neutral"
+    }
+   },
+   "pooled_ratio_median": 0.037467548241188156,
+   "pooled_ratio_passes": 951,
+   "n3_labels_on_pooled": {
+    "label": "dilution",
+    "channels_with_margined_passes": 1,
+    "family_ratio_median_of_medians": 0.037467548241188156,
+    "subadditivity_median": 1.0,
+    "additive_residual_median": 0.0,
+    "families": 3,
+    "families_cancelling": 0,
+    "families_defined_subadditivity": 3
+   },
+   "consumers": {
+    "total": 3,
+    "graph": 3,
+    "vm": 0,
+    "executed": 3,
+    "exposed": 3,
+    "exposed_endpoint_classes": {
+     "decision": 3,
+     "intermediate": 0,
+     "none": 0,
+     "dynamic": 0
+    }
+   },
+   "consistency": {
+    "unexposed_with_effect": 0,
+    "selection_not_reconstructed_passes": 0
+   },
+   "silent_channels": 0,
+   "moving_channels": 2,
+   "action_changing_channels": 1,
+   "exposure_contexts": {
+    "c_candidates": 3,
+    "c_class_counts": {
+     "vote-causal": 1,
+     "param-causal": 0,
+     "action-unresolved": 0,
+     "unexposed": 0,
+     "vm-unresolved": 0,
+     "silent-local-decision": 0,
+     "silent-local-intermediate": 0,
+     "silent-mixed": 0,
+     "masked": 0,
+     "suppressing": 0,
+     "moving-residual": 2
+    },
+    "original_candidates_in_c_candidates": 3,
+    "original_consumers": {
+     "exposed": 3,
+     "executed_zero": 0,
+     "coverage_unresolved": 0
+    },
+    "coverage": [
+     {
+      "parent": 3,
+      "family": "AreaFoodSummary:0",
+      "channel": 1,
+      "in_exposure_candidates": true,
+      "exposed": 1,
+      "executed_zero": 0,
+      "coverage_unresolved": 0
+     },
+     {
+      "parent": 3,
+      "family": "AreaFoodSummary:1",
+      "channel": 2,
+      "in_exposure_candidates": true,
+      "exposed": 1,
+      "executed_zero": 0,
+      "coverage_unresolved": 0
+     },
+     {
+      "parent": 5,
+      "family": "AreaFoodSummary:0",
+      "channel": 6,
+      "in_exposure_candidates": true,
+      "exposed": 1,
+      "executed_zero": 0,
+      "coverage_unresolved": 0
+     }
+    ],
+    "channels": [
+     {
+      "parent": 3,
+      "generation": 251,
+      "family": "AreaFoodSummary:0",
+      "channel": 1,
+      "class": "moving-residual",
+      "consumers": 1,
+      "consumers_graph": 1,
+      "consumers_vm": 0,
+      "consumers_executed": 1,
+      "consumers_exposed": 1,
+      "exposed_endpoint_classes": [
+       "decision"
+      ],
+      "all_endpoint_classes": [
+       "decision"
+      ],
+      "exposed_executions": 48,
+      "exposed_by_group": {
+       "battery": 0,
+       "recorded": 0,
+       "authored": 0,
+       "sequences": 0,
+       "exposure": 48
+      },
+      "executed_by_group": {
+       "battery": 0,
+       "recorded": 0,
+       "authored": 0,
+       "sequences": 0,
+       "exposure": 48
+      },
+      "graph_abs_weight": null,
+      "delta_passes": 480,
+      "scenes_actions_differ": 0,
+      "divergent_passes": 0,
+      "unmatched_passes": 0,
+      "ratio_median": null,
+      "most_moved_sink": "Terminate",
+      "masking": {
+       "delta_passes": 480,
+       "commit_both_passes": 480,
+       "raising_passes": 0,
+       "lowering_passes": 0,
+       "no_kind_moved_passes": 480,
+       "divergent_passes": 0,
+       "guarded_passes_baseline": 0,
+       "shortfall_median": null,
+       "shortfall_min": null,
+       "moved_kinds": {
+        "kindless": 480
+       }
+      },
+      "params": {
+       "action_changing_executions": 0,
+       "aligned_passes": 0,
+       "unmatched_passes": 0,
+       "committed_differs_passes": 0,
+       "executions_without_differing_aligned_commit": 0,
+       "fields_differ": [],
+       "fields_consumed": [],
+       "fields_differ_on_changed_commits": [],
+       "field_passes": {}
+      },
+      "unexposed_with_effect": false,
+      "selection_not_reconstructed": 0
+     },
+     {
+      "parent": 3,
+      "generation": 251,
+      "family": "AreaFoodSummary:1",
+      "channel": 2,
+      "class": "vote-causal",
+      "consumers": 1,
+      "consumers_graph": 1,
+      "consumers_vm": 0,
+      "consumers_executed": 1,
+      "consumers_exposed": 1,
+      "exposed_endpoint_classes": [
+       "decision"
+      ],
+      "all_endpoint_classes": [
+       "decision"
+      ],
+      "exposed_executions": 48,
+      "exposed_by_group": {
+       "battery": 0,
+       "recorded": 0,
+       "authored": 0,
+       "sequences": 0,
+       "exposure": 48
+      },
+      "executed_by_group": {
+       "battery": 0,
+       "recorded": 0,
+       "authored": 0,
+       "sequences": 0,
+       "exposure": 48
+      },
+      "graph_abs_weight": null,
+      "delta_passes": 480,
+      "scenes_actions_differ": 7,
+      "divergent_passes": 0,
+      "unmatched_passes": 0,
+      "ratio_median": 1.0,
+      "most_moved_sink": "Move(6)",
+      "masking": {
+       "delta_passes": 480,
+       "commit_both_passes": 480,
+       "raising_passes": 243,
+       "lowering_passes": 63,
+       "no_kind_moved_passes": 230,
+       "divergent_passes": 0,
+       "guarded_passes_baseline": 0,
+       "shortfall_median": 2.1410770416259766,
+       "shortfall_min": 0.002897977828979492,
+       "moved_kinds": {
+        "Eat": 63,
+        "StealEnergy": 417
+       }
+      },
+      "params": {
+       "action_changing_executions": 7,
+       "aligned_passes": 70,
+       "unmatched_passes": 0,
+       "committed_differs_passes": 66,
+       "executions_without_differing_aligned_commit": 0,
+       "fields_differ": [],
+       "fields_consumed": [],
+       "fields_differ_on_changed_commits": [],
+       "field_passes": {}
+      },
+      "unexposed_with_effect": false,
+      "selection_not_reconstructed": 0
+     },
+     {
+      "parent": 5,
+      "generation": 278,
+      "family": "AreaFoodSummary:0",
+      "channel": 6,
+      "class": "moving-residual",
+      "consumers": 1,
+      "consumers_graph": 1,
+      "consumers_vm": 0,
+      "consumers_executed": 1,
+      "consumers_exposed": 1,
+      "exposed_endpoint_classes": [
+       "decision"
+      ],
+      "all_endpoint_classes": [
+       "decision"
+      ],
+      "exposed_executions": 48,
+      "exposed_by_group": {
+       "battery": 0,
+       "recorded": 0,
+       "authored": 0,
+       "sequences": 0,
+       "exposure": 48
+      },
+      "executed_by_group": {
+       "battery": 0,
+       "recorded": 0,
+       "authored": 0,
+       "sequences": 0,
+       "exposure": 48
+      },
+      "graph_abs_weight": null,
+      "delta_passes": 480,
+      "scenes_actions_differ": 0,
+      "divergent_passes": 0,
+      "unmatched_passes": 0,
+      "ratio_median": null,
+      "most_moved_sink": "Terminate",
+      "masking": {
+       "delta_passes": 480,
+       "commit_both_passes": 449,
+       "raising_passes": 0,
+       "lowering_passes": 0,
+       "no_kind_moved_passes": 480,
+       "divergent_passes": 0,
+       "guarded_passes_baseline": 0,
+       "shortfall_median": null,
+       "shortfall_min": null,
+       "moved_kinds": {
+        "kindless": 480
+       }
+      },
+      "params": {
+       "action_changing_executions": 0,
+       "aligned_passes": 0,
+       "unmatched_passes": 0,
+       "committed_differs_passes": 0,
+       "executions_without_differing_aligned_commit": 0,
+       "fields_differ": [],
+       "fields_consumed": [],
+       "fields_differ_on_changed_commits": [],
+       "field_passes": {}
+      },
+      "unexposed_with_effect": false,
+      "selection_not_reconstructed": 0
+     }
+    ]
+   },
+   "rows": [
+    {
+     "parent": 3,
+     "generation": 251,
+     "family": "AreaFoodSummary:0",
+     "channel": 1,
+     "class": "moving-residual",
+     "consumers": 1,
+     "consumers_graph": 1,
+     "consumers_vm": 0,
+     "consumers_executed": 1,
+     "consumers_exposed": 1,
+     "exposed_endpoint_classes": [
+      "decision"
+     ],
+     "all_endpoint_classes": [
+      "decision"
+     ],
+     "exposed_executions": 53,
+     "exposed_by_group": {
+      "battery": 0,
+      "recorded": 10,
+      "authored": 3,
+      "sequences": 40,
+      "exposure": 0
+     },
+     "executed_by_group": {
+      "battery": 80,
+      "recorded": 32,
+      "authored": 24,
+      "sequences": 128,
+      "exposure": 0
+     },
+     "graph_abs_weight": 0.39231938123703003,
+     "delta_passes": 530,
+     "scenes_actions_differ": 0,
+     "divergent_passes": 0,
+     "unmatched_passes": 0,
+     "ratio_median": null,
+     "most_moved_sink": "Terminate",
+     "masking": {
+      "delta_passes": 530,
+      "commit_both_passes": 530,
+      "raising_passes": 0,
+      "lowering_passes": 0,
+      "no_kind_moved_passes": 530,
+      "divergent_passes": 0,
+      "guarded_passes_baseline": 0,
+      "shortfall_median": null,
+      "shortfall_min": null,
+      "moved_kinds": {
+       "kindless": 530
+      }
+     },
+     "params": {
+      "action_changing_executions": 0,
+      "aligned_passes": 0,
+      "unmatched_passes": 0,
+      "committed_differs_passes": 0,
+      "executions_without_differing_aligned_commit": 0,
+      "fields_differ": [],
+      "fields_consumed": [],
+      "fields_differ_on_changed_commits": [],
+      "field_passes": {}
+     },
+     "unexposed_with_effect": false,
+     "selection_not_reconstructed": 0
+    },
+    {
+     "parent": 3,
+     "generation": 251,
+     "family": "AreaFoodSummary:1",
+     "channel": 2,
+     "class": "vote-causal",
+     "consumers": 1,
+     "consumers_graph": 1,
+     "consumers_vm": 0,
+     "consumers_executed": 1,
+     "consumers_exposed": 1,
+     "exposed_endpoint_classes": [
+      "decision"
+     ],
+     "all_endpoint_classes": [
+      "decision"
+     ],
+     "exposed_executions": 118,
+     "exposed_by_group": {
+      "battery": 0,
+      "recorded": 23,
+      "authored": 3,
+      "sequences": 92,
+      "exposure": 0
+     },
+     "executed_by_group": {
+      "battery": 80,
+      "recorded": 32,
+      "authored": 24,
+      "sequences": 128,
+      "exposure": 0
+     },
+     "graph_abs_weight": 0.5842646956443787,
+     "delta_passes": 1180,
+     "scenes_actions_differ": 1,
+     "divergent_passes": 0,
+     "unmatched_passes": 0,
+     "ratio_median": 0.037467548241188156,
+     "most_moved_sink": "Move(6)",
+     "masking": {
+      "delta_passes": 1180,
+      "commit_both_passes": 1180,
+      "raising_passes": 109,
+      "lowering_passes": 9,
+      "no_kind_moved_passes": 1070,
+      "divergent_passes": 0,
+      "guarded_passes_baseline": 0,
+      "shortfall_median": 3.493075223173946,
+      "shortfall_min": 0.5,
+      "moved_kinds": {
+       "Eat": 9,
+       "StealEnergy": 1171
+      }
+     },
+     "params": {
+      "action_changing_executions": 1,
+      "aligned_passes": 10,
+      "unmatched_passes": 0,
+      "committed_differs_passes": 10,
+      "executions_without_differing_aligned_commit": 0,
+      "fields_differ": [],
+      "fields_consumed": [],
+      "fields_differ_on_changed_commits": [],
+      "field_passes": {}
+     },
+     "unexposed_with_effect": false,
+     "selection_not_reconstructed": 0
+    },
+    {
+     "parent": 5,
+     "generation": 278,
+     "family": "AreaFoodSummary:0",
+     "channel": 6,
+     "class": "moving-residual",
+     "consumers": 1,
+     "consumers_graph": 1,
+     "consumers_vm": 0,
+     "consumers_executed": 1,
+     "consumers_exposed": 1,
+     "exposed_endpoint_classes": [
+      "decision"
+     ],
+     "all_endpoint_classes": [
+      "decision"
+     ],
+     "exposed_executions": 53,
+     "exposed_by_group": {
+      "battery": 0,
+      "recorded": 10,
+      "authored": 3,
+      "sequences": 40,
+      "exposure": 0
+     },
+     "executed_by_group": {
+      "battery": 80,
+      "recorded": 32,
+      "authored": 24,
+      "sequences": 128,
+      "exposure": 0
+     },
+     "graph_abs_weight": 0.5204195976257324,
+     "delta_passes": 530,
+     "scenes_actions_differ": 0,
+     "divergent_passes": 0,
+     "unmatched_passes": 0,
+     "ratio_median": null,
+     "most_moved_sink": "Terminate",
+     "masking": {
+      "delta_passes": 530,
+      "commit_both_passes": 502,
+      "raising_passes": 0,
+      "lowering_passes": 0,
+      "no_kind_moved_passes": 530,
+      "divergent_passes": 0,
+      "guarded_passes_baseline": 0,
+      "shortfall_median": null,
+      "shortfall_min": null,
+      "moved_kinds": {
+       "kindless": 530
+      }
+     },
+     "params": {
+      "action_changing_executions": 0,
+      "aligned_passes": 0,
+      "unmatched_passes": 0,
+      "committed_differs_passes": 0,
+      "executions_without_differing_aligned_commit": 0,
+      "fields_differ": [],
+      "fields_consumed": [],
+      "fields_differ_on_changed_commits": [],
+      "field_passes": {}
+     },
+     "unexposed_with_effect": false,
+     "selection_not_reconstructed": 0
+    }
+   ]
+  }
+ ]
+}

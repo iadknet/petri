@@ -1,0 +1,333 @@
+{
+ "v1": {
+  "dir": "/Users/istefanek/projects/petri/.claude/worktrees/vote-margin/.bench-artifacts/lab/votemargin/v0",
+  "name": "confluence-v1",
+  "sha256": {
+   "samples": "f96fd899e4e46f875151e4da8d87a421b7f7c4602a18f9c6b43de24fdb674445",
+   "census": "59d73e4917d0a9317fb8b12f3ecc05f7afdb019ff771807f5b585457d2a4386f"
+  }
+ },
+ "v2": {
+  "dir": "/Users/istefanek/projects/petri/.claude/worktrees/vote-margin/.bench-artifacts/lab/votemargin/v0",
+  "name": "confluence-v2",
+  "sha256": {
+   "samples": "70524536803f0ddfded94faa29c3cafd80739774b063d7217fa473467b56f8df",
+   "census": "94d8b3f19b95ea61d332938119c7e37c7cfc61da3de2e1cf319cf5b547c8f96f"
+  }
+ },
+ "expected": {
+  "v1": {
+   "samples": [
+    500,
+    1000,
+    1500,
+    2000,
+    2500,
+    3000,
+    3500,
+    4000,
+    4500,
+    5000,
+    5500,
+    6000,
+    6500,
+    7000,
+    7500,
+    8000,
+    8500,
+    9000,
+    9500,
+    10000
+   ],
+   "checkpoints": [
+    10000
+   ],
+   "terminal": 10000
+  },
+  "v2": {
+   "samples": [
+    500,
+    1000,
+    1500,
+    2000,
+    2500,
+    3000,
+    3500,
+    4000,
+    4500,
+    5000,
+    5500,
+    6000,
+    6500,
+    7000,
+    7500,
+    8000,
+    8500,
+    9000,
+    9500,
+    10000
+   ],
+   "checkpoints": [
+    10000
+   ],
+   "terminal": 10000
+  }
+ },
+ "checks": [
+  {
+   "check": "header and footer present on both runs",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "expected tick sets determinable on both runs",
+   "pass": true,
+   "detail": {
+    "v1": {
+     "samples": [
+      500,
+      1000,
+      1500,
+      2000,
+      2500,
+      3000,
+      3500,
+      4000,
+      4500,
+      5000,
+      5500,
+      6000,
+      6500,
+      7000,
+      7500,
+      8000,
+      8500,
+      9000,
+      9500,
+      10000
+     ],
+     "checkpoints": [
+      10000
+     ],
+     "terminal": 10000
+    },
+    "v2": {
+     "samples": [
+      500,
+      1000,
+      1500,
+      2000,
+      2500,
+      3000,
+      3500,
+      4000,
+      4500,
+      5000,
+      5500,
+      6000,
+      6500,
+      7000,
+      7500,
+      8000,
+      8500,
+      9000,
+      9500,
+      10000
+     ],
+     "checkpoints": [
+      10000
+     ],
+     "terminal": 10000
+    }
+   }
+  },
+  {
+   "check": "v1 samples are exactly its expected ticks",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "v1 checkpoints are exactly its expected ticks",
+   "pass": true,
+   "detail": {
+    "have": [
+     10000
+    ],
+    "expected": [
+     10000
+    ]
+   }
+  },
+  {
+   "check": "v2 samples are exactly its expected ticks",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "v2 checkpoints are exactly its expected ticks",
+   "pass": true,
+   "detail": {
+    "have": [
+     10000
+    ],
+    "expected": [
+     10000
+    ]
+   }
+  },
+  {
+   "check": "v1 non-extinct footer reaches the header horizon",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "v2 non-extinct footer reaches the header horizon",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "every sample field present on both sides at every tick",
+   "pass": true,
+   "detail": {
+    "missing": []
+   }
+  },
+  {
+   "check": "every sample field equal at every tick",
+   "pass": true,
+   "detail": {
+    "mismatches": [],
+    "count": 0
+   }
+  },
+  {
+   "check": "extinction tick equal",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "footer ticks and extinct equal",
+   "pass": true,
+   "detail": null
+  },
+  {
+   "check": "checkpoint tick sets equal",
+   "pass": true,
+   "detail": {
+    "v1": [
+     10000
+    ],
+    "v2": [
+     10000
+    ]
+   }
+  },
+  {
+   "check": "blocking blocks present on both sides at every reached checkpoint",
+   "pass": true,
+   "detail": {
+    "absent": []
+   }
+  },
+  {
+   "check": "input_use, e6 and the vote_deltas whitelist projection hash-equal at every checkpoint",
+   "pass": true,
+   "detail": {
+    "differing": []
+   }
+  },
+  {
+   "check": "vote_delta_version is exactly vote-delta-v1 against vote-delta-v2",
+   "pass": true,
+   "detail": {
+    "v1": "vote-delta-v1",
+    "v2": "vote-delta-v2"
+   }
+  },
+  {
+   "check": "header equal outside vote_delta_version, v2-only keys, recipe and label",
+   "pass": true,
+   "detail": {
+    "differing": [
+     "vote_delta_v2_exposure_seed_base",
+     "vote_delta_version"
+    ],
+    "v2_only": [
+     "vote_delta_v2_exposure_seed_base"
+    ],
+    "disallowed": [],
+    "vote_delta_version": {
+     "v1": "vote-delta-v1",
+     "v2": "vote-delta-v2"
+    }
+   }
+  }
+ ],
+ "pass": true,
+ "block_hashes": {
+  "10000:input_use": {
+   "v1": "8b9419c6c0bcb08dd454380f76f33cab69b7b568bce3a53d3693f046b765590b",
+   "v2": "8b9419c6c0bcb08dd454380f76f33cab69b7b568bce3a53d3693f046b765590b"
+  },
+  "10000:e6": {
+   "v1": "bf0755b38981e8d7d3fa1287142a5bf9a9e65b0404299eb1ee7276eabb018ef3",
+   "v2": "bf0755b38981e8d7d3fa1287142a5bf9a9e65b0404299eb1ee7276eabb018ef3"
+  },
+  "10000:vote_deltas_projection": {
+   "v1_raw": "5a89845001f89d12ad43052e3e43fa56e481ef183b7b31830334f712ed12e57a",
+   "v1_projection": "5a89845001f89d12ad43052e3e43fa56e481ef183b7b31830334f712ed12e57a",
+   "v2_projection": "5a89845001f89d12ad43052e3e43fa56e481ef183b7b31830334f712ed12e57a"
+  }
+ },
+ "reported_blocks_equal": {
+  "10000:living": true,
+  "10000:selected_parents": true,
+  "10000:selected_generations": true,
+  "10000:age_deciles": true,
+  "10000:energy_deciles": true,
+  "10000:sample": true,
+  "10000:births": true,
+  "10000:sink_use": true,
+  "10000:memory_loop": true,
+  "10000:memory_sensitivity": true,
+  "10000:temporal_memory_sensitivity": true
+ },
+ "per_checkpoint": {
+  "10000": {
+   "v1_parents_with_executed_target_channels": 2,
+   "v1_executed_target_channels": 3,
+   "v2_vote_deltas_bytes": 2378058,
+   "v1_vote_deltas_bytes": 9581,
+   "vote_delta_secs": {
+    "v1": 0.038368625,
+    "v2": 0.069998458
+   },
+   "census_secs": {
+    "v1": 2.518956208,
+    "v2": 2.631227
+   }
+  }
+ },
+ "footer_sim_secs": {
+  "v1": 698.8708383959987,
+  "v2": 704.495792548002
+ },
+ "v1_budget": {
+  "wall_to_10000": {
+   "source": "footer elapsed_secs at horizon 10,000",
+   "secs": 708.955744333
+  },
+  "ratio": 15.260881337199166,
+  "projection_secs": 10819.289487591623,
+  "kill_secs": 21638
+ },
+ "timing_fields_excluded": [
+  "census_secs",
+  "sim_secs_so_far",
+  "vote_delta_secs",
+  "births_secs",
+  "sink_use_secs",
+  "memory_secs",
+  "footer sim_secs, census_secs, elapsed_secs"
+ ]
+}

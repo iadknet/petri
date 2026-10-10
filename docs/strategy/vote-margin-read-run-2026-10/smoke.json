@@ -1,0 +1,46 @@
+{
+ "pass": true,
+ "problems": [],
+ "checkpoints": [
+  {
+   "tick": 300,
+   "parents": 20,
+   "channels": 0,
+   "c_channels": 0,
+   "classes": {},
+   "vote_deltas_bytes": 4825,
+   "vote_delta_secs": 0.014081125,
+   "census_secs": 0.243810167
+  },
+  {
+   "tick": 2500,
+   "parents": 20,
+   "channels": 0,
+   "c_channels": 0,
+   "classes": {},
+   "vote_deltas_bytes": 4858,
+   "vote_delta_secs": 0.019829375,
+   "census_secs": 0.344084208
+  },
+  {
+   "tick": 5000,
+   "parents": 20,
+   "channels": 0,
+   "c_channels": 0,
+   "classes": {},
+   "vote_deltas_bytes": 4875,
+   "vote_delta_secs": 0.026877917,
+   "census_secs": 0.64996475
+  }
+ ],
+ "any_executed_target_channel": false,
+ "footer": {
+  "census_secs": 1.237859125,
+  "elapsed_secs": 9.162586166,
+  "extinct": false,
+  "kind": "footer",
+  "sim_secs": 7.649543996000008,
+  "threads": 8,
+  "ticks": 5000
+ }
+}
