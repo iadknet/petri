@@ -206,23 +206,22 @@ field or switch); a run shows existing signals moved by the changed draws.
 
 - [x] `cargo test -p v3-core --test viability` -> exit status, before and
       after. Exit 0 both (28 passed).
-- [ ] Focused tests: `cargo test -p v3-core topology` -> exit status and
+- [x] Focused tests: `cargo test -p v3-core topology` -> exit status and
       count, test names in [readings](../../progress/readings/t11-f29.md);
       `cargo test --workspace --no-fail-fast` -> result, with any series-test
       failure attributed to a user-accepted re-pin. Topology: exit 0, 101
-      passed. Workspace: exit 101, only the gate series test (`pass_cap_hits`
-      +271%, severe) awaits the user; eleven seeded pins re-pinned (readings).- [ ] `make check` -> exit 0, tested commit in the readings.
+      passed. Workspace: exit 0, 2,720 passed, 0 failed (series test passes
+      after the re-pin); eleven seeded pins re-pinned (readings).
+- [ ] `make check` -> exit 0, tested commit in the readings.
 - [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants`: summary line, output path,
       and every survivor resolved as killed, equivalent, or deferred, listed
       here.
-- [ ] Benchmark summaries stored at
+- [x] Benchmark summaries stored at
       `docs/progress/features/t11-f29-feedback-route-formation.json` and
       `-goal.json`, local raw hash and byte count and verification time in the
       readings, series entries point to the summaries, no full report staged.
-      Stored: gate `make bench` CLI exit 3, severe (summary 20,422 B, raw
-      102,484 B); goal CLI exit 3, severe (summary 334,176 B, raw 667,053,373 B);
-      hashes and `make` statuses in the readings. Series entries still pending
-      the user's severe decision.
+      Gate and goal CLI exit 3, severe; sizes, hashes and `make` statuses in
+      the readings; both epochs re-pinned (Notes).
 
 ## Performance and Goal Impact
 
@@ -280,22 +279,16 @@ make bench PROFILE=goal FEATURE=t11-f29-feedback-route-formation
 ```
 
 **Measured verdict (2026-10-09, `0b039a32`, host matches; one run each).** Both profiles
-severe, CLI exit 3 (`measurement_evidence.cli_exit`), `make` exit 2; the goal's echoed shell
-status was lost, so its `make` status is inferred from `Error 3`. Gate: `pass_cap_hits` +271%
-and `decided_passes` +482% (severe; seed 11 holds 136 of 200 hits), `plasticity_updates`
-+16.96% (flag), `mesh_hops` +0.50% and the other counters ok, wall +14.5% ok. Goal:
-`pass_cap_hits` +124.3% (severe; 0.0028 / 0.0039 / 0.0027 per tick, under the 0.10 ceiling),
-every other counter and wall (+21.3%) ok. Predeclared rows: pass on goal `mesh_hops`, cap
-ceiling, evolved `pass_cap_fraction` (0 everywhere), silent share (0.6355), `changed_per_all_births`,
-founder row (50 applied, silent 1.0, founder dead 0), drift loop share (rises at 250, 1,000 and 2,000
-on both walks), digests, budgets. **Fail:** Canyon `mesh_ramp` deaths 2.06x; pooled dead per
-birth 0.007983 over 0.007295; cycle-carrying dead per applied birth at Orchards (4/287) and
-Confluence (11/119) and, on the drift walk, Canyon depth 250 (1/322); Canyon final population
-3,098 under the half-reference floor (7,582). Goes to the user, none remediated.
-
-- Summaries: [gate](../../progress/features/t11-f29-feedback-route-formation.json),
-  [goal](../../progress/features/t11-f29-feedback-route-formation-goal.json).
-- Full readings: [`docs/progress/readings/t11-f29.md`](../../progress/readings/t11-f29.md).
+severe (CLI exit 3). Gate: `pass_cap_hits` +271% and `decided_passes` +482% severe (seed 11
+holds 136 of 196 hits), `plasticity_updates` +17% flag, other counters and wall (+14.5%) ok.
+Goal: `pass_cap_hits` +124% severe (under the 0.10 ceiling per world), other counters and wall
+(+21.3%) ok. Every other row passes, the drift loop share rising at every predeclared depth on
+both walks, and budgets except `recruitment_paths` 236.1 s over its 120 s cap, a pre-existing
+overrun (T20.F16 246.7 s) under [T03.F12](t03-f12-genome-length-dependent-reproductive-time.md)'s
+accepted exception. **Fail**, each accepted by the user (Notes): Canyon `mesh_ramp` deaths,
+pooled dead per birth, cycle-carrying dead per applied birth (Orchards, Confluence, drift Canyon
+depth 250), Canyon final population. Summaries are listed under Verification; full readings in
+[`docs/progress/readings/t11-f29.md`](../../progress/readings/t11-f29.md).
 
 ## Success Criteria
 
@@ -319,3 +312,12 @@ Confluence (11/119) and, on the drift walk, Canyon depth 250 (1/322); Canyon fin
 - Decision: (spec owner, 2026-10-09) "the creature's own executed path" is
   T11.F17's executed set, read from the `TargetSelector`, not structural
   reachability; a parent without a dispatch record can only self-loop.
+- Decision: (user, 2026-10-09) severes accepted (gate `pass_cap_hits` +271%,
+  `decided_passes` +482%; goal `pass_cap_hits` +124%); gate and goal-worlds
+  epochs re-pinned to this feature's summaries as at T20.F16, thresholds unchanged.
+- Decision: (user, 2026-10-09) accepted as recorded: Canyon `mesh_ramp` deaths
+  2.06x; cycle-carrying dead per birth Orchards 4/287, Confluence 11/119 (4 of
+  50 parents), drift Canyon depth 250 1/322 (one over); pooled dead 56/7,015
+  vs 0.007295; Canyon final 3,098 (40.9%) under the half floor.
+- Deferred: the T11 track criterion (loop-carrying offspring inside T19.F02's
+  dead-per-birth ceiling) stays unchecked on Orchards 4/287 and Confluence 11/119.
