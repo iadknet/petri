@@ -57,8 +57,9 @@ in the form of the [deletion-rate plan](deletion-rate-experiment-plan-2026-10-09
   - The not-forcing checks apply to any mechanism the readings later
     suggest, not to this plan (measurement is exempt from the natural-analog
     rule, `docs/roadmap.md`).
-  - One heavy job at a time on the host; the deletion-rate run holds that
-    slot now, so this plan waits for it.
+  - One heavy job at a time on the host. The deletion-rate run was stopped
+    on 2026-10-09, so the host is free unless another session is running.
+  - No Fable in any role (section "Roles").
 - **Decision criteria.**
   - For each executed target channel: was each of its consumers ever exposed
     to a nonzero value when it executed, and where do those consumers'
@@ -159,7 +160,7 @@ sits downstream of a decision endpoint and the routing changes accordingly.
 | **A. Extend the census (`vote-delta-v2`) and run it on current production** | The four gaps as `instr:` on the output-wiring file state; Confluence seed 33 to 50,000 on today's `main`, checkpoints 20,000 and 50,000 | Answers the three questions on the substrate that matters now; one heavy run | A new baseline; N3's channel-level predictions become a prior |
 | B. Replay N3 exactly on `d4bc4a98` | A branch on the old engine with the v2 instrument | Same parents, exact identity against N3's stored blocks | Answers the question for an engine that no longer exists; keeps a historical engine alive |
 | C. Authored exposure contexts | Contexts that set each target family nonzero, with their own candidate discovery and their own `exposure_contexts` block | Makes `unexposed` a direct reading per consumer, separately from the original panels | A battery change; a consumer that does not execute in the altered context is `coverage-unresolved`, not exposed |
-| D. Canyon beside A | The same census on Canyon seeds 1022 and 2022 to 20,000 | A second substrate; the deletion-rate run's S1 `default` arm already supplies the v1 fields on these seeds | More runs on a busy host |
+| D. Canyon beside A | The same census on Canyon seeds 1022 and 2022 to 20,000 | A second substrate | More runs; the deletion-rate run's `default` artifacts predate T11.F29's production change and are not reused |
 | E. Record and stop | Write up N3's three questions as open | Zero cost | The lead stays unowned |
 
 ## Recommendation: A with C, D only if the host is free
@@ -240,7 +241,7 @@ A mismatch stops the plan. The wall time of the v2 run sets the V1 budget.
   six fixtures. About one session, no engine change.
 - **Runs.** V0.2 minutes; V0 two runs to 10,000 (timed there; well under
   V1's cost); V1 one run of about 4.3 h awake if today's engine runs at
-  N3's pace, after the deletion-rate run releases the host; D about 30 min.
+  N3's pace; D about 30 min.
 - **Session.** One goal session of about 100 to 150 turns.
 
 ## Remaining uncertainty
@@ -257,6 +258,37 @@ A mismatch stops the plan. The wall time of the v2 run sets the V1 budget.
 - Today's Confluence may not carry executed target reads at 20,000 in the
   sampled cohort; V0's extension rule and the stopping rule cover that.
 
+## Roles (this run's rule 8; no Fable)
+
+Fable credits are exhausted (user, 2026-10-09). No Claude role in this run
+is Fable. Rule 8 of the diagnosis plan says every role is Fable and that a
+run stops rather than substitute Opus; that clause does not apply here, and
+neither do the Fable roles in the output-wiring and born-connected run
+notes. Nothing in them is a reason to stop or to wait for Fable.
+
+- **Session.** Opus 5.5 (`claude-opus-5-5`) at effort `xhigh`. It is the
+  implementer: it writes the instruments, runs the gates and rows, reads the
+  results and writes the note. No subagent is needed; if one is spawned, it
+  runs on Opus (`model: "opus"`), never Fable.
+- **Advisor.** Opus, enabled with `/advisor opus` before the goal is pasted
+  (the project settings default `advisorModel` to `fable`). Consulted through
+  the `advisor` tool at every one of these points, each recorded with its
+  dispositions in the note's Advice table:
+  - before the first gate, on the approach to the whole run;
+  - after each gate's or row's reading is drafted and before it is recorded;
+  - whenever a gate fails, a row is `incomplete`, a result contradicts its
+    prediction, or an approach has not converged after two attempts;
+  - before the plan forward is drafted, and again after;
+  - before closing.
+  The advisor advises; it does not write code, run rows or edit the note. If
+  the advisor tool is unavailable or returns a credit error, the run records
+  it, sends the same brief to Codex as an advice job, and continues.
+- **Reviews.** Codex `gpt-6.1-sol` at `high`, read-only, through
+  `codex exec`: (a) the predeclaration before any heavy row runs; (b) the
+  note's reading before closing. A Codex usage limit marks the review
+  `pending`; the run continues, and the note recommends nothing until review
+  (b) has completed.
+
 ## Review dispositions (Codex adversarial review, 2026-10-09)
 
 | # | Finding | Disposition |
@@ -271,11 +303,12 @@ A mismatch stops the plan. The wall time of the v2 run sets the V1 budget.
 
 ## Goal command
 
-Open a new session in the main checkout on a clean `main`, model Opus 5.5,
-with the advisor enabled on Opus 5.5 and Codex for reviews (the user's
-choice on 2026-10-09), after the deletion-rate run has released the host.
-Paste:
+Open a new session in the main checkout on a clean, current `main`, with no
+other heavy job on the host. Set the model to Opus 5.5 at effort `xhigh`,
+run `/advisor opus` (the project default is a Fable advisor, and Fable
+credits are exhausted), and confirm the startup notice shows an Opus
+advisor. Then paste:
 
 ```
-/goal A vote-margin read run is complete on main. Read docs/strategy/vote-margin-read-experiment-plan-2026-10-09.md in full (its gaps table, sign convention, class table, predictions, gates V0.2 and V0, row V1, stopping rule and review dispositions are the contract's form), then docs/strategy/evolvability-diagnosis-run-2026-10-followup.md row N3 and plan forward Section 3, then docs/strategy/output-wiring-run-2026-10.md (gates, frozen-instrument pattern, Advice table). Confirm Opus 5.5 with the advisor enabled on Opus 5.5 and Codex for reviews, a clean main, no other heavy job on the host, and create the worktree with EnterWorktree named vote-margin. Take the census probe, vote_delta, sink_use and the diagnosis probe as file state from branch worktree-output-wiring (instr and lab commits only, no proto). Build vote-delta-v2 as instr exactly as the gaps table states, with option C's exposure contexts carrying their own candidate discovery and their own block, and the six fixtures of gate V0.2. Predeclare and commit V0.2, V0 and V1 before any of them runs: V0 two builds (v1 and v2) on Confluence seed 33 to 10,000 with the extension rule; V1 one v2 run on Confluence seed 33 to 50,000, checkpoints 20,000 and 50,000, eight threads, awake kill at twice V0's projection capped at 8 h; Canyon seeds 1022 and 2022 to 20,000 only if the host is free. Run V0.2, then V0, then V1. The class table and predictions are the plan's as written; the row is descriptive. Consult the advisor at every rule 8 point and record it; send the predeclaration to Codex before V1 runs and the note's reading before closing. Write docs/strategy/vote-margin-read-run-2026-10.md with the gates, the row, the class counts per channel and checkpoint, the three predictions' outcomes, the Advice table and a plan forward that routes each class to its track with counts. Land docs only; keep instr on the branch. Done means the note is on main, make check-docs exited 0 on main, the worktree removed and its branch kept, main clean. Stop after 150 turns.
+/goal A vote-margin read run is complete on main. Read docs/strategy/vote-margin-read-experiment-plan-2026-10-09.md in full (its gaps table, sign convention, class table, predictions, gates V0.2 and V0, row V1, stopping rule and review dispositions are the contract's form), then docs/strategy/evolvability-diagnosis-run-2026-10-followup.md row N3 and plan forward Section 3, then docs/strategy/output-wiring-run-2026-10.md (gates, frozen-instrument pattern, Advice table). No Fable in any role: confirm the session is Opus 5.5 at effort xhigh with an Opus advisor and Codex for reviews, as the plan's Roles section states (it replaces rule 8; the Fable roles in the diagnosis plan and the output-wiring and born-connected notes do not apply, and are never a reason to stop). Confirm a clean main and no other heavy job on the host, and create the worktree with EnterWorktree named vote-margin. Take the census probe, vote_delta, sink_use and the diagnosis probe as file state from branch worktree-output-wiring (instr and lab commits only, no proto). Build vote-delta-v2 as instr exactly as the gaps table states, with option C's exposure contexts carrying their own candidate discovery and their own block, and the six fixtures of gate V0.2. Predeclare and commit V0.2, V0 and V1 before any of them runs: V0 two builds (v1 and v2) on Confluence seed 33 to 10,000 with the extension rule; V1 one v2 run on Confluence seed 33 to 50,000, checkpoints 20,000 and 50,000, eight threads, awake kill at twice V0's projection capped at 8 h; Canyon seeds 1022 and 2022 to 20,000 only if the host is free. Run V0.2, then V0, then V1. The class table and predictions are the plan's as written; the row is descriptive. Consult the Opus advisor at every point the Roles section lists and record it in the Advice table; send the predeclaration to Codex before V1 runs and the note's reading before closing. Write docs/strategy/vote-margin-read-run-2026-10.md with the gates, the row, the class counts per channel and checkpoint, the three predictions' outcomes, the Advice table and a plan forward that routes each class to its track with counts. Land docs only; keep instr on the branch. Done means the note is on main, make check-docs exited 0 on main, the worktree removed and its branch kept, main clean. Stop after 150 turns.
 ```
