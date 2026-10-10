@@ -4,32 +4,7 @@
 use super::support::*;
 use crate::contracts::{Direction, OrdinaryFoodTypeId, Position, WorldAction};
 use crate::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
-use crate::runtime::trace::domain::TerminationReason;
-use crate::runtime::types::{ComputeCostReport, MeshOutput};
-use crate::simulation::outcomes::OutcomeAccumulator;
 use rand::{rngs::SmallRng, SeedableRng};
-
-fn execute(
-    sim: &mut crate::simulation::Simulation,
-    id: crate::contracts::CreatureId,
-    actions: Vec<WorldAction>,
-) {
-    let decision = MeshOutput {
-        actions,
-        cost_report: ComputeCostReport::default(),
-        priority_bid: 0.0,
-        work_counters: Default::default(),
-        energy_observation: Default::default(),
-        termination_reason: TerminationReason::NoDecision,
-        commit_counts: Default::default(),
-    };
-    super::super::run_phase_2(
-        sim,
-        vec![(id, decision)],
-        &mut OutcomeAccumulator::default(),
-        &mut SmallRng::seed_from_u64(11),
-    );
-}
 
 fn by_type(
     sim: &crate::simulation::Simulation,
@@ -57,14 +32,14 @@ fn every_creature_starts_with_zeroed_profile_counters() {
 #[test]
 fn noop_counts_in_its_own_type_slot() {
     let (mut sim, id) = make_sim_with_one_creature(8.0);
-    execute(&mut sim, id, vec![WorldAction::NoOp]);
+    run_actions(&mut sim, id, vec![WorldAction::NoOp]);
     assert_eq!(by_type(&sim, id), slot(ActionType::NoOp));
 }
 
 #[test]
 fn a_failed_eat_counts_the_attempt_but_no_applied_eat() {
     let (mut sim, id) = make_sim_with_one_creature(8.0);
-    execute(
+    run_actions(
         &mut sim,
         id,
         vec![WorldAction::eat(OrdinaryFoodTypeId::new(0))],
@@ -79,7 +54,7 @@ fn an_applied_eat_counts_under_the_food_type_it_named() {
     let pos = sim.creatures[id].position;
     sim.world
         .set_food_type(pos, OrdinaryFoodTypeId::new(0), 1.0);
-    execute(
+    run_actions(
         &mut sim,
         id,
         vec![WorldAction::eat(OrdinaryFoodTypeId::new(0))],
@@ -97,7 +72,7 @@ fn a_blocked_move_counts_in_the_move_slot() {
     let (mut sim, id) = make_sim_with_one_creature(8.0);
     let pos = sim.creatures[id].position;
     sim.world.set_barrier(Position::new(pos.x, pos.y - 1), true);
-    execute(&mut sim, id, vec![WorldAction::Move(Direction::N)]);
+    run_actions(&mut sim, id, vec![WorldAction::Move(Direction::N)]);
     assert_eq!(by_type(&sim, id), slot(ActionType::Move));
     assert_eq!(sim.creatures[id].lifetime_blocked_move_count, 1);
 }
@@ -106,7 +81,7 @@ fn a_blocked_move_counts_in_the_move_slot() {
 fn a_rejected_reproduce_counts_in_the_reproduce_slot() {
     let (mut sim, id) = make_sim_with_one_creature(8.0);
     sim.config.energy.lifecycle.min_reproduce_age = 1_000;
-    execute(
+    run_actions(
         &mut sim,
         id,
         vec![WorldAction::Reproduce {
@@ -120,7 +95,7 @@ fn a_rejected_reproduce_counts_in_the_reproduce_slot() {
 #[test]
 fn a_rejected_steal_counts_the_attempt_and_no_kill_or_hit() {
     let (mut sim, id) = make_sim_with_one_creature(8.0);
-    execute(
+    run_actions(
         &mut sim,
         id,
         vec![WorldAction::StealEnergy {
@@ -140,7 +115,7 @@ fn a_mixed_sequence_keeps_the_by_type_sum_equal_to_the_attempt_count() {
     let pos = sim.creatures[id].position;
     sim.world
         .set_food_type(pos, OrdinaryFoodTypeId::new(0), 1.0);
-    execute(
+    run_actions(
         &mut sim,
         id,
         vec![
@@ -181,7 +156,7 @@ fn a_child_starts_at_zero_while_its_parent_keeps_its_counters() {
     let pos = sim.creatures[parent].position;
     sim.world
         .set_food_type(pos, OrdinaryFoodTypeId::new(0), 1.0);
-    execute(
+    run_actions(
         &mut sim,
         parent,
         vec![WorldAction::eat(OrdinaryFoodTypeId::new(0))],

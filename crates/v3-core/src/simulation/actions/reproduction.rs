@@ -11,6 +11,7 @@ use crate::mutation::phenotype::mutate_phenotype;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::runtime::action_decode::clamp_unit_interval;
+use crate::simulation::energy_accounting::DeathCause;
 use crate::simulation::simulation::Simulation;
 
 /// Capture birth-local values before any structural mutation.
@@ -157,16 +158,11 @@ pub fn apply_reproduce(
     sim.stats.last_tick_reproduce += 1;
 
     // Step 0 (T16.F02): the attempt effort, paid whatever the outcome.
-    let parent = &mut sim.creatures[parent_id];
-    let before = parent.energy;
-    parent.energy -= sim.config.energy.action_effort(
+    let effort = super::pay_effort(
+        &mut sim.creatures[parent_id],
+        &sim.config.energy,
         sim.config.energy.costs.reproduce_attempt_cost,
-        parent.cached_complexity,
-        parent.age,
-    );
-    let effort = parent.observe_energy(
-        before,
-        crate::simulation::energy_accounting::DeathCause::ActionReproduce,
+        DeathCause::ActionReproduce,
     );
     sim.stats.energy_flows.action_charges.reproduce += effort;
 
@@ -279,15 +275,11 @@ fn conceive(
     // successive f32 subtractions so the parent lands on the same value the
     // charge-first order produced.
     sim.creatures[parent_id].energy = after_cost;
-    sim.stats.energy_flows.action_charges.reproduce += sim.creatures[parent_id].observe_energy(
-        energy_before_cost,
-        crate::simulation::energy_accounting::DeathCause::ActionReproduce,
-    );
+    sim.stats.energy_flows.action_charges.reproduce +=
+        sim.creatures[parent_id].observe_energy(energy_before_cost, DeathCause::ActionReproduce);
     sim.creatures[parent_id].energy = after_cost - transfer;
-    sim.stats.energy_flows.parental_transfer_debit += sim.creatures[parent_id].observe_energy(
-        after_cost,
-        crate::simulation::energy_accounting::DeathCause::ParentalTransfer,
-    );
+    sim.stats.energy_flows.parental_transfer_debit +=
+        sim.creatures[parent_id].observe_energy(after_cost, DeathCause::ParentalTransfer);
 
     // Conception (T03.F12): the litter is carried for the gestation span and
     // born at the parent's Phase 2 slot on its last tick. A span of 0 is

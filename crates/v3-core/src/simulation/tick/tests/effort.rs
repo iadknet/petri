@@ -3,34 +3,8 @@
 
 use super::support::*;
 use crate::contracts::{CreatureId, Direction, OrdinaryFoodTypeId, Position, WorldAction};
-use crate::runtime::trace::domain::TerminationReason;
-use crate::runtime::types::{ComputeCostReport, MeshOutput};
 use crate::simulation::energy_accounting::{applied_debit, DeathCause, EnergyFlows};
-use crate::simulation::outcomes::OutcomeAccumulator;
 use crate::simulation::Simulation;
-use rand::{rngs::SmallRng, SeedableRng};
-
-fn run(sim: &mut Simulation, id: CreatureId, actions: Vec<WorldAction>) {
-    let decision = MeshOutput {
-        actions,
-        cost_report: ComputeCostReport::default(),
-        priority_bid: 0.0,
-        work_counters: Default::default(),
-        energy_observation: Default::default(),
-        termination_reason: TerminationReason::NoDecision,
-        commit_counts: Default::default(),
-    };
-    super::super::run_phase_2(
-        sim,
-        vec![(id, decision)],
-        &mut OutcomeAccumulator::default(),
-        &mut SmallRng::seed_from_u64(11),
-    );
-}
-
-fn execute(sim: &mut Simulation, id: CreatureId, action: WorldAction) {
-    run(sim, id, vec![action]);
-}
 
 const REPRODUCE: WorldAction = WorldAction::Reproduce {
     direction: Direction::N,
@@ -304,7 +278,7 @@ fn an_exhausting_effort_removes_the_creature_with_its_sink_and_ends_the_queue() 
         ),
     ] {
         let (mut sim, id) = barrier_north(0.03);
-        run(&mut sim, id, vec![action, WorldAction::NoOp]);
+        run_actions(&mut sim, id, vec![action, WorldAction::NoOp]);
         assert!(!sim.creatures.contains_key(id), "{cause:?}");
         assert_eq!(sim.stats.mortality.count(cause), 1, "{cause:?}");
         assert_eq!(sim.stats.mortality.deaths_total, 1, "{cause:?}");
@@ -344,7 +318,7 @@ fn a_gestating_parent_and_its_discarded_actions_are_never_charged() {
         .lifecycle
         .gestation_ticks_per_founder_genome = 1.0;
     let eat = WorldAction::eat(OrdinaryFoodTypeId::default());
-    run(
+    run_actions(
         &mut sim,
         id,
         vec![REPRODUCE, eat, WorldAction::Move(Direction::S)],

@@ -6,14 +6,27 @@ pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRec
 pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
 pub(crate) use reproduction::{deliver_pending_birth, BirthDelivery};
 
-use crate::config::OrdinaryFoodTypeId;
-use crate::config::SimulationConfig;
+use crate::config::{EnergyConfig, OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::simulation::energy_accounting::{applied_debit, DeathCause, EnergyFlows};
 
 // ─── Action application functions ─────────────────────────────────────────────
+
+/// Debit `creature` the effort of an action with effort base `base`
+/// (T16.F02, [`EnergyConfig::action_effort`]) and return the applied debit,
+/// observed against `cause`.
+pub(super) fn pay_effort(
+    creature: &mut CreatureState,
+    energy: &EnergyConfig,
+    base: f32,
+    cause: DeathCause,
+) -> f64 {
+    let before = creature.energy;
+    creature.energy -= energy.action_effort(base, creature.cached_complexity, creature.age);
+    creature.observe_energy(before, cause)
+}
 
 /// Classification for rejected move actions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -60,13 +73,12 @@ pub fn apply_noop(
     config: &SimulationConfig,
     flows: &mut EnergyFlows,
 ) {
-    let before = creature.energy;
-    creature.energy -= config.energy.action_effort(
+    flows.action_charges.noop += pay_effort(
+        creature,
+        &config.energy,
         config.energy.costs.noop_cost,
-        creature.cached_complexity,
-        creature.age,
+        DeathCause::ActionNoop,
     );
-    flows.action_charges.noop += creature.observe_energy(before, DeathCause::ActionNoop);
 }
 
 /// Apply a typed Eat action using the configured food owner for the cell.
@@ -98,13 +110,12 @@ pub fn apply_typed_eat(
         flows.zero_floor_credit += applied_debit(creature.energy, credited).max(0.0);
         creature.observe_energy(before, DeathCause::ActionEat);
     }
-    let before = creature.energy;
-    creature.energy -= config.energy.action_effort(
+    let effort = pay_effort(
+        creature,
+        &config.energy,
         config.energy.costs.eat_cost,
-        creature.cached_complexity,
-        creature.age,
+        DeathCause::ActionEat,
     );
-    let effort = creature.observe_energy(before, DeathCause::ActionEat);
     flows.action_charges.eat += effort;
     let succeeded = food > 0.0;
     if !succeeded {
@@ -140,13 +151,12 @@ pub fn apply_move(
         false
     };
 
-    let before = creature.energy;
-    creature.energy -= config.energy.action_effort(
+    let effort = pay_effort(
+        creature,
+        &config.energy,
         config.energy.costs.move_cost,
-        creature.cached_complexity,
-        creature.age,
+        DeathCause::ActionMove,
     );
-    let effort = creature.observe_energy(before, DeathCause::ActionMove);
     flows.action_charges.r#move += effort;
     if !succeeded {
         flows.failed_action_effort.r#move += effort;
