@@ -9,9 +9,19 @@ separators and hashed. The header must be equal on every nested value
 except `vote_delta_version` and keys only v2 carries (and the recipe and
 label). The other checkpoint blocks are hashed and reported, not blocking.
 Also reports, per checkpoint, the v1 block's executed target channels (the
-extension rule) and v2's block size.
+extension rule) and v2's block size, and V1's budget from v2's wall time.
 
-usage: python3 v0check.py <v1 dir> <v1 name> <v2 dir> <v2 name> <out.json>"""
+Amendment A1 (Codex review (a) findings 3 and 4): every legacy key must be
+present in both blocks, v1's block must carry exactly the legacy keys (so
+v1 raw equals its projection), v2's projection is compared against v1 raw,
+the version pair must be exactly vote-delta-v1 / vote-delta-v2, and the
+budget uses v2's wall time to tick 10,000 including that checkpoint's
+census: the footer's elapsed_secs when the horizon is 10,000, otherwise the
+run log's elapsed at the tick-10,000 sample plus that checkpoint's
+census_secs. Projection = that wall time x 15.26 (N3's elapsed 15,560.9 s
+to 50,000 over 1,019.7 s to 10,000); kill = min(2 x projection, 28,800 s).
+
+usage: python3 v0check.py <v1 dir> <v1 name> <v2 dir> <v2 name> <out.json> [<v2 run log>]"""
 import hashlib
 import json
 import sys
@@ -28,6 +38,9 @@ FAMILY_KEYS = ("family", "channels", "stats", "l1_subadditivity_ratio", "additiv
                "channels_positive_on_most_moved", "channels_negative_on_most_moved",
                "most_moved_family_over_max_channel")
 HEADER_MAY_DIFFER = ("vote_delta_version", "recipe", "world")
+VERSIONS = ("vote-delta-v1", "vote-delta-v2")
+N3_ELAPSED_RATIO = 15560.863564084 / 1019.656939875
+KILL_CAP = 28800
 
 
 def sha(path):
@@ -53,6 +66,19 @@ def project(block):
         q["families"] = [{k: f.get(k) for k in FAMILY_KEYS} for f in p.get("families", [])]
         out.append(q)
     return out
+
+
+def legacy_keys_missing(block):
+    """Every legacy key present at every level (a deleted nullable key must
+    not pass as null)."""
+    missing = []
+    for i, p in enumerate(block or []):
+        missing += [f"parent{i}.{k}" for k in PARENT_KEYS if k not in p]
+        for j, c in enumerate(p.get("channels", [])):
+            missing += [f"parent{i}.channel{j}.{k}" for k in CHANNEL_KEYS if k not in c]
+        for j, f in enumerate(p.get("families", [])):
+            missing += [f"parent{i}.family{j}.{k}" for k in FAMILY_KEYS if k not in f]
+    return missing
 
 
 def load(d, name):
@@ -132,9 +158,14 @@ def main():
         va, vb = a.get("vote_deltas"), b.get("vote_deltas")
         if va is None or vb is None:
             absent.append(f"{t}:vote_deltas")
-        hv1, hv2 = canon(project(va)), canon(project(vb))
-        hashes[f"{t}:vote_deltas_projection"] = {"v1": hv1, "v2": hv2, "v1_raw_equals_projection": canon(va) == hv1}
-        if hv1 != hv2:
+        missing_keys = legacy_keys_missing(va) + legacy_keys_missing(vb)
+        if missing_keys:
+            bad.append(f"{t}:vote_deltas_legacy_keys_missing:{missing_keys[:5]}")
+        raw1, hv1, hv2 = canon(va), canon(project(va)), canon(project(vb))
+        hashes[f"{t}:vote_deltas_projection"] = {"v1_raw": raw1, "v1_projection": hv1, "v2_projection": hv2}
+        if raw1 != hv1:
+            bad.append(f"{t}:vote_deltas_v1_raw_not_its_projection")
+        if raw1 != hv2:
             bad.append(f"{t}:vote_deltas_projection")
         for blk in REPORTED:
             reported[f"{t}:{blk}"] = canon(a.get(blk)) == canon(b.get(blk))
@@ -152,14 +183,32 @@ def main():
     diff = sorted(k for k in set(rh) | set(ch) if rh.get(k) != ch.get(k))
     v2_only = sorted(k for k in set(ch) - set(rh))
     disallowed = [k for k in diff if k not in HEADER_MAY_DIFFER and k not in v2_only]
+    check("vote_delta_version is exactly vote-delta-v1 against vote-delta-v2",
+          (rh.get("vote_delta_version"), ch.get("vote_delta_version")) == VERSIONS,
+          {"v1": rh.get("vote_delta_version"), "v2": ch.get("vote_delta_version")})
     check("header equal outside vote_delta_version, v2-only keys, recipe and label", not disallowed,
           {"differing": diff, "v2_only": v2_only, "disallowed": disallowed,
            "vote_delta_version": {"v1": rh.get("vote_delta_version"), "v2": ch.get("vote_delta_version")}})
     sim = {"v1": rf.get("sim_secs"), "v2": cf.get("sim_secs")}
+    wall10k = None
+    if ch.get("horizon") == 10000 and cf.get("elapsed_secs") is not None:
+        wall10k = {"source": "footer elapsed_secs at horizon 10,000", "secs": cf["elapsed_secs"]}
+    elif len(sys.argv) > 6:
+        lines = [json.loads(l) for l in open(sys.argv[6]) if l.startswith("{")]
+        at = next((l for l in lines if l.get("tick") == 10000 and "elapsed" in l), None)
+        cp = cand["checkpoints"].get(10000)
+        if at and cp:
+            wall10k = {"source": "run log elapsed at the tick-10,000 sample + that checkpoint's census_secs",
+                       "secs": at["elapsed"] + cp["census_secs"]}
+    budget = None
+    if wall10k:
+        projection = wall10k["secs"] * N3_ELAPSED_RATIO
+        budget = {"wall_to_10000": wall10k, "ratio": N3_ELAPSED_RATIO, "projection_secs": projection,
+                  "kill_secs": int(min(2 * projection, KILL_CAP))}
     result = {"v1": {"dir": rd, "name": rn, "sha256": ref["sha"]}, "v2": {"dir": cd, "name": cn, "sha256": cand["sha"]},
               "expected": {"v1": er, "v2": ec}, "checks": checks, "pass": all(c["pass"] for c in checks),
               "block_hashes": hashes, "reported_blocks_equal": reported, "per_checkpoint": per_tick,
-              "footer_sim_secs": sim, "timing_fields_excluded": ["census_secs", "sim_secs_so_far", "vote_delta_secs",
+              "footer_sim_secs": sim, "v1_budget": budget, "timing_fields_excluded": ["census_secs", "sim_secs_so_far", "vote_delta_secs",
                                                                  "births_secs", "sink_use_secs", "memory_secs",
                                                                  "footer sim_secs, census_secs, elapsed_secs"]}
     open(out, "w").write(json.dumps(result, indent=1) + "\n")
