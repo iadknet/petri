@@ -174,9 +174,41 @@ reported under the blocker rule, never rounded to a pass.
       epochs re-pinned at the point the Performance section names.
 - [ ] Overhead check (Telemetry): verdict, median ratio and interval, pairs,
       measured time and telemetry's self-timed cost per tick in the readings.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after the re-pin: summary
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after the re-pin: summary
       line, output path, and every survivor resolved as killed, equivalent or
       deferred, listed here.
+
+Mutation gate (2026-10-10, at `87138757` plus the test-only changes below;
+logs and feedback runs in the [readings](../../progress/readings/t16-f02.md),
+"Mutation gate"):
+
+| Item | Record |
+| --- | --- |
+| Fresh run 1 | void: exit 4, `cargo test failed in an unmutated tree`, no mutant tested; `the_lab_command_records_one_measurement_after_its_run` (T21.F06) spawned `v3-lab` from the crate directory, and the CLI refuses to run outside a git checkout, which cargo-mutants' source copy is not. Fixed test-only: the test now runs the CLI in a throwaway checkout with `.bench-artifacts/` ignored (same assertions). |
+| Fresh run 2 (why) | the closure run, needed because run 1 tested nothing; no production code, test selection or tool configuration changed, no test deleted or weakened |
+| Summary | `110 mutants tested in 70m: 10 missed, 86 caught, 13 unviable, 1 timeouts` |
+| Output | `~/.local/share/petri-tools/mutants/t16-f02/mutants.out.fresh` (copy of the fresh run, `run-mode.txt` `fresh`); `mutants.out` is the `MUTANTS_ITERATE=1` feedback pass: `11 mutants tested in 13m: 8 missed, 3 caught` |
+| Feature-on feedback | `cargo mutants --features telemetry-seams --file crates/v3-core/src/simulation/tick/window_seam.rs` on the same diff: `8 mutants tested in 7m: 6 caught, 2 unviable` |
+
+| Survivor (`crates/…`) | Resolution |
+| --- | --- |
+| TIMEOUT `v3-cli/src/bench/profiles.rs:301:5` `build_config` with `Default::default()` | killed: the three `the_real_run_path_*` tests ran the 1600² default world past the 463 s cap; they now share `small_sweep_config`, which asserts the 32 × 32, 8-founder world before running (`crates/v3-cli/src/bench/tests.rs`); caught in the feedback pass |
+| MISSED `v3-core/src/simulation/actions/predation.rs:82:52` `+=` → `*=` (`predation_actions_rejected_total`) | killed: `steal_from_empty_cell_still_costs_energy` asserts the total is 1; caught in the feedback pass |
+| MISSED `predation.rs:86:27` `+=` → `*=` (`predation_actions_by_result[RejectedNoVictim]`) | killed: the same test asserts the by-result count is 1; caught in the feedback pass |
+| MISSED `v3-core/src/simulation/tick/window_seam.rs:132:9` `FlowMarks::of` with `Default::default()` | equivalent: the module exists only under `telemetry-seams`, so the gate's `v3-core` build compiles unchanged code; unviable with the feature on (`FlowMarks` has no `Default`) |
+| MISSED `window_seam.rs:138:17` `+` → `-` in `FlowMarks::of` | equivalent: compiled only under `telemetry-seams`; the feature-on run caught it |
+| MISSED `window_seam.rs:138:17` `+` → `*` in `FlowMarks::of` | equivalent: compiled only under `telemetry-seams`; the feature-on run caught it |
+| MISSED `window_seam.rs:147:9` `FlowMarks::applied` with `Default::default()` | equivalent: compiled only under `telemetry-seams`; unviable with the feature on (`AppliedAction` has no `Default`) |
+| MISSED `window_seam.rs:150:32` `-` → `+` in `FlowMarks::applied` | equivalent: compiled only under `telemetry-seams`; the feature-on run caught it |
+| MISSED `window_seam.rs:150:32` `-` → `/` in `FlowMarks::applied` | equivalent: compiled only under `telemetry-seams`; the feature-on run caught it |
+| MISSED `window_seam.rs:151:32` `-` → `+` in `FlowMarks::applied` | equivalent: compiled only under `telemetry-seams`; the feature-on run caught it |
+| MISSED `window_seam.rs:151:32` `-` → `/` in `FlowMarks::applied` | equivalent: compiled only under `telemetry-seams`; the feature-on run caught it |
+
+No deferrals, no `#[mutants::skip]` or `exclude_re` entries. Tests after the
+changes: `cargo test -p v3-lab --test lab_run` 22 passed, 1 ignored;
+`cargo test -p v3-cli --lib` 150 passed, 2 ignored; `cargo test -p v3-core
+--lib predation` 26 passed; `cargo clippy --workspace --all-targets
+--all-features -- -D warnings` and `cargo fmt --all --check` clean.
 
 ## Performance and Goal Impact
 
